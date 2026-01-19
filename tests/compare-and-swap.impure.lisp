@@ -628,7 +628,7 @@
       (format t "Double-width compare-and-swap NOT TESTED~%")))
 
 (test-util:with-test (:name :cas-sap-ref-smoke-test
-                            :fails-on :riscv ; unsigned-32-bit gets the wrong answer
+                            :fails-on (or :riscv :loongarch64) ; unsigned-32-bit gets the wrong answer
                             :skipped-on (not :sb-thread))
   (let ((data (make-array 1 :element-type 'sb-vm:word)))
     (sb-sys:with-pinned-objects (data)
@@ -656,8 +656,8 @@
           (test nil 32 #xbabab00e)
           ;; on riscv I did not implement these sizes, and
           ;; ppc64 might get "illegal instruction" depending on the particular CPU
-          #-(or riscv ppc64) (test nil 16 #xfafa)
-          #-(or riscv ppc64) (test nil 8 #xbb)
+          #-(or riscv ppc64 loongarch64) (test nil 16 #xfafa)
+          #-(or riscv ppc64 loongarch64) (test nil 8 #xbb)
           )
         ;; SAP-REF-SAP
         (setf (aref data 0) 0)

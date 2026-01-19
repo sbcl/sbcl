@@ -636,7 +636,7 @@
   (sb-ext:gc)
   (incf *n-gcs-done*))
 
-#+(or x86 x86-64 riscv) ;the only platforms with a *binding-stack-pointer* variable
+#+(or x86 x86-64 riscv loongarch64) ;the only platforms with a *binding-stack-pointer* variable
 (defun exercise-binding ()
   (loop
    (let ((*x* (make-something-big)))
@@ -656,7 +656,7 @@
      (wait-for-gc)
      (decf sb-vm::*binding-stack-pointer* binding-pointer-delta))))
 
-#+(or x86 x86-64 riscv) ;the only platforms with a *binding-stack-pointer* variable
+#+(or x86 x86-64 riscv loongarch64) ;the only platforms with a *binding-stack-pointer* variable
 (with-test (:name (:binding-stack-gc-safety)
             :broken-on :win32)
   (let (threads)

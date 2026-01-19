@@ -797,7 +797,7 @@
      ;; No handy backend (or compiler) defined constant for this one,
      ;; so construct it here and now.
      (sb-c:make-sc+offset control-stack-sc-number
-		     #-(or riscv loongarch64) lra-save-offset
+                     #-(or riscv loongarch64) lra-save-offset
                      #+(or riscv loongarch64) sb-vm::ra-save-offset))))
 
 (defun old-fp-offset-for-location (debug-fun location)

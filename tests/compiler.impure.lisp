@@ -2810,7 +2810,7 @@
 (with-test (:name :ftype-return-type-conflict
             ;; Not having UNWIND-TO-FRAME-AND-CALL-VOP changes
             ;; the condition type here?
-            :fails-on (not :unwind-to-frame-and-call-vop))
+            :fails-on (not (or :unwind-to-frame-and-call-vop :loongarch64)))
   (proclaim '(ftype (function () fixnum) ftype-return-type-conflict))
   (checked-compile-and-assert (:optimize :safe :allow-warnings t)
       `(sb-int:named-lambda ftype-return-type-conflict () nil)

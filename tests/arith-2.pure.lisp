@@ -417,7 +417,7 @@
 
 (with-test (:name :signed-byte-8-p-unsigned
                   ;; these lack the necessary RANGE<= vop
-                  :fails-on (:or :mips :ppc :ppc64 :sparc :riscv))
+                  :fails-on (:or :mips :ppc :ppc64 :sparc :riscv :loongarch64))
   (checked-compile
    `(lambda (a)
       (declare (type (simple-array sb-vm:word (*)) a)
@@ -586,7 +586,7 @@
    (values (integer -255 0) (integer -9 0) &optional)))
 
 (with-test (:name :logbitp-on-integers
-            :fails-on :arm)
+            :fails-on (or :arm :loongarch64))
   (assert (not (ctu:ir1-named-calls `(lambda (x)
                                        (logbitp 20 x))))))
 (with-test (:name :bt-negative-bit)
@@ -766,7 +766,8 @@
       n))
    (unsigned-byte 54)))
 
-(with-test (:name :ldb-computed-posn)
+(with-test (:name :ldb-computed-posn
+            :fails-on (or :loongarch64))
   (assert-type
    (lambda (x y)
      (ldb (byte y (- 32 y)) x))
@@ -820,7 +821,7 @@
    ((300 0) 303)))
 
 (with-test (:name :truncate-unknown-integer
-            :fails-on :arm)
+            :fails-on (or :arm :loongarch64))
   (assert (not (ctu:ir1-named-calls `(lambda (x)
                                        (declare (integer x))
                                        (values (the (signed-byte 25) (floor x 2)))))))
@@ -841,7 +842,7 @@
                                        (values (the (signed-byte 25) (ceiling x 2))))))))
 
 (with-test (:name :word-floor-ceiling
-            :fails-on :arm)
+            :fails-on (or :arm :loongarch64))
   (assert (not (ctu:ir1-named-calls `(lambda (x y)
                                        (declare (sb-vm:signed-word x y))
                                        (floor x y)))))

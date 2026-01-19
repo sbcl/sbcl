@@ -1909,7 +1909,7 @@
    (integer -6176139011 -222)))
 
 (with-test (:name :ignore-delays
-            :fails-on :arm)
+            :fails-on (or :arm :loongarch64))
   (assert-type
    (lambda (x)
      (declare (optimize debug))
