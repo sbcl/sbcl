@@ -1806,12 +1806,12 @@ many elements are copied."
 ;;;; REDUCE
 
 (defmacro mumble-reduce (function
-                               sequence
-                               key
-                               start
-                               end
-                               initial-value
-                               ref)
+                         sequence
+                         key
+                         start
+                         end
+                         initial-value
+                         ref)
   `(do ((index ,start (truly-the index (1+ index)))
         (value ,initial-value))
        ((>= index ,end) value)
@@ -1819,15 +1819,15 @@ many elements are copied."
                           (apply-key ,key (,ref ,sequence index))))))
 
 (defmacro mumble-reduce-from-end (function
-                                        sequence
-                                        key
-                                        start
-                                        end
-                                        initial-value
-                                        ref)
-  `(do ((index (truly-the index (1- ,end)) (truly-the index (1- index)))
+                                  sequence
+                                  key
+                                  start
+                                  end
+                                  initial-value
+                                  ref)
+  `(do ((index (1- ,end) (1- index))
         (value ,initial-value)
-        (terminus (truly-the index (1- ,start))))
+        (terminus (1- ,start)))
        ((<= index terminus) value)
      (setq value (funcall ,function
                           (apply-key ,key (,ref ,sequence index))
@@ -1938,6 +1938,7 @@ many elements are copied."
     (seq-dispatch-checking sequence
         (let ((sequence (nthcdr-check-bounds start sequence
                                              start end sequence)))
+          (declare (optimize (sb-c:insert-array-bounds-checks 0)))
           (if end
               (cond ((> start end)
                      (sequence-bounding-indices-bad-error sequence start end))
