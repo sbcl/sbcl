@@ -984,7 +984,7 @@
 
 (define-instruction-format (break 32 :default-printer '(:name :tab code))
   (opcode :field (byte 17 15))
-  (code    :field (byte 15 0)))
+  (code    :field (byte 15 0) :reader break-code))
 
 (define-bitfield-emitter %emit-break 32
   (byte 17 15)

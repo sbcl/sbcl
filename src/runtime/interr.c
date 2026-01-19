@@ -327,7 +327,7 @@ describe_internal_error(os_context_t *context)
     uint32_t trap_instruction = *(uint32_t *)ptr;
     unsigned char trap = trap_instruction >> 5 & 0xFF;
     ptr += 4;
-#elif defined(LISP_FEATURE_PPC64) && defined(LISP_FEATURE_LITTLE_ENDIAN)
+#elif defined(LISP_FEATURE_PPC64) && defined(LISP_FEATURE_LITTLE_ENDIAN) || defined(LISP_FEATURE_LOONGARCH64)
     unsigned char trap = *(ptr-4);
 #else
     unsigned char trap = *(ptr-1);

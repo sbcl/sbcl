@@ -35,17 +35,12 @@ arch_get_bad_addr(int signam, siginfo_t *siginfo, os_context_t *context)
 
 void arch_skip_instruction(os_context_t *context)
 {
-    uint32_t trap_instruction = *(uint32_t *)OS_CONTEXT_PC(context);
-    unsigned code = trap_instruction & 0xFF;
-    if(code == trap_FunEndBreakpoint || code == trap_Breakpoint)
-        OS_CONTEXT_PC(context) += 4;
-    else
-        OS_CONTEXT_PC(context) += 8;
+    OS_CONTEXT_PC(context) += 4;
 }
 
 unsigned char *arch_internal_error_arguments(os_context_t *context)
 {
-    return (unsigned char*)(OS_CONTEXT_PC(context));
+    return (unsigned char *)(OS_CONTEXT_PC(context) + 4);
 }
 
 bool arch_pseudo_atomic_atomic(struct thread *thread) {
@@ -237,19 +232,13 @@ static void
 sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
 {
 
-    uint32_t trap_instruction;
-    memcpy(&trap_instruction, (void *)OS_CONTEXT_PC(context), sizeof trap_instruction);
-    unsigned code;
-    unsigned code_1 = trap_instruction & 0xFF;
+    uint32_t trap_instruction = *(uint32_t *)OS_CONTEXT_PC(context);
+    unsigned code = trap_instruction & 0xFF;
 
     if ((trap_instruction & BREAK_MASK) != BREAK_INST) {
         lose("Unrecognized trap instruction %08x in sigtrap_handler()",
              trap_instruction);
     }
-    if (code_1 == trap_Breakpoint || code_1 == trap_FunEndBreakpoint)
-        code = code_1;
-    else
-        code = *((unsigned char *)(4 + OS_CONTEXT_PC(context)));
 
     handle_trap(context, code);
 }

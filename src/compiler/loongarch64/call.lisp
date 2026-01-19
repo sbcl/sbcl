@@ -640,8 +640,8 @@
                       ;; CONTEXT-PC will be pointing here when the
                       ;; interrupt is handled, not after the BREAK.
                       (note-this-location vop :internal-error)
-                      (inst break 0)
-                      (inst byte (+ single-step-around-trap (tn-offset callable-tn)))
+                      (inst break single-step-around-trap)
+                      (inst byte (tn-offset callable-tn))
                       (emit-alignment 2)
                       (emit-label step-done-label))))
              (declare (ignorable #'insert-step-instrumenting))
@@ -1139,7 +1139,5 @@
     (note-this-location vop :internal-error)
     ;; CALLEE-REGISTER-OFFSET isn't needed for before-traps, so we
     ;; can just use a bare SINGLE-STEP-BEFORE-TRAP as the code.
-    (inst break 0)
-    (inst byte single-step-before-trap)
-    (emit-alignment 2)
+    (inst break single-step-before-trap)
     DONE))

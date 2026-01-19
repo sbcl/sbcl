@@ -221,16 +221,10 @@ function addresses and register values.")
   (destructuring-bind (rd i-imm) value
     (maybe-note-assembler-routine (maybe-augment rd i-imm) t dstate)))
 
-(defun trap-code (chunk dstate)
-  (declare (ignore chunk))
-  (let* ((sap (dstate-segment-sap dstate))
-         (offset (dstate-next-offs dstate)))
-    (sap-ref-8 sap offset)))
-
 (defun break-control (chunk inst stream dstate)
   (declare (ignore inst))
   (flet ((nt (x) (if stream (note x dstate))))
-    (let ((trap (trap-code chunk dstate)))
+    (let ((trap (break-code chunk dstate)))
      (case trap
        (#.breakpoint-trap
         (nt "breakpoint trap"))

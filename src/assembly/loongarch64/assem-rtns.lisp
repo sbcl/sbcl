@@ -308,6 +308,4 @@
 
 (define-assembly-routine (do-pending-interrupt (:return-style :none))
     ()
-  (inst break 0)
-  (inst byte pending-interrupt-trap)
-  (emit-alignment 2))
+  (inst break pending-interrupt-trap))

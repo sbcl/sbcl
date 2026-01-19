@@ -54,12 +54,12 @@
 (defun internal-error-args (context)
   (declare (type (alien (* os-context-t)) context))
   (let* ((pc (context-pc context))
-         (trap-number (sap-ref-8 pc 4)))
+         (trap-number (ldb (byte 15 0) (sap-ref-32 pc 0))))
     (declare (type system-area-pointer pc))
     (if (= trap-number invalid-arg-count-trap)
         (values #.(error-number-or-lose 'invalid-arg-count-error)
                 '(#.arg-count-sc))
-        (sb-kernel::decode-internal-error-args (sap+ pc 5) trap-number))))
+        (sb-kernel::decode-internal-error-args (sap+ pc 4) trap-number))))
 
 ;;; CONTEXT-CALL-FUNCTION
 

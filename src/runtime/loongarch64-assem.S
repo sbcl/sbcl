@@ -55,6 +55,4 @@ fun_end_breakpoint_end:
         .type do_pending_interrupt,%function
 do_pending_interrupt:
         break   trap_PendingInterrupt
-        .byte   trap_PendingInterrupt
-        .align 2
         ret

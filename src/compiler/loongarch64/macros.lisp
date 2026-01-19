@@ -174,10 +174,12 @@
   (assemble ()
     (when vop
       (note-this-location vop :internal-error))
-    (inst break kind)
     (if (= kind invalid-arg-count-trap)
-        (inst byte kind)
-        (emit-internal-error kind code values))
+        (inst break kind)
+        (emit-internal-error kind code values
+                             :trap-emitter (lambda (tramp-number)
+                                             (inst break tramp-number))))
+
     (emit-alignment 2)))
 
 (defun generate-error-code (vop error-code &rest values)
@@ -226,9 +228,7 @@
        (load-pseudo-atomic-interrupted ,flag-tn)
        (let ((not-interrupted (gen-label)))
          (inst beq ,flag-tn zero-tn not-interrupted)
-         (inst break 0)
-         (inst byte pending-interrupt-trap)
-         (emit-alignment 2)
+         (inst break pending-interrupt-trap)
          (emit-label not-interrupted)))))
 
 #|
