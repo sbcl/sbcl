@@ -2361,7 +2361,7 @@
            (multiple-value-bind (quot conservative)
                (if (and (member (interval-high divisor-interval) '(1 1f0 1d0))
                         (member (interval-low divisor-interval) '(1 1f0 1d0)))
-                   (values number-interval nil)
+                   (values (interval-contagion number-interval divisor-interval) nil)
                    (values (interval-div number-interval
                                          divisor-interval) t))
              (let* ((*conservative-quotient-bound* conservative)
@@ -5400,7 +5400,8 @@
                     (associate-lvar (first args))
                     (unless divide
                       (let* ((value (value (second args)))
-                             (div (/ constant value)))
+                             (div (and (/= value 0)
+                                       (/ constant value))))
                         (when (or (ratiop constant)
                                   (integerp div))
                           (setf new t
