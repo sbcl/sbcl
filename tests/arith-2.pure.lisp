@@ -1544,7 +1544,16 @@
     (test `(lambda (a)
              (declare (integer a))
              (- (ash (- a) -2)))
-          0)))
+          0)
+    (checked-compile-and-assert
+        ()
+        `(lambda (m a)
+           (declare (integer a))
+           (abs (if m
+                    (ash (abs a) -5)
+                    -9)))
+      ((t 63) 1)
+      ((nil 1) 9))))
 
 (with-test (:name :abs-match)
   (flet ((test (form count)

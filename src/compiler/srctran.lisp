@@ -5952,7 +5952,7 @@
                               (when (and (typep shift '(integer -4096 -1))
                                          ;; Turning ash into ceiling might not be a win
                                          (not (word-sized-result-p combination t)))
-                                (let ((negated (negate-lvar (first args) test any-branch)))
+                                (let ((negated (negate-lvar (first args) test nil)))
                                   (when (and negated
                                              (or (not test)
                                                  (and (eq test negated)
