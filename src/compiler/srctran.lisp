@@ -5251,8 +5251,34 @@
                      (,',(if flip flip operator) x ,constant))))))
   (def logand)
   (def logior)
-  (def logxor)
-  (def / :type rational :folded (* /) :flip * :no-ratios *))
+  (def logxor))
+
+(deftransform / ((x z) (rational (constant-arg (and rational (not (eql 0))))) * :important nil :node n)
+  "associate //(* /) of constants"
+  (binding* (((folded node)
+              (combination/cast-name (lvar-uses x) #'numeric-type-without-bounds-p))
+             (folded
+              (if (memq folded '(* /))
+                  folded
+                  (give-up-ir1-transform)))
+             (y (second (combination-args node)))
+             (nil (or (constant-lvar-p y)
+                      (give-up-ir1-transform)))
+             (y (lvar-value y))
+             (y (funcall folded (if (and (eq folded '/)
+                                         (zerop y))
+                                    (give-up-ir1-transform)
+                                    y)))
+             (z (/ (lvar-value z)))
+             (constant (* z y)))
+    (when (and (integerp y)
+               (ratiop constant)
+               (eq folded '*))
+      (give-up-ir1-transform))
+    (splice-fun-args x folded #'first t :any)
+    `(lambda (x y)
+       (declare (ignore y))
+       (,'* x ,constant))))
 
 (deftransform + ((x z) (rational (constant-arg rational)) * :important nil :node n)
   "associate +/(+ -) of constants"
