@@ -3013,6 +3013,7 @@ expansion happened."
 ;;; but not a NUMERIC-TYPE.
 (defun numeric-contagion (type1 type2 &key (rational t)
                                            float
+                                           (complex t)
                                            unsigned)
   (cond ((and (numeric-type-p type1) (numeric-type-p type2))
          (let ((class1 (numeric-type-class type1))
@@ -3040,13 +3041,14 @@ expansion happened."
                               (if (eq format1 'long-float)
                                   'long-float
                                   nil)))
-                   :complexp (cond ((and (eq complexp1 :real)
-                                         (eq complexp2 :real))
+                   :complexp (cond ((or (not complex)
+                                        (and (eq complexp1 :real)
+                                             (eq complexp2 :real)))
                                     :real)
                                    ((or (eq complexp1 :complex)
                                         (eq complexp2 :complex))
                                     :complex))))
-                 ((eq class2 'float) (numeric-contagion type2 type1))
+                 ((eq class2 'float) (numeric-contagion type2 type1 :float float :complex complex))
                  (float
                   (specifier-type 'single-float))
                  ((and (eq complexp1 :real) (eq complexp2 :real))
@@ -3079,7 +3081,8 @@ expansion happened."
          (flet ((try-union (a b)
                   (let (union)
                     (loop for type in (union-type-types a)
-                          for contagion = (numeric-contagion type b :rational rational :unsigned unsigned)
+                          for contagion = (numeric-contagion type b :rational rational :unsigned unsigned
+                                                                    :float float :complex complex)
                           do (setf union (if union
                                              (type-union union contagion)
                                              contagion))

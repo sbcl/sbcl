@@ -1107,7 +1107,14 @@
     (dolist (x-type (prepare-arg-for-derive-type log-x))
       (dolist (y-type (prepare-arg-for-derive-type log-y))
         (push (/-derive-type-aux x-type y-type same-arg) accumulated-list)))
-    (apply #'type-union (flatten-list accumulated-list))))
+
+    (let ((union (apply #'type-union (flatten-list accumulated-list))))
+      (if (types-equal-or-intersect y (specifier-type '(or (real 0 0) complex)))
+          ;; If Y can be zero the result can be zero too
+          (type-union union
+                      (type-intersection (specifier-type '(member 0.0 0d0))
+                                         (numeric-contagion x y :float t :complex nil)))
+          union))))
 
 (defoptimizer (log derive-type) ((x &optional y))
   (if y

@@ -292,7 +292,7 @@
 (defknown sb-kernel::10expt (number) number
   (movable foldable flushable no-verify-arg-count))
 
-(defknown log (number &optional real) irrational
+(defknown log (number &optional number) irrational
   (movable foldable flushable recursive))
 
 (defknown log-double-float (double-float) (or double-float (complex double-float))
