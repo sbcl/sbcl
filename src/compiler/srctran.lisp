@@ -4344,10 +4344,10 @@
   (unknown-*-transform x y node))
 
 ;; (* (- x) (- y)) => (* x y)
-(defun remove-paired-negate (x y node &optional minus-zero-ignored)
+(defun remove-paired-negate (x y node &optional minus-zero-ignored float-result)
   (when (or minus-zero-ignored
             (minus-zero-ignored-p node)
-            (eq (float-contagion-for-negate x y) t))
+            (eq (float-contagion-for-negate x y float-result) t))
     (let ((nx (negate-lvar x node :test t)))
       (when nx
         (let ((ny (negate-lvar y node :test t)))
@@ -4367,8 +4367,12 @@
                    (or (lvar-single-value-p (node-lvar node))
                        (mv-bind-unused-p (node-lvar node) 1)))
           (when (remove-paired-negate x y node
-                                      ($when (member '$fun '(truncate round floor ceiling))
-                                             t))
+                                      ($if (member '$fun '(truncate round floor ceiling))
+                                           t
+                                           nil)
+                                      ($if (member '$fun '(ftruncate fround ffloor fceiling))
+                                           t
+                                           nil))
             ($unless (member '$fun '(* /))
               (erase-node-type node t 1)))
           ($unless (member '$fun '(floor ceiling ffloor fceiling))
@@ -5793,11 +5797,10 @@
             t)))))
 
 ;; Don't allow mixing integer 0 and float zero, which have different negations
-(defun float-contagion-for-negate (a b)
-  (cond ((and (csubtypep (lvar-type a) (specifier-type '(or rational (complex rational))))
+(defun float-contagion-for-negate (a b &optional no-rational)
+  (cond ((and (not no-rational)
+              (csubtypep (lvar-type a) (specifier-type '(or rational (complex rational))))
               (csubtypep (lvar-type b) (specifier-type '(or rational (complex rational))))))
-        ((or (csubtypep (lvar-type a) (specifier-type '(and rational (not (eql 0)))))
-             (csubtypep (lvar-type b) (specifier-type '(and rational (not (eql 0)))))))
         ((csubtypep (lvar-type a) (specifier-type '(and number (not (or (eql 0) (complex rational))))))
          (or (csubtypep (lvar-type b) (specifier-type '(and number (not (or (eql 0) (complex rational))))))
              a))

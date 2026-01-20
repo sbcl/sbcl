@@ -1553,7 +1553,13 @@
                     (ash (abs a) -5)
                     -9)))
       ((t 63) 1)
-      ((nil 1) 9))))
+      ((nil 1) 9))
+    (checked-compile-and-assert
+        ()
+        `(lambda (r)
+           (declare (rational r))
+           (values (fceiling (- r) 2)))
+      ((0) 0.0))))
 
 (with-test (:name :abs-match)
   (flet ((test (form count)
