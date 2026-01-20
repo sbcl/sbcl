@@ -1309,7 +1309,7 @@
       (push ref (leaf-refs leaf))
       (setf (leaf-ever-used leaf) t)
       (use-lvar ref lvar)
-      lvar)))
+      (values lvar ref))))
 
 ;;;; miscellaneous shorthand functions
 

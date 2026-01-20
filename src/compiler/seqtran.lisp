@@ -2859,25 +2859,31 @@
                       (if (eq name 'list*)
                           1
                           0)))
-          (let ((car (pop args)))
+          (let* ((car (pop args))
+                 (car-type (lvar-derived-type car))
+                 (cdr-type (and cons-p
+                                (lvar-derived-type (car args)))))
             (setf (combination-args use) args)
             (if cars
                 (let ((var (lambda-add-var (lambda-var-home var) car)))
                   (loop for car in cars
+                        for ref = (nth-value 1 (insert-ref-before var car t))
                         do
-                        (insert-ref-before var car t)
+                        (derive-node-type ref car-type)
                         (flush-combination car)))
-                (flush-dest car)))
-          (when cons-p
-            (erase-node-type use (values-specifier-type '(values t &optional))))
-          (cond ((not args)
-                 (erase-node-type use (values-specifier-type '(values null &optional))))
-                (cdrs
-                 (when cons-p
-                   (aver (splice-fun-args (node-lvar use) :any 1)))
-                 (loop for cdr in cdrs
-                       do (insert-ref-before var cdr t)
-                          (flush-combination cdr)))))))
+                (flush-dest car))
+            (when cons-p
+              (erase-node-type use (values-specifier-type '(values t &optional))))
+            (cond ((not args)
+                   (erase-node-type use (values-specifier-type '(values null &optional))))
+                  (cdrs
+                   (when cons-p
+                     (aver (splice-fun-args (node-lvar use) :any 1)))
+                   (loop for cdr in cdrs
+                         for ref = (nth-value 1 (insert-ref-before var cdr t))
+                         do (when cdr-type
+                              (derive-node-type ref cdr-type))
+                            (flush-combination cdr))))))))
     nil))
 
 (deftransform car ((cons))
