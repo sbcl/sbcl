@@ -1273,6 +1273,7 @@
   ;; as indicative of "..." in the C prototype. We can record that too.
   (varargs nil :type (or boolean fixnum (eql :unspecified)) :read-only t)
   (stub nil :type (or null function))
+  (into-stub nil :type (or null function)) ; for alien-funcall-into
   (convention nil :type calling-convention :read-only t))
 ;;; The safe default is to assume that everything is varargs.
 ;;; On x86-64 we have to emit a spurious instruction because of it.

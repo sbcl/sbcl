@@ -66,7 +66,17 @@
 (defknown (setf %alien-value) (t system-area-pointer word alien-type) t
   ())
 
+;;; alien-funcall calls a foreign function and returns its result.
+;;; For struct returns, it allocates heap memory and returns an alien wrapper.
 (defknown alien-funcall (alien-value &rest t) *
+  (any recursive))
+
+;;; alien-funcall-into calls a foreign function that returns a struct,
+;;; writing the result to a caller-provided buffer (typically stack-allocated
+;;; via with-alien). Returns (values) - caller accesses result via the buffer.
+;;; The function type is extracted from the alien-function argument.
+(defknown alien-funcall-into (alien-value system-area-pointer &rest t)
+    (values)
   (any recursive))
 
 (defknown sb-alien::string-to-c-string (simple-string t) (or (simple-array (unsigned-byte 8) (*))
@@ -572,6 +582,72 @@
          (incf temp-idx))))
     (nreverse stores)))
 
+;;; Build the function expression for %alien-funcall, optimizing to use
+;;; the function name directly when possible (for call-out-named VOP).
+;;; Returns (values func-expr ignore-function-p)
+(defun alien-funcall-func-expr (function alien-type)
+  (declare (ignorable function)) ; unused on platforms without call-out-named
+  (or (when-vop-existsp (:named call-out-named)
+        (when (lvar-matches function :fun-names '(%sap-alien)
+                                     :arg-count 2)
+          (let ((sap (first (combination-args (lvar-use function)))))
+            (when (lvar-matches sap :fun-names '(foreign-symbol-sap)
+                                    :arg-count 1)
+              (let ((sym (first (combination-args (lvar-use sap)))))
+                (when (and (constant-lvar-p sym)
+                           (stringp (lvar-value sym)))
+                  (return-from alien-funcall-func-expr
+                    (values (lvar-value sym) t))))))))
+      (values `(deport function ',alien-type) nil)))
+
+;;; Wrap body with pinning and deport-alloc for alien call parameters.
+;;; The deport-alloc step converts arguments (e.g., Unicode strings to octet
+;;; arrays) and must happen before pinning to ensure we pin the right objects.
+(defun wrap-with-deport (body params arg-types)
+  (let ((wrapped `(maybe-with-pinned-objects ,params ,arg-types ,body)))
+    (loop for param in params
+          for arg-type in arg-types
+          do (setf wrapped
+                   `(let ((,param (deport-alloc ,param ',arg-type)))
+                      ,wrapped)))
+    wrapped))
+
+;;; Wrap body with FP saving if required by policy.
+#+c-stack-is-control-stack
+(defun wrap-with-fp-save (body node)
+  (if (policy node (= 3 alien-funcall-saves-fp-and-pc))
+      `(invoke-with-saved-fp (lambda () ,body))
+      body))
+#-c-stack-is-control-stack
+(defun wrap-with-fp-save (body node)
+  (declare (ignore node))
+  body)
+
+;;; Generate code for a struct-returning foreign call that writes to BUFFER-VAR.
+;;; FUNC-EXPR is the deported function expression.
+;;; DEPORTS is a list of deported argument expressions.
+;;; BUFFER-VAR is the variable/symbol holding the destination SAP.
+;;; For large structs, BUFFER-VAR is passed as hidden first arg to %alien-funcall.
+;;; For small structs, register values are stored to BUFFER-VAR after the call.
+;;; Returns (values) - caller wraps result as alien if needed.
+#-sb-xc-host
+(defun generate-struct-return-code (func-expr alien-type return-type deports buffer-var)
+  (multiple-value-bind (in-registers-p register-slots)
+      (sb-alien::struct-return-info return-type)
+    (cond
+      ;; Large struct: pass buffer as hidden first arg
+      ((not in-registers-p)
+       `(progn
+          (%alien-funcall ,func-expr ',alien-type ,buffer-var ,@deports)
+          (values)))
+      ;; Small struct: receive registers, store to buffer
+      (t
+       (let ((temps (loop repeat (length register-slots) collect (gensym))))
+         `(multiple-value-bind ,temps
+              (%alien-funcall ,func-expr ',alien-type ,@deports)
+            ,@(generate-struct-store-code temps register-slots buffer-var)
+            (values)))))))
+
 (deftransform alien-funcall ((function &rest args)
                              ((alien (* t)) &rest t) *)
   (let ((names (make-gensym-list (length args))))
@@ -587,8 +663,7 @@
     (let ((alien-type (alien-type-type-alien-type type)))
       (unless (alien-fun-type-p alien-type)
         (give-up-ir1-transform))
-      (let ((arg-types (alien-fun-type-arg-types alien-type))
-            (ignore-fun))
+      (let ((arg-types (alien-fun-type-arg-types alien-type)))
         (unless (= (length args) (length arg-types))
           (abort-ir1-transform
            "wrong number of arguments; expected ~W, got ~W"
@@ -599,114 +674,93 @@
             (let ((param (gensym)))
               (params param)
               (deports `(deport ,param ',arg-type))))
-          ;; Build BODY from the inside out.
-          ;; First, detect if this is a large struct return (hidden pointer)
-          (let* ((return-type (alien-fun-type-result-type alien-type))
-                 ;; Check for large struct return (needs hidden pointer)
-                 #-sb-xc-host
-                 (large-struct-size
-                   (multiple-value-bind (in-registers-p register-slots size)
-                       (sb-alien::struct-return-info return-type)
-                     (declare (ignore register-slots))
-                     (when (and size (not in-registers-p))
-                       size)))
-                 #+sb-xc-host
-                 (large-struct-size nil)
-                 ;; For large struct returns, we need a gensym for the sret pointer
-                 (sret-sap (when large-struct-size (gensym "SRET-SAP")))
-                 ;; Innermost, we DEPORT the parameters (e.g. by taking SAPs
-                 ;; to them) and do the call.
-                 (body
-                  ;; If FUNCTION's source looks like
-                  ;;  (%SAP-ALIEN (FOREIGN-SYMBOL-SAP "sym") #<anything>)
-                  ;; then snarf out the string and use it as the funarg
-                  ;; unless the backend lacks the CALL-OUT-NAMED vop.
-                  `(%alien-funcall
-                    ,(or (when-vop-existsp (:named call-out-named)
-                           (when (lvar-matches function :fun-names '(%sap-alien)
-                                                        :arg-count 2)
-                             (let ((sap (first (combination-args (lvar-use function)))))
-                               (when (lvar-matches sap :fun-names '(foreign-symbol-sap)
-                                                       :arg-count 1)
-                                 (let ((sym (first (combination-args (lvar-use sap)))))
-                                   (when (and (constant-lvar-p sym)
-                                              (stringp (lvar-value sym)))
-                                     (setq ignore-fun t)
-                                     (lvar-value sym)))))))
-                         `(deport function ',alien-type))
-                    ',alien-type
-                    ;; For large struct returns, prepend sret-sap as first arg
-                    ;; IR2 will put it in the hidden pointer register (x8 on ARM64, RDI on x86-64)
-                    ,@(when sret-sap (list sret-sap))
-                    ,@(deports))))
-            ;; Wrap that in a WITH-PINNED-OBJECTS to ensure the values
-            ;; the SAPs are taken for won't be moved by the GC. (If
-            ;; needed: some alien types won't need it).
-            (setf body `(maybe-with-pinned-objects ,(params) ,arg-types
-                          ,body))
-            ;; Around that handle any memory allocation that's needed.
-            ;; Mostly the DEPORT-ALLOC alien-type-methods are just an
-            ;; identity operation, but for example for deporting a
-            ;; Unicode string we need to convert the string into an
-            ;; octet array. This step needs to be done before the pinning
-            ;; to ensure we pin the right objects, so it can't be combined
-            ;; with the deporting.
-            ;; -- JES 2006-03-16
-            (loop for param in (params)
-                  for arg-type in arg-types
-                  do (setf body
-                           `(let ((,param (deport-alloc ,param ',arg-type)))
-                              ,body)))
-            (cond
-              ((alien-values-type-p return-type)
-               (collect ((temps) (results))
-                 (dolist (type (alien-values-type-values return-type))
-                   (let ((temp (gensym)))
-                     (temps temp)
-                     (results `(naturalize ,temp ',type))))
-                 (setf body
-                       `(multiple-value-bind ,(temps) ,body
-                          (values ,@(results))))))
-              ;; Struct-by-value return handling
+          (let ((return-type (alien-fun-type-result-type alien-type)))
+            (multiple-value-bind (func-expr ignore-fun)
+                (alien-funcall-func-expr function alien-type)
+              ;; Check for struct return - handled via unified helper
               #-sb-xc-host
-              ((multiple-value-bind (in-registers-p register-slots size)
-                   (sb-alien::struct-return-info return-type)
-                 (cond
-                   ;; Small struct: returned in registers, store to heap memory
-                   (in-registers-p
-                    (let* ((num-values (length register-slots))
-                           (temps (loop repeat num-values collect (gensym)))
-                           (result-sap (gensym "RESULT-SAP")))
-                      (setf body
-                            `(multiple-value-bind ,temps ,body
-                               (let ((,result-sap (sb-alien::%make-alien ,size)))
-                                 ,@(generate-struct-store-code temps register-slots result-sap)
-                                 (sb-alien::%sap-alien ,result-sap ',return-type))))
-                      t))
-                   ;; Large struct: C expects hidden pointer (x8/RDI), returns it (x0/RAX)
-                   ;; sret-sap was already added to %alien-funcall args at the top
-                   ;; Here we wrap with allocation and return the sap-alien
-                   ((and size (not in-registers-p))
-                    ;; sret-sap was defined at the top of this let*
-                    (setf body
-                          `(let ((,sret-sap (sb-alien::%make-alien ,size)))
-                             ,body  ; %alien-funcall with sret-sap as first arg
-                             ;; The callee wrote to sret-sap, return it as alien
-                             (sb-alien::%sap-alien ,sret-sap ',return-type)))
-                    t))))  ; close inner cond clause, inner cond, m-v-b, outer cond clause
-              (t
-               (setf body `(naturalize ,body ',return-type))))
-            ;; Remember this frame to make sure that we can get back
-            ;; to it later regardless of how the foreign stack looks
-            ;; like.
-            #+c-stack-is-control-stack
-            (when (policy node (= 3 alien-funcall-saves-fp-and-pc))
-              (setf body `(invoke-with-saved-fp (lambda () ,body))))
-            (/noshow "returning from DEFTRANSFORM ALIEN-FUNCALL" (params) body)
-            `(lambda (function ,@(params))
-               ,@(when ignore-fun '((declare (ignore function))))
-               (declare (optimize (let-conversion 3)))
-               ,body)))))))
+              (multiple-value-bind (in-registers-p register-slots size)
+                  (sb-alien::struct-return-info return-type)
+                (declare (ignore in-registers-p register-slots))
+                (when size
+                  (let* ((buf (gensym "BUF"))
+                         (body (generate-struct-return-code
+                                func-expr alien-type return-type (deports) buf)))
+                    (setf body (wrap-with-deport body (params) arg-types))
+                    ;; Wrap with allocation and return alien-wrapped buffer
+                    (setf body `(let ((,buf (sb-alien::%make-alien ,size)))
+                                  ,body
+                                  (sb-alien::%sap-alien ,buf ',return-type)))
+                    (setf body (wrap-with-fp-save body node))
+                    (return-from alien-funcall
+                      `(lambda (function ,@(params))
+                         ,@(when ignore-fun '((declare (ignore function))))
+                         (declare (optimize (let-conversion 3)))
+                         ,body)))))
+              ;; Non-struct return: standard %alien-funcall
+              (let ((body `(%alien-funcall ,func-expr ',alien-type ,@(deports))))
+                (setf body (wrap-with-deport body (params) arg-types))
+                (cond
+                  ((alien-values-type-p return-type)
+                   (collect ((temps) (results))
+                     (dolist (type (alien-values-type-values return-type))
+                       (let ((temp (gensym)))
+                         (temps temp)
+                         (results `(naturalize ,temp ',type))))
+                     (setf body
+                           `(multiple-value-bind ,(temps) ,body
+                              (values ,@(results))))))
+                  (t
+                   (setf body `(naturalize ,body ',return-type))))
+                (setf body (wrap-with-fp-save body node))
+                (/noshow "returning from DEFTRANSFORM ALIEN-FUNCALL" (params) body)
+                `(lambda (function ,@(params))
+                   ,@(when ignore-fun '((declare (ignore function))))
+                   (declare (optimize (let-conversion 3)))
+                   ,body)))))))))
+
+;;; alien-funcall-into: call foreign function, write struct result to buffer.
+;;; Like alien-funcall but writes to caller-provided buffer instead of heap.
+;;; Arguments: (function result-buffer &rest args)
+;;;
+;;; Only available on x86-64 and ARM64 where struct-by-value ABI is implemented.
+#+(and (or x86-64 arm64) (not sb-xc-host))
+(deftransform sb-alien::alien-funcall-into ((function result-buffer &rest args)
+                                            * * :node node)
+  (let ((type (lvar-type function)))
+    (unless (alien-type-type-p type)
+      (give-up-ir1-transform "can't tell function type at compile time"))
+    (let ((alien-type (alien-type-type-alien-type type)))
+      (unless (alien-fun-type-p alien-type)
+        (give-up-ir1-transform))
+      (let* ((arg-types (alien-fun-type-arg-types alien-type))
+             (return-type (alien-fun-type-result-type alien-type)))
+        (unless (= (length args) (length arg-types))
+          (abort-ir1-transform
+           "wrong number of arguments; expected ~W, got ~W"
+           (length arg-types)
+           (length args)))
+        (multiple-value-bind (in-registers-p register-slots size)
+            (sb-alien::struct-return-info return-type)
+          (declare (ignore in-registers-p register-slots))
+          (unless size
+            (abort-ir1-transform
+             "alien-funcall-into requires a struct return type"))
+          (collect ((params) (deports))
+            (dolist (arg-type arg-types)
+              (let ((param (gensym)))
+                (params param)
+                (deports `(deport ,param ',arg-type))))
+            (multiple-value-bind (func-expr ignore-fun)
+                (alien-funcall-func-expr function alien-type)
+              (let ((body (generate-struct-return-code
+                           func-expr alien-type return-type (deports) 'result-buffer)))
+                (setf body (wrap-with-deport body (params) arg-types))
+                (setf body (wrap-with-fp-save body node))
+                `(lambda (function result-buffer ,@(params))
+                   ,@(when ignore-fun '((declare (ignore function))))
+                   (declare (optimize (let-conversion 3)))
+                   ,body)))))))))
 
 (defoptimizer (%alien-funcall derive-type) ((function type &rest args))
   (unless (and (constant-lvar-p type)

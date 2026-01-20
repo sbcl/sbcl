@@ -691,5 +691,63 @@
     (let ((result (call-returning-small-union (alien-sap cb) -54321)))
       (assert (= (slot result 'as-int) -54321)))))
 
+;;;; Tests for alien-funcall-into
+;;;;
+;;;; alien-funcall-into writes struct return values directly to a
+;;;; caller-provided buffer instead of heap-allocating.
+
+(with-test (:name :alien-funcall-into)
+  ;; Small struct returned in registers
+  (with-alien ((result (struct tiny-align-8)))
+    (alien-funcall-into
+     (extern-alien "tiny_align_8_return"
+                   (function (struct tiny-align-8) (integer 64)))
+     (alien-sap (addr result))
+     42)
+    (assert (= (slot result 'm0) 42)))
+
+  ;; Large struct returned via hidden pointer
+  (with-alien ((result (struct medium-align-8)))
+    (alien-funcall-into
+     (extern-alien "medium_align_8_return"
+                   (function (struct medium-align-8)
+                             (integer 64) (integer 64) (integer 64)))
+     (alien-sap (addr result))
+     111 222 333)
+    (assert (= (slot result 'm0) 111))
+    (assert (= (slot result 'm1) 222))
+    (assert (= (slot result 'm2) 333)))
+
+  ;; Floating-point struct
+  (with-alien ((result (struct two-doubles)))
+    (alien-funcall-into
+     (extern-alien "two_doubles_return"
+                   (function (struct two-doubles) double double))
+     (alien-sap (addr result))
+     1.5d0 2.5d0)
+    (assert (= (slot result 'd0) 1.5d0))
+    (assert (= (slot result 'd1) 2.5d0)))
+
+  ;; Function pointer call
+  (let ((func-ptr (sb-sys:find-foreign-symbol-address "tiny_align_8_return")))
+    (with-alien ((func (* (function (struct tiny-align-8) (integer 64)))
+                       (sb-sys:int-sap func-ptr))
+                 (result (struct tiny-align-8)))
+      (alien-funcall-into (deref func) (alien-sap (addr result)) 12345)
+      (assert (= (slot result 'm0) 12345)))))
+
+;;; Test runtime evaluation path (function type not known at compile time)
+;;; Skip in fasteval mode - this test requires COMPILE.
+(with-test (:name :alien-funcall-into-runtime
+            :skipped-on (and :sb-fasteval (not :sb-eval)))
+  (let* ((func-ptr (sb-sys:find-foreign-symbol-address "tiny_align_8_return"))
+         (func-sap (sb-sys:int-sap func-ptr)))
+    (with-alien ((func (* (function (struct tiny-align-8) (integer 64))) func-sap)
+                 (result (struct tiny-align-8)))
+      ;; Deref through a variable prevents compile-time type inference
+      (let ((f (deref func)))
+        (alien-funcall-into f (alien-sap (addr result)) 99)
+        (assert (= (slot result 'm0) 99))))))
+
 ;;; Clean up
 #-win32 (ignore-errors (delete-file *soname*))
