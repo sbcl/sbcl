@@ -5402,29 +5402,30 @@
                                             `(lambda (x y) (declare (ignore y)) x)
                                             'associate-multiplication-constants))))
                       (handle-truncation-2 (n name combination &optional (transform-to name))
-                        (multiple-value-bind (q r) (funcall name n constant)
-                          (when (and (eq name divide)
-                                     dividing
-                                     single-value-truncate
-                                     (integerp n)
-                                     (integerp constant)
-                                     (or (eq name 'truncate)
-                                         ;; The outer divisor has to be positive
-                                         (and
-                                          (plusp constant)
-                                          (not *amc-abs*)
-                                          (zerop r))))
-                            (setf new t
-                                  constant (if (and (minusp constant)
-                                                    *amc-abs*)
-                                               -1
-                                               1))
-                            (unless test
-                              (erase-node-type combination *wild-type* nil outer-node)
-                              (transform-call combination
-                                              `(lambda (x y) (declare (ignore x))
-                                                 (,transform-to ,q y))
-                                              'associate-multiplication-constants))))))
+                        (when (and (eq name divide)
+                                   dividing
+                                   single-value-truncate
+                                   (integerp n)
+                                   (integerp constant)
+                                   (/= constant 0))
+                          (multiple-value-bind (q r) (funcall name n constant)
+                            (when (or (eq name 'truncate)
+                                      ;; The outer divisor has to be positive
+                                      (and
+                                       (plusp constant)
+                                       (not *amc-abs*)
+                                       (zerop r)))
+                              (setf new t
+                                    constant (if (and (minusp constant)
+                                                      *amc-abs*)
+                                                 -1
+                                                 1))
+                              (unless test
+                                (erase-node-type combination *wild-type* nil outer-node)
+                                (transform-call combination
+                                                `(lambda (x y) (declare (ignore x))
+                                                   (,transform-to ,q y))
+                                                'associate-multiplication-constants)))))))
                  (combination-case (lvar :cast #'numeric-type-without-bounds-p :node node)
                    (/ (* constant)
                     (associate-lvar (first args))
