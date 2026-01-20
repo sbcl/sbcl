@@ -717,6 +717,7 @@ the only documentation.  Users of a Lisp built with the
 
 @menu
 * The alien-funcall Primitive::
+* The alien-funcall-into Primitive::
 * The define-alien-routine Macro::
 * define-alien-routine Example::
 @end menu
@@ -766,6 +767,43 @@ the @code{(* (struct foo))} objects filled in by the foreign call:
         (setf (svref result i) (deref (deref a) i)))
       ;; Voila.
       result)))
+@end lisp
+
+@node  The alien-funcall-into Primitive
+@comment  node-name,  next,  previous,  up
+@subsection The @code{alien-funcall-into} Primitive
+
+@defun @sbalien{alien-funcall-into} @var{alien-function} @var{result-buffer} &rest @var{arguments}
+
+The @code{alien-funcall-into} function calls a foreign function that
+returns a structure by value, writing the result directly into a
+caller-provided buffer rather than heap-allocating.
+
+@var{alien-function} is the foreign function to call.
+@var{result-buffer} is a @code{system-area-pointer} pointing to memory
+where the struct result will be written.  The buffer is typically
+stack-allocated using @code{with-alien}.
+
+The function returns no values.  The caller accesses the result
+through the buffer.
+
+This function is only available on x86-64 and ARM64.
+
+@end defun
+
+Here is an example that calls a C function returning a struct,
+writing the result to a stack-allocated buffer:
+
+@lisp
+(define-alien-type nil (struct point (x double) (y double)))
+
+(with-alien ((result (struct point)))
+  (alien-funcall-into
+   (extern-alien "make_point"
+                 (function (struct point) double double))
+   (alien-sap (addr result))
+   1.0d0 2.0d0)
+  (values (slot result 'x) (slot result 'y)))
 @end lisp
 
 @node  The define-alien-routine Macro

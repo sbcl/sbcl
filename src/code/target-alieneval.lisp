@@ -757,6 +757,37 @@ type specifies the argument and result types."
       (t
        (error "~S is not an alien function." alien)))))
 
+#+(or x86-64 arm64)
+(defun alien-funcall-into (alien result-buffer &rest args)
+  "Call the foreign function ALIEN, writing the struct result to RESULT-BUFFER.
+RESULT-BUFFER should be a system-area-pointer to appropriately sized memory.
+Only supported on x86-64 and ARM64."
+  (declare (type alien-value alien)
+           (type system-area-pointer result-buffer))
+  (let ((type (alien-value-type alien)))
+    (unless (alien-fun-type-p type)
+      (error "~S is not an alien function." alien))
+    (unless (= (length (alien-fun-type-arg-types type))
+               (length args))
+      (error "wrong number of arguments for ~S~%expected ~W, got ~W"
+             type
+             (length (alien-fun-type-arg-types type))
+             (length args)))
+    (let ((stub (alien-fun-type-into-stub type)))
+      (unless stub
+        (setf stub
+              (let ((fun (gensym "FUN"))
+                    (buf (gensym "BUF"))
+                    (parms (make-gensym-list (length args))))
+                (compile nil
+                         `(lambda (,fun ,buf ,@parms)
+                            (declare (optimize (sb-c:insert-step-conditions 0)))
+                            (declare (type (alien ,(unparse-alien-type type)) ,fun))
+                            (declare (type system-area-pointer ,buf))
+                            (alien-funcall-into ,fun ,buf ,@parms)))))
+        (setf (alien-fun-type-into-stub type) stub))
+      (apply stub alien result-buffer args))))
+
 (defmacro define-alien-routine (name result-type
                                      &rest args
                                      &environment lexenv)

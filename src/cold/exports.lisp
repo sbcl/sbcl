@@ -1221,7 +1221,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)")
   (:import-from "CL" "*" "ARRAY" "CHAR" "DOUBLE-FLOAT" "FLOAT" "FUNCTION"
                 "BOOLEAN" "INTEGER" "LONG-FLOAT" "SINGLE-FLOAT" "UNION" "VALUES")
   (:import-from "SB-SYS" "SYSTEM-AREA-POINTER")
-  (:export "*" "ADDR" "ALIEN" "ALIEN-FUNCALL" "ALIEN-SAP"
+  (:export "*" "ADDR" "ALIEN" "ALIEN-FUNCALL" "ALIEN-FUNCALL-INTO" "ALIEN-SAP"
            "ALIEN-SIZE" "ARRAY" "BOOLEAN" "CAST" "CHAR" "C-STRING"
            "DEFINE-ALIEN-ROUTINE" "DEFINE-ALIEN-TYPE" "DEFINE-ALIEN-VARIABLE"
            "DEREF" "DOUBLE-FLOAT" "DOUBLE" "ENUM" "EXTERN-ALIEN"
