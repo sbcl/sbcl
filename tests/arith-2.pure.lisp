@@ -2107,7 +2107,14 @@
         `(lambda (a)
            (declare (integer a))
            (values (floor (abs (floor 10 a)) 5)))
-      ((-9) 0))))
+      ((-9) 0))
+    (checked-compile-and-assert
+        ()
+        `(lambda (p)
+           (declare (integer p))
+           (values (ceiling (ceiling (* 10 p) -31)
+                            41/50)))
+      ((-97) 40))))
 
 (with-test (:name :logtest)
   (when (ctu:vop-existsp 'logtest)

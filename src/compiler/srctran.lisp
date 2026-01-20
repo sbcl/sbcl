@@ -5353,7 +5353,8 @@
                                    (eq name divide)
                                    (or (eq name 'truncate)
                                        ;; The outer divisor has to be positive
-                                       (plusp constant))
+                                       (and (plusp constant)
+                                            (integerp constant)))
                                    (or (not *amc-abs*)
                                        (let ((sign (integer-type-sign (lvar-type a)))
                                              (d-sign (signum d)))
