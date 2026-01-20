@@ -29,15 +29,15 @@ obj/xbuild/arm64-immobile-space/xc.core: $(DEPS1)
 obj/xbuild/arm64-immobile-space.core: obj/xbuild/arm64-immobile-space/xc.core
 	$(SBCL) $(ARGS) arm64-immobile-space < $(SCRIPT2)
 
-obj/xbuild/loongarch64/xc.core: $(DEPS1)
-	$(SBCL) $(ARGS) loongarch64 loongarch64 "(:UNIX :LINUX :ELF :64-BIT :LITTLE-ENDIAN :SB-THREAD)" < $(SCRIPT1)
-obj/xbuild/loongarch.core: obj/xbuild/loongarch64/xc.core
-	$(SBCL) $(ARGS) loongarch64 < $(SCRIPT2)
-
 obj/xbuild/mips/xc.core: $(DEPS1)
 	$(SBCL) $(ARGS) mips mips "(:UNIX :LINUX :ELF :OS-PROVIDES-CLOCK-GETTIME :LARGEFILE :LITTLE-ENDIAN)" < $(SCRIPT1)
 obj/xbuild/mips.core: obj/xbuild/mips/xc.core
 	$(SBCL) $(ARGS) mips < $(SCRIPT2)
+
+obj/xbuild/loongarch64/xc.core: $(DEPS1)
+	$(SBCL) $(ARGS) loongarch64 loongarch64 "(:UNIX :LINUX :ELF :OS-PROVIDES-CLOCK-GETTIME :64-BIT :LITTLE-ENDIAN :SB-THREAD)" < $(SCRIPT1)
+obj/xbuild/loongarch64.core: obj/xbuild/loongarch64/xc.core
+	$(SBCL) $(ARGS) loongarch64 < $(SCRIPT2)
 
 obj/xbuild/ppc/xc.core: $(DEPS1)
 	$(SBCL) $(ARGS) ppc ppc "(:UNIX :LINUX :ELF :OS-PROVIDES-CLOCK-GETTIME :BIG-ENDIAN)" < $(SCRIPT1)
