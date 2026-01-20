@@ -2123,7 +2123,13 @@
            (declare (integer p))
            (values (ceiling (ceiling (* 10 p) -31)
                             41/50)))
-      ((-97) 40))))
+      ((-97) 40))
+    (checked-compile-and-assert
+        ()
+        `(lambda (n)
+           (declare (integer n))
+           (values (truncate (truncate n 190) 16/25)))
+      ((46945) 385))))
 
 (with-test (:name :logtest)
   (when (ctu:vop-existsp 'logtest)

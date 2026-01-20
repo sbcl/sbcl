@@ -5350,11 +5350,11 @@
                                    single-value-truncate
                                    (and (integerp d)
                                         (not (eql d 0)))
+                                   (integerp constant)
                                    (eq name divide)
                                    (or (eq name 'truncate)
                                        ;; The outer divisor has to be positive
-                                       (and (plusp constant)
-                                            (integerp constant)))
+                                       (plusp constant))
                                    (or (not *amc-abs*)
                                        (let ((sign (integer-type-sign (lvar-type a)))
                                              (d-sign (signum d)))
