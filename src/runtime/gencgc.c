@@ -1449,13 +1449,6 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
     if (widetag_of(native_pointer(addr)) != FILLER_WIDETAG
         && lowtag_ok_for_page_type(addr, page->type)
         && plausible_tag_p(addr)) return AMBIGUOUS_POINTER;
-
-    // FIXME: I think there is a window of GC vulnerability regarding FINs
-    // and FDEFNs containing executable bytes. In either case if the only pointer
-    // to such an object is the program counter, the object could be considered
-    // garbage because there is no _tagged_ pointer to it.
-    // This is an almost impossible situation to arise, but seems worth some study.
-
     return 0;
 }
 #elif defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64
