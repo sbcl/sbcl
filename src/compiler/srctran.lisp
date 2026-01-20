@@ -5441,11 +5441,11 @@
                    (abs (*)
                     (let ((*amc-abs* t))
                       (associate-lvar (first args) :dividing dividing)))
-                   ((truncate floor ceiling) ((type rational) constant)
+                   ((truncate floor ceiling) ((type integer) constant)
                     (handle-truncation (first args)
                                        (value (second args))
                                        name combination))
-                   ((truncate floor ceiling) (constant (type rational))
+                   ((truncate floor ceiling) (constant (type integer))
                     (handle-truncation-2 (value (first args)) name combination))
                    ((+ -) *
                     (unless divide
