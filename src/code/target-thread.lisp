@@ -1825,7 +1825,6 @@ session."
 ;;; the *ALL-THREADS* tree as well. Must be called with the *MAKE-THREAD-LOCK* held
 ;;; or interrupts inhibited or both.
 ;;; We try to keep up to RETAIN blocks of memory for reuse by later calls to MAKE-THREAD.
-(export '%dispose-thread-structs)
 (defun %dispose-thread-structs (&key (retain 0))
   (loop (unless (nthcdr retain *joinable-threads*) (return))
         (let ((item (sb-ext:atomic-pop *joinable-threads*)))

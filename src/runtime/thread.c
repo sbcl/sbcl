@@ -220,9 +220,8 @@ void reset_gc_stats() { // after sb-posix:fork
 }
 #endif
 
-/* This function is seemingly unused by the C runtime, but DO NOT DELETE.
- * It's needed when the C runtime is compiled with --fsanitize=address, because the sanitizer
- * falsely reports that all the threads running at exit have leaked their zstd_dcontext.
+/* If the C runtime is compiled with --fsanitize=address, the sanitizer can falsely report
+ * that all the threads running at exit have leaked a zstd_dcontext.
  * While it's possible to make the sanitizer shut up about particular allocations,
  * you need to know the size in order to pass it to the unpoisoning routine.
  * The allocator of the ZSTD context object is opaque; we don't know the size.

@@ -3370,7 +3370,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
 (defpackage "SB-THREAD"
   (:documentation "public (but low-level): native thread support")
   (:use "CL" "SB-ALIEN" "SB-INT" "SB-SYS" "SB-KERNEL")
-  (:export "*CURRENT-THREAD*"
+  (:export "%DISPOSE-THREAD-STRUCTS"
+           "*CURRENT-THREAD*"
            "CURRENT-THREAD-SAP"
            "DESTROY-THREAD"
            "INTERRUPT-THREAD"

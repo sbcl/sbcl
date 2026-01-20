@@ -355,6 +355,32 @@
 see documentation for SB-EXT:EXIT."
   (exit :code unix-status :abort recklessly-p))
 
+(define-load-time-global *address-sanitizer-cleanup* t)
+#+sb-thread
+(defun cleanup-for-asan ()
+  ;; Try to force finalizers to run which helps avoid spurious reports of
+  ;; C++ object leakage where objects are managed by Lisp and have a finalizer
+  ;; which performs a free() and/or other requisite destructor actions.
+  ;; Unfortunately, GC alone can not guarantee that finalizers have run, because the
+  ;; finalizer thread may not act quickly enough. And even polling for the list
+  ;; of pending finalizers to become empty isn't adequate due to an inherent race
+  ;; and the fact that the finalizer thread tries to exit as soon as possible
+  ;; when asked to by %EXIT.  Disabling the thread and manually checking for
+  ;; pending finalizers is usually enough to avoid false positives.
+  (when (eq (cas *address-sanitizer-cleanup* t nil) t) ; at most one time
+    (finalizer-thread-stop)
+    (gc :full t)
+    (run-pending-finalizers)
+    (with-alien ((asan-lisp-thread-cleanup (function void) :extern))
+      ;; The recyclebin of available thread structs was dealt with by POST-GC,
+      ;; leaving two more sets of threads to deal with:
+      ;; - threads still running, let's hope they don't need their ZSTD context!
+      (alien-funcall asan-lisp-thread-cleanup)
+      ;; - threads ready to be pthread_joined, so effectively dead to Lisp
+      ;;   but whose pthread memory resources have not been released
+      (sb-thread:%dispose-thread-structs))
+    t))
+
 (declaim (ftype (sfunction (&key (:code (or null exit-code))
                                  (:timeout (or null real))
                                  (:abort t))
@@ -396,6 +422,12 @@ Consequences are unspecified if serious conditions occur during EXIT
 excepting errors from *EXIT-HOOKS*, which cause warnings and stop
 execution of the hook that signaled, but otherwise allow the exit
 process to continue normally."
+  #+sb-thread
+  (when (and (not abort)
+             (eql code 0)
+             (proper-list-p *features*) ; Don't croak if features got trashed
+             (member :address-sanitizer *features*))
+    (cleanup-for-asan))
   (if (or abort *exit-in-progress*)
       (os-exit (or code 1) :abort t)
       (let ((code (or code 0)))
