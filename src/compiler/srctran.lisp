@@ -5431,8 +5431,9 @@
                     (associate-lvar (first args))
                     (unless divide
                       (let* ((value (value (second args)))
-                             (div (and (/= value 0)
-                                       (/ constant value))))
+                             (div (if (= value 0)
+                                      (return-from associate-node)
+                                      (/ constant value))))
                         (when (or (ratiop constant)
                                   (integerp div))
                           (setf new t
