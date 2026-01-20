@@ -4146,6 +4146,7 @@
         (delete-stmt stmt)
         next))))
 
+#+nil
 (defpattern "sbfm + ubfm -> sbfm" ((sbfm) (ubfm)) (stmt next)
   (destructuring-bind (dst1 src1 immr1 imms1) (stmt-operands stmt)
     (destructuring-bind (dst2 src2 immr2 imms2) (stmt-operands next)

@@ -2213,3 +2213,13 @@
                 1
                 -10)))
        boolean)))
+
+(with-test (:name :ash-left-bignum)
+  (checked-compile-and-assert
+      ()
+      `(lambda (b s)
+         (declare (bignum b)
+                  ((member -40 25) s))
+         (logand #xffffffffffff (ash b s)))
+    ((-1422907942930057474717222 25) 75401170780160)
+    ((-1422907942930057474717222 -40) 280180849475450)))
