@@ -2135,7 +2135,13 @@
         `(lambda (n)
            (declare (rational n))
            (values (truncate (truncate 4 n) 3)))
-      ((1/3) 4))))
+      ((1/3) 4))
+    (checked-compile-and-assert
+        ()
+        `(lambda (n)
+           (declare (integer n))
+           (* (/ 23 (* 37 n)) -12))
+      ((2) -138/37))))
 
 (with-test (:name :logtest)
   (when (ctu:vop-existsp 'logtest)

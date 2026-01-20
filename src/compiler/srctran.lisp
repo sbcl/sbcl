@@ -5412,8 +5412,7 @@
                                             `(lambda (x y) (declare (ignore y)) x)
                                             'associate-multiplication-constants))))))
                    (/ (* *)
-                    (loop for arg in args
-                          do (associate-lvar arg)))
+                    (associate-lvar (first args)))
                    (* (* constant)
                     (associate-lvar (first args))
                     (handle-multiplication combination (value (second args))))
