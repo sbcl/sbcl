@@ -2271,4 +2271,9 @@
                          9241088767394112609508907202529414093/970467704224781277)
                r))
      (truncate r 1.0))
-   (values (eql 9522303959679631360) (eql 0.0) &optional)))
+   (values (eql 9522303959679631360) (eql 0.0) &optional))
+  (assert-type
+   (lambda (x)
+     (declare ((single-float 0.0 0.0) x))
+     (nth-value 1 (truncate x)))
+   (single-float 0.0 0.0)))

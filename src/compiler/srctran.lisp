@@ -3007,8 +3007,9 @@
   ;; basic idea is to split the ranges of NUM and DEN into positive
   ;; and negative pieces and deal with each of the four possibilities
   ;; in turn.
+  (setf (values num div) (interval-contagion num div))
   (let ((zero (intervals-zero num div)))
-   (case (interval-range-info num)
+   (case (interval-range-info num zero)
      (+
       (case (interval-range-info div)
         (+
