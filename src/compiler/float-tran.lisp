@@ -507,11 +507,13 @@
   (deftransform log ((x y) ($type $type) * :node node)
     (let ((cast (cast-or-check-bound-type node (specifier-type 'real))))
       (if cast
-          `(if (or (< x 0)
-                   (< y 0))
-               (sb-vm::op-not-type2-error x y '(,(type-specifier cast) . log))
-               (truly-the $type (log (truly-the (float 0.0) x)
-                                     (truly-the (float 0.0) y))))
+          `(if (= y 0)
+               (coerce 0 '$type)
+               (if (or (< x 0)
+                       (< y 0))
+                   (sb-vm::op-not-type2-error x y '(,(type-specifier cast) . log))
+                   (truly-the $type (log (truly-the (float 0.0) x)
+                                         (truly-the (float 0.0) y)))))
           (give-up-ir1-transform))))
 
   (deftransform sqrt ((x) ($type) * :node node)
