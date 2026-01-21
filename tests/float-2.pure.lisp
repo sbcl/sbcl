@@ -475,6 +475,22 @@ fractional bits."
                (or (eql #.(log 1.9775647e18 12))
                    (complex single-float))))
 
+(with-test (:name :log-base-zero)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (declare (single-float a b))
+         (log a b))
+    ((-1.0 0.0) 0.0)
+    ((-1.0 -0.0) 0.0))
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (declare (double-float a b))
+         (log a b))
+    ((-1d0 0d0) 0d0)
+    ((-1d0 -0d0) 0d0)))
+
 (with-test (:name (ftruncate :minus-zeros :one-arg))
   (flet ((f (x) (declare (notinline ftruncate)) (ftruncate x)))
     (declare (notinline f))

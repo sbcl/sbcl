@@ -364,16 +364,20 @@
       (log number)))
 
 (defun log-double-float2 (number base)
-  (if (or (< number 0)
-          (< base 0))
-      (/ (log number) (log base))
-      (truly-the double-float (log number base))))
+  (if (zerop base)
+      0d0
+      (if (or (< base 0)
+              (< number 0))
+          (/ (log number) (log base))
+          (truly-the double-float (log number base)))))
 
 (defun log-single-float2 (number base)
-  (if (or (< number 0)
-          (< base 0))
-      (/ (log number) (log base))
-      (truly-the single-float (log number base))))
+  (if (zerop base)
+      0.0
+      (if (or (< base 0)
+              (< number 0))
+          (/ (log number) (log base))
+          (truly-the single-float (log number base)))))
 
 (declaim (start-block log log2/rational log2/double-float))
 (defun log2/nonnegative-integer (x)
