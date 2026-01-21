@@ -120,6 +120,20 @@ This is SETFable."
      (let ((sb-c:*alien-stack-pointer* sb-c:*alien-stack-pointer*))
        ,@body)))
 
+#+(or x86-64 arm64)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun maybe-extract-alien-funcall-into (form alien-type var env)
+    "Transform (alien-funcall func args...) to (alien-funcall-into func sap args...).
+   Returns transformed form or NIL if not applicable."
+    (declare (ignore env))
+    ;; Form must be (alien-funcall func-expr args...)
+    (when (and (consp form)
+               (eq (car form) 'alien-funcall)
+               (alien-record-type-p alien-type))
+      (let ((func-expr (second form))
+            (args (cddr form)))
+        `(alien-funcall-into ,func-expr ,var ,@args)))))
+
 (defmacro with-alien (bindings &body body &environment env)
   "Establish some local alien variables. Each BINDING is of the form:
      VAR TYPE [ ALLOCATION ] [ INITIAL-VALUE | EXTERNAL-NAME ]
@@ -174,16 +188,28 @@ This is SETFable."
                            ,@body)))
                       (:local
                        (let* ((var (gensym "VAR"))
-                              (initval (if initial-value (gensym "INITVAL")))
                               (info (make-local-alien-info :type alien-type))
+                              ;; Try to optimize alien-funcall initializer
+                              (funcall-into-form
+                               #+(or x86-64 arm64)
+                               (and initial-value
+                                    (maybe-extract-alien-funcall-into
+                                     initial-value alien-type var env))
+                               #-(or x86-64 arm64)
+                               nil)
+                              (initval (if (and initial-value (not funcall-into-form))
+                                           (gensym "INITVAL")))
                               (inner-body
                                 `((note-local-alien-type ',info ,var)
                                   (symbol-macrolet ((,symbol (local-alien ',info ,var)))
-                                    ,@(when initial-value
-                                        `((setq ,symbol ,initval)))
-                                    ,@body)))
+                                    ,@(cond
+                                        (funcall-into-form
+                                         `(,funcall-into-form ,@body))
+                                        (initial-value
+                                         `((setq ,symbol ,initval) ,@body))
+                                        (t body)))))
                               (body-forms
-                                (if initial-value
+                                (if initval
                                     `((let ((,initval ,initial-value))
                                         ,@inner-body))
                                     inner-body)))
