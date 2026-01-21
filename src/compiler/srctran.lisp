@@ -898,9 +898,11 @@
      (if (sb-xc:<= most-negative-double-float val most-positive-double-float)
          (coerce val type)))
     ((or (eq type 'single-float) (eq type 'float))
-     ;; coerce to float returns a single-float
-     (if (sb-xc:<= most-negative-single-float val most-positive-single-float)
-         (coerce val 'float)))
+     (if (and (eq type 'float)
+              (typep val 'double-float))
+         val
+         (if (sb-xc:<= most-negative-single-float val most-positive-single-float)
+             (coerce val 'single-float))))
     (t (coerce val type))))
 
 (defun coerce-and-truncate-floats (val type)

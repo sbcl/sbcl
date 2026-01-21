@@ -746,7 +746,8 @@
 ;;; can't compute the bounds using FUN.
 (defun elfun-derive-type-simple (arg fun domain-low domain-high
                                      default-low default-high
-                                     &optional (increasingp t))
+                                     &optional (increasingp t)
+                                               double-float-for-integers)
   (declare (type (or null real) domain-low domain-high))
   (etypecase arg
     (numeric-type
@@ -773,7 +774,9 @@
                         (res-hi (or (bound-func fun (if increasingp high low) nil)
                                     default-high))
                         (format (case (numeric-type-class arg)
-                                  ((integer rational) 'single-float)
+                                  ((integer rational) (if double-float-for-integers
+                                                          'double-float
+                                                          'single-float))
                                   (t (numeric-type-format arg))))
                         (bound-type (or format 'float))
                         (result-type
@@ -1089,32 +1092,74 @@
 (defoptimizer (expt derive-type) ((x y))
   (two-arg-derive-type x y #'expt-derive-type-aux))
 
-(defun log-derive-type-aux-1 (x)
-  (elfun-derive-type-simple x #'log
-                            (if (integer-type-p x) 0 -0d0)
+(defun coerce-float-type (type format)
+  (cond ((listp type)
+         (loop for e in type
+               collect (coerce-float-type e format)))
+        ((eq (numeric-type-format type) format)
+         type)
+        (t
+         (make-numeric-type :class 'float
+                            :format format
+                            :complexp (numeric-type-complexp type)
+                            :low (coerce-for-bound (numeric-type-low type) format)
+                            :high (coerce-for-bound (numeric-type-high type) format)))))
+
+(defun log-derive-type-aux-1 (x &optional (fun #'log) double-float-for-integers)
+  (elfun-derive-type-simple x fun
+                            (if (rational-type-p x) 0 -0d0)
                             nil
                             ;; (log 0) is an error
                             ;; and there's nothing between 0 and 1 for integers.
                             (and (integer-type-p x) -0f0)
-                            nil))
+                            nil
+                            t
+                            double-float-for-integers))
 
 (defun log-derive-type-aux-2 (x y same-arg)
-  (let ((log-x (log-derive-type-aux-1 x))
-        (log-y (log-derive-type-aux-1 y))
-        (accumulated-list nil))
-    ;; LOG-X or LOG-Y might be union types. We need to run through
-    ;; the union types ourselves because /-DERIVE-TYPE-AUX doesn't.
-    (dolist (x-type (prepare-arg-for-derive-type log-x))
-      (dolist (y-type (prepare-arg-for-derive-type log-y))
-        (push (/-derive-type-aux x-type y-type same-arg) accumulated-list)))
-
-    (let ((union (apply #'type-union (flatten-list accumulated-list))))
-      (if (types-equal-or-intersect y (specifier-type '(or (real 0 0) complex)))
-          ;; If Y can be zero the result can be zero too
-          (type-union union
-                      (type-intersection (specifier-type '(member 0.0 0d0))
-                                         (numeric-contagion x y :float t :complex nil)))
-          union))))
+  (multiple-value-bind (log-x log-y coerce)
+      (flet (#-sb-xc-host
+             (rational-float (x y)
+               (values (log-derive-type-aux-1 x 
+                                              #'sb-kernel::log2/rational t)
+                       (log-derive-type-aux-1 (coerce-float-type y 'double-float)
+                                              #'sb-kernel::log2/double-float t)
+                       (numeric-type-format y))))
+        ;; LOG on rationals is computed using double-float and then coerced to single-float
+        (cond #-sb-xc-host
+              ((and (rational-type-p x)
+                    (rational-type-p y))
+               (values (log-derive-type-aux-1 x #'sb-kernel::log2/rational t)
+                       (log-derive-type-aux-1 y #'sb-kernel::log2/rational t)
+                       'single-float))
+              #-sb-xc-host
+              ((and (rational-type-p x)
+                    (float-type-p y))
+               (rational-float x y))
+              #-sb-xc-host
+              ((and (float-type-p x)
+                    (rational-type-p y))
+               (multiple-value-bind (y x coerce) (rational-float y x)
+                 (values x y coerce)))
+              (t
+               (values (log-derive-type-aux-1 x)
+                       (log-derive-type-aux-1 y)
+                       nil))))
+    (let ((accumulated-list nil))
+      ;; LOG-X or LOG-Y might be union types. We need to run through
+      ;; the union types ourselves because /-DERIVE-TYPE-AUX doesn't.
+      (dolist (x-type (prepare-arg-for-derive-type log-x))
+        (dolist (y-type (prepare-arg-for-derive-type log-y))
+          (push (/-derive-type-aux x-type y-type same-arg) accumulated-list)))
+      (when coerce
+        (setf accumulated-list (coerce-float-type accumulated-list coerce)))
+      (let ((union (apply #'type-union (flatten-list accumulated-list))))
+        (if (types-equal-or-intersect y (specifier-type '(or (real 0 0) complex)))
+            ;; If Y can be zero the result can be zero too
+            (type-union union
+                        (type-intersection (specifier-type '(member 0.0 0d0))
+                                           (numeric-contagion x y :float t :complex nil)))
+            union)))))
 
 (defoptimizer (log derive-type) ((x &optional y))
   (if y

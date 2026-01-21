@@ -452,7 +452,28 @@ fractional bits."
   (assert-type (lambda (d)
                  (declare ((complex single-float) d))
                  (log -5 d))
-               (or (member 0.0) (complex single-float))))
+               (or (member 0.0) (complex single-float)))
+  (assert-type (lambda (x y)
+                 (declare ((integer * -1) y))
+                 (log 96 (if x
+                             y
+                             (expt 3434484076828220102 -16))))
+               (or (complex single-float)
+                   (eql #.(log 96 (expt 3434484076828220102 -16)))))
+  (assert-type (lambda (v)
+                 (log 3532504320689493448
+                      (if v
+                          7384646045169235520
+                          51)))
+               (or (eql #.(log 3532504320689493448 7384646045169235520))
+                   (eql #.(log 3532504320689493448 51))))
+  (assert-type (lambda (v)
+                 (LOG 1.9775647e18
+                      (IF v
+                          12
+                          -881536083005615600)))
+               (or (eql #.(log 1.9775647e18 12))
+                   (complex single-float))))
 
 (with-test (:name (ftruncate :minus-zeros :one-arg))
   (flet ((f (x) (declare (notinline ftruncate)) (ftruncate x)))

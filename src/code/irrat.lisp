@@ -375,7 +375,7 @@
       (/ (log number) (log base))
       (truly-the single-float (log number base))))
 
-(declaim (start-block log))
+(declaim (start-block log log2/rational log2/double-float))
 (defun log2/nonnegative-integer (x)
   (declare (type (integer 0) x))
   ;; CMUCL comment:

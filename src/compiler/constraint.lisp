@@ -860,6 +860,18 @@
        (eq (numeric-type-class x) 'integer)
        (eq (numeric-type-complexp x) :real)))
 
+(defun rational-type-p (x)
+  (declare (type ctype x))
+  (and (numeric-type-p x)
+       (memq (numeric-type-class x) '(integer rational))
+       (eq (numeric-type-complexp x) :real)))
+
+(defun float-type-p (x)
+  (declare (type ctype x))
+  (and (numeric-type-p x)
+       (eq (numeric-type-class x) 'float)
+       (eq (numeric-type-complexp x) :real)))
+
 (defun ratio-type-p (x)
   (declare (type ctype x))
   (and (numeric-type-p x)
@@ -893,13 +905,6 @@
       (if greater
           (modified-numeric-type x :low new-bound)
           (modified-numeric-type x :high new-bound)))))
-
-;;; Return true if X is a float NUMERIC-TYPE.
-(defun float-type-p (x)
-  (declare (type ctype x))
-  (and (numeric-type-p x)
-       (eq (numeric-type-class x) 'float)
-       (eq (numeric-type-complexp x) :real)))
 
 ;;; Exactly the same as CONSTRAIN-INTEGER-TYPE, but for float numbers.
 ;;;
