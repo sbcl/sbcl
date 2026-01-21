@@ -696,7 +696,8 @@
 ;;;; alien-funcall-into writes struct return values directly to a
 ;;;; caller-provided buffer instead of heap-allocating.
 
-(with-test (:name :alien-funcall-into)
+(with-test (:name :alien-funcall-into
+            :skipped-on (and :sb-fasteval (not :sb-eval)))
   ;; Small struct returned in registers
   (with-alien ((result (struct tiny-align-8)))
     (alien-funcall-into
@@ -748,6 +749,18 @@
       (let ((f (deref func)))
         (alien-funcall-into f (alien-sap (addr result)) 99)
         (assert (= (slot result 'm0) 99))))))
+
+;;;; Test that (with-alien ((s type (alien-funcall ...)) body))
+;;;; is optimized to use alien-funcall-into.
+(with-test (:name :with-alien-funcall-init-into
+            :skipped-on (and :sb-fasteval (not :sb-eval)))
+  (with-alien ((result (struct two-doubles)
+                (alien-funcall
+                 (extern-alien "two_doubles_return"
+                               (function (struct two-doubles) double double))
+                 1.5d0 2.5d0)))
+    (assert (= (slot result 'd0) 1.5d0))
+    (assert (= (slot result 'd1) 2.5d0))))
 
 ;;; Clean up
 #-win32 (ignore-errors (delete-file *soname*))

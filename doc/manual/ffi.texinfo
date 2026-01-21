@@ -534,6 +534,21 @@ contain named structure or union types with the slots specified.
 Within the lexical scope of the binding specifiers and body, a locally
 defined foreign structure type @var{foo} can be referenced by its name
 using @code{(struct @var{foo})}.
+
+When a foreign function returns a structure by value, using
+@code{alien-funcall} as the @var{initial-value} allows the returned
+struct to be stack-allocated directly into the local variable's
+storage, avoiding heap allocation:
+
+@lisp
+(with-alien ((result (struct point)
+                     (alien-funcall
+                      (extern-alien "make_point"
+                                    (function (struct point) double double))
+                      1.0d0 2.0d0)))
+  (values (slot result 'x) (slot result 'y)))
+@end lisp
+
 @end defmac
 
 @node  External Foreign Variables
