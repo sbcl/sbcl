@@ -839,14 +839,14 @@
                      (:char
                       (if (= n-bits sb-vm:n-word-bits)
                           'word
-                          (format nil "UB~A" n-bits)))
+                          (format nil "UB~D" n-bits)))
                      (:bits
                       (cond ((not (csubtypep element-ctype (specifier-type 'unsigned-byte)))
-                             (format nil "SB~A" n-bits))
+                             (format nil "SB~D" n-bits))
                             ((= n-bits sb-vm:n-word-bits)
                              'word)
                             (t
-                             (format nil "UB~A" n-bits))))
+                             (format nil "UB~D" n-bits))))
                      (:single-float
                       'single-float)
                      #+64-bit
