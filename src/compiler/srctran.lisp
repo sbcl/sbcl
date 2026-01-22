@@ -2368,7 +2368,7 @@
                                          divisor-interval) t))
              (let* ((*conservative-quotient-bound* conservative)
                     (quot (if float
-                              (ftruncate-quotient-bound quot divisor-interval)
+                              (ftruncate-quotient-bound quot number-interval divisor-interval)
                               (truncate-quotient-bound quot))))
                (make-numeric-type :class (if float
                                              'float
@@ -2590,7 +2590,7 @@
                     (divisor-interval (numeric-type->interval divisor-type))
                     (div (interval-div number-interval divisor-interval))
                     (quot (if float
-                              (,(symbolicate "F" q-name) div divisor-interval)
+                              (,(symbolicate "F" q-name) div number-interval divisor-interval)
                               (,q-name div))))
                (make-numeric-type :class (if float
                                              'float
@@ -2703,7 +2703,7 @@
            +
            (type-bound-number hi))))))
 
-(defun ffloor-quotient-bound (quot divisor)
+(defun ffloor-quotient-bound (quot number divisor)
   ;; Take the ffloor of the quotient and then massage it into what we
   ;; need.
   (flet ((safe-ffloor (n)
@@ -2711,38 +2711,41 @@
                    (safe-single-coercion-p n))
                (ffloor n)
                (return-from ffloor-quotient-bound (make-interval)))))
-   (let* ((lo (interval-low quot))
-          (hi (interval-high quot))
-          (new-lo
-            ;; Take the ffloor of the lower bound. The result is always a
-            ;; closed lower bound.
-            (and lo
-                 (conservative-quotient-bound
-                  (safe-ffloor (type-bound-number lo))
-                  sb-xc:-
-                  (type-bound-number lo))))
-          (new-hi
-            (and hi
-                 (conservative-quotient-bound
-                  (if (consp hi)
-                      ;; An open bound. We need to be careful here because
-                      ;; the ffloor of '(10.0) is 9, but the ffloor of
-                      ;; 10.0 is 10.
-                      (multiple-value-bind (q r) (safe-ffloor (first hi))
-                        (if (zerop r)
-                            (sb-xc:- q 1)
-                            q))
-                      ;; A closed bound, so the answer is obvious.
-                      (safe-ffloor hi))
-                  sb-xc:+
-                  (type-bound-number hi)))))
-     (when (and (eql new-lo 0.0)
-                (not (or (floatp (type-bound-number lo))
-                         (floatp (type-bound-number hi))))
-                (not (eql (interval-range-info divisor) '+)))
-       (setf new-lo -0.0))
-     (make-interval :low (coerce-for-bound new-lo 'float)
-                    :high (coerce-for-bound new-hi 'float)))))
+    (let* ((lo (interval-low quot))
+           (hi (interval-high quot))
+           (new-lo
+             ;; Take the ffloor of the lower bound. The result is always a
+             ;; closed lower bound.
+             (and lo
+                  (conservative-quotient-bound
+                   (safe-ffloor (type-bound-number lo))
+                   sb-xc:-
+                   (type-bound-number lo))))
+           (new-hi
+             (and hi
+                  (conservative-quotient-bound
+                   (if (consp hi)
+                       ;; An open bound. We need to be careful here because
+                       ;; the ffloor of '(10.0) is 9, but the ffloor of
+                       ;; 10.0 is 10.
+                       (multiple-value-bind (q r) (safe-ffloor (first hi))
+                         (if (zerop r)
+                             (sb-xc:- q 1)
+                             q))
+                       ;; A closed bound, so the answer is obvious.
+                       (safe-ffloor hi))
+                   sb-xc:+
+                   (type-bound-number hi)))))
+      (when (and (or (eql new-lo 0.0)
+                     (eql new-lo 0d0))
+                 (let ((divisor-range (interval-range-info divisor))
+                       (number-range (interval-range-info number new-lo)))
+                   ;; It can be negative if the signs do not match
+                   (not (and divisor-range number-range
+                             (eq divisor-range number-range)))))
+        (setf new-lo (sb-xc:- new-lo)))
+      (make-interval :low (coerce-for-bound new-lo 'float)
+                     :high (coerce-for-bound new-hi 'float)))))
 
 (defun floor-rem-bound (num div)
   (case (interval-range-info div)
@@ -2850,7 +2853,7 @@
            sb-xc:+
            (type-bound-number hi))))))
 
-(defun fceiling-quotient-bound (quot divisor)
+(defun fceiling-quotient-bound (quot number divisor)
   ;; Take the fceiling of the quotient and then massage it into what we
   ;; need.
   (flet ((safe-fceiling (n)
@@ -2882,11 +2885,14 @@
                    (safe-fceiling (type-bound-number hi))
                    sb-xc:+
                    (type-bound-number hi)))))
-      (when (and (eql new-lo 0.0)
-                 (not (or (floatp (type-bound-number lo))
-                          (floatp (type-bound-number hi))))
-                 (not (eql (interval-range-info divisor) '+)))
-        (setf new-lo -0.0))
+      (when (and (or (eql new-lo 0.0)
+                     (eql new-lo 0d0))
+                 (let ((divisor-range (interval-range-info divisor))
+                       (number-range (interval-range-info number new-lo)))
+                   ;; It can be negative if the signs do not match
+                   (not (and divisor-range number-range
+                             (eq divisor-range number-range)))))
+        (setf new-lo (sb-xc:- new-lo)))
       (make-interval :low (coerce-for-bound new-lo 'float)
                      :high (coerce-for-bound new-hi 'float)))))
 
@@ -2985,23 +2991,23 @@
        (interval-merge-pair (ceiling-quotient-bound neg)
                             (floor-quotient-bound pos))))))
 
-(defun ftruncate-quotient-bound (quot divisor)
+(defun ftruncate-quotient-bound (quot number divisor)
   ;; For positive quotients, truncate is exactly like floor. For
   ;; negative quotients, truncate is exactly like ceiling. Otherwise,
   ;; it's the union of the two pieces.
   (case (interval-range-info quot)
     (+
      ;; just like FLOOR
-     (ffloor-quotient-bound quot divisor))
+     (ffloor-quotient-bound quot number divisor))
     (-
      ;; just like CEILING
-     (fceiling-quotient-bound quot divisor))
+     (fceiling-quotient-bound quot number divisor))
     (otherwise
      ;; Split the interval into positive and negative pieces, compute
      ;; the result for each piece and put them back together.
      (multiple-value-bind (neg pos) (interval-split (interval-zero quot) quot t t)
-       (interval-merge-pair (fceiling-quotient-bound neg divisor)
-                            (ffloor-quotient-bound pos divisor))))))
+       (interval-merge-pair (fceiling-quotient-bound neg number divisor)
+                            (ffloor-quotient-bound pos number divisor))))))
 
 (defun truncate-rem-bound (num div)
   ;; This is significantly more complicated than FLOOR or CEILING. We
