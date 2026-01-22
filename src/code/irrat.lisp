@@ -404,7 +404,7 @@
 
 (defun log2/double-float (x)
   (declare (type double-float x))
-  (if (float-sign-bit-set-p x)
+  (if (minusp x)
       (complex (%log2 (- x)) (sb-xc:/ pi (log 2d0)))
       (%log2 x)))
 

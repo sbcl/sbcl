@@ -1122,7 +1122,7 @@
   (multiple-value-bind (log-x log-y coerce)
       (flet (#-sb-xc-host
              (rational-float (x y)
-               (values (log-derive-type-aux-1 x 
+               (values (log-derive-type-aux-1 x
                                               #'sb-kernel::log2/rational t)
                        (log-derive-type-aux-1 (coerce-float-type y 'double-float)
                                               #'sb-kernel::log2/double-float t)
