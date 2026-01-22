@@ -2860,9 +2860,9 @@
                           1
                           0)))
           (let* ((car (pop args))
-                 (car-type (lvar-derived-type car))
+                 (car-type (lvar-type car))
                  (cdr-type (and cons-p
-                                (lvar-derived-type (car args)))))
+                                (lvar-type (car args)))))
             (setf (combination-args use) args)
             (if cars
                 (let ((var (lambda-add-var (lambda-var-home var) car)))
