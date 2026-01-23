@@ -269,3 +269,13 @@
           (if (/= 0 (svref (sb-impl::hash-table-pairs table) 1))
               (format t "~S wants rehash~%" table)
               (error "~S should be marked for rehash" table)))))))
+
+(with-test (:name :clrhash-empty-weak-table)
+  (let ((ht (make-hash-table :weakness :key)))
+    (loop repeat 3
+          do
+          (clrhash ht)
+          (dotimes (i 100)
+            (setf (gethash (list i) ht) i))
+          (sb-sys:scrub-control-stack)
+          (sb-ext:gc :full t))))

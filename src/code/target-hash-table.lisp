@@ -3089,10 +3089,14 @@ table itself."
                     (setf (kv-vector-rehash-stamp kv-vector) 0))
                   ;; We always deposit empty markers into k/v pairs that are REMHASHed,
                   ;; so a count of 0 implies no clearing need be done.
-                  (when (plusp (hash-table-%count hash-table))
-                    (setf (hash-table-%count hash-table) 0)
-                    ;; Fill all slots with the empty marker.
-                    (fill kv-vector +empty-ht-slot+ :start 2 :end (* (1+ high-water-mark) 2))
+                  (when (or (and (typep hash-table 'general-hash-table)
+                                 ;; The GC might have removed everything in a weak hash-table
+                                 ;; but index-vector is not yet adjusted by TRANSFER-CULLED-CELLS
+                                 (shiftf (hash-table-smashed-cells hash-table) nil))
+                            (plusp (hash-table-%count hash-table)))
+                    (when (plusp (shiftf (hash-table-%count hash-table) 0))
+                      ;; Fill all slots with the empty marker.
+                      (fill kv-vector +empty-ht-slot+ :start 2 :end (* (1+ high-water-mark) 2)))
                     ;; Clear the index-vector if in use. Don't need to
                     ;; clear the hash-vector or the next-vector.
                     (unless flatp
@@ -3113,8 +3117,6 @@ table itself."
                                  ;; This never goes below 4.
                                  (- limit (ash (+ limit 3) -3))
                                  #.(max-chain-length 8)))))))
-                  (when (typep hash-table 'general-hash-table)
-                    (setf (hash-table-smashed-cells hash-table) nil))
                   (setf (hash-table-next-free-kv hash-table) 1
                         (kv-vector-high-water-mark kv-vector) 0))))
       (if (hash-table-synchronized-p hash-table)
