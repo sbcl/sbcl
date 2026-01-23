@@ -1,5 +1,43 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.6.0:
+  * minor incompatible change: the never-documented :NO-CONSTRUCTOR-DEFUN
+    option to DEFSTRUCT is no longer supported.
+  * platform support:
+    ** support for the LoongArch architecture has been added.  (thanks to
+       ZiLong Wang)
+    ** support for FreeBSD on 32-bit and 64-bit PowerPC platforms has been
+       added.  (thanks to Piotr Kubaj)
+    ** SB-ALIEN now supports passing and returning structures by value (rather
+       than by reference) in accordance with the platform ABIs, on x86-64 and
+       arm64 platforms.  (lp#313202, thanks to Jesse Bouwman)
+    ** wide compare-and-exchange is supported on the arm64 platform for
+       Armv8.1-A or later.
+  * bug fix: signal a DIVISION-BY-ZERO error in calls of (/ 0 0).
+    (lp#2137266, reported by khbit)
+  * bug fix: compiler infinite loop from previously-acceptable recursive
+    inline expansions.  (lp#2137380, reported by Frode Fjeld)
+  * bug fix: unnormalized inequality constraints causing a compiler infinite
+    loop.  (lp#2137422, reported by Jesse Bouwman)
+  * bug fix: compiler infinite loop from a deleted loop with an remnant
+    TAGBODY.  (lp#2137493)
+  * bug fix: miscompilation of REDUCE #'APPEND with non-null INITIAL-VALUE and
+    :FROM-END NIL.  (lp#2137736, reported by Vasily Postnicov)
+  * bug fix: encode XREF locations in a way that allows for higher form
+    numbers.  (lp#2137765, reported by Jim White)
+  * bug fix: lookups of optimized memory movers fails when *PRINT-BASE* is not
+    10.  (lp#2138812, reported by Robert Dodier)
+  * bug fix: address a number of type derivation subtleties related to
+    floating point zeros.
+  * optimization: various combinations of arithmetic operations with variables
+    and constants are simplified to have fewer calls.
+  * optimization: elide full calls to CONJUGATE when its argument is known to
+    be of type REAL.  (lp#2137354, thanks to Vasily Postnicov)
+  * optimization: the compiler knows more about the type and results of
+    ARRAY-DIMENSION.
+  * optimization: transform ARRAY-DIMENSIONS away on objects with array types
+    of known dimensions.  (lp#2138581, thanks to Vasily Postnicov)
+
 changes in sbcl-2.6.0 relative to sbcl-2.5.11:
   * enhancement: the compiler will recognize certain combinations of
     high-level optimizations as expressible by shorter machine instruction
