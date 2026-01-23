@@ -980,6 +980,10 @@ garbage_collect_generation(generation_index_t generation, int raise,
     {
         struct thread *th;
         for_each_thread(th) {
+            /* FIXME: we don't require that binding stack values pin their referents.
+             * Nor are they ambiguous pointers, so I'm not sure why this mentions preservation
+             * and/or ambiguity. Was it an abundance of caution when developing incremental
+             * compaction, was something failing, or it just a mistake ? */
             scav_binding_stack((lispobj*)th->binding_stack_start,
                                (lispobj*)get_binding_stack_pointer(th),
                                mr_preserve_ambiguous);
@@ -987,6 +991,12 @@ garbage_collect_generation(generation_index_t generation, int raise,
             lispobj* from = &th->lisp_thread;
             lispobj* to = (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th);
             sword_t nwords = to - from;
+            /* FIXME: as above, why is this "preserving" pointers in the TLS range
+             * instead of just marking them as live when it's OK to move them?
+             * But note that mr_preserve_range doesn't actually manipulate gc_page_pins,
+             * which is odd because "preserve" as used elsewhere implies livening and pinning
+             * objects which would otherwise not be pinned.
+             * Could this be an incompatible use of the term "preserve"? */
             mr_preserve_range(from, nwords);
         }
     }
