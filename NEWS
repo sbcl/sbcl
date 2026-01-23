@@ -37,6 +37,9 @@ changes relative to sbcl-2.6.0:
     ARRAY-DIMENSION.
   * optimization: transform ARRAY-DIMENSIONS away on objects with array types
     of known dimensions.  (lp#2138581, thanks to Vasily Postnicov)
+  * optimization: (equal (array-dimensions a) (array-dimensions b)) does not
+    cons intermediate lists.
+  * optimization: (make-array (array-dimensions a)) does not cons a list.
 
 changes in sbcl-2.6.0 relative to sbcl-2.5.11:
   * enhancement: the compiler will recognize certain combinations of
