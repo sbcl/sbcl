@@ -4935,3 +4935,21 @@
        (values (car l)
                (car l))))
    (values (eql 1) (eql 1) &optional)))
+
+(with-test (:name :>-integer-fixnum)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (v1 m)
+         (declare (single-float v1)
+                  (integer m))
+         (if (> (+ v1 4) 0.9)
+             (>
+              -7
+              (+
+               (if (> v1 7)
+                   #c(4.0 3.0)
+                   2)
+               m))
+             (* -0.2 v1)))
+    ((8.0 8) (condition 'type-error))
+    ((-8.0 8) 1.6)))

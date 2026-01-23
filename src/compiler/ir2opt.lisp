@@ -787,6 +787,7 @@
                                    target-block))
                  (cmp (ir2-block-start-vop target-block)))
             (when (and cmp
+                       (eq cmp (ir2-block-last-vop target-block))
                        (singleton-p (ir2block-predecessors target-block)))
               (let ((integer (vop-args vop))
                     (args (vop-args cmp))
