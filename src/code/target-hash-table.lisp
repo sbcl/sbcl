@@ -3092,11 +3092,16 @@ table itself."
                   (when (or (and (typep hash-table 'general-hash-table)
                                  ;; The GC might have removed everything in a weak hash-table
                                  ;; but index-vector is not yet adjusted by TRANSFER-CULLED-CELLS
-                                 (shiftf (hash-table-smashed-cells hash-table) nil))
+                                 (hash-table-smashed-cells hash-table))
                             (plusp (hash-table-%count hash-table)))
-                    (when (plusp (shiftf (hash-table-%count hash-table) 0))
+                    (when (plusp (hash-table-%count hash-table))
                       ;; Fill all slots with the empty marker.
-                      (fill kv-vector +empty-ht-slot+ :start 2 :end (* (1+ high-water-mark) 2)))
+                      (fill kv-vector +empty-ht-slot+ :start 2 :end (* (1+ high-water-mark) 2))
+                      ;; Set to 0 only after kv-vector is cleared,
+                      ;; or cull_weak_hash_table_bucket will find new dead entries.
+                      (setf (hash-table-%count hash-table) 0))
+                    (when (typep hash-table 'general-hash-table)
+                      (setf (hash-table-smashed-cells hash-table) nil))
                     ;; Clear the index-vector if in use. Don't need to
                     ;; clear the hash-vector or the next-vector.
                     (unless flatp
