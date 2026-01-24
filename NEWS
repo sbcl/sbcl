@@ -27,6 +27,8 @@ changes relative to sbcl-2.6.0:
     numbers.  (lp#2137765, reported by Jim White)
   * bug fix: lookups of optimized memory movers fails when *PRINT-BASE* is not
     10.  (lp#2138812, reported by Robert Dodier)
+  * bug fix: CLRHASH on a hash table with weak keys should not corrupt the
+    table's index vector.  (lp#2138965, reported by Patrick Poitras)
   * bug fix: address a number of type derivation subtleties related to
     floating point zeros.
   * optimization: various combinations of arithmetic operations with variables
