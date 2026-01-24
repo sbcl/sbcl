@@ -2276,4 +2276,9 @@
    (lambda (x)
      (declare ((single-float 0.0 0.0) x))
      (nth-value 1 (truncate x)))
-   (single-float 0.0 0.0)))
+   (single-float 0.0 0.0))
+  (assert-type
+   (lambda (v1)
+     (declare ((rational (96106637441700886132) (96106637441700886133)) v1))
+     (truncate v1 1.0))
+   (values (integer 96106640126225940480 96106640126225940480) (member 0.0) &optional)))

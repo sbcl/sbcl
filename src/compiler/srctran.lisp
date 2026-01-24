@@ -874,11 +874,11 @@
             (arithmetic-error ())))))
 
 (defun coercion-loses-precision-p (val type)
-  (typecase val
+  (etypecase val
     (single-float)
     (double-float (eq type 'single-float))
-    (rational (eq type 'float))
-    (t (bug "Unexpected arguments to bounds coercion: ~S ~S" val type))))
+    (rational
+     (member type '(float single-float double-float)))))
 
 (defun coerce-for-bound (val type)
   (cond
