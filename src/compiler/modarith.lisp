@@ -653,7 +653,7 @@
                (logand most-positive-word (ash (truly-the fixnum x) ,(if minusp
                                                                          `(- count)
                                                                          `count))))
-              (bignum
+              (t
                (multiple-value-bind (words bits) (truncate ,(if minusp
                                                                 `count
                                                                 `(- count))
