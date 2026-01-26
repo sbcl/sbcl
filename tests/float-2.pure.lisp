@@ -804,6 +804,7 @@ fractional bits."
                (opaque-identity double-float-negative-infinity)))
     (assert (= (log (opaque-identity -0f0) (opaque-identity 2))
                (opaque-identity single-float-negative-infinity)))))
+
 (with-test (:name :ffloor-minus-zero-derive-type)
   (assert-type (lambda (x)
                  (declare ((float (-1) (0)) x))
@@ -813,3 +814,36 @@ fractional bits."
                  (declare ((single-float (0.0) (1.0)) x))
                  (values (ftruncate x -1.0)))
                (single-float 0.0 0.0)))
+
+(defun check-ratio-to-float (ratio type)
+  (declare (ratio ratio))
+  (let* ((result (float ratio type))
+         (new-ratio (rational result)))
+    (multiple-value-bind (sig exp sign) (integer-decode-float result)
+      (let* ((prev-float (scale-float (float (* sign (1- sig)) type) exp))
+             (next-float (scale-float (float (* sign (1+ sig)) type) exp))
+             (error (abs (- ratio new-ratio)))
+             (error-prev (abs (- ratio (rational prev-float))))
+             (error-next (abs (- ratio (rational next-float)))))
+        
+        (cond
+          ((< error-next error)
+           (error "(float ~a ~a) = ~a, while ~a is closer" ratio type result next-float))
+          ((< error-prev error)
+           (error "(float ~a ~a) = ~a, while ~a is closer" ratio type result prev-float))
+          ((or (= error error-prev) (= error error-next))
+           (unless (evenp sig)
+             (error "(float ~a ~a) = ~a, not rounded to even" ratio type result))))))))
+
+(with-test (:name :ratio-to-float)
+  (let ((*random-state* (make-random-state t)))
+    (loop repeat 50000
+          do
+          (let* ((n-bits (random 100))
+                 (d-bits (random 100))
+                 (num (random (ash 1 n-bits)))
+                 (den (max 1 (random (ash 1 d-bits))))
+                 (ratio (/ num den)))
+            (when (typep ratio 'ratio)
+              (check-ratio-to-float ratio 1f0)
+              (check-ratio-to-float ratio 1d0))))))

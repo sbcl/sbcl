@@ -719,7 +719,12 @@
                                (den-len (integer-length den))
                                (delta (- den-len num-len))
                                (shift (1+ (+ delta digits)))
-                               (shifted-num (ash num shift)))
+                               (shifted-num (ash num shift))
+                               ;; Sticky bit for any of the shifted out set bits
+                               (sticky (if (and (minusp shift)
+                                                (ldb-test (byte (- shift) 0) num))
+                                           1
+                                           0)))
                           (decf scale delta)
                           (labels ((float-and-scale (bits)
                                      (let* ((bits (ash bits -1))
@@ -747,17 +752,17 @@
                                          fraction-and-guard))
                                (let ((extra (- (integer-length fraction-and-guard) digits)))
                                  (cond ((/= extra 1)
-                                        (aver (> extra 1)))
-                                       ((oddp fraction-and-guard)
-                                        (return
-                                          (if (zerop rem)
-                                              (float-and-scale
-                                               (if (zerop (logand fraction-and-guard 2))
-                                                   fraction-and-guard
-                                                   (1+ fraction-and-guard)))
-                                              (float-and-scale (1+ fraction-and-guard)))))
+                                        (aver (> extra 1))
+                                        ;; Add the newly shifted out bit to the sticky bits
+                                        (setf sticky (logior sticky (logand shifted-num 1))))
                                        (t
-                                        (return (float-and-scale fraction-and-guard)))))
+                                        (return
+                                          (float-and-scale (if (and (oddp fraction-and-guard)
+                                                                    (or (logtest fraction-and-guard 2)
+                                                                        (/= rem 0)
+                                                                        (/= sticky 0)))
+                                                               (1+ fraction-and-guard)
+                                                               fraction-and-guard))))))
                                (setq shifted-num (ash shifted-num -1))
                                (incf scale)))))))))))
   (def double-float)
