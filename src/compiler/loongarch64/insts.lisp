@@ -788,7 +788,7 @@
            (unless (zerop lo)
              (inst addi.d rd rd lo))))))
 
-;;;; li should optimization by lu32i、lu52i
+;;;; li should optimization by lu32i, lu52i
 (defun %li (reg value)
   (etypecase value
     (u+i-immediate
