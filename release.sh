@@ -62,7 +62,7 @@ else
 fi
 
 YEAR=$(date +%y)
-MONTH=$(date +%m)
+MONTH=$(date +%-m)
 
 if [ "$MONTH" = "12" ]
 then
