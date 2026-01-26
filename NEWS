@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.6.0:
+changes in sbcl-2.6.1 relative to sbcl-2.6.0:
   * minor incompatible change: the never-documented :NO-CONSTRUCTOR-DEFUN
     option to DEFSTRUCT is no longer supported.
   * platform support:
