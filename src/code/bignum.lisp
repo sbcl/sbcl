@@ -235,6 +235,12 @@
            (type bignum-length len))
   (%ashr (%bignum-ref bignum (1- len)) (1- digit-size)))
 
+(declaim (inline %sign-digit-signed))
+(defun %sign-digit-signed (bignum len)
+  (declare (type bignum bignum)
+           (type bignum-length len))
+  (truly-the (integer -1 0) (sb-c::mask-signed-field digit-size (%sign-digit bignum len))))
+
 (declaim (inline (setf %bignum-ref)))
 (defun (setf %bignum-ref) (val bignum index)
   (%bignum-set bignum index val) ; valueless
@@ -301,6 +307,16 @@
               (%fixnum-digit-with-correct-sign digit)
               result))
         result)))
+
+(declaim (inline bignum-buffer-integer-length))
+(defun bignum-buffer-integer-length (bignum len)
+  (declare (type bignum bignum))
+  (let* ((len-1 (1- len))
+         (digit (%bignum-ref bignum len-1)))
+    (declare (type bignum-length len len-1)
+             (type bignum-element-type digit))
+    (+ (integer-length (%fixnum-digit-with-correct-sign digit))
+       (* len-1 digit-size))))
 
 ;;;; addition
 
@@ -1117,30 +1133,38 @@
 ;;; locals established by the macro.
 (defun bignum-ashift-right (bignum count)
   (declare (type bignum bignum)
-           (type unsigned-byte count))
+           (type unsigned-byte count)
+           (muffle-conditions compiler-note))
   (let ((bignum-len (%bignum-length bignum)))
     (cond ((fixnump count)
            (multiple-value-bind (digits n-bits) (truncate count digit-size)
              (declare (type bignum-length digits))
              (cond
-              ((>= digits bignum-len)
-               (if (%bignum-0-or-plusp bignum bignum-len) 0 -1))
-              ((zerop n-bits)
-               (bignum-ashift-right-digits bignum digits))
-              (t
-               (shift-right-unaligned bignum digits n-bits (- bignum-len digits)
-                                      ((= j res-len-1)
-                                       (setf (%bignum-ref res j)
-                                             (%ashr (%bignum-ref bignum i) n-bits))
-                                       (%normalize-bignum res res-len))
-                                      res)))))
+               ((>= digits bignum-len)
+                (%sign-digit-signed bignum bignum-len))
+               ((sb-c::when-vop-existsp (:translate sb-kernel:ash-right-two-words)
+                  (and (<= (- bignum-len digits) 2)
+                       (<= (- (bignum-buffer-integer-length bignum bignum-len)
+                              count)
+                           (1- sb-vm:n-word-bits))))
+                (sb-c::mask-signed-field sb-vm:n-word-bits (sb-c::ash-into-word-mod bignum (- count))))
+               ((zerop n-bits)
+                (bignum-ashift-right-digits bignum digits))
+               (t
+
+                (shift-right-unaligned bignum digits n-bits (- bignum-len digits)
+                                       ((= j res-len-1)
+                                        (setf (%bignum-ref res j)
+                                              (%ashr (%bignum-ref bignum i) n-bits))
+                                        (%normalize-bignum res res-len))
+                                       res)))))
           ((> count bignum-len)
-           (if (%bignum-0-or-plusp bignum bignum-len) 0 -1))
-           ;; Since a FIXNUM should be big enough to address anything in
-           ;; memory, including arrays of bits, and since arrays of bits
-           ;; take up about the same space as corresponding fixnums, there
-           ;; should be no way that we fall through to this case: any shift
-           ;; right by a bignum should give zero. But let's check anyway:
+           (%sign-digit-signed bignum bignum-len))
+          ;; Since a FIXNUM should be big enough to address anything in
+          ;; memory, including arrays of bits, and since arrays of bits
+          ;; take up about the same space as corresponding fixnums, there
+          ;; should be no way that we fall through to this case: any shift
+          ;; right by a bignum should give zero. But let's check anyway:
           (t (error "bignum overflow: can't shift right by ~S" count)))))
 
 (defun bignum-ashift-right-digits (bignum digits)
@@ -1575,15 +1599,6 @@
   (def double-float))
 
 ;;;; integer length and logbitp/logcount
-
-(defun bignum-buffer-integer-length (bignum len)
-  (declare (type bignum bignum))
-  (let* ((len-1 (1- len))
-         (digit (%bignum-ref bignum len-1)))
-    (declare (type bignum-length len len-1)
-             (type bignum-element-type digit))
-    (+ (integer-length (%fixnum-digit-with-correct-sign digit))
-       (* len-1 digit-size))))
 
 (defun bignum-integer-length (bignum)
   (declare (type bignum bignum))

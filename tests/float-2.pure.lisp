@@ -825,7 +825,6 @@ fractional bits."
              (error (abs (- ratio new-ratio)))
              (error-prev (abs (- ratio (rational prev-float))))
              (error-next (abs (- ratio (rational next-float)))))
-        
         (cond
           ((< error-next error)
            (error "(float ~a ~a) = ~a, while ~a is closer" ratio type result next-float))

@@ -627,7 +627,7 @@
 (defknown %fixnum-digit-with-correct-sign (bignum-element-type) sb-vm:signed-word
     (foldable flushable movable always-translatable))
 
-;;; %ASHR- take a digit-size quantity and shift it to the left,
+;;; %ASHL- take a digit-size quantity and shift it to the left,
 ;;; returning a digit-size quantity.
 ;;; %ASHR- Do an arithmetic shift right of data even though bignum-element-type is
 ;;; unsigned.
