@@ -113,6 +113,9 @@
 ;;;
 ;;; The cross-compilation process will force the creation of these directories
 ;;; by executing CL:ENSURE-DIRECTORIES-EXIST (on the xc host Common Lisp).
+;;;
+;;; With suitable settings of these prefixes it is possible to run simultaneous
+;;; builds from one source tree.
 (defvar *host-obj-prefix*)
 (defvar *target-obj-prefix*)
 
@@ -510,12 +513,16 @@
 ;;; Determine the source path for a stem by remapping from the abstract name
 ;;; if it contains "/{arch}/" and appending a ".lisp" suffix.
 ;;; Assume that STEM is source-tree-relative unless it starts with "output/"
-;;; in which case it could be elsewhere, if you prefer to keep the sources
-;;; devoid of compilation artifacts. (The production of out-of-tree artifacts
-;;; is not actually implemented in the generic build, however if your build
-;;; system does that by itself, then hooray for you)
+;;; in which case the file is not under source control, but has a generator script.
 (defun stem-source-path (stem)
-  (concatenate 'string (find-bootstrap-file (stem-remap-target stem)) ".lisp"))
+  ;; Tell FIND-BOOTSTRAP-FILE that the stem is BUILD-DEPENDENT for generated files,
+  ;; because "output/stuff-groveled-from-headers" can be sensitive to the
+  ;; architecture even for a single OS - e.g.
+  ;;  (define-alien-type wst-blksize-t (signed 32)) ; arm64 Linux
+  ;;  (define-alien-type wst-blksize-t (signed 64)) ; x86-64 Linux
+  ;; If running multiarchitecture builds at the same time out of one tree,
+  ;; it is essential that we look in *BUILD-DEPENDENT-GENERATED-SOURCES-ROOT*.
+  (concatenate 'string (find-bootstrap-file (stem-remap-target stem) t) ".lisp"))
 (compile 'stem-source-path)
 
 ;;; Determine the object path for a stem/flags/mode combination.
