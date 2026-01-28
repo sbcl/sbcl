@@ -13,7 +13,7 @@
 
 (in-package "SB-KERNEL")
 
-(define-condition defmacro-lambda-list-bind-error (error)
+(define-condition defmacro-lambda-list-bind-error (program-error)
   ((kind :reader defmacro-lambda-list-bind-error-kind
          :initarg :kind)
    (name :reader defmacro-lambda-list-bind-error-name

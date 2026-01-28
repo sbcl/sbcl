@@ -22,7 +22,7 @@ rm -fr sandbox/scratch
                   --eval '(time (do-tests))' \
                   --eval '(when (member "--coverage" sb-ext:*posix-argv* :test (function equal)) (funcall (intern "SAVE-COVERAGE-IN-FILE" "SB-COVER") "../../ansi-tests.coverage"))' \
                   --eval '(let* ((expected (list* "APROPOS-LIST.ERROR.2" "APROPOS.ERROR.2" "COMPILE-FILE.2"
- "DEFINE-COMPILER-MACRO.8" "DESTRUCTURING-BIND.ERROR.10"
+ "DEFINE-COMPILER-MACRO.8"
  "EXP.ERROR.10" "EXP.ERROR.11" "EXP.ERROR.8"
  "EXP.ERROR.9" "EXPT.ERROR.10" "EXPT.ERROR.11" "EXPT.ERROR.8" "EXPT.ERROR.9"
  "FORMAT.A.29" "FORMAT.A.57" "FORMAT.A.58" "FORMAT.B.27" "FORMAT.B.28"
