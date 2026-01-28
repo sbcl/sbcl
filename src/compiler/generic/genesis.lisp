@@ -1590,15 +1590,16 @@ core and return a descriptor to it."
 
 ;; These fixed IDs have no use in lisp code, but we need known values
 ;; for C to find packages easily
-(defconstant +package-id-user+      3)
-(defconstant +package-id-sb-kernel+ 4)
-(defconstant +package-id-sb-ext+    5)
-(defconstant +package-id-sb-int+    6)
-(defvar *package-id-count* 6) ; pre-incremented on use
+(defconstant +package-id-user+   3)
+(defconstant +package-id-kernel+ 4)
+(defconstant +package-id-sys+    5)
+(defvar *package-id-count* 5) ; pre-incremented on use
 (defun package-id-generator (name)
-  (cond ((string= name "SB-KERNEL") +package-id-sb-kernel+)
-        ((string= name "SB-INT") +package-id-sb-int+)
-        ((string= name "SB-EXT") +package-id-sb-ext+)
+  (cond ((string= name "SB-KERNEL") +package-id-kernel+)
+        ((string= name "SB-SYS") +package-id-sys+)
+        ;; These were for C, but they seem unused
+        ;;((string= name "SB-INT") +package-id-int+)
+        ;;((string= name "SB-EXT") +package-id-ext+)
         (t (incf *package-id-count*))))
 
 ;;; Initialize the cold package named by NAME. The information is
@@ -3194,8 +3195,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
                   (when (integerp value)
                     (record (c-symbol-name symbol) 4/5 symbol ""))))))))
       (dolist (c '(sb-impl::+package-id-none+ sb-impl::+package-id-keyword+
-                   +package-id-lisp+ +package-id-user+ +package-id-sb-kernel+
-                   +package-id-sb-int+ +package-id-sb-ext+))
+                   +package-id-lisp+ +package-id-user+ +package-id-kernel+
+                   +package-id-sys+))
         (record (c-symbol-name c) 3/2 #| arb |# c ""))
       ;; Other constants that aren't necessarily grouped into families.
       (dolist (c '(sb-bignum:maximum-bignum-length
