@@ -3268,9 +3268,18 @@ is :ANY, the function name is not checked."
 (defun careful-call (function args)
   (declare (type (or symbol function) function)
            (type list args))
-  (handler-case (values (multiple-value-list (apply (cross function) args)) t)
+  (handler-case (apply (cross function) args)
+    ((or floating-point-overflow floating-point-inexact floating-point-underflow)
+        (c)
+      (values c nil t))
     (error (condition)
-      (values condition nil))))
+      (values condition nil))
+    (:no-error (&rest results)
+      (let ((first (first results)))
+        (if (and (floatp first)
+                 (float-infinity-p first))
+            (values results nil t)
+            (values results t))))))
 
 ;;; Variations of SPECIFIER-TYPE for parsing possibly wrong
 ;;; specifiers.

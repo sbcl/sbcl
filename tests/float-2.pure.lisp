@@ -852,3 +852,7 @@ fractional bits."
             (when (typep ratio 'ratio)
               (check-ratio-to-float ratio 1f0)
               (check-ratio-to-float ratio 1d0))))))
+
+(with-test (:name :scale-float-rounding)
+  (assert (= (integer-decode-float (scale-float (opaque-identity 0.7836354097202904d0) -1032))
+             (opaque-identity 3446464979698))))

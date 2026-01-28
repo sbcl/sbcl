@@ -573,65 +573,131 @@
 
 (declaim (maybe-inline scale-single-float scale-double-float))
 
-;;; Scale a single or double float, calling the correct over/underflow
-;;; functions.
-(defun scale-single-float (x exp)
-  (declare (single-float x) (integer exp))
-  (etypecase exp
-    (fixnum
-     (let* ((bits (single-float-bits x))
-            (old-exp (ldb sb-vm:single-float-exponent-byte bits))
-            (new-exp (+ old-exp exp)))
-       (cond
-         ((zerop x) x)
-         ((or (< old-exp sb-vm:single-float-normal-exponent-min)
-              (< new-exp sb-vm:single-float-normal-exponent-min))
-          (scale-single-float-maybe-underflow x exp))
-         ((or (> old-exp sb-vm:single-float-normal-exponent-max)
-              (> new-exp sb-vm:single-float-normal-exponent-max))
-          (scale-single-float-maybe-overflow x exp))
-         (t
-          (make-single-float (dpb new-exp
-                                  sb-vm:single-float-exponent-byte
-                                  bits))))))
-    (unsigned-byte (scale-single-float-maybe-overflow x exp))
-    ((integer * 0) (scale-single-float-maybe-underflow x exp))))
+;; ====================================================
+;; Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+;;
+;; Developed at SunPro, a Sun Microsystems, Inc. business.
+;; Permission to use, copy, modify, and distribute this
+;; software is freely granted, provided that this notice
+;; is preserved.
+;; ====================================================
+(make-defs ((($type $make $tiny $huge $two^ $two^- $size)
+             (single-float make-single-float
+                           1f-30 1f30 3.355443200f7 2.9802322388f-8 31)
+             #+64-bit
+             (double-float %make-double-float
+                           1d-300 1d300 1.80143985094819840000d16 5.55111512312578270212d-17 63)))
+  (defun scale-$type (float n)
+    (declare ($type float)
+             (integer n)
+             (optimize speed))
+    (block scale-$type
+      (let* ((1+digits (1+ sb-vm\:$type-digits))
+             (two^digits $two^)
+             (two^-digits $two^-)
+             (tiny $tiny)
+             (huge $huge)
+             (bits ($type-bits float))
+             (exp (ldb sb-vm\:$type-exponent-byte bits)))
 
-(defun scale-double-float (x exp)
-  (etypecase exp
-    (fixnum
-     #+64-bit
-     (let* ((bits (double-float-bits x))
-            (old-exp (ldb sb-vm:double-float-exponent-byte bits))
-            (new-exp (+ old-exp exp)))
-       (cond
-         ((zerop x) x)
-         ((or (< old-exp sb-vm:double-float-normal-exponent-min)
-              (< new-exp sb-vm:double-float-normal-exponent-min))
-          (scale-double-float-maybe-underflow x exp))
-         ((or (> old-exp sb-vm:double-float-normal-exponent-max)
-              (> new-exp sb-vm:double-float-normal-exponent-max))
-          (scale-double-float-maybe-overflow x exp))
+        ;; 0 or subnormal x
+        (when (zerop exp)
+          (when (zerop (ldb (byte $size 0) bits))
+            ;; +-0
+            (return-from scale-$type float))
+
+          (setf float (sb-xc:* float two^digits)
+                bits ($type-bits float)
+                exp (- (ldb sb-vm\:$type-exponent-byte bits)
+                       1+digits)))
+
+        ;; NaN or Inf
+        (when (= exp (1+ sb-vm\:$type-normal-exponent-max))
+          (return-from scale-$type (sb-xc:+ float float)))
+
+        (if (typep n 'fixnum)
+            (cond
+              ((> n 5000)
+               (return-from scale-$type (sb-xc:* huge (float-sign float huge))))
+              ((< n -5000)
+               (return-from scale-$type (sb-xc:* tiny (float-sign float tiny)))))
+            (if (plusp n)
+                (return-from scale-$type (sb-xc:* huge (float-sign float huge)))
+                (return-from scale-$type (sb-xc:* tiny (float-sign float tiny)))))
+        (let ((exp-new (+ exp n)))
+          (declare (type fixnum exp-new))
+          (cond ((plusp exp-new)
+                 (cond
+                   ;; Overflow
+                   ((> exp-new sb-vm\:$type-normal-exponent-max)
+                    (sb-xc:* huge (float-sign float huge)))
+                   ;; normal result
+                   (t
+                    ($make
+                     (dpb exp-new sb-vm\:$type-exponent-byte bits)))))
+                ((<= exp-new (- 1+digits))
+                 ;; Underflow
+                 (sb-xc:* tiny (float-sign float tiny)))
+                (t
+                 ;; subnormal result
+                 (sb-xc:* ($make
+                           (dpb (+ exp-new 1+digits)
+                                sb-vm\:$type-exponent-byte
+                                bits))
+                          two^-digits))))))))
+
+#-64-bit
+(defun scale-double-float (float n)
+  (declare (double-float float)
+           (integer n))
+  (block scale-double-float
+    (let* ((1+digits (1+ sb-vm:double-float-digits))
+           (two^digits 1.8014398509481984d16)
+           (two^-digits 5.551115123125783d-17)
+           (tiny 1.0d-300)
+           (huge 1.0d300)
+           (lo-bits (double-float-low-bits float))
+           (hi-bits (double-float-high-bits float))
+           (exp (ldb sb-vm:double-float-hi-exponent-byte hi-bits)))
+      (when (zerop exp)
+        (when (zerop (logior (ldb (byte 31 0) hi-bits) lo-bits))
+          (return-from scale-double-float float))
+        (setf float (sb-xc:* float two^digits)
+              lo-bits (double-float-low-bits float)
+              hi-bits (double-float-high-bits float)
+              exp (- (ldb sb-vm:double-float-hi-exponent-byte hi-bits)
+                     1+digits)))
+      (when (= exp (1+ sb-vm:double-float-normal-exponent-max))
+        (return-from scale-double-float (sb-xc:+ float float)))
+      (if (typep n 'fixnum)
+          (cond
+           ((> n 5000)
+            (return-from scale-double-float (sb-xc:* huge (float-sign float huge))))
+           ((< n -5000)
+            (return-from scale-double-float (sb-xc:* tiny (float-sign float tiny)))))
+          (if (plusp n)
+              (return-from scale-double-float (sb-xc:* huge (float-sign float huge)))
+              (return-from scale-double-float
+                (sb-xc:* tiny (float-sign float tiny)))))
+      (let ((exp-new (+ exp n)))
+        (declare (type fixnum exp-new))
+        (cond
+         ((plusp exp-new)
+          (cond
+           ((> exp-new sb-vm:double-float-normal-exponent-max)
+            (sb-xc:* huge (float-sign float huge)))
+           (t
+            (make-double-float
+             (dpb exp-new sb-vm:double-float-hi-exponent-byte hi-bits)
+             lo-bits))))
+         ((<= exp-new (- 1+digits)) (sb-xc:* tiny (float-sign float tiny)))
          (t
-          (%make-double-float (dpb new-exp sb-vm:double-float-exponent-byte bits)))))
-     #-64-bit
-     (let* ((hi (double-float-high-bits x))
-            (lo (double-float-low-bits x))
-            (old-exp (ldb sb-vm:double-float-hi-exponent-byte hi))
-            (new-exp (+ old-exp exp)))
-       (cond
-         ((zerop x) x)
-         ((or (< old-exp sb-vm:double-float-normal-exponent-min)
-              (< new-exp sb-vm:double-float-normal-exponent-min))
-          (scale-double-float-maybe-underflow x exp))
-         ((or (> old-exp sb-vm:double-float-normal-exponent-max)
-              (> new-exp sb-vm:double-float-normal-exponent-max))
-          (scale-double-float-maybe-overflow x exp))
-         (t
-          (make-double-float (dpb new-exp sb-vm:double-float-hi-exponent-byte hi)
-                             lo)))))
-    (unsigned-byte (scale-double-float-maybe-overflow x exp))
-    ((integer * 0) (scale-double-float-maybe-underflow x exp))))
+          (sb-xc:*
+           (make-double-float
+            (dpb (+ exp-new 1+digits) sb-vm:double-float-hi-exponent-byte
+                 hi-bits)
+            lo-bits)
+           two^-digits)))))))
 
 ;;; Dispatch to the correct type-specific scale-float function.
 (defun scale-float (f ex)

@@ -1521,5 +1521,77 @@ NOTE: This interface is experimental and subject to change."
              (<= (- exponent)
                  ;; count-trailing-zeros, but wider for 32-bit platforms
                  (integer-length (ldb (byte 64 0) (lognor significand (- significand)))))))))
+
+(defmacro make-defs (vars &body body)
+  (labels ((subst-if-with (test tree)
+             (labels ((s (subtree)
+                        (multiple-value-bind (new replace)
+                            (funcall test subtree)
+                          (cond (replace new)
+                                ((comma-p subtree)
+                                 (let ((new (s (comma-expr subtree))))
+                                   (if (eq subtree new)
+                                       subtree
+                                       (unquote new (comma-kind subtree)))))
+                                ((atom subtree) subtree)
+                                (t (let ((car (s (car subtree)))
+                                         (cdr (s (cdr subtree))))
+                                     (if (and (eq car (car subtree))
+                                              (eq cdr (cdr subtree)))
+                                         subtree
+                                         (cond ((and (typep car '(cons symbol))
+                                                     (string= (car car) "$WHEN"))
+                                                (if (eval (second car))
+                                                    (append (cddr car) cdr)
+                                                    cdr))
+                                               ((and (typep car '(cons symbol))
+                                                     (string= (car car) "$UNLESS"))
+                                                (if (eval (second car))
+                                                    cdr
+                                                    (append (cddr car) cdr)))
+                                               ((and (typep car '(cons symbol))
+                                                     (string= (car car) "$IF"))
+                                                (cons
+                                                 (if (eval (second car))
+                                                     (third car)
+                                                     (fourth car))
+                                                 cdr))
+                                               (t
+                                                (cons car cdr))))))))))
+               (s tree)))
+           (test (pattern with)
+             (lambda (x)
+               (when (symbolp x)
+                 (let* ((str (string x))
+                        (start (search pattern str)))
+                   (when start
+                     (values
+                      (if (equal str pattern)
+                          with
+                          (let ((package (position #\: str)))
+                            (if package
+                                (package-symbolicate (subseq str 0 package)
+                                                     (subseq str (1+ package) start)
+                                                     with
+                                                     (subseq str (+ start (length pattern))))
+                                (symbolicate (subseq str 0 start)
+                                             with
+                                             (subseq str (+ start (length pattern)))))))
+                      t))))))
+           (gen (vars body)
+             (if vars
+                 (loop for with in (cdar vars)
+                       append
+                       (gen (cdr vars)
+                            (let ((body body)
+                                  (patterns (sort (loop for v in (ensure-list (caar vars))
+                                                        for w in (ensure-list with)
+                                                        collect (cons v w))
+                                                  #'> :key (lambda (x) (length (string (car x)))))))
+                              (loop for (v . w) in patterns
+                                    do (setf body (subst-if-with (test (string v) w) body)))
+                              body)))
+                 body)))
+    `(progn ,@(gen vars body))))
 
 (defvar *top-level-form-p* nil)

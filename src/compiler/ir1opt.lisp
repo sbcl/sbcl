@@ -1992,12 +1992,13 @@
            (fold-p (fun-info-fold-p info)))
       (when (or (not fold-p)
                 (apply fold-p args))
-       (multiple-value-bind (values win) (careful-call (or folder
+       (multiple-value-bind (values win ignore) (careful-call (or folder
                                                            fun-name)
                                                        args)
          (cond ((not win)
                 ;; Ignore errors from dedicated folders, in lieu of adding fun-info-fold-p.
-                (unless folder
+                (unless (or folder
+                            ignore)
                   (setf (combination-kind call) :error
                         (combination-info call)
                         (list #'compiler-style-warn "Lisp error during constant folding:~%~A" values))
