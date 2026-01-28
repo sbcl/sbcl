@@ -686,54 +686,54 @@
   (if (or (float-infinity-p number)
           (float-nan-p number))
       (prin1 number stream)
-      (multiple-value-bind (num expt) (sb-impl::scale-exponent (abs number))
-        (let* ((k (if (= num 1.0) (1- k) k))
-               (expt (- expt k))
-               (estr (decimal-string (abs expt)))
-               (elen (if e (max (length estr) e) (length estr)))
-               spaceleft)
-          (when w
-            (setf spaceleft (- w 2 elen))
-            (when (or atsign (float-sign-bit-set-p number))
-              (decf spaceleft)))
-          (if (and w ovf e (> elen e))  ;exponent overflow
-              (dotimes (i w) (write-char ovf stream))
-              (let* ((fdig (if d (if (plusp k) (1+ (- d k)) d) nil))
-                     (fmin (if (minusp k) 1 fdig)))
-                (multiple-value-bind (fstr flen lpoint tpoint)
-                    (sb-impl::flonum-to-string num spaceleft fdig k fmin)
-                  (when (eql fdig 0) (setq tpoint nil))
-                  (when w
-                    (decf spaceleft flen)
-                    (when lpoint
-                      (if (or (> spaceleft 0) tpoint)
-                          (decf spaceleft)
-                          (setq lpoint nil)))
-                    (when tpoint
-                      (if (<= spaceleft 0)
-                          (setq tpoint nil)
-                          (decf spaceleft))))
-                  (cond ((and w (< spaceleft 0) ovf)
-                         ;;significand overflow
-                         (dotimes (i w) (write-char ovf stream)))
-                        (t (when w
-                             (dotimes (i spaceleft) (write-char pad stream)))
-                           (if (float-sign-bit-set-p number)
-                               (write-char #\- stream)
-                               (if atsign (write-char #\+ stream)))
-                           (when lpoint (write-char #\0 stream))
-                           (write-string fstr stream)
-                           (when tpoint (write-char #\0 stream))
-                           (write-char (if marker
-                                           marker
-                                           (format-exponent-marker number))
-                                       stream)
-                           (write-char (if (minusp expt) #\- #\+) stream)
-                           (when e
-                             ;;zero-fill before exponent if necessary
-                             (dotimes (i (- e (length estr)))
-                               (write-char #\0 stream)))
-                           (write-string estr stream))))))))))
+      (let* ((num (abs number))
+             (num-expt (sb-impl::flonum-exponent num))
+             (expt (- num-expt k))
+             (estr (decimal-string (abs expt)))
+             (elen (if e (max (length estr) e) (length estr)))
+             spaceleft)
+        (when w
+          (setf spaceleft (- w 2 elen))
+          (when (or atsign (float-sign-bit-set-p number))
+            (decf spaceleft)))
+        (if (and w ovf e (> elen e))  ;exponent overflow
+            (dotimes (i w) (write-char ovf stream))
+            (let* ((fdig (if d (if (plusp k) (1+ (- d k)) d) nil))
+                   (fmin (if (minusp k) 1 fdig)))
+              (multiple-value-bind (fstr flen lpoint tpoint)
+                  (sb-impl::flonum-to-string num spaceleft fdig k fmin num-expt)
+                (when (eql fdig 0) (setq tpoint nil))
+                (when w
+                  (decf spaceleft flen)
+                  (when lpoint
+                    (if (or (> spaceleft 0) tpoint)
+                        (decf spaceleft)
+                        (setq lpoint nil)))
+                  (when tpoint
+                    (if (<= spaceleft 0)
+                        (setq tpoint nil)
+                        (decf spaceleft))))
+                (cond ((and w (< spaceleft 0) ovf)
+                       ;;significand overflow
+                       (dotimes (i w) (write-char ovf stream)))
+                      (t (when w
+                           (dotimes (i spaceleft) (write-char pad stream)))
+                         (if (float-sign-bit-set-p number)
+                             (write-char #\- stream)
+                             (if atsign (write-char #\+ stream)))
+                         (when lpoint (write-char #\0 stream))
+                         (write-string fstr stream)
+                         (when tpoint (write-char #\0 stream))
+                         (write-char (if marker
+                                         marker
+                                         (format-exponent-marker number))
+                                     stream)
+                         (write-char (if (minusp expt) #\- #\+) stream)
+                         (when e
+                           ;;zero-fill before exponent if necessary
+                           (dotimes (i (- e (length estr)))
+                             (write-char #\0 stream)))
+                         (write-string estr stream)))))))))
 
 (def-format-interpreter #\G (colonp atsignp params)
   (check-modifier "colon" colonp)

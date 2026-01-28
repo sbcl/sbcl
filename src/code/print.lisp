@@ -1533,13 +1533,14 @@ variable: an unreadable object representing the error is printed instead.")
 ;;;
 ;;; FLOAT-DIGITS actually generates the digits for positive numbers;
 ;;; see below for comments.
-
-(defun flonum-to-string (x &optional width fdigits scale fmin)
+(defun flonum-to-string (x &optional width fdigits scale fmin exponent-zero)
   (declare (type float x))
   (multiple-value-bind (e string)
       (if fdigits
-          (flonum-to-digits x (min (- (+ fdigits (or scale 0)))
-                                   (- (or fmin 0))))
+          (flonum-to-digits x (+ (min (- (+ fdigits (or scale 0)))
+                                    (- (or fmin 0)))
+                                 (or exponent-zero
+                                     0)))
           (if (and width (> width 1))
               (let ((w (multiple-value-list
                         (flonum-to-digits x
@@ -1556,11 +1557,18 @@ variable: an unreadable object representing the error is printed instead.")
                    (values-list w))
                   (t (values-list f))))
               (flonum-to-digits x)))
-    (let ((e (if (zerop x)
-                 e
-                 (+ e (or scale 0))))
-          (stream (make-string-output-stream)))
-      (if (plusp e)
+    (let* ((e (if exponent-zero
+                  (if (zerop x)
+                      0
+                      (- e exponent-zero))
+                  e))
+           (e (if (zerop x)
+                  e
+                  (+ e (or scale 0))))
+           (stream (make-string-output-stream)))
+      (if (or (and (= e 0)
+                   exponent-zero)
+              (plusp e))
           (progn
             (write-string string stream :end (min (length string) e))
             (dotimes (i (- e (length string)))
@@ -1840,6 +1848,17 @@ variable: an unreadable object representing the error is printed instead.")
                       (values (float z original-x) ex))
                    (declare (long-float m) (integer ex))))
               (declare (long-float d))))))))
+
+;;; flonum-to-digits without producing a string
+(defun flonum-exponent (float)
+  (if (zerop float)
+      (values 1)
+      (%flonum-to-digits
+       (lambda (d)
+         (declare (ignore d)))
+       (lambda (k) k)
+       (lambda (k) (values k))
+       float)))
 
 ;;;; entry point for the float printer
 
