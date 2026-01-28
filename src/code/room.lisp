@@ -14,19 +14,13 @@
 
 ;;;; type format database
 
-;;; FIXME: this structure seems to no longer serve a purpose.
-;;; We'd do as well with a simple-vector of (or symbol cons saetp).
-(defstruct (room-info (:constructor make-room-info (name))
-                      (:copier nil))
-    (name nil :type symbol :read-only t)) ; the name of this type
-(declaim (freeze-type room-info))
-
 (defun room-info-type-name (info)
     (if (specialized-array-element-type-properties-p info)
         (saetp-primitive-type-name info)
-        (room-info-name info)))
+        info))
 
 (defconstant tiny-boxed-size-mask #xFF)
+(eval-when (:compile-toplevel :load-toplevel)
 (defun compute-room-infos ()
   (let ((infos (make-array 256 :initial-element nil)))
     (dolist (obj *primitive-objects*)
@@ -36,9 +30,9 @@
         (when (and (member lowtag '(other-pointer-lowtag fun-pointer-lowtag
                                     instance-pointer-lowtag))
                    (not (member widetag '(t nil simple-fun-widetag))))
-          (setf (svref infos (symbol-value widetag)) (make-room-info name)))))
+          (setf (svref infos (symbol-value widetag)) name))))
 
-    (let ((info (make-room-info 'array-header)))
+    (let ((info 'array-header))
       (dolist (code (list #+sb-unicode complex-character-string-widetag
                           complex-base-string-widetag simple-array-widetag
                           complex-bit-vector-widetag complex-vector-widetag
@@ -49,7 +43,7 @@
       (let ((saetp (aref *specialized-array-element-type-properties* i)))
         (setf (svref infos (saetp-typecode saetp)) saetp)))
 
-    (let ((cons-info (make-room-info 'cons)))
+    (let ((cons-info 'cons))
       ;; A cons consists of two words, both of which may be either a
       ;; pointer or immediate data.  According to the runtime this means
       ;; either a fixnum, a character, an unbound-marker, a single-float
@@ -74,10 +68,9 @@
       ;; Single-floats are immediate data on 64-bit systems.
       #+64-bit (setf (svref infos single-float-widetag) cons-info))
 
-    infos))
+    infos)))
 
-(define-load-time-global *room-info* (compute-room-infos))
-(declaim (type (simple-vector 256) *room-info*))
+(defconstant-eqx +room-info+ (compute-room-infos) #'constantly-t)
 
 (defconstant-eqx +heap-spaces+
   '((:dynamic   "Dynamic space"   dynamic-usage)
@@ -525,7 +518,7 @@ We could try a few things to mitigate this:
         (let ((total-count (aref counts i)))
           (unless (zerop total-count)
             (let* ((total-size (aref sizes i))
-                   (name (room-info-type-name (aref *room-info* i)))
+                   (name (room-info-type-name (aref +room-info+ i)))
                    (found (ensure-gethash name totals (list 0 0 name))))
               (incf (first found) total-size)
               (incf (second found) total-count)))))

@@ -200,16 +200,16 @@
         (incf total-n-patched n-patched)))
     (values total-n-patch-points total-n-patched)))
 
-(defglobal *tag-to-type*
+(defconstant-eqx +tag-to-type+
   (map 'vector
        (lambda (x)
-        (cond ((sb-vm::specialized-array-element-type-properties-p x)
-               (let ((et (sb-vm:saetp-specifier x)))
-                 (sb-kernel:type-specifier
-                  (sb-kernel:specifier-type `(simple-array ,et 1)))))
-              (x
-               (sb-vm::room-info-name x))))
-       sb-vm::*room-info*))
+        (if (sb-vm::specialized-array-element-type-properties-p x)
+            (let ((et (sb-vm:saetp-specifier x)))
+              (sb-kernel:type-specifier
+                  (sb-kernel:specifier-type `(simple-array ,et 1))))
+            x))
+       sb-vm::+room-info+)
+  #'equalp)
 
 (defun layout-name (ptr)
   (if (eql (valid-tagged-pointer-p (int-sap ptr)) 0)
@@ -564,7 +564,7 @@
               (setq nbytes nil))
             (cond ((and (member type '(fixed+header var-array var-xadd any))
                         (typep header '(or sb-vm:word sb-vm:signed-word)))
-                   (setq type (aref *tag-to-type* (logand header #xFF)))
+                   (setq type (aref +tag-to-type+ (logand header #xFF)))
                    (when (register-p nbytes)
                      (setq nbytes nil))
                    (when (eq type 'instance)
