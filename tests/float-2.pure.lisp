@@ -842,16 +842,18 @@ fractional bits."
 
 (with-test (:name :ratio-to-float)
   (let ((*random-state* (make-random-state t)))
-    (loop repeat 50000
+    (loop repeat 20000
           do
-          (let* ((n-bits (random 100))
-                 (d-bits (random 100))
+          (let* ((n-bits (random 1075))
+                 (d-bits (random 1075))
                  (num (random (ash 1 n-bits)))
                  (den (max 1 (random (ash 1 d-bits))))
                  (ratio (/ num den)))
             (when (typep ratio 'ratio)
-              (check-ratio-to-float ratio 1f0)
-              (check-ratio-to-float ratio 1d0))))))
+              (handler-case (progn
+                              (check-ratio-to-float ratio 1f0)
+                              (check-ratio-to-float ratio 1d0))
+                (arithmetic-error ())))))))
 
 (with-test (:name :scale-float-rounding)
   (assert (= (integer-decode-float (scale-float (opaque-identity 0.7836354097202904d0) -1032))

@@ -769,68 +769,38 @@
                                ,(symbolicate 'most-positive-exactly- format '-integer)))
                       (/ (coerce signed-num ',format)
                          (coerce den ',format))
-                      (let* ((plusp (plusp signed-num))
-                             (num (if plusp signed-num (- signed-num)))
-                             (digits ,(package-symbolicate :sb-vm format '-digits))
-                             (scale 0))
-                        (declare (fixnum scale))
-                        ;; Strip any trailing zeros from the denominator and move it into the scale
-                        ;; factor (to minimize the size of the operands.)
-                        (let ((den-twos (1- (integer-length (logxor den (1- den))))))
-                          (decf scale den-twos)
-                          (setq den (ash den (- den-twos))))
-                        ;; Guess how much we need to scale by from the magnitudes of the numerator
-                        ;; and denominator. We want one extra bit for a guard bit.
-                        (let* ((num-len (integer-length num))
-                               (den-len (integer-length den))
-                               (delta (- den-len num-len))
-                               (shift (1+ (+ delta digits)))
-                               (shifted-num (ash num shift))
-                               ;; Sticky bit for any of the shifted out set bits
-                               (sticky (if (and (minusp shift)
-                                                (ldb-test (byte (- shift) 0) num))
-                                           1
-                                           0)))
-                          (decf scale delta)
-                          (labels ((float-and-scale (bits)
-                                     (let* ((bits (ash bits -1))
-                                            (len (integer-length bits)))
-                                       (cond ((> len digits)
-                                              (aver (= len (1+ digits)))
-                                              (scale-float (floatit (ash bits -1)) (1+ scale)))
-                                             (t
-                                              (scale-float (floatit bits) scale)))))
-                                   (floatit (bits)
-                                     (let ((sign (if plusp 0 1)))
-                                       ,(case format
-                                          (single-float
-                                           `(single-from-bits sign sb-vm:single-float-bias bits))
-                                          (double-float
-                                           `(double-from-bits sign sb-vm:double-float-bias bits))
-                                          #+long-float
-                                          (long-float
-                                           `(long-from-bits sign sb-vm:long-float-bias bits))))))
-                            (declare (inline floatit))
-                            (loop
-                             (multiple-value-bind (fraction-and-guard rem) (truncate shifted-num den)
-                               (declare (type
-                                         (unsigned-byte ,(+ (symbol-value (package-symbolicate :sb-vm format '-digits)) 2))
-                                         fraction-and-guard))
-                               (let ((extra (- (integer-length fraction-and-guard) digits)))
-                                 (cond ((/= extra 1)
-                                        (aver (> extra 1))
-                                        ;; Add the newly shifted out bit to the sticky bits
-                                        (setf sticky (logior sticky (logand shifted-num 1))))
-                                       (t
-                                        (return
-                                          (float-and-scale (if (and (oddp fraction-and-guard)
-                                                                    (or (logtest fraction-and-guard 2)
-                                                                        (/= rem 0)
-                                                                        (/= sticky 0)))
-                                                               (1+ fraction-and-guard)
-                                                               fraction-and-guard))))))
-                               (setq shifted-num (ash shifted-num -1))
-                               (incf scale)))))))))))
+                      ;; This algorithm is used by CPython
+                      (dispatch-ratio (x signed-num den)
+                        (let* ((plusp (plusp signed-num))
+                               (num (if plusp signed-num (- signed-num)))
+                               (digits ,(package-symbolicate :sb-vm format '-digits))
+                               (min-exp (- 1 ,(package-symbolicate :sb-vm format '-bias)))
+                               (a-bits (integer-length num))
+                               (b-bits (integer-length den))
+                               (diff (- a-bits b-bits))
+                               (shift (- (max diff (- min-exp 1)) digits 2))
+                               (inexact nil)
+                               (shifted-num (if (minusp shift)
+                                                (ash num (- shift))
+                                                (prog1 (ash num (- shift))
+                                                  (setf inexact (ldb-test (byte shift 0) num))))))
+                          (multiple-value-bind (x rem) (truncate shifted-num den)
+                            (unless (zerop rem)
+                              (setf inexact t))
+                            (let* ((x-bits (integer-length (truly-the (unsigned-byte ,(+ (symbol-value (package-symbolicate :sb-vm format '-digits)) 3))
+                                                                      x)))
+                                   ;; Determine extra bits to round away
+                                   (extra-bits (- (max x-bits (- min-exp shift)) digits))
+                                   (mask (ash 1 (1- extra-bits)))
+                                   (low (logior x (if inexact 1 0))))
+                              (when (and (logtest low mask)
+                                         (logtest low (1- (* 3 mask))))
+                                (incf x mask))
+
+                              ;; Clear the bits we rounded away
+                              (setf x (logand x (lognot (1- (* 2 mask)))))
+                              (let ((result (scale-float (coerce x ',format) shift)))
+                                (if plusp result (- result))))))))))))
   (def double-float)
   (def single-float))
 
