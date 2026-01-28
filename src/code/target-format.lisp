@@ -762,15 +762,15 @@
   (if (or (float-infinity-p number)
           (float-nan-p number))
       (prin1 number stream)
-      (multiple-value-bind (ignore n) (sb-impl::scale-exponent (abs number))
-        (declare (ignore ignore))
+      (let* ((abs (abs number))
+             (n (sb-impl::flonum-exponent abs)))
         ;; KLUDGE: Default d if omitted. The procedure is taken directly from
         ;; the definition given in the manual, and is not very efficient, since
         ;; we generate the digits twice. Future maintainers are encouraged to
         ;; improve on this. -- rtoy?? 1998??
         (unless d
           (multiple-value-bind (str len)
-              (sb-impl::flonum-to-string (abs number))
+              (sb-impl::flonum-to-string abs)
             (declare (ignore str))
             (let ((q (if (= len 1) 1 (1- len))))
               (setq d (max q (min n 7))))))

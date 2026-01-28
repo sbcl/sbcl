@@ -1806,48 +1806,6 @@ variable: an unreadable object representing the error is printed instead.")
            (print-float-exponent float 0 stream)
            (print-float-exponent float (1- k) stream)))
      float)))
-
-;;; Given a non-negative floating point number, SCALE-EXPONENT returns
-;;; a new floating point number Z in the range (0.1, 1.0] and an
-;;; exponent E such that Z * 10^E is (approximately) equal to the
-;;; original number. There may be some loss of precision due the
-;;; floating point representation. The scaling is always done with
-;;; long float arithmetic, which helps printing of lesser precisions
-;;; as well as avoiding generic arithmetic.
-;;;
-;;; When computing our initial scale factor using EXPT, we pull out
-;;; part of the computation to avoid over/under flow. When
-;;; denormalized, we must pull out a large factor, since there is more
-;;; negative exponent range than positive range.
-
-(defun scale-exponent (original-x)
-  (let* ((x (coerce original-x 'long-float)))
-    (multiple-value-bind (sig exponent) (decode-float x)
-      (declare (ignore sig))
-      (if (= x 0.0l0)
-          (values (float 0.0l0 original-x) 1)
-          (let* ((ex (locally (declare (optimize (safety 0)))
-                       (the fixnum
-                         (round (* exponent (log 2l0 10))))))
-                 (x (if (minusp ex)
-                        (if (float-denormalized-p x)
-                            #-long-float
-                            (* x 1.0l16 (expt 10.0l0 (- (- ex) 16)))
-                            #+long-float
-                            (* x 1.0l18 (expt 10.0l0 (- (- ex) 18)))
-                            (* x 10.0l0 (expt 10.0l0 (- (- ex) 1))))
-                        (/ x 10.0l0 (expt 10.0l0 (1- ex))))))
-            (do ((d 10.0l0 (* d 10.0l0))
-                 (y x (/ x d))
-                 (ex ex (1+ ex)))
-                ((< y 1.0l0)
-                 (do ((m 10.0l0 (* m 10.0l0))
-                      (z y (* y m))
-                      (ex ex (1- ex)))
-                     ((>= z 0.1l0)
-                      (values (float z original-x) ex))
-                   (declare (long-float m) (integer ex))))
-              (declare (long-float d))))))))
 
 ;;; flonum-to-digits without producing a string
 (defun flonum-exponent (float)
