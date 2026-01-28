@@ -1402,17 +1402,10 @@ lisp_fun_linkage_space: .zero ~:*~D
               (output-bignum nil (car x) asm-file))
             (cond
               (t ; (get-space immobile-fixedobj-core-space-id spacemap)
-               (format asm-file "~% .section .data~%")
-               (format asm-file " .globl ~A~%~:*~A:
- .quad ~d~%"
-                    (labelize "alien_linkage_values")
-                    (length (core-alien-linkage-symbols core)))
-               ;; -1 (not a plausible function address) signifies that word
-               ;; following it is a data, not text, reference.
-               (loop for s across (core-alien-linkage-symbols core)
-                     do (format asm-file " .quad ~:[~;-1, ~]~a~%"
-                                (consp s)
-                                (if (consp s) (car s) s)))
+               (format asm-file "~% .section .data
+ .globl ~A~%~:*~A:~%" (labelize "alien_linkage_values"))
+               (dovector (s (core-alien-linkage-symbols core))
+                 (format asm-file " .quad ~a~%" (if (consp s) (car s) s)))
                ;; dark magic to ensure that the elf linkage space is emitted
                (when (force-fntbl-ref-p spacemap)
                  (format asm-file "# this is not an alien symbol~% .quad fntbl~%"))

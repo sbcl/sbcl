@@ -18,6 +18,7 @@
 #include "globals.h"
 #include "runtime.h"
 #include "genesis/cons.h"
+#include "genesis/hash-table.h"
 #include "genesis/vector.h"
 #include "genesis/symbol.h"
 #include "genesis/static-symbols.h"
@@ -27,6 +28,7 @@
 #include "interr.h"
 #include "immobile-space.h"
 #include "code.h"
+#include "search.h"
 #if defined(LISP_FEATURE_OS_PROVIDES_DLOPEN) && !defined(LISP_FEATURE_WIN32)
 # include <dlfcn.h>
 #endif
@@ -177,6 +179,19 @@ os_dlsym_default(char *name)
 #endif
 
 int alien_linkage_table_n_prelinked;
+struct vector* find_sb_sys_linkage_info()
+{
+    lispobj* sym = find_symbol("*LINKAGE-INFO*", get_package_by_id(PACKAGE_ID_SYS));
+    lispobj value = ((struct symbol*)sym)->value;
+    gc_assert(instancep(CONS(value)->car));
+    struct hash_table* ht = (void*)native_pointer(CONS(value)->car);
+    gc_assert(simple_vector_p(ht->pairs));
+    struct vector* kvv = (void*)native_pointer(ht->pairs);
+    alien_linkage_table_n_prelinked = fixnum_value(kvv->data[0]); // high-water mark
+    gc_assert(fixnum_value(ht->_count) == alien_linkage_table_n_prelinked);
+    return kvv;
+}
+
 extern lispobj* get_alien_linkage_table_initializer();
 void os_link_runtime()
 {
@@ -185,13 +200,16 @@ void os_link_runtime()
         // Prefill the alien linkage table so that shrinkwrapped executables which
         // link in all their C library dependencies can avoid linking with -ldl
         // but extern-alien still works for newly compiled code.
-        lispobj* ptr = table;
-        int n = alien_linkage_table_n_prelinked = *ptr++;
-        int index = 0;
-        for ( ; n-- ; index++ ) {
-            bool datap = *ptr == (lispobj)-1; // -1 can't be a function address
-            if (datap) ++ptr;
-            arch_write_linkage_table_entry(index, (void*)*ptr++, datap);
+        struct vector* name_table = find_sb_sys_linkage_info();
+        int n = alien_linkage_table_n_prelinked, linkage_index = 0, name_index = 2;
+        for ( ; n-- ; linkage_index++, name_index += 2, table++ ) {
+            lispobj name = name_table->data[name_index];
+            gc_assert(fixnum_value(name_table->data[1+name_index]) == linkage_index);
+            bool is_data = listp(name);
+            // Strings could be non-base but so far there's no need, and the likelihood
+            // of a toolchain fully supporting arbitrary characters is low.
+            gc_assert(simple_base_string_p(is_data ? CONS(name)->car : name));
+            arch_write_linkage_table_entry(linkage_index, (void*)*table, is_data);
         }
         return;
     }
