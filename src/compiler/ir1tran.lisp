@@ -153,11 +153,10 @@
                 (return-from fun-lexically-notinline-p
                   (eq (defined-fun-inlinep fun) 'notinline)))
               (loop for data in (lexenv-user-data env)
-                    when (and (eq (car data) 'no-compiler-macro)
-                              (eq (cdr data) name))
+                    when (and (eq (first data) 'compiler-macro)
+                              (eq (second data) name))
                     do
-                    (return-from fun-lexically-notinline-p
-                      t)))))))
+                    (return-from fun-lexically-notinline-p (eq (third data) 'notinline))))))))
     ;; If ANSWER is NIL, go for the global value
     (eq (or answer (info :function :inlinep name)) 'notinline)))
 
@@ -242,14 +241,16 @@
 ;;; names a macro or special form, then we error out using the
 ;;; supplied context which indicates what we were trying to do that
 ;;; demanded a function.
-(declaim (ftype (sfunction (t string) global-var) find-free-fun))
-(defun find-free-fun (name context &aux (free-funs (free-funs *ir1-namespace*)))
+(declaim (ftype (sfunction (t string &optional boolean) t) find-free-fun))
+(defun find-free-fun (name context &optional (error-on-macro t) &aux (free-funs (free-funs *ir1-namespace*)))
   (or (gethash name free-funs)
       (let ((kind (info :function :kind name)))
         (ecase kind
           ((:macro :special-form)
-           (compiler-error "The ~(~S~) name ~S was found ~A."
-                           kind name context))
+           (if (and (eq kind :macro)
+                    (not error-on-macro))
+               kind
+               (compiler-error "The ~(~S~) name ~S was found ~A." kind name context)))
           ((:function nil)
            (check-fun-name name)
            (let ((expansion (fun-name-inline-expansion name))
@@ -272,16 +273,18 @@
 
 ;;; Return the LEAF structure for the lexically apparent function
 ;;; definition of NAME.
-(declaim (ftype (sfunction (t string) leaf) find-lexically-apparent-fun))
-(defun find-lexically-apparent-fun (name context)
+(declaim (ftype (sfunction (t string &optional t) (or leaf (eql :macro))) find-lexically-apparent-fun))
+(defun find-lexically-apparent-fun (name context &optional (error-on-macro t))
   (let ((var (lexenv-find name funs :test #'equal)))
-    (cond (var
-           (unless (leaf-p var)
-             (aver (and (consp var) (eq (car var) 'macro)))
-             (compiler-error "found macro name ~S ~A" name context))
+    (cond ((leaf-p var)
            var)
+          (var
+           (aver (and (consp var) (eq (car var) 'macro)))
+           (if error-on-macro
+               (compiler-error "found macro name ~S ~A" name context)
+               :macro))
           (t
-           (find-free-fun name context)))))
+           (find-free-fun name context error-on-macro)))))
 
 (declaim (end-block))
 
@@ -1470,7 +1473,8 @@
 ;;; defining, set its INLINEP. If a global function, add a new FENV entry.
 (defun process-inline-decl (spec res fvars)
   (let ((sense (first spec))
-        (new-fenv ()))
+        (new-fenv ())
+        user-data)
     (dolist (name (rest spec))
       (let ((fvar (find name fvars
                         :key (lambda (x)
@@ -1480,8 +1484,16 @@
         (if fvar
             (setf (functional-inlinep fvar) sense)
             (let ((found (find-lexically-apparent-fun
-                          name "in an inline or notinline declaration")))
+                          name "in an inline or notinline declaration"
+                          nil)))
               (etypecase found
+                ((eql :macro)
+                 (unless user-data
+                   (setf user-data (lexenv-user-data res)))
+                 (case sense
+                   ((inline notinline)
+                    (setf user-data
+                          (list* (list 'compiler-macro name sense) user-data)))))
                 (functional
                  (when (policy *lexenv* (>= speed inhibit-warnings))
                    (compiler-notify "ignoring ~A declaration not at ~
@@ -1489,11 +1501,12 @@
                                     sense name)))
                 (global-var
                  (let ((type
-                        (cdr (assoc found (lexenv-type-restrictions res)))))
+                         (cdr (assoc found (lexenv-type-restrictions res)))))
                    (push (cons name (make-new-inlinep found sense type))
                          new-fenv))))))))
-    (if new-fenv
-        (make-lexenv :default res :funs new-fenv)
+    (if (or new-fenv user-data)
+        (make-lexenv :default res :funs new-fenv
+                     :user-data user-data)
         res)))
 
 ;;; like FIND-IN-BINDINGS, but looks for #'FOO in the FVARS
@@ -1657,7 +1670,7 @@
        (no-compiler-macro
         (make-lexenv :default res
                      :user-data (list*
-                                 (cons 'no-compiler-macro (second spec))
+                                 (list 'compiler-macro (second spec) 'notinline)
                                  (lexenv-user-data res))))
        (optimize
         (multiple-value-bind (new-policy specified-qualities)
@@ -1936,7 +1949,6 @@
 (defun process-inline-proclamation (kind funs)
   (declare (type (and inlinep (not null)) kind))
   (dolist (name funs)
-    (proclaim-as-fun-name name)
     (let* ((free-funs (free-funs *ir1-namespace*))
            (var (gethash name free-funs)))
       (etypecase var
