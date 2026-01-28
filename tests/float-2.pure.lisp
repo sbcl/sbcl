@@ -856,3 +856,7 @@ fractional bits."
 (with-test (:name :scale-float-rounding)
   (assert (= (integer-decode-float (scale-float (opaque-identity 0.7836354097202904d0) -1032))
              (opaque-identity 3446464979698))))
+
+(with-test (:name :rationalize-denormals)
+  (assert (= (rationalize (opaque-identity 1.4012985e-45))
+             (opaque-identity 1/713623803817686610712884392543280002697789472))))

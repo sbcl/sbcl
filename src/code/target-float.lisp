@@ -89,37 +89,41 @@
      ;; iterative algorithm above.
      (multiple-value-bind (frac expo sign)
          (integer-decode-float x)
-       (cond ((or (zerop frac) (>= expo 0))
-              (if (minusp sign)
-                  (- (ash frac expo))
-                  (ash frac expo)))
-             (t
-              ;; expo < 0 and (2*m-1) and (2*m+1) are coprime to 2^(1-e),
-              ;; so build the fraction up immediately, without having to do
-              ;; a gcd.
-              (let ((a (build-ratio (- (* 2 frac) 1) (ash 1 (- 1 expo))))
-                    (b (build-ratio (+ (* 2 frac) 1) (ash 1 (- 1 expo))))
-                    (p0 0)
-                    (q0 1)
-                    (p1 1)
-                    (q1 0))
-                (do ((c (ceiling a) (ceiling a)))
-                    ((< c b)
-                     (let ((top (+ (* c p1) p0))
-                           (bot (+ (* c q1) q0)))
-                       (build-ratio (if (minusp sign)
-                                        (- top)
-                                        top)
-                                    bot)))
-                  (let* ((k (- c 1))
-                         (p2 (+ (* k p1) p0))
-                         (q2 (+ (* k q1) q0)))
-                    (psetf a (/ (- b k))
-                           b (/ (- a k)))
-                    (setf p0 p1
-                          q0 q1
-                          p1 p2
-                          q1 q2))))))))
+       ;; Normalize the significand if it's denormal
+       (let* ((shift (- (float-digits x) (integer-length frac)))
+              (frac (truly-the double-float-significand (ash frac shift)))
+              (expo (truly-the double-float-exponent (- expo shift))))
+         (cond ((or (zerop frac) (>= expo 0))
+                (if (minusp sign)
+                    (- (ash frac expo))
+                    (ash frac expo)))
+               (t
+                ;; expo < 0 and (2*m-1) and (2*m+1) are coprime to 2^(1-e),
+                ;; so build the fraction up immediately, without having to do
+                ;; a gcd.
+                (let ((a (build-ratio (- (* 2 frac) 1) (ash 1 (- 1 expo))))
+                      (b (build-ratio (+ (* 2 frac) 1) (ash 1 (- 1 expo))))
+                      (p0 0)
+                      (q0 1)
+                      (p1 1)
+                      (q1 0))
+                  (do ((c (ceiling a) (ceiling a)))
+                      ((< c b)
+                       (let ((top (+ (* c p1) p0))
+                             (bot (+ (* c q1) q0)))
+                         (build-ratio (if (minusp sign)
+                                          (- top)
+                                          top)
+                                      bot)))
+                    (let* ((k (- c 1))
+                           (p2 (+ (* k p1) p0))
+                           (q2 (+ (* k q1) q0)))
+                      (psetf a (/ (- b k))
+                             b (/ (- a k)))
+                      (setf p0 p1
+                            q0 q1
+                            p1 p2
+                            q1 q2)))))))))
     ((rational) x)))
 
 ;;; Unlike most interpreter stubs the definitions of which can be deferred

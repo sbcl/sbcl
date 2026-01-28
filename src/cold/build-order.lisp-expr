@@ -71,7 +71,7 @@
  ;; whereas if it's (BACKQUOTE (FOO (UNQUOTE A) (UNQUOTE B))) then it's
  ;; flat out wrong. At any rate, judicious avoidance of EVAL-WHEN and nested
  ;; quasiquotation in 'primordial-extensions' prevents any such issues.
- ("src/code/backq")
+ ("src/code/backq" :c-headers)
 
  ;; It's difficult to be too early with a DECLAIM SPECIAL (or DEFVAR
  ;; or whatever) thanks to the sullenly-do-the-wrong-thing semantics
