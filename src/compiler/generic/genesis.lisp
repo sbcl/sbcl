@@ -1136,16 +1136,19 @@ core and return a descriptor to it."
     #-64-bit
     (write-wordindexed/raw symbol sb-vm:symbol-tls-index-slot index))
 
-  ;; Return SYMBOL's tls-index,
-  ;; choosing a new index if it doesn't have one yet.
+  ;; Return SYMBOL's tls-index
+  (defun get-symbol-tls-index (symbol)
+    (let ((cold-sym (cold-intern symbol)))
+      #+64-bit (ldb (byte 32 32) (read-bits-wordindexed cold-sym 0))
+      #-64-bit (read-bits-wordindexed cold-sym sb-vm:symbol-tls-index-slot)))
+
+  ;; ... as above, but choosing a new index if it doesn't have one yet.
   (defun ensure-symbol-tls-index (symbol)
-    (let* ((cold-sym (cold-intern symbol))
-           (tls-index #+64-bit (ldb (byte 32 32) (read-bits-wordindexed cold-sym 0))
-                      #-64-bit (read-bits-wordindexed cold-sym sb-vm:symbol-tls-index-slot)))
+    (let ((tls-index (get-symbol-tls-index symbol)))
       (unless (plusp tls-index)
         (let ((next (prog1 *genesis-tls-counter* (incf *genesis-tls-counter*))))
           (setq tls-index (ash next sb-vm:word-shift))
-          (cold-assign-tls-index cold-sym tls-index)))
+          (cold-assign-tls-index (cold-intern symbol) tls-index)))
       tls-index)))
 
 (defvar *cold-symbol-gspace*
@@ -1926,7 +1929,7 @@ core and return a descriptor to it."
     ;; Assign other known TLS indices
     (dolist (pair tls-init)
       (destructuring-bind (tls-index . symbol) pair
-        (aver (eql tls-index (ensure-symbol-tls-index symbol))))))
+        (aver (= tls-index (ensure-symbol-tls-index symbol))))))
 
   ;; Establish the value of T.
   #-x86-64
@@ -3718,7 +3721,7 @@ static inline int hashtable_weakness(struct hash_table* ht) { return ht->uw_flag
         ;; So that "#ifdef thing" works, but not as a C expression
         (format stream "#define ~A (*)~%" c-symbol))
       (format stream "#define ~A_tlsindex 0x~X~%"
-              c-symbol (ensure-symbol-tls-index symbol))))
+              c-symbol (the (not (eql 0)) (get-symbol-tls-index symbol)))))
   ;; This #define is relative to the start of the fixedobj space to allow heap relocation.
   #+compact-instance-header
   (format stream "~@{#define LAYOUT_OF_~A (lispobj)(~A_SPACE_START+0x~x)~%~}"
