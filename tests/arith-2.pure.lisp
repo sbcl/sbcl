@@ -66,7 +66,7 @@
   (checked-compile-and-assert
       ()
       '(lambda (n) (coerce n 'single-float))
-    (((expt 10 1000)) #+no-float-traps sb-ext:single-float-negative-infinity
+    (((expt 10 1000)) #+no-float-traps sb-ext:single-float-positive-infinity
                       #-no-float-traps (condition 'floating-point-overflow))))
 
 (defun are-we-getting-ash-right (x y)
