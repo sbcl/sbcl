@@ -344,7 +344,8 @@
   (assert (equal '(cl-user::yes-this-is-sbcl)
                  (read-from-string "cl-user::(#+sbcl yes-this-is-sbcl)"))))
 
-(with-test (:name :bug-309070)
+(with-test (:name :bug-309070
+            :fails-on :no-float-traps)
   (with-timeout 10
     (assert-error (read-from-string "10e10000000000000000000")
                   sb-kernel:reader-impossible-number-error)))

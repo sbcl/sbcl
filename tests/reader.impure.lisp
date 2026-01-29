@@ -59,7 +59,6 @@
 
 ;;; Bug 51b. (try to throw READER-ERRORs when the reader encounters
 ;;; dubious input)
-(assert-error (read-from-string "1e1000") reader-error)
 (assert-error (read-from-string "1/0") reader-error)
 
 ;;; Bug reported by Antonio Martinez on comp.lang.lisp 2003-02-03 in

@@ -115,19 +115,22 @@
   (setf (aref (the myarraytype array) 0)
         sb-ext:double-float-positive-infinity))
 
-(with-test (:name :bug-407a)
+(with-test (:name :bug-407a
+            :fails-on :no-float-traps)
   (assert-error
    (loop for n from (expt 2 1024) upto (+ 10 (expt 2 1024))
          do (coerce n 'single-float))
    floating-point-overflow))
 
-(with-test (:name :bug-407b)
+(with-test (:name :bug-407b
+            :fails-on :no-float-traps)
   (assert-error
-   (loop for n from (expt 2 1024) upto (+ 10 (expt 2 1024))
-         do (format nil "~E~%" n))
-   floating-point-overflow))
+      (loop for n from (expt 2 1024) upto (+ 10 (expt 2 1024))
+            do (format nil "~E~%" n))
+      floating-point-overflow))
 
-(with-test (:name :bignum-double-float-overflow)
+(with-test (:name :bignum-double-float-overflow
+            :fails-on :no-float-traps)
   (loop for n from 1024 to 1030
         do (assert-error (coerce (opaque-identity (expt 2 n)) 'double-float) floating-point-overflow)
            (assert-error (coerce (opaque-identity (- (expt 2 n))) 'double-float) floating-point-overflow)))
