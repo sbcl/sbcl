@@ -56,6 +56,7 @@ rm -fr sandbox/scratch
  "SUBSTITUTE-IF.FOLD.3" "SUBSTITUTE-IF.FOLD.2" "SUBSTITUTE-IF.FOLD.1"
  "SUBSTITUTE.FOLD.4" "SUBSTITUTE.FOLD.3" "SUBSTITUTE.FOLD.2"
  "SUBSTITUTE.FOLD.1"  "SUBSTITUTE-IF-NOT.FOLD.3"
+ "MISC.598" "IMAGPART.4"
  (append #+x86 (list "CIS.4")
          #+(or arm (and arm64 (not darwin)))
            (list "EXP.ERROR.4" "EXP.ERROR.5" "EXP.ERROR.6" "EXP.ERROR.7" "EXPT.ERROR.4"

@@ -1263,10 +1263,12 @@
 
 (deftransform realpart ((x) (real) * :important nil)
   'x)
-(deftransform imagpart ((x) ((and single-float (not (eql -0f0)))) * :important nil)
+
+(deftransform imagpart ((x) (single-float) * :important nil)
   0f0)
-(deftransform imagpart ((x) ((and double-float (not (eql -0d0)))) * :important nil)
+(deftransform imagpart ((x) (double-float) * :important nil)
   0d0)
+
 
 ;;; Make REALPART and IMAGPART return the appropriate types. This
 ;;; should help a lot in optimized code.
@@ -1305,7 +1307,8 @@
                                 :format format
                                 :complexp :real
                                 :low (coerce 0 bound-format)
-                                :high (coerce 0 bound-format))))
+                                :high (coerce 0 bound-format)
+                                :normalize-zeros nil)))
           (t
            ;; We have a complex number. The result has the same type as
            ;; the imaginary part, except that it's real, not complex,

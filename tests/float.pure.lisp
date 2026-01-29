@@ -789,12 +789,13 @@
     (assert (floatp (funcall f 3)))
     (assert-error (funcall f #c(1 2)))))
 
-(with-test (:name :imagpart-real-negative-zero-derived-type)
+(with-test (:name :imagpart-real-negative-zero)
   (checked-compile-and-assert
    ()
    `(lambda (x)
-      (eql (imagpart (the real x)) -0.0))
-   ((-1.0) t)))
+      (eql (imagpart (the real x)) 0.0))
+   ((-1.0) t))
+  (assert (eql (imagpart (opaque-identity -1.0)) 0.0)))
 
 (with-test (:name :negative-zero-in-ranges)
   (checked-compile-and-assert

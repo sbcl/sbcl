@@ -110,10 +110,9 @@
      (truly-the single-float (imagpart number)))
     ((complex rational)
      (%imagpart number))
-    (float
-     (* 0 number))
-    (number
-     0)))
+    (single-float 0f0)
+    (double-float 0d0)
+    (t 0)))
 
 (defun conjugate (number)
   "Return the complex conjugate of NUMBER. For non-complex numbers, this is
