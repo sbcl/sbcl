@@ -117,8 +117,7 @@
      ,@body))
 
 ;;; a unique tag to show that we're the intended caller of BOGO-FUN
-(defvar *bogo-fun-magic-tag*
-  '(:bogo-fun-magic-tag))
+(defconstant-eqx bogo-fun-magic-tag '(bogo-fun-magic-tag) #'constantly-t)
 
 ;;; The interface of BOGO-FUNs (previously implemented as
 ;;; FUNCALLABLE-INSTANCEs) is just these two operations, so we can do
@@ -134,11 +133,11 @@
 (defun walker-info-to-bogo-fun (walker-info)
   (lambda (magic-tag &rest rest)
     (aver (not rest)) ; else someone is using me in an unexpected way
-    (aver (eql magic-tag *bogo-fun-magic-tag*)) ; else ditto
+    (aver (eql magic-tag bogo-fun-magic-tag)) ; else ditto
     walker-info))
 (defun bogo-fun-to-walker-info (bogo-fun)
   (declare (type function bogo-fun))
-  (funcall bogo-fun *bogo-fun-magic-tag*))
+  (funcall bogo-fun bogo-fun-magic-tag))
 
 (defun with-augmented-environment-internal (env funs macros)
   ;; Note: In order to record the correct function definition, we
