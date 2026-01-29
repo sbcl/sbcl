@@ -601,7 +601,21 @@
 
 (deftransform logtest ((x y) * * :node node)
   (delay-ir1-transform node :ir1-phases)
-  `(not (zerop (logand x y))))
+  (flet ((try (x y x-var y-var)
+           (if (and (not (word-sized-lvar-p x))
+                    (and (csubtypep (lvar-type y) (specifier-type 'fixnum))
+                         (not (csubtypep (lvar-type y) (specifier-type 'unsigned-byte)))))
+               ;; Unlike logand, (logtest bignum fixnum) doesn't need
+               ;; bring in the whole bignum for a negative fixnum, the
+               ;; extended sign will always match a bignum
+               `(if (fixnump ,x-var)
+                    (logtest (truly-the fixnum ,x-var) ,y-var)
+                    (if (< ,y-var 0)
+                        t
+                        (logtest ,x-var (truly-the (and fixnum unsigned-byte) ,y-var)))))))
+    (or (try x y 'x 'y)
+        (try y x 'y 'x)
+        `(not (zerop (logand x y))))))
 
 ;;; (zerop (logand x y)) to (not (logtest x y)) if logtest has a VOP
 (deftransform eq ((x y) (integer (eql 0)) * :node node :important nil)

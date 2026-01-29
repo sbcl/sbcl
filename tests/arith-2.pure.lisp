@@ -2169,7 +2169,11 @@
          (declare (type (integer -845794755782386 1048630) p1))
          (logtest p1 12115639945877374832))
     ((-845794755782386) t)
-    ((145551) nil)))
+    ((145551) nil))
+  (assert (not (ctu:ir1-named-calls `(lambda (x y)
+                                       (declare (integer x)
+                                                (fixnum y))
+                                       (logtest x y))))))
 
 (with-test (:name :ash-mod)
   (checked-compile-and-assert
