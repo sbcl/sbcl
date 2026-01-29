@@ -640,18 +640,15 @@
     (format-exponential stream (next-arg) w d e k ovf pad mark atsignp)))
 
 (defun format-exponential (stream number w d e k ovf pad marker atsign)
-  (if (numberp number)
-      (if (floatp number)
-          (format-exp-aux stream number w d e k ovf pad marker atsign)
-          (if (rationalp number)
-              (format-exp-aux stream
-                              (coerce number 'single-float)
-                              w d e k ovf pad marker atsign)
-              (format-write-field stream
-                                  (decimal-string number)
-                                  w 1 0 #\space t)))
-      (let ((*print-base* 10))
-        (format-princ stream number nil nil w 1 0 pad))))
+  (cond ((floatp number)
+         (format-exp-aux stream number w d e k ovf pad marker atsign))
+        ((rationalp number)
+         (format-exp-aux stream
+                         (coerce number 'single-float)
+                         w d e k ovf pad marker atsign))
+        (t
+         (let ((*print-base* 10))
+           (format-princ stream number nil nil w 1 0 pad)))))
 
 (defun format-exponent-marker (number)
   (if (case *read-default-float-format*
