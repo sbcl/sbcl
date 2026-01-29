@@ -1264,11 +1264,10 @@
 (deftransform realpart ((x) (real) * :important nil)
   'x)
 
-(deftransform imagpart ((x) (single-float) * :important nil)
-  0f0)
-(deftransform imagpart ((x) (double-float) * :important nil)
-  0d0)
-
+(deftransform imagpart ((x) (float) * :important nil)
+  `(if (single-float-p x)
+       0f0
+       0d0))
 
 ;;; Make REALPART and IMAGPART return the appropriate types. This
 ;;; should help a lot in optimized code.
