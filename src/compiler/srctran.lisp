@@ -6209,22 +6209,36 @@
   (def floor)
   (def ceiling))
 
-(macrolet ((def (name &optional float)
-             (let ((x (if float '(float x) 'x)))
-               `(deftransform ,name ((x y) (integer (constant-arg (member 1 -1)))
-                                     *)
-                  "fold division by 1"
-                  `(values ,(if (minusp (lvar-value y))
-                                '(%negate ,x)
-                                ',x)  0)))))
+(macrolet ((def (name)
+             `(deftransform ,name ((x &optional y) (integer &optional (constant-arg (member 1 -1))))
+                "fold division by 1"
+                `(values ,(if (and y (minusp (lvar-value y)))
+                              '(%negate x)
+                              'x)
+                         0))))
   (def truncate)
   (def round)
   (def floor)
-  (def ceiling)
-  (def ftruncate t)
-  (def fround t)
-  (def ffloor t)
-  (def fceiling t))
+  (def ceiling))
+
+(macrolet ((def (name)
+             `(deftransform ,name ((x &optional y) (integer &optional (constant-arg (or (real 1 1) (real -1 -1)))))
+                "fold division by 1"
+                (let* ((y (and y (lvar-value y)))
+                       (float-type (if (typep y 'double-float)
+                                       'double-float
+                                       'single-float))
+                       (x `(coerce x ',float-type)))
+                  `(values ,(if (and y (minusp y))
+                                `(%negate ,x)
+                                `,x)
+                           ,(if (floatp y)
+                                (coerce 0 float-type)
+                                0))))))
+  (def ftruncate)
+  (def fround)
+  (def ffloor)
+  (def fceiling))
 
 
 ;;;; character operations

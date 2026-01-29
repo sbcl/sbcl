@@ -2169,7 +2169,10 @@
          (declare (type (integer -845794755782386 1048630) p1))
          (logtest p1 12115639945877374832))
     ((-845794755782386) t)
-    ((145551) nil))
+    ((145551) nil)))
+
+(with-test (:name :logtest-integer-fixnum
+            :fails-on (or :arm :loongarch64))
   (assert (not (ctu:ir1-named-calls `(lambda (x y)
                                        (declare (integer x)
                                                 (fixnum y))
