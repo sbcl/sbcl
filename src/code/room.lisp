@@ -1560,7 +1560,7 @@ We could try a few things to mitigate this:
 ;;; and not a hash-table, and that the list of fixups in the component
 ;;; can be attached to the debug info (in the manner of debug funs).
 ;;; When this was first implemented, weak-vectors weren't a thing. Maybe?
-(defvar *!cold-allocation-patch-point*)
+(declaim (global *!cold-allocation-patch-point*))
 (loop for (code . points) in *!cold-allocation-patch-point*
       do (setf (gethash code *allocation-patch-points*) points))
 

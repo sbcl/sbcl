@@ -15,7 +15,7 @@
 ;;; -- They are unqualified (primary) methods.
 ;;; Thus exactly one primary method is chosen respecting class
 ;;; precedence order on method invocation.
-(defvar *!initial-methods* '())
+(define-load-time-global *!initial-methods* '())
 
 (defun !early-load-method (class name quals specls ll lambda source-loc)
   (declare (ignore class))
@@ -88,7 +88,8 @@
 
 ;;; FIXME: this no longer holds methods, but it seems to have an effect
 ;;; on the caching of a discriminating function for PRINT-OBJECT
-(defvar *!delayed-defmethod-args* nil)
+(declaim (global *!delayed-defmethod-args*)) ; subject to MAKUNBOUND later on
+(setq *!delayed-defmethod-args* nil)
 
 ;;; This exists only to show that the cross-compiler can constant-fold
 ;;; a constant index into a literal array without crashing.

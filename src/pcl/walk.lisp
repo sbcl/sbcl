@@ -31,7 +31,7 @@
 
 ;;;; forward references
 
-(defvar *key-to-walker-environment*)
+(defglobal *key-to-walker-environment* (make-symbol "*KEY-TO-WALKER-ENVIRONMENT*"))
 
 ;;;; environment hacking stuff, necessarily SBCL-specific
 
@@ -240,8 +240,6 @@
   `(with-augmented-environment
      (,var ,env :macros (walker-environment-bind-1 ,env ,.key-args))
      .,body))
-
-(defvar *key-to-walker-environment* (gensym))
 
 (defun env-lock (env)
   (environment-macro env *key-to-walker-environment*))

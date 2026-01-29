@@ -165,7 +165,7 @@
           (unless (eql inner 0)
             (weak-vector-ref inner lo)))))))
 
-(defvar *!initial-linkage-table*)
+(declaim (global *!initial-linkage-table*))
 (defun !initialize-lisp-linkage-table ()
   (setq sb-vm::*code-alloc-count* 0)
   (let* ((map (make-array (ceiling (ash 1 n-linkage-index-bits) linkage-smallvec-elts)))

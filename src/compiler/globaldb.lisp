@@ -113,8 +113,8 @@
                  *info-types*
                  :start (length *info-priority-order*))))))))
 
-(defvar *globaldb-defaulting-exprs* nil)
-(defvar *globaldb-validate-exprs* nil)
+(define-load-time-global *globaldb-defaulting-exprs* nil)
+(define-load-time-global *globaldb-validate-exprs* nil)
 (eval-when (:compile-toplevel :execute) ; no load-time definition
 (#+sb-xc-host cl:defmacro
  #-sb-xc-host sb-xc:defmacro

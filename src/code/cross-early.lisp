@@ -27,6 +27,16 @@
 
 (defvar *default-source-external-format* :default)
 
+(defmacro defglobal (name value &rest doc)
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (defparameter ,name
+       (if (boundp ',name)
+           (symbol-value ',name)
+           ,value)
+       ,@doc)))
+
+(defmacro define-load-time-global (&rest args) `(defvar ,@args))
+
 (defmacro sb-xc:defconstant (&rest args)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (cl:defconstant ,@args)))

@@ -29,7 +29,7 @@
 ;;; are actually defined.
 
 ;;; Each entry in *EARLY-CLASS-DEFINITIONS* is an EARLY-CLASS-DEFINITION.
-(defparameter *!early-class-definitions* ())
+(define-load-time-global *!early-class-definitions* ())
 
 (defun !early-class-definition (class-name)
   (or (find class-name *!early-class-definitions* :key #'ecd-class-name)
@@ -49,7 +49,7 @@
 (defun ecd-canonical-slots   (ecd) (nth 5 ecd))
 (defun ecd-other-initargs    (ecd) (nth 6 ecd))
 
-(defvar *!early-class-slots* nil)
+(define-load-time-global *!early-class-slots* nil)
 
 (defun canonical-slot-name (canonical-slot)
   (getf canonical-slot :name))

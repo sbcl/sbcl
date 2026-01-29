@@ -32,10 +32,10 @@
 ;;;; !COLD-INIT
 
 ;;; a list of toplevel things set by GENESIS
-(defvar *!cold-toplevels*)
+(declaim (global *!cold-toplevels*))
 
 ;;; a SIMPLE-VECTOR set by GENESIS
-(defvar *!load-time-values*)
+(declaim (global *!load-time-values*))
 
 ;; FIXME: Perhaps we should make SHOW-AND-CALL-AND-FMAKUNBOUND, too,
 ;; and use it for most of the cold-init functions. (Just be careful

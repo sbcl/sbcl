@@ -1467,7 +1467,7 @@
                    :function (set-fun-name function `(sdfun-method ,name))
                    :arg-info fmc-arg-info))))))))))
 
-(defvar *show-make-unordered-methods-emf-calls* nil)
+(define-load-time-global *show-make-unordered-methods-emf-calls* nil)
 
 (defun make-unordered-methods-emf (generic-function methods)
   (when *show-make-unordered-methods-emf-calls*

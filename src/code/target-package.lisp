@@ -1947,9 +1947,9 @@ PACKAGE."
 ;;;; representation of the hosts's *COLD-PACKAGE-SYMBOLS*.
 ;;;; The shape of this list is
 ;;;;    (uninterned-symbols . ((package . (externals . internals)) ...)
-(defvar *!initial-symbols*)
+(define-load-time-global *!initial-symbols* nil)
 ;;; list of (string . list-of-string) to initialize the USE/USED-BY lists
-(defvar *!initial-package-graph*)
+(declaim (global *!initial-package-graph*))
 
 (defun rebuild-package-vector ()
   (let ((max-id 0))

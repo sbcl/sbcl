@@ -44,16 +44,6 @@
 
 (defmacro define-thread-local (&rest rest) `(defvar ,@rest))
 
-(defmacro defglobal (name value &rest doc)
-  `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (defparameter ,name
-       (if (boundp ',name)
-           (symbol-value ',name)
-           ,value)
-       ,@doc)))
-
-(defmacro define-load-time-global (&rest args) `(defvar ,@args))
-
 (defun %set-symbol-global-value (sym val) (setf (symbol-value sym) val))
 
 ;;; Necessary only to placate the host compiler in %COMPILER-DEFGLOBAL.

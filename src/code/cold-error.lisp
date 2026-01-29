@@ -215,7 +215,7 @@ of condition handling occurring."
 
 ;;; These functions definitions are for cold-init.
 ;;; The real definitions are found in 'warm-error.lisp'
-(defvar *!cold-warn-action* #+sb-devel 'print #-sb-devel nil)
+(define-load-time-global *!cold-warn-action* #+sb-devel 'print #-sb-devel nil)
 (defun warn (datum &rest arguments)
   (declare (explicit-check datum)) ;; CONDITION-CLASS not yet defined
   (when (and (stringp datum) (plusp (mismatch "defining setf macro" datum)))

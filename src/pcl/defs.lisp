@@ -161,8 +161,7 @@
 (defun make-class-symbol (class-name)
   (pcl-symbolicate "*THE-CLASS-" class-name "*"))
 
-(defvar *standard-method-combination*)
-(defvar *or-method-combination*)
+(declaim (global *standard-method-combination* *or-method-combination*))
 
 (defun plist-value (object name)
   (getf (object-plist object) name))

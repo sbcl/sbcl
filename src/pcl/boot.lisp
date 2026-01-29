@@ -72,7 +72,7 @@ bootstrapping.
                     ensure-generic-function-using-class
                     add-method remove-method))
 
-(defvar *!early-functions*
+(define-load-time-global *!early-functions*
   '((make-a-method !early-make-a-method real-make-a-method)
     (add-named-method !early-add-named-method real-add-named-method)))
 
@@ -101,7 +101,7 @@ bootstrapping.
 ;;;   (LAMBDA-LIST SPECIALIZERS QUALIFIERS METHOD-BODY-FUNCTION-NAME)
 ;;;
 ;;;,where SPECIALIZERS is a list of class names.
-(defvar *!generic-function-fixups*
+(define-load-time-global *!generic-function-fixups*
   '((add-method
      standard
      ((generic-function method)
@@ -1966,7 +1966,7 @@ bootstrapping.
 
 ;;;; early generic function support
 
-(defvar *!early-generic-functions* ())
+(define-load-time-global *!early-generic-functions* ())
 
 ;; CLHS doesn't specify &allow-other-keys here but I guess the supposition
 ;; is that they'll be checked by ENSURE-GENERIC-FUNCTION-USING-CLASS.

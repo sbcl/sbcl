@@ -44,10 +44,9 @@
 (eval-when (:compile-toplevel)
   (defun plist-to-alist (list)
     (loop for (key value) on list by #'cddr collect (cons key value))))
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter *proplist-properties*
+(sb-ext:defglobal *proplist-properties*
     (mapcar (lambda (x) (cons (car x) (coerce (cdr x) '(vector (unsigned-byte 32)))))
-            '#.(plist-to-alist (read-lisp-expr-file "misc-properties")))))
+            '#.(plist-to-alist (read-lisp-expr-file "misc-properties"))))
 
 (eval-when (:compile-toplevel)
   (defvar *phash-cache-file-pathname*

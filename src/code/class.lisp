@@ -68,7 +68,8 @@
 ;;;
 ;;; In each cons, the car is the symbol naming the layout, and the
 ;;; cdr is the layout itself.
-(defvar *!initial-layouts*)
+#+sb-xc-host (defvar *!initial-layouts*)
+#-sb-xc-host (declaim (global *!initial-layouts*))
 
 ;;; a table mapping class names to layouts for classes we have
 ;;; referenced but not yet loaded. This is initialized from an alist

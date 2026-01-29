@@ -23,7 +23,7 @@
 
 (in-package "SB-PCL")
 
-(defvar *!temporary-ensure-accessor-functions* nil)
+(define-load-time-global *!temporary-ensure-accessor-functions* nil)
 (defun ensure-accessor (fun-name)
   (when (member fun-name *!temporary-ensure-accessor-functions* :test 'equal)
     (error "ENSURE-ACCESSOR ~S called more than once!?" fun-name))

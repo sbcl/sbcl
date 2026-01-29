@@ -261,7 +261,7 @@ version 1[.0.0...] or greater."
               (lisp-implementation-version)
               subversions))))
 
-(defvar sb-pcl::*!docstrings* nil)
+(declaim (global sb-pcl::*!docstrings*)) ; assigned in cold-init, and subject to MAKUNBOUND
 (defun (setf documentation) (string name doc-type)
   (declare (type (or null string) string))
   (push (list string name doc-type) sb-pcl::*!docstrings*)

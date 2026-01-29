@@ -648,7 +648,7 @@
                    :features faff-in-this-file)))))
     (values (nreverse results) freeform-bytes)))
 
-(defvar *!xc-covg-instrumented* nil)
+(define-load-time-global *!xc-covg-instrumented* nil)
 
 (defun load-as-fasl (stream verbose print)
   ;; In general we issue too damn many I/O syscalls. This used to precheck for an empty fasl,

@@ -374,7 +374,7 @@
         finally (return (values min (1+ max)))))
 
 ;;; how we learn about assembler routines at startup
-(defvar *!initial-assembler-routines*)
+(declaim (global *!initial-assembler-routines*))
 
 (defun get-asm-routine (name &aux (code *assembler-routines*))
   (awhen (the list (gethash (the symbol name) (%asm-routine-table code)))

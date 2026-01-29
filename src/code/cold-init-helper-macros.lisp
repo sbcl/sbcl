@@ -16,7 +16,8 @@
 ;;; FIXME: Perhaps this belongs in the %SYS package like some other
 ;;; cold load stuff.
 
-(defvar *!cold-init-forms*)
+#+sb-xc-host (defvar *!cold-init-forms*)
+#-sb-xc-host (declaim (global *!cold-init-forms*))
 
 (defmacro !begin-collecting-cold-init-forms ()
   #+sb-xc '(eval-when (:compile-toplevel :execute)
@@ -88,5 +89,5 @@
 ;;; Deferred methods (which include initial methods) are installed
 ;;; later by the full CLOS implementation. These can have any number
 ;;; of specialized arguments or qualifiers.
-(defvar sb-pcl::*!deferred-methods* '())
+(define-load-time-global sb-pcl::*!deferred-methods* '())
 

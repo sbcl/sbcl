@@ -292,7 +292,7 @@
 
 ;;; Map each widetag symbol to a string to go in 'tagnames.h'.
 ;;; I didn't want to mess with the formatting of the table above.
-(defparameter *widetag-string-alist*
+(define-load-time-global *widetag-string-alist*
   `((bignum-widetag "bignum")
     (ratio-widetag "ratio")
     (single-float-widetag "sfloat")

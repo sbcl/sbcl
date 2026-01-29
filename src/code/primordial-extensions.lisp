@@ -340,7 +340,7 @@
                       it)
                  (acond ,@rest)))))))
 
-(defvar *!removable-symbols*
+(define-load-time-global *!removable-symbols*
   '(("SB-INT" uncross hash-cons swapped-args-fun char-case-info packed-info-field
      type-bound-number
      prepare-for-fast-read-char fast-read-char done-with-fast-read-char

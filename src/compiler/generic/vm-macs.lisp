@@ -100,7 +100,7 @@
                   (bug "~S is not a known slot of thread" sym))
     (when (eq (slot-special slot) sym) (return (slot-offset slot)))))
 
-(defvar *!late-primitive-object-forms* nil)
+(define-load-time-global *!late-primitive-object-forms* nil)
 
 (defmacro define-primitive-object
           ((name &key lowtag widetag alloc-trans (type t)
