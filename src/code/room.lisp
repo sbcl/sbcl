@@ -1304,14 +1304,14 @@ We could try a few things to mitigate this:
          (sort (list-allocated-objects
                 :all
                 :type symbol-widetag
-                :test (lambda (x) (plusp (sb-kernel:symbol-tls-index x))))
-               #'<
-               :key #'sb-kernel:symbol-tls-index))
+                :test (lambda (x) (plusp (symbol-tls-index x))))
+               #'< :key #'symbol-tls-index))
+        (thread-nslots (1+ (ash (symbol-tls-index 'sb-thread:*current-thread*)
+                                (- word-shift))))
         (prev 0))
     (dolist (x list)
-      (let ((n  (ash (sb-kernel:symbol-tls-index x) (- word-shift))))
-        (when (and (> n primitive-thread-object-length)
-                   (> n (1+ prev)))
+      (let ((n (ash (symbol-tls-index x) (- word-shift))))
+        (when (> n (max (1+ prev) thread-nslots))
           (format t "(unused)~%"))
         (format t "~5d = ~s~%" n x)
         (setq prev n)))))
