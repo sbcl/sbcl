@@ -516,6 +516,9 @@ int sbcl_mprotect(void* addr, size_t length, int prot) {
 
 #ifdef LISP_FEATURE_ELF
 #include <elf.h>
+#ifndef SHF_GNU_RETAIN
+#define SHF_GNU_RETAIN (1 << 21)
+#endif
 
 static off_t lisp_rel_section_offset;
 static ssize_t lisp_rel_section_size;
@@ -696,7 +699,8 @@ void generate_elfcore_obj(const char *filename,
      */
     // 5. Section Headers (8 total: 0..7)
     Elf64_Shdr shdr[8] = {0};
-    shdr[1] = (Elf64_Shdr){ .sh_name=core_shname,  .sh_type=SHT_PROGBITS, .sh_flags=SHF_ALLOC,
+    shdr[1] = (Elf64_Shdr){ .sh_name=core_shname,  .sh_type=SHT_PROGBITS,
+      .sh_flags=SHF_ALLOC|SHF_GNU_RETAIN,
       .sh_offset=core_offset, .sh_size=core_size, .sh_addralign=CORE_ALIGNMENT
     };
     shdr[2] = (Elf64_Shdr){ .sh_name=table_shname, .sh_type=SHT_PROGBITS, .sh_flags=SHF_ALLOC|SHF_WRITE,
