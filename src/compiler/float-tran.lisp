@@ -1460,6 +1460,8 @@
                       `(let* ((cs ,(if (csubtypep (lvar-type x) (specifier-type 'real))
                                        '(complex ,(coerce 0 type) (%negate x))
                                        '(conjugate (sb-vm::swap-complex x))))
+                              ,@(if (csubtypep (lvar-type x) (specifier-type 'real))
+                                    '((x (complex x ,(coerce 0 type)))))
                               (ry (realpart y))
                               (iy (imagpart y)))
                          (if (> (abs ry) (abs iy))
