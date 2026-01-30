@@ -26,8 +26,9 @@
         (or end length)
         (sequence-bounding-indices-bad-error seq start end))))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter *sequence-keyword-info*
+(eval-when (:compile-toplevel :execute
+            #+sb-devel :load-toplevel) ; not needed, just convenient maybe
+(defparameter *sequence-keyword-info*
     ;; (name default supplied-p adjustment new-type)
     `((count nil
              nil
@@ -83,9 +84,9 @@
                      (if test-p
                          (error "can't specify both :TEST and :TEST-NOT")
                          (%coerce-callable-to-fun test-not)))
-                (or null function)))))
+                (or null function))))
 
-(defmacro define-sequence-traverser (name args &body body)
+(sb-xc:defmacro define-sequence-traverser (name args &body body)
   (multiple-value-bind (body declarations docstring) (parse-body body t)
     (collect ((new-args)
               (new-declarations)
@@ -143,6 +144,7 @@
            (let* (,@(rebindings/eager))
              (declare ,@(new-declarations))
              ,@body))))))
+) ; end EVAL-WHEN
 
 ;;; SEQ-DISPATCH does an efficient type-dispatch on the given SEQUENCE.
 ;;;

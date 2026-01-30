@@ -33,7 +33,7 @@
 ;;;   > #define HASHSET_LAYOUT_ID 283
 ;;;   > #define HASHSET_STORAGE_LAYOUT_ID 284
 ;;;
-(defparameter *popular-structure-types* (mapcar 'list '(
+(defglobal *popular-structure-types* (mapcar 'list '(
 SB-KERNEL:CTYPE
 HASH-TABLE
 PACKAGE
