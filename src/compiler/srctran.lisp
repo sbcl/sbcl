@@ -6130,7 +6130,9 @@
                            ((and (eql y 0d0)
                                  (csubtypep (lvar-type x) (specifier-type 'double-float)))
                             'x)))
-                    ((not (typep y '(complex float)))
+                    ((and (not (typep y '(complex float)))
+                          (or floats
+                              (not (types-equal-or-intersect (lvar-type x) (specifier-type '(complex float))))))
                      (when (eq (negate-lvar x node :test '%negate) '%negate)
                        `(- ,(- y) x)))))))
       (t
