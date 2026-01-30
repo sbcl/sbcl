@@ -6240,6 +6240,15 @@
   (def ffloor)
   (def fceiling))
 
+(defoptimizers flushable (truncate ceiling floor round ftruncate fceiling ffloor fround)
+    ((number &optional divisor))
+  (or (not divisor)
+      (not (types-equal-or-intersect (lvar-type divisor) (specifier-type '(real 0 0))))))
+
+(defoptimizer (/ flushable) ((number &optional divisor))
+  (not (types-equal-or-intersect (lvar-type (or divisor number))
+                                 (specifier-type '(or (real 0 0) complex)))))
+
 
 ;;;; character operations
 

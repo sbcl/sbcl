@@ -237,7 +237,7 @@
 (defknown - (number &rest number) number
   (movable foldable flushable))
 (defknown / (number &rest number) number
-  (movable foldable unsafely-flushable))
+  (movable foldable))
 (defknown (1+ 1-) (number) number
   (movable foldable flushable))
 
@@ -251,7 +251,7 @@
 
 (defknown sb-kernel::integer-/-integer
   (integer integer) rational
-  (no-verify-arg-count unsafely-flushable))
+  (no-verify-arg-count))
 
 (defknown (two-arg-< two-arg-= two-arg-> two-arg-<= two-arg->=)
     (number number) boolean
@@ -360,20 +360,20 @@
 
 (defknown (floor ceiling)
   (real &optional real) (values integer real)
-  (movable foldable flushable))
+  (movable foldable))
 
 (defknown (truncate round)
   (real &optional real) (values integer real)
-  (movable foldable flushable recursive))
+  (movable foldable recursive))
 
 (defknown (sb-kernel::floor1 sb-kernel::ceiling1) (real real) integer
-  (movable foldable flushable no-verify-arg-count))
+  (movable foldable no-verify-arg-count))
 
 (defknown (sb-kernel::truncate1 sb-kernel::round1) (real real) integer
-  (movable foldable flushable recursive no-verify-arg-count))
+  (movable foldable recursive no-verify-arg-count))
 
 (defknown (sb-kernel::ftruncate1 sb-kernel::ffloor1 sb-kernel::fceiling1 sb-kernel::fround1) (real real) float
-  (movable foldable flushable no-verify-arg-count))
+  (movable foldable no-verify-arg-count))
 
 (defknown unary-truncate (real) (values integer real)
   (movable foldable flushable no-verify-arg-count))
@@ -431,11 +431,11 @@
   (movable foldable flushable no-verify-arg-count))
 
 (defknown (mod rem) (real real) real
-    (movable foldable flushable))
+    (movable foldable))
 
 (defknown (ffloor fceiling fround ftruncate)
   (real &optional real) (values float real)
-  (movable foldable flushable))
+  (movable foldable))
 
 (defknown decode-float (float) (values float float-exponent float)
   (movable foldable unsafely-flushable))
