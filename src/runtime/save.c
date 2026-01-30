@@ -33,6 +33,7 @@
 #include "gc.h"
 #include "thread.h"
 #include "arch.h"
+#include "genesis/hash-table.h"
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
 #include "genesis/vector.h"
@@ -279,6 +280,9 @@ void save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     /* (Now we can actually start copying ourselves into the output file.) */
 
     if (verbose) {
+        /* This shows the temporary file name if writing a .o file. I think that's
+         * a reasonable choice, though we could certainly make an extra copy
+         * of the name as originally specified */
         printf("[saving current Lisp image into %s:\n", filename);
         fflush(stdout);
     }
@@ -707,6 +711,8 @@ static void prepare_dynamic_space_for_final_gc(struct thread* thread)
 char gc_coalesce_string_literals = 0;
 
 extern void move_rospace_to_dynamic(int), prepare_readonly_space(int,int);
+extern bool generate_elfcore_obj(const char *filename, FILE* input_core,
+                                 char **syms, int sym_count);
 
 /* Do a non-conservative GC twice, and then save a core with the initial
  * function being set to the value of 'lisp_init_function'.
@@ -743,10 +749,13 @@ extern void move_rospace_to_dynamic(int), prepare_readonly_space(int,int);
  *  as empty pages, because we can't represent discontiguous ranges.
  */
 void
-gc_and_save(char *filename, bool prepend_runtime, bool purify,
+gc_and_save(char *filename, int core_format, bool purify,
             int save_runtime_options, bool compressed,
             int compression_level, int application_type)
 {
+    int prepend_runtime = core_format == 1;
+    int elf_object = core_format == 2;
+
     // FIXME: Instead of disabling purify for static space relocation,
     // we should make r/o space read-only after fixing up pointers to
     // static space instead.
@@ -768,14 +777,22 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
     extern void coalesce_similar_objects();
     bool verbose = !lisp_startup_options.noinform;
 
+    if (!elf_object) {
+        /* The filename might come from Lisp, and be moved by the now
+         * non-conservative GC. */
+      filename = strdup(filename);
+    } else {
+      int tempnamelen = strlen(filename) + 5; // ".tmp"
+      char* copy = checked_malloc(tempnamelen);
+      snprintf(copy, tempnamelen, "%s.tmp", filename);
+      filename = copy;
+    }
     file = prepare_to_save(filename, prepend_runtime, &runtime_bytes,
                            &runtime_size);
-    if (file == NULL)
+    if (file == NULL) {
+       free(filename);
        return;
-
-    /* The filename might come from Lisp, and be moved by the now
-     * non-conservative GC. */
-    filename = strdup(filename);
+    }
 
     /* We're destined for process exit at this point, and interrupts can not
      * possibly be handled in Lisp. The installed signal handler closures should
@@ -868,8 +885,42 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
         save_runtime_to_filehandle(file, runtime_bytes, runtime_size,
                                    application_type);
 
+    char** elf_c_symbols = 0;
+    int n_symbols = 0;
+    if (elf_object) {
+        // Find SB-SYS:*LINKAGE-INFO*
+        lispobj* sym = find_symbol("*LINKAGE-INFO*", get_package_by_id(PACKAGE_ID_SYS));
+        lispobj value = ((struct symbol*)sym)->value;
+        gc_assert(instancep(CONS(value)->car));
+        struct hash_table* ht = (void*)native_pointer(CONS(value)->car);
+        gc_assert(simple_vector_p(ht->pairs));
+        struct vector* kvv = (void*)native_pointer(ht->pairs);
+        n_symbols = fixnum_value(ht->_count);
+        gc_assert(fixnum_value(kvv->data[0]) == n_symbols); // KVV's high-water mark
+        if (verbose) {
+            printf("[linkage info: %d symbols]\n", n_symbols);
+            fflush(stdout);
+        }
+        elf_c_symbols = calloc(n_symbols, sizeof (char*));
+        int i;
+        for (i=0; i<n_symbols; ++i) {
+            lispobj key = kvv->data[(1+i)<<1];
+            // string is code symbol, singleton cons of string is a data symbol
+            if (listp(key)) key = CONS(key)->car;
+            struct vector* c_symbol = VECTOR(key);
+            elf_c_symbols[i] = (char*)c_symbol->data;
+        }
+    }
     save_to_filehandle(file, filename, lisp_init_function,
                        prepend_runtime, save_runtime_options,
                        compressed ? compression_level : COMPRESSION_LEVEL_NONE);
+    if (elf_object) {
+        file = fopen(filename, "r"); // reopen it for reading
+        unlink(filename);
+        filename[strlen(filename)-4] = '\0'; // chop ".tmp" from the end
+        fseek(file, 0, SEEK_END);
+        generate_elfcore_obj(filename, file, elf_c_symbols, n_symbols);
+        printf("[Converted to ELF]\n");
+    }
     exit(0);
 }

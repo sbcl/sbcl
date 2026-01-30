@@ -123,6 +123,8 @@ The following &KEY arguments are defined:
      to create a standalone executable.  If false (the default), the
      core image will not be executable on its own. Executable images
      always behave as if they were passed the --noinform runtime option.
+     If :EXECUTABLE is :ELF-OBJECT, then the resulting core will be
+     wrapped in a .o which requires further linking. (EXPERIMENTAL)
 
   :SAVE-RUNTIME-OPTIONS
      If true, values of runtime options --dynamic-space-size and
@@ -256,7 +258,7 @@ sufficiently motivated to do lengthy fixes."
           ;; since the GC will invalidate the stack.
           (sb-kernel::unsafe-clear-roots sb-vm:+highest-normal-generation+)
           (gc-and-save name
-                       (foreign-bool executable)
+                       (if (eq executable :elf-object) 2 (foreign-bool executable))
                        (foreign-bool purify)
                        (case save-runtime-options
                          (:accept-runtime-options 2)

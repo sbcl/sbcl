@@ -15,6 +15,28 @@
 
 . ./subr.sh
 
+# The 'embedcore-sbcl' test works for more configurations than the rest of the
+# tests in this file do, so try it first. If this can't be run, neither can
+# anything else.
+run_sbcl <<EOF
+  #+(and linux (or arm64 x86-64)) (exit :code 0) ; good
+  (exit :code 2) ; otherwise
+EOF
+status=$?
+if [ $status != 0 ]; then # test can't be executed
+    # we don't have a way to exit shell tests with "inapplicable" as the result
+    exit $EXIT_TEST_WIN
+fi
+# Ensure that we're not running a stale embedcore-sbcl
+(cd $SBCL_PWD/../src/runtime ; rm -f embedcore-sbcl ; make embedcore-sbcl)
+
+set -e # exit on error
+$SBCL_PWD/../src/runtime/embedcore-sbcl --disable-debugger --no-sysinit --no-userinit --noprint <<EOF
+(format t "~&ELF-embedded core starts OK~%")
+(exit :code 0)
+EOF
+set +e # no exit on error
+
 run_sbcl <<EOF
   #+(and linux elf sb-thread)
   (let ((s (find-symbol "IMMOBILE-SPACE-OBJ-P" "SB-KERNEL")))
