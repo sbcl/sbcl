@@ -914,6 +914,7 @@ gc_and_save(char *filename, int core_format, bool purify,
     save_to_filehandle(file, filename, lisp_init_function,
                        prepend_runtime, save_runtime_options,
                        compressed ? compression_level : COMPRESSION_LEVEL_NONE);
+#ifdef LISP_FEATURE_ELF
     if (elf_object) {
         file = fopen(filename, "r"); // reopen it for reading
         unlink(filename);
@@ -922,5 +923,6 @@ gc_and_save(char *filename, int core_format, bool purify,
         generate_elfcore_obj(filename, file, elf_c_symbols, n_symbols);
         printf("[Converted to ELF]\n");
     }
+#endif
     exit(0);
 }

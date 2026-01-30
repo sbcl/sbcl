@@ -162,7 +162,7 @@ semiwrap-sbcl: shrinkwrap-sbcl.s $(LIBSBCL)
 # simpler version of core embedding where the core is just a section of the ELF file.
 # tools-for-build/elftool could kinda do this but it didn't work as well as it
 # does using the ELF writer from C, because firstly the interface is less
-# polished and secondly it did remove the need for -Wl,--export-dynamic.
+# polished and secondly it did not remove the need for -Wl,--export-dynamic.
 # Note about $(LIBS) - we don't really need -ldl except os-common does reference it
 # so removing it would break that. Also certain platforms need -lm and -lpthread
 # to get in there so using the same link options as for the ordinary "sbcl"

@@ -103,6 +103,7 @@
                                          (compression nil)
                                          #+win32
                                          (application-type :console))
+  #.(format nil
   "Save a \"core image\", i.e. enough information to restart a Lisp
 process later in the same state, in the file of the specified name.
 Only global state is preserved: the stack is unwound in the process.
@@ -122,9 +123,7 @@ The following &KEY arguments are defined:
      If true, arrange to combine the SBCL runtime and the core image
      to create a standalone executable.  If false (the default), the
      core image will not be executable on its own. Executable images
-     always behave as if they were passed the --noinform runtime option.
-     If :EXECUTABLE is :ELF-OBJECT, then the resulting core will be
-     wrapped in a .o which requires further linking. (EXPERIMENTAL)
+     always behave as if they were passed the --noinform runtime option.~A
 
   :SAVE-RUNTIME-OPTIONS
      If true, values of runtime options --dynamic-space-size and
@@ -206,6 +205,10 @@ This implementation is not as polished and painless as you might like:
 This isn't because we like it this way, but just because there don't
 seem to be good quick fixes for either limitation and no one has been
 sufficiently motivated to do lengthy fixes."
+  #+elf "
+     If :EXECUTABLE is :ELF-OBJECT, then the resulting core will be
+     wrapped in a .o which requires further linking. (EXPERIMENTAL)"
+  #-elf "")
   (declare (ignore environment-name))
   (declare (ignorable root-structures))
   (when (and callable-exports toplevel-supplied)
@@ -258,7 +261,8 @@ sufficiently motivated to do lengthy fixes."
           ;; since the GC will invalidate the stack.
           (sb-kernel::unsafe-clear-roots sb-vm:+highest-normal-generation+)
           (gc-and-save name
-                       (if (eq executable :elf-object) 2 (foreign-bool executable))
+                       #+elf (if (eq executable :elf-object) 2 (foreign-bool executable))
+                       #-elf (foreign-bool executable)
                        (foreign-bool purify)
                        (case save-runtime-options
                          (:accept-runtime-options 2)
