@@ -452,38 +452,40 @@
            (type list primitive-types types))
   (let ((primitive-types (or primitive-types
                              (mapcar #'primitive-type types))))
-    (if lvar
-        (let ((2lvar (lvar-info lvar)))
-          (ecase (ir2-lvar-kind 2lvar)
-            (:fixed
-             (let* ((locs (ir2-lvar-locs 2lvar))
-                    (nlocs (length locs))
-                    (ntypes (length primitive-types)))
-               (if (and (= nlocs ntypes)
-                        (loop for loc in locs
-                              for prim-type in primitive-types
-                              always (eq (tn-primitive-type loc) prim-type)))
-                   locs
-                   (loop with optional = (and call
-                                              (vop-info-p (combination-info call))
-                                              (vop-info-optional-results (combination-info call)))
-                         for prim-type in primitive-types
-                         for type in types
-                         for i from 0
-                         for loc = (pop locs)
-                         collect (cond ((and loc
-                                             (if (eq (tn-kind loc) :unused)
-                                                 (member i optional)
-                                                 (eq (tn-primitive-type loc) prim-type)))
-                                        loc)
-                                       ((and (not loc)
-                                             (member i optional))
-                                        (make-unused-tn))
-                                       (t
-                                        (make-normal-tn prim-type type)))))))
-            (:unknown
-             (mapcar #'make-normal-tn primitive-types types))))
-        (mapcar #'make-normal-tn primitive-types types))))
+    (flet ((make-tns (locs)
+             (loop with optional = (and call
+                                        (vop-info-p (combination-info call))
+                                        (vop-info-optional-results (combination-info call)))
+                   for prim-type in primitive-types
+                   for type in types
+                   for i from 0
+                   for loc = (pop locs)
+                   collect (cond ((and loc
+                                       (if (eq (tn-kind loc) :unused)
+                                           (member i optional)
+                                           (eq (tn-primitive-type loc) prim-type)))
+                                  loc)
+                                 ((and (not loc)
+                                       (member i optional))
+                                  (make-unused-tn))
+                                 (t
+                                  (make-normal-tn prim-type type))))))
+      (if lvar
+          (let ((2lvar (lvar-info lvar)))
+            (ecase (ir2-lvar-kind 2lvar)
+              (:fixed
+               (let* ((locs (ir2-lvar-locs 2lvar))
+                      (nlocs (length locs))
+                      (ntypes (length primitive-types)))
+                 (if (and (= nlocs ntypes)
+                          (loop for loc in locs
+                                for prim-type in primitive-types
+                                always (eq (tn-primitive-type loc) prim-type)))
+                     locs
+                     (make-tns locs))))
+              (:unknown
+               (mapcar #'make-normal-tn primitive-types types))))
+          (make-tns nil)))))
 
 ;;; Make the first N standard value TNs, returning them in a list.
 (defun make-standard-value-tns (n)

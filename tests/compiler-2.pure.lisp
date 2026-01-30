@@ -4953,3 +4953,11 @@
              (* -0.2 v1)))
     ((8.0 8) (condition 'type-error))
     ((-8.0 8) 1.6)))
+
+(with-test (:name :unused-tns-erased-types)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      '(lambda ()
+        (truncate (/ 1 0))
+        1)
+    (() (condition 'division-by-zero))))
