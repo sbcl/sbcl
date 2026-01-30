@@ -4726,12 +4726,18 @@
       `(values 1 0)
       (give-up-ir1-transform)))
 
-(defoptimizer (truncate constraint-propagate)
+(defoptimizers constraint-propagate (truncate ceiling floor round
+                                     ftruncate fceiling ffloor fround)
     ((x y) node gen)
-  (when (csubtypep (lvar-type y) (specifier-type 'rational))
-    (let ((var (ok-lvar-lambda-var y gen)))
-      (when var
-        (list (list 'typep var (specifier-type '(eql 0)) t))))))
+  (let ((var (ok-lvar-lambda-var y gen)))
+    (when var
+      (list (list 'typep var (specifier-type '(real 0 0)) t)))))
+
+(defoptimizer (/ constraint-propagate)
+    ((x &optional y) node gen)
+  (let ((var (ok-lvar-lambda-var (or y x) gen)))
+    (when var
+      (list (list 'typep var (specifier-type '(real 0 0)) t)))))
 
 ;;; (the fixnum (truncate integer 2)) can work with a signed-word X.
 (make-defs (($fun truncate floor ceiling))
@@ -4800,13 +4806,6 @@
                           `(defoptimizer (,name rewrite-full-call) ((&rest args) node)
                              (single-value-fun node ',single-name))))))
     (defs)))
-
-(defoptimizer (/ constraint-propagate)
-    ((x y) node gen)
-  (when (csubtypep (lvar-type y) (specifier-type 'rational))
-    (let ((var (ok-lvar-lambda-var y gen)))
-      (when var
-        (list (list 'typep var (specifier-type '(eql 0)) t))))))
 
 ;;; Multiplicative inverse using the Euclidean algorithm.
 ;;; From Hacker's Delight.

@@ -2029,3 +2029,11 @@
    (lambda (x)
      (when (typep (the (or float (rational (-1/2) (1))) (nth-value 1 (truncate x 1))) 'float) x))
    (or float null)))
+
+(with-test (:name :div-by-zero)
+  (assert-type
+   (lambda (x y)
+     (declare (float y))
+     (floor x y)
+     y)
+   (and float (not (float 0 0)))))
