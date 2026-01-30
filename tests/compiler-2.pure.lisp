@@ -4957,7 +4957,9 @@
 (with-test (:name :unused-tns-erased-types)
   (checked-compile-and-assert
       (:optimize :safe)
-      '(lambda ()
-        (truncate (/ 1 0))
-        1)
-    (() (condition 'division-by-zero))))
+      '(lambda (x)
+        (declare ((integer 10 20) x))
+        (let ((q (truncate (/ x 0))))
+          (when (minusp x)
+            q)))
+    ((10) (condition 'division-by-zero))))

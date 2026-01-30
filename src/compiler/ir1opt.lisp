@@ -1273,24 +1273,19 @@
          (clear-reoptimize-args)
          (process-info)
          (unless (eq (combination-kind node) :error) ;; caused by derive-type
-           (let ((attr (fun-info-attributes info)))
-             (when (constant-fold-call node)
-               (return-from ir1-optimize-combination))
-             ;; Don't transform locally flushable functions,
-             ;; their transforms won't know that they are flushable.
-             (when (and (not (node-tail-p node))
-                        (not (node-lvar node))
-                        (let ((name (lvar-fun-name (combination-fun node) t)))
-                          (memq name (lexenv-flushable (node-lexenv node)))))
-               (return-from ir1-optimize-combination))
-             (when (fold-call-derived-to-constant node)
-               (return-from ir1-optimize-combination))
-             (when (and (ir1-attributep attr commutative)
-                        (= (length args) 2)
-                        (constant-lvar-p (first args))
-                        (not (constant-lvar-p (second args))))
-               (setf (basic-combination-args node) (nreverse args))))
-
+           (cond ((constant-fold-call node)
+                  (return-from ir1-optimize-combination))
+                 ((not (flushable-combination-p node)))
+                 ((and (not (node-tail-p node))
+                       (not (node-lvar node)))
+                  (return-from ir1-optimize-combination (flush-node node)))
+                 ((fold-call-derived-to-constant node)
+                  (return-from ir1-optimize-combination)))
+           (when (and (ir1-attributep (fun-info-attributes info) commutative)
+                      (= (length args) 2)
+                      (constant-lvar-p (first args))
+                      (not (constant-lvar-p (second args))))
+             (setf (basic-combination-args node) (nreverse args)))
            (let ((optimizer (fun-info-optimizer info)))
              (if (and optimizer (funcall optimizer node))
                  (when (and (node-reoptimize node)
@@ -1308,8 +1303,7 @@
                      (when (eq show :all)
                        (format *trace-output*
                                "~&quitting because IR1-TRANSFORM result was NIL"))
-                     (return))))))))))
-  (values))
+                     (return)))))))))))
 
 (defun xep-tail-combination-p (node)
   (and (combination-p node)
@@ -2099,13 +2093,15 @@
                             for ref = (lvar-uses values-arg)
                             for (value) in values
                             do
+                            (push value (node-source-path ref))
                             (change-ref-leaf ref (find-constant value)
                                              :recklessly t)
                             (erase-lvar-type values-arg)))
                      (t
                       (loop for ref in (lvar-uses multi-use-lvar)
                             for (value) in values
-                            do (change-ref-leaf ref (find-constant value)
+                            do (push value (node-source-path ref))
+                               (change-ref-leaf ref (find-constant value)
                                                 :recklessly t))
                       (erase-lvar-type multi-use-lvar)))
                (when single-value-mv
@@ -2121,12 +2117,11 @@
                t))))))
 
 (defun fold-call-derived-to-constant (call)
-  (when (flushable-combination-p call)
-    (let ((type (node-derived-type call)))
-      (when (type-single-value-p type)
-        (multiple-value-bind (single-p value) (type-singleton-p (single-value-type type))
-          (when single-p
-            (replace-combination-with-constant value call)))))))
+  (let ((type (node-derived-type call)))
+    (when (type-single-value-p type)
+      (multiple-value-bind (single-p value) (type-singleton-p (single-value-type type))
+        (when single-p
+          (replace-combination-with-constant value call))))))
 
 ;;;; local call optimization
 

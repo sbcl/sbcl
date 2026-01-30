@@ -293,6 +293,11 @@
     "avoid runtime dispatch on array element type"
     (hairy-data-vector-set-transform array new-value node '%data-vector-and-index/check-bound)))
 
+(defoptimizer (hairy-data-vector-ref flushable)
+    ((array index) node)
+  ;; Don't flush access to known NIL-arrays, the call will be transformed
+  (not (eq (node-derived-type node) *empty-type*)))
+
 (deftransform hairy-data-vector-ref ((string index) (simple-string t))
   (let ((ctype (lvar-type string)))
     (if (array-type-p ctype)
