@@ -269,7 +269,7 @@ static void write_static_space_constants(FILE *file)
 }
 #endif
 
-bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
+void save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                         bool make_executable,
                         int save_runtime_options,
                         int core_compression_level)
@@ -473,7 +473,6 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 #endif
 
     if (verbose) printf("done]\n");
-    exit(0);
 }
 
 /* Check if the build_id for the current runtime is present in a
@@ -872,9 +871,5 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
     save_to_filehandle(file, filename, lisp_init_function,
                        prepend_runtime, save_runtime_options,
                        compressed ? compression_level : COMPRESSION_LEVEL_NONE);
-    /* Oops. Save still managed to fail. Since we've mangled the stack
-     * beyond hope, there's not much we can do.
-     * (beyond FUNCALLing lisp_init_function, but I suspect that's
-     * going to be rather unsatisfactory too... */
-    lose("Attempt to save core after non-conservative GC failed.");
+    exit(0);
 }
