@@ -4965,7 +4965,7 @@
     ((10) (condition 'division-by-zero))))
 
 (with-test (:name :constant-fold-call-multiple-uses-casts)
-  (checked-compile-and-assert 
+  (checked-compile-and-assert
       (:optimize :safe
        :allow-warnings t)
       `(lambda (v)
