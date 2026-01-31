@@ -475,7 +475,7 @@
                                                 collect bind)))
                     ,@more-decls ,@forms))
                 ,@(when (consp what)
-                    `((setf (,(package-symbolicate "SB-C" "FUN-INFO-" (second what))
+                    `((setf (,(package-symbolicate #.(find-package "SB-C") "FUN-INFO-" (second what))
                              (fun-info-or-lose ',(first what)))
                             #',name)))))))))
 
@@ -490,7 +490,7 @@
            (,lambda-list ,node ,@vars)
          ,@body)
        ,@(loop for name in (cdr names)
-               collect `(setf (,(package-symbolicate "SB-C" "FUN-INFO-" kind)
+               collect `(setf (,(package-symbolicate #.(find-package "SB-C") "FUN-INFO-" kind)
                                (fun-info-or-lose ',name))
                               #',optimizer-name)))))
 
