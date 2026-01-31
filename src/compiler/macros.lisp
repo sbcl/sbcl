@@ -385,6 +385,22 @@
                                      #',transform-name ,important))
                    names)))))
 
+
+(defun make-optimizer-name (name)
+  (flet ((function-name (name)
+           (etypecase name
+             (symbol name)
+             ((cons (eql setf) (cons symbol null))
+              (symbolicate (car name) "-" (cadr name))))))
+    (if (symbolp name)
+        name
+        (symbolicate (function-name (first name))
+                     "-"
+                     (if (consp (second name))
+                         (caadr name)
+                         (second name))
+                     "-OPTIMIZER"))))
+
 ;;; Create a function which parses combination args according to WHAT
 ;;; and LAMBDA-LIST, where WHAT is either a function name or a list
 ;;; (FUN-NAME KIND) and does some KIND of optimization.
@@ -410,19 +426,7 @@
                               &optional (node (gensym))
                               &rest vars)
                         &body body)
-  (let ((name (flet ((function-name (name)
-                       (etypecase name
-                         (symbol name)
-                         ((cons (eql setf) (cons symbol null))
-                          (symbolicate (car name) "-" (cadr name))))))
-                (if (symbolp what)
-                    what
-                    (symbolicate (function-name (first what))
-                                 "-"
-                                 (if (consp (second what))
-                                     (caadr what)
-                                     (second what))
-                                 "-OPTIMIZER")))))
+  (let ((name (make-optimizer-name what)))
     (cond ((typep what '(cons (eql vop-optimize)))
            `(progn
               (defun ,name (,lambda-list)
@@ -435,7 +439,7 @@
                                                `#',name)))))
           ((typep what '(cons t (cons (eql fold-p))))
            `(progn
-              (defun ,name (,lambda-list)
+              (defun ,name ,lambda-list
                 ,@body)
               (setf (,(let ((*package* (sb-xc:symbol-package 'fun-info)))
                         (symbolicate "FUN-INFO-" (second what)))
@@ -471,8 +475,7 @@
                                                 collect bind)))
                     ,@more-decls ,@forms))
                 ,@(when (consp what)
-                    `((setf (,(let ((*package* (sb-xc:symbol-package 'fun-info)))
-                                (symbolicate "FUN-INFO-" (second what)))
+                    `((setf (,(package-symbolicate "SB-C" "FUN-INFO-" (second what))
                              (fun-info-or-lose ',(first what)))
                             #',name)))))))))
 
@@ -480,17 +483,14 @@
                                      &optional (node (gensym))
                                      &rest vars)
                          &body body)
-  (let ((optimizer-name (symbolicate (car names)
-                                     "-"
-                                     kind
-                                     "-OPTIMIZER")))
+  (let* ((name (list (car names) kind))
+         (optimizer-name (make-optimizer-name name)))
     `(progn
-       (defoptimizer ,optimizer-name
+       (defoptimizer ,name
            (,lambda-list ,node ,@vars)
          ,@body)
-       ,@(loop for name in names
-               collect `(setf (,(let ((*package* (sb-xc:symbol-package 'fun-info)))
-                                  (symbolicate "FUN-INFO-" kind))
+       ,@(loop for name in (cdr names)
+               collect `(setf (,(package-symbolicate "SB-C" "FUN-INFO-" kind)
                                (fun-info-or-lose ',name))
                               #',optimizer-name)))))
 

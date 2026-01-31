@@ -3912,6 +3912,16 @@
                  `(ash ,shifted amount)))))))
       (give-up-ir1-transform)))
 
+(defoptimizer (ash fold-p) ((integer amount))
+  (or (eql integer 0)
+      (typep amount '(integer * 4096))))
+
+(defoptimizers fold-p (expt sb-kernel::intexp) ((base power))
+  (or (typep base '(and number
+                    (or (integer -1 1) (not rational))))
+      (typep power '(and number
+                     (or (not integer) (integer -4096 4096))))))
+
 ;;; Not declaring it as actually being RATIO because it is used as one
 ;;; of the legs in the EXPT transform below and that may result in
 ;;; some unwanted type conflicts, e.g. (random (expt 2 (the integer y)))
@@ -4730,7 +4740,7 @@
   (let ((d (or y x)))
     (when (and (types-equal-or-intersect (lvar-type d)
                                          (specifier-type '(eql 0)))
-               (csubtypep (single-value-result-type node t) 
+               (csubtypep (single-value-result-type node t)
                           (specifier-type 'rational)))
       (let ((var (ok-lvar-lambda-var d gen)))
         (when var
