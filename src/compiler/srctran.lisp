@@ -4717,15 +4717,24 @@
 (defoptimizers constraint-propagate (truncate ceiling floor round
                                      ftruncate fceiling ffloor fround)
     ((x y) node gen)
-  (let ((var (ok-lvar-lambda-var y gen)))
-    (when var
-      (list (list 'typep var (specifier-type '(real 0 0)) t)))))
+  ;; Floats can have their traps disabled
+  (when (and (types-equal-or-intersect (lvar-type y)
+                                       (specifier-type '(eql 0)))
+             (csubtypep (lvar-type x) (specifier-type 'rational))
+             (csubtypep (lvar-type y) (specifier-type 'rational)))
+    (let ((var (ok-lvar-lambda-var y gen)))
+      (when var
+        (list (list 'typep var (specifier-type '(eql 0)) t))))))
 
-(defoptimizer (/ constraint-propagate)
-    ((x &optional y) node gen)
-  (let ((var (ok-lvar-lambda-var (or y x) gen)))
-    (when var
-      (list (list 'typep var (specifier-type '(real 0 0)) t)))))
+(defoptimizer (/ constraint-propagate) ((x &optional y) node gen)
+  (let ((d (or y x)))
+    (when (and (types-equal-or-intersect (lvar-type d)
+                                         (specifier-type '(eql 0)))
+               (csubtypep (single-value-result-type node t) 
+                          (specifier-type 'rational)))
+      (let ((var (ok-lvar-lambda-var d gen)))
+        (when var
+          (list (list 'typep var (specifier-type '(eql 0)) t)))))))
 
 ;;; (the fixnum (truncate integer 2)) can work with a signed-word X.
 (make-defs (($fun truncate floor ceiling))

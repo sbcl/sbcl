@@ -2036,4 +2036,10 @@
      (declare (float y))
      (floor x y)
      y)
-   (and float (not (float 0 0)))))
+   float)
+  (assert-type
+   (lambda (x y)
+     (declare (rational x y))
+     (floor x y)
+     y)
+   (and rational (not (eql 0)))))
