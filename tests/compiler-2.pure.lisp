@@ -4963,3 +4963,19 @@
           (when (minusp x)
             q)))
     ((10) (condition 'division-by-zero))))
+
+(with-test (:name :constant-fold-call-multiple-uses-casts)
+  (checked-compile-and-assert 
+      (:optimize :safe
+       :allow-warnings t)
+      `(lambda (v)
+         (if v
+             (truncate
+              (if v
+                  #c(1 2)
+                  2)
+              (if v
+                  9
+                  2))))
+    ((t) (condition 'type-error))
+    ((nil) nil)))

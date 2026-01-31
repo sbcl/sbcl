@@ -1286,10 +1286,12 @@
     (reoptimize-lvar lvar)
     cast))
 
-(defun insert-cast-after (node lvar type policy &optional context)
+(defun insert-cast-after (node lvar type policy &optional context delay)
   (declare (type node node) (type lvar lvar) (type ctype type))
   (with-ir1-environment-from-node node
-    (let ((cast (make-cast lvar type policy context)))
+    (let ((cast (if delay
+                    (make-delay lvar)
+                    (make-cast lvar type policy context))))
       (let ((lvar (cast-value cast)))
         (insert-node-after node cast)
         (setf (lvar-dest lvar) cast)

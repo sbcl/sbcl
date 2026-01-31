@@ -2066,19 +2066,21 @@
                                     (return-from %constant-fold-call-multiple-uses))
                                    (t
                                     (setf mv t)))
-                             values))))
+                             (cons
+                              values
+                              (list* fun-name constants))))))
         (cond (mv
                (when (loop for ref in (lvar-uses multi-use-lvar)
                            always (almost-immediately-used-p multi-use-lvar ref :flushable t
                                                                                 :no-multiple-value-lvars t))
                  (loop for ref in (lvar-uses multi-use-lvar)
-                       for value in values
+                       for (value) in values
                        do
                        (replace-node ref `(values ,@(loop for v in value
                                                           collect (list 'quote v))))
                        (delete-ref ref))
                  (erase-lvar-type multi-use-lvar)
-                 (use-lvar (insert-cast-after call multi-use-lvar *wild-type* **zero-typecheck-policy**)
+                 (use-lvar (insert-cast-after call multi-use-lvar *wild-type* **zero-typecheck-policy** nil t)
                            (node-lvar call))
                  (flush-dest (combination-fun call))
                  (dolist (arg args)
@@ -2091,16 +2093,16 @@
                       (loop for use in mv-bind
                             for values-arg = (nth nth-value (combination-args use))
                             for ref = (lvar-uses values-arg)
-                            for (value) in values
+                            for ((value) . source) in values
                             do
-                            (push value (node-source-path ref))
+                            (push source (node-source-path ref))
                             (change-ref-leaf ref (find-constant value)
                                              :recklessly t)
                             (erase-lvar-type values-arg)))
                      (t
                       (loop for ref in (lvar-uses multi-use-lvar)
-                            for (value) in values
-                            do (push value (node-source-path ref))
+                            for ((value) . source) in values
+                            do (push source (node-source-path ref))
                                (change-ref-leaf ref (find-constant value)
                                                 :recklessly t))
                       (erase-lvar-type multi-use-lvar)))
