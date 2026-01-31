@@ -519,6 +519,7 @@
       `(lambda (a)
          (declare (bit a))
          (/ 1 a))
+    (:return-type (values (eql 1) &optional))
     ((1) 1)
     ((0) (condition 'division-by-zero)))
   (checked-compile-and-assert
@@ -526,6 +527,7 @@
       `(lambda (a)
          (declare (bit a))
          (= (/ 5 a) 5))
+    (:return-type (values (eql t) &optional))
     ((1) t)
     ((0) (condition 'division-by-zero))))
 

@@ -1520,19 +1520,7 @@
                                        (bound-div top-high (interval-low bot) nil)))))
                        (t
                         (bug "excluded case in INTERVAL-DIV")))))))
-    (let ((interval (interval-div top bot)))
-      (if (consp interval)
-          interval
-          (let ((low (interval-low interval))
-                (high (interval-high interval)))
-            (if (and (integerp low)
-                     (not (eql low 0))
-                     (eql low high))
-                ;; Don't return constants, as it will produce an error when divided by 0.
-                (if (plusp low)
-                    (make-interval :low '(0) :high low)
-                    (make-interval :low low :high '(0)))
-                interval))))))
+    (interval-div top bot)))
 
 ;;; Apply the function F to the interval X. If X = [a, b], then the
 ;;; result is [f(a), f(b)]. It is up to the user to make sure the
