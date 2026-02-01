@@ -4382,7 +4382,12 @@
 ;;; Remove negate and abs
 (make-defs (($fun / * truncate ftruncate fround round
                   floor ceiling ffloor fceiling))
-  (deftransform $fun ((x y) (number number) * :node node :important nil)
+  (deftransform $fun ((x y) (number number)
+                      * :node node :important nil)
+    ($when (eq '$fun '/)
+           (when (and (types-equal-or-intersect (lvar-type y) (specifier-type 'complex))
+                      (policy node (plusp float-accuracy)))
+             (give-up-ir1-transform)))
     (or (when ($if (member '$fun '(* /))
                    t
                    (or (lvar-single-value-p (node-lvar node))
@@ -5979,8 +5984,13 @@
                                                    (- (- y) x))
                                                 'negate-lvar))
                               t))
-                           ((* /) (* *)
+                           (* (* *)
                             (negate-args args t))
+                           (/ (* *)
+                            (when (or (not (types-equal-or-intersect (lvar-type (second args))
+                                                                     (specifier-type 'complex)))
+                                      (float-safe-p))
+                              (negate-args args t)))
                            ((truncate round) (* *)
                             (negate-args args))
                            (%unary-truncate (*)
