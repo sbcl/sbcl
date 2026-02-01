@@ -529,6 +529,28 @@
          (= (/ 5 a) 5))
     (:return-type (values (eql t) &optional))
     ((1) t)
+    ((0) (condition 'division-by-zero)))
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (a)
+         (declare (integer a))
+         (/ 0 a))
+    (:return-type (values (eql 0) &optional))
+    ((1) 0)
+    ((0) (condition 'division-by-zero)))
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (a)
+         (declare (integer a))
+         (floor 0 a))
+    (:return-type (values (eql 0) (eql 0) &optional))
+    ((1) (values 0 0))
+    ((0) (condition 'division-by-zero)))
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (a)
+         (floor 0 a))
+    ((1.0) (values 0 0.0))
     ((0) (condition 'division-by-zero))))
 
 (with-test (:name :dpb-size-overflow)

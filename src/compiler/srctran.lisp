@@ -6200,19 +6200,25 @@
   (delay-ir1-transform node :ir1-phases)
   `(sb-kernel::intexp x y))
 
-(macrolet ((def (name)
-             `(deftransform ,name ((x y) ((constant-arg (integer 0 0)) integer)
-                                   *)
-                "fold zero arg"
-                0)))
-  (def ash)
-  (def /))
+(deftransform ash ((x y) ((constant-arg (eql 0)) integer))
+  "fold zero arg"
+  0)
+
+(defmacro check-div-by-zero (x &optional else)
+  `(if (= ,x 0)
+       (error 'division-by-zero)
+       ,else))
+
+(deftransform / ((x y) ((constant-arg (eql 0)) integer) *)
+  "fold zero arg"
+  (check-div-by-zero x  0))
 
 (macrolet ((def (name)
              `(deftransform ,name ((x y) ((constant-arg (integer 0 0)) integer)
                                    *)
                 "fold zero arg"
-                '(values 0 0))))
+                `(check-div-by-zero y
+                                    (values 0 0)))))
   (def truncate)
   (def round)
   (def floor)
