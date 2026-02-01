@@ -125,17 +125,18 @@ code:
     (as-c "#define CAST_SIGNED(x) ((int) (x))")
     #+(and (not x86-64) (or x86 64-bit))
     (as-c "#define CAST_SIGNED(x) ((long) (x))")
-    (as-c "int main(int argc, char *argv[]) {")
-    (as-c "    FILE *out;")
-    (as-c "    if (argc != 2) {")
-    (as-c "        printf(\"Invalid argcount!\");")
-    (as-c "        return 1;")
-    (as-c "    } else")
-    (as-c "        out = fopen(argv[1], \"w\");")
-    (as-c "    if (!out) {")
-    (as-c "        printf(\"Error opening output file!\");")
-    (as-c "        return 1;")
-    (as-c "    }")
+    (as-c "
+int main(int argc, char *argv[]) {
+    FILE *out;
+    if (argc != 2) {
+        fprintf(stderr, \"Invalid argcount!\\n\");
+        return 1;
+    } else
+        out = fopen(argv[1], \"w\");
+    if (!out) {
+        fprintf(stderr, \"Error opening output file!\\n\");
+        return 1;
+    }")
     (printf "(cl:in-package #:~A)" package-name)
     (printf "(cl:eval-when (:compile-toplevel :execute)")
     (printf "  (cl:defparameter *integer-sizes* (cl:make-hash-table))")
