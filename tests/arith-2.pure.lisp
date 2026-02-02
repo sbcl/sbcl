@@ -593,14 +593,19 @@
 (with-test (:name :log-integer-derive-type)
   (assert-type
    (lambda (x)
-     (declare ((integer 0) x))
+     (declare ((integer 1) x))
      (log x))
    (single-float 0.0))
   (assert-type
    (lambda (x)
+     (declare ((integer 0) x))
+     (log x))
+   single-float)
+  (assert-type
+   (lambda (x)
      (declare (integer x))
      (log x))
-   (or (complex single-float) (single-float 0.0))))
+   (or (complex single-float) single-float)))
 
 (with-test (:name :floor-derive-type)
   (assert-type

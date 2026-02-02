@@ -414,28 +414,11 @@ fractional bits."
   (checked-compile `(lambda () (rational #.sb-ext:single-float-positive-infinity))
                    :allow-style-warnings t))
 
-;; Not all libm implementations of log() raise SIGFPE, which is actually valid,
-;; because when a math function specification speaks of "exceptions" it is
-;; technically referring to a _language's_ exception mechanism, and not POSIX
-;; signals necessarily. SBCL hooks into the signal which might not be delivered.
-;; And also note that "man log" on Linux has two different ways
-;; of expressing what could happen at the edge case:
-;; 1) If x is zero, then a pole error occurs, and the functions return
-;;    -HUGE_VAL, -HUGE_VALF, or -HUGE_VALL, respectively.
-;; 2) The following errors *can* occur: [not "SHALL" occur]
-;;    Pole error: x is zero.  errno is set to ERANGE.  A divide-by-zero
-;;    floating-point exception (FE_DIVBYZERO) is raised
-;; So those are both valid, and they have different effects on type derivation
-;; (which is perhaps unfortunate)
-(with-test (:name :log-derive-type-at-pole)
-  (unless (eql (ignore-errors (sb-kernel:%log2 0d0))
-               #.double-float-negative-infinity)
-    (assert-type (lambda (y)
-                   (declare (integer y))
-                   (log y 2.0d0))
-                 (or (double-float 0d0) (complex double-float)))))
-
 (with-test (:name :log-derive-type)
+  (assert-type (lambda (y)
+                 (declare (integer y))
+                 (log y 2.0d0))
+               (or double-float (complex double-float)))
   (assert-type (lambda (y)
                  (declare (double-float y))
                  (log y 2.0d0))

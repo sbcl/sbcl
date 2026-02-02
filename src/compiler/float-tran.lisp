@@ -1111,9 +1111,7 @@
   (elfun-derive-type-simple x fun
                             (if (rational-type-p x) 0 -0d0)
                             nil
-                            ;; (log 0) is an error
-                            ;; and there's nothing between 0 and 1 for integers.
-                            (and (integer-type-p x) -0f0)
+                            nil
                             nil
                             t
                             double-float-for-integers))
