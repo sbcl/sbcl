@@ -5845,12 +5845,12 @@
 ;; Don't allow mixing integer 0 and float zero, which have different negations
 (defun float-contagion-for-negate (a b &optional no-rational)
   (cond ((and (not no-rational)
-              (csubtypep (lvar-type a) (specifier-type '(or rational (complex rational))))
-              (csubtypep (lvar-type b) (specifier-type '(or rational (complex rational))))))
-        ((csubtypep (lvar-type a) (specifier-type '(and number (not (or (eql 0) (complex rational))))))
-         (or (csubtypep (lvar-type b) (specifier-type '(and number (not (or (eql 0) (complex rational))))))
+              (lvar-csubtypep a (or rational (complex rational)))
+              (lvar-csubtypep b (or rational (complex rational)))))
+        ((lvar-csubtypep a (and number (not (or (eql 0) (complex rational)))))
+         (or (lvar-csubtypep b (and number (not (or (eql 0) (complex rational)))))
              a))
-        ((csubtypep (lvar-type b) (specifier-type '(and number (not (or (eql 0) (complex rational))))))
+        ((lvar-csubtypep b (and number (not (or (eql 0) (complex rational)))))
          b)))
 
 (defun negate-lvar (x outer-node &key test minus-zero-ignored
@@ -5907,18 +5907,22 @@
                  (labels ((negate-args (args &optional contagion any-branch avoid-complex)
                             (if (cdr args)
                                 (destructuring-bind (first second) args
-                                  (when (and avoid-complex
-                                             (not (float-safe-p)))
-                                    (let ((first-complexp (complex-p first))
-                                          (second-complexp (complex-p second)))
-                                      (cond ((and first-complexp second-complexp)
-                                             (return-from negate-args))
-                                            (first-complexp
-                                             (return-from negate-args (negate-lvar second test any-branch)))
-                                            (second-complexp
-                                             (return-from negate-args (negate-lvar first test any-branch))))))
                                   (when contagion
                                     (let ((contagion (float-contagion first second)))
+                                      (when (and avoid-complex
+                                                 (not (float-safe-p)))
+                                        (let ((first-complexp (complex-p first))
+                                              (second-complexp (complex-p second)))
+                                          (let ((target
+                                                  (cond ((and first-complexp second-complexp)
+                                                         (return-from negate-args))
+                                                        (first-complexp second)
+                                                        (second-complexp first))))
+                                            (when (and target
+                                                       (or (eq contagion t)
+                                                           (eq contagion target)))
+                                              (return-from negate-args
+                                                (negate-lvar target test any-branch))))))
                                       (case contagion
                                         ((t))
                                         ((nil) (return-from negate-args))

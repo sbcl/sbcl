@@ -1610,7 +1610,12 @@
         `(lambda (a b)
            (declare ((complex float) a b))
            (- (* (- a) b)))
-      ((#C(-4.0 -3) #C(-0.0 0)) #C(0 -0.0)))))
+      ((#C(-4.0 -3) #C(-0.0 0)) #C(0 -0.0)))
+    (checked-compile-and-assert
+        ()
+        `(lambda (f i)
+           (- (* f (truncate i 20))))
+      ((3.0 1) -0.0))))
 
 (with-test (:name :abs-match)
   (flet ((test (form count)
