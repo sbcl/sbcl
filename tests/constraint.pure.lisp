@@ -2076,4 +2076,18 @@
      (if (> (* c n) 10)
          c
          (error "")))
+   real)
+  (assert-type
+   (lambda (n c)
+     (declare (integer n))
+     (if (realp (/ n c))
+         c
+         (error "")))
+   number)
+  (assert-type
+   (lambda (n c)
+     (declare ((integer 1) n))
+     (if (realp (/ n c))
+         c
+         (error "")))
    real))

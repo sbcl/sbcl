@@ -40,7 +40,9 @@
            (add-back-constraint gen 'typep lvar type consequent))
          (add-alt (lvar type)
            (add-back-constraint gen 'typep lvar type alternative)))
-    (let ((real-type (if complex-p ;; complex rationals multiplied by 0 will produce an integer 0.
+    (let ((real-type (if complex-p
+                         ;; (* 0 complex-rational) => rational
+                         ;; (/ 0 complex-rational) => 0
                          (specifier-type '(and real (not (eql 0))))
                          (specifier-type 'real))))
       (cond ((csubtypep constraint (specifier-type 'rational))
@@ -255,8 +257,8 @@
     (typep
      (flet ((add (lvar type)
               (add-back-constraint gen 'typep lvar type consequent)))
-       (let ((complex-p (or (types-equal-or-intersect (lvar-type x) (specifier-type 'complex))
-                            (types-equal-or-intersect (lvar-type y) (specifier-type 'complex)))))
+       (let ((complex-p (or (lvar-intersectp x complex)
+                            (lvar-intersectp y complex))))
          (cond ((and
                  (csubtypep constraint (specifier-type 'integer))
                  (let* ((rational-type (if complex-p
@@ -304,7 +306,8 @@
   (declare (ignore nth-value))
   (case kind
     (typep
-     (numeric-contagion-constraint-back x y gen constraint consequent alternative))))
+     (numeric-contagion-constraint-back x y gen constraint consequent alternative
+                                        :complex-p (lvar-intersectp y complex)))))
 
 (defoptimizers constraint-propagate-back (car cdr) ((x) node nth-value kind constraint gen consequent alternative)
   (declare (ignore nth-value alternative))
