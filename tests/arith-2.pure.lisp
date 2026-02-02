@@ -1589,7 +1589,12 @@
         ()
         `(lambda (r)
            (- (- r) 5))
-      ((#C(.0 0)) #C(-5 -0.0)))))
+      ((#C(.0 0)) #C(-5 -0.0)))
+    (checked-compile-and-assert
+        ()
+        `(lambda (c)
+           (- (* #C(4.0 3) c)))
+      ((#C(-0.0 0)) #C(0 -0.0)))))
 
 (with-test (:name :abs-match)
   (flet ((test (form count)

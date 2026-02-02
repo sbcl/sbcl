@@ -5953,7 +5953,8 @@
                               negated)))
                    (multiple-value-bind (constant value) (constant-node-p node)
                      (if constant
-                         (unless (and (eql value 0) ;; can't negate a non-float zero
+                         (unless (and (or (eql value 0)  ;; can't negate a non-float zero
+                                          (complexp value))
                                       (not (float-safe-p)))
                            (unless test
                              (let ((negated (- value)))
