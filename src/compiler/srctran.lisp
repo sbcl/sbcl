@@ -5865,6 +5865,9 @@
                  (cond ((float-safe-p))
                        (t
                         (float-contagion-for-negate a b))))
+               (complex-p (lvar)
+                 (types-equal-or-intersect (lvar-type lvar)
+                                           (specifier-type 'complex)))
                (negate-lvar (x test any-branch)
                  (let ((uses (lvar-uses x)))
                    (if (listp uses)
@@ -5898,9 +5901,19 @@
                                      (t)))))
                        (negate-node uses test any-branch))))
                (negate-node (node test any-branch)
-                 (labels ((negate-args (args &optional contagion any-branch)
+                 (labels ((negate-args (args &optional contagion any-branch avoid-complex)
                             (if (cdr args)
                                 (destructuring-bind (first second) args
+                                  (when (and avoid-complex
+                                             (not (float-safe-p)))
+                                    (let ((first-complexp (complex-p first))
+                                          (second-complexp (complex-p second)))
+                                      (cond ((and first-complexp second-complexp)
+                                             (return-from negate-args))
+                                            (first-complexp
+                                             (return-from negate-args (negate-lvar second test any-branch)))
+                                            (second-complexp
+                                             (return-from negate-args (negate-lvar first test any-branch))))))
                                   (when contagion
                                     (let ((contagion (float-contagion first second)))
                                       (case contagion
@@ -5992,10 +6005,9 @@
                                                 'negate-lvar))
                               t))
                            (* (* *)
-                            (negate-args args t))
+                            (negate-args args t nil t))
                            (/ (* *)
-                            (when (or (not (types-equal-or-intersect (lvar-type (second args))
-                                                                     (specifier-type 'complex)))
+                            (when (or (not (complex-p (second args)))
                                       (float-safe-p))
                               (negate-args args t)))
                            ((truncate round) (* *)
