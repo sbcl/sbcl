@@ -4067,3 +4067,8 @@ is :ANY, the function name is not checked."
 (defun after-ir1-phases-p ()
   (and (boundp '*component-being-compiled*)
        (> (component-phase-counter *component-being-compiled*) 0)))
+
+(defmacro lvar-intersectp (lvar type)
+  `(types-equal-or-intersect (lvar-type ,lvar) (specifier-type ',type)))
+(defmacro lvar-csubtypep  (lvar type)
+  `(csubtypep (lvar-type ,lvar) (specifier-type ',type)))

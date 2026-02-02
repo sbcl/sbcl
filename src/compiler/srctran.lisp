@@ -2308,8 +2308,11 @@
   (remove-abs x node))
 
 (defoptimizer (cos optimizer) ((x) node)
-  (negate-lvar x node :test '%negate :minus-zero-ignored t
-               :any-branch t)
+  (when (or ;; can't negate an integer 0 in a complex
+         (not (lvar-intersectp x (complex rational)))
+         (minus-zero-ignored-p node))
+    (negate-lvar x node :test '%negate :minus-zero-ignored t
+                        :any-branch t))
   (remove-abs x node nil))
 
 (defun rem-result-type (number-type divisor-type)
@@ -5942,8 +5945,7 @@
                               (cond ((or (float-safe-p)
                                          (loop for arg in args
                                                do
-                                               (if (csubtypep (lvar-type arg)
-                                                              (specifier-type '(and number (not (or (eql 0) (complex ratio))))))
+                                               (if (lvar-csubtypep arg (and number (not (or (eql 0) (complex ratio)))))
                                                    (setf good arg)
                                                    (setf all-good nil))
                                                finally (return all-good)))
@@ -6065,8 +6067,8 @@
                             (negate-truncation combination args 'ffloor t))
                            (sin (*)
                             (when (or (float-safe-p)
-                                      (csubtypep (lvar-type (first args))
-                                                 (specifier-type '(and number (not (or (eql 0) (complex ratio)))))))
+                                      (lvar-csubtypep (first args)
+                                                      (and number (not (or (eql 0) (complex ratio))))))
                               (negate-lvar (first args) test any-branch)))))))))
         (negate-lvar x test any-branch)))))
 

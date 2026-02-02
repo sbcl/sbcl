@@ -1528,7 +1528,12 @@
         `(lambda (a b)
            (declare (integer b))
            (- (- (+ a 5)) b))
-      ((-5.0 0) -0.0))))
+      ((-5.0 0) -0.0))
+    (checked-compile-and-assert
+        ()
+        `(lambda (a)
+           (cos (- a)))
+      ((#C(0 2)) (cos #C(0 -2))))))
 
 (with-test (:name :remove-negate.2)
   (flet ((test (form count)
