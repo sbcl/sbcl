@@ -4785,11 +4785,17 @@
     (or (and (lvar-single-value-p result)
              (combination-case (x :cast (specifier-type 'real))
                (/ (* *)
-                (splice-fun-args x '/ nil t (specifier-type 'real) t)
-                (erase-node-type node t 1)
-                `(lambda (a b y)
-                   (declare (ignore y))
-                   ($fun a b)))))
+                (destructuring-bind (a b) args
+                  ;; truncate wants real numbers, but / can turn some complex numbers into rationals
+                  (when (or (not (types-equal-or-intersect (lvar-type b) (specifier-type '(complex rational))))
+                            (csubtypep (lvar-type a)
+                                       (specifier-type `(or (complex float)
+                                                            (and rational (not (eql 0)))))))
+                   (splice-fun-args x '/ nil t (specifier-type 'real) t)
+                   (erase-node-type node t 1)
+                   `(lambda (a b y)
+                      (declare (ignore y))
+                      ($fun a b)))))))
         (give-up-ir1-transform))))
 
 (flet ((single-value-fun (combination name)

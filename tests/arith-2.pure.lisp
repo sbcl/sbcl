@@ -2358,3 +2358,10 @@
     ((#c(0.0 3.0) #c(0.0 3.0))
      (/ (opaque-identity (- #c(0.0 3.0)))
         (opaque-identity (- #c(0.0 3.0)))))))
+
+(with-test (:name :truncate+/+complex)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (values (truncate (/ a b))))
+    ((#C(3 6) #C(1 2)) 3)))

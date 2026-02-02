@@ -1668,5 +1668,11 @@
   (let ((b (& val #xf)))
    (let ((a (>> val 28)))
     (^ a (aref tab b))))))")
+(#(236A976D 3F90074C 42D83FFB 4C9563A8 5393DAD1 71FB8EC1 7E1E0B08 B169B946 E940F22A)
+ "(:ALLOW-OTHER-KEYS :CONVENTION :INTO-STUB :STUB :VARARGS :ARG-TYPES :RESULT-TYPE :ALIGNMENT :BITS)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 5 15 2 0 5 0 0)))
+  (let ((b (& val #x7)))
+   (let ((a (>> val 29)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF
