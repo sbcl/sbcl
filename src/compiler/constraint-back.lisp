@@ -33,7 +33,7 @@
 (defun numeric-contagion-constraint-back (x y gen constraint consequent alternative &key
                                                                                       complex-p
                                                                                       integer
-                                                                                      (same-leaf-not-complex t)
+                                                                                      same-leaf-not-complex
                                                                                       (x-type (lvar-type x))
                                                                                       (y-type (lvar-type y)))
   (flet ((add (lvar type)
@@ -159,8 +159,8 @@
              (add y (specifier-type 'complex)))
             ((and x-type
                   (csubtypep constraint (specifier-type 'real)))
-             (let ((x-realp (csubtypep x-type (specifier-type 'real)))
-                   (y-realp (csubtypep y-type (specifier-type 'real))))
+             (let ((x-realp (csubtypep x-type real-type))
+                   (y-realp (csubtypep y-type real-type)))
                (when (and alternative
                           (eq constraint (specifier-type 'real)))
                  (cond (x-realp
@@ -203,10 +203,12 @@
                            (int interval y x)
                            (int interval x y))
                          t))))
-              (numeric-contagion-constraint-back x y gen constraint nil alternative :integer t))
+              (numeric-contagion-constraint-back x y gen constraint nil alternative :integer t
+                                                                                    :same-leaf-not-complex t))
              (t
               (numeric-contagion-constraint-back x y gen constraint consequent alternative
-                                                 :integer t)))))))
+                                                 :integer t
+                                                 :same-leaf-not-complex t)))))))
 
 (defun -constraint-propagate-back (x y x-type y-type kind constraint gen consequent alternative)
   (case kind
@@ -302,7 +304,7 @@
   (declare (ignore nth-value))
   (case kind
     (typep
-     (numeric-contagion-constraint-back x y gen constraint consequent alternative :same-leaf-not-complex nil))))
+     (numeric-contagion-constraint-back x y gen constraint consequent alternative))))
 
 (defoptimizers constraint-propagate-back (car cdr) ((x) node nth-value kind constraint gen consequent alternative)
   (declare (ignore nth-value alternative))

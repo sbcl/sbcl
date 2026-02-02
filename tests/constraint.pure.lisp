@@ -2043,3 +2043,37 @@
      (floor x y)
      y)
    (and rational (not (eql 0)))))
+
+(with-test (:name :complex-into-real)
+  (assert-type
+   (lambda (c)
+     (if (> (- c c) 10)
+         c
+         (error "")))
+   number)
+  (assert-type
+   (lambda (c)
+     (if (> (+ c c) 10)
+         c
+         (error "")))
+   real)
+  (assert-type
+   (lambda (c)
+     (if (> (* c c) 10)
+         c
+         (error "")))
+   number)
+  (assert-type
+   (lambda (c n)
+     (declare (integer n))
+     (if (> (* c n) 10)
+         c
+         (error "")))
+   number)
+  (assert-type
+   (lambda (c n)
+     (declare ((integer 1) n))
+     (if (> (* c n) 10)
+         c
+         (error "")))
+   real))
