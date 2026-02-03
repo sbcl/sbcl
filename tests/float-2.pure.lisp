@@ -893,3 +893,12 @@ fractional bits."
   (assert (not (ctu:ir1-named-calls `(lambda (x)
                                        (declare (fixnum x))
                                        (ffloor x 1d0))))))
+(with-test (:name :the-truncate)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (n)
+         (values (the (integer * 0)
+               (truncate
+                (exp (progn (the fixnum n) n))))))
+    ((-1) 0)
+    ((1) (condition 'type-error))))

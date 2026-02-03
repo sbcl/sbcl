@@ -1865,16 +1865,17 @@
 
 (macrolet ((def (type)
              `(deftransform unary-truncate ((number) (,type) * :node node)
-                (let ((cast (cast-or-check-bound-type node (specifier-type 'sb-vm:signed-word))))
+                (multiple-value-bind (cast result-type)
+                    (cast-or-check-bound-type node (specifier-type 'sb-vm:signed-word))
                   (if cast
-                      (let ((int (type-approximate-interval cast)))
+                      (let ((int (type-approximate-interval result-type)))
                         (when int
                           (multiple-value-bind (low high) (,(symbolicate type '-integer-bounds)
                                                            (interval-low int)
                                                            (interval-high int))
                             `(if (typep number
                                         '(,',type ,low ,high))
-                                 (let ((truncated (truly-the ,(type-specifier cast) (,',(symbolicate '%unary-truncate/ type) number))))
+                                 (let ((truncated (truly-the ,(type-specifier result-type) (,',(symbolicate '%unary-truncate/ type) number))))
                                    (declare (flushable ,',(symbolicate "%" type)))
                                    (values truncated
                                            (- number
