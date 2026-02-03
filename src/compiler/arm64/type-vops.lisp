@@ -260,8 +260,8 @@
     not-target))
 
 (define-vop (signed-byte-64-p-move-to-word signed-byte-64-p)
-  (:results (r :scs (signed-reg)))
-  (:result-types signed-num)
+  (:results (r :scs (signed-reg unsigned-reg)))
+  (:result-types (:or unsigned-num signed-num))
   (:translate)
   (:generator 10
     (let ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))))
