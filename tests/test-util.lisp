@@ -468,6 +468,11 @@
      (list :filter (lambda (&key speed safety &allow-other-keys)
                      (and (> safety 0) (>= safety speed)))
            :compilation-speed 1 :space 1))
+    ((eql :safe-debug)
+     (list :filter (lambda (&key speed safety debug &allow-other-keys)
+                     (and (> safety 0) (>= safety speed)
+                          (> debug 1)))
+           :compilation-speed 1 :space 1))
     ((eql :quick)
      '(:compilation-speed 1 :space 1))
     ((eql :quick/incomplete)
@@ -699,18 +704,31 @@
           (multiple-value-bind (values conditions)
               (apply #'call-capturing-values-and-conditions function args)
             (typecase expected
-              ((cons (eql condition) (cons t null))
+              ((cons (eql condition))
                (let* ((expected-condition-type (second expected))
                       (unexpected (remove-if (lambda (condition)
                                                (typep condition
                                                       expected-condition-type))
                                              conditions))
+                      (test (third expected))
+                      (test-description (fourth expected))
                       (expected (set-difference conditions unexpected)))
                  (cond
                    (unexpected
                     (signaled-unexpected unexpected))
                    ((null expected)
-                    (failed-to-signal expected-condition-type)))))
+                    (failed-to-signal expected-condition-type)))
+                 (when (and test
+                            (not (every test conditions)))
+
+                   (error "~@<Calling the result of compiling~
+                      ~/test-util::print-form-and-optimize/ ~
+                      ~/test-util::print-arguments/~
+                      signaled unexpected condition~P~
+                      ~/test-util::print-signaled-conditions/~
+                      not matching~% ~a.~@:>"
+                          (cons form optimize) args (length conditions) conditions
+                          test-description))))
               (t
                (let ((expected (funcall expected)))
                  (cond
@@ -767,10 +785,12 @@
 ;;;
 ;;; If VALUES-FORM is of the form
 ;;;
-;;;   (CONDITION CONDITION-TYPE)
+;;;   (CONDITION CONDITION-TYPE &OPTIONAL FUNCTION)
 ;;;
 ;;; the function call is expected to signal the designated condition
 ;;; instead of returning values. CONDITION-TYPE is evaluated.
+;;;
+;;; FUNCTION is called with CONDITION.
 ;;;
 ;;; The OPTIMIZE keyword parameter controls the optimization policies
 ;;; (or policy) used when compiling FORM. The argument is interpreted
@@ -791,14 +811,14 @@
                (destructuring-bind (args values &key (test ''equal testp)
                                                      allow-conditions)
                    case
-                 (let ((conditionp (typep values '(cons (eql condition) (cons t null)))))
+                 (let ((conditionp (typep values '(cons (eql condition)))))
                    (when (and testp conditionp)
                      (sb-ext:with-current-source-form (case)
                        (error "~@<Cannot use ~S with ~S ~S.~@:>"
                               values :test test)))
                    `(list (lambda () (values ,@args))
                           ,(if conditionp
-                               `(list 'condition ,(second values))
+                               `(list 'condition ,(second values) ,(third values) ',(third values))
                                `(lambda () (multiple-value-list ,values)))
                           ,test
                           ,allow-conditions))))))

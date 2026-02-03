@@ -84,7 +84,17 @@ os_restore_fp_control(os_context_t *context)
 {
     /* FIXME: Implement. */
 }
+os_context_register_t *
+os_context_float_register_addr(os_context_t *context, int offset)
+{
+    uintptr_t regspace = (uintptr_t)context + 232;
 
+    if (*(uint32_t *)regspace == 0x56465001) {
+        return (os_context_register_t *)(regspace + 8 + (offset * 8));
+    }
+
+    return NULL;
+}
 void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
