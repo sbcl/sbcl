@@ -365,7 +365,9 @@
                          (csubtypep (lvar-type arg) arg-m)
                          (and (constant-lvar-p arg)
                               (or (eq arg-m 'constant)
-                                  (eql (lvar-value arg) arg-m))))))))
+                                  (eql (lvar-value arg) arg-m)
+                                  (and (typep arg-m '(cons (eql constant)))
+                                       (csubtypep (lvar-type arg) (second arg-m))))))))))
 
 (defun combination-matches (name args combination)
   (and (combination-p combination)
@@ -416,9 +418,12 @@
                                                `(combination-matches-args args
                                                                           (load-time-value
                                                                            (list ,@(loop for spec in arg-spec
-                                                                                         collect (if (typep spec '(cons (eql type)))
-                                                                                                     `(specifier-type ',(second spec))
-                                                                                                     `',spec))))))
+                                                                                         collect (cond ((typep spec '(cons (eql type)))
+                                                                                                        `(specifier-type ',(second spec)))
+                                                                                                       ((typep spec '(cons (eql constant)))
+                                                                                                        `(list 'constant (specifier-type ',(second spec))))
+                                                                                                       (t
+                                                                                                        `',spec)))))))
                                           ,@body)
                                          ,@(unless sub
                                              (loop while (and cases

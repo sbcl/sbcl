@@ -3299,16 +3299,21 @@
              ;; cast can be moved to that use.
              (when (and good-types-not-immediately-used
                         (not multiple-bad-uses))
-               (let ((new-cast (if (exit-p bad-use)
-                                   (assert-lvar-type (exit-value bad-use) asserted (lexenv-policy (node-lexenv cast))
-                                                     (cast-context cast)
-                                                     t)
-                                   (assert-node-type bad-use asserted (lexenv-policy (node-lexenv cast))
-                                                     (cast-context cast)
-                                                     t))))
+               (let* ((new-type (values-type-intersection (if (exit-p bad-use)
+                                                              (lvar-derived-type (exit-value bad-use))
+                                                              (lvar-derived-type value)) asserted))
+                      (new-cast (cond ((exit-p bad-use)
+                                       (setf (node-derived-type bad-use) new-type)
+                                       (assert-lvar-type (exit-value bad-use) asserted (lexenv-policy (node-lexenv cast))
+                                                         (cast-context cast)
+                                                         t))
+                                      (t
+                                       (assert-node-type bad-use asserted (lexenv-policy (node-lexenv cast))
+                                                         (cast-context cast)
+                                                         t)))))
                  (setf (cast-silent-conflict new-cast) :style-warning
                        (node-source-path new-cast) (node-source-path cast)
-                       (node-derived-type new-cast) (node-derived-type cast)))
+                       (node-derived-type new-cast) new-type))
                (delete-filter cast lvar value)
                t))))))
 
