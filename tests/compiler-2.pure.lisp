@@ -4989,3 +4989,22 @@
                    v)))
     ((t) (condition 'type-error))
     ((3) (values 1 3))))
+
+(with-test (:name :un/signed-byte-64-p-move-to-word)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x n m)
+         (declare (integer x n))
+         (prog ()
+          sb64
+            (when (typep x '(signed-byte 64))
+              (return (logand x 2)))
+          ub64
+            (when (typep x '(unsigned-byte 64))
+              (return (logand x 1)))
+            (when m
+              (setf x n
+                    m nil)
+              (go ub64))))
+    (((expt 2 64) -1 t) nil)
+    (((expt 2 64) 3 t) 1)))

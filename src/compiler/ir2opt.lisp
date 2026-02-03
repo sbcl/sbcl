@@ -1192,7 +1192,7 @@
                                  (let ((vop2 (branch-destination vop nil)))
                                    (and vop2
                                         (eq (vop-name vop2) not-vop)
-                                        (singleton-p (ir2block-predecessors (vop-block dest)))
+                                        (singleton-p (ir2block-predecessors (vop-block vop2)))
                                         (let ((dest2 (branch-destination vop2)))
                                           (when (and dest2
                                                      (singleton-p (ir2block-predecessors (vop-block dest2)))
