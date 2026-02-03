@@ -93,7 +93,11 @@ os_context_fp_control(os_context_t *context)
 {
     return ((unsigned long*)context->uc_mcontext.regs)[PT_FPSCR];
 }
-
+os_context_register_t *
+os_context_float_register_addr(os_context_t *context, int offset)
+{
+    return (os_context_register_t *)&context->uc_mcontext.fp_regs[offset];
+}
 void
 os_restore_fp_control(os_context_t *context)
 {
