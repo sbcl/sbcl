@@ -4979,3 +4979,13 @@
                   2))))
     ((t) (condition 'type-error))
     ((nil) nil)))
+
+(with-test (:name :cast-externally-checkable-p-vop-ref)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (v3)
+         (let ((v (the integer v3)))
+           (values (logand 1 v)
+                   v)))
+    ((t) (condition 'type-error))
+    ((3) (values 1 3))))

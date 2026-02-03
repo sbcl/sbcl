@@ -254,71 +254,80 @@
 ;;; and should be checked externally -- that is, by the callee and not the caller.
 (defun cast-externally-checkable-p (cast)
   (declare (type cast cast))
-  (multiple-value-bind (dest lvar) (immediately-used-let-dest cast)
-    (let ((context
-            ;; Don't remove casts with a context
-            (and
-             (cast-context cast)
-             (policy cast (or (> debug 1)
-                              (and (> debug 0)
-                                   (>= debug speed))))
-             (cast-context cast))))
-      (cond ((and (basic-combination-p dest)
-                  (not (info :function :specialized-xep
-                             (lvar-fun-name (basic-combination-fun dest))))
-                  (or (not (basic-combination-fun-info dest))
-                      ;; fixed-args functions do not check their arguments.
-                      (not (ir1-attributep (fun-info-attributes (basic-combination-fun-info dest))
-                                           fixed-args
-                                           always-translatable))))
-             (unless (and (policy dest (= debug 3)) ;; don't trust declared types if debug=3
-                          (let ((leaf (nth-value 2 (lvar-fun-type (basic-combination-fun dest)))))
-                            (and leaf
-                                 (memq (leaf-where-from leaf) '(:declared-verify :defined-here)))))
-               (values-subtypep (lvar-externally-checkable-type lvar context)
-                                (cast-type-to-check cast))))
-            ;; Two consecutive casts
-            ((and (not context)
-                  (cast-p dest)
-                  (cast-type-check dest)
-                  (atom (lvar-uses (node-lvar cast)))
-                  (atom (lvar-uses (cast-value dest))))
-             (let* ((asserted-type (cast-asserted-type cast))
-                    (dest-asserted-type (cast-asserted-type dest))
-                    (compatible-p (cond ((and (values-type-p asserted-type)
-                                              (values-type-p dest-asserted-type)
-                                              (= (length (values-type-required asserted-type))
-                                                 (length (values-type-required dest-asserted-type)))
-                                              (= (length (values-type-optional asserted-type))
-                                                 (length (values-type-optional dest-asserted-type)))
-                                              (eql (values-type-rest asserted-type)
-                                                   (values-type-rest dest-asserted-type)))
-                                         'values)
-                                        ((not (or (values-type-p asserted-type)
-                                                  (values-type-p dest-asserted-type))))))
-                    (subtypep
-                      (case compatible-p
-                        (values
-                         (values-subtypep dest-asserted-type asserted-type))
-                        ((t)
-                         (csubtypep dest-asserted-type asserted-type)))))
-               (cond (subtypep
-                      ;; Turn (the fixnum (the integer x)) into (the fixnum x)
-                      (or (cast-externally-checkable-p dest)
-                          (setf (cast-asserted-type cast) (cast-asserted-type dest)
-                                (cast-type-to-check cast) (cast-type-to-check dest)
-                                (cast-%type-check dest) nil)))
-                     (compatible-p
-                      ;; Turn (the integer (the (real 0 5))) into (the (integer 0 5))
-                      (let ((int (case compatible-p
-                                   (values
-                                    (values-type-intersection dest-asserted-type asserted-type))
-                                   ((t)
-                                    (type-intersection dest-asserted-type asserted-type)))))
-                        (unless (eq int *empty-type*)
-                          (setf (cast-asserted-type cast) int
-                                (cast-type-to-check cast) int
-                                (cast-%type-check dest) nil)))))))))))
+  (multiple-value-bind (dest lvar ref) (immediately-used-let-dest cast)
+    (let* ((context
+             ;; Don't remove casts with a context
+             (and
+              (cast-context cast)
+              (policy cast (or (> debug 1)
+                               (and (> debug 0)
+                                    (>= debug speed))))
+              (cast-context cast)))
+           (checkable
+             (cond ((and (basic-combination-p dest)
+                         (not (info :function :specialized-xep
+                                    (lvar-fun-name (basic-combination-fun dest))))
+                         (or (not (basic-combination-fun-info dest))
+                             ;; fixed-args functions do not check their arguments.
+                             (not (ir1-attributep (fun-info-attributes (basic-combination-fun-info dest))
+                                                  fixed-args
+                                                  always-translatable))))
+                    (unless (and (policy dest (= debug 3)) ;; don't trust declared types if debug=3
+                                 (let ((leaf (nth-value 2 (lvar-fun-type (basic-combination-fun dest)))))
+                                   (and leaf
+                                        (memq (leaf-where-from leaf) '(:declared-verify :defined-here)))))
+                      (values-subtypep (lvar-externally-checkable-type lvar context)
+                                       (cast-type-to-check cast))))
+                   ;; Two consecutive casts
+                   ((and (not context)
+                         (cast-p dest)
+                         (cast-type-check dest)
+                         (atom (lvar-uses (node-lvar cast)))
+                         (atom (lvar-uses (cast-value dest))))
+                    (let* ((asserted-type (cast-asserted-type cast))
+                           (dest-asserted-type (cast-asserted-type dest))
+                           (compatible-p (cond ((and (values-type-p asserted-type)
+                                                     (values-type-p dest-asserted-type)
+                                                     (= (length (values-type-required asserted-type))
+                                                        (length (values-type-required dest-asserted-type)))
+                                                     (= (length (values-type-optional asserted-type))
+                                                        (length (values-type-optional dest-asserted-type)))
+                                                     (eql (values-type-rest asserted-type)
+                                                          (values-type-rest dest-asserted-type)))
+                                                'values)
+                                               ((not (or (values-type-p asserted-type)
+                                                         (values-type-p dest-asserted-type))))))
+                           (subtypep
+                             (case compatible-p
+                               (values
+                                (values-subtypep dest-asserted-type asserted-type))
+                               ((t)
+                                (csubtypep dest-asserted-type asserted-type)))))
+                      (cond (subtypep
+                             ;; Turn (the fixnum (the integer x)) into (the fixnum x)
+                             (or (cast-externally-checkable-p dest)
+                                 (setf (cast-asserted-type cast) (cast-asserted-type dest)
+                                       (cast-type-to-check cast) (cast-type-to-check dest)
+                                       (cast-%type-check dest) nil)))
+                            (compatible-p
+                             ;; Turn (the integer (the (real 0 5))) into (the (integer 0 5))
+                             (let ((int (case compatible-p
+                                          (values
+                                           (values-type-intersection dest-asserted-type asserted-type))
+                                          ((t)
+                                           (type-intersection dest-asserted-type asserted-type)))))
+                               (unless (eq int *empty-type*)
+                                 (setf (cast-asserted-type cast) int
+                                       (cast-type-to-check cast) int
+                                       (cast-%type-check dest) nil))))))))))
+      (when checkable
+        (when ref
+          ;; If it's a VOP that does the type check then it might not do anything if the incoming
+          ;; lvar has the right type.
+          ;; Which happens for a cast fed through a variable.
+          (setf (node-derived-type ref) (make-single-value-type (lvar-type (cast-value cast)))
+                (lvar-%derived-type (node-lvar ref)) nil))
+        checkable))))
 
 ;; Type specifiers handled by the general-purpose MAKE-TYPE-CHECK-FORM are often
 ;; trivial enough to have an internal error number assigned to them that can be

@@ -320,7 +320,7 @@
                 (loop for ref in refs
                       for lvar = (node-lvar ref)
                       when (and lvar (almost-immediately-used-p lvar (lambda-bind fun) :flushable flushable))
-                      do (return (values (lvar-dest lvar) lvar))))
+                      do (return (values (lvar-dest lvar) lvar ref))))
               (values dest lvar)))))))
 
 (defun mv-bind-dest (lvar nth-value &optional single-use)
