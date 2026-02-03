@@ -5471,7 +5471,7 @@
                                                    (,transform-to ,q y))
                                                 'associate-multiplication-constants)))))))
                  (combination-case (lvar :cast #'numeric-type-without-bounds-p :node node)
-                   (/ (* constant)
+                   (/ (* (constant rational))
                     (associate-lvar (first args))
                     (unless divide
                       (let* ((value (value (second args)))
@@ -5489,7 +5489,7 @@
                                             'associate-multiplication-constants))))))
                    (/ (* *)
                     (associate-lvar (first args)))
-                   (* (* constant)
+                   (* (* (constant rational))
                     (associate-lvar (first args))
                     (handle-multiplication combination (value (second args))))
                    (* (* *)

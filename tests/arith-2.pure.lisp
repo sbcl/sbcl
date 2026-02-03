@@ -2203,7 +2203,13 @@
         `(lambda (n)
            (declare (integer n))
            (* (/ 23 (* 37 n)) -12))
-      ((2) -138/37))))
+      ((2) -138/37))
+    (checked-compile-and-assert
+        (:optimize :safe)
+        `(lambda (n)
+           (* (the integer (* #c(1 2) n)) 3))
+      ((#c(1 -2)) 15)
+      ((2) (condition 'type-error)))))
 
 (with-test (:name :logtest)
   (when (ctu:vop-existsp 'logtest)
