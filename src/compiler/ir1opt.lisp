@@ -948,7 +948,7 @@
            (when (and (lambda-var-p var)
                       (not (lambda-var-specvar var))
                       (functional-kind-eq (lambda-var-home var) let)
-                      (let-var-immediately-used-p ref var test)
+                      (let-var-immediately-used-p ref var test :flushable t :no-effect t)
                       ;; Rely on constraint propagation to determine
                       ;; that the var with the value of NIL is never
                       ;; used outside of the test itself.

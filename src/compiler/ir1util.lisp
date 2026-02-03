@@ -774,7 +774,8 @@
 ;;; Uninteresting nodes are nodes in the same block which are either
 ;;; REFs, ENCLOSEs, or external CASTs to the same destination.
 (defun almost-immediately-used-p (lvar node &key flushable
-                                                 no-multiple-value-lvars)
+                                                 no-multiple-value-lvars
+                                                 no-effect)
   (declare (type lvar lvar)
            (type (or null node) node))
   (unless node
@@ -796,43 +797,48 @@
                   (return-from almost-immediately-used-p t)
                   (let ((node-lvar (and (valued-node-p node)
                                         (node-lvar node))))
-                    (when (and no-multiple-value-lvars
-                               node-lvar
-                               (not (lvar-single-value-p node-lvar)))
+                    (when (and node-lvar
+                               (or (and no-multiple-value-lvars
+                                        (not (lvar-single-value-p node-lvar)))
+                                   no-effect))
                       (return-from almost-immediately-used-p))
                     (typecase node
                       (ref
                        (go :next))
                       (cast
-                       (when (or (and (memq (cast-type-check node) '(:external nil))
-                                      (eq dest (node-dest node)))
-                                 (and flushable
-                                      (not (contains-hairy-type-p (cast-type-to-check node))))
-                                 ;; If the types do not match then this
-                                 ;; cast is not related to the LVAR and
-                                 ;; wouldn't be affected if it's
-                                 ;; executed out of order.
-                                 (multiple-value-bind (res true)
-                                     (values-subtypep (node-derived-type node)
-                                                      (lvar-derived-type lvar))
-                                   (and (not res)
-                                        true)))
+                       (when (and (not no-effect)
+                                  (or (and (memq (cast-type-check node) '(:external nil))
+                                           (eq dest (node-dest node)))
+                                      (and flushable
+                                           (not (contains-hairy-type-p (cast-type-to-check node))))
+                                      ;; If the types do not match then this
+                                      ;; cast is not related to the LVAR and
+                                      ;; wouldn't be affected if it's
+                                      ;; executed out of order.
+                                      (multiple-value-bind (res true)
+                                          (values-subtypep (node-derived-type node)
+                                                           (lvar-derived-type lvar))
+                                        (and (not res)
+                                             true))))
                          (go :next)))
                       (combination
                        (when (and flushable
                                   (flushable-combination-p node))
                          (go :next))
-                       (let (fun)
-                         (when (and (eq (combination-kind node) :local)
-                                    (functional-kind-eq (setf fun (combination-lambda node)) let))
-                           (setf node (lambda-bind fun))
-                           (go :next))))
+                       (unless no-effect
+                         (let (fun)
+                           (when (and (eq (combination-kind node) :local)
+                                      (functional-kind-eq (setf fun (combination-lambda node)) let))
+                             (setf node (lambda-bind fun))
+                             (go :next)))))
                       (entry
-                       ;; :tagbody may be left from an otherwise deleted loop
-                       (when (eq (cleanup-kind (entry-cleanup node)) :block)
-                         (go :next)))
+                       (unless no-effect
+                        ;; :tagbody may be left from an otherwise deleted loop
+                        (when (eq (cleanup-kind (entry-cleanup node)) :block)
+                          (go :next))))
                       (enclose
-                       (go :next))))))
+                       (unless no-effect
+                         (go :next)))))))
              (t
               ;; Loops shouldn't cause a problem, either it will
               ;; encounter a not "uninteresting" node, or the destination
@@ -859,21 +865,24 @@
 
 ;;; Check that all the uses are almost immediately used and look through CASTs,
 ;;; as they can be freely deleted removing the immediateness
-(defun lvar-almost-immediately-used-p (lvar)
+(defun lvar-almost-immediately-used-p (lvar &key flushable no-effect)
   (do-uses (use lvar t)
-    (unless (and (almost-immediately-used-p lvar use)
+    (unless (and (almost-immediately-used-p lvar use
+                                            :flushable flushable :no-effect no-effect)
                  (or (not (cast-p use))
-                     (lvar-almost-immediately-used-p (cast-value use))))
+                     (lvar-almost-immediately-used-p (cast-value use)
+                                                     :flushable flushable :no-effect no-effect)))
       (return))))
 
-(defun let-var-immediately-used-p (ref var lvar)
+(defun let-var-immediately-used-p (ref var lvar &key flushable no-effect)
   (let ((bind (lambda-bind (lambda-var-home var))))
     (when bind
       (let* ((next-ctran (node-next bind))
              (next-node (and next-ctran
                              (ctran-next next-ctran))))
         (and (eq next-node ref)
-             (lvar-almost-immediately-used-p lvar))))))
+             (lvar-almost-immediately-used-p lvar
+                                             :flushable flushable :no-effect no-effect))))))
 
 
 
