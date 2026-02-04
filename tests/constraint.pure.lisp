@@ -2090,4 +2090,9 @@
      (if (realp (/ n c))
          c
          (error "")))
-   real))
+   real)
+  (assert-type
+   (lambda (n)
+     (the integer (* n n))
+     n)
+   (or integer (complex rational))))

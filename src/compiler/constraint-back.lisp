@@ -296,7 +296,9 @@
                                      (int interval x y)
                                      t))))
                            ((same-leaf-ref-p x y)
-                            (add x (specifier-type 'integer)))))))
+                            (add x (if (csubtypep constraint (specifier-type 'unsigned-byte))
+                                       (specifier-type 'integer)
+                                       (specifier-type '(or integer (complex rational))))))))))
                 (numeric-contagion-constraint-back x y gen constraint nil alternative :integer t))
                (t
                 (numeric-contagion-constraint-back x y gen constraint consequent alternative :complex-p complex-p
