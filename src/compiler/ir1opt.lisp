@@ -2963,6 +2963,10 @@
                         (not (type-single-value-p (node-derived-type use)))))
                   ;; single-value returning forms
                   ((leaf-refs (car vars))) ;; the first value is used, nothing to do
+                  ((exit-p use)
+                   (let ((lvar (exit-value use)))
+                     (erase-node-type use (values-specifier-type '(values null &optional)))
+                     (substitute-lvar-uses (make-nil lvar) lvar nil)))
                   (t
                    ;; A single NIL will do
                    (let ((lvar (node-lvar use)))

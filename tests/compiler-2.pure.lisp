@@ -5020,7 +5020,7 @@
 
 (with-test (:name :unwind-protect-mv-bind)
   (checked-compile-and-assert
-      (:optimize :safe)
+      ()
       `(lambda (m)
          (let (n)
            (values
@@ -5029,4 +5029,12 @@
                             1
                          (setf n m)))
             n)))
-    ((2) (values nil 2))))
+    ((2) (values nil 2)))
+  (checked-compile-and-assert
+      ()
+      `(lambda (m)
+         (nth-value 1
+                    (block nil
+                      (values (unwind-protect t
+                                (return m))))))
+    ((2) nil)))
