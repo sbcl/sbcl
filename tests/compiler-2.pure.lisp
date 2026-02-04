@@ -5008,3 +5008,12 @@
               (go ub64))))
     (((expt 2 64) -1 t) nil)
     (((expt 2 64) 3 t) 1)))
+
+(with-test (:name :test-header-lowtag-null)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (x)
+         (declare ((or bignum null) x))
+         (logand x 3))
+    (((+ (expt 2 64) 2)) 2)
+    ((nil) (condition 'type-error))))

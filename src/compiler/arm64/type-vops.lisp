@@ -128,10 +128,12 @@
               (values drop-through target)
               (values target drop-through))
         (assemble ()
-          (flet ((check-widetag (target not-p)
+          (flet ((check-widetag (target not-p &optional (nil-in-other-pointers nil-in-other-pointers))
                    (unless (and value-tn-ref
                                 (= lowtag other-pointer-lowtag)
-                                (other-pointer-tn-ref-p value-tn-ref nil-in-other-pointers immediate-tested))
+                                (other-pointer-tn-ref-p value-tn-ref
+                                                        nil-in-other-pointers
+                                                        immediate-tested))
                      (multiple-value-bind (bit set) (tn-ref-lowtag-bit lowtag value-tn-ref
                                                                        nil-in-other-pointers immediate-tested)
                        (when (and set (not not-p))
@@ -142,7 +144,12 @@
                          (0
                           (inst tbnz* value bit target))
                          (t
-                          (%test-lowtag value widetag target not-p lowtag))))
+                          (cond ((other-pointer-tn-ref-p value-tn-ref t immediate-tested)
+                                 ;; It's either NIL or an other-pointer
+                                 (inst cmp value null-tn)
+                                 (inst b (if not-p :eq :ne) target))
+                                (t
+                                 (%test-lowtag value widetag target not-p lowtag))))))
                      t)))
             (cond
               ((and value-tn-ref
@@ -156,7 +163,7 @@
                                     thereis (if (consp header)
                                                 (<= (car header) widetag (cdr header))
                                                 (eql widetag header)))))))
-               (or (check-widetag target not-p)
+               (or (check-widetag target not-p nil)
                    (unless not-p
                      (inst b target))))
               (t

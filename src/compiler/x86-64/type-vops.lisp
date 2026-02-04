@@ -166,8 +166,16 @@
                       nil)
                      ((and value-tn-ref
                            (eq lowtag other-pointer-lowtag)
-                           (other-pointer-tn-ref-p value-tn-ref t immediate-tested))
+                           (other-pointer-tn-ref-p value-tn-ref (not test) immediate-tested))
                       nil) ; best case: lowtag is right
+                     ((and test
+                           value-tn-ref
+                           (eq lowtag other-pointer-lowtag)
+                           (other-pointer-tn-ref-p value-tn-ref t immediate-tested))
+                      ;; It's either NIL or an other-pointer
+                      (inst cmp value null-tn)
+                      (inst jmp (if not-p :e :ne) target)
+                      t)
                      ((and value-tn-ref
                            (not test)
                            ;; If HEADERS contains a range, then list pointers have to be
