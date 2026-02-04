@@ -1506,8 +1506,10 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 10
-    (inst asr r x n-fixnum-tag-bits)
-    (inst tbz x 0 AND)
+    (when (types-equal-or-intersect  (tn-ref-type x-ref)
+                                     (specifier-type 'fixnum))
+      (inst asr r x n-fixnum-tag-bits)
+      (inst tbz x 0 AND))
     (let* ((integerp (csubtypep (tn-ref-type x-ref)
                                 (specifier-type 'integer)))
            (error (unless integerp

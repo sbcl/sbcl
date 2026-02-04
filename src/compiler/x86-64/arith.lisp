@@ -4431,16 +4431,18 @@
     (let ((fixnum-mask-p (and (= n-fixnum-tag-bits 1)
                               (= mask (ash most-positive-word -1)))))
       (assemble ()
-        (move r x)
-        (unless (= n-fixnum-tag-bits 1)
-          (generate-fixnum-test r)
-          (inst jmp :nz BIGNUM))
-        (if fixnum-mask-p
-            (inst shr r n-fixnum-tag-bits)
-            (inst sar r n-fixnum-tag-bits))
-        (if (= n-fixnum-tag-bits 1)
-            (inst jmp :nc DONE)
-            (inst jmp DONE))
+        (when (types-equal-or-intersect  (tn-ref-type x-ref)
+                                         (specifier-type 'fixnum))
+          (move r x)
+          (unless (= n-fixnum-tag-bits 1)
+            (generate-fixnum-test r)
+            (inst jmp :nz BIGNUM))
+          (if fixnum-mask-p
+              (inst shr r n-fixnum-tag-bits)
+              (inst sar r n-fixnum-tag-bits))
+          (if (= n-fixnum-tag-bits 1)
+              (inst jmp :nc DONE)
+              (inst jmp DONE)))
         BIGNUM
         (let* ((integerp (eq (tn-kind temp) :unused))
                (error (unless integerp
