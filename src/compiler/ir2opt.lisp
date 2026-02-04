@@ -1203,33 +1203,33 @@
                                                            (eq in22 in))
                                                   (let ((dest-tn1 (make-mov-vop out2 dest))
                                                         (dest-tn2 (make-mov-vop out22 dest2)))
-                                                    (emit-and-insert-vop
-                                                     (vop-node vop) (vop-block vop)
-                                                     (template-or-lose 'sb-vm::un/signed-byte-64-p-move-to-word)
-                                                     (reference-tn-refs (vop-args vop) nil)
-                                                     (reference-tn-list (list dest-tn1 dest-tn2) t)
-                                                     vop
-                                                     (append (vop-codegen-info vop)
-                                                             (vop-codegen-info vop2)
-                                                             (list (vop-label (branch-destination vop2 nil))))))
-                                                  (delete-vop vop)
-                                                  (delete-vop vop2)
-                                                  (delete-vop dest)
-                                                  (delete-vop dest2)
-                                                  t)))))))))
+                                                    (prog1
+                                                        (emit-and-insert-vop
+                                                         (vop-node vop) (vop-block vop)
+                                                         (template-or-lose 'sb-vm::un/signed-byte-64-p-move-to-word)
+                                                         (reference-tn-refs (vop-args vop) nil)
+                                                         (reference-tn-list (list dest-tn1 dest-tn2) t)
+                                                         vop
+                                                         (append (vop-codegen-info vop)
+                                                                 (vop-codegen-info vop2)
+                                                                 (list (vop-label (branch-destination vop2 nil)))))
+                                                      (delete-vop vop)
+                                                      (delete-vop vop2)
+                                                      (delete-vop dest)
+                                                      (delete-vop dest2))))))))))))
                            (t
                             (let ((dest-tn (make-mov-vop out2 dest)))
-                              (emit-and-insert-vop
-                               (vop-node vop) (vop-block vop)
-                               (template-or-lose new-vop)
-                               (reference-tn-refs (vop-args vop) nil)
-                               (reference-tn dest-tn t)
-                               vop (vop-codegen-info (or branch-if vop)))
-                              (delete-vop vop)
-                              (when branch-if
-                                (delete-vop branch-if))
-                              (delete-vop dest)))))))))
-           nil))
+                              (prog1
+                                  (emit-and-insert-vop
+                                   (vop-node vop) (vop-block vop)
+                                   (template-or-lose new-vop)
+                                   (reference-tn-refs (vop-args vop) nil)
+                                   (reference-tn dest-tn t)
+                                   vop (vop-codegen-info (or branch-if vop)))
+                                (delete-vop vop)
+                                (when branch-if
+                                  (delete-vop branch-if))
+                                (delete-vop dest))))))))))))
 
   (when-vop-existsp (:named sb-vm::signed-byte-64-p-move-to-word)
     (defoptimizer (vop-optimize signed-byte-64-p select-representations) (vop)
