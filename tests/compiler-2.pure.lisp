@@ -5017,3 +5017,16 @@
          (logand x 3))
     (((+ (expt 2 64) 2)) 2)
     ((nil) (condition 'type-error))))
+
+(with-test (:name :unwind-protect-mv-bind)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (m)
+         (let (n)
+           (values
+            (nth-value 1
+                       (unwind-protect
+                            1
+                         (setf n m)))
+            n)))
+    ((2) (values nil 2))))

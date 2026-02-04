@@ -3067,25 +3067,26 @@
                                        do (flush-dest arg))
                                  ;; Reference NIL for unsupplied arguments
                                  (when lvars
-                                   (let ((node-prev (node-prev use)))
-                                     (setf (node-prev use) nil)
-                                     (setf (ctran-next node-prev) nil)
-                                     (loop for lvar in lvars
-                                           for prev = node-prev then ctran
-                                           for ctran = (make-ctran)
-                                           do
-                                           (reference-constant prev ctran lvar nil)
-                                           finally
-                                           (link-node-to-previous-ctran use ctran)))))))
+                                   (with-ir1-environment-from-node use
+                                     (let ((node-prev (node-prev use)))
+                                       (setf (node-prev use) nil)
+                                       (setf (ctran-next node-prev) nil)
+                                       (loop for lvar in lvars
+                                             for prev = node-prev then ctran
+                                             for ctran = (make-ctran)
+                                             do
+                                             (reference-constant prev ctran lvar nil)
+                                             finally
+                                             (link-node-to-previous-ctran use ctran))))))))
                         (loop for use in uses
                               do
                               (cond ((and (combination-p use)
-                                        (eq (lvar-fun-name (combination-fun use))
-                                            'values))
-                                   (handle use (combination-args use)
-                                           (values-type-types (node-derived-type use)))
-                                   (flush-dest (combination-fun use))
-                                   (unlink-node use))
+                                          (eq (lvar-fun-name (combination-fun use))
+                                              'values))
+                                     (handle use (combination-args use)
+                                             (values-type-types (node-derived-type use)))
+                                     (flush-dest (combination-fun use))
+                                     (unlink-node use))
                                     (t
                                      (handle use args nil)))))))
                (propagate-to-args new-call fun)
