@@ -504,7 +504,12 @@ fractional bits."
       `(lambda (a b)
          (declare (single-float a b))
          (the real (log a b)))
-    ((-3.0 0.0) 0.0)))
+    ((-3.0 0.0) 0.0))
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (a b)
+         (log a b))
+    ((t 0) (condition 'type-error))))
 
 (with-test (:name (ftruncate :minus-zeros :one-arg))
   (flet ((f (x) (declare (notinline ftruncate)) (ftruncate x)))

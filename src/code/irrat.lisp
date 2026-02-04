@@ -432,6 +432,7 @@
   (if base-p
       (cond
         ((zerop base)
+         (the number number)
          (if (or (typep number '(or double-float (complex double-float)))
                  (typep base '(or double-float (complex double-float))))
              0.0d0
