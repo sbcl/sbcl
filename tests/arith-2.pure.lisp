@@ -2247,7 +2247,13 @@
          (declare (type (integer -845794755782386 1048630) p1))
          (logtest p1 12115639945877374832))
     ((-845794755782386) t)
-    ((145551) nil)))
+    ((145551) nil))
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (logtest a (the (unsigned-byte 30) a)))
+    ((8) t)
+    ((0) nil)))
 
 (with-test (:name :logtest-integer-fixnum
             :fails-on (or :arm :loongarch64))

@@ -615,20 +615,30 @@
                         (logtest ,x-var (truly-the (and fixnum unsigned-byte) ,y-var)))))))
     (or (try x y 'x 'y)
         (try y x 'y 'x)
-        `(not (zerop (logand x y))))))
+        `(not (eq (logand x y) 0)))))
 
 ;;; (zerop (logand x y)) to (not (logtest x y)) if logtest has a VOP
 (deftransform eq ((x y) (integer (eql 0)) * :node node :important nil)
-  (or (when (or (combination-match x (logand * *)
-                  (vop-transform-applicable-p 'logtest combination))
-                ;; Will it work if cut-to-width is applied later?
-                (combination-match x (logand (:type word m) *)
-                  (vop-transform-applicable-p 'logtest combination
-                                              (list (lvar-type m) (specifier-type 'word)))))
-        (splice-fun-args x 'logand 2)
-        `(lambda (x y z)
-           (declare (ignore z))
-           (not (logtest x y))))
+  (or (let (cut)
+        (when (or (combination-match x (logand * *)
+                    (vop-transform-applicable-p 'logtest combination))
+                  ;; Will it work if cut-to-width is applied later?
+                  (combination-match x (logand (:type word m) *)
+                    (when (vop-transform-applicable-p 'logtest combination
+                                                      (list (lvar-type m) (specifier-type 'word)))
+                      (setf cut t))))
+          (splice-fun-args x 'logand 2)
+          (if cut
+              (if (lvar-csubtypep x word)
+                  `(lambda (x y z)
+                     (declare (ignore z))
+                     (not (logtest x (logand most-positive-word y))))
+                  `(lambda (x y z)
+                     (declare (ignore z))
+                     (not (logtest (logand most-positive-word x) y))))
+              `(lambda (x y z)
+                 (declare (ignore z))
+                 (not (logtest x y))))))
       (give-up-ir1-transform)))
 
 (defoptimizer (logtest derive-type) ((x y))
