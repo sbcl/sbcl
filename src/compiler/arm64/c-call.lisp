@@ -356,23 +356,25 @@
                (incf offset 8))))
           (setf arg-tns (nreverse arg-tns))
           (setf offsets (nreverse offsets))
-          ;; Return a function that emits the load VOPs
-          (lambda (arg call block nsp)
-            (declare (ignore nsp))
-            (let ((sap-tn (sb-c::lvar-tn call block arg)))
-              (loop for target-tn in arg-tns
-                    for (off . class) in offsets
-                    do (sb-c::emit-and-insert-vop
-                           call block
-                           (sb-c::template-or-lose
-                            (ecase class
-                              (:integer 'sap-ref-64-c)
-                              (:single 'sap-ref-single-c)
-                              (:double 'sap-ref-double-c)))
-                           (sb-c::reference-tn sap-tn nil)
-                           (sb-c::reference-tn target-tn t)
-                           nil
-                           (list off)))))))))
+          ;; Return arg-tn-loader with TNs exposed for register allocator
+          (sb-c::make-arg-tn-loader
+           arg-tns
+           (lambda (arg call block nsp)
+             (declare (ignore nsp))
+             (let ((sap-tn (sb-c::lvar-tn call block arg)))
+               (loop for target-tn in arg-tns
+                     for (off . class) in offsets
+                     do (sb-c::emit-and-insert-vop
+                         call block
+                         (sb-c::template-or-lose
+                          (ecase class
+                            (:integer 'sap-ref-64-c)
+                            (:single 'sap-ref-single-c)
+                            (:double 'sap-ref-double-c)))
+                         (sb-c::reference-tn sap-tn nil)
+                         (sb-c::reference-tn target-tn t)
+                         nil
+                         (list off))))))))))
 
 (defun make-call-out-tns (type)
   (let ((arg-state (make-arg-state))

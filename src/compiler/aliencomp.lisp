@@ -787,6 +787,21 @@
       (t
        (if (eq spec '*) *wild-type* (values-specifier-type spec))))))
 
+;;; arg-tn-loader bundles struct-by-value argument data: TNs for
+;;; register allocator visibility and a function to emit load VOPs.
+(defstruct (arg-tn-loader
+            (:constructor make-arg-tn-loader (tns fn))
+            (:copier nil)
+            (:predicate arg-tn-loader-p))
+  (tns nil :type list :read-only t)
+  (fn nil :type function :read-only t))
+
+(defun extract-arg-tns (entry)
+  "Extract TNs from an arg-tns entry."
+  (if (arg-tn-loader-p entry)
+      (arg-tn-loader-tns entry)
+      (remove-if-not #'tn-p (ensure-list entry))))
+
 (defoptimizer (%alien-funcall ltn-annotate)
               ((function type &rest args) node)
   (setf (basic-combination-info node) :funny)
@@ -843,13 +858,17 @@
       ;; KLUDGE: This is where the second half of the ARM
       ;; register-pressure change lives (see above).
       (dolist (tn #-arm arg-tns #+arm (reverse arg-tns))
-        (if (functionp tn)
-            (funcall tn (pop args) call block nsp)
-            ;; On PPC, TN might be a list. This is used to indicate
-            ;; something special needs to happen. See below.
-            ;;
-            ;; FIXME: We should implement something better than this.
-            (let* ((first-tn (if (listp tn) (car tn) tn))
+        (cond ((arg-tn-loader-p tn)
+               ;; Struct-by-value: call loader, TNs exposed via arg-tn-loader-tns
+               (funcall (arg-tn-loader-fn tn) (pop args) call block nsp))
+              ((functionp tn)
+               (funcall tn (pop args) call block nsp))
+              (t
+               ;; On PPC, TN might be a list. This is used to indicate
+               ;; something special needs to happen. See below.
+               ;;
+               ;; FIXME: We should implement something better than this.
+               (let* ((first-tn (if (listp tn) (car tn) tn))
                    (arg (pop args))
                    (sc (tn-sc first-tn))
                    (scn (sc-number sc))
@@ -904,11 +923,11 @@
                       (vop sb-vm::move-double-to-int-arg call block
                            float-tn i1-tn i2-tn)
                       (vop sb-vm::move-single-to-int-arg call block
-                           float-tn i1-tn)))))))
+                           float-tn i1-tn))))))))
       (aver (null args))
       (let* ((result-tns (ensure-list result-tns))
              (arg-operands
-              (reference-tn-list (remove-if-not #'tn-p (flatten-list arg-tns)) nil))
+              (reference-tn-list (mapcan #'extract-arg-tns arg-tns) nil))
              (result-operands
               (reference-tn-list (remove-if-not #'tn-p result-tns) t)))
         ;; For large struct returns, set the sret pointer register

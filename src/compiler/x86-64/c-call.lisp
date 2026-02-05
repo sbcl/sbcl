@@ -346,26 +346,28 @@ Floats are passed in integer registers."
   (let ((classification (classify-struct type))
         (arg-tn (int-arg state 'unsigned-byte-64
                          unsigned-reg-sc-number unsigned-stack-sc-number)))
-    (if (sb-alien::struct-classification-memory-p classification)
-        (lambda (arg call block nsp)
-          (declare (ignore nsp))
-          (let ((sap-tn (sb-c::lvar-tn call block arg)))
-            (sb-c::emit-and-insert-vop
-             call block
-             (sb-c::template-or-lose 'load-sap-int-arg)
-             (sb-c::reference-tn sap-tn nil)
-             (sb-c::reference-tn arg-tn t)
-             nil
-             nil)))
-        (lambda (arg call block nsp)
-          (declare (ignore nsp))
-          (sb-c::emit-and-insert-vop
-           call block
-           (sb-c::template-or-lose 'load-struct-int-arg)
-           (sb-c::reference-tn (sb-c::lvar-tn call block arg) nil)
-           (sb-c::reference-tn arg-tn t)
-           nil
-           (list 0))))))
+    (sb-c::make-arg-tn-loader
+     (list arg-tn)
+     (if (sb-alien::struct-classification-memory-p classification)
+         (lambda (arg call block nsp)
+           (declare (ignore nsp))
+           (let ((sap-tn (sb-c::lvar-tn call block arg)))
+             (sb-c::emit-and-insert-vop
+              call block
+              (sb-c::template-or-lose 'load-sap-int-arg)
+              (sb-c::reference-tn sap-tn nil)
+              (sb-c::reference-tn arg-tn t)
+              nil
+              nil)))
+         (lambda (arg call block nsp)
+           (declare (ignore nsp))
+           (sb-c::emit-and-insert-vop
+            call block
+            (sb-c::template-or-lose 'load-struct-int-arg)
+            (sb-c::reference-tn (sb-c::lvar-tn call block arg) nil)
+            (sb-c::reference-tn arg-tn t)
+            nil
+            (list 0)))))))
 
 ;;; System V: structs >16 bytes copied to stack, <=16 bytes in up to 2
 ;;; registers.
@@ -417,22 +419,24 @@ Floats are passed in integer registers."
             (incf offset 8))
           (setf arg-tns (nreverse arg-tns))
           (setf offsets (nreverse offsets))
-          ;; Return a function that emits the load VOPs
-          (lambda (arg call block nsp)
-            (declare (ignore nsp))
-            (let ((sap-tn (sb-c::lvar-tn call block arg)))
-              (loop for target-tn in arg-tns
-                    for (off . class) in offsets
-                    do (let ((vop (ecase class
-                                    (:integer 'load-struct-int-arg)
-                                    (:double 'load-struct-sse-arg))))
-                         (sb-c::emit-and-insert-vop
-                          call block
-                          (sb-c::template-or-lose vop)
-                          (sb-c::reference-tn sap-tn nil)
-                          (sb-c::reference-tn target-tn t)
-                          nil
-                          (list off))))))))))
+          ;; Return arg-tn-loader with TNs exposed for register allocator
+          (sb-c::make-arg-tn-loader
+           arg-tns
+           (lambda (arg call block nsp)
+             (declare (ignore nsp))
+             (let ((sap-tn (sb-c::lvar-tn call block arg)))
+               (loop for target-tn in arg-tns
+                     for (off . class) in offsets
+                     do (let ((vop (ecase class
+                                     (:integer 'load-struct-int-arg)
+                                     (:double 'load-struct-sse-arg))))
+                          (sb-c::emit-and-insert-vop
+                           call block
+                           (sb-c::template-or-lose vop)
+                           (sb-c::reference-tn sap-tn nil)
+                           (sb-c::reference-tn target-tn t)
+                           nil
+                           (list off)))))))))))
 
 ;;; VOP to set up hidden struct return pointer in first arg register.
 #+win32

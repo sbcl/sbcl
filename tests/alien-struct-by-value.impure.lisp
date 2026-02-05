@@ -119,6 +119,18 @@
       (assert (= (slot result 'm0) 11111))
       (assert (= (slot result 'm1) 22222)))))
 
+;;; Test that wired TNs for struct-by-value args survive register pressure.
+;;; FORMAT before alien-funcall can clobber argument registers if the TNs
+;;; aren't exposed to the register allocator via arg-operands.
+(defun test-struct-arg-register-lifetime (a b)
+  (with-alien ((s (struct small-align-8)))
+    (setf (slot s 'm0) a (slot s 'm1) b)
+    (format (make-broadcast-stream) "m0=~A m1=~A" (slot s 'm0) (slot s 'm1))
+    (small-align-8-get-m0 s)))
+
+(with-test (:name :struct-by-value-register-lifetime-bug)
+  (assert (= (test-struct-arg-register-lifetime 42 60) 42)))
+
 ;;; Large struct, alignment 8 (too big for registers, uses hidden pointer)
 (define-alien-type nil
     (struct large-align-8
