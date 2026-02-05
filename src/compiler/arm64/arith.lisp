@@ -1527,6 +1527,42 @@
            (inst and r r (load-immediate-word tmp-tn mask))))
     DONE))
 
+(define-vop (logand-word-mask/integer-unsigned)
+  (:translate logand)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg))
+         (mask :scs (unsigned-reg) :to :save))
+  (:arg-refs x-ref)
+  (:arg-types t unsigned-num)
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:check-type t)
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 10
+    (when (types-equal-or-intersect  (tn-ref-type x-ref)
+                                     (specifier-type 'fixnum))
+      (inst asr r x n-fixnum-tag-bits)
+      (inst tbz x 0 AND))
+    (let* ((integerp (csubtypep (tn-ref-type x-ref)
+                                (specifier-type 'integer)))
+           (error (unless integerp
+                    (generate-error-code vop 'object-not-integer-error x))))
+      (unless integerp
+        (%test-headers x tmp-tn error t nil '(#.bignum-widetag)
+                       :value-tn-ref x-ref
+                       :immediate-tested '(fixnum))))
+    (loadw r x bignum-digits-offset other-pointer-lowtag)
+    AND
+    (inst and r r mask)
+    DONE))
+
+(define-vop (logand-word-mask/unsigned-integer logand-word-mask/integer-unsigned)
+  (:args (mask :scs (unsigned-reg) :to :save)
+         (x :scs (descriptor-reg)))
+  (:arg-refs nil x-ref)
+  (:arg-types unsigned-num t))
+
 ;;;; Bignum stuff.
 
 (define-vop (bignum-length get-header-data)

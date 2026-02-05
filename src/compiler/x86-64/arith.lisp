@@ -4462,6 +4462,46 @@
               (inst btr r (1- (integer-length (logandc1 mask most-positive-word))))
               (inst and r (or (plausible-signed-imm32-operand-p mask)
                               (constantize mask)))))))))
+
+(define-vop (logand-word-mask/integer-unsigned)
+  (:translate logand)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg) :to :save)
+         (mask :scs (unsigned-reg) :to :save))
+  (:arg-refs x-ref)
+  (:arg-types t unsigned-num)
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:check-type t)
+  (:save-p :compute-only)
+  (:vop-var vop)
+  (:temporary (:sc unsigned-reg
+               :unused-if (csubtypep (tn-ref-type x-ref)
+                                     (specifier-type 'integer)))
+              temp)
+  (:generator 10
+    (when (types-equal-or-intersect  (tn-ref-type x-ref)
+                                     (specifier-type 'fixnum))
+      (move r x)
+      (inst sar r n-fixnum-tag-bits)
+      (inst jmp :nc DONE))
+    BIGNUM
+    (let* ((integerp (eq (tn-kind temp) :unused))
+           (error (unless integerp
+                    (generate-error-code vop 'object-not-integer-error x))))
+      (unless integerp
+        (%test-headers x temp error t nil '(#.bignum-widetag)
+                       :value-tn-ref x-ref
+                       :immediate-tested '(fixnum))))
+    (loadw r x bignum-digits-offset other-pointer-lowtag)
+    DONE
+    (inst and r mask)))
+
+(define-vop (logand-word-mask/unsigned-integer logand-word-mask/integer-unsigned)
+  (:args (mask :scs (unsigned-reg) :to :save)
+         (x :scs (descriptor-reg) :to :save))
+  (:arg-refs nil x-ref)
+  (:arg-types unsigned-num t))
 
 (in-package "SB-C")
 
