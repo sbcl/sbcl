@@ -80,5 +80,21 @@
     (do-open 'sb-impl::rename "bar")
     (do-open 'append "foobar")))
 
-(delete-directory *scratchdir*)
+#+sb-thread
+(with-test (:name (probe-file :thread-safety))
+  (let* ((filename (merge-pathnames "probe-file" *scratchdir*))
+         (threads (list (sb-thread:make-thread
+                         (lambda ()
+                           (loop repeat 10000 do (probe-file filename))))
+                        (sb-thread:make-thread
+                         (lambda ()
+                           (loop repeat 10000 do
+                             (with-open-file (o filename :direction :output
+                                                :if-does-not-exist :create
+                                                :if-exists :supersede))
+                             (delete-file filename)))))))
+    (mapc #'sb-thread:join-thread threads)
+    (ignore-errors (delete-file filename))))
 
+
+(delete-directory *scratchdir*)

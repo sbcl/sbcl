@@ -409,7 +409,8 @@
                  (realpath
                   (parse realpath :as-directory t))
                  (errorp
-                  (file-perror filename errno "Couldn't resolve ~S" filename)))))
+                  (file-perror filename errno "Couldn't resolve ~S"
+                               filename)))))
            (resolve-problematic-symlink (filename errno realpath-failed)
              ;; SBCL has for many years had a policy that a pathname
              ;; that names an existing, dangling or self-referential
@@ -430,10 +431,6 @@
                            realpath-failed)
                        linkp)
                   (case query-for
-                    (:existence
-                     ;; We do this reparse so as to return a
-                     ;; normalized pathname.
-                     (parse filename))
                     (:truename
                      (let ((realpath (directory-part-realpath filename)))
                        (when realpath
@@ -443,43 +440,54 @@
                               (parse (car (last (pathname-directory pathname))))
                               pathname)))))
                     (:author (sb-unix:uid-username uid))
-                    (:write-date (+ unix-to-universal-time mtime))))
-                 ;; The file doesn't exist; maybe error.
-                 (errorp
-                  (file-perror
-                   pathname errno
-                   "Failed to find the ~A of ~A" query-for pathname))))))
+                    (:write-date (+ unix-to-universal-time mtime))))))))
     (binding* ((filename (native-namestring pathname :as-file t))
                ((existsp errno nil mode nil uid nil nil nil nil mtime)
                 (sb-unix:unix-stat filename)))
-      (if existsp
-          (case query-for
-            (:existence
-             (parse filename :as-directory (eql (logand mode sb-unix:s-ifmt)
-                                                sb-unix:s-ifdir)))
-            (:truename
-             ;; Note: in case the file is stat'able, POSIX
-             ;; realpath(3) gets us a canonical absolute filename,
-             ;; even if the post-merge PATHNAME is not absolute
-             (parse (or (sb-unix:unix-realpath filename)
-                        (resolve-problematic-symlink filename errno t))
-                    :as-directory (eql (logand mode sb-unix:s-ifmt)
-                                       sb-unix:s-ifdir)))
-            (:author (sb-unix:uid-username uid))
-            (:write-date (+ unix-to-universal-time mtime)))
-          (if (and (not errorp) (eq query-for :existence))
-              ;; If stat() failed for whatever reason, then lstat() will similarly fail,
-              ;; barring race conditions - creating a file, changing mode bits, etc in
-              ;; between the two calls. So just return NIL. There are some edge cases:
-              ;; suppose "foo.txt" is a symlink to "/nosuchthing". The old behavior of ENOENT
-              ;; was to return #P"foo.txt" despite that the link's target does not exist.
-              ;; If such behavior was desirable in the case where RESOLVE- dubiously returned
-              ;; a pathname, then any callers which uses this as a near-equivalent of
-              ;; FILE-EXISTS-P can just use that instead. Unfortunately FILE-EXISTS-P would
-              ;; need to become aware of logical pathnames.
-              ;; I claim that test-driven design says this is working as it should.
-              nil
-              (resolve-problematic-symlink filename errno nil))))))
+      (or (if existsp
+              (case query-for
+                (:existence
+                 (parse filename :as-directory (eql (logand mode sb-unix:s-ifmt)
+                                                    sb-unix:s-ifdir)))
+                (:truename
+                 ;; Note: in case the file is stat'able, POSIX
+                 ;; realpath(3) gets us a canonical absolute filename,
+                 ;; even if the post-merge PATHNAME is not absolute
+                 (multiple-value-bind (realpath errno2)
+                     (sb-unix:unix-realpath filename)
+                   (unless realpath
+                     (setq errno errno2)
+                     (setq realpath (resolve-problematic-symlink
+                                     filename errno t)))
+                   ;; The file could have been deleted since
+                   ;; SB-UNIX:UNIX-STAT succeeded.
+                   (when realpath
+                     (parse realpath
+                            :as-directory (eql (logand mode sb-unix:s-ifmt)
+                                               sb-unix:s-ifdir)))))
+                (:author (sb-unix:uid-username uid))
+                (:write-date (+ unix-to-universal-time mtime)))
+              ;; For :EXISTENCE testing, if stat() failed for whatever
+              ;; reason, then lstat() in RESOLVE-PROBLEMATIC-SYMLINK
+              ;; will similarly fail, barring race conditions --
+              ;; creating a file, changing mode bits, etc in between
+              ;; the two calls. So, don't try. There are some edge
+              ;; cases: suppose "foo.txt" is a symlink to
+              ;; "/nosuchthing". The old behavior of ENOENT was to
+              ;; return #P"foo.txt" despite that the link's target
+              ;; does not exist. If such behavior was desirable in the
+              ;; case where RESOLVE-PROBLEMATIC-SYMLINK dubiously
+              ;; returned a pathname, then any caller that uses this
+              ;; as a near-equivalent of FILE-EXISTS-P can just use
+              ;; that instead. Unfortunately FILE-EXISTS-P would need
+              ;; to become aware of logical pathnames. I claim that
+              ;; test-driven design says this is working as it should.
+              (unless (eq query-for :existence)
+                (resolve-problematic-symlink filename errno nil)))
+          (when errorp
+            (file-perror
+             pathname errno
+             "Failed to find the ~A of ~A" query-for pathname))))))
 
 (defun probe-file (pathspec)
   "Return the truename of PATHSPEC if the truename can be found,
