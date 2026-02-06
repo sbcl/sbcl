@@ -152,7 +152,8 @@
   ;; How much to grow the hash table by when it fills up. If an index,
   ;; then add that amount. If a floating point number, then multiply
   ;; it by that.
-  (rehash-size nil :type (or index (single-float (1.0)))
+  (rehash-size nil :type #+c-headers-only real
+                         #-c-headers-only (or index (single-float (1.0)))
                :read-only t)
   ;; How full the hash table has to get before we rehash
   ;; but only for the initial determination of how many buckets to make.
@@ -161,7 +162,12 @@
   ;; table to be X amount larger *and* that you care at about what load factor the
   ;; new table gets rehashed, but no, you don't get to pick both every time.
   ;; (CLHS says that these are all just "hints" and we're free to ignore)
-  (rehash-threshold nil :type (single-float (0.0) 1.0) :read-only t)
+  ;; If #+c-headers-only, the type is weakened to one which generates the right
+  ;; C type without parsing a float. (NUMBER or T would result in the type being
+  ;; lispobj, while WORD would give the struct field an incorrect name)
+  (rehash-threshold nil :type #+c-headers-only single-float
+                              #-c-headers-only (single-float (0.0) 1.0)
+                        :read-only t)
   ;; The current number of entries in the table.
   (%count 0 :type index)
   ;; Index into the Next vector chaining together free slots in the KV

@@ -71,7 +71,7 @@
  ;; whereas if it's (BACKQUOTE (FOO (UNQUOTE A) (UNQUOTE B))) then it's
  ;; flat out wrong. At any rate, judicious avoidance of EVAL-WHEN and nested
  ;; quasiquotation in 'primordial-extensions' prevents any such issues.
- ("src/code/backq" :c-headers)
+ ("src/code/backq")
 
  ;; It's difficult to be too early with a DECLAIM SPECIAL (or DEFVAR
  ;; or whatever) thanks to the sullenly-do-the-wrong-thing semantics
@@ -163,7 +163,8 @@
 
  ("src/code/number-dispatch" :c-headers)
  ("src/code/cross-float-reader" :c-headers :not-target)
- ("src/code/float" :c-headers)
+ ("src/code/float-from-bits" :c-headers)
+ ("src/code/float")
  ("src/code/cross-float" :c-headers :not-target)
 
  ;; 32-bit implementation of GET-INTERNAL-REAL-TIME needs some thread slots

@@ -344,6 +344,7 @@
                (setf current (cl:/ (cl:+ current (cl:/ rational current)) 2))))))
     (%%sqrt rational (cl:/ (isqrt (numerator rational)) (isqrt (denominator rational))))))
 
+#-c-headers-only
 (defun sb-xc:sqrt (arg)
   (cond ((eql arg 0)
          0.0)
@@ -364,6 +365,7 @@
   `(progn ,@body))
 
 (defun realpart (x) (if (realp x) x (complexnum-real x)))
+#-c-headers-only
 (defun imagpart (x)
   (cond ((rationalp x) 0)
         ((single-float-p x) 0f0)
@@ -375,6 +377,7 @@
 
 ;;; PI is needed in order to build the cross-compiler mainly so that vm-fndb
 ;;; can define bounds on irrational functions.
+#-c-headers-only
 (defconstant pi 3.14159265358979323846264338327950288419716939937511L0)
 
 (macrolet ((def (name lambda-list)
@@ -392,6 +395,7 @@
   (def tan (number))
   (def tanh (number)))
 
+#-c-headers-only
 (defun asin (number)
   (case number
     (-1d0 -1.5707963267948966d0)
@@ -401,6 +405,7 @@
     (t
      (error "Unimplemented."))))
 
+#-c-headers-only
 (defun acos (number)
   (case number
     (-1d0 pi)
@@ -410,6 +415,7 @@
     (t
      (error "Unimplemented."))))
 
+#-c-headers-only
 (defun acosh (number)
   (with-memoized-math-op (acosh number)
     (case number
@@ -418,6 +424,7 @@
       (t
        (error "Unimplemented.")))))
 
+#-c-headers-only
 (defun atanh (number)
   (with-memoized-math-op (atanh number)
     (case number
@@ -428,6 +435,7 @@
       (t
        (error "Unimplemented.")))))
 
+#-c-headers-only
 (defun atan (number1 &optional (number2 nil number2p))
   (if number2p
       (with-memoized-math-op (atan (list number1 number2))
@@ -437,6 +445,7 @@
             number1
             (error "Unimplemented.")))))
 
+#-c-headers-only
 (defun cosh (number)
   (with-memoized-math-op (cosh number)
     (case number
@@ -551,6 +560,7 @@
                  table)))))
 
 ;;; Perform some simple checks
+#-c-headers-only (progn
 (assert (not (eq -0.0f0 -0.0d0)))
 (assert (not (eq single-float-negative-infinity 0f0)))
 (dolist (format '(single-float double-float))
@@ -615,3 +625,4 @@
     (assert-not-number single-float-positive-infinity)
     (assert-not-number double-float-negative-infinity)
     (assert-not-number double-float-positive-infinity))))
+)

@@ -39,6 +39,9 @@ if [ -r $TEST_DIRECTORY/cons.h ]
 then
     for i in $TEST_DIRECTORY/*.h
     do
+          name=`basename $i`
+          echo Diffing $name against genesis and checking that it can stand alone
+          diff $i ../src/runtime/genesis/$name
           echo "#include \"$i\"" > ${src}
           ./run-compiler.sh -I../src/runtime -c -o ${obj} ${src}
     done
