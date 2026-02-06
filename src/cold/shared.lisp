@@ -246,13 +246,18 @@
 
 (load (find-bootstrap-file "^shebang"))
 
+(defun custom-or-default (var default)
+  (if (boundp var) (symbol-value var) default))
+
 ;;; Subfeatures could be assigned as late as the beginning of make-host-2,
 ;;; but I don't want to introduce another mechanism for delaying reading
 ;;; of the customizer just because we can.
 ;;; But it's not well-advertised; does it really merit a customization file?
 (export 'backend-subfeatures)
 (defvar backend-subfeatures
-  (let ((customizer-file-name "customize-backend-subfeatures.lisp"))
+  (let* ((customizer-file-name
+          (custom-or-default 'cl-user::*sbcl-backend-subfeatures-file*
+                             "customize-backend-subfeatures.lisp")))
     (when (probe-file customizer-file-name)
       (copy-list (funcall (compile nil (read-from-file customizer-file-name)) nil)))))
 
@@ -270,10 +275,8 @@
 ;;; The compromise is to examine a variable specifying a path
 ;;; (and it can't go in SB-COLD because the package is not made soon enough)
 (setf sb-xc:*features*
-      (let* ((pathname (let ((var 'cl-user::*sbcl-local-target-features-file*))
-                         (if (boundp var)
-                             (symbol-value var)
-                             "local-target-features.lisp-expr")))
+      (let* ((pathname (custom-or-default 'cl-user::*sbcl-local-target-features-file*
+                                          "local-target-features.lisp-expr"))
              (default-features
                (funcall (compile nil (read-from-file pathname))
                         (read-from-file "^base-target-features.lisp-expr")))

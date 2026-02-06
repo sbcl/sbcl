@@ -14,6 +14,7 @@ run_sbcl <<EOF
  (exit))
 (setq *evaluator-mode* :interpret)
 (defvar *sbcl-local-target-features-file* "../local-target-features.lisp-expr")
+(defvar *sbcl-backend-subfeatures-file* "../customize-backend-subfeatures.lisp")
 (load "../src/cold/shared.lisp")
 (load "../src/cold/set-up-cold-packages.lisp")
 (load "../tools-for-build/corefile.lisp")
