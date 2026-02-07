@@ -7949,8 +7949,7 @@
 (deftransform logandc1 ((x y))
   `(logandc2 y x))
 
-(deftransform gcd ((x y) ((and fixnum (not (eql 0)))
-                          (and fixnum (not (eql 0)))))
+(deftransform gcd ((x y) (fixnum fixnum))
   `(sb-kernel::fixnum-gcd x y))
 
 (deftransforms (gcd sb-kernel::fixnum-gcd) ((x y))
