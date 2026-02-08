@@ -158,39 +158,58 @@
          (n-required (if (values-type-p dtype)
                          (length (values-type-required dtype))
                          (return-from cast-check-types
-                           (values :simple (aver (eq dtype *empty-type*)))))))
+                           (values :simple (aver (eq dtype *empty-type*))))))
+         (optional-p (or (values-type-optional atype)
+                         (and (values-type-rest atype)
+                              (not (eq (values-type-rest atype) *universal-type*)))))
+         (n-asserted (length (values-type-required atype))))
     (aver (not (eq ctype *wild-type*)))
-    (cond ((and (null (values-type-optional dtype))
-                (not (values-type-rest dtype)))
-           ;; we [almost] know how many values are produced
-           (values :simple
-                   (lvar-types-to-check (values-type-out ctype n-required)
-                                        (values-type-out atype n-required)
-                                        n-required)))
-          ((lvar-single-value-p lvar)
-           ;; exactly one value is consumed
-           (principal-lvar-single-valuify lvar)
-           (values :simple (lvar-types-to-check (list (single-value-type ctype))
-                                                (list (single-value-type atype))
-                                                n-required)))
-          ((and (mv-combination-p dest)
-                (eq (mv-combination-kind dest) :local)
-                (lvar-uses (mv-combination-fun dest))
-                (singleton-p (mv-combination-args dest))
-                (let ((fun-ref (lvar-use (mv-combination-fun dest))))
-                  (setf mv-vars (lambda-vars (ref-leaf fun-ref)))))
-           ;; we know the number of consumed values
-           (flet ((filter-unused (types)
-                    (loop for var in mv-vars
-                          for type in types
-                          collect (if (lambda-var-deleted var)
-                                      *universal-type*
-                                      type))))
-             (values :simple (lvar-types-to-check (filter-unused (values-type-out ctype (length mv-vars)))
-                                                  (filter-unused (values-type-out atype (length mv-vars)))
-                                                  n-required))))
-          (t
-           (values :hairy (list ctype atype))))))
+    (labels ((null-accepting (type)
+               (types-equal-or-intersect type (specifier-type 'null)))
+             (unsupplied-ok ()
+               (or (not optional-p)
+                   (and (every #'null-accepting
+                               (values-type-optional atype))
+                        (or (not (values-type-rest atype))
+                            (eq (values-type-rest atype) *universal-type*))))))
+      (cond ((and (null (values-type-optional dtype))
+                  (not (values-type-rest dtype)))
+             ;; we [almost] know how many values are produced
+             (values :simple
+                     (lvar-types-to-check (values-type-out ctype n-required)
+                                          (values-type-out atype n-required)
+                                          n-required)))
+            ((and (lvar-single-value-p lvar)
+                  (unsupplied-ok))
+             ;; exactly one value is consumed
+             (principal-lvar-single-valuify lvar)
+             (if (and (= n-asserted 1)
+                      (not optional-p))
+                 (values :simple (lvar-types-to-check (list (single-value-type ctype))
+                                                      (list (single-value-type atype))
+                                                      n-required))
+                 (let ((n (+ n-asserted
+                             (length (values-type-optional atype)))))
+                   (values :simple (lvar-types-to-check (values-type-out ctype n)
+                                                        (values-type-out atype n)
+                                                        n)))))
+            ((and (unsupplied-ok)
+                  (mv-combination-p dest)
+                  (eq (mv-combination-kind dest) :local)
+                  (lvar-uses (mv-combination-fun dest))
+                  (singleton-p (mv-combination-args dest))
+                  (let ((fun-ref (lvar-use (mv-combination-fun dest))))
+                    (setf mv-vars (lambda-vars (ref-leaf fun-ref)))))
+             (let* ((n-bound (length mv-vars))
+                    (n (max n-bound
+                            (+ n-asserted
+                               (length (values-type-optional atype))))))
+               ;; we know the number of consumed values
+               (values :simple (lvar-types-to-check (values-type-out ctype n)
+                                                    (values-type-out atype n)
+                                                    n))))
+            (t
+             (values :hairy (list ctype atype)))))))
 
 (defun call-full-like-p (call)
   (declare (type basic-combination call))
@@ -452,21 +471,20 @@
                                            (cdr context))))))
     (lambda (dummy)
       `(multiple-value-bind ,temps ,dummy
-         ,@(mapcar
-            (lambda (temp %type)
-              (destructuring-bind (type-to-check type-to-report) %type
-                `(progn
-                   (unless (typep ,temp ',(type-specifier type-to-check t))
-                     ,(internal-type-error-call temp
-                                                (if (fun-designator-type-p type-to-report)
-                                                    ;; Simplify
-                                                    (specifier-type 'function-designator)
-                                                    type-to-report)
-                                                context))
-                   ,@(and restart
-                          `((restart-point ,(car restart)))))))
-            temps
-            types)
+         ,@(loop for temp in temps
+                 for (type-to-check type-to-report) in types
+                 unless (eq type-to-check *universal-type*)
+                 collect
+                 `(progn
+                    (unless (typep ,temp ',(type-specifier type-to-check t))
+                      ,(internal-type-error-call temp
+                                                 (if (fun-designator-type-p type-to-report)
+                                                     ;; Simplify
+                                                     (specifier-type 'function-designator)
+                                                     type-to-report)
+                                                 context))
+                    ,@(and restart
+                           `((restart-point ,(car restart))))))
          (values ,@temps)))))
 
 ;;; Splice in explicit type check code immediately before CAST. This
