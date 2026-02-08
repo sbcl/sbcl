@@ -338,6 +338,7 @@
                                (unless (eq int *empty-type*)
                                  (setf (cast-asserted-type cast) int
                                        (cast-type-to-check cast) int
+                                       (node-derived-type cast) (node-derived-type dest)
                                        (cast-%type-check dest) nil))))))))))
       (when checkable
         (when ref
