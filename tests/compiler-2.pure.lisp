@@ -5061,3 +5061,12 @@
     (((lambda () 1)) 1)
     (((lambda () (values 1 2))) 1)
     (((lambda () (values 2 t))) (condition 'type-error))))
+
+(with-test (:name :unwrap-predicates-block)
+  (checked-compile-and-assert
+      ()
+      `(lambda (v)
+         (if (block nil (> v 7))
+             t))
+    ((8) t)
+    ((0) nil)))

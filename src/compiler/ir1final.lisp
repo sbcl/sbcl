@@ -246,14 +246,19 @@
                                (node-lvar alt-ref))
                            (eq next
                                (next-node alt-ref)))
-                  (loop for succ in (block-succ block)
-                        do (unlink-blocks block succ))
-                  (unlink-node if)
+                  (let ((target (node-block next)))
+                    (cond ((eq (ctran-kind (node-prev if)) :block-start)
+                           (loop for pred in (block-pred block)
+                                 do (change-block-successor pred block target)))
+                          (t
+                           (loop for succ in (block-succ block)
+                                 do (unlink-blocks block succ))
+                           (unlink-node if)
+                           (link-blocks block target))))
                   (%delete-lvar-use combination)
                   (use-lvar combination ref-lvar)
                   (push "unwrap-predicates" (node-source-path con-ref))
-                  (push "unwrap-predicates" (node-source-path alt-ref))
-                  (link-blocks block (node-block next)))))))))))
+                  (push "unwrap-predicates" (node-source-path alt-ref)))))))))))
 
 ;;; Convert function designators to functions in calls to known functions
 ;;; Also convert to TWO-ARG- variants
