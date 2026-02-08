@@ -5068,7 +5068,15 @@
     (((lambda () 1)) 1)
     (((lambda () (values 1 2))) 1)
     (((lambda () nil)) (condition 'type-error))
-    (((lambda () 1.0)) (condition 'type-error))))
+    (((lambda () 1.0)) (condition 'type-error)))
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (f)
+         (the (values number number) (funcall f)))
+    (((lambda () 1)) (condition 'type-error))
+    (((lambda () (values 1 2))) (values 1 2))
+    (((lambda () (values nil 2))) (condition 'type-error))
+    (((lambda () (values 1 nil))) (condition 'type-error))))
 
 (with-test (:name :unwrap-predicates-block)
   (checked-compile-and-assert

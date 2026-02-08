@@ -503,14 +503,19 @@
   (setf (cast-%type-check cast) nil))
 
 (defun make-hairy-type-check-form (types cast)
-  (let ((ctype (first types))
-        (atype (second types))
-        (context (cast-context cast)))
+  (let* ((ctype (first types))
+         (atype (second types))
+         (context (cast-context cast))
+         (n-required (length (values-type-required ctype))))
     (multiple-value-bind (types rest-type) (values-type-types ctype nil)
       (multiple-value-bind (report-types report-rest-type) (values-type-types atype nil)
         (let ((length (length types)))
           (flet ((check (type report-type index)
-                   `(let ((value (fast-&rest-nth ,index args)))
+                   `(let ((value ,(if (or (eq index 'i)
+                                          (>= index n-required))
+                                      `(fast-&rest-nth ,index args)
+                                      `(if (> length ,index)
+                                           (fast-&rest-nth ,index args)))))
                       (unless (typep value
                                      ',(type-specifier type t))
                         ,(internal-type-error-call 'value
@@ -523,17 +528,22 @@
               `(flet ((values-type-check (&rest args)
                         (prog ((length (length args)))
                            (cond
-                             ,@(loop for n downfrom length to 1
+                             ,@(loop for n downfrom length to (1+ n-required)
                                      collect `((>= length ,n) (go ,n)))
                              (t
-                              (go none)))
+                              (go ,(if (plusp n-required)
+                                       'required
+                                       'none))))
                            ,@(loop for type-to-check in (reverse types)
                                    for type-to-report in (reverse report-types)
                                    for n downfrom length
+                                   when (= n n-required)
+                                   collect 'required
                                    collect n
                                    collect (check type-to-check type-to-report (1- n)))
                          none
-                           ,@(when rest-type
+                           ,@(when (and rest-type
+                                        (neq rest-type *universal-type*))
                                `((loop for i from ,length below length
                                        do
                                        ,(check rest-type report-rest-type 'i)))))
