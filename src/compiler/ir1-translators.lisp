@@ -1065,8 +1065,12 @@ other."
                     (constantp value)
                     (or (not (values-type-p type))
                         (values-type-may-be-single-value-p type))
-                    (ctypep (constant-form-value value)
-                            (values-type-nth 0 type nil))))
+                    (multiple-value-call
+                        (lambda (&optional value &rest rest)
+                          (unless rest
+                            (ctypep value
+                                    (values-type-nth 0 type nil))))
+                      (constant-form-value value))))
            (ir1-convert start next result value)
            nil) ;; NIL is important, older SBCLs miscompiled (values &optional x) casts
           (t

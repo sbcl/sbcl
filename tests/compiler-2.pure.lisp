@@ -5082,6 +5082,12 @@
        :allow-warnings t)
       `(lambda ()
          (the (values &optional real) nil))
+    (() (condition 'type-error)))
+  (checked-compile-and-assert
+      (:optimize :safe
+       :allow-warnings t)
+      `(lambda ()
+         (the (values real (not real)) (floor 1 1)))
     (() (condition 'type-error))))
 
 (with-test (:name :unwrap-predicates-block)
