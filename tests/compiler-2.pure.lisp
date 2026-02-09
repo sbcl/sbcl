@@ -5085,8 +5085,7 @@
     ((t) (condition 'type-error))
     ((nil) (condition 'type-error)))
   (checked-compile-and-assert
-      (:optimize :safe
-       :allow-style-warnings t)
+      (:optimize :safe :allow-style-warnings t)
       `(lambda (f)
          (the (values &optional real)
               (the (values &optional complex)
@@ -5095,16 +5094,20 @@
     (((lambda () 1)) (condition 'type-error))
     (((lambda () #c(1 2))) (condition 'type-error)))
   (checked-compile-and-assert
-      (:optimize :safe
-       :allow-warnings t)
+      (:optimize :safe :allow-warnings t)
       `(lambda ()
          (the (values &optional real) nil))
     (() (condition 'type-error)))
   (checked-compile-and-assert
-      (:optimize :safe
-       :allow-warnings t)
+      (:optimize :safe :allow-warnings t)
       `(lambda ()
          (the (values real (not real)) (floor 1 1)))
+    (() (condition 'type-error)))
+  (checked-compile-and-assert
+      (:optimize :safe :allow-warnings t)
+      `(lambda ()
+         (the (values fixnum &optional)
+              (block nil (floor 2))))
     (() (condition 'type-error))))
 
 (with-test (:name :unwrap-predicates-block)

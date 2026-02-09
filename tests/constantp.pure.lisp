@@ -42,3 +42,12 @@
    (not (constantp '(the (array abc) #()))))
   (assert
    (not (constantp '(the (cons (satisfies error)) '("a"))))))
+(with-test (:name :multiple-values)
+  (assert (equal (multiple-value-list (sb-int:constant-form-value '(progn (floor 2))))
+                 '(2 0)))
+  (assert (equal (multiple-value-list (sb-int:constant-form-value '(block nil (floor 2))))
+                 '(2 0)))
+  (assert (equal (multiple-value-list (sb-int:constant-form-value '(if t (floor 2))))
+                 '(2 0)))
+  (assert (equal (multiple-value-list (sb-int:constant-form-value '(if nil t (floor 2))))
+                 '(2 0))))

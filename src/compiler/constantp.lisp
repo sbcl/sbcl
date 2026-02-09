@@ -58,10 +58,11 @@
       (symbol
        (symbol-value form))
       (list
-       (multiple-value-bind (specialp value)
+       (multiple-value-bind (specialp values)
            (constant-special-form-value form environment envp)
-         (if specialp value (constant-function-call-value
-                             form environment envp))))
+         (if specialp
+             (values-list values)
+             (constant-function-call-value form environment envp))))
       (t
        form))))
 
@@ -257,7 +258,7 @@
        `(flet ((constantp* (x) (%constantp x environment envp))
                (constant-form-value* (x) (%constant-form-value x environment envp)))
           (declare (optimize speed) (ignorable #'constantp*)
-                   (ftype (sfunction (t) t) constantp* constant-form-value*))
+                   (ftype (sfunction (t) t) constantp*))
           (let ((args (cdr (truly-the list form))))
             (case (car form)
               ,@(map 'list
@@ -278,8 +279,9 @@
   (defun constant-special-form-value (form environment envp)
     (let ((result))
       (tagbody
-         (setq result (expand-cases 2 (return-from constant-special-form-value
-                                        (values nil nil))))
+         (setq result (multiple-value-list
+                       (expand-cases 2 (return-from constant-special-form-value
+                                         (values nil nil)))))
          (return-from constant-special-form-value (values t result))
        fail))
     ;; Mutatation of FORM could cause failure. It's user error, not a bug.
