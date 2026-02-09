@@ -5092,7 +5092,8 @@
               (the (values &optional complex)
                    (funcall f))))
     (((lambda () (values))) (values))
-    (((lambda () 1)) (condition 'type-error)))
+    (((lambda () 1)) (condition 'type-error))
+    (((lambda () #c(1 2))) (condition 'type-error)))
   (checked-compile-and-assert
       (:optimize :safe
        :allow-warnings t)
