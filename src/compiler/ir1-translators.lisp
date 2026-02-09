@@ -1066,7 +1066,7 @@ other."
                     (or (not (values-type-p type))
                         (values-type-may-be-single-value-p type))
                     (ctypep (constant-form-value value)
-                            (single-value-type type))))
+                            (values-type-nth 0 type nil))))
            (ir1-convert start next result value)
            nil) ;; NIL is important, older SBCLs miscompiled (values &optional x) casts
           (t

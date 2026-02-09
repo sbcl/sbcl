@@ -5076,7 +5076,13 @@
     (((lambda () 1)) (condition 'type-error))
     (((lambda () (values 1 2))) (values 1 2))
     (((lambda () (values nil 2))) (condition 'type-error))
-    (((lambda () (values 1 nil))) (condition 'type-error))))
+    (((lambda () (values 1 nil))) (condition 'type-error)))
+  (checked-compile-and-assert
+      (:optimize :safe
+       :allow-warnings t)
+      `(lambda ()
+         (the (values &optional real) nil))
+    (() (condition 'type-error))))
 
 (with-test (:name :unwrap-predicates-block)
   (checked-compile-and-assert
