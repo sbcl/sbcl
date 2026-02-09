@@ -5042,15 +5042,15 @@
 (with-test (:name :nth-value-the)
   (checked-compile-and-assert
       (:optimize :safe)
-    `(lambda (f)
-      (nth-value 1 (the fixnum (funcall f))))
+      `(lambda (f)
+         (nth-value 1 (the fixnum (funcall f))))
     (((lambda () 1)) nil)
     (((lambda () (values 1 2))) 2)
     (((lambda () (values t 2))) (condition 'type-error)))
   (checked-compile-and-assert
       (:optimize :safe)
-    `(lambda (f)
-      (values (the (values fixnum fixnum) (funcall f))))
+      `(lambda (f)
+         (values (the (values fixnum fixnum) (funcall f))))
     (((lambda () 1)) (condition 'type-error))
     (((lambda () (values 1 2))) 1)
     (((lambda () (values 2 t))) (condition 'type-error)))
@@ -5077,13 +5077,22 @@
     (((lambda () (values 1 2))) (values 1 2))
     (((lambda () (values nil 2))) (condition 'type-error))
     (((lambda () (values 1 nil))) (condition 'type-error)))
-    (checked-compile-and-assert
-        (:optimize :safe
-         :allow-style-warnings t)
-        `(lambda (f)
-           (the (values real boolean) (if f (values 1 1))))
-      ((t) (condition 'type-error))
-      ((nil) (condition 'type-error)))
+  (checked-compile-and-assert
+      (:optimize :safe
+       :allow-style-warnings t)
+      `(lambda (f)
+         (the (values real boolean) (if f (values 1 1))))
+    ((t) (condition 'type-error))
+    ((nil) (condition 'type-error)))
+  (checked-compile-and-assert
+      (:optimize :safe
+       :allow-style-warnings t)
+      `(lambda (f)
+         (the (values &optional real)
+              (the (values &optional complex)
+                   (funcall f))))
+    (((lambda () (values))) (values))
+    (((lambda () 1)) (condition 'type-error)))
   (checked-compile-and-assert
       (:optimize :safe
        :allow-warnings t)

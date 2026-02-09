@@ -317,43 +317,47 @@
                          (cast-type-check dest)
                          (atom (lvar-uses (node-lvar cast)))
                          (atom (lvar-uses (cast-value dest))))
-                    (let* ((asserted-type (cast-asserted-type cast))
-                           (dest-asserted-type (cast-asserted-type dest))
-                           (compatible-p (cond ((and (values-type-p asserted-type)
-                                                     (values-type-p dest-asserted-type)
-                                                     (= (length (values-type-required asserted-type))
-                                                        (length (values-type-required dest-asserted-type)))
-                                                     (= (length (values-type-optional asserted-type))
-                                                        (length (values-type-optional dest-asserted-type)))
-                                                     (eql (values-type-rest asserted-type)
-                                                          (values-type-rest dest-asserted-type)))
-                                                'values)
-                                               ((not (or (values-type-p asserted-type)
-                                                         (values-type-p dest-asserted-type))))))
-                           (subtypep
-                             (case compatible-p
-                               (values
-                                (values-subtypep dest-asserted-type asserted-type))
-                               ((t)
-                                (csubtypep dest-asserted-type asserted-type)))))
-                      (cond (subtypep
-                             ;; Turn (the fixnum (the integer x)) into (the fixnum x)
-                             (or (cast-externally-checkable-p dest)
-                                 (setf (cast-asserted-type cast) (cast-asserted-type dest)
-                                       (cast-type-to-check cast) (cast-type-to-check dest)
-                                       (cast-%type-check dest) nil)))
-                            (compatible-p
-                             ;; Turn (the integer (the (real 0 5))) into (the (integer 0 5))
-                             (let ((int (case compatible-p
-                                          (values
-                                           (values-type-intersection dest-asserted-type asserted-type))
-                                          ((t)
-                                           (type-intersection dest-asserted-type asserted-type)))))
-                               (unless (eq int *empty-type*)
-                                 (setf (cast-asserted-type cast) int
-                                       (cast-type-to-check cast) int
-                                       (node-derived-type cast) (node-derived-type dest)
-                                       (cast-%type-check dest) nil))))))))))
+                    (flet ((compatible-length-p (type1 type2)
+                             (cond ((and (values-type-p type1)
+                                         (values-type-p type2)
+                                         (= (length (values-type-required type1))
+                                            (length (values-type-required type2)))
+                                         (= (length (values-type-optional type1))
+                                            (length (values-type-optional type2)))
+                                         (eql (values-type-rest type1)
+                                              (values-type-rest type2)))
+                                    'values)
+                                   ((not (or (values-type-p type1)
+                                             (values-type-p type2)))))))
+                     (let* ((asserted-type (cast-asserted-type cast))
+                            (dest-asserted-type (cast-asserted-type dest))
+                            (compatible-p (compatible-length-p asserted-type dest-asserted-type))
+                            (subtypep
+                              (case compatible-p
+                                (values
+                                 (values-subtypep dest-asserted-type asserted-type))
+                                ((t)
+                                 (csubtypep dest-asserted-type asserted-type)))))
+                       (cond (subtypep
+                              ;; Turn (the fixnum (the integer x)) into (the fixnum x)
+                              (or (cast-externally-checkable-p dest)
+                                  (setf (cast-asserted-type cast) (cast-asserted-type dest)
+                                        (cast-type-to-check cast) (cast-type-to-check dest)
+                                        (cast-%type-check dest) nil)))
+                             (compatible-p
+                              ;; Turn (the integer (the (real 0 5))) into (the (integer 0 5))
+                              (let ((int (case compatible-p
+                                           (values
+                                            (values-type-intersection dest-asserted-type asserted-type))
+                                           ((t)
+                                            (type-intersection dest-asserted-type asserted-type)))))
+                                (unless (or (eq int *empty-type*)
+                                            (not (compatible-length-p int dest-asserted-type))
+                                            (not (compatible-length-p int asserted-type)))
+                                  (setf (cast-asserted-type cast) int
+                                        (cast-type-to-check cast) int
+                                        (node-derived-type cast) (node-derived-type dest)
+                                        (cast-%type-check dest) nil)))))))))))
       (when checkable
         (when ref
           ;; If it's a VOP that does the type check then it might not do anything if the incoming
