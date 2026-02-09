@@ -1265,3 +1265,10 @@
                   '((or (member 0.0d0) (member -0.0))
                     (or (member -0.0) (member 0.0d0)))
                   :test #'equal)))
+
+(with-test (:name :values-intersection)
+  (assert (eq
+           (sb-kernel:values-type-intersection
+            (sb-kernel:values-specifier-type '(values &optional rational &rest t))
+            (sb-kernel:values-specifier-type '(values &optional complex &rest t)))
+           (sb-kernel:values-specifier-type '(values &optional)))))

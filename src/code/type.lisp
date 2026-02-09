@@ -1040,6 +1040,8 @@
 (defun values-type-op (type1 type2 operation nreq)
   (multiple-value-bind (required optional rest exactp)
       (args-type-op type1 type2 operation nreq)
+    (when (member *empty-type* optional)
+      (setf rest nil))
     (values (make-values-type required optional rest)
             exactp)))
 
