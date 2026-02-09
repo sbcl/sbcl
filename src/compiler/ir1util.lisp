@@ -1761,6 +1761,7 @@
 (defun %link-blocks (block1 block2)
   (declare (type cblock block1 block2))
   (let ((succ1 (block-succ block1)))
+    #+sb-devel
     (aver (not (memq block2 succ1)))
     (cons block2 succ1)))
 
