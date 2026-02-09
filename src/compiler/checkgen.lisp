@@ -162,7 +162,21 @@
          (optional-p (or (values-type-optional atype)
                          (and (values-type-rest atype)
                               (not (eq (values-type-rest atype) *universal-type*)))))
-         (n-asserted (length (values-type-required atype))))
+         (n-asserted (length (values-type-required atype)))
+         (fixed-dtype (and (null (values-type-optional dtype))
+                          (not (values-type-rest dtype))))
+         (mismatching-uses
+           (and fixed-dtype
+                (plusp n-required)
+                (and (listp (lvar-uses (cast-value cast)))
+                     (do-uses (use (cast-value cast) nil)
+                       (let ((type (node-derived-type use)))
+                         (when (and (values-type-p type)
+                                    (null (values-type-optional type))
+                                    (not (values-type-rest type))
+                                    (not (eql (length (values-type-required type))
+                                              n-required)))
+                           (return t))))))))
     (aver (not (eq ctype *wild-type*)))
     (labels ((null-accepting (type)
                (types-equal-or-intersect type (specifier-type 'null)))
@@ -172,8 +186,8 @@
                                (values-type-optional atype))
                         (or (not (values-type-rest atype))
                             (eq (values-type-rest atype) *universal-type*))))))
-      (cond ((and (null (values-type-optional dtype))
-                  (not (values-type-rest dtype)))
+      (cond ((and fixed-dtype
+                  (not mismatching-uses))
              ;; we [almost] know how many values are produced
              (values :simple
                      (lvar-types-to-check (values-type-out ctype n-required)

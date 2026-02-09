@@ -5077,6 +5077,13 @@
     (((lambda () (values 1 2))) (values 1 2))
     (((lambda () (values nil 2))) (condition 'type-error))
     (((lambda () (values 1 nil))) (condition 'type-error)))
+    (checked-compile-and-assert
+        (:optimize :safe
+         :allow-style-warnings t)
+        `(lambda (f)
+           (the (values real boolean) (if f (values 1 1))))
+      ((t) (condition 'type-error))
+      ((nil) (condition 'type-error)))
   (checked-compile-and-assert
       (:optimize :safe
        :allow-warnings t)
