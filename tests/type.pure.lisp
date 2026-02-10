@@ -580,8 +580,11 @@
   (assert (eq (eval '(typep 1 '(satisfies eval))) t)))
 
 (import '(sb-kernel:specifier-type
+          sb-kernel:values-specifier-type
           sb-kernel:type-specifier
           sb-kernel:type-intersection
+          sb-kernel:values-type-intersection
+          sb-kernel:values-subtypep
           #+sb-unicode sb-kernel::character-string
           sb-kernel:simple-character-string
           sb-kernel:type=
@@ -1268,7 +1271,31 @@
 
 (with-test (:name :values-intersection)
   (assert (eq
-           (sb-kernel:values-type-intersection
-            (sb-kernel:values-specifier-type '(values &optional rational &rest t))
-            (sb-kernel:values-specifier-type '(values &optional complex &rest t)))
-           (sb-kernel:values-specifier-type '(values &optional)))))
+           (values-type-intersection
+            (values-specifier-type '(values &optional rational &rest t))
+            (values-specifier-type '(values &optional complex &rest t)))
+           (values-specifier-type '(values &optional))))
+  (assert
+   (eq (values-subtypep (values-specifier-type '(values t &optional))
+                        (values-specifier-type '(values t (not real))))
+       t))
+  (assert
+   (eq (values-subtypep (values-specifier-type '(values t &optional))
+                        (values-specifier-type '(values t (not real) &optional)))
+       t))
+  (assert
+   (eq (values-type-intersection (values-specifier-type '(values t (not rational) &optional))
+                                 (values-specifier-type '(values t &optional)))
+       (values-specifier-type '(values t &optional))))
+  (assert
+   (equal (multiple-value-list
+           (values-subtypep
+            (values-specifier-type '(values real &optional real))
+            (values-specifier-type '(values real real))))
+          '(nil t)))
+  (assert
+   (equal (multiple-value-list
+           (values-subtypep
+            (values-specifier-type '(values (or real null) &optional))
+            (values-specifier-type '(values &optional (not boolean)))))
+          '(nil t))))

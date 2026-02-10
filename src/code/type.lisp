@@ -1014,7 +1014,7 @@
 ;;; OPERATION returned true as its second value each time we called
 ;;; it. Since we approximate the intersection of VALUES types, the
 ;;; second value being true doesn't mean the result is exact.
-(defun args-type-op (type1 type2 operation nreq)
+(defun args-type-op (type1 type2 operation nreq &optional null-unsupplied)
   (declare (type ctype type1 type2)
            (type function operation nreq))
   (when (eq type1 type2)
@@ -1025,21 +1025,50 @@
         (values-type-types type2)
       (multiple-value-bind (rest rest-exact)
           (funcall operation rest1 rest2)
-        (multiple-value-bind (res res-exact)
-            (if (< (length types1) (length types2))
-                (fixed-values-op types2 types1 rest1 operation)
-                (fixed-values-op types1 types2 rest2 operation))
-          (let* ((req (funcall nreq
-                               (length (args-type-required type1))
-                               (length (args-type-required type2))))
-                 (required (subseq res 0 req))
-                 (opt (subseq res req)))
-            (values required opt rest
-                    (and rest-exact res-exact))))))))
+        (let* ((n-req-1 (length (args-type-required type1)))
+               (n-req-2 (length (args-type-required type2)))
+               (n1 (length types1))
+               (n2 (length types2))
+               old-required
+               cut-required)
+          (when null-unsupplied
+            ;; Intersect (values t &optional) and (values t (not real) &optional)
+            ;; into (values t &optional),
+            ;; unsupplied values are treated as NIL, which fits into (not real).
+            (cond ((and (> n-req-1 n2)
+                        (eq rest2 *empty-type*))
+                   (setf rest2 (specifier-type 'null)
+                         rest1 rest2
+                         old-required n-req-1
+                         cut-required n2))
+                  ((and (> n-req-2 n1)
+                        (eq rest1 *empty-type*))
+                   (setf rest2 (specifier-type 'null)
+                         rest1 rest2
+                         old-required n-req-2
+                         cut-required n1))))
+          (multiple-value-bind (res res-exact)
+              (if (< n1 n2)
+                  (fixed-values-op types2 types1 rest1 operation)
+                  (fixed-values-op types1 types2 rest2 operation))
+            (let* ((req (cond ((not cut-required)
+                               (funcall nreq n-req-1 n-req-2))
+                              ((find *empty-type* res :end old-required)
+                               (return-from args-type-op
+                                 (values (load-time-value (list *empty-type*))
+                                         nil nil
+                                         (and rest-exact res-exact))))
+                              (t
+                               cut-required)))
+                   (required (subseq res 0 req))
+                   (opt (unless cut-required
+                          (subseq res req))))
+              (values required opt rest
+                      (and rest-exact res-exact)))))))))
 
-(defun values-type-op (type1 type2 operation nreq)
+(defun values-type-op (type1 type2 operation nreq &optional null-unsupplied)
   (multiple-value-bind (required optional rest exactp)
-      (args-type-op type1 type2 operation nreq)
+      (args-type-op type1 type2 operation nreq null-unsupplied)
     (when (member *empty-type* optional)
       (setf rest nil))
     (values (make-values-type required optional rest)
@@ -1111,7 +1140,8 @@
         (t
          (values (values-type-op type1 (coerce-to-values type2)
                                  #'type-intersection
-                                 #'max)))))
+                                 #'max
+                                 t)))))
 
 ;;; This is like TYPES-EQUAL-OR-INTERSECT, except that it sort of
 ;;; works on VALUES types. Note that due to the semantics of
@@ -1149,30 +1179,36 @@
         (t (setq type2 (coerce-to-values type2))
            (multiple-value-bind (types1 rest1) (values-type-types type1)
              (multiple-value-bind (types2 rest2) (values-type-types type2)
-               (cond ((< (length (values-type-required type1))
-                         (length (values-type-required type2)))
-                      (values nil t))
-                     ((< (length types1) (length types2))
-                      (values nil nil))
-                     (t
-                      (do ((t1 types1 (rest t1))
-                           (t2 types2 (rest t2)))
-                          ((null t2)
-                           (loop named loop
-                                 for type in t1
-                                 do (multiple-value-bind (res win)
-                                        (csubtypep type rest2)
-                                      (unless win
-                                        (return (values nil nil)))
-                                      (unless res
-                                        (return (values nil t)))))
-                           (csubtypep rest1 rest2))
-                        (multiple-value-bind (res win-p)
-                            (csubtypep (first t1) (first t2))
-                          (unless win-p
-                            (return (values nil nil)))
-                          (unless res
-                            (return (values nil t))))))))))))
+               (let ((n-req1 (length (values-type-required type1)))
+                     (n-req2 (length (values-type-required type2))))
+                (loop for i from 0
+                      do
+                      (unless types2
+                        (loop named loop
+                              for type in types1
+                              do (multiple-value-bind (res win)
+                                     (csubtypep type rest2)
+                                   (unless win
+                                     (return (values nil nil)))
+                                   (unless res
+                                     (return (values nil t)))))
+                        (return (csubtypep rest1 rest2)))
+                      (let ((t1 (pop types1))
+                            (t2 (pop types2)))
+                       (when (and t1
+                                  (>= i n-req1)
+                                  (< i n-req2))
+                         (setf t1 (type-union t1 (specifier-type 'null))))
+                       (multiple-value-bind (res win-p)
+                           (csubtypep (or t1
+                                          (if (eq rest1 *empty-type*)
+                                              (specifier-type 'null)
+                                              rest1))
+                                      t2)
+                         (unless win-p
+                           (return (values nil nil)))
+                         (unless res
+                           (return (values nil t))))))))))))
 
 ;;;; type method interfaces
 
