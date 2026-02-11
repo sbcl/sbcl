@@ -11,6 +11,8 @@
 ;;;; absoluely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+#-sb-thread (invoke-restart 'run-tests::skip-file)
+
 (shadowing-import 'assertoid:assert-error)
 (use-package "SB-THREAD")
 (use-package "SB-SYS")
