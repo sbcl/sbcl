@@ -58,13 +58,14 @@ jobs:
         if [ -z "$FEATURES_NAME" ]; then
             FEATURES_NAME="$(echo "${{ matrix.options }}-${{ matrix.subfeatures}}" | sed 's/[^a-zA-Z0-9]/-/g')"
         fi
-        FILENAME="sbcl-${{ runner.os }}-${{ matrix.arch }}-${FEATURES_NAME}.tar.bz2"
+        FILENAME="sbcl-${{ runner.os }}-${{ matrix.arch }}-${FEATURES_NAME}-bin.tar
         # Downcase it
         FILENAME="${FILENAME,,}"
-        # Prevent "tar: .: file changed as we read it" error
-        touch "$FILENAME"
-        # --transform 's,^,sbcl/,' prepends "sbcl/" to every file path in the archive
-        tar cjf "$FILENAME" --exclude=".git" --exclude="$FILENAME" --transform 's,^,sbcl/,' .
+        cd ..
+        mv sbcl sbcl-latest-dev-bin
+        sbcl-latest-dev-bin/binary-distribution.sh sbcl-latest-dev-bin
+        mv sbcl-latest-dev-bin sbcl
+        mv sbcl-latest-dev-binary.tar "$FILENAME"
         # Store this name for the next step (upload/release)
         echo "BINARY_PATH=$FILENAME" >> $GITHUB_ENV
 
