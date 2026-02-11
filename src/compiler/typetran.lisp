@@ -239,20 +239,19 @@
                                                    #-64-bit 'unsigned-byte-32-p)))
                    `(,new-predicate object))))
               ((let ((new-predicate
-                       ;; (typep (the (or (mod 5) (unsigned-byte 65)) x) '(unsigned-byte 64))
+                       ;; (typep (the (or (mod 5) (integer #.(expt 2 65))) x) '(unsigned-byte 64))
                        ;; => (fixnump x)
                        (and (csubtypep intersect (specifier-type 'real))
                             (macrolet ((up (&rest types)
                                          `(cond ,@(loop for (type exclude predicate) on types by #'cdddr
                                                         collect
-                                                        `((and ,@(and exclude
-                                                                      `((neq current-predicate ',exclude)))
-                                                                  (eq intersect
-                                                                      (type-intersection otype (specifier-type ',type))))
+                                                        `((and (not (member current-predicate ',exclude))
+                                                               (eq intersect
+                                                                   (type-intersection otype (specifier-type ',type))))
                                                           ',predicate)))))
                               (up fixnum nil fixnump
-                                  sb-vm:signed-word integerp #+64-bit signed-byte-64-p #-64-bit signed-byte-32-p
-                                  word integerp #+64-bit unsigned-byte-64-p #-64-bit unsigned-byte-32-p)))))
+                                  sb-vm:signed-word (bignump integerp) #+64-bit signed-byte-64-p #-64-bit signed-byte-32-p
+                                  word (bignump integerp) #+64-bit unsigned-byte-64-p #-64-bit unsigned-byte-32-p)))))
                  (when (and new-predicate
                             (neq new-predicate current-predicate))
                    `(,new-predicate object))))
