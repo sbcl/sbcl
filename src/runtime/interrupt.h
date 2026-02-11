@@ -13,6 +13,7 @@
 #define _INCLUDE_INTERRUPT_H_
 
 #include "runtime.h"
+#include <signal.h> // for NSIG
 #include <stdbool.h>
 #include <string.h>
 #include "genesis/static-symbols.h"

@@ -34,10 +34,6 @@ typedef int sigset_t;
 #define SIGBREAK  21 /* Control-break */
 #define SIGABRT   22 /* Abnormal termination (abort) */
 
-#ifndef NSIG
-#define NSIG 32     /* maximum signal number + 1 */
-#endif
-
 /* 1 - Thread */
 
 #define SIG_BLOCK 1
