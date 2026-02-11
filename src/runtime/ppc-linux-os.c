@@ -96,7 +96,11 @@ os_context_fp_control(os_context_t *context)
 os_context_register_t *
 os_context_float_register_addr(os_context_t *context, int offset)
 {
+#ifdef LISP_FEATURE_64_BIT
     return (os_context_register_t *)&context->uc_mcontext.fp_regs[offset];
+#else
+    return (os_context_register_t *)&context->uc_mcontext.uc_regs->fpregs.fpregs[offset];
+#endif
 }
 void
 os_restore_fp_control(os_context_t *context)
