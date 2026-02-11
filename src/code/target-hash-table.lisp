@@ -2461,7 +2461,11 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
                 (address-sensitive-p
                  (and address-sensitive-p
                       (not (logtest (hash-table-flags hash-table) hash-table-userfun-flag))))
-                (hash (clip-hash (the maybe-truncated-hash hash0))))
+                (hash (clip-hash hash0)))
+       ;; On 32bit platforms, the largest valid MAYBE-TRUNCATED-HASH
+       ;; is higher than MOST-POSITIVE-FIXNUM. On 64bit platforms,
+       ;; it's the other way around.
+       (declare (type (or fixnum maybe-truncated-hash) hash0))
        (dx-flet ((body ()
                    (binding* (((probed-value probed-key physical-index predecessor)
                                (findhash-weak key hash-table hash address-sensitive-p))

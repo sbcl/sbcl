@@ -784,3 +784,19 @@
 (with-test (:name (:adaptive-equal-hash :eql-hash-not-truncated))
   (assert (not (truncated-hash-p (sb-impl::perhaps-truncated-equal-hash
                                   (ash 1 +truncated-hash-bit+) 0)))))
+
+(with-test (:name (:user-defined-hash :range))
+  (flet ((mpf (key)
+           (declare (ignore key))
+           ;; According to documentation hash functions must return
+           ;; (AND FIXNUM (INTEGER 0)).
+           most-positive-fixnum))
+    (dolist (test '(eq eql equal equalp))
+      (dolist (weakness '(nil :value :key :key-and-value :key-or-value))
+        (dolist (synchronized '(nil t))
+          (let ((h (make-hash-table :test test
+                                    :weakness weakness
+                                    :hash-function #'mpf)))
+            (dotimes (i 100)
+              (setf (gethash i h) i)
+              (gethash i h))))))))
