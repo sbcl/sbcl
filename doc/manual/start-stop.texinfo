@@ -213,6 +213,10 @@ value is platform dependent.
 Size of control stack reserved for each thread in megabytes. Default
 value is 2.
 
+@item --tls-limit @var{positive integer}
+Maximum number of thread-local symbols in threaded builds. Default
+value is 4096.
+
 @item --noinform
 Suppress the printing of any banner or other informational message at
 startup. This makes it easier to write Lisp programs which work
@@ -228,7 +232,7 @@ with LDB.
 
 @item --lose-on-corruption
 @cindex ldb
-There are some dangerous low level errors (for instance, control stack
+There are some dangerous low-level errors (for instance, control stack
 exhausted, memory fault) that (or whose handlers) can corrupt the
 image. By default SBCL prints a warning, then tries to continue and
 handle the error in Lisp, but this will not always work and SBCL may
