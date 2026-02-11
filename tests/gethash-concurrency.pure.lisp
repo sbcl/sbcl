@@ -148,7 +148,7 @@
                      (forever (sleep (random *sleep-delay-max*))
                               (sb-ext:gc)))
                    :name "GC"))))
-      (unwind-protect (sleep 2.5)
+      (unwind-protect (sleep 1)
         (end-all threads))
       (assert (not *errors*))))))
 
@@ -193,7 +193,7 @@
                            (forever (sleep (random *sleep-delay-max*))
                                     (sb-ext:gc)))))
                      :name "collector"))))
-            (unwind-protect (sleep 2.5)
+            (unwind-protect (sleep 1)
               (end-all threads))
             #+hash-table-metrics
             (let ((n-gethash (reduce #'+ actions))
@@ -244,7 +244,7 @@
                                 (sleep (random *sleep-delay-max*))
                                 (sb-ext:gc))))
                           :name "collector"))))
-          (unwind-protect (sleep 2.5)
+          (unwind-protect (sleep 1)
             (end-all threads))
           (assert (not *errors*)))))))
 
@@ -272,6 +272,6 @@
                          (sb-ext:gc :full t)
                          (sleep (random *sleep-delay-max*)))))
                    :name "collector"))))
-      (unwind-protect (sleep 2.5)
+      (unwind-protect (sleep 1)
         (end-all threads))
       (assert (not *errors*)))))
