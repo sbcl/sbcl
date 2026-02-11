@@ -1063,3 +1063,16 @@
          (reduce #'append l :end 1 :initial-value '(1) :from-end t))
     (('((a b c) (0))) '(a b c 1) :test #'equal)
     ((#((a b c) (0))) '(a b c 1) :test #'equal)))
+
+(with-test (:name :strings-in-sequences)
+  (assert-type
+   (lambda (n)
+     (let ((l '("a" "b")))
+       (dolist (e l)
+         (when (equal e n)
+           (return e)))))
+   (or null simple-string))
+  (assert-type
+   (lambda (n)
+     (aref #("a" "b") n))
+   simple-string))

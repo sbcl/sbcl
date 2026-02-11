@@ -196,6 +196,14 @@
                                                        nil)
                                                       (cons
                                                        (specifier-type 'cons))
+                                                      (simple-string
+                                                       (specifier-type 'simple-string))
+                                                      (string
+                                                       (specifier-type 'string))
+                                                      (simple-vector
+                                                       (specifier-type 'simple-vector))
+                                                      ((simple-array * (*))
+                                                       (specifier-type '(simple-array * (*))))
                                                       (vector
                                                        (specifier-type 'vector))
                                                       (array
@@ -322,6 +330,14 @@
                                      nil)
                                     (cons
                                      (specifier-type 'cons))
+                                    (simple-string
+                                     (specifier-type 'simple-string))
+                                    (string
+                                     (specifier-type 'string))
+                                    (simple-vector
+                                     (specifier-type 'simple-vector))
+                                    ((simple-array * (*))
+                                     (specifier-type '(simple-array * (*))))
                                     (vector
                                      (specifier-type 'vector))
                                     (array
