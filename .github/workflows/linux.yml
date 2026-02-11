@@ -58,7 +58,7 @@ jobs:
         if [ -z "$FEATURES_NAME" ]; then
             FEATURES_NAME="$(echo "${{ matrix.options }}-${{ matrix.subfeatures}}" | sed 's/[^a-zA-Z0-9]/-/g')"
         fi
-        FILENAME="sbcl-${{ runner.os }}-${{ matrix.arch }}-${FEATURES_NAME}-bin.tar
+        FILENAME="sbcl-${{ runner.os }}-${{ matrix.arch }}-${FEATURES_NAME}-bin.tar"
         # Downcase it
         FILENAME="${FILENAME,,}"
         cd ..
