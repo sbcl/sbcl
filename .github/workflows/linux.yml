@@ -61,6 +61,8 @@ jobs:
         FILENAME="sbcl-${{ runner.os }}-${{ matrix.arch }}-${FEATURES_NAME}.tar.bz2"
         # Downcase it
         FILENAME="${FILENAME,,}"
+        # Prevent "tar: .: file changed as we read it" error
+        touch "$FILENAME"
         # --transform 's,^,sbcl/,' prepends "sbcl/" to every file path in the archive
         tar cjf "$FILENAME" --exclude=".git" --exclude="$FILENAME" --transform 's,^,sbcl/,' .
         # Store this name for the next step (upload/release)
