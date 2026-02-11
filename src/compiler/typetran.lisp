@@ -812,112 +812,141 @@
 ;;; Do source transformation for TYPEP of a known union type. If a
 ;;; union type contains LIST, then we pull that out and make it into a
 ;;; single LISTP call.
-(defun source-transform-union-typep (object type)
-  (let* ((types (sb-kernel::flatten-numeric-union-types type))
-         (type-cons (specifier-type 'cons))
-         (type-symbol (specifier-type 'symbol))
-         (mtype (find-if #'member-type-p types))
-         (members (when mtype (member-type-members mtype))))
-    (cond ((and mtype
-                (memq nil members)
-                (memq type-cons types))
-           `(or (listp ,object)
-                (typep ,object
-                       '(or ,@(mapcar #'type-specifier
-                               (remove type-cons
-                                (remove mtype types)))
-                         (member ,@(remove nil members))))))
-          ((and (memq type-cons types)
-                (memq type-symbol types))
-           `(or (listp ,object)
-                (non-null-symbol-p ,object)
-                (typep ,object
-                       '(or ,@(mapcar #'type-specifier
-                               (remove type-cons
-                                (remove type-symbol types)))))))
-          ;; Check for NULL before consp, then consp can be reduced to listp.
-          ((and mtype
-                (memq nil members)
-                (find-if #'cons-type-p types))
-           `(or (null ,object)
-                (typep ,object
-                       '(or ,@(mapcar #'type-specifier
-                               (remove mtype types))
-                         (member ,@(remove nil members))))))
-          ;; The same as above but for all symbols
-          ((and (find (specifier-type 'symbol) types)
-                (find-if #'cons-type-p types))
-           `(or (symbolp ,object)
-                (typep ,object
-                       '(or ,@(mapcar #'type-specifier (remove (specifier-type 'symbol) types))))))
-          ((transform-frozen-struct-union-typep object types))
-          ((group-vector-type-length-tests object types))
-          ((group-vector-length-type-tests object types))
-          ((source-transform-union-numeric-typep object types))
-          ;; Check for CONSP/SINGLE/DOUBLE-FLOAT-P once.
-          ((let* (single-floats
-                  double-floats
-                  conses)
-             (loop for type in types
-                   do
-                   (cond
-                     ((numeric-type-p type)
-                      (cond ((numtype-aspects-eq type (specifier-type 'double-float))
-                             (push type double-floats))
-                            ((numtype-aspects-eq type (specifier-type 'single-float))
-                             (push type single-floats))))
-                     ((cons-type-p type)
-                      (push type conses))))
-             (when (or (cdr single-floats)
-                       (cdr double-floats)
-                       (cdr conses))
-               (flet ((check (sub-types test)
-                        (when (cdr sub-types)
-                          `((and (,test ,object)
-                                 (or
-                                  ,@(loop for type in sub-types
-                                          do (setf types (remove type types :test #'eq :count 1))
-                                          collect `(typep ,object ',(type-specifier type)))))))))
-                 `(or
-                   ,@(check single-floats 'single-float-p)
-                   ,@(check double-floats 'double-float-p)
-                   ,@(check conses 'consp)
-                   ,@(loop for type in types
-                           collect `(typep ,object ',(type-specifier type))))))))
+(defun source-transform-union-typep (object object-lvar type)
+  (let* ((otype (lvar-type object-lvar))
+         (intersect (type-intersection type otype)))
+    (cond ((let* ((real-intersect (type-intersection intersect (specifier-type 'real)))
+                  (real-type (type-intersection type (specifier-type 'real)))
+                  (predicate
+                    ;; Remove bounds from numeric types
+                    (and (neq real-intersect *empty-type*)
+                         (not (numeric-type-without-bounds-p real-type))
+                         (not (eq real-type (specifier-type 'fixnum)))
+                         (macrolet ((up (&rest types)
+                                      `(cond ,@(loop for (type predicate) on types by #'cddr
+                                                     collect
+                                                     `((eq real-intersect
+                                                           (type-intersection otype (specifier-type ',type)))
+                                                       ',predicate)))))
+                           (up integer integerp
+                               rational rationalp
+                               single-float single-float-p
+                               double-float double-float-p
+                               float floatp
+                               real realp)))))
+             (when predicate
+               (let ((remaining (type-difference intersect
+                                                 (specifier-type 'real))))
+                 (if (eq remaining *empty-type*)
+                     `(,predicate object)
+                     `(or (,predicate object)
+                          (typep object ',(type-specifier remaining))))))))
           (t
-           (multiple-value-bind (widetags more-types)
-               (sb-kernel::widetags-from-union-type types)
-             (multiple-value-bind (predicate more-union-types)
-                 (split-union-type-tests types)
-               (cond ((and predicate
-                           (< (length more-union-types)
-                              (length more-types)))
-                      `(or (,predicate ,object)
-                           (typep ,object '(or ,@(mapcar #'type-specifier more-union-types)))))
-                     (widetags
-                      `(or (%other-pointer-subtype-p ,object ',widetags)
-                           (typep ,object '(or ,@(mapcar #'type-specifier more-types)))))
-                     ((and (cdr more-types)
-                           (every #'intersection-type-p more-types)
-                           (let ((common (intersection-type-types (car more-types))))
-                             (loop for type in (cdr more-types)
-                                   for types = (intersection-type-types type)
-                                   for int = (intersection common types :test #'type=)
-                                   always int
-                                   do (setf common int)
-                                   finally
-                                   (return `(and
-                                             (typep ,object '(and ,@(mapcar #'type-specifier common)))
-                                             (or ,@(loop for type in more-types
-                                                         for types = (intersection-type-types type)
-                                                         collect
-                                                         `(typep ,object '(and ,@(mapcar #'type-specifier
-                                                                                  (set-difference types common))))))))))))
-                     (t
-                      `(or
-                        ,@(mapcar (lambda (x)
-                                    `(typep ,object ',(type-specifier x)))
-                                  more-types))))))))))
+           (let* ((types (sb-kernel::flatten-numeric-union-types type))
+                  (type-cons (specifier-type 'cons))
+                  (type-symbol (specifier-type 'symbol))
+                  (mtype (find-if #'member-type-p types))
+                  (members (when mtype (member-type-members mtype))))
+             (cond ((and mtype
+                         (memq nil members)
+                         (memq type-cons types))
+                    `(or (listp ,object)
+                         (typep ,object
+                                '(or ,@(mapcar #'type-specifier
+                                        (remove type-cons
+                                         (remove mtype types)))
+                                  (member ,@(remove nil members))))))
+                   ((and (memq type-cons types)
+                         (memq type-symbol types))
+                    `(or (listp ,object)
+                         (non-null-symbol-p ,object)
+                         (typep ,object
+                                '(or ,@(mapcar #'type-specifier
+                                        (remove type-cons
+                                         (remove type-symbol types)))))))
+                   ;; Check for NULL before consp, then consp can be reduced to listp.
+                   ((and mtype
+                         (memq nil members)
+                         (find-if #'cons-type-p types))
+                    `(or (null ,object)
+                         (typep ,object
+                                '(or ,@(mapcar #'type-specifier
+                                        (remove mtype types))
+                                  (member ,@(remove nil members))))))
+                   ;; The same as above but for all symbols
+                   ((and (find (specifier-type 'symbol) types)
+                         (find-if #'cons-type-p types))
+                    `(or (symbolp ,object)
+                         (typep ,object
+                                '(or ,@(mapcar #'type-specifier (remove (specifier-type 'symbol) types))))))
+                   ((transform-frozen-struct-union-typep object types))
+                   ((group-vector-type-length-tests object types))
+                   ((group-vector-length-type-tests object types))
+                   ((source-transform-union-numeric-typep object types))
+                   ;; Check for CONSP/SINGLE/DOUBLE-FLOAT-P once.
+                   ((let* (single-floats
+                           double-floats
+                           conses)
+                      (loop for type in types
+                            do
+                            (cond
+                              ((numeric-type-p type)
+                               (cond ((numtype-aspects-eq type (specifier-type 'double-float))
+                                      (push type double-floats))
+                                     ((numtype-aspects-eq type (specifier-type 'single-float))
+                                      (push type single-floats))))
+                              ((cons-type-p type)
+                               (push type conses))))
+                      (when (or (cdr single-floats)
+                                (cdr double-floats)
+                                (cdr conses))
+                        (flet ((check (sub-types test)
+                                 (when (cdr sub-types)
+                                   `((and (,test ,object)
+                                          (or
+                                           ,@(loop for type in sub-types
+                                                   do (setf types (remove type types :test #'eq :count 1))
+                                                   collect `(typep ,object ',(type-specifier type)))))))))
+                          `(or
+                            ,@(check single-floats 'single-float-p)
+                            ,@(check double-floats 'double-float-p)
+                            ,@(check conses 'consp)
+                            ,@(loop for type in types
+                                    collect `(typep ,object ',(type-specifier type))))))))
+                   (t
+                    (multiple-value-bind (widetags more-types)
+                        (sb-kernel::widetags-from-union-type types)
+                      (multiple-value-bind (predicate more-union-types)
+                          (split-union-type-tests types)
+                        (cond ((and predicate
+                                    (< (length more-union-types)
+                                       (length more-types)))
+                               `(or (,predicate ,object)
+                                    (typep ,object '(or ,@(mapcar #'type-specifier more-union-types)))))
+                              (widetags
+                               `(or (%other-pointer-subtype-p ,object ',widetags)
+                                    (typep ,object '(or ,@(mapcar #'type-specifier more-types)))))
+                              ((and (cdr more-types)
+                                    (every #'intersection-type-p more-types)
+                                    (let ((common (intersection-type-types (car more-types))))
+                                      (loop for type in (cdr more-types)
+                                            for types = (intersection-type-types type)
+                                            for int = (intersection common types :test #'type=)
+                                            always int
+                                            do (setf common int)
+                                            finally
+                                            (return `(and
+                                                      (typep ,object '(and ,@(mapcar #'type-specifier common)))
+                                                      (or ,@(loop for type in more-types
+                                                                  for types = (intersection-type-types type)
+                                                                  collect
+                                                                  `(typep ,object '(and ,@(mapcar #'type-specifier
+                                                                                           (set-difference types common))))))))))))
+                              (t
+                               `(or
+                                 ,@(mapcar (lambda (x)
+                                             `(typep ,object ',(type-specifier x)))
+                                           more-types)))))))))))))
 
 (defun source-transform-intersection-typep (object type)
   (let (types
@@ -1609,7 +1638,7 @@
        (numeric-type
         (source-transform-numeric-typep object ctype))
        ((or union-type numeric-union-type)
-        (source-transform-union-typep object ctype))
+        (source-transform-union-typep object object-lvar ctype))
        (intersection-type
         (source-transform-intersection-typep object ctype))
        (member-type

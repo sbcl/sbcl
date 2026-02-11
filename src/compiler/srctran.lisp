@@ -5269,7 +5269,7 @@
      (and (not (numeric-type-low type))
           (not (numeric-type-high type))))
     (union-type
-     (every #' numeric-type-without-bounds-p (union-type-types type)))))
+     (every #'numeric-type-without-bounds-p (union-type-types type)))))
 
 ;;; Pick off easy association opportunities for constant folding.
 ;;; More complicated stuff that also depends on commutativity
