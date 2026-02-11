@@ -999,7 +999,10 @@
          (setq constants (loop for i from (- ptr 2) repeat (+ len 2)
                                collect (%vector-raw-bits core-header i))))
         (#.initial-fun-core-entry-type-code
-         (setq initfun (%vector-raw-bits core-header ptr)))))
+         (aver (= len 3)) ; NOT including the entry type code + length itself
+         (setq initfun (vector (%vector-raw-bits core-header ptr)
+                               (%vector-raw-bits core-header (+ ptr 1))
+                               (%vector-raw-bits core-header (+ ptr 2)))))))
     (let ((static (find static-core-space-id space-list :key 'space-id)))
       (assert static)
       (assert (= *nil-taggedptr* (+ (space-addr static) sb-vm::nil-value-offset))))
@@ -1055,7 +1058,8 @@
                            n-ptes (+ (* n-ptes *bitmap-bytes-per-page*) pte-bytes)
                            page-count))
         (setf (%vector-raw-bits core-header (incf offset)) word)))
-    (dolist (word (list initial-fun-core-entry-type-code 3 initfun
+    (dolist (word (list initial-fun-core-entry-type-code 5
+                        (elt initfun 0) (elt initfun 1) (elt initfun 2)
                         end-core-entry-type-code 2))
       (setf (%vector-raw-bits core-header (incf offset)) word))
     (write-sequence core-header output)
@@ -2066,7 +2070,7 @@
         ;; FIXME: WITH-MAPPED-CORE should bind spacemap
         (let* ((spacemap (cons sap (sort (copy-list space-list) #'> :key #'space-addr)))
                (seen (visit-everything spacemap
-                                       (core-header-initfun parsed-header)
+                                       (elt (core-header-initfun parsed-header) 2)
                                        (core-header-linkage-space-info parsed-header)
                                        (core-header-static-constants parsed-header)
                                        print))
@@ -2107,8 +2111,9 @@
                               (core-header-linkage-space-info parsed-header))
                              (core-header-static-constants parsed-header)
                              spacemap new-spacemap seen)
-            (setf (core-header-initfun parsed-header)
-                  (gethash (core-header-initfun parsed-header) seen))
+            (let ((init (core-header-initfun parsed-header)))
+              (loop for i from 1 to 2
+                    do (setf (elt init i) (the (not null) (gethash (elt init i) seen)))))
             (flet ((n (spaces)
                      (space-next-free-page (get-space dynamic-core-space-id spaces))))
               (when print

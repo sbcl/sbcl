@@ -179,29 +179,18 @@ os_dlsym_default(char *name)
 #endif
 
 int alien_linkage_table_n_prelinked;
-struct vector* find_sb_sys_linkage_info()
-{
-    lispobj* sym = find_symbol("*LINKAGE-INFO*", get_package_by_id(PACKAGE_ID_SYS));
-    lispobj value = ((struct symbol*)sym)->value;
-    gc_assert(instancep(CONS(value)->car));
-    struct hash_table* ht = (void*)native_pointer(CONS(value)->car);
-    gc_assert(simple_vector_p(ht->pairs));
-    struct vector* kvv = (void*)native_pointer(ht->pairs);
-    alien_linkage_table_n_prelinked = fixnum_value(kvv->data[0]); // high-water mark
-    gc_assert(fixnum_value(ht->_count) == alien_linkage_table_n_prelinked);
-    return kvv;
-}
-
 extern lispobj* get_alien_linkage_table_initializer();
-void os_link_runtime()
+void os_link_runtime(lispobj vector, lispobj count)
 {
+    // name_table is the vector that backs the SB-SYS:*LINKAGE-INFO* hash-table.
+    // In genesis we create the vector as if it were a hash-table k/v vector.
+    struct vector* name_table = VECTOR(vector);
+    int name_index = 2, linkage_index = 0;
+    // Table is the possibly nonexistent array of words filled in by the system linker.
     lispobj* table = get_alien_linkage_table_initializer();
     if (table) {
-        // Prefill the alien linkage table so that shrinkwrapped executables which
-        // link in all their C library dependencies can avoid linking with -ldl
-        // but extern-alien still works for newly compiled code.
-        struct vector* name_table = find_sb_sys_linkage_info();
-        int n = alien_linkage_table_n_prelinked, linkage_index = 0, name_index = 2;
+        // Every entry in sb-sys:*linkage-info* is considered pre-linked
+        int n = alien_linkage_table_n_prelinked = fixnum_value(name_table->data[0]);
         for ( ; n-- ; linkage_index++, name_index += 2, table++ ) {
             lispobj name = name_table->data[name_index];
             gc_assert(fixnum_value(name_table->data[1+name_index]) == linkage_index);
@@ -211,24 +200,19 @@ void os_link_runtime()
             gc_assert(simple_base_string_p(is_data ? CONS(name)->car : name));
             arch_write_linkage_table_entry(linkage_index, (void*)*table, is_data);
         }
-        return;
-    }
-
-    struct vector* symbols = VECTOR(SymbolValue(REQUIRED_FOREIGN_SYMBOLS,0));
-    int n = alien_linkage_table_n_prelinked = vector_len(symbols);
-    int index;
-    for (index = 0 ; index < n ; ++index)
-    {
-        lispobj item = symbols->data[index];
-        bool datap = listp(item);
-        lispobj symbol_name = datap ? CONS(item)->car : item;
-        char *namechars = vector_sap(symbol_name);
-        void* result = os_dlsym_default(namechars);
-
-        if (result) {
-            arch_write_linkage_table_entry(index, result, datap);
-        } else { // startup might or might not work. ymmv
-            fprintf(stderr, "Missing required foreign symbol '%s'\n", namechars);
+    } else { // Process only 'count' entries by looking them up
+        int n = alien_linkage_table_n_prelinked = count;
+        for ( ; n-- ; linkage_index++, name_index += 2 ) {
+            lispobj item = name_table->data[name_index];
+            bool is_data = listp(item);
+            lispobj c_symbol_name = is_data ? CONS(item)->car : item;
+            char *namechars = vector_sap(c_symbol_name);
+            void* result = os_dlsym_default(namechars);
+            if (result) {
+                arch_write_linkage_table_entry(linkage_index, result, is_data);
+            } else { // startup might or might not work. ymmv
+                fprintf(stderr, "Missing required foreign symbol '%s'\n", namechars);
+            }
         }
     }
 }

@@ -38,7 +38,7 @@
 
 ;; Regression from R/O space change
 (with-test (:name (apropos-list :smoke-test))
-  (assert (plusp (length (apropos-list "required-foreign")))))
+  (assert (plusp (length (apropos-list "**finalizer-store**")))))
 
 ;;; APROPOS should accept a package designator, not just a package, and
 ;;; furthermore do the right thing when it gets a package designator.

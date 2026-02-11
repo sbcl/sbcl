@@ -1387,7 +1387,7 @@ init_coreparse_spaces(int n, struct coreparse_space* input)
  * 0: No
  * -1: default, yes for compressed cores, no otherwise.
  */
-lispobj
+struct initfunctions
 load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
 {
     void *header;
@@ -1395,7 +1395,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
     os_vm_size_t len, remaining_len, stringlen;
     int fd = open_binary(file, O_RDONLY);
     ssize_t count;
-    lispobj initial_function = NIL;
+    struct initfunctions initfun = {0,0,0};
     struct heap_adjust adj;
     memset(&adj, 0, sizeof adj);
     sword_t linkage_table_data_page = -1;
@@ -1532,7 +1532,9 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
                                   spaces, &adj, patch_card_marking_instructions);
             break;
         case INITIAL_FUN_CORE_ENTRY_TYPE_CODE:
-            initial_function = adjust_word(&adj, (lispobj)*ptr);
+            memcpy(&initfun, ptr, sizeof initfun);
+            initfun.c_linkage_vector = adjust_word(&adj, initfun.c_linkage_vector);
+            initfun.lispfun = adjust_word(&adj, initfun.lispfun);
             break;
         case END_CORE_ENTRY_TYPE_CODE:
             free(header);
@@ -1546,15 +1548,15 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
             SYMBOL(FREE_TLS_INDEX)->value = sizeof (struct thread);
 #endif
             // simple-fun implies cold-init, not a warm core (it would be a closure then)
-            if (widetag_of(native_pointer(initial_function)) == SIMPLE_FUN_WIDETAG
+            if (widetag_of(native_pointer(initfun.lispfun)) == SIMPLE_FUN_WIDETAG
                 && !lisp_startup_options.noinform) {
                 fprintf(stderr, "Initial page table:\n");
                 extern void print_generation_stats(void);
                 print_generation_stats();
             }
-            sanity_check_loaded_core(initial_function);
+            sanity_check_loaded_core(initfun.lispfun);
             free(spaces);
-            return initial_function;
+            return initfun;
         case RUNTIME_OPTIONS_MAGIC: break; // already processed
         default:
             lose("unknown core header entry: %"OBJ_FMTX, (lispobj)val);

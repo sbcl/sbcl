@@ -2389,19 +2389,23 @@ Legal values for OFFSET are -4, -8, -12, ..."
 (defun foreign-symbols-to-core ()
   (flet ((to-core (list transducer target-symbol)
            (cold-set target-symbol (vector-in-core (mapcar transducer list)))))
-    ;; Sort by index into alien linkage table
-    (to-core (sort (%hash-table-alist *cold-foreign-symbol-table*) #'< :key #'cdr)
-             (lambda (pair &aux (key (car pair))
-                                (sym (string-literal-to-core
-                                      (if (listp key) (car key) key))))
-               (if (listp key) (cold-list sym) sym))
-             'sb-vm::+required-foreign-symbols+)
     (cold-set (cold-intern '*assembler-routines*) *assembler-routines*)
     (to-core *asm-routine-alist*
              (lambda (rtn)
                (cold-cons (cold-intern (first rtn)) (make-fixnum-descriptor (cdr rtn))))
-             '*!initial-assembler-routines*)))
-
+             '*!initial-assembler-routines*))
+  (flet ((pair-to-core (pair &aux (key (car pair)) (idx (cdr pair)))
+           (let ((str (string-literal-to-core (if (listp key) (car key) key))))
+             (list (if (listp key) (cold-list str) str) (make-fixnum-descriptor idx)))))
+    (let* ((ht *cold-foreign-symbol-table*)
+           (alist (sort (%hash-table-alist ht) #'< :key #'cdr)) ; sort by linkage index
+           ;; V resembles HASH-TABLE-PAIRS of *LINKAGE-INFO*, without its table
+           (v (vector-in-core (list* (make-fixnum-descriptor (hash-table-count ht))
+                                     (make-fixnum-descriptor 0)
+                                     (mapcan #'pair-to-core alist)))))
+      ;; C runtime reads the core header entry but cold-init reads the lisp symbol
+      (cold-set (cold-intern 'sb-sys:*linkage-info*) (cold-cons *nil-descriptor* v))
+      v)))
 
 ;;;; general machinery for cold-loading FASL files
 
@@ -4141,7 +4145,7 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
 ;;; the "initial core file" because core files could be created later
 ;;; by executing SAVE-LISP-AND-DIE in a running system, perhaps after we've
 ;;; added some functionality to the system.)
-(defun write-initial-core-file (filename build-id verbose)
+(defun write-initial-core-file (filename build-id foreign-symbols verbose)
   (when verbose
     (let ((*print-length* nil)
           (*print-level* nil))
@@ -4206,7 +4210,11 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
       ;; Write the initial function.
       (let ((initial-fun (descriptor-bits (cold-symbol-function '!cold-init))))
         (when verbose (format t "~&/INITIAL-FUN=#X~X~%" initial-fun))
-        (write-words core-file initial-fun-core-entry-type-code 3 initial-fun))
+        ;; Write a 'struct initfunctions'
+        (write-words core-file initial-fun-core-entry-type-code 5
+                     (hash-table-count *cold-foreign-symbol-table*)
+                     (descriptor-bits foreign-symbols)
+                     initial-fun))
 
       ;; Write the End entry.
       (write-words core-file end-core-entry-type-code 2)))
@@ -4242,7 +4250,8 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
             (format nil "creating core ~S" core-file-name)
             (format nil "creating headers in ~S" c-header-dir-name))))
 
-  (let ((*cold-foreign-symbol-table* (make-hash-table :test 'equal)))
+  (let ((*cold-foreign-symbol-table* (make-hash-table :test 'equal))
+        (foreign-symbols))
 
     ;; Prefill some linkage table entries perhaps
     (loop for (name datap) in sb-vm::*alien-linkage-table-predefined-entries*
@@ -4377,7 +4386,7 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
       (when core-file-name
         (sort-initial-methods)
         (resolve-deferred-known-funs)
-        (foreign-symbols-to-core)
+        (setq foreign-symbols (foreign-symbols-to-core))
         (finish-symbols)
         (finalize-load-time-value-noise))
 
@@ -4407,7 +4416,7 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
         (with-open-file (stream map-file-name :direction :output :if-exists :supersede)
           (write-map stream)))
       (when core-file-name
-        (write-initial-core-file core-file-name build-id verbose))
+        (write-initial-core-file core-file-name build-id foreign-symbols verbose))
       (unless c-header-dir-name
         (return-from sb-cold:genesis))
       (let ((filename (format nil "~A/Makefile.features" c-header-dir-name)))

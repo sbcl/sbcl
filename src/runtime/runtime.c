@@ -642,7 +642,6 @@ initialize_lisp(int argc, char *argv[], char *envp[])
 
     os_vm_offset_t embedded_core_offset = 0;
 
-    lispobj initial_function;
     struct memsize_options memsize_options;
     memsize_options.present_in_core = 0;
     extern void sb_query_os_page_size();
@@ -759,11 +758,9 @@ initialize_lisp(int argc, char *argv[], char *envp[])
      * and before any random malloc() calls occur improves the chance
      * of mapping dynamic space at our preferred address (if movable).
      * If not movable, it was already mapped in allocate_spaces(). */
-    initial_function = load_core_file(core, embedded_core_offset,
-                                      options.merge_core_pages);
-    if (initial_function == NIL) {
-        lose("couldn't find initial function");
-    }
+    struct initfunctions initfun
+        = load_core_file(core, embedded_core_offset, options.merge_core_pages);
+    if (!initfun.lispfun) lose("couldn't find initial function");
 
 #if defined(SVR4) || defined(__linux__) || defined(__NetBSD__) || defined(__HAIKU__)
     tzset();
@@ -773,7 +770,7 @@ initialize_lisp(int argc, char *argv[], char *envp[])
         enable_lossage_handler();
 
     ensure_undefined_alien();
-    os_link_runtime();
+    os_link_runtime(initfun.c_linkage_vector, initfun.c_linkage_count);
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     /* Delayed until after dynamic space has been mapped, fixups made,
@@ -807,7 +804,7 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     core_string = core;
     posix_argv = options.argv;
 
-    create_main_lisp_thread(initial_function);
+    create_main_lisp_thread(initfun.lispfun);
     return 0;
 }
 

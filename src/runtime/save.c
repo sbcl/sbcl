@@ -270,6 +270,18 @@ static void write_static_space_constants(FILE *file)
 }
 #endif
 
+static lispobj required_foreign_symbols()
+{
+    lispobj* sym = find_symbol("*LINKAGE-INFO*", get_package_by_id(PACKAGE_ID_SYS));
+    lispobj value = ((struct symbol*)sym)->value;
+    gc_assert(instancep(CONS(value)->car));
+    struct hash_table* ht = (void*)native_pointer(CONS(value)->car);
+    gc_assert(simple_vector_p(ht->pairs));
+    struct vector* kvv = (void*)native_pointer(ht->pairs);
+    gc_assert(fixnum_value(ht->_count) == fixnum_value(kvv->data[0])); // high-water mark
+    return ht->pairs;
+}
+
 void save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                         bool make_executable,
                         int save_runtime_options,
@@ -423,7 +435,9 @@ void save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 #endif
 
     write_lispobj(INITIAL_FUN_CORE_ENTRY_TYPE_CODE, file);
-    write_lispobj(3, file);
+    write_lispobj(5, file);
+    write_lispobj(alien_linkage_table_n_prelinked, file);
+    write_lispobj(required_foreign_symbols(), file);
     write_lispobj(init_function, file);
 
 #ifdef LISP_FEATURE_GENERATIONAL

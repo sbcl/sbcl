@@ -1352,15 +1352,6 @@ lisp_fun_linkage_space: .zero ~:*~D
                   (if enable-pie +code-space-nominal-address+ 0))
             (write-sequence new-header output)
             (force-output output)
-            ;; ELF cores created from #-immobile-space cores use +required-foreign-symbols+.
-            ;; But if #+immobile-space the alien-linkage-table values are computed
-            ;; by 'ld' and we don't scan +required-foreign-symbols+.
-            (when (get-space immobile-fixedobj-core-space-id spacemap)
-              (let* ((sym (find-target-symbol (package-id "SB-VM")
-                                              "+REQUIRED-FOREIGN-SYMBOLS+" spacemap :physical))
-                     (vector (translate (symbol-global-value sym) spacemap)))
-                (fill vector 0)
-                (setf (%array-fill-pointer vector) 0)))
             ;; Change SB-C::*COMPILE-FILE-TO-MEMORY-SPACE* to :DYNAMIC
             ;; and SB-C::*COMPILE-TO-MEMORY-SPACE* to :AUTO
             ;; in case the resulting executable needs to compile anything.

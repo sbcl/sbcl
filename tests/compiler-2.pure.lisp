@@ -213,12 +213,6 @@
       ;; Should not have a call to SET-SYMBOL-GLOBAL-VALUE>
       (assert (not (ctu:find-code-constants f :type 'sb-kernel:fdefn))))))
 
-(with-test (:name :alien-linkage-table-bogosity)
-  (let ((strings (map 'list (lambda (x) (if (consp x) (car x) x))
-                      sb-vm::+required-foreign-symbols+)))
-    (assert (= (length (remove-duplicates strings :test 'string=))
-               (length strings)))))
-
 (with-test (:name (:no style-warning :for inline :cl-fun))
   (checked-compile '(lambda (x)
                       (declare (optimize (speed 3)) (inline length)

@@ -79,8 +79,9 @@ int os_preinit(char *argv[], char *envp[]);
 #else
 #define os_preinit(dummy1,dummy2) (0)
 #endif
-void os_link_runtime();
+void os_link_runtime(lispobj, lispobj);
 void os_unlink_runtime();
+extern int alien_linkage_table_n_prelinked;
 
 /* Do anything we need to do when starting up the runtime environment
  * in this OS. */

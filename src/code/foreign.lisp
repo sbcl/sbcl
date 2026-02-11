@@ -211,16 +211,17 @@ symbol designates a variable. May enter the symbol into the linkage-table."
 ;;; There 2 vars are not defglobal, as defglobal implies always-bound.
 (declaim (global *runtime-dlhandle* *shared-objects*))
 (defun !foreign-cold-init ()
-  (loop for table-offset from 0
-        and reference across (symbol-value 'sb-vm::+required-foreign-symbols+)
-        do (setf (gethash reference (car *linkage-info*)) table-offset))
+  (let ((pairvector (the simple-vector (cdr *linkage-info*)))
+        (ht (make-hash-table :test 'equal :synchronized t)))
+    (setf *linkage-info* (list ht))
+    (loop for j from 2 below (length pairvector) by 2
+          for linkage-index fixnum from 0
+          do (aver (eql (svref pairvector (1+ j)) linkage-index))
+             (setf (gethash (svref pairvector j) ht) linkage-index)))
   #+os-provides-dlopen
   (setf *runtime-dlhandle* (dlopen-or-lose))
   #+os-provides-dlopen
   (setf *shared-objects* nil))
-;;; Other than above, +required-foreign-symbols+ is not for Lisp to see.
-;;; But warn if you try to reassign it.
-(setf (info :variable :kind 'sb-vm::+required-foreign-symbols+) :constant)
 
 ;;; Helpers for defining error-signalling NOP's for "not supported
 ;;; here" operations.

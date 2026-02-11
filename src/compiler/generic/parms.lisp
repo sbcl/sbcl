@@ -237,10 +237,6 @@
     #+(and x86-64 sb-thread (not gs-seg))
     sb-aprof::*n-profile-sites*
 
-    ;; runtime linking of lisp->C calls (regardless of whether
-    ;; the C function is in a dynamic shared object or not)
-    +required-foreign-symbols+
-
     ;;; The following symbols aren't strictly required to be static
     ;;; - they are not accessed from C - but we make them static in order
     ;;; to (perhaps) micro-optimize access in Lisp.
