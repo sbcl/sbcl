@@ -62,7 +62,7 @@ jobs:
         # Downcase it
         FILENAME="${FILENAME,,}"
         # --transform 's,^,sbcl/,' prepends "sbcl/" to every file path in the archive
-        tar cjf "$FILENAME" --transform 's,^,sbcl/,' . --exclude=".git" --exclude="$FILENAME"
+        tar cjf "$FILENAME" --transform 's,^,sbcl/,' --exclude=".git" --exclude="$FILENAME" .
         # Store this name for the next step (upload/release)
         echo "BINARY_PATH=$FILENAME" >> $GITHUB_ENV
 
