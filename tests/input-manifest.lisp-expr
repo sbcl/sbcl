@@ -126,7 +126,7 @@
   "../contrib/sb-sprof/test.lisp" "../contrib/sb-sprof/graph.lisp")
  ("signals.impure.lisp" "contrib/sb-posix.fasl")
  ("stream.impure.lisp" "contrib/sb-posix.fasl")
- ("threads.impure.lisp"
+ ("threads-2.impure.lisp"
   "tests/alloca.so"
   "tests/threads-foreign.so")
  ("threads.test.sh" "tests/condition-wait-sigcont.lisp")
