@@ -2,6 +2,9 @@ name: Linux
 
 on: [push]
 
+permissions:
+  contents: write
+
 jobs:
   build:
 
@@ -13,10 +16,10 @@ jobs:
         arch: [x86, x86-64]
         subfeatures: ['']
         include:
-          - { arch: x86-64, subfeatures: sse4, options: --with-sb-thread --with-nonstop-foreign-call }
-          - { arch: x86-64, subfeatures: fasteval, options: --with-sb-fasteval --without-sb-eval --with-nonstop-foreign-call }
-          - { arch: x86-64, options: --with-mark-region-gc --with-nonstop-foreign-call }
-          - { arch: x86-64, options: --with-nonstop-foreign-call }
+          - { arch: x86-64, subfeatures: sse4, options: "--with-sb-thread --with-nonstop-foreign-call", features-name: "sse4-threads-nonstop" }
+          - { arch: x86-64, subfeatures: fasteval, options: "--with-sb-fasteval --without-sb-eval --with-nonstop-foreign-call", features-name: "fasteval-nonstop" }
+          - { arch: x86-64, options: "--with-mark-region-gc --with-nonstop-foreign-call", features-name: "markregion-nonstop" }
+          - { arch: x86-64, options: "--with-nonstop-foreign-call", features-name: "nonstop" }
 
       fail-fast: false
 
@@ -47,6 +50,33 @@ jobs:
       env:
         SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
       run: ./make.sh ${{ matrix.options }} --with-sb-core-compression --xc-host='sbcl --dynamic-space-size 700MB --lose-on-corruption --disable-ldb --disable-debugger' --arch=${{ matrix.arch }}
+
+    - name: package binary
+      # if: github.ref == 'refs/heads/master'
+      run: |
+        FEATURES_NAME="${{ matrix.features-name }}"
+        if [ -z "$FEATURES_NAME" ]; then
+            FEATURES_NAME="$(echo "${{ matrix.options }}-${{ matrix.subfeatures}}" | sed 's/[^a-zA-Z0-9]/-/g')"
+        fi
+        FILENAME="sbcl-${{ runner.os }}-${{ matrix.arch }}-${FEATURES_NAME}.tar.bz2"
+        # Downcase it
+        FILENAME="${FILENAME,,}"
+        # --transform 's,^,sbcl/,' prepends "sbcl/" to every file path in the archive
+        tar cjf "$FILENAME" --transform 's,^,sbcl/,' . --exclude=".git" --exclude="$FILENAME"
+        # Store this name for the next step (upload/release)
+        echo "BINARY_PATH=$FILENAME" >> $GITHUB_ENV
+
+    - name: update latest-dev release
+      # if: github.ref == 'refs/heads/master'
+      uses: softprops/action-gh-release@v2
+      # Prevents a failing upload from failing the whole build
+      continue-on-error: true
+      with:
+        tag_name: latest-dev
+        name: "SBCL latest-dev builds"
+        prerelease: true
+        files: ${{ env.BINARY_PATH }}
+
     - name: test-fasteval
       if: matrix.subfeatures == 'fasteval'
       run: cd tests; ./run-tests.sh --evaluator-mode interpret
