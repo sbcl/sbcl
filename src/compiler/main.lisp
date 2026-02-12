@@ -497,7 +497,6 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; Do all the IR1 phases for a non-top-level component.
 (defun ir1-phases (component)
   (declare (type component component))
-  (aver-live-component component)
   (let ((*constraint-universe* (make-array 64 ; arbitrary, but don't make this 0
                                            :fill-pointer 0 :adjustable t))
         (*delayed-ir1-transforms* nil))
@@ -654,7 +653,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                object)))
 
   ;; We're done, so don't bother keeping anything around.
-  (setf (component-info component) :dead)
+  (setf (component-info component) nil)
 
   (values))
 
@@ -677,7 +676,6 @@ necessary, since type inference may take arbitrarily long to converge.")
 (defvar *compile-component-hook* nil)
 
 (defun compile-component (component)
-  (aver-live-component component)
   (let* ((*component-being-compiled* component))
 
     (when *compile-progress*

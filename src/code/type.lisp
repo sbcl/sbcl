@@ -816,8 +816,6 @@
   (declare (type ctype type))
   (cond ((eq type *wild-type*)
          *universal-type*)
-        ((eq type *empty-type*)
-         *empty-type*)
         ((not (values-type-p type))
          type)
         ((car (args-type-required type)))

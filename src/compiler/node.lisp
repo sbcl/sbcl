@@ -503,10 +503,7 @@
   (dominator nil :type (or null cblock))
   ;; the component this block is in, or NIL temporarily during IR1
   ;; conversion and in deleted blocks
-  (component (progn
-               (aver-live-component *current-component*)
-               *current-component*)
-             :type (or component null))
+  (component *current-component* :type (or component null))
   ;; a flag used by various graph-walking code to determine whether
   ;; this block has been processed already or what. We make this
   ;; initially NIL so that FIND-INITIAL-DFO doesn't have to scan the
@@ -636,7 +633,7 @@
   ;; some sort of name for the code in this component
   (name "<unknown>" :type t)
   ;; some kind of info used by the back end.
-  (info nil)
+  (info nil :type (or null ir2-component))
   ;; a map from combination nodes to things describing how an
   ;; optimization of the node failed. The description is an alist
   ;; (TRANSFORM . ARGS), where TRANSFORM is the structure describing
@@ -664,16 +661,6 @@
            (type (member :maybe t) kind))
   (unless (eq (component-reoptimize component) t)
     (setf (component-reoptimize component) kind)))
-
-;;; Check that COMPONENT is suitable for roles which involve adding
-;;; new code. (gotta love imperative programming with lotso in-place
-;;; side effects...)
-(defun aver-live-component (component)
-  ;; FIXME: As of sbcl-0.pre7.115, we're asserting that
-  ;; COMPILE-COMPONENT hasn't happened yet. Might it be even better
-  ;; (certainly stricter, possibly also correct...) to assert that
-  ;; IR1-FINALIZE hasn't happened yet?
-  (aver (not (eql (component-info component) :dead))))
 
 ;;; A CLEANUP structure represents some dynamic binding action. Blocks
 ;;; are annotated with the current CLEANUP so that dynamic bindings

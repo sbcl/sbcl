@@ -655,7 +655,6 @@
 ;;; FUNCTIONAL is returned.
 (defun maybe-reanalyze-functional (functional)
   (aver (not (functional-kind-eq functional deleted))) ; bug 148
-  (aver-live-component *current-component*)
   ;; When FUNCTIONAL is of a type for which reanalysis isn't a trivial
   ;; no-op
   (when (and (typep functional '(or optional-dispatch clambda))

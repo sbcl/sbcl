@@ -655,7 +655,6 @@
            (*inline-expansions* (if (basic-combination-p ,node)
                                     (basic-combination-inline-expansions ,node)
                                     *inline-expansions*)))
-       (aver-live-component *current-component*)
        ,@forms)))
 
 ;;; *SOURCE-PATHS* is a hashtable from source code forms to the path

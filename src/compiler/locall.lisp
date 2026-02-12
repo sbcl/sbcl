@@ -430,7 +430,6 @@
 ;;; LAMBDAS.
 (defun locall-analyze-component (component)
   (declare (type component component))
-  (aver-live-component component)
   (loop
     (let* ((new (pop (component-new-functionals component)))
            (fun (or new (pop (component-reanalyze-functionals component)))))
@@ -1048,7 +1047,6 @@
   (let* ((call-block (node-block call))
          (bind-block (node-block (lambda-bind clambda)))
          (component (block-component call-block)))
-    (aver-live-component component)
     (let ((clambda-component (block-component bind-block)))
       (unless (eq clambda-component component)
         (aver (eq (component-kind component) :initial))

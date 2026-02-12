@@ -209,9 +209,6 @@
                                 value-source-forms)
   (declare (list body vars aux-vars aux-vals))
 
-  ;; We're about to try to put new blocks into *CURRENT-COMPONENT*.
-  (aver-live-component *current-component*)
-
   (let* ((bind (make-bind))
          (lambda (make-clambda :vars vars
                               :bind bind
@@ -863,7 +860,6 @@
                                      debug-name
                                      *current-path*))
         (min (or (position-if #'lambda-var-arg-info vars) (length vars))))
-    (aver-live-component *current-component*)
     (ir1-convert-hairy-args res () () () () vars nil body aux-vars aux-vals
                             source-name debug-name nil post-binding-lexenv)
     ;; ir1-convert-hairy-args can throw 'locall-already-let-converted

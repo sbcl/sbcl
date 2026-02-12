@@ -38,7 +38,7 @@
   ;; :INITIAL-ELEMENT keyword)
   (initial-element-default (missing-arg) :read-only t)
   ;; how many bits per element
-  (n-bits (missing-arg) :type index :read-only t)
+  (n-bits (missing-arg) :type (mod 129) :read-only t)
   ;; the low-level type code (aka "widetag")
   (typecode (missing-arg) :type index :read-only t)
   ;; if an integer, a typecode corresponding to a complex vector
@@ -51,7 +51,7 @@
   ;; low level hackery (e.g., one element for arrays of BASE-CHAR,
   ;; which is used for a fixed #\NULL so that when we call out to C
   ;; we don't need to cons a new copy)
-  (n-pad-elements (missing-arg) :type index :read-only t))
+  (n-pad-elements (missing-arg) :type bit :read-only t))
 (declaim (freeze-type specialized-array-element-type-properties))
 
 (define-load-time-global *specialized-array-element-type-properties*
