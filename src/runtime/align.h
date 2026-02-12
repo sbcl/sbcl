@@ -5,9 +5,9 @@
 #include <string.h>
 #include "genesis/sbcl.h"
 
-#define ALIGN_UP(value,granularity) (((value)+((granularity)-1))&(~((granularity)-1)))
-#define ALIGN_DOWN(value,granularity) (((value))&(~((granularity)-1)))
-#define IS_ALIGNED(value,granularity) (0==(((value))&((granularity)-1)))
+#define ALIGN_UP(value,granularity) (((value)+((uword_t)(granularity)-1))&(~((uword_t)(granularity)-1)))
+#define ALIGN_DOWN(value,granularity) (((value))&(~((uword_t)(granularity)-1)))
+#define IS_ALIGNED(value,granularity) (0==(((value))&((uword_t)(granularity)-1)))
 
 #define PTR_ALIGN_UP(pointer,granularity)                       \
     (typeof(pointer))ALIGN_UP((uintptr_t)pointer,granularity)
