@@ -2412,7 +2412,13 @@
          (/ (- a) (- b)))
     ((#c(0.0 3.0) #c(0.0 3.0))
      (/ (opaque-identity (- #c(0.0 3.0)))
-        (opaque-identity (- #c(0.0 3.0)))))))
+        (opaque-identity (- #c(0.0 3.0))))))
+  (checked-compile-and-assert
+      ()
+      `(lambda (n)
+         (declare (double-float n))
+         (/ n #C(1.0 2.0)))
+    ((5d0) #C(1.0d0 -2.0d0))))
 
 (with-test (:name :truncate+/+complex)
   (checked-compile-and-assert

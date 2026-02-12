@@ -1457,12 +1457,12 @@
                   (if (vop-existsp :translate sb-vm::swap-complex)
                       (let ((real (csubtypep (lvar-type x) (specifier-type 'real))))
                        `(let* (,@(if real
-                                     '((x (coerce x ',type))))
+                                     '((x (coerce x 'float))))
                                (cs ,(if real
-                                        '(complex ,(coerce 0 type) (%negate x))
+                                        '(complex 0 (%negate x))
                                         '(conjugate (sb-vm::swap-complex x))))
                                ,@(if real
-                                     '((x (complex x ,(coerce 0 type)))))
+                                     '((x (complex x 0))))
                                (ry (realpart y))
                                (iy (imagpart y)))
                           (if (> (abs ry) (abs iy))

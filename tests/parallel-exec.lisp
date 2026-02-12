@@ -1,6 +1,10 @@
 (pop *posix-argv*)
 (require :sb-posix)
-#-sparc (push :test-sprof *features*)
+
+(if (find "--no-sprof" *posix-argv* :test #'equal)
+    (setf *posix-argv* (remove "--no-sprof" *posix-argv* :test #'equal))
+    #-sparc (push :test-sprof *features*))
+
 #+test-sprof (require :sb-sprof)
 
 ;; (push :tlsf-stress *features*)

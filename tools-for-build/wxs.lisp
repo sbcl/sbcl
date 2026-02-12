@@ -260,7 +260,7 @@
                             "Type" "string"
                             "Value" ""
                             "KeyPath" "yes")))))
-       ("Directory" ("Id" #+x86 "ProgramFilesFolder" 
+       ("Directory" ("Id" #+x86 "ProgramFilesFolder"
                           #+64-bit "ProgramFiles64Folder"
                      "Name" "PFiles")
         ("Directory" ("Id" "BaseFolder"
