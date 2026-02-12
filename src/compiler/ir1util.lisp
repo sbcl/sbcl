@@ -1673,8 +1673,7 @@
         while (or (cast-p dest)
                   (exit-p dest))
         do (setf (node-derived-type dest)
-                 (make-short-values-type (list (single-value-type
-                                                (node-derived-type dest)))))
+                 (sb-kernel::convert-to-single-value-type (node-derived-type dest)))
            (reoptimize-lvar prev)))
 
 ;;; Return a new LEXENV just like DEFAULT except for the specified

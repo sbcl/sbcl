@@ -989,7 +989,40 @@
         (make-values-type nil types *universal-type*))))
 
 (defun make-single-value-type (type)
-  (make-values-type (list type)))
+  (if (eq type *empty-type*)
+      type
+      (let* ((list (list type))
+             (required (intern-ctype-list list)))
+        (declare (dynamic-extent list))
+        (new-ctype values-type
+                   (lambda (x)
+                     (type-list-flags (args-type-required x)))
+                   required nil nil))))
+
+(defun convert-to-single-value-type (type)
+  (cond ((eq type *wild-type*)
+         *wild-type*)
+        (t
+         (let* ((req (values-type-required type))
+                (opt (values-type-optional type))
+                (rest (values-type-rest type))
+                (first (car req)))
+           (if (and first
+                    (not (cdr req))
+                    (not opt)
+                    (eq rest *universal-type*))
+               type
+               (let* ((type (list (or first
+                                      (type-union (if opt
+                                                      (car opt)
+                                                      rest)
+                                                  (specifier-type 'null)))))
+                      (required (intern-ctype-list type)))
+                 (declare (dynamic-extent type))
+                 (new-ctype values-type
+                            (lambda (x)
+                              (type-list-flags (args-type-required x)))
+                            required nil *universal-type*)))))))
 
 ;;; Do the specified OPERATION on TYPE1 and TYPE2, which may be any
 ;;; type, including VALUES types. With VALUES types such as:
