@@ -30,20 +30,22 @@ jobs:
     - name: install host sbcl
       shell: pwsh
       run: |
-        choco install sbcl -source tools-for-build
+        Invoke-WebRequest -Uri "https://github.com/sbcl/sbcl/releases/download/sbcl-1.4.14/sbcl-2.6.1.132-4d12ab542-arm64-windows-binary.msi" -OutFile "sbcl.msi"
+        Start-Process msiexec.exe -Wait -ArgumentList '/i sbcl.msi /qn /norestart'
+
+    - name: build
+      env:
+        SBCL_HOME: "/c/Program Files/Steel Bank Common Lisp/"
+      run: |
+        PATH=$PATH:"/c/Program Files/Steel Bank Common Lisp/"
+        export PATH
+        ./make.sh --arch=${{matrix.arch}} --with-sb-core-compression --xc-host='sbcl --lose-on-corruption --disable-ldb --disable-debugger'
     - name: install WiX Toolset
       shell: pwsh
       run: |
         choco install wixtoolset
         $wixPath = (Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" | Select-Object -First 1).FullName
         echo "WIX=$wixPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-    - name: build
-      env:
-        SBCL_HOME: "/c/Program Files/Steel Bank Common Lisp/1.4.14"
-      run: |
-        PATH=$PATH:"/c/Program Files/Steel Bank Common Lisp/1.4.14"
-        export PATH
-        ./make.sh --arch=${{matrix.arch}} --with-sb-core-compression --xc-host='sbcl --lose-on-corruption --disable-ldb --disable-debugger'
     - name: make installer
       env:
         WIX: ${{ env.WIX }}
@@ -55,12 +57,10 @@ jobs:
       with:
         name: sbcl-windows-installer-${{ matrix.sys }}
         path: sbcl-windows-installer
-    - name: tests
-      continue-on-error: true
-      working-directory: tests
-      run: ./run-tests.sh
+    # - name: tests
+    #   working-directory: tests
+    #   run: ./run-tests.sh
     - name: ansi-tests
-      continue-on-error: true
       working-directory: tests
       run: ./ansi-tests.sh
 

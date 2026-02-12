@@ -30,7 +30,8 @@ jobs:
     - name: install host sbcl
       shell: pwsh
       run: |
-        choco install sbcl -source tools-for-build
+        Invoke-WebRequest -Uri "https://github.com/sbcl/sbcl/releases/download/sbcl-1.4.14/sbcl-1.4.14-x86-64-windows-binary.msi" -OutFile "sbcl.msi"
+        Start-Process msiexec.exe -Wait -ArgumentList '/i sbcl.msi /qn /norestart'
     - name: build
       env:
         SBCL_HOME: "/c/Program Files/Steel Bank Common Lisp/1.4.14"

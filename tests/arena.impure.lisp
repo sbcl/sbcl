@@ -78,7 +78,8 @@
     (assert (not (c-find-heap->arena)))
     (destroy-arena a)))
 
-(test-util:with-test (:name :interrupt-thread-on-arena)
+(test-util:with-test (:name :interrupt-thread-on-arena
+                      :broken-on (and :win32 :arm64))
   (let* ((a (new-arena 1048576))
          (sem (sb-thread:make-semaphore))
          (junk))

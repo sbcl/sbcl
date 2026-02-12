@@ -157,7 +157,7 @@
     ("Component" ("Id" ,(component-id root)
                   "Guid" ,(make-guid)
                   "DiskId" 1
-                  #+x86-64 "Win64" #+x86-64 "yes")
+                  #+64-bit "Win64" #+64-bit "yes")
      ,@(loop for file in (directory
                           (make-pathname :name :wild :type :wild :defaults root))
              when (or (pathname-name file) (pathname-type file))
@@ -229,9 +229,9 @@
                  "Language" 1033)
       ("Package" ("Id" "*"
                   "Manufacturer" ,(manufacturer-name)
-                  "InstallerVersion" 200
+                  "InstallerVersion" 500
                   "Compressed" "yes"
-                  #+x86-64 "Platform" #+x86-64 "x64"
+                  #+(or arm64 x86-64) "Platform" #+x86-64 "x64" #+arm64 "arm64"
                   "InstallScope" "perMachine"))
       ("Media" ("Id" 1
                 "Cabinet" "sbcl.cab"
@@ -260,7 +260,8 @@
                             "Type" "string"
                             "Value" ""
                             "KeyPath" "yes")))))
-       ("Directory" ("Id" #-x86-64 "ProgramFilesFolder" #+x86-64 "ProgramFiles64Folder"
+       ("Directory" ("Id" #+x86 "ProgramFilesFolder" 
+                          #+64-bit "ProgramFiles64Folder"
                      "Name" "PFiles")
         ("Directory" ("Id" "BaseFolder"
                       "Name" ,(application-name))
@@ -268,7 +269,7 @@
            ("Component" ("Id" "SBCL_SetPATH"
                          "Guid" ,(make-guid)
                          "DiskId" 1
-                         #+x86-64 "Win64" #+x86-64 "yes")
+                         #+64-bit "Win64" #+64-bit "yes")
             ("CreateFolder")
             ("Environment" ("Id" "Env_PATH"
                             "System" "yes"
@@ -279,7 +280,7 @@
            ("Component" ("Id" "SBCL_Base"
                          "Guid" ,(make-guid)
                          "DiskId" 1
-                         #+x86-64 "Win64" #+x86-64 "yes")
+                         #+64-bit "Win64" #+64-bit "yes")
             ;; If we want to associate files with SBCL, this
             ;; is how it's done -- but doing this by default
             ;; and without asking the user for permission Is
