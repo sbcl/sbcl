@@ -1000,6 +1000,8 @@
 (defun convert-to-single-value-type (type)
   (cond ((eq type *wild-type*)
          *wild-type*)
+        ((eq type (values-specifier-type '(values &optional)))
+         (values-specifier-type '(values null)))
         (t
          (let* ((req (values-type-required type))
                 (opt (values-type-optional type))
