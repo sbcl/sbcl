@@ -102,7 +102,7 @@ prints @code{0} and not @code{1} as of 0.9.6.
 
 Note, however, that there is a hard limit on the number of distinct
 symbols that can be bound dynamically in threaded builds (see
-@code{--tls-index} in @ref{Runtime Options}). Exceeding this limit
+@code{--tls-limit} in @ref{Runtime Options}). Exceeding this limit
 triggers the low-level error ``Thread local storage exhausted.''
 
 @node Atomic Operations
