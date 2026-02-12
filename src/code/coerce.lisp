@@ -11,8 +11,9 @@
 
 (in-package "SB-IMPL")
 
-(macrolet ((def (name constructor access src-type &optional explicit-check)
-             `(defun ,name (object type)
+(macrolet ((def (name constructor access src-type &optional explicit-check (type t))
+             `(defun ,name (object ,@(and type
+                                      '(type)))
                 (declare (type ,src-type object))
                 ,@(when explicit-check `((declare (explicit-check))))
                 (do* ((index 0 (1+ index))
@@ -29,6 +30,7 @@
                            (sequence '(elt in-object index))))))))
 
   (def list-to-vector (make-sequence type length) aref list t)
+  (def list-to-simple-vector (make-array length) aref list t nil)
 
   (def vector-to-vector (make-sequence type length) aref vector t)
 
@@ -121,135 +123,164 @@
                   :format-arguments (list object output-type-spec)
                   :datum object
                   :expected-type output-type-spec)))
-    (let ((type (specifier-type output-type-spec)))
-      (cond
-        ((%%typep object type)
-         object)
-        ((eq type *empty-type*)
-         (coerce-error))
-        ((type= type (specifier-type 'character))
-         (character object))
-        ((numberp object)
+    (case output-type-spec
+      (single-float
+       (%single-float object))
+      (double-float
+       (%double-float object))
+      (float
+       (if (double-float-p object)
+           object
+           (%single-float object)))
+      ((vector simple-vector)
+       (typecase object
+         (list (list-to-simple-vector object))
+         (simple-vector object)
+         (vector (if (eq output-type-spec 'vector)
+                     object
+                     (coerce object 'simple-vector)))
+         (sequence (sequence-to-vector object output-type-spec))
+         (t
+          (coerce-error))))
+      (list
+       (typecase object
+         (list object)
+         (vector
+          (vector-to-list object))
+         (sequence
+          (sb-sequence:make-sequence-like nil (length object) :initial-contents object))))
+      (function
+       (coerce-to-fun object))
+      (t
+       (let ((type (specifier-type output-type-spec)))
          (cond
-           ((csubtypep type (specifier-type 'single-float))
-            (let ((res (%single-float object)))
-              (unless (typep res output-type-spec)
-                (coerce-error))
-              res))
-           ((csubtypep type (specifier-type 'double-float))
-            (let ((res (%double-float object)))
-              (unless (typep res output-type-spec)
-                (coerce-error))
-              res))
-           #+long-float
-           ((csubtypep type (specifier-type 'long-float))
-            (let ((res (%long-float object)))
-              (unless (typep res output-type-spec)
-                (coerce-error))
-              res))
-           ((csubtypep type (specifier-type 'float))
-            (let ((res (%single-float object)))
-              (unless (typep res output-type-spec)
-                (coerce-error))
-              res))
-           (t
-            (let ((res
-                   (cond
-                     ((csubtypep type (specifier-type '(complex single-float)))
-                      (complex (%single-float (realpart object))
-                               (%single-float (imagpart object))))
-                     ((csubtypep type (specifier-type '(complex double-float)))
-                      (complex (%double-float (realpart object))
-                               (%double-float (imagpart object))))
-                     #+long-float
-                     ((csubtypep type (specifier-type '(complex long-float)))
-                      (complex (%long-float (realpart object))
-                               (%long-float (imagpart object))))
-                     ((csubtypep type (specifier-type '(complex float)))
-                      (complex (%single-float (realpart object))
-                               (%single-float (imagpart object))))
-                     ((and (typep object 'rational) ; TODO jmoringe unreachable?
-                           (csubtypep type (specifier-type '(complex float))))
-                      ;; Perhaps somewhat surprisingly, ANSI specifies
-                      ;; that (COERCE FOO 'FLOAT) is a SINGLE-FLOAT,
-                      ;; not dispatching on
-                      ;; *READ-DEFAULT-FLOAT-FORMAT*.  By analogy, we
-                      ;; do the same for complex numbers. -- CSR,
-                      ;; 2002-08-06
-                      (complex (%single-float object)))
-                     ((csubtypep type (specifier-type 'complex))
-                      (complex object))
-                     (t
-                      (coerce-error)))))
-              ;; If RES has the wrong type, that means that rule of
-              ;; canonical representation for complex rationals was
-              ;; invoked. According to the Hyperspec, (coerce 7/2
-              ;; 'complex) returns 7/2. Thus, if the object was a
-              ;; rational, there is no error here.
-              (unless (or (typep res output-type-spec)
-                          (rationalp object))
-                (coerce-error))
-              res))))
-        ((csubtypep type (specifier-type 'list))
-         (if (vectorp object)
-             (cond
-               ((type= type (specifier-type 'list))
-                (vector-to-list object))
-               ((type= type (specifier-type 'null))
-                (if (= (length object) 0)
-                    'nil
-                    (sequence-type-length-mismatch-error type
-                                                         (length object))))
-               ((cons-type-p type)
-                (multiple-value-bind (min exactp)
-                    (sb-kernel::cons-type-length-info type)
-                  (let ((length (length object)))
-                    (if exactp
-                        (unless (= length min)
-                          (sequence-type-length-mismatch-error type length))
-                        (unless (>= length min)
-                          (sequence-type-length-mismatch-error type length)))
-                    (vector-to-list object))))
-               (t (sequence-type-too-hairy (type-specifier type))))
-             (if (sequencep object)
-                 (cond
-                   ((type= type (specifier-type 'list))
-                    (sb-sequence:make-sequence-like
-                     nil (length object) :initial-contents object))
-                   ((type= type (specifier-type 'null))
-                    (if (= (length object) 0)
-                        'nil
-                        (sequence-type-length-mismatch-error type
-                                                             (length object))))
-                   ((cons-type-p type)
-                    (multiple-value-bind (min exactp)
-                        (sb-kernel::cons-type-length-info type)
-                      (let ((length (length object)))
-                        (if exactp
-                            (unless (= length min)
-                              (sequence-type-length-mismatch-error type length))
-                            (unless (>= length min)
-                              (sequence-type-length-mismatch-error type length)))
-                        (sb-sequence:make-sequence-like
-                         nil length :initial-contents object))))
-                   (t (sequence-type-too-hairy (type-specifier type))))
-                 (coerce-error))))
-        ((csubtypep type (specifier-type 'vector))
-         (typecase object
-           ;; FOO-TO-VECTOR* go through MAKE-SEQUENCE, so length
-           ;; errors are caught there. -- CSR, 2002-10-18
-           (list (list-to-vector object output-type-spec))
-           (vector (vector-to-vector object output-type-spec))
-           (sequence (sequence-to-vector object output-type-spec))
-           (t
-            (coerce-error))))
-        ((csubtypep type (specifier-type 'sequence))
-         (let ((class (find-class output-type-spec nil)))
-           (if class
-               (coerce-to-extended-sequence object class)
+           ((%%typep object type)
+            object)
+           ((eq type *empty-type*)
+            (coerce-error))
+           ((type= type (specifier-type 'character))
+            (character object))
+           ((numberp object)
+            (cond
+              ((csubtypep type (specifier-type 'single-float))
+               (let ((res (%single-float object)))
+                 (unless (typep res output-type-spec)
+                   (coerce-error))
+                 res))
+              ((csubtypep type (specifier-type 'double-float))
+               (let ((res (%double-float object)))
+                 (unless (typep res output-type-spec)
+                   (coerce-error))
+                 res))
+              #+long-float
+              ((csubtypep type (specifier-type 'long-float))
+               (let ((res (%long-float object)))
+                 (unless (typep res output-type-spec)
+                   (coerce-error))
+                 res))
+              ((csubtypep type (specifier-type 'float))
+               (let ((res (%single-float object)))
+                 (unless (typep res output-type-spec)
+                   (coerce-error))
+                 res))
+              (t
+               (let ((res
+                       (cond
+                         ((csubtypep type (specifier-type '(complex single-float)))
+                          (complex (%single-float (realpart object))
+                                   (%single-float (imagpart object))))
+                         ((csubtypep type (specifier-type '(complex double-float)))
+                          (complex (%double-float (realpart object))
+                                   (%double-float (imagpart object))))
+                         #+long-float
+                         ((csubtypep type (specifier-type '(complex long-float)))
+                          (complex (%long-float (realpart object))
+                                   (%long-float (imagpart object))))
+                         ((csubtypep type (specifier-type '(complex float)))
+                          (complex (%single-float (realpart object))
+                                   (%single-float (imagpart object))))
+                         ((and (typep object 'rational) ; TODO jmoringe unreachable?
+                               (csubtypep type (specifier-type '(complex float))))
+                          ;; Perhaps somewhat surprisingly, ANSI specifies
+                          ;; that (COERCE FOO 'FLOAT) is a SINGLE-FLOAT,
+                          ;; not dispatching on
+                          ;; *READ-DEFAULT-FLOAT-FORMAT*.  By analogy, we
+                          ;; do the same for complex numbers. -- CSR,
+                          ;; 2002-08-06
+                          (complex (%single-float object)))
+                         ((csubtypep type (specifier-type 'complex))
+                          (complex object))
+                         (t
+                          (coerce-error)))))
+                 ;; If RES has the wrong type, that means that rule of
+                 ;; canonical representation for complex rationals was
+                 ;; invoked. According to the Hyperspec, (coerce 7/2
+                 ;; 'complex) returns 7/2. Thus, if the object was a
+                 ;; rational, there is no error here.
+                 (unless (or (typep res output-type-spec)
+                             (rationalp object))
+                   (coerce-error))
+                 res))))
+           ((csubtypep type (specifier-type 'list))
+            (if (vectorp object)
+                (cond
+                  ((type= type (specifier-type 'list))
+                   (vector-to-list object))
+                  ((type= type (specifier-type 'null))
+                   (if (= (length object) 0)
+                       'nil
+                       (sequence-type-length-mismatch-error type
+                                                            (length object))))
+                  ((cons-type-p type)
+                   (multiple-value-bind (min exactp)
+                       (sb-kernel::cons-type-length-info type)
+                     (let ((length (length object)))
+                       (if exactp
+                           (unless (= length min)
+                             (sequence-type-length-mismatch-error type length))
+                           (unless (>= length min)
+                             (sequence-type-length-mismatch-error type length)))
+                       (vector-to-list object))))
+                  (t (sequence-type-too-hairy (type-specifier type))))
+                (if (sequencep object)
+                    (cond
+                      ((type= type (specifier-type 'list))
+                       (sb-sequence:make-sequence-like
+                        nil (length object) :initial-contents object))
+                      ((type= type (specifier-type 'null))
+                       (if (= (length object) 0)
+                           'nil
+                           (sequence-type-length-mismatch-error type
+                                                                (length object))))
+                      ((cons-type-p type)
+                       (multiple-value-bind (min exactp)
+                           (sb-kernel::cons-type-length-info type)
+                         (let ((length (length object)))
+                           (if exactp
+                               (unless (= length min)
+                                 (sequence-type-length-mismatch-error type length))
+                               (unless (>= length min)
+                                 (sequence-type-length-mismatch-error type length)))
+                           (sb-sequence:make-sequence-like
+                            nil length :initial-contents object))))
+                      (t (sequence-type-too-hairy (type-specifier type))))
+                    (coerce-error))))
+           ((csubtypep type (specifier-type 'vector))
+            (typecase object
+              ;; FOO-TO-VECTOR* go through MAKE-SEQUENCE, so length
+              ;; errors are caught there. -- CSR, 2002-10-18
+              (list (list-to-vector object output-type-spec))
+              (vector (vector-to-vector object output-type-spec))
+              (sequence (sequence-to-vector object output-type-spec))
+              (t
                (coerce-error))))
-        ((type= type (specifier-type 'function))
-         (coerce-to-fun object))
-        (t
-         (coerce-error))))))
+           ((csubtypep type (specifier-type 'sequence))
+            (let ((class (find-class output-type-spec nil)))
+              (if class
+                  (coerce-to-extended-sequence object class)
+                  (coerce-error))))
+           ((type= type (specifier-type 'function))
+            (coerce-to-fun object))
+           (t
+            (coerce-error))))))))
 
