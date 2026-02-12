@@ -2442,6 +2442,40 @@ scavenge_control_stack(struct thread *th)
 #ifdef LISP_FEATURE_MARK_REGION_GC
           mr_preserve_object(word);
 #else
+#if defined(LISP_FEATURE_SB_SAFEPOINT) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
+          /* On safepoint builds with precise GC and separate stacks (ARM64),
+           * dead variables in active frames may contain stale pointers to
+           * from-space addresses that have been freed/reused.  Without stack
+           * maps, the GC cannot distinguish live from dead variables.
+           * Transporting garbage data corrupts the heap, so validate that
+           * from-space pointers actually point to plausible objects before
+           * allowing scav1 to transport them.  Zero invalid slots. */
+          {
+              page_index_t pg = find_page_index((void*)word);
+              if (pg >= 0 && page_table[pg].gen == from_space) {
+                  lispobj *target = native_pointer(word);
+                  if (!forwarding_pointer_p(target)) {
+                      int valid;
+                      if (lowtag_of(word) == LIST_POINTER_LOWTAG) {
+                          /* Cons pointers should target cons pages */
+                          valid = (page_table[pg].type == PAGE_TYPE_CONS);
+                      } else {
+                          /* Headered objects: validate header widetag and
+                           * check that the widetag's lowtag matches the
+                           * pointer's lowtag */
+                          int widetag = *target & WIDETAG_MASK;
+                          valid = other_immediate_lowtag_p(widetag)
+                                  && LOWTAG_FOR_WIDETAG(widetag)
+                                  && LOWTAG_FOR_WIDETAG(widetag) == lowtag_of(word);
+                      }
+                      if (!valid) {
+                          *object_ptr = 0;
+                          continue;
+                      }
+                  }
+              }
+          }
+#endif
           scav1(object_ptr, word);
 #endif
         }

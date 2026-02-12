@@ -1066,6 +1066,17 @@ handle_safepoint_violation(os_context_t *ctx, os_vm_address_t fault_address)
         fake_foreign_function_call(ctx);
         thread_in_lisp_raised(ctx);
         undo_fake_foreign_function_call(ctx);
+        /* Scrub stale Lisp frames left on the control stack by SUB-GC
+         * and thruption handlers.  undo_fake_foreign_function_call
+         * zeroed thread->csp (it IS foreign_function_call_active_p on
+         * ARM64), so temporarily restore it for scrubbing. */
+        {
+            lispobj *csp = (lispobj*)(uword_t)
+                (*os_context_register_addr(ctx, reg_CSP));
+            access_control_stack_pointer(self) = csp;
+            scrub_thread_control_stack(self);
+            access_control_stack_pointer(self) = 0;
+        }
 #endif
         return 1;
     }
