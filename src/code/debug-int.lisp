@@ -2625,11 +2625,11 @@ register."
                     :invalid-value-for-unescaped-register-storage))
              (with-nfp ((var) &body body)
                ;; x86oids have no separate number stack, so dummy it
-               ;; up for them.
-               #+c-stack-is-control-stack
+               ;; up for them. ARM64 Windows is similar - use control stack pointer.
+               #+(or c-stack-is-control-stack (and arm64 win32))
                `(let ((,var fp))
                   ,@body)
-               #-c-stack-is-control-stack
+               #-(or c-stack-is-control-stack (and arm64 win32))
                `(let ((,var (if escaped
                                 (int-sap
                                  (context-register escaped sb-vm::nfp-offset))

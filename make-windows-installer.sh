@@ -26,7 +26,7 @@ cd ./output
                                :if-exists :supersede)
              (format f "~a-~a-windows-binary"
                        (lisp-implementation-version)
-                       #+x86 "x86" #+x86-64 "x86-64"))
+                       #+x86 "x86" #+x86-64 "x86-64" #+arm64 "arm64"))
             (exit))'
 
 "$WIX_PATH/candle" sbcl.wxs

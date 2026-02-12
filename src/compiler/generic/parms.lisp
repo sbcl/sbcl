@@ -83,10 +83,9 @@
                    ;; #+immobile-space implies a relocatable alien linkage space. And x86-64 always
                    ;; has relocatable linkage tables
                    #-(or x86-64 immobile-space) (alien-linkage ,alien-linkage-space-size)
-                   ;; safepoint on 64-bit uses a relocatable trap page just below the card mark
-                   ;; table, which works nicely assuming a register is wired to the card table
+                   ;; x86-64 uses a relocatable trap page just below the card mark
+                   ;; table (wired to a register). Other platforms allocate a separate page.
                    #+(and sb-safepoint (not x86-64))
-                   ;; Must be just before NIL.
                    (safepoint ,(symbol-value '+backend-page-bytes+))
                    (static ,small-space-size)
                    #+darwin-jit (static-code ,small-space-size)))

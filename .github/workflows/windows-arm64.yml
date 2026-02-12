@@ -1,0 +1,68 @@
+name: Windows arm64
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: windows-11-arm
+
+    strategy:
+      matrix:
+        include:
+          - { sys: clangarm64, env: clang-aarch64, arch: arm64}
+
+      fail-fast: false
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - uses: msys2/setup-msys2@v2
+      with:
+        install: mingw-w64-${{matrix.env}}-clang mingw-w64-${{matrix.env}}-toolchain make diffutils git libzstd-devel
+        msystem: ${{matrix.sys}}
+
+    - name: install host sbcl
+      shell: pwsh
+      run: |
+        choco install sbcl -source tools-for-build
+    - name: install WiX Toolset
+      shell: pwsh
+      run: |
+        choco install wixtoolset
+        $wixPath = (Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" | Select-Object -First 1).FullName
+        echo "WIX=$wixPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+    - name: build
+      env:
+        SBCL_HOME: "/c/Program Files/Steel Bank Common Lisp/1.4.14"
+      run: |
+        PATH=$PATH:"/c/Program Files/Steel Bank Common Lisp/1.4.14"
+        export PATH
+        ./make.sh --arch=${{matrix.arch}} --with-sb-core-compression --xc-host='sbcl --lose-on-corruption --disable-ldb --disable-debugger'
+    - name: make installer
+      env:
+        WIX: ${{ env.WIX }}
+      run: |
+        ./make-windows-installer.sh
+        mkdir sbcl-windows-installer; mv output/*msi sbcl-windows-installer
+    - name: save installer
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbcl-windows-installer-${{ matrix.sys }}
+        path: sbcl-windows-installer
+    - name: tests
+      continue-on-error: true
+      working-directory: tests
+      run: ./run-tests.sh
+    - name: ansi-tests
+      continue-on-error: true
+      working-directory: tests
+      run: ./ansi-tests.sh
+
+
+

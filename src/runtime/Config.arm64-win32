@@ -1,0 +1,55 @@
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
+TARGET=sbcl.exe
+
+ASSEM_SRC = arm64-assem.S
+ARCH_SRC = arm64-arch.c
+
+OS_SRC = win32-os.c arm64-win32-os.c
+
+ifdef LISP_FEATURE_SB_LINKABLE_RUNTIME
+  LIBSBCL = libsbcl.a
+  USE_LIBSBCL = -Wl,--whole-archive libsbcl.a -Wl,--no-whole-archive
+endif
+
+LINKFLAGS = -Wl,-export-all-symbols
+LIBSBCL += mswin64.def mswin.def
+USE_LIBSBCL += -Wl,mswin64.def -Wl,mswin.def
+SOFLAGS += -Wl,-export-all-symbols -Wl,mswin64.def -Wl,mswin.def
+
+__LDFLAGS__ =
+
+OS_LIBS = -l ws2_32 -ladvapi32
+ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+  OS_LIBS += -lzstd
+endif
+ifdef LISP_FEATURE_SB_FUTEX
+  OS_LIBS += -lSynchronization
+endif
+
+ifdef LISP_FEATURE_IMMOBILE_SPACE
+  GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c
+else
+  GC_SRC = fullcgc.c gencgc.c traceroot.c
+endif
+
+CFLAGS += -g -W -Wall \
+       -Wno-unused-function -Wno-unused-parameter -Wno-cast-function-type \
+       -Wno-type-limits \
+       -fno-omit-frame-pointer \
+       -O3 -DWINVER=0x0501 \
+       -D__W32API_USE_DLLIMPORT__ \
+       -std=gnu99
+
+CC = clang
+
+ifeq ($(shell $(LD) --disable-dynamicbase 2>&1 | grep disable-dynamicbase),)
+LINKFLAGS += -Wl,--disable-dynamicbase
+endif

@@ -853,7 +853,9 @@ process_directory(int count, struct ndir_entry *entry,
                 break;
 #endif
             case IMMOBILE_TEXT_CORE_SPACE_ID:
+#ifndef LISP_FEATURE_ARM64
                 TEXT_SPACE_START = addr;
+#endif
                 break;
             case DYNAMIC_CORE_SPACE_ID:
                 {

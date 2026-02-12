@@ -69,7 +69,7 @@
 
 ;;;; Where to put the different spaces.
 
-(gc-space-setup #+(or linux openbsd netbsd freebsd)
+(gc-space-setup #+(or linux openbsd netbsd freebsd win32)
                      #x2F0000000
                      #+darwin #x300000000
                      #-darwin :read-only-space-size #-darwin 0

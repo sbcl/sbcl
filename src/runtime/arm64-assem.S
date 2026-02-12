@@ -23,8 +23,16 @@
     ldr     \dest, [\dest, _\symbol@PAGEOFF]
 .endm
 
-#else
+#elif defined(LISP_FEATURE_WIN32)
+#define TYPE(name)
+#define SIZE(name)
+#define GNAME(var) var
+.macro  LOAD_GNAME, dest, symbol
+    adrp    \dest, \symbol
+    ldr     \dest, [\dest, #:lo12:\symbol]
+.endm
 
+#else
 #define TYPE(name) .type name,%function
 #define SIZE(name) .size name,.-name
 #define GNAME(var) var
@@ -153,6 +161,22 @@ GNAME(call_into_lisp):
 	mov	reg_LEXENV, x0
 
 #ifdef LISP_FEATURE_SB_THREAD
+#if defined(LISP_FEATURE_WIN32)
+	// On Windows ARM64, get thread pointer via TlsGetValue(OUR_TLS_INDEX)
+	// Save arguments (x1, x2) and link register before C call
+	stp	x1, x2, [sp, #-32]!
+	stp	x29, x30, [sp, #16]
+
+	// Load OUR_TLS_INDEX (sbcl_thread_tls_index) and call TlsGetValue
+	adrp	x0, sbcl_thread_tls_index
+	ldr	w0, [x0, #:lo12:sbcl_thread_tls_index]
+	bl	TlsGetValue
+	mov	reg_THREAD, x0
+
+	// Restore arguments and link register
+	ldp	x29, x30, [sp, #16]
+	ldp	x1, x2, [sp], #32
+#else
 #ifdef LISP_FEATURE_GCC_TLS
 #ifdef LISP_FEATURE_DARWIN
 
@@ -180,6 +204,7 @@ GNAME(call_into_lisp):
         mov     reg_THREAD, x0
 #endif
 #endif
+#endif
 	// Clear the boxed registers that don't already have something
 	// in them.
         mov     reg_R0, #0
@@ -190,7 +215,8 @@ GNAME(call_into_lisp):
         mov     reg_R5, #0
         mov     reg_R6, #0
         mov     reg_R7, #0
-#ifndef LISP_FEATURE_DARWIN
+#if !defined(LISP_FEATURE_DARWIN) && !defined(LISP_FEATURE_WIN32)
+        // x18 is reserved on Darwin (macOS) and Windows (TEB pointer)
         mov     reg_R8, #0
 #endif
         mov     reg_R10, #0
@@ -219,7 +245,10 @@ GNAME(call_into_lisp):
 1:
 
 #endif
+// Windows uses control_stack_pointer as actual SP, not FFCA flag
+#ifndef LISP_FEATURE_WIN32
         str     xzr,[reg_THREAD, THREAD_CONTROL_STACK_POINTER_OFFSET]
+#endif
 #else
 	ldr     reg_NL3, =GNAME(foreign_function_call_active)
 	str     xzr, [reg_NL3]
@@ -311,13 +340,21 @@ GNAME(call_into_c):
         // All other C arguments are already stashed on the C stack.
 
         // Build a Lisp stack frame.
+#ifdef LISP_FEATURE_WIN32
+        // On Windows ARM64, save thread CFP/CSP before overwriting.
+        // CSP cannot be zeroed to indicate "in Lisp" state on safepoint builds.
+        ldp     x3, x4, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
+        stp     x3, x4, [reg_CSP, #-16]!
+        stp     reg_CFP, reg_LR, [reg_CSP, #-16]!
+        add     reg_R10, reg_CSP, #32
+#else
         // Can store two values above the stack pointer, interrupts ignore them.
         stp     reg_CFP, reg_LR, [reg_CSP]
         add     reg_R10, reg_CSP, #2*8
+#endif
         mov     reg_LEXENV, reg_LR
 
         // Save the lisp stack and frame pointers.
-
 #ifdef LISP_FEATURE_SB_THREAD
         stp     reg_CSP, reg_R10, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
 #else
@@ -359,7 +396,8 @@ GNAME(call_into_c):
         mov     reg_R5, #0
         mov     reg_R6, #0
         mov     reg_R7, #0
-#ifndef LISP_FEATURE_DARWIN
+#if !defined(LISP_FEATURE_DARWIN) && !defined(LISP_FEATURE_WIN32)
+        // x18 is reserved on Darwin (macOS) and Windows (TEB pointer)
         mov     reg_R8,#0
 #endif
 #ifndef LISP_FEATURE_SB_THREAD
@@ -373,6 +411,12 @@ GNAME(call_into_c):
 
 
         // Restore the Lisp stack and frame pointers
+#ifdef LISP_FEATURE_WIN32
+        // Restore CFP/LR from stack, then restore saved thread CFP/CSP.
+        ldp     reg_CFP, reg_LR, [reg_CSP], #16
+        ldp     x3, x4, [reg_CSP], #16
+        stp     x3, x4, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
+#else
 #ifdef LISP_FEATURE_SB_THREAD
         str     xzr, [reg_THREAD, THREAD_CONTROL_STACK_POINTER_OFFSET]
 #else
@@ -380,6 +424,7 @@ GNAME(call_into_c):
 	str     xzr, [reg_OCFP]
 #endif
         mov     reg_LR, reg_LEXENV
+#endif
         ret
 
 	SIZE(call_into_c)

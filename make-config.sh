@@ -694,6 +694,17 @@ case "$sbcl_os" in
         printf ' :os-provides-dlopen' >> $ltf
         printf ' :sb-thread :sb-safepoint' >> $ltf
         #
+        case "$sbcl_arch" in
+            arm64)
+                printf ' :immobile-space' >> $ltf
+                ;;
+            x86 | x86-64)
+                ;;
+            *)
+                echo "unsupported architecture for win32: $sbcl_arch"
+                exit 1
+                ;;
+        esac
         link_or_copy Config.$sbcl_arch-win32 Config
         link_or_copy $sbcl_arch-win32-os.h target-arch-os.h
         link_or_copy win32-os.h target-os.h

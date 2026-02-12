@@ -28,7 +28,12 @@ set -a # export all variables at assignment-time.
 # quote them (with double quotes), to contend with whitespace.
 SBCL_HOME="${TEST_SBCL_HOME:-$SBCL_PWD/../obj/sbcl-home}"
 SBCL_CORE="${TEST_SBCL_CORE:-$SBCL_PWD/../output/sbcl.core}"
-SBCL_RUNTIME="${TEST_SBCL_RUNTIME:-$SBCL_PWD/../src/runtime/sbcl}"
+# On Windows, the runtime is sbcl.exe; on Unix, it's sbcl
+if [ -f "$SBCL_PWD/../src/runtime/sbcl.exe" ]; then
+    SBCL_RUNTIME="${TEST_SBCL_RUNTIME:-$SBCL_PWD/../src/runtime/sbcl.exe}"
+else
+    SBCL_RUNTIME="${TEST_SBCL_RUNTIME:-$SBCL_PWD/../src/runtime/sbcl}"
+fi
 SBCL_ARGS="${TEST_SBCL_ARGS:---disable-ldb --noinform --no-sysinit --no-userinit --noprint --disable-debugger}"
 
 

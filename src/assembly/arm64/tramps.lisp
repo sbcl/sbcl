@@ -90,7 +90,7 @@
                       (inst ldr lr-tn (@ csp-tn -104))
 
                       (inst sub csp-tn csp-tn (+ 32 80)) ;; deallocate the frame
-                      #+sb-thread
+                      #+(and sb-thread (not win32))
                       (inst str zr-tn (@ thread-tn (* thread-control-stack-pointer-slot n-word-bytes)))
                       #-sb-thread
                       (progn
@@ -146,6 +146,7 @@
           (map-pairs ldp csp-tn -16 lisp-registers :delta -16)
           (inst ldr lr-tn (@ csp-tn -104))
           (inst sub csp-tn csp-tn (+ 32 80))
+          #-win32
           (inst str zr-tn (@ thread-tn (* thread-control-stack-pointer-slot n-word-bytes))))
         (map-pairs ldp nsp-tn 64 nl-registers :post-index 80 :delta -16)
         (inst ret))
@@ -167,6 +168,7 @@
           (map-pairs ldp csp-tn -16 lisp-registers :delta -16)
           (inst ldr lr-tn (@ csp-tn -104))
           (inst sub csp-tn csp-tn (+ 32 80))
+          #-win32
           (inst str zr-tn (@ thread-tn (* thread-control-stack-pointer-slot n-word-bytes))))
         (map-pairs ldp nsp-tn 64 nl-registers :post-index 80 :delta -16)
         (inst ret)))))

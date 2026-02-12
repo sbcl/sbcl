@@ -25,7 +25,14 @@
 
 os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {
+#ifdef WIN32
+    /* The `code` argument is really a pointer to an EXCEPTION_RECORD,
+     * not a siginfo_t. */
+    EXCEPTION_RECORD *exception = (EXCEPTION_RECORD *)code;
+    return (os_vm_address_t)exception->ExceptionInformation[1];
+#else
     return (os_vm_address_t)code->si_addr;
+#endif
 }
 
 void arch_skip_instruction(os_context_t *context)
@@ -210,20 +217,30 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     }
     else {
         // Do orig_inst by copying it into a trampoline.
+#ifdef WIN32
+        SYSTEM_INFO sys_info;
+        GetSystemInfo(&sys_info);
+        size_t size = sys_info.dwPageSize;
+#else
         size_t size = getpagesize();
+#endif
         // Allocate the thread-local trampoline on-demand.
         struct thread *th = get_sb_vm_thread();
         unsigned int *trampoline = (unsigned int*)th->breakpoint_misc;
 
         if (!trampoline) {
+#ifdef WIN32
+          trampoline = VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+#else
           trampoline = mmap(NULL, size,
                             PROT_READ | PROT_WRITE,
                             MAP_PRIVATE | MAP_ANONYMOUS,
                             -1, 0);
+#endif
           th->breakpoint_misc = trampoline;
         }
         else
-          os_protect((os_vm_address_t)trampoline, size, PROT_READ | PROT_WRITE);
+          os_protect((os_vm_address_t)trampoline, size, OS_VM_PROT_READ | OS_VM_PROT_WRITE);
 
         unsigned int *inst_ptr = trampoline;
         unsigned int inst;
@@ -246,11 +263,13 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
         inst = 0xD61F0000 | BREAKPOINT_TEMP_REG << 5;
         *inst_ptr++ = inst;
 
-        // address
-        *(unsigned long *)inst_ptr++ = (unsigned long)next_pc;
+        // address (8 bytes for a 64-bit pointer; unsigned long is only
+        // 4 bytes on Windows LLP64, so use uint64_t explicitly)
+        *(uint64_t *)inst_ptr = (uint64_t)next_pc;
+        inst_ptr += 2;
         OS_CONTEXT_PC(context) = (uword_t)trampoline;
         os_flush_icache((os_vm_address_t) trampoline, (char*) inst_ptr - (char*)trampoline);
-        os_protect((os_vm_address_t)trampoline, size, PROT_READ | PROT_EXEC);
+        os_protect((os_vm_address_t)trampoline, size, OS_VM_PROT_READ | OS_VM_PROT_EXECUTE);
         return;
     }
 
@@ -277,6 +296,7 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
     arch_skip_instruction(context);
 }
 
+#ifndef WIN32
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
@@ -289,10 +309,11 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 
     handle_trap(context, code);
 }
+#endif
 
 void sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context);
 
-#ifndef LISP_FEATURE_DARWIN
+#if !defined(LISP_FEATURE_DARWIN) && !defined(WIN32)
 void
 sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
     fake_foreign_function_call(context);
@@ -302,8 +323,12 @@ sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
 
 void arch_install_interrupt_handlers()
 {
+#ifndef WIN32
     ll_install_handler(SIGTRAP, sigtrap_handler);
     ll_install_handler(SIGILL, sigill_handler);
+#else
+    // Interrupt handlers are installed in win32-os.c
+#endif
 }
 
 
@@ -320,7 +345,7 @@ void arch_write_linkage_table_entry(int index, void *target_addr, int datap)
   char *reloc_addr = (char*)ALIEN_LINKAGE_SPACE_START + index * ALIEN_LINKAGE_TABLE_ENTRY_SIZE;
 
   if (datap) {
-    *(unsigned long *)reloc_addr = (unsigned long)target_addr;
+    *(uword_t *)reloc_addr = (uword_t)target_addr;
     goto DONE;
   }
   /*
@@ -341,8 +366,9 @@ void arch_write_linkage_table_entry(int index, void *target_addr, int datap)
   inst = 0xD61F0000 | LINKAGE_TEMP_REG << 5;
   *inst_ptr++ = inst;
 
-  // address
-  *(unsigned long *)inst_ptr++ = (unsigned long)target_addr;
+  // address (64-bit pointer - must use uword_t on Windows where unsigned long is 32-bit)
+  *(uword_t *)inst_ptr = (uword_t)target_addr;
+  inst_ptr += 2;  // advance by 8 bytes (2 x 4-byte ints)
 
   os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
 
@@ -369,6 +395,19 @@ os_vm_address_t coreparse_alloc_space(int space_id, int attr,
         addr -= extra_request; // try to put text space start where expected
     }
 #endif
+
+#ifdef WIN32
+    // On Windows ARM64, STATIC_SPACE needs extra space before it for NIL header access.
+    // ARM64 accesses NIL-0x1F for type checking, which must be within allocated memory.
+    // This must be done even when size==0.
+    if (space_id == STATIC_CORE_SPACE_ID) {
+        uword_t alloc_size = (size == 0) ? BACKEND_PAGE_BYTES : size + BACKEND_PAGE_BYTES;
+        addr = os_alloc_gc_space(space_id, attr, addr - BACKEND_PAGE_BYTES, alloc_size) + BACKEND_PAGE_BYTES;
+        if (!addr) lose("Can't allocate %#"OBJ_FMTX" bytes for space %d", size, space_id);
+        return addr;
+    }
+#endif
+
     if (size == 0) return addr;
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
@@ -385,14 +424,28 @@ os_vm_address_t coreparse_alloc_space(int space_id, int attr,
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     if (space_id == IMMOBILE_TEXT_CORE_SPACE_ID) {
       ALIEN_LINKAGE_SPACE_START = (uword_t)addr;
+      // TEXT_SPACE actually starts after ALIEN_LINKAGE_SPACE
+      TEXT_SPACE_START = (uword_t)addr + extra_request;
       addr += extra_request;
     }
 #endif
     return addr;
 }
 
+#ifdef _WIN32
+/* Windows ARM64 (LLP64): unsigned long is 32-bit, and __uint128_t
+   passing via registers differs from the Lisp alien-funcall ABI.
+   Take hi/lo as separate 64-bit args to match the Lisp transform. */
+uint64_t sb_udivmodti4(uint64_t lo, uint64_t hi, uint64_t y, uint64_t *rem) {
+    __uint128_t x = ((__uint128_t)hi << 64) | lo;
+    if (rem)
+        *rem = x % y;
+    return x / y;
+}
+#else
 long sb_udivmodti4(__uint128_t x, unsigned long y, unsigned long *rem) {
     if (rem)
         *rem = x % y;
     return x / y;
 }
+#endif
