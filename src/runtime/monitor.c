@@ -1368,7 +1368,7 @@ int load_gc_crashdump(char* pathname)
     if (preamble.card_size != GENCGC_CARD_BYTES)
         lose("Can't load crashdump: memory parameters differ");
     gc_card_table_nbits = preamble.card_table_nbits;
-    gc_card_table_mask = (1<<gc_card_table_nbits)-1;
+    gc_card_table_mask = ((sword_t)1<<gc_card_table_nbits)-1;
 #ifdef LISP_FEATURE_LINKAGE_SPACE
     linkage_space = (lispobj*)os_alloc_gc_space(0, 0, (char*)preamble.linkage_start,
                                                 preamble.linkage_nbytes);

@@ -1007,7 +1007,7 @@ static bool compute_card_table_size(int saved_card_mask_nbits)
     // The card table size is a power of 2 at *least* as large
     // as the number of cards. These are the default values.
     int nbits = 13;
-    long num_gc_cards = 1L << nbits;
+    sword_t num_gc_cards = (sword_t)1 << nbits;
 
     // Sure there's a fancier way to round up to a power-of-2
     // but this is executed exactly once, so KISS.
@@ -1033,7 +1033,7 @@ static bool compute_card_table_size(int saved_card_mask_nbits)
     // Regardless of the mask implied by space size, it has to be gc_card_table_nbits wide
     // even if that is excessive - when the core is restarted using a _smaller_ dynamic space
     // size than saved at - otherwise lisp could overrun the mark table.
-    num_gc_cards = 1L << gc_card_table_nbits;
+    num_gc_cards = (sword_t)1 << gc_card_table_nbits;
 
     gc_card_table_mask =  num_gc_cards - 1;
     return patch_card_index_mask_fixups;
@@ -1451,7 +1451,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
     // The initializer ensures that indexing into spaces[] is insensitive
     // to the space numbering and the order listed in defined_spaces.
     struct coreparse_space* spaces =
-      init_coreparse_spaces(sizeof defined_spaces/sizeof (struct coreparse_space),
+      init_coreparse_spaces(sizeof(defined_spaces)/sizeof(struct coreparse_space),
                             defined_spaces);
     bool patch_card_marking_instructions = 0;
 

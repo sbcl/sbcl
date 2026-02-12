@@ -1320,7 +1320,7 @@ gc_init(void)
 }
 
 int gc_card_table_nbits;
-long gc_card_table_mask;
+sword_t gc_card_table_mask;
 
 
 /*

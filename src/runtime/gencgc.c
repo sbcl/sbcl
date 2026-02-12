@@ -3890,9 +3890,12 @@ collect_garbage(generation_index_t last_gen)
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
   if (ENABLE_PAGE_PROTECTION) {
       // Unprotect the in-use ranges. Any page could be written during scavenge
+#ifndef LISP_FEATURE_ARM64
+      // ARM64 does not use fixedobj space (FIXEDOBJ_SPACE_START=0).
       os_protect((os_vm_address_t)FIXEDOBJ_SPACE_START,
                  (lispobj)fixedobj_free_pointer - FIXEDOBJ_SPACE_START,
                  OS_VM_PROT_ALL);
+#endif
   }
 #endif
 
@@ -4110,7 +4113,7 @@ gc_init(void)
 }
 
 int gc_card_table_nbits;
-long gc_card_table_mask;
+sword_t gc_card_table_mask;
 
 
 /* alloc() and alloc_list() are external interfaces for memory allocation.

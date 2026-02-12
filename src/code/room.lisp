@@ -726,12 +726,13 @@ We could try a few things to mitigate this:
                  (classoid
                   (format t "  ~V@<~/sb-ext:print-symbol-with-prefix/~>"
                           (1+ types-width) (classoid-name type))))
-               (format t " ~V:D bytes, ~V:D object~:P "
+               (format t " ~V:D bytes, ~V:D object~:P"
                         bytes-width bytes objects-width objects)
-               (let ((avarage-size (/ bytes objects)))
-                 (if (ratiop avarage-size)
-                     (format t "(~,2F per object)" (float avarage-size))
-                     (format t "(~:D per object)" avarage-size)))
+               (when (plusp objects)
+                 (let ((avarage-size (/ bytes objects)))
+                   (if (ratiop avarage-size)
+                       (format t " (~,2F per object)" (float avarage-size))
+                       (format t " (~:D per object)" avarage-size))))
                (format t ".~%")))
         (loop for (type . (objects . bytes)) in interesting
               do (incf printed-bytes bytes)

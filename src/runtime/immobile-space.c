@@ -134,7 +134,7 @@ unsigned char* text_page_genmask;
 // one per page *excluding* all pseudostatic pages.
 // Unlike with dynamic-space, the scan start for a text page
 // is an address not lower than the base page.
-unsigned short int* tlsf_page_sso;
+unsigned int* tlsf_page_sso;
 // Array of inverted write-protect flags, 1 bit per page.
 unsigned int* text_page_touched_bits;
 static int n_bitmap_elts; // length of array measured in 'int's
@@ -186,7 +186,7 @@ void *tlsf_alloc_codeblob(tlsf_t tlsf, int requested_nwords, unsigned boxed)
     if (end > text_space_highwatermark) text_space_highwatermark = end;
     // Adjust the scan start if this became the lowest addressable in-use block on its page
     low_page_index_t tlsf_page = ((char*)c - (char*)tlsf_mem_start) / IMMOBILE_CARD_BYTES;
-    int offset = (uword_t)c & (IMMOBILE_CARD_BYTES-1);
+    unsigned int offset = (uword_t)c & (IMMOBILE_CARD_BYTES-1);
     if (offset < tlsf_page_sso[tlsf_page]) tlsf_page_sso[tlsf_page] = offset;
     text_page_genmask[find_text_page_index(c)] |= 1;
 #if 0
@@ -224,7 +224,7 @@ void tlsf_unalloc_codeblob(tlsf_t tlsf, struct code* code)
     }
     // See if the page scan start needs to change
     low_page_index_t tlsf_page = ((char*)code - (char*)tlsf_mem_start) / IMMOBILE_CARD_BYTES;
-    int offset = (uword_t)code & (IMMOBILE_CARD_BYTES-1);
+    unsigned int offset = (uword_t)code & (IMMOBILE_CARD_BYTES-1);
     if (offset == tlsf_page_sso[tlsf_page]) {
         lispobj* next = end;
         if (*next & block_header_free_bit) {
@@ -515,7 +515,7 @@ lispobj* text_page_scan_start(low_page_index_t page) {
     }
     if (pagebase > (char*)text_space_highwatermark) return 0;
     int tlsf_page = (pagebase - (char*)tlsf_mem_start) / IMMOBILE_CARD_BYTES;
-    unsigned short sso = tlsf_page_sso[tlsf_page];
+    unsigned int sso = tlsf_page_sso[tlsf_page];
     return (sso < IMMOBILE_CARD_BYTES) ? (lispobj*)(pagebase + sso) : 0;
 }
 
@@ -1251,8 +1251,8 @@ void immobile_space_coreparse(uword_t fixedobj_len,
     int tlsf_memory_size = tlsf_memory_end - (char*)tlsf_mem_start;
     tlsf_add_pool(tlsf_control, tlsf_mem_start, tlsf_memory_size);
     int n_tlsf_pages = tlsf_memory_size / IMMOBILE_CARD_BYTES;
-    tlsf_page_sso = malloc(n_tlsf_pages * sizeof (short int));
-    memset(tlsf_page_sso, 0xff, n_tlsf_pages * sizeof (short int));
+    tlsf_page_sso = malloc(n_tlsf_pages * sizeof *tlsf_page_sso);
+    memset(tlsf_page_sso, 0xff, n_tlsf_pages * sizeof *tlsf_page_sso);
 
     // Set the WP bits for pages occupied by the core file.
     // (There can be no inter-generation pointers.)

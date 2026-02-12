@@ -43,7 +43,7 @@ text_page_address(low_page_index_t page_num)
 }
 
 extern unsigned char* text_page_genmask;
-extern unsigned short int* tlsf_page_sso;
+extern unsigned int* tlsf_page_sso;
 
 static inline low_page_index_t find_fixedobj_page_index(void *addr)
 {

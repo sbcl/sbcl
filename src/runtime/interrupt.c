@@ -1568,14 +1568,14 @@ arrange_return_to_c_function(os_context_t *context,
 
     /* this much of the calling convention is common to all
        non-x86 ports */
-    set_os_context_pc(context, (os_context_register_t)(unsigned long)code);
+    set_os_context_pc(context, (os_context_register_t)(uintptr_t)code);
     *os_context_register_addr(context,reg_NARGS) = 0;
 #ifdef reg_LIP
     *os_context_register_addr(context,reg_LIP) =
-        (os_context_register_t)(unsigned long)code;
+        (os_context_register_t)(uintptr_t)code;
 #endif
     *os_context_register_addr(context,reg_CFP) =
-        (os_context_register_t)(unsigned long)access_control_frame_pointer(th);
+        (os_context_register_t)(uintptr_t)access_control_frame_pointer(th);
 #endif
 #ifdef ARCH_HAS_NPC_REGISTER
     *os_context_npc_addr(context) = 4 + os_context_pc(context);
