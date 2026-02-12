@@ -1832,25 +1832,26 @@
 ;;; be a list of types.
 (defun %one-arg-derive-type (arg-type derive-fun)
   (declare (type function derive-fun))
-  (let ((arg-list (prepare-arg-for-derive-type arg-type)))
-    (when arg-list
-      (labels ((deriver (x)
-                 (when (numeric-type-p x)
-                   (funcall derive-fun x))))
-        ;; Run down the list of args and derive the type of each one,
-        ;; saving all of the results in a list.
-        (let ((results nil))
-          (dolist (arg arg-list)
-            (let ((result (deriver arg)))
-              (cond ((not result)
-                     (return-from %one-arg-derive-type))
-                    ((listp result)
-                     (setf results (append results result)))
-                    (t
-                     (push result results)))))
-          (if (rest results)
-              (make-derived-union-type results)
-              (first results)))))))
+  (unless (eq arg-type (specifier-type 'number))
+    (let ((arg-list (prepare-arg-for-derive-type arg-type)))
+      (when arg-list
+        (labels ((deriver (x)
+                   (when (numeric-type-p x)
+                     (funcall derive-fun x))))
+          ;; Run down the list of args and derive the type of each one,
+          ;; saving all of the results in a list.
+          (let ((results nil))
+            (dolist (arg arg-list)
+              (let ((result (deriver arg)))
+                (cond ((not result)
+                       (return-from %one-arg-derive-type))
+                      ((listp result)
+                       (setf results (append results result)))
+                      (t
+                       (push result results)))))
+            (if (rest results)
+                (make-derived-union-type results)
+                (first results))))))))
 
 (defun one-arg-derive-type (arg derive-fun)
   (%one-arg-derive-type (lvar-type arg) derive-fun))
@@ -1867,35 +1868,40 @@
 
 (defun %two-arg-derive-type (arg1-type arg2-type derive-fun &optional same-leaf)
   (declare (type function derive-fun))
-  (labels ((deriver (x y same-arg)
-             (if (and (numeric-type-p x) (numeric-type-p y))
-                 (funcall derive-fun x y same-arg)
-                 *universal-type*))
-           (derive (type1 type2 same-arg)
-             (let ((a1 (prepare-arg-for-derive-type type1))
-                   (a2 (prepare-arg-for-derive-type type2)))
-               (when (and a1 a2)
-                 (let ((results nil))
-                   (if same-arg
-                       ;; Since the args are the same LVARs, just run down the
-                       ;; lists.
-                       (dolist (x a1)
-                         (let ((result (deriver x x same-arg)))
-                           (if (listp result)
-                               (setf results (append results result))
-                               (push result results))))
-                       ;; Try all pairwise combinations.
-                       (dolist (x a1)
-                         (dolist (y a2)
-                           (let ((result (or (deriver x y same-arg)
-                                             (numeric-contagion x y))))
+  (unless (or (and (eq arg1-type (specifier-type 'number))
+                   (or (eq arg2-type (specifier-type 'number))
+                       (eq arg2-type (specifier-type 'real))))
+              (and (eq arg1-type (specifier-type 'real))
+                   (eq arg2-type (specifier-type 'number))))
+    (labels ((deriver (x y same-arg)
+               (if (and (numeric-type-p x) (numeric-type-p y))
+                   (funcall derive-fun x y same-arg)
+                   *universal-type*))
+             (derive (type1 type2 same-arg)
+               (let ((a1 (prepare-arg-for-derive-type type1))
+                     (a2 (prepare-arg-for-derive-type type2)))
+                 (when (and a1 a2)
+                   (let ((results nil))
+                     (if same-arg
+                         ;; Since the args are the same LVARs, just run down the
+                         ;; lists.
+                         (dolist (x a1)
+                           (let ((result (deriver x x same-arg)))
                              (if (listp result)
                                  (setf results (append results result))
-                                 (push result results))))))
-                   (if (rest results)
-                       (make-derived-union-type results)
-                       (first results)))))))
-    (derive arg1-type arg2-type same-leaf)))
+                                 (push result results))))
+                         ;; Try all pairwise combinations.
+                         (dolist (x a1)
+                           (dolist (y a2)
+                             (let ((result (or (deriver x y same-arg)
+                                               (numeric-contagion x y))))
+                               (if (listp result)
+                                   (setf results (append results result))
+                                   (push result results))))))
+                     (if (rest results)
+                         (make-derived-union-type results)
+                         (first results)))))))
+      (derive arg1-type arg2-type same-leaf))))
 
 (defun +-derive-type-aux (x y same-arg)
   (cond ((and (integer-type-p x)
