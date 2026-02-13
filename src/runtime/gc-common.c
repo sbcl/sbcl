@@ -75,7 +75,6 @@ int sb_sprof_enabled;
 //  - trans_code() is responsible for leaving FPs for both the code object
 //    AND all embedded functions.
 static lispobj (*transother[64])(lispobj object);
-static lispobj trans_lose(lispobj object); /* forward decl for validation */
 sword_t (*sizetab[256])(lispobj *where);
 struct weak_pointer *weak_pointer_chain = WEAK_POINTER_CHAIN_END;
 struct cons *weak_vectors;
@@ -139,33 +138,8 @@ static inline void scav1(lispobj* addr, lispobj object)
 #endif
             if (forwarding_pointer_p(native_pointer(object)))
                 *addr = forwarding_pointer_value(native_pointer(object));
-            else if (!pinned_p(object, page)) {
-#if defined(LISP_FEATURE_SB_SAFEPOINT) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-                /* On ARM64 safepoint builds, concurrent hash table operations
-                 * can leave stale pointers in kv-vectors due to HWM race
-                 * conditions with weak memory ordering. Validate objects
-                 * before transport to avoid copying garbage. */
-                if (lowtag_of(object) == LIST_POINTER_LOWTAG) {
-                    /* Cons pointers must target PAGE_TYPE_CONS pages */
-                    if (page_table[page].type != PAGE_TYPE_CONS) {
-                        *addr = 0;
-                        return;
-                    }
-                } else {
-                    /* Headered objects: validate header widetag and
-                     * transport function. Some valid header widetags
-                     * (e.g. 0x45) have no transport function. */
-                    int wt = *native_pointer(object) & WIDETAG_MASK;
-                    if (!(widetag_lowtag[wt] & 0x80)
-                        || (lowtag_of(object) == OTHER_POINTER_LOWTAG
-                            && transother[wt>>2] == trans_lose)) {
-                        *addr = 0;
-                        return;
-                    }
-                }
-#endif
+            else if (!pinned_p(object, page))
                 scav_ptr[PTR_SCAVTAB_INDEX(object)](addr, object);
-            }
     }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     // Test immobile_space_p() only if object was definitely not in dynamic space
@@ -227,33 +201,8 @@ void heap_scavenge(lispobj *start, lispobj *end)
              * scav_lose without knowing the [start,end] */
             if (scavtab[header_widetag(object)] == scav_lose) lose("Losing @ %p", object_ptr);
 #endif
-#if defined(LISP_FEATURE_SB_SAFEPOINT) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-            /* On ARM64 safepoint builds, garbage data from stale list-pointer
-             * transport can end up in newspace. If the "header" maps to
-             * scav_lose, zero it and treat as a cons cell. */
-            if (scavtab[header_widetag(object)] == scav_lose) {
-                *object_ptr = 0;
-                gc_scav_pair(object_ptr);
-                object_ptr += 2;
-                continue;
-            }
-#endif
             /* It's some sort of header object or another. */
-            {
-                sword_t nwords = (scavtab[header_widetag(object)])(object_ptr, object);
-#if defined(LISP_FEATURE_SB_SAFEPOINT) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-                /* Guard against corrupt headers with oversized length from
-                 * garbage data that ended up in newspace via stale pointer
-                 * transport. If the computed size overshoots, skip to end.
-                 * Don't try to scavenge remaining words as they are likely
-                 * corrupt data from the same stale transport. */
-                if (object_ptr + nwords > end) {
-                    object_ptr = end;
-                    break;
-                }
-#endif
-                object_ptr += nwords;
-            }
+            object_ptr += (scavtab[header_widetag(object)])(object_ptr, object);
         } else {  // it's a cons
             gc_scav_pair(object_ptr);
             object_ptr += 2;
@@ -777,15 +726,6 @@ scav_other_pointer(lispobj *where, lispobj object)
     /* Object is a pointer into from space - not FP. */
     lispobj *first_pointer = (lispobj *)(object - OTHER_POINTER_LOWTAG);
     int tag = widetag_of(first_pointer);
-#if defined(LISP_FEATURE_SB_SAFEPOINT) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-    /* Additional safety net: if the scav1 check didn't catch this
-     * (e.g. called from scavtab path), zero stale pointers here too. */
-    if (!(widetag_lowtag[tag] & 0x80)
-        || transother[other_immediate_lowtag_p(tag)?tag>>2:0] == trans_lose) {
-        *where = 0;
-        return 1;
-    }
-#endif
     lispobj copy = transother[other_immediate_lowtag_p(tag)?tag>>2:0](object);
 
     // If the object was large, then instead of transporting it,
@@ -1661,21 +1601,7 @@ static void scan_nonweak_kv_vector(struct vector *kv_vector, void (*scav_entry)(
 
     if (!vector_flagp(kv_vector->header, VectorAddrHashing)) {
         // All keys were hashed address-insensitively
-        unsigned hwm_ni = KV_PAIRS_HIGH_WATER_MARK(data);
-        scavenge(data + 2, hwm_ni * 2);
-#if defined(LISP_FEATURE_SB_SAFEPOINT) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-        /* On ARM64 with safepoints, concurrent rehash may write kv entries
-         * beyond the high-water-mark before updating hwm due to weak memory
-         * ordering. Scan beyond hwm to avoid leaving dangling pointers. */
-        {
-            sword_t kv_len = vector_len(kv_vector);
-            sword_t max_idx = (kv_len - 1) / 2;
-            for (unsigned j = hwm_ni + 1; j <= (unsigned)max_idx; j++)
-                if (at_least_one_pointer_p(data[2*j], data[2*j+1]))
-                    scavenge(&data[2*j], 2);
-        }
-#endif
-        return;
+        return (void)scavenge(data + 2, KV_PAIRS_HIGH_WATER_MARK(data) * 2);
     }
     // Read the hash vector (or NIL) from the last element. If the last element
     // satisfies instancep() then this vector belongs to a weak table,
@@ -1700,20 +1626,6 @@ static void scan_nonweak_kv_vector(struct vector *kv_vector, void (*scav_entry)(
         gc_assert(2 * vector_len(VECTOR(kv_supplement)) + 1 == kv_length);
     }
     SCAV_ENTRIES(1, );
-#if defined(LISP_FEATURE_SB_SAFEPOINT) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-    /* Same beyond-hwm scan for address-hashing tables */
-    {
-        unsigned hwm_check = KV_PAIRS_HIGH_WATER_MARK(data);
-        sword_t max_idx = (kv_length - 1) / 2;
-        for (unsigned j = hwm_check + 1; j <= (unsigned)max_idx; j++) {
-            lispobj key = data[2*j];
-            if (at_least_one_pointer_p(key, data[2*j+1])) {
-                scav_entry(&data[2*j]);
-                if (SHOULD_REHASH(key, data[2*j], hashvals, j)) rehash = 1;
-            }
-        }
-    }
-#endif
 }
 
 bool scan_weak_hashtable(struct hash_table *hash_table,
@@ -2530,40 +2442,6 @@ scavenge_control_stack(struct thread *th)
 #ifdef LISP_FEATURE_MARK_REGION_GC
           mr_preserve_object(word);
 #else
-#if defined(LISP_FEATURE_SB_SAFEPOINT) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-          /* On safepoint builds with precise GC and separate stacks (ARM64),
-           * dead variables in active frames may contain stale pointers to
-           * from-space addresses that have been freed/reused.  Without stack
-           * maps, the GC cannot distinguish live from dead variables.
-           * Transporting garbage data corrupts the heap, so validate that
-           * from-space pointers actually point to plausible objects before
-           * allowing scav1 to transport them.  Zero invalid slots. */
-          {
-              page_index_t pg = find_page_index((void*)word);
-              if (pg >= 0 && page_table[pg].gen == from_space) {
-                  lispobj *target = native_pointer(word);
-                  if (!forwarding_pointer_p(target)) {
-                      int valid;
-                      if (lowtag_of(word) == LIST_POINTER_LOWTAG) {
-                          /* Cons pointers should target cons pages */
-                          valid = (page_table[pg].type == PAGE_TYPE_CONS);
-                      } else {
-                          /* Headered objects: validate header widetag and
-                           * check that the widetag's lowtag matches the
-                           * pointer's lowtag */
-                          int widetag = *target & WIDETAG_MASK;
-                          valid = other_immediate_lowtag_p(widetag)
-                                  && LOWTAG_FOR_WIDETAG(widetag)
-                                  && LOWTAG_FOR_WIDETAG(widetag) == lowtag_of(word);
-                      }
-                      if (!valid) {
-                          *object_ptr = 0;
-                          continue;
-                      }
-                  }
-              }
-          }
-#endif
           scav1(object_ptr, word);
 #endif
         }

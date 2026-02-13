@@ -2664,38 +2664,6 @@ static void newspace_full_scavenge(generation_index_t generation)
     }
     /* Enable recording of all new allocation regions */
     record_new_regions_below = 1 + page_table_pages;
-
-#if defined(LISP_FEATURE_SB_SAFEPOINT) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-    /* Scavenge pinned from_space objects. These objects reside on pages with
-     * gen=from_space, so they are NOT processed by scavenge_root_gens (which
-     * requires gen >= from) or the newspace scan above (which requires
-     * gen == generation, i.e., new_space). Without this step, slots of pinned
-     * objects that point to from_space targets are never forwarded.
-     * After obliterate_nonpinned_words changes these pages to new_space gen,
-     * the stale pointers become dangling references when free_oldspace runs.
-     *
-     * On conservative platforms (x86), this is masked because the conservative
-     * stack scan tends to pin transitively reachable objects. On precise
-     * platforms (ARM64), pinned objects can reference non-pinned from_space
-     * objects that must be explicitly transported here. */
-    if (gc_pin_count > 0) {
-        lispobj* keys = gc_filtered_pins;
-        int n = gc_pin_count;
-        for (int k = 0; k < n; k++) {
-            lispobj* obj = native_pointer(keys[k]);
-            page_index_t page = find_page_index(obj);
-            if (page < 0 || page_table[page].gen != from_space) continue;
-            if (!page_boxed_p(page)) continue;
-            lispobj header = *obj;
-            if (is_header(header)) {
-                scavtab[header_widetag(header)](obj, header);
-            } else {
-                /* cons cell */
-                scavenge(obj, 2);
-            }
-        }
-    }
-#endif
 }
 
 void gc_close_collector_regions(int flag)

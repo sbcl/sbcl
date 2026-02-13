@@ -23,17 +23,13 @@
 #include "breakpoint.h"
 #include "pseudo-atomic.h"
 
+#ifndef LISP_FEATURE_WIN32
 os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {
-#ifdef WIN32
-    /* The `code` argument is really a pointer to an EXCEPTION_RECORD,
-     * not a siginfo_t. */
-    EXCEPTION_RECORD *exception = (EXCEPTION_RECORD *)code;
-    return (os_vm_address_t)exception->ExceptionInformation[1];
-#else
     return (os_vm_address_t)code->si_addr;
-#endif
+
 }
+#endif
 
 void arch_skip_instruction(os_context_t *context)
 {
@@ -217,13 +213,8 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     }
     else {
         // Do orig_inst by copying it into a trampoline.
-#ifdef WIN32
-        SYSTEM_INFO sys_info;
-        GetSystemInfo(&sys_info);
-        size_t size = sys_info.dwPageSize;
-#else
-        size_t size = getpagesize();
-#endif
+        size_t size = GETPAGESIZE;
+
         // Allocate the thread-local trampoline on-demand.
         struct thread *th = get_sb_vm_thread();
         unsigned int *trampoline = (unsigned int*)th->breakpoint_misc;
@@ -263,10 +254,8 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
         inst = 0xD61F0000 | BREAKPOINT_TEMP_REG << 5;
         *inst_ptr++ = inst;
 
-        // address (8 bytes for a 64-bit pointer; unsigned long is only
-        // 4 bytes on Windows LLP64, so use uint64_t explicitly)
-        *(uint64_t *)inst_ptr = (uint64_t)next_pc;
-        inst_ptr += 2;
+        // address
+        *(uword_t *)inst_ptr++ = (uword_t)next_pc;
         OS_CONTEXT_PC(context) = (uword_t)trampoline;
         os_flush_icache((os_vm_address_t) trampoline, (char*) inst_ptr - (char*)trampoline);
         os_protect((os_vm_address_t)trampoline, size, OS_VM_PROT_READ | OS_VM_PROT_EXECUTE);
@@ -366,9 +355,8 @@ void arch_write_linkage_table_entry(int index, void *target_addr, int datap)
   inst = 0xD61F0000 | LINKAGE_TEMP_REG << 5;
   *inst_ptr++ = inst;
 
-  // address (64-bit pointer - must use uword_t on Windows where unsigned long is 32-bit)
-  *(uword_t *)inst_ptr = (uword_t)target_addr;
-  inst_ptr += 2;  // advance by 8 bytes (2 x 4-byte ints)
+  // address
+  *(uword_t *)inst_ptr++ = (uword_t)target_addr;
 
   os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
 
