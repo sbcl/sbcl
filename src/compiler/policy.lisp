@@ -388,29 +388,34 @@ See also :POLICY option in WITH-COMPILATION-UNIT."
         (specified-qualities))
     ;; Add new entries from SPEC.
     (dolist (q-and-v-or-just-q (cdr spec) (values result specified-qualities))
-      (multiple-value-bind (quality raw-value)
-          (if (atom q-and-v-or-just-q)
-              (values q-and-v-or-just-q 3)
-            (destructuring-bind (quality raw-value) q-and-v-or-just-q
-              (values quality raw-value)))
-        (let ((index (policy-quality-name-p quality)))
-          (cond ((not index)
-                 (compiler-warn
-                  "~@<Ignoring unknown optimization quality ~S in:~_ ~S~:>"
-                  quality spec))
-                ((not (typep raw-value 'policy-quality))
-                 (compiler-warn
-                  "~@<Ignoring bad optimization value ~S in:~_ ~S~:>"
-                  raw-value spec))
-                (t
-                 ;; we can't do this yet, because CLOS macros expand
-                 ;; into code containing INHIBIT-WARNINGS.
-                 #+nil
-                 (when (eql quality 'inhibit-warnings)
-                   (compiler-style-warn "~S is deprecated: use ~S instead"
-                                        quality 'muffle-conditions))
-                 (push (cons quality raw-value) specified-qualities)
-                 (alter-policy result index raw-value))))))))
+      (block skip
+        (multiple-value-bind (quality raw-value)
+            (if (atom q-and-v-or-just-q)
+                (values q-and-v-or-just-q 3)
+                (cond ((typep q-and-v-or-just-q '(cons t (cons t null)))
+                       (destructuring-bind (quality raw-value) q-and-v-or-just-q
+                         (values quality raw-value)))
+                      (t
+                       (compiler-warn "~@<Malformed optimize declaration:~_ ~S~:>" spec)
+                       (return-from skip))))
+          (let ((index (policy-quality-name-p quality)))
+            (cond ((not index)
+                   (compiler-warn
+                    "~@<Ignoring unknown optimization quality ~S in:~_ ~S~:>"
+                    quality spec))
+                  ((not (typep raw-value 'policy-quality))
+                   (compiler-warn
+                    "~@<Ignoring bad optimization value ~S in:~_ ~S~:>"
+                    raw-value spec))
+                  (t
+                   ;; we can't do this yet, because CLOS macros expand
+                   ;; into code containing INHIBIT-WARNINGS.
+                   #+nil
+                   (when (eql quality 'inhibit-warnings)
+                     (compiler-style-warn "~S is deprecated: use ~S instead"
+                                          quality 'muffle-conditions))
+                   (push (cons quality raw-value) specified-qualities)
+                   (alter-policy result index raw-value)))))))))
 
 ;;; Same as above but slightly more efficient
 (defun %augment-policy (quality value policy)
