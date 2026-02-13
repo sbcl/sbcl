@@ -1373,13 +1373,6 @@
                    (res (global-conflicts-tn gtn))))
                (res)))))))
 
-(defun nth-vop (thing n)
-  "Return the Nth VOP in the IR2-BLOCK pointed to by THING."
-  (let ((block (block-info (block-or-lose thing))))
-    (do ((i 0 (1+ i))
-         (vop (ir2-block-start-vop block) (vop-next vop)))
-        ((= i n) vop))))
-
 (defun show-transform-p (showp fun-name)
   (or (and (listp showp) (member fun-name showp :test 'equal))
       (eq showp t)))

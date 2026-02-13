@@ -510,7 +510,7 @@
   ;; entire initial component just to clear the flags.
   (flag nil)
   ;; some kind of info used by the back end
-  (info nil)
+  (info nil :type (or ir2-block null))
   ;; what macroexpansions and source transforms happened "in" this block, used
   ;; for xref
   (xrefs nil :type list)
