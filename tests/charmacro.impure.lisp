@@ -1,3 +1,20 @@
+;;;; miscellaneous side-effectful tests involving read macros
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; While most of SBCL is derived from the CMU CL system, the test
+;;;; files (like this one) were written from scratch after the fork
+;;;; from CMU CL.
+;;;;
+;;;; This software is in the public domain and is provided with
+;;;; absolutely no warranty. See the COPYING and CREDITS files for
+;;;; more information.
+
+;;;; Note that the MOP is not in an entirely supported state.
+;;;; However, this seems a good a way as any of ensuring that we have
+;;;; no regressions.
+
 (with-test (:name :charmacro-reassign-constituentp)
   ;; Set up a non-terminating macro.
   ;; I really wish they had named the NON-TERMINATING-P argument as CONSTITUENTP.
@@ -35,16 +52,16 @@
   (assert (equal (read-from-string "(foo some\\$thing)")
                  '(FOO |SOME$THING|))))
 
-(with-test (:name :charmacro-printer-bug :fails-on :sbcl)
-  ;; - ECL, CLISP, and GNU Common Lisp all print the test case as (FOO |SOME!THING|)
-  ;; - Closzure prints as (FOO SOME\!THING)
-  ;; either is acceptable.
+(with-test (:name (:charmacro-output-symbol :escape t))
   (let* ((expr (read-from-string "(foo some\\!thing)"))
-         ;; ":escape t" should be strong enough, but just in case we think
-         ;; it demands ":readably t" do that, not that it fixes the problem.
-         (stringified (write-to-string expr :readably t))
+         (stringified (write-to-string expr :escape t))
          (readback (read-from-string stringified)))
-    (assert (equal readback '(FOO |SOME!THING|))))
-  ;; This is the root cause. Of course the test has already failed
-  ;; (assert (sb-impl::symbol-quotep "SOME!THING" *readtable*))
-  )
+    (print stringified)
+    (assert (equal readback expr))))
+
+(with-test (:name (:charmacro-output-symbol :readably t))
+  (let* ((expr (read-from-string "(foo some\\!thing)"))
+         (stringified (write-to-string expr :readably t))
+         (readback (let ((*readtable* (copy-readtable nil)))
+                     (read-from-string stringified))))
+    (assert (equal readback expr))))
