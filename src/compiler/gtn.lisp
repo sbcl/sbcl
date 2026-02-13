@@ -90,6 +90,11 @@
                  (environment-live-tn res (lambda-environment fun)))
 
                 (debug-variable-p
+                 ;; :DEBUG-ENVIRONMENT TNs might be spilled before they are initialized,
+                 ;; putting unboxed values onto the stack.
+                 #-c-stack-is-control-stack
+                 (when (member sb-vm:any-reg-sc-number (primitive-type-scs type))
+                   (setf (tn-sc res) (sc-or-lose 'sb-vm::control-stack)))
                  ;; If it's a constant it may end up being never read,
                  ;; replaced by COERCE-FROM-CONSTANT.
                  ;; Yet it might get saved on the stack, but since it's
