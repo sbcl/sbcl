@@ -1281,6 +1281,10 @@
        t))
   (assert
    (eq (values-subtypep (values-specifier-type '(values t &optional))
+                        (values-specifier-type '(values t &optional t)))
+       t))
+  (assert
+   (eq (values-subtypep (values-specifier-type '(values t &optional))
                         (values-specifier-type '(values t (not real) &optional)))
        t))
   (assert

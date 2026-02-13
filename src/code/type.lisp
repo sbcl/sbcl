@@ -1228,16 +1228,17 @@
                         (return (csubtypep rest1 rest2)))
                       (let ((t1 (pop types1))
                             (t2 (pop types2)))
-                       (when (and t1
-                                  (>= i n-req1)
-                                  (< i n-req2))
-                         (setf t1 (type-union t1 (specifier-type 'null))))
+                        (cond ((not t1)
+                               (if (eq rest1 *empty-type*)
+                                   (return (values t t))
+                                   (setf t1 rest1)))
+                              ((and t1
+                                    (>= i n-req1)
+                                    (< i n-req2))
+                               (setf t1 (type-union t1 (specifier-type 'null)))))
+
                        (multiple-value-bind (res win-p)
-                           (csubtypep (or t1
-                                          (if (eq rest1 *empty-type*)
-                                              (specifier-type 'null)
-                                              rest1))
-                                      t2)
+                           (csubtypep t1 t2)
                          (unless win-p
                            (return (values nil nil)))
                          (unless res
