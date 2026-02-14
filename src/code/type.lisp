@@ -998,8 +998,9 @@
                    required nil nil))))
 
 (defun convert-to-single-value-type (type)
-  (cond ((eq type *wild-type*)
-         *wild-type*)
+  (cond ((or (eq type *wild-type*)
+             (eq type *empty-type*))
+         type)
         ((eq type (values-specifier-type '(values &optional)))
          (values-specifier-type '(values null)))
         (t
