@@ -44,7 +44,7 @@ CFLAGS += -g -W -Wall \
        -Wno-unused-function -Wno-unused-parameter -Wno-cast-function-type \
        -Wno-type-limits \
        -fno-omit-frame-pointer \
-       -O3 -DWINVER=0x0501 \
+       -DWINVER=0x0501 \
        -D__W32API_USE_DLLIMPORT__ \
        -std=gnu99
 

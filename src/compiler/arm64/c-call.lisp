@@ -481,7 +481,6 @@
         ;; No longer OK to run GC except at safepoints.
         #+(or sb-safepoint nonstop-foreign-call)
         (storew zr-tn thread-tn thread-saved-csp-slot))
-      #-win32
       (storew zr-tn thread-tn thread-control-stack-pointer-slot)
       return
       #-sb-thread

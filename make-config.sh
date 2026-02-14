@@ -696,7 +696,6 @@ case "$sbcl_os" in
         #
         case "$sbcl_arch" in
             arm64)
-                printf ' :immobile-space' >> $ltf
                 ;;
             x86 | x86-64)
                 ;;

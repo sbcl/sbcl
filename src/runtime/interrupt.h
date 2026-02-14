@@ -102,6 +102,7 @@ typedef lispobj (*call_into_lisp_lookalike)(
 extern bool interrupt_handler_pending_p(void);
 extern void interrupt_init(void);
 extern void fake_foreign_function_call(os_context_t* context);
+extern void fake_foreign_function_call_noassert(os_context_t *context);
 extern void undo_fake_foreign_function_call(os_context_t* context);
 extern void arrange_return_to_c_function(
     os_context_t *, call_into_lisp_lookalike, lispobj);

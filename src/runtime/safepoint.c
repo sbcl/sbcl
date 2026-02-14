@@ -591,7 +591,7 @@ static bool can_invoke_post_gc(struct thread* th)
 }
 
 // returns 0 if skipped, 1 otherwise
-int check_pending_gc()
+int check_pending_gc(__attribute__((unused)) os_context_t *context)
 {
     odxprint(misc, "check_pending_gc");
     struct thread * self = get_sb_vm_thread();
@@ -609,6 +609,11 @@ int check_pending_gc()
 
             bind_variable(IN_SAFEPOINT,LISP_T,self);
             block_deferrable_signals(&sigset);
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+            int was_in_lisp = !foreign_function_call_active_p(self);
+            if (was_in_lisp)
+                fake_foreign_function_call_noassert(context);
+#endif
             if(read_TLS(GC_PENDING,self)==LISP_T)
                 gc_happened = funcall1(StaticSymbolFunction(SUB_GC), 0);
             unbind(self);
@@ -621,6 +626,13 @@ int check_pending_gc()
                     funcall0(StaticSymbolFunction(POST_GC));
                 done = 1;
             }
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+            if (was_in_lisp) {
+                sigset_t oldset = thread_extra_data(self)->blocked_signal_set;
+                undo_fake_foreign_function_call(context);
+                thread_extra_data(self)->blocked_signal_set = oldset;
+            }
+#endif
         }
     }
     return done;
@@ -699,7 +711,7 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
     /* If we still need to GC, and it's not inhibited, call into
      * SUB-GC.  Phase is either GC_QUIET or GC_NONE. */
     if (check_gc_and_thruptions) {
-        check_pending_gc();
+        check_pending_gc(ctxptr);
         while(check_pending_thruptions(ctxptr));
     }
 }
@@ -781,7 +793,7 @@ void thread_interrupted(os_context_t *ctxptr)
             thread_in_lisp_raised(ctxptr);
         }
     }
-    check_pending_gc();
+    check_pending_gc(ctxptr);
     while(check_pending_thruptions(ctxptr));
 }
 #endif
