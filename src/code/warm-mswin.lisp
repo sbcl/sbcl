@@ -141,18 +141,17 @@
   (case event-code
     (0
      (flet ((interrupt-it ()
-              (let* ((context
-                       (sb-di::nth-interrupt-context
-                        (1- sb-kernel:*free-interrupt-context-index*)))
-                     (pc (sb-vm:context-pc context)))
-                (with-interrupts
-                  (let ((int (make-condition
-                              'interactive-interrupt
-                              :context context
-                              :address (sb-sys:sap-int pc))))
-                    ;; First SIGNAL, so that handlers can run.
-                    (signal int)
-                    (%break 'sigint int))))))
+              (with-alien ((context (* os-context-t)
+                                    sb-kernel:*current-internal-error-context*))
+                (let ((pc (sb-vm:context-pc context)))
+                  (with-interrupts
+                    (let ((int (make-condition
+                                'interactive-interrupt
+                                :context context
+                                :address (sb-sys:sap-int pc))))
+                      ;; First SIGNAL, so that handlers can run.
+                      (signal int)
+                      (%break 'sigint int)))))))
        (sb-thread:interrupt-thread (sb-thread::foreground-thread)
                                    #'interrupt-it)
        t))))
