@@ -9,7 +9,6 @@
 ;;; (> (mod seconds 1) (* most-positive-fixnum 1e-9))
 (with-test (:name (sleep :non-consing)
             :serial t :skipped-on :interpreter
-            :broken-on (and :win32 :arm64)
             :fails-on (and :arm :64-bit-time))
   (handler-case (sb-ext:with-timeout 5
                   (ctu:assert-no-consing (sleep 0.00001s0))
@@ -22,8 +21,7 @@
 ;;; Changes to make SLEEP cons less led to SLEEP
 ;;; not sleeping at all on 32-bit platforms when
 ;;; (> (mod seconds 1) (* most-positive-fixnum 1e-9)).
-(with-test (:name (sleep :bug-1194673)
-            :broken-on (and :win32 :arm64))
+(with-test (:name (sleep :bug-1194673))
   (assert (eq :timeout
               (handler-case
                   (with-timeout 0.01
@@ -33,7 +31,7 @@
 
 ;;; SLEEP should work with large integers as well
 (with-test (:name (sleep :pretty-much-forever)
-            :broken-on (:and (:or :linux :darwin (and :win32 :arm64)) :sb-safepoint)) ; hangs
+            :skipped-on (:and (:or :linux :darwin) :sb-safepoint)) ; hangs
   (assert (eq :timeout
               (handler-case
                   (sb-ext:with-timeout 1

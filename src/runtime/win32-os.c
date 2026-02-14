@@ -911,12 +911,15 @@ handle_access_violation(os_context_t *ctx,
          * stack scan to cover the CONTEXT, so register values are found. */
         thread_in_lisp_raised(ctx);
 #else
+        sigset_t oldset = thread_extra_data(self)->blocked_signal_set;
         /* ARM64: separate control and C stacks.  The register context must
-         * be explicitly saved so that GC can scan Lisp register values.
-         * (Mirrors handle_safepoint_violation in safepoint.c for Unix.) */
+         * be explicitly saved so that GC can scan Lisp register values. */
         fake_foreign_function_call(ctx);
         thread_in_lisp_raised(ctx);
         undo_fake_foreign_function_call(ctx);
+        // undo the actions of undo_fake_foreign_function_call
+        thread_extra_data(self)->blocked_signal_set = oldset;
+        ctx->sigmask = oldset;
 #endif
         return 0;
     }
