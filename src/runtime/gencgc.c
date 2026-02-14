@@ -3516,36 +3516,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
 #if !defined(LISP_FEATURE_MIPS) && defined(reg_CODE) // interrupt contexts already pinned everything they see
             scavenge_interrupt_contexts(th);
 #endif
-#if defined(LISP_FEATURE_SB_SAFEPOINT) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-            /* On safepoint builds with separate control and C stacks (ARM64),
-             * GC runs as Lisp code (SUB-GC) on the control stack.  The current
-             * thread->csp includes SUB-GC's frames, which may contain stale or
-             * uninitialized pointers.  Precise scanning of these frames crashes
-             * when it encounters stale pointers to freed from-space objects.
-             *
-             * Fix: temporarily limit the scan to the interrupted code's CSP
-             * (from the interrupt context stored by fake_foreign_function_call).
-             * The interrupt context registers are already scavenged by
-             * scavenge_interrupt_contexts above. */
-            {
-                lispobj *saved_csp = access_control_stack_pointer(th);
-                int ctx_idx = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX, th));
-                if (ctx_idx > 0) {
-                    os_context_t *ctx = nth_interrupt_context(ctx_idx - 1, th);
-                    lispobj *interrupted_csp =
-                        (lispobj*)(uword_t)(*os_context_register_addr(ctx, reg_CSP));
-                    /* build_fake_control_stack_frames places a 4-word frame above
-                     * the interrupted CSP.  Include it in the scan. */
-                    lispobj *limit = interrupted_csp + 4;
-                    if (limit < saved_csp)
-                        access_control_stack_pointer(th) = limit;
-                }
-                scavenge_control_stack(th);
-                access_control_stack_pointer(th) = saved_csp;
-            }
-#else
             scavenge_control_stack(th);
-#endif
         }
 
 # ifdef LISP_FEATURE_SB_SAFEPOINT
