@@ -609,7 +609,7 @@ int check_pending_gc(__attribute__((unused)) os_context_t *context)
 
             bind_variable(IN_SAFEPOINT,LISP_T,self);
             block_deferrable_signals(&sigset);
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
             int was_in_lisp = !foreign_function_call_active_p(self);
             if (was_in_lisp)
                 fake_foreign_function_call_noassert(context);
@@ -626,7 +626,7 @@ int check_pending_gc(__attribute__((unused)) os_context_t *context)
                     funcall0(StaticSymbolFunction(POST_GC));
                 done = 1;
             }
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
             if (was_in_lisp) {
                 sigset_t oldset = thread_extra_data(self)->blocked_signal_set;
                 undo_fake_foreign_function_call(context);

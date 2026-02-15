@@ -45,30 +45,28 @@
 #include <stdbool.h>
 #include "thread.h"
 
-#if defined(LISP_FEATURE_WIN32)
+#ifdef LISP_FEATURE_WIN32
+#define STACK_GUARD_SIZE (win32_page_size + win32_stack_guarantee)
+#else
+#define STACK_GUARD_SIZE os_vm_page_size
+#endif
+
+#ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
 
 #define CONTROL_STACK_HARD_GUARD_PAGE(th) \
     ((os_vm_address_t)(th->control_stack_start))
 #define CONTROL_STACK_GUARD_PAGE(th) \
-    (CONTROL_STACK_HARD_GUARD_PAGE(th) + win32_page_size + win32_stack_guarantee)
-
-#elif defined(LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD)
-
-#define CONTROL_STACK_HARD_GUARD_PAGE(th) \
-    ((os_vm_address_t)(th->control_stack_start))
-#define CONTROL_STACK_GUARD_PAGE(th) \
-    (CONTROL_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size)
+    (CONTROL_STACK_HARD_GUARD_PAGE(th) + STACK_GUARD_SIZE)
 #define CONTROL_STACK_RETURN_GUARD_PAGE(th) \
-    (CONTROL_STACK_GUARD_PAGE(th) + os_vm_page_size)
-
+    (CONTROL_STACK_GUARD_PAGE(th) + STACK_GUARD_SIZE)
 #else
 
 #define CONTROL_STACK_HARD_GUARD_PAGE(th) \
-    (((os_vm_address_t)(th->control_stack_end)) - os_vm_page_size)
+    (((os_vm_address_t)(th->control_stack_end)) - STACK_GUARD_SIZE)
 #define CONTROL_STACK_GUARD_PAGE(th) \
-    (CONTROL_STACK_HARD_GUARD_PAGE(th) - os_vm_page_size)
+    (CONTROL_STACK_HARD_GUARD_PAGE(th) - STACK_GUARD_SIZE)
 #define CONTROL_STACK_RETURN_GUARD_PAGE(th) \
-    (CONTROL_STACK_GUARD_PAGE(th) - os_vm_page_size)
+    (CONTROL_STACK_GUARD_PAGE(th) - STACK_GUARD_SIZE)
 
 #endif
 
