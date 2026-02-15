@@ -628,9 +628,9 @@ int check_pending_gc(__attribute__((unused)) os_context_t *context)
             }
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
             if (was_in_lisp) {
-                sigset_t oldset = thread_extra_data(self)->blocked_signal_set;
                 undo_fake_foreign_function_call(context);
-                thread_extra_data(self)->blocked_signal_set = oldset;
+                /* It blocks all signals again */
+                thread_sigmask(SIG_SETMASK,&sigset,NULL);
             }
 #endif
         }
