@@ -854,9 +854,8 @@ handle_breakpoint_trap(os_context_t *ctx, struct thread* self)
         (lispobj *)*os_context_sp_addr(ctx);
 
     WITH_GC_AT_SAFEPOINTS_ONLY() {
-        block_blockable_signals(&ctx->sigmask);
+        block_blockable_signals(0);
         handle_trap(ctx, trap);
-        thread_sigmask(SIG_SETMASK,&ctx->sigmask,NULL);
     }
 
     /* Done, we're good to go! */
@@ -911,15 +910,11 @@ handle_access_violation(os_context_t *ctx,
          * stack scan to cover the CONTEXT, so register values are found. */
         thread_in_lisp_raised(ctx);
 #else
-        sigset_t oldset = thread_extra_data(self)->blocked_signal_set;
         /* ARM64: separate control and C stacks.  The register context must
          * be explicitly saved so that GC can scan Lisp register values. */
         fake_foreign_function_call(ctx);
         thread_in_lisp_raised(ctx);
         undo_fake_foreign_function_call(ctx);
-        // undo the actions of undo_fake_foreign_function_call
-        thread_extra_data(self)->blocked_signal_set = oldset;
-        ctx->sigmask = oldset;
 #endif
         return 0;
     }
@@ -994,14 +989,14 @@ signal_internal_error_or_lose(os_context_t *ctx,
          * marbles to be able to handle exceptions, but exceptions
          * aren't supposed to happen during cold init or reinit
          * anyway. */
-
-        block_blockable_signals(&ctx->sigmask);
+        sigset_t oldmask;
+        block_blockable_signals(&oldmask);
         fake_foreign_function_call(ctx);
 
         WITH_GC_AT_SAFEPOINTS_ONLY() {
             DX_ALLOC_SAP(context_sap, ctx);
             DX_ALLOC_SAP(exception_record_sap, exception_record);
-            thread_sigmask(SIG_SETMASK, &ctx->sigmask, NULL);
+            thread_sigmask(SIG_SETMASK, &oldmask, NULL);
 
 #if defined(LISP_FEATURE_X86_64)
             asm("fninit");
@@ -1014,7 +1009,6 @@ signal_internal_error_or_lose(os_context_t *ctx,
         }
         /* If Lisp doesn't nlx, we need to put things back. */
         undo_fake_foreign_function_call(ctx);
-        thread_sigmask(SIG_SETMASK, &ctx->sigmask, NULL);
         /* FIXME: HANDLE-WIN32-EXCEPTION should be allowed to decline */
         return;
     }
@@ -1142,8 +1136,10 @@ handle_exception_ex(EXCEPTION_RECORD *exception_record,
         /* All else failed, drop through to the lisp-side exception handler. */
         signal_internal_error_or_lose(ctx, exception_record, fault_address);
 
-    if (self)
+    if (self) {
         thread_extra_data(self)->carried_base_pointer = oldbp;
+        thread_extra_data(self)->blocked_signal_set = context.sigmask;
+    }
 
     errno = lastErrno;
     SetLastError(lastError);

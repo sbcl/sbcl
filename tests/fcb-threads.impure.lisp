@@ -22,7 +22,7 @@
 
 #+win32
 (with-scratch-file (solib "dll")
-  (sb-ext:run-program "gcc"
+  (sb-ext:run-program (or #+arm64 "clang" "gcc")
                       `("-shared" "-o" ,solib "fcb-threads.c")
                       :search t)
   (sb-alien:load-shared-object solib))
@@ -219,4 +219,3 @@
 
 (with-test (:name :try-join-foreign-thread)
   (assert (eq (tryjoiner) 'ok)))
-
