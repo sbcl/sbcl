@@ -56,6 +56,50 @@
       (assert (= 1 (count 1 bv3)))
       (assert (= 67 (count 0 bv3))))))
 
+(with-test (:name (bit-vector count :start :end))
+  ;; a special COUNT transform on bitvectors; triggers on (>= SPEED
+  ;; SPACE)
+  (locally
+      (declare (optimize (speed 3) (space 1)))
+    (let ((bv1 (make-array 5 :element-type 'bit :initial-element 0))
+          (bv2 (make-array 0 :element-type 'bit :initial-element 0)))
+      (declare (type simple-bit-vector bv1 bv2))
+      ;; bitvector smaller than the word size
+      (assert (= 0 (count 1 bv1)))
+      (assert (= 5 (count 0 bv1)))
+      (assert (= 0 (count 1 bv1 :start 0 :end 5)))
+      (assert (= 4 (count 0 bv1 :start 1 :end 5)))
+      ;; special case of 0-length bitvectors
+      (assert (= 0 (count 1 bv2)))
+      (assert (= 0 (count 0 bv2))))
+    (let ((bv3 (make-array 68 :element-type 'bit :initial-element 0)))
+      ;; bitvector larger than the word size
+      (setf (sbit bv3 42) 1)
+      (assert (= 1 (count 1 bv3)))
+      (assert (= 67 (count 0 bv3)))
+      (fill bv3 1)
+      (assert (= 0 (count 1 bv3 :start 0 :end 0)))
+      (assert (= 1 (count 1 bv3 :start 64 :end 65)))
+      (assert (= 0 (count 1 bv3 :start 64 :end 64)))
+      (assert (= 0 (count 1 bv3 :start 65 :end 65))))
+    ;; Displaced bit vectors
+    (let ((bv4 (make-array 98 :element-type 'bit :initial-element 0)))
+      (fill bv4 1 :start 60 :end 70)
+      (assert (= 10 (count 1 (make-array 10 :element-type 'bit :displaced-to bv4 :displaced-index-offset 60))))
+      (assert (= 0 (count 1 (make-array 10 :element-type 'bit :displaced-to bv4 :displaced-index-offset 60)
+                          :start 10))))
+    (let ((bv/fp (make-array 10 :element-type 'bit :initial-element 1 :fill-pointer 0)))
+      (assert (zerop (count 1 bv/fp))))
+    (dotimes (x 10)
+      (let* ((len (random 514))
+             (start (if (zerop len) 0 (random len)))
+             (end (if (zerop len) 0 (random len)))
+             (bv (make-array len :element-type 'bit :initial-element 1)))
+        (when (> start end) (rotatef start end))
+        (assert (= (- end start) (count 1 bv :start start :end end)))
+        (fill bv 0)
+        (assert (= (- end start) (count 0 bv :start start :end end)))))))
+
 ;;; now test the biggy, mostly that it works...
 ;;;
 ;;; except on machines where the arrays won't fit into the dynamic
