@@ -98,16 +98,16 @@
 ;;; types and initialization
 
 (define-alien-type gmp-limb
-  #-(and win32 x86-64) unsigned-long
-  #+(and win32 x86-64) unsigned-long-long)
+  #-(and win32 64-bit) unsigned-long
+  #+(and win32 64-bit) unsigned-long-long)
 
 (deftype ui ()
-  #-(and win32 x86-64) 'sb-vm:word
-  #+(and win32 x86-64) '(unsigned-byte 32))
+  #-(and win32 64-bit) 'sb-vm:word
+  #+(and win32 64-bit) '(unsigned-byte 32))
 
 (deftype si ()
-  #-(and win32 x86-64) 'sb-vm:signed-word
-  #+(and win32 x86-64) '(signed-byte 32))
+  #-(and win32 64-bit) 'sb-vm:signed-word
+  #+(and win32 64-bit) '(signed-byte 32))
 
 (define-alien-type nil
     (struct gmpint
