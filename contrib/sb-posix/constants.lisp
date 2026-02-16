@@ -310,7 +310,7 @@
               (c-string-pointer passwd "char *" "gr_passwd")
               (gid-t gid "gid_t" "gr_gid")
               ((* c-string) mem "char **" "gr_mem")))
-
+ #-(and win32 ucrt)
  (:structure alien-stat
              ("struct stat"
               (mode-t mode "mode_t" "st_mode")
@@ -339,6 +339,20 @@
               (off-t size "off_t" "st_size")
               #+android
               ((signed 64) size "long long" "st_size")
+              (time-t atime "time_t" "st_atime")
+              (time-t mtime "time_t" "st_mtime")
+              (time-t ctime "time_t" "st_ctime")))
+ #+(and win32 ucrt)
+ (:structure alien-stat
+             ("struct __stat64"
+              (dev-t dev "_dev_t" "st_dev")
+              (ino-t ino "_ino_t" "st_ino")
+              (mode-t mode "mode_t" "st_mode")
+              (nlink-t nlink "nlink_t" "st_nlink")
+              (uid-t uid "uid_t" "st_uid")
+              (gid-t gid "gid_t" "st_gid")
+              (dev-t rdev "_dev_t" "st_rdev")
+              ((signed 64) size "__int64" "st_size")
               (time-t atime "time_t" "st_atime")
               (time-t mtime "time_t" "st_mtime")
               (time-t ctime "time_t" "st_ctime")))

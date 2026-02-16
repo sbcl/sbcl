@@ -27,8 +27,7 @@
           (loop repeat nthreads
              collect (make-thread (lambda ()
                                     (loop repeat 1000
-                                       do (atomic-update (cdr x) #'1+)
-                                         (sleep 0.00001))))))
+                                       do (atomic-update (cdr x) #'1+))))))
     (assert (equal x `(:count ,@(* 1000 nthreads))))))
 
 (with-test (:name mutex-owner)
