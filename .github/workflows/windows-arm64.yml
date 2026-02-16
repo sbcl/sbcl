@@ -57,9 +57,9 @@ jobs:
       with:
         name: sbcl-windows-installer-${{ matrix.sys }}
         path: sbcl-windows-installer
-    # - name: tests
-    #   working-directory: tests
-    #   run: ./run-tests.sh
+    - name: tests
+      working-directory: tests
+      run: ./run-tests.sh
     - name: ansi-tests
       working-directory: tests
       run: ./ansi-tests.sh

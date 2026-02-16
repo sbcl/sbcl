@@ -19,7 +19,7 @@
 (defvar *soname*)
 #+win32
 (with-scratch-file (dll "dll")
-  (sb-ext:run-program "gcc" `("-shared" "-o" ,dll "alien-struct-by-value.c")
+  (sb-ext:run-program (or #+arm64 "clang" "gcc") `("-shared" "-o" ,dll "alien-struct-by-value.c")
                       :search t)
   (load-shared-object dll))
 #-win32

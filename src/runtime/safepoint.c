@@ -252,7 +252,7 @@ set_csp_from_context(struct thread *self, os_context_t *ctx)
      * called fake_foreign_function_call(), and having accurate values
      * here makes the debugging experience easier and less
      * disconcerting. */
-    void **sp = (void **) access_control_stack_pointer(self);
+    void **sp = (void **) *os_context_register_addr(ctx, reg_CSP);
 #endif
     csp_around_foreign_call(self) = (lispobj) sp;
 }
@@ -597,11 +597,6 @@ int check_pending_gc(__attribute__((unused)) os_context_t *context)
 
             bind_variable(IN_SAFEPOINT,LISP_T,self);
             block_deferrable_signals(&sigset);
-#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-            int was_in_lisp = !foreign_function_call_active_p(self);
-            if (was_in_lisp)
-                fake_foreign_function_call_noassert(context);
-#endif
             if(read_TLS(GC_PENDING,self)==LISP_T)
                 gc_happened = funcall1(StaticSymbolFunction(SUB_GC), 0);
             unbind(self);
@@ -614,11 +609,6 @@ int check_pending_gc(__attribute__((unused)) os_context_t *context)
                     funcall0(StaticSymbolFunction(POST_GC));
                 done = 1;
             }
-#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-            if (was_in_lisp) {
-                undo_fake_foreign_function_call(context);
-            }
-#endif
         }
     }
     return done;

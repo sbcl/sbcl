@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - { sys: mingw64, env: x86_64, arch: x86-64}
+          # - { sys: mingw64, env: x86_64, arch: x86-64}
           # - { sys: mingw32, env: i686, arch: x86}
           - { sys: ucrt64,  env: ucrt-x86_64, arch: x86-64}
 

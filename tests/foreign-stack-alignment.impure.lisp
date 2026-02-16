@@ -25,7 +25,7 @@
              output))
     output))
 (defun cc (&rest arguments)
-  (apply #'run #+unix "./run-compiler.sh" #+win32 "gcc" arguments))
+  (apply #'run #+unix "./run-compiler.sh" #+win32 (or #+arm64 "clang" "gcc") arguments))
 
 (defvar *required-alignment*
   (or #+arm 8

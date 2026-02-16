@@ -844,14 +844,21 @@ handle_breakpoint_trap(os_context_t *ctx, struct thread* self)
     if (trap == trap_PendingInterrupt) {
         /* Advance PC past the trap instruction and any trailing data. */
         arch_skip_instruction(ctx);
+#ifdef LISP_FEATURE_ARM64
+        fake_foreign_function_call(ctx);
+#endif
         thread_interrupted(ctx);
+#ifdef LISP_FEATURE_ARM64
+        undo_fake_foreign_function_call(ctx);
+#endif
         return 0;
     }
 
+#ifndef LISP_FEATURE_ARM64
     /* This is just for info in case the monitor wants to print an
      * approximation. */
-    access_control_stack_pointer(self) =
-        (lispobj *)*os_context_sp_addr(ctx);
+    access_control_stack_pointer(self) = (lispobj *)*os_context_sp_addr(ctx);
+#endif
 
     WITH_GC_AT_SAFEPOINTS_ONLY() {
         block_blockable_signals(0);

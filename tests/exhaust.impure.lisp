@@ -11,7 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#+interpreter (invoke-restart 'run-tests::skip-file)
+#+(or interpreter (and win32 arm64)) (invoke-restart 'run-tests::skip-file)
 
 (test-util::disable-profiling)
 

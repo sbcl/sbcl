@@ -1,4 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-2.6.1:
+  * platform support:
+    ** ported to Windows on arm64 (thanks to Masatoshi SANO)
 
 changes in sbcl-2.6.1 relative to sbcl-2.6.0:
   * minor incompatible change: the never-documented :NO-CONSTRUCTOR-DEFUN
