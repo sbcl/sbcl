@@ -252,7 +252,7 @@ set_csp_from_context(struct thread *self, os_context_t *ctx)
      * called fake_foreign_function_call(), and having accurate values
      * here makes the debugging experience easier and less
      * disconcerting. */
-    void **sp = (void **) *os_context_register_addr(ctx, reg_CSP);
+    void **sp = (void **) access_control_stack_pointer(self);
 #endif
     csp_around_foreign_call(self) = (lispobj) sp;
 }
