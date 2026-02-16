@@ -178,10 +178,11 @@
       (sb-sys:with-pinned-objects (packed-int result)
         ;; Now exercise the C unpacker.
         ;; This hack of allocating 4 longs is terrible, but whatever.
-        (let ((unpacker (make-alien long 4))
+        (let ((unpacker (make-alien (signed #.sb-vm:n-word-bits) 4))
               (prev-loc 0))
           (alien-funcall (extern-alien "varint_unpacker_init"
-                                       (function void (* long) unsigned))
+                                       (function void (* long)
+                                                 (unsigned #.sb-vm:n-word-bits)))
                          unpacker
                          (sb-kernel:get-lisp-obj-address packed-int))
           (sb-int:collect ((unpacked))
