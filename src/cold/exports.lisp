@@ -1245,6 +1245,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)")
            "UNLOAD-SHARED-OBJECT"
            "UNSIGNED"
            "UNSIGNED-CHAR" "UNSIGNED-INT" "UNSIGNED-LONG" "UNSIGNED-LONG-LONG" "UNSIGNED-SHORT"
+           "WORD" "SIGNED-WORD"
            "UTF8-STRING"
            "VALUES"
            "VOID"

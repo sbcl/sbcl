@@ -178,11 +178,10 @@
       (sb-sys:with-pinned-objects (packed-int result)
         ;; Now exercise the C unpacker.
         ;; This hack of allocating 4 longs is terrible, but whatever.
-        (let ((unpacker (make-alien (signed #.sb-vm:n-word-bits) 4))
+        (let ((unpacker (make-alien word 4))
               (prev-loc 0))
           (alien-funcall (extern-alien "varint_unpacker_init"
-                                       (function void (* long)
-                                                 (unsigned #.sb-vm:n-word-bits)))
+                                       (function void (* word) word))
                          unpacker
                          (sb-kernel:get-lisp-obj-address packed-int))
           (sb-int:collect ((unpacked))
@@ -190,7 +189,7 @@
              (let ((status
                     (alien-funcall
                      (extern-alien "varint_unpack"
-                                   (function int (* long) system-area-pointer))
+                                   (function int (* word) system-area-pointer))
                      unpacker (sb-sys:vector-sap result))))
                (let ((val (aref result 0)))
                  ;; status of 0 is EOF, val = 0 means a decoded value was 0,

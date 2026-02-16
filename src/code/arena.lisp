@@ -115,8 +115,7 @@ one or more times, not to exceed MAX-EXTENSIONS times"
   (%primitive delete-arena arena)
   #-x86-64
   (alien-funcall (extern-alien "sbcl_delete_arena"
-                               (function void
-                                         unsigned-long))
+                               (function void word))
                  (get-lisp-obj-address arena))
   ;; It is illegal to access the structure now, since that was in the arena.
   ;; So return an arbitrary success indicator. It might happen that you can accidentally

@@ -34,6 +34,8 @@
 (define-alien-type unsigned-long (unsigned #+win32 32
                                            #-win32 #.sb-vm:n-machine-word-bits))
 (define-alien-type unsigned-long-long (unsigned 64))
+(define-alien-type word (unsigned #.sb-vm:n-machine-word-bits))
+(define-alien-type signed-word (signed #.sb-vm:n-machine-word-bits))
 
 (define-alien-type float single-float)
 (define-alien-type double double-float)

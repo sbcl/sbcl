@@ -97,9 +97,7 @@
 
 ;;; types and initialization
 
-(define-alien-type gmp-limb
-  #-(and win32 64-bit) unsigned-long
-  #+(and win32 64-bit) unsigned-long-long)
+(define-alien-type gmp-limb word)
 
 (deftype ui ()
   #-(and win32 64-bit) 'sb-vm:word
