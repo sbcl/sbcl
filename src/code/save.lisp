@@ -324,20 +324,20 @@ sufficiently motivated to do lengthy fixes."
   #+sb-thread
   (let (error)
     (with-system-mutex (sb-thread::*make-thread-lock*)
-      (finalizer-thread-stop)
       (sb-thread::%dispose-thread-structs)
       (let ((threads (sb-thread:list-all-threads))
             (starting
              (setq sb-thread::*starting-threads* ; ordinarily pruned in MAKE-THREAD
                    (delete 0 sb-thread::*starting-threads*)))
             (joinable sb-thread::*joinable-threads*))
-        (when (or (cdr threads) starting joinable)
-          (let* ((interactive (sb-thread::interactive-threads))
-                 (other (union (set-difference threads interactive)
-                               (union starting joinable))))
-            (setf error (make-condition 'save-with-multiple-threads-error
-                                        :interactive-threads interactive
-                                        :other-threads other))))))
+        (if (or (cdr threads) starting joinable)
+            (let* ((interactive (sb-thread::interactive-threads))
+                   (other (union (set-difference threads interactive)
+                                 (union starting joinable))))
+              (setf error (make-condition 'save-with-multiple-threads-error
+                                          :interactive-threads interactive
+                                          :other-threads other)))
+            (finalizer-thread-stop))))
     (when error (error error))
     #+allocator-metrics (setq sb-thread::*allocator-metrics* nil)
     (setq sb-thread::*sprof-data* nil))

@@ -27,3 +27,14 @@
       (setf donep t)
       (sb-thread:condition-notify cvar))
     (sb-thread:join-thread thread)))
+
+(with-test (:name (sb-ext:save-lisp-and-die error :multiple-threads-2))
+  (let* ((sem (sb-thread:make-semaphore))
+         (thread (sb-thread:make-thread
+                  (lambda () (sb-thread:wait-on-semaphore sem)))))
+    (assert (eq (handler-case (save-lisp-and-die "expect_failure")
+                  (sb-impl::save-with-multiple-threads-error () 'ok))
+                'ok))
+    (assert (sb-thread::thread-p sb-impl::*finalizer-thread*))
+    (sb-thread:signal-semaphore sem)
+    (sb-thread:join-thread thread)))
