@@ -588,12 +588,17 @@ int apply_pie_relocs(long code_space_translation,
 # define ELF_MACHINE EM_AARCH64
 # define CORE_ALIGNMENT 65536
 # define OUR_RELOC_KIND R_AARCH64_ABS64
-#else
+#elif defined LISP_FEATURE_PPC64 && defined LISP_FEATURE_LITTLE_ENDIAN /* assume abi v2 */
+# define ELF_MACHINE EM_PPC64
+# define CORE_ALIGNMENT 65536
+# define OUR_RELOC_KIND R_PPC64_ADDR64
+#elif defined LISP_FEATURE_X86_64
 # define ELF_MACHINE EM_X86_64
 # define CORE_ALIGNMENT 32768
 # define OUR_RELOC_KIND R_X86_64_64
 #endif
 
+#ifdef ELF_MACHINE
 static uint32_t add_string(char *buffer, uint32_t *current_size, const char *str) {
     uint32_t offset = *current_size;
     strcpy(buffer + offset, str);
@@ -729,5 +734,8 @@ void generate_elfcore_obj(const char *filename,
     fclose(f);
     // Should really free() some stuff but it's not a leak since this program is now exiting
 }
+#else
+void generate_elfcore_obj() { lose("Unsupported: generate_elfcore_obj"); }
+#endif /* ELF_MACHINE */
 
-#endif
+#endif /* LISP_FEATURE_ELF */

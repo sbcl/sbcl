@@ -84,7 +84,9 @@ open_binary(char *filename, int mode)
     return open(filename, mode);
 }
 
-#if defined LISP_FEATURE_LINUX && (defined LISP_FEATURE_X86_64 || defined LISP_FEATURE_ARM64)
+#if defined LISP_FEATURE_LINUX && \
+ (defined LISP_FEATURE_X86_64 || defined LISP_FEATURE_ARM64 \
+ || (defined LISP_FEATURE_PPC64 && defined LISP_FEATURE_LITTLE_ENDIAN))
 #define ELFCORE 1
 #elif !defined(ELFCORE)
 #define ELFCORE 0
