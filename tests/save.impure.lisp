@@ -28,7 +28,8 @@
       (sb-thread:condition-notify cvar))
     (sb-thread:join-thread thread)))
 
-(with-test (:name (sb-ext:save-lisp-and-die error :multiple-threads-2))
+(with-test (:name (sb-ext:save-lisp-and-die error :multiple-threads-2)
+              :skipped-on (not :sb-thread))
   (let* ((sem (sb-thread:make-semaphore))
          (thread (sb-thread:make-thread
                   (lambda () (sb-thread:wait-on-semaphore sem)))))
