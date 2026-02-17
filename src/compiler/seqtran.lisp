@@ -461,6 +461,8 @@
   (when (and key (lvar-fun-is key '(identity)))
     (setf key nil))
   (flet ((test-is (names)
+           ;; test-value is a symbol coming from
+           ;; %member or %member-eq, which do not have a :test lvar
            (if test-value
                (memq test-value names)
                (if test
@@ -529,7 +531,8 @@
         (let* ((c-test (cond ((test-is '(eq))
                               (setf test nil)
                               'eq)
-                             ((and (not test) (not test-not))
+                             ((or (eq test-value 'eql)
+                                  (and (not test) (not test-not)))
                               (when (cond ((or (neq name 'adjoin)
                                                (not key))
                                            (eq-comparable-type-p (lvar-type item)))
@@ -710,6 +713,8 @@
                `(progn
                   (deftransform ,name ((item list &key key test test-not) * * :node node)
                     (transform-list-item-seek ',name item list key test test-not node))
+                  (deftransform ,basic ((item list) * * :important nil :node node)
+                    (transform-list-item-seek ',name item list nil nil nil node 'eql))
                   (deftransform ,basic ((item list) (eq-comparable-type t) * :important nil)
                     `(,',basic-eq item list))
                   (deftransform ,basic-eq ((item list) * * :node node :important nil)

@@ -1082,4 +1082,9 @@
            (ctu:ir1-named-calls
             `(lambda (l m)
                (unless l
-                 (and (member m (or l '(3 5 7)) :test #'eq) t)))))))
+                 (and (member m (or l '(3 5 7)) :test #'eq) t))))))
+  (assert (null
+           (ctu:ir1-named-calls
+            `(lambda (l m)
+               (unless l
+                 (and (member m (or l '(3 5 7))) t)))))))
