@@ -1076,3 +1076,10 @@
    (lambda (n)
      (aref #("a" "b") n))
    simple-string))
+
+(with-test (:name :member-test-eq-reoptimize)
+  (assert (null
+           (ctu:ir1-named-calls
+            `(lambda (l m)
+               (unless l
+                 (and (member m (or l '(3 5 7)) :test #'eq) t)))))))

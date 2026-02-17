@@ -451,7 +451,7 @@
 
 (defparameter *list-open-code-limit* 128)
 
-(defun transform-list-item-seek (name item list key test test-not node)
+(defun transform-list-item-seek (name item list key test test-not node &optional test-value)
   (when (and test test-not)
     (abort-ir1-transform "Both ~S and ~S supplied to ~S." :test :test-not name))
   ;; If TEST is EQL, drop it.
@@ -460,130 +460,137 @@
   ;; Ditto for KEY IDENTITY.
   (when (and key (lvar-fun-is key '(identity)))
     (setf key nil))
+  (flet ((test-is (names)
+           (if test-value
+               (memq test-value names)
+               (if test
+                   (lvar-fun-is test names)
+                   (member 'eql names)))))
+    (when (and (member name '(member assoc rassoc))
+               (not test-not) ; keep it simple, no other keywords allowed
+               (not key)
+               (test-is '(eq eql))
+               (constant-lvar-p list))
+      (let ((items (lvar-value list)))
+        ;; spec says MEMBER "Should be prepared to signal an error of type type-error
+        ;; if list is not a proper list." This optimization can't do that.
+        ;; TRY-mumble will figure out based on what function it is trying to transform
+        ;; whether all keys are acceptable.
+        (when (and (slow-findhash-allowed node)
+                   (proper-list-p items)
+                   (policy node (> jump-table 0)))
+          (let* ((conditional (if-p (node-dest node)))
+                 (expr (unless (and conditional
+                                    (or-eq-transform-p items))
+                         (try-perfect-find/position-map
+                          name
+                          (if conditional ''(t)) ; returned value if present in the mapping
+                          (lvar-type item) items nil node))))
+            ;; Give the user a way to realize that the compiler didn't do what they might have
+            ;; expected it to. What's particularly sad about this is that we had complete
+            ;; freedom to pick any hash function to avoid collisions, so in the case of fixnums,
+            ;; we could have chosen something other than the low 32 bits if that worked better.
+            ;; But I think this is better than feigning ignorance of a problem.
+            (when (eq expr :fail)
+              (when (policy node (> jump-table 1))
+                (compiler-notify 'perfect-hash-generator-failed
+                                 :format-control "Hash collisions prevent converting ~S to O(1) search"
+                                 :format-arguments (list name)))
+              (setq expr nil))
+            (when expr
+              ;; The value delivered to an IF node must be a list because MEMBER and MEMQ
+              ;; are declared in fndb to return a list. If it were just the symbol T,
+              ;; then type inference would get all whacky on you.
+              (when conditional
+                (derive-node-type node (specifier-type 'list) :from-scratch t)) ; erase any cons types
+              (return-from transform-list-item-seek expr))))))
 
-  (when (and (member name '(member assoc rassoc))
-             ;; If the test was EQL, we've already changed it to NIL.
-             (or (not test) (lvar-fun-is test '(eq)))
-             (not test-not) ; keep it simple, no other keywords allowed
-             (not key)
-             (constant-lvar-p list))
-    (let ((items (lvar-value list)))
-      ;; spec says MEMBER "Should be prepared to signal an error of type type-error
-      ;; if list is not a proper list." This optimization can't do that.
-      ;; TRY-mumble will figure out based on what function it is trying to transform
-      ;; whether all keys are acceptable.
-      (when (and (slow-findhash-allowed node)
-                 (proper-list-p items)
-                 (policy node (> jump-table 0)))
-        (let* ((conditional (if-p (node-dest node)))
-               (expr (unless (and conditional
-                                  (or-eq-transform-p items))
-                       (try-perfect-find/position-map
-                        name
-                        (if conditional ''(t)) ; returned value if present in the mapping
-                        (lvar-type item) items nil node))))
-          ;; Give the user a way to realize that the compiler didn't do what they might have
-          ;; expected it to. What's particularly sad about this is that we had complete
-          ;; freedom to pick any hash function to avoid collisions, so in the case of fixnums,
-          ;; we could have chosen something other than the low 32 bits if that worked better.
-          ;; But I think this is better than feigning ignorance of a problem.
-          (when (eq expr :fail)
-            (when (policy node (> jump-table 1))
-              (compiler-notify 'perfect-hash-generator-failed
-                               :format-control "Hash collisions prevent converting ~S to O(1) search"
-                               :format-arguments (list name)))
-            (setq expr nil))
-          (when expr
-            ;; The value delivered to an IF node must be a list because MEMBER and MEMQ
-            ;; are declared in fndb to return a list. If it were just the symbol T,
-            ;; then type inference would get all whacky on you.
-            (when conditional
-              (derive-node-type node (specifier-type 'list) :from-scratch t)) ; erase any cons types
-            (return-from transform-list-item-seek expr))))))
-
-  ;; Key can legally be NIL, but if it's NIL for sure we pretend it's
-  ;; not there at all. If it might be NIL, make up a form to that
-  ;; ensures it is a function.
-  (multiple-value-bind (key key-form)
-      (when key
-        (let ((key-type (lvar-type key))
-              (null-type (specifier-type 'null)))
-          (cond ((csubtypep key-type null-type)
-                 (values nil nil))
-                ((types-equal-or-intersect null-type key-type)
-                 (values key '(if key
-                               (%coerce-callable-to-fun key)
-                               #'identity)))
-                (t
-                 (values key (ensure-lvar-fun-form key 'key))))))
-    (let ((test-sym 'test)
-          (test-not-sym 'test-not))
-      (when (and (or test test-not)
-                 (splice-fun-args (or test test-not) 'complement 1 nil))
-        (rotatef test test-not)
-        (rotatef test-sym test-not-sym))
-      (let* ((c-test (cond ((and test (lvar-fun-is test '(eq)))
-                            (setf test nil)
-                            'eq)
-                           ((and (not test) (not test-not))
-                            (when (cond ((or (neq name 'adjoin)
-                                             (not key))
-                                         (eq-comparable-type-p (lvar-type item)))
-                                        (t
-                                         (let ((type (lvar-fun-type key t t)))
-                                           (when (fun-type-p type)
-                                             (eq-comparable-type-p
-                                              (single-value-type (fun-type-returns type)))))))
-                              'eq))))
-             (funs (delete nil (list (when key (list key 'key))
-                                     (when test (list test 'test test-sym))
-                                     (when test-not (list test-not 'test-not test-not-sym)))))
-             (target-expr (if key '(%funcall key target) 'target))
-             (test-expr (cond (test `(%funcall ,test-sym item ,target-expr))
-                              (test-not `(not (%funcall ,test-not-sym item ,target-expr)))
-                              (c-test `(,c-test item ,target-expr))
-                              (t `(eql item ,target-expr)))))
-        (labels ((open-code (tail)
-                   (when tail
-                     `(if (let ((this ',(car tail)))
-                            ,(ecase name
-                               ((assoc rassoc)
-                                (let ((cxx (if (eq name 'assoc) 'car 'cdr)))
-                                  `(and this (let ((target (,cxx this)))
-                                               ,test-expr))))
-                               (member
-                                `(let ((target this))
-                                   ,test-expr))))
-                          ',(ecase name
-                              ((assoc rassoc) (car tail))
-                              (member tail))
-                          ,(open-code (cdr tail)))))
-                 (ensure-fun (args)
-                   (if (eq 'key (second args))
-                       key-form
-                       (ensure-lvar-fun-form (first args) (third args)))))
-          (let* ((cp (constant-lvar-p list))
-                 (c-list (when cp (lvar-value list))))
-            (cond ((not (proper-list-p c-list))
-                   (abort-ir1-transform "Argument to ~a is not a proper list." name))
-                  ((and cp c-list (member name '(assoc rassoc member))
-                        (policy node (>= speed space))
-                        (not (nthcdr *list-open-code-limit* c-list))
-                        (not (and (producing-fasl-file)
-                                  (handler-case (maybe-emit-make-load-forms c-list)
-                                    ((or compiler-error error) ()
-                                      t)))))
-                   `(let ,(mapcar (lambda (fun) `(,(second fun) ,(ensure-fun fun))) funs)
-                      ,(open-code c-list)))
-                  ((and cp (not c-list))
-                   ;; constant nil list
-                   (if (eq name 'adjoin)
-                       '(list item)
-                       nil))
+    ;; Key can legally be NIL, but if it's NIL for sure we pretend it's
+    ;; not there at all. If it might be NIL, make up a form to that
+    ;; ensures it is a function.
+    (multiple-value-bind (key key-form)
+        (when key
+          (let ((key-type (lvar-type key))
+                (null-type (specifier-type 'null)))
+            (cond ((csubtypep key-type null-type)
+                   (values nil nil))
+                  ((types-equal-or-intersect null-type key-type)
+                   (values key '(if key
+                                 (%coerce-callable-to-fun key)
+                                 #'identity)))
                   (t
-                   ;; specialized out-of-line version
-                   `(,(specialized-list-seek-function-name name (mapcar #'second funs) c-test)
-                     item list ,@(mapcar #'ensure-fun funs))))))))))
+                   (values key (ensure-lvar-fun-form key 'key))))))
+      (let ((test-sym 'test)
+            (test-not-sym 'test-not))
+        (when (and (or test test-not)
+                   (splice-fun-args (or test test-not) 'complement 1 nil))
+          (rotatef test test-not)
+          (rotatef test-sym test-not-sym))
+        (let* ((c-test (cond ((test-is '(eq))
+                              (setf test nil)
+                              'eq)
+                             ((and (not test) (not test-not))
+                              (when (cond ((or (neq name 'adjoin)
+                                               (not key))
+                                           (eq-comparable-type-p (lvar-type item)))
+                                          (t
+                                           (let ((type (lvar-fun-type key t t)))
+                                             (when (fun-type-p type)
+                                               (eq-comparable-type-p
+                                                (single-value-type (fun-type-returns type)))))))
+                                'eq))))
+               (funs (delete nil (list (when key (list key 'key))
+                                       (when test (list test 'test test-sym))
+                                       (when test-not (list test-not 'test-not test-not-sym)))))
+               (target-expr (if key '(%funcall key target) 'target))
+               (test-expr (cond (test `(%funcall ,test-sym item ,target-expr))
+                                (test-not `(not (%funcall ,test-not-sym item ,target-expr)))
+                                (c-test `(,c-test item ,target-expr))
+                                (t `(eql item ,target-expr)))))
+          (labels ((open-code (tail)
+                     (when tail
+                       `(if (let ((this ',(car tail)))
+                              ,(ecase name
+                                 ((assoc rassoc)
+                                  (let ((cxx (if (eq name 'assoc) 'car 'cdr)))
+                                    `(and this (let ((target (,cxx this)))
+                                                 ,test-expr))))
+                                 (member
+                                  `(let ((target this))
+                                     ,test-expr))))
+                            ',(ecase name
+                                ((assoc rassoc) (car tail))
+                                (member tail))
+                            ,(open-code (cdr tail)))))
+                   (ensure-fun (args)
+                     (if (eq 'key (second args))
+                         key-form
+                         (ensure-lvar-fun-form (first args) (third args)))))
+            (let* ((cp (constant-lvar-p list))
+                   (c-list (when cp (lvar-value list))))
+              (cond ((not (proper-list-p c-list))
+                     (abort-ir1-transform "Argument to ~a is not a proper list." name))
+                    ((and cp c-list (member name '(assoc rassoc member))
+                          (policy node (>= speed space))
+                          (not (nthcdr *list-open-code-limit* c-list))
+                          (not (and (producing-fasl-file)
+                                    (handler-case (maybe-emit-make-load-forms c-list)
+                                      ((or compiler-error error) ()
+                                        t)))))
+                     `(let ,(mapcar (lambda (fun) `(,(second fun) ,(ensure-fun fun))) funs)
+                        ,(open-code c-list)))
+                    ((and cp (not c-list))
+                     ;; constant nil list
+                     (if (eq name 'adjoin)
+                         '(list item)
+                         nil))
+                    (test-value
+                     ;; already specialized
+                     (give-up-ir1-transform))
+                    (t
+                     ;; specialized out-of-line version
+                     `(,(specialized-list-seek-function-name name (mapcar #'second funs) c-test)
+                       item list ,@(mapcar #'ensure-fun funs)))))))))))
 
 (defun transform-list-pred-seek (name pred list key node)
   ;; If KEY is IDENTITY, drop it.
@@ -705,6 +712,8 @@
                     (transform-list-item-seek ',name item list key test test-not node))
                   (deftransform ,basic ((item list) (eq-comparable-type t) * :important nil)
                     `(,',basic-eq item list))
+                  (deftransform ,basic-eq ((item list) * * :node node :important nil)
+                    (transform-list-item-seek ',name item list nil nil nil node 'eq))
                   ,(unless (eq name 'adjoin) ;; applies KEY to ITEM.
                      `(deftransform ,basic-key ((item list key) (eq-comparable-type t t) * :important nil)
                         `(,',basic-key-eq item list key)))
