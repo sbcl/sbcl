@@ -327,8 +327,8 @@ sufficiently motivated to do lengthy fixes."
       (sb-thread::%dispose-thread-structs)
       (let ((threads (sb-thread:list-all-threads))
             (starting
-             (setq sb-thread::*starting-threads* ; ordinarily pruned in MAKE-THREAD
-                   (delete sb-impl::*finalizer-thread*
+             (remove sb-impl::*finalizer-thread*
+                     (setq sb-thread::*starting-threads* ; ordinarily pruned in START-THREAD
                            (delete 0 sb-thread::*starting-threads*))))
             (joinable sb-thread::*joinable-threads*))
         (if (or (cdr threads) starting joinable)
