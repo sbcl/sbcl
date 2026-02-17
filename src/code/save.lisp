@@ -328,7 +328,8 @@ sufficiently motivated to do lengthy fixes."
       (let ((threads (sb-thread:list-all-threads))
             (starting
              (setq sb-thread::*starting-threads* ; ordinarily pruned in MAKE-THREAD
-                   (delete 0 sb-thread::*starting-threads*)))
+                   (delete sb-impl::*finalizer-thread*
+                           (delete 0 sb-thread::*starting-threads*))))
             (joinable sb-thread::*joinable-threads*))
         (if (or (cdr threads) starting joinable)
             (let* ((interactive (sb-thread::interactive-threads))
