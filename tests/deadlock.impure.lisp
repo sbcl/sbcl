@@ -107,8 +107,7 @@
                     :deadlock))))
     (assert (eq :ok (join-thread t1)))))
 
-(with-test (:name (:deadlock-detection :interrupts)
-            :broken-on :win32)
+(with-test (:name (:deadlock-detection :interrupts))
   (let* ((m1 (sb-thread:make-mutex :name "M1"))
          (m2 (sb-thread:make-mutex :name "M2"))
          (t1-can-go (sb-thread:make-semaphore :name "T1 can go"))
@@ -278,8 +277,7 @@
 ;;; This encounters the "backing off for retry" error if attempting
 ;;; to start too many threads.
 (defparameter *max-runnable-threads* #+x86-64 100 #-x86-64 5)
-(with-test (:name :gc-deadlock
-            :broken-on :win32)
+(with-test (:name :gc-deadlock)
   #+nil (write-line "WARNING: THIS TEST WILL HANG ON FAILURE!")
   ;; Prior to 0.9.16.46 thread exit potentially deadlocked the
   ;; GC due to *all-threads-lock* and session lock. On earlier

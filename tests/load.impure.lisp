@@ -387,8 +387,7 @@
 ;; entirely by the fasl interpreter - which exacerbated the problem.
 ;; A meager attempt at a fix of mutex-guarding ALLOCATE-CODE-OBJECT did not
 ;; resolve the deadlock, and was not ideal anyway.
-(with-test (:name :parallel-fasl-load
-            :skipped-on :sb-safepoint)
+(with-test (:name :parallel-fasl-load)
   #+sb-thread
   (with-scratch-file (fasl "fasl")
     (let ((ready nil))

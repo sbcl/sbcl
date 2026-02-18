@@ -1,7 +1,7 @@
 #-sb-thread (invoke-restart 'run-tests::skip-file)
 
 (with-test (:name (:two-threads-running-gc)
-                  :broken-on :sb-safepoint)
+                  )
   (let (a-done b-done)
     (make-join-thread (lambda ()
                         (dotimes (i 100)
@@ -21,8 +21,7 @@
 
 (compile 'waste)
 
-(with-test (:name (:one-thread-runs-gc-while-other-conses)
-                  :broken-on :win32)
+(with-test (:name (:one-thread-runs-gc-while-other-conses))
   (loop for i below 100 do
         (princ "!")
         (force-output)
@@ -33,8 +32,7 @@
         (sb-ext:gc)))
 
 (defparameter *aaa* nil)
-(with-test (:name (:one-thread-runs-gc-while-other-conses :again)
-            :broken-on :win32)
+(with-test (:name (:one-thread-runs-gc-while-other-conses :again))
   (loop for i below 100 do
         (princ "!")
         (force-output)

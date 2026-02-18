@@ -26,8 +26,7 @@
 ;;; exactly once, but on Linux I've seen threads print more than once, which
 ;;; unquestionably indicates spurious wakeup.
 (defparameter nthreads 10)
-(with-test (:name (:condition-variable :notify-multiple)
-                  :broken-on :win32)
+(with-test (:name (:condition-variable :notify-multiple))
   (flet ((tester (name notify-fun)
            (format t "~&Exercising ~A~%" name)
            (let ((queue (make-waitqueue :name "queue"))

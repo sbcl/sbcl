@@ -1,4 +1,4 @@
-#+(or sb-safepoint interpreter) (invoke-restart 'run-tests::skip-file)
+#+interpreter (invoke-restart 'run-tests::skip-file)
 
 (defvar *tmp* 0.0) ; don't remove - used by the setq below
 (defglobal *count* 0)

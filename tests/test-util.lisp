@@ -130,7 +130,6 @@
   #-sb-thread (error "can't make-kill-thread ~s" args)
   #+sb-thread
   (let ((thread (apply #'sb-thread:make-thread args)))
-    #-win32 ;; poor thread interruption on safepoints
     (when (boundp '*threads-to-kill*)
       (push thread *threads-to-kill*))
     thread))

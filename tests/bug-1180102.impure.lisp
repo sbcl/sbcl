@@ -36,8 +36,7 @@
     (test sb-thread:*current-thread*)))
 
 (with-test (:name (:make-thread :interrupt-with :make-thread :bug-1180102)
-            :skipped-on (not :sb-thread)
-            :broken-on :sb-safepoint)
+            :skipped-on (not :sb-thread))
   (fresh-line)
   (write-string "; ")
   (force-output)

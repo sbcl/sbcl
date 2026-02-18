@@ -75,18 +75,7 @@
     (signal 'restart-condition))
   foo)
 
-#+win32
-(defun decline ()
-  ;; these tests currently fail no matter whether threads are enabled or
-  ;; not, but on threaded builds the failure mode is particularly
-  ;; unfortunate.  As a workaround, opt out of running the test.
-  #+sb-thread
-  (error "this test fails with exception 0xc0000029 ~
-          (STATUS_INVALID_UNWIND_TARGET), from which we cannot currently ~
-          recover"))
-
 (defun test-restart (name)
-  #+win32 (decline)
   (setf *a* nil)
   (let ((*foo* 'x))
     (let ((*foo* 'y)
@@ -99,13 +88,13 @@
     ;; Check that the binding stack was correctly unwound.
     (assert (eql *foo* 'x))))
 
-(with-test (:name (:restart-frame :special) :fails-on :win32)
+(with-test (:name (:restart-frame :special))
   (test-restart 'restart/special))
 
-(with-test (:name (:restart-frame :optional-special) :fails-on :win32)
+(with-test (:name (:restart-frame :optional-special))
   (test-restart 'restart/optional-special))
 
-(with-test (:name (:restart-frame :normal) :fails-on :win32)
+(with-test (:name (:restart-frame :normal))
   (test-restart 'restart/normal))
 
 
@@ -140,7 +129,6 @@
   foo)
 
 (defun test-return (name)
-  #+win32 (decline)
   (setf *a* nil)
   (let ((*foo* 'x))
     (let ((*foo* 'y))
@@ -152,19 +140,19 @@
     ;; Check that the binding stack was correctly unwound.
     (assert (eql *foo* 'x))))
 
-(with-test (:name (:return-from-frame :special) :fails-on :win32)
+(with-test (:name (:return-from-frame :special))
   (test-return 'return/special))
 
-(with-test (:name (:return-from-frame :optional-special) :fails-on :win32)
+(with-test (:name (:return-from-frame :optional-special))
   (test-return 'return/optional-special))
 
-(with-test (:name (:return-from-frame :normal) :fails-on :win32)
+(with-test (:name (:return-from-frame :normal))
   (test-return 'return/normal))
 
 (defun throw-y () (throw 'y 'y))
 
 ;; Check that *CURRENT-CATCH-BLOCK* was correctly restored.
-(with-test (:name :current-catch-block-restored :fails-on :win32)
+(with-test (:name :current-catch-block-restored)
   (assert (eql (catch 'y
                  (test-return 'return/catch)
                  (throw-y))
@@ -205,7 +193,6 @@
       (setf *b* (multiple-value-list (b :*c* :good))))))
 
 (defun test-locals (name)
-  #+win32 (decline)
   (handler-bind ((in-a (lambda (c)
                          (declare (ignore c))
                          (return-from-frame `(flet a :in ,name) 'x 'y)))
@@ -225,10 +212,10 @@
       (assert (equal *b* '(z))))
     (assert (eql *foo* 'x))))
 
-(with-test (:name (:return-from-frame :local-function) :fails-on :win32)
+(with-test (:name (:return-from-frame :local-function))
   (test-locals 'locals))
 
-(with-test (:name (:return-from-frame :hairy-local-function) :fails-on :win32)
+(with-test (:name (:return-from-frame :hairy-local-function))
   (test-locals 'hairy-locals))
 
 
@@ -264,7 +251,6 @@
 (defparameter *anon-4* (make-anon-4))
 
 (defun test-anon (fun var-name &optional in)
-  #+win32 (decline)
   (handler-bind ((anon-condition (lambda (c)
                                    (declare (ignore c))
                                    (return-from-frame
@@ -279,17 +265,16 @@
 
 (defvar *p* (namestring (if sb-c::*merge-pathnames* *load-truename* *load-pathname*)))
 
-(with-test (:name (:return-from-frame :anonymous :toplevel) :fails-on :win32)
+(with-test (:name (:return-from-frame :anonymous :toplevel))
   (test-anon *anon-1* 'foo *p*))
 
-(with-test (:name (:return-from-frame :anonymous :toplevel-special)
-                  :fails-on :win32)
+(with-test (:name (:return-from-frame :anonymous :toplevel-special))
   (test-anon *anon-2* '*foo* *p*))
 
-(with-test (:name (:return-from-frame :anonymous) :fails-on :win32)
+(with-test (:name (:return-from-frame :anonymous))
   (test-anon *anon-3* 'foo 'make-anon-3))
 
-(with-test (:name (:return-from-frame :anonymous :special) :fails-on :win32)
+(with-test (:name (:return-from-frame :anonymous :special))
   (test-anon *anon-4* '*foo* 'make-anon-4))
 
 
@@ -310,7 +295,6 @@
     (push :unwind-2 *unwind-state*)))
 
 (defun test-unwind (fun wanted)
-  #+win32 (decline)
   (handler-bind ((return-condition (lambda (c)
                                      (declare (ignore c))
                                      (return-from-frame fun
@@ -327,9 +311,9 @@
           (assert (eql *foo* 'y)))
         (assert (eql *foo* 'x))))))
 
-(with-test (:name :test-unwind-1 :fails-on :win32)
+(with-test (:name :test-unwind-1)
   (test-unwind 'unwind-1 '(:unwind-1)))
-(with-test (:name :test-unwind-2 :fails-on :win32)
+(with-test (:name :test-unwind-2)
   (test-unwind 'unwind-2 '(:unwind-2 :unwind-1)))
 
 ;;; Regression in 1.0.10.47 reported by James Knight

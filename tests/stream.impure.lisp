@@ -123,9 +123,8 @@
   (assert-error (read-byte (make-string-input-stream "abc"))
                 type-error))
 
-(with-test (:name (:default :element-type read-byte error)
-            :skipped-on :win32)
-  (assert-error (with-open-file (s "/dev/zero")
+(with-test (:name (:default :element-type read-byte error))
+  (assert-error (with-open-file (s #-win32 "/dev/zero" #+win32 "nul")
                   (read-byte s))
       type-error))
 
@@ -654,9 +653,14 @@
 ;;; READ-CHAR-NO-HANG on bivalent streams (as returned by RUN-PROGRAM)
 ;;; was wrong.  CSR managed to promote the wrongness to all streams in
 ;;; the 1.0.32.x series, breaking slime instantly.
-(with-test (:name (read-char :no-hang-after unread-char) :skipped-on :win32)
-  (let* ((process (run-program "/bin/sh" '("-c" "echo a && sleep 10")
-                               :output :stream :wait nil))
+(with-test (:name (read-char :no-hang-after unread-char))
+  (let* ((process #-win32 (run-program "/bin/sh" '("-c" "echo a && sleep 10")
+                                       :output :stream :wait nil)
+                  #+win32 (run-program
+                           "cmd.exe" '("/c" "(echo a) && (%SystemRoot%\\System32\\timeout 10 > nul )")
+                           :external-format '(:default :newline :crlf)
+                           :search t
+                           :input t :output :stream :wait nil))
          (stream (process-output process))
          (char (read-char stream)))
     (assert (char= char #\a))
@@ -855,9 +859,8 @@
         (assert (listen cs))))
     (delete-file file)))
 
-(with-test (:name :read-sequence-end
-            :skipped-on :win32)
-  (assert (=  (with-open-file (s "/dev/zero")
+(with-test (:name :read-sequence-end)
+  (assert (=  (with-open-file (s (or #+win32 "zero" "/dev/zero"))
                 (read-sequence (make-string 4096) s :start 9))
               4096)))
 
@@ -1052,8 +1055,8 @@
         (test-justification ctor)
         (test-pretty-printing ctor)))))
 
-(with-test (:name :form-tracking-set-file-position :skipped-on :win32)
-  (with-open-file (s "/dev/zero" :class 'sb-int:form-tracking-stream)
+(with-test (:name :form-tracking-set-file-position)
+  (with-open-file (s (or #+win32 "zero" "/dev/zero") :class 'sb-int:form-tracking-stream)
     (assert (eql (read-char s) (code-char 0)))
     (assert (equal (sb-impl::line/col-from-charpos
                     s (sb-impl::form-tracking-stream-current-char-pos s))

@@ -59,20 +59,20 @@
                            time)
     (loop until finishedp)))
 
-(with-test (:name (:timer :deferrables-blocked) :skipped-on :win32)
+(with-test (:name (:timer :deferrables-blocked))
   (make-and-schedule-and-wait (lambda ()
                                 (check-deferrables-blocked-or-lose 0))
                               (random 0.1))
   (check-deferrables-unblocked-or-lose 0))
 
-(with-test (:name (:timer :deferrables-unblocked) :skipped-on :win32)
+(with-test (:name (:timer :deferrables-unblocked))
   (make-and-schedule-and-wait (lambda ()
                                 (sb-sys:with-interrupts
                                   (check-deferrables-unblocked-or-lose 0)))
                               (random 0.1))
   (check-deferrables-unblocked-or-lose 0))
 
-(with-test (:name (:timer :deferrables-unblocked :unwind) :skipped-on :win32)
+(with-test (:name (:timer :deferrables-unblocked :unwind))
   (catch 'xxx
     (make-and-schedule-and-wait (lambda ()
                                   (check-deferrables-blocked-or-lose 0)
@@ -87,7 +87,7 @@
 
 (with-test (:name (:timer :relative)
             :fails-on (and :sparc :linux)
-            :skipped-on (or :win32 :gc-stress))
+            :skipped-on :gc-stress)
   (let* ((has-run-p nil)
          (timer (make-timer (lambda () (setq has-run-p t))
                             :name "simple timer")))
@@ -100,7 +100,7 @@
 
 (with-test (:name (:timer :absolute)
             :fails-on (and :sparc :linux)
-            :skipped-on (or :win32 :gc-stress))
+            :skipped-on :gc-stress)
   (let* ((has-run-p nil)
          (timer (make-timer (lambda () (setq has-run-p t))
                             :name "simple timer")))
@@ -131,8 +131,7 @@
     (schedule-timer timer 0.1)))
 
 (with-test (:name (:timer :repeat-and-unschedule)
-            :fails-on (and :sparc :linux)
-            :skipped-on :win32)
+            :fails-on (and :sparc :linux))
   (let* ((run-count 0)
          timer)
     (setq timer
@@ -146,7 +145,7 @@
     (assert (not (timer-scheduled-p timer)))
     (assert (zerop (length (sb-impl::%pqueue-contents sb-impl::*schedule*))))))
 
-(with-test (:name (:timer :reschedule) :skipped-on :win32)
+(with-test (:name (:timer :reschedule))
   (let* ((has-run-p nil)
          (timer (make-timer (lambda ()
                               (setq has-run-p t)))))
@@ -156,14 +155,14 @@
     (assert has-run-p)
     (assert (zerop (length (sb-impl::%pqueue-contents sb-impl::*schedule*))))))
 
-(with-test (:name (:timer :stress) :skipped-on :win32)
+(with-test (:name (:timer :stress))
   (let ((time (1+ (get-universal-time))))
     (loop repeat 200 do
              (schedule-timer (make-timer (lambda ())) time :absolute-p t))
     (sleep 2)
     (assert (zerop (length (sb-impl::%pqueue-contents sb-impl::*schedule*))))))
 
-(with-test (:name (:timer :stress2) :skipped-on :win32)
+(with-test (:name (:timer :stress2))
   (let ((time (1+ (get-universal-time)))
         (n 0))
     (loop for time-n from time upto (+ 1/10 time) by (/ 1/10 200)
@@ -172,32 +171,31 @@
     (sleep 2)
     (assert (zerop (length (sb-impl::%pqueue-contents sb-impl::*schedule*))))))
 
-(with-test (:name (:with-timeout :timeout) :skipped-on :win32)
+(with-test (:name (:with-timeout :timeout))
   (assert (raises-timeout-p
            (sb-ext:with-timeout 0.2
              (sleep 1)))))
 
 (with-test (:name (:with-timeout :fall-through)
-            :skipped-on (or :win32 :gc-stress))
+            :skipped-on :gc-stress)
   (assert (not (raises-timeout-p
                 (sb-ext:with-timeout 0.3
                   (sleep 0.1))))))
 
-(with-test (:name (:with-timeout :nested-timeout-smaller) :skipped-on :win32)
+(with-test (:name (:with-timeout :nested-timeout-smaller))
   (assert(raises-timeout-p
           (sb-ext:with-timeout 10
             (sb-ext:with-timeout 0.5
               (sleep 2))))))
 
-(with-test (:name (:with-timeout :nested-timeout-bigger) :skipped-on :win32)
+(with-test (:name (:with-timeout :nested-timeout-bigger))
   (assert(raises-timeout-p
           (sb-ext:with-timeout 0.5
             (sb-ext:with-timeout 2
               (sleep 2))))))
 
 (with-test (:name (:with-timeout :many-at-the-same-time)
-                  :skipped-on (not :sb-thread)
-                  :broken-on :win32)
+                  :skipped-on (not :sb-thread))
   (let ((ok t))
     (let ((threads (loop repeat 10 collect
                          (sb-thread:make-thread
@@ -218,7 +216,7 @@
 ;;; before they ran) and dying threads were open interrupts.
 (with-test (:name (:timer :parallel-unschedule)
             :skipped-on (not :sb-thread)
-            :broken-on (or :ppc :win32))
+            :broken-on :ppc)
   (let ((timer (sb-ext:make-timer (lambda () 42) :name "parallel schedulers"))
         (other nil))
     (flet ((flop ()
@@ -246,8 +244,7 @@
 ;;;;
 ;;;; Used to have problems in genereal, see comment on (:TIMER
 ;;;; :PARALLEL-UNSCHEDULE).
-(with-test (:name (:timer :schedule-stress)
-            :broken-on :win32)
+(with-test (:name (:timer :schedule-stress))
   (flet ((test ()
          (let* ((slow-timers
                  (loop for i from 1 upto 1
@@ -272,10 +269,7 @@
 
 (with-test (:name (:timer :threaded-stress)
             :skipped-on (not :sb-thread)
-            :broken-on :x86
-            :fails-on :win32)
-  #+win32
-  (error "fixme")
+            :broken-on :x86)
   (let ((barrier (sb-thread:make-semaphore))
         (goal 100))
     (flet ((wait-for-goal ()

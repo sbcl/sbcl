@@ -12,8 +12,7 @@
   (unless (typep i 'fixnum)
     (error "!!!!!!!!!!!")))
 
-(with-test (:name (interrupt-thread :interrupt-ATOMIC-INCF)
-                  :broken-on :win32)
+(with-test (:name (interrupt-thread :interrupt-ATOMIC-INCF))
   (let ((c (make-thread
             (lambda ()
               (handler-bind ((error #'(lambda (cond)

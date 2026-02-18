@@ -45,8 +45,7 @@
     (sb-thread:join-thread thr1)
     (sb-thread:join-thread thr2)))
 
-(with-test (:name (:debugger-no-hang-on-session-lock-if-interrupted)
-            :broken-on :win32)
+(with-test (:name (:debugger-no-hang-on-session-lock-if-interrupted))
   (sb-debug::enable-debugger)
   (let ((main-thread sb-thread:*current-thread*))
     (make-join-thread

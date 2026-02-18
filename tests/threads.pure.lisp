@@ -42,8 +42,7 @@
 ;;; Terminating a thread that's waiting for the terminal.
 
 (with-test (:name (:terminate-thread :get-foreground)
-                  :skipped-on (not :sb-thread)
-                  :broken-on :win32)
+                  :skipped-on (not :sb-thread))
  (let ((thread (make-thread (lambda ()
                               (sb-thread:get-foreground)))))
    (sleep 1)
@@ -59,8 +58,7 @@
 ;;; to loop over a condition-wait.
 
 (with-test (:name :without-interrupts+condition-wait
-            :skipped-on (not :sb-thread)
-            :broken-on :win32)
+            :skipped-on (not :sb-thread))
   (let* ((lock (make-mutex))
          (queue (make-waitqueue))
          (actually-wakeup nil)
@@ -86,8 +84,7 @@
 ;;; GRAB-MUTEX should not be interruptible under WITHOUT-INTERRUPTS
 
 (with-test (:name :without-interrupts+grab-mutex
-            :skipped-on (not :sb-thread)
-            :broken-on :win32)
+            :skipped-on (not :sb-thread))
   (let* ((lock (make-mutex))
          (bar (progn (grab-mutex lock) nil))
          (thread (make-thread (lambda ()
@@ -204,7 +201,7 @@
 
 (with-test (:name :symbol-value-in-thread.3
             :skipped-on (not :sb-thread)
-            :broken-on :sb-safepoint)
+            )
   (let* ((parent *current-thread*)
          (semaphore (make-semaphore))
          (running t)
@@ -412,8 +409,7 @@
         (assert (find 0 values))))))
 
 (with-test (:name (wait-on-semaphore semaphore-notification :lp-1038034)
-            :skipped-on (not :sb-thread)
-            :broken-on :sb-safepoint)
+            :skipped-on (not :sb-thread))
   ;; Test robustness of semaphore acquisition and notification with
   ;; asynchronous thread termination...  Which we know is currently
   ;; fragile.

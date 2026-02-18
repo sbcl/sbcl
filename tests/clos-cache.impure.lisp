@@ -98,8 +98,7 @@
             sb-thread:*current-thread* e)
       (sb-ext:exit :code 1))))
 
-(with-test (:name :clos-cache-test
-            :broken-on :sb-safepoint)
+(with-test (:name :clos-cache-test)
   #+sb-thread
   (let ((threads (loop repeat 32
                        collect (sb-thread:make-thread 'test-loop))))

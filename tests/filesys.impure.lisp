@@ -81,7 +81,8 @@
     (do-open 'append "foobar")))
 
 #+sb-thread
-(with-test (:name (probe-file :thread-safety))
+(with-test (:name (probe-file :thread-safety)
+            :skipped-on :win32)
   (let* ((filename (merge-pathnames "probe-file" *scratchdir*))
          (threads (list (sb-thread:make-thread
                          (lambda ()

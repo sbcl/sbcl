@@ -210,8 +210,7 @@
            (list `(flet test :in ,*p*) #'not-optimized)))))
 
 (with-test (:name (:backtrace :interrupted-condition-wait)
-            :skipped-on (not :sb-thread)
-            :broken-on :sb-safepoint) ;; unreliable
+            :skipped-on (not :sb-thread))
   (let ((m (sb-thread:make-mutex))
         (q (sb-thread:make-waitqueue)))
     (assert-backtrace

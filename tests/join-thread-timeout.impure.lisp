@@ -1,7 +1,6 @@
 (use-package "SB-THREAD")
 
 (with-test (:name (:join-thread :timeout)
-            :broken-on :sb-safepoint
             :skipped-on (or (not :sb-thread) :gc-stress))
   (macrolet ((delta-t () '(/ (- (get-internal-real-time) begin)
                              internal-time-units-per-second)))

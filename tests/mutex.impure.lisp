@@ -20,7 +20,7 @@
         (wait-for-threads (list kid1 kid2))))))
 
 (with-test (:name (interrupt-thread :interrupt-mutex-acquisition)
-                  :broken-on :win32)
+                  )
   (let ((lock (make-mutex :name "loctite"))
         child)
     (with-mutex (lock)

@@ -30,7 +30,7 @@
 ;;; fruitful to concentrate their efforts around this test...
 
 (with-test (:name (:funcallable-instances)
-            :broken-on (and :sb-safepoint (not :c-stack-is-control-stack)))
+            :broken-on (and :sb-safepoint :ppc))
   ;; the funcallable-instance implementation used not to be threadsafe
   ;; against setting the funcallable-instance function to a closure
   ;; (because the code and lexenv were set separately).

@@ -38,8 +38,7 @@
 
 (define-alien-routine kill-non-lisp-thread void)
 
-(with-test (:name :kill-non-lisp-thread
-            :broken-on :win32)
+(with-test (:name :kill-non-lisp-thread)
   (let ((sem (sb-thread:make-semaphore)))
     (push (lambda ()
             (sb-thread:signal-semaphore sem))

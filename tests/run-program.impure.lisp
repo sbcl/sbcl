@@ -47,7 +47,7 @@
       (process-close process))))
 
 (with-test (:name (run-program :cat 2)
-                  :skipped-on (or (not :sb-thread) :win32))
+                  :skipped-on (not :sb-thread))
   ;; Tests that reading from a FIFO is interruptible.
   (let* ((process (run-program "cat" '() :search t
                                :wait nil :output :stream :input :stream))
@@ -166,7 +166,7 @@
   (defparameter *cat-out-pipe* (make-pipe))
   (defparameter *cat-out* (make-synonym-stream '*cat-out-pipe*)))
 
-(with-test (:name (run-program :cat 5) :fails-on :win32)
+(with-test (:name (run-program :cat 5) :skipped-on :win32)
   (let ((cat (run-program "cat" nil :search t :input *cat-in* :output *cat-out*
                           :wait nil)))
     (dolist (test '("This is a test!"
@@ -256,7 +256,7 @@
             #-sb-thread (loop repeat 10 collect (start-run))))))
 
 (with-test (:name (run-program :pty-stream)
-            :fails-on :win32
+            :skipped-on :win32
             :broken-on :darwin)
   (let (process
         stream)
@@ -304,14 +304,17 @@
 
 ;; Check that in when you do run-program with :wait t that causes
 ;; encoding error, it does not affect the following run-program
-(with-test (:name (run-program :clean-exit-after-encoding-error)
-                  :fails-on :win32)
+(with-test (:name (run-program :clean-exit-after-encoding-error))
   (let ((had-error-p nil))
     (flet ((barf (&optional (format :default))
              (with-output-to-string (stream)
-               (run-program "perl"
-                            '("-e" "print \"\\x20\\xfe\\xff\\x0a\"")
-                            :search t
+               (run-program (sb-ext:posix-getenv "SBCL_RUNTIME")
+                            '("--core"
+                              (sb-ext:posix-getenv "SBCL_CORE")
+                              "--disable-ldb" "--noinform" "--no-sysinit" "--no-userinit" "--noprint" "--disable-debugger"
+                              "--eval"
+                              "(mapc (lambda (b) (write-byte b *standard-output*)) '(#x20 #xfe #xff #x0))"
+                              "--quit" )
                             :output stream
                             :external-format format)))
            (no-barf ()

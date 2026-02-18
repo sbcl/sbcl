@@ -83,8 +83,7 @@
 ;;; and I really don't care why but since this file is allegedly "pure",
 ;;; its death kills all the remaining tests.
 (with-test (:name (profile :threads)
-                  :skipped-on :cheneygc
-                  :broken-on :win32)
+                  :skipped-on :cheneygc)
   (profile #.(package-name cl:*package*))
   ;; This used to signal an error with threads
   (let* ((n #+sb-thread 5 #-sb-thread 1)

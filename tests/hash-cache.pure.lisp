@@ -1,7 +1,4 @@
-;;; FIXME: Since timeouts do not work on Windows this would loop
-;;; forever.
-(with-test (:name (:hash-cache :interrupt)
-            :skipped-on (or :win32 :sb-safepoint))
+(with-test (:name (:hash-cache :interrupt))
   (let* ((type1 (random-type 500))
          (type2 (random-type 500))
          (wanted (subtypep type1 type2)))

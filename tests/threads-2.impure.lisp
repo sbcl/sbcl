@@ -103,8 +103,7 @@
 
 ;;; Here we test that interrupting TRY-SEMAPHORE does not leave a
 ;;; semaphore in a bad state.
-(with-test (:name (try-semaphore :interrupt-safe)
-            :broken-on :win32)
+(with-test (:name (try-semaphore :interrupt-safe))
   (flet ((make-threads (count fn)
            (loop repeat count collect (make-thread fn)))
          (kill-thread (thread)
@@ -158,8 +157,7 @@
 ;; (d) waiting on a lock, (e) some code which we hope is likely to be
 ;; in pseudo-atomic
 
-(with-test (:name (interrupt-thread :more-basics)
-            :broken-on :win32)
+(with-test (:name (interrupt-thread :more-basics))
   (let ((child (test-interrupt (lambda () (loop)))))
     (terminate-thread child)))
 
@@ -185,18 +183,17 @@
 
 (with-test (:name (interrupt-thread :interrupt-foreign-loop)
                   ;; This feature is explicitly unsupported on Win32.
-            :broken-on :win32)
+            :skipped-on :win32)
   (test-interrupt #'loop-forever :quit))
 
-(with-test (:name (interrupt-thread :interrupt-sleep)
-                  :broken-on :win32)
+(with-test (:name (interrupt-thread :interrupt-sleep))
   (let ((child (test-interrupt (lambda () (loop (sleep 2000))))))
     (terminate-thread child)
     (wait-for-threads (list child))))
 
 (defvar *runningp* nil)
 
-(with-test (:name (interrupt-thread :no-nesting) :broken-on :win32)
+(with-test (:name (interrupt-thread :no-nesting))
   (let ((thread (make-thread (lambda ()
                                (catch 'xxx
                                  (loop))))))
@@ -210,7 +207,7 @@
                                (throw 'xxx *runningp*)))
     (assert (not (join-thread thread)))))
 
-(with-test (:name (interrupt-thread :nesting) :broken-on :win32)
+(with-test (:name (interrupt-thread :nesting))
   (let ((thread (make-thread (lambda ()
                                (catch 'xxx
                                  (loop))))))
@@ -225,8 +222,7 @@
                                (throw 'xxx *runningp*)))
     (assert (join-thread thread))))
 
-(with-test (:name :all-threads-have-abort-restart
-                  :broken-on :win32)
+(with-test (:name :all-threads-have-abort-restart)
   ;; This test can fail with without the extra semaphore.
   ;; See also TEST-INTERRUPT in test-util for further explanation.
   (let* ((sem (make-semaphore))
@@ -305,8 +301,7 @@
      (decf sb-vm::*binding-stack-pointer* binding-pointer-delta))))
 
 #+(or x86 x86-64 riscv loongarch64) ;the only platforms with a *binding-stack-pointer* variable
-(with-test (:name (:binding-stack-gc-safety)
-            :broken-on :win32)
+(with-test (:name (:binding-stack-gc-safety))
   (let (threads)
     (unwind-protect
          (progn
@@ -498,7 +493,7 @@
         (assert (eq t (funcall with lock)))))))
 
 (with-test (:name :interrupt-io-unnamed-pipe
-                  :broken-on :win32)
+            :skipped-on :win32)
   (let (result)
     (labels
         ((reader (fd)

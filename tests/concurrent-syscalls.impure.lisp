@@ -17,8 +17,7 @@
               (abort-thread)))))))
 
 ;; (nanosleep -1 0) does not fail on FreeBSD
-(with-test (:name (:exercising-concurrent-syscalls)
-            :broken-on :win32)
+(with-test (:name (:exercising-concurrent-syscalls))
   (let* (#-freebsd
          (nanosleep-errno (progn
                             (sb-unix:nanosleep -1 0)
