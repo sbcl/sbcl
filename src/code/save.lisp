@@ -325,16 +325,26 @@ sufficiently motivated to do lengthy fixes."
   (let (error)
     (with-system-mutex (sb-thread::*make-thread-lock*)
       (sb-thread::%dispose-thread-structs)
-      (let ((threads (sb-thread:list-all-threads))
-            (starting
-             (remove sb-impl::*finalizer-thread*
-                     (setq sb-thread::*starting-threads* ; ordinarily pruned in START-THREAD
-                           (delete 0 sb-thread::*starting-threads*))))
-            (joinable sb-thread::*joinable-threads*))
-        (if (or (cdr threads) starting joinable)
+      ;; As a consequence of a discovery I made about a nasty but common pattern
+      ;; among users of doing (mapc #'some-harmful-operation (list-all-threads),
+      ;; the finalizer thread is not present in (LIST-ALL-THREADS). Better to pretend
+      ;; it doesn't exist than let users affect it (backtrace/terminate/whatever).
+      ;; The same is not true of the signal-waiter thread on #+(and unix sb-safepoint).
+      ;; Maybe it should be. But that being the case, we need to remove the sigwait
+      ;; thread from list-all-threads.
+      (let* ((userthreads
+              (remove-if #'sb-thread::thread-ephemeral-p
+                         (sb-thread:list-all-threads)))
+             (actually-starting
+              (setq sb-thread::*starting-threads* ; ordinarily pruned in START-THREAD
+                    (delete 0 sb-thread::*starting-threads*)))
+             (starting-userthreads
+              (remove-if #'sb-thread::thread-ephemeral-p actually-starting))
+             (joinable sb-thread::*joinable-threads*))
+        (if (or (cdr userthreads) starting-userthreads joinable)
             (let* ((interactive (sb-thread::interactive-threads))
-                   (other (union (set-difference threads interactive)
-                                 (union starting joinable))))
+                   (other (union (set-difference userthreads interactive)
+                                 (union starting-userthreads joinable))))
               (setf error (make-condition 'save-with-multiple-threads-error
                                           :interactive-threads interactive
                                           :other-threads other)))
