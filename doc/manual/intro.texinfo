@@ -346,7 +346,7 @@ Mode for Emacs) together with Emacs is recommended for use with
 SBCL, though other options exist as well.
 
 SLIME can be downloaded from
-@uref{http://www.common-lisp.net/project/slime/}.
+@uref{https://slime.common-lisp.dev/}.
 
 @node Language Reference
 @comment  node-name,  next,  previous,  up
@@ -356,7 +356,7 @@ SLIME can be downloaded from
 standard, made freely available by @emph{LispWorks} -- an invaluable
 reference.
 
-See: @uref{http://www.lispworks.com/reference/HyperSpec/index.html}
+See: @uref{https://www.lispworks.com/documentation/HyperSpec/Front/index.htm}
 
 @node Generating Executables
 @comment  node-name,  next,  previous,  up
@@ -439,14 +439,18 @@ Summarizes changes between various SBCL versions.
 If you're interested in the development of the SBCL system itself,
 then subscribing to @cite{sbcl-devel} is a good idea.
 
+@c FIXME: Copy historical info from the Web Archive to ... somewhere?
+
 SBCL internals documentation -- besides comments in the source -- is
-currently maintained as a @emph{wiki-like} website:
-@uref{http://sbcl-internals.cliki.net/}.
+available
+@uref{https://web.archive.org/web/20120814000933/http://sbcl-internals.cliki.net/index,in
+the Web Archive}.
 
 Some low-level information describing the programming details of the
 conversion from CMUCL to SBCL is available in the
-@file{doc/FOR-CMUCL-DEVELOPERS} file in the SBCL distribution, though
-it is not installed by default.
+@file{doc/FOR-CMUCL-DEVELOPERS} file in the SBCL distribution and
+@uref{https://sourceforge.net/p/sbcl/sbcl/ci/master/tree/doc/FOR-CMUCL-DEVELOPERS,on
+SourceForge}.
 
 @node More Common Lisp Information
 @comment  node-name,  next,  previous,  up
@@ -465,10 +469,10 @@ it is not installed by default.
 @c FIXME: Say something smart here
 
 The Common Lisp internet community is fairly diverse:
-@uref{news://comp.lang.lisp} is fairly high volume newsgroup, but has
+@uref{https://groups.google.com/g/comp.lang.lisp} is fairly high volume newsgroup, but has
 a rather poor signal/noise ratio. Various special interest mailing
 lists and IRC tend to provide more content and less flames.
-@uref{http://www.lisp.org} and @uref{http://www.cliki.net} contain
+@uref{https://www.lisp.org} and @uref{https://cliki.net} contain
 numerous pointers places in the net where lispers talks shop.
 
 @node Third-party Libraries
@@ -476,7 +480,7 @@ numerous pointers places in the net where lispers talks shop.
 @subsection Third-party Libraries
 
 For a wealth of information about free Common Lisp libraries and tools
-we recommend checking out @emph{CLiki}: @uref{http://www.cliki.net/}.
+we recommend checking out @emph{CLiki}: @uref{https://cliki.net/}.
 
 @node Common Lisp Books
 @comment  node-name,  next,  previous,  up
@@ -485,7 +489,8 @@ we recommend checking out @emph{CLiki}: @uref{http://www.cliki.net/}.
 If you're not a programmer and you're trying to learn, many
 introductory Lisp books are available. However, we don't have any
 standout favorites. If you can't decide, try checking the Usenet
-@uref{news://comp.lang.lisp} FAQ for recent recommendations.
+@uref{https://groups.google.com/g/comp.lang.lisp} FAQ for recent
+recommendations.
 
 @c FIXME: This non-stance is silly. Maybe we could recommend SICP,
 @c Touretzky, or something at least.
@@ -498,7 +503,7 @@ learn about Common Lisp, some books stand out:
 @item Practical Common Lisp, by Peter Seibel
 An excellent introduction to the language, covering both the basics
 and ``advanced topics'' like macros, CLOS, and packages. Available
-both in print format and on the web: @uref{http://www.gigamonkeys.com/book/}.
+both in print format and on the web: @uref{https://gigamonkeys.com/book/}.
 
 @item Paradigms Of Artificial Intelligence Programming, by Peter Norvig
 Good information on general Common Lisp programming, and many
@@ -510,7 +515,7 @@ An in-depth treatment of macros, but not recommended as a first Common
 Lisp book, since it is slightly pre-ANSI so you need to be on your
 guard against non-standard usages, and since it doesn't really even
 try to cover the language as a whole, focusing solely on macros.
-Downloadable from @uref{http://www.paulgraham.com/onlisp.html}.
+Downloadable from @uref{https://www.paulgraham.com/onlisp.html}.
 
 @item Object-Oriented Programming In Common Lisp, by Sonya Keene
 With the exception of @cite{Practical Common Lisp} most introductory
@@ -560,8 +565,8 @@ storage to be specified at compile time.
 @item
 The system overcommits memory, allocating large amounts of address
 space from the system (often more than the amount of virtual memory
-available) and then failing if ends up using too much of the allocated
-storage.
+available) and then failing if it ends up using too much of the
+allocated storage.
 
 @item
 The system is implemented as a C program which is responsible for
