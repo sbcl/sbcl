@@ -80,7 +80,7 @@
   (defregset boxed-regs
       fdefn code lexenv ocfp lra
       a0 a1 a2 a3
-      l0 l1 thread)
+      l0 l1)
 
 
  (defregset *register-arg-offsets*  a0 a1 a2 a3)

@@ -336,8 +336,7 @@
   (move value0-pass ca0)
   (move value1-pass ca1)
 
-  ;; FIXME: Don't need to initialize all. e.g. callee saved or ones that get initialized anyway.
-  (initialize-boxed-regs (list #+sb-thread thread-base-tn))
+  (initialize-boxed-regs)
 
   (pseudo-atomic (pa-temp)
     ;; FIXME: We could do some trickery like in other backends where

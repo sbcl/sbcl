@@ -294,7 +294,7 @@
   (move value0-pass ca0)
   (move value1-pass ca1)
 
-  (initialize-boxed-regs (list #+sb-thread thread-base-tn))
+  (initialize-boxed-regs)
 
   (pseudo-atomic (pa-temp)
     (set-up-lisp-context csp-tn cfp-tn temp)
