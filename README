@@ -18,14 +18,14 @@ source distribution; HTML version is available for download, and
 The system is a work in progress. See the "TODO" file in the source
 distribution for some highlights.
 
-The "BUGS" file lists current known bugs.
+See the "BUGS" file for how to view or report bugs.
 
 If you'd like to make suggestions, report a bug, or help to improve the
 system, please send mail to one of the mailing lists:
   sbcl-help@lists.sourceforge.net
   sbcl-devel@lists.sourceforge.net
 Note that as a spam reduction measure you must subscribe to the lists
-before you can post.
+before you can post: https://sourceforge.net/p/sbcl/mailman/
 
 The "HACKING" file has more details regarding hacking on and
 contributing to SBCL.
