@@ -372,7 +372,7 @@ lra:
 	mr reg_OCFP, reg_CSP
 
 	/* Reserve a save location for the one value we have. */
-	addi reg_CSP, reg_CSP, 4
+	addi reg_CSP, reg_CSP, N_WORD_BYTES
 
 	/* Record the number of values we have as a FIXNUM. */
 	li reg_NARGS, 1<<N_FIXNUM_TAG_BITS

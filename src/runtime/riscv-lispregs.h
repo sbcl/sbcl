@@ -9,8 +9,8 @@
  * files for more information.
  */
 
-#ifdef LANGUAGE_ASSEMBLY
-#define REG(num) $ ## num
+#ifdef __ASSEMBLER__
+#define REG(num) x##num
 #else
 #define REG(num) num
 #endif

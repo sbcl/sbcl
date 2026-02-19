@@ -9,6 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
+ASSEM_SRC = riscv-assem.S
 ARCH_SRC = riscv-arch.c
 
 OS_SRC = linux-os.c linux-mman.c riscv-linux-os.c
