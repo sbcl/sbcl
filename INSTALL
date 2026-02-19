@@ -13,6 +13,7 @@ INSTALLING SBCL
     2.3. Troubleshooting
     2.4. Tracking SBCL sources
     2.5. Supported platforms
+    2.6. Windows-specific notes
 
 
 1. BINARY DISTRIBUTION
@@ -294,3 +295,73 @@ INSTALLING SBCL
       http://www.sbcl.org/manual/Getting-Support-and-Reporting-Bugs.html
 
     if you do not have the manual for some reason.
+
+2.6. Windows-specific notes
+
+  There are multiple ways to compile SBCL on Windows.
+  Probably the easiest is using MSYS2 (https://www.msys2.org/)
+  and Roswell (https://roswell.github.io).
+
+  1. Download an MSYS2 installer from https://www.msys2.org, install
+     it and update the package database by opening the MSYS2 console
+     (running MSYS2 MSYS from Windows Start Menu) and running
+
+       pacman -Syu
+
+       pacman -Su
+
+       pacman -S git
+
+     Now you can close this console.
+
+  2. Continue by installing the required toolchain and SBCL dependencies.
+     Open MSYS2 UCRT64 console from Windows Start Menu and run
+
+       pacman -S --needed base-devel\
+       mingw-w64-ucrt-x86_64-toolchain\
+       mingw-w64-ucrt-x86_64-zstd\
+       mingw-w64-ucrt-x86_64-roswell
+
+  3. Continue by installing existing SBCL binaries via Roswell,
+     they are needed to boostrap the SBCL build by running
+     following commands in the same MSYS2 UCRT64 console
+
+       ros setup
+
+       ros install sbcl-bin
+
+  4. Add downloaded SBCL binary to your PATH.
+
+     Roswell installs binary distributions into a directory structure
+     according to their platforms and versions. Typically
+     ~/.roswell/impls/x86-64/windows/sbcl-bin/<version>
+
+     Note: Roswell might be installed in /C/Users/username/.roswell
+     rather than in ~/.roswell - they are different paths in MSYS2.
+
+       export PATH=<your-sbcl-install-dir>/bin:$PATH
+
+  5. Clone the SBCL sources from this repository (alternative way
+     is to download sbcl-source from Roswell by running
+     `ros install sbcl-source`, you can then skip this step)
+
+        git clone https://github.com/sbcl/sbcl ~/sbcl && cd ~/sbcl
+
+  6. Build SBCL by running following commands in the directory with
+     downloaded SBCL sources 
+
+        ./make.sh --fancy
+
+  7. If you'd like to make SBCL as a library, use script
+
+        ./make-shared-library.sh --fancy
+
+     Note that the resulting file might have .so extension even on Windows
+     but works just fine.
+
+  8. Dependencies can be checked by ldd command
+
+       ldd ./src/runtime/sbcl.exe
+       
+       
+  
