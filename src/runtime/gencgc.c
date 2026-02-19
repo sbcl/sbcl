@@ -3066,6 +3066,10 @@ static void conservative_pin_code_from_return_addresses(struct thread* th) {
         os_context_t* context = nth_interrupt_context(i, th);
         maybe_pin_code(os_context_pc(context));
         maybe_pin_code((lispobj)*os_context_register_addr(context, reg_RA));
+#ifdef LISP_FEATURE_LOONGARCH64
+        /* It can't call a tagged pointer directly */
+        maybe_pin_code((lispobj)*os_context_register_addr(context, reg_LIP));
+#endif
     }
 }
 #endif

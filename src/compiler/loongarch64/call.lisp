@@ -532,11 +532,6 @@
                     :to :eval)
                    return-pc-pass)
 
-        (:temporary (:sc any-reg
-             :offset t7-offset
-             :to :eval)
-            tmp)
-
        ,@(unless (eq named :direct)
          `((:temporary (:sc descriptor-reg :offset lexenv-offset
                         :from (:argument ,(if (eq return :tail) 0 1))
@@ -562,10 +557,9 @@
            '((:temporary (:scs (descriptor-reg) :from :eval) move-temp)))
 
        (:temporary (:scs (descriptor-reg) :to :eval) stepping)
-
+       (:temporary (:scs (interior-reg)) lip)
        ,@(unless (eq return :tail)
-           '((:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
-             (:temporary (:scs (interior-reg)) lip)))
+           '((:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)))
 
        (:generator ,(+ (if named 5 0)
                        (if variable 19 1)
@@ -685,10 +679,8 @@
                    (do-next-filler)
                    (return)))
              (note-this-location vop :call-site)
-             (inst addi.d tmp function (- fun-pointer-lowtag))
-             (inst jirl ,(if (eq return :tail) 'zero-tn 'ra-tn)
-                          tmp
-                          (ash simple-fun-insts-offset word-shift)))
+             (inst addi.d lip function (- (ash simple-fun-insts-offset word-shift) fun-pointer-lowtag))
+             (inst jirl ,(if (eq return :tail) 'zero-tn 'ra-tn) lip 0))
            ,@(ecase return
                (:fixed
                 '((emit-label label)
