@@ -63,3 +63,5 @@
 #define reg_CFP        REG(29)
 #define reg_LR          REG(30)
 #define reg_NSP         REG(31)
+
+#define reg_LINK_RETURN  reg_LR

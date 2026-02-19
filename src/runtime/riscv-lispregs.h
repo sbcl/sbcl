@@ -53,3 +53,5 @@
 #define reg_NULL     REG(29)
 #define reg_CODE     REG(30)
 #define reg_NARGS    REG(31)
+
+#define reg_LINK_RETURN reg_RA

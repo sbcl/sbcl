@@ -2460,7 +2460,7 @@ scavenge_control_stack(struct thread *th)
     }
 }
 
-#ifdef reg_CODE
+#ifndef reg_LINK_RETURN // where registers are pinned in pin_call_chain_and_boxed_registers
 /* Scavenging Interrupt Contexts */
 
 static int boxed_registers[] = BOXED_REGISTERS;

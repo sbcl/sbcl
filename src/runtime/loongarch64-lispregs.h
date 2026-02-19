@@ -53,3 +53,5 @@
 #define reg_L2        REG(30)
 #endif
 #define reg_CFUNC     REG(31)
+
+#define reg_LINK_RETURN  reg_RA

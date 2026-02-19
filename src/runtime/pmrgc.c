@@ -556,32 +556,53 @@ static void __attribute__((unused)) maybe_pin_code(lispobj addr) {
 }
 #endif
 
-#if GENCGC_IS_PRECISE && !defined(reg_CODE)
+#if defined GENCGC_IS_PRECISE && defined reg_LINK_RETURN
 
 static int boxed_registers[] = BOXED_REGISTERS;
 
-/* Pin all (condemned) code objects pointed to by the chain of in-flight calls
- * based on scanning from the innermost frame pointer. This relies on an exact backtrace,
- * which some of our architectures have trouble obtaining. But it's theoretically
- * more efficient to do it this way versus looking at all stack words to see
- * whether each points to a code object. */
 static void pin_call_chain_and_boxed_registers(struct thread* th) {
+#ifdef reg_RA
+    // We need more information to reliably backtrace through a call
+    // chain, as these backends may generate leaf functions where the
+    // return address does not get spilled. Therefore, fall back to
+    // scanning the entire stack for potential interior code pointers.
+    for (object_ptr = th->control_stack_start;
+         object_ptr < access_control_stack_pointer(th);
+         object_ptr++)
+        maybe_pin_code(*object_ptr);
+#else
+    /* Pin all (condemned) code objects pointed to by the chain of in-flight calls
+     * based on scanning from the innermost frame pointer. This relies on an exact backtrace,
+     * which some of our architectures have trouble obtaining. But it's theoretically
+     * more efficient to do it this way versus looking at all stack words to see
+     * whether each points to a code object. */
     lispobj *cfp = access_control_frame_pointer(th);
 
     if (cfp) {
-      while (1) {
-        lispobj* ocfp = (lispobj *) cfp[0];
-        lispobj lr = cfp[1];
-        if (ocfp == 0)
-            break;
-        maybe_pin_code(lr);
-        cfp = ocfp;
-      }
+        while (1) {
+            lispobj* ocfp = (lispobj *) cfp[0];
+            lispobj lr = cfp[1];
+            if (ocfp == 0)
+                break;
+            maybe_pin_code(lr);
+            cfp = ocfp;
+        }
     }
+#endif
+
     int i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
     for (i = i - 1; i >= 0; --i) {
         os_context_t* context = nth_interrupt_context(i, th);
-        maybe_pin_code((lispobj)*os_context_register_addr(context, reg_LR));
+        maybe_pin_code((lispobj)*os_context_register_addr(context, reg_LINK_RETURN));
+#ifdef reg_RA
+        maybe_pin_code(os_context_pc(context));
+#endif
+
+#ifdef LISP_FEATURE_LOONGARCH64
+        /* It can't call a tagged pointer directly (neither can ARM64,
+         * but it has a different call sequence for tail calls) */
+        maybe_pin_code((lispobj)*os_context_register_addr(context, reg_LIP));
+#endif
 
         for (unsigned i = 0; i < (sizeof(boxed_registers) / sizeof(int)); i++) {
             lispobj word = *os_context_register_addr(context, boxed_registers[i]);
@@ -591,7 +612,6 @@ static void pin_call_chain_and_boxed_registers(struct thread* th) {
             }
         }
     }
-
 }
 #endif
 
@@ -858,9 +878,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
 #elif defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64
             // Pin code if needed
             semiconservative_pin_stack(th, generation);
-#elif defined reg_RA
-            conservative_pin_code_from_return_addresses(th);
-#elif !defined(reg_CODE)
+#elif defined reg_LINK_RETURN
             pin_call_chain_and_boxed_registers(th);
 #endif
         }
@@ -941,7 +959,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
     if (conservative_stack) {
         struct thread *th;
         for_each_thread(th) {
-#if !defined(LISP_FEATURE_MIPS) && defined(reg_CODE) // interrupt contexts already pinned everything they see
+#if !defined(LISP_FEATURE_MIPS) && !defined(reg_LINK_RETURN) // interrupt contexts already pinned everything they see
             scavenge_interrupt_contexts(th);
 #endif
             scavenge_control_stack(th);
