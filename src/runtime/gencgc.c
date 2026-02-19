@@ -3432,7 +3432,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
 #elif defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64
             // Pin code if needed
             semiconservative_pin_stack(th, generation);
-#elif defined REG_RA
+#elif defined reg_RA
             conservative_pin_code_from_return_addresses(th);
 #elif !defined(reg_CODE)
             pin_call_chain_and_boxed_registers(th);

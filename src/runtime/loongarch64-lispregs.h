@@ -18,7 +18,6 @@
 #define NREGS (32)
 
 #define reg_ZERO      REG(0)
-#define REG_RA        REG(1)
 #define reg_RA        REG(1)
 #define reg_TP        REG(2)
 #define reg_NSP       REG(3)
