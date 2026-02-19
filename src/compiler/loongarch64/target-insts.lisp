@@ -87,12 +87,9 @@ function addresses and register values.")
     (maybe-note-associated-storage-ref
      value 'float-registers regname dstate)))
 
-(defun reconstruct-s-immediate (value)
-  (coerce-signed (dpb (first value) (byte 7 5) (second value)) 12))
-
 (defun print-s-imm (value stream dstate)
   (declare (stream stream) (ignore dstate))
-  (princ value stream))
+  (princ (coerce-signed value 12) stream))
 
 (defun use-b-label (imm16 dstate)
   (declare (type integer imm16)
