@@ -3078,12 +3078,14 @@ static void semiconservative_pin_stack(struct thread* th,
             if (gen == 0) sticky_preserve_pointer(word, (void*)1);
             else preserve_pointer(word, (void*)1);
         }
-        // What kinds of data do we put in the Count register?
-        // maybe it's count (raw word), maybe it's a PC. I just don't know.
-        preserve_pointer(*os_context_lr_addr(context), (void*)1);
-        preserve_pointer(*os_context_ctr_addr(context), (void*)1);
+        /* LIP has the target address before moving to CTR */
+        maybe_pin_code((lispobj)*os_context_register_addr(context, reg_LIP));
+        /* CTR has the target address before a call */
+        maybe_pin_code((lispobj)*os_context_ctr_addr(context));
+        maybe_pin_code((lispobj)*os_context_lr_addr(context));
+
 #endif
-        preserve_pointer(os_context_pc(context), (void*)1);
+        maybe_pin_code((lispobj)os_context_pc(context));
     }
 }
 #endif
