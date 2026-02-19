@@ -554,7 +554,13 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
         return;
     }
 
-    interrupt_handle_now(signal, (siginfo_t *)code, context);
+    if (signal == SIGILL) {
+        fake_foreign_function_call(context);
+        lose("Unhandled SIGILL at %p.", (void*)OS_CONTEXT_PC(context));
+    }
+    else {
+        interrupt_handle_now(signal, (siginfo_t *)siginfo, context);
+    }
 }
 
 
