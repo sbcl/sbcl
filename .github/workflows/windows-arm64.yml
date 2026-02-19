@@ -36,6 +36,7 @@ jobs:
     - name: build
       env:
         SBCL_HOME: "/c/Program Files/Steel Bank Common Lisp/"
+        SBCL_MAKE_JOBS: -j4
       run: |
         PATH=$PATH:"/c/Program Files/Steel Bank Common Lisp/"
         export PATH

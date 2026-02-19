@@ -10,7 +10,7 @@ jobs:
     strategy: 
       matrix:
         arch: [arm64, x86-64]
-        options: [--with-sb-thread, --with-mark-region-gc --with-nonstop-foreign-call, --with-nonstop-foreign-call]
+        options: [--with-sb-thread --with-nonstop-foreign-call, --with-mark-region-gc --with-nonstop-foreign-call]
       fail-fast: false
 
     steps:
@@ -18,7 +18,8 @@ jobs:
     - name: instal host sbcl
       run: brew install sbcl
     - name: build
-      env:  
+      env:
+        SBCL_MAKE_JOBS: -j4
         SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
       run: ./make.sh ${{ matrix.options }} --with-sb-core-compression --xc-host='sbcl --lose-on-corruption --disable-ldb --disable-debugger'
     - name: make binary

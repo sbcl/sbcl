@@ -34,6 +34,7 @@ jobs:
         Start-Process msiexec.exe -Wait -ArgumentList '/i sbcl.msi /qn /norestart'
     - name: build
       env:
+        SBCL_MAKE_JOBS: -j4
         SBCL_HOME: "/c/Program Files/Steel Bank Common Lisp/1.4.14"
       run: |
         PATH=$PATH:"/c/Program Files/Steel Bank Common Lisp/1.4.14"

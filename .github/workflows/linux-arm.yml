@@ -24,6 +24,7 @@ jobs:
 
     - name: build
       env:
+        SBCL_MAKE_JOBS: -j4
         SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
         CC: arm-linux-gnueabihf-gcc
       run: ./make.sh --xc-host='sbcl --dynamic-space-size 700MB --lose-on-corruption --disable-ldb --disable-debugger' --arch=arm
