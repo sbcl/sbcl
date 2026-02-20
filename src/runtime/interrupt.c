@@ -773,15 +773,13 @@ static void
 build_fake_control_stack_frames(struct thread *th, os_context_t *context)
 {
 
-    lispobj oldcont;
     /* Ignore the two words above CSP, which can be used without adjusting CSP */
-    lispobj* csp = (lispobj *)(uword_t) (*os_context_register_addr(context, reg_CSP)) + 2;
-    access_control_frame_pointer(th) = (lispobj *)(uword_t) csp;
-
-    oldcont = (lispobj)(*os_context_register_addr(context, reg_CFP));
+    lispobj* csp = (lispobj *)(*os_context_register_addr(context, reg_CSP)) + 2;
+    lispobj cfp = (lispobj)(*os_context_register_addr(context, reg_CFP));
+    access_control_frame_pointer(th) = csp;
 
     access_control_frame_pointer(th)[1] = os_context_pc(context);
-    access_control_frame_pointer(th)[0] = oldcont;
+    access_control_frame_pointer(th)[0] = cfp;
     access_control_stack_pointer(th) = csp + 2;
 }
 #else

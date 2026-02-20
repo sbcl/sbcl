@@ -139,7 +139,6 @@
     (move res csp-tn)
     (let ((size (* (max 1 (sb-allocated-size 'control-stack))
                    n-word-bytes)))
-      (storew cfp-tn res ocfp-save-offset)
       (add-imm csp-tn csp-tn size 'allocate-frame tmp))
     ;; number stack frame
     (when (ir2-environment-number-stack-p callee)
@@ -161,13 +160,9 @@
   (:temporary (:sc unsigned-reg
                :unused-if (typep (* nargs n-word-bytes) 'short-immediate)) tmp)
   (:generator 2
-    (if (<= nargs register-arg-count)
-        (storew cfp-tn csp-tn ocfp-save-offset)
-        (let ((size (* nargs n-word-bytes)))
-          (move res csp-tn)
-          (storew cfp-tn res ocfp-save-offset)
-          ;; CSP += size
-          (add-imm csp-tn csp-tn size 'allocate-full-call-frame tmp)))))
+    (when (> nargs register-arg-count)
+      (move res csp-tn)
+      (add-imm csp-tn csp-tn (* nargs n-word-bytes) 'allocate-full-call-frame tmp))))
 
 
 
