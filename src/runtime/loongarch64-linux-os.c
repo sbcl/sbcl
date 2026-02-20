@@ -86,8 +86,6 @@ os_restore_fp_control(os_context_t *context)
 os_context_register_t *
 os_context_float_register_addr(os_context_t *uc, int offset)
 {
-    if (offset < 0 || offset >= 32) return NULL; /* bounds check */
-
     mcontext_t *mc = &uc->uc_mcontext;
 
     uint8_t *p = (uint8_t *)&mc->__extcontext[0];
@@ -103,7 +101,7 @@ os_context_float_register_addr(os_context_t *uc, int offset)
                 return NULL;
 
             uintptr_t base = ((uintptr_t)p + sizeof(struct sctx_info) + 15) & ~((uintptr_t)15);
-        struct fpu_context *fpu = (struct fpu_context *)base;
+            struct fpu_context *fpu = (struct fpu_context *)base;
             return (os_context_register_t *)&(fpu->regs[offset]);
         }
 
