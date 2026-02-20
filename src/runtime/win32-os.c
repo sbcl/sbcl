@@ -661,9 +661,16 @@ os_alloc_gc_space(int space_id, int attributes, os_vm_address_t addr, os_vm_size
 
     if (!actual) {
         if (!(attributes & MOVABLE)) {
-            fprintf(stderr,
-                    "VirtualAlloc: wanted %lu bytes at %p, actually mapped at %p\n",
-                    (unsigned long) len, addr, actual);
+            DWORD err = GetLastError();
+            LPSTR msg = NULL;
+            if (FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                               FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                               NULL, err, 0, (LPSTR)&msg, 0, NULL)) {
+                fprintf(stderr, "VirtualAlloc: failed to map %zu bytes at %p: %s", len, addr, msg);
+                LocalFree(msg);
+            } else {
+                fprintf(stderr, "VirtualAlloc: failed to map %zu bytes at %p: error code %d\n", len, addr, err);
+            }
             fflush(stderr);
             return 0;
         }
