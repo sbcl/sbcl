@@ -1377,8 +1377,12 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
         || (signal == SIGEMT)
 #endif
         )
+    {
+        if (lose_on_corruption_p || gc_active_p)
+            save_context_for_ldb(context);
         corruption_warning_and_maybe_lose("Signal %d received (PC: %p)", signal,
                                           os_context_pc(context));
+    }
 #endif
     interrupt_handle_now(signal, info, context);
     RESTORE_ERRNO;
