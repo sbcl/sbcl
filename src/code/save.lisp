@@ -335,11 +335,14 @@ sufficiently motivated to do lengthy fixes."
       (let* ((userthreads
               (remove-if #'sb-thread::thread-ephemeral-p
                          (sb-thread:list-all-threads)))
-             (actually-starting
-              (setq sb-thread::*starting-threads* ; ordinarily pruned in START-THREAD
-                    (delete 0 sb-thread::*starting-threads*)))
              (starting-userthreads
-              (remove-if #'sb-thread::thread-ephemeral-p actually-starting))
+              ;; Cleanup of *starting-threads* is normally done in START-THREAD guarded
+              ;; by *make-thread-lock*. We need to avoid racing with that.
+              (mapcan (lambda (x)
+                        (if (and (sb-thread::thread-p x)
+                                 (not (sb-thread::thread-ephemeral-p x)))
+                            (list x)))
+                      sb-thread::*starting-threads*))
              (joinable sb-thread::*joinable-threads*))
         (if (or (cdr userthreads) starting-userthreads joinable)
             (let* ((interactive (sb-thread::interactive-threads))
