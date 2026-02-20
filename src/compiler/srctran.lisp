@@ -5988,9 +5988,10 @@
                               negated)))
                    (multiple-value-bind (constant value) (constant-node-p node)
                      (if constant
-                         (unless (and (or (eql value 0)  ;; can't negate a non-float zero
-                                          (complexp value))
-                                      (not (float-safe-p)))
+                         (when (and (numberp value)
+                                    (or (and (realp value)
+                                             (not (eql value 0))) ;; can't negate a non-float zero
+                                        (float-safe-p)))
                            (unless test
                              (let ((negated (- value)))
                                (replace-node-with-constant node negated)
