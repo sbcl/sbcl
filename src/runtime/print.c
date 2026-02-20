@@ -487,6 +487,8 @@ static void print_slots(char **slots, int count, lispobj *ptr, iochannel_t io)
     }
 }
 
+bool sized_widetag_p(unsigned char widetag);
+
 static void print_fun_or_otherptr(lispobj obj, iochannel_t io)
 {
     lispobj *ptr;
@@ -501,8 +503,7 @@ static void print_fun_or_otherptr(lispobj obj, iochannel_t io)
 
     lispobj header = *ptr;
     unsigned char type = header_widetag(header);
-    // recall that object_size deliberately croaks on simple-funs
-    int count = (type != SIMPLE_FUN_WIDETAG) ? (object_size(ptr) - 1) : 0;
+    int count = (sized_widetag_p(type)) ? (object_size(ptr) - 1) : 0;
     ++ptr;
 
     print_obj("header: ", header, io);
