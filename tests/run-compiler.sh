@@ -18,6 +18,7 @@ case "$platform" in
     SunOS-X86-64)  args=-m64 ;;
     Linux-X86)     args="-m32" ;;
     Linux-PowerPC) args="-m32" ;;
+    Linux-SPARC)   args="-m32" ;;
     FreeBSD-X86)   args="-m32" ;;
 esac
 
