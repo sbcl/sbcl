@@ -277,7 +277,7 @@ static lispobj required_foreign_symbols()
     gc_assert(instancep(CONS(value)->car));
     struct hash_table* ht = (void*)native_pointer(CONS(value)->car);
     gc_assert(simple_vector_p(ht->pairs));
-    struct vector* kvv = (void*)native_pointer(ht->pairs);
+    __attribute__((unused)) struct vector* kvv = (void*)native_pointer(ht->pairs);
     gc_assert(fixnum_value(ht->_count) == fixnum_value(kvv->data[0])); // high-water mark
     return ht->pairs;
 }
