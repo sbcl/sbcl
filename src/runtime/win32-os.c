@@ -669,7 +669,7 @@ os_alloc_gc_space(int space_id, int attributes, os_vm_address_t addr, os_vm_size
                 fprintf(stderr, "VirtualAlloc: failed to map %zu bytes at %p: %s", len, addr, msg);
                 LocalFree(msg);
             } else {
-                fprintf(stderr, "VirtualAlloc: failed to map %zu bytes at %p: error code %d\n", len, addr, err);
+                fprintf(stderr, "VirtualAlloc: failed to map %zu bytes at %p: error code %lu\n", len, addr, err);
             }
             fflush(stderr);
             return 0;
