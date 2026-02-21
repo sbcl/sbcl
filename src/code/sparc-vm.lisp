@@ -26,25 +26,53 @@
 ;;; This is like CONTEXT-REGISTER, but returns the value of a float
 ;;; register. FORMAT is the type of float to return.
 
-;;; FIXME: Whether COERCE actually knows how to make a float out of a
-;;; long is another question. This stuff still needs testing.
-#+nil
 (define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
   (* long)
   (context (* os-context-t))
   (index int))
+
 (defun context-float-register (context index format &optional integer)
   (declare (ignore integer)
-           (type (alien (* os-context-t)) context))
-  (error "context-float-register not working yet? ~S" (list context index format))
-  #+nil
-  (coerce (deref (context-float-register-addr context index)) format))
-(defun %set-context-float-register (context index format new)
+           (ignorable context index))
+  #+linux
+  (let ((sap (alien-sap (context-float-register-addr context index))))
+    (ecase format
+      (single-float
+       (coerce (sap-ref-double sap 0) 'single-float))
+      (double-float
+       (sap-ref-double sap 0))
+      (complex-single-float
+       (complex (coerce (sap-ref-double sap 0) 'single-float)
+                (coerce (sap-ref-double sap 8) 'single-float)))
+      (complex-double-float
+       (complex (sap-ref-double sap 0)
+                (sap-ref-double sap 8)))))
+  #-linux
+  (progn
+    (warn "stub CONTEXT-FLOAT-REGISTER")
+    (coerce 0 format)))
+
+(defun %set-context-float-register (context index format value)
   (declare (type (alien (* os-context-t)) context))
-  (error "%set-context-float-register not working yet? ~S" (list context index format new))
-  #+nil
-  (setf (deref (context-float-register-addr context index))
-        (coerce new format)))
+  #+linux
+  (let ((sap (alien-sap (context-float-register-addr context index))))
+    (ecase format
+      (single-float
+       (setf (sap-ref-single sap 0) value))
+      (double-float
+       (setf (sap-ref-double sap 0) value))
+      (complex-single-float
+       (locally
+           (declare (type (complex single-float) value))
+         (setf (sap-ref-single sap 0) (realpart value)
+               (sap-ref-single sap 4) (imagpart value))))
+      (complex-double-float
+       (locally
+           (declare (type (complex double-float) value))
+         (setf (sap-ref-double sap 0) (realpart value)
+               (sap-ref-double sap 8) (imagpart value))))))
+  #-linux
+  (error "%set-context-float-register not working yet? ~S" (list context index format value)))
 
 ;;; Given a signal context, return the floating point modes word in
 ;;; the same format as returned by FLOATING-POINT-MODES.

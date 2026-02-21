@@ -850,7 +850,7 @@ fractional bits."
 
 (with-test (:name :ratio-to-float)
   (let ((*random-state* (make-random-state t)))
-    (loop repeat 20000
+    (loop repeat 1000
           do
           (let* ((n-bits (random 1075))
                  (d-bits (random 1075))

@@ -72,6 +72,13 @@ os_context_sigmask_addr(os_context_t *context)
     return (sigset_t*)&(context->si_mask);
 }
 
+os_context_register_t *
+os_context_float_register_addr(os_context_t *context, int offset)
+{
+    ucontext_t *uc = (ucontext_t *)context;
+    return (os_context_register_t *)&uc->uc_mcontext.fpregs.fpu_fr.fpu_regs[offset];
+}
+
 void
 os_restore_fp_control(os_context_t *context)
 {
