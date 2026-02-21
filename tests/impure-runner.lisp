@@ -23,6 +23,8 @@
   (setf *break-on-failure* break-on-failure
         *break-on-expected-failure* break-on-expected-failure
         *break-on-error* break-on-error)
+  (when *break-on-error*
+    (enable-debugger))
   (when interpret
     (setf *test-evaluator-mode* :interpret)
     (push :interpreter *features*))

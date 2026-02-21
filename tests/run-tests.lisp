@@ -457,6 +457,8 @@
       (setf *input-manifest*
             (if manifest (read manifest) :ignore))))
   (format t "// Running pure tests (~a)~%" test-fun)
+  (when *break-on-error*
+    (enable-debugger))
   (let ((*failures* nil)
         ;; in case somebody corrupts CL-USER's use list, of course
         (standard-use-list (package-use-list "CL-USER")))
