@@ -887,7 +887,7 @@ void perform_backtrace(struct thread *th, os_context_t* context, FILE* f)
         if (print_lisp_fun_name(pc, f)) {
             // printed
         } else if (!unw_get_proc_name(&cursor, procname, sizeof procname, &offset)) {
-            fprintf(f, " %p [%s]\n", pc, procname);
+            fprintf(f, " %p [%s+%#x]\n", pc, procname, (int)offset);
         } else {
             fprintf(f, " %p ?\n", pc);
         }
