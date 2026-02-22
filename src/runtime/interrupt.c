@@ -1582,8 +1582,11 @@ arrange_return_to_c_function(os_context_t *context,
 #ifdef ARCH_HAS_NPC_REGISTER
     *os_context_npc_addr(context) = 4 + os_context_pc(context);
 #endif
-#if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_RISCV)
-    *os_context_register_addr(context,reg_CODE) =
+#if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM)
+     *os_context_register_addr(context,reg_CODE) =
+         (os_context_register_t)((char*)fun + FUN_POINTER_LOWTAG);
+#elif defined(LISP_FEATURE_RISCV) || defined(LISP_FEATURE_LOONGARCH64)
+    *os_context_register_addr(context,reg_L0) =
         (os_context_register_t)((char*)fun + FUN_POINTER_LOWTAG);
 #endif
 }
