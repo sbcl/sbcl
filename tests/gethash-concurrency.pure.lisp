@@ -131,8 +131,7 @@
 
 (defparameter *sleep-delay-max* .025)
 
-(with-test (:name (hash-table :synchronized)
-                  :broken-on (or :loongarch64))
+(with-test (:name (hash-table :synchronized))
   (dolist (shrinkp '(nil t))
    (with-test-setup (keys (hash (make-hash-table :synchronized t)))
     (let* ((*errors* nil)
@@ -208,18 +207,14 @@
             (assert (not *errors*))))))))
 (compile 'test-concurrent-gethash)
 
-(with-test (:name (hash-table :parallel-readers-eq-table)
-            :broken-on (or :loongarch64))
+(with-test (:name (hash-table :parallel-readers-eq-table))
   (test-concurrent-gethash 'eq))
-(with-test (:name (hash-table :parallel-readers-eql-table)
-            :broken-on (or :riscv :loongarch64)) ;; memory reordering issues
+(with-test (:name (hash-table :parallel-readers-eql-table))
   (test-concurrent-gethash 'eql))
-(with-test (:name (hash-table :parallel-readers-equal-table)
-            :broken-on (or :riscv :loongarch64))
+(with-test (:name (hash-table :parallel-readers-equal-table))
   (test-concurrent-gethash 'equal))
 
-(with-test (:name (hash-table :single-accessor :parallel-gc)
-            :broken-on (or :loongarch64))
+(with-test (:name (hash-table :single-accessor :parallel-gc))
   (dolist (shrinkp '(nil t))
     (with-test-setup (keys (hash (make-hash-table)))
       (let ((*errors* nil))
@@ -250,8 +245,7 @@
 
 ;;; Stress GROW-HASH-TABLE's optimization wherein no rehashing may be
 ;;; done if the index vector is not growing.
-(with-test (:name (hash-table :not-growing-index-vector :parallel-gc)
-            :broken-on (or :loongarch64))
+(with-test (:name (hash-table :not-growing-index-vector :parallel-gc))
   (let ((*errors* nil))
     (let ((threads
             (list (make-kill-thread
