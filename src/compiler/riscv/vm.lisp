@@ -65,7 +65,8 @@
   (defreg l0 22)     ; s6
   (defreg nl6 23)    ; s7
   (defreg l1 24)     ; s8
-  (defreg nl7 25)    ; s9
+  ;; A register needed to load constants into descriptor-regs
+  (defreg tmp 25)    ; s9
   (defreg #-sb-thread l2 #+sb-thread thread 26) ; s10
 
   (defreg cfunc 27)  ; s11
@@ -74,7 +75,7 @@
   (defreg code 30)   ; t5
   (defreg nargs 31)  ; t6
 
-  (defregset non-descriptor-regs nl0 nl1 nl2 ra nl3 nl4 nl5 nl6 nl7 nargs nfp cfunc)
+  (defregset non-descriptor-regs nl0 nl1 nl2 ra nl3 nl4 nl5 nl6 nargs nfp cfunc)
   (defregset descriptor-regs a0 a1 a2 a3 a4 a5 l0 l1 #-sb-thread l2 ocfp lexenv)
   (defregset reserve-descriptor-regs lexenv)
   (defregset reserve-non-descriptor-regs cfunc)
@@ -210,7 +211,9 @@
   (defregtn ocfp any-reg)
   (defregtn nfp any-reg)
 
-  (defregtn ra any-reg))
+  (defregtn ra any-reg)
+
+  (defregtn tmp unsigned-reg))
 
 ;;; If VALUE can be represented as an immediate constant, then return the
 ;;; appropriate SC number, otherwise return NIL.

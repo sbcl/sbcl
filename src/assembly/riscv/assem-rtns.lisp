@@ -266,7 +266,7 @@
 
      ;; Don't want these to overlap with C args.
      (:temp pa-temp non-descriptor-reg nl6-offset)
-     (:temp temp non-descriptor-reg nl7-offset))
+     (:temp temp non-descriptor-reg tmp-offset))
   (save-c-registers)
 
   (initialize-boxed-regs (list function arg-ptr nargs #+sb-thread tls-ptr))
@@ -313,7 +313,7 @@
      (:temp value0-pass (any-reg) (result-reg-offset 0))
      (:temp value1-pass (any-reg) (result-reg-offset 1))
      (:temp pa-temp (any-reg) nl6-offset)
-     (:temp temp (any-reg) nl7-offset))
+     (:temp temp (unsigned-reg) tmp-offset))
   ;; The C stack frame and argument registers should have already been
   ;; set up in Lisp.
 
