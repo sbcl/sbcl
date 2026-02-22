@@ -878,7 +878,7 @@
                 (error "no unique move-arg-vop for moves in SC ~S" (sc-name sc)))
 
               (cond
-                #+arm-softfp
+                #+(or arm-softfp riscv loongarch64)
                 ((and (listp tn)
                       (symbolp (car (last tn))))
                  (emit-template call block
