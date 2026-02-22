@@ -155,6 +155,12 @@
               (invoke-alien-type-method :result-tn type state))
             values)))
 
+(define-alien-type-method (integer :naturalize-gen) (type alien)
+  (if (and (not (alien-integer-type-signed type))
+           (= (alien-type-bits type) 32))
+      `(logand ,alien ,(1- (ash 1 (alien-type-bits type))))
+      alien))
+
 (defun make-call-out-tns (type)
   (let ((arg-state (make-arg-state)))
     (collect ((arg-tns))
@@ -331,3 +337,28 @@
                                  unsigned-long))
          sap (length buffer))
         vector))))
+
+(defknown sign-extend ((signed-byte 64) t) fixnum
+    (foldable flushable movable))
+
+(defoptimizer (sign-extend derive-type) ((x size))
+  (when (sb-c:constant-lvar-p size)
+    (specifier-type `(signed-byte ,(sb-c:lvar-value size)))))
+
+(define-vop (sign-extend)
+  (:translate sign-extend)
+  (:policy :fast-safe)
+  (:args (val :scs (signed-reg)))
+  (:arg-types signed-num (:constant fixnum))
+  (:info size)
+  (:results (res :scs (signed-reg)))
+  (:result-types fixnum)
+  (:generator 1
+    (check-type size (member 32))
+    (inst addi.w res val 0)))
+
+#-sb-xc-host
+(defun sign-extend (x size)
+  (declare (type (signed-byte 64) x))
+  (ecase size
+    (32 (sign-extend x size))))

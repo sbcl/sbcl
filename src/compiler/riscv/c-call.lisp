@@ -153,6 +153,12 @@
               (invoke-alien-type-method :result-tn type state))
             values)))
 
+(define-alien-type-method (integer :naturalize-gen) (type alien)
+  (if (and (not (alien-integer-type-signed type))
+           (= (alien-type-bits type) 32))
+      `(logand ,alien ,(1- (ash 1 (alien-type-bits type))))
+      alien))
+
 (defun make-call-out-tns (type)
   (let ((arg-state (make-arg-state)))
     (collect ((arg-tns))
