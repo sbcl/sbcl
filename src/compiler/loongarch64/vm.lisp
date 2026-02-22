@@ -225,9 +225,6 @@
          nil))
     ((integer #.most-negative-fixnum #.most-positive-fixnum)
      immediate-sc-number)
-    #-sb-xc-host
-    (system-area-pointer
-     immediate-sc-number)
     (character
      immediate-sc-number)
     (structure-object

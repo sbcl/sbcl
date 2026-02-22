@@ -289,9 +289,6 @@
          nil))
     ((signed-byte 30)
      immediate-sc-number)
-    #-sb-xc-host ; There is no such object type in the host
-    (system-area-pointer
-     immediate-sc-number)
     (character
      immediate-sc-number)
     (structure-object
