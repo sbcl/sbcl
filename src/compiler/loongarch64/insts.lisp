@@ -783,11 +783,10 @@
       (u-and-i-inst-immediate immediate)
     (cond ((zerop hi)
            (inst addi.d rd zero-tn immediate))
-          ((zerop lo)
-           (inst lu12i.w rd hi))
           (t
-           (inst lu12i.w t7-tn hi)
-           (inst addi.d rd t7-tn lo)))))
+           (inst lu12i.w rd hi)
+           (unless (zerop lo)
+             (inst addi.d rd rd lo))))))
 
 ;;;; li should optimization by lu32i, lu52i
 (defun %li (reg value)

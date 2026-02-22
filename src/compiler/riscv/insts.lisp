@@ -441,11 +441,10 @@
       (u-and-i-inst-immediate immediate)
     (cond ((zerop hi)
            (inst addi rd zero-tn immediate))
-          ((zerop lo)
-           (inst lui rd hi))
           (t
-           (inst lui tmp-tn hi)
-           (inst addi rd tmp-tn lo)))))
+           (inst lui rd hi)
+           (unless (zerop lo)
+             (inst addi rd rd lo))))))
 
 (defun %li (reg value)
   (etypecase value
