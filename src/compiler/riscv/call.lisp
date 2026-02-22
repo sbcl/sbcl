@@ -42,7 +42,9 @@
 (defun make-return-pc-save-location (env)
   (let ((ptype *fixnum-primitive-type*))
     (specify-save-tn
-     (environment-debug-live-tn (make-normal-tn ptype) env)
+     ;; KLUDGE: use a stack location because it needs to be either
+     ;; pinned while in $RA or while saved on the stack.
+     (environment-debug-live-tn (make-restricted-tn ptype control-stack-arg-scn) env)
      (make-wired-tn ptype control-stack-arg-scn ra-save-offset))))
 
 ;;; Make a TN for the standard argument count passing location.  We
