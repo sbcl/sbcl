@@ -89,7 +89,7 @@ run in any thread.")
 
 ;;;; internal GC
 
-(define-alien-routine collect-garbage int (last-gen int))
+(define-alien-routine collect-garbage void (last-gen int))
 
 (define-alien-routine gc-stop-the-world void)
 (define-alien-routine gc-start-the-world void)
