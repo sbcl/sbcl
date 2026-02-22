@@ -899,7 +899,6 @@ os_vm_address_t coreparse_alloc_space(int space_id, int attr,
 extern int futex_wait(int*,int,long,unsigned long), futex_wake(int*, int);
 int futex_wait_allowing_gc(int *lock_word, int oldval)
 {
-    gc_assert(trap_PendingInterrupt == 9); // this static assertion will (hopefully) be compiled out
     struct thread* th = get_sb_vm_thread();
     /* This has a problem with #+gs-seg because RBP-TN is used for the arbitrary nonzero bits
      * (with the low bit 0) stored in pa_bits - See NONZERO-BITS in EMIT-BEGIN-PSEUDO-ATOMIC
@@ -912,7 +911,11 @@ int futex_wait_allowing_gc(int *lock_word, int oldval)
         th->pseudo_atomic_bits = (uword_t)th; // become pseudo-atomic again
         return result;
     }
-    asm volatile("ud2\n\t.byte 9"); // receive pending int
+#ifdef LISP_FEATURE_UD2_BREAKPOINTS
+    asm volatile("ud2\n\t.byte %c0" : : "i"(trap_PendingInterrupt));
+#else // No trap code follows the UD2. See sigill_handler for explanation
+    asm volatile("ud2");
+#endif
     int result = futex_wait(lock_word, oldval, -1, 0);
     th->pseudo_atomic_bits = (uword_t)th;
     return result;
