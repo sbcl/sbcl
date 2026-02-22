@@ -683,7 +683,12 @@
                        t)
          :test #'car-type-equal)))))
 
-(with-test (:name :comparison-transform-overflow)
+;; figure out whether the floating-point environment is as expected
+(handler-case (eval '(* 1.0e30 1.0e30))
+  (division-by-zero () (push :skip-=-xform-test *features*)) ; strange result
+  (floating-point-overflow ())) ; normal result
+
+(with-test (:name :comparison-transform-overflow :skipped-on :skip-=-xform-test)
   (checked-compile-and-assert
    ()
    `(lambda (a)
