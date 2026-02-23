@@ -199,14 +199,15 @@ os_context_float_register_addr(os_context_t *context, int offset)
 unsigned int
 os_context_fp_control(os_context_t *context)
 {
-    return context->uc_mcontext->__ns.__fpsr | context->uc_mcontext->__ns.__fpcr;
+    return (context->uc_mcontext->__ns.__fpsr & 0xf800009f) |
+        (context->uc_mcontext->__ns.__fpcr & 0x3ff8f00);
 }
 
 void
 os_context_set_fp_control(os_context_t *context, unsigned int value)
 {
-    context->uc_mcontext->__ns.__fpsr = value;
-    context->uc_mcontext->__ns.__fpcr = value;
+    context->uc_mcontext->__ns.__fpsr = value & 0xf800009f;
+    context->uc_mcontext->__ns.__fpcr = value & 0x3ff8f00;
 }
 
 void

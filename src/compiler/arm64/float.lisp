@@ -873,10 +873,13 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:translate floating-point-modes)
+  (:temporary (:sc unsigned-reg) tmp2)
   (:policy :fast-safe)
   (:generator 3
     (inst mrs res :fpsr)
+    (inst and res res (load-immediate-word tmp-tn #xf800009f))
     (inst mrs tmp-tn :fpcr)
+    (inst and tmp-tn tmp-tn (load-immediate-word tmp2 #x3ff8f00))
     (inst orr res res tmp-tn)))
 
 (define-vop (set-floating-point-modes)
@@ -887,8 +890,10 @@
   (:translate (setf floating-point-modes))
   (:policy :fast-safe)
   (:generator 3
-    (inst msr :fpsr new)
-    (inst msr :fpcr new)
+    (inst and tmp-tn new (load-immediate-word tmp-tn #xf800009f))
+    (inst msr :fpsr tmp-tn)
+    (inst and tmp-tn new (load-immediate-word tmp-tn #x3ff8f00))
+    (inst msr :fpcr tmp-tn)
     (move res new)))
 
 ;;;; Complex float VOPs

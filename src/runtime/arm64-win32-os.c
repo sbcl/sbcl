@@ -198,7 +198,8 @@ os_context_flags_addr(os_context_t *context)
 unsigned long
 os_context_fp_control(os_context_t *context)
 {
-    return context->win32_context->Fpsr | context->win32_context->Fpcr;
+    return (context->win32_context->Fpsr & 0xf800009f)
+        | (context->win32_context->Fpcr & 0x3ff8f00);
 }
 
 void
