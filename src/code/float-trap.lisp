@@ -158,9 +158,12 @@ sets the floating point modes to their current values (and thus is a no-op)."
 ;;; disabled by default. Joe User can explicitly enable them if
 ;;; desired.
 (define-load-time-global *saved-floating-point-modes*
-  '(:traps (#-(and arm64 win32) :overflow
-            #-(or netbsd ppc (and arm64 win32)) :invalid
-            #-(and arm64 win32) :divide-by-zero)
+  '(:traps
+    #-riscv
+    (#-(and arm64 win32) :overflow
+     #-(or netbsd ppc (and arm64 win32)) :invalid
+     #-(and arm64 win32) :divide-by-zero)
+    #+riscv nil
     :rounding-mode :nearest :current-exceptions nil
     :accrued-exceptions nil :fast-mode nil
     #+x86 :precision #+x86 :53-bit))

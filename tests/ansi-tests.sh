@@ -58,9 +58,10 @@ rm -fr sandbox/scratch
  "SUBSTITUTE.FOLD.1"  "SUBSTITUTE-IF-NOT.FOLD.3"
  "MISC.598" "IMAGPART.4"
  (append #+x86 (list "CIS.4")
-         #+(or arm (and arm64 (not darwin)))
+         #+(or arm riscv (and arm64 (not darwin)))
            (list "EXP.ERROR.4" "EXP.ERROR.5" "EXP.ERROR.6" "EXP.ERROR.7" "EXPT.ERROR.4"
                  "EXPT.ERROR.5" "EXPT.ERROR.6" "EXPT.ERROR.7")
+         #+(or riscv loongarch64) (list "LOOP.13.8")
          #-sb-unicode (list "MISC.638")
          (if (member :sb-fasteval sb-impl:+internal-features+)
              (list "INTERSECTION.FOLD.1" "UNION.FOLD.1" "SET-DIFFERENCE.FOLD.1"
