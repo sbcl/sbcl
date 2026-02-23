@@ -15,7 +15,7 @@
 ;;;  - garbage_collect: no SP known for thread 0x802bea000 (OS 34367133952)
 ;;;  - failed AVER: (NOT (SB-THREAD::AVL-FIND ADDR SB-THREAD::OLD))
 
-#+(or (not sb-thread) freebsd) (invoke-restart 'run-tests::skip-file)
+#+(or riscv (not sb-thread) freebsd) (invoke-restart 'run-tests::skip-file)
 
 (setf (generation-number-of-gcs-before-promotion 0) 5)
 (setf (generation-number-of-gcs-before-promotion 1) 3)

@@ -618,7 +618,7 @@
       (double-reg
        (inst fmvx<- :double bits float))
       (double-stack
-       (loadw bits (current-nfp-tn vop) (tn-byte-offset float)))
+       (loadw bits (current-nfp-tn vop) (tn-offset float)))
       (descriptor-reg
        (loadw bits float double-float-value-slot other-pointer-lowtag)))))
 
