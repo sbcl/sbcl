@@ -935,7 +935,7 @@ gc_and_save(char *filename, int core_format, bool purify,
         filename[strlen(filename)-4] = '\0'; // chop ".tmp" from the end
         fseek(file, 0, SEEK_END);
         generate_elfcore_obj(filename, file, elf_c_symbols, n_symbols);
-        printf("[Converted to ELF]\n");
+        if (verbose) printf("[Converted to ELF]\n");
     }
 #endif
     exit(0);
