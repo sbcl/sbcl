@@ -322,11 +322,9 @@
   (let* ((f (checked-compile
              '(lambda (x)
                (if (sb-int:memq x '(a b c d e f g h i j k l m n o p)) 1 2))))
-         (code (sb-kernel:fun-code-header f))
-         (constant
-          (sb-kernel:code-header-ref code sb-vm:code-constants-offset)))
+         (constants (remove-if #'integerp (ctu:find-code-constants f))))
     ;; should have a vector of symbols, not references to each symbol
-    (assert (vectorp constant))
+    (assert (vectorp (car constants)))
     (assert (eql (funcall f 'j) 1))
     (assert (eql (funcall f 42) 2)))
 
@@ -334,11 +332,9 @@
              '(lambda (x)
                (or (member x '(a b c d e f g h i j k nil t l m n o p) :test 'eq)
                    -1))))
-         (code (sb-kernel:fun-code-header f))
-         (constant1
-           (sb-kernel:code-header-ref code sb-vm:code-constants-offset))
-         (constant2
-           (sb-kernel:code-header-ref code (1+ sb-vm:code-constants-offset))))
+         (constants (remove-if #'integerp (ctu:find-code-constants f)))
+         (constant1 (first constants))
+         (constant2 (second constants)))
     ;; These accesses are safe because if the transform happened,
     ;; there should be 2 constants, and if it didn't, then at least 2 constants.
     (assert (and (vectorp constant1) (vectorp constant2)))

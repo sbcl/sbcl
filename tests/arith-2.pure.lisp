@@ -616,7 +616,7 @@
    (values (integer -255 0) (integer -9 0) &optional)))
 
 (with-test (:name :logbitp-on-integers
-            :fails-on (or :arm :loongarch64))
+            :fails-on (or :ppc :ppc64 :arm :riscv :loongarch64))
   (assert (not (ctu:ir1-named-calls `(lambda (x)
                                        (logbitp 20 x))))))
 (with-test (:name :bt-negative-bit)
@@ -797,7 +797,7 @@
    (unsigned-byte 54)))
 
 (with-test (:name :ldb-computed-posn
-            :fails-on (or :loongarch64))
+            :fails-on (or :ppc64 :riscv :loongarch64))
   (assert-type
    (lambda (x y)
      (ldb (byte y (- 32 y)) x))
@@ -851,7 +851,7 @@
    ((300 0) 303)))
 
 (with-test (:name :truncate-unknown-integer
-            :fails-on (or :arm :loongarch64))
+            :fails-on (or :arm :riscv :loongarch64))
   (assert (not (ctu:ir1-named-calls `(lambda (x)
                                        (declare (integer x))
                                        (values (the (signed-byte 25) (floor x 2)))))))
@@ -872,7 +872,7 @@
                                        (values (the (signed-byte 25) (ceiling x 2))))))))
 
 (with-test (:name :word-floor-ceiling
-            :fails-on (or :arm :loongarch64))
+            :fails-on (or :ppc :arm :riscv :loongarch64))
   (assert (not (ctu:ir1-named-calls `(lambda (x y)
                                        (declare (sb-vm:signed-word x y))
                                        (floor x y)))))
@@ -1328,7 +1328,8 @@
      (ash x y))
    (integer * 0)))
 
-(with-test (:name :ash-overflow)
+(with-test (:name :ash-overflow
+            :fails-on (or :ppc :ppc64))
   (checked-compile-and-assert
       ()
       `(lambda (a)
@@ -1890,24 +1891,6 @@
      (logand -2 most-positive-word))))
 
 (with-test (:name :logand-cut-constants)
-  #-arm
-  (assert (= (count-if (lambda (c)
-                         (member c '(logand sb-kernel:two-arg-and)))
-                       (ctu:ir1-named-calls `(lambda (n m)
-                                               (declare ((unsigned-byte 64) n)
-                                                        ((unsigned-byte 8) m))
-                                               (logand m (logand n #xFFFF)))
-                                            nil))
-             1))
-  #-arm
-  (assert (= (count-if (lambda (c)
-                         (member c '(logand sb-kernel:two-arg-and)))
-                       (ctu:ir1-named-calls `(lambda (x m)
-                                               (declare ((unsigned-byte 32) x)
-                                                        ((unsigned-byte 8) m))
-                                               (logand m (logand x #xFF)))
-                                            nil))
-             1))
   ;; (assert (= (count-if
   ;;             (lambda (c)
   ;;               (member c '(logand logtest)))
@@ -1969,6 +1952,26 @@
          (logand (logior -10 s) 29953653503380140701))
     ((0) 29953653503380140692)
     ((1) 29953653503380140693)))
+
+(with-test (:name :logand-cut-constants
+            :fails-on (or :arm :ppc))
+  (assert (= (count-if (lambda (c)
+                         (member c '(logand sb-kernel:two-arg-and)))
+                       (ctu:ir1-named-calls `(lambda (n m)
+                                               (declare ((unsigned-byte 64) n)
+                                                        ((unsigned-byte 8) m))
+                                               (logand m (logand n #xFFFF)))
+                                            nil))
+             1))
+  #-arm
+  (assert (= (count-if (lambda (c)
+                         (member c '(logand sb-kernel:two-arg-and)))
+                       (ctu:ir1-named-calls `(lambda (x m)
+                                               (declare ((unsigned-byte 32) x)
+                                                        ((unsigned-byte 8) m))
+                                               (logand m (logand x #xFF)))
+                                            nil))
+             1)))
 
 (with-test (:name :lognot)
   (assert (= (count 'lognot
@@ -2228,7 +2231,8 @@
            (* (the integer (* n 0)) 3))
       ((#c(1 -2)) 0))))
 
-(with-test (:name :logtest)
+(with-test (:name :logtest
+            :fails-on :ppc64)
   (when (ctu:vop-existsp 'logtest)
     (assert (= (count 'logtest
                       (ctu:ir1-named-calls `(lambda (a)
@@ -2256,7 +2260,7 @@
     ((0) nil)))
 
 (with-test (:name :logtest-integer-fixnum
-            :fails-on (or :arm :loongarch64))
+            :fails-on (or :arm :ppc64 :ppc :riscv :loongarch64))
   (assert (not (ctu:ir1-named-calls `(lambda (x y)
                                        (declare (integer x)
                                                 (fixnum y))

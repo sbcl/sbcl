@@ -195,8 +195,9 @@
 
 (let* ((n-saved-registers (length c-saved-registers))
        (n-saved-float-registers (length c-saved-float-registers))
-       (framesize (+ (* n-word-bytes n-saved-registers)
-                     (* 8 n-saved-float-registers))))
+       (framesize (align-up (+ (* n-word-bytes n-saved-registers)
+                               (* 8 n-saved-float-registers))
+                            (1+ +number-stack-alignment-mask+))))
   (defun save-c-registers ()
     (inst subi nsp-tn nsp-tn framesize)
     (loop for offset from 0

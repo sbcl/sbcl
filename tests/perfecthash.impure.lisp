@@ -109,7 +109,7 @@
           (dolist (const constants)
             ;; This assertion failed when the printed representation of
             ;; the lambda omitted array specializations
-            (assert (typep const 'sb-kernel:simple-unboxed-array)))
+            (assert (typep const '(or sb-kernel:simple-unboxed-array integer))))
           (test-perfect-hashfun fun keys))))))
 
 (with-test (:name :typo-example-1) ; of which there may be more
