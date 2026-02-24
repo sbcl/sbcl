@@ -470,7 +470,7 @@
 ;;;; register saving
 
 (declaim (start-block optimized-emit-saves emit-saves assign-tn-costs
-                      pack-save-tn))
+                      pack-save-tn pack-wired-tns))
 
 ;;; Do stuff to note that TN is spilled at VOP for the debugger's benefit.
 (defun note-spilled-tn (tn vop)
@@ -870,6 +870,37 @@
               ((null ref))
             (incf cost (+ write-cost (vop-depth-cost (tn-ref-vop ref)))))
           (setf (tn-cost tn) cost))))))
+
+(defun pack-wired-tns (2comp &optional callback)
+  (flet (#-fp-and-pc-standard-save
+         (save-tn-p (tn)
+           (let ((save-tn (tn-save-tn tn)))
+             (and save-tn (eq (tn-kind save-tn) :specified-save)))))
+    ;; First, pack wired-tns without :specified-save
+    (do ((tn (ir2-component-wired-tns 2comp) (tn-next tn)))
+        ((null tn))
+      (unless (or (eq (tn-kind tn) :arg-pass)
+                  #-fp-and-pc-standard-save
+                  (save-tn-p tn))
+        (pack-wired-tn tn)
+        (when callback
+          (funcall callback tn))))
+    ;; Now that the conflicts are populated, unwire any conflicting
+    ;; specified-save tns to their save location
+    #-fp-and-pc-standard-save
+    (do ((tn (ir2-component-wired-tns 2comp) (tn-next tn)))
+        ((null tn))
+      ;; The return address register might be wired and span the whole
+      ;; environment, if it conflicts with something put it into its
+      ;; specified save and unwire
+      (cond ((not (save-tn-p tn)))
+            ((conflicts-in-sc tn (tn-sc tn) (tn-offset tn))
+             (sb-c::deletef-in tn-next (ir2-component-wired-tns 2comp) tn)
+             (setf (tn-sc tn) (tn-sc (tn-save-tn tn))))
+            (t
+             (pack-wired-tn tn)
+             (when callback
+               (funcall callback tn)))))))
 
 ;;; If we're not assigning costs, and on a system where it matters, go
 ;;; through and force TNs with specified save locations (OCFP and LRA
@@ -1759,10 +1790,7 @@
   (declare (type component component)
            (type ir2-component 2comp))
   ;; Pack wired TNs first.
-  (do ((tn (ir2-component-wired-tns 2comp) (tn-next tn)))
-      ((null tn))
-    (unless (eq (tn-kind tn) :arg-pass)
-      (pack-wired-tn tn)))
+  (pack-wired-tns 2comp)
 
   ;; Then, pack restricted TNs, ones that are live over the whole
   ;; component first (they cause no fragmentation).  Sort by TN cost

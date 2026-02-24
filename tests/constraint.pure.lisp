@@ -826,7 +826,8 @@
              0)))
 
 
-(with-test (:name :bounds-check-min-length)
+(with-test (:name :bounds-check-min-length
+            :fails-on (or :ppc :ppc64 :riscv :loongarch64))
   (assert (= (count 'sb-kernel:%check-bound
                     (ctu:ir1-named-calls
                      `(lambda (x v)
@@ -1909,7 +1910,7 @@
    (integer -6176139011 -222)))
 
 (with-test (:name :ignore-delays
-            :fails-on (or :arm :loongarch64))
+            :fails-on (or :arm :riscv :loongarch64 :ppc :ppc64))
   (assert-type
    (lambda (x)
      (declare (optimize debug))

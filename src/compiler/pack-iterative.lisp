@@ -622,12 +622,9 @@
     ;; Pack TNs that *must* be in a certain location, but still
     ;; register them in the interference graph: it's useful to have
     ;; them in the graph for targeting purposes.
-    (do ((tn (ir2-component-wired-tns 2comp) (tn-next tn)))
-        ((null tn))
-      (unless (eq (tn-kind tn) :arg-pass)
-        (pack-wired-tn tn)
-        (unless (unbounded-tn-p tn)
-          (vertices (make-vertex tn :wired)))))
+    (pack-wired-tns 2comp (lambda (tn)
+                            (unless (unbounded-tn-p tn)
+                              (vertices (make-vertex tn :wired)))))
 
     ;; Preallocate vertices that *must* be in this finite SC.  If
     ;; targeting is improved, giving them a high priority in regular

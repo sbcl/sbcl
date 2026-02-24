@@ -297,10 +297,6 @@
   #-c-stack-is-control-stack
   ;; If this component has a NFP, then this is it.
   (nfp nil :type (or tn null))
-  ;; a list of the explicitly specified save TNs (kind
-  ;; :SPECIFIED-SAVE). These TNs will also appear in the
-  ;; {NORMAL,RESTRICTED,WIRED} TNs as appropriate to their location.
-  (specified-save-tns () :type list)
   ;; a list of all the blocks whose IR2-BLOCK has a non-null value for
   ;; POPPED. This slot is initialized by LTN-ANALYZE as an input to
   ;; STACK-ANALYZE.

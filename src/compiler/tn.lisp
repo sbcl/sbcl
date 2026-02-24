@@ -209,9 +209,6 @@
   (setf (tn-kind save) :specified-save)
   (setf (tn-save-tn tn) save)
   (setf (tn-save-tn save) tn)
-  (push save
-        (ir2-component-specified-save-tns
-         (component-info *component-being-compiled*)))
   tn)
 
 ;;; Create a constant TN. The backend dependent
