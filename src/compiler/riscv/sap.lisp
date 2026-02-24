@@ -203,6 +203,9 @@
                            (inst add addr sap offset)
                            LOOP
                            (inst ,load result addr :aq)
+                           #+64-bit ,@(when (and (not signed) (eq size :word))
+                                        `((inst slli result result 32)
+                                          (inst srli result result 32)))
                            (inst bne result oldval EXIT)
                            (inst ,store temp newval addr :aq :rl)
                            (inst bne temp zero-tn LOOP)
