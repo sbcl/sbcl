@@ -39,7 +39,6 @@
 
 #include <sys/types.h>
 #include <signal.h>
-/* #include <sys/sysinfo.h> */
 #include "validate.h"
 #include "gc.h"
 #include "sys_mmap.inc"

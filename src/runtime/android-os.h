@@ -15,7 +15,6 @@
 #include <signal.h>
 #include <string.h>
 #include <strings.h>
- /* #include <dlfcn.h> */
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>

@@ -36,7 +36,6 @@
 
 #include <sys/types.h>
 #include <signal.h>
-/* #include <sys/sysinfo.h> */
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
