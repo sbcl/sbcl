@@ -781,52 +781,60 @@
                                            return-pc-save-offset)))))))))))
 ) ; end PROGN
 
-(defun return-pc-offset-for-location (debug-fun location)
-  (declare (ignorable debug-fun location))
+(defun return-pc-offset-for-location (debug-fun frame)
+  (declare (ignorable debug-fun frame))
   #+fp-and-pc-standard-save
   sb-c:return-pc-passing-offset
   #-fp-and-pc-standard-save
-  (etypecase debug-fun
-    (compiled-debug-fun
-     (let ((c-d-f (compiled-debug-fun-compiler-debug-fun debug-fun))
-           (pc-offset (compiled-code-location-pc location)))
-       (if (>= pc-offset (sb-c::compiled-debug-fun-lra-saved-pc c-d-f))
-           (sb-c::compiled-debug-fun-return-pc c-d-f)
-           (sb-c::compiled-debug-fun-return-pc-pass c-d-f))))
-    (bogus-debug-fun
-     ;; No handy backend (or compiler) defined constant for this one,
-     ;; so construct it here and now.
-     (sb-c:make-sc+offset control-stack-sc-number
-                     #-(or riscv loongarch64) lra-save-offset
-                     #+(or riscv loongarch64) sb-vm::ra-save-offset))))
+  (let ((location (frame-code-location frame)))
+    (etypecase debug-fun
+      (compiled-debug-fun
+       (let ((c-d-f (compiled-debug-fun-compiler-debug-fun debug-fun))
+             (pc-offset (compiled-code-location-pc location)))
+         (if (and (>= pc-offset (sb-c::compiled-debug-fun-lra-saved-pc c-d-f))
+                  ;; it's not saved yet, and the code is in elsewhere
+                  (not (and (eq (debug-fun-kind debug-fun) :external)
+                            (eq (interrupted-frame-error frame) 'invalid-arg-count-error))))
+             (sb-c::compiled-debug-fun-return-pc c-d-f)
+             (sb-c::compiled-debug-fun-return-pc-pass c-d-f))))
+      (bogus-debug-fun
+       ;; No handy backend (or compiler) defined constant for this one,
+       ;; so construct it here and now.
+       (sb-c:make-sc+offset control-stack-sc-number
+                            #-(or riscv loongarch64) lra-save-offset
+                            #+(or riscv loongarch64) sb-vm::ra-save-offset)))))
 
-(defun old-fp-offset-for-location (debug-fun location)
-  (declare (ignorable debug-fun location))
+(defun old-fp-offset-for-location (debug-fun frame)
+  (declare (ignorable debug-fun frame))
   #+fp-and-pc-standard-save
   sb-c:old-fp-passing-offset
   #-fp-and-pc-standard-save
-  (etypecase debug-fun
-    (compiled-debug-fun
-     (let ((c-d-f (compiled-debug-fun-compiler-debug-fun debug-fun))
-           (pc-offset (compiled-code-location-pc location)))
-       (if (>= pc-offset (sb-c::compiled-debug-fun-cfp-saved-pc c-d-f))
-           (sb-c::compiled-debug-fun-old-fp c-d-f)
-           sb-c:old-fp-passing-offset)))
-    (bogus-debug-fun
-     ;; No handy backend (or compiler) defined constant for this one,
-     ;; so construct it here and now.
-     (sb-c:make-sc+offset control-stack-sc-number ocfp-save-offset))))
+  (let ((location (frame-code-location frame)))
+    (etypecase debug-fun
+      (compiled-debug-fun
+       (let ((c-d-f (compiled-debug-fun-compiler-debug-fun debug-fun))
+             (pc-offset (compiled-code-location-pc location)))
+         (if (and (>= pc-offset (sb-c::compiled-debug-fun-cfp-saved-pc c-d-f))
+                  ;; it's not saved yet, and the code is in elsewhere
+                  (not (and (eq (debug-fun-kind debug-fun) :external)
+                            (eq (interrupted-frame-error frame) 'invalid-arg-count-error))))
+             (sb-c::compiled-debug-fun-old-fp c-d-f)
+             sb-c:old-fp-passing-offset)))
+      (bogus-debug-fun
+       ;; No handy backend (or compiler) defined constant for this one,
+       ;; so construct it here and now.
+       (sb-c:make-sc+offset control-stack-sc-number ocfp-save-offset)))))
 
 (defun frame-saved-cfp (frame debug-fun)
   (sub-access-debug-var-slot
    (frame-pointer frame)
-   (old-fp-offset-for-location debug-fun (frame-code-location frame))
+   (old-fp-offset-for-location debug-fun frame)
    (compiled-frame-escaped frame)))
 
 (defun frame-saved-lra (frame debug-fun)
   (sub-access-debug-var-slot
    (frame-pointer frame)
-   (return-pc-offset-for-location debug-fun (frame-code-location frame))
+   (return-pc-offset-for-location debug-fun frame)
    (compiled-frame-escaped frame)))
 
 (defun (setf frame-saved-lra) (new-lra frame debug-fun)
