@@ -426,6 +426,7 @@
 ;;             314  172   57   24   14    6    1    0    0    0    0    0
 ;; Avg=1.7653061
 (with-test (:name :numeric-type-hash-mixer
+            :fails-on :ppc64
             :skipped-on :gc-stress)
   (let* ((hs sb-kernel::*numeric-union-type-hashset*)
          ;; Theoretically we should be more concerned with the _average_

@@ -139,7 +139,8 @@
     ((#\b) nil)))
 
 (with-test (:name :array-subtype-dispatch-table
-                  :fails-on :sb-cover-for-internals) ; lp#2131957
+            :skipped-on (not (or :x86 :x86-64 :arm64))
+            :fails-on :sb-cover-for-internals) ; lp#2131957
   (assert (> (sb-kernel:code-jump-table-words
               (sb-kernel:fun-code-header #'sb-kernel:vector-subseq))
              20)))

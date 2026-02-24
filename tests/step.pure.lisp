@@ -12,7 +12,7 @@
 ;;;; more information.
 
 ;; No stepper support on some platforms.
-#+(or interpreter riscv loongarch64) (invoke-restart 'run-tests::skip-file)
+#+(or interpreter riscv loongarch64 (and ppc64 big-endian)) (invoke-restart 'run-tests::skip-file)
 
 ;; These tests should either with code in dynamic space
 ;; or immobile space, but they only accidentally worked

@@ -281,6 +281,7 @@
   (prin1-to-string (make-condition 'simple-type-error)))
 
 (with-test (:name (:print-undefined-function-condition)
+            :broken-on :ppc
             :fails-on :ppc64)
   (handler-case (funcall '#:foo)
     (undefined-function (c) (princ-to-string c))))

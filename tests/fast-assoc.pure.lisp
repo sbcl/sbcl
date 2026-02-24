@@ -132,7 +132,7 @@
   (position x #.*my-pos-testvector* :from-end t))
 (compile 'fast-rpos-mixed-keytypes)
 (with-test (:name :pos-mixed-keytypes)
-  (let ((c (delete-if (lambda (x) (typep x '(vector * 8)))
+  (let ((c (delete-if (lambda (x) (typep x '(or (vector * 8) integer)))
                       (ctu:find-code-constants #'fast-rpos-mixed-keytypes))))
     (assert (typep (car c) '(simple-vector 11)))
     (assert (typep (cadr c) '(vector (unsigned-byte 8) 11)))

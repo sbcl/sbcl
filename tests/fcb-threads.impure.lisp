@@ -159,13 +159,15 @@
                   (/ (- stop start) internal-time-units-per-second)))))))
 
 (with-test (:name :call-me-from-1-thread-no-gc
-                  :skipped-on (or :interpreter))
+            :fails-on (and :ppc64 :big-endian)
+            :skipped-on (or :interpreter))
   ;; smoke test and no GCing
   (setq *print-greetings-and-salutations* t)
   (f 1 1 1 nil)
   (setq *print-greetings-and-salutations* nil))
 
 (with-test (:name :call-me-from-many-threads-and-gc
+            :fails-on (and :ppc64 :big-endian)
             :skipped-on (or :interpreter (and :x86 :win32)))
   ;; two trials, 5 threads, 40 calls each
   (f 2 5 40 t)

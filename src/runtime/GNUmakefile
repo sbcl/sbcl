@@ -113,7 +113,7 @@ $(TARGET): $(LIBSBCL)
 # tests/heap-reloc/fake-mman.c assumes #+linux, so this recipe
 # only works on linux.
 heap-reloc-test: ../../tests/heap-reloc/fake-mman.c $(OBJS)
-	$(CC) ${LINKFLAGS} -o $@ ../../tests/heap-reloc/fake-mman.c $(filter-out linux-mman.o,$(OBJS)) $(LIBS)
+	$(CC) ${LINKFLAGS} $(CPPFLAGS) -o $@ ../../tests/heap-reloc/fake-mman.c $(filter-out linux-mman.o,$(OBJS)) $(LIBS)
 
 # Enable compiling gencgc with even more assertions and/or
 # data collection, with COMPILING_TESTS. Not really used yet.

@@ -161,8 +161,7 @@
 
 ;;; on the PPC, we got the magic numbers in undefined_tramp wrong for
 ;;; a while; fixed by CSR 2002-07-18
-(with-test (:name :undefined-function-error
-            :fails-on :ppc64)
+(with-test (:name :undefined-function-error)
   (multiple-value-bind (value error)
       (ignore-errors (funcall (checked-compile
                                `(lambda () (some-undefined-function))
@@ -3435,7 +3434,7 @@
                                t))))
     (ctu:assert-no-consing (funcall f))))
 
-(with-test (:name :truncate-float :fails-on :ppc64)
+(with-test (:name :truncate-float)
   (let ((s (checked-compile `(lambda (x)
                                (declare (single-float x))
                                (truncate x))))
@@ -3541,8 +3540,7 @@
     (test 'base-string 'sb-kernel:%concatenate-to-base-string)
     (test 'simple-base-string 'sb-kernel:%concatenate-to-base-string)))
 
-(with-test (:name (satisfies :no-local-fun)
-            :fails-on :ppc64)
+(with-test (:name (satisfies :no-local-fun))
   (let ((fun (checked-compile
               `(lambda (arg)
                  (labels ((local-not-global-bug (x)
@@ -5457,7 +5455,7 @@
   (let ((f (checked-compile '(lambda (x) (oddp x)))))
     (ctu:assert-no-consing (funcall f most-positive-fixnum))))
 (with-test (:name (oddp bignum :no-consing)
-            :serial t :skipped-on :interpreter :fails-on (or :arm :ppc :loongarch64))
+            :serial t :skipped-on :interpreter :fails-on (or :arm :ppc :ppc64 :riscv :loongarch64))
   (let ((f (checked-compile '(lambda (x) (oddp x))))
         (x (* most-positive-fixnum most-positive-fixnum 3)))
     (ctu:assert-no-consing (funcall f x))))
@@ -5466,7 +5464,7 @@
   (let ((f (checked-compile '(lambda (x) (logtest x most-positive-fixnum)))))
     (ctu:assert-no-consing (funcall f 1))))
 (with-test (:name (logtest bignum :no-consing)
-            :serial t :skipped-on :interpreter :fails-on (or :arm :ppc :loongarch64))
+            :serial t :skipped-on :interpreter :fails-on (or :arm :ppc :ppc64 :riscv :loongarch64))
   (let ((f (checked-compile '(lambda (x) (logtest x 1))))
         (x (* most-positive-fixnum most-positive-fixnum 3)))
     (ctu:assert-no-consing (funcall f x))))

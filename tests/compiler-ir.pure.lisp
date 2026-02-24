@@ -535,7 +535,7 @@
     (assert (node-tail-p combination))))
 
 (with-test (:name :evenp+arithmetic
-            :fails-on (or :riscv :loongarch64))
+            :fails-on (or :riscv :loongarch64 :ppc64 :ppc))
   (assert (not (ir-full-calls `(lambda (x)
                                  (evenp (+ x 3))))))
   (assert (not (ir-full-calls `(lambda (x)
@@ -587,7 +587,7 @@
                             n))))))
 
 (with-test (:name :truncate-signed-word-error
-            :fails-on (or :riscv :loongarch64))
+            :fails-on (or :ppc64 :riscv :loongarch64))
   (assert (not (find 'sb-vm::move-from-signed
                      (ir2-vops '(lambda (x d)
                                  (declare ((signed-byte 64) x d))

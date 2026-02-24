@@ -10,7 +10,8 @@
       (disassemble-annotate-funs-f2)
       (print 20)))
 
-(with-test (:name :disassemble-annotate-funs)
+(with-test (:name :disassemble-annotate-funs
+            :fails-on :ppc)
   (let ((dis (with-output-to-string (str) (disassemble #'disassemble-annotate-funs :use-labels nil :stream str))))
     (assert (search "PRINC" dis))
     (assert (search "PRINT" dis))

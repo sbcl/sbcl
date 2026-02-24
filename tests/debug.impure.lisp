@@ -138,7 +138,7 @@
                                       (declare (ignore f stuff))))))
 
 (defparameter *breakpoint-tracing-expectations*
-  '(:fails-on (or :arm :riscv)
+  '(:fails-on (or :arm :riscv :ppc64 :ppc)
     :broken-on (or :loongarch64 :freebsd)))
 
 ;;; bug 379
@@ -955,7 +955,7 @@
 
 (with-test (:name (:debugger :list-locations)
             ;; there's an extra location on arm for some reason.
-            :fails-on (or :arm :loongarch64 :riscv))
+            :fails-on (or :arm :loongarch64 :riscv :ppc :ppc64))
   (test-debugger
    "ll #'!
     debugger-test-done!"

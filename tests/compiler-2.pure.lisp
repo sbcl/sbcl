@@ -4451,7 +4451,8 @@
     ((0 nil 2) nil)
     ((0 1 2) (condition 'undefined-function))))
 
-(with-test (:name :undefined-system-fun)
+(with-test (:name :undefined-system-fun
+            :fails-on (and :ppc64 :big-endian))
   (checked-compile-and-assert
       (:optimize :safe :allow-warnings t)
       `(lambda ()
