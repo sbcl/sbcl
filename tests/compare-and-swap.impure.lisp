@@ -628,7 +628,6 @@
       (format t "Double-width compare-and-swap NOT TESTED~%")))
 
 (test-util:with-test (:name :cas-sap-ref-smoke-test
-                            :fails-on :loongarch64 ; unsigned-32-bit gets the wrong answer
                             :skipped-on (not :sb-thread))
   (let ((data (make-array 1 :element-type 'sb-vm:word)))
     (sb-sys:with-pinned-objects (data)

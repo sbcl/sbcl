@@ -437,8 +437,8 @@
 
 (define-instruction-format (bstr 32 :default-printer bstr-printer)
   (opcode :field (byte 10 22))
-  (lsbw :field (byte 6 16))
   (msbw :field (byte 6 10))
+  (lsbw :field (byte 6 16))
   (rj :field (byte 5 5) :type 'reg)
   (rd :field (byte 5 0) :type 'reg))
 
@@ -450,7 +450,7 @@
   (byte 5 0))
 
 (defun emit-bstr-inst (segment opcode rd rj msbw lsbw)
-     (%emit-bstr-inst segment opcode lsbw msbw (reg-tn-encoding rj) (reg-tn-encoding rd)))
+     (%emit-bstr-inst segment opcode msbw lsbw (reg-tn-encoding rj) (reg-tn-encoding rd)))
 
 (define-instruction bstrins.d (segment rd rj msbw lsbw)
   (:printer bstr ((opcode #b0000000010))

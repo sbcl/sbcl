@@ -204,6 +204,7 @@
                            LOOP
                            (inst ,load result addr :aq)
                            #+64-bit ,@(when (and (not signed) (eq size :word))
+                                        ;; zero extend
                                         `((inst slli result result 32)
                                           (inst srli result result 32)))
                            (inst bne result oldval EXIT)

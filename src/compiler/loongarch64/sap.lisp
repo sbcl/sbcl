@@ -199,6 +199,9 @@
                           LOOP
                            (inst dbar #x14)
                            (inst ,load result addr 0)
+                           ,@(when (and (not signed) (eq size :word))
+                               ;; zero extend
+                               `((inst bstrpick.d result result 31 0)))
                            (inst bne result oldval EXIT)
                            (inst move temp newval)
                            (inst ,store temp addr 0)
