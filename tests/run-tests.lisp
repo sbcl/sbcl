@@ -50,7 +50,8 @@
                   (error "~@<Invalid evaluator mode: ~A. Must be one ~
                            of interpret, compile.~@:>"
                          mode)))))
-            ((string= arg "--break-on-failure")
+            ((or (string= arg "--break-on-failure")
+                 (string= arg "-b"))
              (setf *break-on-error* t)
              (setf test-util:*break-on-failure* t))
             ((string= arg "--break-on-expected-failure")

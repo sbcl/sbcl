@@ -22,7 +22,7 @@ Options:
   --evaluator-mode              Either compile or interpret. Set the
                                 value of SB-EXT:*EVALUATOR-MODE* while
                                 running tests.
-  --break-on-failure            Break into the debugger when a test fails
+  --break-on-failure -b         Break into the debugger when a test fails
                                 unexpectedly.
   --break-on-expected-failure   Break into the debugger when any test fails.
   --report-skipped-tests        Include tests :skipped-on target SBCL in
