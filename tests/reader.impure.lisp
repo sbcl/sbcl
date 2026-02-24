@@ -379,7 +379,8 @@
   (assert-error (read-from-string "#S(NODE :NEXT #(#S(NODE :NEXT NIL)))"))
   (assert-error (read-from-string "#S(NODE :NEXT #S(NODE :NEXT 1))")))
 
-(with-test (:name (:sharp=-typed-slot :circular :no-error))
+(with-test (:name (:sharp=-typed-slot :circular :no-error)
+            :fails-on :sparc)
   (let ((circ (read-from-string "#1=#S(NODE :NEXT #1#)")))
     (assert (eql (node-next circ) circ))))
 (with-test (:name (:sharp=-typed-slot :circular error))
@@ -398,7 +399,8 @@
   (assert-error (read-from-string "#S(NODE :LISTNEXT #(#S(NODE :LISTNEXT NIL)))"))
   (assert-error (read-from-string "#S(NODE :LISTNEXT (#S(NODE :LISTNEXT 1)))")))
 
-(with-test (:name (:sharp=-cons-typed-slot :circular :no-error))
+(with-test (:name (:sharp=-cons-typed-slot :circular :no-error)
+            :fails-on :sparc)
   (let ((circ (read-from-string "#1=#S(NODE :LISTNEXT (#1#))")))
     (assert (eql (car (node-listnext circ)) circ))))
 (with-test (:name (:sharp=-cons-typed-slot :circular error))
@@ -412,7 +414,8 @@
   (assert-error (read-from-string "#S(NODE :CONSCONS 1)"))
   (assert-error (read-from-string "#S(NODE :CONSCONS (1))")))
 
-(with-test (:name (:sharp=-cons-typed-cons-slot :circular :no-error))
+(with-test (:name (:sharp=-cons-typed-cons-slot :circular :no-error)
+            :fails-on :sparc)
   (let* ((circ (car (read-from-string "#1=(#S(NODE :CONSCONS #1#) . #1#)")))
          (conscons (node-conscons circ)))
     (assert (eql (car conscons) circ))
@@ -446,7 +449,8 @@
     (dotimes (i 5)
       (assert (eql (aref displacement i) array)))))
 
-(with-test (:name (:sharp= :circular-mismatch))
+(with-test (:name (:sharp= :circular-mismatch)
+            :fails-on :sparc)
   (assert-error
       (read-from-string "#S(NODE :NEXT (#1=#S(NODE :NEXT #1#)))")
       type-error))

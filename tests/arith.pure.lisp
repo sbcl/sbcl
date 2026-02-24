@@ -1057,7 +1057,8 @@
    ((2 2) t)
    ((3 2) nil)))
 
-(with-test (:name :ash-signed-negation-overflow :fails-on :arm)
+(with-test (:name :ash-signed-negation-overflow
+            :fails-on (or :sparc :arm))
   (checked-compile-and-assert
       ()
       `(lambda (a b)

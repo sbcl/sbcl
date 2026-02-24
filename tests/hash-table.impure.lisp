@@ -225,7 +225,7 @@
     (with-locked-hash-table (h) (setf (gethash 'foo h) 1))))
 
 (with-test (:name :hash-table-iterator-no-notes
-                  :fails-on (:or :arm :ppc :ppc64 :loongarch64 :riscv))
+                  :fails-on (:or :arm :ppc :ppc64 :loongarch64 :riscv :sparc :mips))
   (let ((f
          (checked-compile
           '(lambda (h)

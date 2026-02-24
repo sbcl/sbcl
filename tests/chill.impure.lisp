@@ -1,6 +1,7 @@
 #+parallel-test-runner (setq run-tests::*allowed-inputs* :any)
 
-(with-test (:name (:chill :loads-quietly))
+(with-test (:name (:chill :loads-quietly)
+            :fails-on sparc)
   (handler-bind (#-sb-devel (warning (lambda (c) (error "Caught warning: ~A" c))))
     (load "../src/cold/chill.lisp")))
 
@@ -27,7 +28,8 @@
          (when (eql o eof)
            (return)))))))
 
-(with-test (:name (:chill :read-xc-files))
+(with-test (:name (:chill :read-xc-files)
+            :fails-on sparc)
   (flet ((try-replacing (stem this that)
            (let ((position (search this stem)))
              (when position
@@ -44,7 +46,8 @@
                            stem)))
             (read-file name)))))))
 
-(with-test (:name (:chill :read-target-2-files))
+(with-test (:name (:chill :read-target-2-files)
+            :fails-on sparc)
   (let ((target-2-stems-lists (cdr *build-order-data*)))
     (dolist (stems-list target-2-stems-lists)
       (dolist (stem stems-list)

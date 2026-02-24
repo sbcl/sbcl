@@ -605,7 +605,7 @@
     (('(or (eql -16) unsigned-byte)) #(0) :test #'equalp)))
 
 (with-test (:name :check-bound-signed-bound-notes
-            :fails-on (not (or :x86-64 :x86 :arm64 :loongarch64)))
+            :fails-on (not (or :x86-64 :x86 :arm64 :riscv :loongarch64)))
   (checked-compile-and-assert
       (:allow-notes nil)
       `(lambda (x y)

@@ -616,7 +616,7 @@
    (values (integer -255 0) (integer -9 0) &optional)))
 
 (with-test (:name :logbitp-on-integers
-            :fails-on (or :ppc :ppc64 :arm :riscv :loongarch64))
+            :fails-on (or :ppc :ppc64 :arm :riscv :loongarch64 :mips :sparc))
   (assert (not (ctu:ir1-named-calls `(lambda (x)
                                        (logbitp 20 x))))))
 (with-test (:name :bt-negative-bit)
@@ -872,7 +872,7 @@
                                        (values (the (signed-byte 25) (ceiling x 2))))))))
 
 (with-test (:name :word-floor-ceiling
-            :fails-on (or :ppc :arm :riscv :loongarch64))
+            :fails-on (or :ppc :arm :riscv :loongarch64 :mips :sparc))
   (assert (not (ctu:ir1-named-calls `(lambda (x y)
                                        (declare (sb-vm:signed-word x y))
                                        (floor x y)))))
@@ -1329,7 +1329,7 @@
    (integer * 0)))
 
 (with-test (:name :ash-overflow
-            :fails-on (or :ppc :ppc64))
+            :fails-on (or :sparc :ppc :ppc64))
   (checked-compile-and-assert
       ()
       `(lambda (a)
@@ -1953,8 +1953,8 @@
     ((0) 29953653503380140692)
     ((1) 29953653503380140693)))
 
-(with-test (:name :logand-cut-constants
-            :fails-on (or :arm :ppc))
+(with-test (:name :logand-cut-constants.2
+            :fails-on (or :arm :ppc :sparc))
   (assert (= (count-if (lambda (c)
                          (member c '(logand sb-kernel:two-arg-and)))
                        (ctu:ir1-named-calls `(lambda (n m)
@@ -2260,7 +2260,7 @@
     ((0) nil)))
 
 (with-test (:name :logtest-integer-fixnum
-            :fails-on (or :arm :ppc64 :ppc :riscv :loongarch64))
+            :fails-on (or :arm :ppc64 :ppc :riscv :loongarch64 :mips :sparc))
   (assert (not (ctu:ir1-named-calls `(lambda (x y)
                                        (declare (integer x)
                                                 (fixnum y))

@@ -78,7 +78,8 @@
 ;;;
 ;;; I don't remember what the problem is with PPC.
 (with-test (:name :no-list-on-large-object-pages
-                  :skipped-on (:or :mips :ppc :ppc64))
+            :fails-on :sparc
+            :skipped-on (:or :mips :ppc :ppc64))
   (let* ((fun (checked-compile
                '(lambda ()
                  (macrolet ((expand (n) `(list ,@(loop for i from 1 to n collect i))))

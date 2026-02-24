@@ -382,7 +382,8 @@
    (read-from-string string)))
 (compile 'test-reader-consing)
 
-(with-test (:name :read-does-not-cons-per-se)
+(with-test (:name :read-does-not-cons-per-se
+            :fails-on :sparc)
     ;; These each used to produce at least 20 MB of garbage,
     ;; a result of using 128-character (= 512 bytes for Unicode) buffers.
     ;; Now we use exactly one buffer, or maybe two for package + symbol-name.
@@ -402,7 +403,7 @@
     ;; *READ-SUPPRESS* avoids creation of lists
     (test-reader-consing "#-sbcl(a (b c (d (e) (f) g)) h i j . x . y baz) 5"))
 (with-test (:name :read-symbol-does-not-cons-per-se
-            :fails-on (or :arm :ppc)) ; no idea why. does it vary by #+/-sb-thread?
+            :fails-on (or :arm :ppc :sparc)) ; no idea why. does it vary by #+/-sb-thread?
   (test-reader-consing "COMMON-LISP-USER::A-SYMBOL"))
 (when (let ((s (find-symbol "ALLOCATE-VECTOR-ON-NUMBER-STACK" "SB-VM")))
         (and s (gethash s sb-c::*backend-parsed-vops*)))

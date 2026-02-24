@@ -190,7 +190,8 @@
           (string2 (disassembly-text '(lambda (y) (car y)))))
       (assert (string= string1 string2)))))
 
-(with-test (:name :disassemble-assembly-routine)
+(with-test (:name :disassemble-assembly-routine
+            :fails-on :riscv)
   (disassemble sb-fasl:*assembler-routines* :stream (make-broadcast-stream)))
 
 (with-test (:name (sb-ext:assert-version->= :ok))

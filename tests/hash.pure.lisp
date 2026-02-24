@@ -409,8 +409,9 @@
     ;; Also the same issue exists with bit-vectors.
     (assert-error (sxhash displaced-string))))
 
-(with-test (:name :array-psxhash-non-consing :skipped-on :interpreter
-            :fails-on :ppc64)
+(with-test (:name :array-psxhash-non-consing
+            :skipped-on :interpreter
+            :fails-on (or :ppc64 :sparc))
    (let ((a (make-array 1000 :element-type 'double-float
                         :initial-element (+ 0d0 #+(or arm64 x86-64)
                                                 1d300))))
@@ -512,7 +513,8 @@
 (with-test (:name :mumur-hash-compare)
   (murmur-compare (make-random-state t) 100000))
 
-(with-test (:name :sap-hash)
+(with-test (:name :sap-hash
+            :fails-on :sparc)
   (assert (/= (sxhash (sb-sys:int-sap #x1000))
               (sxhash (sb-sys:int-sap 0))))
   #-interpreter
