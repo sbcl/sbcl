@@ -636,7 +636,7 @@
 
 (defun emit-relative-branch (segment opcode r1 r2 target)
   (emit-chooser
-   segment 20 2
+   segment 24 2
       #'(lambda (segment chooser posn magic-value)
           (declare (ignore chooser magic-value))
           (let ((delta (ash (- (label-position target) (+ posn 4)) -2)))
@@ -671,19 +671,22 @@
                                  opcode
                                  (if (fixnump r1) r1 (reg-tn-encoding r1))
                                  (if (fixnump r2) r2 (reg-tn-encoding r2))
-                                 4)
+                                 5)
             (emit-nop segment)
             (emit-back-patch segment 8
               #'(lambda (segment posn)
                   (declare (ignore posn))
-                  (emit-immediate-inst segment #b001111 0
-                                       (reg-tn-encoding lip-tn)
-                                       (ldb (byte 16 16)
-                                            (label-position target)))
-                  (emit-immediate-inst segment #b001101 0
-                                       (reg-tn-encoding lip-tn)
-                                       (ldb (byte 16 0)
-                                            (label-position target)))))
+                  (let ((code-offset (+ (component-header-length)
+                                        (label-position target)
+                                        (- sb-vm:other-pointer-lowtag))))
+                    (emit-immediate-inst segment #b001111 0
+                                         (reg-tn-encoding lip-tn)
+                                         (ldb (byte 16 16) code-offset))
+                    (emit-immediate-inst segment #b001101 (reg-tn-encoding lip-tn)
+                                         (reg-tn-encoding lip-tn)
+                                         (ldb (byte 16 0) code-offset)))))
+            (assemble (segment)
+              (inst add lip-tn sb-vm::code-tn))
             (emit-register-inst segment special-op (reg-tn-encoding lip-tn)
                                 0 (if linked 31 0) 0
                                 (if linked #b001001 #b001000))))))
