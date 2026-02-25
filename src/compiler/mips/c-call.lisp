@@ -322,6 +322,7 @@
         `(deref (sap-alien (sap+ ,sap ,(+ offset delta)) (* ,type)))))
      delta)))
 
+;;; FIXME: doesn't actually work (see tests)
 ;;; Returns a vector in static space containing machine code for the
 ;;; callback wrapper
 #-sb-xc-host
