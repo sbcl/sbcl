@@ -153,7 +153,10 @@
             (t
              (let ((index (+ (- (integer-length size) minlog2) vector-data-offset n-bins-small)))
                (inst add :qword (object-slot-ea data (+ index n-bins-large) other-pointer-lowtag)
-                     size)
+                     (if use-size-temp
+                         ;; Loaded above
+                         temp
+                         size))
                (inst inc :qword (object-slot-ea data index other-pointer-lowtag)))))
       (inst pop data)))) ; restore the primive thread
 
