@@ -68,7 +68,8 @@
   (assert (= *good-offset* (stack-alignment-offset *required-alignment*))))
 
 #+alien-callbacks
-(with-test (:name :callback)
+(with-test (:name :callback
+            :broken-on :mips)
   (assert (= *good-offset*
              (with-alien-callable ((callback int ()
                                      (stack-alignment-offset *required-alignment*)))

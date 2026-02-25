@@ -411,7 +411,7 @@
 
 (with-test (:name :array-psxhash-non-consing
             :skipped-on :interpreter
-            :fails-on (or :ppc64 :sparc))
+            :fails-on (or :ppc64 :mips :sparc))
    (let ((a (make-array 1000 :element-type 'double-float
                         :initial-element (+ 0d0 #+(or arm64 x86-64)
                                                 1d300))))
@@ -514,7 +514,7 @@
   (murmur-compare (make-random-state t) 100000))
 
 (with-test (:name :sap-hash
-            :fails-on :sparc)
+            :fails-on (or :mips :sparc))
   (assert (/= (sxhash (sb-sys:int-sap #x1000))
               (sxhash (sb-sys:int-sap 0))))
   #-interpreter

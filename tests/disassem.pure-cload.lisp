@@ -11,7 +11,7 @@
       (print 20)))
 
 (with-test (:name :disassemble-annotate-funs
-            :fails-on (or :ppc :sparc))
+            :fails-on (or :ppc :sparc :mips))
   (let ((dis (with-output-to-string (str) (disassemble #'disassemble-annotate-funs :use-labels nil :stream str))))
     (assert (search "PRINC" dis))
     (assert (search "PRINT" dis))

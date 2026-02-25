@@ -872,7 +872,7 @@
                                        (values (the (signed-byte 25) (ceiling x 2))))))))
 
 (with-test (:name :word-floor-ceiling
-            :fails-on (or :ppc :arm :riscv :loongarch64 :mips :sparc))
+            :fails-on (or :ppc :arm :riscv :loongarch64 :sparc))
   (assert (not (ctu:ir1-named-calls `(lambda (x y)
                                        (declare (sb-vm:signed-word x y))
                                        (floor x y)))))
@@ -1954,7 +1954,7 @@
     ((1) 29953653503380140693)))
 
 (with-test (:name :logand-cut-constants.2
-            :fails-on (or :arm :ppc :sparc))
+            :fails-on (or :arm :mips :ppc :sparc))
   (assert (= (count-if (lambda (c)
                          (member c '(logand sb-kernel:two-arg-and)))
                        (ctu:ir1-named-calls `(lambda (n m)

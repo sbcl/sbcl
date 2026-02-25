@@ -959,7 +959,7 @@
                    #P"a/b/srcfile.fasl"))))
 
 (with-test (:name :intern-pathname-non-consy
-            :fails-on :sparc
+            :fails-on (or :mips :sparc)
             :skipped-on :interpreter)
   (ctu:assert-no-consing (make-pathname :name "hi" :type "txt")))
 

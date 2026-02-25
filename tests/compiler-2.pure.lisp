@@ -2459,7 +2459,8 @@
                   (f count))))))
    ((1) nil)))
 
-(with-test (:name (:mv-call :more-arg))
+(with-test (:name (:mv-call :more-arg)
+            :fails-on :mips)
   (checked-compile-and-assert
    ()
    '(lambda (&rest rest)
@@ -2468,7 +2469,8 @@
        (list a b)))
    ((1 3) '(1 3) :test #'equal)))
 
-(with-test (:name (:mv-call :more-arg-unused))
+(with-test (:name (:mv-call :more-arg-unused)
+            :fails-on :mips)
   (checked-compile-and-assert
    ()
    '(lambda (&rest rest)

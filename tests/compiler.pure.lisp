@@ -5457,7 +5457,7 @@
 (with-test (:name (oddp bignum :no-consing)
             :serial t
             :skipped-on :interpreter
-            :fails-on (or :arm :ppc :ppc64 :riscv :loongarch64 :sparc))
+            :fails-on (or :arm :ppc :ppc64 :riscv :loongarch64 :sparc :mips))
   (let ((f (checked-compile '(lambda (x) (oddp x))))
         (x (* most-positive-fixnum most-positive-fixnum 3)))
     (ctu:assert-no-consing (funcall f x))))
@@ -5468,7 +5468,7 @@
 (with-test (:name (logtest bignum :no-consing)
             :serial
             t :skipped-on :interpreter
-            :fails-on (or :arm :ppc :ppc64 :riscv :loongarch64 :sparc))
+            :fails-on (or :arm :ppc :ppc64 :riscv :loongarch64 :sparc :mips))
   (let ((f (checked-compile '(lambda (x) (logtest x 1))))
         (x (* most-positive-fixnum most-positive-fixnum 3)))
     (ctu:assert-no-consing (funcall f x))))

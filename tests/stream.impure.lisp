@@ -475,32 +475,25 @@
 
     (delete-file pathname)))
 
-;;; writing looong lines. takes way too long and way too much space
-;;; to test on 64 bit platforms
-(with-test (:name (:write-char :long-lines :stream-ouput-column)
-            :skipped-on :64-bit)
-  (let ((test (scratch-file-name)))
-    (unwind-protect
-         (with-open-file (f test
-                            :direction :output
-                            :external-format :ascii
-                            :element-type 'character
-                            :if-does-not-exist :create
-                            :if-exists :supersede)
-           (let* ((n (truncate most-positive-fixnum 16))
-                  (m 18)
-                  (p (* n m))
-                  (buffer (make-string n)))
-             (dotimes (i m)
-               (write-char #\.)
-               (finish-output)
-               (write-sequence buffer f))
-             (assert (= p (sb-impl::fd-stream-output-column f)))
-             (write-char #\! f)
-             (assert (= (+ 1 p) (sb-impl::fd-stream-output-column f)))
-             (assert (typep p 'bignum))))
-      (when (probe-file test)
-        (delete-file test)))))
+(with-test (:name (:write-char :long-lines :stream-ouput-column))
+  (with-open-file (f (or #+win32 "nul" "/dev/null")
+                     :direction :output
+                     :external-format :ascii
+                     :element-type 'character
+                     :if-exists :append)
+    (let* ((n 33554431)
+           (m 17)
+           (p (* n m))
+           (buffer (make-string n :element-type 'base-char)))
+      (dotimes (i m)
+        (write-char #\.)
+        (finish-output)
+        (write-sequence buffer f))
+      (assert (= p (sb-impl::fd-stream-output-column f)))
+      (write-char #\! f)
+      (assert (= (+ 1 p) (sb-impl::fd-stream-output-column f)))
+      #-64-bit
+      (assert (typep p 'bignum)))))
 
 ;;; read-sequence misreported the amount read and lost position
 (with-test (:name (read-sequence :read-elements))
