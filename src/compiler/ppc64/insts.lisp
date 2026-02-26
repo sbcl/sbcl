@@ -1641,19 +1641,19 @@
     (:emitter (emit-xfx-form-inst segment 31 (reg-tn-encoding rt) (ash 0 5) 339 0)))
 
   (define-instruction mfxer (segment rt)
-    (:printer xfx ((op 31) (xo 339) (spr 1)) '(:name :tab rt))
+    (:printer xfx ((op 31) (xo 339) (spr (ash 1 5))) '(:name :tab rt))
     (:delay 1)
     (:dependencies (reads :xer) (writes rt))
     (:emitter (emit-xfx-form-inst segment 31 (reg-tn-encoding rt) (ash 1 5) 339 0)))
 
   (define-instruction mflr (segment rt)
-    (:printer xfx ((op 31) (xo 339) (spr 8)) '(:name :tab rt))
+    (:printer xfx ((op 31) (xo 339) (spr (ash 8 5))) '(:name :tab rt))
     (:delay 1)
     (:dependencies (reads :lr) (writes rt))
     (:emitter (emit-xfx-form-inst segment 31 (reg-tn-encoding rt) (ash 8 5) 339 0)))
 
   (define-instruction mfctr (segment rt)
-    (:printer xfx ((op 31) (xo 339) (spr 9)) '(:name :tab rt))
+    (:printer xfx ((op 31) (xo 339) (spr (ash 9 5))) '(:name :tab rt))
     (:delay 1)
     (:dependencies (reads rt) (reads :ctr))
     (:emitter (emit-xfx-form-inst segment 31 (reg-tn-encoding rt) (ash 9 5) 339 0)))
