@@ -190,12 +190,26 @@
   (:policy :fast)
   (:translate symbol-value))
 
-;;; On unithreaded builds these are just copies of the non-global versions.
-(define-vop (%set-symbol-global-value set))
-(define-vop (symbol-global-value symbol-value)
+(define-vop (%set-symbol-global-value cell-set)
+  (:variant symbol-value-slot other-pointer-lowtag))
+
+(define-vop (fast-symbol-global-value cell-ref)
+  (:variant symbol-value-slot other-pointer-lowtag)
+  (:policy :fast)
   (:translate symbol-global-value))
-(define-vop (fast-symbol-global-value fast-symbol-value)
-  (:translate symbol-global-value))
+
+(define-vop (symbol-global-value)
+  (:policy :fast-safe)
+  (:translate symbol-global-value)
+  (:args (object :scs (descriptor-reg) :to (:result 1)))
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 9
+    (let ((err-lab (generate-error-code vop 'unbound-symbol-error object)))
+      (loadw value object symbol-value-slot other-pointer-lowtag)
+      (inst xori tmp-tn value unbound-marker-widetag)
+      (inst beq tmp-tn zero-tn err-lab))))
 
 #+64-bit
 (progn

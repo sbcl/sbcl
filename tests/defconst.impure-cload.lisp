@@ -12,6 +12,6 @@
 ;; a symbol globally unbound. Unfortunately I don't see an efficient way to make this test
 ;; pass on threadless builds without scanning the whole binding stack in %DEFCONSTANT.
 (test-util:with-test (:name :defconstant-when-specially-boundp
-                      :fails-on (:or :riscv (:not :sb-thread)))
+                      :fails-on (:not :sb-thread))
   (constify-boundp)
   (assert (eq (symbol-value 'zook) 93)))

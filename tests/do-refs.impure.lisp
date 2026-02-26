@@ -149,7 +149,7 @@
 
 (defvar *some-symbol* 'a)
 (test-util:with-test (:name :symbol-refs
-                      :fails-on (or :riscv :interpreter))
+                      :fails-on :interpreter)
   (sb-int:collect ((results))
     (let ((*some-symbol* 'b))
       (do-referenced-object ('*some-symbol* results)))
