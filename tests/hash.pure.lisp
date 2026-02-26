@@ -455,7 +455,8 @@
   (flet ((try (hasher)
            (let (hashes)
              (dotimes (i 20)
-               (let* ((a (+ #+64-bit sb-vm:dynamic-space-start
+               (let* ((a (+ #+64-bit #x7003000000
+                            ;; Used to be sb-vm:dynamic-space-start but it varies too much
                             #-64-bit #xD7C83000
                             (* i 32768)))
                       (hash (funcall hasher a)))
@@ -469,8 +470,8 @@
              ;; 32-bit doesn't seem to suffer from this.
              (dotimes (position (- sb-vm:n-fixnum-bits 4))
                (let ((field
-                      (mapcar (lambda (x) (ldb (byte 4 position) x))
-                              hashes)))
+                       (mapcar (lambda (x) (ldb (byte 4 position) x))
+                               hashes)))
                  ;; (print `(,position , (length (delete-duplicates field))))
                  (when #-64-bit t #+64-bit (not (eq hasher 'sxhash))
                    (assert (>= (length (remove-duplicates field)) 8))))))))
