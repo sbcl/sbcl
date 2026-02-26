@@ -31,8 +31,6 @@ static __attribute__((unused)) inline void* arena_mutex(struct arena* a) {
 #define ARENA_MUTEX_ACQUIRE_GC_MAYBE(a) ARENA_MUTEX_ACQUIRE(a)
 #endif
 
-extern lispobj * component_ptr_from_pc(char *pc);
-
 // Arena memory block. At least one is associated with each arena,
 // and potentially more than one, depending on allowance for growth.
 struct arena_memblk {
