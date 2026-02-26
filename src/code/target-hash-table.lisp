@@ -2494,6 +2494,13 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
        ;; it's the other way around.
        (declare (type (or fixnum maybe-truncated-hash) hash0))
        (dx-flet ((body ()
+                   ;; Delaying the transfer of culled cells could causee the linked list
+                   ;; denoting the cells to itself be promoted into a higher generation.
+                   ;; Ideally the list would be off-heap and not subject to GC. Attempting to
+                   ;; do that would engender two other problems: (1) knowing when to free the list
+                   ;; if the table becomes garbage and we had not yet processed - and thus freed -
+                   ;; the list. (2) GC can't call malloc()
+                   (transfer-culled-cells hash-table)
                    (binding* (((probed-value probed-key physical-index predecessor)
                                (findhash-weak key hash-table hash address-sensitive-p))
                               (kv-vector (hash-table-pairs hash-table)))
@@ -2507,6 +2514,8 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
            ;; Use the private slot accessor for the lock because it's known
            ;; to have a mutex.
            (sb-thread::call-with-recursive-system-lock #'body (hash-table-%lock hash-table))
+           ;; Question: can we assert that any weak table without a mutex has
+           ;; some _other_ mutex that guards it?
            (body))))))
 
 (defun gethash/weak (key hash-table default)
@@ -2919,13 +2928,6 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
 
   (defun puthash/weak (key hash-table value)
     (declare (type hash-table hash-table) (optimize speed))
-    ;; Delaying the transfer of culled cells could causee the linked list
-    ;; denoting the cells to itself be promoted into a higher generation.
-    ;; Ideally the list would be off-heap and not subject to GC. Attempting to
-    ;; do that would engender two other problems: (1) knowing when to free the list
-    ;; if the table becomes garbage and we had not yet processed - and thus freed -
-    ;; the list. (2) GC can't call malloc()
-    (transfer-culled-cells hash-table)
     (with-weak-hash-table-entry
       (declare (ignore predecessor))
       (cond ((= physical-index 0)
