@@ -1,7 +1,57 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-2.6.1:
+  * minor incompatible change: IMAGPART of a negative float returns 0.0, not
+    -0.0, consistent with a treatment of reals as complexes with an imaginary
+    part of strictly 0.0, but strictly incompatible with the requirement that
+    the IMAGPART equal (* 0 <float>)
   * platform support:
-    ** ported to Windows on arm64 (thanks to Masatoshi SANO)
+    ** support for Windows on arm64 has been added.  (thanks to Masatoshi SANO)
+    ** various mismatches and bugs related to mismatches between Win32 and
+       Unix have been addressed.
+    ** fixed an issue in unsigned 32-bit compare-and-swap on RISC-V (thanks to
+       Andreas Schwab) and LoongArch.
+    ** fixed the integration of the system with the (lack of) floating point
+       traps on RISC-V.  (thanks to Andreas Schwab)
+    ** implemented the missing runtime breakpoint-related functions on RISC-V.
+       (lp#2130944)
+    ** fix for assembling large relative jumps on MIPS.
+    ** fix for GC safety of function calling on RISC-V and LoongArch.
+       (reported by Will Sinatra)
+    ** support little-endian PPC64 to write cores in ELF format.
+    ** fix for SB-POSIX:STAT on Windows with the UCRT C library.
+    ** numerous other fixes related to architecture definitions, particularly
+       on RISC-V, but also on LoongArch, MIPS, PPC and PPC64, and ARM64.
+  * enhancement: support stack allocation of results for struct return values
+    from alien functions.  (thanks to Jesse Bouwman)
+  * bug fix: rounding of floats converted from ratios.  (lp#2139007)
+  * bug fix: SCALE-FLOAT and RATIONALIZE on denormals gave wrong answers, and
+    converting ratios to denormals is both more correct and faster.
+  * bug fix: the ~E FORMAT directive scales its float more correctly.
+    (lp#1854151, lp#2016431, lp#2125287, reported by Michał "phoe" Herda,
+    Robert Dodier and Francis Wright)
+  * bug fix: the error when failing to bind in DESTRUCTURING-BIND is now a
+    PROGRAM-ERROR.
+  * bug fix: the compiler respects INLINE and NOTINLINE declarations to
+    control compiler macros that apply to macros.  (lp#1490345)
+  * bug fix: converting bignums to float will trap or return floating point
+    infinities as appropriate to the prevailing floating point modes.
+  * bug fix: division with a (COMPLEX FLOAT) result will be more consistent
+    with results involving negative zeros.
+  * bug fix: allow the full range of hash values in weak hash-tables with
+    user-defined hash functions.  (lp#2141482, reported by Patrick Poitras)
+  * bug fix: malformed OPTIMIZE declarations no longer cause the compiler to
+    stop.
+  * bug fix: symbols with terminating macro characters in their names (or
+    non-terminating ones at the start) print with escapes when *PRINT-ESCAPE*
+    is true.
+  * bug fix: documentation issues, in README and the manual.  (thanks to Carl
+    Gay)
+  * bug fix: compiler crash while transforming arithmetic operations on known
+    non-numeric inputs.  (lp#2142297)
+  * optimization: avoid consing when right-shifting a bignum gives a fixnum
+    result.
+  * optimization: various type tests in the presence of intersecting
+    constraints do less redundant work.
 
 changes in sbcl-2.6.1 relative to sbcl-2.6.0:
   * minor incompatible change: the never-documented :NO-CONSTRUCTOR-DEFUN
