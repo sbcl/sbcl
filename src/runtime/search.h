@@ -15,7 +15,6 @@
 #include <stdbool.h>
 lispobj get_package_by_id(int);
 extern lispobj* find_symbol(char*, lispobj); // Find in a package
-extern struct symbol* lisp_symbol_from_tls_index(lispobj tls_index);
 // Find via heap scan
 extern lispobj* search_for_symbol(char *name, lispobj start, lispobj end, bool);
 lispobj *search_all_gc_spaces(void *pointer); // 'search.c' provides

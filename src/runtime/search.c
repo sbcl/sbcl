@@ -164,35 +164,6 @@ lispobj* search_for_symbol(char *name, lispobj start, lispobj end, bool ignore_c
     return 0;
 }
 
-/// This unfortunately entails a heap scan,
-/// but it's quite fast if the symbol is found in immobile space.
-#ifdef LISP_FEATURE_SB_THREAD
-struct symbol* lisp_symbol_from_tls_index(lispobj tls_index)
-{
-    lispobj* where = 0;
-    lispobj* end = 0;
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    where = (lispobj*)FIXEDOBJ_SPACE_START;
-    end = fixedobj_free_pointer;
-#endif
-    while (1) {
-        while (where < end) {
-            lispobj header = *where;
-            int widetag = header_widetag(header);
-            if (widetag == SYMBOL_WIDETAG &&
-                tls_index_of(((struct symbol*)where)) == tls_index)
-                return (struct symbol*)where;
-            where += object_size2(where, header);
-        }
-        if (where >= (lispobj*)DYNAMIC_SPACE_START)
-            break;
-        where = (lispobj*)DYNAMIC_SPACE_START;
-        end = (lispobj*)dynamic_space_highwatermark();
-    }
-    return 0;
-}
-#endif
-
 static uword_t bruteforce_findpkg_by_id(lispobj* where, lispobj* limit, void* arg)
 {
     uword_t id = (uword_t)arg;
