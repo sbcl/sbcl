@@ -1071,7 +1071,12 @@ instead of
        (recons form
                (if (or (symbolp (car form)) (integerp (car form)))
                    (walk-template (car form) 'quote context env)
-                   (walk-form-internal (car form) context env))
+                   (let ((result (walk-form-internal (car form) context env)))
+                     (if (atom result)
+                         ;; TAGBODY's body should consist either of tags
+                         ;; ofr statements, which are compound forms.
+                         (relist (car form) 'progn result)
+                         result)))
                (walk-tagbody-1 (cdr form) context env))))
 
 (defun walk-macrolet (form context old-env)
