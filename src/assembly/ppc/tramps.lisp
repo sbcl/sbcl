@@ -19,7 +19,7 @@
     (inst word nil-value))
 
   UNDEFINED-TRAMP
-  (inst addi code-tn lip-tn (- fun-pointer-lowtag
+  (inst addi code-tn lip-tn (- other-pointer-lowtag
                                (ash simple-fun-insts-offset word-shift)))
 
   (inst cmpwi nargs-tn 16)
@@ -30,6 +30,7 @@
   (inst add csp-tn cfp-tn nargs-tn)
   FINISH-FRAME-SETUP
   (storew ocfp-tn cfp-tn 0)
+  (inst mflr lra-tn)
   (storew lra-tn cfp-tn 1)
   (error-call nil 'undefined-fun-error fdefn-tn))
 

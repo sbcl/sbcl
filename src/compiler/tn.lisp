@@ -600,7 +600,15 @@
                           (sc-name sc)))
         (when (and (not (sc-save-p alt))
                    (eq (sb-kind (sc-sb alt)) :unbounded))
-          (setf (tn-sc tn) alt)
+          (cond #-fp-and-pc-standard-save
+                ((let ((save-tn (tn-save-tn tn)))
+                   (when (and save-tn (eq (tn-kind save-tn) :specified-save))
+                     (setf (tn-offset tn) (tn-offset save-tn)
+                           (tn-sc tn) (tn-sc save-tn))
+                     t)))
+                (t
+                 (setf (tn-sc tn) alt)))
+
           (return)))))
   (values))
 

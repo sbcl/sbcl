@@ -108,7 +108,7 @@
   (def-type-predicate-wrapper integerp)
   (def-type-predicate-wrapper listp)
   (def-type-predicate-wrapper long-float-p)
-  #-(or x86 x86-64 arm64 riscv loongarch64) (def-type-predicate-wrapper lra-p)
+  #-(or x86 x86-64 arm64 riscv loongarch64 ppc64 ppc) (def-type-predicate-wrapper lra-p)
   (def-type-predicate-wrapper null)
   (def-type-predicate-wrapper numberp)
   (sb-c::when-vop-existsp (:translate pointerp)

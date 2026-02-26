@@ -355,7 +355,7 @@
            (type alignment size))
   (zerop (logand (1- size) address)))
 
-#-(or x86 x86-64 arm64 riscv loongarch64)
+#-(or x86 x86-64 arm64 riscv loongarch64 ppc64 ppc)
 (progn
 (defconstant lra-size (words-to-bytes 1))
 (defun lra-hook (chunk stream dstate)
@@ -1381,7 +1381,7 @@
       (format stream "#X~2,'0x" (sap-ref-8 sap (+ offs start-offs))))))
 
 (defvar *default-dstate-hooks*
-  (list* #-(or x86 x86-64 arm64 riscv loongarch64) #'lra-hook nil))
+  (list* #-(or x86 x86-64 arm64 riscv loongarch64 ppc64 ppc) #'lra-hook nil))
 
 ;;; Make a disassembler-state object.
 (defun make-dstate (&optional (fun-hooks *default-dstate-hooks*))

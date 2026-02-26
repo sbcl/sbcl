@@ -89,8 +89,6 @@
 (defmacro lisp-jump (function lip)
   "Jump to the lisp function FUNCTION.  LIP is an interior-reg temporary."
   `(progn
-    ;; something is deeply bogus.  look at this
-    ;; (loadw ,lip ,function function-code-offset function-pointer-type)
     (inst addi ,lip ,function (- (* n-word-bytes simple-fun-insts-offset) fun-pointer-lowtag))
     (inst mtctr ,lip)
     (inst bctr)))
@@ -98,18 +96,9 @@
 (defmacro lisp-return (return-pc lip &key (offset 0))
   "Return to RETURN-PC."
   `(progn
-     (inst addi ,lip ,return-pc (- (* (1+ ,offset) n-word-bytes) other-pointer-lowtag))
+     (inst addi ,lip ,return-pc (* ,offset 4))
      (inst mtlr ,lip)
      (inst blr)))
-
-(defmacro emit-return-pc (label)
-  "Emit a return-pc header word.  LABEL is the label to use for this return-pc."
-  `(progn
-     (emit-alignment n-lowtag-bits)
-     (emit-label ,label)
-     (inst lra-header-word)))
-
-
 
 ;;;; Stack TN's
 

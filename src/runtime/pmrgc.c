@@ -421,7 +421,7 @@ static void impart_mark_stickiness(lispobj word)
     }
 }
 
-#if !GENCGC_IS_PRECISE || defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64
+#if !GENCGC_IS_PRECISE || defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC
 static void preserve_pointer(os_context_register_t object,
                              __attribute__((unused)) void* arg) {
     /* The mark-region GC never filters based on type tags,
@@ -456,7 +456,9 @@ static void preserve_pointer(os_context_register_t object,
 static void sticky_preserve_pointer(os_context_register_t register_word, void* arg)
 {
     uword_t word = register_word;
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
     if (is_lisp_pointer(word)) impart_mark_stickiness(word);
+#endif
     preserve_pointer(word, arg);
 }
 #endif

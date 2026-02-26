@@ -1451,7 +1451,7 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
         && plausible_tag_p(addr)) return AMBIGUOUS_POINTER;
     return 0;
 }
-#elif defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64
+#elif defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC
 /* Consider interior pointers to code as roots.
  * But most other pointers are *unambiguous* conservative roots.
  * This is not "less conservative" per se, than the non-precise code,
@@ -2007,7 +2007,7 @@ static void impart_mark_stickiness(lispobj word)
 }
 #endif
 
-#if !GENCGC_IS_PRECISE || defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64
+#if !GENCGC_IS_PRECISE || defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC
 /* Take a possible pointer to a Lisp object and mark its page in the
  * page_table so that it will not be relocated during a GC.
  *
@@ -2063,16 +2063,18 @@ static void NO_SANITIZE_MEMORY preserve_pointer(os_context_register_t word, void
     lispobj* found = search_dynamic_space((void*)word);
     if (found) gc_mark_obj(compute_lispobj(found));
 }
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+
 static void sticky_preserve_pointer(os_context_register_t register_word, void* arg)
 {
     // registers can be wider than words. This could accept uword_t as the arg type
     // but I like it to be directly callable with os_context_register.
     uword_t word = register_word;
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
     if (is_lisp_pointer(word)) impart_mark_stickiness(word);
+#endif
     preserve_pointer(word, arg);
 }
-#endif
+
 #endif
 
 /* Pin an unambiguous descriptor object which may or may not be a pointer.
@@ -3047,7 +3049,7 @@ static void __attribute__((unused)) maybe_pin_code(lispobj addr) {
 }
 #endif
 
-#if defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64
+#if defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC
 static void semiconservative_pin_stack(struct thread* th,
                                        generation_index_t gen) {
     /* Stack can only pin code, since it contains return addresses.
@@ -3071,7 +3073,7 @@ static void semiconservative_pin_stack(struct thread* th,
             if (gen == 0) sticky_preserve_pointer(word, (void*)1);
             else preserve_pointer(word, (void*)1);
         }
-#elif defined LISP_FEATURE_PPC64
+#elif defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC
         static int boxed_registers[] = BOXED_REGISTERS;
         for (j = (int)(sizeof boxed_registers / sizeof boxed_registers[0])-1; j >= 0; --j) {
             lispobj word = *os_context_register_addr(context, boxed_registers[j]);
@@ -3429,7 +3431,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
              * sticky card mark on any page (in any generation)
              * referenced from the stack. */
             conservative_stack_scan(th, generation, cur_thread_approx_stackptr);
-#elif defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64
+#elif defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC
             // Pin code if needed
             semiconservative_pin_stack(th, generation);
 #elif defined reg_LINK_RETURN
@@ -3511,7 +3513,8 @@ garbage_collect_generation(generation_index_t generation, int raise,
     if (conservative_stack) {
         struct thread *th;
         for_each_thread(th) {
-#if !defined(LISP_FEATURE_MIPS) && !defined(reg_LINK_RETURN) // interrupt contexts already pinned everything they see
+#if !defined(LISP_FEATURE_MIPS) && !defined(reg_LINK_RETURN) \
+    && !defined(LISP_FEATURE_PPC) && !defined(LISP_FEATURE_PPC64) // interrupt contexts already pinned everything they see
             scavenge_interrupt_contexts(th);
 #endif
             scavenge_control_stack(th);

@@ -168,7 +168,8 @@
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
-    (emit-return-pc label)
+    (emit-alignment 3 :long-nop)
+    (emit-label label)
     (note-this-location vop :non-local-entry)
     (cond ((zerop nvals))
           ((= nvals 1)
@@ -222,7 +223,8 @@
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
-    (emit-return-pc label)
+    (emit-alignment 3 :long-nop)
+    (emit-label label)
     (note-this-location vop :non-local-entry)
     (move res value)
     (load-stack-tn csp-tn sp)))
@@ -239,7 +241,8 @@
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
-    (emit-return-pc label)
+    (emit-alignment 3 :long-nop)
+    (emit-label label)
     (note-this-location vop :non-local-entry)
 
     ;; Setup results, and test for the zero value case.
@@ -276,6 +279,6 @@
   (:ignore block start count)
   (:vop-var vop)
   (:generator 0
-    (emit-return-pc label)
+    (emit-alignment 3 :long-nop)
+    (emit-label label)
     (note-this-location vop :non-local-entry)))
-

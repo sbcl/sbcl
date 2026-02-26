@@ -192,8 +192,9 @@
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
       (inst lr temp (make-fixup "call_into_c" :foreign))
-      (inst mtctr temp)
       (move cfunc function)
+      (emit-alignment 3 :long-nop)
+      (inst mtctr temp)
       (inst bctrl)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))

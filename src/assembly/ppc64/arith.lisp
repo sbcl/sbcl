@@ -55,6 +55,7 @@
   (inst add temp2 temp2 temp)
   (with-fixed-allocation (res flag temp bignum-widetag (1+ bignum-digits-offset))
     (storew temp2 res bignum-digits-offset other-pointer-lowtag))
+  (inst mflr lra)
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FUN (tail-call-fallback-fun two-arg-+)
@@ -93,6 +94,7 @@
   (inst sub temp2 temp temp2)
   (with-fixed-allocation (res flag temp bignum-widetag (1+ bignum-digits-offset))
     (storew temp2 res bignum-digits-offset other-pointer-lowtag))
+  (inst mflr lra)
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FUN (tail-call-fallback-fun two-arg--)
@@ -146,11 +148,13 @@
   ;; one word bignum
   (with-fixed-allocation (res pa-flag temp bignum-widetag (1+ bignum-digits-offset))
     (storew lo res bignum-digits-offset other-pointer-lowtag))
+  (inst mflr lra)
   (lisp-return lra lip :offset 2)
   TWO-WORD-BIGNUM
   (with-fixed-allocation (res pa-flag temp bignum-widetag (+ bignum-digits-offset 2))
     (storew lo res bignum-digits-offset other-pointer-lowtag)
     (storew hi res (1+ bignum-digits-offset) other-pointer-lowtag))
+  (inst mflr lra)
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FUN (tail-call-fallback-fun two-arg-*)
@@ -179,7 +183,6 @@
 
 
 ;;;; Comparison
-
 (macrolet
     ((define-cond-assem-rtn (name translate static-fn inst)
        `(define-assembly-routine

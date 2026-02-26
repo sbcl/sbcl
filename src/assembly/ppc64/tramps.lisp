@@ -25,8 +25,7 @@
   ;; to load header constants since there is no PC-relative load form,
   ;; but there are no constants, and this routine can't be GC'ed so it's
   ;; not for that either.
-  (inst addi code-tn lip-tn (- fun-pointer-lowtag
-                               (ash simple-fun-insts-offset word-shift)))
+  (inst addi code-tn lip-tn (- (ash simple-fun-insts-offset word-shift)))
 
   (inst cmpwi nargs-tn (fixnumize register-arg-count))
   (inst bgt NO-STACK-ARGS)
@@ -36,6 +35,7 @@
   (inst add csp-tn cfp-tn nargs-tn)
   FINISH-FRAME-SETUP
   (storew ocfp-tn cfp-tn 0)
+  (inst mflr lra-tn)
   (storew lra-tn cfp-tn 1)
   (error-call nil 'undefined-fun-error fdefn-tn))
 
@@ -107,6 +107,7 @@
                         (inst ld r12 r12 0))
     ;; load the size argument into the first C argument register
     (inst ld r3 lip -8)
+
     (inst mtctr r12)
     (inst bctrl)
     ;; We're back.

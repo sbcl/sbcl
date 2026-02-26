@@ -645,7 +645,7 @@
                  (word (int-sap pc)))))))
       (unless (= base-ptr 0) (%make-lisp-obj (logior base-ptr other-pointer-lowtag))))))
 
-#+(or arm64 riscv loongarch64)
+#+(or arm64 riscv loongarch64 ppc64 ppc)
 (defun compute-lra-data-from-pc (pc)
   (declare (type integer pc))
   (let* ((pc-sap (int-sap (ash pc n-fixnum-tag-bits)))
@@ -893,7 +893,7 @@
 ;;; Note: Sometimes LRA is actually a fixnum. This happens when lisp
 ;;; calls into C. In this case, the code object is stored on the stack
 ;;; after the LRA, and the LRA is the word offset.
-#-(or x86 x86-64 arm64 riscv loongarch64)
+#-(or x86 x86-64 arm64 riscv loongarch64 ppc64 ppc)
 (defun compute-calling-frame (caller lra up-frame &optional savedp)
   (declare (type system-area-pointer caller)
            (ignore savedp))
@@ -946,9 +946,9 @@
                                  (if up-frame (1+ (frame-number up-frame)) 0)
                                  escaped))))))
 
-#+(or x86 x86-64 arm64 riscv loongarch64)
+#+(or x86 x86-64 arm64 riscv loongarch64 ppc64 ppc)
 (defun compute-calling-frame (caller ra up-frame &optional savedp)
-  (declare (type system-area-pointer caller #-(or arm64 riscv loongarch64) ra))
+  (declare (type system-area-pointer caller #-(or ppc ppc64 arm64 riscv loongarch64) ra))
   (when (control-stack-pointer-valid-p caller)
     ;; First check for an escaped frame.
     (multiple-value-bind (code pc-offset escaped off-stack assembly-routine-p)
@@ -973,8 +973,8 @@
                        "undefined function"))
                      (:foreign-function
                       (make-bogus-debug-fun
-                       (foreign-function-backtrace-name #-(or arm64 riscv loongarch64) ra
-                                                        #+(or arm64 riscv loongarch64) (int-sap (get-lisp-obj-address ra)))))
+                       (foreign-function-backtrace-name #-(or arm64 riscv loongarch64 ppc64 ppc) ra
+                                                        #+(or arm64 riscv loongarch64 ppc64 ppc) (int-sap (get-lisp-obj-address ra)))))
                      ((nil)
                       (make-bogus-debug-fun
                        "bogus stack frame"))
@@ -1124,7 +1124,7 @@
           (code (code-object-from-context context))
           assembly-routine-p)
       (/noshow0 "got CODE")
-      #+(or arm64 loongarch64)
+      #+(or arm64 loongarch64 ppc64 ppc)
       (when (eq code sb-fasl:*assembler-routines*)
         (unless (memq (assembly-routine-name-from-pc code (code-pc-offset pc code))
                       '(sb-vm::undefined-tramp sb-vm::undefined-alien-tramp
@@ -1170,7 +1170,7 @@
               (setf pc-offset 0))))
         (/noshow0 "returning from FIND-ESCAPED-FRAME")
         (return
-          (cond #-(or riscv arm64 loongarch64)
+          (cond #-(or riscv arm64 loongarch64 ppc64 ppc)
                 ((eq (%code-debug-info code) :bpt-lra)
                  (let ((real-lra (code-header-ref code real-lra-slot)))
                    (values (lra-code-header real-lra)
@@ -1195,12 +1195,12 @@ register."
 ;;; Find the code object corresponding to the object represented by
 ;;; bits and return it. We assume bogus functions correspond to the
 ;;; undefined-function.
-#+(or riscv arm64 ppc64 x86 x86-64 loongarch64)
+#+(or riscv arm64 ppc ppc64 x86 x86-64 loongarch64)
 (defun code-object-from-context (context)
   (declare (type (sb-alien:alien (* os-context-t)) context))
   (code-header-from-pc (context-pc context)))
 
-#-(or riscv arm64 ppc64 x86 x86-64 loongarch64)
+#-(or riscv arm64 ppc ppc64 x86 x86-64 loongarch64)
 (defun code-object-from-context (context)
   (declare (type (sb-alien:alien (* os-context-t)) context))
   ;; The GC constraint on the program counter on precisely-scavenged
@@ -1356,7 +1356,7 @@ register."
         (fp (frame-pointer frame)))
     (labels ((catch-ref (slot)
                (sap-ref-lispobj catch (* slot n-word-bytes)))
-             #-(or x86 x86-64 arm64 riscv loongarch64)
+             #-(or x86 x86-64 arm64 riscv loongarch64 ppc64 ppc)
              (catch-entry-offset ()
                (let* ((lra (catch-ref catch-block-entry-pc-slot))
                       (component (catch-ref catch-block-code-slot))
@@ -1366,15 +1366,18 @@ register."
                  (* (- (1+ (get-header-data lra))
                        (code-header-words component))
                     n-word-bytes)))
-             #+(or x86 x86-64 arm64 riscv loongarch64)
+             #+(or x86 x86-64 arm64 riscv loongarch64 ppc64 ppc)
              (catch-entry-offset ()
                (let* ((ra (sap-ref-sap
                            catch (* catch-block-entry-pc-slot
                                     n-word-bytes)))
-                      (component #+(or riscv loongarch64)
+                      (component #+(or riscv loongarch64 ppc64 ppc)
                                  (catch-ref catch-block-code-slot)
                                  #+(or x86 x86-64 arm64)
-                                 (code-header-from-pc ra)))
+                                 (code-header-from-pc ra))
+                      #+ppc64
+                      (component (%make-lisp-obj (logior (ash component n-fixnum-tag-bits)
+                                                         other-pointer-lowtag))))
                  (- (sap-int ra)
                     (- (get-lisp-obj-address component)
                        other-pointer-lowtag)
@@ -3890,8 +3893,8 @@ register."
 ;;; state of the program, not merely a return PC location.
 ;;; (I tried changing this to DEFUN-CACHED, which failed a regression test)
 (defun make-bpt-lra (real-lra &optional known-return-p)
-  (declare (type #-(or x86 x86-64 arm64 riscv loongarch64) lra
-                 #+(or arm64 riscv loongarch64) fixnum
+  (declare (type #-(or x86 x86-64 arm64 riscv loongarch64 ppc64 ppc) lra
+                 #+(or arm64 riscv loongarch64 ppc64 ppc) fixnum
                  #+(or x86 x86-64) system-area-pointer real-lra))
   (let* ((src-start
            ;; Just trap when using the known return values convention,
@@ -3929,11 +3932,11 @@ register."
     (with-pinned-objects (code-object)
       (let ((dst-start
               (sap+ (code-instructions code-object) start-offset)))
-        #-(or x86 x86-64 arm64 riscv loongarch64)
+        #-(or x86 x86-64 arm64 riscv loongarch64 ppc64 ppc)
         (progn
           (setf (code-header-ref code-object real-lra-slot) real-lra)
           (setf (code-header-ref code-object known-return-p-slot) known-return-p))
-        #+(or x86 x86-64 arm64 riscv loongarch64)
+        #+(or x86 x86-64 arm64 riscv loongarch64 ppc64 ppc)
         (multiple-value-bind (offset code)
             (compute-lra-data-from-pc real-lra)
           (setf (code-header-ref code-object real-lra-slot) code)
@@ -3947,11 +3950,11 @@ register."
         ;; CODE-OBJECT is implicitly pinned after leaving
         ;; WITH-PINNED-OBJECTS (and would be pinned even if the W-P-O
         ;; were deleted), so it's OK to return a SAP into CODE-OBJECT.
-        #+(or x86 x86-64 arm64 riscv loongarch64)
+        #+(or x86 x86-64 arm64 riscv loongarch64 ppc64 ppc)
         (let ((dst-start #+(or x86 x86-64) dst-start
                          #+(or arm64 riscv loongarch64) (%make-lisp-obj (sap-int dst-start))))
           (values dst-start code-object trap-offset))
-        #-(or x86 x86-64 arm64 riscv loongarch64)
+        #-(or x86 x86-64 arm64 riscv loongarch64 ppc64 ppc)
         (let* ((lra-header (sap+ dst-start (* -1 n-word-bytes)))
                ;; Compute the LRA->code backpointer in words
                (delta (ash (sap- lra-header

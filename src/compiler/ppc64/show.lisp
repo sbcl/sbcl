@@ -35,8 +35,9 @@
       (move nl0 object)
       (inst lr temp  (make-fixup "call_into_c" :foreign))
       (inst mr lip temp)
-      (inst mtctr lip)
       (inst lr cfunc (make-fixup "debug_print" :foreign))
+      (emit-alignment 3 :long-nop)
+      (inst mtctr lip)
       (inst bctrl)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save))

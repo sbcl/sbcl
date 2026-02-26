@@ -855,7 +855,8 @@
                     ;; will lead to race conditions in the debugger
                     ;; involving backtraces from asynchronous
                     ;; interrupts.
-                    (setf (tn-sc tn) (tn-sc save-tn))))
+                    (setf (tn-offset tn) (tn-offset save-tn)
+                          (tn-sc tn) (tn-sc save-tn))))
                 (decf (tn-cost tn) penalty))))))
 
       (do ((tn (ir2-component-normal-tns (component-info component))
@@ -896,7 +897,8 @@
       (cond ((not (save-tn-p tn)))
             ((conflicts-in-sc tn (tn-sc tn) (tn-offset tn))
              (sb-c::deletef-in tn-next (ir2-component-wired-tns 2comp) tn)
-             (setf (tn-sc tn) (tn-sc (tn-save-tn tn))))
+             (setf (tn-offset tn) (tn-offset (tn-save-tn tn))
+                   (tn-sc tn) (tn-sc (tn-save-tn tn))))
             (t
              (pack-wired-tn tn)
              (when callback
@@ -922,7 +924,8 @@
               ;; lead to some useless loads in some code, and
               ;; race conditions in the debugger involving
               ;; backtraces from asynchronous interrupts.
-              (setf (tn-sc tn) (tn-sc save-tn)))))))))
+              (setf (tn-offset tn) (tn-offset save-tn)
+                    (tn-sc tn) (tn-sc save-tn)))))))))
 
 (declaim (end-block))
 

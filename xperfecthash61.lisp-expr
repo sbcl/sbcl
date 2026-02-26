@@ -42,6 +42,9 @@
 (#(0 DB121C2 53D924E0 9EE57DB1 B05D4415 C92447CE)
  "(NIL :LOAD-FP :SAVE-FP :FROB-NFP :COMP-LRA :LOAD-NARGS)"
  "((& (+ (>> val 3) (>> val 4)) 7))")
+(#(0 DB121C2 53D924E0 B05D4415 C92447CE)
+ "(NIL :LOAD-FP :SAVE-FP :FROB-NFP :LOAD-NARGS)"
+ "((& (+ (>> val 2) (>> val 27)) 7))")
 (#(0 120FC1D0 2C444648 488BF057 97EE124C AD4575D9 EBD01872)
  "(:VERSION :TYPE :NAME :DIRECTORY :DEVICE :HOST NIL)"
  "((& (+ (>> val 5) (>> val 12)) 7))")
@@ -1316,6 +1319,9 @@
   (let ((b (& val #x7)))
    (let ((a (>> val 29)))
     (^ a (aref tab b))))))")
+(#(822301E9 94AB411F A806FCD7 EDDACDA4)
+ "(SB-VM::UNDEFINED-TRAMP SB-VM::UNDEFINED-ALIEN-TRAMP SB-VM::RETURN-VALUES-LIST SB-VM::CALL-SYMBOL)"
+ "((& (>> val 3) 3))")
 (#(831D9492 952EFA09 9DFD6B68 DC33E6FC)
  "#(:LT :GT :EQ :SO)"
  "((& (>> val 4) 3))")

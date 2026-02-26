@@ -35,14 +35,13 @@
             (note-next-instruction ,vop :call-site)
             (load-asm-rtn-addr ,jump ',name)
             (inst mtlr ,jump)
-            (inst blr)
-            (emit-return-pc lra-label)
+            (inst blrl)
+            (emit-label lra-label)
             (note-this-location ,vop :single-value-return)
             (without-scheduling ()
               (move csp-tn ocfp-tn)
               (inst nop))
-            (inst compute-code-from-lra code-tn lra-tn
-                  lra-label ,temp)
+            (inst compute-code-from-lip code-tn lra-tn lra-label ,temp)
             (when cur-nfp
               (load-stack-tn cur-nfp ,nfp-save))))
         `((:temporary (:scs (non-descriptor-reg) :from (:eval 0) :to (:eval 1))
@@ -60,7 +59,8 @@
     (:raw
      `((inst blr)))
     (:full-call
-     `((lisp-return (make-random-tn (sc-or-lose 'descriptor-reg) lra-offset)
+     `((inst mflr (make-random-tn (sc-or-lose 'descriptor-reg) lra-offset))
+       (lisp-return (make-random-tn (sc-or-lose 'descriptor-reg) lra-offset)
                     (make-random-tn (sc-or-lose 'interior-reg) lip-offset)
                     :offset 2)))
     (:none)))

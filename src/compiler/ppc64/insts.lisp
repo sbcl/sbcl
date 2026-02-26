@@ -1211,6 +1211,7 @@
     (:emitter (emit-d-form-inst segment 3 (valid-tcond-encoding tcond) (reg-tn-encoding ra) si)))
 
   (define-instruction isel (segment rt ra rb bc)
+    (:printer a ((op 31) (xo 15) (rc 0)))
     (:emitter
      (emit-a-form-inst segment 31
                        (reg-tn-encoding rt)
@@ -2288,13 +2289,6 @@
   (:delay 0)
   (:emitter
    (emit-header-data segment simple-fun-widetag)))
-
-(define-instruction lra-header-word (segment)
-  :pinned
-  (:delay 0)
-  (:emitter
-   (emit-header-data segment return-pc-widetag)))
-
 
 ;;;; Instructions for converting between code objects, functions, and lras.
 (defun emit-compute-inst (segment vop dst src label temp calc)
@@ -2332,22 +2326,7 @@
                              (label-position label posn delta-if-after)
                              (component-header-length))))))
 
-;; code = lra - other-pointer-tag - header - label-offset + code-tn-lowtag
-(define-instruction compute-code-from-lra (segment dst src label temp)
-  (:declare (type tn dst src temp) (type label label))
-  (:attributes variable-length)
-  (:dependencies (reads src) (writes dst) (writes temp))
-  (:delay 0)
-  (:vop-var vop)
-  (:emitter
-   (emit-compute-inst segment vop dst src label temp
-                      #'(lambda (label posn delta-if-after)
-                          (- code-tn-lowtag
-                             (label-position label posn delta-if-after)
-                             (component-header-length)
-                             other-pointer-lowtag)))))
-
-;; lra = code - code-tn-lowtag + header + label-offset + other-pointer-tag
+;; lra = code - code-tn-lowtag + header + label-offset
 (define-instruction compute-lra-from-code (segment dst src label temp)
   (:declare (type tn dst src temp) (type label label))
   (:attributes variable-length)
@@ -2359,7 +2338,6 @@
                       #'(lambda (label posn delta-if-after)
                           (+ (label-position label posn delta-if-after)
                              (component-header-length)
-                             other-pointer-lowtag
                              (- code-tn-lowtag))))))
 
 ;;; Unboxed constant support
@@ -2481,3 +2459,12 @@
                (inst* segment 'lis temp (ldb (byte 15 16) offset))
                (inst* segment 'ori temp (ldb (byte 16 16) offset))
                temp))))))
+
+(defun emit-long-nop (segment amount)
+  (declare (type sb-assem:segment segment)
+           (type index amount))
+  (if (= amount 4)
+      (assemble (segment)
+        (inst nop))
+      (loop repeat amount
+            do (emit-byte segment 0))))

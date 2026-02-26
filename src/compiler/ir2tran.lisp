@@ -979,7 +979,9 @@
                (ir2-environment-return-pc this-env)
                (ir2-environment-return-pc-pass
                 (environment-info
-                 (lambda-environment fun)))))
+                 (lambda-environment fun))))
+    #+(or ppc ppc64)
+    (vop sb-vm::move-to-lr node block (ir2-environment-return-pc this-env)))
 
   (values))
 
@@ -1650,6 +1652,8 @@
       (vop emit-label node block lab)
       (setf (ir2-environment-cfp-saved-pc env) lab))
 
+    #+(or ppc ppc64)
+    (vop sb-vm::move-from-lr node block (ir2-environment-return-pc-pass env))
     #-fp-and-pc-standard-save
     (emit-move node
                block

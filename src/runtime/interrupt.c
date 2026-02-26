@@ -782,6 +782,23 @@ build_fake_control_stack_frames(struct thread *th, os_context_t *context)
     access_control_frame_pointer(th)[0] = cfp;
     access_control_stack_pointer(th) = csp + 2;
 }
+#elif defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC
+static void
+build_fake_control_stack_frames(struct thread *th, os_context_t *context)
+{
+    lispobj* csp = (lispobj *)(*os_context_register_addr(context, reg_CSP));
+    lispobj cfp = (lispobj)(*os_context_register_addr(context, reg_CFP));
+    access_control_frame_pointer(th) = csp;
+
+#ifdef LISP_FEATURE_PPC64
+    access_control_frame_pointer(th)[1] = ALIGN_DOWN(os_context_pc(context), 16);
+#else
+    access_control_frame_pointer(th)[1] = os_context_pc(context);
+#endif
+
+    access_control_frame_pointer(th)[0] = cfp;
+    access_control_stack_pointer(th) = csp;
+}
 #else
 static void
 build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,

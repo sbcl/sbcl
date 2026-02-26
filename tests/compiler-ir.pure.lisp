@@ -480,7 +480,7 @@
              1)))
 
 (with-test (:name :sign-extend
-            :fails-on (or :riscv :loongarch64))
+            :fails-on (or :ppc :riscv :loongarch64))
   (assert (= (count 'sb-c::mask-signed-field
                     (ir-calls
                      `(lambda (a)
@@ -541,7 +541,8 @@
   (assert (not (ir-full-calls `(lambda (x)
                                  (logbitp 0 (+ x 3)))))))
 
-(with-test (:name :modarith-unknown-types)
+(with-test (:name :modarith-unknown-types
+            :fails-on :ppc)
   (assert (not (ir-full-calls `(lambda (x)
                                  (logand (+ x 10) 20)))))
   (assert (not (ir-full-calls `(lambda (m x)

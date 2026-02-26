@@ -71,7 +71,7 @@ and submit it as a patch."
   (cond ((not (sb-vm:is-lisp-pointer (get-lisp-obj-address object))) 0)
         ((eq object nil) (ash sb-vm::sizeof-nil-in-words sb-vm:word-shift))
         ((simple-fun-p object) (code-object-size (fun-code-header object)))
-        #-(or x86 x86-64 arm64 riscv loongarch64) ((lra-p object) 1)
+        #-(or x86 x86-64 arm64 riscv loongarch64 ppc64 ppc) ((lra-p object) 1)
         (t
          (with-alien ((sizer (function unsigned unsigned) :extern "primitive_object_size"))
            (with-pinned-objects (object)

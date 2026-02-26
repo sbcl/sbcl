@@ -410,26 +410,12 @@ x:
 	lwz reg_A2,8(reg_CFP)
 	lwz reg_A3,12(reg_CFP)
 
-	/* Calculate LRA */
-#ifdef LISP_FEATURE_DARWIN
-	lis reg_LRA,ha16(lra)
-	addi reg_LRA,reg_LRA,lo16(lra)
-#else
-	lis reg_LRA,lra@h
-	ori reg_LRA,reg_LRA,lra@l
-#endif
-	addi reg_LRA,reg_LRA,OTHER_POINTER_LOWTAG
-
 	/* Function is an indirect closure */
 	lwz reg_CODE,SIMPLE_FUN_SELF_OFFSET(reg_LEXENV)
 	addi reg_LIP,reg_CODE,SIMPLE_FUN_INSTS_OFFSET
 	mtctr reg_LIP
 	slwi reg_NARGS,reg_NL2,2
-	bctr
-
-	.align 3
-lra:
-	.long RETURN_PC_WIDETAG
+	bctrl
 
 	/* Blow off any extra values. */
 	mr reg_CSP,reg_OCFP
@@ -484,6 +470,7 @@ lra:
 	mr reg_CFP,reg_CSP
 	la reg_CSP,32(reg_CSP)
 	stw reg_OCFP,0(reg_CFP)
+	stw reg_LIP,4(reg_CFP)
 	stw reg_CODE,8(reg_CFP)
 	/* The pseudo-atomic mechanism wants to use reg_NL3, but that
 	may be an outgoing C argument.  Copy reg_NL3 to something that's
@@ -492,11 +479,6 @@ lra:
 
 	/* Turn on pseudo-atomic */
 	BEGIN_PSEUDO_ATOMIC
-
-	/* Convert the return address to an offset and save it on the stack. */
-	sub reg_NFP,reg_LIP,reg_CODE
-	la reg_NFP,OTHER_POINTER_LOWTAG(reg_NFP)
-	stw reg_NFP,4(reg_CFP)
 
 #ifdef LISP_FEATURE_SB_THREAD
 	/* Store Lisp state */
@@ -586,8 +568,6 @@ lra:
 	/* Get the return address back. */
 	lwz reg_LIP,4(reg_CFP)
 	lwz reg_CODE,8(reg_CFP)
-	add reg_LIP,reg_CODE,reg_LIP
-	la reg_LIP,-OTHER_POINTER_LOWTAG(reg_LIP)
 
         /* Debugger expects LR to be valid when we come out of PA */
 	mtlr reg_LIP

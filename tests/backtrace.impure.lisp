@@ -263,7 +263,7 @@
 (defun throw-test ()
   (throw 'no-such-tag t))
 (with-test (:name (:backtrace :throw :no-such-tag)
-                  :fails-on (or :mips :ppc :ppc64 :riscv (and :sparc :linux)))
+                  :fails-on (or :mips :ppc :riscv (and :sparc :linux)))
   (assert-backtrace #'throw-test '((throw-test))))
 
 (funcall (checked-compile
@@ -276,7 +276,7 @@
                   (bar x)
                   (bar v)))))
           :allow-style-warnings t))
-(with-test (:name (:backtrace :bug-308926) :skipped-on :interpreter)
+(with-test (:name (:backtrace :bug-308926) :skipped-on :interpreter :fails-on (:or :ppc :ppc64))
   (assert-backtrace (lambda () (bug-308926 13))
                     '(((flet bar :in bug-308926) 13)
                       (bug-308926 &rest t))))

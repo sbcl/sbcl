@@ -1001,7 +1001,7 @@
        (emit-byte segment pattern)))
     ;; EMIT-LONG-NOP does not exist for most backends.
     ;; Better to get an ECASE error than undefined-function.
-    #+x86-64
+    #+(or x86-64 ppc64)
     ((eql :long-nop)
      (sb-vm:emit-long-nop segment amount)))
   (values))

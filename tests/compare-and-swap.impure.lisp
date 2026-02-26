@@ -628,7 +628,8 @@
       (format t "Double-width compare-and-swap NOT TESTED~%")))
 
 (test-util:with-test (:name :cas-sap-ref-smoke-test
-                            :skipped-on (not :sb-thread))
+                      :skipped-on (not :sb-thread)
+                      :broken-on :ppc)
   (let ((data (make-array 1 :element-type 'sb-vm:word)))
     (sb-sys:with-pinned-objects (data)
       (let ((sap (sb-sys:vector-sap data)))

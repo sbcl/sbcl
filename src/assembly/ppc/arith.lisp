@@ -53,6 +53,7 @@
   (inst add temp2 temp2 temp)
   (with-fixed-allocation (res flag temp bignum-widetag (1+ bignum-digits-offset))
     (storew temp2 res bignum-digits-offset other-pointer-lowtag))
+  (inst mflr lra)
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FUN (tail-call-fallback-fun two-arg-+)
@@ -96,6 +97,7 @@
   (inst sub temp2 temp temp2)
   (with-fixed-allocation (res flag temp bignum-widetag (1+ bignum-digits-offset))
     (storew temp2 res bignum-digits-offset other-pointer-lowtag))
+  (inst mflr lra)
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FUN (tail-call-fallback-fun two-arg--)
@@ -168,6 +170,7 @@
       (storew lo res bignum-digits-offset other-pointer-lowtag)))
   ;; Out of here
   GO-HOME
+  (inst mflr lra)
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FUN (tail-call-fallback-fun two-arg-*)
@@ -332,6 +335,7 @@
 
   RETURN-NIL
   (inst mr res null-tn)
+  (inst mflr lra)
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FN (tail-call-fallback-fun eql)
@@ -363,6 +367,7 @@
   (inst beq :cr1 RETURN-T)
 
   (inst mr res null-tn)
+  (inst mflr lra)
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FN (tail-call-fallback-fun two-arg-=)
@@ -393,6 +398,7 @@
   (inst beq :cr1 RETURN-NIL)
 
   (load-symbol res t)
+  (inst mflr lra)
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FN (tail-call-fallback-fun two-arg-/=)

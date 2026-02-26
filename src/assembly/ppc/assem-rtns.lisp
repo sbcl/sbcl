@@ -102,7 +102,8 @@
      (:temp a0 descriptor-reg a0-offset)
      (:temp a1 descriptor-reg a1-offset)
      (:temp a2 descriptor-reg a2-offset)
-     (:temp a3 descriptor-reg a3-offset))
+     (:temp a3 descriptor-reg a3-offset)
+     (:temp lra descriptor-reg lra-offset))
 
 
   ;; Calculate NARGS (as a fixnum)
@@ -132,8 +133,9 @@
 
   DONE
   ;; We are done.  Do the jump.
-  (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
-  (lisp-jump temp lip))
+  (inst mtlr lra)
+  (loadw lip lexenv closure-fun-slot fun-pointer-lowtag)
+  (lisp-jump lip lip))
 
 
 
