@@ -280,7 +280,9 @@
              (default-features
                (funcall (compile nil (read-from-file pathname))
                         (read-from-file "^base-target-features.lisp-expr")))
-             (customizer-file-name "customize-target-features.lisp")
+             (customizer-file-name
+              (custom-or-default 'cl-user::*sbcl-customize-target-features-file*
+                                 "customize-target-features.lisp"))
              (customizer (if (probe-file customizer-file-name)
                              (compile nil
                                       (read-from-file customizer-file-name))

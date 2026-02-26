@@ -24,6 +24,7 @@ run_sbcl <<EOF
          :compile)))
 (defvar *sbcl-local-target-features-file* "../local-target-features.lisp-expr")
 (defvar *sbcl-backend-subfeatures-file* "../customize-backend-subfeatures.lisp")
+(defvar *sbcl-customize-target-features-file* "../customize-target-features.lisp")
 (load "../src/cold/shared.lisp")
 (load "../src/cold/set-up-cold-packages.lisp")
 (load "../tools-for-build/corefile.lisp")
