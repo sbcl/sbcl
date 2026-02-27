@@ -48,6 +48,8 @@ changes relative to sbcl-2.6.1:
     Gay)
   * bug fix: compiler crash while transforming arithmetic operations on known
     non-numeric inputs.  (lp#2142297)
+  * bug fix: unsafe concurrent access to synchronized weak hash tables.
+    (lp#2142714)
   * optimization: avoid consing when right-shifting a bignum gives a fixnum
     result.
   * optimization: various type tests in the presence of intersecting
