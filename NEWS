@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-2.6.1:
+changes in sbcl-2.6.2 relative to sbcl-2.6.1:
   * minor incompatible change: IMAGPART of a negative float returns 0.0, not
     -0.0, consistent with a treatment of reals as complexes with an imaginary
     part of strictly 0.0, but strictly incompatible with the requirement that
