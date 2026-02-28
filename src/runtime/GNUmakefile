@@ -168,7 +168,8 @@ semiwrap-sbcl: shrinkwrap-sbcl.s $(LIBSBCL)
 # to get in there so using the same link options as for the ordinary "sbcl"
 # is just easiest.
 embedcore-sbcl: $(LIBSBCL)
-	../../run-sbcl.sh --eval '(save-lisp-and-die "wrappedcore.o" :executable :elf-object)'
+	../../run-sbcl.sh --no-sysinit --no-userinit \
+	    --eval '(save-lisp-and-die "wrappedcore.o" :executable :elf-object)'
 	$(CC) -no-pie $(filter-out -Wl$(comma)--export-dynamic, $(LINKFLAGS)) \
  $(CFLAGS) -o $@ wrappedcore.o $^ $(LIBS)
 
