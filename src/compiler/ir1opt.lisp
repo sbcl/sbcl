@@ -754,11 +754,9 @@
              (combination (lvar-uses lvar)))
         (labels ((erase-types (type)
                    (dolist (ref (leaf-refs lambda))
-                     (let* ((lvar (node-lvar ref))
-                            (combination (lvar-dest lvar)))
-                       (setf (node-derived-type ref) (specifier-type 'function)
-                             (lvar-%derived-type lvar) nil
-                             (node-derived-type combination) type)
+                     (let* ((combination (node-dest ref)))
+                       (replace-node-type ref (specifier-type 'function))
+                       (setf (node-derived-type combination) type)
                        (principal-lvar-single-valuify (node-lvar combination))
                        (reoptimize-lvar (node-lvar combination))))
                    (setf (return-result-type node) type
@@ -2107,8 +2105,7 @@
                                                 :recklessly t))
                       (erase-lvar-type multi-use-lvar)))
                (when single-value-mv
-                 (setf (node-derived-type call) (lvar-derived-type multi-use-lvar)
-                       (lvar-%derived-type (node-lvar call)) nil)
+                 (replace-node-type call (lvar-derived-type multi-use-lvar))
                  (principal-lvar-single-valuify (node-lvar call)))
                (let ((ll (make-gensym-list (length args))))
                  (transform-call call

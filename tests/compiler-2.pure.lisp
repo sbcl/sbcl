@@ -4985,7 +4985,17 @@
            (values (logand 1 v)
                    v)))
     ((t) (condition 'type-error))
-    ((3) (values 1 3))))
+    ((3) (values 1 3)))
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (p n)
+         (declare ((or float (rational 6357799611333445141)) n))
+         (let ((v (if p
+                      9
+                      (the integer n))))
+           (values (logand v 9) v)))
+    ((t 1.0) (values 9 9))
+    ((nil 1.0) (condition 'type-error))))
 
 (with-test (:name :un/signed-byte-64-p-move-to-word)
   (checked-compile-and-assert

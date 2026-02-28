@@ -224,9 +224,6 @@
                  (setf (block-reoptimize (node-block node)) t)
                  (reoptimize-component (node-component node) :maybe))
                t)
-             (change-return-type (node type)
-               (setf (node-derived-type node) type)
-               (setf (lvar-%derived-type (node-lvar node)) nil))
              (cut-node (node)
                "Try to cut a node to width. The primary return value is
                 whether we managed to cut (cleverly), and the second whether
@@ -251,7 +248,7 @@
                              (t
                               (change-ref-leaf node (find-constant new-value)
                                                :recklessly t)
-                              (change-return-type node (make-values-type (list (ctype-of new-value))))
+                              (replace-node-type node (make-values-type (list (ctype-of new-value))))
                               (setf (block-reoptimize (node-block node)) t)
                               (reoptimize-component (node-component node) :maybe)
                               (values t t)))))))
@@ -308,10 +305,10 @@
                                  ;; Can't rely on REOPTIMIZE-NODE, as it may neve get reoptimized.
                                  ;; But the outer functions don't want the type to get
                                  ;; widened and their VOPs may never be applied.
-                                 (change-return-type node
-                                                     (fun-type-returns (global-ftype (if (eq name t)
-                                                                                         fun-name
-                                                                                         name))))
+                                 (replace-node-type node
+                                                    (fun-type-returns (global-ftype (if (eq name t)
+                                                                                        fun-name
+                                                                                        name))))
                                  (ir1-optimize-combination node))
                                (values t did-something over-wide)))))))
                  (cast
@@ -333,10 +330,10 @@
                               (when (cut-node combination)
                                 (setf did-something t))))))
                       (when did-something
-                        (change-return-type node
-                                            (if (type-single-value-p (node-derived-type node))
-                                                (values-specifier-type '(values integer &optional))
-                                                (values-specifier-type '(values integer)))))
+                        (replace-node-type node
+                                           (if (type-single-value-p (node-derived-type node))
+                                               (values-specifier-type '(values integer &optional))
+                                               (values-specifier-type '(values integer)))))
                       nil)))))
              (cut-lvar (lvar &key head
                         &aux did-something must-insert over-wide)

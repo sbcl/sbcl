@@ -370,8 +370,8 @@
           ;; If it's a VOP that does the type check then it might not do anything if the incoming
           ;; lvar has the right type.
           ;; Which happens for a cast fed through a variable.
-          (setf (node-derived-type ref) (make-single-value-type (lvar-type (cast-value cast)))
-                (lvar-%derived-type (node-lvar ref)) nil))
+          (replace-node-type cast (lvar-derived-type (cast-value cast)))
+          (replace-node-type ref (make-single-value-type (lvar-type (cast-lvar cast)))))
         checkable))))
 
 ;; Type specifiers handled by the general-purpose MAKE-TYPE-CHECK-FORM are often

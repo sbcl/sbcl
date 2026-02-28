@@ -4086,3 +4086,7 @@ is :ANY, the function name is not checked."
   `(types-equal-or-intersect (lvar-type ,lvar) (specifier-type ',type)))
 (defmacro lvar-csubtypep  (lvar type)
   `(csubtypep (lvar-type ,lvar) (specifier-type ',type)))
+
+(defun replace-node-type (node type)
+  (setf (node-derived-type node) type
+        (lvar-%derived-type (node-lvar node)) nil))
