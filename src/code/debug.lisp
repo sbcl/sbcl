@@ -56,18 +56,17 @@ provide bindings for printer control variables.")
   nil
   "*READTABLE* for the debugger")
 
-(defvar *in-the-debugger* nil
+(sb-impl:define-thread-local *in-the-debugger* nil
   "This is T while in the debugger.")
 
 ;;; nestedness inside debugger command loops
-(defvar *debug-command-level* 0)
+(sb-impl:define-thread-local *debug-command-level* 0)
 
 ;;; If this is bound before the debugger is invoked, it is used as the stack
 ;;; top by the debugger. It can either be the first interesting frame, or the
 ;;; name of the last uninteresting frame.
-(defvar *stack-top-hint* nil)
-(defvar *current-frame* nil)
-(declaim (always-bound *stack-top-hint* *current-frame*))
+(sb-impl:define-thread-local *stack-top-hint* nil)
+(sb-impl:define-thread-local *current-frame* nil)
 
 ;;; Beginner-oriented help messages are important because you end up
 ;;; in the debugger whenever something bad happens, or if you try to
@@ -174,21 +173,21 @@ Other commands:
 
 ;;; a list of the types of code-locations that should not be stepped
 ;;; to and should not be listed when listing breakpoints
-(defvar *bad-code-location-types* '(:call-site :internal-error))
+(define-load-time-global *bad-code-location-types* '(:call-site :internal-error))
 (declaim (type list *bad-code-location-types*))
 
 ;;; code locations of the possible breakpoints
-(defvar *possible-breakpoints*)
+(declaim (global *possible-breakpoints*))
 (declaim (type list *possible-breakpoints*))
 
 ;;; a list of the made and active breakpoints, each is a
 ;;; BREAKPOINT-INFO structure
-(defvar *breakpoints* nil)
+(define-load-time-global *breakpoints* nil)
 (declaim (type list *breakpoints*))
 
 ;;; a list of BREAKPOINT-INFO structures of the made and active step
 ;;; breakpoints
-(defvar *step-breakpoints* nil)
+(define-load-time-global *step-breakpoints* nil)
 (declaim (type list *step-breakpoints*))
 
 ;;; the number of times left to step
@@ -1165,9 +1164,9 @@ the current thread are replaced with dummy objects which can safely escape."
    around the invocation.")
 
 ;;; These are bound on each invocation of INVOKE-DEBUGGER.
-(defvar *debug-restarts*)
-(defvar *debug-condition*)
-(defvar *nested-debug-condition*)
+(sb-impl:define-thread-local *debug-restarts*)
+(sb-impl:define-thread-local *debug-condition*)
+(sb-impl:define-thread-local *nested-debug-condition*)
 
 ;;; Oh, what a tangled web we weave when we preserve backwards
 ;;; compatibility with 1968-style use of global variables to control
