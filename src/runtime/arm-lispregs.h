@@ -34,3 +34,6 @@
 #define reg_NSP         REG(13)
 #define reg_LR          REG(14)
 #define reg_PC          REG(15)
+
+#define reg_RA reg_LR
+#define reg_LINK_RETURN reg_LR

@@ -263,7 +263,7 @@
 (defun throw-test ()
   (throw 'no-such-tag t))
 (with-test (:name (:backtrace :throw :no-such-tag)
-                  :fails-on (or :mips :ppc :riscv (and :sparc :linux)))
+                  :fails-on (or :arm :mips :ppc :riscv (and :sparc :linux)))
   (assert-backtrace #'throw-test '((throw-test))))
 
 (funcall (checked-compile

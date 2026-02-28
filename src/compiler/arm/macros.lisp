@@ -120,17 +120,7 @@
              (:single-value '(inst msr (cpsr :f) 0))
              (:multiple-values '(inst msr (cpsr :f) #xf0000000))
              (:known))
-     #+(or) ;; Doesn't work, can't have a negative immediate value.
-     (inst add pc-tn ,return-pc (- 4 other-pointer-lowtag))
-     (inst sub pc-tn ,return-pc (- other-pointer-lowtag 4))))
-
-(defmacro emit-return-pc (label)
-  "Emit a return-pc header word.  LABEL is the label to use for this return-pc."
-  `(progn
-     (emit-alignment n-lowtag-bits)
-     (emit-label ,label)
-     (inst lra-header-word)))
-
+     (inst bx ,return-pc)))
 
 ;;;; Stack TN's
 

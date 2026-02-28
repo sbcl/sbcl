@@ -73,10 +73,6 @@ call_into_lisp:
 	@@ Set up the "frame link"
 	str     reg_NFP, [reg_OCFP, #-8]
 
-	@@ Set up the return address
-	ldr	reg_NL3, =.lra
-        str     reg_NL3, [reg_OCFP, #-4]
-
 	@@ Leave PSEUDO-ATOMIC and check for interrupts.
 	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
 	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
@@ -95,11 +91,8 @@ call_into_lisp:
         ldr     reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
 
 	@@ And, finally, call into Lisp!
-	add	reg_PC, reg_CODE, #SIMPLE_FUN_INSTS_OFFSET
-
-	.align 3
-	.equ	.lra, .+OTHER_POINTER_LOWTAG
-	.word	RETURN_PC_WIDETAG
+	add	reg_LR, reg_CODE, #SIMPLE_FUN_INSTS_OFFSET
+        blx     reg_LR    
 
 	@@ Correct stack pointer for return processing.
 	streq	reg_OCFP, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
@@ -148,20 +141,6 @@ call_into_c:
         @@ NL3 -- Fourth C register argument.
         @@ All other C arguments are already stashed on the C stack.
 
-	@@ We need to convert our return address to a GC-safe format,
-	@@ build a stack frame to count for the "foreign" frame,
-	@@ switch to C mode, move the register arguments to the
-        @@ correct locations, call the C function, move the result to
-        @@ the correct location, switch back to Lisp mode, tear down
-        @@ our stack frame, restore the return address, and return to
-        @@ our caller.
-
-        @@ We have ONE unboxed scratch register: NFP.  Use it as a
-	@@ temporary while we convert the (unboxed) return address to
-        @@ a (fixnum) offset within the component.
-        sub     reg_NFP, reg_LR, reg_CODE
-        add     reg_NFP, reg_NFP, #OTHER_POINTER_LOWTAG
-
         @@ Build a Lisp stack frame.  We need to stash our frame link,
         @@ the code component, and our return offset.  Frame link goes
 	@@ in slot 0 (OCFP-SAVE-OFFSET), the offset (a FIXNUM) goes in
@@ -173,7 +152,7 @@ call_into_c:
         add     reg_R0, reg_R0, #12
         str     reg_R0, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
         str     reg_CFP, [reg_R0, #-12]
-        str     reg_NFP, [reg_R0, #-8]
+        str     reg_LR, [reg_R0, #-8]
         str     reg_CODE, [reg_R0, #-4]
 
         @@ Enter PSEUDO-ATOMIC.
@@ -259,13 +238,11 @@ call_into_c:
 
         @@ Restore our caller state from our stack frame.
         ldr     reg_CODE, [reg_NFP, #8]
-        ldr     reg_NL2, [reg_NFP, #4]
+        ldr     reg_LR, [reg_NFP, #4]
         ldr     reg_CFP, [reg_NFP]
         str     reg_NFP, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
 
-        @@ Restore our return address... into the program counter.
-        sub     reg_NL2, reg_NL2, #OTHER_POINTER_LOWTAG
-        add     reg_PC, reg_NL2, reg_CODE
+        bx      reg_LR
 
 	.size	call_into_c, .-call_into_c
 

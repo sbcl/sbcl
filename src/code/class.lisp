@@ -952,7 +952,7 @@ between the ~A definition and the ~A definition"
 (declaim (type cons **non-instance-classoid-types**))
 (defglobal **non-instance-classoid-types**
   '(symbol system-area-pointer weak-pointer code-component
-    #-(or x86 x86-64 arm64 riscv loongarch64 ppc64 ppc) lra
+    #-(or x86 x86-64 arm arm64 riscv loongarch64 ppc64 ppc) lra
     fdefn random-class))
 
 (defun classoid-non-instance-p (classoid)
@@ -1053,7 +1053,7 @@ between the ~A definition and the ~A definition"
      (code-component :codes (,sb-vm:code-header-widetag)
                      :predicate code-component-p
                      :prototype-form (fun-code-header #'identity))
-     #-(or x86 x86-64 arm64 riscv loongarch64 ppc64 ppc)
+     #-(or x86 x86-64 arm arm64 riscv loongarch64 ppc64 ppc)
      (lra :codes (,sb-vm:return-pc-widetag)
           :predicate lra-p
           ;; Make the PROTOTYPE slot unbound.

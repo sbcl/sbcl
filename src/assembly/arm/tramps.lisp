@@ -16,8 +16,9 @@
   (inst word (make-fixup 'undefined-tramp :assembly-routine))
   (dotimes (i (- simple-fun-insts-offset 2))
     (inst word nil-value))
-
+  
   (inst adr code-tn header fun-pointer-lowtag)
+  (storew lr-tn cfp-tn lra-save-offset)
   (error-call nil 'undefined-fun-error lexenv-tn))
 
 (define-assembly-routine
@@ -38,7 +39,6 @@
                          :assembly-routine))
   (dotimes (i (- simple-fun-insts-offset 2))
     (inst word nil-value))
-
   UNDEFINED-ALIEN-TRAMP
   ;; Zero out C arguments, they are not descriptors
   (inst mov r0 0)
@@ -46,6 +46,7 @@
   (inst mov r2 0)
   (inst mov lexenv 0)
   (inst adr code-tn header fun-pointer-lowtag)
+  (storew lr-tn cfp-tn lra-save-offset)
   (error-call nil 'undefined-alien-fun-error r8))
 
 (define-assembly-routine

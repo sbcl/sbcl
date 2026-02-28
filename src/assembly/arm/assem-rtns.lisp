@@ -11,7 +11,7 @@
     ((:temp nvals any-reg nargs-offset)
      (:temp vals any-reg ocfp-offset)
      (:temp old-fp any-reg nl2-offset)
-     (:temp lra descriptor-reg lexenv-offset)
+     (:temp lra descriptor-reg lr-offset)
 
      ;; These are just needed to facilitate the transfer
      (:temp count any-reg nfp-offset)
@@ -166,6 +166,7 @@
   ;; instances), and R8 (known as TEMP) and, technically, CODE happen
   ;; to be the only ones available.
   (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
+  (loadw lr-tn cfp-tn lra-save-offset)
   (lisp-jump temp))
 
 ;;;; Non-local exit noise.
@@ -207,7 +208,7 @@
                           (:arg start (any-reg descriptor-reg) r8-offset)
                           (:arg count (any-reg descriptor-reg) nargs-offset)
                           (:temp ocfp non-descriptor-reg ocfp-offset)
-                          (:temp lra descriptor-reg lexenv-offset)
+                          (:temp lra interior-reg lr-offset)
                           (:temp cur-uwp any-reg nl2-offset))
   (declare (ignore start count))
 

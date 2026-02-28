@@ -88,8 +88,8 @@
     (storew temp block unwind-block-uwp-slot)
     (storew cfp-tn block unwind-block-cfp-slot)
     (storew code-tn block unwind-block-code-slot)
-    (inst compute-lra temp lip entry-label)
-    (storew temp block catch-block-entry-pc-slot)))
+    (inst compute-lra lip lip entry-label)
+    (storew lip block catch-block-entry-pc-slot)))
 
 ;;; Like Make-Unwind-Block, except that we also store in the specified tag, and
 ;;; link the block into the Current-Catch list.
@@ -108,8 +108,8 @@
     (storew temp result catch-block-uwp-slot)
     (storew cfp-tn result catch-block-cfp-slot)
     (storew code-tn result catch-block-code-slot)
-    (inst compute-lra temp lip entry-label)
-    (storew temp result catch-block-entry-pc-slot)
+    (inst compute-lra lip lip entry-label)
+    (storew lip result catch-block-entry-pc-slot)
 
     (storew tag result catch-block-tag-slot)
     (load-symbol-value temp *current-catch-block*)
@@ -158,7 +158,7 @@
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)
     (cond ((zerop nvals))
           ((= nvals 1)
@@ -191,7 +191,7 @@
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)
     (move res value)
     (load-stack-tn move-temp sp)
@@ -209,7 +209,7 @@
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)
 
     ;; Setup results, and test for the zero value case.
@@ -244,7 +244,7 @@
   (:ignore block start count)
   (:vop-var vop)
   (:generator 0
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)))
 
 ;;; Doesn't handle NSP and is disabled.
@@ -285,8 +285,8 @@
       ;; it's not going to be used and will be overwritten after the
       ;; function call
 
-      (inst compute-lra temp lip entry-label)
-      (storew temp block catch-block-entry-pc-slot)
+      (inst compute-lra lip lip entry-label)
+      (storew lip block catch-block-entry-pc-slot)
 
       ;; Run any required UWPs.
       (assemble (:elsewhere vop)
@@ -294,7 +294,7 @@
         (inst word (make-fixup 'unwind :assembly-routine)))
       (inst load-from-label pc-tn lr-tn uwp-label)
 
-      (emit-return-pc ENTRY-LABEL)
+      (emit-label ENTRY-LABEL)
       (inst mov nargs 0)
 
       (move lexenv saved-function)

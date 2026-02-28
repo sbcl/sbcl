@@ -1451,7 +1451,7 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
         && plausible_tag_p(addr)) return AMBIGUOUS_POINTER;
     return 0;
 }
-#elif defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC
+#elif defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC || defined LISP_FEATURE_ARM
 /* Consider interior pointers to code as roots.
  * But most other pointers are *unambiguous* conservative roots.
  * This is not "less conservative" per se, than the non-precise code,
@@ -2007,7 +2007,7 @@ static void impart_mark_stickiness(lispobj word)
 }
 #endif
 
-#if !GENCGC_IS_PRECISE || defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC
+#if !GENCGC_IS_PRECISE || defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC
 /* Take a possible pointer to a Lisp object and mark its page in the
  * page_table so that it will not be relocated during a GC.
  *

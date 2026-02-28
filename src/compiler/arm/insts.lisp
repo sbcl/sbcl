@@ -392,10 +392,6 @@
 (define-instruction simple-fun-header-word (segment)
   (:emitter
    (emit-header-data segment simple-fun-widetag)))
-
-(define-instruction lra-header-word (segment)
-  (:emitter
-   (emit-header-data segment return-pc-widetag)))
 
 ;;;; Addressing mode 1 support
 
@@ -1197,34 +1193,71 @@
   (define-misc-load/store-instruction ldrsb 1 #b1101 nil)
   (define-misc-load/store-instruction ldrsh 1 #b1111 nil))
 
-;;;; Boxed-object computation instructions (for LRA and CODE)
-
-;;; Compute the address of a CODE object by parsing the header of a
-;;; nearby LRA or SIMPLE-FUN.
-(define-instruction compute-code (segment code lip object-label temp)
+(define-instruction compute-code (segment dest lip)
   (:vop-var vop)
   (:emitter
-   (emit-back-patch
-    segment 16
-    (lambda (segment position)
-      (assemble (segment vop)
-        ;; Calculate the address of the code component.  This is an
-        ;; exercise in excess cleverness.  First, we calculate (from
-        ;; our program counter only) the address of OBJECT-LABEL plus
-        ;; OTHER-POINTER-LOWTAG.  The extra two words are to
-        ;; compensate for the offset applied by ARM CPUs when reading
-        ;; the program counter.
-        (inst sub lip pc-tn (- ;; The 8 below is the displacement
-                               ;; from reading the program counter.
-                               (+ position 8)
-                               (+ (label-position object-label)
-                                  other-pointer-lowtag)))
-        ;; Next, we read the function header.
-        (inst ldr temp (@ lip (- other-pointer-lowtag)))
-        (inst bic temp temp widetag-mask)
-        ;; And finally we use the header value (a count in words),
-        ;; to compute the boxed address of the code component.
-        (inst sub code lip (lsr temp (- 8 word-shift))))))))
+   (labels ((compute-delta (position &optional magic-value)
+              (- (label-position (segment-origin segment)
+                                 (when magic-value position)
+                                 magic-value)
+                 (component-header-length)
+                 (+ position 8)
+                 (- other-pointer-lowtag)))
+
+            (load-chunk (segment delta dst src chunk)
+              (assemble (segment vop)
+                (if (< delta 0)
+                    (inst sub dst src chunk)
+                    (inst add dst src chunk))))
+
+            (three-instruction-emitter (segment position)
+              (let* ((delta (compute-delta position))
+                     (absolute-delta (abs delta)))
+                (load-chunk segment delta
+                            lip pc-tn (mask-field (byte 8 16) absolute-delta))
+                (load-chunk segment delta
+                            lip lip (mask-field (byte 8 8) absolute-delta))
+                (load-chunk segment delta
+                            dest lip (mask-field (byte 8 0) absolute-delta))))
+
+            (two-instruction-emitter (segment position)
+              (let* ((delta (compute-delta position))
+                     (absolute-delta (abs delta)))
+                (assemble (segment vop)
+                  (load-chunk segment delta
+                              lip pc-tn (mask-field (byte 8 8) absolute-delta))
+                  (load-chunk segment delta
+                              dest lip (mask-field (byte 8 0) absolute-delta)))))
+
+            (one-instruction-emitter (segment position)
+              (let* ((delta (compute-delta position))
+                     (absolute-delta (abs delta)))
+                (assemble (segment vop)
+                  (load-chunk segment delta
+                              dest pc-tn absolute-delta))))
+
+            (two-instruction-maybe-shrink (segment chooser posn magic-value)
+              (declare (ignore chooser))
+              (let ((delta (compute-delta posn magic-value)))
+                (when (<= (integer-length delta) 8)
+                  (emit-back-patch segment 4
+                                   #'one-instruction-emitter)
+                  t)))
+
+            (three-instruction-maybe-shrink (segment chooser posn magic-value)
+              (declare (ignore chooser))
+              (let ((delta (compute-delta posn magic-value)))
+                (when (<= (integer-length delta) 16)
+                  (emit-chooser segment 8 2
+                                #'two-instruction-maybe-shrink
+                                #'two-instruction-emitter)
+                  t))))
+     (emit-chooser
+      ;; We need to emit up to three instructions, which is 12 octets.
+      ;; This preserves a mere two bits of alignment.
+      segment 12 2
+      #'three-instruction-maybe-shrink
+      #'three-instruction-emitter))))
 
 ;;; Compute the address of a nearby LRA object by dead reckoning from
 ;;; the location of the current instruction.
@@ -1241,10 +1274,9 @@
    ;; megabyte segment (24 bits of displacement) is ridiculous), so we
    ;; need to cover a range of up to three octets of displacement.
    (labels ((compute-delta (position &optional magic-value)
-              (- (+ (label-position lra-label
-                                    (when magic-value position)
-                                    magic-value)
-                    other-pointer-lowtag)
+              (- (label-position lra-label
+                                 (when magic-value position)
+                                 magic-value)
                  ;; The 8 below is the displacement
                  ;; from reading the program counter.
                  (+ position 8)))

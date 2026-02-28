@@ -209,8 +209,8 @@
   simple-fun-widetag                              ;  3A   41
   closure-widetag                                 ;  3E   45
 
-  #-(or x86 x86-64 arm64 riscv loongarch64 ppc ppc64) return-pc-widetag ;  42   49
-  #+(or x86 x86-64 arm64 riscv loongarch64 ppc ppc64) lra-widetag-notused
+  #-(or x86 x86-64 arm arm64 riscv loongarch64 ppc ppc64) return-pc-widetag ;  42   49
+  #+(or x86 x86-64 arm arm64 riscv loongarch64 ppc ppc64) lra-widetag-notused
 
   value-cell-widetag                              ;  46   4D
   character-widetag                               ;  4A   51

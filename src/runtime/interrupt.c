@@ -782,11 +782,15 @@ build_fake_control_stack_frames(struct thread *th, os_context_t *context)
     access_control_frame_pointer(th)[0] = cfp;
     access_control_stack_pointer(th) = csp + 2;
 }
-#elif defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC
+#elif defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC || defined LISP_FEATURE_ARM
 static void
 build_fake_control_stack_frames(struct thread *th, os_context_t *context)
 {
+#ifdef LISP_FEATURE_ARM
+    lispobj* csp = (lispobj*)SymbolValue(CONTROL_STACK_POINTER, th);
+#else
     lispobj* csp = (lispobj *)(*os_context_register_addr(context, reg_CSP));
+#endif
     lispobj cfp = (lispobj)(*os_context_register_addr(context, reg_CFP));
     access_control_frame_pointer(th) = csp;
 
@@ -810,7 +814,6 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
 
     /* Build a fake stack frame or frames */
 
-#if !defined(LISP_FEATURE_ARM)
     access_control_frame_pointer(th) =
         (lispobj *)(uword_t)
         (*os_context_register_addr(context, reg_CSP));
@@ -840,9 +843,6 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
             oldcont = (lispobj)(*os_context_register_addr(context, reg_OCFP));
         }
     } else
-#elif defined (LISP_FEATURE_ARM)
-        access_control_frame_pointer(th) = (lispobj*) SymbolValue(CONTROL_STACK_POINTER, th);
-#endif
     /* We can't tell whether we are still in the caller if it had to
      * allocate a stack frame due to stack arguments. */
     /* This observation provoked some past CMUCL maintainer to ask
