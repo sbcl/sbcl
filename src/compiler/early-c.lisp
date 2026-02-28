@@ -75,7 +75,7 @@
   (similar-constants (make-similarity-table) :read-only t :type hash-table))
 (declaim (freeze-type ir1-namespace))
 
-(sb-impl::define-thread-local *ir1-namespace*)
+(sb-impl:define-thread-local *ir1-namespace*)
 (declaim (type ir1-namespace *ir1-namespace*))
 
 ;;; *ALLOW-INSTRUMENTING* controls whether we should allow the
@@ -172,11 +172,10 @@ possible.")
     name))
 
 ;;; Bound during eval-when :compile-time evaluation.
-(defvar *compile-time-eval* nil)
-(declaim (always-bound *compile-time-eval*))
+(sb-impl:define-thread-local *compile-time-eval* nil)
 
 #-immobile-code (defmacro code-immobile-p (thing) `(progn ,thing nil))
-#-sb-xc-host ; not needed for make-hlst-1
+#-sb-xc-host ; not needed for make-host-1
 (defmacro maybe-with-system-tlab ((source-object) allocator)
   (declare (ignorable source-object))
   #+system-tlabs `(if (sb-vm::force-to-heap-p ,source-object)
@@ -276,7 +275,7 @@ possible.")
   deleted-source-paths)
 (declaim (freeze-type compilation))
 
-(sb-impl::define-thread-local *compilation*)
+(sb-impl:define-thread-local *compilation*)
 (declaim (type compilation *compilation*))
 
 ;; from 'llvm/projects/compiler-rt/lib/msan/msan.h':

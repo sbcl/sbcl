@@ -345,11 +345,6 @@
 
 ;;;; external formats
 
-(defvar *default-external-format* :utf-8)
-(defvar *default-source-external-format*
-  #+win32 '(:default :newline :crlf)
-  #-win32 :default)
-
 (defun default-external-format ()
   (/show0 "/getting default external format")
   *default-external-format*)

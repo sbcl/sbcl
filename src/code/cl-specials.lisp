@@ -72,8 +72,19 @@
                 sb-ext:*print-vector-length*
                 sb-ext:*print-circle-not-shared*)))
     `(progn
+       ;; When (DECLAIM ALWAYS-BOUND) is evaluated for all of the above specials
+       ;; in cold-init, being one of the very first actions, almost none of those
+       ;; symbols are actually bound. So our code is bad and consequently the error
+       ;; "Cannot proclaim an unbound symbol as always-bound" SHOULD be signaled
+       ;; yet it wasn't. The reason is that we were also lying about ALWAYS-BOUND
+       ;; for *COMPILE-TIME-EVAL* when it was in fact an unbound-marker. An effect
+       ;; of trust-and-don't-verify is that this is as good as T.
+       ;; These SETs of *COMPILE-TIME-EVAL* are certainly a hack, but more
+       ;; discoverable than the formerly obscure behavior.
+       #+sb-xc (sb-sys:%primitive set 'sb-c::*compile-time-eval* t)
        (declaim (special ,@list)
                 (sb-ext:always-bound ,@list))
+       #+sb-xc (sb-sys:%primitive set 'sb-c::*compile-time-eval* nil)
        (eval-when (:compile-toplevel :load-toplevel)
          (dolist (symbol ',list)
            (declare (notinline (setf sb-int:info))) ; skirt failure-to-inline warning

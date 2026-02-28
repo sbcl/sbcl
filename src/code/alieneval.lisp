@@ -12,7 +12,7 @@
 
 (in-package "SB-ALIEN")
 
-#-sb-xc-host (sb-impl::define-thread-local *saved-fp* nil)
+#-sb-xc-host (sb-impl:define-thread-local *saved-fp* nil)
 
 (defvar *default-c-string-external-format* nil)
 

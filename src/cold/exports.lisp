@@ -2472,6 +2472,7 @@ be submitted as a CDR")
            ;; other
 
            "INSTALL-HASH-TABLE-LOCK"
+           "DEFINE-THREAD-LOCAL"
            "%MAKUNBOUND")
   (:use "CL" "SB-ALIEN" "SB-BIGNUM" "SB-EXT"
         "SB-GRAY" "SB-INT" "SB-KERNEL" "SB-SYS"))
