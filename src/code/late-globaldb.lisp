@@ -87,9 +87,13 @@
                       thread
                       ,@(loop for (var form) in (cdr *thread-local-specials*)
                               for index = (info :variable :wired-tls var)
-                              append `((sap-ref-lispobj sap ,index)
+                              append
+                              (if (fixnump form)
+                                  `((sap-ref-word sap ,index)
+                                    ,(ash form sb-vm:n-fixnum-tag-bits))
+                                  `((sap-ref-lispobj sap ,index)
                                        ,(if (equal form '(sb-kernel:make-unbound-marker))
-                                            'ubm form))))))
+                                            'ubm form)))))))
     (let ((sap (current-thread-sap)) (ubm (make-unbound-marker))) (expand)))
   thread)
 
