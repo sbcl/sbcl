@@ -16,7 +16,7 @@
   (inst word (make-fixup 'undefined-tramp :assembly-routine))
   (dotimes (i (- simple-fun-insts-offset 2))
     (inst word nil-value))
-  
+
   (inst adr code-tn header fun-pointer-lowtag)
   (storew lr-tn cfp-tn lra-save-offset)
   (error-call nil 'undefined-fun-error lexenv-tn))
