@@ -2564,53 +2564,6 @@ mechanism for inter-thread communication."
                  :info (list :write :unbound-in-thread))
           (values nil nil))))
 
-
-
-;;; Initialize thread-local special vars other than the GC control specials.
-;;; globaldb should indicate that the variable is both :always-thread-local
-;;; (which says that the TLS index is nonzero), and :always-bound (which says that
-;;; the value in TLS is not UNBOUND-MARKER).
-(defun init-thread-local-storage (thread)
-  ;; In addition to wanting the expressly unsafe variant of SYMBOL-VALUE, any error
-  ;; signaled such as invalid-arg-count would just go totally wrong at this point.
-  (declare (optimize (safety 0)))
-  #-sb-thread
-  (macrolet ((expand () `(setf ,@(apply #'append (cdr *thread-local-specials*)))))
-    (setf *current-thread* thread)
-    (expand))
-  ;; These assignments require a trick with #+sb-thread as all of the symbols' TLS
-  ;; cells contain NO-TLS-VALUE which ordinarily causes SET to affect SYMBOL-GLOBAL-VALUE.
-  ;; So we have to store directly into offsets off the primitive thread.
-  ;; See %SET-SYMBOL-VALUE-IN-THREAD for comparison.
-  #+sb-thread
-  (let ((sap (current-thread-sap)))
-    (macrolet ((expand ()
-                 `(setf (sap-ref-lispobj sap ,(info :variable :wired-tls '*current-thread*))
-                        thread
-                        ,@(loop for (var form) in (cdr *thread-local-specials*)
-                                for index = (info :variable :wired-tls var)
-                                append
-                                (cond ((equal form '(sb-kernel:make-unbound-marker))
-                                       `((sap-ref-word sap ,index) ,sb-vm:unbound-marker-widetag))
-                                      (t
-                                       `((sap-ref-lispobj sap ,index) ,form)))))))
-      (expand)))
-  thread)
-
-(eval-when (:compile-toplevel)
-  ;; Inform genesis of the index <-> symbol mapping made by DEFINE-THREAD-LOCAL
-  (with-open-file (output (sb-cold:find-bootstrap-file "output/tls-init.lisp-expr" t)
-                          :direction :output :if-exists :supersede)
-    (let ((list (mapcar (lambda (x &aux (symbol (car x)))
-                          (cons (info :variable :wired-tls symbol) symbol))
-                        (cdr *thread-local-specials*)))
-          (*package* *keyword-package*))
-      (write list :stream output :readably t :pretty nil)
-      (terpri output)))
-  ;; Prevent further use of DEFINE-THREAD-LOCAL after compiling this file
-  ;; because the definition of INIT-THREAD-LOCAL-STORAGE is now frozen.
-  (setf *thread-local-specials* (cons :final (cdr *thread-local-specials*))))
-
 ;;;; Diagnostic tool
 
 #+sb-devel
