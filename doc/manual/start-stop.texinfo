@@ -228,7 +228,8 @@ cleanly in Unix pipelines. See also the @code{--noprint} and
 @cindex ldb, disabling
 @cindex disabling ldb
 Disable the low-level debugger. Only effective if SBCL is compiled
-with LDB.
+with LDB.  On occasions when SBCL would have dropped into the LDB,
+it will instead exit with a non-zero exit status.
 
 @item --lose-on-corruption
 @cindex ldb
