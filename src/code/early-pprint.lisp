@@ -189,3 +189,10 @@
   ;; Block-start queue entries in effect at the queue head.
   (pending-blocks nil :type list)
   (pending-blocks-length 0 :type index))
+
+;;; The current level we are printing at, to be compared against
+;;; *PRINT-LEVEL*. See the macro DESCEND-INTO for a handy interface to
+;;; depth abbreviation. (Not specific to the pretty-printer, but needs
+;;; to be seen prior to any DEFSTRUCT's print function being defined)
+(sb-impl:define-thread-local *current-level-in-print* 0)
+(declaim (index *current-level-in-print*))

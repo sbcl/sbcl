@@ -66,9 +66,8 @@
                 cl:/
                 cl://
                 cl:///
-                ;; extension/internal specials are also proclaimed early
+                ;; extension specials are also proclaimed early
                 ;; to benefit from always-bound and precomputed TLS index.
-                sb-kernel:*current-level-in-print*
                 sb-ext:*print-vector-length*
                 sb-ext:*print-circle-not-shared*)))
     `(progn
@@ -175,9 +174,6 @@
 ;;; They aren't actually "inlined", but they were bypassing the fdefinition in
 ;;; situations involving (APPLY ...) which rendered encapsulation impossible.
 (declaim (notinline open compile-file load compile))
-
-(in-package "SB-IMPL")
-
 
 ;;; Ensure some VM symbols get wired TLS.
 (in-package "SB-VM")
