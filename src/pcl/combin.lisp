@@ -242,6 +242,16 @@
 
 (defun get-effective-method-gensym ()
   (or (pop *rebound-effective-method-gensyms*)
+      ;; There's an obvious race here, but do we care? It may not matter much because:
+      ;; * despite the obvious possibilities of LENGTH getting computed before APPEND
+      ;;   occurs in another thread, and/or collision on the SETQ, the only ill
+      ;;   effect may be symbol names appearing out-of-order or duplicated.
+      ;; * each invocation of MAKE-EFFECTIVE-METHOD-FUNCTION-INTERNAL tries to work on
+      ;;   its own copy of the global list through rebinding, thus the aforementioned
+      ;;   race should not often occur.
+      ;; However, and this is important part: though the function name -GENSYM suggests
+      ;; that it creates _uninterned_ symbols, that's actually not so. They are _interned_
+      ;; symbols, so I think there is a real bug potentially.
       (let ((new (pcl-symbolicate "EFFECTIVE-METHOD-GENSYM-"
                                     (length *global-effective-method-gensyms*))))
         (setq *global-effective-method-gensyms*
