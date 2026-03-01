@@ -83,6 +83,11 @@
 ;;; a list of handlers maintained by HANDLER-BIND
 (define-thread-local *handler-clusters* sb-kernel::**initial-handler-clusters**)
 
+(define-thread-local *compile-file-pathname* nil)
+(define-thread-local *compile-file-truename* nil)
+(define-thread-local *load-pathname* nil)
+#+ansi-compliant-load-truename (define-thread-local *load-truename* nil)
+
 (defvar *default-external-format* :utf-8)
 (defvar *default-source-external-format*
   #+win32 '(:default :newline :crlf)

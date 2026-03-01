@@ -16,8 +16,6 @@
                 cl:**
                 cl:***
                 cl:*break-on-signals*
-                cl:*compile-file-pathname*
-                cl:*compile-file-truename*
                 cl:*compile-print*
                 cl:*compile-verbose*
                 cl:*debug-io*
@@ -26,9 +24,7 @@
                 cl:*error-output*
                 cl:*features*
                 cl:*gensym-counter*
-                cl:*load-pathname*
                 cl:*load-print*
-                #+ansi-compliant-load-truename cl:*load-truename*
                 cl:*load-verbose*
                 cl:*macroexpand-hook*
                 cl:*modules*
