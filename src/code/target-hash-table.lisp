@@ -13,8 +13,7 @@
 (in-package "SB-IMPL")
 
 
-(defvar *show-putweak* nil)
-
+(declaim (freeze-type general-hash-table))
 (!begin-collecting-cold-init-forms)
 
 (declaim (ftype (sfunction (hash-table t maybe-truncated-hash)
@@ -1092,11 +1091,13 @@ Examples:
                 (pick-table-methods (logtest flags hash-table-synchronized-flag)
                                     (if userfunp nil test) hash-fun-state)))
            (table
-            (funcall (if weakp #'%alloc-general-hash-table #'%alloc-hash-table)
-                               flags getter setter remover hash-fun-state
-                               test test-fun hash-fun
-                               rehash-size rehash-threshold
-                               kv-vector index-vector next-vector hash-vector)))
+            (if (or (/= rehash-threshold 1) (/= rehash-size default-rehash-size) userfunp weakp)
+                (%alloc-general-hash-table flags getter setter remover hash-fun-state
+                                           test test-fun hash-fun
+                                           rehash-size rehash-threshold
+                                           kv-vector index-vector next-vector hash-vector)
+                (%alloc-hash-table flags getter setter remover hash-fun-state test-fun hash-fun
+                                   kv-vector index-vector next-vector hash-vector))))
       (declare (type index scaled-size))
       ;; The trailing metadata element is either the table itself or the hash-vector
       ;; depending on weakness. Non-weak hashing vectors can be GCed without looking
@@ -3286,6 +3287,17 @@ table itself."
 ;;; It can't go in src/code/pred whose forms execute *before* the defstruct,
 ;;; so its effect would just get clobbered by the defstruct.
 (sb-kernel::assign-equalp-impl 'hash-table #'hash-table-equalp)
+
+(defun hash-table-test (hash-table)
+  (if (typep hash-table 'general-hash-table)
+      (hash-table-%test hash-table)
+      (aref #(eq eql equal equalp) (ht-flags-kind (hash-table-flags hash-table)))))
+(defun hash-table-rehash-threshold (hash-table)
+  (if (typep hash-table 'general-hash-table) (hash-table-%rehash-threshold hash-table) 1.0f0))
+(defun hash-table-rehash-size (hash-table)
+  (if (typep hash-table 'general-hash-table)
+      (hash-table-%rehash-size hash-table)
+      default-rehash-size))
 
 (!defun-from-collected-cold-init-forms !hash-table-cold-init)
 

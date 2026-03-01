@@ -67,11 +67,8 @@
                                 puthash-impl
                                 remhash-impl
                                 %hash-fun-state
-                                test
                                 test-fun
                                 hash-fun
-                                rehash-size
-                                rehash-threshold
                                 pairs
                                 index-vector
                                 next-vector
@@ -146,28 +143,6 @@
   ;; next GC. It may take HASH-FUN-STATE as an extra argument.
   (hash-fun nil :type function)
 
-  ;; The type of hash table this is. Part of the exported interface,
-  ;; as well as needed for the MAKE-LOAD-FORM and PRINT-OBJECT methods.
-  (test nil :type (or symbol function) :read-only t)
-  ;; How much to grow the hash table by when it fills up. If an index,
-  ;; then add that amount. If a floating point number, then multiply
-  ;; it by that.
-  (rehash-size nil :type #+c-headers-only real
-                         #-c-headers-only (or index (single-float (1.0)))
-               :read-only t)
-  ;; How full the hash table has to get before we rehash
-  ;; but only for the initial determination of how many buckets to make.
-  ;; Subsequent resizing is at our discretion. i.e. you might think that a
-  ;; deliberate choice of rehash size and threshold implies that you want the new
-  ;; table to be X amount larger *and* that you care at about what load factor the
-  ;; new table gets rehashed, but no, you don't get to pick both every time.
-  ;; (CLHS says that these are all just "hints" and we're free to ignore)
-  ;; If #+c-headers-only, the type is weakened to one which generates the right
-  ;; C type without parsing a float. (NUMBER or T would result in the type being
-  ;; lispobj, while WORD would give the struct field an incorrect name)
-  (rehash-threshold nil :type #+c-headers-only single-float
-                              #-c-headers-only (single-float (0.0) 1.0)
-                        :read-only t)
   ;; The current number of entries in the table.
   (%count 0 :type index)
   ;; Index into the Next vector chaining together free slots in the KV
@@ -197,15 +172,38 @@
                                 puthash-impl
                                 remhash-impl
                                 %hash-fun-state
-                                test
+                                %test
                                 test-fun
                                 hash-fun
-                                rehash-size
-                                rehash-threshold
+                                %rehash-size
+                                %rehash-threshold
                                 pairs
                                 index-vector
                                 next-vector
                                 hash-vector)))
+  ;; The type of hash table this is. Part of the exported interface,
+  ;; as well as needed for the MAKE-LOAD-FORM and PRINT-OBJECT methods.
+  ;; Inferrable from FLAGS except unless a custom function.
+  (%test nil :type (or symbol function) :read-only t)
+  ;; How much to grow the hash table by when it fills up. If an index,
+  ;; then add that amount. If a floating point number, then multiply
+  ;; it by that.
+  (%rehash-size nil :type #+c-headers-only real
+                          #-c-headers-only (or index (single-float (1.0)))
+               :read-only t)
+  ;; How full the hash table has to get before we rehash
+  ;; but only for the initial determination of how many buckets to make.
+  ;; Subsequent resizing is at our discretion. i.e. you might think that a
+  ;; deliberate choice of rehash size and threshold implies that you want the new
+  ;; table to be X amount larger *and* that you care at about what load factor the
+  ;; new table gets rehashed, but no, you don't get to pick both every time.
+  ;; (CLHS says that these are all just "hints" and we're free to ignore)
+  ;; If #+c-headers-only, the type is weakened to one which generates the right
+  ;; C type without parsing a float. (NUMBER or T would result in the type being
+  ;; lispobj, while WORD would give the struct field an incorrect name)
+  (%rehash-threshold nil :type #+c-headers-only single-float
+                               #-c-headers-only (single-float (0.0) 1.0)
+                         :read-only t)
   ;; List of (pair-index . bucket-number) which GC smashed and are almost
   ;; equivalent to free cells, except that they are not yet unlinked from
   ;; their chain. Skipping the removal in GC eliminates a race with REMHASH.

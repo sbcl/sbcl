@@ -4571,7 +4571,6 @@ static inline uword_t word_has_stickymark(uword_t word) {
                 (format stream "~&#include \"~A.h\"~%"
                         (string-downcase (sb-vm:primitive-object-name obj)))))))
         ;; For purposes of the C code, cast all hash tables as general_hash_table
-        ;; even if they lack the slots for weak tables.
         (out-to "hash-table"
           (write-structure-type (layout-info (find-layout 'sb-impl::general-hash-table))
                                 stream "hash_table"))
