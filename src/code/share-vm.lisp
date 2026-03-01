@@ -183,7 +183,7 @@
          (when (eq (%fun-name #',name) ',variant)
            (setf (%symbol-function ',name) fun))))))
 
-(defvar *previous-cpu-routines* nil)
+(define-load-time-global *previous-cpu-routines* nil)
 
 (defmacro !setup-cpu-specific-routines ()
   `(progn

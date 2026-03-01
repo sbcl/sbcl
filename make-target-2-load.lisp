@@ -20,7 +20,6 @@
 #+system-tlabs (push :arena-allocator *features*)
 
 ;;; Remove symbols from CL:*FEATURES* that should not be exposed to users.
-(export 'sb-impl::+internal-features+ 'sb-impl)
 (let* (#-sb-devel
        (non-target-features
         ;;
@@ -98,10 +97,11 @@
        #-sb-devel
        (removable-features
         (append non-target-features public-features)))
-  (defconstant sb-impl:+internal-features+
+  (setq sb-impl:+internal-features+
             (remove-if (lambda (x) (member x #+sb-devel public-features
                                              #-sb-devel removable-features))
                        *features*))
+  (setf (sb-int:info :variable :kind 'sb-impl:+internal-features+) :constant)
   (setq *features* (remove-if-not (lambda (x) (member x public-features))
                                   *features*)))
 

@@ -12,6 +12,10 @@
 
 (in-package "SB-IMPL")
 
+;;; TODO: the computation of +internal-features+ could be moved
+;;; from its current home in make-target-2-load to here.
+(define-load-time-global +internal-features+ nil)
+
 ;;; Define a variable that is assigned into TLS either in INIT-INITIAL-THREAD
 ;;; or NEW-LISP-THREAD-TRAMPOLINE before any other Lisp code runs.
 ;;; !COLD-INIT gets these assignents via INIT-INITIAL-THREAD.

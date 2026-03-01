@@ -2471,6 +2471,7 @@ be submitted as a CDR")
            "TOKEN-DELIMITERP" "WHITESPACE[2]P" "WITH-READ-BUFFER"
            ;; other
 
+           "+INTERNAL-FEATURES+"
            "INSTALL-HASH-TABLE-LOCK"
            "DEFINE-THREAD-LOCAL"
            "%MAKUNBOUND")

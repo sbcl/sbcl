@@ -3276,7 +3276,7 @@ register."
                        (*features* (if sbcl-source-p
                                        (append *features*
                                                '(:sb-xc)
-                                               (symbol-value 'sb-impl::+internal-features+))
+                                               sb-impl:+internal-features+)
                                        *features*)))
                    (loop repeat tlf-offset
                          do (read f)))))

@@ -671,10 +671,8 @@ This is interpreted as
 ;;; so that we can then also proclaim ALWAYS-BOUND.
 #+sb-xc-host
 (defvar *info-environment* (make-hash-table :test 'equal))
-#-sb-xc-host
-(progn (defvar *info-environment* nil)
-       (declaim (type info-hashtable *info-environment*)
-                (always-bound *info-environment*)))
+#-sb-xc-host (progn (define-load-time-global *info-environment* nil)
+                    (declaim (type info-hashtable *info-environment*)))
 
 (defmacro pcl-methodfn-name-p (name)
   `(typep ,name '(cons (member sb-pcl::slow-method sb-pcl::fast-method))))
