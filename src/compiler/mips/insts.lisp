@@ -1138,14 +1138,6 @@
   (:emitter
    (emit-header-data segment simple-fun-widetag)))
 
-(define-instruction lra-header-word (segment)
-  :pinned
-  (:cost 0)
-  (:delay 0)
-  (:emitter
-   (emit-header-data segment return-pc-widetag)))
-
-
 (defun emit-compute-inst (segment vop dst src label temp calc)
   (emit-chooser
    ;; We emit either 12 or 4 bytes, so we maintain 8 byte alignments.
@@ -1181,8 +1173,7 @@
                              (label-position label posn delta-if-after)
                              (component-header-length))))))
 
-;; code = lra - other-pointer-tag - header - label-offset + other-pointer-tag
-;;      = lra - (header + label-offset)
+;; code = lra  - header - label-offset + other-pointer-tag
 (define-instruction compute-code-from-lra (segment dst src label temp)
   (:declare (type tn dst src temp) (type label label))
   (:attributes variable-length)
@@ -1192,11 +1183,11 @@
   (:emitter
    (emit-compute-inst segment vop dst src label temp
                       #'(lambda (label posn delta-if-after)
-                          (- (+ (label-position label posn delta-if-after)
-                                (component-header-length)))))))
+                          (+ (- (+ (label-position label posn delta-if-after)
+                                 (component-header-length)))
+                             other-pointer-lowtag)))))
 
-;; lra = code + other-pointer-tag + header + label-offset - other-pointer-tag
-;;     = code + header + label-offset
+;; lra = code + header + label-offset - other-pointer-tag
 (define-instruction compute-lra-from-code (segment dst src label temp)
   (:declare (type tn dst src temp) (type label label))
   (:attributes variable-length)
@@ -1206,8 +1197,9 @@
   (:emitter
    (emit-compute-inst segment vop dst src label temp
                       #'(lambda (label posn delta-if-after)
-                          (+ (label-position label posn delta-if-after)
-                             (component-header-length))))))
+                          (- (+ (label-position label posn delta-if-after)
+                              (component-header-length))
+                             other-pointer-lowtag)))))
 
 
 ;;;; Loads and Stores

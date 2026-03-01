@@ -360,7 +360,8 @@ default-value-8
 (defun emit-block-header (start-label trampoline-label fall-thru-p alignp)
   (declare (ignore alignp))
   (when (and fall-thru-p trampoline-label)
-    (inst b start-label))
+    (inst b start-label)
+    (inst nop))
   (when trampoline-label
     (emit-label trampoline-label)
     (storew lra-tn cfp-tn lra-save-offset))

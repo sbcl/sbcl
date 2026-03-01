@@ -164,9 +164,6 @@ symbol:
 	lw	reg_A4, 16(reg_CFP)
 	lw	reg_A5, 20(reg_CFP)
 
-	/* Calculate LRA */
-	la	reg_LRA, lra + OTHER_POINTER_LOWTAG
-
 	/* Indirect closure */
 	lw	reg_CODE, CLOSURE_FUN_OFFSET(reg_LEXENV)
 
@@ -177,11 +174,8 @@ symbol:
 	lw	reg_CARDBASE, gc_card_mark
 
 	/* Jump into lisp land. */
-	jr	reg_LIP
-
-	.align	3
-	.set	noreorder
-lra:	.word	RETURN_PC_WIDETAG
+	jalr	reg_LRA, reg_LIP
+        nop
 
 	/* Multiple value return spot, clear stack. */
 	move	reg_CSP, reg_OCFP
@@ -244,11 +238,8 @@ lra:	.word	RETURN_PC_WIDETAG
 
 	BEGIN_PSEUDO_ATOMIC
 
-	/* Convert the return address to an offset and save it on the stack. */
-	subu	reg_NFP, reg_LIP, reg_CODE
-	addu	reg_NFP, OTHER_POINTER_LOWTAG
         sw      reg_OCFP, (reg_CFP)
-	sw	reg_NFP, 4(reg_CFP)
+	sw	reg_LIP, 4(reg_CFP)
 	sw	reg_CODE, 8(reg_CFP)
 	sw	$gp, 12(reg_CFP) // should this be saved? on the control stack?
 
@@ -299,13 +290,11 @@ lra:	.word	RETURN_PC_WIDETAG
 
 	lw	reg_BSP, current_binding_stack_pointer
 
-	/* Restore CODE */
+	lw	reg_LIP, 4(reg_CFP)
 	lw	reg_CODE, 8(reg_CFP)
-        /* Setup the return address */
-	subu	reg_LIP, reg_NFP, OTHER_POINTER_LOWTAG
-	addu	reg_LIP, reg_CODE
 
 	END_PSEUDO_ATOMIC(reg_NL4)
+
 
 	/* Reset the lisp stack. */
 	/* Note: OCFP and CFP are in saved regs. */
@@ -315,6 +304,7 @@ lra:	.word	RETURN_PC_WIDETAG
 	/* Mark us as in Lisp land. */
 	sw	zero, foreign_function_call_active
 	lw	reg_CARDBASE, gc_card_mark
+
 
 	/* Return to LISP. */
 	jr	reg_LIP

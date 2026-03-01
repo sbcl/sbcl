@@ -29,27 +29,21 @@
                 (cur-nfp (current-nfp-tn ,vop)))
             (when cur-nfp
               (store-stack-tn ,nfp-save cur-nfp))
-            (inst compute-lra-from-code ,lra code-tn lra-label ,temp)
             (note-next-instruction ,vop :call-site)
             (inst li fixup (make-fixup ',name :assembly-routine))
-            (inst j fixup)
+            (inst jal ,lra fixup)
             (inst nop)
             (without-scheduling ()
-              (emit-return-pc lra-label)
+              (emit-label lra-label)
               (note-this-location ,vop :single-value-return)
               (inst move csp-tn ocfp-tn)
               (inst nop))
-            (inst compute-code-from-lra code-tn code-tn
-                  lra-label ,temp)
+            (inst compute-code-from-lra code-tn ,lra lra-label ,temp)
             (when cur-nfp
               (load-stack-tn cur-nfp ,nfp-save))))
-        `((:temporary (:scs (non-descriptor-reg) :from (:eval 0) :to (:eval 1))
-                      ,temp)
-          (:temporary (:sc descriptor-reg :offset lra-offset
-                       :from (:eval 0) :to (:eval 1))
-                      ,lra)
-          (:temporary (:scs (control-stack) :offset nfp-save-offset)
-                      ,nfp-save)
+        `((:temporary (:scs (non-descriptor-reg) :from (:eval 0) :to (:eval 1)) ,temp)
+          (:temporary (:sc descriptor-reg :offset lra-offset :from (:eval 0) :to (:eval 1)) ,lra)
+          (:temporary (:scs (control-stack) :offset nfp-save-offset) ,nfp-save)
           (:temporary (:sc any-reg) fixup)
           (:save-p t)))))))
 
@@ -60,5 +54,5 @@
        (inst nop)))
     (:full-call
      `((lisp-return (make-random-tn (sc-or-lose 'descriptor-reg) lra-offset)
-                    lip-tn :offset 2)))
+                    (make-random-tn (sc-or-lose 'descriptor-reg) lip-offset) :offset 2)))
     (:none)))

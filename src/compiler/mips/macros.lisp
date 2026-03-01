@@ -85,24 +85,12 @@ byte-ordering issues."
      (inst j ,lip)
      (emit-nop-or-move code-tn ,function)))
 
-(defmacro lisp-return (return-pc lip &key (offset 0) (frob-code t))
-  "Return to RETURN-PC.  LIP is an interior-reg temporary."
+(defmacro lisp-return (return-pc lra &key (offset 0))
+  "Return to RETURN-PC."
   `(progn
-     (inst addu ,lip ,return-pc
-           (- (* (1+ ,offset) n-word-bytes) other-pointer-lowtag))
-     (inst j ,lip)
-     ,(if frob-code
-          `(emit-nop-or-move code-tn ,return-pc)
-          '(inst nop))))
-
-
-(defmacro emit-return-pc (label)
-  "Emit a return-pc header word.  LABEL is the label to use for this return-pc."
-  `(progn
-     (emit-alignment n-lowtag-bits)
-     (emit-label ,label)
-     (inst lra-header-word)))
-
+     (inst addu ,lra ,return-pc (* ,offset n-word-bytes))
+     (inst j ,lra)
+     (inst nop)))
 
 
 ;;;; Stack TN's

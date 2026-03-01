@@ -506,16 +506,8 @@ int lisp_frame_previous(struct thread *thread, struct call_info *info)
         }
     } else if (fixnump(lra)) {
         info->code =
-#if defined reg_CODE && !(defined(LISP_FEATURE_PPC64) || defined(LISP_FEATURE_PPC) || defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_SPARC))
-        (struct code*)native_pointer(this_frame->code);
-#else
         (struct code*)component_ptr_from_pc((char *)lra);
-#endif
-#if defined reg_LRA && !(defined(LISP_FEATURE_PPC64) || defined(LISP_FEATURE_PPC) || defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_SPARC))
-        info->pc = lra;
-#else
         info->pc = (char*)native_pointer(lra) - (char*)info->code;
-#endif
         info->lra = NIL;
     } else {
         info->code = code_pointer(lra);

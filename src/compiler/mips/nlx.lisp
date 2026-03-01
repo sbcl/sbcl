@@ -152,7 +152,7 @@
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)
     (cond ((zerop nvals))
           ((= nvals 1)
@@ -204,7 +204,7 @@
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)
     (move res value)
     (load-stack-tn csp-tn sp)))
@@ -222,7 +222,7 @@
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)
     (let ((loop (gen-label))
           (done (gen-label)))
@@ -264,5 +264,5 @@
   (:ignore block start count)
   (:vop-var vop)
   (:generator 0
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)))

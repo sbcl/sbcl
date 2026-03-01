@@ -768,28 +768,24 @@ check_interrupt_context_or_lose(os_context_t *context)
 /*
  * utility routines used by various signal handlers
  */
+
 #ifdef LISP_FEATURE_ARM64
+/* Ignore the two words above CSP, which can be used without adjusting CSP */
+#define CONTRL_STACK_RED_ZONE 2
+#else
+#define CONTRL_STACK_RED_ZONE 0
+#endif
+
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
 static void
 build_fake_control_stack_frames(struct thread *th, os_context_t *context)
 {
 
     /* Ignore the two words above CSP, which can be used without adjusting CSP */
-    lispobj* csp = (lispobj *)(*os_context_register_addr(context, reg_CSP)) + 2;
-    lispobj cfp = (lispobj)(*os_context_register_addr(context, reg_CFP));
-    access_control_frame_pointer(th) = csp;
-
-    access_control_frame_pointer(th)[1] = os_context_pc(context);
-    access_control_frame_pointer(th)[0] = cfp;
-    access_control_stack_pointer(th) = csp + 2;
-}
-#elif defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC || defined LISP_FEATURE_ARM || defined LISP_FEATURE_SPARC
-static void
-build_fake_control_stack_frames(struct thread *th, os_context_t *context)
-{
 #ifdef LISP_FEATURE_ARM
     lispobj* csp = (lispobj*)SymbolValue(CONTROL_STACK_POINTER, th);
 #else
-    lispobj* csp = (lispobj *)(*os_context_register_addr(context, reg_CSP));
+    lispobj* csp = (lispobj *)(*os_context_register_addr(context, reg_CSP)) + CONTRL_STACK_RED_ZONE;
 #endif
     lispobj cfp = (lispobj)(*os_context_register_addr(context, reg_CFP));
     access_control_frame_pointer(th) = csp;
@@ -801,68 +797,7 @@ build_fake_control_stack_frames(struct thread *th, os_context_t *context)
 #endif
 
     access_control_frame_pointer(th)[0] = cfp;
-    access_control_stack_pointer(th) = csp;
-}
-#else
-static void
-build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
-                                os_context_t __attribute__((unused)) *context)
-{
-#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-
-    lispobj oldcont;
-
-    /* Build a fake stack frame or frames */
-
-    access_control_frame_pointer(th) =
-        (lispobj *)(uword_t)
-        (*os_context_register_addr(context, reg_CSP));
-    if ((lispobj *)(uword_t)
-        (*os_context_register_addr(context, reg_CFP))
-        == access_control_frame_pointer(th)) {
-        /* There is a small window during call where the callee's
-         * frame isn't built yet. */
-        if (functionp(*os_context_register_addr(context, reg_CODE))) {
-            /* We have called, but not built the new frame, so
-             * build it for them. */
-            access_control_frame_pointer(th)[0] =
-                *os_context_register_addr(context, reg_OCFP);
-            access_control_frame_pointer(th)[1] =
-#ifdef reg_LRA
-              *os_context_register_addr(context, reg_LRA);
-#else
-              *os_context_register_addr(context, reg_RA);
-#endif
-            access_control_frame_pointer(th) += 2;
-            /* Build our frame on top of it. */
-            oldcont = (lispobj)(*os_context_register_addr(context, reg_CFP));
-        }
-        else {
-            /* We haven't yet called, build our frame as if the
-             * partial frame wasn't there. */
-            oldcont = (lispobj)(*os_context_register_addr(context, reg_OCFP));
-        }
-    } else
-    /* We can't tell whether we are still in the caller if it had to
-     * allocate a stack frame due to stack arguments. */
-    /* This observation provoked some past CMUCL maintainer to ask
-     * "Can anything strange happen during return?" */
-    {
-        /* normal case */
-        oldcont = (lispobj)(*os_context_register_addr(context, reg_CFP));
-    }
-
-    access_control_stack_pointer(th) = access_control_frame_pointer(th) + 3;
-
-    access_control_frame_pointer(th)[0] = oldcont;
-#ifdef reg_CODE
-    access_control_frame_pointer(th)[1] = NIL;
-    access_control_frame_pointer(th)[2] =
-        (lispobj)(*os_context_register_addr(context, reg_CODE));
-#else
-    access_control_frame_pointer(th)[1] = os_context_pc(context);
-#endif
-#endif
+    access_control_stack_pointer(th) = csp + 2;
 }
 #endif
 
@@ -912,7 +847,9 @@ void fake_foreign_function_call_noassert(os_context_t *context)
 
     save_interrupt_context(thread, context);
 
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     build_fake_control_stack_frames(thread, context);
+#endif
 
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64) &&  \
   !(defined(LISP_FEATURE_ARM64) && defined(LISP_FEATURE_SB_THREAD))
