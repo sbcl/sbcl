@@ -951,9 +951,7 @@ between the ~A definition and the ~A definition"
 ;;; hierarchy).  See NAMED :COMPLEX-SUBTYPEP-ARG2
 (declaim (type cons **non-instance-classoid-types**))
 (defglobal **non-instance-classoid-types**
-  '(symbol system-area-pointer weak-pointer code-component
-    #-(or x86 x86-64 arm arm64 riscv loongarch64 ppc64 ppc) lra
-    fdefn random-class))
+  '(symbol system-area-pointer weak-pointer code-component fdefn random-class))
 
 (defun classoid-non-instance-p (classoid)
   (declare (type classoid classoid))
@@ -1053,11 +1051,6 @@ between the ~A definition and the ~A definition"
      (code-component :codes (,sb-vm:code-header-widetag)
                      :predicate code-component-p
                      :prototype-form (fun-code-header #'identity))
-     #-(or x86 x86-64 arm arm64 riscv loongarch64 ppc64 ppc)
-     (lra :codes (,sb-vm:return-pc-widetag)
-          :predicate lra-p
-          ;; Make the PROTOTYPE slot unbound.
-          :prototype-form sb-pcl:+slot-unbound+)
      (fdefn :codes (,sb-vm:fdefn-widetag)
             :predicate fdefn-p
             :prototype-form (find-or-create-fdefn '(setf car)))

@@ -674,12 +674,6 @@ static void print_fun_or_otherptr(lispobj obj, iochannel_t io)
         break;
     }
 
-#ifdef RETURN_PC_WIDETAG
-    case RETURN_PC_WIDETAG:
-        print_obj("code: ", obj - (count * N_WORD_BYTES), io);
-        break;
-#endif
-
     case CLOSURE_WIDETAG:
         print_slots(closure_slots, count, ptr, io);
         break;

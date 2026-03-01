@@ -71,10 +71,6 @@
         (inst b done)
         (move code null-tn)))))
 
-(define-vop (code-from-lra code-from-mumble)
-  (:translate lra-code-header)
-  (:variant other-pointer-lowtag))
-
 (define-vop (code-from-function code-from-mumble)
   (:translate fun-code-header)
   (:variant fun-pointer-lowtag))

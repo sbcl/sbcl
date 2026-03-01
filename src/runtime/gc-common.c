@@ -485,28 +485,6 @@ static sword_t size_code_blob(lispobj *where)
     return code_total_nwords((struct code*)where);
 }
 
-#ifdef RETURN_PC_WIDETAG
-static sword_t
-scav_return_pc_header(lispobj *where, lispobj object)
-{
-    lose("attempted to scavenge a return PC header where=%p object=%"OBJ_FMTX,
-         where, object);
-    return 0; /* bogus return value to satisfy static type checking */
-}
-
-static lispobj
-trans_return_pc_header(lispobj object)
-{
-    struct simple_fun *return_pc = (struct simple_fun *) native_pointer(object);
-    uword_t offset = HeaderValue(return_pc->header) * N_WORD_BYTES;
-
-    /* Transport the whole code object */
-    struct code *code = trans_code((struct code *) ((uword_t) return_pc - offset));
-
-    return make_lispobj((char*)code + offset, OTHER_POINTER_LOWTAG);
-}
-#endif /* RETURN_PC_WIDETAG */
-
 #if FUN_SELF_FIXNUM_TAGGED
 /* Closures hold a pointer to the raw simple-fun entry address instead of the
  * tagged object so that a native call instruction can be used more easily */
@@ -2145,20 +2123,6 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
                                  (struct simple_fun*)potential_fun) >= 0)
                 return 1;
         }
-#ifdef RETURN_PC_WIDETAG
-        /* LRA objects are similar to simple-funs in that they are
-         * embedded objects. We can't actually do as precise a test
-         * as for simple-funs, since we don't know where the LRAs are.
-         * Nonetheless, the check of header validity should produce
-         * very few false positives */
-        if (lowtag_of(pointer) == OTHER_POINTER_LOWTAG) {
-            lispobj *potential_lra = native_pointer(pointer);
-            if ((widetag_of(potential_lra) == RETURN_PC_WIDETAG) &&
-                ((potential_lra - HeaderValue(potential_lra[0])) == start_addr)) {
-                return 1; /* It's as good as we can verify. */
-            }
-        }
-#endif
     }
     return 0; // no good
 }

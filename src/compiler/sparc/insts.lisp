@@ -1650,12 +1650,6 @@ Otherwise, use the Sparc register names")
   (:emitter
    (emit-header-data segment simple-fun-widetag)))
 
-(define-instruction lra-header-word (segment)
-  :pinned
-  (:delay 0)
-  (:emitter
-   (emit-header-data segment return-pc-widetag)))
-
 
 ;;;; Instructions for converting between code objects, functions, and lras.
 

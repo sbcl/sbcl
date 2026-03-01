@@ -124,7 +124,6 @@
 ;;; things have to happen:
 ;;; * funcallable-instances must become directly callable objects
 ;;; * simple-fun-self, closure-fun, fin-fun must be raw addresses
-;;; * LRAs should be removed
 ;;; For now, I'm using a hand-assembled simple-fun as simplifying wrapper
 ;;; since executable funinstances are not supported.
 #+64-bit

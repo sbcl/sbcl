@@ -60,9 +60,6 @@
     (closure ,(or #+(or arm64 ppc64 x86 x86-64) "closure" "short_boxed") "lose" "short_boxed")
     ;; Like closure, but these can also have a layout pointer in the high header bytes.
     (funcallable-instance "funinstance" "lose" "short_boxed")
-    ;; These have a scav and trans function, but no size function.
-    #-(or x86 x86-64 arm arm64 riscv loongarch64 ppc64 ppc)
-    (return-pc "return_pc_header" "return_pc_header" "lose")
 
     (value-cell "boxed")
     (symbol "symbol")

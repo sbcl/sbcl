@@ -41,7 +41,7 @@
 #define reg_CNAME     REG(20)   /* Current function name */
 #define reg_LEXENV    REG(21)   /* And why burn a register for this ? */
 #define reg_OCFP      REG(22)   /* The caller's reg_CFP */
-#define reg_LRA       REG(23)   /* Tagged lisp return address */
+#define reg_LRA       REG(23)   /* Lisp return address */
 #define reg_A0        REG(24)   /* First function arg/return value */
 #define reg_A1        REG(25)   /* Second. */
 #define reg_A2        REG(26)   /*  */

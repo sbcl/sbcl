@@ -209,8 +209,7 @@
   simple-fun-widetag                              ;  3A   41
   closure-widetag                                 ;  3E   45
 
-  #-(or x86 x86-64 arm arm64 riscv loongarch64 ppc ppc64) return-pc-widetag ;  42   49
-  #+(or x86 x86-64 arm arm64 riscv loongarch64 ppc ppc64) lra-widetag-notused
+  unused10-widetag                                ;  42   49
 
   value-cell-widetag                              ;  46   4D
   character-widetag                               ;  4A   51
@@ -306,7 +305,6 @@
     (simple-fun-widetag "simplefun")
     (closure-widetag "closure")
     (code-header-widetag "codeblob")
-    (return-pc-widetag "LRA")
     (value-cell-widetag "value-cell")
     (character-widetag "char")
     (sap-widetag "sap")

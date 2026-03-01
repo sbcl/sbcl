@@ -1969,11 +1969,6 @@ variable: an unreadable object representing the error is printed instead.")
       (format stream " {~X..~X}"
               a (+ (logandc2 a sb-vm:lowtag-mask) (code-object-size component))))))
 
-#-(or x86 x86-64 arm arm64 riscv loongarch64 ppc64 ppc)
-(defmethod print-object ((lra lra) stream)
-  (print-unreadable-object (lra stream :identity t)
-    (write-string "return PC object" stream)))
-
 (defmethod print-object ((fdefn fdefn) stream)
   (print-unreadable-object (fdefn stream :type t)
     ;; As fdefn names are particularly relevant to those hacking on the compiler

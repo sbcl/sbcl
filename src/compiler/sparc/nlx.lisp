@@ -151,8 +151,7 @@
 
 
 (define-vop (nlx-entry)
-  (:args (sp) ; Note: we can't list an sc-restriction, 'cause any load vops
-              ; would be inserted before the LRA.
+  (:args (sp)
          (start)
          (count))
   (:results (values :more t))

@@ -312,9 +312,6 @@ lispobj copy_potential_large_object(lispobj object, sword_t nwords,
 #define page_single_obj_p(page) ((page_table[page].type & SINGLE_OBJECT_FLAG)!=0)
 
 extern unsigned char* gc_page_pins;
-#ifdef RETURN_PC_WIDETAG
-#include "code.h" // for fun_code_header
-#endif
 static inline bool pinned_p(lispobj obj, page_index_t page)
 {
     extern struct hopscotch_table pinned_objects;
@@ -323,18 +320,6 @@ static inline bool pinned_p(lispobj obj, page_index_t page)
     // but the answer is always 'No', because if pinned, the page would
     // already have had its generation changed to newspace.
     if (page_single_obj_p(page)) return 0;
-
-#ifdef RETURN_PC_WIDETAG
-    // Yet another complication from the despised LRA objects- with the
-    // refinement of 8 pin bits per page, we either must set all possible bits
-    // for a simple-fun, or map LRAs to the code base address.
-    if (widetag_of(native_pointer(obj)) == RETURN_PC_WIDETAG) {
-        // The hash-table stores tagged pointers.
-        obj = make_lispobj(fun_code_header((struct simple_fun*)native_pointer(obj)),
-                           OTHER_POINTER_LOWTAG);
-        page = find_page_index((void*)obj);
-    }
-#endif
 
     unsigned char pins = gc_page_pins[page];
     if (!pins) return 0;

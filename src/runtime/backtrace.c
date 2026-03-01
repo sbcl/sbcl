@@ -407,9 +407,6 @@ code_pointer(lispobj object)
     switch (widetag_of(headerp)) {
         case CODE_HEADER_WIDETAG:
             break;
-#ifdef RETURN_PC_WIDETAG
-        case RETURN_PC_WIDETAG:
-#endif
         case SIMPLE_FUN_WIDETAG:
             len = (HeaderValue(*headerp) & FUN_HEADER_NWORDS_MASK);
             if (len == 0)

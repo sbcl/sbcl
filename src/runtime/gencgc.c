@@ -2106,9 +2106,6 @@ static void pin_exact_root(lispobj obj)
     lispobj *object_start = native_pointer(obj);
     switch (widetag_of(object_start)) {
     case SIMPLE_FUN_WIDETAG:
-#ifdef RETURN_PC_WIDETAG
-    case RETURN_PC_WIDETAG:
-#endif
         obj = make_lispobj(fun_code_header((struct simple_fun*)object_start),
                            OTHER_POINTER_LOWTAG);
     }

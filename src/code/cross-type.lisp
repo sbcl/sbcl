@@ -151,7 +151,7 @@
                      ;; probably not a function. What about FMT-CONTROL instances?
                      (values nil t)))
                 ((system-area-pointer stream fdefn weak-pointer file-stream
-                  code-component lra pathname logical-pathname)
+                  code-component pathname logical-pathname)
                  (values nil t)))
               (cond ((eq name 'pathname)
                      (values (pathnamep obj) t))

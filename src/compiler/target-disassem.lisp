@@ -278,7 +278,7 @@
 ;;;     <padding to dual-word boundary>
 ;;;     start of instructions
 ;;;     ...
-;;;     fun-headers and lra's buried in here randomly
+;;;     fun-headers buried in here randomly
 ;;;     ...
 ;;;     <padding to dual-word boundary>
 ;;;
@@ -290,8 +290,6 @@
 ;;;     type
 ;;;     info
 ;;;
-;;; LRA layout (dual word aligned):
-;;;     header-word
 
 (declaim (inline words-to-bytes))
 
@@ -354,28 +352,6 @@
   (declare (type address address)
            (type alignment size))
   (zerop (logand (1- size) address)))
-
-#-(or x86 x86-64 arm arm64 riscv loongarch64 ppc64 ppc)
-(progn
-(defconstant lra-size (words-to-bytes 1))
-(defun lra-hook (chunk stream dstate)
-  (declare (type dchunk chunk)
-           (ignore chunk)
-           (type (or null stream) stream)
-           (type disassem-state dstate))
-  (when (and (aligned-p (dstate-cur-addr dstate)
-                        (* 2 sb-vm:n-word-bytes))
-             ;; Check type.
-             (= (sap-ref-8 (dstate-segment-sap dstate)
-                                  (if (eq (dstate-byte-order dstate)
-                                          :little-endian)
-                                      (dstate-cur-offs dstate)
-                                      (+ (dstate-cur-offs dstate)
-                                         (1- lra-size))))
-                sb-vm:return-pc-widetag))
-    (when stream
-      (note "possible LRA header" dstate)))
-  nil))
 
 ;;; Print the fun-header (entry-point) pseudo-instruction at the
 ;;; current location in DSTATE to STREAM and skip 2 words.
@@ -1380,8 +1356,7 @@
         (write-string ", " stream))
       (format stream "#X~2,'0x" (sap-ref-8 sap (+ offs start-offs))))))
 
-(defvar *default-dstate-hooks*
-  (list* #-(or x86 x86-64 arm arm64 riscv loongarch64 ppc64 ppc) #'lra-hook nil))
+(defvar *default-dstate-hooks* nil)
 
 ;;; Make a disassembler-state object.
 (defun make-dstate (&optional (fun-hooks *default-dstate-hooks*))
