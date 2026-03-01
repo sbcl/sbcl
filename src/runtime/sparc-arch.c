@@ -230,6 +230,8 @@ static void handle_allocation_trap(os_context_t *context, unsigned int *pc)
     undo_fake_foreign_function_call(context);
 }
 
+void save_context_for_ldb(os_context_t *context);
+
 static void sigill_handler(int signal, siginfo_t *siginfo,
                            os_context_t *context)
 {
@@ -238,8 +240,10 @@ static void sigill_handler(int signal, siginfo_t *siginfo,
         unsigned int inst;
         unsigned int* pc = (unsigned int*) siginfo->si_addr;
 
-        if (!gc_managed_heap_space_p((lispobj)pc))
+        if (!gc_managed_heap_space_p((lispobj)pc)) {
+          save_context_for_ldb(context);
           lose("Illegal instruction not in lisp: %p [%x]\n", pc, *pc);
+        }
 
         inst = *pc;
         trap = inst & 0xff;

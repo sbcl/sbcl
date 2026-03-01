@@ -42,7 +42,7 @@
 #define reg_NL4         OREG(4)
 #define reg_NL5         OREG(5)
 #define reg_NSP         OREG(6)
-#define reg_NARGS       OREG(7)
+#define reg_LRA         OREG(7)
 
 #define reg_A0          LREG(0)
 #define reg_A1          LREG(1)
@@ -51,7 +51,7 @@
 #define reg_A4          LREG(4)
 #define reg_A5          LREG(5)
 #define reg_OCFP        LREG(6)
-#define reg_LRA         LREG(7)
+#define reg_NARGS       LREG(7)
 
 #define reg_CNAME       IREG(0)
 #define reg_LEXENV      IREG(1)
@@ -60,3 +60,6 @@
 #define reg_CFUNC       IREG(4)
 #define reg_CODE        IREG(5)
 #define reg_LIP         IREG(7)
+
+#define reg_RA reg_LRA
+#define reg_LINK_RETURN reg_LRA

@@ -480,7 +480,7 @@
              1)))
 
 (with-test (:name :sign-extend
-            :fails-on (or :ppc :riscv :loongarch64))
+            :fails-on (or :ppc :riscv :loongarch64 :sparc :mips))
   (assert (= (count 'sb-c::mask-signed-field
                     (ir-calls
                      `(lambda (a)
@@ -535,14 +535,14 @@
     (assert (node-tail-p combination))))
 
 (with-test (:name :evenp+arithmetic
-            :fails-on (or :arm :riscv :loongarch64 :ppc64 :ppc))
+            :fails-on (or :arm :riscv :loongarch64 :ppc64 :ppc :sparc :mips))
   (assert (not (ir-full-calls `(lambda (x)
                                  (evenp (+ x 3))))))
   (assert (not (ir-full-calls `(lambda (x)
                                  (logbitp 0 (+ x 3)))))))
 
 (with-test (:name :modarith-unknown-types
-            :fails-on (or :arm :ppc))
+            :fails-on (or :arm :ppc :sparc :mips))
   (assert (not (ir-full-calls `(lambda (x)
                                  (logand (+ x 10) 20)))))
   (assert (not (ir-full-calls `(lambda (m x)

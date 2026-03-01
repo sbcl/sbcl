@@ -46,10 +46,10 @@
   (lisp-return lra :offset 2)
 
   DO-STATIC-FUN
-  (inst ld code-tn null-tn (static-fun-offset 'two-arg-+))
+  (inst ld lip-tn null-tn (static-fun-offset 'two-arg-+))
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
-  (inst j code-tn
+  (inst j lip-tn
         (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 
@@ -90,10 +90,10 @@
   (lisp-return lra :offset 2)
 
   DO-STATIC-FUN
-  (inst ld code-tn null-tn (static-fun-offset 'two-arg--))
+  (inst ld lip-tn null-tn (static-fun-offset 'two-arg--))
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
-  (inst j code-tn
+  (inst j lip-tn
         (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 
@@ -193,10 +193,10 @@
   (lisp-return lra :offset 2)
 
   DO-STATIC-FUN
-  (inst ld code-tn null-tn (static-fun-offset 'two-arg-*))
+  (inst ld lip-tn null-tn (static-fun-offset 'two-arg-*))
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
-  (inst j code-tn
+  (inst j lip-tn
         (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 
@@ -412,10 +412,10 @@
           (inst cmp x y)
 
           DO-STATIC-FN
-          (inst ld code-tn null-tn (static-fun-offset ',static-fn))
+          (inst ld lip-tn null-tn (static-fun-offset ',static-fn))
           (inst li nargs (fixnumize 2))
           (inst move ocfp cfp-tn)
-          (inst j code-tn
+          (inst j lip-tn
                 (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
           (inst move cfp-tn csp-tn)
 
@@ -458,10 +458,10 @@
   (lisp-return lra :offset 2)
 
   DO-STATIC-FN
-  (inst ld code-tn null-tn (static-fun-offset 'eql))
+  (inst ld lip-tn null-tn (static-fun-offset 'eql))
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
-  (inst j code-tn
+  (inst j lip-tn
         (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 
@@ -494,10 +494,10 @@
   (lisp-return lra :offset 2)
 
   DO-STATIC-FN
-  (inst ld code-tn null-tn (static-fun-offset 'two-arg-=))
+  (inst ld lip-tn null-tn (static-fun-offset 'two-arg-=))
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
-  (inst j code-tn
+  (inst j lip-tn
         (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 
@@ -530,10 +530,10 @@
   (lisp-return lra :offset 2)
 
   DO-STATIC-FN
-  (inst ld code-tn null-tn (static-fun-offset 'two-arg-/=))
+  (inst ld lip-tn null-tn (static-fun-offset 'two-arg-/=))
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
-  (inst j code-tn
+  (inst j lip-tn
         (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 

@@ -782,7 +782,7 @@ build_fake_control_stack_frames(struct thread *th, os_context_t *context)
     access_control_frame_pointer(th)[0] = cfp;
     access_control_stack_pointer(th) = csp + 2;
 }
-#elif defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC || defined LISP_FEATURE_ARM
+#elif defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC || defined LISP_FEATURE_ARM || defined LISP_FEATURE_SPARC
 static void
 build_fake_control_stack_frames(struct thread *th, os_context_t *context)
 {

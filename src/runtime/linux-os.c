@@ -306,12 +306,16 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
             sbcl_fallback_sigsegv_handler(signal, info, context);
 }
 
+void interrupt_handle_now_handler(int signal, siginfo_t *info, os_context_t *context);
 void
 os_install_interrupt_handlers(void)
 {
     if (INSTALL_SIG_MEMORY_FAULT_HANDLER) {
     ll_install_handler(SIG_MEMORY_FAULT, sigsegv_handler);
     }
+#if defined LISP_FEATURE_SPARC || defined LISP_FEATURE_MIPS
+    ll_install_handler(SIGBUS, interrupt_handle_now_handler);
+#endif
 }
 
 char *os_get_runtime_executable_path()

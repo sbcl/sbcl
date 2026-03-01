@@ -77,24 +77,13 @@
   `(progn
      (inst j ,fun
            (- (ash simple-fun-insts-offset word-shift) fun-pointer-lowtag))
-     (move code-tn ,fun)))
+     (inst nop)))
 
-(defmacro lisp-return (return-pc &key (offset 0) (frob-code t))
+(defmacro lisp-return (return-pc &key (offset 0))
   "Return to RETURN-PC."
   `(progn
-     (inst j ,return-pc
-           (- (* (1+ ,offset) n-word-bytes) other-pointer-lowtag))
-     ,(if frob-code
-          `(move code-tn ,return-pc)
-          '(inst nop))))
-
-(defmacro emit-return-pc (label)
-  "Emit a return-pc header word.  LABEL is the label to use for this return-pc."
-  `(progn
-     (emit-alignment n-lowtag-bits)
-     (emit-label ,label)
-     (inst lra-header-word)))
-
+     (inst j ,return-pc (+ 8 (* ,offset n-word-bytes)))
+     (inst nop)))
 
 
 ;;;; stack TN's

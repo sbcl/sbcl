@@ -64,7 +64,7 @@
 
 ;;; the TN used for passing the return PC in a local call to the function
 ;;; designated by 2ENV
-#+(or mips sparc)
+#+mips
 (defun callee-return-pc-tn (2env)
   (ir2-environment-return-pc-pass 2env))
 
@@ -349,7 +349,7 @@
           (assemble-sections
            asmstream
            (ir2-component-entries ir2-component)
-           (make-segment (default-segment-run-scheduler) skew))
+           (make-segment nil skew))
         (values segment text-length fun-table
                 (asmstream-elsewhere-label asmstream) fixup-notes
                 (sb-assem::get-allocation-points asmstream))))))

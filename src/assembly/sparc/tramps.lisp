@@ -33,9 +33,9 @@
       (inst word nil-value))
 
     (loadw lexenv-tn cname-tn fdefn-fun-slot other-pointer-lowtag)
-    (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-    (inst j code-tn (- (ash simple-fun-insts-offset word-shift)
-                       fun-pointer-lowtag))
+    (loadw lip-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
+    (inst j lip-tn (- (ash simple-fun-insts-offset word-shift)
+                      fun-pointer-lowtag))
     (inst nop)))
 
 (define-assembly-routine
@@ -52,7 +52,7 @@
       (inst word nil-value))
 
     (loadw lexenv-tn lexenv-tn funcallable-instance-function-slot fun-pointer-lowtag)
-    (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-    (inst j code-tn (- (ash simple-fun-insts-offset word-shift)
-                       fun-pointer-lowtag))
+    (loadw lip-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
+    (inst j lip-tn (- (ash simple-fun-insts-offset word-shift)
+                      fun-pointer-lowtag))
     (inst nop)))

@@ -1,7 +1,7 @@
 #+parallel-test-runner (setq run-tests::*allowed-inputs* :any)
 
 (with-test (:name (:chill :loads-quietly)
-            :fails-on sparc)
+            :fails-on :sparc)
   (handler-bind (#-sb-devel (warning (lambda (c) (error "Caught warning: ~A" c))))
     (load "../src/cold/chill.lisp")))
 

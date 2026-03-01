@@ -1451,7 +1451,7 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
         && plausible_tag_p(addr)) return AMBIGUOUS_POINTER;
     return 0;
 }
-#elif defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC || defined LISP_FEATURE_ARM
+#elif defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC
 /* Consider interior pointers to code as roots.
  * But most other pointers are *unambiguous* conservative roots.
  * This is not "less conservative" per se, than the non-precise code,
@@ -2007,7 +2007,7 @@ static void impart_mark_stickiness(lispobj word)
 }
 #endif
 
-#if !GENCGC_IS_PRECISE || defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC
+#if !GENCGC_IS_PRECISE || defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC
 /* Take a possible pointer to a Lisp object and mark its page in the
  * page_table so that it will not be relocated during a GC.
  *
@@ -3135,7 +3135,7 @@ static void pin_call_chain_and_boxed_registers(struct thread* th) {
         maybe_pin_code(os_context_pc(context));
 #endif
 
-#ifdef LISP_FEATURE_LOONGARCH64
+#if defined LISP_FEATURE_LOONGARCH64 || defined LISP_FEATURE_SPARC
         /* It can't call a tagged pointer directly (neither can ARM64,
          * but it has a different call sequence for tail calls) */
         maybe_pin_code((lispobj)*os_context_register_addr(context, reg_LIP));

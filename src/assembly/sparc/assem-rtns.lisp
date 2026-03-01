@@ -154,8 +154,8 @@
 
   DONE
   ;; We are done.  Do the jump.
-  (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
-  (lisp-jump temp))
+  (loadw lip-tn lexenv closure-fun-slot fun-pointer-lowtag)
+  (lisp-jump lip-tn))
 
 
 
@@ -179,6 +179,7 @@
     (inst b :eq error))
 
   (load-symbol-value cur-uwp *current-unwind-protect-block*)
+
   (loadw target-uwp block unwind-block-uwp-slot)
   (inst cmp cur-uwp target-uwp)
   (inst b :ne do-uwp)
@@ -189,10 +190,9 @@
   DO-EXIT
 
   (loadw cfp-tn cur-uwp unwind-block-cfp-slot)
-  (loadw code-tn cur-uwp unwind-block-code-slot)
   (loadw lra cur-uwp unwind-block-entry-pc-slot)
-  (lisp-return lra :frob-code nil)
-
+  (inst j lra)
+  (loadw code-tn cur-uwp unwind-block-code-slot)
   DO-UWP
 
   (loadw next-uwp cur-uwp unwind-block-uwp-slot)

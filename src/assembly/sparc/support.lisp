@@ -33,17 +33,15 @@
                 (cur-nfp (current-nfp-tn ,vop)))
             (when cur-nfp
               (store-stack-tn ,nfp-save cur-nfp))
-            (inst compute-lra-from-code ,lra code-tn lra-label ,temp)
             (note-next-instruction ,vop :call-site)
-            (inst ji ,temp (make-fixup ',name :assembly-routine))
+            (inst jali ,lra ,temp (make-fixup ',name :assembly-routine))
             (inst nop)
-            (emit-return-pc lra-label)
+            (emit-label lra-label)
             (note-this-location ,vop :single-value-return)
             (without-scheduling ()
               (move csp-tn ocfp-tn)
               (inst nop))
-            (inst compute-code-from-lra code-tn code-tn
-                  lra-label ,temp)
+            (inst compute-code-from-lra code-tn ,lra lra-label ,temp)
             (when cur-nfp
               (load-stack-tn cur-nfp ,nfp-save))))
         `((:temporary (:scs (non-descriptor-reg) :from (:eval 0) :to (:eval 1))

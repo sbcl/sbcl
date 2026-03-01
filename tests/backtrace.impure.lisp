@@ -202,6 +202,7 @@
   ;; bug 353: This test fails at least most of the time for x86/linux
   ;; ca. 0.8.20.16. -- WHN
   (with-test (:name (:backtrace :undefined-function :bug-353)
+              :fails-on :sparc
               :skipped-on :interpreter)
     (assert-backtrace
      (lambda () (test #'not-optimized))
@@ -263,7 +264,7 @@
 (defun throw-test ()
   (throw 'no-such-tag t))
 (with-test (:name (:backtrace :throw :no-such-tag)
-                  :fails-on (or :arm :mips :ppc :riscv (and :sparc :linux)))
+                  :fails-on (or :arm :mips :ppc :riscv))
   (assert-backtrace #'throw-test '((throw-test))))
 
 (funcall (checked-compile

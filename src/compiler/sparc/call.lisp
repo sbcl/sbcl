@@ -21,9 +21,8 @@
 ;;; this may be restricted by a desire to use a subroutine call
 ;;; instruction.
 (defun make-return-pc-passing-location (standard)
-  (if standard
-      (make-wired-tn *backend-t-primitive-type* descriptor-reg-sc-number lra-offset)
-      (make-restricted-tn *backend-t-primitive-type* descriptor-reg-sc-number)))
+  (declare (ignore standard))
+  (make-wired-tn *backend-t-primitive-type* descriptor-reg-sc-number lra-offset))
 
 ;;; This is similar to MAKE-RETURN-PC-PASSING-LOCATION, but makes a
 ;;; location to pass OLD-FP in. This is (obviously) wired in the
@@ -47,11 +46,12 @@
                   ocfp-save-offset)))
 
 (defun make-return-pc-save-location (env)
-  (specify-save-tn
-   (environment-debug-live-tn (make-normal-tn *backend-t-primitive-type*) env)
-   (make-wired-tn *backend-t-primitive-type*
-                  control-stack-arg-scn
-                  lra-save-offset)))
+  (let ((ptype *backend-t-primitive-type*))
+    (specify-save-tn
+     (environment-debug-live-tn
+      (make-wired-tn ptype descriptor-reg-sc-number lra-offset)
+      env)
+     (make-wired-tn ptype control-stack-arg-scn lra-save-offset))))
 
 ;;; Make a TN for the standard argument count passing location.  We
 ;;; only need to make the standard location, since a count is never
@@ -121,7 +121,7 @@
     (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
     ;; The start of the actual code.
     ;; Fix CODE, cause the function object was passed in.
-    (inst compute-code-from-fn code-tn code-tn start-lab temp)))
+    (inst compute-code-from-fn code-tn lip-tn start-lab temp)))
 
 (define-vop (xep-setup-sp)
   (:vop-var vop)
@@ -235,7 +235,7 @@ default-value-8
           (note-this-location vop :single-value-return)
           (move csp-tn ocfp-tn)
           (inst nop))
-        (inst compute-code-from-lra code-tn code-tn lra-label temp))
+        (inst compute-code-from-lra code-tn lra-tn lra-label temp))
       (let ((regs-defaulted (gen-label))
             (defaulting-done (gen-label))
             (default-stack-vals (gen-label)))
@@ -246,7 +246,7 @@ default-value-8
           (if (> nvals register-arg-count)
               (inst subcc temp nargs-tn (fixnumize register-arg-count))
               (move csp-tn ocfp-tn)))
-
+        (inst compute-code-from-lra code-tn lra-tn lra-label temp)
         ;; Do the single value calse.
         (do ((i 1 (1+ i))
              (val (tn-ref-across values) (tn-ref-across val)))
@@ -257,6 +257,7 @@ default-value-8
           (move ocfp-tn csp-tn))
 
         (emit-label regs-defaulted)
+        (inst compute-code-from-lra code-tn lra-tn lra-label temp)
         (when (> nvals register-arg-count)
           (collect ((defaults))
             (do ((i register-arg-count (1+ i))
@@ -288,9 +289,7 @@ default-value-8
                       (emit-label (car def))
                       (when (null (cdr remaining))
                         (inst b defaulting-done))
-                      (store-stack-tn (cdr def) null-tn))))))))
-
-        (inst compute-code-from-lra code-tn code-tn lra-label temp)))
+                      (store-stack-tn (cdr def) null-tn))))))))))
   (values))
 
 
@@ -319,7 +318,7 @@ default-value-8
       (inst b variable-values)
       (inst nop))
 
-    (inst compute-code-from-lra code-tn code-tn lra-label temp)
+    (inst compute-code-from-lra code-tn lra-tn lra-label temp)
     (inst add csp-tn 4)
     (storew (first *register-arg-tns*) csp-tn -1)
     (inst sub start csp-tn 4)
@@ -329,7 +328,7 @@ default-value-8
 
     (assemble (:elsewhere)
       (emit-label variable-values)
-      (inst compute-code-from-lra code-tn code-tn lra-label temp)
+      (inst compute-code-from-lra code-tn lra-tn lra-label temp)
       (do ((arg *register-arg-tns* (rest arg))
            (i 0 (1+ i)))
           ((null arg))
@@ -359,9 +358,12 @@ default-value-8
 ;;; points, local-call entry points, and tail-call entry points.  The default
 ;;; does nothing.
 (defun emit-block-header (start-label trampoline-label fall-thru-p alignp)
-  (declare (ignore fall-thru-p alignp))
+  (declare (ignore alignp))
+  (when (and fall-thru-p trampoline-label)
+    (inst b start-label))
   (when trampoline-label
-    (emit-label trampoline-label))
+    (emit-label trampoline-label)
+    (storew lra-tn cfp-tn lra-save-offset))
   (emit-label start-label))
 
 
@@ -407,12 +409,10 @@ default-value-8
         (when callee-nfp
           (maybe-load-stack-tn callee-nfp nfp)))
       (maybe-load-stack-tn cfp-tn fp)
-      (inst compute-lra-from-code
-            (callee-return-pc-tn callee) code-tn label temp)
       (note-this-location vop :call-site)
-      (inst b target)
+      (inst call target)
       (inst nop)
-      (emit-return-pc label)
+      (emit-label label)
       (default-unknown-values vop values nvals move-temp temp label)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
@@ -445,12 +445,10 @@ default-value-8
         (when callee-nfp
           (maybe-load-stack-tn callee-nfp nfp)))
       (maybe-load-stack-tn cfp-tn fp)
-      (inst compute-lra-from-code
-            (callee-return-pc-tn callee) code-tn label temp)
       (note-this-location vop :call-site)
-      (inst b target)
+      (inst call target)
       (inst nop)
-      (emit-return-pc label)
+      (emit-label label)
       (note-this-location vop :unknown-return)
       (receive-unknown-values values-start nvals start count label temp)
       (when cur-nfp
@@ -476,7 +474,6 @@ default-value-8
   (:ignore args res save)
   (:vop-var vop)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
-  (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 5
     (let ((label (gen-label))
           (cur-nfp (current-nfp-tn vop)))
@@ -486,12 +483,10 @@ default-value-8
         (when callee-nfp
           (maybe-load-stack-tn callee-nfp nfp)))
       (maybe-load-stack-tn cfp-tn fp)
-      (inst compute-lra-from-code
-            (callee-return-pc-tn callee) code-tn label temp)
       (note-this-location vop :call-site)
-      (inst b target)
+      (inst call target)
       (inst nop)
-      (emit-return-pc label)
+      (emit-label label)
       (note-this-location vop :known-return)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
@@ -505,24 +500,24 @@ default-value-8
 ;;; MAYBE-LOAD-STACK-TN.
 (define-vop (known-return)
   (:args (old-fp :target old-fp-temp)
-         (return-pc :target return-pc-temp)
+         (return-pc :target lra)
          (vals :more t))
   (:temporary (:sc any-reg :from (:argument 0)) old-fp-temp)
-  (:temporary (:sc descriptor-reg :from (:argument 1)) return-pc-temp)
+  (:temporary (:sc descriptor-reg :offset lra-offset :from (:argument 1)) lra)
   (:move-args :known-return)
   (:info val-locs)
   (:ignore val-locs vals)
   (:vop-var vop)
   (:generator 6
     (maybe-load-stack-tn old-fp-temp old-fp)
-    (maybe-load-stack-tn return-pc-temp return-pc)
+    (maybe-load-stack-tn lra return-pc)
     (move csp-tn cfp-tn)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (inst add nsp-tn cur-nfp
               (- (bytes-needed-for-non-descriptor-stack-frame)
                  number-stack-displacement))))
-    (inst j return-pc-temp (- n-word-bytes other-pointer-lowtag))
+    (inst j lra 8)
     (move cfp-tn old-fp-temp)))
 
 
@@ -670,8 +665,7 @@ default-value-8
                                        :load-return-pc)
                                      (when cur-nfp
                                        :frob-nfp))
-                                   '(:comp-lra
-                                     (when cur-nfp
+                                   '((when cur-nfp
                                        :frob-nfp)
                                      :save-fp
                                      :load-fp))))))
@@ -707,10 +701,7 @@ default-value-8
                                (inst add nsp-tn cur-nfp
                                      (- (bytes-needed-for-non-descriptor-stack-frame)
                                         number-stack-displacement))))
-                            `((:comp-lra
-                               (inst compute-lra-from-code
-                                     return-pc-pass code-tn lra-label temp))
-                              (:frob-nfp
+                            `((:frob-nfp
                                (store-stack-tn nfp-save cur-nfp))
                               (:save-fp
                                (inst move old-fp-pass cfp-tn))
@@ -777,20 +768,21 @@ default-value-8
                  (return)))
 
            (note-this-location vop :call-site)
-           (inst j function
-                 (- (ash simple-fun-insts-offset word-shift)
-                    fun-pointer-lowtag))
-           (inst move code-tn function))
+           ,@(if (eq return :tail)
+                 '((inst j function
+                    (- (ash simple-fun-insts-offset word-shift) fun-pointer-lowtag)))
+                 '((inst jmpl return-pc-pass function (- (ash simple-fun-insts-offset word-shift) fun-pointer-lowtag))))
+           (inst move lip-tn function))
 
          ,@(ecase return
              (:fixed
-              '((emit-return-pc lra-label)
+              '((emit-label lra-label)
                 (default-unknown-values vop values nvals move-temp
                                         temp lra-label)
                 (when cur-nfp
                   (load-stack-tn cur-nfp nfp-save))))
              (:unknown
-              '((emit-return-pc lra-label)
+              '((emit-label lra-label)
                 (note-this-location vop :unknown-return)
                 (receive-unknown-values values-start nvals start count
                                         lra-label temp)
@@ -856,11 +848,13 @@ default-value-8
 ;;; Return a single value using the unknown-values convention.
 (define-vop (return-single)
   (:args (old-fp :scs (any-reg))
-         (return-pc :scs (descriptor-reg))
+         (return-pc :scs (descriptor-reg) :target lra)
          (value))
+  (:temporary (:sc descriptor-reg :offset lra-offset :from (:argument 1)) lra)
   (:ignore value)
   (:vop-var vop)
   (:generator 6
+    (move lra return-pc)
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
@@ -871,7 +865,7 @@ default-value-8
     (move csp-tn cfp-tn)
     (move cfp-tn old-fp)
     ;; Out of here.
-    (lisp-return return-pc :offset 2)))
+    (lisp-return lra :offset 2)))
 
 ;;; Do unknown-values return of a fixed number of values.  The Values are
 ;;; required to be set up in the standard passing locations.  Nvals is the
@@ -888,7 +882,7 @@ default-value-8
 (define-vop (return)
   (:args
    (old-fp :scs (any-reg))
-   (return-pc :scs (descriptor-reg) :to (:eval 1))
+   (return-pc :scs (descriptor-reg) :to (:eval 1) :target lra)
    (values :more t))
   (:ignore values)
   (:info nvals)
@@ -900,8 +894,10 @@ default-value-8
   (:temporary (:sc descriptor-reg :offset a5-offset :from (:eval 0)) a5)
   (:temporary (:sc any-reg :offset nargs-offset) nargs)
   (:temporary (:sc any-reg :offset ocfp-offset) val-ptr)
+  (:temporary (:sc descriptor-reg :offset lra-offset :from (:eval 1)) lra)
   (:vop-var vop)
   (:generator 6
+    (move lra return-pc)
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
@@ -913,7 +909,7 @@ default-value-8
            (move csp-tn cfp-tn)
            (move cfp-tn old-fp)
            ;; Out of here.
-           (lisp-return return-pc :offset 2))
+           (lisp-return lra :offset 2))
           (t
            ;; Establish the values pointer and values count.
            (move val-ptr cfp-tn)
@@ -927,7 +923,7 @@ default-value-8
              (dolist (reg (subseq (list a0 a1 a2 a3 a4 a5) nvals))
                (move reg null-tn)))
            ;; And away we go.
-           (lisp-return return-pc)))))
+           (lisp-return lra)))))
 
 ;;; Do unknown-values return of an arbitrary number of values (passed on the
 ;;; stack.)  We check for the common case of a single return value, and do that
@@ -951,6 +947,7 @@ default-value-8
   (:vop-var vop)
 
   (:generator 13
+    (move lra lra-arg)
     (let ((not-single (gen-label)))
       ;; Clear the number stack.
       (let ((cur-nfp (current-nfp-tn vop)))
@@ -967,12 +964,11 @@ default-value-8
       ;; Return with one value.
       (move csp-tn cfp-tn)
       (move cfp-tn old-fp-arg)
-      (lisp-return lra-arg :offset 2)
+      (lisp-return lra :offset 2)
 
       ;; Nope, not the single case.
       (emit-label not-single)
       (move old-fp old-fp-arg)
-      (move lra lra-arg)
       (move vals vals-arg)
       (move nvals nvals-arg)
       (inst ji temp (make-fixup 'return-multiple :assembly-routine))

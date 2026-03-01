@@ -23,7 +23,6 @@
  andcc temp, temp, reg_ZERO ; \
  tne PSEUDO_ATOMIC_TRAP
 
-/* FIXME */
 #define FRAMESIZE 0x48
 #define ST_FLUSH_WINDOWS 0x03
 	.seg    "text"
@@ -78,18 +77,10 @@ call_into_lisp:
         ld      [reg_CFP+16], reg_A4
         ld      [reg_CFP+20], reg_A5
 
-        /* Calculate LRA */
-        set     lra + OTHER_POINTER_LOWTAG, reg_LRA
-
         /* Indirect closure */
-        ld      [reg_LEXENV+CLOSURE_FUN_OFFSET], reg_CODE
-
-        jmp     reg_CODE+SIMPLE_FUN_INSTS_OFFSET
+        ld      [reg_LEXENV+CLOSURE_FUN_OFFSET], reg_LIP
+        jmpl    reg_LIP + SIMPLE_FUN_INSTS_OFFSET, reg_LRA
         nop
-
-        .align  8
-lra:
-        .word   RETURN_PC_WIDETAG
 
         /* Blow off any extra values. */
         mov     reg_OCFP, reg_CSP
@@ -124,15 +115,11 @@ call_into_c:
         mov     reg_CSP, reg_CFP
         add     reg_CSP, 32, reg_CSP
         st      reg_OCFP, [reg_CFP]
+	st	reg_LIP, [reg_CFP+4]
         st      reg_CODE, [reg_CFP+8]
 
         /* Turn on pseudo-atomic. */
 	BEGIN_PSEUDO_ATOMIC
-
-	/* Convert the return address to an offset and save it on the stack. */
-	sub	reg_LIP, reg_CODE, reg_L0
-	add	reg_L0, OTHER_POINTER_LOWTAG, reg_L0
-	st	reg_L0, [reg_CFP+4]
 
         /* Store LISP state */
         store(reg_BSP,current_binding_stack_pointer)
@@ -174,8 +161,6 @@ call_into_c:
 	/* Get the return address back. */
 	ld	[reg_CFP+4], reg_LIP
 	ld	[reg_CFP+8], reg_CODE
-	add	reg_LIP, reg_CODE, reg_LIP
-	sub	reg_LIP, OTHER_POINTER_LOWTAG, reg_LIP
 
         /* No longer atomic. */
 	END_PSEUDO_ATOMIC(reg_NL2)

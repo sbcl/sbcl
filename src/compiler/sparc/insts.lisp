@@ -208,7 +208,7 @@ Otherwise, use the Sparc register names")
 (define-instruction-format
     (format-1 32 :default-printer '(:name :tab disp))
   (op   :field (byte 2 30) :value 1)
-  (disp :field (byte 30 0)))
+  (disp :field (byte 30 0) :type 'relative-label))
 
 (define-instruction-format
     (format-2-immed 32 :default-printer '(:name :tab immed ", " rd))
@@ -1116,6 +1116,17 @@ Otherwise, use the Sparc register names")
         (declare (type (or label null) target))
         (emit-relative-branch segment 0 #b010 cond-or-target target))))))
 
+(define-instruction call (segment target)
+  (:declare (type label target))
+  (:printer format-1 ((op #b01)))
+  (:attributes branch)
+  (:delay 1)
+  (:emitter
+   (emit-back-patch segment 4
+                    (lambda (segment posn)
+                      (emit-format-1
+                       segment #b01 (ash (- (label-position target) posn) -2))))))
+
 (define-instruction bp (segment cond-or-target &optional target pred cc)
   (:declare (type (or label branch-condition) cond-or-target)
             (type (or label null) target))
@@ -1514,6 +1525,16 @@ Otherwise, use the Sparc register names")
         (inst sethi tmpreg value)
         (inst jal link tmpreg value))))))
 
+(define-instruction jmpl (segment link target offset)
+  (:declare (type tn link target)
+            (type (signed-byte 13) offset))
+   (:attributes branch)
+  (:dependencies (writes link))
+  (:delay 1)
+  (:emitter
+   (emit-format-3-immed segment #b10 (reg-tn-encoding link) #b111000
+                        (reg-tn-encoding target) 1 offset)))
+
 ;;; Jump to a full 32-bit address.  Tmpreg is trashed.
 (define-instruction ji (segment tmpreg value)
   (:declare (type tn tmpreg)
@@ -1674,8 +1695,7 @@ Otherwise, use the Sparc register names")
                              (label-position label posn delta-if-after)
                              (component-header-length))))))
 
-;; code = lra - other-pointer-tag - header - label-offset + other-pointer-tag
-;;      = lra - (header + label-offset)
+;; code = lra - (header + label-offset) + other-pointer-lowtag
 (define-instruction compute-code-from-lra (segment dst src label temp)
   (:declare (type tn dst src temp) (type label label))
   (:attributes variable-length)
@@ -1685,11 +1705,12 @@ Otherwise, use the Sparc register names")
   (:emitter
    (emit-compute-inst segment vop dst src label temp
                       (lambda (label posn delta-if-after)
-                          (- (+ (label-position label posn delta-if-after)
-                                (component-header-length)))))))
+                        (+ (- 8
+                              (+ (label-position label posn delta-if-after)
+                                 (component-header-length)))
+                           other-pointer-lowtag)))))
 
-;; lra = code + other-pointer-tag + header + label-offset - other-pointer-tag
-;;     = code + header + label-offset
+;; lra = code + header + label-offset - other-pointer-lowtag
 (define-instruction compute-lra-from-code (segment dst src label temp)
   (:declare (type tn dst src temp) (type label label))
   (:attributes variable-length)
@@ -1699,8 +1720,9 @@ Otherwise, use the Sparc register names")
   (:emitter
    (emit-compute-inst segment vop dst src label temp
                       (lambda (label posn delta-if-after)
-                          (+ (label-position label posn delta-if-after)
-                             (component-header-length))))))
+                          (- (+ (label-position label posn delta-if-after)
+                                (component-header-length))
+                             other-pointer-lowtag)))))
 
 ;;; Sparc V9 additions
 
