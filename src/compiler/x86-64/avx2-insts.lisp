@@ -1271,3 +1271,21 @@
   . #.(avx2-inst-printer-list 'vex-gpr #xF2 #xF6
                               :nds t
                               :opcode-prefix #x0f38))
+
+(define-instruction adcx (segment &prefix prefix dst src)
+  (:printer ext-2byte-prefix-reg-reg/mem
+            ((prefix #x66) (op1 #x38) (op2 #xf6)))
+  (:emitter
+   (let ((size (pick-operand-size prefix dst src)))
+     (aver (memq size '(:dword :qword)))
+     (emit-sse-inst-2byte segment dst src #x66 #x38 #xf6
+                          :operand-size size))))
+
+(define-instruction adox (segment &prefix prefix dst src)
+  (:printer ext-2byte-prefix-reg-reg/mem
+            ((prefix #xf3) (op1 #x38) (op2 #xf6)))
+  (:emitter
+   (let ((size (pick-operand-size prefix dst src)))
+     (aver (memq size '(:dword :qword)))
+     (emit-sse-inst-2byte segment dst src #xf3 #x38 #xf6
+                          :operand-size size))))
