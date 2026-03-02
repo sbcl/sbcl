@@ -713,24 +713,24 @@ static lispobj *find_object(uword_t address, uword_t start) {
       sword_t first_word_index = first_bit_index / N_WORD_BITS;
       sword_t last_word_index = mark_bitmap_word_index((void*)start);
       for (sword_t i = first_word_index; i >= last_word_index; i--) {
-	uword_t word = allocation_bitmap[i];
-	/* Find the last object which is not after this pointer. */
-	while (word) {
-	  int last_bit_set = N_WORD_BITS - 1 - __builtin_clzl(word);
-	  lispobj *location = index_to_object(N_WORD_BITS * i + last_bit_set);
-	  if (location <= np) {
-	    /* Found a candidate - now check that the pointer is inside
-	     * this object, and make sure not to produce an embedded
-	     * object. */
-	    if (embedded_obj_p(widetag_of(location)))
-	      location = (lispobj*)fun_code_header((struct simple_fun*)location);
-	    if (np >= location + object_size(location))
-	      return 0;
-	    return location;
-	  }
-	  /* Remove the bit, try again */
-	  word &= ~((uword_t)(1) << last_bit_set);
-	}
+        uword_t word = allocation_bitmap[i];
+        /* Find the last object which is not after this pointer. */
+        while (word) {
+          int last_bit_set = N_WORD_BITS - 1 - __builtin_clzl(word);
+          lispobj *location = index_to_object(N_WORD_BITS * i + last_bit_set);
+          if (location <= np) {
+            /* Found a candidate - now check that the pointer is inside
+             * this object, and make sure not to produce an embedded
+             * object. */
+            if (embedded_obj_p(widetag_of(location)))
+              location = (lispobj*)fun_code_header((struct simple_fun*)location);
+            if (np >= location + object_size(location))
+              return 0;
+            return location;
+          }
+          /* Remove the bit, try again */
+          word &= ~((uword_t)(1) << last_bit_set);
+        }
       }
     } else {
       /* Just use ordinary search when the GC is not active */
@@ -740,10 +740,10 @@ static lispobj *find_object(uword_t address, uword_t start) {
 
       lispobj *where = (lispobj*)line_address(start), *limit = (lispobj*)line_address(end);
       while (where < limit) {
-	lispobj *next = where + object_size(where);
-	if (np < next)
-	  return where;
-	where = next;
+        lispobj *next = where + object_size(where);
+        if (np < next)
+          return where;
+        where = next;
       }
     }
   return 0;
