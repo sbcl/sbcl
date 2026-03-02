@@ -287,11 +287,14 @@ lispobj alloc_code_object(unsigned total_words, unsigned boxed)
     gc_assert(result);
     struct code *code =
         (void*)lisp_alloc(nbytes >= LARGE_OBJECT_SIZE, code_region, nbytes, PAGE_TYPE_CODE, th);
+    THREAD_JIT_WP(0);
+    /* Write the header before releasing the lock, so that linear
+    search for a code object allocated after this one skips the
+    correct amount */
+    code->header = ((uword_t)total_words << CODE_HEADER_SIZE_SHIFT) | CODE_HEADER_WIDETAG;
     result = mutex_release(&code_allocator_lock);
     gc_assert(result);
-    THREAD_JIT_WP(0);
 
-    code->header = ((uword_t)total_words << CODE_HEADER_SIZE_SHIFT) | CODE_HEADER_WIDETAG;
     // GC mustn't see uninitialized data. And one word past the boxed words (which holds the
     // count of following words containing absolute jump addresses) must also be pre-zeroed.
     memset((lispobj*)code + 2, 0, (1 + boxed - 2) * N_WORD_BYTES);
