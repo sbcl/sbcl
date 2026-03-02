@@ -161,7 +161,7 @@
                      (:results (result :scs (,sc)))
                      (:result-types ,type)
                      ,@(when use-lip
-                             '((:temporary (:sc interior-reg) lip)))
+                             '((:temporary (:sc non-descriptor-reg) lip)))
                      (:generator 5
                       ,@(when use-lip
                           '((inst add lip sap offset)))
@@ -199,7 +199,7 @@
                             (offset :scs (signed-reg)))
                      (:arg-types ,type system-area-pointer signed-num)
                      ,@(when use-lip
-                             '((:temporary (:sc interior-reg) lip)))
+                             '((:temporary (:sc non-descriptor-reg) lip)))
                      (:generator 5
                       ,@(when use-lip
                           '((inst add lip sap offset)))

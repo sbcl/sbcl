@@ -73,7 +73,7 @@
 ;;; return instructions.
 
 (defmacro lisp-jump (fun)
-  "Jump to the lisp function FUNCTION.  LIP is an interior-reg temporary."
+  "Jump to the lisp function FUNCTION.  LIP is lip-tn"
   `(progn
      (inst j ,fun
            (- (ash simple-fun-insts-offset word-shift) fun-pointer-lowtag))

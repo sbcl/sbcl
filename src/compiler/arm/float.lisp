@@ -55,7 +55,7 @@
   (:results (y))
   (:note "float to pointer coercion")
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc non-descriptor-reg) lip)
   (:variant-vars double-p size type data)
   (:generator 13
     (with-fixed-allocation (y pa-flag type size)
@@ -81,7 +81,7 @@
                 (define-vop (,name)
                   (:args (x :scs (descriptor-reg)))
                   (:results (y :scs (,sc)))
-                  (:temporary (:sc interior-reg) lip)
+                  (:temporary (:sc non-descriptor-reg) lip)
                   (:note "pointer to float coercion")
                   (:generator 2
                      (inst sub lip x other-pointer-lowtag)
@@ -218,7 +218,7 @@
 (define-vop (move-to-complex-single)
   (:args (x :scs (descriptor-reg)))
   (:results (y :scs (complex-single-reg)))
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc non-descriptor-reg) lip)
   (:note "pointer to complex float coercion")
   (:generator 2
     (inst sub lip x (- other-pointer-lowtag
@@ -231,7 +231,7 @@
 (define-vop (move-to-complex-double)
   (:args (x :scs (descriptor-reg)))
   (:results (y :scs (complex-double-reg)))
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc non-descriptor-reg) lip)
   (:note "pointer to complex float coercion")
   (:generator 2
     (inst add lip x (- (* complex-double-float-real-slot
@@ -249,7 +249,7 @@
   (:args (x :scs (complex-single-reg) :target y)
          (nfp :scs (any-reg) :load-if (not (sc-is y complex-single-reg))))
   (:results (y))
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc non-descriptor-reg) lip)
   (:note "complex single-float arg move")
   (:generator 1
     (sc-case y
@@ -266,7 +266,7 @@
   (:args (x :scs (complex-double-reg) :target y)
          (nfp :scs (any-reg) :load-if (not (sc-is y complex-double-reg))))
   (:results (y))
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc non-descriptor-reg) lip)
   (:note "complex double-float arg move")
   (:generator 2
     (sc-case y

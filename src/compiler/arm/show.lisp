@@ -22,7 +22,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc non-descriptor-reg :offset nargs-offset) nargs)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc any-reg :offset lr-offset) lip)
   (:vop-var vop)
   (:generator 100
     (let ((call-into-c-fixup (gen-label))

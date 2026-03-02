@@ -194,11 +194,6 @@
   (non-descriptor-reg registers
    :locations #.non-descriptor-regs)
 
-  ;; Pointers to the interior of objects.  Used only as an temporary.
-  (interior-reg registers
-   :locations (#.lip-offset))
-
-
   ;; **** Things that can go in the floating point registers.
 
   ;; Non-Descriptor single-floats.

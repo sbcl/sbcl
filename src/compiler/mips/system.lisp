@@ -184,7 +184,7 @@
   (:arg-types * fixnum)
   (:results (res :scs (unsigned-reg) :from (:argument 0)))
   (:result-types unsigned-num)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 10
     (loadw res code 0 other-pointer-lowtag)
     (inst sll res res 2) ; shift out the GC bits

@@ -79,7 +79,7 @@
   (:info entry-label)
   (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 22
     (add-imm block cfp-tn (tn-byte-offset tn) 'make-unwind-block temp)
     (load-current-unwind-protect-block temp)
@@ -98,7 +98,7 @@
   (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (descriptor-reg) :target block :to (:result 0)) result)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 44
     ;; ADD-IMM needs 3 instructions usually, but this way almost always needs
     ;; at most 2 instructions in all likelihood.

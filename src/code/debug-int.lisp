@@ -2454,9 +2454,6 @@
       ((#.unsigned-reg-sc-number #-c-stack-is-control-stack #.non-descriptor-reg-sc-number)
        (with-escaped-value (val)
          val))
-      #-(or x86 x86-64 arm64)
-      (#.interior-reg-sc-number
-       (error "Local interior register access?"))
       #+sb-simd-pack
       ((#.sb-vm::sse-reg-sc-number #.sb-vm::int-sse-reg-sc-number)
        (escaped-float-value simd-pack-int))
@@ -2687,9 +2684,6 @@
       #-c-stack-is-control-stack
       (#.non-descriptor-reg-sc-number
        (error "Local non-descriptor register access?"))
-      #-(or x86 x86-64 arm64)
-      (#.interior-reg-sc-number
-       (error "Local interior register access?"))
       #+sb-simd-pack
       ((#.sb-vm::sse-reg-sc-number #.sb-vm::int-sse-reg-sc-number)
        (set-escaped-float-value simd-pack-int value))

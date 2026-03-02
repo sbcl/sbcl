@@ -134,7 +134,7 @@ obj/xbuild/{cfg}.core: obj/xbuild/{cfg}/xc.core
                  "-k"
                  "-fcrossbuild-runner/Makefile"
                  ,@(corefiles))
-               :output t :error t
+               :input t :output t :error t
                :search t))
 (when (= (process-exit-code *process*) 0)
   (load "src/cold/shared" :verbose t)

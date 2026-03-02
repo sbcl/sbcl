@@ -497,7 +497,7 @@ default-value-8
          (vals :more t))
   (:temporary (:sc any-reg :from (:argument 0)) old-fp-temp)
   (:temporary (:sc descriptor-reg :offset lra-offset :from (:argument 1)) lra)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc any-reg :offset lip-offset) lip)
   (:move-args :known-return)
   (:info val-locs)
   (:ignore val-locs vals)
@@ -642,7 +642,7 @@ default-value-8
          '((:temporary (:scs (non-descriptor-reg)) temp)
            (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)))
 
-     (:temporary (:sc interior-reg :offset lip-offset) entry-point)
+     (:temporary (:sc any-reg :offset lip-offset) entry-point)
 
      (:generator ,(+ (if named 5 0)
                      (if variable 19 1)
@@ -864,7 +864,7 @@ default-value-8
          (value))
   (:ignore value)
   (:temporary (:sc descriptor-reg :offset lra-offset :from (:argument 1)) lra)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc any-reg :offset lip-offset) lip)
   (:vop-var vop)
   (:generator 6
     (move lra return-pc)
@@ -906,7 +906,7 @@ default-value-8
   (:temporary (:sc descriptor-reg :offset lra-offset :from (:eval 1)) lra)
   (:temporary (:sc any-reg :offset nargs-offset) nargs)
   (:temporary (:sc any-reg :offset ocfp-offset) val-ptr)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc any-reg :offset lip-offset) lip)
   (:vop-var vop)
   (:generator 6
     (move lra return-pc)
@@ -953,7 +953,7 @@ default-value-8
   (:temporary (:sc any-reg :offset nl0-offset :from (:argument 2)) vals)
   (:temporary (:sc any-reg :offset nargs-offset :from (:argument 3)) nvals)
   (:temporary (:sc descriptor-reg :offset a0-offset) a0)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc any-reg :offset lip-offset) lip)
   (:temporary (:sc any-reg) temp)
   (:vop-var vop)
   (:generator 13

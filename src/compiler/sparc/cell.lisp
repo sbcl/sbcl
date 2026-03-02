@@ -126,8 +126,7 @@
   (:policy :fast-safe)
   (:args (function :scs (descriptor-reg))
          (fdefn :scs (descriptor-reg)))
-  (:temporary (:scs (interior-reg)) lip)
-  (:temporary (:scs (non-descriptor-reg)) type)
+  (:temporary (:scs (non-descriptor-reg)) lip type)
   (:generator 38
     (load-type type function (- fun-pointer-lowtag))
     (inst cmp type simple-fun-widetag)

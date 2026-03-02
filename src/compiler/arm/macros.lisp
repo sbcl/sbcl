@@ -334,7 +334,7 @@
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg)))
      (:arg-types ,type tagged-num)
-     (:temporary (:scs (interior-reg)) lip)
+     (:temporary (:scs (non-descriptor-reg)) lip)
      (:results (value :scs ,scs))
      (:result-types ,el-type)
      (:generator 5
@@ -351,7 +351,7 @@
             (index :scs (any-reg))
             (value :scs ,scs))
      (:arg-types ,type tagged-num ,el-type)
-     (:temporary (:scs (interior-reg)) lip)
+     (:temporary (:scs (non-descriptor-reg)) lip)
      (:generator 2
        (inst add lip object index)
        (storew value lip ,offset ,lowtag))))
@@ -367,7 +367,7 @@
      (:arg-types ,type positive-fixnum)
      (:results (value :scs ,scs))
      (:result-types ,el-type)
-     (:temporary (:scs (interior-reg)) lip)
+     (:temporary (:scs (non-descriptor-reg)) lip)
      (:generator 5
        ,(if (eq size :byte)
             '(inst add lip object index)
@@ -387,7 +387,7 @@
             (index :scs (unsigned-reg))
             (value :scs ,scs))
      (:arg-types ,type positive-fixnum ,el-type)
-     (:temporary (:scs (interior-reg)) lip)
+     (:temporary (:scs (non-descriptor-reg)) lip)
      (:generator 5
        ,(if (eq size :byte)
             '(inst add lip object index)

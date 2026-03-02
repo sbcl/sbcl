@@ -78,7 +78,7 @@ byte-ordering issues."
 ;;; return instructions.
 
 (defmacro lisp-jump (function lip)
-  "Jump to the lisp function FUNCTION.  LIP is an interior-reg temporary."
+  "Jump to the lisp function FUNCTION.  LIP is lip-tn"
   `(progn
      (inst addu ,lip ,function (- (ash simple-fun-insts-offset word-shift)
                                    fun-pointer-lowtag))
@@ -251,7 +251,7 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg)))
        (:arg-types ,type tagged-num)
-       (:temporary (:scs (interior-reg)) lip)
+       (:temporary (:scs (non-descriptor-reg)) lip)
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:generator 5
@@ -325,7 +325,7 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
          (:arg-types ,type positive-fixnum)
          (:results (value :scs ,scs))
          (:result-types ,el-type)
-         (:temporary (:scs (interior-reg)) lip)
+         (:temporary (:scs (non-descriptor-reg)) lip)
          (:generator 5
            (inst addu lip object index)
            ,@(when (eq size :short)
@@ -367,7 +367,7 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
                 (index :scs (unsigned-reg))
                 (value :scs ,scs))
          (:arg-types ,type positive-fixnum ,el-type)
-         (:temporary (:scs (interior-reg)) lip)
+         (:temporary (:scs (non-descriptor-reg)) lip)
          (:generator 5
            (inst addu lip object index)
            ,@(when (eq size :short)

@@ -208,7 +208,7 @@
                           (:arg start (any-reg descriptor-reg) r8-offset)
                           (:arg count (any-reg descriptor-reg) nargs-offset)
                           (:temp ocfp non-descriptor-reg ocfp-offset)
-                          (:temp lra interior-reg lr-offset)
+                          (:temp lra any-reg lr-offset)
                           (:temp cur-uwp any-reg nl2-offset))
   (declare (ignore start count))
 

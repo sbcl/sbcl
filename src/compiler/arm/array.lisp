@@ -157,14 +157,13 @@
          (:arg-types ,type positive-fixnum)
          (:results (value :scs (any-reg)))
          (:result-types positive-fixnum)
-         (:temporary (:scs (interior-reg)) lip)
          (:temporary (:scs (non-descriptor-reg) :to (:result 0)) temp result)
          (:generator 20
            ;; Compute the offset for the word we're interested in.
            (inst mov temp (lsr index ,bit-shift))
            ;; Load the word in question.
-           (inst add lip object (lsl temp word-shift))
-           (inst ldr result (@ lip
+           (inst add temp object (lsl temp word-shift))
+           (inst ldr result (@ temp
                                (- (* vector-data-offset n-word-bytes)
                                   other-pointer-lowtag)))
            ;; Compute the position of the bitfield we need.
@@ -187,7 +186,7 @@
                 (index :scs (unsigned-reg) :target shift)
                 (value :scs (unsigned-reg immediate)))
          (:arg-types ,type positive-fixnum positive-fixnum)
-         (:temporary (:scs (interior-reg)) lip)
+         (:temporary (:scs (descriptor-reg)) lip)
          (:temporary (:scs (non-descriptor-reg)) temp old)
          (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) shift)
          (:generator 25
@@ -234,7 +233,7 @@
          (index :scs (any-reg)))
   (:arg-types simple-array-single-float positive-fixnum)
   (:results (value :scs (single-reg)))
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:result-types single-float)
   (:generator 5
     (inst add lip object (- (* vector-data-offset n-word-bytes)
@@ -251,7 +250,7 @@
          (index :scs (any-reg))
          (value :scs (single-reg)))
   (:arg-types simple-array-single-float positive-fixnum single-float)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 5
     (inst add lip object (- (* vector-data-offset n-word-bytes)
                             other-pointer-lowtag))
@@ -267,7 +266,7 @@
   (:arg-types simple-array-double-float positive-fixnum)
   (:results (value :scs (double-reg)))
   (:result-types double-float)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 7
     (inst add lip object (- (* vector-data-offset n-word-bytes)
                             other-pointer-lowtag))
@@ -282,7 +281,7 @@
          (index :scs (any-reg))
          (value :scs (double-reg)))
   (:arg-types simple-array-double-float positive-fixnum double-float)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 20
     (inst add lip object (- (* vector-data-offset n-word-bytes)
                                other-pointer-lowtag))
@@ -299,7 +298,7 @@
          (index :scs (any-reg)))
   (:arg-types simple-array-complex-single-float positive-fixnum)
   (:results (value :scs (complex-single-reg)))
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:result-types complex-single-float)
   (:generator 5
     (let ((real-tn (complex-single-reg-real-tn value)))
@@ -319,7 +318,7 @@
          (value :scs (complex-single-reg)))
   (:arg-types simple-array-complex-single-float positive-fixnum
               complex-single-float)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 5
     (inst add lip object (- (* vector-data-offset n-word-bytes)
                             other-pointer-lowtag))
@@ -336,7 +335,7 @@
   (:arg-types simple-array-complex-double-float positive-fixnum)
   (:results (value :scs (complex-double-reg)))
   (:result-types complex-double-float)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 7
     (let ((real-tn (complex-double-reg-real-tn value)))
       (inst add lip object (- (* vector-data-offset n-word-bytes)
@@ -355,7 +354,7 @@
          (value :scs (complex-double-reg)))
   (:arg-types simple-array-complex-double-float positive-fixnum
               complex-double-float)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 20
     (inst add lip object (- (* vector-data-offset n-word-bytes)
                             other-pointer-lowtag))

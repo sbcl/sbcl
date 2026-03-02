@@ -68,6 +68,6 @@
     #+(or)
     (:full-call
      `((lisp-return (make-random-tn (sc-or-lose 'descriptor-reg) lra-offset)
-                    (make-random-tn (sc-or-lose 'interior-reg) lip-offset)
+                    (make-random-tn (sc-or-lose 'any-reg) lip-offset)
                     :offset 2)))
     (:none)))

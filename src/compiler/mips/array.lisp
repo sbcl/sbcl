@@ -188,7 +188,7 @@
          (:arg-types ,type positive-fixnum)
          (:results (value :scs (any-reg)))
          (:result-types positive-fixnum)
-         (:temporary (:scs (interior-reg)) lip)
+         (:temporary (:scs (non-descriptor-reg)) lip)
          (:temporary (:scs (non-descriptor-reg) :to (:result 0)) temp result)
          (:generator 20
            (inst srl temp index ,bit-shift)
@@ -238,8 +238,7 @@
                 (index :scs (unsigned-reg) :target shift)
                 (value :scs (unsigned-reg zero immediate)))
          (:arg-types ,type positive-fixnum positive-fixnum)
-         (:temporary (:scs (interior-reg)) lip)
-         (:temporary (:scs (non-descriptor-reg)) temp old)
+         (:temporary (:scs (non-descriptor-reg)) lip temp old)
          (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) shift)
          (:generator 25
            (inst srl temp index ,bit-shift)
@@ -332,7 +331,7 @@
   (:arg-types simple-array-single-float positive-fixnum)
   (:results (value :scs (single-reg)))
   (:result-types single-float)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 20
     (inst addu lip object index)
     (inst lwc1 value lip
@@ -348,7 +347,7 @@
          (index :scs (any-reg))
          (value :scs (single-reg)))
   (:arg-types simple-array-single-float positive-fixnum single-float)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 20
     (inst addu lip object index)
     (inst swc1 value lip
@@ -364,7 +363,7 @@
   (:arg-types simple-array-double-float positive-fixnum)
   (:results (value :scs (double-reg)))
   (:result-types double-float)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 20
     (inst addu lip object index)
     (inst addu lip index)
@@ -395,7 +394,7 @@
          (index :scs (any-reg))
          (value :scs (double-reg)))
   (:arg-types simple-array-double-float positive-fixnum double-float)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 20
     (inst addu lip object index)
     (inst addu lip index)
@@ -426,7 +425,7 @@
          (index :scs (any-reg)))
   (:arg-types simple-array-complex-single-float positive-fixnum)
   (:results (value :scs (complex-single-reg)))
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:result-types complex-single-float)
   (:generator 5
     (inst addu lip object index)
@@ -448,7 +447,7 @@
          (value :scs (complex-single-reg)))
   (:arg-types simple-array-complex-single-float positive-fixnum
               complex-single-float)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 5
     (inst addu lip object index)
     (inst addu lip index)
@@ -468,7 +467,7 @@
   (:arg-types simple-array-complex-double-float positive-fixnum)
   (:results (value :scs (complex-double-reg)))
   (:result-types complex-double-float)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:temporary (:scs (any-reg) :from (:argument 1)) shift)
   (:generator 6
     (inst sll shift index n-fixnum-tag-bits)
@@ -490,7 +489,7 @@
          (value :scs (complex-double-reg)))
   (:arg-types simple-array-complex-double-float positive-fixnum
               complex-double-float)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:temporary (:scs (any-reg) :from (:argument 1)) shift)
   (:generator 6
     (inst sll shift index n-fixnum-tag-bits)

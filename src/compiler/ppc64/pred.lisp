@@ -32,7 +32,7 @@
                 :target offset))
   (:info targets otherwise min max)
   (:temporary (:sc any-reg :from (:argument 0)) offset)
-  (:temporary (:sc interior-reg :offset lip-offset) lip)
+  (:temporary (:sc any-reg :offset lip-offset) lip)
   (:generator 0
     (let ((fixnump (sc-is index any-reg)))
       (flet ((fix (x)

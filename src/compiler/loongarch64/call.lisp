@@ -106,7 +106,7 @@
 
 (define-vop (xep-allocate-frame)
   (:info start-lab)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:temporary (:scs (descriptor-reg) :offset l0-offset) fn)
   (:generator 1
     ;; Make sure the function is aligned, and drop a label pointing to this
@@ -363,7 +363,7 @@
   (:temporary (:scs (descriptor-reg) :from (:eval 0)) move-temp)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:temporary (:sc any-reg :offset ocfp-offset :from (:eval 0)) ocfp)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc any-reg :offset lip-offset) lip)
   (:ignore arg-locs args ocfp)
   (:info arg-locs callee target nvals)
   (:generator 5
@@ -400,7 +400,7 @@
   (:ignore args save)
   (:vop-var vop)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc any-reg :offset lip-offset) lip)
   (:generator 20
     (let ((label (gen-label))
           (cur-nfp (current-nfp-tn vop)))
@@ -550,7 +550,7 @@
            '((:temporary (:scs (descriptor-reg) :from :eval) move-temp)))
 
        (:temporary (:scs (descriptor-reg) :to :eval) stepping)
-       (:temporary (:scs (interior-reg)) lip)
+       (:temporary (:sc any-reg :offset lip-offset) lip)
        ,@(unless (eq return :tail)
            '((:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)))
 

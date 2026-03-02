@@ -195,7 +195,7 @@
               (:arg-types ,type positive-fixnum)
               (:results (value :scs (any-reg)))
               (:result-types positive-fixnum)
-              (:temporary (:scs (interior-reg)) lip)
+              (:temporary (:scs (non-descriptor-reg)) lip)
               (:temporary (:scs (non-descriptor-reg) :to (:result 0)) temp result)
               (:generator 20
                 ;; Compute the offset for the word we're interested in.
@@ -244,8 +244,7 @@
                      (index :scs (unsigned-reg) :target shift)
                      (value :scs (unsigned-reg zero immediate)))
               (:arg-types ,type positive-fixnum positive-fixnum)
-              (:temporary (:scs (interior-reg)) lip)
-              (:temporary (:scs (non-descriptor-reg)) temp old)
+              (:temporary (:scs (non-descriptor-reg)) lip temp old)
               (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) shift)
               (:generator 25
                 ;; Compute the offset for the word we're interested in.

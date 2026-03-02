@@ -180,11 +180,6 @@
   (non-descriptor-reg registers
    :locations #.non-descriptor-regs)
 
-  ;; Pointers to the interior of objects.  Used only as a temporary.
-  (interior-reg registers
-   :locations (#.lip-offset))
-
-
   ;; **** Things that can go in the floating point registers.
 
   ;; Non-Descriptor single-floats.
@@ -231,7 +226,7 @@
                  `(defparameter ,tn-sym
                    (make-random-tn (sc-or-lose ',sc) ,offset-sym)))))
 
-  (defregtn lip interior-reg)
+  (defregtn lip any-reg)
   (defregtn null descriptor-reg)
   (defregtn code descriptor-reg)
   (defregtn lra descriptor-reg)

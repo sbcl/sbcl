@@ -80,7 +80,7 @@
   (:info entry-label)
   (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 22
     (composite-immediate-instruction add block cfp-tn
                                      (tn-byte-offset tn))
@@ -100,7 +100,7 @@
   (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (descriptor-reg) :target block :to (:result 0)) result)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 44
     (composite-immediate-instruction
      add result cfp-tn (tn-byte-offset tn))
@@ -258,7 +258,7 @@
   (:temporary (:sc descriptor-reg :offset r8-offset) saved-function)
   (:temporary (:sc unsigned-reg :offset r0-offset) block)
   (:temporary (:sc descriptor-reg :offset lexenv-offset) lexenv)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:temporary (:sc descriptor-reg :offset nargs-offset) nargs)
   (:vop-var vop)
   (:generator 22

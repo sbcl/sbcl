@@ -96,7 +96,7 @@
      (:temp dst any-reg nl2-offset)
      (:temp count any-reg nl3-offset)
      (:temp temp descriptor-reg l0-offset)
-     (:temp lip interior-reg lip-offset)
+     (:temp lip any-reg lip-offset)
 
      ;; These are needed so we can get at the register args.
      (:temp a0 descriptor-reg a0-offset)

@@ -122,8 +122,7 @@
   (:policy :fast-safe)
   (:args (function :scs (descriptor-reg))
          (fdefn :scs (descriptor-reg)))
-  (:temporary (:scs (interior-reg)) lip)
-  (:temporary (:scs (non-descriptor-reg)) type)
+  (:temporary (:scs (non-descriptor-reg)) lip type)
   (:generator 38
     (let ((closure-tramp-fixup (gen-label)))
       (assemble (:elsewhere)
@@ -140,8 +139,7 @@
   (:policy :fast-safe)
   (:translate fdefn-makunbound)
   (:args (fdefn :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip temp)
   (:generator 38
     (let ((undefined-tramp-fixup (gen-label)))
       (assemble (:elsewhere)
@@ -285,7 +283,7 @@
          (value :scs (any-reg descriptor-reg)))
   (:arg-types * tagged-num *)
   (:temporary (:scs (non-descriptor-reg)) temp #+gencgc card)
-  #+gencgc (:temporary (:scs (interior-reg)) lip)
+  #+gencgc (:temporary (:scs (non-descriptor-reg)) lip)
   #+gencgc (:temporary (:sc non-descriptor-reg) pa-flag)
   (:generator 10
     #+cheneygc
@@ -346,7 +344,7 @@
                 (:results (value :scs (,value-sc)))
                 (:result-types ,value-primtype)
                 (:temporary (:scs (non-descriptor-reg)) offset)
-                ,@(when use-lip '((:temporary (:scs (interior-reg)) lip)))
+                ,@(when use-lip '((:temporary (:scs (non-descriptor-reg)) lip)))
                 (:generator 5 ,@(emit-generator ref-inst nil)))
               (define-vop ()
                 (:translate ,(symbolicate "%RAW-INSTANCE-SET/" name))
@@ -356,7 +354,7 @@
                        (value :scs (,value-sc)))
                 (:arg-types * positive-fixnum ,value-primtype)
                 (:temporary (:scs (non-descriptor-reg)) offset)
-                ,@(when use-lip '((:temporary (:scs (interior-reg)) lip)))
+                ,@(when use-lip '((:temporary (:scs (non-descriptor-reg)) lip)))
                 (:generator 5 ,@(emit-generator set-inst nil)))))))
   (define-raw-slot-vops word ldr str unsigned-num unsigned-reg)
   (define-raw-slot-vops signed-word ldr str signed-num signed-reg)

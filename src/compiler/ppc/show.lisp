@@ -9,7 +9,7 @@
   (:save-p t)
   (:temporary (:sc any-reg :offset nl0-offset :from (:argument 0)) nl0)
   (:temporary (:sc any-reg :offset cfunc-offset) cfunc)
-  (:temporary (:sc interior-reg :offset lip-offset) lip)
+  (:temporary (:sc any-reg :offset lip-offset) lip)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:vop-var vop)

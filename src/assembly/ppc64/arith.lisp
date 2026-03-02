@@ -42,7 +42,7 @@
    (:temp flag non-descriptor-reg nl3-offset)
    (:temp lra descriptor-reg lra-offset)
    (:temp nargs any-reg nargs-offset)
-   (:temp lip interior-reg lip-offset)
+   (:temp lip any-reg lip-offset)
    (:temp ocfp any-reg ocfp-offset))
 
   (maybe-call-static-fun)
@@ -78,7 +78,7 @@
    (:temp temp non-descriptor-reg nl0-offset)
    (:temp temp2 non-descriptor-reg nl1-offset)
    (:temp flag non-descriptor-reg nl3-offset)
-   (:temp lip interior-reg lip-offset)
+   (:temp lip any-reg lip-offset)
    (:temp lra descriptor-reg lra-offset)
    (:temp nargs any-reg nargs-offset)
    (:temp ocfp any-reg ocfp-offset))
@@ -121,7 +121,7 @@
    (:temp lo non-descriptor-reg nl1-offset)
    (:temp hi non-descriptor-reg nl2-offset)
    (:temp pa-flag non-descriptor-reg nl3-offset)
-   (:temp lip interior-reg lip-offset)
+   (:temp lip any-reg lip-offset)
    (:temp lra descriptor-reg lra-offset)
    (:temp nargs any-reg nargs-offset)
    (:temp ocfp any-reg ocfp-offset))
@@ -193,7 +193,7 @@
 
            (:res res descriptor-reg a0-offset)
 
-           (:temp lip interior-reg lip-offset)
+           (:temp lip any-reg lip-offset)
            (:temp nargs any-reg nargs-offset)
            (:temp ocfp any-reg ocfp-offset))
 
@@ -227,7 +227,7 @@
 
                           (:res res descriptor-reg a0-offset)
 
-                          (:temp lip interior-reg lip-offset)
+                          (:temp lip any-reg lip-offset)
                           (:temp nargs any-reg nargs-offset)
                           (:temp ocfp any-reg ocfp-offset))
   (inst and nargs x y) ; (x&y) tag is 0 if at least one is fixnum

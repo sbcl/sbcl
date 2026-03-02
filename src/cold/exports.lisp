@@ -3013,7 +3013,7 @@ structure representations")
            "INSTANCE-DATA-START"
            "INSTANCE-WIDETAG" "INSTANCE-POINTER-LOWTAG"
            "INSTANCE-SLOTS-OFFSET" "INSTANCE-USAGE"
-           "INTERIOR-REG-SC-NUMBER" "INTERNAL-ERROR-ARGS"
+           "INTERNAL-ERROR-ARGS"
            "IS-LISP-POINTER"
            "LARGE-OBJECT-SIZE"
            "LDB-MONITOR"

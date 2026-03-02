@@ -15,7 +15,7 @@
      (:temp lra descriptor-reg lra-offset)
 
      ;; These are just needed to facilitate the transfer
-     (:temp lip interior-reg lip-offset)
+     (:temp lip any-reg lip-offset)
      (:temp count any-reg nl2-offset)
      (:temp dst any-reg nl3-offset)
      (:temp temp descriptor-reg l0-offset)
@@ -106,7 +106,7 @@
      (:temp temp descriptor-reg l0-offset)
 
      ;; Needed for the jump
-     (:temp lip interior-reg lip-offset)
+     (:temp lip any-reg lip-offset)
 
      ;; These are needed so we can get at the register args.
      (:temp a0 descriptor-reg a0-offset)
@@ -160,7 +160,7 @@
     ((:arg block (any-reg descriptor-reg) a0-offset)
      (:arg start (any-reg descriptor-reg) ocfp-offset)
      (:arg count (any-reg descriptor-reg) nargs-offset)
-     (:temp lip interior-reg lip-offset)
+     (:temp lip any-reg lip-offset)
      (:temp lra descriptor-reg lra-offset)
      (:temp cur-uwp any-reg nl0-offset)
      (:temp next-uwp any-reg nl1-offset)

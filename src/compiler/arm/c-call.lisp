@@ -181,7 +181,7 @@
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc non-descriptor-reg) lip)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
@@ -197,7 +197,7 @@
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc non-descriptor-reg) lip)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
@@ -218,7 +218,7 @@
                    :from (:argument 0) :to (:result 0)) cfunc)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:temporary (:sc any-reg) temp)
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc any-reg :offset lr-offset) lip)
   (:vop-var vop)
   (:generator 0
     (let ((call-into-c-fixup (gen-label))

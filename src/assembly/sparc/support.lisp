@@ -22,7 +22,7 @@
           (inst nop))
         `((:temporary (:scs (non-descriptor-reg) :from (:eval 0) :to (:eval 1))
                       ,temp)
-          (:temporary (:scs (interior-reg) :from (:eval 0) :to (:eval 1))
+          (:temporary (:scs (any-reg) :offset lip-offset :from (:eval 0) :to (:eval 1))
                       ,lip)))))
     (:full-call
      (let ((temp (make-symbol "TEMP"))
@@ -57,7 +57,7 @@
   (ecase style
     (:raw
      `((inst j
-             (make-random-tn (sc-or-lose 'interior-reg) lip-offset)
+             (make-random-tn (sc-or-lose 'any-reg) lip-offset)
              8)
        (inst nop)))
     (:full-call

@@ -37,7 +37,7 @@
                           (:temp temp2 non-descriptor-reg nl2-offset)
                           (:temp pa-flag non-descriptor-reg nl4-offset)
                           (:temp lra descriptor-reg lra-offset)
-                          (:temp lip interior-reg lip-offset)
+                          (:temp lip any-reg lip-offset)
                           (:temp nargs any-reg nargs-offset)
                           (:temp ocfp any-reg ocfp-offset))
   (inst or temp x y)
@@ -86,7 +86,7 @@
                           (:temp temp2 non-descriptor-reg nl2-offset)
                           (:temp pa-flag non-descriptor-reg nl4-offset)
                           (:temp lra descriptor-reg lra-offset)
-                          (:temp lip interior-reg lip-offset)
+                          (:temp lip any-reg lip-offset)
                           (:temp nargs any-reg nargs-offset)
                           (:temp ocfp any-reg ocfp-offset))
   (inst or temp x y)
@@ -139,7 +139,7 @@
                           (:temp hi non-descriptor-reg nl2-offset)
                           (:temp pa-flag non-descriptor-reg nl4-offset)
                           (:temp lra descriptor-reg lra-offset)
-                          (:temp lip interior-reg lip-offset)
+                          (:temp lip any-reg lip-offset)
                           (:temp nargs any-reg nargs-offset)
                           (:temp ocfp any-reg ocfp-offset))
   ;; If either arg is not a fixnum, call the static function.
@@ -309,7 +309,7 @@
 
                                   (:temp temp non-descriptor-reg nl0-offset)
                                   (:temp lra descriptor-reg lra-offset)
-                                  (:temp lip interior-reg lip-offset)
+                                  (:temp lip any-reg lip-offset)
                                   (:temp nargs any-reg nargs-offset)
                                   (:temp ocfp any-reg ocfp-offset))
           (inst or temp x y)
@@ -350,7 +350,7 @@
 
                           (:temp temp non-descriptor-reg nl0-offset)
                           (:temp lra descriptor-reg lra-offset)
-                          (:temp lip interior-reg lip-offset)
+                          (:temp lip any-reg lip-offset)
                           (:temp nargs any-reg nargs-offset)
                           (:temp ocfp any-reg ocfp-offset))
   (inst beq x y RETURN-T)
@@ -389,7 +389,7 @@
 
                           (:temp temp non-descriptor-reg nl0-offset)
                           (:temp lra descriptor-reg lra-offset)
-                          (:temp lip interior-reg lip-offset)
+                          (:temp lip any-reg lip-offset)
                           (:temp nargs any-reg nargs-offset)
                           (:temp ocfp any-reg ocfp-offset))
   (inst or temp x y)
@@ -425,7 +425,7 @@
 
                           (:temp temp non-descriptor-reg nl0-offset)
                           (:temp lra descriptor-reg lra-offset)
-                          (:temp lip interior-reg lip-offset)
+                          (:temp lip any-reg lip-offset)
                           (:temp nargs any-reg nargs-offset)
                           (:temp ocfp any-reg ocfp-offset))
   (inst or temp x y)

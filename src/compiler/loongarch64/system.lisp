@@ -32,8 +32,7 @@
   (:translate widetag-of)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) ndescr)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip ndescr)
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
@@ -194,7 +193,7 @@
          (offset :scs (signed-reg) :to (:result 0)))
   (:arg-types * fixnum)
   (:results (res :scs (unsigned-reg) :from (:argument 0)))
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:result-types unsigned-num)
   (:generator 10
     (progn
@@ -230,7 +229,7 @@
   (:result-types system-area-pointer)
   (:translate current-thread-offset-sap)
   (:args (n :scs (signed-reg) :target sap))
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:arg-types signed-num)
   (:policy :fast-safe)
   (:generator 3

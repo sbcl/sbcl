@@ -94,7 +94,7 @@
 (define-vop (xep-allocate-frame)
   (:info start-lab)
   (:temporary (:scs (non-descriptor-reg) :offset nl2-offset) temp)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc any-reg :offset lr-offset) lip)
   (:generator 1
     ;; Make sure the function is aligned, and drop a label pointing to this
     ;; function header.
@@ -614,7 +614,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:temporary (:sc any-reg :offset ocfp-offset :from (:eval 0)) ocfp)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc any-reg :offset lr-offset) lip)
   (:ignore arg-locs args ocfp)
   (:generator 5
     (let ((cur-nfp (current-nfp-tn vop)))
@@ -649,7 +649,7 @@
   (:vop-var vop)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:temporary (:scs (non-descriptor-reg)) temp)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc any-reg :offset lr-offset) lip)
   (:generator 20
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
@@ -710,7 +710,7 @@
          (return-pc)
          (vals :more t))
   (:temporary (:sc any-reg :from (:argument 0)) old-fp-temp)
-  (:temporary (:sc interior-reg :offset lr-offset :from (:eval 1)) lra)
+  (:temporary (:sc any-reg :offset lr-offset :from (:eval 1)) lra)
   (:move-args :known-return)
   (:info val-locs)
   (:ignore val-locs vals return-pc)
@@ -833,7 +833,7 @@
          '((:temporary (:scs (non-descriptor-reg)) temp)
            (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)))
 
-     (:temporary (:scs (interior-reg)) lip)
+     (:temporary (:sc any-reg :offset lr-offset) lip)
 
      (:generator ,(+ (if named 5 0)
                      (if variable 19 1)
@@ -991,7 +991,7 @@
    (lra-arg))
   (:temporary (:sc any-reg :offset nl2-offset :from (:argument 0)) args)
   (:temporary (:sc any-reg :offset lexenv-offset :from (:argument 1)) lexenv)
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc any-reg :offset lr-offset) lip)
   (:ignore old-fp-arg lra-arg)
   (:vop-var vop)
   (:generator 75
@@ -1016,7 +1016,7 @@
   (:args (old-fp :scs (any-reg) :to :eval)
          (return-pc)
          (value))
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc any-reg :offset lr-offset) lip)
   (:ignore return-pc value)
   (:vop-var vop)
   (:generator 6
@@ -1054,7 +1054,7 @@
   (:temporary (:sc descriptor-reg :offset r0-offset :from (:eval 0)) r0)
   (:temporary (:sc descriptor-reg :offset r1-offset :from (:eval 0)) r1)
   (:temporary (:sc descriptor-reg :offset r2-offset :from (:eval 0)) r2)
-  (:temporary (:sc interior-reg :offset lr-offset :from (:eval 1)) lra)
+  (:temporary (:sc any-reg :offset lr-offset :from (:eval 1)) lra)
   (:temporary (:sc any-reg :offset nargs-offset) nargs)
   (:temporary (:sc any-reg :offset ocfp-offset) val-ptr)
   (:vop-var vop)
