@@ -281,6 +281,10 @@
           (sb-ext:gc :full t))))
 
 (with-test (:name :hash-table-equalp)
-  (assert (equalp (make-hash-table :rehash-threshold 0.3) (make-hash-table :rehash-threshold 0.9)))
+  (assert (equalp (opaque-identity (make-hash-table :rehash-threshold 0.3))
+                  (opaque-identity (make-hash-table :rehash-threshold 0.9))))
   ;; general-hash-table vs hash-table
-  (assert (equalp (make-hash-table :rehash-threshold 0.3) (make-hash-table))))
+  (assert (equalp (opaque-identity (make-hash-table :rehash-threshold 0.3))
+                  (opaque-identity (make-hash-table))))
+  (equalp (opaque-identity (make-hash-table :weakness :key))
+          (opaque-identity (make-hash-table))))
