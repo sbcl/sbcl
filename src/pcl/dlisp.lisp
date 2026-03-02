@@ -159,11 +159,8 @@
 (defvar *precompiling-lap* nil)
 (defvar *emit-function-p* t)
 
-;;; Should PCL call compile at runtime to optimize cache functions?
-(defvar *optimize-cache-functions-p* t)
-
 (defun emit-default-only (metatypes applyp)
-  (unless *optimize-cache-functions-p*
+  (unless (optimize-cache-functions-p *codegen-parms*)
     (when (and (null *precompiling-lap*) *emit-function-p*)
       (return-from emit-default-only
         (emit-default-only-function metatypes applyp))))
@@ -284,7 +281,7 @@
 (defun emit-one-or-n-index-reader/writer (reader/writer
                                           cached-index-p
                                           class-slot-p)
-  (unless *optimize-cache-functions-p*
+  (unless (optimize-cache-functions-p *codegen-parms*)
     (when (and (null *precompiling-lap*) *emit-function-p*)
       (return-from emit-one-or-n-index-reader/writer
         (emit-one-or-n-index-reader/writer-function
@@ -330,7 +327,7 @@
 ;;  METATYPES must be acceptable to EMIT-FETCH-WRAPPER.
 ;;  APPLYP says whether there is a &MORE context.
 (defun emit-checking-or-caching (cached-emf-p return-value-p metatypes applyp)
-  (unless *optimize-cache-functions-p*
+  (unless (optimize-cache-functions-p *codegen-parms*)
     (when (and (null *precompiling-lap*) *emit-function-p*)
       (return-from emit-checking-or-caching
         (emit-checking-or-caching-function

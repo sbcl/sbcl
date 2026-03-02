@@ -225,3 +225,28 @@
                          collect)))
                *fgens*)
     `(progn ,@collect)))
+
+(defstruct (codegen-parms (:conc-name nil)
+                          (:constructor make-codegen-parms ())
+                          (:predicate nil))
+  ;; If this is NIL, then the whole mechanism for caching dfun constructors is
+  ;; turned off. The only time that makes sense is when debugging LAP code.
+  (enable-dfun-constructor-caching t)
+  (raise-metatypes-to-class-p t)
+  ;; Should PCL call compile at runtime to optimize cache functions?
+  (optimize-cache-functions-p t)
+  ;;
+  (compute-std-cpl-class->entry-table-size 60 :type fixnum)
+  ;;
+  (non-system-typep-cost   100 :type fixnum)
+  (structure-typep-cost     15 :type fixnum)
+  (system-typep-cost         5 :type fixnum)
+  ;;
+  (cache-lookup-cost        30 :type fixnum)
+  (wrapper-of-cost          15 :type fixnum)
+  (secondary-dfun-call-cost 30 :type fixnum)
+  ;;
+  (eq-case-table-limit      15 :type fixnum)
+  (case-table-limit         10 :type fixnum))
+(define-load-time-global *codegen-parms* (make-codegen-parms))
+(declaim (codegen-parms *codegen-parms*))

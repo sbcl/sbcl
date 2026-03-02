@@ -105,12 +105,10 @@
        (compute-std-cpl-phase-2 all-cpds)
        (compute-std-cpl-phase-3 class all-cpds nclasses)))))
 
-(defvar *compute-std-cpl-class->entry-table-size* 60)
-
 (defun compute-std-cpl-phase-1 (class supers)
   (let ((nclasses 0)
         (all-cpds ())
-        (table (make-hash-table :size *compute-std-cpl-class->entry-table-size*
+        (table (make-hash-table :size (compute-std-cpl-class->entry-table-size *codegen-parms*)
                                 :test #'eq)))
     (declare (fixnum nclasses))
     (labels ((get-cpd (c)

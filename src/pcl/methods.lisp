@@ -1284,9 +1284,6 @@
                                            (do-if t) (do-if nil))))))))))
       (do-column precedence methods ()))))
 
-(defvar *eq-case-table-limit* 15)
-(defvar *case-table-limit* 10)
-
 (defun compute-mcase-parameters (case-list)
   (unless (eq t (caar (last case-list)))
     (error "The key for the last case arg to mcase was not T"))
@@ -1295,12 +1292,13 @@
                              (symbolp (caar case)))
                    (return nil))))
          (len (1- (length case-list)))
+         (limits *codegen-parms*)
          (type (cond ((= len 1)
                       :simple)
                      ((<= len
                           (if eq-p
-                              *eq-case-table-limit*
-                              *case-table-limit*))
+                              (eq-case-table-limit limits)
+                              (case-table-limit limits)))
                       :assoc)
                      (t
                       :hash-table))))

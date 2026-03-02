@@ -26,9 +26,8 @@
 
 (in-package "SB-PCL")
 
-(eval-when (:compile-toplevel :load-toplevel)
-(defparameter *optimize-speed*
-  '(optimize (speed 3) (safety 0) (sb-ext:inhibit-warnings 3) (debug 0))))
+(define-load-time-global *optimize-speed*
+  '(optimize (speed 3) (safety 0) (sb-ext:inhibit-warnings 3) (debug 0)))
 
 (declaim (declaration
           ;; These nonstandard declarations seem to be used privately

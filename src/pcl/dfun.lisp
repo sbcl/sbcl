@@ -85,24 +85,17 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 ;;;   (<args> <constructor> <system>).
 (define-load-time-global *dfun-constructors* ())
 
-;;; If this is NIL, then the whole mechanism for caching dfun constructors is
-;;; turned off. The only time that makes sense is when debugging LAP code.
-(defvar *enable-dfun-constructor-caching* t)
-
 (defun show-dfun-constructors ()
   (format t "~&DFUN constructor caching is ~A."
-          (if *enable-dfun-constructor-caching*
-              "enabled" "disabled"))
+          (if (enable-dfun-constructor-caching *codegen-parms*) "enabled" "disabled"))
   (dolist (generator-entry *dfun-constructors*)
     (dolist (args-entry (cdr generator-entry))
       (format t "~&~S ~S"
               (cons (car generator-entry) (caar args-entry))
               (caddr args-entry)))))
 
-(defvar *raise-metatypes-to-class-p* t)
-
 (defun get-dfun-constructor (generator &rest args)
-  (when (and *raise-metatypes-to-class-p*
+  (when (and (raise-metatypes-to-class-p *codegen-parms*)
              (member generator '(emit-checking emit-caching
                                  emit-in-checking-cache-p emit-constant-value)))
     (setq args (cons (mapcar (lambda (mt)
@@ -113,7 +106,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                      (cdr args))))
   (let* ((generator-entry (assq generator *dfun-constructors*))
          (args-entry (assoc args (cdr generator-entry) :test #'equal)))
-    (if (null *enable-dfun-constructor-caching*)
+    (if (not (enable-dfun-constructor-caching *codegen-parms*))
         (apply (fdefinition generator) args)
         (or (cadr args-entry)
             (multiple-value-bind (new not-best-p)
@@ -626,10 +619,6 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
       (let ((cdc  (caching-dfun-cost gf))) ; fast
         (> cdc (dispatch-dfun-cost gf cdc))))))
 
-(defparameter *non-system-typep-cost* 100)
-(defparameter *structure-typep-cost*  15)
-(defparameter *system-typep-cost* 5)
-
 ;;; According to comments in the original CMU CL version of PCL,
 ;;; the cost LIMIT is important to cut off exponential growth for
 ;;; large numbers of gf methods and argument lists.
@@ -644,12 +633,13 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
      (let* ((type-test-cost
              (if (eq 'class (car type))
                  (let* ((metaclass (class-of (cadr type)))
-                        (mcpl (class-precedence-list metaclass)))
+                        (mcpl (class-precedence-list metaclass))
+                        (costs *codegen-parms*))
                    (cond ((memq *the-class-system-class* mcpl)
-                          *system-typep-cost*)
+                          (system-typep-cost costs))
                          ((memq *the-class-structure-class* mcpl)
-                          *structure-typep-cost*)
-                         (t *non-system-typep-cost*)))
+                          (structure-typep-cost costs))
+                         (t (non-system-typep-cost costs))))
                  0))
             (max-cost-so-far
              (+ (max true-value false-value) type-test-cost)))
@@ -658,17 +648,13 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
        max-cost-so-far))
    #'identity))
 
-(defparameter *cache-lookup-cost*  30)
-(defparameter *wrapper-of-cost* 15)
-(defparameter *secondary-dfun-call-cost* 30)
-
 (defun caching-dfun-cost (gf)
-  (let ((nreq (get-generic-fun-info gf)))
-    (+ *cache-lookup-cost*
-       (* *wrapper-of-cost* nreq)
-       (if (methods-contain-eql-specializer-p
-            (generic-function-methods gf))
-           *secondary-dfun-call-cost*
+  (let ((nreq (get-generic-fun-info gf))
+        (costs *codegen-parms*))
+    (+ (cache-lookup-cost costs)
+       (* (wrapper-of-cost costs) nreq)
+       (if (methods-contain-eql-specializer-p (generic-function-methods gf))
+           (secondary-dfun-call-cost costs)
            0))))
 
 (declaim (inline make-callable))
