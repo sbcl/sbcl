@@ -643,7 +643,16 @@ void set_allocation_bit_mark(void *address) {
   allocation_bitmap[i / N_WORD_BITS] |= (uword_t)1 << (i % N_WORD_BITS);
 }
 
-static void compute_allocations(void *address) {
+/* Find the first fresh line after the closest preceding unfresh line */
+static line_index_t fresh_region_start (line_index_t line, page_index_t first_line, bool unfreshen)
+{
+  line_index_t start = line;
+  for (; start >= first_line && IS_FRESH(line_bytemap[start]); start--)
+    if (unfreshen) line_bytemap[start] = UNFRESHEN_GEN(line_bytemap[start]);
+  return start + 1;
+}
+
+static void compute_allocations(void *address, bool unfreshen) {
   line_index_t l = address_line(address), start, end;
   page_index_t this_page = find_page_index(address);
   /* Spans of fresh lines exist inside pages, so don't search outside the
@@ -655,15 +664,13 @@ static void compute_allocations(void *address) {
    * brothertree.impure.lisp to fail. */
   /* TODO: We can unfreshen if the page is not in a TLAB, right?
    * But I daren't race if another thread begins allocating into the page. */
-  bool unfreshen = gc_active_p;
-  /* Find the last previous unfresh line. */
-  for (start = l; start != first_line - 1 && IS_FRESH(line_bytemap[start]); start--)
-    if (unfreshen) line_bytemap[start] = UNFRESHEN_GEN(line_bytemap[start]);
-  start++;                       /* Go back to first fresh line. */
+
+  start = fresh_region_start(l, first_line, unfreshen);
+
   /* Find the first subsequent unfresh line. */
   for (end = l + 1; end != last_line && IS_FRESH(line_bytemap[end]); end++)
     if (unfreshen) line_bytemap[end] = UNFRESHEN_GEN(line_bytemap[end]);
-  if (gc_active_p)
+  if (unfreshen)
     meters.fresh_pointers += (end - start) * LINE_SIZE;
   /* Now we have found the span of fresh objects which encloses the address,
    * and we mark each contiguous object in the allocation bitmap. */
@@ -689,42 +696,57 @@ static void compute_allocations(void *address) {
 
 static lispobj *find_object(uword_t address, uword_t start) {
   lispobj *np = native_pointer(address);
-  page_index_t p = find_page_index(np);
-  if (p == -1) return 0;
+  page_index_t page = find_page_index(np);
+  if (page == -1) return 0;
   bool fresh = IS_FRESH(line_bytemap[address_line(np)]);
-  if (page_free_p(p)) return 0;
-  if (page_table[p].type == PAGE_TYPE_CONS) {
+  if (page_free_p(page)) return 0;
+  if (page_table[page].type == PAGE_TYPE_CONS) {
     if (fresh) return np;
     /* CONS cells are always aligned, and the mutator is allowed to be lazy
      * w.r.t putting down allocation bits, so just use alignment. */
     return allocation_bit_marked(np) ? np : 0;
-  } else {
-    if (fresh) compute_allocations(np);
-    uword_t first_bit_index = object_index(address);
-    sword_t first_word_index = first_bit_index / N_WORD_BITS;
-    sword_t last_word_index = mark_bitmap_word_index((void*)start);
-    for (sword_t i = first_word_index; i >= last_word_index; i--) {
-      uword_t word = allocation_bitmap[i];
-      /* Find the last object which is not after this pointer. */
-      while (word) {
-        int last_bit_set = N_WORD_BITS - 1 - __builtin_clzl(word);
-        lispobj *location = index_to_object(N_WORD_BITS * i + last_bit_set);
-        if (location <= np) {
-          /* Found a candidate - now check that the pointer is inside
-           * this object, and make sure not to produce an embedded
-           * object. */
-          if (embedded_obj_p(widetag_of(location)))
-            location = (lispobj*)fun_code_header((struct simple_fun*)location);
-          if (np >= location + object_size(location))
-            return 0;
-          return location;
-        }
-        /* Remove the bit, try again */
-        word &= ~((uword_t)(1) << last_bit_set);
+  } else
+    /* Don't compute allocations if the GC is not running, they won't
+       be preserved for any future invocations */
+    if (!fresh || (gc_active_p && (compute_allocations(np, true), 1))) {
+      uword_t first_bit_index = object_index(address);
+      sword_t first_word_index = first_bit_index / N_WORD_BITS;
+      sword_t last_word_index = mark_bitmap_word_index((void*)start);
+      for (sword_t i = first_word_index; i >= last_word_index; i--) {
+	uword_t word = allocation_bitmap[i];
+	/* Find the last object which is not after this pointer. */
+	while (word) {
+	  int last_bit_set = N_WORD_BITS - 1 - __builtin_clzl(word);
+	  lispobj *location = index_to_object(N_WORD_BITS * i + last_bit_set);
+	  if (location <= np) {
+	    /* Found a candidate - now check that the pointer is inside
+	     * this object, and make sure not to produce an embedded
+	     * object. */
+	    if (embedded_obj_p(widetag_of(location)))
+	      location = (lispobj*)fun_code_header((struct simple_fun*)location);
+	    if (np >= location + object_size(location))
+	      return 0;
+	    return location;
+	  }
+	  /* Remove the bit, try again */
+	  word &= ~((uword_t)(1) << last_bit_set);
+	}
+      }
+    } else {
+      /* Just use ordinary search when the GC is not active */
+      line_index_t first_line = page_to_line(page);
+      line_index_t start = fresh_region_start(address_line(np), first_line, false);
+      line_index_t end = first_line + LINES_PER_PAGE;
+
+      lispobj *where = (lispobj*)line_address(start), *limit = (lispobj*)line_address(end);
+      while (where < limit) {
+	lispobj *next = where + object_size(where);
+	if (np < next)
+	  return where;
+	where = next;
       }
     }
-    return 0;
-  }
+  return 0;
 }
 
 lispobj *search_dynamic_space(void *pointer) {
