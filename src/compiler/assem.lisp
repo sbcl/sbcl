@@ -1569,10 +1569,11 @@
             (setf (sap-ref-32 sap index) val)
             (incf index 4)))))
     (aver (= index (- (length octets) 4)))
-    (values segment
-            (label-position end-text)
-            (segment-fixup-notes segment)
-            fun-offsets)))
+    (sb-c::make-assembly segment (segment-contents-as-vector segment)
+                         (label-position end-text) fun-offsets
+                         (asmstream-elsewhere-label asmstream)
+                         (segment-fixup-notes segment)
+                         (get-allocation-points asmstream))))
 
 ;;; Most backends do not convert register TNs into a different type of
 ;;; internal object prior to handing the operands off to the emitter.

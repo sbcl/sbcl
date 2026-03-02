@@ -16,6 +16,15 @@
 
 ;;;; utilities used during code generation
 
+(defstruct (assembly ; result of calling the assembler
+             (:conc-name "ASM-")
+             (:constructor make-assembly
+                           (segment bytes text-length fun-table elsewhere-label
+                                    fixup-notes alloc-sites))
+             (:copier nil))
+  segment bytes text-length fun-table elsewhere-label
+  fixup-notes alloc-sites)
+
 ;;; KLUDGE: the assembler can not emit backpatches comprising jump tables without
 ;;; knowing the boxed code header length. But there is no compiler IR2 metaobject,
 ;;; for SB-FASL:*ASSEMBLER-ROUTINES*. We have to return a fixed answer for that.
@@ -339,18 +348,12 @@
            (skew (if (and (= code-boxed-words-align 1) (oddp n-boxed))
                      sb-vm:n-word-bytes
                      0)))
-      (multiple-value-bind (segment text-length fixup-notes fun-table)
-          (assemble-sections
-           asmstream
-           (ir2-component-entries ir2-component)
-           (make-segment (default-segment-run-scheduler) skew))
+      (assemble-sections asmstream
+                         (ir2-component-entries ir2-component)
+                         (make-segment (default-segment-run-scheduler) skew)))))
 
-        (values segment text-length fun-table
-                (asmstream-elsewhere-label asmstream) fixup-notes
-                (sb-assem::get-allocation-points asmstream))))))
-
-(defun label-elsewhere-p (label-or-posn kind)
-  (let ((elsewhere (label-position *elsewhere-label*))
+(defun label-elsewhere-p (label-or-posn kind elsewhere-label)
+  (let ((elsewhere (label-position elsewhere-label))
         (label (etypecase label-or-posn
                  (label
                   (label-position label-or-posn))

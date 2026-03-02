@@ -372,7 +372,7 @@
 ;;;    by all the non-elsewhere locations.
 ;;; -- Dump the elsewhere block header and all the elsewhere
 ;;;    locations (if any.)
-(defun compute-debug-blocks (fun var-locs)
+(defun compute-debug-blocks (fun var-locs elsewhere-label)
   (declare (type clambda fun) (type hash-table var-locs))
   (let ((*previous-location* 0)
         *previous-live*
@@ -395,7 +395,8 @@
         (collect ((here prev-locs))
           (dolist (loc (ir2-block-locations 2block))
             (if (label-elsewhere-p (location-info-label loc)
-                                   (location-info-kind loc))
+                                   (location-info-kind loc)
+                                   elsewhere-label)
                 (elsewhere loc)
                 (here loc)))
           (setq prev-locs (here))))
@@ -807,7 +808,7 @@
 ;;; Return a complete C-D-F structure for FUN. This involves
 ;;; determining the DEBUG-INFO level and filling in optional slots as
 ;;; appropriate.
-(defun compute-1-debug-fun (fun var-locs)
+(defun compute-1-debug-fun (fun var-locs elsewhere-label)
   (declare (type clambda fun) (type hash-table var-locs))
   (let* ((dfun (dfun-from-fun fun))
          (actual-level (policy (lambda-bind fun) compute-debug-fun))
@@ -831,7 +832,7 @@
 
     (if (>= level 1)
         (multiple-value-bind (blocks tlf-num)
-            (compute-debug-blocks fun var-locs)
+            (compute-debug-blocks fun var-locs elsewhere-label)
           (setf (compiled-debug-fun-blocks dfun) blocks
                 (compiled-debug-fun-tlf-number dfun) tlf-num))
         (setf (compiled-debug-fun-tlf-number dfun) (find-tlf-number fun)))
@@ -1026,7 +1027,7 @@
 
 ;;; Return a DEBUG-INFO structure describing COMPONENT. This has to be
 ;;; called after assembly so that source map information is available.
-(defun debug-info-for-component (component)
+(defun debug-info-for-component (component assembly)
   (declare (type component component))
   (flet ((lambda-position (lambda)
            (let ((2block (block-info (lambda-block lambda))))
@@ -1068,7 +1069,7 @@
        (unless (empty-fun-p lambda)
          (clrhash var-locs)
          (push (cons (lambda-position lambda)
-                     (compute-1-debug-fun lambda var-locs))
+                     (compute-1-debug-fun lambda var-locs (asm-elsewhere-label assembly)))
                dfuns)))
      (let ((map (compute-packed-debug-funs (nreverse dfuns)))
            (contexts (compact-vector *contexts*)))

@@ -146,14 +146,12 @@
 
 ;;; Dump a component to core. We pass in the assembler fixups, code
 ;;; vector and node info.
-(defun make-core-component (component segment length fixup-notes alloc-points object)
+(defun make-core-component (component assembly object)
   (declare (type component component)
-           (type segment segment)
-           (type index length)
-           (list fixup-notes)
+           (type assembly assembly)
            (type core-object object))
   (binding*
-      ((debug-info (debug-info-for-component component))
+      ((debug-info (debug-info-for-component component assembly))
        (2comp (component-info component))
        (constants (ir2-component-constants 2comp))
        (n-boxed-words (length constants))
@@ -170,13 +168,13 @@
           (let ((const (aref constants index)))
             (when (typep const '(cons (eql :fdefinition)))
               (setf (second const) (find-or-create-fdefn (second const)))))))
+       (fixup-notes (asm-fixup-notes assembly))
        (retained-fixups (sb-c::pack-fixups-for-reapplication fixup-notes))
+       (bytes (the (simple-array assembly-unit 1) (asm-bytes assembly)))
        ((code-obj total-nwords)
         (allocate-code-object (component-mem-space component)
                               (align-up n-boxed-words code-boxed-words-align)
-                              length))
-       (bytes
-        (the (simple-array assembly-unit 1) (segment-contents-as-vector segment)))
+                              (length bytes)))
        (n-simple-funs (length (ir2-component-entries 2comp)))
        (named-call-fixups nil)
        (real-code-obj code-obj))
@@ -187,7 +185,7 @@
         :fixup (setq named-call-fixups
                      (apply-core-fixups code-obj fixup-notes retained-fixups real-code-obj)))
 
-    (when alloc-points
+    (binding* ((alloc-points (asm-alloc-sites assembly) :exit-if-null))
       #+(and x86-64 sb-thread)
       (if (= (extern-alien "alloc_profiling" int) 0) ; record the object for later
           (setf (gethash code-obj *allocation-patch-points*) alloc-points)

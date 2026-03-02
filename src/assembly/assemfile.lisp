@@ -36,7 +36,7 @@
     (unwind-protect
         (progn
           (let ((sb-xc:*features* (cons :sb-assembling sb-xc:*features*))
-                (sb-c::*compilation* (sb-c::make-compilation))
+                (*compilation* (make-compilation))
                 (*readtable* sb-cold:*xc-readtable*))
             (load (merge-pathnames name (make-pathname :type "lisp"))))
           (resolve-ep-labels (asmstream-code-section asmstream))
@@ -67,19 +67,17 @@
           ;; alignment is ensured by SIMPLE-FUN-HEADER-WORD.
           (emit (asmstream-data-section asmstream)
                 `(.align ,sb-vm:n-lowtag-bits))
-          (let ((segment (assemble-sections
-                          asmstream nil
-                          (make-segment nil))))
+          (let ((assembly (assemble-sections asmstream nil (make-segment nil))))
             (unless (= (length (remove-duplicates (mapcar 'car *entry-points*)))
                        (length *entry-points*))
               (error "Duplicate asm routine: ~S"
                      (loop for (this . rest) on *entry-points*
                            when (assoc (car this) rest)
                            collect (car this))))
-            (dump-assembler-routines segment
-                                     (segment-buffer segment)
-                                     (sb-assem::segment-fixup-notes segment)
-                                     (sb-assem::get-allocation-points asmstream)
+            (dump-assembler-routines (asm-segment assembly)
+                                     (segment-buffer (asm-segment assembly))
+                                     (asm-fixup-notes assembly)
+                                     (asm-alloc-sites assembly)
                                      *entry-points*
                                      lap-fasl-output))
           (setq won t))

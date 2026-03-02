@@ -1185,9 +1185,9 @@
 ;;; constants.
 ;;;
 ;;; We dump trap objects in any unused slots or forward referenced slots.
-(defun dump-code-object (component code-segment code-length fixups alloc-points fasl-output)
+(defun dump-code-object (component assembly fasl-output)
   (declare (type component component)
-           (type index code-length)
+           (type assembly assembly)
            (type fasl-output fasl-output))
   (let* ((2comp (component-info component))
          (constants (ir2-component-constants 2comp))
@@ -1239,24 +1239,25 @@
                                          fasl-output)))))))
 
       ;; Dump the debug info.
-      (let ((info (debug-info-for-component component)))
+      (let ((info (debug-info-for-component component assembly)))
         (fasl-validate-structure info fasl-output)
         (dump-object info fasl-output)
         (push (dump-to-table fasl-output)
               (fasl-output-debug-info fasl-output)))
 
-      (let ((n-fixup-elts (dump-fixups fixups alloc-points fasl-output)))
+      (let ((n-fixup-elts (dump-fixups (asm-fixup-notes assembly)
+                                       (asm-alloc-sites assembly) fasl-output)))
         (dump-fop 'fop-load-code fasl-output
                   (logior (ash header-length 1)
                           (if (code-immobile-p component) 1 0))
-                  code-length
+                  (length (asm-bytes assembly))
                   n-fixup-elts))
       ;; Fasl dumper/loader convention allows at most 3 integer args.
       ;; Others have to be written with explicit calls.
       (dump-integer-as-n-bytes (length (ir2-component-entries 2comp))
                                4 ; output 4 bytes
                                fasl-output)
-      (dump-segment code-segment code-length fasl-output)
+      (dump-segment (asm-segment assembly) (length (asm-bytes assembly)) fasl-output)
 
       (let ((handle (dump-pop fasl-output)))
         (dolist (patch (patches))
@@ -1302,9 +1303,8 @@
   (dump-fop 'fop-alter-code file offset)
   (values))
 
-;;; Dump the code, constants, etc. for component. We pass in the
-;;; assembler fixups, code vector and node info.
-(defun fasl-dump-component (component code-segment code-length fixups alloc-points file)
+;;; Dump the code, constants, etc. for component.
+(defun fasl-dump-component (component assembly file)
   (declare (type component component))
   (declare (type fasl-output file))
 
@@ -1316,9 +1316,7 @@
   (let* ((2comp (component-info component))
          (entries (ir2-component-entries 2comp))
          (nfuns (length entries))
-         (code-handle
-             (dump-code-object component code-segment code-length fixups
-                               alloc-points file))
+         (code-handle (dump-code-object component assembly file))
          (fun-index nfuns))
 
     (dolist (entry entries)
