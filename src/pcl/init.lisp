@@ -62,7 +62,6 @@
   instance)
 
 (defglobal **typecheck-cache** (make-hash-table :test #'equal :synchronized t))
-(defvar *typecheck-stack* nil)
 
 (defun generate-slotd-typecheck (slotd info)
   (let* ((type (slot-definition-type slotd))

@@ -15,6 +15,9 @@
 (defun receive-pending-interrupt ()
   (receive-pending-interrupt))
 
+(sb-impl:define-thread-local sb-pcl::*cache-miss-values-stack* nil)
+(sb-impl:define-thread-local sb-pcl::*dfun-miss-gfs-on-stack* nil)
+
 (defmacro with-interrupt-bindings (&body body)
   `(let*
        ;; KLUDGE: Whatever is on the PCL stacks before the interrupt
@@ -25,8 +28,6 @@
        ;; hit.
        ((sb-pcl::*cache-miss-values-stack* nil)
         (sb-pcl::*dfun-miss-gfs-on-stack* nil))
-     (declare (special sb-pcl::*cache-miss-values-stack*
-                       sb-pcl::*dfun-miss-gfs-on-stack*))
      ,@body))
 
 (defun unblock-deferrable-signals ()

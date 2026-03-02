@@ -693,7 +693,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                                 :size 4))))
     (make-emf-cache generic-function valuep cache classes-list new-class)))
 
-(defvar *dfun-miss-gfs-on-stack* ())
+(defvar *dfun-miss-gfs-on-stack* ()) ; define-thread-local is in target-signal-common
 
 (defmacro dfun-miss ((gf args wrappers invalidp nemf
                       &optional type index caching-p applicable)
@@ -1041,7 +1041,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 ;;;  <index>      If <type> is READER or WRITER, and the slot accessed is
 ;;;            an :instance slot, this is the index number of that slot
 ;;;            in the object argument.
-(defvar *cache-miss-values-stack* ())
+(defvar *cache-miss-values-stack* ()) ; define-thread-local is in target-signal-common
 
 (defun cache-miss-values (gf args state)
   (multiple-value-bind (nreq applyp metatypes nkeys arg-info)

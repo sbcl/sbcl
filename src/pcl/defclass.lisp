@@ -89,10 +89,10 @@
 ;;;; DEFCLASS macro and close personal friends
 
 ;;; state for the current DEFCLASS expansion
-(defvar *initfunctions-for-this-defclass*)
-(defvar *readers-for-this-defclass*)
-(defvar *writers-for-this-defclass*)
-(defvar *slot-names-for-this-defclass*)
+(sb-impl:define-thread-local *initfunctions-for-this-defclass*)
+(sb-impl:define-thread-local *readers-for-this-defclass*)
+(sb-impl:define-thread-local *writers-for-this-defclass*)
+(sb-impl:define-thread-local *slot-names-for-this-defclass*)
 
 ;; forward declarations so the host doesn't warn these to be undefined functions.
 (declaim (ftype (function (t t) (values t t &optional)) *subtypep))

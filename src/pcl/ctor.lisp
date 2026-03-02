@@ -442,8 +442,6 @@
 ;;; Compile-Time Expansion of MAKE-INSTANCE *******
 ;;; ***********************************************
 
-(defvar *compiling-optimized-constructor* nil)
-
 ;;; There are some MAKE-INSTANCE calls compiled prior to this macro definition.
 ;;; While it would be trivial to move earlier, I'm not sure that it would
 ;;; actually work.

@@ -196,3 +196,14 @@
   pv
   next-method-call
   arg-info)
+
+(sb-impl:define-thread-local *compiling-optimized-constructor* nil)
+(sb-impl:define-thread-local *rebound-effective-method-gensyms*)
+(sb-impl:define-thread-local *typecheck-stack* nil)
+(sb-impl:define-thread-local *allow-forward-referenced-classes-in-cpl-p* nil)
+(sb-impl:define-thread-local *in-obsolete-instance-trap* nil)
+
+;;; These are used to communicate the method name and lambda-list to
+;;; MAKE-METHOD-LAMBDA-INTERNAL.
+(sb-impl:define-thread-local *method-name* nil)
+(sb-impl:define-thread-local *method-lambda-list* nil)

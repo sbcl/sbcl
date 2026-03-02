@@ -516,11 +516,6 @@ bootstrapping.
             (class-prototype (or (generic-function-method-class gf?)
                                  (find-class 'standard-method)))))))
 
-;;; These are used to communicate the method name and lambda-list to
-;;; MAKE-METHOD-LAMBDA-INTERNAL.
-(defvar *method-name* nil)
-(defvar *method-lambda-list* nil)
-
 (defun expand-defmethod (name proto-gf proto-method qualifiers lambda-list
                          body env)
   (binding* (;; ENV could be of type SB-INTERPRETER:BASIC-ENV but I

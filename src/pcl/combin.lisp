@@ -237,8 +237,7 @@
                                             method-alist wrappers)
             method))))
 
-(defvar *global-effective-method-gensyms* ())
-(defvar *rebound-effective-method-gensyms*)
+(defglobal *global-effective-method-gensyms* ())
 
 (defun get-effective-method-gensym ()
   (or (pop *rebound-effective-method-gensyms*)

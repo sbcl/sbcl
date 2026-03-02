@@ -114,7 +114,6 @@
     (labels ((get-cpd (c)
                (ensure-gethash c table (make-cpd)))
              (walk (c supers)
-               (declare (special *allow-forward-referenced-classes-in-cpl-p*))
                (if (and (forward-referenced-class-p c)
                         (not *allow-forward-referenced-classes-in-cpl-p*))
                    (cpl-forward-referenced-class-error class c)

@@ -565,8 +565,6 @@
   (declare (ignore slot-names))
   (make-preliminary-layout class))
 
-(defvar *allow-forward-referenced-classes-in-cpl-p* nil)
-
 ;;; Give CLASS a preliminary layout if it doesn't have one already, to
 ;;; make it known to the type system.
 (defun make-preliminary-layout (class)
@@ -1583,8 +1581,6 @@
                                               old-class new-class))
                    value)))
     (setf (clos-slots-ref slots (slot-definition-location slot)) value)))
-
-(defvar *in-obsolete-instance-trap* nil)
 
 (define-condition obsolete-structure (error)
   ((datum :reader obsolete-structure-datum :initarg :datum))

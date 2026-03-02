@@ -135,7 +135,7 @@
 ;;;
 ;;; FIXME: SB-KERNEL has fast-and-not-quite-precise type code for use
 ;;; in the compiler. Could we share some of it here?
-(defvar *in-*subtypep* nil)
+(sb-impl:define-thread-local *in-*subtypep* nil)
 
 (defun *subtypep (type1 type2)
   (if (equal type1 type2)
