@@ -1074,15 +1074,8 @@
            (contexts (compact-vector *contexts*)))
        #+sb-xc-host
        (!make-compiled-debug-info name *package* map contexts simple-fun-headers)
-       ;; FIXME: This allocates 1 word too many, which often means 2 words too many
-       ;; due to padding. The cross-compiler looks right though - the emulated
-       ;; %INSTANCE-LENGTH for variable-length COMPILED-DEBUG-INFO subtracts 1 when
-       ;; adding in slots for each simple-fun. The right solution may be to delete
-       ;; the "REST" slot from the defstruct, and change %SIMPLE-FUN- accessors
-       ;; to use DD-LENGTH instead of (GET-DSD-INDEX COMPILED-DEBUG-INFO REST).
-       ;; This has been wrong ever since rev ff7acc4be0.
        #-sb-xc-host
-       (let ((di (%make-instance (+ (sb-kernel::type-dd-length compiled-debug-info)
+       (let ((di (%make-instance (+ (1- (sb-kernel::type-dd-length compiled-debug-info))
                                     (length simple-fun-headers)))))
          (setf (%instance-layout di) #.(find-layout 'compiled-debug-info)
                ;; The fixed slots except for SOURCE are declared readonly
