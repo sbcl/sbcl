@@ -1018,7 +1018,6 @@
         (with-code-pages-pinned (:dynamic)
           (return (escaped-frame-from-context context)))))))
 
-;#+(or x86 x86-64)
 (defun escaped-frame-from-context (context)
   (declare (type (sb-alien:alien (* os-context-t)) context))
   (block nil

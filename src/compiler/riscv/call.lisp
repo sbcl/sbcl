@@ -16,8 +16,7 @@
 (defconstant closure-sc (make-sc+offset descriptor-reg-sc-number lexenv-offset))
 
 ;;; Make a passing location TN for a local call return PC.
-(defun make-return-pc-passing-location (standard)
-  (declare (ignore standard))
+(defun make-return-pc-passing-location ()
   (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ra-offset))
 
 ;;; This is similar to MAKE-RETURN-PC-PASSING-LOCATION, but makes a

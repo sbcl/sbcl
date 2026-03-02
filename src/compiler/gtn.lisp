@@ -143,7 +143,7 @@
                 #+fp-and-pc-standard-save
                 old-pc
                 #-fp-and-pc-standard-save
-                (make-return-pc-passing-location (xep-p clambda)))))
+                (make-return-pc-passing-location))))
       (setf (environment-info lambda-environment) res)
       (setf (ir2-environment-old-fp res)
             #-fp-and-pc-standard-save

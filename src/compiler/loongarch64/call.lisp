@@ -14,12 +14,8 @@
 (defconstant arg-count-sc (make-sc+offset immediate-arg-scn nargs-offset))
 (defconstant closure-sc (make-sc+offset descriptor-reg-sc-number lexenv-offset))
 
-;;; Make a passing location TN for a local call return PC.  If standard is
-;;; true, then use the standard (full call) location, otherwise use any legal
-;;; location.  Even in the non-standard case, this may be restricted by a
-;;; desire to use a subroutine call instruction.
-(defun make-return-pc-passing-location (standard)
-  (declare (ignore standard))
+;;; Make a passing location TN for a local call return PC.
+(defun make-return-pc-passing-location ()
   (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ra-offset))
 
 ;;; This is similar to MAKE-RETURN-PC-PASSING-LOCATION, but makes a
