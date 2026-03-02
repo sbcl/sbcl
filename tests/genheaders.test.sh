@@ -30,6 +30,15 @@ run_sbcl <<EOF
 (load "../tools-for-build/corefile.lisp")
 (in-package "SB-COLD")
 (defvar *target-sbcl-version* (read-from-file "../version.lisp-expr"))
+(host-sb-int:encapsulate 'sb-vm::!read-dynamic-space-size 'readsize
+  (lambda (realfun)
+   ;; Strip "tests/" from the directory name so that this function can find
+   ;; "output/dynamic-space-size.txt" in the SBCL root, if it exists.
+   (let* ((dpd *default-pathname-defaults*)
+          (*default-pathname-defaults*
+           (make-pathname :directory (butlast (pathname-directory dpd))
+                          :defaults dpd)))
+     (funcall realfun))))
 (in-host-compilation-mode
  (lambda (&aux (sb-xc:*features* (cons :c-headers-only sb-xc:*features*))
                (*load-verbose* t))
