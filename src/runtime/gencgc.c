@@ -3510,10 +3510,6 @@ garbage_collect_generation(generation_index_t generation, int raise,
     if (conservative_stack) {
         struct thread *th;
         for_each_thread(th) {
-#if !defined(LISP_FEATURE_MIPS) && !defined(reg_LINK_RETURN) \
-    && !defined(LISP_FEATURE_PPC) && !defined(LISP_FEATURE_PPC64) // interrupt contexts already pinned everything they see
-            scavenge_interrupt_contexts(th);
-#endif
             scavenge_control_stack(th);
         }
 

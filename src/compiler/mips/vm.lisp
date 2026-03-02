@@ -303,11 +303,6 @@
 
 ;;;; Function Call Parameters
 
-;;; The SC numbers for register and stack arguments/return values.
-;;;
-(defconstant immediate-arg-scn any-reg-sc-number)
-(defconstant control-stack-arg-scn control-stack-sc-number)
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
 ;;; Offsets of special stack frame locations

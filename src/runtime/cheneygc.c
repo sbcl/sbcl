@@ -165,10 +165,6 @@ collect_garbage(generation_index_t ignore)
     new_space_free_pointer = new_space;
 
     /* Scavenge all of the roots. */
-#ifdef PRINTNOISE
-    printf("Scavenging interrupt contexts ...\n");
-#endif
-    scavenge_interrupt_contexts(th);
 
 #ifdef PRINTNOISE
     printf("Scavenging interrupt handlers ...\n");

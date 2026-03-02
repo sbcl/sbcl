@@ -169,7 +169,7 @@
   #-c-stack-is-control-stack
 (defun make-nfp-tn ()
   (component-live-tn
-   (make-wired-tn *fixnum-primitive-type* immediate-arg-scn nfp-offset)))
+   (make-wired-tn *fixnum-primitive-type* any-reg-sc-number nfp-offset)))
 
 ;;; Make an environment-live stack TN for saving the SP for NLX entry.
 (defun make-nlx-sp-tn (env)

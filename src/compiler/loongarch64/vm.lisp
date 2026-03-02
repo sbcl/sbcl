@@ -235,11 +235,6 @@
   (or (eql sc zero-sc-number)
       (eql sc immediate-sc-number)))
 
-;;;; Function Call Parameters
-;;; The SC numbers for register and stack arguments/return values.
-(defconstant immediate-arg-scn any-reg-sc-number)
-(defconstant control-stack-arg-scn control-stack-sc-number)
-
 (defconstant ocfp-save-offset 0)
 (defconstant ra-save-offset 1)
 (defconstant nfp-save-offset 2)

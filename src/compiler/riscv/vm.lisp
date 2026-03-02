@@ -249,11 +249,6 @@
 
 ;;;; Function Call Parameters
 
-;;; The SC numbers for register and stack arguments/return values.
-;;;
-(defconstant immediate-arg-scn any-reg-sc-number)
-(defconstant control-stack-arg-scn control-stack-sc-number)
-
 ;;; Offsets of special stack frame locations
 (defconstant ocfp-save-offset 0)
 (defconstant ra-save-offset 1)

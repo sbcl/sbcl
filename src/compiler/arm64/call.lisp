@@ -11,7 +11,7 @@
 
 (in-package "SB-VM")
 
-(defconstant arg-count-sc (make-sc+offset immediate-arg-scn nargs-offset))
+(defconstant arg-count-sc (make-sc+offset any-reg-sc-number nargs-offset))
 (defconstant closure-sc (make-sc+offset descriptor-reg-sc-number lexenv-offset))
 
 (defconstant return-pc-passing-offset
@@ -30,7 +30,7 @@
   ;; to be a stack TN wired to the save offset, not a normal TN with a
   ;; wired SAVE-TN.
   (let ((tn (make-wired-tn *fixnum-primitive-type*
-                           control-stack-arg-scn
+                           control-stack-sc-number
                            ocfp-save-offset)))
     (setf (tn-kind tn) :environment)
     tn))
@@ -44,7 +44,7 @@
 ;;; only need to make the standard location, since a count is never
 ;;; passed when we are using non-standard conventions.
 (defun make-arg-count-location ()
-  (make-wired-tn *fixnum-primitive-type* immediate-arg-scn nargs-offset))
+  (make-wired-tn *fixnum-primitive-type* any-reg-sc-number nargs-offset))
 
 ;;;; Frame hackery:
 
