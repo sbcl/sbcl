@@ -111,6 +111,7 @@
       (format t "~&Top 15 worst by max GC duration (excluding STW delay):~%")
       (let ((list (sort (copy-list observations) #'> :key (lambda (x) (third (third x))))))
         (dotimes (i 15) (apply #'format t fmt (pop list)))))))
+
 (defun parallel-execute-tests (files max-jobs vop-summary-stats-p)
   (format t "Using ~D processes~%" max-jobs)
   ;; Interleave the order in which all tests are launched rather than
@@ -250,16 +251,20 @@
       (when missing-usage
         (format t "~&Missing vop-usage:~{ ~a~}~%" missing-usage))
 
-      (when losing
-        (format t "~&Failing files:~%")
-        (dolist (filename losing)
-          (format t "~A~%" filename))
-        (format t "==== Logs are in ~a ====~%" *logdir*)
-        (exit :code 1)))))
+      (cond (losing
+             (format t "~&Failing files:~%")
+             (dolist (filename losing)
+               (format t "~A~%" filename))
+             (format t "==== Logs are in ~a ====~%" *logdir*)
+             (exit :code 1))
+            (*delete-logs*
+             (delete-directory *logdir*))))))
+
 (when (string= (car *posix-argv*) "--filter")
   (setq *filter* (cadr *posix-argv*))
   (setq *posix-argv* (cddr *posix-argv*)))
-(when (find "--delete-logs" *posix-argv* :test #'equal)
+(when (or (find "--delete-logs" *posix-argv* :test #'equal)
+          (sb-ext:posix-getenv "SBCL_TEST_DELETE_LOGS"))
   (setf *delete-logs* t)
   (setf *posix-argv* (remove "--delete-logs" *posix-argv* :test #'equal)))
 

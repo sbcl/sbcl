@@ -14,6 +14,10 @@
   "Return a string describing the type of the local machine."
   "X86-64")
 
+(defun return-machine-address (context)
+  (let ((sp (context-register context sb-vm::rsp-offset)))
+    (sap-ref-word (int-sap sp) return-pc-save-offset)))
+
 #+(or darwin linux openbsd win32 sunos (and freebsd x86-64))
 (define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
   (* unsigned) (context (* os-context-t)) (index int))

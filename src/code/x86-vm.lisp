@@ -32,6 +32,10 @@
 ;;;;      and internal error handling) the extra runtime cost should be
 ;;;;      negligible.
 
+(defun return-machine-address (context)
+  (let ((sp (context-register context sb-vm::esp-offset)))
+    (sap-ref-word (int-sap sp) return-pc-save-offset)))
+
 #+(or linux win32)
 (define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
   (* unsigned) (context (* os-context-t)) (index int))

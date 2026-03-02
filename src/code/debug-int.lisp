@@ -643,21 +643,6 @@
                  (word (int-sap pc)))))))
       (unless (= base-ptr 0) (%make-lisp-obj (logior base-ptr other-pointer-lowtag))))))
 
-#-(or x86 x86-64)
-(defun compute-lra-data-from-pc (pc)
-  (declare (type integer pc))
-  (let* ((pc-sap (int-sap (ash pc n-fixnum-tag-bits)))
-         (code (code-header-from-pc pc-sap)))
-    (values (if code
-                (sap- pc-sap (code-instructions code))
-                nil)
-            code)))
-
-;;;; (OR X86 X86-64) support
-
-#+(or x86 x86-64)
-(progn
-
 (defun compute-lra-data-from-pc (pc)
   (declare (type system-area-pointer pc))
   ;; While theoretically we should inhibit GC any time we search the heap,
@@ -666,6 +651,9 @@
   (let ((code (code-header-from-pc pc)))
     (values (if code (sap- pc (code-instructions code)) nil)
             code)))
+
+#+(or x86 x86-64)
+(progn
 
 ;;; Check for a valid return address - it could be any valid C/Lisp
 ;;; address.
@@ -711,7 +699,13 @@
 (defun top-frame ()
   (/noshow0 "entering TOP-FRAME")
   (compute-calling-frame (descriptor-sap (%caller-frame))
+                         #+c-stack-is-control-stack
+                         ;; Not a descriptor because PC is not fixnum-aligned on x86,
+                         ;; but it can directly specify sap-stack, because it has only one stack.
+                         ;; Everywhere else SAPs are saved on the number stack.
                          (%caller-pc)
+                         #-c-stack-is-control-stack
+                         (descriptor-sap (%caller-pc))
                          nil))
 
 ;;; Flush all of the frames above FRAME, and renumber all the frames
@@ -830,16 +824,20 @@
    (compiled-frame-escaped frame)))
 
 (defun frame-saved-lra (frame debug-fun)
-  (sub-access-debug-var-slot
-   (frame-pointer frame)
-   (return-pc-offset-for-location debug-fun frame)
-   (compiled-frame-escaped frame)))
+  (let ((lra
+          (sub-access-debug-var-slot
+           (frame-pointer frame)
+           (return-pc-offset-for-location debug-fun frame)
+           (compiled-frame-escaped frame))))
+    #+c-stack-is-control-stack lra
+    #-c-stack-is-control-stack (descriptor-sap lra)))
 
 (defun (setf frame-saved-lra) (new-lra frame debug-fun)
   (sub-set-debug-var-slot
    (frame-pointer frame)
    (return-pc-offset-for-location debug-fun (frame-code-location frame))
-   new-lra
+   #+c-stack-is-control-stack new-lra
+   #-c-stack-is-control-stack (%make-lisp-obj (sap-int new-lra))
    (compiled-frame-escaped frame))
   new-lra)
 
@@ -889,7 +887,7 @@
 ;;; will continue executing upon returning to that previous frame.
 
 (defun compute-calling-frame (caller ra up-frame &optional savedp)
-  (declare (type system-area-pointer caller #+c-stack-is-control-stack ra))
+  (declare (type system-area-pointer caller ra))
   (when (control-stack-pointer-valid-p caller)
     ;; First check for an escaped frame.
     (multiple-value-bind (code pc-offset escaped off-stack assembly-routine-p)
@@ -914,8 +912,7 @@
                        "undefined function"))
                      (:foreign-function
                       (make-bogus-debug-fun
-                       (foreign-function-backtrace-name #+c-stack-is-control-stack ra
-                                                        #-c-stack-is-control-stack (int-sap (get-lisp-obj-address ra)))))
+                       (foreign-function-backtrace-name ra)))
                      ((nil)
                       (make-bogus-debug-fun
                        "bogus stack frame"))
@@ -1021,7 +1018,7 @@
         (with-code-pages-pinned (:dynamic)
           (return (escaped-frame-from-context context)))))))
 
-#+(or x86 x86-64)
+;#+(or x86 x86-64)
 (defun escaped-frame-from-context (context)
   (declare (type (sb-alien:alien (* os-context-t)) context))
   (block nil
@@ -1029,17 +1026,14 @@
           (code (code-object-from-context context))
           assembly-routine-p)
       (/noshow0 "got CODE")
-      #+x86-64
       (when (eq code sb-fasl:*assembler-routines*)
         (unless (memq (assembly-routine-name-from-pc code (code-pc-offset pc code))
                       '(sb-vm::undefined-tramp sb-vm::undefined-alien-tramp
                         sb-vm::return-values-list sb-vm::call-symbol
                         sb-vm::unwind))
-          (let* ((sp (context-register context sb-vm::rsp-offset))
-                 (return (sap-ref-word (int-sap sp) 0)))
-            (setf assembly-routine-p t
-                  pc (int-sap return)
-                  code (code-header-from-pc pc)))))
+          (setf assembly-routine-p t
+                pc (int-sap (sb-vm::return-machine-address context))
+                code (code-header-from-pc pc))))
       (when (null code)
         ;; KLUDGE: Detect undefined functions by a range-check
         ;; against the trampoline address and the following
@@ -1056,74 +1050,6 @@
         (/noshow0 "returning from FIND-ESCAPED-FRAME")
         (return
           (values code pc-offset context nil assembly-routine-p))))))
-
-#-(or x86 x86-64)
-(defun escaped-frame-from-context (context)
-  (declare (type (sb-alien:alien (* os-context-t)) context))
-  (block nil
-    (let ((pc (context-pc context))
-          (code (code-object-from-context context))
-          assembly-routine-p)
-      (/noshow0 "got CODE")
-      (when (eq code sb-fasl:*assembler-routines*)
-        (unless (memq (assembly-routine-name-from-pc code (code-pc-offset pc code))
-                      '(sb-vm::undefined-tramp sb-vm::undefined-alien-tramp
-                        sb-vm::return-values-list sb-vm::call-symbol))
-          (setf assembly-routine-p t
-                pc (int-sap (sb-vm::return-machine-address context))
-                code (code-header-from-pc pc))))
-      (when (symbolp code)
-        (return (values code 0 context nil nil)))
-      (multiple-value-bind
-            (pc-offset valid-p code-size)
-          (code-pc-offset pc code)
-        (unless valid-p
-          ;; We were in an assembly routine.
-          (multiple-value-bind (new-pc-offset computed-return)
-              (find-pc-from-assembly-fun code context)
-            (setf pc-offset new-pc-offset)
-            (unless (<= 0 pc-offset code-size)
-              (cerror
-               "Set PC-OFFSET to zero and continue backtrace."
-               'bug
-               :format-control
-               "~@<PC-OFFSET (~D) not in code object. Frame details:~
-                   ~2I~:@_PC: #X~X~:@_CODE: ~S~:@_CODE FUN: ~S~:@_LRA: ~
-                   #X~X~:@_COMPUTED RETURN: #X~X.~:>"
-               :format-arguments
-               (list pc-offset
-                     (sap-int (context-pc context))
-                     code
-                     (%code-entry-point code 0)
-                     #-(or riscv arm arm64 loongarch64)
-                     (context-register context sb-vm::lra-offset)
-                     #+(or riscv loongarch64)
-                     (context-register context sb-vm::ra-offset)
-                     #+(or arm arm64)
-                     (stack-ref (int-sap (context-register context
-                                                           sb-vm::cfp-offset))
-                                lra-save-offset)
-                     computed-return))
-              ;; We failed to pinpoint where PC is, but set
-              ;; pc-offset to 0 to keep the backtrace from
-              ;; exploding.
-              (setf pc-offset 0))))
-        (/noshow0 "returning from FIND-ESCAPED-FRAME")
-        (return
-          (values code pc-offset context nil assembly-routine-p))))))
-
-#-(or x86 x86-64)
-(defun find-pc-from-assembly-fun (code scp)
-  "Finds the PC for the return from an assembly routine properly.
-For some architectures (such as PPC) this will not be the $LRA
-register."
-  (with-pinned-objects (code)
-    (let ((return-machine-address (sb-vm::return-machine-address scp))
-          (code-header-len (* (code-header-words code) n-word-bytes)))
-      (values (- return-machine-address
-                 (- (get-lisp-obj-address code) other-pointer-lowtag)
-                 code-header-len)
-              return-machine-address))))
 
 ;;; Find the code object corresponding to the object represented by
 ;;; bits and return it. We assume bogus functions correspond to the
@@ -2496,21 +2422,20 @@ register."
              (with-nfp ((var) &body body)
                ;; x86oids have no separate number stack, so dummy it
                ;; up for them. ARM64 Windows is similar - use control stack pointer.
-               #+(or c-stack-is-control-stack (and arm64 win32))
+               #+c-stack-is-control-stack
                `(let ((,var fp))
                   ,@body)
-               #-(or c-stack-is-control-stack (and arm64 win32))
+               #-c-stack-is-control-stack
                `(let ((,var (if escaped
                                 (int-sap
                                  (context-register escaped sb-vm::nfp-offset))
                                 (sap-ref-sap fp (* nfp-save-offset n-word-bytes)))))
                   ,@body))
              (number-stack-offset (&optional (offset 0))
-               #+(or x86 x86-64)
-               `(+ (sb-vm::frame-byte-offset (sb-c:sc+offset-offset sc+offset))
-                   ,offset)
-               #-(or x86 x86-64)
-               `(+ (* (sb-c:sc+offset-offset sc+offset) n-word-bytes)
+               `(+ #+c-stack-is-control-stack
+                   (sb-vm::frame-byte-offset (sb-c:sc+offset-offset sc+offset))
+                   #-c-stack-is-control-stack
+                   (* (sb-c:sc+offset-offset sc+offset) n-word-bytes)
                    ,offset)))
     (ecase (sb-c:sc+offset-scn sc+offset)
       ((#.any-reg-sc-number
@@ -2527,7 +2452,7 @@ register."
          (if (logbitp (1- n-word-bits) val)
              (logior val (ash -1 n-word-bits))
              val)))
-      ((#.unsigned-reg-sc-number #-(or x86 x86-64) #.non-descriptor-reg-sc-number)
+      ((#.unsigned-reg-sc-number #-c-stack-is-control-stack #.non-descriptor-reg-sc-number)
        (with-escaped-value (val)
          val))
       #-(or x86 x86-64 arm64)
@@ -2743,11 +2668,10 @@ register."
                                 (sap-ref-sap fp (* nfp-save-offset n-word-bytes)))))
                   ,@body))
              (number-stack-offset (&optional (offset 0))
-               #+(or x86 x86-64)
-               `(+ (sb-vm::frame-byte-offset (sb-c:sc+offset-offset sc+offset))
-                   ,offset)
-               #-(or x86 x86-64)
-               `(+ (* (sb-c:sc+offset-offset sc+offset) n-word-bytes)
+               `(+ #+c-stack-is-control-stack
+                   (sb-vm::frame-byte-offset (sb-c:sc+offset-offset sc+offset))
+                   #-c-stack-is-control-stack
+                   (* (sb-c:sc+offset-offset sc+offset) n-word-bytes)
                    ,offset)))
     (ecase (sb-c:sc+offset-scn sc+offset)
       ((#.any-reg-sc-number
@@ -2761,7 +2685,7 @@ register."
        (set-escaped-value (logand value most-positive-word)))
       (#.unsigned-reg-sc-number
        (set-escaped-value value))
-      #-(or x86 x86-64)
+      #-c-stack-is-control-stack
       (#.non-descriptor-reg-sc-number
        (error "Local non-descriptor register access?"))
       #-(or x86 x86-64 arm64)
@@ -3366,9 +3290,7 @@ register."
     (do ((frame frame (frame-down frame)))
         ((not frame) nil)
       (when (and (compiled-frame-p frame)
-                 (#-(or x86 x86-64) eq #+(or x86 x86-64) sap=
-                  lra
-                  (frame-saved-lra frame (frame-debug-fun frame))))
+                 (sap= lra (frame-saved-lra frame (frame-debug-fun frame))))
         (return t)))))
 
 ;;;; ACTIVATE-BREAKPOINT
@@ -3678,13 +3600,7 @@ register."
 (defun signal-context-frame (signal-context)
   (let* ((scp (sb-alien:sap-alien signal-context (* os-context-t)))
          (cfp (int-sap (context-register scp sb-vm::cfp-offset))))
-    (compute-calling-frame cfp
-                           ;; KLUDGE: This argument is ignored on
-                           ;; x86oids in this scenario, but is
-                           ;; declared to be a SAP.
-                           #+(or x86 x86-64) (context-pc scp)
-                           #-(or x86 x86-64) nil
-                           nil)))
+    (compute-calling-frame cfp (context-pc scp) nil)))
 
 (defun handle-fun-end-breakpoint (offset component context)
   (let ((data (breakpoint-data component offset nil)))
@@ -3752,8 +3668,7 @@ register."
 ;;; state of the program, not merely a return PC location.
 ;;; (I tried changing this to DEFUN-CACHED, which failed a regression test)
 (defun make-bpt-lra (real-lra &optional known-return-p)
-  (declare (type #-(or x86 x86-64) fixnum
-                 #+(or x86 x86-64) system-area-pointer real-lra))
+  (declare (type system-area-pointer real-lra))
   (let* ((src-start
            ;; Just trap when using the known return values convention,
            ;; as call sites don't process unknown values in that case.
@@ -3762,11 +3677,7 @@ register."
                (foreign-symbol-sap "fun_end_breakpoint_guts" t)))
          ;; START-OFFSET is the distance from CODE-INSTRUCTIONS to the
          ;; start of the copied :FUN-END code.
-         (start-offset
-           (+ n-word-bytes ; Jump Table prefix word
-              ;; Alignment padding, LRA header.
-              #-(or x86 x86-64 arm arm64 sparc riscv loongarch64)
-              (* 2 n-word-bytes)))
+         (start-offset n-word-bytes) ; Jump Table prefix word
          ;; TRAP-OFFSET is the distance from CODE-INSTRUCTIONS to the
          ;; actual magic fun_end breakpoint trap.
          (trap-offset
@@ -3803,9 +3714,7 @@ register."
         ;; CODE-OBJECT is implicitly pinned after leaving
         ;; WITH-PINNED-OBJECTS (and would be pinned even if the W-P-O
         ;; were deleted), so it's OK to return a SAP into CODE-OBJECT.
-        (let ((dst-start #+(or x86 x86-64) dst-start
-                         #-(or x86 x86-64) (%make-lisp-obj (sap-int dst-start))))
-          (values dst-start code-object trap-offset))))))
+        (values dst-start code-object trap-offset)))))
 
 ;;;; miscellaneous
 

@@ -2208,7 +2208,7 @@
 (defknown string-hairy-data-vector-set/check-bounds (string index t) t (no-verify-arg-count))
 
 (defknown %caller-frame () t (flushable))
-(defknown %caller-pc () system-area-pointer (flushable))
+(defknown %caller-pc () #-c-stack-is-control-stack fixnum #+c-stack-is-control-stack system-area-pointer (flushable))
 (defknown %with-array-data (array index (or index null))
   (values (simple-array * (*)) index index index)
   (foldable flushable no-verify-arg-count))
