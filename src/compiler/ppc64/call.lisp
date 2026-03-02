@@ -109,7 +109,8 @@
     (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
     (let ((entry-point (gen-label)))
       (emit-label entry-point)
-      (inst compute-code-from-lip code-tn lip-tn entry-point temp))))
+      (inst compute-code-from-lip code-tn lip-tn entry-point temp)
+      (inst mflr lra-tn))))
 
 (define-vop (xep-setup-sp)
   (:vop-var vop)
@@ -294,9 +295,12 @@
 ;;; points, local-call entry points, and tail-call entry points.  The default
 ;;; does nothing.
 (defun emit-block-header (start-label trampoline-label fall-thru-p alignp)
-  (declare (ignore fall-thru-p alignp))
+  (declare (ignore alignp))
+  (when (and fall-thru-p trampoline-label)
+    (inst b start-label))
   (when trampoline-label
-    (emit-label trampoline-label))
+    (emit-label trampoline-label)
+    (inst mflr lra-tn))
   (emit-label start-label))
 
 
@@ -352,18 +356,6 @@
       ;; instead of the clause below
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
-
-(define-vop (move-to-lr)
-  (:args (return-pc :scs (descriptor-reg)))
-  (:generator 0
-   (inst mtlr return-pc)))
-
-(define-vop (move-from-lr)
-  (:results (return-pc :scs (descriptor-reg)))
-  (:generator 0
-    (inst mflr return-pc)))
-
-
 ;;; Non-TR local call for a variable number of return values passed according
 ;;; to the unknown values convention.  The results are the start of the values
 ;;; glob and the number of values received.

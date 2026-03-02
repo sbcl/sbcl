@@ -171,7 +171,7 @@
   (loadw cfp-tn cur-uwp unwind-block-cfp-slot)
   (loadw code-tn cur-uwp unwind-block-code-slot)
   (loadw lra cur-uwp unwind-block-entry-pc-slot)
-  (inst mtlr lra) 
+  (inst mtlr lra)
   (inst blr)
 
   DO-UWP
