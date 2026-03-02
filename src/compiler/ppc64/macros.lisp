@@ -84,14 +84,19 @@
 
 ;;; Macros to handle the fact that we cannot use the machine native call and
 ;;; return instructions.
-(defmacro lisp-return (return-pc lip &key (offset 0))
+(defmacro lisp-return (return-pc &key multiple (mtlr t) (mflr t))
   "Return to RETURN-PC."
   `(progn
-     (inst addi ,lip ,return-pc (* ,offset 4))
-     (inst mtlr ,lip)
-     ;; (inst cmpd null-tn ,(if (zerop offset)
-     ;;                         'csp-tn
-     ;;                         'null-tn))
+     ;; The caller needs to get the address from LRA to compute its CODE
+     (assert (location= ,return-pc lra-tn))
+     ,(if mtlr
+          `(inst mtlr ,return-pc)
+          (and mflr
+               `(inst mflr ,lra-tn)))
+     ;; Set a flag for single/multiple return values
+     (inst cmpd null-tn ,(if multiple
+                             'csp-tn
+                             'null-tn))
      (inst blr)))
 
 ;;;; Stack TN's

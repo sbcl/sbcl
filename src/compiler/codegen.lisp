@@ -61,12 +61,6 @@
   (unless (zerop (sb-allocated-size 'non-descriptor-stack))
     (when (ir2-environment-number-stack-p 2env)
       (ir2-component-nfp (component-info *component-being-compiled*)))))
-
-;;; the TN used for passing the return PC in a local call to the function
-;;; designated by 2ENV
-#+mips
-(defun callee-return-pc-tn (2env)
-  (ir2-environment-return-pc-pass 2env))
 
 ;;;; Fixups
 

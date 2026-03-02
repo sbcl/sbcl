@@ -15,7 +15,6 @@
      (:temp lra descriptor-reg lra-offset)
 
      ;; These are just needed to facilitate the transfer
-     (:temp lip interior-reg lip-offset)
      (:temp count any-reg nl2-offset)
      (:temp src any-reg nl3-offset)
      (:temp dst any-reg cfunc-offset)
@@ -74,7 +73,7 @@
   (inst add csp-tn ocfp-tn temp)
 
   ;; Return.
-  (lisp-return lra lip))
+  (lisp-return lra :multiple t :mflr nil :mtlr nil))
 
 
 
@@ -151,7 +150,6 @@
                           (:arg start (any-reg descriptor-reg) ocfp-offset)
                           (:arg count (any-reg descriptor-reg) nargs-offset)
                           (:temp lra descriptor-reg lra-offset)
-                          (:temp lip interior-reg lip-offset)
                           (:temp cur-uwp any-reg nl0-offset)
                           (:temp next-uwp any-reg nl1-offset)
                           (:temp target-uwp any-reg nl2-offset))
@@ -173,7 +171,8 @@
   (loadw cfp-tn cur-uwp unwind-block-cfp-slot)
   (loadw code-tn cur-uwp unwind-block-code-slot)
   (loadw lra cur-uwp unwind-block-entry-pc-slot)
-  (lisp-return lra lip)
+  (inst mtlr lra) 
+  (inst blr)
 
   DO-UWP
 

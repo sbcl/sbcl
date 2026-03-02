@@ -39,10 +39,8 @@
             (inst blrl)
             (emit-label lra-label)
             (note-this-location ,vop :single-value-return)
-            (without-scheduling ()
-              (move csp-tn ocfp-tn)
-              (inst nop))
             (inst compute-code-from-lip code-tn ,lra lra-label ,temp)
+            (inst isel csp-tn csp-tn ocfp-tn :eq)
             (when cur-nfp
               (load-stack-tn cur-nfp ,nfp-save))))
         `((:temporary (:scs (non-descriptor-reg) :from (:eval 0) :to (:eval 1))
@@ -60,8 +58,5 @@
     (:raw
      `((inst blr)))
     (:full-call
-     `((inst mflr (make-random-tn (sc-or-lose 'descriptor-reg) lra-offset))
-       (lisp-return (make-random-tn (sc-or-lose 'descriptor-reg) lra-offset)
-                    (make-random-tn (sc-or-lose 'interior-reg) lip-offset)
-                    :offset 2)))
+     `((lisp-return lra-tn :mtlr nil)))
     (:none)))

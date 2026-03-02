@@ -179,9 +179,8 @@ Low Address
 	mtctr reg_LIP
 	bctrl
 
-	/* Blow off any extra values. */
-	mr reg_CSP,reg_OCFP
-	nop
+        /* Clear the stack allocated for multiple values, if any */
+        iseleq reg_CSP, reg_CSP, reg_OCFP
 
 	/* Return the one value. */
 	mr REG(3),reg_A0

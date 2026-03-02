@@ -2633,7 +2633,7 @@ be submitted as a CDR")
            "BRANCH"
            "CALL" "CALL-LOCAL" "CALL-NAMED" "CALL-VARIABLE"
            "CALL-OUT" "CALL-OUT-NAMED"
-           "CALLEE-NFP-TN" "CALLEE-RETURN-PC-TN"
+           "CALLEE-NFP-TN"
            "CATCH-BLOCK" "UNWIND-BLOCK"
            "CLOSURE-INIT" "CLOSURE-REF" "CLOSURE-INIT-FROM-FP"
            "CODE-IMMOBILE-P"
