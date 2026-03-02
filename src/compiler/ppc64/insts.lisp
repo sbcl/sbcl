@@ -326,6 +326,7 @@
       (bf :field ,(ppc-byte 6 8) :type 'crf)
       (bfa :field ,(ppc-byte 11 13) :type 'crf)
       (bi :field ,(ppc-byte 11 15) :type 'bi-field)
+      (bc :field ,(ppc-byte 21 25) :type 'bi-field)
       (bo :field ,(ppc-byte 6 10) :type 'bo-field)
       (bt :field ,(ppc-byte 6 10) :type 'bi-field)
       (d :field ,(ppc-byte 16 31) :sign-extend t)
@@ -552,6 +553,9 @@
 
 (def-ppc-iformat (a '(:name :tab frt "," fra "," frb "," frc))
   frt fra frb frc (xo xo26-30) rc)
+
+(def-ppc-iformat (a-i '(:name :tab rt "," ra "," rb "," bc))
+  rt ra rb bc (xo xo26-30) rc)
 
 (def-ppc-iformat (a-tab '(:name :tab frt "," fra "," frb))
   frt fra frb (xo xo26-30) rc)
@@ -1211,7 +1215,7 @@
     (:emitter (emit-d-form-inst segment 3 (valid-tcond-encoding tcond) (reg-tn-encoding ra) si)))
 
   (define-instruction isel (segment rt ra rb bc)
-    (:printer a ((op 31) (xo 15) (rc 0)))
+    (:printer a-i ((op 31) (xo 15) (rc 0)))
     (:emitter
      (emit-a-form-inst segment 31
                        (reg-tn-encoding rt)
