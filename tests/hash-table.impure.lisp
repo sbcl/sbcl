@@ -279,3 +279,8 @@
             (setf (gethash (list i) ht) i))
           (sb-sys:scrub-control-stack)
           (sb-ext:gc :full t))))
+
+(with-test (:name :hash-table-equalp)
+  (assert (equalp (make-hash-table :rehash-threshold 0.3) (make-hash-table :rehash-threshold 0.9)))
+  ;; general-hash-table vs hash-table
+  (assert (equalp (make-hash-table :rehash-threshold 0.3) (make-hash-table))))

@@ -1306,7 +1306,7 @@
 (defknown hash-table-size (hash-table) index (flushable))
 (defknown hash-table-test (hash-table) function-designator (foldable flushable))
 (defknown (sxhash psxhash) (t) hash-code (foldable flushable))
-(defknown hash-table-equalp (hash-table hash-table) boolean (foldable flushable))
+(defknown hash-table-equalp (hash-table instance) boolean (foldable flushable))
 (defknown sb-impl:install-hash-table-lock (hash-table) sb-thread:mutex ())
 (defknown sb-vm::quick-try-mutex (sb-thread:mutex) boolean)
 ;; To avoid emitting code to test for nil-function-returned
@@ -1882,6 +1882,7 @@
   sb-impl::%pathname-version (flushable))
 
 (defknown pathname= (pathname pathname) boolean (movable foldable flushable))
+(defknown pathname-equalp (pathname instance) boolean (movable foldable flushable))
 
 (defknown (namestring file-namestring directory-namestring host-namestring)
   (pathname-designator) (or simple-string null)

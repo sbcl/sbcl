@@ -366,11 +366,11 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
            (equal x y)))))
 
 ;;; EQUALP comparison of HASH-TABLE values
-;;; Can be called only if both X and Y are definitely hash-tables.
+;;; Can be called only if X is is definitely a hash-table.
 (defun hash-table-equalp (x y)
-  (declare (type hash-table x y) (explicit-check))
   (or (eq x y)
-      (and (eql (hash-table-count x) (hash-table-count y))
+      (and (hash-table-p y)
+           (= (hash-table-count (truly-the hash-table x)) (hash-table-count y))
            (eql (hash-table-test x) (hash-table-test y))
            (block comparison-of-entries
              (maphash (lambda (key x-value)
@@ -385,21 +385,26 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
              `(let ((x-el (%instance-ref x i))
                     (y-el (%instance-ref y i)))
                 (or (eq x-el y-el) (equalp x-el y-el)))))
-(defun instance-equalp (x y)
+;; Define two versions of the general EQUALP function installed in the
+;; LAYOUT-EQUALP-IMPL slot of structure classoids.
+;; X and Y are known to be of type INSTANCE
+(defun instance-equalp (x y) ; when all slots are tagged pointers
   (declare (optimize (safety 0)))
-  (loop for i downfrom (1- (%instance-length x)) to sb-vm:instance-data-start
-        always (slot-ref-equalp)))
-(defun instance-equalp* (comparators x y)
+  (and (eq (%instance-layout x) (%instance-layout y))
+       (loop for i downfrom (1- (%instance-length x)) to sb-vm:instance-data-start
+             always (slot-ref-equalp))))
+(defun instance-equalp* (comparators x y) ; when any raw slot exists
   (declare (optimize (safety 0))
            (simple-vector comparators)
            (type instance x y))
   ;; See remark at the source code for %TARGET-DEFSTRUCT
   ;; explaining how to use the vector of comparators.
-  (loop for i downfrom (1- (%instance-length x)) to sb-vm:instance-data-start
-        for test = (data-vector-ref comparators (- i sb-vm:instance-data-start))
-        always (cond ((eql test 0) (slot-ref-equalp))
-                     ((functionp test) (funcall test i x y))
-                     (t)))))
+  (and (eq (%instance-layout x) (%instance-layout y))
+       (loop for i downfrom (1- (%instance-length x)) to sb-vm:instance-data-start
+             for test = (data-vector-ref comparators (- i sb-vm:instance-data-start))
+             always (cond ((eql test 0) (slot-ref-equalp))
+                          ((functionp test) (funcall test i x y))
+                          (t))))))
 
 (defun array-equalp (a b)
   (declare (explicit-check))
@@ -503,7 +508,6 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
               (let ((layout (%instance-layout x)))
                 (and (logtest (logior +structure-layout-flag+ +pathname-layout-flag+)
                               (layout-flags layout))
-                     (eq (%instance-layout y) layout)
                      (funcall (layout-equalp-impl layout) x y)))))
         ((arrayp x)
          (and (arrayp y)

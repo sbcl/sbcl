@@ -6995,6 +6995,8 @@
                           ((both-csubtypep 'number)
                            '(= x y))
                           ((both-csubtypep 'hash-table)
+                           ;; HASH-TABLE-EQUALP doesn't need Y to be a hash-table, so this
+                           ;; could be improved to fire if only X is known. (or flip them)
                            '(hash-table-equalp x y))
                           ;; TODO: two instances of the same type should dispatch
                           ;; directly to the EQUALP-IMPL function in the layout.

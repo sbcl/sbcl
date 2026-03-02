@@ -569,8 +569,9 @@
                (compare-component (pathname-version a)
                                   (pathname-version b))))))
 
-(sb-kernel::assign-equalp-impl 'pathname #'pathname=)
-(sb-kernel::assign-equalp-impl 'logical-pathname #'pathname=)
+(defun pathname-equalp (a b) (and (pathnamep b) (pathname= a b)))
+(sb-kernel::assign-equalp-impl 'pathname #'pathname-equalp)
+(sb-kernel::assign-equalp-impl 'logical-pathname #'pathname-equalp)
 
 ;;; Hash a PATHNAME or a PATHNAME-DIRECTORY or pieces of a PATTERN.
 ;;; This is called by both SXHASH and by the interning of pathnames, which uses a

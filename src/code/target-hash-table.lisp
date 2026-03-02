@@ -3287,6 +3287,7 @@ table itself."
 ;;; It can't go in src/code/pred whose forms execute *before* the defstruct,
 ;;; so its effect would just get clobbered by the defstruct.
 (sb-kernel::assign-equalp-impl 'hash-table #'hash-table-equalp)
+(sb-kernel::assign-equalp-impl 'general-hash-table #'hash-table-equalp)
 
 (defun hash-table-test (hash-table)
   (if (typep hash-table 'general-hash-table)

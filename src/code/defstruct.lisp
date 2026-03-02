@@ -454,7 +454,7 @@
                   (y `(truly-the ,(dsd-type dsd) (,(dsd-reader dsd nil) b ,(dsd-index dsd)))))
               (cond ((member comparator '(= char-equal))
                      (group1 `(,comparator ,x ,y))) ; bounded amount of testing
-                    ((member comparator '(bit-vector-=))
+                    ((member comparator '(bit-vector-=)) ; TODO: strings
                      ;; unbounded but not recursive. Try EQ first though
                      (group2
                       `((lambda (x y) (or (eq x y) (bit-vector-= x y))) ,x ,y)))
@@ -464,9 +464,13 @@
           comparators)
     ;; use a string for the name since it's not a global function
     `(named-lambda ,(format nil "~A-EQUALP" (dd-name dd)) (a b)
-       (declare (optimize (sb-c:store-source-form 0) (safety 0)) (type ,(dd-name dd) a b)
-                (ignorable a b)) ; if zero slots
-       (and ,@(group1) ,@(group2) ,@(group3)))))
+       (declare (optimize (sb-c:store-source-form 0) (safety 0))
+                (type ,(dd-name dd) a) (type instance b))
+       ;; The righthand arg must be tested for its type
+       (and (eq (%instance-layout b) (%instance-layout a))
+            (let ((b (truly-the ,(dd-name dd) b)))
+              (declare (ignorable b))
+              (and ,@(group1) ,@(group2) ,@(group3)))))))
 
 #+sb-xc-host
 (progn
