@@ -507,7 +507,8 @@ Examples:
     (aver (sb-thread::thread-p thread))
     (without-interrupts ;; don't unwind while holding finalizer_mutex
       (alien-funcall (extern-alien "finalizer_thread_stop" (function void))))
-    (sb-thread:join-thread thread)))
+    (sb-thread:join-thread thread))
+  (sb-thread::%dispose-thread-structs))
 )
 
 (export 'show-finalizers)
