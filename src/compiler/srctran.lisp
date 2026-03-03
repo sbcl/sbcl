@@ -8983,20 +8983,22 @@
      vector))
 
 (deftransform stable-sort ((sequence predicate &key key)
-                           ((or vector list) t))
-  (let ((sequence-type (lvar-type sequence)))
-    (cond ((csubtypep sequence-type (specifier-type 'list))
-           `(sb-impl::stable-sort-list sequence
-                                       (%coerce-callable-to-fun predicate)
-                                       (if key (%coerce-callable-to-fun key) #'identity)))
-          ((csubtypep sequence-type (specifier-type 'simple-vector))
-           `(sb-impl::stable-sort-simple-vector sequence
-                                                (%coerce-callable-to-fun predicate)
-                                                (and key (%coerce-callable-to-fun key))))
-          (t
-           `(sb-impl::stable-sort-vector sequence
-                                         (%coerce-callable-to-fun predicate)
-                                         (and key (%coerce-callable-to-fun key)))))))
+                           (list t))
+  `(sb-impl::stable-sort-list
+    sequence
+    (%coerce-callable-to-fun predicate)
+    (if key (%coerce-callable-to-fun key) #'identity)))
+
+(deftransform stable-sort ((sequence predicate &key key)
+                           (vector t))
+  `(,(if (csubtypep (lvar-type sequence)
+                    (specifier-type 'simple-vector))
+         'sb-impl::stable-sort-simple-vector
+         'sb-impl::stable-sort-vector)
+    sequence
+    (%coerce-callable-to-fun predicate)
+    (and key (%coerce-callable-to-fun key))))
+
 
 ;;;; transforms for SB-EXT:OCTETS-TO-STRING and SB-EXT:STRING-TO-OCTETS
 

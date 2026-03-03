@@ -186,6 +186,13 @@
   (assert (equal (stable-sort (list 1 2 3 -3 -2 -1) '< :key 'abs)
                  '(1 -1 2 -2 3 -3))))
 
+(with-test (:name (stable-sort :no-transform))
+  (checked-compile-and-assert ()
+    `(lambda (seq) (declare ((or vector list) seq))
+       (stable-sort seq #'<))
+    (((list 3 2 1 4)) '(1 2 3 4) :test #'equal)
+    (((vector 3 1 2 4)) #(1 2 3 4) :test #'equalp)))
+
 ;;; CSR broke FILL by not returning the sequence argument in a transform.
 (with-test (:name fill)
   (let* ((s1 (copy-seq "abcde"))
