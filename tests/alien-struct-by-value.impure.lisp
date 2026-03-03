@@ -16,20 +16,7 @@
 
 ;;; Compile and load shared library
 
-(defvar *soname*)
-#+win32
-(with-scratch-file (dll "dll")
-  (sb-ext:run-program (or #+arm64 "clang" "gcc") `("-shared" "-o" ,dll "alien-struct-by-value.c")
-                      :search t)
-  (load-shared-object dll))
-#-win32
-(progn
-  (unless (probe-file "alien-struct-by-value.so")
-    (sb-ext:run-program "/bin/sh" '("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
-                                    "-o" "alien-struct-by-value.so"
-                                    "alien-struct-by-value.c")))
-  (setq *soname* (truename "alien-struct-by-value.so"))
-  (load-shared-object *soname*))
+(compile-so "alien-struct-by-value.c" "alien-struct-by-value.so")
 
 ;;; Tiny struct, alignment 8 (fits in one register)
 (define-alien-type nil (struct tiny-align-8 (m0 (integer 64))))
@@ -773,6 +760,3 @@
                  1.5d0 2.5d0)))
     (assert (= (slot result 'd0) 1.5d0))
     (assert (= (slot result 'd1) 2.5d0))))
-
-;;; Clean up
-#-win32 (ignore-errors (delete-file *soname*))

@@ -585,25 +585,9 @@
                 (alien-funcall (extern-alien (something) (function c-string c-string)) s))))))
     (assert (string= (funcall f "SBCL_HOME") (sb-ext:posix-getenv "SBCL_HOME")))))
 
-#+win32
-(with-scratch-file (solib "dll")
-  (sb-ext:run-program (or #+arm64 "clang" "gcc")
-                      `("-shared" "-o" ,solib "alien-128.c")
-                      :search t)
-  (sb-alien:load-shared-object solib))
-
-#-win32
-(if (probe-file "alien-128.so")
-    (load-shared-object (truename "alien-128.so"))
-    (with-scratch-file (solib "so")
-      (sb-ext:run-program "/bin/sh"
-                          `("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
-                                              "-o" ,solib "alien-128.c")
-                          :output t :error :output)
-      (sb-alien:load-shared-object solib)))
-
 (with-test (:name :alien-128bit-value-passing
             :skipped-on (or (not :x86-64) :win32))
+  (compile-so "alien-128.c" "alien-128.so")
   ;; Verify that both halves of a 128-bit alien value survive the FFI call.
   (let ((val (+ (ash #xDEADBEEFCAFEBABE 64) #x0123456789ABCDEF)))
     (assert (= (alien-funcall

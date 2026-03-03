@@ -55,7 +55,8 @@
            #:generate-test-directory-name
            #:*test-directory*
            #:opaque-identity
-           #:runtime #:split-string #:integer-sequence #:shuffle))
+           #:runtime #:split-string #:integer-sequence #:shuffle
+           #:compile-so))
 
 (in-package :test-util)
 
@@ -1092,3 +1093,22 @@
   (funcall
    (compile nil
             `(lambda () (sb-kernel:%make-funcallable-instance ,n)))))
+
+(defun compile-so (file so-name)
+  (if (probe-file so-name)
+      ;; Assume the test automator built this for us
+      (sb-alien:load-shared-object (truename so-name))
+      ;; Otherwise, write into /tmp so that we never fail to rebuild
+      ;; the '.so' if it gets changed, and assume that it's OK to
+      ;; delete a mapped file (which it is for *nix).
+      (with-scratch-file (solib (or #+win32 "dll" "so"))
+        #+win32
+        (sb-ext:run-program (or #+arm64 "clang" "gcc")
+                            `("-shared" "-o" ,solib ,file)
+                            :search t)
+        #-win32
+        (sb-ext:run-program "/bin/sh"
+                            `("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
+                              "-o" ,solib ,file)
+                            :output t :error :output)
+        (sb-alien:load-shared-object solib))))

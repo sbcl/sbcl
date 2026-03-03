@@ -44,6 +44,7 @@
  ("elfcore.test.sh" "src/runtime/shrinkwrap-sbcl")
  ("exit-hang.impure.lisp" "tests/fcb-threads.so")
  ("fcb-threads.impure.lisp" "tests/fcb-threads.so")
+ ("alien.impure.lisp" "tests/alien-128.so")
  ("fifo-slow.impure.lisp" "contrib/sb-posix.fasl")
  ("filecompile.impure.lisp"
   "tests/data/wonky1.lisp"
@@ -157,4 +158,5 @@
   "tests/undefined-classoid-bug-1.lisp"
   "tests/undefined-classoid-bug-2.lisp")
  ("x86-64-codegen.impure.lisp"
-  "tests/typep-golden-data.txt"))
+  "tests/typep-golden-data.txt")
+  )
