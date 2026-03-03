@@ -28,6 +28,8 @@
   (value (unsigned 32)))
 
 (defun context-float-register (context index format &optional integer)
+  #+openbsd (declare (ignore context index))
+  #-openbsd
   (let ((sap (alien-sap (context-float-register-addr context index))))
     (ecase format
       (single-float
@@ -48,9 +50,13 @@
                         (sap-ref-64 sap 0))
                    16)
            (complex (sap-ref-double sap 0)
-                    (sap-ref-double sap 8)))))))
+                    (sap-ref-double sap 8))))))
+  #+openbsd
+  (coerce 0 format))
 
 (defun %set-context-float-register (context index format value)
+  #+openbsd (declare (ignore context index format value))
+  #-openbsd
   (let ((sap (alien-sap (context-float-register-addr context index))))
     (ecase format
       (single-float
