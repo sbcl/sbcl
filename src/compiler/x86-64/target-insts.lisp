@@ -345,7 +345,18 @@
              ea))
          (displacement ()
            (case mod
-             (#b01 (read-signed-suffix 8 dstate))
+             (#b01
+              (let ((disp8 (read-signed-suffix 8 dstate)))
+                ;; EVEX compressed displacement: the CPU multiplies disp8
+                ;; by N (tuple size). Scale for display so the shown offset
+                ;; matches the effective address. +evex-l1+ is only set by
+                ;; the EVEX L'L prefilter (never VEX), so it reliably
+                ;; identifies EVEX 512-bit where N=64 for Full tuple type.
+                ;; This is approximate (narrow-load instructions have
+                ;; smaller N) but covers the common case correctly.
+                (if (dstate-getprop dstate +evex-l1+)
+                    (* disp8 64)
+                    disp8)))
              (#b10 (read-signed-suffix 32 dstate))))
          (extend (bit-name reg)
            (logior (if (dstate-getprop dstate bit-name) 8 0) reg)))

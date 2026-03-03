@@ -183,8 +183,29 @@
   (defreg float13 13 :float)
   (defreg float14 14 :float)
   (defreg float15 15 :float)
+  (defreg float16 16 :float)
+  (defreg float17 17 :float)
+  (defreg float18 18 :float)
+  (defreg float19 19 :float)
+  (defreg float20 20 :float)
+  (defreg float21 21 :float)
+  (defreg float22 22 :float)
+  (defreg float23 23 :float)
+  (defreg float24 24 :float)
+  (defreg float25 25 :float)
+  (defreg float26 26 :float)
+  (defreg float27 27 :float)
+  (defreg float28 28 :float)
+  (defreg float29 29 :float)
+  (defreg float30 30 :float)
+  (defreg float31 31 :float)
   (defregset *float-regs* float0 float1 float2 float3 float4 float5 float6 float7
              float8 float9 float10 float11 float12 float13 float14 float15)
+  ;; ZMM16-31 are only accessible via EVEX encoding
+  (defregset *zmm-regs* float0 float1 float2 float3 float4 float5 float6 float7
+             float8 float9 float10 float11 float12 float13 float14 float15
+             float16 float17 float18 float19 float20 float21 float22 float23
+             float24 float25 float26 float27 float28 float29 float30 float31)
 
   ;; registers used to pass arguments
   ;;
@@ -204,7 +225,7 @@
 (!define-storage-bases
 (define-storage-base registers :finite :size 16)
 
-(define-storage-base float-registers :finite :size 16)
+(define-storage-base float-registers :finite :size 32)
 
 ;;; Start from 2, for the old RBP (aka OCFP) and return address
 (define-storage-base stack :unbounded :size 2 :size-increment 1)
@@ -249,6 +270,12 @@
   (double-avx2-stack stack :element-size 4)
   #+sb-simd-pack-256
   (single-avx2-stack stack :element-size 4)
+  #+sb-simd-pack-512
+  (int-avx512-stack stack :element-size 8)
+  #+sb-simd-pack-512
+  (double-avx512-stack stack :element-size 8)
+  #+sb-simd-pack-512
+  (single-avx512-stack stack :element-size 8)
 
   ;;
   ;; things that can go in the integer registers
@@ -370,6 +397,26 @@
                   :constant-scs (fp-immediate)
                   :save-p t
                   :alternate-scs (single-avx2-stack))
+  ;; ZMM SCs use all 32 registers (16-31 require EVEX encoding)
+  (zmm-reg float-registers :locations #.*zmm-regs*)
+  #+sb-simd-pack-512
+  (int-avx512-reg float-registers
+                  :locations #.*zmm-regs*
+                  :constant-scs (fp-immediate)
+                  :save-p t
+                  :alternate-scs (int-avx512-stack))
+  #+sb-simd-pack-512
+  (double-avx512-reg float-registers
+                     :locations #.*zmm-regs*
+                     :constant-scs (fp-immediate)
+                     :save-p t
+                     :alternate-scs (double-avx512-stack))
+  #+sb-simd-pack-512
+  (single-avx512-reg float-registers
+                     :locations #.*zmm-regs*
+                     :constant-scs (fp-immediate)
+                     :save-p t
+                     :alternate-scs (single-avx512-stack))
 
   (catch-block stack :element-size catch-block-size)
   (unwind-block stack :element-size unwind-block-size)))
@@ -392,11 +439,19 @@
 #+sb-simd-pack-256
 (defparameter *hword-sc-names* '(ymm-reg int-avx2-reg single-avx2-reg double-avx2-reg
                                    int-avx2-stack single-avx2-stack double-avx2-stack))
+(defparameter *zword-sc-names* '(zmm-reg
+                                 #+sb-simd-pack-512 int-avx512-reg
+                                 #+sb-simd-pack-512 single-avx512-reg
+                                 #+sb-simd-pack-512 double-avx512-reg
+                                 #+sb-simd-pack-512 int-avx512-stack
+                                 #+sb-simd-pack-512 single-avx512-stack
+                                 #+sb-simd-pack-512 double-avx512-stack))
 ) ; EVAL-WHEN
 (!define-storage-classes
   . #.(mapcar (lambda (class-spec)
                 (let ((size
                         (case (car class-spec)
+                          (#.*zword-sc-names*   :zword)
                           #+sb-simd-pack
                           (#.*oword-sc-names*   :oword)
                           #+sb-simd-pack-256

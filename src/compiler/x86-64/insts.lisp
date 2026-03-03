@@ -25,7 +25,8 @@
   (import '(sb-vm::tn-byte-offset sb-vm::tn-reg sb-vm::reg-name
             sb-vm::frame-byte-offset sb-vm::rip-tn sb-vm::rbp-tn
             sb-vm::gpr-tn-p sb-vm::stack-tn-p sb-c::tn-reads sb-c::tn-writes
-            sb-vm::ymm-reg
+            sb-vm::ymm-reg sb-vm::zmm-reg
+            sb-vm::int-avx512-reg sb-vm::double-avx512-reg sb-vm::single-avx512-reg
             sb-vm::linkage-addr->name
             sb-vm::registers sb-vm::float-registers sb-vm::stack))) ; SB names
 
@@ -126,7 +127,8 @@
     (:dword 4)
     (:qword 8)
     (:oword 16)
-    (:hword 32)))
+    (:hword 32)
+    (:zword 64)))
 
 ;;; If chopping IMM to 32 bits and sign-extending is equal to the original value,
 ;;; return the signed result, which the CPU will always extend to 64 bits.
@@ -997,12 +999,18 @@
                1)))
 
 (defun make-fpr-id (index size)
-  (declare (type (mod 16) index))
+  (declare (type (mod 32) index))
   (ecase size
     (:xmm (logior (ash index 3) 1)) ; low bit = FPR, not GPR
-    (:ymm (logior (ash index 3) 3))))
+    (:ymm (logior (ash index 3) 3))
+    (:zmm (logior (ash index 3) 5))
+    (:kreg (logior (ash index 3) 7))))
 (defun is-ymm-id-p (reg-id)
   (= (ldb (byte 3 0) reg-id) 3))
+(defun is-zmm-id-p (reg-id)
+  (= (ldb (byte 3 0) reg-id) 5))
+(defun is-kreg-id-p (reg-id)
+  (= (ldb (byte 3 0) reg-id) 7))
 
 (declaim (inline is-gpr-id-p gpr-id-size-class reg-id-num))
 (defun is-gpr-id-p (reg-id)
@@ -1041,6 +1049,12 @@
                                   sb-vm::+byte-register-names+)
                           t)
                          (gpr-id-size-class id)))
+                 ((is-kreg-id-p id)
+                  #.(coerce (loop for i below 8 collect (format nil "K~D" i))
+                            'vector))
+                 ((is-zmm-id-p id)
+                  #.(coerce (loop for i below 32 collect (format nil "ZMM~D" i))
+                            'vector))
                  ((is-ymm-id-p id)
                   #.(coerce (loop for i below 16 collect (format nil "YMM~D" i))
                             'vector))
@@ -1102,6 +1116,20 @@
                         collect (!make-reg (make-fpr-id i :ymm)))
                      'vector)
              t)
+            number))
+    (:zmm
+     (svref (load-time-value
+             (coerce (loop for i from 0 below 32
+                        collect (!make-reg (make-fpr-id i :zmm)))
+                     'vector)
+             t)
+            number))
+    (:kreg
+     (svref (load-time-value
+             (coerce (loop for i from 0 below 8
+                        collect (!make-reg (make-fpr-id i :kreg)))
+                     'vector)
+             t)
             number))))
 
 ;;; Given a TN which maps to a GPR, return the corresponding REG.
@@ -1128,6 +1156,12 @@
                   ((eq (sb-name (sc-sb (tn-sc operand))) 'registers)
                    (tn-reg operand))
                   ((memq (sc-name (tn-sc operand))
+                         '(zmm-reg
+                           int-avx512-reg
+                           double-avx512-reg
+                           single-avx512-reg))
+                   (get-fpr :zmm (tn-offset operand)))
+                  ((memq (sc-name (tn-sc operand))
                          '(ymm-reg
                            int-avx2-reg
                            double-avx2-reg
@@ -1139,7 +1173,7 @@
                    operand)))
           operands))
 
-(defun emit-ea (segment thing reg &key (remaining-bytes 0) xmm-index)
+(defun emit-ea (segment thing reg &key (remaining-bytes 0) xmm-index (disp-n 1))
   (when (register-p reg)
     (setq reg (reg-encoding reg segment)))
   (etypecase thing
@@ -1186,9 +1220,23 @@
             (scale (ea-scale thing))
             (disp (ea-disp thing))
             (base-encoding (when base (reg-encoding (tn-reg base) segment)))
+            ;; EVEX compressed displacement: the CPU multiplies disp8 by N
+            ;; (the tuple size), so we must encode disp/N. A displacement
+            ;; qualifies for disp8 if it's a multiple of N and the quotient
+            ;; fits in a signed byte. When disp-n=0, disp8 is disabled
+            ;; entirely (safe fallback for EVEX when tuple type is unknown).
+            (compressed-disp (and (fixnump disp)
+                                  (> disp-n 1)
+                                  (zerop (mod disp disp-n))
+                                  (let ((q (/ disp disp-n)))
+                                    (and (<= -128 q 127) q))))
             (mod (cond ((or (null base) (and (eql disp 0) (/= base-encoding #b101)))
                         #b00)
-                       ((and (fixnump disp) (<= -128 disp 127))
+                       (compressed-disp
+                        #b01)
+                       ;; For EVEX (disp-n > 0), skip normal disp8: the CPU
+                       ;; would multiply the byte by N, giving wrong offset.
+                       ((and (= disp-n 1) (fixnump disp) (<= -128 disp 127))
                         #b01)
                        (t
                         #b10)))
@@ -1212,7 +1260,7 @@
                (base (if (null base) #b101 base-encoding)))
            (emit-sib-byte segment ss index base)))
        (cond ((= mod #b01)
-              (emit-byte segment disp))
+              (emit-byte segment (or compressed-disp disp)))
              ((or (= mod #b10) (null base))
               (cond ((not (fixup-p disp))
                      (emit-signed-dword segment disp))
@@ -3320,6 +3368,9 @@
       ((:hword :avx2)
        (aver (integerp value))
        (cons :hword value))
+      ((:zword :avx512)
+       (aver (integerp value))
+       (cons :zword value))
       ((:single-float)
        (aver (typep value 'single-float))
        (cons (if alignedp :oword :dword)

@@ -13,13 +13,31 @@
 
 (defun print-ymmreg (value stream dstate)
   (let* ((offset (etypecase value
-                  ((unsigned-byte 4) value)
-                  (reg (reg-num value))))
-         (reg (get-fpr (if (dstate-getprop dstate +vex-l+) :ymm :xmm) offset))
+                   ((unsigned-byte 4) value)
+                   (reg (reg-num value))))
+         ;; For EVEX, R' provides bit 4 of the reg field (registers 16-31).
+         ;; This flag is set by the evex-r-prime prefilter.
+         (offset (if (dstate-getprop dstate +evex-r-prime+)
+                     (+ offset 16)
+                     offset))
+         (reg (get-fpr (cond ((dstate-getprop dstate +evex-l1+) :zmm)
+                             ((dstate-getprop dstate +vex-l+) :ymm)
+                             (t :xmm))
+                       offset))
          (name (reg-name reg)))
     (if stream
         (write-string name stream)
         (operand name dstate))))
+
+(defun print-kreg (value stream dstate)
+  (declare (ignore dstate))
+  (let* ((offset (etypecase value
+                   ((unsigned-byte 4) value)
+                   (reg (reg-num value))))
+         (reg (get-fpr :kreg offset))
+         (name (reg-name reg)))
+    (when stream
+      (write-string name stream))))
 
 (defun print-ymmreg/mem (value stream dstate)
   (if (machine-ea-p value)
@@ -61,3 +79,13 @@
 (defun print-sized-xmmreg/mem-default-qword (value stream dstate)
   (print-xmmreg/mem-with-width
    value (inst-operand-size-default-qword dstate) t stream dstate))
+
+(defconstant-eqx +opmask-reg-names+
+    #("K0" "K1" "K2" "K3" "K4" "K5" "K6" "K7")
+  #'equalp)
+
+(defun print-opmask-reg (value stream dstate)
+  (declare (ignore dstate))
+  (let ((name (svref +opmask-reg-names+ (logand value 7))))
+    (if stream
+        (write-string name stream))))
