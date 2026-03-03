@@ -500,6 +500,9 @@ int sbcl_mprotect(void* addr, size_t length, int prot) {
 
 #ifdef LISP_FEATURE_ELF
 #include <elf.h>
+#ifdef LISP_FEATURE_OPENBSD
+#include <machine/reloc.h>
+#endif
 #ifndef SHF_GNU_RETAIN
 #define SHF_GNU_RETAIN (1 << 21)
 #endif
