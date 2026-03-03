@@ -121,17 +121,6 @@ unlink_thread(struct thread *th)
         th->next->prev = th->prev;
 }
 
-/* Not safe in general, but if your thread names are all
- * simple-base-string and won't move, this is slightly ok */
-char* vm_thread_name(struct thread* th)
-{
-    if (!th) return "non-lisp";
-    struct thread_instance *lispthread = (void*)INSTANCE(th->lisp_thread);
-    lispobj name = lispthread->_name;
-    if (simple_base_string_p(name)) return vector_sap(name);
-    return "?";
-}
-
 #if HAVE_GC_STW_SIGNAL
 
 
