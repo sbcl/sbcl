@@ -1314,8 +1314,13 @@ We could try a few things to mitigate this:
       (let ((n (ash (symbol-tls-index x) (- word-shift))))
         (when (> n (max (1+ prev) thread-nslots))
           (format t "(unused)~%"))
-        (format t "~5d = ~s~%" n x)
-        (setq prev n)))))
+        (let* ((val (sb-sys:sap-int (sb-vm::current-thread-offset-sap n)))
+               (displayval
+                (case val
+                  (#.sb-vm:no-tls-value-marker "[no-tls-value]")
+                  (#.sb-vm:unbound-marker-widetag "[unbound-marker]"))))
+          (format t "~5d = ~s~@[ ~A~]~%" n x displayval)
+          (setq prev n))))))
 
 (flet ((print-it (obj type size)
          (declare (ignore type size))
