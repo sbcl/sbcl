@@ -236,7 +236,7 @@
       (test (not (> nan 1.0))))))
 
 (with-test (:name (:nan :comparison :non-float)
-            :fails-on (or :no-float-traps :sparc :loongarch64))
+            :fails-on (or :sparc :loongarch64))
   (sb-int:with-float-traps-masked (:invalid)
     (let ((nan (/ 0.0 0.0))
           (reals (list 0 1 -1 1/2 -1/2 (expt 2 300) (- (expt 2 300))))

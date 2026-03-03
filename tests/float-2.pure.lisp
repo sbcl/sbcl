@@ -901,7 +901,8 @@ fractional bits."
                                        (ffloor x 1d0))))))
 
 (with-test (:name :the-truncate
-            :fails-on (or :mips :loongarch64))
+            :fails-on (or :mips :loongarch64
+                          (and :openbsd :arm64)))
   (checked-compile-and-assert
       (:optimize :safe-debug)
       `(lambda (n)

@@ -664,7 +664,7 @@ void generate_elfcore_obj(const char *filename,
     size_t table_data_size = symbol_count * N_WORD_BYTES;
     uint64_t *table_data = calloc((unsigned int)symbol_count, 8); // Initialized to 0
     Elf64_Rela *relocs = calloc((unsigned int)symbol_count, sizeof(Elf64_Rela));
-    for (int i = 0; i < symbol_count; i++) {
+    for (long i = 0; i < symbol_count; i++) {
         relocs[i].r_offset = i * 8;
         // Syms start at index 2
         relocs[i].r_info   = ELF64_R_INFO(i + 2, OUR_RELOC_KIND);
