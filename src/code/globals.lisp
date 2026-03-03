@@ -98,9 +98,7 @@
   #-win32 :default)
 (declaim (always-bound *default-external-format* *default-source-external-format*))
 
-(declaim (special sb-debug:*in-the-debugger*
-                  sb-debug:*stack-top-hint*
-                  *gc-inhibit* *gc-pending*
+(declaim (special *gc-inhibit* *gc-pending*
                   #+sb-thread *stop-for-gc-pending*
                   *posix-argv*
                   *free-interrupt-context-index*))

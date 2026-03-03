@@ -23,6 +23,10 @@ an implementation of EVAL that calls the compiler will be used. If set
 to :INTERPRET, an interpreter will be used.")
 (declaim (always-bound *evaluator-mode*))
 
+;;; If this is bound before the debugger is invoked, it is used as the stack
+;;; top by the debugger. It can either be the first interesting frame, or the
+;;; name of the last uninteresting frame.
+(sb-impl:define-thread-local sb-debug:*stack-top-hint* nil)
 ;;; Like DEFUN, but hides itself in the backtrace. This is meant for
 ;;; trivial functions which just do some argument parsing and call
 ;;; ERROR for real. Hence, having them and their locals in the

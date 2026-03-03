@@ -62,10 +62,6 @@ provide bindings for printer control variables.")
 ;;; nestedness inside debugger command loops
 (sb-impl:define-thread-local *debug-command-level* 0)
 
-;;; If this is bound before the debugger is invoked, it is used as the stack
-;;; top by the debugger. It can either be the first interesting frame, or the
-;;; name of the last uninteresting frame.
-(sb-impl:define-thread-local *stack-top-hint* nil)
 (sb-impl:define-thread-local *current-frame* nil)
 
 ;;; Beginner-oriented help messages are important because you end up
