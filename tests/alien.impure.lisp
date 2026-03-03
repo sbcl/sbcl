@@ -585,6 +585,49 @@
                 (alien-funcall (extern-alien (something) (function c-string c-string)) s))))))
     (assert (string= (funcall f "SBCL_HOME") (sb-ext:posix-getenv "SBCL_HOME")))))
 
+#+win32
+(with-scratch-file (solib "dll")
+  (sb-ext:run-program (or #+arm64 "clang" "gcc")
+                      `("-shared" "-o" ,solib "alien-128.c")
+                      :search t)
+  (sb-alien:load-shared-object solib))
+
+#-win32
+(if (probe-file "alien-128.so")
+    (load-shared-object (truename "alien-128.so"))
+    (with-scratch-file (solib "so")
+      (sb-ext:run-program "/bin/sh"
+                          `("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
+                                              "-o" ,solib "alien-128.c")
+                          :output t :error :output)
+      (sb-alien:load-shared-object solib)))
+
+(with-test (:name :alien-128bit-value-passing
+            :skipped-on (or (not :x86-64) :win32))
+  ;; Verify that both halves of a 128-bit alien value survive the FFI call.
+  (let ((val (+ (ash #xDEADBEEFCAFEBABE 64) #x0123456789ABCDEF)))
+    (assert (= (alien-funcall
+                (extern-alien "uint128_low_64"
+                              (function (unsigned 64) (unsigned 128)))
+                val)
+               #x0123456789ABCDEF))
+    (assert (= (alien-funcall
+                (extern-alien "uint128_high_64"
+                              (function (unsigned 64) (unsigned 128)))
+                val)
+               #xDEADBEEFCAFEBABE)))
+  (let ((val (+ (ash #x-DEADBEEFCAFEBAB 64) #x0123456789ABCDEF)))
+    (assert (= (alien-funcall
+                (extern-alien "int128_low_64"
+                              (function (unsigned 64) (signed 128)))
+                val)
+               #x0123456789ABCDEF))
+    (assert (= (alien-funcall
+                (extern-alien "int128_high_64"
+                              (function (signed 64) (signed 128)))
+                val)
+               #x-DEADBEEFCAFEBAB))))
+
 (cl:in-package "SB-KERNEL")
 (test-util:with-test (:name :hash-consing)
   (assert (eq (parse-alien-type '(integer 9) nil)

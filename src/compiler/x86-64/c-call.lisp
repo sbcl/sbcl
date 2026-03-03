@@ -512,16 +512,15 @@ Floats are passed in integer registers."
               (lambda-vars arg)
               (cond ((and (alien-integer-type-p type)
                           (> (sb-alien::alien-integer-type-bits type) 64))
-                     ;; CLH: FIXME! This should really be
-                     ;; #xffffffffffffffff. nyef says: "Passing
-                     ;; 128-bit integers to ALIEN functions on x86-64
-                     ;; believed to be broken."
-                     (new-args `(logand ,arg #xffffffff))
-                     (new-args `(ash ,arg -64))
-                     (new-arg-types (parse-alien-type '(unsigned 64) env))
-                     (if (alien-integer-type-signed type)
-                         (new-arg-types (parse-alien-type '(signed 64) env))
-                         (new-arg-types (parse-alien-type '(unsigned 64) env))))
+                     (let ((signed (alien-integer-type-signed type)))
+                       (new-args `(ldb (byte 64 0) ,arg))
+                       (new-args (if signed
+                                     `(sb-c::mask-signed-field 64 (ldb (byte 64 64) ,arg))
+                                     `(ldb (byte 64 64) ,arg)))
+                       (new-arg-types (parse-alien-type '(unsigned 64) env))
+                       (if signed
+                           (new-arg-types (parse-alien-type '(signed 64) env))
+                           (new-arg-types (parse-alien-type '(unsigned 64) env)))))
                     (t
                      (new-args arg)
                      (new-arg-types type)))))
