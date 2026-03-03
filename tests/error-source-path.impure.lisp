@@ -361,3 +361,7 @@
    (lambda ()
      ```(progn . ,,,(progn (progn (setq x 1)))))
    (1 1 1 1 2 1 1 1 2)))
+
+(with-test (:name :def-error-context-printing)
+  (let ((*error-output* (make-broadcast-stream)))
+    (compile nil '(lambda () `(def  . ,(print x))))))
