@@ -620,7 +620,9 @@ prepare_to_save(char *filename, bool prepend_runtime, void **runtime_bytes,
     // SB-IMPL::DEINIT already checked for exactly 1 thread,
     // so this really shouldn't happen.
     if (all_threads->next) {
-        fprintf(stderr, "Can't save image with more than one executing thread");
+        extern void list_lisp_threads(int regions, FILE* f);
+        list_lisp_threads(0, stderr);
+        fprintf(stderr, "Can't save image with more than one executing thread\n");
         return NULL;
     }
 
