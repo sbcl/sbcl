@@ -721,6 +721,25 @@
                  (t
                   (tn-ref-tn ,temp)))))))
 
+;;; A vop inherits from a vop with :arg-ref, but it puts its argument
+;;; into an :info constant, bind the extra arg-refs to NIL.
+(defun extra-arg-refs (parse)
+  (let ((inherits (vop-parse-inherits parse)))
+    (when inherits
+      (let ((inherited-parse (vop-parse-or-lose inherits)))
+        (when (eq (vop-parse-body parse)
+                  (vop-parse-body inherited-parse))
+          (let ((arg-count (length (vop-parse-args parse)))
+                (inherited-arg-count (length (vop-parse-args inherited-parse))))
+            (when (/= arg-count inherited-arg-count)
+              (loop for extra in (nthcdr arg-count (vop-parse-args inherited-parse))
+                    for temp = (operand-parse-temp extra)
+                    for name = (string temp)
+                    unless (string= name
+                                    #1="OPERAND-PARSE-TEMP"
+                                    :end1 (min (length name) (length #1#)))
+                    collect `(,temp)))))))))
+
 ;;; Make a lambda that parses the VOP TN-REFS, does automatic operand
 ;;; loading, and runs the appropriate code generator.
 (defun make-generator-function (parse)
@@ -749,7 +768,6 @@
            (binds `(,(operand-parse-name op)
                     (tn-ref-tn ,(operand-parse-temp op)))))
           ((:more-argument :more-result))))
-
       `(named-lambda (vop ,(vop-parse-name parse)) (,n-vop)
          (declare (ignorable ,n-vop))
          (let* (,@(access-operands (vop-parse-args parse)
@@ -773,7 +791,8 @@
                 ,@(and (neq (vop-parse-before-load parse) :unspecified)
                        `((,dummy (progn
                                    ,@(vop-parse-before-load parse)))))
-                ,@(binds))
+                ,@(binds)
+                ,@(extra-arg-refs parse))
            (declare (ignore ,@(vop-parse-ignores parse)
                             ,@(and (neq (vop-parse-before-load parse) :unspecified)
                                    `(,dummy))))

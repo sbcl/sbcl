@@ -241,14 +241,21 @@
     :c/fixnum=>fixnum
     ;; Use :dword size if the constant is (unsigned-byte 32) and destination
     ;; is a GPR; the high 32 bits get automatically zeroed.
-    ((let ((y (fixnumize y)))
-       (cond ((and (typep y '(unsigned-byte 32)) (gpr-tn-p x))
+    ((let ((y (fixnumize y))
+           (gpr-r-p (gpr-tn-p r)))
+       (cond ((and gpr-r-p
+                   (eql y (logandc2 (1- (expt 2 32)) fixnum-tag-mask)))
+              (inst mov :dword r x))
+             ((and gpr-r-p
+                   (eql y (logandc2 (1- (expt 2 16)) fixnum-tag-mask)))
+              (inst movzx '(:word :dword) r x))
+             ((and gpr-r-p
+                   (eql y (logandc2 (1- (expt 2 8)) fixnum-tag-mask)))
+              (inst movzx '(:byte :dword) r x))
+             ((and (gpr-tn-p x) (typep y '(unsigned-byte 32)))
               ;; A 32-bit mov suffices unless to memory.
               (unless (location= x r)
-                (inst mov (if (gpr-tn-p r) :dword :qword) r x))
-              ;; TODO: if a :dword MOV was done, the AND is unnecessary
-              ;; when Y = (ldb (byte 32 0) (fixnumize -1 n-fixnum-tag-bits))
-              ;; Probably not very common, so not too important.
+                (inst mov (if gpr-r-p :dword :qword) r x))
               (inst and :dword r y))
              ((and (not (plausible-signed-imm32-operand-p y))
                    (let* ((int (sb-c::type-approximate-interval (tn-ref-type x-ref)))
@@ -263,25 +270,43 @@
               (move r x)
               (inst and r (constantize y))))))
     :c/unsigned=>unsigned
-    ;; Probably should give it the preceding treatment here too.
-    ;; Also, if the constant is #xFFFFFFFF, then just a MOV is enough
-    ;; if the destination is a register.
-    ((move r x)
-     ;; ANDing with #xFFFF_FFFF_FFFF_FFFF is a no-op, other than
-     ;; the eflags state which we don't care about.
-     (cond ((eql y most-positive-word))
-           ((and (not (plausible-signed-imm32-operand-p y))
-                 (= (logcount (logandc1 y most-positive-word)) 1))
-            (inst btr r (1- (integer-length (logandc1 y most-positive-word)))))
-           (t
-            (inst and r (constantize y)))))
+    ((let ((gpr-r-p (gpr-tn-p r)))
+       (cond ((eql y most-positive-word)
+              (move r x))
+             ((and gpr-r-p
+                   (eql y (1- (expt 2 32))))
+              (inst mov :dword r x))
+             ((and gpr-r-p
+                   (eql y (1- (expt 2 16))))
+              (inst movzx '(:word :dword) r x))
+             ((and gpr-r-p
+                   (eql y (1- (expt 2 8))))
+              (inst movzx '(:byte :dword) r x))
+             ((and (not (plausible-signed-imm32-operand-p y))
+                   (= (logcount (logandc1 y most-positive-word)) 1))
+              (move r x)
+              (inst btr r (1- (integer-length (logandc1 y most-positive-word)))))
+             (t
+              (move r x)
+              (inst and r (constantize y))))))
     :c/signed=>signed
-    ((move r x)
-     (cond ((and (not (plausible-signed-imm32-operand-p y))
-                 (= (logcount (logandc1 y most-positive-word)) 1))
-            (inst btr r (1- (integer-length (logandc1 y most-positive-word)))))
-           (t
-            (inst and r (constantize y))))))
+    ((let ((gpr-r-p (gpr-tn-p r)))
+       (cond ((and gpr-r-p
+                   (eql y (1- (expt 2 32))))
+              (inst mov :dword r x))
+             ((and gpr-r-p
+                   (eql y (1- (expt 2 16))))
+              (inst movzx '(:word :dword) r x))
+             ((and gpr-r-p
+                   (eql y (1- (expt 2 8))))
+              (inst movzx '(:byte :dword) r x))
+             ((and (not (plausible-signed-imm32-operand-p y))
+                   (= (logcount (logandc1 y most-positive-word)) 1))
+              (move r x)
+              (inst btr r (1- (integer-length (logandc1 y most-positive-word)))))
+             (t
+              (move r x)
+              (inst and r (constantize y)))))))
 
   (define-binop logior 2 or
     :c/fixnum=>fixnum
@@ -4468,7 +4493,7 @@
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg) :to :save)
          (mask :scs (unsigned-reg) :to :save))
-  (:arg-refs x-ref)
+  (:arg-refs x-ref mask-ref)
   (:arg-types t unsigned-num)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
@@ -4480,27 +4505,59 @@
                                      (specifier-type 'integer)))
               temp)
   (:generator 10
-    (when (types-equal-or-intersect  (tn-ref-type x-ref)
-                                     (specifier-type 'fixnum))
-      (move r x)
-      (inst sar r n-fixnum-tag-bits)
-      (inst jmp :nc DONE))
-    BIGNUM
-    (let* ((integerp (eq (tn-kind temp) :unused))
-           (error (unless integerp
-                    (generate-error-code vop 'object-not-integer-error x))))
-      (unless integerp
-        (%test-headers x temp error t nil '(#.bignum-widetag)
-                       :value-tn-ref x-ref
-                       :immediate-tested '(fixnum))))
-    (loadw r x bignum-digits-offset other-pointer-lowtag)
-    DONE
-    (inst and r mask)))
+    (let ((32-bit-mask-p (or (typep mask '(unsigned-byte 32))
+                             (and mask-ref
+                                  (csubtypep (tn-ref-type mask-ref)
+                                             (specifier-type '(unsigned-byte 32))))))
+          (31-bit-mask-p (or (typep mask `(unsigned-byte ,(- 32 n-fixnum-tag-bits)))
+                             (and mask-ref
+                                  (csubtypep (tn-ref-type mask-ref)
+                                             (specifier-type `(unsigned-byte ,(- 32 n-fixnum-tag-bits))))))))
+      (assemble ()
+        (when (types-equal-or-intersect  (tn-ref-type x-ref)
+                                         (specifier-type 'fixnum))
+          (move r x)
+          (inst sar (if 31-bit-mask-p :dword :qword) r n-fixnum-tag-bits)
+          (inst jmp :nc DONE))
+        BIGNUM
+        (let* ((integerp (eq (tn-kind temp) :unused))
+               (error (unless integerp
+                        (generate-error-code vop 'object-not-integer-error x))))
+          (unless integerp
+            (%test-headers x temp error t nil '(#.bignum-widetag)
+                           :value-tn-ref x-ref
+                           :immediate-tested '(fixnum))))
+        (inst mov (if 32-bit-mask-p
+                      :dword
+                      :qword)
+              r (object-slot-ea x bignum-digits-offset other-pointer-lowtag))
+        DONE
+        (cond ((eql mask most-positive-word))
+              ((eql mask (1- (expt 2 32)))
+               (inst mov :dword r r))
+              ((eql mask (1- (expt 2 16)))
+               (inst movzx '(:word :dword) r r))
+              ((eql mask (1- (expt 2 8)))
+               (inst movzx '(:byte :dword) r r))
+              (t
+               (inst and (if 32-bit-mask-p
+                             :dword
+                             :qword)
+                     r mask)))))))
+
+(defun plausible-signed-imm32-operand-or-32-mask-p (n)
+  (or (eql n (1- (expt 2 32)))
+      (plausible-signed-imm32-operand-p n)))
+
+(define-vop (logand-word-mask/integer-unsigned-c logand-word-mask/integer-unsigned)
+  (:args (x :scs (descriptor-reg)))
+  (:info mask)
+  (:arg-types t (:constant (satisfies plausible-signed-imm32-operand-or-32-mask-p))))
 
 (define-vop (logand-word-mask/unsigned-integer logand-word-mask/integer-unsigned)
   (:args (mask :scs (unsigned-reg) :to :save)
          (x :scs (descriptor-reg) :to :save))
-  (:arg-refs nil x-ref)
+  (:arg-refs mask-ref x-ref)
   (:arg-types unsigned-num t))
 
 (in-package "SB-C")

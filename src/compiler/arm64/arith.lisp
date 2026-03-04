@@ -1554,8 +1554,15 @@
                        :immediate-tested '(fixnum))))
     (loadw r x bignum-digits-offset other-pointer-lowtag)
     AND
-    (inst and r r mask)
+    (unless (eql mask most-positive-word)
+      (inst and r r mask))
     DONE))
+
+(define-vop (logand-word-mask/integer-unsigned-c logand-word-mask/integer-unsigned)
+  (:args (x :scs (descriptor-reg)))
+  (:info mask)
+  (:arg-refs x-ref)
+  (:arg-types t (:constant (satisfies logical-immediate-or-word-mask))))
 
 (define-vop (logand-word-mask/unsigned-integer logand-word-mask/integer-unsigned)
   (:args (mask :scs (unsigned-reg) :to :save)
