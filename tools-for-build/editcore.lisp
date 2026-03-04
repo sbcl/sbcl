@@ -67,7 +67,7 @@
   id addr data-page page-adjust nwords)
 (defmethod print-object ((self core-space) stream)
   (print-unreadable-object (self stream :type t)
-    (format stream "~d" (space-id self))))
+    (format stream "~d @ #x~x" (space-id self) (space-addr self))))
 (defun space-size (space) (* (space-nwords space) n-word-bytes))
 (defun space-end (space) (+  (space-addr space) (space-size space)))
 (defun space-nbytes-aligned (space)
@@ -2140,3 +2140,34 @@
                              (space-addr space) (space-nwords space)))
                      (cdr spacemap))
              core-header parsed-header spacemap output)))))))
+
+;;; A diagnostic function to discover whether final GC left junk that should not be visible
+(defun scan-for-end-of-page-garbage (corefile-name)
+  (with-open-file (input corefile-name :element-type '(unsigned-byte 8))
+    (let* ((core-header (make-array +backend-page-bytes+ :element-type '(unsigned-byte 8)))
+           (core-offset (read-core-header input core-header t))
+           (parsed-header (parse-core-header input core-header core-offset))
+           (parsed-spacelist (core-header-space-list parsed-header))
+           (words-per-page (/ +backend-page-bytes+ n-word-bytes))
+           (total-bad 0))
+      (with-mapped-core (sap core-offset (core-header-total-npages parsed-header) input)
+        (let ((spacemap (cons sap (sort (copy-list parsed-spacelist) #'> :key #'space-addr))))
+          (dolist (space parsed-spacelist)
+            (multiple-value-bind (npages deficit) (ceiling (space-nwords space) words-per-page)
+              (unless (zerop deficit)
+                ;; words on the last page above the end of the used range should be 0.
+                (let* ((mapped-addr (int-sap (translate-ptr (space-addr space) spacemap)))
+                       (range-end (* npages +backend-page-bytes+))
+                       (range-begin (+ range-end (* deficit n-word-bytes))) ; deficit is negative
+                       (this-space-bad 0))
+                  (loop for byte-offset from range-begin below range-end by n-word-bytes
+                        when (/= (sap-ref-word mapped-addr byte-offset) 0)
+                        do (incf this-space-bad)
+                           (format t "~x = ~x~%"
+                                   (+ (space-addr space) byte-offset)
+                                   (sap-ref-word mapped-addr byte-offset)))
+                  (incf total-bad this-space-bad)
+                  (format t "~x is at ~x, ~D pages, remainder ~D, paddr ~X..~X, bad: ~D~%"
+                          (space-addr space) mapped-addr npages deficit
+                          range-begin range-end this-space-bad)))))))
+      total-bad)))

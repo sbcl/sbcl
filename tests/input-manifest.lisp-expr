@@ -2,6 +2,7 @@
 ;;; is binary its diff view.
 ;;; Or not.
 (("alien-struct-by-value.impure.lisp" "tests/alien-struct-by-value.so")
+ ("alien.impure.lisp" "tests/alien-128.so")
  ("aprof.impure.lisp"
   "src/code/aprof.lisp"
   "src/code/shaketree.lisp")
@@ -44,7 +45,6 @@
  ("elfcore.test.sh" "src/runtime/shrinkwrap-sbcl")
  ("exit-hang.impure.lisp" "tests/fcb-threads.so")
  ("fcb-threads.impure.lisp" "tests/fcb-threads.so")
- ("alien.impure.lisp" "tests/alien-128.so")
  ("fifo-slow.impure.lisp" "contrib/sb-posix.fasl")
  ("filecompile.impure.lisp"
   "tests/data/wonky1.lisp"
@@ -85,6 +85,8 @@
   "../xperfecthash61.lisp-expr")
  ("redblack.pure.lisp" "tests/bbtree-test-util.lisp" "src/code/redblack.lisp")
  ("run-program.impure.lisp" "contrib/sb-posix.fasl")
+ ("save11.test.sh"
+  "src/code/repack-xref.lisp" "tools-for-build/corefile.lisp" "tools-for-build/editcore.lisp")
  ("sb-aclrepl.impure.lisp" "contrib/sb-aclrepl.fasl"
   "../contrib/sb-aclrepl/tests.lisp")
  ("sb-bsd-sockets.impure.lisp" "contrib/sb-bsd-sockets.fasl" "contrib/sb-posix.fasl"

@@ -1,6 +1,5 @@
 . ./subr.sh
 
-this_file=`pwd`/save10.test.sh
 use_test_subdirectory
 
 tmpcore=$TEST_FILESTEM.core

@@ -206,13 +206,10 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end,
         printf("writing %lu bytes from the %s space at %p\n",
                (long unsigned)bytes, names[id], addr);
 
-    /* FIXME: it sure would be nice to discover and document the behavior of this function
-     * with regard to aligning up the byte count as pertains to bytes spanned by a rounded
-     * up count that were not zeroized and would not have been written had we not rounded.
-     * That seems quite bogus to operate on bytes that the caller didn't promise were OK
-     * to be saved out (and didn't contain, say, a password and social security number) */
-    data = write_bytes(file, (char *)addr, ALIGN_UP(bytes, os_vm_page_size),
-                       file_offset, core_compression_level);
+    size_t aligned = ALIGN_UP(bytes, os_vm_page_size);
+    if (aligned > bytes)
+        memset((char*)addr + bytes, 0, aligned - bytes);
+    data = write_bytes(file, (char *)addr, aligned, file_offset, core_compression_level);
 
     write_lispobj(data, file);
     write_lispobj((uword_t)addr, file);
