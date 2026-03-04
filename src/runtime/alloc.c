@@ -559,6 +559,9 @@ void gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
 
 #ifdef LISP_FEATURE_WIN32
 #define ALT_STACK_SIZE 0
+#elif defined LISP_FEATURE_ARM64 && defined LISP_FEATURE_DARWIN
+/* SIGSTKSZ is already 128KB */
+#define ALT_STACK_SIZE SIGSTKSZ
 #else
 #define ALT_STACK_SIZE 32 * SIGSTKSZ
 #endif
