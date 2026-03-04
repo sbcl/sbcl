@@ -207,7 +207,7 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end,
                (long unsigned)bytes, names[id], addr);
 
     size_t aligned = ALIGN_UP(bytes, os_vm_page_size);
-    if (aligned > bytes)
+    if (aligned > bytes && id != READ_ONLY_CORE_SPACE_ID)
         memset((char*)addr + bytes, 0, aligned - bytes);
     data = write_bytes(file, (char *)addr, aligned, file_offset, core_compression_level);
 
