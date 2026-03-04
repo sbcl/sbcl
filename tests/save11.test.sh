@@ -14,7 +14,7 @@ EOF
 
 status=$?
 
-if [ $status == 2 ]; then
+if [ $status -eq 2 ]; then
     # skip
     exit $EXIT_TEST_WIN
 elif [ $status != 0 ]; then
