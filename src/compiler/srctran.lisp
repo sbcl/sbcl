@@ -3937,17 +3937,17 @@
 
 ;; (ash (unsigned-byte 128) -64) produces a word sized result
 (when-vop-existsp (:translate ash-right-two-words)
-  (deftransform ash ((integer amount) * word :node node :important nil)
-    (if (or (word-sized-lvar-p integer)
-            (combination-matches 'logand `(* ,most-positive-word) (node-dest node)))
-        (give-up-ir1-transform)
-        `(logand (ash integer amount) ,most-positive-word)))
-
   (deftransform ash ((integer amount) * signed-word :node node :important nil)
     (if (or (word-sized-lvar-p integer)
             (combination-matches 'logand `(* ,most-positive-word) (node-dest node)))
         (give-up-ir1-transform)
-        `(mask-signed-field ,sb-vm:n-word-bits (logand (ash integer amount) ,most-positive-word)))))
+        `(mask-signed-field ,sb-vm:n-word-bits (logand (ash integer amount) ,most-positive-word))))
+
+  (deftransform ash ((integer amount) * word :node node :important nil)
+    (if (or (word-sized-lvar-p integer)
+            (combination-matches 'logand `(* ,most-positive-word) (node-dest node)))
+        (give-up-ir1-transform)
+        `(logand (ash integer amount) ,most-positive-word))))
 
 (defoptimizers fold-p (expt sb-kernel::intexp) ((base power))
   (or (typep base '(and number
