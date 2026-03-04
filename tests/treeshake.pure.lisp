@@ -12,5 +12,6 @@
 (with-test (:name :no-v0p-ex1stsp-in-build ; spelled L33t Hax0r style on purpose
             :skipped-on (or :sb-devel
                             :sb-xref-for-internals))
-  (assert (null (remove-if (lambda (s) (equal (symbol-package s) (find-package "CTU")))
+  (assert (null (remove-if (lambda (s) (or (eq (symbol-package s) (find-package "TEST-UTIL"))
+                                           (eq s :vop-existsp)))
                            (apropos-list "VOP-EXISTSP")))))

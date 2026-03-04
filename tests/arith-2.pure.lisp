@@ -616,7 +616,7 @@
    (values (integer -255 0) (integer -9 0) &optional)))
 
 (with-test (:name :logbitp-on-integers
-            :fails-on (or :ppc :ppc64 :arm :riscv :loongarch64 :mips :sparc))
+            :implemented-on (:vop-existsp logbitp))
   (assert (not (ctu:ir1-named-calls `(lambda (x)
                                        (logbitp 20 x))))))
 (with-test (:name :bt-negative-bit)
@@ -886,19 +886,24 @@
                                        (declare (sb-vm:word x y))
                                        (floor x y))))))
 
+(with-test (:name :fixnum-*-by-unknown-overflow
+            :implemented-on (:vop-existsp overflow*))
+  (assert (not (ctu:ir1-named-calls `(lambda (x y)
+                                       (declare (integer x)
+                                                (fixnum y))
+                                       (the fixnum (* x y))))))
+  (assert (not (ctu:ir1-named-calls `(lambda (x y)
+                                       (declare (integer x)
+                                                (fixnum y))
+                                       (the fixnum (* y x))))))
+  (assert (not (ctu:ir1-named-calls `(lambda (x y)
+                                       (declare (integer x y))
+                                       (the fixnum (* x y))))))
+  (assert (equal (ctu:ir1-named-calls `(lambda (x)
+                                         (the fixnum (* x 2))))
+                 '(sb-kernel:*-by-fixnum-to-fixnum))))
+
 (with-test (:name :fixnum-*-by-unknown)
-  (when (ctu:vop-existsp 'overflow*)
-    (assert (not (ctu:ir1-named-calls `(lambda (x y)
-                                         (declare (integer x)
-                                                  (fixnum y))
-                                         (the fixnum (* x y))))))
-    (assert (not (ctu:ir1-named-calls `(lambda (x y)
-                                         (declare (integer x)
-                                                  (fixnum y))
-                                         (the fixnum (* y x))))))
-    (assert (not (ctu:ir1-named-calls `(lambda (x y)
-                                         (declare (integer x y))
-                                         (the fixnum (* x y)))))))
   (assert (equal (ctu:ir1-named-calls `(lambda (x)
                                          (the fixnum (* x 2))))
                  '(sb-kernel:*-by-fixnum-to-fixnum)))
@@ -906,9 +911,9 @@
   (checked-compile-and-assert
       (:optimize :safe)
       `(lambda (a)
-        (declare ((integer -1 11094097273866491717) a))
-        (the (integer 1)
-             (truncate a 2305843009213693949)))
+         (declare ((integer -1 11094097273866491717) a))
+         (the (integer 1)
+              (truncate a 2305843009213693949)))
     ((11094097273866491717) (values 4 1870725237011715921))))
 
 (with-test (:name :logxor-1-type)
@@ -1710,38 +1715,40 @@
    ((0) -9)
    ((79) -10)))
 
+(with-test (:name :ctz-transform
+            :implemented-on (:vop-existsp sb-kernel:count-trailing-zeros))
+  (assert (find 'sb-kernel:count-trailing-zeros
+                (ctu:ir1-named-calls `(lambda (n)
+                                        (declare ((unsigned-byte 64) n))
+                                        (integer-length (ldb (byte 64 0) (lognor n (- n)))))
+                                     nil)))
+  (assert (find 'sb-kernel:count-trailing-zeros
+                (ctu:ir1-named-calls `(lambda (n)
+                                        (declare ((signed-byte 64) n))
+                                        (integer-length (ldb (byte 64 0) (lognor n (- n)))))
+                                     nil)))
+  (assert (find 'sb-kernel:count-trailing-zeros
+                (ctu:ir1-named-calls `(lambda (n)
+                                        (declare (fixnum n))
+                                        (integer-length (ldb (byte 64 0) (lognor n (- n)))))
+                                     nil)))
+  (assert (find 'sb-kernel:count-trailing-zeros
+                (ctu:ir1-named-calls `(lambda (n)
+                                        (declare ((signed-byte 32) n))
+                                        (integer-length (ldb (byte 64 0) (lognor n (- n)))))
+                                     nil)))
+  (assert (find 'sb-kernel:count-trailing-zeros
+                (ctu:ir1-named-calls `(lambda (n)
+                                        (declare ((unsigned-byte 63) n))
+                                        (integer-length (ldb (byte 64 0) (lognor n (- n)))))
+                                     nil)))
+  (assert (find 'sb-kernel:count-trailing-zeros
+                (ctu:ir1-named-calls `(lambda (n)
+                                        (declare ((unsigned-byte 62) n))
+                                        (integer-length (ldb (byte 64 0) (lognor n (- n)))))
+                                     nil))))
+
 (with-test (:name :ctz)
-  (when (ctu:vop-existsp 'sb-kernel:count-trailing-zeros)
-    (assert (find 'sb-kernel:count-trailing-zeros
-                  (ctu:ir1-named-calls `(lambda (n)
-                                          (declare ((unsigned-byte 64) n))
-                                          (integer-length (ldb (byte 64 0) (lognor n (- n)))))
-                                       nil)))
-    (assert (find 'sb-kernel:count-trailing-zeros
-                  (ctu:ir1-named-calls `(lambda (n)
-                                          (declare ((signed-byte 64) n))
-                                          (integer-length (ldb (byte 64 0) (lognor n (- n)))))
-                                       nil)))
-    (assert (find 'sb-kernel:count-trailing-zeros
-                  (ctu:ir1-named-calls `(lambda (n)
-                                          (declare (fixnum n))
-                                          (integer-length (ldb (byte 64 0) (lognor n (- n)))))
-                                       nil)))
-    (assert (find 'sb-kernel:count-trailing-zeros
-                  (ctu:ir1-named-calls `(lambda (n)
-                                          (declare ((signed-byte 32) n))
-                                          (integer-length (ldb (byte 64 0) (lognor n (- n)))))
-                                       nil)))
-    (assert (find 'sb-kernel:count-trailing-zeros
-                  (ctu:ir1-named-calls `(lambda (n)
-                                          (declare ((unsigned-byte 63) n))
-                                          (integer-length (ldb (byte 64 0) (lognor n (- n)))))
-                                       nil)))
-    (assert (find 'sb-kernel:count-trailing-zeros
-                  (ctu:ir1-named-calls `(lambda (n)
-                                          (declare ((unsigned-byte 62) n))
-                                          (integer-length (ldb (byte 64 0) (lognor n (- n)))))
-                                       nil))))
   (checked-compile-and-assert
       ()
       `(lambda (n)
@@ -1776,21 +1783,23 @@
     (((ash 1 (- sb-vm:n-fixnum-bits 2))) (- sb-vm:n-fixnum-bits 2))
     (((ash -1 (- sb-vm:n-fixnum-bits 1))) (- sb-vm:n-fixnum-bits 1))))
 
+(with-test (:name :ash-left-add
+            :implemented-on (:vop-existsp sb-kernel:ash-left-add))
+  (assert (find 'sb-kernel:ash-left-add
+                (ctu:ir1-named-calls `(lambda (n)
+                                        (declare (sb-vm:signed-word n))
+                                        (+ (ash n 8) 8))
+                                     nil)))
+  (assert (find 'sb-kernel:ash-left-add
+                (ctu:ir1-named-calls `(lambda (n)
+                                        (declare (sb-vm:word n))
+                                        (+ (ash n 8) 8))
+                                     nil)))
+  (assert (find 'sb-kernel:ash-left-add
+                (ctu:ir1-named-calls `(lambda (n)
+                                        (+ (ash n 8) 8))))))
+
 (with-test (:name :ash-left-add)
-  (when (ctu:vop-existsp 'sb-kernel:ash-left-add)
-    (assert (find 'sb-kernel:ash-left-add
-                  (ctu:ir1-named-calls `(lambda (n)
-                                          (declare (sb-vm:signed-word n))
-                                          (+ (ash n 8) 8))
-                                       nil)))
-    (assert (find 'sb-kernel:ash-left-add
-                  (ctu:ir1-named-calls `(lambda (n)
-                                          (declare (sb-vm:word n))
-                                          (+ (ash n 8) 8))
-                                       nil)))
-    (assert (find 'sb-kernel:ash-left-add
-                  (ctu:ir1-named-calls `(lambda (n)
-                                          (+ (ash n 8) 8))))))
   (checked-compile-and-assert
       ()
       `(lambda (n)
@@ -1825,26 +1834,28 @@
     ((#x7FFFFFFFFFFFFFFF) (+ (ash #x7FFFFFFFFFFFFFFF 8) 8))
     (((- (expt 2 63))) (+ (ash (- (expt 2 63)) 8) 8))))
 
+(with-test (:name :ash-right-two-words-transform
+            :implemented-on (:vop-existsp sb-kernel:ash-right-two-words))
+  (assert (find 'sb-kernel:ash-right-two-words
+                (ctu:ir1-named-calls `(lambda (n)
+                                        (logand (ash n -8) most-positive-fixnum))
+                                     nil)))
+  (assert (find 'sb-kernel:ash-right-two-words
+                (ctu:ir1-named-calls `(lambda (n s)
+                                        (declare ((integer -64 -1) s))
+                                        (logand (ash n s) most-positive-fixnum))
+                                     nil)))
+  (assert (find 'sb-kernel:ash-right-two-words
+                (ctu:ir1-named-calls `(lambda (n)
+                                        (logand (ash n -8) most-positive-word))
+                                     nil)))
+  (assert (find 'sb-kernel:ash-right-two-words
+                (ctu:ir1-named-calls `(lambda (n s)
+                                        (declare ((integer -64 -1) s))
+                                        (logand (ash n s) most-positive-word))
+                                     nil))))
+
 (with-test (:name :ash-right-two-words)
-  (when (ctu:vop-existsp 'sb-kernel:ash-right-two-words)
-    (assert (find 'sb-kernel:ash-right-two-words
-                  (ctu:ir1-named-calls `(lambda (n)
-                                          (logand (ash n -8) most-positive-fixnum))
-                                       nil)))
-    (assert (find 'sb-kernel:ash-right-two-words
-                  (ctu:ir1-named-calls `(lambda (n s)
-                                          (declare ((integer -64 -1) s))
-                                          (logand (ash n s) most-positive-fixnum))
-                                       nil)))
-    (assert (find 'sb-kernel:ash-right-two-words
-                  (ctu:ir1-named-calls `(lambda (n)
-                                          (logand (ash n -8) most-positive-word))
-                                       nil)))
-    (assert (find 'sb-kernel:ash-right-two-words
-                  (ctu:ir1-named-calls `(lambda (n s)
-                                          (declare ((integer -64 -1) s))
-                                          (logand (ash n s) most-positive-word))
-                                       nil))))
   (checked-compile-and-assert
       ()
       `(lambda (n)
@@ -2231,20 +2242,22 @@
            (* (the integer (* n 0)) 3))
       ((#c(1 -2)) 0))))
 
+(with-test (:name :logtest-vop
+            :implemented-on (and (:vop-existsp logtest) (not :ppc64)))
+  (assert (= (count 'logtest
+                    (ctu:ir1-named-calls `(lambda (a)
+                                            (zerop (logand a 1)))
+                                         nil))
+             1))
+  (assert (= (count 'logtest
+                    (ctu:ir1-named-calls `(lambda (a)
+                                            (declare (fixnum a))
+                                            (plusp (logand a 6)))
+                                         nil))
+             1)))
+
 (with-test (:name :logtest
             :fails-on :ppc64)
-  (when (ctu:vop-existsp 'logtest)
-    (assert (= (count 'logtest
-                      (ctu:ir1-named-calls `(lambda (a)
-                                              (zerop (logand a 1)))
-                                           nil))
-               1))
-    (assert (= (count 'logtest
-                      (ctu:ir1-named-calls `(lambda (a)
-                                              (declare (fixnum a))
-                                              (plusp (logand a 6)))
-                                           nil))
-               1)))
   (checked-compile-and-assert
       ()
       `(lambda (p1)
@@ -2260,7 +2273,7 @@
     ((0) nil)))
 
 (with-test (:name :logtest-integer-fixnum
-            :fails-on (or :arm :ppc64 :ppc :riscv :loongarch64 :mips :sparc))
+            :implemented-on (or :arm64 :x86-64 :x86))
   (assert (not (ctu:ir1-named-calls `(lambda (x y)
                                        (declare (integer x)
                                                 (fixnum y))
@@ -2332,7 +2345,7 @@
                         nil))
              1)))
 (with-test (:name :range<-empty)
-  (if (ctu:vop-existsp 'sb-kernel:range<<=)
+  (if (vop-existsp 'sb-kernel:range<<=)
       (assert-type
        (lambda (v)
          (declare ((integer -50 0) v))
@@ -2430,3 +2443,14 @@
       `(lambda (a b)
          (values (truncate (/ a b))))
     ((#C(3 6) #C(1 2)) 3)))
+
+(with-test (:name :ash-into-word
+            :implemented-on (:vop-existsp sb-kernel:ash-right-two-words))
+  (assert (not (ctu:ir1-named-calls
+                `(lambda (x)
+                   (ash (the (unsigned-byte ,(* 2 sb-vm:n-word-bits)) x)
+                        ,(- sb-vm:n-word-bits))))))
+  (assert (not (ctu:ir1-named-calls
+                `(lambda (x)
+                   (ash (the (signed-byte ,(* 2 sb-vm:n-word-bits)) x)
+                        ,(- sb-vm:n-word-bits)))))))

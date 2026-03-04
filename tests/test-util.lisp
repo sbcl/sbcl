@@ -56,7 +56,8 @@
            #:*test-directory*
            #:opaque-identity
            #:runtime #:split-string #:integer-sequence #:shuffle
-           #:compile-so))
+           #:compile-so
+           :vop-existsp))
 
 (in-package :test-util)
 
@@ -194,12 +195,12 @@
           (*threads-to-join* nil)
           (*threads-to-kill* nil))
       (handler-bind ((error (lambda (error)
-                              (if (expected-failure-p fails-on)
+                              (if (skipped-p fails-on)
                                   (fail-test :expected-failure name error)
                                   (fail-test :unexpected-failure name error))
                               (return-from run-test)))
                      (timeout (lambda (error)
-                                (if (expected-failure-p fails-on)
+                                (if (skipped-p fails-on)
                                     (fail-test :expected-failure name error t)
                                     (fail-test :unexpected-failure name error t))
                                 (return-from run-test))))
@@ -227,7 +228,7 @@
           (when any-leftover
             (fail-test :leftover-thread name any-leftover)
             (return-from run-test)))
-        (if (expected-failure-p fails-on)
+        (if (skipped-p fails-on)
             (fail-test :unexpected-success name nil)
             ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
             (log-msg/non-pretty *trace-output* "Success ~S" name)))))
@@ -264,7 +265,7 @@
 ;;; The purpose of running tests in parallel is to exercise the compiler
 ;;; to show that it works without acquiring the world lock,
 ;;; but the nice side effect is that the tests finish quicker.
-(defmacro with-test ((&key fails-on broken-on skipped-on name serial slow)
+(defmacro with-test ((&key fails-on broken-on skipped-on implemented-on name serial slow)
                      &body body)
   ;; Failing and skipped tests are written into a summary file which is later read back.
   ;; To guarantee readability there can't be symbols in random packages.
@@ -281,7 +282,7 @@
                  (character `(code-char ,(char-code x)))
                  (string x))))
   (cond
-    ((broken-p broken-on)
+    ((skipped-p broken-on)
      `(progn
         (start-test)
         (fail-test :skipped-broken ',name "Test broken on this platform")))
@@ -289,10 +290,16 @@
      `(progn
         (start-test)
         (fail-test :skipped-disabled ',name "Test disabled for this combination of platform and features")))
+    ((and implemented-on
+          (not
+           (skipped-p implemented-on)))
+     `(progn
+        (start-test)
+        (fail-test :skipped-unimplemented ',name "Test for a feature not implemented for this platform")))
     ((and (boundp '*deferred-test-forms*)
           (not serial)
           (or (not fails-on)
-              (not (expected-failure-p fails-on))))
+              (not (skipped-p fails-on))))
      ;; To effectively parallelize calls to COMPILE, we must defer compilation
      ;; until a worker thread has picked off the test from shared worklist.
      ;; Thus we push only the form to be compiled, not a lambda.
@@ -339,14 +346,37 @@
               *break-on-expected-failure*)
       (really-invoke-debugger condition))))
 
-(defun expected-failure-p (fails-on)
-  (sb-impl::featurep fails-on))
+(defun vop-existsp (name &optional (query :translate))
+  (ecase query
+    (:named
+     (gethash name sb-c::*backend-template-names*))
+    (:translate
+     (let ((info (sb-int:info :function :info name)))
+       (when info
+         (sb-c::fun-info-templates info))))))
 
-(defun broken-p (broken-on)
-  (sb-impl::featurep broken-on))
-
-(defun skipped-p (skipped-on)
-  (sb-impl::featurep skipped-on))
+(defun skipped-p (x)
+  (typecase x
+    (cons
+     (case (car x)
+       (:vop-existsp
+        (vop-existsp (second x) (or (third x)
+                                    :translate)))
+       ((:not not)
+        (cond
+          ((cddr x)
+           (error "too many subexpressions in feature expression: ~S" x))
+          ((null (cdr x))
+           (error "too few subexpressions in feature expression: ~S" x))
+          (t (not (skipped-p (cadr x))))))
+       ((:and and) (every #'skipped-p (cdr x)))
+       ((:or or) (some #'skipped-p (cdr x)))
+       (t
+        (error "unknown operator in feature expression: ~S." x))))
+    (symbol
+     (and (member x *features*) t))
+    (t
+     (error "invalid feature expression: ~S" x))))
 
 ;;;; MAP-{OPTIMIZATION-QUALITY-COMBINATIONS,OPTIMIZE-DECLARATIONS}
 

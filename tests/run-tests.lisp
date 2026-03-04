@@ -104,6 +104,7 @@
   (terpri)
   (format t "Finished running tests.~%")
   (let ((skipcount 0)
+        (unimplemented 0)
         (*print-pretty* nil))
     (cond (*all-failures*
            (format t "Status:~%")
@@ -118,13 +119,20 @@
                                           " Invalid exit status:")
                     (format t " ~a~%"
                             (enough-namestring (second fail))))
+                   ((eq (car fail) :skipped-unimplemented)
+                    (when *report-skipped-tests*
+                      (format t " ~20a ~a / ~a~%"
+                              "Skipped (unimplemented):"
+                              (enough-namestring (second fail))
+                              (third fail)))
+                    (incf skipcount))
                    ((eq (car fail) :skipped-disabled)
                     (when *report-skipped-tests*
                       (format t " ~20a ~a / ~a~%"
                               "Skipped (irrelevant):"
                               (enough-namestring (second fail))
                               (third fail)))
-                    (incf skipcount))
+                    (incf unimplemented))
                    (t
                     (output-colored-text
                      (first fail)
@@ -134,12 +142,16 @@
                        (:leftover-thread " Leftover thread (broken):")
                        (:unexpected-success " Unexpected success:")
                        (:skipped-broken " Skipped (broken):")
-                       (:skipped-disabled " Skipped (irrelevant):")))
+                       (:skipped-disabled " Skipped (irrelevant):")
+                       (:skipped-unimplemented " Skipped (unimplemented):")))
                     (format t " ~a / ~a~%"
                             (enough-namestring (second fail))
                             (third fail)))))
            (when (> skipcount 0)
-             (format t " (~a tests skipped for this combination of platform and features)~%"
+             (format t " (~a test~:p skipped for this combination of platform and features)~%"
+                     skipcount))
+           (when (> skipcount 0)
+             (format t " (~a test~:p skipped for features not implemented for this platform)~%"
                      skipcount)))
           (t
            (format t "All tests succeeded~%")))))
@@ -645,10 +657,8 @@
 
 (defun unexpected-failures ()
   (remove-if (lambda (x)
-               (or (eq (car x) :expected-failure)
-                   (eq (car x) :unexpected-success)
-                   (eq (car x) :skipped-broken)
-                   (eq (car x) :skipped-disabled)))
+               (member (car x) '(:expected-failure :unexpected-success :skipped-broken
+                                 :skipped-disabled :skipped-unimplemented)))
              *all-failures*))
 
 (defun filter-test-files (wild-mask)
