@@ -244,6 +244,12 @@ lispobj set_thread_foreign_call_trigger(struct thread* th, bool writable)
     return csp_around_foreign_call(th);
 }
 
+#ifdef NDEBUG
+# define VERIFY(expr) (void)(expr)
+#else
+# define VERIFY(expr) gc_assert(expr)
+#endif
+
 int
 handle_foreign_call_trigger (os_context_t *context, os_vm_address_t fault_address)
 {
@@ -257,8 +263,8 @@ handle_foreign_call_trigger (os_context_t *context, os_vm_address_t fault_addres
                 /* gc_stop_the_world has left this thread untouched,
                    wait for gc_start_the_world */
                 pthread_mutex_t *exit_lock = &thread_extra_data(th)->foreign_exit_lock;
-                gc_assert(mutex_acquire(exit_lock));
-                gc_assert(mutex_release(exit_lock));
+                VERIFY(mutex_acquire(exit_lock));
+                VERIFY(mutex_release(exit_lock));
             }
             else {
                 /* gc_stop_the_world has either already sent a signal
@@ -277,8 +283,8 @@ handle_foreign_call_trigger (os_context_t *context, os_vm_address_t fault_addres
             if (exiting) {
                 pthread_mutex_t *exit_lock = &thread_extra_data(th)->foreign_exit_lock;
                 write_TLS(STOP_FOR_GC_PENDING, LISP_T, th);
-                gc_assert(mutex_acquire(exit_lock));
-                gc_assert(mutex_release(exit_lock));
+                VERIFY(mutex_acquire(exit_lock));
+                VERIFY(mutex_release(exit_lock));
             } else {
                 if (read_TLS(STOP_FOR_GC_PENDING, th) == NIL) {
                     /* Block SIG_STOP_FOR_GC and exit,
@@ -361,7 +367,7 @@ void gc_stop_the_world()
             bool foreign = 0;
 #ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
             pthread_mutex_t *exit_lock = &semaphores->foreign_exit_lock;
-            gc_assert(mutex_acquire(exit_lock));
+            VERIFY(mutex_acquire(exit_lock));
             lispobj csp = set_thread_foreign_call_trigger(th, 0);
             foreign = csp != 0;
 #endif
@@ -387,7 +393,7 @@ void gc_stop_the_world()
                            *stop-for-gc-pending*, need to unlock the exit
                            lock to reach the end of without-gcing* */
                         semaphores->gc_inhibited = 2;
-                        gc_assert(mutex_release(exit_lock));
+                        VERIFYt(mutex_release(exit_lock));
                     } else {
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
                         th->control_stack_pointer = (lispobj*)csp;
@@ -453,7 +459,7 @@ void gc_start_the_world()
             set_thread_foreign_call_trigger(th, 1);
 
             if (thread_extra_data(th)->gc_inhibited != 2) // already released
-                gc_assert(mutex_release(&thread_extra_data(th)->foreign_exit_lock));
+                VERIFY(mutex_release(&thread_extra_data(th)->foreign_exit_lock));
 
             thread_extra_data(th)->gc_inhibited = 0;
 
