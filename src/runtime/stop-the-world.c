@@ -393,7 +393,7 @@ void gc_stop_the_world()
                            *stop-for-gc-pending*, need to unlock the exit
                            lock to reach the end of without-gcing* */
                         semaphores->gc_inhibited = 2;
-                        VERIFYt(mutex_release(exit_lock));
+                        VERIFY(mutex_release(exit_lock));
                     } else {
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
                         th->control_stack_pointer = (lispobj*)csp;
