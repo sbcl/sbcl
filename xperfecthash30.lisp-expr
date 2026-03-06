@@ -2,9 +2,9 @@
 (#(0 4 8 C)
  "((:NEAREST . 0) (:ZERO . 3) (:POSITIVE-INFINITY . 1) (:NEGATIVE-INFINITY . 2))"
  "((& (>> val 2) 3))")
-(#(0 4 8 C 18 1C 20 24 28 2C 30 34 38 3C 40 44 48 4C 50 54 58 5C 60 F4)
- "(61 6 3 11 8 9 10 7 15 14 13 12 24 23 22 21 20 19 18 2 17 16 0 1)"
- "((let ((tab #a((16) (unsigned-byte 8) 0 13 1 7 15 3 13 21 13 21 16 17 21 13 18 22)))
+(#(0 4 8 C 18 1C 20 24 28 2C 30 34 38 3C 40 44 48 4C 50 54 58 5C F4)
+ "(61 6 3 11 8 9 10 7 15 14 13 12 23 22 21 20 19 18 2 17 16 0 1)"
+ "((let ((tab #a((16) (unsigned-byte 8) 0 13 1 21 15 21 13 7 16 12 9 22 21 0 16 4)))
   (let ((b (& (>> val 2) #xf)))
    (let ((a (>> (<< val 24) 28)))
     (^ a (aref tab b))))))")
@@ -644,9 +644,9 @@
   (let ((b (& val #x7)))
    (let ((a (>> (<< val 3) 29)))
     (^ a (aref tab b))))))")
-(#(22301E9 806FCD7 DDACDA4 14AB411F)
- "(SB-VM::UNDEFINED-TRAMP SB-VM::UNDEFINED-ALIEN-TRAMP SB-VM::RETURN-VALUES-LIST SB-VM::CALL-SYMBOL)"
- "((& (>> val 3) 3))")
+(#(22301E9 806FCD7 DDACDA4 14AB411F 1D79BB17)
+ "(SB-VM::UNDEFINED-TRAMP SB-VM::UNDEFINED-ALIEN-TRAMP SB-VM::RETURN-VALUES-LIST SB-VM::CALL-SYMBOL SB-C:UNWIND)"
+ "((& (>> val 23) 7))")
 (#(2272EB9 2D83FFB 4F39EEA D4575D9 152FF428 1812BD4D 1B8B3DFE)
  "(:ALLOW-OTHER-KEYS :SLOTS :VARIABLE-LENGTH-P :LENGTH :LOWTAG :WIDETAG :NAME)"
  "((& (>> val 19) 7))")
@@ -1358,9 +1358,6 @@
 (#(92447CE DB121C2 102153B3 105D4415 13D924E0)
  "(NIL :LOAD-FP :SAVE-FP :FROB-NFP :LOAD-NARGS)"
  "((& (^ (>> val 5) (>> val 19)) 7))")
-(#(92447CE DB121C2 102153B3 105D4415 13D924E0 1EE57DB1)
- "(NIL :LOAD-FP :SAVE-FP :FROB-NFP :COMP-LRA :LOAD-NARGS)"
- "((& (^ (>> val 4) (>> val 21)) 7))")
 (#(99FDFD4 9FE1D98 EF3F4BC 102153B3)
  "(:COMPUTE-ONLY :FORCE-TO-STACK NIL T)"
  "((& (>> val 2) 3))")

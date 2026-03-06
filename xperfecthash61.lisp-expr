@@ -2,9 +2,9 @@
 (#(0 8 10 18)
  "((:NEAREST . 0) (:ZERO . 1) (:POSITIVE-INFINITY . 2) (:NEGATIVE-INFINITY . 3))"
  "((& (>> val 3) 3))")
-(#(0 8 10 18 28 30 38 40 48 50 58 60 68 70 78 80 88 90 98 A0 A8 B0 B8 1E8)
- "(61 5 3 10 7 8 9 6 14 13 12 11 23 22 21 20 19 18 17 2 16 15 0 1)"
- "((let ((tab #a((16) (unsigned-byte 8) 0 13 1 21 21 13 7 15 21 16 9 22 21 0 16 4)))
+(#(0 8 10 18 28 30 38 40 48 50 58 60 68 70 78 80 88 90 98 A0 A8 B0 1E8)
+ "(61 5 3 10 7 8 9 6 14 13 12 11 22 21 20 19 18 17 2 16 15 0 1)"
+ "((let ((tab #a((16) (unsigned-byte 8) 0 13 1 21 15 13 7 15 16 9 18 22 21 0 16 4)))
   (let ((b (& (>> val 3) #xf)))
    (let ((a (>> (<< val 23) 28)))
     (^ a (aref tab b))))))")
@@ -39,9 +39,6 @@
 (#(0 DB121C2 52B126B3 53D924E0 E450DECD)
  "(NIL :FROB-NFP :LOAD-RETURN-PC :LOAD-OLD-FP :LOAD-NARGS)"
  "((& (^ (>> val 1) (>> val 7)) 7))")
-(#(0 DB121C2 53D924E0 9EE57DB1 B05D4415 C92447CE)
- "(NIL :LOAD-FP :SAVE-FP :FROB-NFP :COMP-LRA :LOAD-NARGS)"
- "((& (+ (>> val 3) (>> val 4)) 7))")
 (#(0 DB121C2 53D924E0 B05D4415 C92447CE)
  "(NIL :LOAD-FP :SAVE-FP :FROB-NFP :LOAD-NARGS)"
  "((& (+ (>> val 2) (>> val 27)) 7))")
@@ -1319,9 +1316,9 @@
   (let ((b (& val #x7)))
    (let ((a (>> val 29)))
     (^ a (aref tab b))))))")
-(#(822301E9 94AB411F A806FCD7 EDDACDA4)
- "(SB-VM::UNDEFINED-TRAMP SB-VM::UNDEFINED-ALIEN-TRAMP SB-VM::RETURN-VALUES-LIST SB-VM::CALL-SYMBOL)"
- "((& (>> val 3) 3))")
+(#(7D79BB17 822301E9 94AB411F A806FCD7 EDDACDA4)
+ "(SB-VM::UNDEFINED-TRAMP SB-VM::UNDEFINED-ALIEN-TRAMP SB-VM::RETURN-VALUES-LIST SB-VM::CALL-SYMBOL SB-C:UNWIND)"
+ "((& (>> val 23) 7))")
 (#(831D9492 952EFA09 9DFD6B68 DC33E6FC)
  "#(:LT :GT :EQ :SO)"
  "((& (>> val 4) 3))")
