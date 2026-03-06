@@ -458,56 +458,11 @@
       (when (and lvar (constant-lvar-p lvar))
         (careful-specifier-type (lvar-value lvar))))))
 
-;;; Derive the type to be the type specifier which is the Nth arg,
-;;; with the additional restriptions noted in the CLHS for STRING and
-;;; SIMPLE-STRING, defined to specialize on CHARACTER, and for VECTOR
-;;; (under the page for MAKE-SEQUENCE).
-;;; At present this is used to derive the output type of CONCATENATE,
-;;; MAKE-SEQUENCE, and MERGE. Two things seem slightly amiss:
-;;; 1. The sequence type actually produced might not be exactly that specified.
-;;;    (TYPE-OF (MAKE-SEQUENCE '(AND (NOT SIMPLE-ARRAY) (VECTOR BIT)) 9))
-;;;    => (SIMPLE-BIT-VECTOR 9)
-;;; 2. Because we *know* that a hairy array won't be produced,
-;;;    why does derivation preserve the non-simpleness, if so specified?
 (defun creation-result-type-specifier-nth-arg (n &optional nil-nil)
   (lambda (call)
     (let ((lvar (nth n (basic-combination-args call))))
-      (when (and lvar (constant-lvar-p lvar))
-        (let* ((specifier (lvar-value lvar))
-               (lspecifier (if (atom specifier) (list specifier) specifier)))
-          (cond
-            ((eq (car lspecifier) 'string)
-             (destructuring-bind (string &rest size)
-                 lspecifier
-               (declare (ignore string))
-               (careful-specifier-type
-                `(vector character ,@(when size size)))))
-            ((eq (car lspecifier) 'simple-string)
-             (destructuring-bind (simple-string &rest size)
-                 lspecifier
-               (declare (ignore simple-string))
-               (careful-specifier-type
-                `(simple-array character ,@(if size (list size) '((*)))))))
-            ((and nil-nil
-                  (eq specifier 'nil))
-             (specifier-type 'null))
-            (t
-             (let ((ctype (careful-specifier-type specifier)))
-               (cond ((not (array-type-p ctype))
-                      ctype)
-                     ((unknown-type-p (array-type-element-type ctype))
-                      (make-array-type (array-type-dimensions ctype)
-                                       :complexp (array-type-complexp ctype)
-                                       :element-type *wild-type*
-                                       :specialized-element-type *wild-type*))
-                     ((eq (array-type-specialized-element-type ctype)
-                          *wild-type*)
-                      (make-array-type (array-type-dimensions ctype)
-                                       :complexp (array-type-complexp ctype)
-                                       :element-type *universal-type*
-                                       :specialized-element-type *universal-type*))
-                     (t
-                      ctype))))))))))
+      (when lvar
+        (creation-result-type-specifier lvar nil-nil)))))
 
 (defun read-elt-type-deriver (skip-arg-p element-type-spec no-hang)
   (lambda (call)
