@@ -189,7 +189,11 @@
   (assert-type
      (lambda (y)
        (coerce "ab" y))
-     (or list (simple-array * (*)) sb-kernel:extended-sequence)))
+     (or list (simple-array * (*)) sb-kernel:extended-sequence))
+  (assert-type
+   (lambda (x y)
+     (coerce (the function x) y))
+   (or function sequence)))
 
 (with-test (:name :coerce-constructed-type)
   (assert-type

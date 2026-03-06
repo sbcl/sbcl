@@ -8864,11 +8864,18 @@
            value
            (lambda (type)
              (macrolet ((cases (&body cases)
-                          `(cond ,@(loop for (supertype result) on cases by #'cddr
+                          `(cond ((or (eq type *universal-type*))
+                                  type)
+                                 ((opaque-type-p type)
+                                  *universal-type*)
+                                 ((types-equal-or-intersect type (specifier-type 'extended-sequence))
+                                  (type-union type (specifier-type 'sequence)))
+                                 ,@(loop for (supertype result) on cases by #'cddr
                                          collect `((csubtypep type (specifier-type ',supertype))
                                                    ,(if (eq result 'type)
                                                         'type
                                                         `(specifier-type ',result))))
+
                                  (t
                                   type))))
                (cases
