@@ -480,6 +480,10 @@
   (when (= (length args) n-args)
     (values-list args)))
 
+(defun check-min-args (args n-args)
+  (when (>= (length args) n-args)
+    (values-list args)))
+
 (defmacro combination-match (lvar spec &body body)
   (let (bound-vars)
     (labels ((ensure-or (x)
@@ -506,7 +510,10 @@
                      (spec (ensure-or spec)))
                  (labels ((gen (&optional sub)
                             (destructuring-bind (name . args) (pop spec)
-                              (let* ((vars (make-gensym-list (length args) "ARG"))
+                              (let* ((variable (position '&rest args))
+                                     (arg-count (or variable
+                                                    (length args)))
+                                     (vars (make-gensym-list arg-count "ARG"))
                                      (names (ensure-or name))
                                      (commutative (and (loop for name in names
                                                              always (or (typep name '(cons (eql :commutative)))
@@ -521,7 +528,9 @@
                                                               (second name)
                                                               name))))
                                 (setf bound-vars old-bound-vars)
-                                (let ((args `(or (multiple-value-bind ,vars (check-args args ,(length args))
+                                (let ((args `(or (multiple-value-bind ,vars ,(if variable
+                                                                                 `(check-min-args args ,arg-count)
+                                                                                 `(check-args args ,arg-count))
                                                    (declare (ignorable ,@vars))
                                                    (when ,(car vars)
                                                      ,(expand lvars specs

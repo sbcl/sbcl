@@ -190,3 +190,13 @@
      (lambda (y)
        (coerce "ab" y))
      (or list (simple-array * (*)) sb-kernel:extended-sequence)))
+
+(with-test (:name :coerce-constructed-type)
+  (assert-type
+   (lambda (x n)
+     (coerce x `(vector ,n)))
+   vector)
+  (assert-type
+   (lambda (x n)
+     (coerce (the list x) `(vector ,n)))
+   (simple-array * (*))))

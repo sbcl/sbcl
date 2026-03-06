@@ -8801,54 +8801,58 @@
 
 (defoptimizer (coerce derive-type) ((value type))
   (let ((type-type
-          (multiple-value-bind (type constant)
-              (if (constant-lvar-p type)
-                  (values (lvar-value type) t)
-                  (constant-cons-type (lvar-type type)))
-            (when constant
-              ;; This branch is essentially (RESULT-TYPE-SPECIFIER-NTH-ARG 2),
-              ;; but dealing with the niggle that complex canonicalization gets
-              ;; in the way: (COERCE 1 'COMPLEX) returns 1, which is not of
-              ;; type COMPLEX.
-              (let ((result-typeoid (careful-specifier-type type)))
-                (cond
-                  ((null result-typeoid) nil)
-                  ((csubtypep result-typeoid (specifier-type 'number))
-                   ;; the difficult case: we have to cope with ANSI 12.1.5.3
-                   ;; Rule of Canonical Representation for Complex Rationals,
-                   ;; which is a truly nasty delivery to field.
-                   (cond
-                     ((csubtypep result-typeoid (specifier-type 'real))
-                      ;; cleverness required here: it would be nice to deduce
-                      ;; that something of type (INTEGER 2 3) coerced to type
-                      ;; DOUBLE-FLOAT should return (DOUBLE-FLOAT 2.0d0 3.0d0).
-                      ;; FLOAT gets its own clause because it's implemented as
-                      ;; a UNION-TYPE, so we don't catch it in the NUMERIC-TYPE
-                      ;; logic below.
-                      result-typeoid)
-                     ((and (numeric-type-p result-typeoid)
-                           (eq (numeric-type-complexp result-typeoid) :real))
-                      ;; FIXME: is this clause (a) necessary or (b) useful?
-                      result-typeoid)
-                     ((or (csubtypep result-typeoid
-                                     (specifier-type '(complex single-float)))
-                          (csubtypep result-typeoid
-                                     (specifier-type '(complex double-float)))
-                          #+long-float
-                          (csubtypep result-typeoid
-                                     (specifier-type '(complex long-float))))
-                      ;; float complex types are never canonicalized.
-                      result-typeoid)
-                     (t
-                      ;; if it's not a REAL, or a COMPLEX FLOAToid, it's
-                      ;; probably just a COMPLEX or equivalent.  So, in that
-                      ;; case, we will return a complex or an object of the
-                      ;; provided type if it's rational:
-                      (type-union result-typeoid
-                                  (type-intersection (lvar-type value)
-                                                     (specifier-type 'rational))))))
-                  (t
-                   result-typeoid))))))
+          (or (multiple-value-bind (type constant)
+                  (if (constant-lvar-p type)
+                      (values (lvar-value type) t)
+                      (constant-cons-type (lvar-type type)))
+                (when constant
+                  ;; This branch is essentially (RESULT-TYPE-SPECIFIER-NTH-ARG 2),
+                  ;; but dealing with the niggle that complex canonicalization gets
+                  ;; in the way: (COERCE 1 'COMPLEX) returns 1, which is not of
+                  ;; type COMPLEX.
+                  (let ((result-typeoid (careful-specifier-type type)))
+                    (cond
+                      ((null result-typeoid) nil)
+                      ((csubtypep result-typeoid (specifier-type 'number))
+                       ;; the difficult case: we have to cope with ANSI 12.1.5.3
+                       ;; Rule of Canonical Representation for Complex Rationals,
+                       ;; which is a truly nasty delivery to field.
+                       (cond
+                         ((csubtypep result-typeoid (specifier-type 'real))
+                          ;; cleverness required here: it would be nice to deduce
+                          ;; that something of type (INTEGER 2 3) coerced to type
+                          ;; DOUBLE-FLOAT should return (DOUBLE-FLOAT 2.0d0 3.0d0).
+                          ;; FLOAT gets its own clause because it's implemented as
+                          ;; a UNION-TYPE, so we don't catch it in the NUMERIC-TYPE
+                          ;; logic below.
+                          result-typeoid)
+                         ((and (numeric-type-p result-typeoid)
+                               (eq (numeric-type-complexp result-typeoid) :real))
+                          ;; FIXME: is this clause (a) necessary or (b) useful?
+                          result-typeoid)
+                         ((or (csubtypep result-typeoid
+                                         (specifier-type '(complex single-float)))
+                              (csubtypep result-typeoid
+                                         (specifier-type '(complex double-float)))
+                              #+long-float
+                              (csubtypep result-typeoid
+                                         (specifier-type '(complex long-float))))
+                          ;; float complex types are never canonicalized.
+                          result-typeoid)
+                         (t
+                          ;; if it's not a REAL, or a COMPLEX FLOAToid, it's
+                          ;; probably just a COMPLEX or equivalent.  So, in that
+                          ;; case, we will return a complex or an object of the
+                          ;; provided type if it's rational:
+                          (type-union result-typeoid
+                                      (type-intersection (lvar-type value)
+                                                         (specifier-type 'rational))))))
+                      (t
+                       result-typeoid)))))
+              (combination-match type ((:or list list*) (:constant type) &rest *)
+                (case type
+                  ((array simple-array vector)
+                   (specifier-type type))))))
         (value-type
           (one-arg-derive-type
            value
