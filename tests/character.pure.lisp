@@ -224,7 +224,6 @@
        c))
    null))
 
-
 (with-test (:name :equalp-to-eql)
   (checked-compile-and-assert
    ()
@@ -233,3 +232,10 @@
       (equalp a (the (or null character) b)))
    ((#\a #\A) t)
    ((#\a #\b) nil)))
+
+(with-test (:name :character-input-type)
+  (assert-type
+   (lambda (x)
+     (character x)
+     x)
+   (or (string 1) character symbol)))

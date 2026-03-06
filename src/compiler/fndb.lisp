@@ -591,7 +591,9 @@
     (character character) boolean
   (movable foldable flushable no-verify-arg-count))
 
-(defknown character (t) character (movable foldable unsafely-flushable))
+(defknown character ((or character (string 1) symbol))
+    character
+    (movable foldable unsafely-flushable))
 (defknown char-code (character) %char-code (movable foldable flushable))
 (defknown (char-upcase char-downcase) (character) character
   (movable foldable flushable))
