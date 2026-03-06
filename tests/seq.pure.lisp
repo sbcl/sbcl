@@ -1095,3 +1095,7 @@
             `(lambda (l m)
                (unless l
                  (and (member m (or l '(3 5 7))) t)))))))
+
+(with-test (:name :make-sequence-non-simple)
+  (assert-error (make-sequence '(and vector (not simple-array)) 10)
+      type-error))

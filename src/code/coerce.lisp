@@ -241,7 +241,7 @@
                            (unless (>= length min)
                              (sequence-type-length-mismatch-error type length)))
                        (vector-to-list object))))
-                  (t (sequence-type-too-hairy (type-specifier type))))
+                  (t (sequence-type-too-hairy type)))
                 (if (sequencep object)
                     (cond
                       ((type= type (specifier-type 'list))
@@ -263,7 +263,7 @@
                                  (sequence-type-length-mismatch-error type length)))
                            (sb-sequence:make-sequence-like
                             nil length :initial-contents object))))
-                      (t (sequence-type-too-hairy (type-specifier type))))
+                      (t (sequence-type-too-hairy type)))
                     (coerce-error))))
            ((csubtypep type (specifier-type 'vector))
             (typecase object

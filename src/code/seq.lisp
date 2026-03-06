@@ -217,12 +217,17 @@
      (make-vector-like ,sequence ,length t)
      (sb-sequence:make-sequence-like ,sequence ,length)))
 
-(define-error-wrapper bad-sequence-type-error (type-spec)
-  (error 'simple-type-error
-         :datum type-spec
-         :expected-type '(satisfies is-a-valid-sequence-type-specifier-p)
-         :format-control "~S is a bad type specifier for sequences."
-         :format-arguments (list type-spec)))
+(define-error-wrapper bad-sequence-type-error (type-spec &optional complex)
+  (let ((type (if (ctype-p type-spec)
+                  (type-specifier type-spec)
+                  type-spec)))
+   (error 'simple-type-error
+          :datum type
+          :expected-type '(satisfies is-a-valid-sequence-type-specifier-p)
+          :format-control (if complex
+                              "Can't make a non-simple vector: ~s"
+                              "~S is a bad type specifier for sequences.")
+          :format-arguments (list type))))
 
 (define-error-wrapper sequence-type-length-mismatch-error (type length)
   (error 'simple-type-error
@@ -249,7 +254,10 @@
 
   ;; On the other hand, I'm not sure it deserves to be a type-error,
   ;; either. -- bem, 2005-08-10
-  (%program-error "~S is too hairy for sequence functions." type-spec))
+  (let ((type (if (ctype-p type-spec)
+                  type-spec
+                  (specifier-type type-spec))))
+    (%program-error "~S is too hairy for sequence functions." type)))
 
 (defmacro when-extended-sequence-type
     ((type-specifier type
@@ -276,7 +284,8 @@
 (defun is-a-valid-sequence-type-specifier-p (type)
   (let ((type (specifier-type type)))
     (or (csubtypep type (specifier-type 'list))
-        (csubtypep type (specifier-type 'vector)))))
+        (and (csubtypep type (specifier-type 'vector))
+             (not (csubtypep type (specifier-type '(and vector (not simple-array)))))))))
 
 (declaim (ftype (function (sequence index) nil) signal-index-too-large-error))
 (define-error-wrapper signal-index-too-large-error (sequence index)
@@ -469,7 +478,7 @@
                  ((eq type list-type)
                   (make-list length :initial-element initial-element))
                  ((eq type *empty-type*)
-                  (bad-sequence-type-error nil))
+                  (bad-sequence-type-error type))
                  ((eq type (specifier-type 'null))
                   (if (= length 0)
                       'nil
@@ -486,23 +495,26 @@
                  ;; We'll get here for e.g. (OR NULL (CONS INTEGER *)),
                  ;; which may seem strange and non-ideal, but then I'd say
                  ;; it was stranger to feed that type in to MAKE-SEQUENCE.
-                 (t (sequence-type-too-hairy (type-specifier type)))))
+                 (t (sequence-type-too-hairy type))))
               ((csubtypep type (specifier-type 'vector))
                (cond
                  (;; is it immediately obvious what the result type is?
                   (typep type 'array-type)
-                  (let* ((etype (type-specifier
-                                 (array-type-specialized-element-type type)))
-                         (etype (if (eq etype '*) t etype))
-                         (type-length (car (array-type-dimensions type))))
-                    (unless (or (eq type-length '*)
-                                (= type-length length))
-                      (sequence-type-length-mismatch-error type length))
-                    (if iep
-                        (make-array length :element-type etype
-                                           :initial-element initial-element)
-                        (make-array length :element-type etype))))
-                 (t (sequence-type-too-hairy (type-specifier type)))))
+                  (if (eq (array-type-complexp type) t)
+                      (bad-sequence-type-error type t)
+                      (let* ((etype (type-specifier
+                                     (array-type-specialized-element-type type)))
+                             (etype (if (eq etype '*) t etype))
+                             (type-length (car (array-type-dimensions type))))
+                        (unless (or (eq type-length '*)
+                                    (= type-length length))
+                          (sequence-type-length-mismatch-error type length))
+
+                        (if iep
+                            (make-array length :element-type etype
+                                               :initial-element initial-element)
+                            (make-array length :element-type etype)))))
+                 (t (sequence-type-too-hairy type))))
               ((when-extended-sequence-type
                    (expanded-type type :expandedp t :prototype prototype)
                  ;; This function has the EXPLICIT-CHECK declaration, so
@@ -513,7 +525,7 @@
                            prototype length :initial-element initial-element)
                           (sb-sequence:make-sequence-like
                            prototype length)))))
-              (t (bad-sequence-type-error (type-specifier type))))))))
+              (t (bad-sequence-type-error type)))))))
 
 ;;;; SUBSEQ
 ;;;;
@@ -1270,7 +1282,7 @@ many elements are copied."
               ((type= type (specifier-type 'list))
                (apply #'%concatenate-to-list sequences))
               ((eq type *empty-type*)
-               (bad-sequence-type-error nil))
+               (bad-sequence-type-error type))
               ((type= type (specifier-type 'null))
                (unless (every #'emptyp sequences)
                  (sequence-type-length-mismatch-error
@@ -1286,7 +1298,7 @@ many elements are copied."
                        (unless (>= length min)
                          (sequence-type-length-mismatch-error type length)))
                    (apply #'%concatenate-to-list sequences))))
-              (t (sequence-type-too-hairy (type-specifier type)))))
+              (t (sequence-type-too-hairy type))))
            ((csubtypep type (specifier-type 'vector))
             (concat-to-simple* result-type sequences))
            ((when-extended-sequence-type

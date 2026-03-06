@@ -413,7 +413,7 @@
          (when (type= type (specifier-type 'list))
            (return-from merge (merge-lists s1 s2 pred-fun key-fun)))
          (when (eq type *empty-type*)
-           (bad-sequence-type-error nil))
+           (bad-sequence-type-error type))
          (when (type= type (specifier-type 'null))
            (if (and (null s1) (null s2))
                (return-from merge 'nil)
