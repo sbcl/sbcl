@@ -176,3 +176,17 @@
                        ((vector t) 1)
                        (t
                         (coerce x '(vector t)))))))
+
+(with-test (:name :coerce-object-type)
+  (assert-type
+     (lambda (x y)
+       (coerce (the float x) y))
+     (or float (complex float)))
+  (assert-type
+     (lambda (x y)
+       (coerce (the array x) y))
+     (or array sequence character))
+  (assert-type
+     (lambda (y)
+       (coerce "ab" y))
+     (or list (simple-array * (*)) sb-kernel:extended-sequence)))

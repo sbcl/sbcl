@@ -1722,7 +1722,7 @@
 ;;; Take some type of lvar and massage it so that we get a list of the
 ;;; constituent types. If ARG is *EMPTY-TYPE*, return NIL to indicate
 ;;; failure.
-(defun prepare-arg-for-derive-type (arg &optional (flatten-numeric-union t))
+(defun prepare-arg-for-derive-type (arg &optional (flatten-numeric-union t) (numeric t))
   (labels ((split (arg)
              (typecase arg
                (numeric-type
@@ -1743,18 +1743,21 @@
                (t
                 (list arg)))))
     (unless (eq arg *empty-type*)
-      ;; Make sure all args are some type of numeric-type.
-      (let ((new-args nil))
-        (dolist (arg (split arg) new-args)
-          (if (member-type-p arg)
-              ;; Convert member types (i.e. complex numbers) to their supertypes
-              (mapc-member-type-members
-               (lambda (x)
-                 (if (numberp x)
-                     (pushnew (specifier-type (type-of x)) new-args :test #'eq)
-                     (return)))
-               arg)
-              (push arg new-args)))))))
+      (let ((split (split arg)))
+        (if numeric
+            ;; Make sure all args are some type of numeric-type.
+            (let ((new-args nil))
+              (dolist (arg split new-args)
+                (if (member-type-p arg)
+                    ;; Convert member types (i.e. complex numbers) to their supertypes
+                    (mapc-member-type-members
+                     (lambda (x)
+                       (if (numberp x)
+                           (pushnew (specifier-type (type-of x)) new-args :test #'eq)
+                           (return)))
+                     arg)
+                    (push arg new-args))))
+            split)))))
 
 ;;; Take a list of types and return a canonical type specifier,
 ;;; combining any MEMBER types together. If both positive and negative
@@ -1830,13 +1833,14 @@
 ;;; "atomic" lvar type like numeric-type or member-type (containing
 ;;; just one element). It should return the resulting type, which can
 ;;; be a list of types.
-(defun %one-arg-derive-type (arg-type derive-fun)
+(defun %one-arg-derive-type (arg-type derive-fun &key (numeric t))
   (declare (type function derive-fun))
   (unless (eq arg-type (specifier-type 'number))
-    (let ((arg-list (prepare-arg-for-derive-type arg-type)))
+    (let ((arg-list (prepare-arg-for-derive-type arg-type t numeric)))
       (when arg-list
         (labels ((deriver (x)
-                   (when (numeric-type-p x)
+                   (when (or (not numeric)
+                             (numeric-type-p x))
                      (funcall derive-fun x))))
           ;; Run down the list of args and derive the type of each one,
           ;; saving all of the results in a list.
@@ -1853,8 +1857,8 @@
                 (make-derived-union-type results)
                 (first results))))))))
 
-(defun one-arg-derive-type (arg derive-fun)
-  (%one-arg-derive-type (lvar-type arg) derive-fun))
+(defun one-arg-derive-type (arg derive-fun &key (numeric t))
+  (%one-arg-derive-type (lvar-type arg) derive-fun :numeric numeric))
 
 ;;; Same as ONE-ARG-DERIVE-TYPE, except we assume the function takes
 ;;; two arguments. DERIVE-FUN takes 3 args in this case: the two
@@ -8796,54 +8800,90 @@
                     (values (cons car cdr) t)))))))))
 
 (defoptimizer (coerce derive-type) ((value type))
-  (multiple-value-bind (type constant)
-      (if (constant-lvar-p type)
-          (values (lvar-value type) t)
-          (constant-cons-type (lvar-type type)))
-    (when constant
-      ;; This branch is essentially (RESULT-TYPE-SPECIFIER-NTH-ARG 2),
-      ;; but dealing with the niggle that complex canonicalization gets
-      ;; in the way: (COERCE 1 'COMPLEX) returns 1, which is not of
-      ;; type COMPLEX.
-      (let ((result-typeoid (careful-specifier-type type)))
-        (cond
-          ((null result-typeoid) nil)
-          ((csubtypep result-typeoid (specifier-type 'number))
-           ;; the difficult case: we have to cope with ANSI 12.1.5.3
-           ;; Rule of Canonical Representation for Complex Rationals,
-           ;; which is a truly nasty delivery to field.
-           (cond
-             ((csubtypep result-typeoid (specifier-type 'real))
-              ;; cleverness required here: it would be nice to deduce
-              ;; that something of type (INTEGER 2 3) coerced to type
-              ;; DOUBLE-FLOAT should return (DOUBLE-FLOAT 2.0d0 3.0d0).
-              ;; FLOAT gets its own clause because it's implemented as
-              ;; a UNION-TYPE, so we don't catch it in the NUMERIC-TYPE
-              ;; logic below.
-              result-typeoid)
-             ((and (numeric-type-p result-typeoid)
-                   (eq (numeric-type-complexp result-typeoid) :real))
-              ;; FIXME: is this clause (a) necessary or (b) useful?
-              result-typeoid)
-             ((or (csubtypep result-typeoid
-                             (specifier-type '(complex single-float)))
-                  (csubtypep result-typeoid
-                             (specifier-type '(complex double-float)))
-                  #+long-float
-                  (csubtypep result-typeoid
-                             (specifier-type '(complex long-float))))
-              ;; float complex types are never canonicalized.
-              result-typeoid)
-             (t
-              ;; if it's not a REAL, or a COMPLEX FLOAToid, it's
-              ;; probably just a COMPLEX or equivalent.  So, in that
-              ;; case, we will return a complex or an object of the
-              ;; provided type if it's rational:
-              (type-union result-typeoid
-                          (type-intersection (lvar-type value)
-                                             (specifier-type 'rational))))))
-          (t
-           result-typeoid))))))
+  (let ((type-type
+          (multiple-value-bind (type constant)
+              (if (constant-lvar-p type)
+                  (values (lvar-value type) t)
+                  (constant-cons-type (lvar-type type)))
+            (when constant
+              ;; This branch is essentially (RESULT-TYPE-SPECIFIER-NTH-ARG 2),
+              ;; but dealing with the niggle that complex canonicalization gets
+              ;; in the way: (COERCE 1 'COMPLEX) returns 1, which is not of
+              ;; type COMPLEX.
+              (let ((result-typeoid (careful-specifier-type type)))
+                (cond
+                  ((null result-typeoid) nil)
+                  ((csubtypep result-typeoid (specifier-type 'number))
+                   ;; the difficult case: we have to cope with ANSI 12.1.5.3
+                   ;; Rule of Canonical Representation for Complex Rationals,
+                   ;; which is a truly nasty delivery to field.
+                   (cond
+                     ((csubtypep result-typeoid (specifier-type 'real))
+                      ;; cleverness required here: it would be nice to deduce
+                      ;; that something of type (INTEGER 2 3) coerced to type
+                      ;; DOUBLE-FLOAT should return (DOUBLE-FLOAT 2.0d0 3.0d0).
+                      ;; FLOAT gets its own clause because it's implemented as
+                      ;; a UNION-TYPE, so we don't catch it in the NUMERIC-TYPE
+                      ;; logic below.
+                      result-typeoid)
+                     ((and (numeric-type-p result-typeoid)
+                           (eq (numeric-type-complexp result-typeoid) :real))
+                      ;; FIXME: is this clause (a) necessary or (b) useful?
+                      result-typeoid)
+                     ((or (csubtypep result-typeoid
+                                     (specifier-type '(complex single-float)))
+                          (csubtypep result-typeoid
+                                     (specifier-type '(complex double-float)))
+                          #+long-float
+                          (csubtypep result-typeoid
+                                     (specifier-type '(complex long-float))))
+                      ;; float complex types are never canonicalized.
+                      result-typeoid)
+                     (t
+                      ;; if it's not a REAL, or a COMPLEX FLOAToid, it's
+                      ;; probably just a COMPLEX or equivalent.  So, in that
+                      ;; case, we will return a complex or an object of the
+                      ;; provided type if it's rational:
+                      (type-union result-typeoid
+                                  (type-intersection (lvar-type value)
+                                                     (specifier-type 'rational))))))
+                  (t
+                   result-typeoid))))))
+        (value-type
+          (one-arg-derive-type
+           value
+           (lambda (type)
+             (macrolet ((cases (&body cases)
+                          `(cond ,@(loop for (supertype result) on cases by #'cddr
+                                         collect `((csubtypep type (specifier-type ',supertype))
+                                                   ,(if (eq result 'type)
+                                                        'type
+                                                        `(specifier-type ',result))))
+                                 (t
+                                  type))))
+               (cases
+                float (or float (complex float))
+                integer (or integer float (complex float))
+                ratio (or ratio float (complex float))
+                rational (or rational float (complex float))
+                complex complex
+                null (or null (simple-array * (0)) extended-sequence)
+                cons (or cons function (simple-array * (*)) extended-sequence)
+                (and (simple-array * (*)) (not (string 1))) (or (simple-array * (*)) list extended-sequence)
+                (simple-array * (*)) (or (simple-array * (*)) list extended-sequence character)
+                (and vector (not string)) sequence
+                vector (or sequence character)
+                (and array (not vector)) type
+                (and simple-array (not (string 1))) (or simple-array list extended-sequence)
+                simple-array (or simple-array list extended-sequence character)
+                (and array (not string)) (or sequence array)
+                array (or sequence array character)
+                symbol (or symbol function character)
+                sequence sequence)))
+           :numeric nil)))
+    (if (and type-type value-type)
+        (type-intersection type-type value-type)
+        (or type-type value-type))))
 
 (defoptimizer (compile derive-type) ((nameoid function))
   (when (csubtypep (lvar-type nameoid)
