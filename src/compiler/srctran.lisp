@@ -6163,16 +6163,21 @@
 
 (deftransform + ((x y) (number number) * :node node)
   (let ((floats (or (policy node (zerop float-accuracy))
-                    (not (types-equal-or-intersect (single-value-type (node-derived-type node))
-                                                   (specifier-type '(or (float 0.0 0.0) (complex float))))))))
+                    (not (types-equal-or-intersect (single-value-result-type node t)
+                                                   (specifier-type '(or (float 0.0 0.0) (complex float)))))))
+        (complex-float-result-p (types-equal-or-intersect (single-value-result-type node t)
+                                                          (specifier-type '(complex float)))))
     (cond ((and (or floats
                     ;; Can't negate integer 0
-                    (not (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))))
+                    (and (not (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0))))
+                         ;; imaginary zero isn't negated by subtraction
+                         (not complex-float-result-p)))
                 (eq (negate-lvar y node :test '%negate) '%negate))
            `(- x y))
           ((and
             (or floats
-                (not (types-equal-or-intersect (lvar-type x) (specifier-type '(eql 0)))))
+                (and (not (types-equal-or-intersect (lvar-type x) (specifier-type '(eql 0))))
+                     (not complex-float-result-p)))
             (eq (negate-lvar x node :test '%negate) '%negate))
            `(- y x))
           (t
@@ -6181,14 +6186,18 @@
 (deftransform - ((x y) (number number) * :node node)
   (let ((floats (or (policy node (zerop float-accuracy))
                     (not (types-equal-or-intersect (single-value-type (node-derived-type node))
-                                                   (specifier-type '(or (float 0.0 0.0) (complex float))))))))
+                                                   (specifier-type '(or (float 0.0 0.0) (complex float)))))))
+        (complex-float-result-p (types-equal-or-intersect (single-value-result-type node t)
+                                                          (specifier-type '(complex float)))))
    (or
     (cond
       ;; (- x (- y)) => (+ x y)
       ((and
         (or floats
             ;; Can't negate integer 0
-            (not (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))))
+            (and (not (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0))))
+                 ;; imaginary zero isn't negated by subtraction
+                 (not complex-float-result-p)))
         (eq (negate-lvar y node :test '%negate) '%negate))
        `(+ x y))
       ;; (- (- x) c) => (- -c x)

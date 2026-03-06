@@ -1621,7 +1621,19 @@
         ()
         `(lambda (f i)
            (- (* f (truncate i 20))))
-      ((3.0 1) -0.0))))
+      ((3.0 1) -0.0))
+    (checked-compile-and-assert
+        ()
+        `(lambda (r c)
+           (+ (- (the (not (eql 0)) r)) c))
+      ((-2 #c(1.0 -0.0)) #C(3.0 0.0))
+      ((-3 #c(1.0 -0.0)) (+ (opaque-identity 3) (opaque-identity #c(1.0 -0.0)))))
+    (checked-compile-and-assert
+        ()
+        `(lambda (r c)
+           (- c (- (the (not (eql 0)) r))))
+      ((-1 #c(1.0 -0.0)) #C(0.0 -0.0))
+      ((2.0 #c(1.0 -0.0)) (- (opaque-identity #c(1.0 -0.0)) (opaque-identity -2.0))))))
 
 (with-test (:name :abs-match)
   (flet ((test (form count)
