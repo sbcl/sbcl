@@ -199,4 +199,8 @@
   (assert-type
    (lambda (x n)
      (coerce (the list x) `(vector ,n)))
-   (simple-array * (*))))
+   (simple-array * (*)))
+  (assert-type
+   (lambda (x n)
+     (coerce n (if x 'single-float 'double-float)))
+   float))

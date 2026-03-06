@@ -4101,43 +4101,49 @@ is :ANY, the function name is not checked."
         (lvar-%derived-type (node-lvar node)) nil))
 
 (defun creation-result-type-specifier (lvar &optional nil-nil)
-  (if (constant-lvar-p lvar)
-      (let* ((specifier (lvar-value lvar))
-             (lspecifier (if (atom specifier) (list specifier) specifier)))
-        (cond
-          ((eq (car lspecifier) 'string)
-           (destructuring-bind (string &rest size)
-               lspecifier
-             (declare (ignore string))
-             (careful-specifier-type
-              `(vector character ,@(when size size)))))
-          ((eq (car lspecifier) 'simple-string)
-           (destructuring-bind (simple-string &rest size)
-               lspecifier
-             (declare (ignore simple-string))
-             (careful-specifier-type
-              `(simple-array character ,@(if size (list size) '((*)))))))
-          ((and nil-nil
-                (eq specifier 'nil))
-           (specifier-type 'null))
+  (flet ((handle-constant (specifier)
+           (let ((lspecifier (if (atom specifier) (list specifier) specifier)))
+             (cond
+               ((eq (car lspecifier) 'string)
+                (destructuring-bind (string &rest size)
+                    lspecifier
+                  (declare (ignore string))
+                  (careful-specifier-type
+                   `(vector character ,@(when size size)))))
+               ((eq (car lspecifier) 'simple-string)
+                (destructuring-bind (simple-string &rest size)
+                    lspecifier
+                  (declare (ignore simple-string))
+                  (careful-specifier-type
+                   `(simple-array character ,@(if size (list size) '((*)))))))
+               ((and nil-nil
+                     (eq specifier 'nil))
+                (specifier-type 'null))
+               (t
+                (let ((ctype (careful-specifier-type specifier)))
+                  (cond ((not (array-type-p ctype))
+                         ctype)
+                        ((unknown-type-p (array-type-element-type ctype))
+                         (make-array-type (array-type-dimensions ctype)
+                                          :complexp (array-type-complexp ctype)
+                                          :element-type *wild-type*
+                                          :specialized-element-type *wild-type*))
+                        ((eq (array-type-specialized-element-type ctype)
+                             *wild-type*)
+                         (make-array-type (array-type-dimensions ctype)
+                                          :complexp (array-type-complexp ctype)
+                                          :element-type *universal-type*
+                                          :specialized-element-type *universal-type*))
+                        (t
+                         ctype))))))))
+    (cond ((constant-lvar-p lvar)
+           (handle-constant (lvar-value lvar)))
+          ((member-type-p (lvar-type lvar))
+           (let ((types (mapcar #'handle-constant (member-type-members (lvar-type lvar)))))
+             (unless (member nil types)
+               (sb-kernel::%type-union types))))
           (t
-           (let ((ctype (careful-specifier-type specifier)))
-             (cond ((not (array-type-p ctype))
-                    ctype)
-                   ((unknown-type-p (array-type-element-type ctype))
-                    (make-array-type (array-type-dimensions ctype)
-                                     :complexp (array-type-complexp ctype)
-                                     :element-type *wild-type*
-                                     :specialized-element-type *wild-type*))
-                   ((eq (array-type-specialized-element-type ctype)
-                        *wild-type*)
-                    (make-array-type (array-type-dimensions ctype)
-                                     :complexp (array-type-complexp ctype)
-                                     :element-type *universal-type*
-                                     :specialized-element-type *universal-type*))
-                   (t
-                    ctype))))))
-      (combination-match lvar ((:or list list*) (:constant type) &rest *)
-        (case type
-          ((array simple-array vector)
-           (specifier-type 'simple-array))))))
+           (combination-match lvar ((:or list list*) (:constant type) &rest *)
+             (case type
+               ((array simple-array vector)
+                (specifier-type 'simple-array))))))))
