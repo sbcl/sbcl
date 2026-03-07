@@ -778,14 +778,15 @@ necessary, since type inference may take arbitrarily long to converge.")
     (let ((ir1-namespace *ir1-namespace*))
       (clrhash (free-funs ir1-namespace))
       (clrhash (free-vars ir1-namespace))
-      ;; FIXME: It would make sense to clear these tables on arm64 as
-      ;; well, but it relies on the constant for NIL to stay around in
-      ;; order to assign a wired TN to it. A possible fix is to give
-      ;; arm64 NULL-SC like on other platforms.
-      #-arm64
-      (progn
-        (clrhash (eql-constants ir1-namespace))
-        (clrhash (similar-constants ir1-namespace))))))
+      (let* ((eql-constants (eql-constants ir1-namespace))
+             #+arm64
+             (nil-constant (gethash nil eql-constants)))
+        (clrhash eql-constants)
+        ;; Something might break if it's removed, unclear what.
+        #+arm64
+        (when nil-constant
+          (setf (gethash nil eql-constants) nil-constant)))
+      (clrhash (similar-constants ir1-namespace)))))
 
 ;;;; trace output
 
