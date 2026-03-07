@@ -3874,7 +3874,7 @@
 
 ;;; This flag is used to prevent infinite recursive lossage when
 ;;; we can't find the caller for some reason.
-(defvar *finding-frame* nil)
+(sb-impl:define-thread-local *finding-frame* nil)
 
 (defun find-caller-frame ()
   (unless *finding-frame*

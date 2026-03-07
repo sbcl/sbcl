@@ -40,9 +40,9 @@
 ;;; interruption, but there are other means to get code interrupted
 ;;; and inspecting code around PC for the error number may yield wrong
 ;;; results.
-(defvar *current-internal-error* nil)
-(defvar *current-internal-trap-number*)
-(defvar *current-internal-error-args*)
+(sb-impl:define-thread-local *current-internal-error* nil)
+(sb-impl:define-thread-local *current-internal-trap-number*)
+(sb-impl:define-thread-local *current-internal-error-args*)
 
 #+undefined-fun-restarts
 (defun restart-undefined (name condition fdefn-or-symbol context)
@@ -653,7 +653,7 @@
 ;;; also do not save their own BSP, and we need to discard the
 ;;; bindings made by the error handling machinery.
 #+unwind-to-frame-and-call-vop
-(defvar *interr-current-bsp* nil)
+(sb-impl:define-thread-local *interr-current-bsp* nil)
 
 (defun internal-error (context continuable)
   (declare (type system-area-pointer context))
@@ -765,8 +765,8 @@
 ;;; time. The condition is created by GC-REINIT.
 (define-load-time-global *heap-exhausted-error-condition*
   (make-condition 'heap-exhausted-error))
-(defvar *heap-exhausted-error-available-bytes*)
-(defvar *heap-exhausted-error-requested-bytes*)
+(sb-impl:define-thread-local *heap-exhausted-error-available-bytes*)
+(sb-impl:define-thread-local *heap-exhausted-error-requested-bytes*)
 
 (defun heap-exhausted-error (available requested)
   ;; Double word aligned bytes, can be passed as fixnums to avoid

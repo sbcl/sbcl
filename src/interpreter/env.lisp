@@ -250,11 +250,9 @@
 ;;; and all system functions are safe when invoked through their public API.
 ;;; Whether maximally strict checking of types is performed in user code
 ;;; has nothing to do with how the interpreter is compiled.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  ;; Of course, errors are possible in the interpreter itself,
-  ;; so in that case it helps to define this as '() for debugging.
-  #+nil(defparameter +handler-optimize+ '(optimize))
-  (defparameter +handler-optimize+ '(optimize (speed 2) (debug 2) (safety 0))))
+;;; Of course, errors are possible in the interpreter itself,
+;;; so in that case it helps to define this as '() for debugging.
+(defglobal +handler-optimize+ '(optimize (speed 2) (debug 2) (safety 0)))
 
 ;;; We represent a pointer to a symbol in an environment by a FRAME-PTR
 ;;; which is a packed integer containing the "up" and "across" indices.

@@ -103,7 +103,7 @@
 
 ;;; counts of nested errors (with internal errors double-counted)
 (defvar *maximum-error-depth*) ; this gets set to 10 in !COLD-INIT
-(defvar *current-error-depth* 0)
+(sb-impl:define-thread-local *current-error-depth* 0)
 
 ;;; INFINITE-ERROR-PROTECT is used by ERROR and friends to keep us out
 ;;; of hyperspace.

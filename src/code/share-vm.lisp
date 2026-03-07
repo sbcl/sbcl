@@ -12,7 +12,7 @@
 
 (declaim (ftype (function (integer) (or symbol (eql 0))) symbol-from-tls-index))
 
-(defvar *current-internal-error-context*)
+(sb-impl:define-thread-local *current-internal-error-context*)
 
 (defmacro with-pinned-context-code-object
     ((&optional (context '*current-internal-error-context*))

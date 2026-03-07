@@ -296,7 +296,7 @@
       (enable-package-locks
        (set-difference old names :test #'equal)))))
 
-(defvar *queued-proclaims* nil)
+#-sb-xc-host (declaim (global *queued-proclaims*))
 
 (defun process-variable-declaration (name kind info-value)
   (unless (symbolp name)
@@ -545,10 +545,8 @@
                                     (type #'proclaim-type)
                                     (ftype #'proclaim-ftype))
                             ctype type :declared)))
-             #-sb-xc-host
-             (push raw-form *queued-proclaims*)
-             #+sb-xc-host
-             (error "Type system not yet initialized.")))
+             #-sb-xc-host (push raw-form *queued-proclaims*)
+             #+sb-xc-host (error "Type system not yet initialized.")))
         (freeze-type
          (map-args #'process-freeze-type-declaration))
         ;; This only has compile-time effects.
