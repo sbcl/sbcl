@@ -499,6 +499,9 @@ int sbcl_mprotect(void* addr, size_t length, int prot) {
 #endif
 
 #ifdef LISP_FEATURE_ELF
+#if defined LISP_FEATURE_SUNOS && defined LISP_FEATURE_X86_64
+#define ELF_TARGET_AMD64
+#endif
 #include <elf.h>
 #ifdef LISP_FEATURE_OPENBSD
 #include <machine/reloc.h>
