@@ -691,6 +691,8 @@ static void attach_os_thread(init_thread_data *scribble)
     stack_size = stack.ss_size;
     stack_addr = (void*)((size_t)stack.ss_sp - stack_size);
 # elif defined LISP_FEATURE_SUNOS
+    #include "/usr/include/thread.h"
+    #include <signal.h>
     stack_t stack;
     thr_stksegment(&stack);
     stack_size = stack.ss_size;
