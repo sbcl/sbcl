@@ -1794,8 +1794,9 @@ void gc_gen_report_to_file(int filedes, FILE *file) {
       large_generation_total[gen] += GENCGC_PAGE_BYTES;
     } else {
       for_lines_in_page (l, p) {
-        if (line_bytemap[l]) {
-          generation_index_t gen = DECODE_GEN(line_bytemap[l]);
+        generation_index_t gen;
+        // DECODE_GEN can produce -1
+        if (line_bytemap[l] && (gen = DECODE_GEN(line_bytemap[l])) >= 0) {
           small_generation_type[gen][pt] += LINE_SIZE;
           small_generation_total[gen] += LINE_SIZE;
         }
