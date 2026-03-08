@@ -19,7 +19,7 @@ int arch_os_thread_init(struct thread *thread) {
     return 1;
 }
 
-int arch_os_thread_cleanup(struct thread *thread) {
+int arch_os_thread_cleanup(struct thread __attribute__((unused)) *thread) {
     return 1;
 }
 
@@ -62,6 +62,7 @@ os_restore_fp_control(os_context_t *context)
 }
 
 void
-os_flush_icache(os_vm_address_t address, os_vm_size_t length)
+os_flush_icache(__attribute__((unused)) os_vm_address_t address,
+                __attribute__((unused)) os_vm_size_t length)
 {
 }

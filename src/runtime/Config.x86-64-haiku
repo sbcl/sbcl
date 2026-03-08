@@ -13,6 +13,7 @@ ASSEM_SRC = x86-64-assem.S
 ARCH_SRC = x86-64-arch.c
 OS_SRC = haiku-os.c x86-64-haiku-os.c
 
+CFLAGS += -I/boot/system/develop/headers/private/system/arch/x86_64
 LINKFLAGS += -Wl,--export-dynamic
 OS_LIBS += -lbe -lnetwork -lbsd
 
