@@ -195,7 +195,7 @@ int main(int argc, char *argv[]) {
      (sb-ext:run-program
       cc
       (append
-       (split-cflags (sb-ext:posix-getenv "EXTRA_CFLAGS"))
+       (split-cflags (sb-ext:posix-getenv "CFLAGS"))
        #+(and linux largefile)
        '("-D_LARGEFILE_SOURCE" "-D_LARGEFILE64_SOURCE" "-D_FILE_OFFSET_BITS=64")
        #+64-bit-time
