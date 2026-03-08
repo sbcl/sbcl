@@ -1060,7 +1060,10 @@
           (creturn
            (write-string "return ")
            (print-lvar (return-result node))
-           (print-leaf (return-lambda node)))
+           (print-leaf (return-lambda node))
+           (when *debug-print-types*
+             (write-char #\space)
+             (princ (type-specifier (return-result-type node)))))
           (entry
            (format t "entry ~S" (entry-exits node)))
           (exit
