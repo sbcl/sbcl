@@ -201,7 +201,11 @@
   (assert-type
    (lambda (x y)
      (coerce (the symbol x) y))
-   (or symbol (simple-array * (0)) sb-kernel:extended-sequence function character)))
+   (or symbol (simple-array * (0)) sb-kernel:extended-sequence function character))
+  (assert-type
+   (lambda (x y)
+     (coerce (the (not single-float) x) y))
+   t))
 
 (with-test (:name :coerce-constructed-type)
   (assert-type
