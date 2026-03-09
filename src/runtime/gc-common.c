@@ -1305,6 +1305,18 @@ void smash_weak_pointers(void)
         }
     }
     weak_vectors = 0;
+
+    if (!tlsindex_to_symbol_map) return;
+    /* If the weak map is present, Lisp could potentially recycle unused TLS indices
+     * by finding an empty element below the free TLS index.  Not currently done */
+    int i;
+    int n_elements = dynamic_values_bytes / bytes_per_tls_symbol;
+    for (i=0; i<n_elements; ++i) {
+        lispobj symbol = tlsindex_to_symbol_map[i];
+        if (symbol != NO_TLS_VALUE_MARKER) {
+            TEST_WEAK_CELL(tlsindex_to_symbol_map[i], symbol, NO_TLS_VALUE_MARKER);
+        }
+    }
 }
 
 

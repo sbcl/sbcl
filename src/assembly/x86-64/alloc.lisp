@@ -170,6 +170,14 @@
        ;; Must ignore the semaphore bit in the register's high half.
        (inst cmp :dword scratch-reg (thread-slot-ea thread-tls-size-slot))
        (inst jmp :ae tls-full)
+       ;; Fill in the tlsindex-to-symbol entry prior to setting the symbol's index,
+       ;; preserving the invariant in every thread that if a symbol has a nonzero index,
+       ;; then it is definitely in the map.
+       (inst push rbx-tn)
+       (inst mov rbx-tn (static-symbol-value-ea '*tls-symbol-map*))
+       (inst btc rbx-tn 63) ; fudge the array base address to "subtract out" bit 63 of scratch-reg
+       (inst mov (ea rbx-tn scratch-reg) symbol)
+       (inst pop rbx-tn)
        ;; scratch-reg goes into symbol's TLS and into the arg/result reg.
        (inst mov :dword (tls-index-of symbol) scratch-reg)
        (inst mov :dword result scratch-reg)

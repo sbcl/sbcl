@@ -70,6 +70,7 @@
 (defconstant-eqx sb-kernel::+save-lisp-clobbered-globals+
     '#(sb-impl::*exit-lock*
        sb-vm::*allocator-mutex*
+       sb-vm::*tls-symbol-map*
        sb-thread::*make-thread-lock*
        sb-thread::*initial-thread*
        ;; Saving *JOINABLE-THREADS* could cause catastophic failure on restart.

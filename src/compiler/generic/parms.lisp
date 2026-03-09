@@ -232,6 +232,7 @@
     ;; threading support
     #+sb-thread sb-thread::*starting-threads*
     *free-tls-index* ; always exists for benefit of C runtime
+    *tls-symbol-map*
 
     #+(and x86-64 sb-thread (not gs-seg))
     sb-aprof::*n-profile-sites*

@@ -1385,6 +1385,41 @@ init_coreparse_spaces(int n, struct coreparse_space* input)
     return output;
 }
 
+lispobj* tlsindex_to_symbol_map;
+static void construct_tls_map()
+{
+    int map_nbytes = dynamic_values_bytes;
+    tlsindex_to_symbol_map = checked_malloc(map_nbytes);
+    memset(tlsindex_to_symbol_map, 0xff, map_nbytes);
+    // A static Lisp symbol is slightly easier to access than a C symbol from Lisp
+    SYMBOL(TLS_SYMBOL_MAP)->value = (uword_t)tlsindex_to_symbol_map;
+
+    int offset;
+#define EXAMINE_OBJECT() if (widetag_of(where) == SYMBOL_WIDETAG && \
+    (offset = tls_index_of((struct symbol*)where)) != 0) \
+        tlsindex_to_symbol_map[offset>>WORD_SHIFT] = make_lispobj(where, OTHER_POINTER_LOWTAG)
+#ifdef LISP_FEATURE_MARK_REGION_GC
+# define SYMBOL_PAGE_TYPE PAGE_TYPE_MIXED
+#else
+# define SYMBOL_PAGE_TYPE PAGE_TYPE_SMALL_MIXED
+#endif
+    for (page_index_t p = 0; p < page_table_pages; p++) {
+        if ((page_table[p].type & PAGE_TYPE_MASK) != SYMBOL_PAGE_TYPE) continue;
+        lispobj* end = (lispobj*)page_address(p+1);
+        lispobj* where = next_object((lispobj*)page_address(p), 0, end);
+        for ( ; where ; where = next_object(where, object_size(where), end) ) EXAMINE_OBJECT();
+    }
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    lispobj *where = (lispobj*)FIXEDOBJ_SPACE_START, *end = fixedobj_free_pointer;
+#elif defined LISP_FEATURE_PERMGEN
+    lispobj *where = (lispobj*)PERMGEN_SPACE_START, *end = permgen_space_free_pointer;
+#else
+    lispobj *where = (lispobj*)STATIC_SPACE_START, *end = where;
+#endif
+    for ( ; where < end ; where += object_size(where) ) EXAMINE_OBJECT();
+#undef EXAMINE_OBJECT
+}
+
 /* 'merge_core_pages': Tri-state flag to determine whether we attempt to mark
  * pages as targets for virtual memory deduplication via MADV_MERGEABLE.
  * 1: Yes
@@ -1548,6 +1583,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
                 dynamic_values_bytes = (int)SymbolValue(FREE_TLS_INDEX,0) * 2;
                 // fprintf(stderr, "NOTE: TLS size increased to %x\n", dynamic_values_bytes);
             }
+            construct_tls_map();
 #else
             SYMBOL(FREE_TLS_INDEX)->value = sizeof (struct thread);
 #endif

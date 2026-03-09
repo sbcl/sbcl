@@ -78,6 +78,7 @@ extern os_vm_address_t alloc_profile_buffer;
 extern lispobj alloc_profile_data; // Lisp SIMPLE-VECTOR
 
 extern lispobj arena_chain;
+extern lispobj* tlsindex_to_symbol_map;
 
 #if !defined(LISP_FEATURE_SB_THREAD)
 extern lispobj *current_control_stack_pointer;

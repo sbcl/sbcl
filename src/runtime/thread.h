@@ -358,4 +358,6 @@ extern void scrub_thread_control_stack(struct thread *);
 extern void scavenge_control_stack(struct thread *th);
 extern void gc_close_thread_regions(struct thread*, int);
 
+static const int bytes_per_tls_symbol = N_WORD_BYTES;
+
 #endif /* _INCLUDE_THREAD_H_ */
