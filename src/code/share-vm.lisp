@@ -159,12 +159,10 @@
   (defparameter *cpu-features* nil))
 
 (defmacro def-cpu-feature (name detect)
-  ;; eval-when doesn't work correctly in the XC
-  (setf (getf *cpu-features* name) detect)
   `(progn
-     (eval-when (:compile-toplevel :load-toplevel :execute)
-       (define-load-time-global ,(symbolicate '+ name '-routines+) ()))
-     (setf (getf *cpu-features* ',name) ',detect)))
+     (define-load-time-global ,(symbolicate '+ name '-routines+) ())
+     (eval-when (:compile-toplevel)
+       (setf (getf *cpu-features* ',name) ',detect))))
 
 (defmacro def-variant (name cpu-feature lambda-list &body body)
   (let ((variant (symbolicate name '- cpu-feature)))
@@ -185,7 +183,8 @@
 
 (define-load-time-global *previous-cpu-routines* nil)
 
-(defmacro !setup-cpu-specific-routines ()
+(eval-when (:compile-toplevel)
+(sb-xc:defmacro setup-cpu-specific-routines ()
   `(progn
      ,@(loop for (feature detect) on *cpu-features* by #'cddr
              collect
@@ -195,7 +194,7 @@
                       do
                       (push (cons symbol (%symbol-function symbol))
                             *previous-cpu-routines*)
-                      (setf (%symbol-function symbol) definition))))))
+                      (setf (%symbol-function symbol) definition)))))))
 
 (defun restore-cpu-specific-routines ()
   (loop for (symbol . fun) in *previous-cpu-routines*
