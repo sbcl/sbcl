@@ -372,26 +372,26 @@ created and old ones may exit at any time."
 
 (defvar *session*)
 
-;;; Not uncoincidentally, the variables assigned here are also
-;;; listed in SB-KERNEL::+SAVE-LISP-CLOBBERED-GLOBALS+
 (defun init-main-thread ()
   (/show0 "Entering INIT-MAIN-THREAD")
-  (setf sb-impl::*exit-lock* (make-mutex :name "Exit Lock")
-        sb-vm::*allocator-mutex* (make-mutex :name "Allocator")
-        *make-thread-lock* (make-mutex :name "Make-Thread Lock"))
   (let* ((name "main thread")
-         (lock (make-mutex :name "thread memory"))
          (thread
           #-sb-thread (sap-ref-lispobj (current-thread-sap)
                                        (ash sb-vm::thread-lisp-thread-slot sb-vm:word-shift))
           #+sb-thread *current-thread*)) ; an ordinary read of the TLS
-    (setf (%instance-layout thread) #.(find-layout 'thread)
-          (thread-%name thread) name
-          (%instance-ref thread (get-dsd-index thread semaphore)) (make-semaphore :name name)
-          (%instance-ref thread (get-dsd-index thread storage-lock)) lock)
     ;; Run the macro-generated function which writes some values into the TLS,
     ;; most especially *CURRENT-THREAD*.
     (init-thread-local-storage thread)
+    (setf (%instance-layout thread) #.(find-layout 'thread)
+          (thread-%name thread) name
+          (%instance-ref thread (get-dsd-index thread semaphore)) (make-semaphore :name name)
+          (%instance-ref thread (get-dsd-index thread storage-lock))
+          (make-mutex :name "thread memory"))
+    ;; Not uncoincidentally, the variables assigned here are also
+    ;; listed in SB-KERNEL::+SAVE-LISP-CLOBBERED-GLOBALS+
+    (setf sb-impl::*exit-lock* (make-mutex :name "Exit Lock")
+          sb-vm::*allocator-mutex* (make-mutex :name "Allocator")
+          *make-thread-lock* (make-mutex :name "Make-Thread Lock"))
     (setf *initial-thread* thread)
     (setf *joinable-threads* nil)
     (setq *session* (new-session thread))
