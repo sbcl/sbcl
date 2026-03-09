@@ -3541,6 +3541,34 @@
         (return-from try-perfect-find/position-map conditional))
       (when (eq fun-name 'find) ; nothing to do. Wasted some time, no big deal
         (return-from try-perfect-find/position-map 'item))) ; transform arg is always named ITEM
+
+    ;; Use a linear mapping for [R]ASSOC if the key set is a nearly contiguous range.
+    (when (and (member fun-name '(assoc rassoc))
+               (or (every #'characterp keys) (every #'fixnump keys)))
+      (let* ((characterp (characterp (car keys)))
+             (to-fixnum (if characterp #'char-code #'identity))
+             (min (reduce #'min keys :key to-fixnum))
+             (max (reduce #'max keys :key to-fixnum))
+             (theoretical-nkeys (1+ (- max min))))
+        ;; Allow at most (arbitrarily) 5 unused keys in the range to avoid wasting space.
+        (when (>= (hash-table-count map) (- theoretical-nkeys 5))
+          (let ((result (make-array theoretical-nkeys :initial-element nil)))
+            (dohash ((k v) map) (setf (aref result (- (funcall to-fixnum k) min)) v))
+            (when (eq alistp :synthetic)
+              ;; once-and-only-once-more, of course
+              (let* ((car/cdr (node-dest node))
+                     (fun (lvar-use (combination-fun car/cdr))))
+                (aver (ref-p fun))
+                (change-full-call car/cdr 'values :recklessly t)
+                (derive-node-type node (specifier-type 't) :from-scratch t)
+                (reoptimize-node car/cdr)))
+            (return-from try-perfect-find/position-map
+              (if characterp
+                  `(if (typep item '(character-set ((,min . ,max))))
+                       (aref ,result (- (char-code item) ,min)))
+                  `(if (typep item '(integer ,min ,max))
+                       (aref ,result (- item ,min)))))))))
+    ;;
     (binding* ((hashfn (prehash-function-for-mph-generator
                         (minperfhash-key-universe-type keys)))
                (hashes (map '(simple-array (unsigned-byte 32) (*)) hashfn keys))

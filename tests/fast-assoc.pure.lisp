@@ -171,3 +171,18 @@
     (dotimes (i (or #+sb-unicode 1000 256))
       (assert (eql (position (code-char i) +averylongstring+)
                    (funcall f (code-char i)))))))
+
+(defglobal *assoc-char-example*
+    '((#\g . 100) (#\d . 102) (#\i . 103) (#\f . 104) (#\e . 105)))
+(defun rassoc-int-range (x) (car (rassoc x '#.*assoc-char-example*)))
+(with-test (:name :assoc-dense-ranges)
+  (let* ((f (compile nil '(lambda (x) (cdr (assoc x '#.*assoc-char-example*)))))
+         (vector (car (ctu:find-code-constants f))))
+    (assert (equalp vector #(102 105 104 100 NIL 103)))
+    (dolist (x *assoc-char-example*)
+      (assert (eql (funcall f (car x)) (cdr x)))))
+  (let* ((f (compile nil '(lambda (x) (car (rassoc x '#.*assoc-char-example*)))))
+         (vector (car (ctu:find-code-constants f))))
+    (assert (equalp vector #(#\g NIL #\d #\i #\f #\e)))
+    (dolist (x *assoc-char-example*)
+      (assert (eql (funcall f (cdr x)) (car x))))))
