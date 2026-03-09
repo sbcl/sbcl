@@ -40,7 +40,6 @@
 ;;; interruption, but there are other means to get code interrupted
 ;;; and inspecting code around PC for the error number may yield wrong
 ;;; results.
-(sb-impl:define-thread-local *current-internal-error* nil)
 (sb-impl:define-thread-local *current-internal-trap-number*)
 (sb-impl:define-thread-local *current-internal-error-args*)
 
@@ -670,7 +669,7 @@
              (sb-vm:internal-error-args alien-context))
          (with-interrupt-bindings
            (let ((sb-debug:*stack-top-hint* (find-interrupted-frame))
-                 (*current-internal-error* error-number)
+                 (sb-di::*current-internal-error* error-number)
                  (*current-internal-error-args* arguments)
                  (*current-internal-error-context* alien-context)
                  (fp (int-sap (sb-vm:context-register alien-context

@@ -1289,15 +1289,13 @@
     (bogus-debug-fun
      (bogus-debug-fun-%name debug-fun))))
 
-(defun interrupted-frame-error (frame)
-  (declare (special sb-kernel::*current-internal-error*))
-  (when (and (compiled-frame-p frame)
+(sb-impl:define-thread-local *current-internal-error* nil)
+(defun interrupted-frame-error (frame &aux (err *current-internal-error*))
+  (when (and err
+             (compiled-frame-p frame)
              (compiled-frame-escaped frame)
-             sb-kernel::*current-internal-error*
-             (array-in-bounds-p sb-c:+backend-internal-errors+
-                                sb-kernel::*current-internal-error*))
-    (cadr (svref sb-c:+backend-internal-errors+
-                 sb-kernel::*current-internal-error*))))
+             (array-in-bounds-p sb-c:+backend-internal-errors+ err))
+    (cadr (svref sb-c:+backend-internal-errors+ err))))
 
 (defun all-args-available-p (frame)
   (let ((error (interrupted-frame-error frame))
