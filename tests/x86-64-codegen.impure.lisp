@@ -1428,6 +1428,7 @@
     ;; should have 1 call to list-alloc-tramp, not one for the cons of x, y and one for push
     (assert (= 1 (count 'sb-c:call (get-simple-fun-instruction-model f) :key 'second)))))
 
+#+sb-thread
 (with-test (:name :tls-symbol-map)
   (let ((sap (sb-sys:int-sap (ash (symbol-value 'sb-vm::*tls-symbol-map*)
                                   sb-vm:n-fixnum-tag-bits)))

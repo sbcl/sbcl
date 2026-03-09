@@ -19,7 +19,7 @@
          (op (ldb (byte 8 20) inst))
          (offset (ldb (byte 12 0) inst))
          (rn (ldb (byte 4 16) inst)))
-    (cond ((and (= rn null-offset))
+    (cond ((= rn null-offset)
            (let ((offset (+ nil-value offset)))
              (case op
                ((88 89) ;; LDR/STR
@@ -30,10 +30,26 @@
                 (maybe-note-static-symbol offset dstate)))))
           (t
            (case op
+             (81 ;; LDR negative immediate
+              (case rn
+                (#.pc-offset
+                 (note-code-constant (sb-disassem::segment-offs-to-code-offs
+                                      (- (dstate-cur-offs dstate) offset -8) (dstate-segment dstate))
+                                     dstate))
+                (t
+                 (let* ((prev-inst (current-instruction dstate -4))
+                        (prev-rd (ldb (byte 4 12) prev-inst))
+                        (prev-offset (decode-shifter-immediate (ldb (byte 12 0) prev-inst))))
+                   (when (= (logand prev-inst #x0FEF0000) #x024F0000) ;; sub rx, pc, #offset
+                     (case op
+                       (81
+                        (when (= prev-rd rn)
+                          (note-code-constant (sb-disassem::segment-offs-to-code-offs
+                                               (- (dstate-cur-offs dstate) (+ offset prev-offset) -4)
+                                               (dstate-segment dstate))
+                                              dstate)))))))))
              (89 ;; LDR
               (case rn
-                (#.code-offset
-                 (note-code-constant offset dstate))
                 (#.pc-offset
                  (let ((value (sap-ref-int (dstate-segment-sap dstate)
                                            (+ (dstate-cur-offs dstate) offset 8)
@@ -96,16 +112,19 @@
        (princ " #" stream)
        (princ amount stream)))))
 
-(defun print-shifter-immediate (value stream dstate)
-  (declare (type stream stream)
-           (fixnum value))
-  (maybe-add-notes dstate)
+(defun decode-shifter-immediate (value)
   (let* ((rotate (ldb (byte 4 8) value))
          (immediate (mask-field (byte 8 0) value))
          (left (mask-field (byte 32 0)
                            (ash immediate (- 32 rotate rotate))))
          (right (ash immediate (- 0 rotate rotate))))
-    (princ (logior left right) stream)))
+    (logior left right)))
+
+(defun print-shifter-immediate (value stream dstate)
+  (declare (type stream stream)
+           (fixnum value))
+  (maybe-add-notes dstate)
+  (princ (decode-shifter-immediate value) stream))
 
 (defun use-label-relative-label (value dstate)
   (declare (type (signed-byte 24) value)
@@ -127,10 +146,19 @@
           (unless (zerop p)
             (princ (if (zerop w) "]" "]!") stream))))))
 
+(defun current-instruction (dstate &optional (offset 0))
+  (sap-ref-int (dstate-segment-sap dstate)
+               (+ (dstate-cur-offs dstate) offset)
+               n-word-bytes
+               (dstate-byte-order dstate)))
+
+
+
 (defun print-load/store-register (value stream dstate)
   (destructuring-bind (p u w shift-imm shift rm) value
     (when (zerop p)
       (princ "]" stream))
+    (maybe-add-notes dstate)
     (princ (if (zerop u) ", -" ", ") stream)
     (print-reg rm stream dstate)
     (print-immediate-shift (list shift-imm shift) stream dstate)

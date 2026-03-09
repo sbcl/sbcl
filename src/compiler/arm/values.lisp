@@ -14,7 +14,7 @@
 (define-vop (reset-stack-pointer)
   (:args (ptr :scs (any-reg)))
   (:generator 1
-    (store-csp ptr)))
+    (move csp-tn ptr)))
 
 (define-vop (%%nip-values)
   (:args (last-nipped-ptr :scs (any-reg) :target dest)
@@ -24,23 +24,21 @@
   (:temporary (:sc any-reg) src)
   (:temporary (:sc any-reg) dest)
   (:temporary (:sc descriptor-reg) temp)
-  (:temporary (:sc any-reg) stack-pointer)
   (:ignore r-moved-ptrs)
   (:generator 1
     (move src last-preserved-ptr)
     (move dest last-nipped-ptr)
-    (load-csp stack-pointer)
-    (inst cmp stack-pointer src)
+    (inst cmp csp-tn src)
     (inst b :le DONE)
     LOOP
     (loadw temp src)
     (inst add dest dest n-word-bytes)
     (inst add src src n-word-bytes)
     (storew temp dest -1)
-    (inst cmp stack-pointer src)
+    (inst cmp csp-tn src)
     (inst b :gt LOOP)
     DONE
-    (store-csp dest)
+    (move csp-tn dest)
     (inst sub src src dest)
     (loop for moved = moved-ptrs then (tn-ref-across moved)
           while moved
@@ -67,9 +65,8 @@
   (:info nvals)
   (:temporary (:scs (descriptor-reg)) temp)
   (:generator 20
-    (load-csp start)
-    (inst add temp start (* nvals n-word-bytes))
-    (store-csp temp)
+    (move start csp-tn)
+    (inst add csp-tn csp-tn (* nvals n-word-bytes))
     (do ((val vals (tn-ref-across val))
          (i 0 (1+ i)))
         ((null val))
@@ -94,27 +91,24 @@
   (:temporary (:scs (descriptor-reg) :from (:argument 0)) list)
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
-  (:temporary (:sc any-reg) csp-temp)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 0
     (move list arg)
-    (load-csp start)
-    (move csp-temp start)
+    (move start csp-tn)
 
     LOOP
     (inst cmp list null-tn)
     (loadw temp list cons-car-slot list-pointer-lowtag)
     (inst b :eq DONE)
     (loadw list list cons-cdr-slot list-pointer-lowtag)
-    (inst add csp-temp csp-temp n-word-bytes)
-    (store-csp csp-temp)
-    (storew temp csp-temp -1)
+    (inst add csp-tn csp-tn n-word-bytes)
+    (storew temp csp-tn -1)
     (test-type list ndescr LOOP nil (list-pointer-lowtag))
     (cerror-call vop 'bogus-arg-to-values-list-error list)
 
     DONE
-    (inst sub count csp-temp start)))
+    (inst sub count csp-tn start)))
 
 
 ;;; Copy the more arg block to the top of the stack so we can use them
@@ -124,23 +118,20 @@
   (:args (context :scs (descriptor-reg any-reg) :to :save)
          (num :scs (any-reg) :target count))
   (:arg-types * positive-fixnum)
-  (:temporary (:sc any-reg :from (:argument 2)) dst)
   (:temporary (:sc descriptor-reg :from (:argument 1)) temp)
   (:temporary (:sc any-reg) i)
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
   (:generator 20
     (inst adds count num 0)
-    (load-csp start)
+    (move start csp-tn)
     (inst b :eq DONE)
-    (inst mov dst start)
-    (inst add i start count)
-    (store-csp i)
+    (inst add csp-tn csp-tn count)
     (inst mov i count)
     LOOP
     (inst cmp i 4)
     (inst sub i i 4)
     (inst ldr temp (@ context i))
-    (inst str temp (@ dst i))
+    (inst str temp (@ start i))
     (inst b :ne LOOP)
     DONE))

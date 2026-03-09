@@ -92,15 +92,6 @@
                            (:big-endian `(+ ,n-offset (1- n-word-bytes))))))
       `(inst ldrb ,predicate ,n-target (@ ,n-source ,target-offset)))))
 
-;;; Macros to handle the fact that our stack pointer isn't actually in
-;;; a register (or won't be, by the time we're done).
-
-(defmacro load-csp (target &optional (predicate :al))
-  `(load-symbol-value ,target *control-stack-pointer* ,predicate))
-
-(defmacro store-csp (source &optional (predicate :al))
-  `(store-symbol-value ,source *control-stack-pointer* ,predicate))
-
 ;;; Macros to handle the fact that we cannot use the machine native call and
 ;;; return instructions.
 
@@ -178,13 +169,12 @@
 
 ;;;; Storage allocation:
 
-(defun generate-stack-overflow-check (vop size temp temp2)
+(defun generate-stack-overflow-check (vop size temp)
   (let ((overflow (generate-error-code vop
                                        'stack-allocated-object-overflows-stack-error
                                        size)))
     (load-symbol-value temp *control-stack-end*)
-    (load-csp temp2)
-    (inst sub temp temp temp2)
+    (inst sub temp temp csp-tn)
     (inst cmp temp size)
     (inst b :le overflow)))
 
@@ -223,13 +213,12 @@
 (defun allocation (type size lowtag result-tn &key flag-tn stack-allocate-p)
   ;; Normal allocation to the heap.
   (cond (stack-allocate-p
-         (load-csp result-tn)
+         (move result-tn csp-tn)
          (inst tst result-tn lowtag-mask)
          (inst add :ne result-tn result-tn n-word-bytes)
          (if (integerp size)
-             (composite-immediate-instruction add flag-tn result-tn size)
-             (inst add flag-tn result-tn size))
-         (store-csp flag-tn)
+             (composite-immediate-instruction add csp-tn result-tn size)
+             (inst add csp-tn result-tn size))
          ;; :ne is from TST above, this needs to be done after the
          ;; stack pointer has been stored.
          (storew null-tn result-tn -1 0 :ne)

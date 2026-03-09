@@ -29,7 +29,7 @@
   (defreg r2 2)
   (defreg lexenv 3)
   (defreg nl2 4)
-  (defreg code 5)
+  (defreg csp 5)
   (defreg nl3 6)
   (defreg ocfp 7)
   (defreg r8 8)
@@ -42,7 +42,7 @@
   (defreg pc 15) ;; Yes, the program counter.
 
   (defregset system-regs
-      null cfp nsp lr pc code)
+      null cfp nsp lr pc)
 
   (defregset descriptor-regs
       r0 r1 r2 lexenv r8)
@@ -51,7 +51,7 @@
       ocfp nfp nargs nl2 nl3)
 
   (defregset boxed-regs
-      r0 r1 r2 lexenv r8 code)
+      r0 r1 r2 lexenv r8)
 
   ;; registers used to pass arguments
   ;;
@@ -203,11 +203,11 @@
                    (make-random-tn (sc-or-lose ',sc) ,offset-sym)))))
 
   (defregtn null descriptor-reg)
-  (defregtn code descriptor-reg)
 
   (defregtn nargs any-reg)
   (defregtn ocfp any-reg)
   (defregtn nsp any-reg)
+  (defregtn csp any-reg)
   (defregtn cfp any-reg)
   (defregtn lr any-reg)
   (defregtn pc any-reg))

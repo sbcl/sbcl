@@ -324,7 +324,7 @@ during backtrace.
 (define-primitive-object (unwind-block)
   (uwp :c-type "struct unwind_block *")
   (cfp :c-type "lispobj *")
-  #-(or x86 x86-64 arm64) code
+  #-(or x86 x86-64 arm64 arm) code
   entry-pc
   #+(and win32 x86) #(next-seh-frame seh-frame-handler)
   #+(and unbind-in-unwind (not c-stack-is-control-stack)) #(nfp nsp)
@@ -333,7 +333,7 @@ during backtrace.
 (define-primitive-object (catch-block)
   (uwp :c-type "struct unwind_block *")
   (cfp :c-type "lispobj *")
-  #-(or x86 x86-64 arm64) code
+  #-(or x86 x86-64 arm64 arm) code
   entry-pc
   #+(and win32 x86) #(next-seh-frame seh-frame-handler)
   #+(and unbind-in-unwind (not c-stack-is-control-stack)) #(nfp nsp)

@@ -17,7 +17,7 @@
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 1
-    (load-csp res)))
+    (move res csp-tn)))
 
 (define-vop (current-fp-sap)
   (:translate current-fp)

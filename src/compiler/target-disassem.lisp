@@ -2364,7 +2364,7 @@
                 ;; x86-64 and arm64 do not have a code-tn, but they behave like ppc64
                 ;; in that the displacement is relative to the base of the code.
                 (let ((addr (+ location
-                               #-(or x86-64 ppc64 arm64) sb-vm:other-pointer-lowtag)))
+                               #-(or x86-64 ppc64 arm64 arm) sb-vm:other-pointer-lowtag)))
                   (values addr (ash addr (- sb-vm:word-shift)))))
                (:absolute
                 ;; Concerning object movement:

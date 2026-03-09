@@ -106,9 +106,7 @@
 ;;;
 (defconstant-eqx +static-symbols+
  `#(,@+common-static-symbols+
-     *control-stack-pointer*
      *binding-stack-pointer*
-     *interrupted-control-stack-pointer*
 
      ;; interrupt handling
      *pseudo-atomic-atomic*

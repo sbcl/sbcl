@@ -1155,9 +1155,9 @@
                (let* ((ra (sap-ref-sap
                            catch (* catch-block-entry-pc-slot
                                     n-word-bytes)))
-                      (component #-(or x86 x86-64 arm64)
+                      (component #-(or x86 x86-64 arm arm64)
                                  (catch-ref catch-block-code-slot)
-                                 #+(or x86 x86-64 arm64)
+                                 #+(or x86 x86-64 arm arm64)
                                  (code-header-from-pc ra))
                       #+ppc64
                       (component (%make-lisp-obj (logior (ash component n-fixnum-tag-bits)

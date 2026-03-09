@@ -53,7 +53,7 @@
 (define-vop (current-stack-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 1
-    (load-csp res)))
+    (move res csp-tn)))
 
 (define-vop (current-binding-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
@@ -87,7 +87,6 @@
     (load-symbol-value temp *current-unwind-protect-block*)
     (storew temp block unwind-block-uwp-slot)
     (storew cfp-tn block unwind-block-cfp-slot)
-    (storew code-tn block unwind-block-code-slot)
     (inst compute-lra lip lip entry-label)
     (storew lip block catch-block-entry-pc-slot)))
 
@@ -107,7 +106,6 @@
     (load-symbol-value temp *current-unwind-protect-block*)
     (storew temp result catch-block-uwp-slot)
     (storew cfp-tn result catch-block-cfp-slot)
-    (storew code-tn result catch-block-code-slot)
     (inst compute-lra lip lip entry-label)
     (storew lip result catch-block-entry-pc-slot)
 
@@ -179,14 +177,12 @@
                   (loadw move-temp start i 0 :ge)
                   (store-stack-tn tn move-temp :ge)
                   (store-stack-tn tn null-tn :lt)))))))
-    (load-stack-tn move-temp sp)
-    (store-csp move-temp)))
+    (load-stack-tn csp-tn sp)))
 
 (define-vop (nlx-entry-single)
   (:args (sp)
          (value))
   (:results (res :from :load))
-  (:temporary (:scs (descriptor-reg)) move-temp)
   (:info label)
   (:save-p :force-to-stack)
   (:vop-var vop)
@@ -194,8 +190,7 @@
     (emit-label label)
     (note-this-location vop :non-local-entry)
     (move res value)
-    (load-stack-tn move-temp sp)
-    (store-csp move-temp)))
+    (load-stack-tn csp-tn sp)))
 
 (define-vop (nlx-entry-multiple)
   (:args (top :target result) (src) (count))
@@ -232,8 +227,7 @@
 
     ;; Reset the CSP.
     DONE
-    (inst add temp result num)
-    (store-csp temp)))
+    (inst add csp-tn result num)))
 
 ;;; This VOP is just to force the TNs used in the cleanup onto the stack.
 ;;;
@@ -271,9 +265,8 @@
       (move saved-function function)
 
       ;; Allocate space for magic UWP block.
-      (load-csp block)
-      (inst add temp block (* unwind-block-size n-word-bytes))
-      (store-csp temp)
+      (move block csp-tn)
+      (inst add csp-tn csp-tn (* unwind-block-size n-word-bytes))
 
       ;; Set up magic catch / UWP block.
 

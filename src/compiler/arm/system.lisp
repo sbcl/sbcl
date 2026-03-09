@@ -157,7 +157,7 @@
   (:translate control-stack-pointer-sap)
   (:policy :fast-safe)
   (:generator 1
-    (load-csp int)))
+    (move int csp-tn)))
 
 ;;;; Code object frobbing.
 
@@ -241,6 +241,4 @@
  (:info x)
  (:temporary (:sc unsigned-reg) tmp)
  (:generator 4
-   ;; Can't compute code-tn-relative index until the boxed header length
-   ;; is known. Some vops emit new boxed words via EMIT-CONSTANT.
    (inst store-coverage-mark x tmp)))
