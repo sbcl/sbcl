@@ -2802,7 +2802,7 @@
              (truly-the (unsigned-byte 8)
                         (aref sb-vm::%%simple-array-n-bits-shifts%% widetag)))))
 
-(deftransform sb-vm::%vector-widetag-and-n-bits-shift ((type))
+(deftransform sb-vm::%vector-widetag-and-n-bits-shift ((type) * * :node node)
   (cond
     ((csubtypep (lvar-type type) (specifier-type '(member character base-char)))
      `(cond #+sb-unicode
@@ -2816,6 +2816,15 @@
                      #.(sb-vm:saetp-n-bits-shift
                         (find sb-vm:simple-base-string-widetag
                               sb-vm:*specialized-array-element-type-properties* :key #'sb-vm:saetp-typecode))))))
+    ((progn
+       (delay-ir1-transform node :ir1-phases)
+       ;; Handle (make-array n :element-type `(signed-byte ,x))
+       ;; without consing
+       (let ((args (splice-fun-args type 'list nil nil)))
+         (when args
+           (let ((vars (make-gensym-list (length args))))
+            `(lambda ,vars
+               (sb-vm::%vector-widetag-and-n-bits-shift-list ,@vars)))))))
     (t
      (give-up-ir1-transform "ELEMENT-TYPE is not constant."))))
 

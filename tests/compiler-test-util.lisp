@@ -28,7 +28,10 @@
            #:inspect-ir
            #:ir1-named-calls
            #:ir1-funargs
-           #:disassembly-lines))
+           #:disassembly-lines
+           #:do-blocks
+           #:do-nodes
+           #:do-ir2-blocks))
 
 (cl:in-package :ctu)
 
@@ -95,6 +98,13 @@
                               (sb-c::node-lvar ,node-var))))))
           (nil)
        ,@body)))
+
+(defmacro do-ir2-blocks ((block-var component &optional result)
+                         &body forms)
+  `(do ((,block-var (sb-c::block-info (sb-c::component-head ,component))
+                    (sb-c::ir2-block-next ,block-var)))
+       ((null ,block-var) ,result)
+     ,@forms))
 
 (defun ir1-named-calls (lambda-expression &optional (full t))
   (declare (ignorable lambda-expression full))

@@ -1358,9 +1358,12 @@
     (values (integer 128 255) (integer 0 7))
     (flushable foldable))
 
-(defknown sb-vm::%vector-widetag-and-n-bits-shift (type-specifier)
+(defknown sb-vm::%vector-widetag-and-n-bits-shift ((read-only type-specifier))
     (values (integer 128 255) (integer 0 7))
     (flushable foldable recursive no-verify-arg-count))
+(defknown sb-vm::%vector-widetag-and-n-bits-shift-list (&rest t)
+    (values (integer 128 255) (integer 0 7))
+    (flushable))
 
 (defknown sb-vm::%string-widetag-and-n-bits-shift (type-specifier)
     (values (member #+sb-unicode #.sb-vm:simple-character-string-widetag

@@ -333,6 +333,10 @@
                  (result simple-vector-widetag)
                  (%vector-widetag-and-n-bits-shift expansion)))))))))
 
+(defun %vector-widetag-and-n-bits-shift-list (&rest type)
+  (declare (dynamic-extent type))
+  (%vector-widetag-and-n-bits-shift type))
+
 (defun %string-widetag-and-n-bits-shift (element-type)
   (declare (explicit-check))
   (macrolet ((result (widetag)
