@@ -333,8 +333,8 @@ distinct from the global value. Can also be SETF."
          (old-id (symbol-package-id symbol)))
     (when (= new-id +package-id-overflow+) ; put the package in the dbinfo
       (setf (info :symbol :package symbol) package))
-    #-compact-symbol (set-symbol-package-id symbol new-id)
-    #+compact-symbol
+    #-64-bit (set-symbol-package-id symbol new-id)
+    #+64-bit
     (let ((disp #+big-endian 4
                 #+x86-64 1
                 #+(and little-endian (not x86-64)) 2))
@@ -412,9 +412,8 @@ distinct from the global value. Can also be SETF."
                                (logior (ash name-hash 32)
                                        (mask-field symbol-hash-prng-byte salt)))
               #-64-bit (logior (ash name-hash 3) (ldb (byte 3 0) salt)))))
-    ;; Compact-symbol (which is equivalent to #+64-bit) has the package already NIL
-    ;; because the PACKAGE-ID-BITS field defaults to 0.
-    #-compact-symbol (%set-symbol-package symbol nil)
+    ;; if #+64-bit then the package ID bits are already 0, implying uninterned
+    #-64-bit (%set-symbol-package symbol nil)
     symbol))
 
 (defun get (symbol indicator &optional (default nil))

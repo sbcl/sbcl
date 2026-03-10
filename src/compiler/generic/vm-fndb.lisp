@@ -128,14 +128,8 @@
 ;;; not only symbols. The value is reliable only if the object is a symbol.
 (defknown hash-as-if-symbol-name (t) symbol-name-hash (flushable movable always-translatable))
 
-;;; SYMBOL-PACKAGE-ID for #+compact-symbol demands a vop which avoids loading
-;;; a raw bit value in a descriptor register (the SLOT vop returns a descriptor)
+;;; SYMBOL-PACKAGE-ID is more efficient than (LDB ... (GET-HEADER-DATA))
 (defknown symbol-package-id (symbol) (unsigned-byte 16))
-;;; TODO: I'd like to eliminate the (OR NULL) from this return type.
-;;; For that to happen, I probably need +nil-packed-infos+ to become
-;;; placed in static space because assembly routines may need it.
-;;; On the other hand, they may not, because there is no special case
-;;; code needed when reading from it, which is entire point.
 (defknown symbol-dbinfo (symbol) (or null packed-info))
 
 (defknown initialize-vector ((simple-array * (*)) &rest t)

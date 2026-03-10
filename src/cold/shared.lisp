@@ -320,8 +320,6 @@
           (pushnew :sb-devel sb-xc:*features*))
         (when (target-featurep :immobile-space)
           (pushnew :immobile-code sb-xc:*features*))
-        (when (target-featurep :64-bit)
-          (push :compact-symbol sb-xc:*features*))
         (when (target-featurep '(:and :sb-thread (:or (:and :darwin (:not (:or :ppc :x86))) :openbsd)))
           (push :os-thread-stack sb-xc:*features*))
         (when (target-featurep '(:and :x86 :int4-breakpoints))
