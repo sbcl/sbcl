@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+
+changes relative to sbcl-2.6.2:
+  * bug fix: USE-PACKAGE once again signals the correct error if an attempt is
+    made to use the KEYWORD package.
+
 changes in sbcl-2.6.2 relative to sbcl-2.6.1:
   * minor incompatible change: IMAGPART of a negative float returns 0.0, not
     -0.0, consistent with a treatment of reals as complexes with an imaginary

@@ -1890,7 +1890,7 @@ PACKAGE."
         (deduped-packages (remove-duplicates (package-listify packages-to-use) :from-end t))
         (packages))
     ;; "packages-to-use ... The KEYWORD package may not be supplied."
-    (when (memq *keyword-package* packages)
+    (when (memq *keyword-package* deduped-packages)
       (error "Can not USE-PACKAGE ~S" *keyword-package*))
     (with-package-graph ()
       (with-single-package-locked-error ()
