@@ -2,7 +2,7 @@
   (append (directory "*.pure.lisp") (directory "*.impure.lisp")))
 
 (defun file-tests (file)
-  (with-simple-restart (continue "Skip file ~S" file)
+  (with-simple-restart (skip-file "Skip file ~S" file)
     (let ((string (with-open-file (stream file
                                           :direction :input
                                           :element-type 'character
@@ -13,20 +13,22 @@
                            do (write-sequence buffer output :end characters-read)
                            while (= characters-read 4096)))))))
       (loop with prefix = "(with-test "
-         for match = (search prefix string) then (search prefix string :start2 position)
-         for position = (when match (+ match (length prefix)))
-         while position
-         appending (with-simple-restart (continue "Skip WITH-TEST form")
-                     (let* ((options (read-from-string string nil nil :start position))
-                            (name    (getf options :name)))
-                       (list (cons name file))))))))
+            for match = (search prefix string) then (search prefix string :start2 position)
+            for position = (when match (+ match (length prefix)))
+            while position
+            appending (with-simple-restart (skip-test "Skip WITH-TEST form")
+                        (let* ((options (read-from-string string nil nil :start position))
+                               (name    (getf options :name)))
+                          (list (cons name file))))))))
 
 (defun all-tests ()
   (let ((skip-count 0))
     (handler-bind ((error (lambda (condition)
                             (declare (ignore condition))
                             (incf skip-count)
-                            (continue))))
+                            (if (find-restart 'skip-test)
+                                (invoke-restart 'skip-test)
+                                (invoke-restart 'skip-file)))))
       (prog1
           (mapcan #'file-tests (find-test-files))
         (when (plusp skip-count)
