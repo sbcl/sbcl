@@ -4781,8 +4781,7 @@ expansion happened."
 
 (define-type-method (union :complex-=) (type1 type2)
   (declare (ignore type1))
-  (if (some #'type-might-contain-other-types-p
-            (union-type-types type2))
+  (if (opaque-type-p type2)
       (values nil nil)
       (values nil t)))
 

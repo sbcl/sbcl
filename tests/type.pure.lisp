@@ -1303,3 +1303,10 @@
             (values-specifier-type '(values (or real null) &optional))
             (values-specifier-type '(values &optional (not boolean)))))
           '(nil t))))
+
+(with-test (:name :type=-union-negation)
+  (assert
+   (equal (multiple-value-list
+           (sb-kernel:type= (specifier-type '(or (and symbol (not null)) vector))
+                            (specifier-type 't)))
+          '(nil t))))

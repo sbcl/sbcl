@@ -806,8 +806,7 @@
                    (when (find-result-type return)
                      (go :restart)))
                  (res (return-result-type return)))))
-
-           (when (type/= (res) (tail-set-type tails))
+           (unless (type= (res) (tail-set-type tails))
              (setf (tail-set-type tails) (res))
              (dolist (fun (tail-set-funs tails))
                (dolist (ref (leaf-refs fun))

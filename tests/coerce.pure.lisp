@@ -194,10 +194,10 @@
    (lambda (x y)
      (coerce (the function x) y))
    (or function sequence))
-  ;; (assert-type
-  ;;  (lambda (x y)
-  ;;    (coerce (the (and symbol (not null)) x) y))
-  ;;  (or symbol function character))
+  (assert-type
+   (lambda (x y)
+     (coerce (the (and symbol (not null)) x) y))
+   (or (and symbol (not null)) function character))
   (assert-type
    (lambda (x y)
      (coerce (the symbol x) y))
