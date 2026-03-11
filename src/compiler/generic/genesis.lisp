@@ -439,7 +439,7 @@
     (setf (gspace-free-word-index gspace) new-free-word-index)
     old-free-word-index))
 
-(defconstant min-usable-hole-size 10) ; semi-arbitrary constant to speed up the allocator
+(defconstant min-usable-hole-size 14) ; semi-arbitrary constant to speed up the allocator
 ;; Place conses and code on their respective page type.
 (defun dynamic-space-claim-n-words (gspace n-words page-type
                                     &aux (words-per-page
