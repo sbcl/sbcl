@@ -1426,6 +1426,8 @@ invoked. In that case it will store into PLACE and start over."
 ;;;; WITH-FOO i/o-related macros
 
 (sb-xc:defmacro with-open-stream ((var stream) &body body)
+  (when (typep stream '(cons (eql open) (cons t)))
+    (setf stream `(open ,@(cdr stream) :auto-close nil)))
   (multiple-value-bind (forms decls) (parse-body body nil)
     `(let ((,var ,stream))
        ,@decls
@@ -1437,7 +1439,7 @@ invoked. In that case it will store into PLACE and start over."
                                 &body body)
   (multiple-value-bind (forms decls) (parse-body body nil)
     (let ((abortp (gensym)))
-      `(let ((,stream (open ,filespec ,@options))
+      `(let ((,stream (open ,filespec ,@options :auto-close nil))
              (,abortp t))
          ,@decls
          (unwind-protect

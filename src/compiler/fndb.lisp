@@ -1912,6 +1912,7 @@
                                            :append :supersede nil))
                        (:if-does-not-exist (member :error :create nil))
                        (:external-format external-format-designator)
+                       (:auto-close t)
                        #+win32 (:overlapped t))
   (or stream null))
 

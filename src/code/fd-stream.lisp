@@ -2253,17 +2253,18 @@
                          "~@<Couldn't remove ~S while closing ~S~:>" file fd-stream)))))))
            (t
             (finish-fd-stream-output fd-stream)
-            (let ((orig (fd-stream-original fd-stream)))
-              (when (and orig (fd-stream-delete-original fd-stream))
-                (multiple-value-bind (okay err) (sb-unix:unix-unlink orig)
-                  (unless okay
-                    (file-perror
-                     orig err
-                     "~@<Couldn't delete ~S while closing ~S~:>" orig fd-stream)))))
-            ;; In case of no-abort close, don't *really* close the
-            ;; stream until the last moment -- the cleaning up of the
-            ;; original can be done first.
-            (release-fd-stream-resources fd-stream))))
+            (unwind-protect
+                 (let ((orig (fd-stream-original fd-stream)))
+                   (when (and orig (fd-stream-delete-original fd-stream))
+                     (multiple-value-bind (okay err) (sb-unix:unix-unlink orig)
+                       (unless okay
+                         (file-perror
+                          orig err
+                          "~@<Couldn't delete ~S while closing ~S~:>" orig fd-stream)))))
+              ;; In case of no-abort close, don't *really* close the
+              ;; stream until the last moment -- the cleaning up of the
+              ;; original can be done first.
+              (release-fd-stream-resources fd-stream)))))
     (:clear-input
      (fd-stream-clear-input fd-stream))
     (:force-output
@@ -2496,7 +2497,7 @@
                        (name (if file
                                  (format nil "file ~A" file)
                                  (format nil "descriptor ~W" fd)))
-                         auto-close)
+                       auto-close)
   (declare (type index fd) (type (or real null) timeout)
            (type (member :none :line :full) buffering))
   ;; OPEN ensures that the external-format argument is OK before
@@ -2631,6 +2632,7 @@
                (external-format :default)
                ;; private options - use at your own risk
                (class 'fd-stream)
+               (auto-close t)
                #+win32
                (overlapped t)
              &aux
@@ -2802,7 +2804,7 @@
                                           :dual-channel-p nil
                                           :serve-events nil
                                           :input-buffer-p t
-                                          :auto-close t))
+                                          :auto-close auto-close))
                          (:probe
                           (let ((stream
                                   (%make-fd-stream :name namestring

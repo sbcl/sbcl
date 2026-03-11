@@ -626,11 +626,12 @@
                    (return nil)))))))))
 
 (defun open-fd-stream (pathname &key (class 'sb-sys:fd-stream)
-                                (direction :input)
-                                (element-type 'base-char)
-                                (if-exists nil if-exists-given)
-                                (if-does-not-exist nil if-does-not-exist-given)
-                                (external-format :default))
+                                     (direction :input)
+                                     (element-type 'base-char)
+                                     (if-exists nil if-exists-given)
+                                     (if-does-not-exist nil if-does-not-exist-given)
+                                     (external-format :default)
+                                     (auto-close t))
   (declare (type (or pathname string stream) pathname)
            (type (member :input :output :io :probe) direction)
            (type (member :error :new-version :rename :rename-and-delete
@@ -654,7 +655,7 @@
                                   :pathname pathname
                                   :dual-channel-p nil
                                   :input-buffer-p t
-                                  :auto-close t
+                                  :auto-close auto-close
                                   :external-format external-format))
           (:probe
            (let ((stream (sb-impl::%make-fd-stream :name namestring :fd fd

@@ -605,7 +605,8 @@
              if-exists if-does-not-exist
              (external-format :default)
              class mapped input-handle output-handle
-             #+win32 (overlapped t))
+             #+win32 (overlapped t)
+             (auto-close t))
   "Return a stream which reads from or writes to Filename.
   Defined keywords:
    :direction - one of :input, :output, :io, or :probe
@@ -622,7 +623,7 @@
    :input-handle - a stream or Unix file descriptor to read from
    :output-handle - a stream or Unix file descriptor to write to"
   (declare (ignore element-type external-format input-handle output-handle
-                   #+win32 overlapped
+                   #+win32 overlapped auto-close
                    if-exists if-does-not-exist))
   (let ((class (or class 'sb-sys:fd-stream))
         (options (copy-list options))
@@ -642,6 +643,7 @@
            (when (subtypep class 'file-simple-stream)
              (when (eq direction :probe)
                (setq class 'probe-simple-stream)))
+           (remf options :auto-close)
            (apply #'make-instance class :filename filespec options))
           ((subtypep class 'sb-gray:fundamental-stream)
            (remf options :class)
