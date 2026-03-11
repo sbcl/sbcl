@@ -4780,10 +4780,11 @@ expansion happened."
               (values nil (and (not subtype) certain?)))))))
 
 (define-type-method (union :complex-=) (type1 type2)
-  (declare (ignore type1))
-  (if (opaque-type-p type2)
-      (values nil nil)
-      (values nil t)))
+  (cond ((or (opaque-type-p type1)
+             (opaque-type-p type2))
+         (values nil nil))
+        (t
+         (values nil t))))
 
 ;;; Similarly, a union type is a subtype of another if and only if
 ;;; every element of TYPE1 is a subtype of TYPE2.

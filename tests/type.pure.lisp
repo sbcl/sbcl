@@ -588,6 +588,7 @@
           #+sb-unicode sb-kernel::character-string
           sb-kernel:simple-character-string
           sb-kernel:type=
+          sb-kernel:type/=
           sb-kernel:find-classoid
           sb-kernel:make-numeric-type
           sb-kernel:types-equal-or-intersect
@@ -1306,7 +1307,11 @@
 
 (with-test (:name :type=-union-negation)
   (assert
-   (equal (multiple-value-list
-           (sb-kernel:type= (specifier-type '(or (and symbol (not null)) vector))
-                            (specifier-type 't)))
-          '(nil t))))
+   (type/= (specifier-type '(or (and symbol (not null)) vector))
+                     (specifier-type 't)))
+  (assert
+   (not (type/= (specifier-type 'unknown) (specifier-type '(or vector cons)))))
+  (assert
+   (not (type/= (specifier-type '(and unknown unknown2)) (specifier-type '(or vector cons)))))
+  (assert
+   (not (type/= (specifier-type '(or unknown unknown2)) (specifier-type '(or vector cons))))))
