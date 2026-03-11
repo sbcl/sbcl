@@ -614,8 +614,9 @@
        ;; Add an item accounting for waste caused by closing regions on unfull pages
        (let ((count (extern-alien "close_region_nfillers" int))
              (total-bytes (extern-alien "close_region_tot_bytes_wasted" unsigned)))
-         (push (make-alloc total-bytes count 'sb-vm::filler 0)
-               (gethash 'sb-vm::filler collection)))
+         (when (plusp total-bytes)
+           (push (make-alloc total-bytes count 'sb-vm::filler 0)
+                 (gethash 'sb-vm::filler collection))))
        (return collection))
      (let ((count (sap-ref-word sap (* index 8))))
        (multiple-value-bind (code pc-offset total-bytes)
