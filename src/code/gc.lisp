@@ -311,6 +311,7 @@ used to specify the oldest generation guaranteed to be collected."
   (scrub-power-cache)
   (setf sb-unicode::*name->char-buffers* nil)
   (setf sb-c::*phash-lambda-cache* nil)
+  (setf sb-impl::*available-ub8-buffers* nil sb-impl::*available-char-buffers* nil)
   (setf sb-impl::*read-line-buffers* nil)
   ;; Clear caches depending on the generation being collected.
   (cond ((eql 0 gen)

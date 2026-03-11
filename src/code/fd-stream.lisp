@@ -49,8 +49,18 @@
   (prev-head 0 :type index))
 (declaim (freeze-type buffer))
 
+;;; Buffer for I/O operations with the OS. This is in the fd-stream's
+;;; IBUF slot, not to be confused with IN-BUF slot.
 (define-load-time-global *available-buffers* ()
   "List of available buffers.")
+
+;;; Array of decoded characters, when required.
+(define-load-time-global *available-char-buffers* ())
+;;; Array of element type (unsigned-byte 8) could serve two needs:
+;;; - storing length-in-octets of each character for maintaining char pos
+;;    vs. byte pos involving non-fixed-width EFs.
+;;; - holding data for streams of element type UB8 (not done)
+(define-load-time-global *available-ub8-buffers* ())
 
 (defconstant +bytes-per-buffer+ (* 32 1024)
   "Default number of bytes per buffer.")
@@ -181,6 +191,7 @@
 
 ;;; Release all of FD-STREAM's buffers. Originally the intent of this
 ;;; was to grab a mutex once only, but the buffer pool is lock-free now.
+;;; (why is this even a separately callable function any more?)
 (defun release-fd-stream-buffers (fd-stream)
   (awhen (fd-stream-ibuf fd-stream)
     (setf (fd-stream-ibuf fd-stream) nil)
@@ -2023,12 +2034,15 @@
                    ;; temporary disable on :io streams
                    (not output-p))
           (cond (character-stream-p
-                 (setf (ansi-stream-cin-buffer fd-stream)
-                       (make-array +ansi-stream-in-buffer-length+
-                                   :element-type 'character))
-                 (setf (ansi-stream-csize-buffer fd-stream)
-                       (make-array +ansi-stream-in-buffer-length+
-                                   :element-type '(unsigned-byte 8))))
+                 (locally (declare (sb-c::tlab :system))
+                   (setf (ansi-stream-cin-buffer fd-stream)
+                         (or (atomic-pop *available-char-buffers*)
+                             (make-array +ansi-stream-in-buffer-length+
+                                         :element-type 'character)))
+                   (setf (ansi-stream-csize-buffer fd-stream)
+                         (or (atomic-pop *available-ub8-buffers*)
+                             (make-array +ansi-stream-in-buffer-length+
+                                         :element-type '(unsigned-byte 8))))))
                 ((equal target-type '(unsigned-byte 8))
                  (setf (ansi-stream-in-buffer fd-stream)
                        (make-array +ansi-stream-in-buffer-length+
@@ -2103,6 +2117,15 @@
 ;;; Handles the resource-release aspects of stream closing, and marks
 ;;; it as closed.
 (defun release-fd-stream-resources (fd-stream)
+  (declare (sb-c::tlab :system)) ; so ATOMIC-PUSH goes to the heap
+  (let ((buffer (ansi-stream-csize-buffer fd-stream)))
+    (when buffer
+      (setf (ansi-stream-csize-buffer fd-stream) nil)
+      (atomic-push buffer *available-ub8-buffers*)))
+  (let ((buffer (ansi-stream-cin-buffer fd-stream)))
+    (when buffer
+      (setf (ansi-stream-cin-buffer fd-stream) nil)
+      (atomic-push buffer *available-char-buffers*)))
   (handler-case
       (without-interrupts
         ;; Drop handlers first.
@@ -2202,8 +2225,6 @@
     (:close
      ;; Drop input buffers
      (setf (ansi-stream-in-index fd-stream) +ansi-stream-in-buffer-length+
-           (ansi-stream-cin-buffer fd-stream) nil
-           (ansi-stream-csize-buffer fd-stream) nil
            (ansi-stream-in-buffer fd-stream) nil)
      (cond (arg1
             ;; We got us an abort on our hands.

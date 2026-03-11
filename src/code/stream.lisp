@@ -2676,6 +2676,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   ;; before we're ready (or after we think it's been deinitialized).
   ;; This uses the internal %MAKUNBOUND because the CL: function would
   ;; rightly complain that *AVAILABLE-BUFFERS* is proclaimed always bound.
+  (%makunbound '*available-ub8-buffers*)
+  (%makunbound '*available-char-buffers*)
   (%makunbound '*available-buffers*))
 
 (defvar *streams-closed-by-slad*)
@@ -2708,6 +2710,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     ;; Use the internal %BOUNDP for similar reason to that cited above-
     ;; BOUNDP on a known global transforms to the constant T.
     (aver (not (%boundp '*available-buffers*)))
+    (setf *available-char-buffers* nil
+          *available-ub8-buffers* nil)
     (setf *available-buffers* nil))
   (%with-output-to-string (*error-output*)
     (multiple-value-bind (in out err)
