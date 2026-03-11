@@ -189,21 +189,6 @@
   (print-unreadable-object (fd-stream stream :type t :identity t)
     (format stream "for ~S" (fd-stream-name fd-stream))))
 
-;;; Release all of FD-STREAM's buffers. Originally the intent of this
-;;; was to grab a mutex once only, but the buffer pool is lock-free now.
-;;; (why is this even a separately callable function any more?)
-(defun release-fd-stream-buffers (fd-stream)
-  (awhen (fd-stream-ibuf fd-stream)
-    (setf (fd-stream-ibuf fd-stream) nil)
-    (release-buffer it))
-  (awhen (fd-stream-obuf fd-stream)
-    (setf (fd-stream-obuf fd-stream) nil)
-    (release-buffer it))
-  (dolist (buf (fd-stream-output-queue fd-stream))
-    (when (buffer-p buf)
-      (release-buffer buf)))
-  (setf (fd-stream-output-queue fd-stream) nil))
-
 ;;;; FORM-TRACKING-STREAM
 
 ;; The compiler uses this to record for each input subform the start and
@@ -2145,9 +2130,18 @@
     ;; On error unwind from WITHOUT-INTERRUPTS.
     (serious-condition (e)
       (error e)))
-  ;; Release all buffers. If this is undone, or interrupted,
+  ;; Release all buffers. If this is not performed, or interrupted,
   ;; we're still safe: buffers have finalizers of their own.
-  (release-fd-stream-buffers fd-stream))
+  (awhen (fd-stream-ibuf fd-stream)
+    (setf (fd-stream-ibuf fd-stream) nil)
+    (release-buffer it))
+  (awhen (fd-stream-obuf fd-stream)
+    (setf (fd-stream-obuf fd-stream) nil)
+    (release-buffer it))
+  (dolist (buf (fd-stream-output-queue fd-stream))
+    (when (buffer-p buf) ; how can it NOT be a buffer?
+      (release-buffer buf)))
+  (setf (fd-stream-output-queue fd-stream) nil))
 
 ;;; Flushes the current input buffer and any supplied replacements,
 ;;; and returns the input buffer, and the amount of flushed input in
