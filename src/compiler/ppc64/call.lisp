@@ -173,16 +173,16 @@
 (defun default-unknown-values (vop values nvals move-temp temp lra-label)
   (declare (type (or tn-ref null) values)
            (type unsigned-byte nvals) (type tn move-temp temp))
+  (note-this-location vop (if (<= nvals 1)
+                              :single-value-return
+                              :unknown-return))
   (inst compute-code-from-lip code-tn lra-tn lra-label temp)
   (if (<= nvals 1)
-      (progn
-        (note-this-location vop :single-value-return)
-        (inst isel csp-tn csp-tn ocfp-tn :eq))
+      (inst isel csp-tn csp-tn ocfp-tn :eq)
       (let ((regs-defaulted (gen-label))
             (defaulting-done (gen-label))
             (default-stack-vals (gen-label)))
         ;; Branch off to the MV case.
-        (note-this-location vop :unknown-return)
         (inst b? :ne regs-defaulted)
 
         ;; Do the single value case.
@@ -700,14 +700,14 @@
                  (do-next-filler)
                  (return)))
 
-           (note-this-location vop :call-site)
-
            ,@(if (eq return :tail)
                  '((inst mtlr return-pc-pass)
                    (inst mtctr entry-point)
+                   (note-this-location vop :call-site)
                    (inst bctr))
                  '((emit-alignment 3 :long-nop)
                    (inst mtctr entry-point)
+                   (note-this-location vop :call-site)
                    (inst bctrl))))
 
          ,@(ecase return
