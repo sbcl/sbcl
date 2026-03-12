@@ -251,6 +251,8 @@ static void unwind_binding_stack(struct thread* th)
     // these are akin to weak-pointers
     lisp_package_vector = 0;
     alloc_profile_data = 0;
+    free(tlsindex_to_symbol_map);
+    tlsindex_to_symbol_map = 0;
     if (verbose) printf("done]\n");
 }
 

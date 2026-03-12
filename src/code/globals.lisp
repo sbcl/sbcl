@@ -129,6 +129,8 @@
     (list (make-hash-table :test 'equal :synchronized t)))
 (declaim (type (cons hash-table) *code-coverage-info*))
 
+(define-load-time-global sb-vm::*tls-symbol-map* 0)
+
 (in-package "SB-DEBUG")
 
 ;;; This is a list of conses (fun-end-cookie . condition-satisfied),
