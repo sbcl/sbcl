@@ -42,7 +42,9 @@ exefile=$TEST_DIRECTORY/sbcl-new-elf
 cc -no-pie -o ${exefile} -Wl,--export-dynamic -Wl,-no-as-needed \
    ${temp}-src.s ${temp}-src-core.o ../src/runtime/libsbcl.a -lm -ldl ${m_arg}
 
-result=`${exefile} --eval '(princ "Success")' --quit`
+result=`${exefile} --eval \
+   '(if (alien-funcall (extern-alien "gc_managed_heap_space_p" (function (boolean 8) unsigned))
+                       sb-vm:text-space-start) (princ "Success"))' --quit`
 echo $result
 if [ "$result" = Success ]
 then

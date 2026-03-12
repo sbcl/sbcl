@@ -235,8 +235,11 @@ bool gc_managed_heap_space_p(lispobj addr)
         || (DYNAMIC_1_SPACE_START <= addr &&
             addr < DYNAMIC_1_SPACE_START + dynamic_space_size)
 #endif
+#ifndef LISP_FEATURE_IMMOBILE_SPACE // elf-sans-immobile needs this case
+        || (TEXT_SPACE_START <= addr && addr < (lispobj)text_space_highwatermark)
+#endif
 #ifdef LISP_FEATURE_PERMGEN
-        || (PERMGEN_SPACE_START <= addr && addr < (uword_t)permgen_space_free_pointer)
+        || (PERMGEN_SPACE_START <= addr && addr < (lispobj)permgen_space_free_pointer)
 #endif
 #ifdef LISP_FEATURE_DARWIN_JIT
         || (STATIC_CODE_SPACE_START <= addr && addr < STATIC_CODE_SPACE_END)
