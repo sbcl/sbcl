@@ -769,20 +769,13 @@ check_interrupt_context_or_lose(os_context_t *context)
  * utility routines used by various signal handlers
  */
 
-#ifdef LISP_FEATURE_ARM64
-/* Ignore the two words above CSP, which can be used without adjusting CSP */
-#define CONTRL_STACK_RED_ZONE 2
-#else
-#define CONTRL_STACK_RED_ZONE 0
-#endif
-
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
 static void
 build_fake_control_stack_frames(struct thread *th, os_context_t *context)
 {
 
     /* Ignore the two words above CSP, which can be used without adjusting CSP */
-    lispobj* csp = (lispobj *)(*os_context_register_addr(context, reg_CSP)) + CONTRL_STACK_RED_ZONE;
+    lispobj* csp = (lispobj *)(*os_context_register_addr(context, reg_CSP)) + 2;
     lispobj cfp = (lispobj)(*os_context_register_addr(context, reg_CFP));
     access_control_frame_pointer(th) = csp;
 

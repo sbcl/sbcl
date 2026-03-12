@@ -133,8 +133,8 @@
   ;; the debugger regards a function pointer in reg_CODE which
   ;; doesn't point to a code object as undefined function.
   (inst li code-tn (make-fixup 'undefined-tramp :assembly-routine))
-  (storew ocfp-tn cfp-tn 0)
-  (storew ra cfp-tn 1)
+  (storew ocfp-tn cfp-tn ocfp-save-offset)
+  (storew ra cfp-tn ra-save-offset)
   (error-call nil 'undefined-fun-error lexenv-tn))
 
 (define-assembly-routine
