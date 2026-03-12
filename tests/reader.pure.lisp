@@ -580,6 +580,13 @@
               '(simple-array character (9))
               '(simple-array character (9))))))
 
+(with-test (:name :sharp-colon-base-char-preference :skipped-on (not sb-unicode))
+  (let ((syms (sb-vm:list-allocated-objects :all :type sb-vm:symbol-widetag)))
+    (dolist (x syms)
+      (when (eql (sb-kernel:generation-of x) sb-vm:+pseudo-static-generation+)
+        ;; this was finding various gensyms before the tweak to #: reading
+        (assert (not (typep (symbol-name x) '(simple-array character))))))))
+
 (with-test (:name :rational-rdff)
   (with-standard-io-syntax
     (let ((*read-default-float-format* 'rational))

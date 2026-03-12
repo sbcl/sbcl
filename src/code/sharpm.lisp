@@ -604,7 +604,11 @@
                 stream "The symbol following #: has numeric syntax: ~S"
                 token))
               (t
-               (make-symbol token)))))))
+               ;; Don't check READTABLE-BASE-CHAR-PREFERENCE here because
+               ;; what right has a user to object to #:FOO getting a base-string
+               ;; for its name? Only if the user explicitly invokes MAKE-SYMBOL
+               ;; might they have a valid complaint.
+               (make-symbol (possibly-base-stringize token))))))))
 
 (defvar *read-eval* t
   "If false, then the #. read macro is disabled.")

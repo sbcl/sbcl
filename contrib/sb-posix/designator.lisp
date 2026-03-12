@@ -4,10 +4,8 @@
 (defmacro define-designator (name (lisp-type alien-type) doc
                              &body conversions)
   (let ((designator-type `(or ,@(mapcar #'car conversions)))
-        (designator-name (intern (format nil "~A-~A"
-                                         (symbol-name name)
-                                  (symbol-name :designator))
-                                 #.*package*))
+        (designator-name
+         (sb-int:package-symbolicate #.*package* name "-DESIGNATOR"))
         (name (intern (symbol-name name) :sb-posix)))
     `(progn
        (deftype ,name ()
