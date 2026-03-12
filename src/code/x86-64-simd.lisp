@@ -1079,13 +1079,14 @@
             (inst movdqu bytes3 (ea 32 32-bit-array))
             (inst movdqu bytes4 (ea 48 32-bit-array))
 
-            (loop for bytes in (list bytes1 bytes2 bytes3 bytes4)
-                  do
-                  (inst movdqa temp bytes)
-                  (inst pcmpgtd temp ascii-mask)
-                  (inst pmovmskb tail temp)
-                  (inst test :dword tail tail)
-                  (inst jmp :nz done))
+            (inst movdqa temp bytes1)
+            (inst por temp bytes2)
+            (inst por temp bytes3)
+            (inst por temp bytes4)
+            (inst pcmpgtd temp ascii-mask)
+            (inst pmovmskb tail temp)
+            (inst test :dword tail tail)
+            (inst jmp :nz done)
 
             (loop for bytes in (list bytes1 bytes2 bytes3 bytes4)
                   do
@@ -1179,7 +1180,7 @@
                (last-newline signed-reg signed-num))
             (inst vmovdqu ascii-mask (register-inline-constant :avx2
                                                                (concat-ub 32 (loop repeat 8
-                                                                                   collect 127))))
+                                                                                   collect (ldb (byte 32 0) (lognot 127))))))
             (inst vmovdqu newlines (register-inline-constant :avx2
                                                             (concat-ub 32 (loop repeat 8
                                                                                 collect 10))))
@@ -1203,12 +1204,9 @@
             (inst vmovdqu bytes1 (ea 32-bit-array))
             (inst vmovdqu bytes2 (ea 32 32-bit-array))
 
-            (loop for bytes in (list bytes1 bytes2)
-                  do
-                  (inst vpcmpgtd temp bytes ascii-mask)
-                  (inst vpmovmskb tail temp)
-                  (inst test :dword tail tail)
-                  (inst jmp :nz done))
+            (inst vpor temp bytes1 bytes2)
+            (inst vptest temp ascii-mask)
+            (inst jmp :nz done)
 
             (loop for bytes in (list bytes1 bytes2)
                   do
