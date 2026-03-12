@@ -545,7 +545,10 @@ value."
                  (info :type :expander typespec-operator)))
          (f (if (listp f) (car f) f)))
     (if (functionp f)
-        (values (%fun-lambda-list f) t)
+        (let ((lambda-list (%fun-lambda-list f)))
+          (if (eq lambda-list :unknown)
+              (values nil nil)
+              (values lambda-list t)))
         (values nil nil))))
 
 (defun method-combination-lambda-list (method-combination)

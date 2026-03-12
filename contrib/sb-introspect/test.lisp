@@ -95,3 +95,11 @@
     (x)))
 
 (defun 0-debug (a b c) (declare (optimize (debug 0))) (+ a b c))
+
+(defvar *x* 1)
+
+(eval-when (:compile-toplevel)
+  (declaim (optimize (debug 0))))
+
+(deftype 0-debug-type ()
+  `(member ,*x*))

@@ -47,6 +47,11 @@
            '(x b))
   t)
 
+(deftest deftype-lambda-list.1
+    (deftype-lambda-list 'cl-user::0-debug-type)
+  nil
+  nil)
+
 (defmacro interpret (form)
   `(let ((sb-ext:*evaluator-mode* :interpret))
      (eval ',form)))
