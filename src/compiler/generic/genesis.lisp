@@ -272,7 +272,7 @@
 #+x86-64 (defconstant asm-jump-vect-nelems 112) ; arb
 
 (defstruct page
-  (type nil :type (member nil :code :list :mixed))
+  (type nil :type (member nil :code :list :mixed #+gencgc :small-mixed))
   (words-used 0)
   (allocation-bitmap
    (make-array (/ sb-vm:gencgc-page-bytes
@@ -295,6 +295,7 @@
   ;; the gspace contents as a BIGVEC
   (data (make-bigvec) :type bigvec :read-only t)
   (page-table nil) ; for dynamic space
+  (symbol-region) ; (word-index . limit) - this region is also for FDEFNs
   (cons-region) ; (word-index . limit)
   ;; lists of holes created by the allocator to segregate code from data.
   ;; Doesn't matter for cheneygc; does for gencgc.
@@ -444,6 +445,7 @@
 (defun dynamic-space-claim-n-words (gspace n-words page-type
                                     &aux (words-per-page
                                           (/ sb-vm:gencgc-page-bytes sb-vm:n-word-bytes)))
+  #-gencgc (when (eq page-type :small-mixed) (setq page-type :mixed))
   (labels ((alignedp (word-index) ; T if WORD-INDEX aligns to a GC page boundary
              (not (logtest (* word-index sb-vm:n-word-bytes)
                            (1- sb-vm:gencgc-page-bytes))))
@@ -537,6 +539,34 @@
         (mark-allocation result)
         (when (= (incf (car region) sb-vm:cons-size) (cdr region))
           (setf (gspace-cons-region gspace) nil))
+        (return-from dynamic-space-claim-n-words result)))
+    (when (eq page-type :small-mixed)
+      ;; Similar to conses, claim a page at a time
+      (let* ((words-per-card (floor sb-vm:gencgc-card-bytes sb-vm:n-word-bytes))
+             (region
+              (or (gspace-symbol-region gspace)
+                  (progn
+                    (unless (alignedp (gspace-free-word-index gspace))
+                      (realign-frontier))
+                    (let ((word-index (gspace-claim-n-words gspace words-per-page)))
+                      (assign-page-type page-type word-index sb-vm:symbol-size)
+                      (let ((pte (pte (page-index word-index))))
+                        (setf (page-words-used pte) words-per-card
+                              (page-scan-start pte) word-index))
+                      (setf (gspace-symbol-region gspace)
+                            (cons word-index (+ word-index words-per-card)))))))
+             (result (car region)))
+        (incf (car region) n-words) ; there is where the next symbol (aftr this) will go
+        ;; But if that next symbol would not fit within the current GC card, point to the
+        ;; following card, or else discard the remainder if no cards remain on the page.
+        (when (>= (+ (car region) n-words) (cdr region))
+          (let* ((page-base (logandc2 result (1- words-per-page)))
+                 (card-base (logandc2 result (1- words-per-card)))
+                 (next-card (+ card-base words-per-card)))
+            (setf (gspace-symbol-region gspace)
+                  (when (< next-card (+ page-base words-per-page))
+                    (incf (page-words-used (pte (page-index next-card))) words-per-card)
+                    (cons next-card (+ next-card words-per-card))))))
         (return-from dynamic-space-claim-n-words result)))
     (let* ((holder (ecase page-type
                      (:code (gspace-code-free-ranges gspace))
@@ -778,8 +808,12 @@
   "Allocate LENGTH words in GSPACE and return an ``other-pointer'' descriptor.
    LENGTH must count the header word itself as 1 word.  The header word is
    initialized with the payload size as (1- LENGTH), and WIDETAG."
-  (let ((des (allocate-cold-descriptor gspace (ash length sb-vm:word-shift)
-                                       sb-vm:other-pointer-lowtag))
+  (let* ((page-type (or (and (eq gspace *dynamic*)
+                             (find widetag `(,sb-vm:symbol-widetag ,sb-vm:fdefn-widetag))
+                             :small-mixed)
+                        :mixed))
+        (des (allocate-cold-descriptor gspace (ash length sb-vm:word-shift)
+                                       sb-vm:other-pointer-lowtag page-type))
         (header-word (sb-vm::compute-object-header length widetag)))
     #+permgen
     (when (and (= widetag sb-vm:symbol-widetag) (eq gspace *static*))
@@ -4068,6 +4102,8 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
                             (ecase (page-type pte)
                               (:code  (incf n-code)  #b111)
                               (:list  (incf n-cons)  #b101)
+                              (:small-mixed
+                                      (incf n-mixed) #b100)
                               (:mixed (incf n-mixed) #b011))
                             0)))
         (setf (bvref-word-unaligned ptes pte-offset) (logior sso type-bits))
