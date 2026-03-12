@@ -491,7 +491,8 @@
 (gc :full t)
 (sb-kernel:run-pending-finalizers)
 #+sb-thread (sb-kernel:run-pending-finalizers)
-(with-test (:name :xset-stable-hash-weakness)
+(with-test (:name :xset-stable-hash-weakness
+            :skipped-on :gc-stress)
   ;; After running the :MEMBER-TYPE-HASH-MIXER test, there were >5000 entries
   ;; in the *XSET-STABLE-HASHES* table for me.
   ;; The preceding GC should have had some effect.

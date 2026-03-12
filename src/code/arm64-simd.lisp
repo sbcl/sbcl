@@ -513,6 +513,17 @@
       (inst mov res null-tn)
       DONE)))
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun check-ascii (input temp not-ascii-label &optional (size 1))
+    ;; Check for ASCII by looking at the largest byte
+    (multiple-value-bind (v-size size) (ecase size
+                                         (1 (values :16b :b))
+                                         (4 (values :4s :s)))
+      (inst umaxv temp input v-size)
+      (inst umov tmp-tn temp 0 size)
+      (inst cmp tmp-tn 127)
+      (inst b :hs not-ascii-label))))
+
 (defun simd-copy-utf8-to-character-string (start end string ibuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
@@ -532,7 +543,6 @@
                           ((end unsigned-reg))
                           ((head any-reg) head)
                           ((n any-reg) n)
-                          ((ascii-mask complex-double-reg))
                           ((bytes complex-double-reg))
                           ((16-bits complex-double-reg))
                           ((16-bits-2 complex-double-reg))
@@ -542,7 +552,6 @@
                           ((32-bits-4 complex-double-reg))
                           ((temp complex-double-reg)))
                  ((res unsigned-reg unsigned-num))
-               (inst movi ascii-mask 128 :16b)
                (inst add byte-array* byte-array* (lsr head 1))
                (inst mov byte-array byte-array*)
                (inst add end byte-array* (lsr n 1))
@@ -551,10 +560,8 @@
 
                LOOP
                (inst ldr bytes (@ byte-array))
-               (inst s-and temp bytes ascii-mask)
-               (inst umaxv temp temp :4s)
-               (inst umov tmp-tn temp 0 :s)
-               (inst cbnz tmp-tn DONE)
+               (check-ascii bytes temp DONE)
+
                (inst add byte-array byte-array 16)
 
                (inst ushll 16-bits :8h bytes :8b)
@@ -590,7 +597,6 @@
              (inline-vop (((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
                           ((byte-array sap-reg t))
                           ((char-array sap-reg t) (vector-sap string))
-                          ((ascii-mask complex-double-reg))
                           ((bytes complex-double-reg))
                           ((string-start any-reg) start)
                           ((end unsigned-reg))
@@ -598,7 +604,6 @@
                           ((n any-reg) n)
                           ((temp complex-double-reg)))
                  ((res unsigned-reg unsigned-num))
-               (inst movi ascii-mask 128 :16b)
                (inst add byte-array* byte-array* (lsr head 1))
                (inst mov byte-array byte-array*)
                (inst add end byte-array* (lsr n 1))
@@ -607,10 +612,7 @@
 
                LOOP
                (inst ldr bytes (@ byte-array))
-               (inst s-and temp bytes ascii-mask)
-               (inst umaxv temp temp :4s)
-               (inst umov tmp-tn temp 0 :s)
-               (inst cbnz tmp-tn DONE)
+               (check-ascii bytes temp DONE)
                (inst add byte-array byte-array 16)
                (inst str bytes (@ char-array 16 :post-index))
 
@@ -659,7 +661,6 @@
                            ((byte-array sap-reg t))
                            ((char-array* sap-reg t) (vector-sap string))
                            ((char-array sap-reg t))
-                           ((ascii-mask complex-double-reg))
                            ((crlf-mask complex-double-reg))
                            ((bytes complex-double-reg))
                            ((next-bytes complex-double-reg))
@@ -677,7 +678,6 @@
                            ((count unsigned-reg)))
                   ((new-head unsigned-reg positive-fixnum :from :load)
                    (copied unsigned-reg positive-fixnum :from :load))
-                (inst movi ascii-mask 128 :16b)
                 (inst mov tmp-tn #x0A0D)
                 (inst dup crlf-mask tmp-tn :8h)
 
@@ -693,19 +693,13 @@
                                                            (loop for i downfrom 7 to 0
                                                                  collect (ash 1 i)))))
                 (inst ldr next-bytes (@ byte-array))
-                (inst s-and temp next-bytes ascii-mask)
-                (inst umaxv temp temp :4s)
-                (inst umov tmp-tn temp 0 :s)
-                (inst cbnz tmp-tn DONE)
+                (check-ascii next-bytes temp DONE)
 
                 LOOP
                 (inst s-mov bytes next-bytes)
                 (inst ldr next-bytes (@ byte-array 16))
+                (check-ascii next-bytes temp DONE)
 
-                (inst s-and temp next-bytes ascii-mask)
-                (inst umaxv temp temp :4s)
-                (inst umov tmp-tn temp 0 :s)
-                (inst cbnz tmp-tn DONE)
                 (inst add byte-array byte-array 16)
 
 
@@ -794,7 +788,6 @@
                            ((byte-array sap-reg t))
                            ((char-array* sap-reg t) (vector-sap string))
                            ((char-array sap-reg t))
-                           ((ascii-mask complex-double-reg))
                            ((crlf-mask complex-double-reg))
                            ((bytes complex-double-reg))
                            ((next-bytes complex-double-reg))
@@ -816,7 +809,6 @@
                            ((count unsigned-reg)))
                   ((new-head unsigned-reg positive-fixnum :from :load)
                    (copied unsigned-reg positive-fixnum :from :load))
-                (inst movi ascii-mask 128 :16b)
                 (inst mov tmp-tn #x0A0D)
                 (inst dup crlf-mask tmp-tn :8h)
 
@@ -832,20 +824,12 @@
                                                            (loop for i downfrom 7 to 0
                                                                  collect (ash 1 i)))))
                 (inst ldr next-bytes (@ byte-array))
-                (inst s-and temp next-bytes ascii-mask)
-                (inst umaxv temp temp :4s)
-                (inst umov tmp-tn temp 0 :s)
-                (inst cbnz tmp-tn DONE)
+                (check-ascii next-bytes temp DONE)
 
                 LOOP
                 (inst s-mov bytes next-bytes)
                 (inst ldr next-bytes (@ byte-array 16))
-
-                (inst s-and temp next-bytes ascii-mask)
-                (inst umaxv temp temp :4s)
-                (inst umov tmp-tn temp 0 :s)
-                (inst cbnz tmp-tn DONE)
-                (inst add byte-array byte-array 16)
+                (check-ascii next-bytes temp DONE)
 
                 ;; Shift bytes right to find CRLF starting at odd indexes
                 ;; and grab the first byte from the next vector to check if it
@@ -931,19 +915,18 @@
                        ((end unsigned-reg))
                        ((tail any-reg) tail)
                        ((n any-reg) n)
-                       ((ascii-mask complex-double-reg))
                        ((newlines complex-double-reg))
                        ((bytes complex-double-reg))
                        ((bytes2 complex-double-reg))
                        ((bytes3 complex-double-reg))
                        ((bytes4 complex-double-reg))
                        ((temp complex-double-reg))
+                       ((temp2 complex-double-reg))
                        ((indexes))
                        ((increment))
                        ((last-newlines)))
               ((res unsigned-reg unsigned-num)
                (last-newline signed-reg signed-num))
-            (inst mvni ascii-mask 127 :4s)
             (inst movi newlines 10 :4s)
             (inst movi increment 4 :4s)
             (inst mvni last-newlines 0 :4s)
@@ -958,12 +941,10 @@
             (inst ldp bytes bytes2 (@ 32-bit-array))
             (inst ldp bytes3 bytes4 (@ 32-bit-array 32))
 
-            (loop for bytes in (list bytes bytes2 bytes3 bytes4)
-                  do
-                  (inst s-and temp bytes ascii-mask)
-                  (inst umaxv temp temp :4s)
-                  (inst umov tmp-tn temp 0 :s)
-                  (inst cbnz tmp-tn DONE))
+            (inst s-orr temp bytes bytes2)
+            (inst s-orr temp2 bytes3 bytes4)
+            (inst s-orr temp temp temp2)
+            (check-ascii temp temp DONE 4)
 
             ;; Find newlines
             (loop for bytes in (list bytes bytes2 bytes3 bytes4)
