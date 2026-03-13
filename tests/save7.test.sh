@@ -61,9 +61,12 @@ echo "::: Running :DYNAMIC-SPACE-SIZE-ARG"
 run_sbcl_with_core "$tmpcore" --noinform --control-stack-size 640KB \
     --tls-limit 5000 \
     --dynamic-space-size 260MB --no-userinit --no-sysinit --noprint <<EOF
+  (defconstant tls-element-size
+    (* (if (find :tls-load-indirect sb-impl:+internal-features+) 2 1)
+       sb-vm:n-word-bytes))
   (assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 640 1024)))
   (assert (eql (extern-alien "dynamic_values_bytes" (unsigned 32))
-               (* 5000 sb-vm:n-word-bytes)))
+               (* 5000 tls-element-size)))
   ; allow slight shrinkage if heap relocation has to adjust for alignment
   (defun dynamic-space-size-good-p ()
     (<= 0 (- (* 260 1048576) (dynamic-space-size)) 65536))
@@ -73,9 +76,12 @@ EOF
 chmod u+x "${tmpcore}2"
 echo "::: INFO: prepared test core"
 ./"${tmpcore}2" --no-userinit --no-sysinit --noprint <<EOF
+  (defconstant tls-element-size
+    (* (if (find :tls-load-indirect sb-impl:+internal-features+) 2 1)
+       sb-vm:n-word-bytes))
   (when (and (eql (extern-alien "thread_control_stack_size" unsigned) (* 640 1024))
              (eql (extern-alien "dynamic_values_bytes" (unsigned 32))
-                  (* 5000 sb-vm:n-word-bytes))
+                  (* 5000 tls-element-size))
              (dynamic-space-size-good-p))
     (exit :code 42))
 EOF

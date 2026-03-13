@@ -395,6 +395,13 @@ created and old ones may exit at any time."
     (setf *initial-thread* thread)
     (setf *joinable-threads* nil)
     (setq *session* (new-session thread))
+    #+(and sb-thread tls-load-indirect)
+    (let ((sap (int-sap (ash sb-vm::*tls-symbol-map* sb-vm:n-fixnum-tag-bits))))
+      ;; Elements of the tls-symbol-map are meaningless below the tls index of
+      ;; *PACKAGE* because there are more symbols than there are cells to hold them.
+      ;; Wiping out the nonsense cell range is better than keeping fictitious data.
+      (dotimes (i (ash (symbol-tls-index '*package*) (- (1+ sb-vm:word-shift))))
+        (setf (sap-ref-word sap (ash i sb-vm:word-shift)) sb-vm:no-tls-value-marker)))
     (setq *all-threads*
           (avl-insert nil
                       (sb-thread::thread-primitive-thread sb-thread:*current-thread*)
@@ -2478,6 +2485,10 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
                    (values nil :no-tls-value))
                   (t
                    (setf (sap-ref-lispobj (int-sap c-thread) offset) value)
+                   #+tls-load-indirect
+                   (when (>= offset (sb-kernel:symbol-tls-index '*package*))
+                     (setf (sap-ref-sap (int-sap c-thread) (- offset sb-vm:n-word-bytes))
+                           (sap+ (int-sap c-thread) (1- offset))))
                    (values value :ok))))
           (values nil :thread-dead))))
 
@@ -2501,7 +2512,10 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
          list)
       ;; NO-TLS-VALUE-MARKER may or may not satisfy IS-LISP-POINTER,
       ;; so be sure to exclude it in case it does.
-      (unless (eql (sap-ref-word sap index) sb-vm:no-tls-value-marker)
+      (when (and #+tls-load-indirect
+                 (and (oddp (ash index (- sb-vm:word-shift)))
+                      (>= index (symbol-tls-index '*package*)))
+                 (/= (sap-ref-word sap index) sb-vm:no-tls-value-marker))
         (let ((obj (sap-ref-lispobj sap index)))
           (when (and obj ; don't bother returning NIL
                      (sb-vm:is-lisp-pointer (get-lisp-obj-address obj))
@@ -2572,6 +2586,7 @@ mechanism for inter-thread communication."
          (slots (sb-vm::primitive-object-slots primobj))
          (sap (current-thread-sap))
          (thread-obj-len (sb-vm::primitive-object-length primobj))
+         (tls-end (sap+ sap (extern-alien "dynamic_values_bytes" (unsigned 32))))
          (names (make-array thread-obj-len :initial-element "")))
     (loop for slot across slots
           do
@@ -2580,6 +2595,15 @@ mechanism for inter-thread communication."
              (cond ((eql bits sb-vm:no-tls-value-marker) :no-tls-value)
                    ((eql (logand bits sb-vm:widetag-mask) sb-vm:unbound-marker-widetag) :unbound)
                    (t (sap-ref-lispobj sap offset))))
+           (indirection-cell-p (tlsindex)
+             (let ((word (sap-ref-word sap tlsindex)))
+               (cond ((and (= (logand word sb-vm:lowtag-mask) sb-vm:list-pointer-lowtag)
+                           (>= word (sap-int sap))
+                           (< word (sap-int tls-end)))
+                      :tls)
+                     ((and (= (logand word sb-vm:lowtag-mask) sb-vm:other-pointer-lowtag)
+                           (/= word sb-ext:most-positive-word))
+                      :global))))
            (show (sym val)
              (let ((*print-right-margin* 128)
                    (*print-lines* 4))
@@ -2595,15 +2619,21 @@ mechanism for inter-thread communication."
             #-sb-thread (ash thread-obj-len sb-vm:word-shift)
             by sb-vm:n-word-bytes
             do
-           (let ((thread-slot-name
-                  (if (< tlsindex (ash thread-obj-len sb-vm:word-shift))
-                           (aref names (ash tlsindex (- sb-vm:word-shift))))))
-                 (if (and thread-slot-name (neq thread-slot-name 'sb-vm::lisp-thread))
-                     (format t " ~3d ~30a : #x~x~%" (ash tlsindex (- sb-vm:word-shift))
-                             thread-slot-name (sap-ref-word sap tlsindex))
+           (let* ((n (ash tlsindex (- sb-vm:word-shift)))
+                  (thread-slot-name
+                   (if (< tlsindex (ash thread-obj-len sb-vm:word-shift))
+                       (aref names n))))
+             (acond ((and thread-slot-name (neq thread-slot-name 'sb-vm::lisp-thread))
+                     (format t " ~3d ~30a : #x~x~%" n
+                             thread-slot-name (sap-ref-word sap tlsindex)))
+                    ((and (evenp (ash tlsindex (- sb-vm:word-shift)))
+                          (>= (ash tlsindex (- sb-vm:word-shift)) 75) ; HACK HACK HACK
+                          (indirection-cell-p tlsindex))
+                     (format t " ~3d indirect -> ~S ~x~%" n it (sap-ref-word sap tlsindex)))
+                    (t
                      (let ((val (safely-read sap tlsindex)))
                        (unless (eq val :no-tls-value)
-                         (show tlsindex val))))))
+                         (show tlsindex val)))))))
       (let ((from (descriptor-sap sb-vm:*binding-stack-start*))
             (to (binding-stack-pointer-sap)))
         (format t "~%Binding stack: (depth ~d)~%"

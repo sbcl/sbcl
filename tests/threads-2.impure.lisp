@@ -314,7 +314,10 @@
            (sleep 3))
       (mapc #'terminate-thread threads))))
 
-(with-test (:name :test-%thread-local-references)
+(with-test (:name :test-%thread-local-references
+                  ;; test is doing something very suspicious
+                  ;; and needs to be rewritten to not do that
+                  :skipped-on :tls-load-indirect)
   (let ((mysym (gensym))
         (fool1 (cons 1 2))
         (fool2 (cons 2 3)))

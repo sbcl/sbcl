@@ -298,6 +298,10 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
     if (handle_foreign_call_trigger(context, addr)) return;
 #endif
 
+#ifdef LISP_FEATURE_TLS_LOAD_INDIRECT
+    if (handle_tls_deref_trap(context, addr)) return;
+#endif
+
     extern int diagnose_arena_fault(os_context_t*,char*);
 #ifdef LISP_FEATURE_SYSTEM_TLABS
     if (diagnose_arena_fault(context, addr)) return;

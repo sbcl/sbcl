@@ -1157,6 +1157,10 @@ core and return a descriptor to it."
 (defvar *tls-index-to-symbol*)
 #+sb-thread
 (progn
+  ;; This can be 1 or 2 depending on how the TLS is utilized.
+  ;; Double-indirect TLS uses 2 words per entry but the initial
+  ;; portion of the TLS is never double-indirect.
+  (defvar *tls-increment* 1)
   ;; Simulate *FREE-TLS-INDEX*. This is a word count, not a displacement.
   (defvar *genesis-tls-counter* sb-vm::primitive-thread-object-length)
   ;; Assign SYMBOL the tls-index INDEX. SYMBOL must be a descriptor.
@@ -1180,7 +1184,8 @@ core and return a descriptor to it."
   (defun ensure-symbol-tls-index (symbol)
     (let ((tls-index (get-symbol-tls-index symbol)))
       (unless (plusp tls-index)
-        (let ((next (prog1 *genesis-tls-counter* (incf *genesis-tls-counter*))))
+        (let ((next (prog1 *genesis-tls-counter*
+                      (incf *genesis-tls-counter* *tls-increment*))))
           (setq tls-index (ash next sb-vm:word-shift))
           (cold-assign-tls-index (cold-intern symbol) tls-index)))
       tls-index)))
@@ -1963,7 +1968,12 @@ core and return a descriptor to it."
     ;; Assign other known TLS indices
     (dolist (pair tls-init)
       (destructuring-bind (tls-index . symbol) pair
-        (aver (= tls-index (ensure-symbol-tls-index symbol))))))
+        (aver (= tls-index (ensure-symbol-tls-index symbol)))))
+    #+(and x86-64 tls-load-indirect)
+    (let ((index *genesis-tls-counter*))
+      ;; From here on we can only write to odd-numbered slots
+      (setq *genesis-tls-counter* (+ index (if (oddp index) 2 1))
+            *tls-increment* 2)))
 
   ;; Establish the value of T.
   #-x86-64

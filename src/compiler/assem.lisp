@@ -322,6 +322,8 @@
   ;; for deterministic allocation profiler (or possibly other tooling)
   ;; that wants to monkey patch the instructions at runtime.
   (alloc-points)
+  ;; Exception-handling locations (which can be handled in the C runtime)
+  (eh-locs)
   ;; for shrinking the size of the code fixups, we can choose to emit at most one call
   ;; from a dynamic space code component to a given assembly routine. The call goes
   ;; through an extra indirection in the component.
@@ -1573,6 +1575,7 @@
                          (label-position end-text) fun-offsets
                          (asmstream-elsewhere-label asmstream)
                          (segment-fixup-notes segment)
+                         (sort (mapcar 'label-posn (asmstream-eh-locs asmstream)) #'<)
                          (get-allocation-points asmstream))))
 
 ;;; Most backends do not convert register TNs into a different type of
@@ -1658,7 +1661,8 @@
   "Emit LABEL at this location in the current section."
   (let ((s *current-destination*))
     (trace-inst s :label label)
-    (emit s label)))
+    (emit s label))
+  label)
 
 (defun emit-postit (function)
   (let ((s *current-destination*))

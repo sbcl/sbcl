@@ -402,7 +402,7 @@ static int is_memsize_arg(char *argv[], int argi, int argc, int *merge_core_page
         // this is not named "tls-size" because "size" is not the
         // best measurement for how many symbols to allow
         if ((argi+1) >= argc) lose("missing argument for --tls-limit");
-        dynamic_values_bytes = N_WORD_BYTES * atoi(argv[argi+1]);
+        dynamic_values_bytes = bytes_per_tls_symbol * atoi(argv[argi+1]);
         return 2;
     }
     if (!strcmp(arg, "--merge-core-pages")) {

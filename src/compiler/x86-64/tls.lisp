@@ -28,10 +28,10 @@
   (ea (make-fixup (tn-value symbol) :immobile-symbol (- 4 other-pointer-lowtag))))
 
 ;; Return the DISP field to use in an EA relative to thread-base
-(defun load-time-tls-offset (symbol)
+(defun load-time-tls-offset (symbol &optional (disp 0))
   (let ((where (info :variable :wired-tls symbol)))
     (cond ((integerp where) where)
-          (t (make-fixup symbol :symbol-tls-index)))))
+          (t (make-fixup symbol :symbol-tls-index disp)))))
 
 (deftransform %compare-and-swap-symbol-value ((symbol old new)
                                               ((constant-arg symbol) t t))
@@ -99,6 +99,39 @@
     CAS
     (emit-cas (ea cell) symbol old new rax result vop))))
 
+;;; The :tls-load-indirect feature is, in most situations, an improvement over "direct"
+;;; access (contrary to what indirection implies, but I couldn't settle on a better name).
+;;; Profiling of some typical code making use of special vars produced a distribution
+;;; of operations showing SYMBOL-VALUE being 9x to 10x more frequent than BIND or SET:
+;;;     90% SYMBOL-VALUE
+;;;      8% BIND
+;;;   1.75% SET
+;;;    .25% COMPARE-AND-SWAP
+;;; Therefore reducing the cost of [FAST-]SYMBOL-VALUE at the expense of more
+;;; instructions in BIND should be a worthwhile trade-off.
+;;; The idea is simple: rather than a CMOV or conditional branch to choose either the
+;;; global or TLS value at each read, extra work can instead be done in BIND/UNBIND
+;;; to maintain a pointer to the current address of the value. Then SYMBOL-VALUE becomes
+;;; merely a double deref, which modern memory systems are well-equipped to deal with.
+;;; In fact the indirect word and value are adjacent, and brought into L1 cache together.
+
+;;; One tricky piece is that a null-pointer exception may need to be handled, at most
+;;; once per thread per symbol that lacks a thread-local value.  When the indirection
+;;; contains NO-TLS-VALUE-MARKER, then the second deref reads an invalid address.
+;;; This is caught in an architecture-specific routine which recognizes that the
+;;; indirection word should point to SYMBOL-GLOBAL-VALUE. Attempting to resolve this
+;;; at thread startup would avoid some sigsegvs, but not all of them, since new
+;;; special variables can be created at any time in any thread and read in any thread.
+
+;;; Whether the net effect is a performance boost depends on at least two factors
+;;; which are unpredictable:
+;;; - if the distribution of operations is skewed toward BIND being more common
+;;;   than symbol-value, then load-indirect can make the wrong trade-off.
+;;; - certain CPUs may do worse with the double-indirect load.
+;;; As an example of the former issue, the STAK-AUX function in cl-bench performs
+;;; symbol-value only about twice as often as BIND, which is not enough to outform
+;;; a comparision and conditional move. But I suspect this situation is rare.
+
 ;; This code is tested by 'codegen.impure.lisp'
 (defun emit-symeval (value symbol symbol-ref symbol-reg check-boundp vop)
   (let ((known-symbol (and (constant-tn-p symbol) (tn-value symbol))))
@@ -106,6 +139,11 @@
       ((symbol-always-has-tls-value-p symbol-ref (sb-c::vop-node vop))
        (setq symbol-reg nil)
        (inst mov value (access-wired-tls-val known-symbol)))
+      #+tls-load-indirect
+      ((symbol-always-has-tls-index-p known-symbol)
+       (inst mov value (thread-tls-ea (load-time-tls-offset known-symbol -8)))
+       (push (emit-label (gen-label)) (sb-assem::asmstream-eh-locs sb-assem:*asmstream*))
+       (inst mov value (ea 1 value)))
       (t
        ;; Step 1: load the TLS index and then then the slot of the thread
        (cond
@@ -311,6 +349,7 @@
 ;;; symbol.
 ;;; See the "Chapter 9: Specials" of the SBCL Internals Manual.
 
+#-tls-load-indirect (progn
 (define-vop (dynbind) ; bind a symbol in a PROGV form
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
@@ -376,6 +415,93 @@
                   (symbol-slot-ea symbol symbol-value-slot)
                   (symbol-value-slot-ea symbol-reg)))
         (inst mov tls-cell tls-value)))))
+)
+
+#+tls-load-indirect (progn
+(defun binding-stack-push (node symbol index-temp bsp val-temp
+                           &optional (newval nil newvalp)
+                           &aux (value-ea (ea 1 index-temp)))
+  (inst mov val-temp (ea index-temp thread-tn))
+  (inst mov bsp (* binding-size n-word-bytes))
+  (inst xadd (thread-slot-ea thread-binding-stack-pointer-slot) bsp)
+  (inst mov (ea (ash binding-value-slot word-shift) bsp) val-temp)
+  (inst mov :dword (ea (ash binding-symbol-slot word-shift) bsp) index-temp)
+  ;; (usually) update the indirect pointer
+  (cond ((not symbol) ; compile-time-unknown if indirection word exists
+         (assemble ()
+           ;; *PACKAGE* has the lowest TLS index in the range of specials which
+           ;; have indirection cells. Comparing to the TLS index of *PACKAGE* is
+           ;; surely a hack. However, it is correct, and verified by a test
+           ;; in x86-64-codegen.
+           (inst cmp index-temp (make-fixup '*package* :symbol-tls-index))
+           (inst lea index-temp (ea -1 index-temp thread-tn))
+           (inst jmp :l NO-INDIRECT-CELL)
+           (inst mov (ea -7 index-temp) index-temp)
+           NO-INDIRECT-CELL))
+        ((symbol-always-has-tls-value-p symbol node)
+         ;; if always-tls-value, then either there is no reason to affect
+         ;; the indirection word, or there is no indirection word.
+         (setq value-ea (ea index-temp thread-tn)))
+        (t
+         (inst lea index-temp (ea -1 index-temp thread-tn))
+         (inst mov (ea -7 index-temp) index-temp)))
+  (unless newvalp (return-from binding-stack-push))
+  (let ((repr (encode-value-if-immediate newval)))
+    (cond ((or (gpr-tn-p repr) (fixup-p repr)
+               (plausible-signed-imm32-operand-p repr))
+           (setq newval repr))
+          ((nil-relative-p repr)
+           (move-immediate (setq newval val-temp) repr))
+          (t
+           (aver (sc-is newval constant control-stack))
+           (move val-temp newval)
+           (setq newval val-temp))))
+  (inst mov :qword value-ea newval))
+
+(define-vop (bind) ; bind a known symbol
+  (:args (val :scs (any-reg descriptor-reg control-stack constant immediate)))
+  (:temporary (:sc unsigned-reg) index bsp tmp)
+  (:info symbol)
+  (:node-var node)
+  (:generator 10
+    (inst mov :dword index (load-time-tls-offset symbol))
+    (binding-stack-push node symbol index bsp tmp val)))
+
+(define-vop (rebind)
+  (:temporary (:sc unsigned-reg) index bsp val)
+  (:info symbol)
+  (:node-var node)
+  (:generator 10
+    (inst mov :dword index (load-time-tls-offset symbol))
+    (binding-stack-push node symbol index bsp val)
+    (unless (symbol-always-has-tls-value-p symbol node)
+      (inst cmp val NO-TLS-VALUE-MARKER)
+      (inst jmp :ne DONE)
+      ;; load symbol-global-value
+      (cond ((immediate-constant-sc symbol)
+             (inst mov val (symbol-slot-ea symbol symbol-value-slot)))
+            (t
+             (inst mov val (emit-constant symbol))
+             (inst mov val (symbol-value-slot-ea val))))
+      (inst mov :qword (ea 1 index) val))
+    DONE))
+
+(define-vop (dynbind) ; bind a symbol in a PROGV form
+  (:args (val :scs (any-reg descriptor-reg))
+         (symbol :scs (descriptor-reg)))
+  (:temporary (:sc unsigned-reg :offset rax-offset) tls-index)
+  (:temporary (:sc unsigned-reg) bsp tmp)
+  (:vop-var vop)
+  (:node-var node)
+  (:generator 10
+    (inst mov :dword tls-index (tls-index-of symbol))
+    (inst test :dword tls-index tls-index)
+    (inst jmp :ne TLS-INDEX-VALID)
+    (inst mov tls-index symbol)
+    (invoke-asm-routine 'call 'alloc-tls-index vop)
+    TLS-INDEX-VALID
+    (binding-stack-push node nil tls-index bsp tmp val)))
+) ; end #+tls-load-indirect
 
 (define-vop (unbind-n)
   (:temporary (:sc unsigned-reg) temp bsp)
@@ -385,27 +511,41 @@
   (:generator 0
     (load-binding-stack-pointer bsp)
     (inst xorpd zero zero)
-    (loop for symbol in symbols
-          for tls-index = (load-time-tls-offset symbol)
-          for tls-cell = (thread-tls-ea tls-index)
-          do
-          #+ultrafutex
-          (when (eq symbol '*current-mutex*)
-            (let ((uncontested (gen-label)))
-              (inst mov temp tls-cell) ; load the current value
-              (inst mov :qword (mutex-slot temp %owner) 0)
-              (inst dec :lock :byte (mutex-slot temp state))
-              (inst jmp :z uncontested) ; if ZF then previous value was 1, no waiters
-              (invoke-asm-routine 'call 'mutex-wake-waiter vop)
-              (emit-label uncontested)))
+    (dolist (symbol symbols)
+      (let* ((tls-index (load-time-tls-offset symbol))
+             (tls-cell (thread-tls-ea tls-index)))
+        #+ultrafutex
+        (when (eq symbol '*current-mutex*)
+          (let ((uncontested (gen-label)))
+            (inst mov temp tls-cell) ; load the current value
+            (inst mov :qword (mutex-slot temp %owner) 0)
+            (inst dec :lock :byte (mutex-slot temp state))
+            (inst jmp :z uncontested) ; if ZF then previous value was 1, no waiters
+            (invoke-asm-routine 'call 'mutex-wake-waiter vop)
+            (emit-label uncontested)))
 
-          (inst sub bsp (* binding-size n-word-bytes))
+        (inst sub bsp (* binding-size n-word-bytes))
 
-          ;; Load VALUE from stack, then restore it to the TLS area.
-          (loadw temp bsp binding-value-slot)
-          (inst mov tls-cell temp)
-          ;; Zero out the stack.
-          (inst movapd (ea bsp) zero))
+        ;; Load VALUE from stack, then restore it to the TLS area.
+        (loadw temp bsp binding-value-slot)
+        (inst mov tls-cell temp)
+        #+tls-load-indirect
+        (unless (symbol-always-has-tls-value-p symbol nil)
+          (assemble ()
+            (inst cmp temp NO-TLS-VALUE-MARKER)
+            (inst jmp :ne SKIP)
+            ;; Write the symbol into the indirection cell
+            (let ((const (emit-constant symbol))
+                  (cell (thread-tls-ea (load-time-tls-offset symbol -8))))
+              (cond ((sc-is const immediate)
+                     (inst mov :qword cell (immediate-tn-repr const)))
+                    (t
+                     (move temp const)
+                     (inst mov cell temp))))
+            SKIP))
+
+        ;; Zero out the stack.
+        (inst movapd (ea bsp) zero)))
     (store-binding-stack-pointer bsp)))
 
 (define-vop (atomic-inc-symbol-global-value cell-xadd)

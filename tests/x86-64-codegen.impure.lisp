@@ -115,9 +115,11 @@
   ;;    480F44142538F94B20 CMOVEQ RDX, [#x204BF938]  ; *PRINT-BASE*
   ;; (TODO: could use "CMOVEQ RDX, [RIP-n]" in immobile code)
   (let ((text (disasm-load 0 '*print-base*)))
+    #+tls-load-indirect (assert (= (length text) 2)) ; number of lines
+    #-tls-load-indirect (progn
     (assert (= (length text) 3)) ; number of lines
     ;; two lines should be annotated with *PRINT-BASE*
-    (assert (= (loop for line in text count (search "*PRINT-BASE*" line)) 2)))
+    (assert (= (loop for line in text count (search "*PRINT-BASE*" line)) 2))))
 
   ;; When symbol SC is CONSTANT:
   ;;    498B9578290000     MOV RDX, [R13+disp]       ; tls: FOO
@@ -125,9 +127,11 @@
   ;;    83FA61             CMP EDX, 97
   ;;    480F4450F9         CMOVEQ RDX, [RAX-7]
   (let ((text (disasm-load 0 'foo)))
+    #+tls-load-indirect (assert (= (length text) 2)) ; number of lines
+    #-tls-load-indirect (progn
     (assert (= (length text) 4))
     ;; two lines should be annotated with FOO
-    (assert (= (loop for line in text count (search "FOO" line)) 2))))
+    (assert (= (loop for line in text count (search "FOO" line)) 2)))))
 
 (defvar *blub*) ; immobile space
 (defvar blub)   ; dynamic space
@@ -1430,11 +1434,29 @@
 
 #+sb-thread
 (with-test (:name :tls-symbol-map)
-  (let ((sap (sb-sys:int-sap (ash (symbol-value 'sb-vm::*tls-symbol-map*)
-                                  sb-vm:n-fixnum-tag-bits)))
+  (let ((sap (sb-sys:int-sap (ash sb-vm::*tls-symbol-map* sb-vm:n-fixnum-tag-bits)))
         (limit (ash (ash sb-vm::*free-tls-index* sb-vm:n-fixnum-tag-bits)
-                    (- sb-vm:word-shift))))
-    (dotimes (i limit)
-      (unless (= (sb-sys:sap-ref-word sap (ash i sb-vm:word-shift)) sb-vm:no-tls-value-marker)
-        (let ((sym (sb-sys:sap-ref-lispobj sap (ash i sb-vm:word-shift))))
-          (assert (= (sb-kernel:symbol-tls-index sym) (ash i sb-vm:word-shift))))))))
+                    (- sb-vm:word-shift)))
+        (divisor (or #+tls-load-indirect 16 8)))
+    (loop for i from (or #+tls-load-indirect (ash (sb-kernel:symbol-tls-index '*package*)
+                                                  (- (1+ sb-vm:word-shift)))
+                         1)
+          below limit
+          unless (= (sb-sys:sap-ref-word sap (ash i sb-vm:word-shift)) sb-vm:no-tls-value-marker)
+          do (let ((sym (sb-sys:sap-ref-lispobj sap (ash i sb-vm:word-shift))))
+               (assert (= (floor (sb-kernel:symbol-tls-index sym) divisor) i))))))
+
+#+sb-thread
+(with-test (:name :tls-index-validity :skipped-on (:not :tls-load-indirect))
+  (let ((index-of-package (ash (sb-kernel:symbol-tls-index '*package*)
+                               (- sb-vm:word-shift))))
+    (do-all-symbols (sym)
+      (let ((index (ash (sb-kernel:symbol-tls-index sym) (- sb-vm:word-shift))))
+        (when (plusp index)
+          ;; Every TLS slot below *PACKAGE* corresponds to an always-thread-local special.
+          (if (< index index-of-package)
+              (assert (typep (sb-int:info :variable :wired-tls sym)
+                             '(or (eql :always-thread-local) integer)))
+              (assert (oddp index)))
+          ;; No always-thread-local special clashes with *PACKAGE*'s indirection cell
+          (assert (/= index (1- index-of-package))))))))

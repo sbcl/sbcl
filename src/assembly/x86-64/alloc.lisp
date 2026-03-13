@@ -175,15 +175,23 @@
        ;; then it is definitely in the map.
        (inst push rbx-tn)
        (inst mov rbx-tn (static-symbol-value-ea '*tls-symbol-map*))
-       (inst btc rbx-tn 63) ; fudge the array base address to "subtract out" bit 63 of scratch-reg
-       (inst mov (ea rbx-tn scratch-reg) symbol)
+       #+tls-load-indirect
+       (progn (inst shr :dword scratch-reg 1)
+              (inst mov (ea -4 rbx-tn scratch-reg) symbol)
+              (inst shl :dword scratch-reg 1))
+       #-tls-load-indirect
+       (progn
+         ;; fudge the array base address to "subtract out" bit 63 of scratch-reg
+         (inst btc rbx-tn 63)
+         (inst mov (ea rbx-tn scratch-reg) symbol))
        (inst pop rbx-tn)
        ;; scratch-reg goes into symbol's TLS and into the arg/result reg.
        (inst mov :dword (tls-index-of symbol) scratch-reg)
        (inst mov :dword result scratch-reg)
        ;; Load scratch-reg with a constant that clears the lock bit
        ;; and bumps the free index in one go.
-       (inst mov scratch-reg (+ (- (ash 1 lock-bit)) n-word-bytes))
+       (let ((increment (* (or #+tls-load-indirect 2 1) n-word-bytes)))
+         (inst mov scratch-reg (+ (- (ash 1 lock-bit)) increment)))
        (inst add :qword :lock free-tls-index-ea scratch-reg)
        (inst pop scratch-reg)
      DONE) ; end PSEUDO-ATOMIC

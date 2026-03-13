@@ -20,10 +20,10 @@
              (:conc-name "ASM-")
              (:constructor make-assembly
                            (segment bytes text-length fun-table elsewhere-label
-                                    fixup-notes alloc-sites))
+                                    fixup-notes eh-locs alloc-sites))
              (:copier nil))
   segment bytes text-length fun-table elsewhere-label
-  fixup-notes alloc-sites)
+  fixup-notes eh-locs alloc-sites)
 
 ;;; KLUDGE: the assembler can not emit backpatches comprising jump tables without
 ;;; knowing the boxed code header length. But there is no compiler IR2 metaobject,

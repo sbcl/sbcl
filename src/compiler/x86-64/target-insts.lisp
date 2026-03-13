@@ -629,15 +629,19 @@
                    (note (lambda (stream) (format stream "thread.~(~A~)" symbol))
                          dstate))))
              #+sb-thread
-             (let ((symbol (or (guess-symbol
-                                (lambda (s) (= (symbol-tls-index s) disp)))
-                               ;; static symbols aren't in the code header
-                               (find disp +static-symbols+
-                                     :key #'symbol-tls-index))))
+             (let* ((indirect)
+                    (symbol (or (guess-symbol
+                                 (lambda (s &aux (i (symbol-tls-index s)))
+                                   (cond ((= disp (- i 8)) (setq indirect t))
+                                         ((= disp i)))))
+                                ;; static symbols aren't in the code header
+                                (find disp +static-symbols+
+                                      :key #'symbol-tls-index))))
                (when symbol
                  (return-from print-mem-ref
                    ;; "tls:" refers to the current value of the symbol in TLS
-                   (note (lambda (stream) (format stream "tls: ~S" symbol))
+                   (note (lambda (stream)
+                           (format stream "~A: ~S" (if indirect "&var" "tls") symbol))
                          dstate)))))))))
 
 (defun lea-compute-label (value dstate)

@@ -121,4 +121,4 @@ __thread struct thread *current_thread;
 pthread_key_t current_thread = 0;
 #endif
 struct thread *all_threads;
-int dynamic_values_bytes = 4096 * sizeof(lispobj);  // same for all threads
+int dynamic_values_bytes = 4096 * bytes_per_tls_symbol;  // same for all threads

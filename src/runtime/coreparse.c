@@ -1388,16 +1388,21 @@ init_coreparse_spaces(int n, struct coreparse_space* input)
 lispobj* tlsindex_to_symbol_map;
 static void construct_tls_map()
 {
-    int map_nbytes = dynamic_values_bytes;
+    int map_nbytes = N_WORD_BYTES * (dynamic_values_bytes / bytes_per_tls_symbol);
     tlsindex_to_symbol_map = checked_malloc(map_nbytes);
     memset(tlsindex_to_symbol_map, 0xff, map_nbytes);
     // A static Lisp symbol is slightly easier to access than a C symbol from Lisp
     SYMBOL(TLS_SYMBOL_MAP)->value = (uword_t)tlsindex_to_symbol_map;
 
+#ifdef LISP_FEATURE_TLS_LOAD_INDIRECT
+    const int shift = 1+WORD_SHIFT;
+#else
+    const int shift = WORD_SHIFT;
+#endif
     int offset;
 #define EXAMINE_OBJECT() if (widetag_of(where) == SYMBOL_WIDETAG && \
     (offset = tls_index_of((struct symbol*)where)) != 0) \
-        tlsindex_to_symbol_map[offset>>WORD_SHIFT] = make_lispobj(where, OTHER_POINTER_LOWTAG)
+        tlsindex_to_symbol_map[offset>>shift] = make_lispobj(where, OTHER_POINTER_LOWTAG)
 #ifdef LISP_FEATURE_MARK_REGION_GC
 # define SYMBOL_PAGE_TYPE PAGE_TYPE_MIXED
 #else

@@ -372,8 +372,20 @@
     #-sb-thread (progn (emit-gengc-barrier symbol nil value) ; VALUE is the card-mark temp
                        (loadw value bsp binding-value-slot)
                        (storew value symbol symbol-value-slot other-pointer-lowtag))
-    #+sb-thread (progn (loadw value bsp binding-value-slot)
-                       (inst mov (thread-tls-ea symbol) value))
+    #+sb-thread
+    (progn
+      (loadw value bsp binding-value-slot)
+      (inst mov (thread-tls-ea symbol) value)
+      #+tls-load-indirect (progn
+      ;; Storing NO-TLS-VALUE sets the indirection cell to point at the symbol.
+      (inst cmp value NO-TLS-VALUE-MARKER)
+      (inst jmp :ne SKIP)
+      (inst mov value (static-symbol-value-ea '*tls-symbol-map*))
+      (inst shr :dword symbol 1) ; symbol-map is half the size of TLS
+      ;; Load the symbol. The -4 is because this conceptually should
+      ;; have rounded down to an even address before dividing by 2.
+      (inst mov value (ea -4 value symbol))
+      (inst mov (ea -8 thread-tn symbol 2) value)))
     SKIP
     (inst movapd (ea bsp) zero)
 

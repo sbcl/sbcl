@@ -32,6 +32,9 @@
 
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
+#include "genesis/compiled-debug-info.h"
+#include "genesis/vector.h"
+#include "code.h"
 #include "core.h"
 #include "gc.h"
 
@@ -646,7 +649,6 @@ lispobj entrypoint_taggedptr(uword_t entrypoint) {
 }
 
 #ifdef LISP_FEATURE_SB_THREAD
-#include "genesis/vector.h"
 #define LOCK_PREFIX 0xF0
 #undef SHOW_PC_RECORDING
 
@@ -921,5 +923,43 @@ int futex_wait_allowing_gc(int *lock_word, int oldval)
     return result;
 }
 #endif
+
+int handle_tls_deref_trap(os_context_t* context, os_vm_address_t addr)
+{
+    unsigned char* pc = (void*)os_context_pc(context);
+    if (!(addr == 0 && gc_managed_heap_space_p((lispobj)pc))) return 0;
+    struct code* code = (void*)component_ptr_from_pc((char*)pc);
+    if (!code) return 0;
+    struct compiled_debug_info* cdi = (void*)native_pointer(code->debug_info);
+    if (cdi->eh_locs == NIL) return 0;
+
+    // Check that the faulting instruction is MOV Rd,[Rn+1]
+    if ((pc[0] == 0x48 || pc[0] == 0x4D) && pc[1] == 0x8B &&
+        (pc[2] & 0300) == 0100 && pc[3] == 1) {
+    } else {
+      return 0;
+    }
+    struct vector* eh_locs = VECTOR(cdi->eh_locs);
+    uint32_t* data = (void*)eh_locs->data;
+    uint32_t pc_offset = (char*)pc - code_text_start(code);
+    int i = bsearch_greatereql_uint32(pc_offset, data, vector_len(eh_locs));
+    if (i<0 || data[i] != pc_offset) return 0;
+
+    pc -= 7;
+    int32_t disp = UNALIGNED_LOAD32(pc+3);
+    int logical_index = disp >> (1+WORD_SHIFT);
+    lispobj symbol = tlsindex_to_symbol_map[logical_index];
+    gc_assert(symbol != NO_TLS_VALUE_MARKER);
+    //fprintf(stderr, "TLS trap handled: %s\n", (char*)VECTOR(SYMBOL(symbol)->name)->data);
+    struct thread* th = get_sb_vm_thread();
+    lispobj* pcell = (lispobj*)(disp + (char*)th);
+    lispobj value = pcell[1];
+    if (value != NO_TLS_VALUE_MARKER)
+        lose("TLS should not trap on thread-locally bound symbol");
+    *pcell = symbol;
+    // Restart the 2-instruction sequence
+    OS_CONTEXT_PC(context) = (os_context_register_t)pc;
+    return 1;
+}
 
 #include "x86-arch-shared.inc"

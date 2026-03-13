@@ -1072,9 +1072,12 @@
                      (compute-1-debug-fun lambda var-locs (asm-elsewhere-label assembly)))
                dfuns)))
      (let ((map (compute-packed-debug-funs (nreverse dfuns)))
+           (eh-locs (awhen (asm-eh-locs assembly)
+                      (logically-readonlyize
+                       (sb-xc:coerce it '(simple-array (unsigned-byte 32) 1)))))
            (contexts (compact-vector *contexts*)))
        #+sb-xc-host
-       (!make-compiled-debug-info name *package* map contexts simple-fun-headers)
+       (!make-compiled-debug-info name eh-locs *package* map contexts simple-fun-headers)
        #-sb-xc-host
        (let ((di (%make-instance (+ (1- (sb-kernel::type-dd-length compiled-debug-info))
                                     (length simple-fun-headers)))))
@@ -1082,6 +1085,7 @@
                ;; The fixed slots except for SOURCE are declared readonly
                (%instance-ref di (get-dsd-index compiled-debug-info name)) name
                (%instance-ref di (get-dsd-index compiled-debug-info source)) nil
+               (%instance-ref di (get-dsd-index compiled-debug-info eh-locs)) eh-locs
                (%instance-ref di (get-dsd-index compiled-debug-info package)) *package*
                (%instance-ref di (get-dsd-index compiled-debug-info fun-map)) map
                (%instance-ref di (get-dsd-index compiled-debug-info contexts)) contexts)
