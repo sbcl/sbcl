@@ -141,6 +141,7 @@
        (inst mov value (access-wired-tls-val known-symbol)))
       #+tls-load-indirect
       ((symbol-always-has-tls-index-p known-symbol)
+       (setq symbol-reg nil)
        (inst mov value (thread-tls-ea (load-time-tls-offset known-symbol -8)))
        (push (emit-label (gen-label)) (sb-assem::asmstream-eh-locs sb-assem:*asmstream*))
        (inst mov value (ea 1 value)))

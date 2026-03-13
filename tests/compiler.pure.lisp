@@ -169,6 +169,11 @@
     (assert (null value))
     (assert (eq (cell-error-name error) 'some-undefined-function))))
 
+(defvar *unbound*)
+
+;;; Assign a TLS index
+(let (*unbound*))
+
 (with-test (:name :unbound-variable-error)
   (let ((foo (gensym)))
     (assert (eq (handler-case (symbol-value foo)
@@ -183,7 +188,10 @@
     ;; variable names that looked like names of thread slots.
     (assert (eq (handler-case *state*
                   (unbound-variable (c) (cell-error-name c)))
-                '*state*))))
+                '*state*))
+    (assert (eq (handler-case *unbound*
+                  (unbound-variable (c) (cell-error-name c)))
+                '*unbound*))))
 
 ;;; Non-symbols shouldn't be allowed as VARs in lambda lists. (Where VAR
 ;;; is a variable name, as in section 3.4.1 of the ANSI spec.)
