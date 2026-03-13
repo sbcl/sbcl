@@ -9051,24 +9051,23 @@
 (deftransform sort ((vector predicate &key key)
                     ((or null vector) t &rest t) *
                     :policy (= space 0))
-  (let ((null (lvar-intersectp vector null)))
-    (cond ((eq (array-type-upgraded-element-type (lvar-type vector) :ignore-null t) *wild-type*)
-           (unless null
-             (give-up-ir1-transform)))
-          (t
-           (wrap-if
-            null
-            `(if vector)
-            `(progn
-               (with-array-data ((vector vector)
-                                 (start)
-                                 (end)
-                                 :check-fill-pointer t)
-                 (sb-impl::sort-vector vector
-                                       start end
-                                       (%coerce-callable-to-fun predicate)
-                                       (if key (%coerce-callable-to-fun key) #'identity)))
-               vector))))))
+  (cond ((eq (array-type-upgraded-element-type (lvar-type vector) :ignore-null t) *wild-type*)
+         (unless (lvar-csubtypep vector null)
+           (give-up-ir1-transform)))
+        (t
+         (wrap-if
+          (lvar-intersectp vector null)
+          `(if vector)
+          `(progn
+             (with-array-data ((vector vector)
+                               (start)
+                               (end)
+                               :check-fill-pointer t)
+               (sb-impl::sort-vector vector
+                                     start end
+                                     (%coerce-callable-to-fun predicate)
+                                     (if key (%coerce-callable-to-fun key) #'identity)))
+             vector)))))
 
 (deftransform stable-sort ((sequence predicate &key key)
                            (list t &rest t))
