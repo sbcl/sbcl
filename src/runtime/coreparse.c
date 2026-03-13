@@ -1386,7 +1386,8 @@ init_coreparse_spaces(int n, struct coreparse_space* input)
 }
 
 lispobj* tlsindex_to_symbol_map;
-static void construct_tls_map()
+int tls_map_starting_offset;
+static void construct_tls_map(int starting_tlsoffset)
 {
     int map_nbytes = N_WORD_BYTES * (dynamic_values_bytes / bytes_per_tls_symbol);
     tlsindex_to_symbol_map = checked_malloc(map_nbytes);
@@ -1401,7 +1402,7 @@ static void construct_tls_map()
 #endif
     int offset;
 #define EXAMINE_OBJECT() if (widetag_of(where) == SYMBOL_WIDETAG && \
-    (offset = tls_index_of((struct symbol*)where)) != 0) \
+    (offset = tls_index_of((struct symbol*)where)) >= starting_tlsoffset) \
         tlsindex_to_symbol_map[offset>>shift] = make_lispobj(where, OTHER_POINTER_LOWTAG)
 #ifdef LISP_FEATURE_MARK_REGION_GC
 # define SYMBOL_PAGE_TYPE PAGE_TYPE_MIXED
@@ -1423,6 +1424,7 @@ static void construct_tls_map()
 #endif
     for ( ; where < end ; where += object_size(where) ) EXAMINE_OBJECT();
 #undef EXAMINE_OBJECT
+    tls_map_starting_offset = starting_tlsoffset; // for later save_to_filehandle()
 }
 
 /* 'merge_core_pages': Tri-state flag to determine whether we attempt to mark
@@ -1439,7 +1441,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
     os_vm_size_t len, remaining_len, stringlen;
     int fd = open_binary(file, O_RDONLY);
     ssize_t count;
-    struct initfunctions initfun = {0,0,0};
+    struct initfunctions initfun = {0,0,0,0};
     struct heap_adjust adj;
     memset(&adj, 0, sizeof adj);
     sword_t linkage_table_data_page = -1;
@@ -1588,7 +1590,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
                 dynamic_values_bytes = (int)SymbolValue(FREE_TLS_INDEX,0) * 2;
                 // fprintf(stderr, "NOTE: TLS size increased to %x\n", dynamic_values_bytes);
             }
-            construct_tls_map();
+            construct_tls_map(initfun.tls_map_starting_offset);
 #else
             SYMBOL(FREE_TLS_INDEX)->value = sizeof (struct thread);
 #endif

@@ -433,10 +433,13 @@ void save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     write_static_space_constants(file);
 #endif
 
+    extern int tls_map_starting_offset;
     write_lispobj(INITIAL_FUN_CORE_ENTRY_TYPE_CODE, file);
-    write_lispobj(5, file);
+    write_lispobj(6, file); // length in lispobjs (including this field)
+    // a 'struct initfunctions' from core.h. (Consider a struct-writing function perhaps)
     write_lispobj(alien_linkage_table_n_prelinked, file);
     write_lispobj(required_foreign_symbols(), file);
+    write_lispobj(tls_map_starting_offset, file);
     write_lispobj(init_function, file);
 
 #ifdef LISP_FEATURE_GENERATIONAL

@@ -1196,6 +1196,7 @@ lisp_fun_linkage_space: .zero ~:*~D
       ;;                            :element-type '(unsigned-byte 8) :if-exists :supersede)
       (let ((split-core nil))
         (setq core-offset (read-core-header input core-header verbose))
+        ;; TODO: just use PARSE-CORE-HEADER. Any day now. (This logic got here first)
         (do-core-header-entry ((id len ptr) core-header)
           (case id
             (#.build-id-core-entry-type-code

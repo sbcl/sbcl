@@ -1435,16 +1435,12 @@
 #+sb-thread
 (with-test (:name :tls-symbol-map)
   (let ((sap (sb-sys:int-sap (ash sb-vm::*tls-symbol-map* sb-vm:n-fixnum-tag-bits)))
-        (limit (ash (ash sb-vm::*free-tls-index* sb-vm:n-fixnum-tag-bits)
-                    (- sb-vm:word-shift)))
         (divisor (or #+tls-load-indirect 16 8)))
-    (loop for i from (or #+tls-load-indirect (ash (sb-kernel:symbol-tls-index '*package*)
-                                                  (- (1+ sb-vm:word-shift)))
-                         1)
-          below limit
-          unless (= (sb-sys:sap-ref-word sap (ash i sb-vm:word-shift)) sb-vm:no-tls-value-marker)
-          do (let ((sym (sb-sys:sap-ref-lispobj sap (ash i sb-vm:word-shift))))
-               (assert (= (floor (sb-kernel:symbol-tls-index sym) divisor) i))))))
+    (dotimes (i (ash (ash sb-vm::*free-tls-index* sb-vm:n-fixnum-tag-bits)
+                     (- sb-vm:word-shift)))
+      (unless (= (sb-sys:sap-ref-word sap (ash i sb-vm:word-shift)) sb-vm:no-tls-value-marker)
+        (let ((sym (sb-sys:sap-ref-lispobj sap (ash i sb-vm:word-shift))))
+          (assert (= (floor (sb-kernel:symbol-tls-index sym) divisor) i)))))))
 
 #+sb-thread
 (with-test (:name :tls-index-validity :skipped-on (:not :tls-load-indirect))

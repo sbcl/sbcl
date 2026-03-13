@@ -4255,9 +4255,10 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
       (let ((initial-fun (descriptor-bits (cold-symbol-function '!cold-init))))
         (when verbose (format t "~&/INITIAL-FUN=#X~X~%" initial-fun))
         ;; Write a 'struct initfunctions'
-        (write-words core-file initial-fun-core-entry-type-code 5
+        (write-words core-file initial-fun-core-entry-type-code 6
                      (hash-table-count *cold-foreign-symbol-table*)
                      (descriptor-bits foreign-symbols)
+                     (get-symbol-tls-index '*package*)
                      initial-fun))
 
       ;; Write the End entry.

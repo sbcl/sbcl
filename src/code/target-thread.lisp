@@ -395,13 +395,6 @@ created and old ones may exit at any time."
     (setf *initial-thread* thread)
     (setf *joinable-threads* nil)
     (setq *session* (new-session thread))
-    #+(and sb-thread tls-load-indirect)
-    (let ((sap (int-sap (ash sb-vm::*tls-symbol-map* sb-vm:n-fixnum-tag-bits))))
-      ;; Elements of the tls-symbol-map are meaningless below the tls index of
-      ;; *PACKAGE* because there are more symbols than there are cells to hold them.
-      ;; Wiping out the nonsense cell range is better than keeping fictitious data.
-      (dotimes (i (ash (symbol-tls-index '*package*) (- (1+ sb-vm:word-shift))))
-        (setf (sap-ref-word sap (ash i sb-vm:word-shift)) sb-vm:no-tls-value-marker)))
     (setq *all-threads*
           (avl-insert nil
                       (sb-thread::thread-primitive-thread sb-thread:*current-thread*)

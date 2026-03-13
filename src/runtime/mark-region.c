@@ -784,6 +784,7 @@ static void local_smash_weak_pointers()
         }
     }
     weak_vectors = 0;
+    // TODO: tlsindex_to_symbol_map
 }
 
 static void reset_statistics() {
