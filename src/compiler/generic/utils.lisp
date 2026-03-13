@@ -318,6 +318,14 @@
 (defun instance-tn-ref-p (tn-ref)
   (csubtypep (tn-ref-type tn-ref) (specifier-type 'instance)))
 
+(defun remove-moves (tn)
+  (or (let ((write (sb-c::tn-writes tn)))
+        (when (and write (not (tn-ref-next write)))
+          (let ((vop (tn-ref-vop write)))
+            (when (and vop (eq (vop-name vop) 'move))
+              (remove-moves (tn-ref-tn (vop-args vop)))))))
+      tn))
+
 ;;; Note that this is a allowed to fail by returning NIL.
 ;;; So it's really testing "CERTAINLY-STACK-CONSED-P", which is
 ;;; T if and only if if knows, and NIL if it doesn't know,
@@ -325,7 +333,7 @@
 ;;; In general this is a crummy way to deduce the object's creator,
 ;;; because MOVE-OPERAND has a nasty way of interfering.
 (defun stack-consed-p (object)
-  (let ((write (sb-c::tn-writes object))) ; list of write refs
+  (let ((write (sb-c::tn-writes (remove-moves object)))) ; list of write refs
     (when (or (not write)    ; grrrr, the only write is from a LOAD tn
                                         ; and we don't know the corresponding normal TN?
               (tn-ref-next write))      ; can't determine if > 1 write
@@ -342,11 +350,11 @@
       ;; Should we try to detect a stack-consed LIST also?
       ;; I don't think that will work.
       ;; (And is there anything else interesting to try?)
-      (unless (member (vop-name vop) '(splat-word splat-small splat-any))
+      (unless (member (vop-name vop) '(splat-word splat-small splat-any splat))
         (return-from stack-consed-p nil))
       (let* ((splat-input (vop-args vop))
              (splat-input-source
-               (tn-ref-vop (sb-c::tn-writes (tn-ref-tn splat-input)))))
+               (tn-ref-vop (sb-c::tn-writes (remove-moves (tn-ref-tn splat-input))))))
         ;; How in the heck can there NOT be a vop??? Well, sometimes there isn't.
         (when (and splat-input-source
                    (eq (vop-name splat-input-source)

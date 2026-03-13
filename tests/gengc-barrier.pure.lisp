@@ -69,3 +69,16 @@
                      `(lambda (x m j)
                         (setf (car x) m)
                         (setf (cdr x) (list j))))))
+
+(with-test (:name :dx)
+  (assert-barriers 1 0
+                   `(lambda ()
+                      (let ((vector (make-array 10)))
+                        (declare (dynamic-extent vector))
+                        (setf (aref vector 0) *))))
+  (assert-barriers 1 0
+                   `(lambda ()
+                      (declare (optimize (debug 2)))
+                      (let ((vector (make-array 10)))
+                        (declare (dynamic-extent vector))
+                        (setf (aref vector 0) *)))))

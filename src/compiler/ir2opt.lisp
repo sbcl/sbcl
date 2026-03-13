@@ -334,23 +334,32 @@
                        (not (and (eq (vop-info-move-vop-p (vop-info vop)) :move-arg)
                                  ;; MOVE-ARG moves stack args into a different frame
                                  (eq (sb-kind (sc-sb (tn-sc x))) :unbounded))))
-              (delete-vop vop)
-              ;; Deleting the copy may make it look like that register
-              ;; is not used anywhere else and some optimizations,
-              ;; like combine-instructions, may incorrectly trigger.
-              ;; FIXME: these tn-refs never go away, so things like
-              ;; combine-instructions should use a different mechanism
-              ;; for checking writes/reads.
-              (let ((x-reads (tn-reads x))
-                    (x-writes (tn-writes x)))
-                (when (tn-reads y)
-                  (reference-tn x nil))
-                (when (tn-writes y)
-                  (reference-tn x t))
-                (when x-reads
-                  (reference-tn y nil))
-                (when x-writes
-                  (reference-tn y t))))))))))
+              (let ((transferred (eq (tn-sc x) (tn-sc y))))
+                (when transferred
+                  (loop with ref = (tn-writes x)
+                        while ref
+                        do
+                        (let ((next (tn-ref-next ref)))
+                          (change-tn-ref-tn ref y)
+                          (setf ref next))))
+                (delete-vop vop)
+                ;; Deleting the copy may make it look like that register
+                ;; is not used anywhere else and some optimizations,
+                ;; like combine-instructions, may incorrectly trigger.
+                ;; FIXME: these tn-refs never go away, so things like
+                ;; combine-instructions should use a different mechanism
+                ;; for checking writes/reads.
+                (unless transferred
+                  (let ((x-reads (tn-reads x))
+                        (x-writes (tn-writes x)))
+                    (when (tn-reads y)
+                      (reference-tn x nil))
+                    (when (tn-writes y)
+                      (reference-tn x t))
+                    (when x-reads
+                      (reference-tn y nil))
+                    (when x-writes
+                      (reference-tn y t))))))))))))
 
 ;;; Unchain BRANCHes that jump to a BRANCH.
 ;;; Remove BRANCHes that are jumped over by BRANCH-IF
