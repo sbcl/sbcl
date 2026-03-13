@@ -516,7 +516,7 @@
   (:vop-var vop)
   (:generator 0
     (load-binding-stack-pointer bsp)
-    (inst xorpd zero zero)
+    (inst xorps zero zero)
     (dolist (symbol symbols)
       (let* ((tls-index (load-time-tls-offset symbol))
              (tls-cell (thread-tls-ea tls-index)))

@@ -341,7 +341,7 @@
     (load-binding-stack-pointer bsp)
     (inst cmp where bsp)
     (inst jmp :e DONE)
-    (inst xorpd zero zero)
+    (inst xorps zero zero)
     LOOP
     (inst sub bsp (* binding-size n-word-bytes))
     ;; on sb-thread symbol is actually a tls-index, and it fits into
@@ -550,7 +550,7 @@
         (bug "unexpected set-multiple"))
       (emit-gengc-barrier instance nil val-temp values)
       (when use-xmm-p
-        (inst xorpd xmm-temp xmm-temp))
+        (inst xorps xmm-temp xmm-temp))
       (loop
        (let* ((index (pop indices))
               (val (tn-ref-tn values))

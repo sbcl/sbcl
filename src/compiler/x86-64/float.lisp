@@ -850,7 +850,7 @@
   (:save-p :compute-only)
   (:generator 1
      (unless (location= x y)
-       (inst xorpd y y))
+       (inst xorps y y))
      (note-float-location 'sqrt vop x)
      (inst sqrtss y x)))
 
