@@ -452,8 +452,8 @@
            (setq newval repr))
           ((nil-relative-p repr)
            (move-immediate (setq newval val-temp) repr))
-          ((sc-is newval immediate)
-           (inst mov val-temp (tn-value newval))
+          ((integerp repr)
+           (inst mov val-temp repr)
            (setq newval val-temp))
           (t
            (aver (sc-is newval constant control-stack))
