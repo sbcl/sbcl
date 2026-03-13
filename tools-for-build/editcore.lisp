@@ -2061,6 +2061,9 @@
                    (logtest header (ash vector-addr-hashing-flag array-flags-position)))
           (setf (sap-ref-word sap (ash 3 word-shift)) (fixnumize 1)))))))
 
+(defconstant initfunctions-linkagevector-slot 1)
+(defconstant initfunctions-lispfun-slot 3)
+
 (defun reorganize-core (input-pathname output-pathname &optional print)
   (with-open-file (input input-pathname :element-type '(unsigned-byte 8))
     (let* ((core-header (make-array +backend-page-bytes+ :element-type '(unsigned-byte 8)))
@@ -2071,7 +2074,8 @@
         ;; FIXME: WITH-MAPPED-CORE should bind spacemap
         (let* ((spacemap (cons sap (sort (copy-list space-list) #'> :key #'space-addr)))
                (seen (visit-everything spacemap
-                                       (elt (core-header-initfun parsed-header) 2)
+                                       (elt (core-header-initfun parsed-header)
+                                            initfunctions-lispfun-slot)
                                        (core-header-linkage-space-info parsed-header)
                                        (core-header-static-constants parsed-header)
                                        print))
@@ -2113,8 +2117,8 @@
                              (core-header-static-constants parsed-header)
                              spacemap new-spacemap seen)
             (let ((init (core-header-initfun parsed-header)))
-              (loop for i from 1 to 2
-                    do (setf (elt init i) (the (not null) (gethash (elt init i) seen)))))
+              (dolist (i `(,initfunctions-linkagevector-slot ,initfunctions-lispfun-slot))
+                (setf (elt init i) (the (not null) (gethash (elt init i) seen)))))
             (flet ((n (spaces)
                      (space-next-free-page (get-space dynamic-core-space-id spaces))))
               (when print
