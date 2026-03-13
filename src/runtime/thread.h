@@ -360,9 +360,9 @@ extern void gc_close_thread_regions(struct thread*, int);
 
 extern int handle_tls_deref_trap(os_context_t*, os_vm_address_t);
 #ifdef LISP_FEATURE_TLS_LOAD_INDIRECT
-static const int bytes_per_tls_symbol = N_WORD_BYTES*2;
+# define bytes_per_tls_symbol (N_WORD_BYTES*2)
 #else
-static const int bytes_per_tls_symbol = N_WORD_BYTES;
+# define bytes_per_tls_symbol N_WORD_BYTES
 #endif
 
 #endif /* _INCLUDE_THREAD_H_ */
