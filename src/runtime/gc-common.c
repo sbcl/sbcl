@@ -2303,42 +2303,18 @@ bool maybe_gc(os_context_t *context)
 
 #define BYTES_ZERO_BEFORE_END (1<<12)
 
-/* There used to be a similar function called SCRUB-CONTROL-STACK in
- * Lisp and another called zero_stack() in cheneygc.c, but since it's
- * shorter to express in, and more often called from C, I keep only
- * the C one after fixing it. -- MG 2009-03-25 */
-
 /* Zero the unused portion of the control stack so that old objects
- * are not kept alive because of uninitialized stack variables.
- *
- * "To summarize the problem, since not all allocated stack frame
- * slots are guaranteed to be written by the time you call an another
- * function or GC, there may be garbage pointers retained in your dead
- * stack locations. The stack scrubbing only affects the part of the
- * stack from the SP to the end of the allocated stack." - ram, on
- * cmucl-imp, Tue, 25 Sep 2001
- *
- * So, as an (admittedly lame) workaround, from time to time we call
- * scrub-control-stack to zero out all the unused portion. This is
- * supposed to happen when the stack is mostly empty, so that we have
- * a chance of clearing more of it: callers are currently (2002.07.18)
- * REPL, SUB-GC and sig_stop_for_gc_handler. */
-
-/* Take care not to tread on the guard page and the hard guard page as
- * it would be unkind to sig_stop_for_gc_handler. Touching the return
- * guard page is not dangerous. For this to work the guard page must
- * be zeroed when protected. */
-
-/* FIXME: I think there is no guarantee that once
- * BYTES_ZERO_BEFORE_END bytes are zero the rest are also zero. This
- * may be what the "lame" adjective in the above comment is for. In
- * this case, exact gc may lose badly. */
+ * are not kept alive because of uninitialized stack variables. */
 void
 scrub_control_stack()
 {
     scrub_thread_control_stack(get_sb_vm_thread());
 }
 
+/* Take care not to tread on the guard page and the hard guard page as
+ * it would be unkind to sig_stop_for_gc_handler. Touching the return
+ * guard page is not dangerous. For this to work the guard page must
+ * be zeroed when protected. */
 void
 scrub_thread_control_stack(struct thread *th)
 {
@@ -2349,39 +2325,42 @@ scrub_thread_control_stack(struct thread *th)
      * a routine in $ARCH-assem.S. */
     extern void arch_scrub_control_stack(struct thread *, os_vm_address_t, os_vm_address_t)
 #ifdef LISP_FEATURE_X86_64
-    __attribute__((sysv_abi))
+        __attribute__((sysv_abi))
 #endif
-    ;
+        ;
     arch_scrub_control_stack(th, guard_page_address, hard_guard_page_address);
 #else
-    lispobj *sp = access_control_stack_pointer(th);
- scrub:
-    if ((((os_vm_address_t)sp < (hard_guard_page_address + os_vm_page_size)) &&
-         ((os_vm_address_t)sp >= hard_guard_page_address)) ||
-        (((os_vm_address_t)sp < (guard_page_address + os_vm_page_size)) &&
-         ((os_vm_address_t)sp >= guard_page_address) &&
-         th->state_word.control_stack_guard_page_protected))
-        return;
+    os_vm_address_t sp = (os_vm_address_t)access_control_stack_pointer(th);
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
-    do {
-        *sp = 0;
-    } while (((uword_t)sp--) & (BYTES_ZERO_BEFORE_END - 1));
-    if ((os_vm_address_t)sp < (hard_guard_page_address + os_vm_page_size))
-        return;
-    do {
-        if (*sp)
-            goto scrub;
-    } while (((uword_t)sp--) & (BYTES_ZERO_BEFORE_END - 1));
+    os_vm_address_t start = guard_page_address + STACK_GUARD_SIZE;
+    if (!th->state_word.control_stack_guard_page_protected) {
+        /* Scrub the guard page first, touching the return page first
+         * will reprotect it */
+        if (sp < start) {
+            gc_assert(sp > guard_page_address);
+            memset(guard_page_address, 0, sp - guard_page_address);
+            return;
+        } else {
+            memset(guard_page_address, 0, STACK_GUARD_SIZE);
+        }
+    }
+    gc_assert(start <= sp);
+    memset(start, 0, sp - start);
 #else
-    do {
-        *sp = 0;
-    } while (((uword_t)++sp) & (BYTES_ZERO_BEFORE_END - 1));
-    if ((os_vm_address_t)sp >= hard_guard_page_address)
-        return;
-    do {
-        if (*sp)
-            goto scrub;
-    } while (((uword_t)++sp) & (BYTES_ZERO_BEFORE_END - 1));
+    os_vm_address_t end = guard_page_address;
+    if (!th->state_word.control_stack_guard_page_protected) {
+        /* Scrub the guard page first, touching the return page first
+         * will reprotect it */
+        if (sp >= end) {
+            gc_assert(sp <= hard_guard_page_address);
+            memset(sp, 0, hard_guard_page_address - sp);
+            return;
+        } else {
+            memset(guard_page_address, 0, STACK_GUARD_SIZE);
+        }
+    }
+    gc_assert(sp <= end);
+    memset(sp, 0, end - sp);
 #endif
 #endif /* LISP_FEATURE_C_STACK_IS_CONTROL_STACK */
 }
