@@ -1155,6 +1155,8 @@ core and return a descriptor to it."
 ;;;; symbol magic
 
 (defvar *tls-index-to-symbol*)
+#-sb-thread
+(defun get-symbol-tls-index (symbol) (declare (ignore symbol)) 0)
 #+sb-thread
 (progn
   ;; This can be 1 or 2 depending on how the TLS is utilized.
