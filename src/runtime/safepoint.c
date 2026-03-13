@@ -855,19 +855,16 @@ wake_thread_io(struct thread * thread)
 static void wake_thread_impl(struct thread_instance *lispthread)
 {
     struct thread* thread = (void*)lispthread->uw_primitive_thread;
-    wake_thread_io(thread);
 
     if (read_TLS(THRUPTION_PENDING,thread)==LISP_T)
         return;
 
     write_TLS(THRUPTION_PENDING,LISP_T,thread);
+    wake_thread_io(thread);
 
-    if ((read_TLS(GC_PENDING,thread)==LISP_T)
-        ||(THREAD_STOP_PENDING(thread)==LISP_T)
-        )
+    if (read_TLS(GC_PENDING,thread)==LISP_T || THREAD_STOP_PENDING(thread)==LISP_T)
         return;
 
-    wake_thread_io(thread);
     mutex_release(&all_threads_lock);
 
     WITH_GC_STATE_LOCK {
