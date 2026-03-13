@@ -209,7 +209,9 @@
   (:policy :fast-safe)
   (:args (symbol :scs (descriptor-reg constant immediate) :to (:result 1)))
   (:arg-refs symbol-ref)
-  (:temporary (:unused-if (symbol-always-has-tls-value-p symbol-ref (sb-c::vop-node vop))
+  (:temporary (:unused-if (or (symbol-always-has-tls-value-p symbol-ref (sb-c::vop-node vop))
+                              #+tls-load-indirect
+                              (symbol-always-has-tls-index-p (and (constant-tn-p symbol) (tn-value symbol))))
                :sc descriptor-reg)
               temp)
   (:results (value :scs (descriptor-reg any-reg)))
