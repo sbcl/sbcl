@@ -478,6 +478,23 @@
     (try 'sxhash)
     (try 'sb-int:murmur-hash-word/fixnum)))
 
+(with-test (:name :number-or-null-hash)
+  (flet ((get-callees (x-type)
+           (ctu:find-named-callees
+            (compile nil `(lambda (x) (sxhash (the ,x-type x)))))))
+    (sb-int:encapsulate 'sb-int:permanent-fname-p 'test-shim #'sb-int:constantly-nil)
+    (unwind-protect
+         (let ((transformed-cases '((integer sb-impl::integer-sxhash)
+                                    (number sb-impl::number-sxhash)))
+               (inlined-cases '(single-float double-float fixnum)))
+           (loop for (type . hasher) in transformed-cases
+                 do (assert (equal (get-callees type) hasher))
+                    (assert (equal (get-callees `(or null ,type)) hasher)))
+           (dolist (type inlined-cases)
+             (assert (null (get-callees type)))
+             (assert (null (get-callees `(or null ,type))))))
+      (sb-int:unencapsulate 'sb-int:permanent-fname-p 'test-shim))))
+
 ;;; Ensure that all layout-clos-hash values have a 1 somewhere
 ;;; such that LOGANDing any number of nonzero hashes is nonzero.
 (with-test (:name :layout-hashes-constant-1-bit)

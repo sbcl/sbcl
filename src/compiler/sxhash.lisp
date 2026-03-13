@@ -35,9 +35,6 @@
                  (return `(if x (,(cdr case) x) ,(sb-xc:sxhash nil))))))
         (give-up-ir1-transform))))
 
-(deftransform sxhash ((x) (number)) `(sb-impl::number-sxhash x))
-(deftransform sxhash ((x) (integer)) `(sb-impl::integer-sxhash x))
-
 ;;; Note about signed zeros with respect to SXHASH (but not PSXHASH!) -
 
 ;;; Change b0a51fec91 added some logic to discard the sign of floating-point zeros
@@ -121,15 +118,21 @@
 ;;; that the distinction between +0 and -0 makes no difference *ANYWHERE* that uses
 ;;; floating-point literals, I think there is no argument here.
 
-;;; SXHASH of FLOAT values is defined directly in terms of DEFTRANSFORM in
-;;; order to avoid boxing.
-(deftransform sxhash ((x) (single-float)) '#.(sxhash-single-float-xform 'x))
-
-;;; SXHASH of FIXNUM values is defined as a DEFTRANSFORM because it's so
-;;; simple.
-(deftransform sxhash ((x) (fixnum)) '#.(sxhash-fixnum-xform 'x))
-
-(deftransform sxhash ((x) (double-float)) '#.(sxhash-double-float-xform 'x))
+;;; SXHASH of various numeric types tries to avoid boxing and/or uses a
+;;; type-specific hash function. Also, allow NULL into the type of X
+;;; which efficiently handles (SXHASH (MYSTRUCT-MYVAL s)) in
+;;; (defstruct mystruct (myval nil :type (or null single-float)))
+(deftransform sxhash ((x) ((or number null)))
+  (let* ((type (lvar-type x))
+         (numberp (csubtypep type (specifier-type 'number)))
+         (num (if numberp type (type-difference type (specifier-type 'null))))
+         (expr
+          (cond ((csubtypep num (specifier-type 'fixnum)) '#.(sxhash-fixnum-xform 'x))
+                ((csubtypep num (specifier-type 'single-float)) '#.(sxhash-single-float-xform 'x))
+                ((csubtypep num (specifier-type 'double-float)) '#.(sxhash-double-float-xform 'x))
+                ((csubtypep num (specifier-type 'integer)) '(sb-impl::integer-sxhash x))
+                (t '(sb-impl::number-sxhash x)))))
+    (if numberp expr `(if x ,expr (sb-xc:sxhash nil)))))
 
 ;;; All symbols have a precomputed hash.
 ;;; Here are the behaviors I plan on implementing:

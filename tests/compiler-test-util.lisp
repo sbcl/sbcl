@@ -44,7 +44,7 @@
     (declare (ignore x))
     (values t nil)))
 
-;;; New tests should use INSPECT-IR or ASM-SEARCH rather than FIND-NAMED-CALLEES
+;;; New tests should often use INSPECT-IR or ASM-SEARCH rather than FIND-NAMED-CALLEES
 ;;; unless you are 100% certain that there will be an fdefn of the given name.
 ;;; (negative assertions may yield falsely passing tests)
 (defun asm-search (expect lambda)
@@ -165,6 +165,12 @@
       (if (fdefn-p (code-header-ref code-obj i)) (incf count) (return)))
     (values start count)))
 
+;;; Despite the precautionary comment at (DEFUN ASM-SEARCH), a reasonable use
+;;; of FIND-NAMED-CALLEES is to assert that there are _zero_ named callees,
+;;; as would occur in a function that is entirely transformed to inline expressions.
+;;; For that assertion to be valid on #+linkage-space platforms (ppc64 and x86-64)
+;;; it is furthermore required to override PERMANENT-FNAME-P so that the set
+;;; of linkage table entries referenced is not eliminated from the code header.
 (defun find-named-callees (fun &key (name nil namep))
   (let ((code (fun-code-header (%fun-fun fun))))
     #+linkage-space
