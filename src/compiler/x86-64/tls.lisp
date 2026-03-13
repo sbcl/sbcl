@@ -551,7 +551,7 @@
             SKIP))
 
         ;; Zero out the stack.
-        (inst movapd (ea bsp) zero)))
+        (inst movaps (ea bsp) zero)))
     (store-binding-stack-pointer bsp)))
 
 (define-vop (atomic-inc-symbol-global-value cell-xadd)

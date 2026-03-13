@@ -387,7 +387,7 @@
       (inst mov value (ea -4 value symbol))
       (inst mov (ea -8 thread-tn symbol 2) value)))
     SKIP
-    (inst movapd (ea bsp) zero)
+    (inst movaps (ea bsp) zero)
 
     (inst cmp where bsp)
     (inst jmp :ne LOOP)
