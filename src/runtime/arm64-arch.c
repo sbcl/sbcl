@@ -384,30 +384,26 @@ os_vm_address_t coreparse_alloc_space(int space_id, int attr,
     }
 #endif
 
-#ifdef WIN32
-    // On Windows ARM64, STATIC_SPACE needs extra space before it for NIL header access.
-    // ARM64 accesses NIL-0x1F for type checking, which must be within allocated memory.
-    // This must be done even when size==0.
+#ifdef LISP_FEATURE_SB_SAFEPOINT
     if (space_id == STATIC_CORE_SPACE_ID) {
-        uword_t alloc_size = (size == 0) ? BACKEND_PAGE_BYTES : size + BACKEND_PAGE_BYTES;
-        addr = os_alloc_gc_space(space_id, attr, addr - BACKEND_PAGE_BYTES, alloc_size) + BACKEND_PAGE_BYTES;
-        if (!addr) lose("Can't allocate %#"OBJ_FMTX" bytes for space %d", size, space_id);
-        return addr;
+      // Allocate space for the safepoint page.
+      addr -= BACKEND_PAGE_BYTES;
+      size += BACKEND_PAGE_BYTES;
     }
 #endif
 
     if (size == 0) return addr;
 
+    addr = os_alloc_gc_space(space_id, attr, addr, size);
+
+    if (!addr)
+        lose("Can't allocate %#"OBJ_FMTX" bytes for space %d", size, space_id);
+
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     if (space_id == STATIC_CORE_SPACE_ID) {
-        // Allocate space for the safepoint page.
-        addr = os_alloc_gc_space(space_id, attr, addr - BACKEND_PAGE_BYTES, size + BACKEND_PAGE_BYTES) + BACKEND_PAGE_BYTES;
+        addr += BACKEND_PAGE_BYTES;
     }
-    else
 #endif
-        addr = os_alloc_gc_space(space_id, attr, addr, size);
-
-    if (!addr) lose("Can't allocate %#"OBJ_FMTX" bytes for space %d", size, space_id);
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     if (space_id == IMMOBILE_TEXT_CORE_SPACE_ID) {

@@ -115,12 +115,7 @@ static void set_seh_frame(void *frame)
 
 void alloc_gc_page()
 {
-#ifdef LISP_FEATURE_ARM64
-    // ARM64: safepoint page address is reserved by the address space layout
-    // (parms.lisp), but needs to be committed. Use MEM_COMMIT only.
-    gc_assert(VirtualAlloc(GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES,
-                           MEM_COMMIT, PAGE_READWRITE));
-#elif !defined(LISP_FEATURE_64_BIT)
+#ifndef LISP_FEATURE_64_BIT
     // 32-bit: reserve and commit safepoint page.
     // 64-bit x86-64: allocated as part of static space (extra_above in x86-64-arch.c).
     gc_assert(VirtualAlloc(GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES,
