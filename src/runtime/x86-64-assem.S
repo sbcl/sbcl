@@ -401,7 +401,8 @@ GNAME(arch_scrub_control_stack):
 	 * A (struct thread *) in RDI,
 	 * the address of the guard page in RSI, and
 	 * the address of the hard guard page in RDX.
-	 * We may trash RAX, RCX, and R8-R11 with impunity.
+         * guard size is in RCX
+	 * We may trash RAX, and R8-R11 with impunity.
 	 * [RSP] is our return address, [RSP-8] is the first
 	 * stack slot to scrub. */
 
@@ -409,13 +410,9 @@ GNAME(arch_scrub_control_stack):
 	 * guard page upper bound in R8, and our hard guard
 	 * page upper bound in R9. */
 	lea	-8(%rsp), %rax
-#ifdef LISP_FEATURE_WIN32
-	LOAD_PIC_VAR(win32_page_size, %r9)
-#else
-	LOAD_PIC_VAR(os_vm_page_size, %r9)
-#endif
-	lea	(%rsi,%r9), %r8
-	lea	(%rdx,%r9), %r9
+
+	lea	(%rsi,%rcx), %r8
+	Lea	(%rdx,%rcx), %r9
 
 	/* Now we begin our main scrub loop. */
 ascs_outer_loop:

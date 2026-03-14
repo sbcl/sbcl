@@ -692,10 +692,11 @@ GNAME(post_signal_tramp):
 	.globl GNAME(arch_scrub_control_stack)
 	TYPE(GNAME(arch_scrub_control_stack))
 GNAME(arch_scrub_control_stack):
-	/* We are passed three parameters:
+	/* We are passed four parameters:
 	 * A (struct thread *) at [ESP+4],
 	 * the address of the guard page at [ESP+8], and
 	 * the address of the hard guard page at [ESP+12].
+         * guard size in [ESP+16]
 	 * We may trash EAX, ECX, and EDX with impunity.
 	 * [ESP] is our return address, [ESP-4] is the first
 	 * stack slot to scrub. */
@@ -704,7 +705,7 @@ GNAME(arch_scrub_control_stack):
 	 * guard page upper bound in ECX, and our hard guard
 	 * page upper bound in EDX. */
 	lea	-4(%esp), %eax
-	mov	GNAME(os_vm_page_size),%edx
+	mov	16(%esp),%edx
 	mov	%edx, %ecx
 	add	8(%esp), %ecx
 	add	12(%esp), %edx
