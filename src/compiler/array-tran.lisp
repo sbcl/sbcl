@@ -2824,9 +2824,7 @@
        ;; without consing
        (let ((args (splice-fun-args type 'list nil nil)))
          (when args
-           (let ((vars (make-gensym-list (length args))))
-            `(lambda ,vars
-               (sb-vm::%vector-widetag-and-n-bits-shift-list ,@vars)))))))
+           (make-transform-lambda 'sb-vm::%vector-widetag-and-n-bits-shift-list args)))))
     (t
      (give-up-ir1-transform "ELEMENT-TYPE is not constant."))))
 

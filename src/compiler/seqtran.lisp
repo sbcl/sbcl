@@ -1377,7 +1377,8 @@
   (check-sequence-test item sequence test key node))
 
 (defoptimizers ir2-hook
-    (remove-duplicates delete-duplicates)
+    (remove-duplicates delete-duplicates
+     sb-impl::length-remove-duplicates sb-impl::length-delete-duplicates)
     ((sequence &key start end &allow-other-keys) node)
   (check-sequence-ranges sequence start end node))
 
@@ -2456,6 +2457,13 @@
   (multiple-value-bind (min max)
       (index-into-sequence-derive-type sequence start end)
     (specifier-type `(integer 0 ,(- max min)))))
+
+(defoptimizer (sb-impl::length-remove-duplicates derive-type) ((sequence &key &allow-other-keys))
+  (multiple-value-bind (max min) (sequence-lvar-dimensions sequence)
+    (specifier-type `(integer ,(if min
+                                   (min 1 min)
+                                   0)
+                              ,(or max '*)))))
 
 (defoptimizer (subseq derive-type) ((sequence start &optional end) node)
   (let* ((sequence-type (lvar-type sequence))
@@ -4228,7 +4236,7 @@
                     (new (and (ref-p key-ref)
                               (splice-fun-args value 'complement 1 nil))))
                (when new
-                 (change-ref-leaf key-ref (find-constant complement))
+                 (change-ref-leaf key-ref (find-constant complement) :recklessly t)
                  (setf (lvar-annotations (car new))
                        (lvar-annotations value))
                  t))))
@@ -4246,7 +4254,8 @@
                          args))
 
 (defoptimizers optimizer
-    (remove-duplicates delete-duplicates)
+    (remove-duplicates delete-duplicates
+     sb-impl::length-remove-duplicates sb-impl::length-delete-duplicates)
     ((sequence &rest args &key
                ((test test-keyword))
                ((test-not test-not-keyword))

@@ -4147,3 +4147,8 @@ is :ANY, the function name is not checked."
              (case type
                ((array simple-array vector)
                 (specifier-type 'simple-array))))))))
+
+(defun make-transform-lambda (fun args)
+  (let ((vars (make-gensym-list (length args))))
+    `(lambda ,vars
+       (,fun ,@vars))))

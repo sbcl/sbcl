@@ -8420,6 +8420,14 @@
             (t
              (delay-ir1-optimizer node :constraint))))))
 
+(deftransform length ((sequence) * * :node node)
+  (let ((args (splice-fun-args sequence 'remove-duplicates nil nil)))
+    (cond (args
+           (make-transform-lambda 'sb-impl::length-remove-duplicates args))
+          (t
+           (make-transform-lambda 'sb-impl::length-delete-duplicates
+                                  (splice-fun-args sequence 'delete-duplicates nil))))))
+
 ;;; ENDP, NULL and NOT -> %REST-NULL
 ;;;
 ;;; Outside &REST convert into an IF so that IF optimizations will eliminate

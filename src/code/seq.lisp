@@ -2549,7 +2549,7 @@ many elements are copied."
 ;;; the item. If we check from beginning we check into the rest of the
 ;;; original list up to the :end marker (this we have to do by running a
 ;;; do loop down the list that far and using our test.
-(defun list-remove-duplicates* (list test test-not start end key from-end)
+(defun list-remove-duplicates (list test test-not start end key from-end)
   (declare (fixnum start)
            (list list))
   (let* ((result (list ())) ; Put a marker on the beginning to splice with.
@@ -2634,13 +2634,13 @@ many elements are copied."
     (rplacd splice tail)
     (cdr result)))
 
-(defun vector-remove-duplicates* (vector test test-not start end key from-end
-                                         &optional (length (length vector)))
-  (declare (vector vector) (fixnum start length))
-  (when (null end) (setf end (length vector)))
-  (let ((result (%make-sequence-like vector length))
-        (index 0)
-        (jndex start))
+(defun vector-remove-duplicates (vector test test-not start end key from-end)
+  (declare (vector vector) (fixnum start))
+  (let* ((length (length vector))
+         (end (or end length))
+         (result (%make-sequence-like vector length))
+         (index 0)
+         (jndex start))
     (declare (fixnum index jndex))
     (do ()
         ((= index start))
@@ -2675,6 +2675,93 @@ many elements are copied."
       (setq jndex (1+ jndex)))
     (%shrink-vector result jndex)))
 
+(defun length-list-remove-duplicates (list test test-not start end key &optional (hash t))
+  (declare (index start)
+           ((or index null) end)
+           ((or function null) key)
+           (list list))
+  (let* ((current list)
+         (length (length list))
+         (count length)
+         (end (or end length))
+         (whole (= end length))
+         (hash (and hash
+                    (> (- end start) 20)
+                    (not test-not)
+                    (hash-table-test-p test)
+                    (make-hash-table :test test :size (- end start)))))
+    (declare (index count))
+    (setf current (nthcdr start list))
+    (if hash
+        (if whole
+            (loop for e in current
+                  for elt = (apply-key key e)
+                  do (if (gethash elt hash)
+                         (decf count)
+                         (setf (gethash elt hash) t)))
+            (loop for e in current
+                  for elt = (apply-key key e)
+                  for i from start below end
+                  do (if (gethash elt hash)
+                         (decf count)
+                         (setf (gethash elt hash) t))))
+        (let ((testp test) ;; for with-member-test
+              (notp test-not))
+          (with-member-test (member-test
+                             ((not whole)
+                              (if notp
+                                  (if key
+                                      (lambda (x y key test)
+                                        (not (funcall (truly-the function test) x
+                                                      (funcall (truly-the function key) y))))
+                                      (lambda (x y key test)
+                                        (declare (ignore key))
+                                        (not (funcall (truly-the function test) x y))))
+                                  (if key
+                                      (lambda (x y key test)
+                                        (funcall (truly-the function test) x
+                                                 (funcall (truly-the function key) y)))
+                                      (lambda (x y key test)
+                                        (declare (ignore key))
+                                        (funcall (truly-the function test) x y))))))
+            (do ((tail (and (not whole)
+                            (nthcdr end list)))
+                 (copied current))
+                ((eq current tail))
+              (let ((elt (pop current)))
+                (when (cond (whole
+                             (funcall member-test elt current key test))
+                            (t
+                             (do ((it (apply-key key elt))
+                                  (l current (cdr l)))
+                                 ((eq l tail))
+                               (when (funcall member-test it (car l) key test)
+                                 (return t)))))
+                  (decf count)))))))
+    count))
+
+(defun length-vector-remove-duplicates (vector test test-not start end key)
+  (declare (vector vector)
+           (index start)
+           ((or function null) key)
+           ((or index null) end))
+  (let* ((length (length vector))
+         (count length)
+         (end (or end length)))
+    (declare (index count))
+    (loop for index from start below end
+          for elt = (apply-key key (aref vector index))
+          do
+          (when (if test-not
+                    (position elt vector
+                              :start (1+ index) :end end
+                              :test-not test-not :key key)
+                    (position elt vector
+                              :start (1+ index) :end end
+                              :test test :key key))
+            (decf count)))
+    count))
+
 (define-sequence-traverser remove-duplicates
     (sequence &rest args &key test test-not start end from-end key)
   "The elements of SEQUENCE are compared pairwise, and if any two match,
@@ -2688,13 +2775,26 @@ many elements are copied."
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking=>seq sequence
     (if sequence
-        (list-remove-duplicates* sequence test test-not
+        (list-remove-duplicates sequence test test-not
                                  start end key from-end))
-    (vector-remove-duplicates* sequence test test-not start end key from-end)
+    (vector-remove-duplicates sequence test test-not start end key from-end)
     (apply #'sb-sequence:remove-duplicates sequence args)))
+
+(define-sequence-traverser length-remove-duplicates
+    (sequence &rest args &key test test-not start end key from-end)
+  (declare (fixnum start)
+           (ignore from-end)
+           (dynamic-extent args))
+  (seq-dispatch sequence
+    (if sequence
+        (length-list-remove-duplicates sequence test test-not
+                                        start end key)
+        0)
+    (length-vector-remove-duplicates sequence test test-not start end key)
+    (length (apply #'sb-sequence:remove-duplicates sequence args))))
 
 ;;;; DELETE-DUPLICATES
-(defun list-delete-duplicates* (list test test-not key from-end start end)
+(defun list-delete-duplicates (list test test-not key from-end start end)
   (declare (index start)
            (list list))
   (let* ((handle (cons nil list))
@@ -2728,7 +2828,7 @@ many elements are copied."
           (rplacd previous (cdr current))
           (pop previous)))))
 
-(defun vector-delete-duplicates* (vector test test-not key from-end start end
+(defun vector-delete-duplicates (vector test test-not key from-end start end
                                          &optional (length (length vector)))
   (declare (vector vector) (fixnum start length))
   (when (null end) (setf end (length vector)))
@@ -2764,10 +2864,23 @@ many elements are copied."
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking=>seq sequence
     (when sequence
-      (list-delete-duplicates* sequence test test-not
+      (list-delete-duplicates sequence test test-not
                                key from-end start end))
-    (vector-delete-duplicates* sequence test test-not key from-end start end)
+    (vector-delete-duplicates sequence test test-not key from-end start end)
     (apply #'sb-sequence:delete-duplicates sequence args)))
+
+(define-sequence-traverser length-delete-duplicates
+    (sequence &rest args &key test test-not start end key from-end)
+  (declare (fixnum start)
+           (ignore from-end)
+           (dynamic-extent args))
+  (seq-dispatch sequence
+    (if sequence
+        (length-list-remove-duplicates sequence test test-not
+                                       start end key nil)
+        0)
+    (length-vector-remove-duplicates sequence test test-not start end key)
+    (length (apply #'sb-sequence:delete-duplicates sequence args))))
 
 ;;;; SUBSTITUTE
 

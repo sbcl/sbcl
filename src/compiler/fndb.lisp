@@ -895,6 +895,19 @@
   (foldable flushable call mv-deriver)
   :derive-type (sequence-result-nth-arg 0))
 
+(defknown sb-impl::length-remove-duplicates
+  (proper-sequence &rest t &key
+            (:test (function-designator ((nth-arg 0 :sequence t :key :key)
+                                        (nth-arg 0 :sequence t :key :key))))
+            (:test-not (function-designator ((nth-arg 0 :sequence t :key :key)
+                                        (nth-arg 0 :sequence t :key :key))))
+            (:start (inhibit-flushing index 0))
+            (:end (inhibit-flushing sequence-end nil))
+            (:from-end t)
+            (:key (function-designator ((nth-arg 0 :sequence t)))))
+    index
+  (foldable flushable call mv-deriver))
+
 (defknown delete-duplicates
   ((modifying sequence)
    &rest t &key
@@ -908,6 +921,19 @@
   sequence
   (call important-result mv-deriver)
   :derive-type (sequence-result-nth-arg 0))
+
+(defknown sb-impl::length-delete-duplicates
+  ((modifying sequence)
+   &rest t &key
+   (:test (function-designator ((nth-arg 0 :sequence t :key :key)
+                                (nth-arg 0 :sequence t :key :key))))
+   (:test-not (function-designator ((nth-arg 0 :sequence t :key :key)
+                                    (nth-arg 0 :sequence t :key :key))))
+   (:start index)
+   (:from-end t) (:end sequence-end)
+   (:key (function-designator ((nth-arg 0 :sequence t)))))
+  index
+  (call mv-deriver))
 
 (defknown find
   (t proper-sequence &rest t &key
