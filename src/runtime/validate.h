@@ -45,7 +45,7 @@
 #include <stdbool.h>
 #include "thread.h"
 
-#ifdef LISP_FEATURE_WIN32
+#if defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK
 #define STACK_GUARD_SIZE (win32_page_size + win32_stack_guarantee)
 #else
 #define STACK_GUARD_SIZE os_vm_page_size

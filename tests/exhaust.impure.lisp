@@ -11,7 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#+(or interpreter (and win32 arm64)) (invoke-restart 'run-tests::skip-file)
+#+interpreter (invoke-restart 'run-tests::skip-file)
 
 (test-util::disable-profiling)
 
@@ -63,7 +63,8 @@
 ;;; Check that non-local control transfers restore the stack
 ;;; exhaustion checking after unwinding -- and that previous test
 ;;; didn't break it.
-(with-test (:name (:exhaust :non-local-control))
+(with-test (:name (:exhaust :non-local-control)
+            :broken-on (and :win32 :arm64))
   (let ((exhaust-count 0)
         (recurse-count 0))
     (tagbody
@@ -80,7 +81,8 @@
 
 ;;; Check that we can safely use user-provided restarts to
 ;;; unwind.
-(with-test (:name (:exhaust :restarts))
+(with-test (:name (:exhaust :restarts)
+            :broken-on (and :win32 :arm64))
   (let ((exhaust-count 0)
         (recurse-count 0))
     (block nil
@@ -100,7 +102,7 @@
 ;;; memory protection set up by win32_reset_stack_overflow_guard_page(). This is
 ;;; certainly not fool proof, though.
 (with-test (:name (:exhaust :write-to-stack-on-unwind)
-            :skipped-on (not :win32))
+            :skipped-on (not (and :win32 :c-stack-is-control-stack)))
   (let ((count 0))
     (labels ((recurse-and-write-to-stack-on-unwind ()
                (let ((x (random 1.0)))
@@ -122,7 +124,7 @@
 ;;; will re-trigger the CONTROL_STACK_RETURN_GUARD_PAGE and
 ;;; CONTROL_STACK_GUARD_PAGE, and issue a CORRUPTION WARNING.
 (with-test (:name (:exhaust :write-to-stack-in-handler)
-            :skipped-on (not :win32))
+            :skipped-on (not (and :win32 :c-stack-is-control-stack)))
   (labels ((recurse-and-write-to-stack-on-error ()
              (let ((x 0))
                (handler-bind ((storage-condition (lambda (c)
@@ -137,6 +139,8 @@
   (let ((ok nil)
         (symbols (loop repeat 1024 collect (gensym)))
         (values (loop repeat 1024 collect nil)))
+    ;; FIXME
+    #-(and sb-safepoint (not c-stack-is-control-stack))
     (gc :full t)
     (labels ((exhaust-binding-stack (i)
                (progv symbols values

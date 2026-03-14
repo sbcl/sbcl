@@ -1548,7 +1548,7 @@ undefined_alien_function(void)
 
 void lower_thread_control_stack_guard_page(__attribute__((unused)) struct thread *th)
 {
-#ifndef LISP_FEATURE_WIN32
+#if !(defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
     protect_control_stack_guard_page(0, th);
     protect_control_stack_return_guard_page(1, th);
     th->state_word.control_stack_guard_page_protected = 0;
@@ -1606,7 +1606,7 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
 {
     struct thread *th = get_sb_vm_thread();
 
-#ifndef LISP_FEATURE_WIN32
+#if !(defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
     if(addr >= CONTROL_STACK_HARD_GUARD_PAGE(th) &&
        addr < CONTROL_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size) {
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK

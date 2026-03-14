@@ -320,14 +320,12 @@ void create_main_lisp_thread(lispobj function) {
     th->lisp_thread = cons_lisp_thread(th);
     SET_LISPTHREAD_TID(LISPTHREAD(th));
 
-#ifndef LISP_FEATURE_WIN32
+#if !(defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
     protect_control_stack_hard_guard_page(1, th);
+    protect_control_stack_guard_page(1, th);
 #endif
     protect_binding_stack_hard_guard_page(1, th);
     protect_alien_stack_hard_guard_page(1, th);
-#ifndef LISP_FEATURE_WIN32
-    protect_control_stack_guard_page(1, th);
-#endif
     protect_binding_stack_guard_page(1, th);
     protect_alien_stack_guard_page(1, th);
 
@@ -383,7 +381,7 @@ init_new_thread(struct thread *th,
 #define GUARD_BINDING_STACK 2
 #define GUARD_ALIEN_STACK   4
 
-#ifndef LISP_FEATURE_WIN32
+#if !(defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
     if (guardp & GUARD_CONTROL_STACK)
         protect_control_stack_guard_page(1, th);
 #endif

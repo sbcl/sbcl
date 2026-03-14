@@ -1862,7 +1862,7 @@ session."
                      `(alien-funcall (extern-alien ,fun (function void int
                                                                   system-area-pointer))
                                      1 thread-sap)))
-          #-win32
+          #-(and win32 c-stack-is-control-stack)
           (prot "protect_control_stack_guard_page")
           (prot "protect_binding_stack_guard_page")
           (prot "protect_alien_stack_guard_page")))

@@ -45,17 +45,8 @@
 
 int arch_os_thread_init(struct thread *thread)
 {
-    // On ARM64 Windows, we use the allocated Lisp control stack (from alloc_thread_struct),
-    // not the OS thread's C stack. Unlike x86-64 which uses C_STACK_IS_CONTROL_STACK,
-    // ARM64 has a separate Lisp control stack.
-    // Therefore, we do NOT call VirtualQuery here to overwrite control_stack_start/end.
-    // They have already been set correctly by alloc_thread_struct().
-
-    // CRITICAL: Set the TLS value so that get_sb_vm_thread() returns the correct thread!
-    // Without this, funcall0-3 will get the wrong thread from TlsGetValue.
-    extern DWORD OUR_TLS_INDEX;
-    TlsSetValue(OUR_TLS_INDEX, thread);
-
+    /* For some reason this is still needed, even though the control
+     * stack is seperate from the C stack and has its own guards */
     extern void win32_set_stack_guarantee(void);
     win32_set_stack_guarantee();
 

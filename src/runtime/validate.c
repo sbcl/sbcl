@@ -120,7 +120,7 @@ protect_guard_page(void *page, int protect_p, os_vm_prot_t flags) {
         protect_guard_page(page_name(thread), protect_p, flags);        \
     }
 
-#ifndef LISP_FEATURE_WIN32
+#if !(defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
 DEF_PROTECT_PAGE(control_stack_hard_guard_page,
                  CONTROL_STACK_HARD_GUARD_PAGE,
                  OS_VM_PROT_NONE)
