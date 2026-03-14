@@ -133,22 +133,6 @@
       (multiple-value-bind (start end) (%space-bounds space)
         (ash (- end start) n-fixnum-tag-bits))))
 
-(defun instance-length (instance) ; excluding header, not aligned to even
-  ;; Add 1 if expressed length PLUS header (total number of words) would be
-  ;; an even number, and the hash state bits indicate hashed-and-moved.
-  (+ (%instance-length instance)
-     ;; Compute 1 or 0 depending whether the instance was physically extended
-     ;; by one word for the stable hash value. Extension occurs when and only when
-     ;; the hash state is hashed-and-moved, and the apparent total number of words
-     ;; inclusive of header (and exclusive of extension) is even. ANDing the least
-     ;; significant bit of the payload size with HASH-SLOT-PRESENT arrives at the
-     ;; desired boolean value. If apparent size is odd in hashed-and-moved state,
-     ;; the physical size undergoes no change.
-     (let ((header-word (instance-header-word instance)))
-       (logand (ash header-word (- instance-length-shift))
-               (ash header-word (- hash-slot-present-flag))
-               1))))
-
 ;;; Iterate over all the objects in the contiguous block of memory
 ;;; with the low address at START and the high address just before
 ;;; END, calling FUN with the object, the object's type code, and the
