@@ -2301,8 +2301,6 @@ bool maybe_gc(os_context_t *context)
     return (gc_happened != NIL);
 }
 
-#define BYTES_ZERO_BEFORE_END (1<<12)
-
 /* Zero the unused portion of the control stack so that old objects
  * are not kept alive because of uninitialized stack variables. */
 void
@@ -2363,6 +2361,35 @@ scrub_thread_control_stack(struct thread *th)
     memset(sp, 0, end - sp);
 #endif
 #endif /* LISP_FEATURE_C_STACK_IS_CONTROL_STACK */
+}
+
+void scrub_control_stacks () {
+    if (!conservative_stack)
+        return;
+
+#if defined LISP_FEATURE_SB_SAFEPOINT &&                                \
+    !defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK /* can't scrub stacks of other threads
+                                                      and not strictly neccesary */
+    /* In this case, scrub all stacks right here from the GCing thread
+     * instead of doing what the comment below says.  Suboptimal, but
+     * easier. */
+    struct thread *th;
+    for_each_thread(th)
+        scrub_thread_control_stack(th);
+    /* Scrub the unscavenged control stack space, so that we can't run
+     * into any stale pointers in a later GC (this is done by the
+     * stop-for-gc handler in the other threads). */
+#elif defined LISP_FEATURE_NONSTOP_FOREIGN_CALL && !defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    struct thread *th;
+    for_each_thread(th) {
+        /* Threads stopped by gc_stop_the_world scrub the stack on
+         * their own in sig_stop_for_gc_handler. */
+        if (csp_around_foreign_call(th) != 0)
+            scrub_thread_control_stack(th);
+    }
+#else
+    scrub_control_stack();
+#endif
 }
 
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)

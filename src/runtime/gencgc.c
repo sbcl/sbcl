@@ -3512,28 +3512,6 @@ garbage_collect_generation(generation_index_t generation, int raise,
         for_each_thread(th) {
             scavenge_control_stack(th);
         }
-
-# ifdef LISP_FEATURE_SB_SAFEPOINT
-        /* In this case, scrub all stacks right here from the GCing thread
-         * instead of doing what the comment below says.  Suboptimal, but
-         * easier. */
-        for_each_thread(th)
-            scrub_thread_control_stack(th);
-# else
-        /* Scrub the unscavenged control stack space, so that we can't run
-         * into any stale pointers in a later GC (this is done by the
-         * stop-for-gc handler in the other threads). */
-#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
-        for_each_thread(th) {
-            /* Threads stopped by gc_stop_the_world scrub the stack on
-             * their own in sig_stop_for_gc_handler. */
-            if (csp_around_foreign_call(th) != 0)
-                scrub_thread_control_stack(th);
-        }
-#else
-        scrub_control_stack();
-#endif
-# endif
     }
 #endif
 
@@ -3918,6 +3896,8 @@ collect_garbage(generation_index_t last_gen)
      * needed by a finalizer. */
     dynspace_codeblob_tree_snapshot = SYMBOL(DYNSPACE_CODEBLOB_TREE)->value;
     SYMBOL(DYNSPACE_CODEBLOB_TREE)->value = NIL;
+
+    scrub_control_stacks();
 
     page_index_t initial_nfp = next_free_page;
     if (gc_mark_only) {

@@ -354,6 +354,7 @@ extern int sb_GetTID();
 
 extern bool is_in_stack_space(lispobj);
 extern void scrub_control_stack(void);
+extern void scrub_control_stacks(void);
 extern void scrub_thread_control_stack(struct thread *);
 extern void scavenge_control_stack(struct thread *th);
 extern void gc_close_thread_regions(struct thread*, int);
