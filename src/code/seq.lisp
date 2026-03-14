@@ -2884,7 +2884,7 @@ many elements are copied."
 
 ;;;; SUBSTITUTE
 
-(defun list-substitute* (pred new list start end count key test test-not old)
+(defun list-substitute (pred new list start end count key test test-not old)
   (declare (fixnum start end count)
            (type (or null function) key)
            (optimize speed))
@@ -2927,8 +2927,8 @@ many elements are copied."
 
 ;;; Replace old with new in sequence moving from left to right by incrementer
 ;;; on each pass through the loop. Called by all three substitute functions.
-(defun vector-substitute* (pred new sequence incrementer left right length
-                           start end count key test test-not old)
+(defun vector-substitute (pred new sequence incrementer left right length
+                          start end count key test test-not old)
   (declare (fixnum start count end incrementer right)
            (type (or null function) key))
   (let* ((result (make-vector-like sequence length nil))
@@ -2974,31 +2974,31 @@ many elements are copied."
      (let ((end (or end length)))
        (declare (type index end))
        (if from-end
-           (nreverse (list-substitute* ,pred
-                                       new
-                                       (reverse sequence)
-                                       (- (the fixnum length)
-                                          (the fixnum end))
-                                       (- (the fixnum length)
-                                          (the fixnum start))
-                                       count key test test-not old))
-           (list-substitute* ,pred
-                             new sequence start end count key test test-not
-                             old)))
+           (nreverse (list-substitute ,pred
+                                      new
+                                      (reverse sequence)
+                                      (- (the fixnum length)
+                                         (the fixnum end))
+                                      (- (the fixnum length)
+                                         (the fixnum start))
+                                      count key test test-not old))
+           (list-substitute ,pred
+                            new sequence start end count key test test-not
+                            old)))
 
      (let ((end (or end length)))
        (declare (type index end))
        (if from-end
-           (vector-substitute* ,pred new sequence -1 (1- (the fixnum length))
+           (vector-substitute ,pred new sequence -1 (1- (the fixnum length))
                                -1 length (1- (the fixnum end))
                                (1- (the fixnum start))
                                count key test test-not old)
-           (vector-substitute* ,pred new sequence 1 0 length length
+           (vector-substitute ,pred new sequence 1 0 length length
                                start end count key test test-not old)))
 
     ;; FIXME: wow, this is an odd way to implement the dispatch.  PRED
     ;; here is (QUOTE [NORMAL|IF|IF-NOT]).  Not only is this pretty
-    ;; pointless, but also LIST-SUBSTITUTE* and VECTOR-SUBSTITUTE*
+    ;; pointless, but also LIST-SUBSTITUTE and VECTOR-SUBSTITUTE
     ;; dispatch once per element on PRED's run-time identity.
     ,(ecase (cadr pred)
        ((normal) `(apply #'sb-sequence:substitute new old sequence args))
@@ -3056,22 +3056,22 @@ many elements are copied."
     (let ((end (or end length)))
       (declare (type index end))
       (if from-end
-          (nreverse (nlist-substitute*
+          (nreverse (nlist-substitute
                      new old (nreverse (the list sequence))
                      test test-not (- length end) (- length start)
                      count key))
-          (nlist-substitute* new old sequence
-                             test test-not start end count key)))
+          (nlist-substitute new old sequence
+                            test test-not start end count key)))
     (let ((end (or end length)))
       (declare (type index end))
       (if from-end
-          (nvector-substitute* new old sequence -1
-                               test test-not (1- end) (1- start) count key)
-          (nvector-substitute* new old sequence 1
-                               test test-not start end count key)))
+          (nvector-substitute new old sequence -1
+                              test test-not (1- end) (1- start) count key)
+          (nvector-substitute new old sequence 1
+                              test test-not start end count key)))
     (apply #'sb-sequence:nsubstitute new old sequence args)))
 
-(defun nlist-substitute* (new old sequence test test-not start end count key)
+(defun nlist-substitute (new old sequence test test-not start end count key)
   (declare (fixnum start count end)
            (type (or null function) key))
   (do ((test (or test-not test))
@@ -3087,7 +3087,7 @@ many elements are copied."
        (rplaca list new)
        (decf count)))))
 
-(defun nvector-substitute* (new old sequence incrementer
+(defun nvector-substitute (new old sequence incrementer
                             test test-not start end count key)
   (declare (fixnum start count end)
            (type (integer -1 1) incrementer)
@@ -3122,21 +3122,21 @@ many elements are copied."
     (let ((end (or end length)))
       (declare (type index end))
       (if from-end
-          (nreverse (nlist-substitute-if*
+          (nreverse (nlist-substitute-if
                      new predicate (nreverse (the list sequence))
                      (- length end) (- length start) count key))
-          (nlist-substitute-if* new predicate sequence
-                                start end count key)))
+          (nlist-substitute-if new predicate sequence
+                               start end count key)))
     (let ((end (or end length)))
       (declare (type index end))
       (if from-end
-          (nvector-substitute-if* new predicate sequence -1
-                                  (1- end) (1- start) count key)
-          (nvector-substitute-if* new predicate sequence 1
-                                  start end count key)))
+          (nvector-substitute-if new predicate sequence -1
+                                 (1- end) (1- start) count key)
+          (nvector-substitute-if new predicate sequence 1
+                                 start end count key)))
     (apply #'sb-sequence:nsubstitute-if new predicate sequence args)))
 
-(defun nlist-substitute-if* (new test sequence start end count key)
+(defun nlist-substitute-if (new test sequence start end count key)
   (declare (type fixnum start end count)
            (type (or null function) key)
            (type function test)) ; coercion is done by caller
@@ -3149,8 +3149,8 @@ many elements are copied."
       (rplaca list new)
       (decf count))))
 
-(defun nvector-substitute-if* (new test sequence incrementer
-                               start end count key)
+(defun nvector-substitute-if (new test sequence incrementer
+                              start end count key)
   (declare (type fixnum end count)
            (type (integer -1 1) incrementer)
            (type (or null function) key)
@@ -3178,21 +3178,21 @@ many elements are copied."
     (let ((end (or end length)))
       (declare (fixnum end))
       (if from-end
-          (nreverse (nlist-substitute-if-not*
+          (nreverse (nlist-substitute-if-not
                      new predicate (nreverse (the list sequence))
                      (- length end) (- length start) count key))
-          (nlist-substitute-if-not* new predicate sequence
-                                    start end count key)))
+          (nlist-substitute-if-not new predicate sequence
+                                   start end count key)))
     (let ((end (or end length)))
       (declare (fixnum end))
       (if from-end
-          (nvector-substitute-if-not* new predicate sequence -1
-                                      (1- end) (1- start) count key)
-          (nvector-substitute-if-not* new predicate sequence 1
-                                      start end count key)))
+          (nvector-substitute-if-not new predicate sequence -1
+                                     (1- end) (1- start) count key)
+          (nvector-substitute-if-not new predicate sequence 1
+                                     start end count key)))
     (apply #'sb-sequence:nsubstitute-if-not new predicate sequence args)))
 
-(defun nlist-substitute-if-not* (new test sequence start end count key)
+(defun nlist-substitute-if-not (new test sequence start end count key)
   (declare (type fixnum start end count)
            (type (or null function) key)
            (type function test))        ; coercion is done by caller
@@ -3205,8 +3205,8 @@ many elements are copied."
       (rplaca list new)
       (decf count))))
 
-(defun nvector-substitute-if-not* (new test sequence incrementer
-                                   start end count key)
+(defun nvector-substitute-if-not (new test sequence incrementer
+                                  start end count key)
   (declare (type fixnum end count)
            (type (integer -1 1) incrementer)
            (type (or null function) key)
