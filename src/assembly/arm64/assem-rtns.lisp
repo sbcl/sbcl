@@ -342,7 +342,9 @@
      ;; for unbind-to-here
      (:temp where any-reg r1-offset)
      (:temp symbol descriptor-reg r2-offset)
-     (:temp value descriptor-reg r3-offset))
+     (:temp value descriptor-reg r3-offset)
+     #+sb-assembling
+     (:temp nfp any-reg nfp-offset))
   AGAIN
   (inst cbz block (generate-error-code nil 'invalid-unwind-error))
   (load-tl-symbol-value cur-uwp *current-unwind-protect-block*)
@@ -370,8 +372,7 @@
   (loadw-pair cfp-tn unwind-block-cfp-slot lr unwind-block-entry-pc-slot cur-uwp)
   (loadw next-uwp cur-uwp unwind-block-current-catch-slot)
   (store-tl-symbol-value next-uwp *current-catch-block*)
-  (loadw-pair (make-random-tn (sc-or-lose 'any-reg) nfp-offset)
-              unwind-block-nfp-slot next-uwp unwind-block-nsp-slot cur-uwp)
+  (loadw-pair nfp unwind-block-nfp-slot next-uwp unwind-block-nsp-slot cur-uwp)
   (inst mov-sp nsp-tn next-uwp)
 
   ;; Since THROW is called with BLR for better backtraces use BLR here
@@ -388,8 +389,7 @@
   (loadw-pair cfp-tn unwind-block-cfp-slot lr unwind-block-entry-pc-slot block)
   (loadw next-uwp block unwind-block-current-catch-slot)
   (store-tl-symbol-value next-uwp *current-catch-block*)
-  (loadw-pair (make-random-tn (sc-or-lose 'any-reg) nfp-offset)
-              unwind-block-nfp-slot next-uwp unwind-block-nsp-slot block)
+  (loadw-pair nfp unwind-block-nfp-slot next-uwp unwind-block-nsp-slot block)
   (inst mov-sp nsp-tn next-uwp)
 
   (inst blr lr))
