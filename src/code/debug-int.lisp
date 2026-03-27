@@ -2305,7 +2305,13 @@
           (escaped
            (sub-access-debug-var-slot
             (frame-pointer frame)
-            (compiled-debug-var-sc+offset debug-var)
+            ;; Immediately after a call returns, saved locations have
+            ;; not been restored yet, so we access the debug var
+            ;; directly from the save location.
+            (or (and (memq (code-location-kind (frame-code-location frame))
+                           '(:single-value-return :unknown-return :known-return))
+                     (compiled-debug-var-save-sc+offset debug-var))
+                (compiled-debug-var-sc+offset debug-var))
             escaped))
           (t
            (sub-access-debug-var-slot
