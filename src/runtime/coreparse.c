@@ -29,6 +29,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#ifdef LISP_FEATURE_DARWIN
+#include <mach-o/loader.h>
+#endif
+
 #include "os.h"
 #include "runtime.h"
 #include "globals.h"
@@ -102,12 +106,156 @@ int lisp_code_in_elf() { return &lisp_code_start != 0; }
 lispobj* get_alien_linkage_table_initializer() { return &alien_linkage_values; }
 #endif
 
-/* Search 'filename' for an embedded core.  An SBCL core has, at the
- * end of the file, a trailer containing optional saved runtime
- * options, the start of the core (an os_vm_offset_t), and a final
- * signature word (the lispobj CORE_MAGIC).  If this trailer is found
- * at the end of the file, the start of the core can be determined
- * from the core size.
+static int read_exactly(int fd, void *buf, size_t size)
+{
+    return read(fd, buf, size) == (ssize_t)size;
+}
+
+static int read_bytes_at(int fd, os_vm_offset_t offset, void *buf, size_t size)
+{
+    return lseek(fd, offset, SEEK_SET) == offset && read_exactly(fd, buf, size);
+}
+
+static os_vm_offset_t validate_core_start(int fd, os_vm_offset_t core_start,
+                                          lispobj *header, os_vm_offset_t lispobj_size)
+{
+    if (core_start < 0)
+        return -1;
+    if (!read_bytes_at(fd, core_start, header, (size_t)lispobj_size) ||
+        *header != CORE_MAGIC)
+        return -1;
+    return core_start;
+}
+
+/* Search for a core appended to the end of an executable. In this
+ * legacy format an SBCL core has, at the end of the file, a trailer
+ * containing optional saved runtime options, the start of the core
+ * (an os_vm_offset_t), and a final signature word (the lispobj
+ * CORE_MAGIC). If this trailer is found at the end of the file, the
+ * start of the core can be determined from the stored offset. */
+static os_vm_offset_t search_for_legacy_appended_core(int fd)
+{
+    lispobj header = 0;
+    os_vm_offset_t core_start = -1;
+    os_vm_offset_t lispobj_size = sizeof(lispobj);
+
+    if (lseek(fd, -lispobj_size, SEEK_END) < 0 ||
+        !read_exactly(fd, &header, (size_t)lispobj_size) ||
+        header != CORE_MAGIC)
+        return -1;
+
+    /* The last word in the file could be CORE_MAGIC by pure coincidence. */
+    if (lseek(fd, -(lispobj_size + (os_vm_offset_t)sizeof(os_vm_offset_t)),
+              SEEK_END) < 0 ||
+        !read_exactly(fd, &core_start, sizeof(os_vm_offset_t)))
+        return -1;
+
+    return validate_core_start(fd, core_start, &header, lispobj_size);
+}
+
+/* The search_for_{format}_core helpers find cores embedded in named
+ * platform sections or segments rather than appended to the end of
+ * the executable. Ordinary executables produced with :executable t
+ * use the appended-core format and do not use these helpers. */
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_64_BIT)
+static os_vm_offset_t search_for_macho_core(int fd)
+{
+    struct mach_header_64 header;
+    struct stat st;
+    os_vm_offset_t load_commands_end, command_offset;
+    uint32_t i;
+
+    if (fstat(fd, &st) < 0 ||
+        !read_bytes_at(fd, 0, &header, sizeof header) ||
+        header.magic != MH_MAGIC_64)
+        return -1;
+
+    load_commands_end = sizeof header + header.sizeofcmds;
+    if (load_commands_end > (os_vm_offset_t)st.st_size)
+        return -1;
+
+    command_offset = sizeof header;
+    for (i = 0; i < header.ncmds; ++i) {
+        struct load_command command;
+        if (!read_bytes_at(fd, command_offset, &command, sizeof command) ||
+            command.cmdsize < sizeof command ||
+            command_offset + command.cmdsize > load_commands_end)
+            return -1;
+
+        if (command.cmd == LC_SEGMENT_64) {
+            struct segment_command_64 segment;
+            os_vm_offset_t section_offset, command_end;
+            uint32_t j;
+            if (command.cmdsize < sizeof segment ||
+                !read_bytes_at(fd, command_offset, &segment, sizeof segment))
+                return -1;
+            section_offset = command_offset + sizeof segment;
+            command_end = command_offset + command.cmdsize;
+            for (j = 0; j < segment.nsects;
+                 ++j, section_offset += sizeof(struct section_64)) {
+                struct section_64 section;
+                if (section_offset + (os_vm_offset_t)sizeof section > command_end ||
+                    !read_bytes_at(fd, section_offset, &section, sizeof section))
+                    return -1;
+                if (!strncmp(section.segname, "__SBCL", sizeof section.segname) &&
+                    !strncmp(section.sectname, "__core", sizeof section.sectname) &&
+                    section.size)
+                    return section.offset;
+            }
+        }
+        command_offset += command.cmdsize;
+    }
+    return -1;
+}
+#endif
+
+#ifdef LISP_FEATURE_WIN32
+static os_vm_offset_t search_for_pe_core(int fd)
+{
+    struct stat st;
+    IMAGE_DOS_HEADER dos_header;
+    DWORD signature;
+    IMAGE_FILE_HEADER file_header;
+    os_vm_offset_t section_offset;
+    int i;
+
+    if (fstat(fd, &st) < 0 ||
+        !read_bytes_at(fd, 0, &dos_header, sizeof dos_header) ||
+        dos_header.e_magic != IMAGE_DOS_SIGNATURE ||
+        dos_header.e_lfanew < 0)
+        return -1;
+
+    if (!read_bytes_at(fd, dos_header.e_lfanew, &signature, sizeof signature) ||
+        signature != IMAGE_NT_SIGNATURE ||
+        !read_bytes_at(fd, dos_header.e_lfanew + sizeof signature,
+                       &file_header, sizeof file_header))
+        return -1;
+
+    section_offset = dos_header.e_lfanew + sizeof signature +
+        sizeof file_header + file_header.SizeOfOptionalHeader;
+    if (section_offset > st.st_size)
+        return -1;
+
+    for (i = 0; i < file_header.NumberOfSections; ++i) {
+        IMAGE_SECTION_HEADER section;
+        if (section_offset + sizeof section > st.st_size ||
+            !read_bytes_at(fd, section_offset, &section, sizeof section))
+            return -1;
+        if (!memcmp(section.Name, ".sbclcr", 7) && section.Name[7] == 0 &&
+            section.SizeOfRawData != 0)
+            return section.PointerToRawData;
+        section_offset += sizeof section;
+    }
+    return -1;
+}
+#endif
+
+/* Search 'filename' for an embedded core. An SBCL core can be a bare
+ * .core file, can be embedded in an executable section, or can be in
+ * the legacy appended-core format with a trailer containing
+ * optional saved runtime options, the start of the core (an
+ * os_vm_offset_t), and a final signature word (the lispobj
+ * CORE_MAGIC).
  *
  * If an embedded core is present, this returns the offset into the
  * file to load the core from, or -1 if no core is present. */
@@ -131,19 +279,17 @@ search_for_embedded_core(char *filename, struct memsize_options *memsize_options
     }
 
     os_vm_offset_t core_start = -1; // invalid value
-    if (lseek(fd, -lispobj_size, SEEK_END) < 0 ||
-        read(fd, &header, (size_t)lispobj_size) != lispobj_size)
-        goto lose;
-
-    if (header == CORE_MAGIC) {
-        // the last word in the file could be CORE_MAGIC by pure coincidence
-        if (lseek(fd, -(lispobj_size + sizeof(os_vm_offset_t)), SEEK_END) < 0 ||
-            read(fd, &core_start, sizeof(os_vm_offset_t)) != sizeof(os_vm_offset_t))
-            goto lose;
-        if (lseek(fd, core_start, SEEK_SET) != core_start ||
-            read(fd, &header, lispobj_size) != lispobj_size || header != CORE_MAGIC)
-            core_start = -1; // reset to invalid
-    }
+    /* Mach-O and PE section lookup is independent of memsize_options
+     * because (unlike ELF :elf-object cores) the core is stored as
+     * opaque section bytes with no pre-baked linkage information, so
+     * finding one via an explicit --core works fine too. */
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_64_BIT)
+    core_start = validate_core_start(fd, search_for_macho_core(fd), &header, lispobj_size);
+#endif
+#ifdef LISP_FEATURE_WIN32
+    if (core_start < 0)
+        core_start = validate_core_start(fd, search_for_pe_core(fd), &header, lispobj_size);
+#endif
 #if ELFCORE && !defined(LISP_FEATURE_DARWIN)
     // Specifying "--core" as an ELF file with a lisp.core section doesn't work.
     // (There are bunch of reasons) So only search for a core section if this
@@ -151,16 +297,18 @@ search_for_embedded_core(char *filename, struct memsize_options *memsize_options
     // The two cases can be distinguished based on whether the core is able
     // to set the memsize_options. (Implicit can set them, explicit can't)
     if (core_start < 0 && memsize_options) {
-        if (!(core_start = search_for_elf_core(fd)) ||
-            lseek(fd, core_start, SEEK_SET) != core_start ||
-            read(fd, &header, lispobj_size) != lispobj_size || header != CORE_MAGIC)
+        core_start = search_for_elf_core(fd);
+        if (!core_start ||
+            (core_start = validate_core_start(fd, core_start, &header, lispobj_size)) < 0)
             core_start = -1; // reset to invalid
     }
 #endif
+    if (core_start < 0)
+        core_start = search_for_legacy_appended_core(fd);
     if (core_start > 0 && memsize_options) {
         core_entry_elt_t optarray[RUNTIME_OPTIONS_WORDS];
         // file is already positioned to the first core header entry
-        if (read(fd, optarray, sizeof optarray) == sizeof optarray
+        if (read_exactly(fd, optarray, sizeof optarray)
             && optarray[0] == RUNTIME_OPTIONS_MAGIC) {
             memsize_options->dynamic_space_size = optarray[2];
             memsize_options->thread_control_stack_size = optarray[3];
@@ -169,7 +317,6 @@ search_for_embedded_core(char *filename, struct memsize_options *memsize_options
             memsize_options->present_in_core = optarray[1] == RUNTIME_OPTIONS_WORDS ? 1 : 2;
         }
     }
-lose:
     close(fd);
     return core_start;
 }
