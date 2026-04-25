@@ -64,30 +64,48 @@
               ,@body)
          (setf flag saved)))))
 
-(defmacro with-guarded-struct ((var size type-form) &body body)
-  (let ((sap (gensym "SAP-"))
+(defmacro with-fault-handler (label &body body)
+  `(with-memory-faults
+     (handler-case (progn ,@body)
+       (sb-sys:memory-fault-error (c)
+         (error "~A: ~A" ,label c)))))
+
+;;; VAR is bound to a deref'd struct view of a freshly-allocated
+;;; guarded buffer.
+;;;
+;;; Optional SAP-VAR names the raw system-area-pointer to that same
+;;; buffer, for probes that need to pass it to ALIEN-FUNCALL-INTO.
+
+(defmacro with-guarded-struct ((var size type-form &optional sap-var) &body body)
+  (let ((sap-sym (or sap-var (gensym "SAP-")))
         (size-sym (gensym "SIZE-")))
     `(let* ((,size-sym ,size)
-            (,sap (guarded-alloc ,size-sym)))
-       (when (sb-sys:sap= ,sap (sb-sys:int-sap 0))
-         (error "guarded_struct_alloc(~A) failed" ,size-sym))
+            (,sap-sym (guarded-alloc ,size-sym)))
+       (when (sb-sys:sap= ,sap-sym (sb-sys:int-sap 0))
+         (error "guarded_alloc(~A) failed" ,size-sym))
        (unwind-protect
             (let ((,var (sb-alien:deref
-                         (sb-alien:sap-alien ,sap (* ,type-form)))))
+                         (sb-alien:sap-alien ,sap-sym (* ,type-form)))))
               ,@body)
-         (guarded-free ,sap ,size-sym)))))
+         (guarded-free ,sap-sym ,size-sym)))))
 
-(defmacro probe-overread (size type-form init-form sum-fn expected-sum
+(defmacro probe-overread (size type-form init-form value-fn expected-value
                           &key (tolerance 0))
   `(with-guarded-struct (s ,size ,type-form)
      ,init-form
-     (let ((result (with-memory-faults
-                       (handler-case (,sum-fn s)
-                         (sb-sys:memory-fault-error (c)
-                           (error "OVER-READ: ~A" c))))))
+     (let ((result (with-fault-handler "OVER-READ" (,value-fn s))))
        ,(if (zerop tolerance)
-            `(assert (= result ,expected-sum))
-            `(assert (< (abs (- result ,expected-sum)) ,tolerance))))))
+            `(assert (= result ,expected-value))
+            `(assert (< (abs (- result ,expected-value)) ,tolerance))))))
+
+(defmacro probe-overwrite (size type-form make-name fn-type
+                           call-args check-body)
+  `(with-guarded-struct (s ,size ,type-form sap)
+     (declare (ignorable s))
+     (with-fault-handler "OVER-WRITE"
+       (alien-funcall-into (extern-alien ,make-name ,fn-type)
+                           sap ,@call-args))
+     ,check-body))
 
 (with-test (:name :overread-i8)
   (probe-overread 1 (struct gp-i8)
@@ -142,19 +160,56 @@
 (with-test (:name :overread-i8-identity)
   (with-guarded-struct (s 1 (struct gp-i8))
     (setf (slot s 'm0) 99)
-    (let ((r (with-memory-faults
-               (handler-case (gp-i8-identity s)
-                 (sb-sys:memory-fault-error (c)
-                   (error "OVER-READ in identity: ~A" c))))))
+    (let ((r (with-fault-handler "OVER-READ in identity"
+               (gp-i8-identity s))))
       (assert (= (slot r 'm0) 99)))))
 
 (with-test (:name :overread-3f-identity)
   (with-guarded-struct (s 12 (struct gp-3f))
     (setf (slot s 'a) 7.5f0 (slot s 'b) -1.25f0 (slot s 'c) 0.5f0)
-    (let ((r (with-memory-faults
-               (handler-case (gp-3f-identity s)
-                 (sb-sys:memory-fault-error (c)
-                   (error "OVER-READ in identity: ~A" c))))))
+    (let ((r (with-fault-handler "OVER-READ in identity"
+               (gp-3f-identity s))))
       (assert (= (slot r 'a) 7.5f0))
       (assert (= (slot r 'b) -1.25f0))
       (assert (= (slot r 'c) 0.5f0)))))
+
+;;; Over-write probes (return-buffer side).
+
+(with-test (:name :overwrite-i8 :broken-on :sbcl)
+  (probe-overwrite 1 (struct gp-i8)
+                   "gp_i8_make"
+                   (function (struct gp-i8) (signed 8))
+                   (-42)
+                   (assert (= (slot s 'm0) -42))))
+
+(with-test (:name :overwrite-i16 :broken-on :sbcl)
+  (probe-overwrite 2 (struct gp-i16)
+                   "gp_i16_make"
+                   (function (struct gp-i16) (signed 16))
+                   (12345)
+                   (assert (= (slot s 'm0) 12345))))
+
+(with-test (:name :overwrite-i32 :broken-on :sbcl)
+  (probe-overwrite 4 (struct gp-i32)
+                   "gp_i32_make"
+                   (function (struct gp-i32) (signed 32))
+                   (#x7abcdef0)
+                   (assert (= (slot s 'm0) #x7abcdef0))))
+
+(with-test (:name :overwrite-1f :broken-on :sbcl)
+  (probe-overwrite 4 (struct gp-1f)
+                   "gp_1f_make"
+                   (function (struct gp-1f) single-float)
+                   (42.5f0)
+                   (assert (= (slot s 'm0) 42.5f0))))
+
+(with-test (:name :overwrite-3f :broken-on :sbcl)
+  (probe-overwrite 12 (struct gp-3f)
+                   "gp_3f_make"
+                   (function (struct gp-3f)
+                             single-float single-float single-float)
+                   (1.0f0 2.0f0 3.0f0)
+                   (progn
+                     (assert (= (slot s 'a) 1.0f0))
+                     (assert (= (slot s 'b) 2.0f0))
+                     (assert (= (slot s 'c) 3.0f0)))))

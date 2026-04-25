@@ -71,3 +71,16 @@ double gp_3f_sum (struct gp_3f s) {
 
 IDENTITY(gp_i8)   IDENTITY(gp_i16)  IDENTITY(gp_i32) IDENTITY(gp_1f)
 IDENTITY(gp_i8x7) IDENTITY(gp_i8x9) IDENTITY(gp_i8x15) IDENTITY(gp_3f)
+
+/*
+ * functions that return structs by value
+ */
+struct gp_i8  gp_i8_make  (int8_t  v) { struct gp_i8  s; s.m0 = v; return s; }
+struct gp_i16 gp_i16_make (int16_t v) { struct gp_i16 s; s.m0 = v; return s; }
+struct gp_i32 gp_i32_make (int32_t v) { struct gp_i32 s; s.m0 = v; return s; }
+struct gp_1f  gp_1f_make  (float   v) { struct gp_1f  s; s.m0 = v; return s; }
+struct gp_3f  gp_3f_make  (float a, float b, float c) {
+  struct gp_3f s;
+  s.a = a; s.b = b; s.c = c;
+  return s;
+}
