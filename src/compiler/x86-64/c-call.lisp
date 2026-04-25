@@ -286,19 +286,53 @@ Floats are passed in integer registers."
 ;;; VOPs for struct argument passing
 ;;; These VOPs load eightbytes from a struct SAP into target registers
 
+(defun emit-load-partial-int (target sap offset size temp)
+  (aver (<= 1 size 8))
+  (ecase size
+    (8 (inst mov :qword target (ea offset sap)))
+    (4 (inst mov :dword target (ea offset sap))) ; zero-extends
+    (2 (inst movzx '(:word :qword) target (ea offset sap)))
+    (1 (inst movzx '(:byte :qword) target (ea offset sap)))
+    (3
+     (inst movzx '(:word :qword) target (ea offset sap))
+     (inst movzx '(:byte :qword) temp   (ea (+ offset 2) sap))
+     (inst shl temp 16)
+     (inst or target temp))
+    (5
+     (inst mov :dword target (ea offset sap))
+     (inst movzx '(:byte :qword) temp (ea (+ offset 4) sap))
+     (inst shl temp 32)
+     (inst or target temp))
+    (6
+     (inst mov :dword target (ea offset sap))
+     (inst movzx '(:word :qword) temp (ea (+ offset 4) sap))
+     (inst shl temp 32)
+     (inst or target temp))
+    (7
+     (inst mov :dword target (ea offset sap))
+     (inst movzx '(:word :qword) temp (ea (+ offset 4) sap))
+     (inst shl temp 32)
+     (inst or target temp)
+     (inst movzx '(:byte :qword) temp (ea (+ offset 6) sap))
+     (inst shl temp 48)
+     (inst or target temp))))
+
 (define-vop (load-struct-int-arg)
-  (:args (sap :scs (sap-reg)))
-  (:info offset)
+  (:args (sap :scs (sap-reg) :to :save))
+  (:info offset size)
   (:results (target :scs (unsigned-reg signed-reg)))
+  (:temporary (:sc unsigned-reg) temp)
   (:generator 5
-    (inst mov :qword target (ea offset sap))))
+    (emit-load-partial-int target sap offset size temp)))
 
 (define-vop (load-struct-sse-arg)
   (:args (sap :scs (sap-reg)))
-  (:info offset)
+  (:info offset size)
   (:results (target :scs (double-reg single-reg)))
   (:generator 5
-    (inst movsd target (ea offset sap))))
+    (ecase size
+      (4 (inst movss target (ea offset sap)))
+      (8 (inst movsd target (ea offset sap))))))
 
 ;;; VOPs for storing struct result registers to memory
 ;;; These VOPs store result register values back to memory for struct-by-value returns
@@ -317,15 +351,17 @@ Floats are passed in integer registers."
   (:generator 5
     (inst movsd (ea offset sap) value)))
 
-;;; VOP to copy a qword from struct SAP to the C argument stack
-;;; Used for passing large structs (>16 bytes) by value
+;;; VOP to copy a full or partial qword from struct SAP to the C
+;;; argument stack Used for passing large structs (>16 bytes) by value
+
 (define-vop (copy-struct-arg-to-stack)
-  (:args (sap :scs (sap-reg))
+  (:args (sap :scs (sap-reg) :to :save)
          (nsp :scs (any-reg)))
-  (:info src-offset dst-offset)
+  (:info src-offset dst-offset size)
   (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
+  (:temporary (:sc unsigned-reg) temp2)
   (:generator 5
-    (inst mov :qword temp (ea src-offset sap))
+    (emit-load-partial-int temp sap src-offset size temp2)
     (inst mov :qword (ea dst-offset nsp) temp)))
 
 ;;; Arg TN generation for record types
@@ -365,6 +401,7 @@ Floats are passed in integer registers."
    For large structs (>16 bytes), copies to stack per System V AMD64 ABI.
    For small structs, returns a function that emits load VOPs into registers."
   (let* ((classification (classify-struct type))
+         (struct-size (sb-alien::struct-classification-size classification))
          (slots (sb-alien::struct-classification-register-slots classification)))
     (if (or (sb-alien::struct-classification-memory-p classification)
             (let (stack
@@ -380,8 +417,7 @@ Floats are passed in integer registers."
               stack))
         ;; Large struct: copy to stack (System V AMD64 ABI)
         ;; The struct is passed by value on the stack, not by pointer
-        (let* ((size (sb-alien::struct-classification-size classification))
-               (words (ceiling size 8))
+        (let* ((words (ceiling struct-size 8))
                (stack-base (arg-state-stack-frame-size state)))
           ;; Reserve stack slots for the struct
           (incf (arg-state-stack-frame-size state) words)
@@ -391,13 +427,14 @@ Floats are passed in integer registers."
               (loop for i from 0 below words
                     for src-offset = (* i 8)
                     for dst-offset = (* (+ stack-base i) n-word-bytes)
+                    for load-size = (min 8 (- struct-size src-offset))
                     do (sb-c::emit-and-insert-vop
                         call block
                         (sb-c::template-or-lose 'copy-struct-arg-to-stack)
                         (sb-c::reference-tn-list (list sap-tn nsp) nil)
                         nil  ; no results
                         nil  ; insert at end
-                        (list src-offset dst-offset))))))
+                        (list src-offset dst-offset load-size))))))
         ;; Small struct: allocate target TNs and return a function to load into them
         (let ((arg-tns nil)
               (offsets nil)
@@ -427,6 +464,7 @@ Floats are passed in integer registers."
              (let ((sap-tn (sb-c::lvar-tn call block arg)))
                (loop for target-tn in arg-tns
                      for (off . class) in offsets
+                     for load-size = (min 8 (- struct-size off))
                      do (let ((vop (ecase class
                                      (:integer 'load-struct-int-arg)
                                      (:double 'load-struct-sse-arg))))
@@ -436,7 +474,7 @@ Floats are passed in integer registers."
                            (sb-c::reference-tn sap-tn nil)
                            (sb-c::reference-tn target-tn t)
                            nil
-                           (list off)))))))))))
+                           (list off load-size)))))))))))
 
 ;;; VOP to set up hidden struct return pointer in first arg register.
 #+win32
