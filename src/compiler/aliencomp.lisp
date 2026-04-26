@@ -558,28 +558,68 @@
 
 ;;;; ALIEN-FUNCALL support
 
-;;; Generate code to store struct register values to memory
+;;; Size-dispatched SETF forms that write exactly SIZE bytes (1..8)
+;;; from TEMP, a (unsigned-byte 64), into [result-sap+offset].  Used
+;;; for the trailing partial eightbyte of a struct-by-value return.
 #-sb-xc-host
-(defun generate-struct-store-code (temps register-slots result-sap)
+(defun %gen-int-slot-store (result-sap offset size temp)
+  (ecase size
+    (8 `(setf (sb-sys:sap-ref-64 ,result-sap ,offset) ,temp))
+    (4 `(setf (sb-sys:sap-ref-32 ,result-sap ,offset)
+              (ldb (byte 32 0) ,temp)))
+    (2 `(setf (sb-sys:sap-ref-16 ,result-sap ,offset)
+              (ldb (byte 16 0) ,temp)))
+    (1 `(setf (sb-sys:sap-ref-8 ,result-sap ,offset)
+              (ldb (byte 8 0) ,temp)))
+    ((3 5 6 7)
+     ;; No primitive store matches; fall back to byte-granular.
+     `(progn
+        ,@(loop for i from 0 below size collect
+                `(setf (sb-sys:sap-ref-8 ,result-sap ,(+ offset i))
+                       (ldb (byte 8 ,(* i 8)) ,temp)))))))
+
+;;; Generate code to store struct register values to memory.
+#-sb-xc-host
+(defun generate-struct-store-code (temps register-slots bytes result-sap)
   "Generate SETF forms to store register values to struct memory."
   (let ((offset 0)
         (stores nil)
         (temp-idx 0))
     (dolist (class register-slots)
-      (case class
-        (:integer
-         (push `(setf (sb-sys:sap-ref-64 ,result-sap ,offset) ,(nth temp-idx temps)) stores)
-         (incf offset 8)
-         (incf temp-idx))
-        (:double
-         (push `(setf (sb-sys:sap-ref-double ,result-sap ,offset) ,(nth temp-idx temps)) stores)
-         (incf offset 8)
-         (incf temp-idx))
-        ;; :single is ARM64 HFA only - x86-64 classifies all floats as :double
-        (:single
-         (push `(setf (sb-sys:sap-ref-single ,result-sap ,offset) ,(nth temp-idx temps)) stores)
-         (incf offset 4)
-         (incf temp-idx))))
+      (let* ((remaining (- bytes offset))
+             (slot-size (case class
+                          ((:integer :double) (min 8 remaining))
+                          (:single (min 4 remaining)))))
+        (ecase class
+          (:integer
+           (push (%gen-int-slot-store result-sap offset slot-size
+                                      (nth temp-idx temps))
+                 stores)
+           (incf offset 8)
+           (incf temp-idx))
+          (:double
+           (cond
+             ((= slot-size 8)
+              (push `(setf (sb-sys:sap-ref-double ,result-sap ,offset)
+                           ,(nth temp-idx temps))
+                    stores))
+             ((= slot-size 4)
+              (push `(setf (sb-sys:sap-ref-32 ,result-sap ,offset)
+                           (sb-kernel:double-float-low-bits
+                            ,(nth temp-idx temps)))
+                    stores))
+             (t
+              (error "Unexpected :double slot size ~A at offset ~A ~
+                      (struct size ~A)" slot-size offset bytes)))
+           (incf offset 8)
+           (incf temp-idx))
+          ;; :single is ARM64 HFA only - x86-64 classifies all floats as :double
+          (:single
+           (push `(setf (sb-sys:sap-ref-single ,result-sap ,offset)
+                        ,(nth temp-idx temps))
+                 stores)
+           (incf offset 4)
+           (incf temp-idx)))))
     (nreverse stores)))
 
 ;;; Build the function expression for %alien-funcall, optimizing to use
@@ -632,7 +672,7 @@
 ;;; Returns (values) - caller wraps result as alien if needed.
 #-sb-xc-host
 (defun generate-struct-return-code (func-expr alien-type return-type deports buffer-var)
-  (multiple-value-bind (in-registers-p register-slots)
+  (multiple-value-bind (in-registers-p register-slots bytes)
       (sb-alien::struct-return-info return-type)
     (cond
       ;; Large struct: pass buffer as hidden first arg
@@ -645,7 +685,7 @@
        (let ((temps (loop repeat (length register-slots) collect (gensym))))
          `(multiple-value-bind ,temps
               (%alien-funcall ,func-expr ',alien-type ,@deports)
-            ,@(generate-struct-store-code temps register-slots buffer-var)
+            ,@(generate-struct-store-code temps register-slots bytes buffer-var)
             (values)))))))
 
 (deftransform alien-funcall ((function &rest args)

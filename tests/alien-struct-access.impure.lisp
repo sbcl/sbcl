@@ -175,35 +175,35 @@
 
 ;;; Over-write probes (return-buffer side).
 
-(with-test (:name :overwrite-i8 :broken-on :sbcl)
+(with-test (:name :overwrite-i8)
   (probe-overwrite 1 (struct gp-i8)
                    "gp_i8_make"
                    (function (struct gp-i8) (signed 8))
                    (-42)
                    (assert (= (slot s 'm0) -42))))
 
-(with-test (:name :overwrite-i16 :broken-on :sbcl)
+(with-test (:name :overwrite-i16)
   (probe-overwrite 2 (struct gp-i16)
                    "gp_i16_make"
                    (function (struct gp-i16) (signed 16))
                    (12345)
                    (assert (= (slot s 'm0) 12345))))
 
-(with-test (:name :overwrite-i32 :broken-on :sbcl)
+(with-test (:name :overwrite-i32)
   (probe-overwrite 4 (struct gp-i32)
                    "gp_i32_make"
                    (function (struct gp-i32) (signed 32))
                    (#x7abcdef0)
                    (assert (= (slot s 'm0) #x7abcdef0))))
 
-(with-test (:name :overwrite-1f :broken-on :sbcl)
+(with-test (:name :overwrite-1f)
   (probe-overwrite 4 (struct gp-1f)
                    "gp_1f_make"
                    (function (struct gp-1f) single-float)
                    (42.5f0)
                    (assert (= (slot s 'm0) 42.5f0))))
 
-(with-test (:name :overwrite-3f :broken-on :sbcl)
+(with-test (:name :overwrite-3f)
   (probe-overwrite 12 (struct gp-3f)
                    "gp_3f_make"
                    (function (struct gp-3f)
