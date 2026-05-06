@@ -3616,6 +3616,18 @@ is :ANY, the function name is not checked."
                   when (eq v lambda-var)
                   do (funcall function combination arg))))))))
 
+(defun map-callers (function lambda &key not-a-caller)
+  (declare (dynamic-extent function)
+           (dynamic-extent not-a-caller))
+  (loop for ref in (leaf-refs lambda)
+        for lvar = (node-lvar ref)
+        for dest = (and lvar (lvar-dest lvar))
+        do (cond ((and (combination-p dest)
+                       (eq (combination-fun dest) lvar))
+                  (funcall function dest))
+                 (not-a-caller
+                  (funcall not-a-caller)))))
+
 (declaim (ftype (sfunction (function t &key (:leaf-set t) (:multiple-uses t) (:cast t)) null) map-refs))
 (defun map-refs (function leaf/lvar &key leaf-set
                                          multiple-uses

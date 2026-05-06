@@ -661,3 +661,12 @@
                     :key (lambda (x) (and (combination-p x)
                                           (combination-fun-source-name x nil))))
              0)))
+
+(with-test (:name :xep-calls-no-arg-count-checking)
+  (assert (= (count 'sb-c:verify-arg-count
+                    (ir2-vops '(lambda (n)
+                                (funcall (if n
+                                             (lambda (a) (+ a 2))
+                                             (lambda (b) (+ b 1)))
+                                 1))))
+             1)))
