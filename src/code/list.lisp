@@ -995,32 +995,40 @@
          (make-hash-table :test #'string= :hash-function #'string=-hash :size size))
         ((eq fun #'string-equal)
          (make-hash-table :test #'string-equal :hash-function #'string-equal-hash :size size))
-        ((or (eq fun #'=)
-             (eq fun #'two-arg-=))
+        ((or (eq fun #'two-arg-=)
+             (eq fun #'=))
          (make-hash-table :test #'two-arg-= :hash-function #'psxhash :size size))))
 
-(flet ((hashing-p (notp testp test n1 n2)
-         (declare (index n1 n2))
+;; return (values short-list long-list short-length (nthcdr short-length long-list))
+(defun shorter-list-length (list1 list2)
+  (let ((length 0)
+        (cdr1 list1)
+        (cdr2 list2))
+    (declare (index length))
+    (loop (cond ((not cdr1)
+                 (return (values list1 list2 length cdr2)))
+                ((not cdr2)
+                 (return (values list2 list1 length cdr1))))
+          (pop cdr1)
+          (pop cdr2)
+          (incf (truly-the index length)))))
+
+(flet ((hashing-p (notp testp test short-length long-nthcdr)
+         (declare (index short-length))
          ;; If there is no TEST-NOT, and both lists are long enough, and the
          ;; test function is that of a standard hash-table, then use a hash-table.
          (and (not notp)
-              (or (and (> n1 20) (> n2 20)) ; both lists are non-short
+              (or (> short-length 20)   ; both lists are non-short
                   ;; or one list is very long, and the other is not tiny
-                  (and (>= n1 3) (>= n2 100))
-                  (and (>= n2 3) (>= n1 100)))
-              (make-hash-table-for-duplicates (if testp test #'eql) (+ n1 n2))))
-       (unionize (table key set1 set2)
-         (dolist (elt set1)
-           (setf (gethash (apply-key key elt) table) elt))
-         (dolist (elt set2)
-           (setf (gethash (apply-key key elt) table) elt))
-         table))
+                  (and (>= short-length 3)
+                       (list-of-length-at-least-p long-nthcdr
+                                                  (- 100 short-length))))
+              (make-hash-table-for-duplicates (if testp test #'eql) short-length))))
+  (declare (inline hashing-p))
 
 ;;; "If there is a duplication between list-1 and list-2, only one of the duplicate
 ;;;  instances will be in the result. If either list-1 or list-2 has duplicate entries
 ;;;  within it, the redundant entries might or might not appear in the result."
-;;; Our answer differs based on whether a hash-table is employed or not.
-
 (defun union (list1 list2 &key key (test nil testp) (test-not nil notp))
   "Return the union of LIST1 and LIST2."
   (declare (dynamic-extent key test test-not)
@@ -1032,28 +1040,31 @@
     ;; (and a 1000-element list unioned with NIL should not cons a hash-table)
     (cond ((null list1) (return-from union list2))
           ((null list2) (return-from union list1)))
-    (let* ((n1 (length list1))
-           (n2 (length list2))
-           (hash-table (hashing-p notp testp test n1 n2)))
-      (if hash-table
-          ;; "The order of elements in the result do not have to reflect the ordering
-          ;;  of list-1 or list-2 in any way."
-          (loop for k being the hash-values of (unionize hash-table key list1 list2)
-                collect k)
-          ;; Start with the initial result being the shorter of the inputs.
-          ;; Search for each element of the longer in the shorter, adding the missing ones.
-          (flet ((swapped-test (x y)
-                   (funcall test y x)))
-            (declare (dynamic-extent #'swapped-test))
-            (multiple-value-bind (short long test)
-                (if (< n1 n2)
-                    (values list1 list2 (and test
-                                             #'swapped-test))
-                    (values list2 list1 test))
+    (multiple-value-bind (short long short-length long-nthcdr)
+        (shorter-list-length list1 list2)
+     (let ((hash-table (hashing-p notp testp test short-length long-nthcdr)))
+       (cond (hash-table
+              (dolist (elt short)
+                (setf (gethash (apply-key key elt) hash-table) t))
               (let ((result short))
-                (dolist (elt long result)
-                  (unless (funcall member-test elt short key test)
-                    (push elt result))))))))))
+                (dolist (elt long)
+                  (unless (gethash (apply-key key elt) hash-table)
+                    (push elt result)))
+                result))
+             (t
+              ;; Start with the initial result being the shorter of the inputs.
+              ;; Search for each element of the longer in the shorter, adding the missing ones.
+              (flet ((swapped-test (x y)
+                       (funcall test y x)))
+                (declare (dynamic-extent #'swapped-test))
+                (let ((test (if (eq list1 short)
+                                (and test
+                                     #'swapped-test)
+                                test)))
+                  (let ((result short))
+                    (dolist (elt long result)
+                      (unless (funcall member-test elt short key test)
+                        (push elt result))))))))))))
 
 (defun nunion (list1 list2 &key key (test nil testp) (test-not nil notp))
   "Destructively return the union of LIST1 and LIST2."
@@ -1064,37 +1075,31 @@
   (with-member-test (member-test)
     (cond ((null list1) (return-from nunion list2))
           ((null list2) (return-from nunion list1)))
-    (binding* ((n1 (length list1))
-               (n2 (length list2))
-               ((short long swap)
-                (if (< n1 n2)
-                    (values list1 list2 t)
-                    (values list2 list1 nil)))
-               (hash-table (hashing-p notp testp test n1 n2)))
-      (if hash-table
-          (let ((table (unionize hash-table key short long))
-                (union long)
-                (head long))
-            (maphash (lambda (k v)
-                       (declare (ignore k))
-                       (if head
-                           (setf (car head) v
-                                 head (cdr head))
-                           (push v union))) ; easier than re-using cons cells of SHORT
-                     table)
-            union)
-          (flet ((swapped-test (x y)
-                   (funcall (truly-the function test) y x)))
-            (declare (dynamic-extent #'swapped-test))
-            (let ((test (if swap
-                            (and test #'swapped-test)
-                            test)))
-              (do ((orig short)
-                   (elt (car long) (car long)))
-                  ((endp long) short)
-                (if (funcall member-test elt orig key test)
-                    (pop long)
-                    (shiftf long (cdr long) short long))))))))))
+    (multiple-value-bind (short long short-length long-nthcdr)
+        (shorter-list-length list1 list2)
+      (let ((hash-table (hashing-p notp testp test short-length long-nthcdr)))
+        (cond (hash-table
+               (dolist (elt short)
+                 (setf (gethash (apply-key key elt) hash-table) t))
+               (do ((orig short)
+                    (elt (car long) (car long)))
+                   ((endp long) short)
+                 (if (gethash (apply-key key elt) hash-table)
+                     (pop long)
+                     (shiftf long (cdr long) short long))))
+              (t
+               (flet ((swapped-test (x y)
+                        (funcall (truly-the function test) y x)))
+                 (declare (dynamic-extent #'swapped-test))
+                 (let ((test (if (eq list1 short)
+                                 (and test #'swapped-test)
+                                 test)))
+                   (do ((orig short)
+                        (elt (car long) (car long)))
+                       ((endp long) short)
+                     (if (funcall member-test elt orig key test)
+                         (pop long)
+                         (shiftf long (cdr long) short long))))))))))))
 
 (defun intersection (list1 list2
                      &key key (test nil testp) (test-not nil notp))
