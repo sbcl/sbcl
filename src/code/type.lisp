@@ -7095,35 +7095,39 @@ expansion happened."
         (values (aref ranges 1) (aref ranges (1- (length ranges))))
         (values (aref ranges 0) (aref ranges (1- (length ranges)))))))
 
+(defun map-numeric-union-ranges (function type)
+  (declare (dynamic-extent function))
+  (let ((ranges (numeric-union-type-ranges type))
+        (aspects (numeric-union-type-aspects type)))
+    (if (memq (numtype-aspects-class aspects) '(integer rational))
+        (loop for i below (length ranges) by 3
+              for low = (aref ranges (+ i 1))
+              for high = (aref ranges (+ i 2))
+              do (funcall function low high))
+        (loop for i below (length ranges) by 2
+              for low = (aref ranges i)
+              for high = (aref ranges (1+ i))
+              do (funcall function low high)))))
+
 ;; (or (integer * -3) (integer 5)) => -3, 5
 ;; (integer 5) => nil, 5
 ;; (integer * -5) => -5, nil
 ;; (integer -5 5) => 0, 0
 (defun numeric-union-min-abs-bounds (type)
-  (let ((ranges (numeric-union-type-ranges type))
-        (aspects (numeric-union-type-aspects type))
-        min-left
+  (let (min-left
         min-right)
     (block nil
-      (flet ((process (low high)
-               (cond ((not (fp-high-ge-high-p high 0))
-                      (setf min-left high))
-                     ((not (fp-low-le-low-p low 0))
-                      (setf min-right low)
-                      (return))
-                     (t
-                      (setf min-left 0
-                            min-right 0)
-                      (return)))))
-        (if (memq (numtype-aspects-class aspects) '(integer rational))
-            (loop for i below (length ranges) by 3
-                  for low = (aref ranges (+ i 1))
-                  for high = (aref ranges (+ i 2))
-                  do (process low high))
-            (loop for i below (length ranges) by 2
-                  for low = (aref ranges i)
-                  for high = (aref ranges (1+ i))
-                  do (process low high)))))
+      (map-numeric-union-ranges (lambda (low high)
+                                  (cond ((not (fp-high-ge-high-p high 0))
+                                         (setf min-left high))
+                                        ((not (fp-low-le-low-p low 0))
+                                         (setf min-right low)
+                                         (return))
+                                        (t
+                                         (setf min-left 0
+                                               min-right 0)
+                                         (return))))
+                                type))
     (values min-left min-right)))
 
 (defun weaken-numeric-union (type)

@@ -864,6 +864,51 @@
                    (or (add-missing (specifier-type 'real) 'realp)
                        (add-missing (specifier-type 'number) 'numberp)
                        (add-missing (specifier-type 'rational) 'rationalp)))))))
+          ;; Turn disjoint singlegton numeric types into a single
+          ;; call to MEMBER
+          ((flet ((transform-numeric (type)
+                    (when (eq (numeric-type-complexp type) :real)
+                      (let ((singletons))
+                        (sb-kernel::map-numeric-union-ranges
+                         (lambda (low high)
+                           (when (and low high
+                                      (eql low high))
+                             (push low singletons)))
+                         type)
+                        (when singletons
+                          (let* (left-over
+                                 (class (numeric-type-class type))
+                                 (type-name (ecase class
+                                              ((integer rational)
+                                               class)
+                                              (float
+                                               (numeric-type-format type)))))
+                            (sb-kernel::map-numeric-union-ranges
+                             (lambda (low high)
+                               (unless (and low high
+                                            (eql low high))
+                                 (push (list type-name (or low '*) (or high '*)) left-over)))
+                             type)
+                            `(boolean-or (member ,object '(,@singletons))
+                                         ,@ (and left-over
+                                                 `((typep ,object '(or ,@left-over)))))))))))
+             (if (numeric-union-type-p type)
+                 (transform-numeric type)
+                 (let (tests
+                       tested)
+                   (loop for type in (union-type-types type)
+                         when (numeric-union-type-p type)
+                         do (let ((test (transform-numeric type)))
+                              (when test
+                                (push test tests)
+                                (push type tested))))
+                   (when tests
+                     (let ((left-over (mapcar #'type-specifier
+                                              (set-difference (union-type-types type) tested))))
+                       `(boolean-or ,@tests
+                                    ,@(and left-over
+                                           `((typep ,object
+                                                    '(or ,@left-over)))))))))))
           (t
            (let* ((types (sb-kernel::flatten-numeric-union-types type))
                   (type-cons (specifier-type 'cons))
@@ -930,7 +975,7 @@
                                            ,@(loop for type in sub-types
                                                    do (setf types (remove type types :test #'eq :count 1))
                                                    collect `(typep ,object ',(type-specifier type)))))))))
-                          `(or
+                          `(boolean-or
                             ,@(and #+64-bit
                                    (not (every #'type-singleton-p single-floats)) ;; tested using EQL
                                    (check single-floats 'single-float-p))
@@ -946,11 +991,12 @@
                         (cond ((and predicate
                                     (< (length more-union-types)
                                        (length more-types)))
-                               `(or (,predicate ,object)
-                                    (typep ,object '(or ,@(mapcar #'type-specifier more-union-types)))))
+                               `(boolean-or (,predicate ,object)
+                                            (typep ,object '(or ,@(mapcar #'type-specifier more-union-types)))))
                               (widetags
-                               `(or (%other-pointer-subtype-p ,object ',widetags)
-                                    (typep ,object '(or ,@(mapcar #'type-specifier more-types)))))
+                               `(boolean-or
+                                 (%other-pointer-subtype-p ,object ',widetags)
+                                 (typep ,object '(or ,@(mapcar #'type-specifier more-types)))))
                               ((and (cdr more-types)
                                     (every #'intersection-type-p more-types)
                                     (let ((common (intersection-type-types (car more-types))))
@@ -968,7 +1014,7 @@
                                                                   `(typep ,object '(and ,@(mapcar #'type-specifier
                                                                                            (set-difference types common))))))))))))
                               (t
-                               `(or
+                               `(boolean-or
                                  ,@(mapcar (lambda (x)
                                              `(typep ,object ',(type-specifier x)))
                                            more-types)))))))))))))

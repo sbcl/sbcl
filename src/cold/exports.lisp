@@ -1687,6 +1687,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "BIND" "BINDING-STACK-POINTER-SAP"
            "BOGUS-ARG-TO-VALUES-LIST-ERROR" "BOOLE-CODE"
            "BOUNDING-INDICES-BAD-ERROR" "BYTE-SPECIFIER" "%BYTE-BLT"
+           "BOOLEAN-OR"
            "FUNCTION-DESIGNATOR"
            "CAR-EQ-IF-LISTP"
            "CASE-BODY-ERROR"

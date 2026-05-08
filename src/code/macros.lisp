@@ -562,6 +562,15 @@ evaluated as a PROGN."
                     ,n-result
                     ,(expand-forms t (rest forms)))))))))
 
+;;; Just return T, simplifying compilation by not needing LETs
+(sb-xc:defmacro boolean-or (&rest forms)
+  (named-let expand-forms ((forms forms))
+    (cond ((endp forms) nil)
+          (t
+           `(if ,(first forms)
+                t
+                ,(expand-forms (rest forms)))))))
+
 
 ;;;; Multiple value macros:
 
