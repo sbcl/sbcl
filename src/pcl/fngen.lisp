@@ -97,7 +97,8 @@
 
 (defun default-constantp (form)
   (and (constantp form)
-       (not (typep (constant-form-value form) '(or symbol fixnum cons layout)))))
+       (not (typep (constant-form-value form) '(or symbol fixnum cons layout
+                                                sb-c::restart-location)))))
 
 (defun default-test-converter (form)
   (if (default-constantp form)

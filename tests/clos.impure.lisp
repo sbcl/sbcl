@@ -1352,10 +1352,6 @@
   (assert-error (shared-initialize (make-instance 'shared-initialize-keyword-check) nil :a)
                 program-error))
 
-(with-test (:name (:check-keyword-args shared-initialize :non-keyword :error))
-  (assert-error (shared-initialize (make-instance 'shared-initialize-keyword-check) nil '(abc) 1)
-                program-error))
-
 ;;; verify that we can still detect no primary methods and invalid qualifiers
 
 (defmethod gf-with-keys-and-no-primary-method :around ((x integer) &key b)

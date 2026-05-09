@@ -576,46 +576,36 @@
         (aver any-keyp)
         (values (if allowp t keys) nopt)))))
 
-(defun check-applicable-keywords (start valid-keys more-context more-count)
-  (let ((allow-other-keys-seen nil)
-        (allow-other-keys nil)
-        (i start))
-    (declare (type index i more-count)
-             (optimize speed))
-    (flet ((current-value ()
-             (sb-c::%more-arg more-context i)))
-      (declare (inline current-value))
-      (collect ((invalid))
-        (loop
-           (when (>= i more-count)
-             (when (and (invalid) (not allow-other-keys))
-               (%program-error "~@<invalid keyword argument~P: ~
-                                ~{~S~^, ~} (valid keys are ~{~S~^, ~}).~@:>"
-                               (length (invalid)) (invalid) valid-keys))
-             (return))
-           (let ((key (current-value)))
-             (incf i)
-             (cond
-               ((not (symbolp key))
-                (%program-error "~@<keyword argument not a symbol: ~S.~@:>"
-                                key))
-               ((= i more-count)
-                (sb-c::%odd-key-args-error))
-               ((eq key :allow-other-keys)
-                ;; only the leftmost :ALLOW-OTHER-KEYS has any effect
-                (unless allow-other-keys-seen
-                  (setq allow-other-keys-seen t
-                        allow-other-keys (current-value))))
-               ((eq t valid-keys))
-               ((not (memq key valid-keys)) (invalid key))))
-           (incf i))))))
-
 (defun wrap-with-applicable-keyword-check (effective valid-keys keyargs-start)
-  `(let ((.valid-keys. ',valid-keys)
-         (.keyargs-start. ',keyargs-start))
-     (multiple-value-bind (.more-context. .more-count.) (sb-c::%rest-context .rest.)
-      (check-applicable-keywords
-       .keyargs-start. .valid-keys. .more-context. .more-count.))
+  `(progn
+     (multiple-value-bind (more-context more-count) (sb-c::%rest-context .rest.)
+       (declare (ignorable more-context))
+       ;; Similar to what SB-C::CONVERT-MORE-ENTRY does
+       (let ((count (- more-count ,keyargs-start)))
+         (when ,(if (zerop keyargs-start)
+                    `(oddp count)
+                    `(and (plusp count)
+                          (oddp count)))
+           (sb-c::%odd-key-args-error)))
+       ,@(unless (eq valid-keys t)
+           (let ((restart (sb-c:make-restart-location)))
+             `((let (allowp
+                     (lose (make-unbound-marker))
+                     (index more-count))
+                 (declare (index index))
+                 (loop until (<= index ,keyargs-start)
+                       do (decf (truly-the index index) 2)
+                          (let ((key (sb-c::%more-arg more-context index)))
+                            (case key
+                              (,(remove :allow-other-keys valid-keys))
+                              (:allow-other-keys
+                               (setf allowp (sb-c::%more-arg more-context (1+ index))))
+                              (t
+                               (setf lose key)))))
+                 (if (or (unbound-marker-p lose)
+                         allowp)
+                     (sb-c::restart-point ,restart)
+                     (sb-c::%unknown-key-arg-error lose ,restart)))))))
      ,effective))
 
 ;;;; the STANDARD method combination type. This is coded by hand
