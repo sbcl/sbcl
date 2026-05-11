@@ -1062,7 +1062,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (if (and classes (equal classes (cdr (assq gf *cache-miss-values-stack*))))
       (break-vicious-metacircle gf classes arg-info)
       (let ((*cache-miss-values-stack*
-             (acons gf classes *cache-miss-values-stack*))
+              (acons gf classes *cache-miss-values-stack*))
             (cam-std-p (or (null arg-info)
                            (gf-info-c-a-m-emf-std-p arg-info))))
         (multiple-value-bind (methods all-applicable-and-sorted-p)
@@ -1070,20 +1070,20 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                 (compute-applicable-methods-using-types gf types)
                 (compute-applicable-methods-using-classes gf classes))
 
-  (let* ((for-accessor-p (eq state 'accessor))
-         (for-cache-p (or (eq state 'caching) (eq state 'accessor)))
-         (emf (if (or cam-std-p all-applicable-and-sorted-p)
-                  (let ((generator
-                         (get-secondary-dispatch-function1
-                          gf methods types nil (and for-cache-p wrappers)
-                          all-applicable-and-sorted-p)))
-                    (make-callable generator nil (and for-cache-p wrappers)))
-                  (default-secondary-dispatch-function gf))))
-    (multiple-value-bind (index accessor-type)
-        (and for-accessor-p all-applicable-and-sorted-p methods
-             (accessor-values gf arg-info classes methods))
-      (values (if (integerp index) index emf)
-              methods accessor-type index)))))))
+          (let* ((for-accessor-p (eq state 'accessor))
+                 (for-cache-p (or (eq state 'caching) (eq state 'accessor)))
+                 (emf (if (or cam-std-p all-applicable-and-sorted-p)
+                          (let ((generator
+                                  (get-secondary-dispatch-function1
+                                   gf methods types nil (and for-cache-p wrappers)
+                                   all-applicable-and-sorted-p)))
+                            (make-callable generator nil (and for-cache-p wrappers)))
+                          (default-secondary-dispatch-function gf))))
+            (multiple-value-bind (index accessor-type)
+                (and for-accessor-p all-applicable-and-sorted-p methods
+                     (accessor-values gf arg-info classes methods))
+              (values (if (integerp index) index emf)
+                      methods accessor-type index)))))))
 
 ;;; Try to break a vicious circle while computing a cache miss.
 ;;; GF is the generic function, CLASSES are the classes of actual

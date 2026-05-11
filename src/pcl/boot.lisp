@@ -1458,10 +1458,10 @@ bootstrapping.
   `(progn
      (trace-emf-call ,emf ,restp (list ,@required-args rest-arg))
      ,(if more-arg
-          `(invoke-fast-method-call/more ,emf
+          `(invoke-fast-method-call/more (truly-the fast-method-call ,emf)
                                          ,@more-arg
                                          ,@required-args)
-          `(invoke-fast-method-call ,emf
+          `(invoke-fast-method-call (truly-the fast-method-call ,emf)
                                     ,restp
                                     ,@required-args
                                     ,@rest-arg))))
