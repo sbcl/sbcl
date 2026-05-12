@@ -917,19 +917,23 @@ many elements are copied."
          (target-sequence target-sequence1)
          (source-sequence source-sequence2)
          (target-start start1)
-         (source-start start2)
-         (target-end (or end1 length1))
-         (source-end (or end2 length2)))
+         (source-start start2))
     (seq-dispatch-checking target-sequence
-      (seq-dispatch-checking source-sequence
-        (return-from replace (list-replace-from-list))
-        (return-from replace (list-replace-from-vector))
-        nil)
-      (seq-dispatch-checking source-sequence
-        (return-from replace (vector-replace-from-list))
-        (return-from replace (vector-replace-from-vector))
-        nil)
-      t)
+        (let ((target-end (or end1 length1)))
+          (seq-dispatch-checking source-sequence
+              (return-from replace (let ((source-end (or end2 length2)))
+                                     (list-replace-from-list)))
+              (return-from replace (let ((source-end (or end2 length2)))
+                                     (list-replace-from-vector)))
+              nil))
+        (let ((target-end (or end1 length1)))
+          (seq-dispatch-checking source-sequence
+              (return-from replace (let ((source-end (or end2 length2)))
+                                     (vector-replace-from-list)))
+              (return-from replace (let ((source-end (or end2 length2)))
+                                     (vector-replace-from-vector)))
+              nil))
+        t)
     ;; If sequence1 is an extended-sequence, we know nothing about sequence2.
     ;; If sequence1 was a list or vector, then sequence2 is an extended-sequence
     ;; or not a sequence. Either way, check it.
