@@ -1233,8 +1233,19 @@
   list
   (foldable flushable call))
 
-(defknown (nunion nintersection nset-difference nset-exclusive-or)
+(defknown (nunion nset-exclusive-or)
   ((modifying list) (modifying list)
+   &key (:key (function-designator ((or (nth-arg 0 :sequence t)
+                                        (nth-arg 1 :sequence t)))))
+   (:test (function-designator ((nth-arg 0 :sequence t :key :key)
+                                (nth-arg 1 :sequence t :key :key))))
+   (:test-not (function-designator ((nth-arg 0 :sequence t :key :key)
+                                    (nth-arg 1 :sequence t :key :key)))))
+  list
+  (foldable flushable call important-result))
+
+(defknown (nintersection nset-difference)
+  ((modifying list) proper-list
    &key (:key (function-designator ((or (nth-arg 0 :sequence t)
                                         (nth-arg 1 :sequence t)))))
    (:test (function-designator ((nth-arg 0 :sequence t :key :key)
