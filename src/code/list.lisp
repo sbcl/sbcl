@@ -20,8 +20,7 @@
 (declaim (maybe-inline
           tree-equal %setnth nthcdr nth
           tailp
-          #| union nunion |# ; what the ????
-          intersection nintersection set-difference nset-difference
+          set-difference nset-difference
           set-exclusive-or nset-exclusive-or subsetp acons
           subst subst-if
           ;; NSUBLIS is >400 lines of assembly. How is it helpful to inline?
@@ -1099,7 +1098,7 @@
                        ((endp long) short)
                      (if (funcall member-test elt orig key test)
                          (pop long)
-                         (shiftf long (cdr long) short long))))))))))))
+                         (shiftf long (cdr long) short long)))))))))))
 
 (defun intersection (list1 list2
                      &key key (test nil testp) (test-not nil notp))
@@ -1110,11 +1109,27 @@
     (error ":TEST and :TEST-NOT were both supplied."))
   (with-member-test (member-test)
     (when (and list1 list2)
-      (let ((res nil))
-        (dolist (elt list1)
-          (when (funcall member-test elt list2 key test)
-            (push elt res)))
-        res))))
+      (multiple-value-bind (short long short-length long-nthcdr)
+          (shorter-list-length list1 list2)
+        (let ((res nil)
+              (hash-table (hashing-p notp testp test short-length long-nthcdr)))
+          (cond (hash-table
+                 (dolist (elt short)
+                   (setf (gethash (apply-key key elt) hash-table) t))
+                 (dolist (elt long)
+                   (when (gethash (apply-key key elt) hash-table)
+                     (push elt res))))
+                (t
+                 (flet ((swapped-test (x y)
+                          (funcall (truly-the function test) y x)))
+                    (declare (dynamic-extent #'swapped-test))
+                   (let ((test (if (eq list1 short)
+                                   test
+                                   (and test #'swapped-test))))
+                     (dolist (elt short)
+                       (when (funcall member-test elt long key test)
+                         (push elt res)))))))
+          res))))))
 
 (defun nintersection (list1 list2
                       &key key (test nil testp) (test-not nil notp))
