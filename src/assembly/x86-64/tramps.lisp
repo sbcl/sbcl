@@ -314,3 +314,20 @@
   uncontended
   (inst pop rax-tn))
 ) ; end PROGN
+
+#+sb-fiber
+(progn
+(define-assembly-routine (fiber-swap-context (:return-style :none))
+    ((:temp rdi unsigned-reg rdi-offset)
+     (:temp rsi unsigned-reg rsi-offset))
+  (emit-save-fiber-context rdi)
+  (emit-restore-fiber-context rsi)
+  (inst ret))
+
+(define-assembly-routine (fiber-trampoline-asm (:return-style :none))
+    ((:temp rdi unsigned-reg rdi-offset)
+     (:temp r12 unsigned-reg r12-offset))
+  (inst mov rdi r12)
+  (inst call (make-fixup "fiber_trampoline_c" :foreign))
+  (inst ud2))
+) ; end #+sb-fiber

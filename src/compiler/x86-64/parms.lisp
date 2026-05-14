@@ -179,6 +179,14 @@
 ;;;; static symbols
 
 (defvar *binding-stack-pointer*)
+
+;;; Lisp assembly routines whose entry addresses need to be
+;;; discoverable from C
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *runtime-asm-routines*
+    '(#+sb-fiber fiber-swap-context
+      #+sb-fiber fiber-trampoline-asm)))
+
 ;;; These symbols reside in low static space and referenced off NULL-TN
 (defconstant-eqx +static-symbols+
  `#(,@+common-static-symbols+
@@ -189,7 +197,8 @@
     #-sb-thread *alien-stack-pointer*    ; a thread slot if #+sb-thread
     ;; Asm code assembled by DEFINE-ALIEN-CALLABLE resides in static space and looks up
     ;; the address of the C helper via the SYMBOL-VALUE slot of this Lisp symbol.
-    callback-wrapper-trampoline)
+    callback-wrapper-trampoline
+    ,@*runtime-asm-routines*)
   #'equalp)
 
 ;; No static-fdefns are actually needed, but #() here causes the

@@ -20,6 +20,10 @@ ASSEM_SRC = x86-64-assem.S
 ARCH_SRC = x86-64-arch.c
 
 OS_SRC = linux-os.c linux-mman.c x86-64-linux-os.c android-os.c x86-64-android-os.c
+
+ifdef LISP_FEATURE_SB_FIBER
+  OS_SRC += fiber.c x86-64-fiber.c
+endif
 OS_LIBS = -ldl
 
 CFLAGS += -Wunused-parameter -fno-omit-frame-pointer -momit-leaf-frame-pointer

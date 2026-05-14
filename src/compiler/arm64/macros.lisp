@@ -609,3 +609,38 @@
         (setf prev-constant nil)
         (load-stack-tn ,temp ,tn)
         ,temp))))
+
+#+sb-fiber
+(flet ((u (offset) (make-random-tn (sc-or-lose 'unsigned-reg) offset))
+       (a (offset) (make-random-tn (sc-or-lose 'any-reg) offset))
+       (d (offset) (make-random-tn (sc-or-lose 'double-reg) offset)))
+;;; Save and restore a fiber's callee-saved GP/FP register state.
+;;; Offsets match `fiber_context` struct.
+(defun emit-save-fiber-context (base tmp)
+  (inst mov-sp tmp nsp-tn)
+  (inst str tmp (@ base #x00))
+  (inst stp cfp-tn        lr-tn          (@ base #x08))   ; x29 x30
+  (inst stp (u r9-offset) (u r10-offset) (@ base #x18))   ; x19 x20
+  (inst stp thread-tn     lexenv-tn      (@ base #x28))   ; x21 x22
+  (inst stp nargs-tn      (a nfp-offset) (@ base #x38))   ; x23 x24
+  (inst stp ocfp-tn       null-tn        (@ base #x48))   ; x25 x26
+  (inst stp csp-tn        cardtable-tn   (@ base #x58))   ; x27 x28
+  (inst stp (d  8)        (d  9)         (@ base #x68))
+  (inst stp (d 10)        (d 11)         (@ base #x78))
+  (inst stp (d 12)        (d 13)         (@ base #x88))
+  (inst stp (d 14)        (d 15)         (@ base #x98)))
+
+(defun emit-restore-fiber-context (base tmp)
+  (inst ldr tmp (@ base #x00))
+  (inst mov-sp nsp-tn tmp)
+  (inst ldp cfp-tn        lr-tn          (@ base #x08))   ; x29 x30
+  (inst ldp (u r9-offset) (u r10-offset) (@ base #x18))   ; x19 x20
+  (inst ldp thread-tn     lexenv-tn      (@ base #x28))   ; x21 x22
+  (inst ldp nargs-tn      (a nfp-offset) (@ base #x38))   ; x23 x24
+  (inst ldp ocfp-tn       null-tn        (@ base #x48))   ; x25 x26
+  (inst ldp csp-tn        cardtable-tn   (@ base #x58))   ; x27 x28
+  (inst ldp (d  8)        (d  9)         (@ base #x68))
+  (inst ldp (d 10)        (d 11)         (@ base #x78))
+  (inst ldp (d 12)        (d 13)         (@ base #x88))
+  (inst ldp (d 14)        (d 15)         (@ base #x98)))
+)

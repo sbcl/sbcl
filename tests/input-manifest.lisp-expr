@@ -46,6 +46,8 @@
  ("elfcore.test.sh" "src/runtime/shrinkwrap-sbcl")
  ("exit-hang.impure.lisp" "tests/fcb-threads.so")
  ("fcb-threads.impure.lisp" "tests/fcb-threads.so")
+ ("fiber.pure.lisp" "contrib/sb-fiber.fasl")
+ ("fiber.impure.lisp" "contrib/sb-fiber.fasl")
  ("fifo-slow.impure.lisp" "contrib/sb-posix.fasl")
  ("filecompile.impure.lisp"
   "tests/data/wonky1.lisp"

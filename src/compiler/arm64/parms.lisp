@@ -112,13 +112,21 @@
 ;;; space directly after the static symbols.  That way, the raw-addr
 ;;; can be loaded directly out of them by indirecting relative to NIL.
 ;;;
+;;; Lisp assembly routines whose entry addresses need to be
+;;; discoverable from C (fiber_trampoline_c, sb_fiber_prepare).
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *runtime-asm-routines*
+    '(#+sb-fiber fiber-swap-context
+      #+sb-fiber fiber-trampoline-asm)))
+
 (defconstant-eqx +static-symbols+
  `#(#-sb-thread
     ,@'(*binding-stack-pointer*
         *pseudo-atomic-atomic*
         *pseudo-atomic-interrupted*)
      ;; interrupt handling
-     ,@+common-static-symbols+)
+     ,@+common-static-symbols+
+     ,@*runtime-asm-routines*)
   #'equalp)
 
 (defconstant-eqx +static-fdefns+ `#(,@common-static-fdefns) #'equalp)

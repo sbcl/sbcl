@@ -1,0 +1,172 @@
+@node sb-fiber
+@section sb-fiber
+@cindex Fiber
+@cindex Sb-fiber
+
+@code{sb-fiber} provides user-space execution contexts -- coroutines
+with their own control and binding stacks, cooperatively scheduled and
+confined to a single OS thread.
+
+@code{switch-fiber} is the only control-transfer operation;
+schedulers, I/O integration, and fiber-aware synchronization live in
+user code.
+
+@subsection API
+
+@deffn Function make-fiber function &key name (stack-size 65536) (binding-stack-size 8192)
+Create a new fiber whose entry @var{function} runs when first switched
+to.  @var{name}, if supplied, is a string label used by
+@code{print-object} (mirroring @code{sb-thread:thread-name}).  Returns
+a @code{fiber} object that must eventually be passed to
+@code{destroy-fiber}.
+
+If @var{function} returns normally, the fiber is marked @code{:dead}
+and control auto-switches back to its return fiber, carrying the
+return value as the auto-return's value (see @code{switch-fiber}).
+If @var{function} exits via an unhandled condition, the condition is
+stashed on the fiber and re-signaled in the caller's context on the
+auto-return.
+@end deffn
+
+@deffn Function make-main-fiber &key name
+Create a fiber representing the current thread's own stack and bind
+@code{*current-fiber*}.  Must be called once on each thread that
+intends to use fibers, and destroyed after that thread is done.
+@end deffn
+
+@deffn Function fiber-name fiber
+The @code{:name} string supplied to @code{make-fiber}, or @code{nil}.
+@end deffn
+
+@deffn Function destroy-fiber fiber
+Release @var{fiber}'s stacks.  @var{fiber} must not be running.
+@end deffn
+
+@deffn Macro with-fiber (var function &rest make-args) &body body
+@code{make-fiber} + @code{unwind-protect} + @code{destroy-fiber}.
+@end deffn
+
+@deffn Function switch-fiber from to &optional value
+Suspend @var{from} and resume @var{to}, delivering @var{value}.
+Returns the value supplied by the next switch-in (or @var{to}'s entry
+function's return value if it ran to completion).  Both fibers must
+be registered to the current thread; @var{from} must be
+@code{:running} and @var{to} must be @code{:runnable} or @code{:new}.
+
+The switch preserves the resumed fiber's control stack, binding stack,
+@code{*handler-clusters*}, @code{*restart-clusters*}, current catch
+and unwind-protect chains, callee-saved registers, and (on x86-64)
+the SSE control word.  @code{*current-fiber*} (per-thread) tracks the
+resumed fiber.
+
+If @var{to}'s entry function previously escaped via an unhandled
+condition, that condition is re-signaled here in the caller's
+context.
+@end deffn
+
+@deffn Function yield-fiber &optional value
+@code{(switch-fiber *current-fiber* (fiber-return-fiber *current-fiber*) value)}.
+Errors if the current fiber has never been resumed.
+@end deffn
+
+@deffn Function join-fiber fiber
+Resume @var{fiber} from @code{*current-fiber*} repeatedly until its
+entry function returns; return that function's value.  Parallels
+@code{sb-thread:join-thread} for cooperative coroutines.
+@end deffn
+
+@deffn Function interrupt-fiber fiber condition
+Stage @var{condition} to be signaled in @var{fiber} on its next
+resume.  Cooperative: nothing happens until @code{switch-fiber}
+delivers control into @var{fiber}, at which point @var{condition}
+is signaled in the fiber's own context (for a runnable fiber) or
+raised by the trampoline before the entry function runs (for a new
+fiber).  Mirrors @code{sb-thread:interrupt-thread} in shape but not
+in preemption semantics.
+@end deffn
+
+@deffn Function fiber-condition fiber
+The condition (if any) staged for @var{fiber}'s next resume, or
+@code{nil}.  Cleared when consumed by @code{switch-fiber}.
+@end deffn
+
+@deffn Function make-fiber-generator function &key name
+Wrap @var{function} in a fiber and return a thunk that, on each
+call, resumes the fiber and returns its next @code{yield-fiber}
+value (or the entry function's return value).  Returns @code{nil}
+when the fiber has run to completion; the underlying fiber is
+auto-destroyed at that point.  Mirrors Lua's @code{coroutine.wrap}.
+@end deffn
+
+@deffn Macro do-fiber-generator (var generator) &body body
+Iterate @var{var} over the values produced by @var{generator}
+(a thunk built by @code{make-fiber-generator}), terminating when
+the generator returns @code{nil}.
+@end deffn
+
+@deffn Function current-fiber
+Function form of @code{*current-fiber*}.
+@end deffn
+
+@deffn Macro with-fiber-pinned () &body body
+Mark the current fiber unsuspendable for the dynamic extent of
+@var{body}; @code{switch-fiber} signals an error if invoked with a
+pinned @code{from}.  Pins nest.  Intended for FFI: wrap any region
+containing live foreign frames so a yield can't leave them atop a
+re-entered stack.
+@end deffn
+
+@deffn Function fiber-pinned-p fiber
+@code{t} if @var{fiber} has a nonzero pin count.
+@end deffn
+
+@deffn Function fiber-alive-p fiber
+@code{t} if @var{fiber}'s state is not @code{+fiber-dead+} (i.e. it
+has not run to completion or been destroyed).
+@end deffn
+
+@deffn Function fiber-state fiber
+Integer state: @code{+fiber-new+}, @code{+fiber-runnable+},
+@code{+fiber-running+}, @code{+fiber-dead+}.
+@end deffn
+
+@subsection Example
+
+@lisp
+(require :sb-fiber)
+(use-package :sb-fiber)
+
+(let* ((main  (make-main-fiber))
+       (child (make-fiber
+               (lambda ()
+                 (format t "hello from child~%")
+                 (yield-fiber)
+                 (format t "back again~%")))))
+  (switch-fiber main child)
+  (format t "main resumed~%")
+  (switch-fiber main child)
+  (destroy-fiber child)
+  (destroy-fiber main))
+@end lisp
+
+Prints @code{hello from child}, @code{main resumed}, @code{back again}.
+
+A realistic scheduler layers non-blocking I/O on top: when a fiber
+would block on an fd, it registers with
+@code{poll}/@code{epoll}/@code{kqueue} and yields; the scheduler's
+poll loop wakes it when ready.
+
+@subsection Caveats
+
+@itemize
+@item @strong{Platforms.}  x86-64 and arm64 POSIX only.
+@item @strong{No migration.}  A fiber is bound to its creating thread.
+@item @strong{No preemption.}  Tight compute loops starve the scheduler.
+@item @strong{Handler isolation.}  A fiber's entry function runs with
+a fresh @code{*handler-clusters*} / @code{*restart-clusters*};
+handlers on the caller's stack do not catch conditions raised inside.
+Let conditions escape -- they're re-signaled in the caller on the
+auto-return.
+@item @strong{Image survival.}  Fibers do not survive
+@code{save-lisp-and-die}; drop wrapper references before saving.
+@end itemize

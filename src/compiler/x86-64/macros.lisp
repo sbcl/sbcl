@@ -479,3 +479,28 @@
          (word-index (+ instance-slots-offset (dsd-index slot))))
     `(ea ,(- (ash word-index word-shift) instance-pointer-lowtag)
          ,base-reg)))
+
+#+sb-fiber
+(progn
+;;; Save and restore a fiber's callee-saved register state.  Offsets
+;;; match `fiber_context` struct.
+(defun emit-save-fiber-context (base)
+  (inst mov (ea #x00 base) rsp-tn)
+  (inst mov (ea #x08 base) rbx-tn)
+  (inst mov (ea #x10 base) rbp-tn)
+  (inst mov (ea #x18 base) r12-tn)
+  (inst mov (ea #x20 base) r13-tn)
+  (inst mov (ea #x28 base) r14-tn)
+  (inst mov (ea #x30 base) r15-tn)
+  (inst stmxcsr (ea #x38 base)))
+
+(defun emit-restore-fiber-context (base)
+  (inst mov rsp-tn (ea #x00 base))
+  (inst mov rbx-tn (ea #x08 base))
+  (inst mov rbp-tn (ea #x10 base))
+  (inst mov r12-tn (ea #x18 base))
+  (inst mov r13-tn (ea #x20 base))
+  (inst mov r14-tn (ea #x28 base))
+  (inst mov r15-tn (ea #x30 base))
+  (inst ldmxcsr (ea #x38 base)))
+)
