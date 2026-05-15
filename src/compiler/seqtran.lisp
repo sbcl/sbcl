@@ -703,6 +703,30 @@
                   test)
         test))))
 
+(defun change-test-based-on-item-and-sequence-type (test item sequence key)
+  (let* ((test (if test
+                   (lvar-fun-is test '(eql equal equalp char= char-equal =))
+                   'eql))
+         (test-origin test))
+    (when test
+      (setf test (change-test-based-on-item test (lvar-type item)))
+      (unless (eq test 'eq)
+        (let ((elt (sequence-element-type sequence key)))
+          (setf test (change-test-based-on-item test elt))
+          (cond ((and (memq test '(equalp =))
+                      (csubtypep (lvar-type item) (specifier-type 'integer))
+                      (csubtypep elt (specifier-type 'integer)))
+                 (setf test (if (or (csubtypep (lvar-type item) (specifier-type 'fixnum))
+                                    (csubtypep elt (specifier-type 'fixnum)))
+                                'eq
+                                'eql)))
+                ((and (eq test 'char=)
+                      (csubtypep (lvar-type item) (specifier-type 'character))
+                      (csubtypep elt (specifier-type 'character)))
+                 (setf test 'eq))))))
+    (unless (eq test test-origin)
+      test)))
+
 (macrolet ((def (name &optional if/if-not)
              (let ((basic (symbolicate "%" name))
                    (basic-eq (symbolicate "%" name "-EQ"))
@@ -3098,27 +3122,10 @@
           type))))
 
 (deftransform %find-position ((item sequence from-end start end key test))
-  (let* ((test (lvar-fun-is test '(eql equal equalp char= char-equal =)))
-         (test-origin test))
-    (when test
-      (setf test (change-test-based-on-item test (lvar-type item)))
-      (unless (eq test 'eq)
-        (let ((elt (sequence-element-type sequence key)))
-          (setf test (change-test-based-on-item test elt))
-          (cond ((and (memq test '(equalp =))
-                      (csubtypep (lvar-type item) (specifier-type 'integer))
-                      (csubtypep elt (specifier-type 'integer)))
-                 (setf test (if (or (csubtypep (lvar-type item) (specifier-type 'fixnum))
-                                    (csubtypep elt (specifier-type 'fixnum)))
-                                'eq
-                                'eql)))
-                ((and (eq test 'char=)
-                      (csubtypep (lvar-type item) (specifier-type 'character))
-                      (csubtypep elt (specifier-type 'character)))
-                 (setf test 'eq))))))
-    (if (eq test test-origin)
-        (give-up-ir1-transform)
-        `(%find-position item sequence from-end start end key #',test))))
+  (let ((new-test (change-test-based-on-item-and-sequence-type test item sequence key)))
+    (if new-test
+        `(%find-position item sequence from-end start end key #',new-test)
+        (give-up-ir1-transform))))
 
 ;;; %FIND-POSITION for LIST data can be expanded into %FIND-POSITION-IF
 ;;; without loss of efficiency. (I.e., the optimizer should be able
@@ -3766,27 +3773,6 @@
   (define-find-position find 0)
   (define-find-position position 1))
 
-;;; Lower :test
-(macrolet ((def (fun-name)
-             `(deftransform ,fun-name ((item sequence &key
-                                             from-end start end
-                                             key test test-not)
-                                       (t  &rest t))
-                (macrolet ((maybe-arg (arg &optional (key (keywordicate arg)))
-                             `(and ,arg `(,,key ,',arg))))
-                  (let ((test (and (not test-not)
-                                   (change-test-lvar-based-on-item test item))))
-                    (if test
-                        `(,',fun-name item sequence :test ',test
-                                      ,@(maybe-arg from-end)
-                                      ,@(maybe-arg start)
-                                      ,@(maybe-arg end)
-                                      ,@(maybe-arg key)
-                                      ,@(maybe-arg test-not))
-                        (give-up-ir1-transform)))))))
-  (def find)
-  (def position))
-
 (macrolet ((define-find-position-if (fun-name values-index)
              `(deftransform ,fun-name ((predicate sequence &key
                                                   from-end (start 0)
@@ -4277,7 +4263,14 @@
                        (lvar-annotations value))
                  t))))
       (or (change test-keyword test :test-not)
-          (change test-not-keyword test-not :test)))))
+          (change test-not-keyword test-not :test))
+      nil)))
+
+(defun lower-item-test (node test item sequence key)
+  (let ((new-test (change-test-based-on-item-and-sequence-type test item sequence key)))
+    (when new-test
+      (change-keyword-value (find-global-fun new-test t) :test test node))
+    nil))
 
 (defoptimizers optimizer
     (remove delete count find position
@@ -4285,9 +4278,12 @@
     ((item sequence &rest args &key
            ((test test-keyword))
            ((test-not test-not-keyword))
-           &allow-other-keys))
-  (test-not-complementer test test-keyword test-not test-not-keyword
-                         args))
+           key
+           &allow-other-keys) node)
+  (or (test-not-complementer test test-keyword test-not test-not-keyword
+                             args)
+      (unless test-not
+        (lower-item-test node test item sequence key))))
 
 (defoptimizers optimizer
     (remove-duplicates delete-duplicates
@@ -4304,9 +4300,13 @@
     ((new old sequence &rest args &key
           ((test test-keyword))
           ((test-not test-not-keyword))
-          &allow-other-keys))
+          key
+          &allow-other-keys)
+     node)
   (test-not-complementer test test-keyword test-not test-not-keyword
-                         args))
+                         args)
+  (unless test-not
+    (lower-item-test node test new sequence key)))
 
 (defoptimizers optimizer
     (mismatch search tree-equal

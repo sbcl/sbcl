@@ -2957,6 +2957,25 @@ is :ANY, the function name is not checked."
        (change-ref-leaf node constant :recklessly t))
       (t
        (insert-ref-before constant node t)))))
+
+(defun change-keyword-value (new-constant keyword value node)
+  (cond (value
+         (let ((ref (lvar-uses value)))
+           (cond ((ref-p ref)
+                  (change-ref-leaf ref new-constant :recklessly t))
+                 (t
+                  (flush-dest value)
+                  (setf (combination-args node)
+                        (subst (insert-ref-before new-constant node)
+                               value
+                               (combination-args node)))))))
+        (t
+         (let ((key (insert-ref-before (find-constant keyword) node))
+               (value (insert-ref-before new-constant node)))
+           (setf (combination-args node)
+                 (append
+                  (combination-args node)
+                  (list key value)))))))
 
 ;;;; leaf hackery
 
