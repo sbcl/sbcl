@@ -396,14 +396,14 @@
 ;;;       walker.
 
 (defmacro define-walker-template (name
-                                  &optional (template '(nil repeat (eval))))
+                                  &optional (template '(nil repeat eval)))
   `(setf (info :function :walker-template ',name) ',template))
 
 (defun get-walker-template (x context)
   (cond ((symbolp x)
          (info :function :walker-template x))
         ((and (listp x) (eq (car x) 'lambda))
-         '(lambda repeat (eval)))
+         '(lambda repeat eval))
         (t
          ;; FIXME: In an ideal world we would do something similar to
          ;; COMPILER-ERROR here, replacing the form within the walker
@@ -416,10 +416,10 @@
 ;;;; the actual templates
 
 ;;; ANSI special forms
-(define-walker-template block                (nil nil repeat (eval)))
-(define-walker-template catch                (nil eval repeat (eval)))
+(define-walker-template block                (nil nil repeat eval))
+(define-walker-template catch                (nil eval repeat eval))
 (define-walker-template declare              walk-unexpected-declare)
-(define-walker-template eval-when            (nil quote repeat (eval)))
+(define-walker-template eval-when            (nil quote repeat eval))
 (define-walker-template flet                 walk-flet)
 (define-walker-template function             (nil call))
 (define-walker-template go                   (nil quote))
@@ -431,18 +431,18 @@
 (define-walker-template load-time-value      walk-load-time-value)
 (define-walker-template locally              walk-locally)
 (define-walker-template macrolet             walk-macrolet)
-(define-walker-template multiple-value-call  (nil eval repeat (eval)))
-(define-walker-template multiple-value-prog1 (nil return repeat (eval)))
-(define-walker-template progn                (nil repeat (eval)))
-(define-walker-template progv                (nil eval eval repeat (eval)))
+(define-walker-template multiple-value-call  (nil eval repeat eval))
+(define-walker-template multiple-value-prog1 (nil return repeat eval))
+(define-walker-template progn                (nil repeat eval))
+(define-walker-template progv                (nil eval eval repeat eval))
 (define-walker-template quote                (nil quote))
-(define-walker-template return-from          (nil quote repeat (return)))
+(define-walker-template return-from          (nil quote repeat return))
 (define-walker-template setq                 walk-setq)
 (define-walker-template symbol-macrolet      walk-symbol-macrolet)
 (define-walker-template tagbody              walk-tagbody)
 (define-walker-template the                  (nil quote eval))
 (define-walker-template throw                (nil eval eval))
-(define-walker-template unwind-protect       (nil return repeat (eval)))
+(define-walker-template unwind-protect       (nil return repeat eval))
 (define-walker-template defun                walk-defun)
 
 ;;; SBCL-only special forms
@@ -452,7 +452,7 @@
 ;;; FIXME: maybe we don't need this one any more, given that
 ;;; NAMED-LAMBDA now expands into (FUNCTION (NAMED-LAMBDA ...))?
 (define-walker-template named-lambda walk-named-lambda)
-(define-walker-template sb-c::jump-table (nil eval repeat ((quote repeat (eval)))))
+(define-walker-template sb-c::jump-table (nil eval repeat (quote repeat eval)))
 #|
 ;;; To find templateized symbols that aren't special operators:
 (do-all-symbols (s)
@@ -648,7 +648,7 @@ instead of
                             (cond ((eq newnewnewform newnewform)
                                    (if *walk-form-expand-macros-p* newnewform newform))
                                   (t
-                                   (record-new-source-path newform newnewnewform )))))
+                                   (record-new-source-path newform newnewnewform)))))
                          ((and (symbolp fn)
                                (special-operator-p fn))
                           ;; This shouldn't happen, since this walker is now
@@ -661,7 +661,7 @@ instead of
                           ;; standard function call using a template for
                           ;; standard function call.
                           (walk-template
-                           newnewform '(call repeat (eval)) context env))))))))))))))
+                           newnewform '(call repeat eval) context env))))))))))))))
 
 (defun record-new-source-path (old-form new-form)
   (when (and *walk-form-preserve-source*
@@ -690,20 +690,8 @@ instead of
                (t (walk-form-internal form context env)))))
       (case (car template)
         (repeat
-          (walk-template-handle-repeat form
-                                       (cdr template)
-                                       ;; For the case where nothing
-                                       ;; happens after the repeat
-                                       ;; optimize away the call to
-                                       ;; LENGTH.
-                                       (if (null (cddr template))
-                                           ()
-                                           (nthcdr (- (length form)
-                                                      (length
-                                                        (cddr template)))
-                                                   form))
-                                       context
-                                       env))
+         (aver (null (cddr template)))
+         (walk-template-handle-repeat form (cadr template) context env))
         (if
           (walk-template form
                          (if (if (listp (cadr template))
@@ -723,38 +711,37 @@ instead of
                            (walk-template
                              (cdr form) (cdr template) context env))))))))
 
-(defun walk-template-handle-repeat (form template stop-form context env)
-  (if (eq form stop-form)
-      (walk-template form (cdr template) context env)
-      (walk-template-handle-repeat-1
-       form template (car template) stop-form context env)))
-
-(defun walk-template-handle-repeat-1 (form template repeat-template
-                                           stop-form context env)
-  (cond ((null form) ())
-        ((eq form stop-form)
-         (if (null repeat-template)
-             (walk-template stop-form (cdr template) context env)
-             (error "while handling code walker REPEAT:
-                     ~%ran into STOP while still in REPEAT template")))
-        ((null repeat-template)
-         (walk-template-handle-repeat-1
-           form template (car template) stop-form context env))
-        (t
-         (recons form
-                 (walk-template (car form) (car repeat-template) context env)
-                 (walk-template-handle-repeat-1 (cdr form)
-                                                template
-                                                (cdr repeat-template)
-                                                stop-form
-                                                context
-                                                env)))))
+(defun walk-template-handle-repeat (form template context env)
+  (let ((cdr form)
+        new)
+    (collect ((result))
+     (loop (when (atom cdr)
+             (if cdr
+                 ;; A dotted list is not right, just return the original form
+                 (return-from walk-template-handle-repeat form)
+                 (return)))
+           (let* ((e (pop cdr))
+                  (walked (walk-template e template context env)))
+             (cond (new
+                    (result walked))
+                   ((not (eq e walked))
+                    (loop for (car . next) on form
+                          until (eq next cdr)
+                          do
+                          (result car))
+                    (result walked)
+                    (setf new t)))))
+      (cond (new
+             (let ((result (result)))
+               (loop for old on form
+                     for new on result
+                     do (record-new-source-path old new))
+               result))
+            (t
+             form)))))
 
 (defun walk-repeat-eval (form env)
-  (and form
-       (recons form
-               (walk-form-internal (car form) :eval env)
-               (walk-repeat-eval (cdr form) env))))
+  (walk-template-handle-repeat form 'eval :eval env))
 
 (defun relist (x &rest args)
   (if (null args)

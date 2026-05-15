@@ -98,6 +98,20 @@
   ;; flushed in some circumstances.
   (flushable nil :type list))
 
+#+sb-devel
+(defprinter (lexenv)
+  vars
+  blocks
+  tags
+  (type-restrictions :test type-restrictions)
+  (lambda :test lambda)
+  (cleanup :test cleanup)
+  (handled-conditions :test handled-conditions)
+  (disabled-package-locks :test disabled-package-locks)
+  (%policy :test %policy)
+  (user-data :test user-data)
+  (flushable :test flushable))
+
 #+sb-eval
 (defstruct (sb-eval::eval-lexenv
             (:include lexenv)

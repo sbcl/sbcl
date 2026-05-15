@@ -2831,3 +2831,9 @@
               c)))
   (assert (null (sb-mop:class-direct-subclasses (find-class 'super-class-cycle-forward-referenced-a))))
   (defclass super-class-cycle-forward-referenced-b () ()))
+
+(with-test (:name :walking-long-progn)
+  (eval `(defmethod ,(gensym) ()
+           (macrolet ((gen (n)
+                        `(progn ,@(make-list n :initial-element 1))))
+             (gen 100000)))))
