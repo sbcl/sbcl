@@ -729,6 +729,8 @@
                          `(,',basic-eq item list))
                         (eql
                          `(,',basic item list))
+                        (char=
+                         `(,',test item list #'char=))
                         (t
                          (give-up-ir1-transform)))))
                   (deftransform ,key-test ((item list key test) (t t t t) * :important nil)
@@ -742,6 +744,8 @@
                          `(,',basic-key-eq item list key))
                         (eql
                          `(,',basic-key item list key))
+                        (char=
+                         `(,',key-test item list key #'char=))
                         (t
                          (give-up-ir1-transform)))))
                   ,@(when if/if-not
