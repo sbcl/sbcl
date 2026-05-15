@@ -3969,6 +3969,17 @@
           (t
            (give-up-ir1-transform)))))
 
+(defoptimizer (intersection rewrite-full-call)
+    ((function sequence &rest args) node)
+  (when (block nil
+          (map-all-dests (lambda (dest lvar nth-value)
+                           (declare (ignore lvar nth-value))
+                           (unless (if-p dest)
+                             (return)))
+                         node)
+          t)
+    'sb-impl::intersection-p))
+
 (deftransform nunion ((list1 list2 &key key test test-not))
   (let ((null-type (specifier-type 'null)))
     (cond ((csubtypep (lvar-type list1) null-type)

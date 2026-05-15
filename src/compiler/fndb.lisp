@@ -1233,6 +1233,16 @@
   list
   (foldable flushable call))
 
+(defknown sb-impl::intersection-p
+  (proper-list proper-list &key (:key (function-designator ((or (nth-arg 0 :sequence t)
+                                                  (nth-arg 1 :sequence t)))))
+                  (:test (function-designator ((nth-arg 0 :sequence t :key :key)
+                                               (nth-arg 1 :sequence t :key :key))))
+                  (:test-not (function-designator ((nth-arg 0 :sequence t :key :key)
+                                                   (nth-arg 1 :sequence t :key :key)))))
+  boolean
+  (foldable flushable call))
+
 (defknown (nunion nset-exclusive-or)
   ((modifying list) (modifying list)
    &key (:key (function-designator ((or (nth-arg 0 :sequence t)

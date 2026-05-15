@@ -1129,7 +1129,37 @@
                      (dolist (elt short)
                        (when (funcall member-test elt long key test)
                          (push elt res)))))))
-          res))))))
+          res)))))
+
+;;; A boolean variant
+(defun intersection-p (list1 list2
+                       &key key (test nil testp) (test-not nil notp))
+  (declare (dynamic-extent key test test-not)
+           (explicit-check key test test-not))
+  (when (and testp notp)
+    (error ":TEST and :TEST-NOT were both supplied."))
+  (with-member-test (member-test)
+    (when (and list1 list2)
+      (multiple-value-bind (short long short-length long-nthcdr)
+          (shorter-list-length list1 list2)
+        (let ((hash-table (hashing-p notp testp test short-length long-nthcdr)))
+          (cond (hash-table
+                 (dolist (elt short)
+                   (setf (gethash (apply-key key elt) hash-table) t))
+                 (dolist (elt long)
+                   (when (gethash (apply-key key elt) hash-table)
+                     (return-from intersection-p t))))
+                (t
+                 (flet ((swapped-test (x y)
+                          (funcall (truly-the function test) y x)))
+                   (declare (dynamic-extent #'swapped-test))
+                   (let ((test (if (eq list1 short)
+                                   test
+                                   (and test #'swapped-test))))
+                     (dolist (elt short)
+                       (when (funcall member-test elt long key test)
+                         (return-from intersection-p t)))))))
+          nil))))))
 
 (defun nintersection (list1 list2
                       &key key (test nil testp) (test-not nil notp))
