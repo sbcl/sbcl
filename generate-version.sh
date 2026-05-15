@@ -38,13 +38,7 @@ EOF
 fi
 # Build it.
 version_head=`git rev-parse HEAD`
-if grep -q "ref: refs/heads/.*" .git/HEAD > /dev/null 2>&1
-then
-    version_branchname=`cut -d / -f 3- < .git/HEAD`
-else
-    # Detached head.
-    version_branchname="HEAD"
-fi
+version_branchname=`git symbolic-ref --short -q HEAD || echo HEAD`
 if [ -z "$SBCL_BUILDING_RELEASE_FROM" ]
 then
     version_root=`git merge-base HEAD origin/master`
