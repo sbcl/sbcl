@@ -1309,11 +1309,11 @@
                         (specifier-type 'character))
                        (t
                         *universal-type*))))
-        (multiple-value-bind (key-type key) (and key
-                                                 (lvar-fun-type key))
+        (multiple-value-bind (key-type key-name) (and key
+                                                      (lvar-fun-type key))
           (let ((*compiler-error-context* node))
             (when (and (or (not key)
-                           (eq key 'identity))
+                           (eq key-name 'identity))
                        (not (types-equal-or-intersect item (sequence-element-type (lvar-type sequence)))))
               (compiler-style-warn "Item of type ~s can't be found in a sequence of type ~s."
                                    (type-specifier item)
@@ -1323,7 +1323,7 @@
                 (unless (types-equal-or-intersect item returns)
                   (compiler-style-warn "Item of type ~s can't be found using :key ~s which returns ~s."
                                        (type-specifier item)
-                                       key
+                                       key-name
                                        (type-specifier returns)))))))))))
 
 (defun check-sequence-ranges (sequence start end node &key (suffix "") name (warn t))
@@ -1407,9 +1407,10 @@
     (find position
      remove delete
      count)
-    ((item sequence &key key test start end &allow-other-keys) node)
+    ((item sequence &key key test test-not start end &allow-other-keys) node)
   (check-sequence-ranges sequence start end node)
-  (check-sequence-test item sequence test key node))
+  (unless test-not
+    (check-sequence-test item sequence test key node)))
 
 (defoptimizers ir2-hook
     (remove-duplicates delete-duplicates
@@ -1768,9 +1769,16 @@
                            (type-specifier seq-type))))))))
 
 (defoptimizers ir2-hook
-    (substitute substitute-if substitute-if-not
-                nsubstitute nsubstitute-if nsubstitute-if-not)
-    ((new x seq &key start end &allow-other-keys) node)
+    (substitute nsubstitute)
+    ((new old seq &key start end test test-not key &allow-other-keys) node)
+  (check-sequence-ranges seq start end node)
+  (check-sequence-item new seq node "Can't substitute ~a into ~a")
+  (unless test-not
+    (check-sequence-test old seq test key node)))
+
+(defoptimizers ir2-hook
+    (substitute-if substitute-if-not nsubstitute-if nsubstitute-if-not)
+    ((new p seq &key start end test test-not key &allow-other-keys) node)
   (check-sequence-ranges seq start end node)
   (check-sequence-item new seq node "Can't substitute ~a into ~a"))
 
