@@ -59,8 +59,8 @@
    (u64.2!-from-p256      #:vextracti128  (u64.2) (p256)          :cost 1 :suffix '(0) :always-translatable nil)
    (u64.2-broadcast       nil             (u64.2) (u64)           :cost 1 :encoding :fake-vop)
    (u64.2-broadcastvec    #:vpbroadcastq  (u64.2) (u64.2)         :cost 1)
-   (u64.2-shiftl          #:vpsllvd       (u64.2) (u64.2 u64.2)   :cost 1)
-   (u64.2-shiftr          #:vpsrlvd       (u64.2) (u64.2 u64.2)   :cost 1)
+   (u64.2-shiftl          #:vpsllvq       (u64.2) (u64.2 u64.2)   :cost 1)
+   (u64.2-shiftr          #:vpsrlvq       (u64.2) (u64.2 u64.2)   :cost 1)
    ;; s8.16
    (s8.16!-from-p256      #:vextracti128  (s8.16) (p256)          :cost 1 :suffix '(0) :always-translatable nil)
    (s8.16-broadcast       nil             (s8.16) (s8)            :cost 1 :encoding :fake-vop)
@@ -73,8 +73,8 @@
    (s32.4!-from-p256      #:vextracti128  (s32.4) (p256)          :cost 1 :suffix '(0) :always-translatable nil)
    (s32.4-broadcast       nil             (s32.4) (s32)           :cost 1 :encoding :fake-vop)
    (s32.4-broadcastvec    #:vpbroadcastd  (s32.4) (s32.4)         :cost 1)
-   (s32.4-shiftl          #:vpsllvq       (s32.4) (s32.4 s32.4)   :cost 1)
-   (s32.4-shiftr          #:vpsrlvq       (s32.4) (s32.4 s32.4)   :cost 1)
+   (s32.4-shiftl          #:vpsllvd       (s32.4) (s32.4 s32.4)   :cost 1)
+   (s32.4-shiftr          #:vpsrlvd       (s32.4) (s32.4 s32.4)   :cost 1)
    ;; s64.2
    (s64.2!-from-p256      #:vextracti128  (s64.2) (p256)          :cost 1 :suffix '(0) :always-translatable nil)
    (s64.2-broadcast       nil             (s64.2) (s64)           :cost 1 :encoding :fake-vop)
