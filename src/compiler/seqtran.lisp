@@ -4306,7 +4306,7 @@
   (test-not-complementer test test-keyword test-not test-not-keyword
                          args)
   (unless test-not
-    (lower-item-test node test new sequence key)))
+    (lower-item-test node test old sequence key)))
 
 (defoptimizers optimizer
     (mismatch search tree-equal
