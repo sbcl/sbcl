@@ -1051,10 +1051,10 @@ Experimental: interface subject to change."
                already nickname for ~A.~:@>"
               nick (package-name actual) (package-name package) (package-name old-actual))
           (keep-old ()
-           :report (lambda (s)
-                     (format s "Keep ~A as local nickname for ~A."
-                             nick (package-name old-actual))
-                     (return-from %add-package-local-nickname package)))
+            :report (lambda (s)
+                      (format s "Keep ~A as local nickname for ~A."
+                              nick (package-name old-actual)))
+            (return-from %add-package-local-nickname package))
           (change-nick ()
             :report (lambda (s)
                       (format s "Use ~A as local nickname for ~A instead."

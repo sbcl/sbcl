@@ -7,6 +7,9 @@ changes relative to sbcl-2.6.4:
     uninitialized structure slot is no longer a TYPE-ERROR.
   * bug fix: strings of arbitrary size with fill-pointer set to 1 are
     character designators.  (reported by _death)
+  * bug fix: the KEEP-OLD restart established by ADD-PACKAGE-LOCAL-NICKNAME
+    keeps the old nickname instead of going ahead with the change (and the
+    restart report function no longer returns from ADD-PACKAGE-LOCAL-NICKNAME).
 
 changes in sbcl-2.6.4 relative to sbcl-2.6.3:
   * minor incompatible change: when DEFSETF is called on a name that was

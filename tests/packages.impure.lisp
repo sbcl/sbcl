@@ -738,6 +738,16 @@ if a restart was invoked."
                 (let ((*package* p1))
                   (intern "FOO" :own-nickname))))))
 
+(with-test (:name (add-package-local-nickname :nickname-conflict :restart :keep-old))
+  (with-tmp-packages ((p1 (make-package "NICKNAME-CONFLICT1"))
+                      (p2 (make-package "NICKNAME-CONFLICT2"))
+                      (p3 (make-package "NICKNAME-CONFLICT3")))
+    (assert (eq p3 (add-package-local-nickname #1="N" p1 p3)))
+    (handler-bind ((error (lambda (condition)
+                            (invoke-restart 'sb-impl::keep-old))))
+      (assert (eq p3 (add-package-local-nickname #1# p2 p3))))
+    (assert (eq p1 (cdr (assoc "N" (package-local-nicknames p3) :test #'string=))))))
+
 (defun random-package-name (min max)
   (let* ((s (make-string (+ min (random (- max min))))))
     (dotimes (i (length s) s)
