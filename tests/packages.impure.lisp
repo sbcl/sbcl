@@ -288,6 +288,25 @@ if a restart was invoked."
           (is (= 1 (length result)))
           (is (eql (sym "FOO" "SYM") (car result))))))))
 
+(with-test (:name (export :name-conflict :restart sb-impl::take-new))
+  (with-packages (("old-exporting" (:export "foo"))
+                  ("new-exporting" (:intern "foo"))
+                  ("using" (:use "old-exporting" "new-exporting")))
+    (let* ((old-exporting (find-package "old-exporting"))
+           (new-exporting (find-package "new-exporting"))
+           (using (find-package "using"))
+           (old-symbol (find-symbol "foo" old-exporting))
+           (new-symbol (find-symbol "foo" new-exporting)))
+      (assert (equal (list old-symbol :inherited)
+                     (multiple-value-list (find-symbol "foo" using))))
+      (handler-bind ((sb-ext:name-conflict
+                       (lambda (condition)
+                         (declare (ignore condition))
+                         (invoke-restart 'sb-impl::take-new))))
+        (export new-symbol new-exporting))
+      (assert (equal (list new-symbol :internal)
+                     (multiple-value-list (find-symbol "foo" using)))))))
+
 ;;; IMPORT
 (with-test (:name :import-nil.1)
   (with-packages (("FOO" (:use) (:intern "NIL"))

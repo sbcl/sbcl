@@ -10,6 +10,10 @@ changes relative to sbcl-2.6.4:
   * bug fix: the KEEP-OLD restart established by ADD-PACKAGE-LOCAL-NICKNAME
     keeps the old nickname instead of going ahead with the change (and the
     restart report function no longer returns from ADD-PACKAGE-LOCAL-NICKNAME).
+  * bug fix: when EXPORT results in a conflict between symbols exported by
+    different used packages, the TAKE-NEW restart now shadowing-imports the
+    new symbol instead of doing nothing and leaving the package in an
+    inconsistent state.
 
 changes in sbcl-2.6.4 relative to sbcl-2.6.3:
   * minor incompatible change: when DEFSETF is called on a name that was

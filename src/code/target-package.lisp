@@ -1548,15 +1548,32 @@ Experimental: interface subject to change."
           :report (lambda (s)
                     (ecase function
                       (export
-                       (format s "Make ~S accessible in ~A (uninterning ~S)."
+                       (format s "Make ~S accessible in ~A (uninterning or shadowing ~S)."
                                datum pname (old-symbol)))
                       (use-package
-                       (format s "Make ~S accessible in ~A (uninterning ~S)."
+                       (format s "Make ~S accessible in ~A (uninterning or shadowing ~S)."
                                (car datum) pname (old-symbol)))))
           :test use1-or-export-p
           (dolist (s symbols)
-            (when (eq s (find-symbol (symbol-name s) package))
-              (unintern s package))))
+            (multiple-value-bind (accessible-symbol status)
+                (find-symbol (symbol-name s) package)
+              (cond ((and (eq accessible-symbol s)
+                          (member status '(:internal :exported)))
+                     ;; The symbol S is present in PACKAGE.  Unintern
+                     ;; to resolve the conflict.
+                     (unintern s package))
+                    ((eq status :inherited)
+                     ;; Two symbols with the same symbol name would be
+                     ;; inherited from different packages.  This case
+                     ;; happens when S is the "old" symbol which is
+                     ;; currently inherited.  Shadowing-import the
+                     ;; "new" symbol to resolve the conflict.
+                     (shadowing-import s package)
+                     ;; Stop the iteration so that the "new" symbol
+                     ;; which is now present in PACKAGE does not get
+                     ;; uninterned again by the other case in the next
+                     ;; iteration.
+                     (return))))))
         ;; IMPORT with a pair of symbols conflicting.
         (shadowing-import-it ()
           :report (lambda (s)
