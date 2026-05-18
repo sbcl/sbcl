@@ -55,10 +55,9 @@
     ;; I sure hope that users don't expect COMPILE to necessarily return a
     ;; unique blob of code. How could they?
     (return-from %compile-in-lexenv
-      (values (if (policy *lexenv* (= safety 0))
-                  (load-time-value #'constantly-nil t)
-                  (load-time-value #'sb-impl::0-arg-nil t))
-              nil nil)))
+      (if (policy *lexenv* (= safety 0))
+          (load-time-value #'constantly-nil t)
+          (load-time-value #'sb-impl::0-arg-nil t))))
   (with-compilation-values (:just-values for-eval)
     (prog ((source-paths (when source-info *source-paths*))
            (compile-object (make-core-object ephemeral))

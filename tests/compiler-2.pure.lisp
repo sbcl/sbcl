@@ -5111,7 +5111,7 @@
                :name 'self-call))))
     (assert (member 'self-call (ctu:find-named-callees fun)))))
 
-(with-test (:name :compile-self-call-policy.1)
+(with-test (:name :compile-self-call-policy.2)
   (let ((fun (symbol-function
               (checked-compile
                `(lambda (a)
