@@ -1544,56 +1544,86 @@ necessary, since type inference may take arbitrarily long to converge.")
       (setf (block-compile compilation) :specified)
       (setf (entry-points compilation) nil))))
 
-(declaim (ftype function handle-condition-p))
-(flet ((get-handled-conditions ()
-         (if (boundp '*lexenv*)
-             (let ((ctxt *compiler-error-context*))
-               (etypecase ctxt
-                 (node
-                  (lexenv-handled-conditions (node-lexenv ctxt)))
-                 (lvar-annotation
-                  (lexenv-handled-conditions (lvar-annotation-lexenv ctxt)))
-                 (compiler-error-context
-                  (compiler-error-context-handled-conditions ctxt))
-                 ;; Is this right? I would think that if lexenv is null
-                 ;; we should look at *HANDLED-CONDITIONS*.
-                 ((or ctran list) (lexenv-handled-conditions *lexenv*))))
-             *handled-conditions*))
-       (handle-p (condition type)
-         #+sb-xc-host (cl:typep condition type) ; TYPE is a sexpr
-         #-sb-xc-host (%%typep condition type))) ; TYPE is a CTYPE
-  (declare (inline handle-p))
+(declaim (start-block handle-condition-p handle-condition-handler would-muffle-p))
 
-  (defun handle-condition-p (condition)
-    (dolist (muffle (get-handled-conditions) nil)
+(defun get-handled-conditions ()
+  (if (boundp '*lexenv*)
+      (let ((ctxt *compiler-error-context*))
+        (etypecase ctxt
+          (node
+           (lexenv-handled-conditions (node-lexenv ctxt)))
+          (lvar-annotation
+           (lexenv-handled-conditions (lvar-annotation-lexenv ctxt)))
+          (compiler-error-context
+           (compiler-error-context-handled-conditions ctxt))
+          ;; Is this right? I would think that if lexenv is null
+          ;; we should look at *HANDLED-CONDITIONS*.
+          ((or ctran list) (lexenv-handled-conditions *lexenv*))))
+      *handled-conditions*))
+
+(declaim (inline handle-p))
+(defun handle-p (condition type)
+  #+sb-xc-host (cl:typep condition type) ; TYPE is a sexpr
+  #-sb-xc-host (%%typep condition type)) ; TYPE is a CTYPE
+
+(defun handle-condition-p (condition)
+  (dolist (muffle (get-handled-conditions) nil)
+    (destructuring-bind (type . restart-name) muffle
+      (when (and (handle-p condition type)
+                 (find-restart restart-name condition))
+        (return t)))))
+
+(defun handle-condition-handler (condition)
+  (let ((muffles (get-handled-conditions)))
+    (aver muffles) ; FIXME: looks redundant with UNREACHABLE
+    (dolist (muffle muffles (sb-impl::unreachable))
       (destructuring-bind (type . restart-name) muffle
-        (when (and (handle-p condition type)
-                   (find-restart restart-name condition))
-          (return t)))))
+        (when (handle-p condition type)
+          (awhen (find-restart restart-name condition)
+            (invoke-restart it)))))))
 
-  (defun handle-condition-handler (condition)
-    (let ((muffles (get-handled-conditions)))
-      (aver muffles) ; FIXME: looks redundant with UNREACHABLE
-      (dolist (muffle muffles (sb-impl::unreachable))
-        (destructuring-bind (type . restart-name) muffle
-          (when (handle-p condition type)
-            (awhen (find-restart restart-name condition)
-              (invoke-restart it)))))))
+;;; WOULD-MUFFLE-P is called (incorrectly) only by
+;;; NOTE-UNDEFINED-REFERENCE. It is not wrong per se, but as used, it
+;;; is wrong, making it nearly impossible to muffle a subset of
+;;; undefind warnings whose NAME and KIND slots match specific things
+;;; tested by a user-defined predicate. Attempting to do that might
+;;; muffle everything, depending on how your predicate responds to a
+;;; vanilla WARNING. Consider e.g. (AND WARNING (NOT (SATISFIES
+;;; HAIRYFN))) where HAIRYFN depends on the :FORMAT-CONTROL and
+;;; :FORMAT-ARGUMENTS.
+(defun would-muffle-p (condition)
+  (let ((ctype (rassoc 'muffle-warning
+                       (lexenv-handled-conditions *lexenv*))))
+    (and ctype (handle-p condition (car ctype)))))
 
-  ;; WOULD-MUFFLE-P is called (incorrectly) only by NOTE-UNDEFINED-REFERENCE.
-  ;; It is not wrong per se, but as used, it is wrong, making it nearly
-  ;; impossible to muffle a subset of undefind warnings whose NAME and KIND
-  ;; slots match specific things tested by a user-defined predicate.
-  ;; Attempting to do that might muffle everything, depending on how your
-  ;; predicate responds to a vanilla WARNING. Consider e.g.
-  ;;   (AND WARNING (NOT (SATISFIES HAIRYFN)))
-  ;; where HAIRYFN depends on the :FORMAT-CONTROL and :FORMAT-ARGUMENTS.
-  (defun would-muffle-p (condition)
-    (let ((ctype (rassoc 'muffle-warning
-                         (lexenv-handled-conditions *lexenv*))))
-      (and ctype (handle-p condition (car ctype))))))
+(declaim (end-block))
 
 (defglobal *coverage-augmentation-hook* nil)
+
+;;; Print some junk at the beginning and end of compilation.
+(defun print-compile-start-note (source-info)
+  (declare (type source-info source-info))
+  (let ((file-info (source-info-file-info source-info)))
+    #+sb-xc-host
+    (compiler-mumble "~&; ~Aing file ~S:~%"
+                     (if sb-cold::*compile-for-effect-only* "load" "x-compil")
+                     (namestring (file-info-pathname file-info)))
+    #-sb-xc-host
+    (compiler-mumble "~&; compiling file ~S (written ~A):~%"
+                     (namestring (file-info-pathname file-info))
+                     (format-universal-time nil
+                                            (file-info-write-date file-info)
+                                            :style :government
+                                            :print-weekday nil
+                                            :print-timezone nil)))
+  (values))
+
+(defglobal *compile-elapsed-time* 0) ; nanoseconds
+(defglobal *compile-file-elapsed-time* 0) ; nanoseconds
+
+(declaim (start-block compile compile-file
+                      compile-file-to-tempfile compile-form-to-file))
+
 ;;; Read all forms from INFO and compile them, with output to
 ;;; *COMPILE-OBJECT*. Return (VALUES ABORT-P WARNINGS-P FAILURE-P).
 (defun sub-compile-file (info cfasl)
@@ -1682,45 +1712,34 @@ necessary, since type inference may take arbitrarily long to converge.")
        (finish-output *error-output*)
        (values t t t)))))
 
+;;; Close the stream in INFO if it is open.
+(defun close-source-info (info)
+  (declare (type source-info info))
+  (let ((stream (source-info-stream info)))
+    (when stream (close stream)))
+  (setf (source-info-stream info) nil)
+  (values))
+
 ;;; Return a pathname for the named file. The file must exist.
-(macrolet ((fast-probe-file (x)
-             #+sb-xc-host `(probe-file ,x)
-             #-sb-xc-host `(sb-impl::query-file-system ,x :existence nil)))
 (defun verify-source-file (pathname-designator)
   (let* ((pathname (pathname pathname-designator))
          (default-host (make-pathname :host (pathname-host pathname))))
-    (flet ((try-with-type (type)
-             (let ((new (merge-pathnames
-                         pathname (make-pathname :type type :defaults default-host))))
-               ;; This is more efficient than always calling (TRUENAME NEW)
-               ;; because the truename isn't actually needed yet, if at all -
-               ;; the call merely forces a FILE-DOES-NOT-EXIST error.
-               (cond ((fast-probe-file new) new)
-                     (t (truename new))))))
+    (labels ((fast-probe-file (x)
+               #+sb-xc-host (probe-file x)
+               #-sb-xc-host (sb-impl::query-file-system x :existence nil))
+             (try-with-type (type)
+               (let ((new (merge-pathnames
+                           pathname (make-pathname :type type :defaults default-host))))
+                 ;; This is more efficient than always calling (TRUENAME NEW)
+                 ;; because the truename isn't actually needed yet, if at all -
+                 ;; the call merely forces a FILE-DOES-NOT-EXIST error.
+                 (cond ((fast-probe-file new) new)
+                       (t (truename new))))))
+      (declare (inline fast-probe-file))
       (cond ((typep pathname 'logical-pathname) (try-with-type "LISP"))
             ((fast-probe-file pathname) pathname)
-            ((try-with-type "lisp")))))))
+            ((try-with-type "lisp"))))))
 
-;;; Print some junk at the beginning and end of compilation.
-(defun print-compile-start-note (source-info)
-  (declare (type source-info source-info))
-  (let ((file-info (source-info-file-info source-info)))
-    #+sb-xc-host
-    (compiler-mumble "~&; ~Aing file ~S:~%"
-                     (if sb-cold::*compile-for-effect-only* "load" "x-compil")
-                     (namestring (file-info-pathname file-info)))
-    #-sb-xc-host
-    (compiler-mumble "~&; compiling file ~S (written ~A):~%"
-                     (namestring (file-info-pathname file-info))
-                     (format-universal-time nil
-                                            (file-info-write-date file-info)
-                                            :style :government
-                                            :print-weekday nil
-                                            :print-timezone nil)))
-  (values))
-
-(defglobal *compile-elapsed-time* 0) ; nanoseconds
-(defglobal *compile-file-elapsed-time* 0) ; nanoseconds
 (defun get-thread-virtual-time ()
   #+(and linux sb-devel (not sb-xc-host))
   (return-from get-thread-virtual-time
@@ -1731,29 +1750,104 @@ necessary, since type inference may take arbitrarily long to converge.")
   (declare (ignorable symbol start-sec start-nsec))
   #+(and linux (not sb-xc-host))
   (multiple-value-bind (stop-sec stop-nsec) (get-thread-virtual-time)
-      (let* ((sec-diff (- stop-sec start-sec))
-             (nsec-diff (- stop-nsec start-nsec))
-             (total-nsec-diff (+ (* sec-diff (* 1000 1000 1000))
-                                 nsec-diff))
-             (old (symbol-global-value symbol)))
-          (loop
-            ;; FIXME: should we define #'(CAS SYMBOL-GLOBAL-VALUE) ?
-            ;; Probably want to get it working everywhere first.
-            (let ((new (+ old total-nsec-diff)))
-              (when (eq old (setq old
-                                  #-x86-64
-                                  (cas (symbol-value symbol) old new)
-                                  #+x86-64
-                                  (%cas-symbol-global-value symbol old new)))
-                (return)))))))
+    (let* ((sec-diff (- stop-sec start-sec))
+           (nsec-diff (- stop-nsec start-nsec))
+           (total-nsec-diff (+ (* sec-diff (* 1000 1000 1000))
+                               nsec-diff))
+           (old (symbol-global-value symbol)))
+      (loop
+        ;; FIXME: should we define #'(CAS SYMBOL-GLOBAL-VALUE) ?
+        ;; Probably want to get it working everywhere first.
+        (let ((new (+ old total-nsec-diff)))
+          (when (eq old (setq old
+                              #-x86-64
+                              (cas (symbol-value symbol) old new)
+                              #+x86-64
+                              (%cas-symbol-global-value symbol old new)))
+            (return)))))))
 
-(flet ((open-trace-file (trace-file fasl-output)
-         (if (streamp trace-file)
-             trace-file
-             (open (merge-pathnames (if (eql trace-file t) "" trace-file)
-                                    (make-pathname :type "trace" :defaults
-                                                   (fasl-output-stream fasl-output)))
-                   :if-exists :supersede :direction :output))))
+(defun open-trace-file (trace-file fasl-output)
+  (if (streamp trace-file)
+      trace-file
+      (open (merge-pathnames (if (eql trace-file t) "" trace-file)
+                             (make-pathname :type "trace" :defaults
+                                            (fasl-output-stream fasl-output)))
+            :if-exists :supersede :direction :output)))
+
+;;; NOTE: COMPILE may be slightly nonconforming regarding generic functions,
+;;; but no more nonconforming than it was prior to the redefinition of
+;;; COMPILED-FUNCTION to exclude GENERIC-FUNCTION.
+;;; The concern stems from http://www.lispworks.com/documentation/HyperSpec/Issues/iss064_w.htm
+;;; which says "(4) Clarify that COMPILE must produce an object of type COMPILED-FUNCTION."
+;;;
+;;; In the case where DEFINITION is given, we're fine: the compiler can only return
+;;; a compiled function. But if only NAME is given, and it is fboundp to a generic-function,
+;;; we don't do anything at all - we don't touch the GF's dispatch function (which is a closure
+;;; over compiled code) and we don't touch the methods. But COMPILE doesn't return a function
+;;; in that case, so it's not wrong that COMPILED-FUNCTION-P is false of the result,
+;;; because the result is a symbol, not a function.
+
+;;; Also note that we lack good regression tests setting expectations around what's supposed
+;;; to happen when DEFINITION is supplied as a generic function. (Does it even make sense?)
+#-sb-xc-host
+(defun compile (name &optional (definition (or (and (symbolp name)
+                                                    (macro-function name))
+                                               (fdefinition name))
+                                           defp))
+  "Produce a compiled function from DEFINITION. If DEFINITION is a
+lambda-expression, it is coerced to a function. If DEFINITION is an
+interpreted function, it is compiled. If DEFINITION is already a compiled
+function, it is used as-is. (Future versions of SBCL might try to
+recompile the existing definition, but this is not currently supported.)
+
+If NAME is NIL, the compiled function is returned as the primary value.
+Otherwise the resulting compiled function replaces existing function
+definition of NAME, and NAME is returned as primary value; if NAME is a symbol
+that names a macro, its macro function is replaced and NAME is returned as
+primary value.
+
+Also returns a secondary value which is true if any conditions of type
+WARNING occur during the compilation, and NIL otherwise.
+
+Tertiary value is true if any conditions of type ERROR, or WARNING that are
+not STYLE-WARNINGs occur during compilation, and NIL otherwise.
+"
+  (binding*
+      (((start-sec start-nsec) (get-thread-virtual-time))
+       ((compiled-definition warnings-p failure-p)
+        (if (or (compiled-function-p definition)
+                (sb-pcl::generic-function-p definition))
+            ;; We're not invoking COMPILE. If NAME isn't NIL then we need to
+            ;; ensure that DEFINITION (if supplied) gets bound to NAME even if
+            ;; (COMPILED-FUNCTION-P #'NAME) => NIL afterwards.
+            ;; This is a minor bug if DEFINITION is a GENERIC-FUNCTION with
+            ;; at least one interpreted method.
+            (values (if (and name defp) definition (make-unbound-marker))
+                    nil nil)
+            (multiple-value-bind (sexpr lexenv)
+                (if (not (typep definition 'interpreted-function))
+                    (values (the cons definition) (make-null-lexenv))
+                    #+(or sb-eval sb-fasteval)
+                    (prepare-for-compile definition))
+              (sb-vm:without-arena "compile"
+                (compile-in-lexenv sexpr lexenv name nil nil nil nil))))))
+    (accumulate-compiler-time '*compile-elapsed-time* start-sec start-nsec)
+    (values (cond (name
+                   ;; Do NOT assign anything into the symbol if we did not
+                   ;; actually invoke the compiler and DEFINITION was not given.
+                   ;; In that case it's not observable whether NAME get reassigned,
+                   ;; but since there is nonzero overhead to setting
+                   ;; an fdefinition, don't do it if it has no effect.
+                   (unless (unbound-marker-p compiled-definition)
+                     (if (and (symbolp name) (macro-function name))
+                         (setf (macro-function name) compiled-definition)
+                         (setf (fdefinition name) compiled-definition)))
+                   name)
+                  ;; Didn't run the compiler
+                  ((unbound-marker-p compiled-definition) definition)
+                  (t compiled-definition))
+            warnings-p
+            failure-p)))
 
 ;;; Open some files and call SUB-COMPILE-FILE. If something unwinds
 ;;; out of the compile, then abort the writing of the output file, so
@@ -1762,21 +1856,21 @@ necessary, since type inference may take arbitrarily long to converge.")
     (input-file
      &key
 
-     ;; ANSI options
-     (output-file "" output-file-p)
-     ;; We rebind the specials despite such behavior not being mentioned
-     ;; in CLHS. Several other lisp implementations do this as well.
-     ((:verbose *compile-verbose*) *compile-verbose*)
-     ((:print *compile-print*) *compile-print*)
-     (external-format :default)
+       ;; ANSI options
+       (output-file "" output-file-p)
+       ;; We rebind the specials despite such behavior not being mentioned
+       ;; in CLHS. Several other lisp implementations do this as well.
+       ((:verbose *compile-verbose*) *compile-verbose*)
+       ((:print *compile-print*) *compile-print*)
+       (external-format :default)
 
-     ;; extensions
-     ((:progress *compile-progress*) *compile-progress*)
-     (trace-file nil)
-     ((:block-compile *block-compile-argument*)
-      *block-compile-default*)
-     ((:entry-points *entry-points-argument*) nil)
-     (emit-cfasl *emit-cfasl*))
+       ;; extensions
+       ((:progress *compile-progress*) *compile-progress*)
+       (trace-file nil)
+       ((:block-compile *block-compile-argument*)
+        *block-compile-default*)
+       ((:entry-points *entry-points-argument*) nil)
+       (emit-cfasl *emit-cfasl*))
   "Compile INPUT-FILE, producing a corresponding fasl file and
 returning its filename.
 
@@ -1823,71 +1917,69 @@ returning its filename.
      (Experimental). If true, outputs the toplevel compile-time effects
      of this file into a separate .cfasl file."
   (binding*
-        ((input-file (pathname input-file))
-         (output-file-pathname
-             ;; To avoid passing "" as OUTPUT-FILE when unsupplied, we exploit the fact
-             ;; that COMPILE-FILE-PATHNAME allows random &KEY args.
-             (compile-file-pathname input-file (when output-file-p :output-file) output-file))
-         (fasl-output nil)
-         (cfasl-pathname nil)
-         (cfasl-output nil)
-         (abort-p t)
-         (warnings-p nil)
-         (failure-p t) ; T in case error keeps this from being set later
-         ((start-sec start-nsec) (get-thread-virtual-time))
-         (input-pathname (verify-source-file input-file))
-         (external-format (if (eq external-format :default)
-                              sb-ext:*default-source-external-format*
-                              external-format))
-         (source-info
-          (make-file-source-info input-pathname external-format
-                                 #-sb-xc-host t)) ; can't track, no SBCL streams
-         (*last-message-count* (list* 0 nil nil))
-         (*last-error-context* nil)
-         (*compiler-trace-output* nil)) ; might be modified below
+      ((input-file (pathname input-file))
+       (output-file-pathname
+        ;; To avoid passing "" as OUTPUT-FILE when unsupplied, we exploit the fact
+        ;; that COMPILE-FILE-PATHNAME allows random &KEY args.
+        (compile-file-pathname input-file (when output-file-p :output-file) output-file))
+       (fasl-output nil)
+       (cfasl-pathname nil)
+       (cfasl-output nil)
+       (abort-p t)
+       (warnings-p nil)
+       (failure-p t) ; T in case error keeps this from being set later
+       ((start-sec start-nsec) (get-thread-virtual-time))
+       (input-pathname (verify-source-file input-file))
+       (external-format (if (eq external-format :default)
+                            sb-ext:*default-source-external-format*
+                            external-format))
+       (source-info
+        (make-file-source-info input-pathname external-format
+                               #-sb-xc-host t)) ; can't track, no SBCL streams
+       (*last-message-count* (list* 0 nil nil))
+       (*last-error-context* nil)
+       (*compiler-trace-output* nil))   ; might be modified below
     (when (equal input-file output-file-pathname)
       (error "INPUT-FILE and OUTPUT-FILE refer to the same file: ~s" input-file))
-   (labels ((print-compile-end-note ()
-              (compiler-mumble "~&; compilation ~:[finished in~;aborted after~] ~A~&"
-                               abort-p
-                               (elapsed-time-to-string
-                                (- (get-internal-real-time)
-                                   (source-info-start-real-time source-info)))))
-            (elapsed-time-to-string (internal-time-delta)
-              (multiple-value-bind (tsec remainder)
-                  (truncate internal-time-delta internal-time-units-per-second)
-                (let ((ms (truncate remainder (/ internal-time-units-per-second 1000))))
-                  (multiple-value-bind (tmin sec) (truncate tsec 60)
-                    (multiple-value-bind (thr min) (truncate tmin 60)
-                      (format nil "~D:~2,'0D:~2,'0D.~3,'0D" thr min sec ms)))))))
-    (unwind-protect
-        (progn
-          (setq fasl-output (open-fasl-output output-file-pathname (namestring input-pathname)))
-          (when emit-cfasl
-            (setq cfasl-pathname (make-pathname :type "cfasl" :defaults output-file-pathname))
-            (setq cfasl-output (open-fasl-output cfasl-pathname (namestring input-pathname))))
-          (when trace-file
-            (setq *compiler-trace-output* (open-trace-file trace-file fasl-output)))
-          (let ((*compile-object* fasl-output))
-            (setf (values abort-p warnings-p failure-p)
-                  (sub-compile-file source-info cfasl-output))))
+    (labels ((print-compile-end-note ()
+               (compiler-mumble "~&; compilation ~:[finished in~;aborted after~] ~A~&"
+                                abort-p
+                                (elapsed-time-to-string
+                                 (- (get-internal-real-time)
+                                    (source-info-start-real-time source-info)))))
+             (elapsed-time-to-string (internal-time-delta)
+               (multiple-value-bind (tsec remainder)
+                   (truncate internal-time-delta internal-time-units-per-second)
+                 (let ((ms (truncate remainder (/ internal-time-units-per-second 1000))))
+                   (multiple-value-bind (tmin sec) (truncate tsec 60)
+                     (multiple-value-bind (thr min) (truncate tmin 60)
+                       (format nil "~D:~2,'0D:~2,'0D.~3,'0D" thr min sec ms)))))))
+      (unwind-protect
+           (progn
+             (setq fasl-output (open-fasl-output output-file-pathname (namestring input-pathname)))
+             (when emit-cfasl
+               (setq cfasl-pathname (make-pathname :type "cfasl" :defaults output-file-pathname))
+               (setq cfasl-output (open-fasl-output cfasl-pathname (namestring input-pathname))))
+             (when trace-file
+               (setq *compiler-trace-output* (open-trace-file trace-file fasl-output)))
+             (let ((*compile-object* fasl-output))
+               (setf (values abort-p warnings-p failure-p)
+                     (sub-compile-file source-info cfasl-output))))
 
-      ;; Close all files prior to showing any message
-      (awhen (source-info-stream source-info) (close it))
-      (setf (source-info-stream source-info) nil)
-      (when fasl-output (close-fasl-output fasl-output abort-p))
-      (when cfasl-output (close-fasl-output cfasl-output abort-p))
-      ;; Don't nuke stdout if you use :trace-file *standard-output*
-      (when (and trace-file (not (streamp trace-file)))
-        (close *compiler-trace-output*))
-      (when (and *compile-verbose* abort-p)
+        (close-source-info source-info)
+        (when fasl-output (close-fasl-output fasl-output abort-p))
+        (when cfasl-output (close-fasl-output cfasl-output abort-p))
+        ;; Don't nuke stdout if you use :trace-file *standard-output*
+        (when (and trace-file (not (streamp trace-file)))
+          (close *compiler-trace-output*))
+        (when (and *compile-verbose* abort-p)
+          (print-compile-end-note)))
+
+      ;; In the normal case show the artifact names, then say we're done
+      (when (and *compile-verbose* (not abort-p))
+        (compiler-mumble "~2&; wrote ~A~%" (namestring output-file-pathname))
+        (when cfasl-output (compiler-mumble "; wrote ~A~%" (namestring cfasl-pathname)))
         (print-compile-end-note)))
-
-    ;; In the normal case show the artifact names, then say we're done
-    (when (and *compile-verbose* (not abort-p))
-      (compiler-mumble "~2&; wrote ~A~%" (namestring output-file-pathname))
-      (when cfasl-output (compiler-mumble "; wrote ~A~%" (namestring cfasl-pathname)))
-      (print-compile-end-note)))
 
     (accumulate-compiler-time '*compile-file-elapsed-time* start-sec start-nsec)
 
@@ -1946,7 +2038,7 @@ returning its filename.
 #-sb-xc-host
 (defun compile-form-to-file
     (form output-file &key ((:progress *compile-progress*) *compile-progress*)
-                      (trace-file nil))
+                           (trace-file nil))
   ;; As a special case, if PATHNAME-DESIGNATOR is a STDIO-FILE, then we write _directly_ to
   ;; that. This allows treating Lisp STREAM subtypes as pathname designators in the ordinary
   ;; way they are treated, which deduces a name from the stream, versus directly utilizing
@@ -1959,22 +2051,22 @@ returning its filename.
   ;; to operate on those magic filenames.
   (declare (type (or pathname-designator stdio-file) output-file))
   (binding*
-        ((abort-p t)
-         (warnings-p nil)
-         (failure-p t)
-         (source-info (make-lisp-source-info form))
-         (*last-message-count* (list* 0 nil nil))
-         (*last-error-context* nil)
-         ((result fasl-output)
-          (if (typep output-file 'stdio-file)
-              (values output-file
-                      (open-fasl-output (sb-impl::stream-from-stdio-file output-file :output t)
-                                        "?"))
-              (let ((pathname (compile-file-pathname "" :output-file output-file)))
-                (values pathname (open-fasl-output pathname "?")))))
-         (*compiler-trace-output*
-          (when trace-file
-            (open-trace-file trace-file fasl-output))))
+      ((abort-p t)
+       (warnings-p nil)
+       (failure-p t)
+       (source-info (make-lisp-source-info form))
+       (*last-message-count* (list* 0 nil nil))
+       (*last-error-context* nil)
+       ((result fasl-output)
+        (if (typep output-file 'stdio-file)
+            (values output-file
+                    (open-fasl-output (sb-impl::stream-from-stdio-file output-file :output t)
+                                      "?"))
+            (let ((pathname (compile-file-pathname "" :output-file output-file)))
+              (values pathname (open-fasl-output pathname "?")))))
+       (*compiler-trace-output*
+        (when trace-file
+          (open-trace-file trace-file fasl-output))))
     (unwind-protect
          (let ((*block-compile-argument* nil)
                (*entry-points-argument* nil)
@@ -1984,7 +2076,9 @@ returning its filename.
         (close-fasl-output fasl-output abort-p))
       (when (and trace-file (not (streamp trace-file)))
         (close *compiler-trace-output*)))
-    (values (unless abort-p result) warnings-p failure-p))))
+    (values (unless abort-p result) warnings-p failure-p)))
+
+(declaim (end-block))
 
 ;;; KLUDGE: Part of the ANSI spec for this seems contradictory:
 ;;;   If INPUT-FILE is a logical pathname and OUTPUT-FILE is unsupplied,
@@ -2055,7 +2149,7 @@ returning its filename.
 ;;; Is "obj" on the logical host or the physical host?
 
 (defun compile-file-pathname (input-file &key (output-file nil output-file-p)
-                              &allow-other-keys)
+                                         &allow-other-keys)
   "Return a pathname describing what file COMPILE-FILE would write to given
    these arguments."
   ;; ANSI: The defaults for the OUTPUT-FILE are taken from the pathname
@@ -2063,30 +2157,30 @@ returning its filename.
   ;; *DEFAULT-PATHNAME-DEFAULTS*, except that the type component should
   ;; default to the appropriate implementation-defined default type for
   ;; compiled files.
-   (let* ((input (pathname input-file))
-          (output (if output-file-p (pathname output-file)))
-          (host/dev/dir
+  (let* ((input (pathname input-file))
+         (output (if output-file-p (pathname output-file)))
+         (host/dev/dir
            (if (or (not output) (memq (pathname-directory output) '(nil :unspecific)))
                input output)))
-     ;; Merging *D-P-D* here is ridiculous, because every pathname is eventually
-     ;; merged against it.
-     ;; Users can set it to #P"" around calling this to obtain a lossless answer.
-     (merge-pathnames
-      (flet ((pick (slot default &aux (specified (if output (funcall slot output))))
-               ;; :unspecific is left alone, "as if the field were 'filled'"
-               ;; (http://www.lispworks.com/documentation/HyperSpec/Body/19_bbbca.htm)
-               ;; which makes little to zero sense at all for the PATHNAME-NAME
-               ;; of a fasl file, but is allowable for its PATHNAME-TYPE.
-               (cond ((or (not specified)
-                          (and (eq specified :unspecific) (eq slot 'pathname-name)))
-                      default)
-                     (t
-                      specified))))
-        (make-pathname :host (pathname-host host/dev/dir)
-                       :device (pathname-device host/dev/dir)
-                       :directory (pathname-directory host/dev/dir)
-                       :name (pick 'pathname-name (pathname-name input))
-                       :type (pick 'pathname-type *fasl-file-type*))))))
+    ;; Merging *D-P-D* here is ridiculous, because every pathname is eventually
+    ;; merged against it.
+    ;; Users can set it to #P"" around calling this to obtain a lossless answer.
+    (merge-pathnames
+     (flet ((pick (slot default &aux (specified (if output (funcall slot output))))
+              ;; :unspecific is left alone, "as if the field were 'filled'"
+              ;; (http://www.lispworks.com/documentation/HyperSpec/Body/19_bbbca.htm)
+              ;; which makes little to zero sense at all for the PATHNAME-NAME
+              ;; of a fasl file, but is allowable for its PATHNAME-TYPE.
+              (cond ((or (not specified)
+                         (and (eq specified :unspecific) (eq slot 'pathname-name)))
+                     default)
+                    (t
+                     specified))))
+       (make-pathname :host (pathname-host host/dev/dir)
+                      :device (pathname-device host/dev/dir)
+                      :directory (pathname-directory host/dev/dir)
+                      :name (pick 'pathname-name (pathname-name input))
+                      :type (pick 'pathname-type *fasl-file-type*))))))
 
 ;;; FIXME: find a better place for this.
 (defun always-boundp (name node)
