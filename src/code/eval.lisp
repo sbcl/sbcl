@@ -18,12 +18,8 @@
   (let ((sb-c::*source-form-context-alist*
           (acons expr *eval-source-context*
                  sb-c::*source-form-context-alist*)))
-    (handler-bind (;; Compiler notes just clutter up the REPL:
-                   ;; anyone caring about performance should not
-                   ;; be using EVAL.
-                   (compiler-note #'muffle-warning))
-      (sb-c:eval-with-compile-in-lexenv expr lexenv *eval-source-info*
-                                        *eval-tlf-index* nil))))
+    (sb-c:eval-with-compile-in-lexenv expr lexenv *eval-source-info*
+                                      *eval-tlf-index* nil)))
 
 ;;; Handle PROGN and implicit PROGN.
 #-sb-fasteval

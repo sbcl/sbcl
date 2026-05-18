@@ -81,7 +81,15 @@
                      (*last-message-count* (list* 0 nil nil)))
                 (handler-bind ((compiler-error #'compiler-error-handler)
                                (style-warning #'compiler-style-warning-handler)
-                               (warning #'compiler-warning-handler))
+                               (warning #'compiler-warning-handler)
+                               (compiler-note
+                                 ;; Compiler notes just clutter up the
+                                 ;; REPL: anyone caring about
+                                 ;; performance should not be using
+                                 ;; EVAL.
+                                 (lambda (c)
+                                   (when for-eval
+                                     (muffle-warning c)))))
                   (with-source-paths
                     (let* ((tlf (or tlf 0))
                            ;; If we have a source-info from LOAD, we will
