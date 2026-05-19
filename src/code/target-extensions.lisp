@@ -203,7 +203,7 @@ unspecified."
                        :interactive
                        (lambda ()
                          (read-evaluated-form-of-type 'symbol))
-                       (values value :symbol)))))
+                       (return (values value :symbol))))))
        (go retry))))
 
 ;;;; Deprecating stuff

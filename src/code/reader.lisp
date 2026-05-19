@@ -1572,37 +1572,41 @@ extended <package-name>::<form-in-package> syntax."
             (if package-designator
                 (reader-find-package package-designator stream t)
                 (or *reader-package* (sane-package)))
-          (if (eq restart-kind :uninterned)
-              (return (make-symbol (copy-token-buf-string buf)))
-              (let* ((intern-p (or (/= colons 1)
-                                   (eq pkg *keyword-package*)
-                                   (eq restart-kind :current))))
-                (unless intern-p        ; Try %FIND-SYMBOL
-                  (multiple-value-bind (symbol accessibility)
-                      (%find-symbol (token-buf-string buf) (token-buf-fill-ptr buf) pkg)
-                    (when (eq accessibility :external) (return symbol))
-                    (when (and accessibility
-                               (check-deprecated-export pkg symbol))
-                      (return symbol))
-                    (with-simple-restart (continue "Use symbol anyway.")
-                      (error 'simple-reader-package-error
-                             :package pkg
-                             :stream stream
-                             :format-arguments
-                             (list (copy-token-buf-string buf) (package-name pkg))
-                             :format-control
-                             (if accessibility
-                                 "The symbol ~S is not external in the ~A package."
-                                 "Symbol ~S not found in the ~A package.")))))
-                (return (%intern (token-buf-string buf)
-                                 (token-buf-fill-ptr buf)
-                                 pkg
-                                 (if (token-buf-only-base-chars buf)
-                                     (%readtable-symbol-preference rt)
-                                     'character)
-                                 ;; reader-package behaves as if *package* were that package.
-                                 ;; Hence it should be allowed to create new symbols.
-                                 (eq pkg *reader-package*))))))))))
+          (case restart-kind
+            (:uninterned
+             (return (make-symbol (copy-token-buf-string buf))))
+            (:symbol
+             (return pkg))
+            (t
+             (let ((intern-p (or (/= colons 1)
+                                 (eq pkg *keyword-package*)
+                                 (eq restart-kind :current))))
+               (unless intern-p         ; Try %FIND-SYMBOL
+                 (multiple-value-bind (symbol accessibility)
+                     (%find-symbol (token-buf-string buf) (token-buf-fill-ptr buf) pkg)
+                   (when (eq accessibility :external) (return symbol))
+                   (when (and accessibility
+                              (check-deprecated-export pkg symbol))
+                     (return symbol))
+                   (with-simple-restart (continue "Use symbol anyway.")
+                     (error 'simple-reader-package-error
+                            :package pkg
+                            :stream stream
+                            :format-arguments
+                            (list (copy-token-buf-string buf) (package-name pkg))
+                            :format-control
+                            (if accessibility
+                                "The symbol ~S is not external in the ~A package."
+                                "Symbol ~S not found in the ~A package.")))))
+               (return (%intern (token-buf-string buf)
+                                (token-buf-fill-ptr buf)
+                                pkg
+                                (if (token-buf-only-base-chars buf)
+                                    (%readtable-symbol-preference rt)
+                                    'character)
+                                ;; reader-package behaves as if *package* were that package.
+                                ;; Hence it should be allowed to create new symbols.
+                                (eq pkg *reader-package*)))))))))))
 
 ;;; For semi-external use: Return 3 values: the token-buf,
 ;;; a flag for whether there was an escape char, and the position of

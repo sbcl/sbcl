@@ -641,3 +641,9 @@
   ;; constituent when not a dot by itself (or all dots). And #\( terminates a token.
   ;; The token "#." is then ignored by *read-suppress*
   (assert (equal (read-from-string "#+notfeat #o#.(progn wat)") '(progn wat))))
+
+(with-test (:name :missing-package-restarts)
+  (handler-bind ((reader-error
+                   (lambda (c)
+                     (invoke-restart (find-restart 'symbol c) 'pi))))
+    (assert (eq (read-from-string "missing-package::symbol") 'pi))))
