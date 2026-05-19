@@ -4281,8 +4281,7 @@
     nil))
 
 (defoptimizers optimizer
-    (remove delete count find position
-     sublis nsublis copy-remove)
+    (remove delete count find position copy-remove)
     ((item sequence &rest args &key
            ((test test-keyword))
            ((test-not test-not-keyword))
@@ -4292,6 +4291,15 @@
                              args)
       (unless test-not
         (lower-item-test node test item sequence key))))
+
+(defoptimizers optimizer
+    (sublis nsublis)
+    ((item sequence &rest args &key
+           ((test test-keyword))
+           ((test-not test-not-keyword))
+           &allow-other-keys) node)
+  (test-not-complementer test test-keyword test-not test-not-keyword
+                         args))
 
 (defoptimizers optimizer
     (remove-duplicates delete-duplicates
