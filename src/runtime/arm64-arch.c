@@ -211,7 +211,7 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
         int opc = (orig_inst >> 30) & 0b11;
         int rt = orig_inst & 0b11111;
         int offset = sign_extend((orig_inst >> 5) & (1 << 19)-1, 19);
-        unsigned int *new_pc = (pc + offset);
+        unsigned int *new_pc = pc + offset;
 
         if (opc == 0b01)
             *os_context_register_addr(context, rt) = *((uint64_t *)new_pc);
@@ -219,6 +219,28 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
             *os_context_register_addr(context, rt) = *((uint32_t *)new_pc);
         else if (opc == 0b10)
             *os_context_register_addr(context, rt) = *((int32_t *)new_pc);
+
+        next_pc += 1;
+    }
+    else if (((orig_inst >> 24) & 0b111111) == 0b011100) {
+        // SIMD LDR (literal)
+        int opc = (orig_inst >> 30) & 0b11;
+        int rt = orig_inst & 0b11111;
+        int offset = sign_extend((orig_inst >> 5) & (1 << 19)-1, 19);
+        unsigned int *new_pc = pc + offset;
+
+        if (opc == 0b00) {
+            *os_context_float_register_addr(context, rt) = *((uint32_t *)new_pc);
+        }
+        else if (opc == 0b01) {
+            *os_context_float_register_addr(context, rt) = *((uint64_t *)new_pc);
+        }
+        else if (opc == 0b10) {
+            memcpy(os_context_float_register_addr(context, rt), new_pc, 16);
+        }
+        else {
+            lose("Unsupported SIMD/FP LDR (literal) variant: %x", orig_inst);
+        }
 
         next_pc += 1;
     }
