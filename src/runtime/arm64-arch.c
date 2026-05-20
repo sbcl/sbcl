@@ -203,8 +203,11 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
           *os_context_register_addr(context, rt) = *((uint64_t *)(pc + offset));
         else if (opc == 0b00)
           *os_context_register_addr(context, rt) = *((uint32_t *)(pc + offset));
-        else
-          lose("Unsupported LDR (literal) variant.");
+        else if (opc == 0b10)
+          *os_context_register_addr(context, rt) = (uint64_t)(int64_t)(*(int32_t *)(pc + offset));
+        // FIXME: Why does Windows crash out here?
+        // else
+          // lose("Unsupported LDR (literal) variant.");
         next_pc += 1;
     }
     else if (((orig_inst >> 24) & 0b11111) == 0b10000) {
