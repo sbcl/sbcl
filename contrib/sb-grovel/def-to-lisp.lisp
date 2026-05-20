@@ -80,25 +80,39 @@ code:
   (destructuring-bind (cname &rest elements) cstruct
     (printf "(sb-grovel::define-c-struct ~A %ld" lispname
             (word-cast (format nil "sizeof(~A)" cname)))
-    (dolist (e elements)
-      (destructuring-bind (lisp-type lisp-el-name c-type c-el-name &key distrust-length) e
-        (printf " (~A ~A \"~A\"" lisp-el-name lisp-type c-type)
-        ;; offset
-        (as-c "{" cname "t;")
-        (printf "  %lu"
-                (format nil "((unsigned long~A)&(t.~A)) - ((unsigned long~A)&(t))"
-                        #+(and win32 64-bit) " long" #-(and win32 64-bit) ""
-                        c-el-name
-                        #+(and win32 64-bit) " long" #-(and win32 64-bit) ""))
-        (as-c "}")
-        ;; length
-        (if distrust-length
-            (printf "  0)")
-            (progn
-              (as-c "{" cname "t;")
-              (printf "  %ld)"
-                      (word-cast (format nil "sizeof(t.~A)" c-el-name)))
-              (as-c "}")))))
+    (when elements
+      (as-c "{" cname "t;")
+      (dolist (e elements)
+        (destructuring-bind (lisp-type lisp-el-name c-type c-el-name &key distrust-length) e
+          (printf " (~A ~A \"~A\"" lisp-el-name lisp-type c-type)
+          ;; offset
+          (flet ((ifdef (fun c-el-name)
+                   (cond ((typep c-el-name '(cons (eql :if)))
+                          (destructuring-bind (cond then else) (cdr c-el-name)
+                            (as-c "#if" cond)
+                            (funcall fun then)
+                            (as-c "#else")
+                            (funcall fun else)
+                            (as-c "#endif")))
+                         (t
+                          (funcall fun c-el-name)))))
+            (ifdef (lambda (c-el-name)
+                     (printf "  %lu"
+                             (format nil "((unsigned long~A)&(t.~A)) - ((unsigned long~A)&(t))"
+                                     #+(and win32 64-bit) " long" #-(and win32 64-bit) ""
+                                     c-el-name
+                                     #+(and win32 64-bit) " long" #-(and win32 64-bit) "")))
+                   c-el-name)
+
+            ;; length
+            (if distrust-length
+                (printf "  0)")
+                (ifdef (lambda (c-el-name)
+                         (printf "  %ld)"
+
+                                 (word-cast (format nil "sizeof(t.~A)" c-el-name))))
+                       c-el-name)))))
+      (as-c "}"))
     (printf ")")))
 
 (defun print-c-source (stream headers definitions package-name)

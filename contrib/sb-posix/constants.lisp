@@ -435,9 +435,13 @@
               (tcflag-t lflag "tcflag_t" "c_lflag")
               ((array cc-t) cc "cc_t" "c_cc")
               #-sunos
-              (speed-t ispeed "speed_t" "c_ispeed")
+              (speed-t ispeed "speed_t" (:if "defined(__linux__) && !defined(__GLIBC__)"
+                                             "__c_ispeed" ;; musl
+                                             "c_ispeed"))
               #-sunos
-              (speed-t ospeed "speed_t" "c_ospeed")))
+              (speed-t ospeed "speed_t" (:if "defined(__linux__) && !defined(__GLIBC__)"
+                                             "__c_ospeed" ;; musl
+                                             "c_ospeed"))))
 
  ;; utime(), utimes()
  #-win32
