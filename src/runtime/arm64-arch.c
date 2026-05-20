@@ -199,10 +199,14 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
         int opc = (orig_inst >> 30) & 0b11;
         int rt = orig_inst & 0b11111;
         int offset = sign_extend((orig_inst >> 5) & ~(1 << 19), 19);
+        unsigned int *new_pc = (pc + offset);
+
         if (opc == 0b01)
-            *os_context_register_addr(context, rt) = *((uint64_t *)(pc + offset));
+            *os_context_register_addr(context, rt) = *((uint64_t *)new_pc);
         else if (opc == 0b00)
-            *os_context_register_addr(context, rt) = *((uint32_t *)(pc + offset));
+            *os_context_register_addr(context, rt) = *((uint32_t *)new_pc);
+        else if (opc == 0b10)
+            *os_context_register_addr(context, rt) = *((int32_t *)new_pc);
         else
             lose("Unsupported LDR (literal) variant. %x", orig_inst);
         next_pc += 1;
