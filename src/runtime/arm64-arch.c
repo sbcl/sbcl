@@ -207,8 +207,7 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
             *os_context_register_addr(context, rt) = *((uint32_t *)new_pc);
         else if (opc == 0b10)
             *os_context_register_addr(context, rt) = *((int32_t *)new_pc);
-        else
-            lose("Unsupported LDR (literal) variant. %x", orig_inst);
+
         next_pc += 1;
     }
     else if (((orig_inst >> 24) & 0b11111) == 0b10000) {
