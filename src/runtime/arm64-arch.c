@@ -194,20 +194,17 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
         else
             next_pc += 1;
     }
-    else if (((orig_inst >> 24) & 0b11111) == 0b11000) {
+    else if (((orig_inst >> 24) & 0b111111) == 0b011000) {
         // LDR (literal)
         int opc = (orig_inst >> 30) & 0b11;
         int rt = orig_inst & 0b11111;
         int offset = sign_extend((orig_inst >> 5) & ~(1 << 19), 19);
         if (opc == 0b01)
-          *os_context_register_addr(context, rt) = *((uint64_t *)(pc + offset));
+            *os_context_register_addr(context, rt) = *((uint64_t *)(pc + offset));
         else if (opc == 0b00)
-          *os_context_register_addr(context, rt) = *((uint32_t *)(pc + offset));
-        else if (opc == 0b10)
-          *os_context_register_addr(context, rt) = (uint64_t)(int64_t)(*(int32_t *)(pc + offset));
-        // FIXME: Why does Windows crash out here?
-        // else
-          // lose("Unsupported LDR (literal) variant.");
+            *os_context_register_addr(context, rt) = *((uint32_t *)(pc + offset));
+        else
+            lose("Unsupported LDR (literal) variant. %x", orig_inst);
         next_pc += 1;
     }
     else if (((orig_inst >> 24) & 0b11111) == 0b10000) {
