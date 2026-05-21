@@ -282,7 +282,7 @@
   (let ((methods (mapcan (lambda (call)
                            (if (consp call)
                                (copy-list (compute-applicable-methods
-                                           (gdefinition (car call))
+                                           (fdefinition (car call))
                                            (cdr call)))
                                (list call)))
                          call-list))

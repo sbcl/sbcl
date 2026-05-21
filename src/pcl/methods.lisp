@@ -805,7 +805,7 @@
 
 (defun compute-applicable-methods-emf (generic-function)
   (if (eq **boot-state** 'complete)
-      (let* ((cam (gdefinition 'compute-applicable-methods))
+      (let* ((cam (fdefinition 'compute-applicable-methods))
              (cam-methods (compute-applicable-methods-using-types
                            cam (list `(eql ,generic-function) t))))
         (values (get-effective-method-function cam cam-methods)

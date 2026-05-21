@@ -83,7 +83,7 @@
                               (writer '(setf slot-value-using-class))
                               (boundp 'slot-boundp-using-class)
                               (makunbound 'slot-makunbound-using-class)))
-             (gf (gdefinition gf-name)))
+             (gf (fdefinition gf-name)))
         ;; KLUDGE: this logic is cut'n'pasted from
         ;; GET-ACCESSOR-METHOD-FUNCTION, which (for STD-CLASSes) is
         ;; only called later, because it does things that can't be
@@ -109,7 +109,7 @@
                       (writer '(setf slot-value-using-class))
                       (boundp 'slot-boundp-using-class)
                       (makunbound 'slot-makunbound-using-class)))
-           (gf (gdefinition gf-name)))
+           (gf (fdefinition gf-name)))
       (compute-slot-accessor-info slotd type gf))))
 
 ;;; CMUCL (Gerd PCL 2003-04-25) comment:
@@ -394,7 +394,7 @@
             'safe-p safe-p
             other))))
 
-(setf (gdefinition 'load-defclass) #'real-load-defclass)
+(setf (fdefinition 'load-defclass) #'real-load-defclass)
 
 (defun ensure-class (name &rest args)
   (with-world-lock ()
@@ -854,9 +854,9 @@
               (make-structure-class-defstruct-form name direct-slots include)
             (unless (structure-type-p name) (eval defstruct-form))
             (mapc (lambda (dslotd reader-name writer-name)
-                    (let* ((reader (gdefinition reader-name))
+                    (let* ((reader (fdefinition reader-name))
                            (writer (when (fboundp writer-name)
-                                     (gdefinition writer-name))))
+                                     (fdefinition writer-name))))
                       (setf (slot-value dslotd 'internal-reader-function)
                             reader)
                       (setf (slot-value dslotd 'internal-writer-function)

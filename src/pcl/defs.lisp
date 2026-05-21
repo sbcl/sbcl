@@ -38,14 +38,6 @@
            has already been partially loaded. This may not work, you may~%~
            need to get a fresh lisp (reboot) and then load PCL."))
 
-(declaim (inline gdefinition))
-(defun gdefinition (spec)
-  (sb-ext:unencapsulated-function spec))
-
-(defun (setf gdefinition) (new-value spec)
-  (sb-c::note-name-defined spec :function) ; FIXME: do we need this? Why?
-  (setf (fdefinition spec) new-value))
-
 ;;;; type specifier hackery
 
 ;;; internal to this file

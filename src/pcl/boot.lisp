@@ -82,7 +82,7 @@ bootstrapping.
 ;;; effect. This makes development easier.
 (loop for (name early-name) in *!early-functions*
    do (let ((early-name early-name))
-        (setf (gdefinition name)
+        (setf (fdefinition name)
               (set-fun-name
                (lambda (&rest args)
                  (apply (fdefinition early-name) args))
@@ -484,7 +484,7 @@ bootstrapping.
   (if (not (eq **boot-state** 'complete))
       (values nil nil)
       (let ((gf? (and (fboundp name)
-                      (gdefinition name))))
+                      (fdefinition name))))
         (if (or (null gf?)
                 (not (generic-function-p gf?)))
             (values (class-prototype (find-class 'standard-generic-function))
@@ -506,7 +506,7 @@ bootstrapping.
 ;;; Note: During bootstrapping, this function is allowed to return NIL.
 (defun method-prototype-for-gf (name)
   (let ((gf? (and (fboundp name)
-                  (gdefinition name))))
+                  (fdefinition name))))
     (cond ((neq **boot-state** 'complete) nil)
           ((or (null gf?)
                (not (generic-function-p gf?)))          ; Someone else MIGHT
@@ -668,7 +668,7 @@ bootstrapping.
   (make-method-initargs-form-internal method-lambda initargs env))
 
 (unless (fboundp 'make-method-initargs-form)
-  (setf (gdefinition 'make-method-initargs-form)
+  (setf (fdefinition 'make-method-initargs-form)
         (symbol-function 'real-make-method-initargs-form)))
 
 (defun real-make-method-lambda-using-specializers
@@ -684,7 +684,7 @@ bootstrapping.
     (make-method-lambda proto-gf proto-method method-lambda env)))
 
 (unless (fboundp 'make-method-lambda-using-specializers)
-  (setf (gdefinition 'make-method-lambda-using-specializers)
+  (setf (fdefinition 'make-method-lambda-using-specializers)
         (symbol-function 'real-make-method-lambda-using-specializers)))
 
 ;;; When bootstrapping PCL MAKE-METHOD-LAMBDA starts out as a regular
@@ -698,7 +698,7 @@ bootstrapping.
   (make-method-lambda-internal proto-gf proto-method method-lambda env))
 
 (unless (fboundp 'make-method-lambda)
-  (setf (gdefinition 'make-method-lambda)
+  (setf (fdefinition 'make-method-lambda)
         (symbol-function 'real-make-method-lambda)))
 
 (defun declared-specials (declarations)
@@ -981,7 +981,7 @@ bootstrapping.
     `(list ,@(mapcar #'make-parse-form specializer-names))))
 
 (unless (fboundp 'make-method-specializers-form)
-  (setf (gdefinition 'make-method-specializers-form)
+  (setf (fdefinition 'make-method-specializers-form)
         (symbol-function 'real-make-method-specializers-form)))
 
 (defun real-make-specializer-form-using-class/t
@@ -1031,7 +1031,7 @@ bootstrapping.
     (delegations)))
 
 (unless (fboundp 'make-specializer-form-using-class)
-  (setf (gdefinition 'make-specializer-form-using-class)
+  (setf (fdefinition 'make-specializer-form-using-class)
         (symbol-function 'real-make-specializer-form-using-class)))
 
 (defun real-specializer-type-specifier/specializer
@@ -1185,7 +1185,7 @@ bootstrapping.
     (delegations)))
 
 (unless (fboundp 'specializer-type-specifier)
-  (setf (gdefinition 'specializer-type-specifier)
+  (setf (fdefinition 'specializer-type-specifier)
         (symbol-function 'real-specializer-type-specifier)))
 
 (defun real-parse-specializer-using-class (generic-function specializer)
@@ -1214,7 +1214,7 @@ bootstrapping.
      (specializer-name-syntax-error specializer generic-function))))
 
 (unless (fboundp 'parse-specializer-using-class)
-  (setf (gdefinition 'parse-specializer-using-class)
+  (setf (fdefinition 'parse-specializer-using-class)
         (symbol-function 'real-parse-specializer-using-class)))
 
 (defun real-unparse-specializer-using-class (generic-function specializer)
@@ -1241,7 +1241,7 @@ bootstrapping.
              specializer generic-function)))
 
 (unless (fboundp 'unparse-specializer-using-class)
-  (setf (gdefinition 'unparse-specializer-using-class)
+  (setf (fdefinition 'unparse-specializer-using-class)
         (symbol-function 'real-unparse-specializer-using-class)))
 
 ;;; For passing a list (groveled by the walker) of the required
@@ -1811,8 +1811,8 @@ bootstrapping.
   (and (legal-fun-name-p name)
        (fboundp name)
        (if (eq **boot-state** 'complete)
-           (standard-generic-function-p (gdefinition name))
-           (funcallable-instance-p (gdefinition name)))))
+           (standard-generic-function-p (fdefinition name))
+           (funcallable-instance-p (fdefinition name)))))
 
 (defun method-plist-value (method key &optional default)
   (let ((plist (if (consp method)
@@ -1966,7 +1966,7 @@ bootstrapping.
 ;; for not catching errant keywords.
 (defun ensure-generic-function (fun-name &rest all-keys)
   (let ((existing (and (fboundp fun-name)
-                       (gdefinition fun-name))))
+                       (fdefinition fun-name))))
     (cond ((and existing
                 (eq **boot-state** 'complete)
                 (null (generic-function-p existing)))
@@ -2337,7 +2337,7 @@ bootstrapping.
     (replace (fsc-instance-slots fin) *sgf-slots-init*)
     (when function
       (setf (%funcallable-instance-fun fin) function))
-    (setf (gdefinition name) fin)
+    (setf (fdefinition name) fin)
     (!bootstrap-set-slot 'standard-generic-function fin 'name name)
     (!bootstrap-set-slot 'standard-generic-function fin
                          'source source-location)
@@ -2519,7 +2519,7 @@ bootstrapping.
           (generic-function-class lambda-list lambda-list-p initargs)
         (apply #'normalize-options options)
       (prog1
-          (setf (gdefinition fun-name)
+          (setf (fdefinition fun-name)
                 (apply #'make-instance generic-function-class
                        :name fun-name initargs))
         (note-gf-signature fun-name lambda-list-p lambda-list)))))
@@ -2780,7 +2780,7 @@ bootstrapping.
     ;; FIX-EARLY-GENERIC-FUNCTIONS.
     (dolist (early-gf-spec *!early-generic-functions*)
       (when (every #'early-method-standard-accessor-p
-                   (early-gf-methods (gdefinition early-gf-spec)))
+                   (early-gf-methods (fdefinition early-gf-spec)))
         (push early-gf-spec accessors)))
     (dolist (spec (nconc accessors
                          '(accessor-method-slot-name
@@ -2803,7 +2803,7 @@ bootstrapping.
 
     (dolist (early-gf-spec *!early-generic-functions*)
       (/show early-gf-spec)
-      (let* ((gf (gdefinition early-gf-spec))
+      (let* ((gf (fdefinition early-gf-spec))
              (methods (mapcar (lambda (early-method)
                                 (let ((args (copy-list (fifth
                                                         early-method))))
@@ -2820,10 +2820,10 @@ bootstrapping.
 
     (dolist (fn *!early-functions*)
       (/show fn)
-      (setf (gdefinition (car fn)) (fdefinition (caddr fn))))
+      (setf (fdefinition (car fn)) (fdefinition (caddr fn))))
 
     (loop for (fspec method-combination . methods) in *!generic-function-fixups*
-          for gf = (gdefinition fspec) do
+          for gf = (fdefinition fspec) do
           (labels ((translate-source-location (function)
                      ;; This is lifted from sb-introspect, OAOO and all that.
                      (let ((code (fun-code-header (sb-kernel::%fun-fun function)))
