@@ -140,9 +140,8 @@
       (clear-info :function :type name))))
 
 ;;; Return the fdefn-fun of NAME's fdefinition including any
-;;; encapsulations.  This is the core of the implementation of the standard
-;;; FDEFINITION function, but as we've defined FDEFINITION, that
-;;; strips encapsulations.
+;;; encapsulations. This is the core of the implementation of the
+;;; standard FDEFINITION function.
 (defun %coerce-name-to-fun (name)
   (typecase name
     ((and symbol (not null))
@@ -202,7 +201,11 @@
 (setf (symbol-function '%coerce-callable-for-call) (symbol-function '%coerce-callable-to-fun))
 
 
-;;;; definition encapsulation
+;;;; Function definition encapsulation
+;;;;
+;;;; The API is based on names to allow the associated function object
+;;;; to be changed. We do this for normal functions. For generic
+;;;; functions, we mutate the object.
 
 (defstruct (encapsulation-info (:constructor make-encapsulation-info
                                              (type definition))
@@ -303,55 +306,45 @@
               (when specialized-xep
                 (fset (%fun-name specialized-xep) specialized-xep)))))))))
 
+(defun unencapsulated-function (function)
+  "Return the innermost function within any encapsulations of the
+  function designated by FUNCTION. The identity of the returned
+  function is not affected by encapsulations.
+
+  Note that the unencapsulated function may be EQ to the designated
+  function even in the presence of encapsulations. For generic
+  functions, this is currently always the case."
+  (let ((fun (if (functionp function)
+                 function
+                 (fdefinition function))))
+    (loop
+      (let ((encap-info (encapsulation-info fun)))
+        (if encap-info
+            (setf fun (encapsulation-info-definition encap-info))
+            (return fun))))))
 
 ;;;; FDEFINITION
 
-;;; KLUDGE: Er, it looks as though this means that
-;;;    (FUNCALL (FDEFINITION 'FOO))
-;;; doesn't do the same thing as
-;;;    (FUNCALL 'FOO),
-;;; and (SYMBOL-FUNCTION 'FOO) isn't in general the same thing
-;;; as (FDEFINITION 'FOO). That doesn't look like ANSI behavior to me.
-;;; Look e.g. at the ANSI definition of TRACE: "Whenever a traced
-;;; function is invoked, information about the call, ..". Try this:
-;;;   (DEFUN FOO () (PRINT "foo"))
-;;;   (TRACE FOO)
-;;;   (FUNCALL 'FOO)
-;;;   (FUNCALL (FDEFINITION 'FOO))
-;;; What to do? ANSI says TRACE "Might change the definitions of the
-;;; functions named by function-names." Might it be OK to just get
-;;; punt all this encapsulation stuff and go back to a simple but
-;;; correct implementation of TRACE? We'd lose the ability to redefine
-;;; a TRACEd function and keep the trace in place, but that seems
-;;; tolerable to me. (Is the wrapper stuff needed for anything else
-;;; besides TRACE?)
-;;;
-;;; The only problem I can see with not having a wrapper: If tracing
-;;; EQ, EQL, EQUAL, or EQUALP causes its function address to change,
-;;; it will mess up the MAKE-HASH-TABLE logic which uses EQ tests
-;;; on those function values. But given the ANSI statement about
-;;; TRACE causing things to change, that doesn't seem too unreasonable;
-;;; and we might even be able to forbid tracing these functions.
-;;; -- WHN 2001-11-02
 (defun fdefinition (name)
-  "Return name's global function definition taking care to respect any
-   encapsulations and to return the innermost encapsulated definition.
-   This is SETF'able."
+  "Return the global function associated with NAME. SETFable.
+
+  Note that encapsulations (e.g. by TRACE and SB-PROFILE:PROFILE)
+  can change the global function definition. FDEFINITION always returns
+  outermost encapsulation. SB-EXT:UNENCAPSULATED-FUNCTION may be used
+  to get the innermost function.
+
+  When SETFed, NAME's encapsulations are kept and the innermost
+  encapsulated function is replaced by the new value (stripped from
+  any encapsulations)."
   (declare (explicit-check))
   ;; %COERCE-NAME-TO-FUN signals an error for macros and special operators,
   ;; but FDEFINITION should not, so pick off symbols using %SYMBOL-FUNCTION.
-  (strip-encapsulation (or (and (symbolp name) (%symbol-function name))
-                           (%coerce-name-to-fun name))))
-(defun strip-encapsulation (fun)
-    (loop
-     (let ((encap-info (encapsulation-info fun)))
-       (if encap-info
-           (setf fun (encapsulation-info-definition encap-info))
-           (return fun)))))
+  (or (and (symbolp name) (%symbol-function name))
+      (%coerce-name-to-fun name)))
 
 (define-load-time-global *setf-fdefinition-hook* nil
   "A list of functions that (SETF FDEFINITION) invokes before storing the
-   new value. The functions take the function name and the new value.")
+  new value. The functions take the function name and the new value.")
 
 ;; Reject any "object of implementation-dependent nature" that
 ;; so happens to be a function in SBCL, but which must not be
@@ -379,8 +372,7 @@
 (defun setf-fdefinition (new-value name clear-specialized-xep)
   (declare (type function new-value) (optimize (safety 1)))
   (declare (explicit-check))
-  (err-if-unacceptable-function new-value '(setf fdefinition))
-  (setq new-value (strip-encapsulation new-value))
+  (setq new-value (unencapsulated-function new-value))
   (with-single-package-locked-error (:symbol name "setting fdefinition of ~A")
     (maybe-clobber-ftype name new-value)
 
@@ -420,6 +412,7 @@
   "Set NAME's global function definition."
   (declare (type function new-value) (optimize (safety 1)))
   (declare (explicit-check))
+  (err-if-unacceptable-function new-value '(setf fdefinition))
   (setf-fdefinition new-value name t))
 
 ;;;; FBOUNDP and FMAKUNBOUND

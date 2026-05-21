@@ -40,14 +40,9 @@
 
 (declaim (inline gdefinition))
 (defun gdefinition (spec)
-  ;; This is null layer right now, but once FDEFINITION stops bypasssing
-  ;; fwrappers/encapsulations we can do that here.
-  (fdefinition spec))
+  (sb-ext:unencapsulated-function spec))
 
 (defun (setf gdefinition) (new-value spec)
-  ;; This is almost a null layer right now, but once (SETF
-  ;; FDEFINITION) stops bypasssing fwrappers/encapsulations we can do
-  ;; that here.
   (sb-c::note-name-defined spec :function) ; FIXME: do we need this? Why?
   (setf (fdefinition spec) new-value))
 

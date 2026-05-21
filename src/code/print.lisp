@@ -2084,16 +2084,21 @@ variable: an unreadable object representing the error is printed instead.")
     (when (unprintable-instance-p object)
       (return-from print-object
         (print-unreadable-object (object stream :type t :identity t)))))
-  (let* ((name (%fun-name object))
+  (let* ((unencapsulated (sb-ext:unencapsulated-function object))
+         (name (%fun-name unencapsulated))
          (proper-name-p (and (legal-fun-name-p name) (fboundp name)
                              (eq (fdefinition name) object))))
     ;; ":TYPE T" is no good, since CLOSURE doesn't have full-fledged status.
     (print-unreadable-object (object stream :identity (not proper-name-p))
-      (format stream "~A~@[ ~S~]"
-              ;; CLOSURE and SIMPLE-FUN should print as #<FUNCTION>
+      (format stream "~A~@[ ~S~]~:[ ENCAPSULATED~;~]"
+              ;; CLOSURE and SIMPLE-FUN should print as #<FUNCTION>,
               ;; but anything else prints as its exact type.
-              (if (funcallable-instance-p object) (type-of object) 'function)
-              name))))
+              (if (or (funcallable-instance-p object)
+                      (typep object 'sb-kernel:interpreted-function))
+                  (type-of object)
+                  'function)
+              name
+              (eq unencapsulated object)))))
 
 ;;;; catch-all for unknown things
 

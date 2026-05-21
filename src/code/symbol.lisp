@@ -119,7 +119,8 @@ distinct from the global value. Can also be SETF."
 (defun (setf %symbol-function) (newval symbol) (fset symbol newval))
 
 (defun symbol-function (symbol)
-  "Return SYMBOL's current function definition. Settable with SETF."
+  "Return SYMBOL's current function definition. SETFable. Behaves
+  identically to FDEFINITION for symbol arguments."
   (truly-the function (or (%symbol-function symbol) ; fast way
                           (%coerce-name-to-fun symbol)))) ; fallback w/restart
 
@@ -133,22 +134,11 @@ distinct from the global value. Can also be SETF."
 ;; 2. (SETF (SYMBOL-FUNCTION 'I-ONCE-WAS-A-MACRO) #'CONS)
 ;;    should _probably_ make I-ONCE-WAS-A-MACRO not a macro
 (defun (setf symbol-function) (new-value symbol)
-  (declare (type symbol symbol) (type function new-value))
   ;; (SYMBOL-FUNCTION symbol) == (FDEFINITION symbol) according to the writeup
   ;; on SYMBOL-FUNCTION. It doesn't say that SETF behaves the same, but let's
   ;; assume it does, and that we can't assign our macro/special guard funs.
   (err-if-unacceptable-function new-value '(setf symbol-function))
-  (setq new-value (strip-encapsulation new-value))
-  (with-single-package-locked-error
-      (:symbol symbol "setting the symbol-function of ~A")
-    ;; This code is a little "surprising" in that it is not just a limited
-    ;; case of (SETF FDEFINITION), but instead a different thing.
-    ;; I really think the code paths should be reconciled.
-    ;; e.g. what's up with *USER-HASH-TABLE-TESTS* being checked
-    ;; in %SET-FDEFINITION but not here?
-    (remove-specialized-xep symbol)
-    (maybe-clobber-ftype symbol new-value)
-    (fset symbol new-value)))
+  (setf-fdefinition new-value symbol t))
 
 ;;; Incredibly bogus kludge: the :CAS-TRANS option in objdef makes no indication
 ;;; that you can not use it on certain platforms, so then you do try to use it,

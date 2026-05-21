@@ -231,7 +231,8 @@
                        ((and (symbolp name) (special-operator-p name))
                         (fdefinition name))
                        ((and (symbolp name) (macro-function name)))
-                       ((fdefinition name))))))))
+                       ((fdefinition name)
+                        (sb-ext:unencapsulated-function name))))))))
 
   (defmethod documentation ((x function) (doc-type (eql 't)))
     (fun-doc x))

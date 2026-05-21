@@ -256,12 +256,7 @@ will return NIL."
            (and (symbolp name)
                 (find-class name nil)))
          (real-fdefinition (name)
-           ;; for getting the real function object, even if the
-           ;; function is being profiled
-           (let ((profile-info (gethash name sb-profile::*profiled-fun-name->info*)))
-             (if profile-info
-                 (sb-profile::profile-info-encapsulated-fun profile-info)
-                 (fdefinition name)))))
+           (sb-ext:unencapsulated-function name)))
     (ensure-list
      (case type
        ((:variable)

@@ -151,7 +151,9 @@
        (cond ((not valid)
               (warn "~S is not a valid function name, not tracing." x))
              ((fboundp x)
-              (values (or definition (fdefinition x)) block-name :function))
+              (values (sb-ext:unencapsulated-function
+                       (or definition (fdefinition x)))
+                      block-name :function))
              (t
               (warn "~/sb-ext:print-symbol-with-prefix/ is ~
                     undefined, not tracing." x)))))))

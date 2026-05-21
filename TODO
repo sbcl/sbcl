@@ -65,10 +65,7 @@ ADVICE/FWRAP
   SBCL has an internal function encapsulation mechanism, and is able to
   install breakpoint to function start/end -- this is used to implement
   the instrumentation based profiler and tracing. It would be good to
-  have this as an exported interface, and it would be good if the
-  SYMBOL-FUNCTION / FDEFINITION confusion was fixed: currently the
-  latter returns the underlying definition, whereas the first returns
-  the encapsulation.
+  have this as an exported interface.
 
 POLICY MADNESS
 

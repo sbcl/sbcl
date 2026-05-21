@@ -1435,6 +1435,7 @@ and its context.
 @include fun-sb-ext-delete-directory.texinfo
 @include fun-sb-ext-get-time-of-day.texinfo
 @include fun-sb-ext-assert-version-gt=.texinfo
+@include fun-sb-ext-unencapsulated-function.texinfo
 
 @node Stale Extensions
 @comment  node-name,  next,  previous,  up

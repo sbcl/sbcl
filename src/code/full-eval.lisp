@@ -622,12 +622,6 @@
                 (interpreted-apply function args)))
       function))
 
-(defmethod print-object ((obj interpreted-function) stream)
-  (print-unreadable-object (obj stream
-                            :identity (not (interpreted-function-name obj)))
-    (format stream "~A ~A" '#:interpreted-function
-            (interpreted-function-name obj))))
-
 ;;; Create an interpreted function from the lambda-form EXP evaluated
 ;;; in the environment ENV.
 (defun eval-lambda (exp env)

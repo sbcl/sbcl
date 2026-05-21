@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.6.5:
+  * minor incompatible change: FDEFINITION now returns the outermost wrapper
+    (added e.g. by TRACE, PROFILE) like SYMBOL-FUNCTION.  (lp#799533)
+
 changes in sbcl-2.6.5 relative to sbcl-2.6.4:
   * minor incompatible change: the condition signalled when an accessed slot
     is missing from an object is no longer a TYPE-ERROR.

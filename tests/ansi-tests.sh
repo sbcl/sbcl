@@ -67,7 +67,7 @@ rm -fr sandbox/scratch
          (if (member :sb-fasteval sb-impl:+internal-features+)
              (list "INTERSECTION.FOLD.1" "UNION.FOLD.1" "SET-DIFFERENCE.FOLD.1"
                    "SET-EXCLUSIVE-OR.FOLD.1"
-                   "ALL-STRUCTURE-CLASSES-ARE-SUBTYPES-OF-STRUCTURE-OBJECT.2" "TRACE.8")
+                   "ALL-STRUCTURE-CLASSES-ARE-SUBTYPES-OF-STRUCTURE-OBJECT.2")
              (list "MAP.48" "SYMBOL-FUNCTION.ERROR.5"
                    "SUBSTITUTE-IF-NOT.FOLD.4" "REMOVE-IF.FOLD.2"
                     "REMOVE-IF-NOT.FOLD.1" "REMOVE-IF-NOT.FOLD.3" "REMOVE-IF-NOT.FOLD.4"))

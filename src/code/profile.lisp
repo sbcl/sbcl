@@ -88,8 +88,6 @@
    :synchronized t))
 (defstruct (profile-info (:copier nil))
   (name              (missing-arg) :read-only t)
-  (encapsulated-fun  (missing-arg) :type function :read-only t)
-  (encapsulation-fun (missing-arg) :type function :read-only t)
   (read-stats-fun    (missing-arg) :type function :read-only t)
   (clear-stats-fun   (missing-arg) :type function :read-only t))
 (declaim (freeze-type profile-info))
@@ -144,8 +142,8 @@
 ;;; Return a collection of closures over the same lexical context,
 ;;;   (VALUES ENCAPSULATION-FUN READ-STATS-FUN CLEAR-STATS-FUN).
 ;;;
-;;; ENCAPSULATION-FUN is a plug-in replacement for ENCAPSULATED-FUN,
-;;; which updates statistics whenever it's called.
+;;; ENCAPSULATION-FUN is function similar to APPLY, but it also
+;;; updates statistics whenever it's called.
 ;;;
 ;;; READ-STATS-FUN returns the statistics:
 ;;;   (VALUES COUNT TIME CONSING PROFILE).
@@ -265,18 +263,15 @@
 ;;; Profile the named function, which should exist and not be profiled
 ;;; already.
 (defun profile-1-unprofiled-fun (name)
-  (let ((encapsulated-fun (fdefinition name)))
-    (multiple-value-bind (encapsulation-fun read-stats-fun clear-stats-fun)
-        (profile-encapsulation-lambdas)
-      (without-package-locks
-        (encapsulate name 'profile encapsulation-fun))
-      (setf (gethash name *profiled-fun-name->info*)
-            (make-profile-info :name name
-                               :encapsulated-fun encapsulated-fun
-                               :encapsulation-fun encapsulation-fun
-                               :read-stats-fun read-stats-fun
-                               :clear-stats-fun clear-stats-fun))
-      (values))))
+  (multiple-value-bind (encapsulation-fun read-stats-fun clear-stats-fun)
+      (profile-encapsulation-lambdas)
+    (without-package-locks
+      (encapsulate name 'profile encapsulation-fun))
+    (setf (gethash name *profiled-fun-name->info*)
+          (make-profile-info :name name
+                             :read-stats-fun read-stats-fun
+                             :clear-stats-fun clear-stats-fun))
+    (values)))
 
 ;;; Profile the named function. If already profiled, unprofile first.
 (defun profile-1-fun (name)
