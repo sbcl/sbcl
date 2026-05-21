@@ -513,24 +513,15 @@ has written, having proved that it is unreachable."))
     (force-output stream)
     (values)))
 
-;;; Return a string that somehow names the code in COMPONENT. We use
-;;; the source path for the bind node for an arbitrary entry point to
-;;; find the source context, then return that as a string.
-(declaim (ftype (function (component) simple-string) find-component-name))
+;;; We use the source path for the bind node for an arbitrary entry
+;;; point to find the source context.
+(declaim (ftype (sfunction (component) t) find-component-name))
 (defun find-component-name (component)
-  (let ((ep (first (block-succ (component-head component)))))
-    (aver ep) ; else no entry points??
-    (multiple-value-bind (form context)
-        (find-original-source (node-source-path (block-start-node ep)))
-      (declare (ignore form))
-      (let ((*print-level* 2)
-            (*print-pretty* nil))
-        ;; It's arbitrary how this name is stringified.
-        ;; Using ~A in lieu of ~S prevents "SB-" strings from getting in.
-        (format nil
-                "~{~{~A~^ ~}~^ => ~}"
-                #+sb-xc-host (list (list (caar context)))
-                #-sb-xc-host context)))))
+  (let* ((ep (first (block-succ (component-head component))))
+         (context (nth-value 1
+                             (find-original-source (node-source-path (block-start-node ep))))))
+
+    (car context)))
 
 ;;;; condition system interface
 
