@@ -378,7 +378,7 @@
                                     (specifier-type '(integer 1)))))
                          (if type
                              (type-intersection type r)
-                             (specifier-type r))))))
+                             r)))))
                  ;; (logxor x (1+ x)) is positive, except -1 => -1.
                  (multiple-value-bind (name combination args)
                      (combination-matches* '(+) '(* 1) (lvar-uses y) :cast-type (specifier-type 'integer))
@@ -390,22 +390,22 @@
                                     (specifier-type '(integer 1)))))
                          (if type
                              (type-intersection type r)
-                             (specifier-type r))))))
+                             r)))))
                  ;; (logxor x (- x)) is <= 0
                  (combination-case (x :cast (specifier-type 'integer))
                    (%negate (*)
                     (when (same-leaf-ref-p (car args) y)
                       (multiple-value-bind (len pos neg low high) (integer-type-length (lvar-type y))
                         (declare (ignore pos neg))
-                        (let* ((int (if len
-                                        (make-numeric-type 'integer
-                                                           (ash -1 (integer-length (max (abs low) (abs high))))
-                                                           (if (<= low 0 high)
-                                                               0
-                                                               -2))
-                                        (if (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))
-                                            (specifier-type '(integer * 0))
-                                            (specifier-type '(integer * -2))))))
+                        (let ((int (if len
+                                       (make-numeric-type 'integer
+                                                          (ash -1 (integer-length (max (abs low) (abs high))))
+                                                          (if (<= low 0 high)
+                                                              0
+                                                              -2))
+                                       (if (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))
+                                           (specifier-type '(integer * 0))
+                                           (specifier-type '(integer * -2))))))
                           (if type
                               (type-intersection type int)
                               int)))))))))
