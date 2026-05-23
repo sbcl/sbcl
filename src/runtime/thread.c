@@ -11,6 +11,9 @@
 #ifdef __linux__
 #define _GNU_SOURCE // for pthread_setname_np()
 #endif
+#ifdef __APPLE__
+#define _DARWIN_C_SOURCE // for pthread_mach_thread_np()
+#endif
 #include "genesis/sbcl.h"
 
 #include <stdlib.h>
