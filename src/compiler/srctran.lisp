@@ -3254,25 +3254,12 @@
        (make-numeric-type 'integer lo-res hi-res)))))
 
 (defoptimizer (char-code derive-type) ((char))
-  (let ((type (type-intersection (lvar-type char) (specifier-type 'character))))
-    (cond ((member-type-p type)
-           (specifier-type
-            `(member
-              ,@(loop for member in (member-type-members type)
-                      when (characterp member)
-                      collect (char-code member)))))
-          ((sb-kernel::character-set-type-p type)
-           (specifier-type
-            `(or
-              ,@(loop for (low . high)
-                      in (character-set-type-pairs type)
-                      collect `(integer ,low ,high)))))
-          ((csubtypep type (specifier-type 'base-char))
-           (specifier-type
-            (make-numeric-type 'mod base-char-code-limit)))
-          (t
-           (specifier-type
-            (make-numeric-type 'mod char-code-limit))))))
+  (let ((type (lvar-type char)))
+    (when (sb-kernel::character-set-type-p type)
+      (specifier-type
+       `(or
+         ,@(loop for (low . high) in (character-set-type-pairs type)
+                 collect `(integer ,low ,high)))))))
 
 (defoptimizer (code-char derive-type) ((code))
   (one-arg-derive-type code
