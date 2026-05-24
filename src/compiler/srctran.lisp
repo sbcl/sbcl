@@ -9337,16 +9337,20 @@
   (delete-lvar-cast-if (specifier-type '(or stream boolean)) stream)
   `(block nil
      (or (and (sb-impl::ansi-stream-p stream)
-              (let* ((buffer (sb-impl::ansi-stream-cin-buffer stream))
-                     (index (ansi-stream-in-index stream)))
+              (let ((buffer (sb-impl::ansi-stream-cin-buffer stream))
+                    (index (ansi-stream-in-index stream)))
                 (if buffer
                     (when (/= index sb-impl::+ansi-stream-in-buffer-length+)
                       (prog1
                           (aref buffer index)
                         (setf (ansi-stream-in-index stream) (1+ index))))
-                    (return (funcall (ansi-stream-in stream) stream ,(if eof-error-p
-                                                                         'eof-error-p
-                                                                         t) eof-value)))))
+                    (return
+                      (values (funcall (ansi-stream-in stream)
+                                       stream
+                                       ,(if eof-error-p
+                                            'eof-error-p
+                                            t)
+                                       eof-value))))))
          (locally (declare (notinline read-char))
            (read-char ,@(loop for (lvar var) on (list stream 'stream
                                                       eof-error-p 'eof-error-p
