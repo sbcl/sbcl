@@ -803,7 +803,6 @@
                            ((shuffle-mask complex-double-reg))
                            ((shuffle-mask2 complex-double-reg))
                            ((16-bits complex-double-reg))
-                           ((16-bits-2 complex-double-reg))
                            ((32-bits complex-double-reg))
                            ((32-bits-2 complex-double-reg))
                            ((count unsigned-reg)))
@@ -862,7 +861,6 @@
                 ;; Widen
                 (inst ushll 16-bits :8h temp :8b)
                 (inst ushll 32-bits :4s 16-bits :4h)
-                (inst ushll2 16-bits-2 :8h temp :16b)
                 (inst ushll2 32-bits-2 :4s 16-bits :8h)
                 (inst stp 32-bits 32-bits-2 (@ char-array 32 :post-index))
                 (inst sub char-array char-array (lsl count 2))
@@ -884,7 +882,6 @@
 
                 (inst ushll 16-bits :8h temp :8b)
                 (inst ushll 32-bits :4s 16-bits :4h)
-                (inst ushll2 16-bits-2 :8h temp :16b)
                 (inst ushll2 32-bits-2 :4s 16-bits :8h)
                 (inst stp 32-bits 32-bits-2 (@ char-array 32 :post-index))
                 (inst sub char-array char-array (lsl count 2))
