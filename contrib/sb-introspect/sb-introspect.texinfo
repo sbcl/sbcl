@@ -1,0 +1,61 @@
+@node sb-introspect
+@section sb-introspect
+@cindex Introspection Library
+
+The @code{sb-introspect} module is about finding definitions, as well
+as querying their properties and relationships in the running image.
+
+@menu
+* Finding Definitions::
+* Special Variables in sb-introspect::
+* Functions::
+* Types and Classes::
+* Allocation::
+@end menu
+
+
+@node Finding Definitions
+@subsection Finding Definitions
+
+@include struct-sb-introspect-definition-source.texinfo
+@include fun-sb-introspect-definition-source-pathname.texinfo
+@include fun-sb-introspect-definition-source-form-path.texinfo
+@include fun-sb-introspect-definition-source-form-number.texinfo
+@include fun-sb-introspect-definition-source-character-offset.texinfo
+@include fun-sb-introspect-definition-source-file-write-date.texinfo
+@include fun-sb-introspect-definition-source-plist.texinfo
+
+@include fun-sb-introspect-find-definition-source.texinfo
+@include fun-sb-introspect-find-definition-sources-by-name.texinfo
+
+@node Special Variables in sb-introspect
+@subsection Special Variables
+
+@include fun-sb-introspect-who-binds.texinfo
+@include fun-sb-introspect-who-references.texinfo
+@include fun-sb-introspect-who-sets.texinfo
+
+@node Functions
+@subsection Functions
+
+@include fun-sb-introspect-function-lambda-list.texinfo
+@include fun-sb-introspect-function-type.texinfo
+@include fun-sb-introspect-method-combination-lambda-list.texinfo
+@include fun-sb-introspect-valid-function-name-p.texinfo
+@include fun-sb-introspect-find-function-callers.texinfo
+@include fun-sb-introspect-find-function-callees.texinfo
+@include fun-sb-introspect-who-calls.texinfo
+@include fun-sb-introspect-who-macroexpands.texinfo
+
+@node Types and Classes
+@subsection Types and Classes
+
+@include fun-sb-introspect-deftype-lambda-list.texinfo
+@include fun-sb-introspect-who-specializes-directly.texinfo
+@include fun-sb-introspect-who-specializes-generally.texinfo
+
+@node Allocation
+@subsection Allocation
+
+@include fun-sb-introspect-allocation-information.texinfo
+@include fun-sb-introspect-map-root.texinfo

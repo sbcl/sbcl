@@ -17,7 +17,7 @@
 ;;; own project, there will be much wailing and gnashing of teeth.
 ;;; Your teeth.  If need be, we'll kick them for you.  This is a
 ;;; contrib, we're allowed to look in internals.  You're an
-;;; application programmer, and are not.
+;;; application programmer and are not.
 
 ;;; TODO
 ;;; 3) error handling.  Signal random errors, or handle and resignal 'our'
@@ -67,7 +67,7 @@
 ;;;
 (deftype debug-info ()
   "Structure containing all the debug information related to a function.
-Function objects reference debug-infos which in turn reference
+Function objects reference debug-infos, which in turn reference
 debug-sources and so on."
   'sb-c::compiled-debug-info)
 
@@ -92,8 +92,9 @@ include the pathname of the file and the position of the definition."
   (sb-c::debug-info-source debug-info))
 
 (defun valid-function-name-p (name)
-  "True if NAME denotes a valid function name, ie. one that can be passed to
-FBOUNDP."
+  "See if NAME is a valid function name. In addition to the ANSI
+definition of function name, which is symbols plus lists like (SETF
+SYMBOL), SBCL allows (CAS SYMBOL) and various internal constructs."
   (and (sb-int:valid-function-name-p name) t))
 
 ;;;; Utilities for code
@@ -108,9 +109,9 @@ FBOUNDP."
 (declaim (inline map-allocated-code-components))
 (defun map-allocated-code-components (spaces fn)
   "Call FN for each allocated code component in one of SPACES.  FN
-receives the object and its size as arguments.  SPACES should be a
-list of the symbols :dynamic, :static, :read-only, or :immobile on
-#+immobile-space"
+receives the object and its size as arguments. SPACES should be a list
+of the symbols :DYNAMIC, :STATIC, :READ-ONLY, or :IMMOBILE on
+#+IMMOBILE-SPACE. The shorthand (:ALL) is also accepted."
   (apply #'sb-vm:map-allocated-objects
      (lambda (obj header size)
        (when (= sb-vm:code-header-widetag header)
@@ -119,7 +120,7 @@ list of the symbols :dynamic, :static, :read-only, or :immobile on
 
 (declaim (inline map-caller-code-components))
 (defun map-caller-code-components (function spaces fn)
-  "Call FN for each code component with a fdefn for FUNCTION in its
+  "Call FN for each code component with a FDEFN for FUNCTION in its
 constant pool."
   (let ((function (coerce function 'function)))
     (map-allocated-code-components
@@ -146,32 +147,112 @@ constant pool."
 
 ;;;; Finding definitions
 
-(defstruct definition-source
-  ;; Pathname of the source file that the definition was compiled from.
-  ;; This is null if the definition was not compiled from a file.
-  (pathname nil :type (or null pathname))
-  ;; Source-path of the definition within the file.
-  ;; This may be incomplete depending on the debug level at which the
-  ;; source was compiled.
-  (form-path '() :type list)
-  ;; Depth first number of the form.
-  ;; FORM-PATH above usually contains just the top-level form number,
-  ;; ideally the proper form path could be dervied from the
-  ;; form-number and the tlf-number, but it's a bit complicated and
-  ;; Slime already knows how to deal with form numbers, so delegate
-  ;; that job to Slime.
-  (form-number nil :type (or null unsigned-byte))
-  ;; Character offset of the top-level-form containing the definition.
-  ;; This corresponds to the first element of form-path.
-  (character-offset nil :type (or null unsigned-byte))
-  ;; File-write-date of the source file when compiled.
-  ;; Null if not compiled from a file.
-  (file-write-date nil :type (or null unsigned-byte))
-  ;; plist from WITH-COMPILATION-UNIT
-  (plist nil)
+(defmacro defstruct* (name-and-options &rest slot-descriptions)
+  "Like DEFSTRUCT, but support :DOCUMENTATION among slot options.
+The documentation is attached to the slot's STRUCTURE-ACCESSOR.
+Example:
+
+    (defstruct* my-struct
+      (my-slot nil :documentation \"docstring\"))
+
+In addition to the normal DEFSTRUCT processing, the above also does
+the moral equivalent of
+
+    (setf (documentation 'my-struct-my-slot 'function) \"docstring\")"
+  (destructuring-bind (name &rest options)
+      (sb-c::ensure-list name-and-options)
+    (let* ((conc-name-option (find :conc-name options :key (lambda (x)
+                                                             (if (consp x)
+                                                                 (car x)
+                                                                 x))))
+           (conc-name (cond ((not conc-name-option)
+                             (format nil "~A-" name))
+                            ((or (atom conc-name-option)
+                                 (null (cdr conc-name-option))
+                                 (null (second conc-name-option)))
+                             "")
+                            (t
+                             (string (second conc-name-option)))))
+           (not-found (gensym))
+           (set-doc-forms ())
+           (new-sds
+             (loop
+               for sd in slot-descriptions
+               collect (let ((documentation
+                               (and (listp sd)
+                                    (getf (cddr sd) :documentation not-found))))
+                         (cond
+                           ((or (not (listp sd))
+                                (eq documentation not-found))
+                            sd)
+                           (t
+                            (let ((accessor-name (intern
+                                                  (format nil "~A~A" conc-name
+                                                          (first sd)))))
+                              (push `(setf (documentation ',accessor-name
+                                                          'function)
+                                           ,documentation)
+                                    set-doc-forms))
+                            (let ((sd (copy-seq sd)))
+                              (remf (cddr sd) :documentation)
+                              sd)))))))
+      `(progn
+         (defstruct ,name-and-options
+           ,@new-sds)
+         ,@set-doc-forms))))
+
+;;; FIXME: Rename this
+(defstruct* definition-source
+  "This structure identifies a sexp in a compiled file.
+Despite the name, the source location may not correspond to a
+definition but to e.g. a function call (see WHO-CALLS)."
+  (pathname
+   nil :type (or null pathname)
+   :documentation "Pathname of the source file.
+This is NIL if the source location is not in a compiled file.")
+  (form-path
+   '() :type list
+   :documentation "List of indices that identify the sexp in the
+file given by DEFINITION-SOURCE-PATHNAME. The first element in the
+list is the index of the top-level form that contains the sexp. If the
+file was compiled at a high enough debug level, then the rest of the
+elements recursively index into the list structure of the top-level
+form.
+
+Thus, the form path is somewhat stable regarding edits in the file,
+but it gets invalidated by, for example, inserting a new top-level
+form before the sexp in question.")
+  (form-number
+   nil :type (or null unsigned-byte)
+   :documentation "Depth-first index of the sexp within the top-level
+form identified by the first element of DEFINITION-SOURCE-FORM-PATH.
+That is, this is the index of the sexp in the list of subexpressions
+of the top-level form ordered according to depth-first traversal. 0
+corresponds to the top-level form itself.
+
+When combined with the index of the top-level form (given by the first
+element of DEFINITION-SOURCE-FORM-PATH), the form number allows
+reconstruction of the rest of the form path, which may be missing.
+This requires parsing the source file. Currently, this job is
+delegated to e.g. SLIME.")
+  (character-offset
+   nil :type (or null unsigned-byte)
+   :documentation "Character offset of the top-level form containing
+the sexp.")
+  (file-write-date
+   nil :type (or null unsigned-byte)
+   :documentation "FILE-WRITE-DATE of DEFINITION-SOURCE-PATHNAME at
+the time of compilation. NIL if not compiled from a file.")
+  (plist
+   nil
+   :documentation "The SOURCE-PLIST from WITH-COMPILATION-UNIT in effect
+when the file was compiled.")
   ;; Any extra metadata that the caller might be interested in. For
-  ;; example the specializers of the method whose definition-source this
-  ;; is.
+  ;; example, DEFINITION-SOURCE of a method contains the specializers
+  ;; of the method to help disambiguate it.
+  ;;
+  ;; FIXME: This is currently unexported, but it is also necessary to
+  ;; disambiguate methods. See e.g. WHO-SPECIALIZES-DIRECTLY.
   (description nil :type list))
 
 (defun vops-translating-fun (name)
@@ -204,9 +285,12 @@ constant pool."
 
 (defun find-definition-sources-by-name (name type)
   "Returns a list of DEFINITION-SOURCEs for definitions of NAME with
-the given definition TYPE. TYPE can currently be one of the following.
+the given definition TYPE. A DEFINITION-SOURCE object is always
+returned for definitions that exist, but the source location (e.g.
+DEFINITION-SOURCE-PATHNAME) may be missing. TYPE can currently be one
+of the following.
 
-Public definition TYPEs:
+Public definition types:
 
     :CLASS
     :COMPILER-MACRO
@@ -227,7 +311,7 @@ Public definition TYPEs:
     :VARIABLE
     :DECLARATION
 
-Internal definition TYPEs:
+Internal definition types:
 
     :OPTIMIZER
     :SOURCE-TRANSFORM
@@ -250,8 +334,8 @@ Valid NAMEs are generally SYMBOLs with the following exceptions:
 
 - For :PACKAGE, string designators are valid.
 
-If an unsupported TYPE is requested or NAME is invalid, the function
-will return NIL."
+If an unsupported TYPE is requested or NAME is invalid, this function
+returns NIL."
   (flet ((get-class (name)
            (and (symbolp name)
                 (find-class name nil)))
@@ -438,6 +522,18 @@ will return NIL."
         nil)))))
 
 (defun find-definition-source (object)
+  "Return the DEFINITION-SOURCE corresponding to the definition of OBJECT
+or NIL if there is no corresponding definition. OBJECT must be a
+PACKAGE, FUNCTION, METHOD, METHOD-COMBINATION, SB-MOP:SLOT-DEFINITION,
+STANDARD-OBJECT, STRUCTURE-OBJECT, CONDITION, CLASS, STRUCTURE-CLASS,
+or a subclass of CONDITION. An error is signalled for other types.
+
+A DEFINITION-SOURCE object is always returned for definitions that
+exist, but the source location (e.g. DEFINITION-SOURCE-PATHNAME) may
+be missing.
+
+For definitions that do not define an object (e.g. DEFVAR), use
+FIND-DEFINITION-SOURCES-BY-NAME."
   (typecase object
     ((or sb-pcl::condition-class sb-pcl::structure-class)
      (let ((classoid (sb-pcl::class-classoid object)))
@@ -533,13 +629,13 @@ will return NIL."
   (function-lambda-list function))
 
 (defun function-lambda-list (function)
-  "Return the lambda list for the extended function designator FUNCTION.
-Works for special-operators, macros, simple functions, interpreted functions,
-and generic functions. Signals an error if FUNCTION is not a valid extended
-function designator.
+  "Return the lambda list of FUNCTION.
+FUNCTION must be a function object or a function name in the sense of
+VALID-FUNCTION-NAME-P. Works for special operators, macros, simple
+functions, interpreted functions, and generic functions.
 
-If the function does not have a lambda list (compiled with debug 0),
-then two values are returned: (values nil t)"
+The second return value indicates whether the lambda list could not be
+determined (e.g. because the function was compiled with DEBUG 0)."
   (cond ((and (symbolp function) (special-operator-p function))
          (function-lambda-list (info :function :ir1-convert function)))
         ((valid-function-name-p function)
@@ -554,14 +650,19 @@ then two values are returned: (values nil t)"
                (values nil t)
                (values raw-result nil))))))
 
-(defun deftype-lambda-list (typespec-operator)
-  "Returns the lambda list of TYPESPEC-OPERATOR as first return
-value, and a flag whether the arglist could be found as second
-value."
-  (check-type typespec-operator symbol)
-  ;; Don't return a lambda-list for combinators AND,OR,NOT.
-  (let* ((f (and (info :type :kind typespec-operator)
-                 (info :type :expander typespec-operator)))
+(defun deftype-lambda-list (type-specifier-name)
+  "Returns the lambda list of TYPE-SPECIFIER-NAME as the first return
+value, and a flag whether the arglist could be found as the second
+value.
+
+TYPE-SPECIFIER-NAME must be a symbol. This function can find the
+lambda list of derived type specifiers (e.g. those defined with
+DEFTYPE) and classes with compound type specifier syntaxes (e.g. the
+class FLOAT). It returns NIL, NIL for other type specifiers (e.g. AND,
+OR, NOT) and types (e.g. LIST)."
+  (check-type type-specifier-name symbol)
+  (let* ((f (and (info :type :kind type-specifier-name)
+                 (info :type :expander type-specifier-name)))
          (f (if (listp f) (car f) f)))
     (if (functionp f)
         (let ((lambda-list (%fun-lambda-list f)))
@@ -571,7 +672,7 @@ value."
         (values nil nil))))
 
 (defun method-combination-lambda-list (method-combination)
-  "Return the lambda-list of METHOD-COMBINATION designator.
+  "Return the lambda list of the METHOD-COMBINATION designator.
 METHOD-COMBINATION can be a method combination object,
 or a method combination name."
   (let* ((name (etypecase method-combination
@@ -583,7 +684,7 @@ or a method combination name."
     (sb-pcl::method-combination-info-lambda-list info)))
 
 (defun function-type (function-designator)
-  "Returns the ftype of FUNCTION-DESIGNATOR, or NIL."
+  "Returns the ftype of FUNCTION-DESIGNATOR or NIL."
   (etypecase function-designator
     ((or symbol cons)
      ;; XXX: why require FBOUNDP? Would it be wrong to always report the proclaimed type?
@@ -651,7 +752,12 @@ or a method combination name."
         callees)))
 
 (defun find-function-callers (function &optional (spaces '(:all)))
-  "Return functions which call FUNCTION, by searching SPACES for code objects"
+  "List functions that call FUNCTION by searching SPACES for code objects.
+This can make previously garbage objects live.
+
+SPACES should be a list of the symbols :DYNAMIC, :STATIC, :READ-ONLY,
+or :IMMOBILE on #+IMMOBILE-SPACE. The shorthand (:ALL) is also
+accepted."
   (let ((referrers '()))
     (map-caller-code-components
      function
@@ -820,47 +926,46 @@ or a method combination name."
       result)))))
 
 (defun who-calls (function-name)
-  "Use the xref facility to search for source locations where the
-global function named FUNCTION-NAME is called. Returns a list of
-function name, definition-source pairs."
+  "Find the source locations where the global function FUNCTION-NAME is
+called, and return them as an alist of function or macro name,
+DEFINITION-SOURCE pairs."
   (collect-xref :calls function-name))
 
 (defun who-binds (symbol)
-  "Use the xref facility to search for source locations where the
-special variable SYMBOL is rebound. Returns a list of function name,
-definition-source pairs."
+  "Find the source locations where the special variable SYMBOL is bound,
+and return them as an alist of function or macro name,
+DEFINITION-SOURCE pairs."
   (collect-xref :binds symbol))
 
 (defun who-references (symbol)
-  "Use the xref facility to search for source locations where the
-special variable or constant SYMBOL is read. Returns a list of function
-name, definition-source pairs."
+  "Find the source locations where the special variable SYMBOL is read,
+and return them as an alist of function or macro name,
+DEFINITION-SOURCE pairs."
   (collect-xref :references symbol))
 
 (defun who-sets (symbol)
-  "Use the xref facility to search for source locations where the
-special variable SYMBOL is written to. Returns a list of function name,
-definition-source pairs."
+  "Find the source locations where the special variable SYMBOL is set,
+and return them as an alist of function or macro name,
+DEFINITION-SOURCE pairs."
   (collect-xref :sets symbol))
 
 (defun who-macroexpands (macro-name)
-  "Use the xref facility to search for source locations where the
-macro MACRO-NAME is expanded. Returns a list of function name,
-definition-source pairs."
+  "Find the source locations where the macro MACRO-NAME is expanded, and
+return them as an alist of function or macro name, DEFINITION-SOURCE
+pairs."
   (collect-xref :macroexpands macro-name))
 
 (defun who-specializes-directly (class-designator)
-  "Search for source locations of methods directly specializing on
-CLASS-DESIGNATOR. Returns an alist of method name, definition-source
-pairs.
+  "Find the source locations of methods directly specializing on
+CLASS-DESIGNATOR, and return them as an alist of generic function
+name, DEFINITION-SOURCE pairs.
 
 A method matches the criterion either if it specializes on the same
 class as CLASS-DESIGNATOR designates (this includes CLASS-EQ
 specializers), or if it eql-specializes on an instance of the
 designated class.
 
-Experimental.
-"
+Experimental."
   (let ((class (canonicalize-class-designator class-designator)))
     (unless class
       (return-from who-specializes-directly nil))
@@ -883,17 +988,17 @@ Experimental.
                 result))))
 
 (defun who-specializes-generally (class-designator)
-  "Search for source locations of methods specializing on
-CLASS-DESIGNATOR, or a subclass of it. Returns an alist of method
-name, definition-source pairs.
+  "Find the source locations of methods specializing on
+CLASS-DESIGNATOR or a subclass of it, and return them as an alist of
+generic function name, DEFINITION-SOURCE pairs.
+DEFINITION-SOURCE-DESCRIPTION identifies the method.
 
 A method matches the criterion either if it specializes on the
 designated class itself or a subclass of it (this includes CLASS-EQ
 specializers), or if it eql-specializes on an instance of the
 designated class or a subclass of it.
 
-Experimental.
-"
+Experimental."
   (let ((class (canonicalize-class-designator class-designator)))
     (unless class
       (return-from who-specializes-generally nil))
@@ -945,12 +1050,12 @@ Experimental.
           1)))
 
 (defun allocation-information (object)
-  "Returns information about the allocation of OBJECT. Primary return value
-indicates the general type of allocation: :IMMEDIATE, :HEAP, :STACK,
-or :FOREIGN.
+  "Returns information about the allocation of OBJECT. The primary return
+value indicates the general type of allocation: :IMMEDIATE, :HEAP,
+:STACK, or :FOREIGN.
 
-Possible secondary return value provides additional information about the
-allocation.
+Non-NIL secondary return values provide additional information about
+the allocation.
 
 For :HEAP objects the secondary value is a plist:
 
@@ -958,7 +1063,7 @@ For :HEAP objects the secondary value is a plist:
     Indicates the heap segment the object is allocated in.
 
   :GENERATION
-    Is the current generation of the object: 0 for nursery, 6 for pseudo-static
+    The current generation of the object: 0 for nursery, 6 for pseudo-static
     generation loaded from core. (GENCGC and :SPACE :DYNAMIC only.)
 
   :LARGE
@@ -967,13 +1072,13 @@ For :HEAP objects the secondary value is a plist:
 
   :BOXED
     Indicates that the object is allocated in a boxed region. Unboxed
-    allocation is used for eg. specialized arrays after they have survived one
+    allocation is used for e.g. specialized arrays after they have survived one
     collection. (GENCGC and :SPACE :DYNAMIC only.)
 
   :PINNED
     Indicates that the page(s) on which the object resides are kept live due
     to conservative references. Note that object may reside on a pinned page
-    even if :PINNED in NIL if the GC has not had the need to mark the the page
+    even if :PINNED is NIL if the GC has not had the need to mark the page
     as pinned. (GENCGC and :SPACE :DYNAMIC only.)
 
   :WRITE-PROTECTED
@@ -982,11 +1087,11 @@ For :HEAP objects the secondary value is a plist:
     the last GC of its generation. (GENCGC and :SPACE :DYNAMIC only.)
 
   :PAGE
-    The index of the page the object resides on. (GENGC and :SPACE :DYNAMIC
+    The index of the page the object resides on. (GENCGC and :SPACE :DYNAMIC
     only.)
 
-For :STACK objects secondary value is the thread on whose stack the object is
-allocated.
+For :STACK objects, the secondary value is the thread on whose stack
+the object is allocated.
 
 Expected use-cases include introspection to gain insight into allocation and
 GC behaviour and restricting memoization to heap-allocated arguments.
@@ -1044,12 +1149,12 @@ Experimental: interface subject to change."
 Returns OBJECT.
 
 If SIMPLE is true (default is NIL), elides those pointers that are not
-notionally part of certain built-in objects, but backpointers to a
-conceptual parent: eg. elides the pointer from a SYMBOL to the
+notionally part of certain built-in objects but backpointers to a
+conceptual parent: e.g. elides the pointer from a SYMBOL to the
 corresponding PACKAGE.
 
 If EXT is true (default is T), includes some pointers that are not
-actually contained in the object, but found in certain well-known
+actually contained in the object but found in certain well-known
 indirect containers: FDEFINITIONs, EQL specializers, classes, and
 thread-local symbol values in other threads fall into this category.
 

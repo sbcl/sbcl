@@ -86,7 +86,8 @@ you deserve to lose.")
 (defparameter *symbol-characters* "ABCDEFGHIJKLMNOPQRSTUVWXYZ*:-+&#'"
   "List of characters that make up symbols in a docstring.")
 
-(defparameter *symbol-delimiters* " ,.!?;()")
+;;; #\s is included to catch some plurals (e.g. FDEFINITIONs).
+(defparameter *symbol-delimiters* " ,.!?;()s")
 
 (defparameter *ordered-documentation-kinds*
   '(package type structure condition class macro))

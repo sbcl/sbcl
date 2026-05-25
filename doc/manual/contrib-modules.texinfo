@@ -13,6 +13,7 @@ contributed modules.
 * sb-concurrency::
 * sb-cover::
 * sb-grovel::
+* sb-introspect::
 * sb-md5::
 * sb-posix::
 * sb-queue::
@@ -31,6 +32,9 @@ contributed modules.
 
 @page
 @include sb-grovel/sb-grovel.texinfo
+
+@page
+@include sb-introspect/sb-introspect.texinfo
 
 @page
 @include sb-md5/sb-md5.texinfo
