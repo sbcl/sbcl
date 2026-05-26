@@ -4564,6 +4564,9 @@ static char *event_printf_format[] = {~{~%  ~S~^,~}~%};~%#endif~2%"
             (mapcar (lambda (x) (count-printf-args (cadr x))) defs)
             (mapcar 'cadr defs))
     (dotimes (argc 7)
+      #-sb-thread
+      (format output "#define EVENT~D(id~A) { /* ignore */ }~%" argc (formals argc))
+      #+sb-thread
       (format output "#define EVENT~D(id~A) { if(should_record_event(id)) \\
  { int i_ = __sync_fetch_and_add(&n_logevents, ~A); if (i_ < EVENTBUFMAX) { \\
    eventdata[i_] = ((uword_t)pthread_self() << 2) | id;~
