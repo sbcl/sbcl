@@ -703,6 +703,20 @@
                   test)
         test))))
 
+(defun lower-test (test type1 type2)
+  (cond ((and (memq test '(equalp =))
+              (csubtypep type1 (specifier-type 'integer))
+              (csubtypep type2 (specifier-type 'integer)))
+         (setf test (if (or (csubtypep type1 (specifier-type 'fixnum))
+                            (csubtypep type2 (specifier-type 'fixnum)))
+                        'eq
+                        'eql)))
+        ((and (eq test 'char=)
+              (csubtypep type1 (specifier-type 'character))
+              (csubtypep type2 (specifier-type 'character)))
+         (setf test 'eq)))
+  test)
+
 (defun change-test-based-on-item-and-sequence-type (test item sequence key)
   (let* ((test (if test
                    (lvar-fun-is test '(eql equal equalp char= char-equal =))
@@ -713,17 +727,23 @@
       (unless (eq test 'eq)
         (let ((elt (sequence-element-type sequence key)))
           (setf test (change-test-based-on-item test elt))
-          (cond ((and (memq test '(equalp =))
-                      (csubtypep (lvar-type item) (specifier-type 'integer))
-                      (csubtypep elt (specifier-type 'integer)))
-                 (setf test (if (or (csubtypep (lvar-type item) (specifier-type 'fixnum))
-                                    (csubtypep elt (specifier-type 'fixnum)))
-                                'eq
-                                'eql)))
-                ((and (eq test 'char=)
-                      (csubtypep (lvar-type item) (specifier-type 'character))
-                      (csubtypep elt (specifier-type 'character)))
-                 (setf test 'eq))))))
+          (setf test (lower-test test (lvar-type item) elt)))))
+    (unless (eq test test-origin)
+      test)))
+
+(defun change-test-based-on-two-sequences-types (test sequence1 sequence2 key)
+  (let* ((test (if test
+                   (lvar-fun-is test '(eql equal equalp char= char-equal =))
+                   'eql))
+         (test-origin test))
+    (when test
+      (unless (eq test 'eq)
+        (let ((elt1 (sequence-element-type sequence1 key))
+              (elt2 (sequence-element-type sequence2 key)))
+          (setf test (change-test-based-on-item test elt1))
+          (unless (eq test 'eq)
+            (setf test (change-test-based-on-item test elt2))
+            (setf test (lower-test test elt1 elt2))))))
     (unless (eq test test-origin)
       test)))
 
@@ -4280,6 +4300,12 @@
       (change-keyword-value (find-global-fun new-test t) :test test node))
     nil))
 
+(defun lower-two-sequences-test (node test sequence1 sequence2 key)
+  (let ((new-test (change-test-based-on-two-sequences-types test sequence1 sequence2 key)))
+    (when new-test
+      (change-keyword-value (find-global-fun new-test t) :test test node))
+    nil))
+
 (defoptimizers optimizer
     (remove delete count find position copy-remove)
     ((item sequence &rest args &key
@@ -4291,6 +4317,18 @@
                              args)
       (unless test-not
         (lower-item-test node test item sequence key))))
+
+(defoptimizers optimizer
+    (search mismatch)
+    ((sequence1 sequence2 &rest args &key
+                ((test test-keyword))
+                ((test-not test-not-keyword))
+                key
+                &allow-other-keys) node)
+  (or (test-not-complementer test test-keyword test-not test-not-keyword
+                             args)
+      (unless test-not
+        (lower-two-sequences-test node test sequence1 sequence2 key))))
 
 (defoptimizers optimizer
     (sublis nsublis)
