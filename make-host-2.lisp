@@ -98,6 +98,12 @@
               (source-xform (sb-int:info :function :source-transform name))
               (info (sb-int:info :function :info name)))
          (when (and cell
+                    ;; Do not report if all calls were expressly
+                    ;; NOTINLINE. If CELL is odd (i.e. there were full
+                    ;; calls without NOTINLINE), then the number of
+                    ;; full calls reported includes those expressly
+                    ;; NOTINLINE. See SB-C::EMITTED-FULL-CALL-COUNT.
+                    (oddp cell)
                     (or inlinep
                         source-xform
                         (and info (sb-c::fun-info-templates info))
