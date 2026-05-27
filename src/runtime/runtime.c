@@ -193,39 +193,31 @@ search_for_core ()
     char *lookhere;
     char *stem = "/sbcl.core";
     char *core;
+    size_t path_length;
     struct stat filename_stat;
 
     if (!(env_sbcl_home && *env_sbcl_home) ||
         stat(env_sbcl_home, &filename_stat))
         env_sbcl_home = sbcl_runtime_home;
-    lookhere = (char *) calloc(strlen(env_sbcl_home) +
-                               strlen(libpath) +
-                               strlen(stem) +
-                               1,
-                               sizeof(char));
-    sprintf(lookhere, "%s%s%s", env_sbcl_home, libpath, stem);
+
+    path_length = strlen(env_sbcl_home) +
+                  strlen(libpath) +
+                  strlen(stem) +
+                  1;
+    lookhere = (char *) successful_malloc(path_length);
+
+    snprintf(lookhere, path_length, "%s%s%s", env_sbcl_home, libpath, stem);
     core = copied_existing_filename_or_null(lookhere);
 
-    if (core) {
-        free(lookhere);
-    } else {
-        free(lookhere);
+    if (!core) {
         core = copied_existing_filename_or_null ("sbcl.core");
         if (!core) {
-            lookhere = (char *) calloc(strlen(env_sbcl_home) +
-                                       strlen(stem) +
-                                       1,
-                                       sizeof(char));
-            sprintf(lookhere, "%s%s", env_sbcl_home, stem);
+            snprintf(lookhere, path_length, "%s%s", env_sbcl_home, stem);
             core = copied_existing_filename_or_null (lookhere);
-            if (core) {
-                free(lookhere);
-            } else {
-                return NULL;
-            }
         }
     }
 
+    free(lookhere);
     return core;
 }
 
