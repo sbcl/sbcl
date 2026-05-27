@@ -72,8 +72,8 @@ extensions have proper documentation yet.
 
 @item System Definition Tool
 @code{asdf} is a flexible and popular protocol-oriented system
-definition tool by Daniel Barlow. @inforef{Top,the asdf manual,asdf}, for
-more information.
+definition tool by Daniel Barlow. @xref{Top, , , asdf} for more
+information.
 
 @item Foreign Function Interface
 @code{sb-alien} package allows interfacing with C-code, loading shared

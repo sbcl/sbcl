@@ -638,9 +638,9 @@ with that condition (or with no condition) will be returned."
    report function from the specified PARENT-TYPEs. A slot spec is a list of:
      (slot-name :reader <rname> :initarg <iname> {Option Value}*
 
-   The DEFINE-CLASS slot options :ALLOCATION, :INITFORM, [slot] :DOCUMENTATION
-   and :TYPE and the overall options :DEFAULT-INITARGS and
-   [type] :DOCUMENTATION are also allowed.
+   The DEFCLASS slot options :ALLOCATION, :INITFORM, [slot]
+   :DOCUMENTATION and :TYPE and the overall options :DEFAULT-INITARGS
+   and [type] :DOCUMENTATION are also allowed.
 
    The :REPORT option is peculiar to DEFINE-CONDITION. Its argument is either
    a string or a two-argument lambda or function name. If a function, the
@@ -1677,18 +1677,14 @@ stepped."))
                (step-condition-args condition)))))
   (:documentation "Condition signalled by code compiled with
 single-stepping information when about to execute a form.
-STEP-CONDITION-FORM holds the form, STEP-CONDITION-PATHNAME holds the
-pathname of the original file or NIL, and STEP-CONDITION-SOURCE-PATH
-holds the source-path to the original form within that file or NIL.
-Associated with this condition are always the restarts STEP-INTO,
-STEP-NEXT, and STEP-CONTINUE."))
+STEP-CONDITION-FORM holds the form. Associated with this condition are
+always the restarts STEP-INTO, STEP-NEXT, and STEP-CONTINUE."))
 
 (define-condition step-result-condition (step-condition)
   ((result :initarg :result :reader step-condition-result)))
 
 (setf (documentation 'step-condition-result 'function)
-      "Return values associated with STEP-VALUES-CONDITION as a list,
-or the variable value associated with STEP-VARIABLE-CONDITION.")
+      "Return values associated with STEP-VALUES-CONDITION as a list.")
 
 (define-condition step-values-condition (step-result-condition)
   ()

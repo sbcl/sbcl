@@ -1297,7 +1297,7 @@ of specialized arrays is supported."
   (array-total-size array))
 
 (defun array-displacement (array)
-  "Return the values of :DISPLACED-TO and :DISPLACED-INDEX-offset
+  "Return the values of :DISPLACED-TO and :DISPLACED-INDEX-OFFSET
    options to MAKE-ARRAY, or NIL and 0 if not a displaced array."
   (declare (type array array))
   (if (and (array-header-p array) ; if unsimple and

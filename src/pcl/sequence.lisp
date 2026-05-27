@@ -52,9 +52,9 @@
   (:method ((s sequence))
     (sequence:protocol-unimplemented 'sequence:length s))
   (:documentation
-   "Returns the length of SEQUENCE or signals a PROTOCOL-UNIMPLEMENTED
-   error if the sequence protocol is not implemented for the class of
-   SEQUENCE."))
+   "Returns the length of SEQUENCE or signals a
+   SEQUENCE:PROTOCOL-UNIMPLEMENTED error if the sequence protocol is
+   not implemented for the class of SEQUENCE."))
 
 (defgeneric sequence:elt (sequence index)
   (:method ((s list) index) (elt s index))
@@ -63,8 +63,8 @@
     (sequence:protocol-unimplemented 'sequence:elt s))
   (:documentation
    "Returns the element at position INDEX of SEQUENCE or signals a
-   PROTOCOL-UNIMPLEMENTED error if the sequence protocol is not
-   implemented for the class of SEQUENCE."))
+   SEQUENCE:PROTOCOL-UNIMPLEMENTED error if the sequence protocol is
+   not implemented for the class of SEQUENCE."))
 
 (defgeneric (setf sequence:elt) (new-value sequence index)
   (:argument-precedence-order sequence new-value index)
@@ -74,8 +74,8 @@
     (sequence:protocol-unimplemented '(setf sequence:elt) s))
   (:documentation
    "Replaces the element at position INDEX of SEQUENCE with NEW-VALUE
-   and returns NEW-VALUE or signals a PROTOCOL-UNIMPLEMENTED error if
-   the sequence protocol is not implemented for the class of
+   and returns NEW-VALUE or signals a SEQUENCE:PROTOCOL-UNIMPLEMENTED
+   error if the sequence protocol is not implemented for the class of
    SEQUENCE."))
 
 (defgeneric sequence:make-sequence-like
@@ -108,8 +108,8 @@
    same class as SEQUENCE. Elements of the new sequence are
    initialized to INITIAL-ELEMENT, if supplied, initialized to
    INITIAL-CONTENTS if supplied, or undefined if neither is supplied.
-   Signals a PROTOCOL-UNIMPLEMENTED error if the sequence protocol is
-   not implemented for the class of SEQUENCE."))
+   Signals a SEQUENCE:PROTOCOL-UNIMPLEMENTED error if the sequence
+   protocol is not implemented for the class of SEQUENCE."))
 
 (defgeneric sequence:adjust-sequence
     (sequence length &key initial-element initial-contents)
@@ -148,8 +148,8 @@
    of the returned sequence are initialized to INITIAL-ELEMENT, if
    supplied, initialized to INITIAL-CONTENTS if supplied, or identical
    to the elements of SEQUENCE if neither is supplied. Signals a
-   PROTOCOL-UNIMPLEMENTED error if the sequence protocol is not
-   implemented for the class of SEQUENCE."))
+   SEQUENCE:PROTOCOL-UNIMPLEMENTED error if the sequence protocol is
+   not implemented for the class of SEQUENCE."))
 
 
 ;;;; iterator protocol
@@ -301,8 +301,9 @@
    3. from-end
 
    The returned iterator can be used with the generic iterator
-   functions ITERATOR-STEP, ITERATOR-ENDP, ITERATOR-ELEMENT, (SETF
-   ITERATOR-ELEMENT), ITERATOR-INDEX and ITERATOR-COPY."))
+   functions SEQUENCE:ITERATOR-STEP, SEQUENCE:ITERATOR-STEP,
+   SEQUENCE:ITERATOR-ELEMENT, (SETF SEQUENCE:ITERATOR-ELEMENT),
+   SEQUENCE:ITERATOR-INDEX and SEQUENCE:ITERATOR-COPY."))
 
 (defgeneric sequence:iterator-step (sequence iterator from-end)
   (:method ((s list) iterator from-end)
@@ -392,9 +393,9 @@
                 step endp element set-element index copy)
      (sequence &key from-end (start 0) end) &body body)
   "Executes BODY with the elements of VARS bound to the iteration
-  state returned by MAKE-SEQUENCE-ITERATOR for SEQUENCE and
+  state returned by SEQUENCE:MAKE-SEQUENCE-ITERATOR for SEQUENCE and
   ARGS. Elements of VARS may be NIL in which case the corresponding
-  value returned by MAKE-SEQUENCE-ITERATOR is ignored."
+  value returned by SEQUENCE:MAKE-SEQUENCE-ITERATOR is ignored."
   (declare (ignore iterator limit from-end-p
                    step endp element set-element index copy))
   (let* ((ignored '())
@@ -415,11 +416,11 @@
      &body body)
   "Executes BODY with the names STEP, ENDP, ELT, SETF, INDEX and COPY
 bound to local functions which execute the iteration state query and
-mutation functions returned by MAKE-SEQUENCE-ITERATOR for SEQUENCE and
-ARGS. When some names are not supplied or NIL is supplied for a given
-name, no local functions are established for those names. The
-functions established for STEP, ENDP, ELT, SETF, INDEX and COPY have
-dynamic extent."
+mutation functions returned by SEQUENCE:MAKE-SEQUENCE-ITERATOR for
+SEQUENCE and ARGS. When some names are not supplied or NIL is supplied
+for a given name, no local functions are established for those names.
+The functions established for STEP, ENDP, ELT, SETF, INDEX and COPY
+have dynamic extent."
   (declare (ignore from-end start end))
   (let ((nstate (gensym "STATE")) (nlimit (gensym "LIMIT"))
         (nfrom-end (gensym "FROM-END-")) (nstep (gensym "STEP"))

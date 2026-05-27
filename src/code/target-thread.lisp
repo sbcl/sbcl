@@ -2476,7 +2476,7 @@ Short version: be careful out there."
 
 (defun terminate-thread (thread)
   "Terminate the thread identified by THREAD, by interrupting it and
-causing it to call SB-EXT:ABORT-THREAD with :ALLOW-EXIT T.
+causing it to call SB-THREAD:ABORT-THREAD with :ALLOW-EXIT T.
 
 The unwind caused by TERMINATE-THREAD is asynchronous, meaning that
 eg. thread executing

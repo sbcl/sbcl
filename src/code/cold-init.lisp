@@ -410,18 +410,19 @@ Recursive calls to EXIT cause EXIT to behave as if ABORT was true.
 TIMEOUT controls waiting for other threads to terminate when ABORT is
 NIL. Once current thread has been unwound and *EXIT-HOOKS* have been
 run, spawning new threads is prevented and all other threads are
-terminated by calling TERMINATE-THREAD on them. The system then waits
-for them to finish using JOIN-THREAD, waiting at most a total TIMEOUT
-seconds for all threads to join. Those threads that do not finish
-in time are simply ignored while the exit protocol continues. TIMEOUT
-defaults to *EXIT-TIMEOUT*, which in turn defaults to 60. TIMEOUT NIL
-means to wait indefinitely.
+terminated by calling SB-THREAD:TERMINATE-THREAD on them. The system
+then waits for them to finish using SB-THREAD:JOIN-THREAD, waiting at
+most a total TIMEOUT seconds for all threads to join. Those threads
+that do not finish in time are simply ignored while the exit protocol
+continues. TIMEOUT defaults to *EXIT-TIMEOUT*, which in turn defaults
+to 60. TIMEOUT NIL means to wait indefinitely.
 
-Note that TIMEOUT applies only to JOIN-THREAD, not *EXIT-HOOKS*. Since
-TERMINATE-THREAD is asynchronous, getting multithreaded application
-termination with complex cleanups right using it can be tricky. To
-perform an orderly synchronous shutdown use an exit hook instead of
-relying on implicit thread termination.
+Note that TIMEOUT applies only to SB-THREAD:JOIN-THREAD, not
+*EXIT-HOOKS*. Since SB-THREAD:TERMINATE-THREAD is asynchronous,
+getting multithreaded application termination with complex cleanups
+right using it can be tricky. To perform an orderly synchronous
+shutdown use an exit hook instead of relying on implicit thread
+termination.
 
 Consequences are unspecified if serious conditions occur during EXIT
 excepting errors from *EXIT-HOOKS*, which cause warnings and stop

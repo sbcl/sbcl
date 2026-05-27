@@ -280,11 +280,11 @@ T if SERVE-EVENT did something and NIL if not."
 
 ;;; Serve a single set of events.
 (defun serve-event (&optional timeout)
-  "Receive pending events on all FD-STREAMS and dispatch to the appropriate
-handler functions. If timeout is specified, server will wait the specified
-time (in seconds) and then return, otherwise it will wait until something
-happens. Server returns T if something happened and NIL otherwise. Timeout
-0 means polling without waiting."
+  "Receive pending events on all FD-STREAMs, and dispatch to the
+appropriate handler functions. If timeout is specified, server will
+wait the specified time (in seconds) and then return, otherwise it
+will wait until something happens. Server returns T if something
+happened and NIL otherwise. Timeout 0 means polling without waiting."
   (multiple-value-bind (to-sec to-usec stop-sec stop-usec signalp)
       (decode-timeout timeout)
     (declare (ignore stop-sec stop-usec))

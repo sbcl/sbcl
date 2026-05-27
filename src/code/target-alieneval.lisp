@@ -135,7 +135,7 @@ This is SETFable."
         `(alien-funcall-into ,func-expr ,var ,@args)))))
 
 (defmacro with-alien (bindings &body body &environment env)
-  "Establish some local alien variables. Each BINDING is of the form:
+  "Establish some local alien variables. Each of BINDINGS is of the form:
      VAR TYPE [ ALLOCATION ] [ INITIAL-VALUE | EXTERNAL-NAME ]
    ALLOCATION should be one of:
      :LOCAL (the default)
@@ -824,7 +824,7 @@ Also automatically DECLAIM the FTYPE of the defined function.
 
 NAME may be either a string, a symbol, or a list of the form (string symbol).
 
-RETURN-TYPE is the alien type for the function return value. VOID may be
+RESULT-TYPE is the alien type for the function return value. VOID may be
 used to specify a function with no result.
 
 The remaining forms specify individual arguments that are passed to the

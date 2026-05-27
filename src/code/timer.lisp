@@ -166,9 +166,10 @@ If a THREAD is supplied, FUNCTION is run in that thread. If THREAD is
 T, a new thread is created for FUNCTION each time the timer is
 triggered. If THREAD is NIL, FUNCTION is run in an unspecified thread.
 
-When THREAD is not T, INTERRUPT-THREAD is used to run FUNCTION and the
-ordering guarantees of INTERRUPT-THREAD apply. In that case, FUNCTION
-runs with interrupts disabled but WITH-INTERRUPTS is allowed.")
+When THREAD is not T, SB-THREAD:INTERRUPT-THREAD is used to run
+FUNCTION and the ordering guarantees of SB-THREAD:INTERRUPT-THREAD
+apply. In that case, FUNCTION runs with interrupts disabled but
+WITH-INTERRUPTS is allowed.")
 
 (defun timer-name (timer)
   "Return the name of TIMER."

@@ -301,7 +301,8 @@ redefinition of callable functions."
 (defmacro with-alien-callable (definitions
                                &body body
                                &environment env)
-    "Establish some local alien functions. Each DEFINITION is of the form:
+    "Establish some local alien functions.
+     Each element of DEFINITIONS is of the form:
      NAME RESULT-TYPE {(ARG-NAME ARG-TYPE)}*
        {doc-string} {decls}* {FORM}*
 

@@ -94,7 +94,8 @@ include the pathname of the file and the position of the definition."
 (defun valid-function-name-p (name)
   "See if NAME is a valid function name. In addition to the ANSI
 definition of function name, which is symbols plus lists like (SETF
-SYMBOL), SBCL allows (CAS SYMBOL) and various internal constructs."
+SYMBOL), SBCL allows (SB-EXT:CAS SYMBOL) and various internal
+constructs."
   (and (sb-int:valid-function-name-p name) t))
 
 ;;;; Utilities for code
@@ -290,7 +291,7 @@ returned for definitions that exist, but the source location (e.g.
 DEFINITION-SOURCE-PATHNAME) may be missing. TYPE can currently be one
 of the following.
 
-Public definition types:
+- Public definition types:
 
     :CLASS
     :COMPILER-MACRO
@@ -311,7 +312,7 @@ Public definition types:
     :VARIABLE
     :DECLARATION
 
-Internal definition types:
+- Internal definition types:
 
     :OPTIMIZER
     :SOURCE-TRANSFORM
@@ -961,9 +962,8 @@ CLASS-DESIGNATOR, and return them as an alist of generic function
 name, DEFINITION-SOURCE pairs.
 
 A method matches the criterion either if it specializes on the same
-class as CLASS-DESIGNATOR designates (this includes CLASS-EQ
-specializers), or if it eql-specializes on an instance of the
-designated class.
+class as CLASS-DESIGNATOR designates, or if it eql-specializes on an
+instance of the designated class.
 
 Experimental."
   (let ((class (canonicalize-class-designator class-designator)))

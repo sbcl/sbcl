@@ -72,9 +72,9 @@
 respecting deadlines occurs either after the deadline has passed, or
 would take longer than the time left to complete.
 
-Currently only SLEEP, blocking IO operations, GET-MUTEX, and
-CONDITION-WAIT respect deadlines, but this includes their implicit
-uses inside SBCL itself.
+Currently only SLEEP, blocking IO operations, SB-THREAD:GET-MUTEX, and
+SB-THREAD:CONDITION-WAIT respect deadlines, but this includes their
+implicit uses inside SBCL itself.
 
 Unless OVERRIDE is true, existing deadlines can only be restricted,
 not extended. Deadlines are per thread: children are unaffected by

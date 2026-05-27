@@ -217,21 +217,21 @@ implementation it is ~S." *!default-package-use-list*)
 (defmacro defpackage (package &rest options)
   #.(format nil
      "Defines a new package called PACKAGE. Each of OPTIONS should be one of the
-   following: ~{~&~4T~A~}
-   All options except ~{~A, ~}and :DOCUMENTATION can be used multiple
+   following: ~{~&~4T(~S ~A)~}
+   All options except ~{~S, ~}and :DOCUMENTATION can be used multiple
    times."
-     '((:use "{package-name}*")
-       (:export "{symbol-name}*")
-       (:import-from "<package-name> {symbol-name}*")
-       (:shadow "{symbol-name}*")
-       (:shadowing-import-from "<package-name> {symbol-name}*")
-       (:local-nicknames "{(local-nickname actual-package-name)}*")
-       (:lock "boolean")
-       (:implement "{package-name}*")
-       (:documentation "doc-string")
-       (:intern "{symbol-name}*")
-       (:size "<integer>")
-       (:nicknames "{package-name}*"))
+     '(:use "{package-name}*"
+       :export "{symbol-name}*"
+       :import-from "<package-name> {symbol-name}*"
+       :shadow "{symbol-name}*"
+       :shadowing-import-from "<package-name> {symbol-name}*"
+       :local-nicknames "{(local-nickname actual-package-name)}*"
+       :lock "boolean"
+       :implement "{package-name}*"
+       :documentation "doc-string"
+       :intern "{symbol-name}*"
+       :size "<integer>"
+       :nicknames "{package-name}*")
      '(:size :lock))
   (let ((nicknames nil)
         (local-nicknames nil)

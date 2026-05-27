@@ -1,8 +1,8 @@
 (in-package "SB-POSIX")
 
 (defun strtod (string)
-  "Parse the string INPUT and return a double-precision float,
-and a secondary value, the number of characters consumed."
+  "Parse STRING into a double-precision float.
+As the second value, return the number of characters consumed."
   (flet ((strtod/base-string (chars offset)
            (declare (simple-base-string chars))
            ;; On x86, dx arrays are quicker to make than aliens.

@@ -351,9 +351,9 @@ readtable when not provided."
 
 (defun set-syntax-from-char (to-char from-char &optional
                              (to-readtable *readtable*) (from-readtable nil))
-  "Causes the syntax of TO-CHAR to be the same as FROM-CHAR in the optional
-readtable (defaults to the current readtable). The FROM-TABLE defaults to the
-standard Lisp readtable when NIL."
+  "Causes the syntax of TO-CHAR in TO-READTABLE to be the same as
+FROM-CHAR in FROM-READTABLE. TO-READTABLE defaults to *READTABLE*, and
+FROM-READTABLE defaults to the standard Lisp readtable when NIL."
   ;; TO-READTABLE is a readtable, not a readtable-designator
   (assert-not-standard-readtable to-readtable 'set-syntax-from-char)
   (let* ((from-readtable (or from-readtable *standard-readtable*))

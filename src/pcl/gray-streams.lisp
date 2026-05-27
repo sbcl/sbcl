@@ -282,7 +282,7 @@
 (defgeneric stream-terpri (stream)
   (:documentation
    "Writes an end of line, as for TERPRI. Returns NIL. The default
-  method does (STREAM-WRITE-CHAR stream #\NEWLINE)."))
+  method does (STREAM-WRITE-CHAR stream #\\NEWLINE)."))
 
 (defmethod stream-terpri ((stream fundamental-character-output-stream))
   (stream-write-char stream #\Newline))
@@ -331,7 +331,7 @@
   successful, or NIL if it is not supported for this stream. This is
   intended for use by by PPRINT and FORMAT ~T. The default method uses
   STREAM-LINE-COLUMN and repeated calls to STREAM-WRITE-CHAR with a
-  #\SPACE character; it returns NIL if STREAM-LINE-COLUMN returns NIL."))
+  #\\SPACE character; it returns NIL if STREAM-LINE-COLUMN returns NIL."))
 
 (defmethod stream-advance-to-column ((stream fundamental-character-output-stream)
                                      column)

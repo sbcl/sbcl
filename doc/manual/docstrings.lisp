@@ -84,8 +84,7 @@ you deserve to lose.")
 (defparameter *symbol-characters* "ABCDEFGHIJKLMNOPQRSTUVWXYZ*:-+&#'"
   "List of characters that make up symbols in a docstring.")
 
-;;; #\s is included to catch some plurals (e.g. FDEFINITIONs).
-(defparameter *symbol-delimiters* " ,.!?;()s")
+(defparameter *symbol-delimiters* " ,.!?;()'")
 
 (defparameter *ordered-documentation-kinds*
   '(package type structure condition class macro))
@@ -103,7 +102,7 @@ you deserve to lose.")
          (cons (car list) (flatten (cdr list))))))
 
 (defun whitespacep (char)
-  (find char #(#\tab #\space #\page)))
+  (find char #(#\tab #\space #\page #\newline)))
 
 (defun setf-name-p (name)
   (or (symbolp name)
@@ -454,15 +453,56 @@ with #\@. Optionally downcase the result."
 
 ;;; line markups
 
-(defvar *not-symbols* '("ANSI" "CLHS" "UNIX"))
+(defvar *not-code* '("ANSI" "CLHS" "UNIX" "SBCL" "BSD" "C" "A" "I"))
+(defvar *code*
+  '(":WINDOW" ":HIDE" ":SHOW-NORMAL" ":SHOW-MAXIMIZED" ":SHOW-MINIMIZED"
+    ":SHOW-NO-ACTIVATE" ":SHOW-MIN-NO-ACTIVE" ":SHOW-NA"
+    ":SB-CORE-COMPRESSION" ":CONSOLE" ":GUI" ":APPLICATION-TYPE"
+    "NODE*" "GUESSED-PC" "SYS" "SPECIALIZER-KIND" "SPECIFIC-SYNTAX"
+    "QUALIFIERS*" "SPECIALIZERS*" "OUTER-NAME" "EXTERNAL-NAME"
+    "GET-FOO" "RELEASE-FOO" "C-CALL" "BODY-FORM" "ALLOCATION"
+    "INITIAL-VALUE" "ARG-NAME" "ARG-TYPE" "FORM" "WHILE"
+    "TO-SEC" "TO-USEC" "STOP-SEC" "STOP-USEC" "DEADLINEP"
+    "FUNDAMENTAL-CHARACTER-STREAM" "SOURCE-PLIST" "PEEK-TYPE"
+    "THREAD-NAME" "THREAD-OBJECT" "NEW-VALUE" "PROCESS"
+    "COLON" "ATSIGN" "GATE" "MAILBOX" "QUEUE" "X" "Y"
+    "INDEX" "SEQUENCE" "ITERATOR" "STATEMENT"
+    "MACROEXPAND-ALL"))
+
+(defun interesting-name-p (name)
+  (let ((name (if (and (plusp (length name))
+                       (find (aref name 0) "'`"))
+                  (subseq name 1)
+                  name)))
+    (or (find-package name)
+        (if (and (plusp (length name))
+                 (char= (aref name 0) #\:))
+            (internedp (subseq name 1) :keyword)
+            (let ((pos (position #\: name)))
+              (if pos
+                  (let ((package-name (subseq name 0 pos))
+                        (symbol-name (subseq name (1+ pos))))
+                    (when (and (plusp (length symbol-name))
+                               (char= (aref symbol-name 0) #\:))
+                      (setq symbol-name (subseq symbol-name 1)))
+                    (if (and package-name (find-package package-name))
+                        (internedp symbol-name package-name)
+                        (internedp symbol-name *documentation-package*)))
+                  (internedp name *documentation-package*)))))))
+
+(defun internedp (symbol-name package)
+  (nth-value 1 (find-symbol symbol-name package)))
 
 (defun locate-symbols (line)
   "Return a list of index pairs of symbol-like parts of LINE."
   ;; This would be a good application for a regex ...
   (let (result)
     (flet ((grab (start end)
-             (unless (member (subseq line start end) *not-symbols*)
-               (push (list start end) result)))
+             (let ((name (subseq line start end)))
+               (when (and (not (member name *not-code* :test #'equal))
+                          (or (member name *code* :test #'equal)
+                              (interesting-name-p name)))
+                 (push (list start end) result))))
            (got-symbol-p (start)
              (let ((end (when (< start (length line))
                           (position #\space line :start start))))
@@ -474,12 +514,20 @@ with #\@. Optionally downcase the result."
            (i 0 (1+ i)))
           ((>= i (length line))
            ;; symbol at end of line
-           (when (and begin (or (> i (1+ begin))
-                                (not (member (char line begin) '(#\A #\I)))))
+           (when begin
              (grab begin i))
            (nreverse result))
         (cond
-          ((and begin (find (char line i) *symbol-delimiters*))
+          ((and begin
+                (or (find (char line i) *symbol-delimiters*)
+                    ;; This catches lowercase suffixes. SETFable,
+                    ;; PRINTs, CLASSes.
+                    (and (<= (+ begin 3) i)
+                         (lower-case-p (char line i)))
+                    ;; For e.g. "T:"
+                    (and (char= (char line i) #\:)
+                         (or (= (1+ i) (length line))
+                             (whitespacep (char line (1+ i)))))))
            ;; symbol end; remember it if it's not "A" or "I"
            (when (or (> i (1+ begin)) (not (member (char line begin) '(#\A #\I))))
              (grab begin i))
@@ -813,13 +861,52 @@ followed another tabulation label or a tabulation body."
 
 (defun write-texinfo (doc)
   "Writes TexInfo for a DOCUMENTATION instance to *TEXINFO-OUTPUT*."
-  (texinfo-anchor doc)
-  (texinfo-begin doc)
-  (texinfo-inferred-body doc)
-  (texinfo-body doc)
-  (texinfo-end doc)
-  ;; FIXME: Children should be sorted one way or another
-  (mapc #'write-texinfo (get-children doc)))
+  (let ((*documentation-package*
+          (or (guess-package-from-arglist (lambda-list doc))
+              (let ((p (get-package doc)))
+                (cond ((eq p (find-package :cl))
+                       ;; Most of the implementation of CL is done under
+                       ;; (IN-PACKAGE :SB-IMPL).
+                       (find-package :sb-impl))
+                      ((eq p (find-package :sequence))
+                       (find-package :sb-impl))
+                      (t
+                       (get-package doc)))))))
+    (texinfo-anchor doc)
+    (texinfo-begin doc)
+    (texinfo-inferred-body doc)
+    (texinfo-body doc)
+    (texinfo-end doc)
+    ;; FIXME: Children should be sorted one way or another
+    (mapc #'write-texinfo (get-children doc))))
+
+
+;;;; Utilities lifted from MGL-PAX
+
+;;; Unexported argument names are highly informative about *PACKAGE*
+;;; at read time. No one ever uses fully-qualified internal symbols
+;;; from another package for arguments, right?
+(defun guess-package-from-arglist (args)
+  (dolist (arg args)
+    (when (and (symbolp arg)
+               (not (external-symbol-in-any-package-p arg)))
+      (return (symbol-package arg)))
+    (when (and (listp arg)
+               (symbolp (first arg))
+               (not (external-symbol-in-any-package-p (first arg))))
+      (return (symbol-package (first arg))))))
+
+(defun external-symbol-in-any-package-p (symbol)
+  (loop for package in (list-all-packages)
+          thereis (external-symbol-p symbol package)))
+
+(defun external-symbol-p (symbol &optional (package (symbol-package symbol)))
+  (and package
+       (multiple-value-bind (symbol* status)
+           (find-symbol (symbol-name symbol) package)
+         (and (eq status :external)
+              (eq symbol symbol*)))))
+
 
 ;;;; main logic
 

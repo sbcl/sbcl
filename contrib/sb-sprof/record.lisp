@@ -45,9 +45,9 @@
 
 The signature of FUNCTION must be compatible with (thread trace).
 
-FUNCTION is called once for each trace where THREAD is the SB-THREAD:TREAD
-instance which was sampled to produce TRACE, and TRACE is an opaque object
-to be passed to MAP-TRACE-PC-LOCS.
+FUNCTION is called once for each trace where THREAD is the
+SB-THREAD:THREAD instance that was sampled to produce TRACE, and TRACE
+is an opaque object to be passed to MAP-TRACE-PC-LOCS.
 
 EXPERIMENTAL: Interface subject to change."
   (let ((function (sb-kernel:%coerce-callable-to-fun function))
