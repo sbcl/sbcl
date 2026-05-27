@@ -731,6 +731,27 @@
     (unless (eq test test-origin)
       test)))
 
+(defun change-test-based-on-sequence-type (test sequence key)
+  (let* ((test (if test
+                   (lvar-fun-is test '(eql equal equalp char= char-equal =))
+                   'eql))
+         (test-origin test))
+    (when test
+      (unless (eq test 'eq)
+        (let ((elt (sequence-element-type sequence key)))
+          (setf test (change-test-based-on-item test elt))
+          (unless (eq test 'eq)
+            (cond ((and (memq test '(equalp =))
+                        (csubtypep elt (specifier-type 'integer)))
+                   (setf test (if (csubtypep elt (specifier-type 'fixnum))
+                                  'eq
+                                  'eql)))
+                  ((and (eq test 'char=)
+                        (csubtypep elt (specifier-type 'character)))
+                   (setf test 'eq)))))))
+    (unless (eq test test-origin)
+      test)))
+
 (defun change-test-based-on-two-sequences-types (test sequence1 sequence2 key)
   (let* ((test (if test
                    (lvar-fun-is test '(eql equal equalp char= char-equal =))
@@ -4306,6 +4327,12 @@
       (change-keyword-value (find-global-fun new-test t) :test test node))
     nil))
 
+(defun lower-one-sequence-test (node test sequence key)
+  (let ((new-test (change-test-based-on-sequence-type test sequence key)))
+    (when new-test
+      (change-keyword-value (find-global-fun new-test t) :test test node))
+    nil))
+
 (defoptimizers optimizer
     (remove delete count find position copy-remove)
     ((item sequence &rest args &key
@@ -4345,9 +4372,13 @@
     ((sequence &rest args &key
                ((test test-keyword))
                ((test-not test-not-keyword))
-               &allow-other-keys))
+               key
+               &allow-other-keys)
+     node)
   (test-not-complementer test test-keyword test-not test-not-keyword
-                         args))
+                         args)
+  (unless test-not
+    (lower-one-sequence-test node test sequence key)))
 
 (defoptimizers optimizer
     (substitute nsubstitute subst nsubst)
