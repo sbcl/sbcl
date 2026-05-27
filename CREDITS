@@ -168,7 +168,7 @@ Guy Steele wrote the original character functions
 	code/char.lisp
 They were subsequently rewritten by David Dill, speeded up by Scott
 Fahlman, and rewritten without fonts and with a new type system by Rob
-MachLachlan.
+MacLachlan.
 
 Lee Schumacher made the Spice Lisp version of backquote. The comment
 in the CMU CL sources suggests he based it on someone else's code for
@@ -695,8 +695,8 @@ Dave McDonald:
 Gabor Melis:
   He mainly worked on robustness related to signal handling, threads,
   timers with small excursions to constraint propagation, weak hash
-  tables (based on CMUCL code) and optimizing x86/x86-64 calling
-  convention.
+  tables (based on CMUCL code), adaptive hash tables, and optimizing
+  x86/x86-64 calling convention.
 
 Perry E. Metzger:
   He ported SBCL to NetBSD with newer signals, building on the

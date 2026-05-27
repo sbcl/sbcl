@@ -1,4 +1,4 @@
-Proposed contrib standard, $Revision$
+Proposed contrib standard
 
 The SBCL contrib mechanism provides a mechanism to
 manage code which does not form part of SBCL itself, but which is

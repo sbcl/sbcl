@@ -1,5 +1,3 @@
-;;; -*- lisp -*-
-;;;
 ;;; **********************************************************************
 ;;; This code was written by Paul Foley and has been placed in the public
 ;;; domain.

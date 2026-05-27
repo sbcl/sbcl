@@ -8,7 +8,7 @@ can result from mistaking a packaged SBCL for the upstream one.
 
 If you are working from a Git branch, all you need to do is make sure
 the branch name reflects the situation -- the build system will
-incorporate the it in the version string.
+incorporate it in the version string.
 
 If you are working from a release tarball, please edit
 version.lisp-expr, and append ".packaging-target-or-patch[.version]".

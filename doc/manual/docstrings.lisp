@@ -1,5 +1,3 @@
-;;; -*- lisp -*-
-
 ;;;; A docstring extractor for the sbcl manual.  Creates
 ;;;; @include-ready documentation from the docstrings of exported
 ;;;; symbols of specified packages.

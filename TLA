@@ -3,8 +3,8 @@
 abbreviations we try to use pervasively in the system
 
 As Dan Barlow pointed out long ago on the mailing list, unabbreviated
-names are easier to deal with than abbreviated names, because you
-never need to remember what abbreviation to use. That's true, but in a
+names are easier to deal with than abbreviated names because you never
+need to remember what abbreviation to use. That's true, but in a
 language like Lisp which depends on compound names for important
 things like structure accessors, that can lead to painful names like
 MAKE-EXTERNAL-ENTRY-POINT-LAMBDA-EXPRESSION and associated indenting
@@ -30,8 +30,8 @@ making them more consistent.
 	SB	storage base (in compiler IR2)
 	SC	storage class (in compiler IR2)
 	TN	temporary name (?) (in compiler IR2)
-	VAR	variable (in the lisp entity "noun" sense, not in the 
+	VAR	variable (in the lisp entity "noun" sense, not in the
 			adjectival sense)
 	XEP	external entry point
-Making them even more consistent (within the limits of ANSI and 
+Making them even more consistent (within the limits of ANSI and
 MOP compatibility) would probably be good.

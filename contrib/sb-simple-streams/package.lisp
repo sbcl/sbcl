@@ -1,5 +1,3 @@
-;;; -*- lisp -*-
-
 ;;; This code is in the public domain.
 
 ;;; The cmucl implementation of simple-streams was done by Paul Foley,
