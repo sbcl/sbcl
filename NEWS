@@ -5,6 +5,24 @@ changes relative to sbcl-2.6.4:
     is missing from an object is no longer a TYPE-ERROR.
   * minor incompatible change: the condition signalled when accessing an
     uninitialized structure slot is no longer a TYPE-ERROR.
+  * minor incompatible change: the implementations of standardized functions
+    treating lists as sets, such as INTERSECTION and UNION, take more
+    advantage of the freedom to return the elements of the result in any
+    order.
+  * platform support:
+    ** add low-level support for floating point state manipulation on
+       PPC64/FreeBSD.  (thanks to Piotr Kubaj)
+    ** improve the software emulation of displaced instructions on ARM64.
+    ** restore building the system using the musl C library.  (lp#2153432,
+       reported by Tom Gillespie)
+    ** fix some SB-SIMD shifting instructions on AVX2.  (lp#2152791, reported
+       by Willem Broekema)
+  * enhancement: definition sources for alien callbacks are now findable by
+    name in SB-INTROSPECT.
+  * bug fix: the SYMBOL restart for finding packages now actually performs a
+    non-local exit.  (lp#2153092, reported by Zach Shaftel)
+  * bug fix: TYPEP on large disjoint numeric union types compiles faster using
+    fewer resources.  (lp#2151818, reported by James McDonald)
   * bug fix: strings of arbitrary size with fill-pointer set to 1 are
     character designators.  (reported by _death)
   * bug fix: the KEEP-OLD restart established by ADD-PACKAGE-LOCAL-NICKNAME
@@ -14,6 +32,14 @@ changes relative to sbcl-2.6.4:
     different used packages, the TAKE-NEW restart now shadowing-imports the
     new symbol instead of doing nothing and leaving the package in an
     inconsistent state.
+  * bug fix: the SB-EVAL interpreter checks program syntax more thoroughly.
+  * bug fix: compiler cross-reference data is decoded correctly for a
+    functional with more than one entry for a given name.
+  * bug fix: TYPE-ERRORs signalled by SBCL are more likely to have a DATUM
+    that is not of the condition's EXPECTED-TYPE.
+  * bug fix: the code walker no longer uses the stack to walk PROGN bodies.
+  * optimization: in various situations, INTERSECTION and UNION will use
+    hash-tables to perform the operation more quickly.
 
 changes in sbcl-2.6.4 relative to sbcl-2.6.3:
   * minor incompatible change: when DEFSETF is called on a name that was
