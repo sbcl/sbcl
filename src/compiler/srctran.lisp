@@ -8915,6 +8915,26 @@
                 symbol (or symbol (simple-array * (0)) extended-sequence function character)
                 sequence sequence)))
            :numeric nil)))
+    (let ((value (lvar-type value))
+          (exclude nil))
+      (macrolet ((cases (&body cases)
+                   `(progn
+                      ,@(loop for exclude in cases
+                              collect `(unless (types-equal-or-intersect (specifier-type ',exclude) value)
+                                         (setf exclude
+                                               (if exclude
+                                                   (type-intersection exclude (specifier-type ',exclude))
+                                                   (specifier-type ',exclude))))))))
+        (unless (or (eq value *universal-type*)
+                    (opaque-type-p value))
+          (cases
+           number
+           real)
+          (when exclude
+            (setf value-type
+                  (if value-type
+                      (type-difference value-type exclude)
+                      (type-negation exclude)))))))
     (if (and type-type value-type)
         (type-intersection type-type value-type)
         (or type-type value-type))))

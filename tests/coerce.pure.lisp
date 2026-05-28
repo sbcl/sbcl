@@ -220,3 +220,9 @@
    (lambda (x n)
      (coerce n (if x 'single-float 'double-float)))
    float))
+
+(with-test (:name :coerce-excluded-types)
+  (assert-type
+   (lambda (x y)
+     (coerce (the (not real) x) y))
+   (not real)))
