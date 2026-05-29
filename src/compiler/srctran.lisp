@@ -8919,17 +8919,22 @@
           (exclude nil))
       (macrolet ((cases (&body cases)
                    `(progn
-                      ,@(loop for exclude in cases
+                      ,@(loop for (exclude excluded) on cases by #'cddr
                               collect `(unless (types-equal-or-intersect (specifier-type ',exclude) value)
                                          (setf exclude
                                                (if exclude
-                                                   (type-intersection exclude (specifier-type ',exclude))
-                                                   (specifier-type ',exclude))))))))
+                                                   (type-intersection exclude (specifier-type ',excluded))
+                                                   (specifier-type ',excluded))))))))
         (unless (or (eq value *universal-type*)
                     (opaque-type-p value))
           (cases
-           number
-           real)
+           number number
+           real real
+           sequence sequence
+           (and array (not vector)) (and array (not vector))
+           array (and array (not vector))
+           (or (and symbol (not null)) function cons) function
+           (or character string (and symbol (not null))) character)
           (when exclude
             (setf value-type
                   (if value-type
