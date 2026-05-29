@@ -78,9 +78,15 @@ else
 fi
 if [ "$version_base" = "$version_head" ]
 then
-    printf "\"%s%s%s%s\"\n" \
-           $version_release "$version_n_root_pretty" \
-           $version_hash $version_dirty >>version.lisp-expr
+    if [ "0" = "$version_n_root" ]
+    then
+        printf "\"%s%s\"\n" \
+            $version_release $version_dirty >>version.lisp-expr
+    else
+        printf "\"%s.%s%s%s\"\n" \
+            $version_release $version_n_root \
+            $version_hash $version_dirty >>version.lisp-expr
+    fi
 else
     echo "base=$version_base"
     echo "head=$version_head"
