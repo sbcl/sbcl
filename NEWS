@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.6.4:
+changes in sbcl-2.6.5 relative to sbcl-2.6.4:
   * minor incompatible change: the condition signalled when an accessed slot
     is missing from an object is no longer a TYPE-ERROR.
   * minor incompatible change: the condition signalled when accessing an
