@@ -179,26 +179,12 @@ implementation-dependent members of all structure types on your system
 objects corresponding to supported POSIX structures, and the supported
 slots for those structures.
 
-@itemize
-
-@item flock
 @include class-sb-posix-flock.texinfo
-
-@item passwd
 @include class-sb-posix-passwd.texinfo
-
-@item passwd
 @include class-sb-posix-group.texinfo
-
-@item stat
 @include class-sb-posix-stat.texinfo
-
-@item termios
 @include class-sb-posix-termios.texinfo
-
-@item timeval
 @include class-sb-posix-timeval.texinfo
-@end itemize
 
 @node Functions with idiosyncratic bindings
 @subsection Functions with idiosyncratic bindings
@@ -206,14 +192,9 @@ slots for those structures.
 A few functions in sb-posix don't correspond directly to their C
 counterparts.
 
-@itemize
-@item getcwd
 @include fun-sb-posix-getcwd.texinfo
-@item readlink
 @include fun-sb-posix-readlink.texinfo
-@item syslog
 @include fun-sb-posix-syslog.texinfo
-@end itemize
 
 
 @node Extensions to POSIX
@@ -235,9 +216,5 @@ database while preventing the keyed accesses (@code{SB-POSIX:GETPWNAM},
 @code{SB-POSIX:GETGRGID})
 from running until iteration completes.
 
-@itemize
-@item do-passwds
 @include macro-sb-posix-do-passwds.texinfo
-@item do-groups
 @include macro-sb-posix-do-groups.texinfo
-@end itemize

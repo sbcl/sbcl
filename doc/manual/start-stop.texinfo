@@ -24,10 +24,10 @@
 @comment  node-name,  next,  previous,  up
 @subsection From Shell to Lisp
 
-To run SBCL type @command{sbcl} at the command line.
+To run SBCL, type @command{sbcl} at the command line.
 
-You should end up in the toplevel @dfn{REPL} (read, eval, print
--loop), where you can interact with SBCL by typing expressions.
+You should end up in the toplevel @dfn{REPL} (read-eval-print loop),
+where you can interact with SBCL by typing expressions.
 
 @smallexample
 $ sbcl
@@ -39,7 +39,6 @@ It is mostly in the public domain; some portions are provided under
 BSD-style licenses.  See the CREDITS and COPYING files in the
 distribution for more information.
 * (+ 2 2)
-
 4
 * (exit)
 $
@@ -51,8 +50,8 @@ See also @ref{Command Line Options} and @ref{Stopping SBCL}.
 @comment  node-name,  next,  previous,  up
 @subsection Running from Emacs
 
-To run SBCL as an inferior-lisp from Emacs in your @file{.emacs} do
-something like:
+To run SBCL as an @code{inferior-lisp} from Emacs, in your
+@file{.emacs} do something like:
 
 @lisp
 ;;; The SBCL binary and command-line arguments
@@ -70,7 +69,7 @@ Integration}.
 
 Standard Unix tools that are interpreters follow a common command line
 protocol that is necessary to work with ``shebang scripts''. SBCL supports
-this via the @code{--script} command line option.
+this via the @code{--script} command line option @pxref{Command Line Options}.
 
 Example file (@file{hello.lisp}):
 
@@ -79,12 +78,14 @@ Example file (@file{hello.lisp}):
 (write-line "Hello, World!")
 @end lisp
 
-Usage examples:
+Usage from the command line:
 
 @smallexample
 $ ./hello.lisp
 Hello, World!
 @end smallexample
+
+Note that SBCL skips the shebang line when it reads the file:
 
 @smallexample
 $ sbcl --script hello.lisp
@@ -175,18 +176,17 @@ command line arguments are passed on to user code.
 
 The full, unambiguous syntax for invoking SBCL at the command line is:
 
-@command{sbcl} @var{runtime-option}* @code{--end-runtime-options} @var{toplevel-option}* @code{--end-toplevel-options} @var{user-options}*
+@command{sbcl} @var{runtime-option}* @code{--end-runtime-options} @var{toplevel-option}* @code{--end-toplevel-options} @var{user-option}*
 
-For convenience, the @code{--end-runtime-options} and
-@code{--end-toplevel-options} elements can be omitted. Omitting these
-elements can be convenient when you are running the program
-interactively, and you can see that no ambiguities are possible with
-the option values you are using. Omitting these elements is probably a
-bad idea for any batch file where any of the options are under user
-control, since it makes it impossible for SBCL to detect erroneous
-command line input, so that erroneous command line arguments will be
-passed on to the user program even if they was intended for the
-runtime system or the Lisp system.
+For convenience, @code{--end-runtime-options} and
+@code{--end-toplevel-options} can be omitted, which can be convenient
+when you are running the program interactively, and you can see that
+no ambiguities are possible with the option values you are using.
+Omitting these elements is probably a bad idea for any batch file
+where any of the options are under user control, since it makes it
+impossible for SBCL to detect erroneous command line input, so that
+erroneous command line arguments will be passed on to the user program
+even if they was intended for the runtime system or the Lisp system.
 
 @menu
 * Runtime Options::
@@ -234,19 +234,20 @@ with LDB.
 @cindex ldb
 There are some dangerous low-level errors (for instance, control stack
 exhausted, memory fault) that (or whose handlers) can corrupt the
-image. By default SBCL prints a warning, then tries to continue and
-handle the error in Lisp, but this will not always work and SBCL may
+image. By default, SBCL prints a warning, then tries to continue and
+handle the error in Lisp, but this will not always work, and SBCL may
 malfunction or even hang. With this option, upon encountering such an
-error SBCL will invoke ldb (if present and enabled) or else exit.
+error, SBCL will exit instead of invoking LDB (if present and
+enabled).
 
 
 @item --script @var{filename}
-As a runtime option this is equivalent to @code{--noinform}
+As a @emph{runtime} option, this is equivalent to @code{--noinform}
 @code{--disable-ldb} @code{--lose-on-corruption}
 @code{--end-runtime-options} @code{--script} @var{filename}. See the
-description of @code{--script} as a toplevel option below. If there
-are no other command line arguments following @code{--script}, the
-filename argument can be omitted.
+description of @code{--script} as a @emph{toplevel} option below. If
+there are no other command line arguments following @code{--script},
+the filename argument can be omitted.
 
 
 @item --merge-core-pages
@@ -271,9 +272,9 @@ Print SBCL's version information, then exit.
 In the future, runtime options may be added to control behaviour such
 as lazy allocation of memory.
 
-Runtime options, including any --end-runtime-options option, are
-stripped out of the command line before the Lisp toplevel logic gets a
-chance to see it.
+Runtime options, including any @code{--end-runtime-options} option,
+are stripped out of the command line before the Lisp toplevel logic
+gets a chance to see it.
 
 @node Toplevel Options
 @comment  node-name,  next,  previous,  up

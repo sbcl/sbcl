@@ -530,7 +530,7 @@ variables if the symbol in question is contained in symbols
 
 (defun lisp-section-p (line line-number lines)
   "Returns T if the given LINE looks like start of lisp code --
-ie. if it starts with whitespace followed by a paren or
+i.e. if it starts with whitespace followed by a paren or
 semicolon, and the previous line is empty"
   (let ((offset (indentation line)))
     (and offset
