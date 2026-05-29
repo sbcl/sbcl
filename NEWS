@@ -3,6 +3,8 @@
 changes relative to sbcl-2.6.5:
   * minor incompatible change: FDEFINITION now returns the outermost wrapper
     (added e.g. by TRACE, PROFILE) like SYMBOL-FUNCTION.  (lp#799533)
+  * bug fix: TRACE no longer fails when trying to print a return value that
+    cannot be printed readble and *PRINT-READABLY* is true.
   * documentation: SB-INTROSPECT is documented.
 
 changes in sbcl-2.6.5 relative to sbcl-2.6.4:

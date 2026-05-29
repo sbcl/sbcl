@@ -137,3 +137,13 @@
   (let ((s (with-output-to-string (*trace-output*)
              (g1))))
     (assert (search "G1 returned INVOKED" s))))
+
+
+(defun echo (x)
+  x)
+
+(trace echo)
+
+;;; Check that this does not fail when printing *PACKAGE*.
+(let ((*print-readably* t))
+  (echo *package*))
