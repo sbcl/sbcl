@@ -166,17 +166,20 @@ pointing to objects for which roots should be searched.
 CRITERION determines just how rooty (how deep) a root must be in order
 to be considered. Possible values are:
 
-  :OLDEST
-     This says we can stop upon seeing an object in the oldest gen to
-     GC, or older. This is the easiest test to satisfy.
+- :OLDEST
 
-  :PSEUDO-STATIC
-     This is usually the same as :OLDEST, unless the oldest gen to GC
-     has been decreased.
+    This says we can stop upon seeing an object in the oldest gen to
+    GC, or older. This is the easiest test to satisfy.
 
-  :STATIC
-     To find a root of an image-backed object, you want to stop only at
-     a truly :STATIC object.
+- :PSEUDO-STATIC
+
+    This is usually the same as :OLDEST, unless the oldest gen to GC
+    has been decreased.
+
+- :STATIC
+
+  To find a root of an image-backed object, you want to stop only at a
+  truly :STATIC object.
 
 IGNORE is a list of objects to treat as if nonexistent in the heap.
 It can often be useful for finding a path to an interned symbol other than
@@ -185,39 +188,46 @@ through its package by specifying the package as an ignored object.
 PRINT controls whether discovered paths should be returned or
 printed. Possible values are
 
-  :VERBOSE
+- :VERBOSE
+
     Return no values. Print discovered paths using a verbose format
     with each node of each path on a separate line.
 
-  true (other than :VERBOSE)
+- true (other than :VERBOSE)
+
     Return no values. Print discovered paths using a compact format
     with all nodes of each path on a single line.
 
-  NIL
+- NIL
+
     Do not print any output. Instead return the discovered paths as a
     list of lists. Each list has the form
 
-      (TARGET . (ROOT NODE*))
+        (TARGET . (ROOT NODE*))
 
     where TARGET is one of the target of one of the WEAK-POINTERS.
 
     ROOT is a description of the root at which the path starts and has
     one of the following forms:
 
-      :STATIC
+    - :STATIC
+
         If the root of the path is a non-collectible heap object.
 
-      :PINNED
+    - :PINNED
+
         If an unknown thread stack pins the root of the path.
 
-      ((THREAD-NAME | THREAD-OBJECT) SYMBOL CURRENTP)
-        If the path begins at a special binding of SYMBOL in a
-        thread. CURRENTP is a BOOLEAN indicating whether the value is
-        current or shadowed by another binding.
+    - `((THREAD-NAME | THREAD-OBJECT) SYMBOL CURRENTP)`
 
-      ((THREAD-NAME | THREAD-OBJECT) GUESSED-PC)
+        If the path begins at a special binding of SYMBOL in a thread.
+        CURRENTP is a BOOLEAN indicating whether the value is current
+        or shadowed by another binding.
+
+    - `((THREAD-NAME | THREAD-OBJECT) GUESSED-PC)`
+
         If the path begins at a lexical variable in the function whose
-        code contains GUESSED-PC.
+        code contains `GUESSED-PC`.
 
     Each NODE in the remainder of the path is a cons (OBJECT . SLOT)
     indicating that the slot at index SLOT in OBJECT references the

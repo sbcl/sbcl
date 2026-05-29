@@ -205,13 +205,14 @@ If ABS-SEC and ABS-USEC are in the past, 0 0 is returned."
                 decode-timeout))
 (defun decode-timeout (seconds)
   "Decodes a relative timeout in SECONDS into five values, taking any
-global deadlines into account: TO-SEC, TO-USEC, STOP-SEC, STOP-USEC,
-DEADLINEP.
+global deadlines into account: `TO-SEC`, `TO-USEC`, `STOP-SEC`,
+`STOP-USEC`, `DEADLINEP`.
 
-TO-SEC and TO-USEC indicate the relative timeout in seconds and microseconds.
-STOP-SEC and STOP-USEC indicate the absolute timeout in seconds and
-microseconds. DEADLINEP is true if the returned values reflect a global
-deadline instead of the local timeout indicated by SECONDS.
+`TO-SEC` and `TO-USEC` indicate the relative timeout in seconds and
+microseconds. `STOP-SEC` and `STOP-USEC` indicate the absolute timeout
+in seconds and microseconds. `DEADLINEP` is true if the returned
+values reflect a global deadline instead of the local timeout
+indicated by SECONDS.
 
 If SECONDS is null and there is no global timeout all returned values will be
 null. If a global deadline has already passed when DECODE-TIMEOUT is called,

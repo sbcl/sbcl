@@ -685,9 +685,9 @@ line break."
 
 (defun pprint-fill (stream list &optional (colon? t) atsign?)
   "Output LIST to STREAM putting :FILL conditional newlines between each
-   element. If COLON? is NIL (defaults to T), then no parens are printed
-   around the output. ATSIGN? is ignored (but allowed so that PPRINT-FILL
-   can be used with the ~/.../ format directive."
+   element. If `COLON?` is NIL (defaults to T), then no parens are
+   printed around the output. `ATSIGN?` is ignored (but allowed so
+   that PPRINT-FILL can be used with the `~/.../` format directive."
   (declare (ignore atsign?))
   (pprint-logical-block (stream list
                                 :prefix (if colon? "(" "")
@@ -701,9 +701,9 @@ line break."
 
 (defun pprint-linear (stream list &optional (colon? t) atsign?)
   "Output LIST to STREAM putting :LINEAR conditional newlines between each
-   element. If COLON? is NIL (defaults to T), then no parens are printed
-   around the output. ATSIGN? is ignored (but allowed so that PPRINT-LINEAR
-   can be used with the ~/.../ format directive."
+   element. If `COLON?` is NIL (defaults to T), then no parens are
+   printed around the output. `ATSIGN?` is ignored (but allowed so
+   that PPRINT-LINEAR can be used with the `~/.../` format directive."
   (declare (ignore atsign?))
   (pprint-logical-block (stream list
                                 :prefix (if colon? "(" "")
@@ -718,10 +718,10 @@ line break."
 (defun pprint-tabular (stream list &optional (colon? t) atsign? tabsize)
   "Output LIST to STREAM tabbing to the next column that is an even multiple
    of TABSIZE (which defaults to 16) between each element. :FILL style
-   conditional newlines are also output between each element. If COLON? is
-   NIL (defaults to T), then no parens are printed around the output.
-   ATSIGN? is ignored (but allowed so that PPRINT-TABULAR can be used with
-   the ~/.../ format directive."
+   conditional newlines are also output between each element. If
+   `COLON?` is NIL (defaults to T), then no parens are printed around
+   the output. `ATSIGN?` is ignored (but allowed so that
+   PPRINT-TABULAR can be used with the `~/.../` format directive."
   (declare (ignore atsign?))
   (pprint-logical-block (stream list
                                 :prefix (if colon? "(" "")

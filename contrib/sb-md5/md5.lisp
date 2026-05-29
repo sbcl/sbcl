@@ -270,7 +270,7 @@ where a is the intended low-order byte and d the high-order byte."
 
 (deftype md5-regs ()
   "The working state of the MD5 algorithm, which contains the 4 32-bit
-registers A, B, C and D."
+registers `\\\\A`, `\\\\B`, `\\\\C` and `\\\\D`."
   `(ub32-vector 4))
 
 (defmacro md5-regs-a (regs)
@@ -286,13 +286,13 @@ registers A, B, C and D."
   `(ub32-aref ,regs 3))
 
 (defconstant +md5-magic-a+ (assemble-ub32 #x01 #x23 #x45 #x67)
-  "Initial value of Register A of the MD5 working state.")
+  "Initial value of Register `\\\\A` of the MD5 working state.")
 (defconstant +md5-magic-b+ (assemble-ub32 #x89 #xab #xcd #xef)
-  "Initial value of Register B of the MD5 working state.")
+  "Initial value of Register `\\\\B` of the MD5 working state.")
 (defconstant +md5-magic-c+ (assemble-ub32 #xfe #xdc #xba #x98)
-  "Initial value of Register C of the MD5 working state.")
+  "Initial value of Register `\\\\C` of the MD5 working state.")
 (defconstant +md5-magic-d+ (assemble-ub32 #x76 #x54 #x32 #x10)
-  "Initial value of Register D of the MD5 working state.")
+  "Initial value of Register `\\\\D` of the MD5 working state.")
 
 (declaim (inline initial-md5-regs))
 (defun initial-md5-regs ()
@@ -314,8 +314,8 @@ registers A, B, C and D."
 
 (defun update-md5-block (regs block)
   "This is the core part of the MD5 algorithm.  It takes a complete 16
-word block of input, and updates the working state in A, B, C, and D
-accordingly."
+word block of input, and updates the working state in `\\\\A`,
+`\\\\B`, `\\\\C`, and `\\\\D` accordingly."
   (declare (type md5-regs regs)
            (type md5-block block)
            (optimize (speed 3) (safety 0) (space 0) (debug 0) #+lw-int32 (float 0)))
@@ -358,7 +358,7 @@ accordingly."
 (declaim (inline fill-block fill-block-ub8 fill-block-char))
 (defun fill-block-ub8 (block buffer offset)
   "Convert a complete 64 (unsigned-byte 8) input vector segment
-starting from `offset' into the given 16 word MD5 block."
+starting from OFFSET into the given 16 word MD5 block."
   (declare (type (integer 0 #.(- most-positive-fixnum 64)) offset)
            (type md5-block block)
            (type (simple-array (unsigned-byte 8) (*)) buffer)
@@ -384,7 +384,7 @@ starting from `offset' into the given 16 word MD5 block."
 
 (defun fill-block-char (block buffer offset)
   "DEPRECATED: Convert a complete 64 character input string segment
-starting from `offset' into the given 16 word MD5 block."
+starting from OFFSET into the given 16 word MD5 block."
   (declare (type (integer 0 #.(- most-positive-fixnum 64)) offset)
            (type md5-block block)
            (type simple-string buffer)
@@ -412,9 +412,9 @@ starting from `offset' into the given 16 word MD5 block."
 (defun fill-block (block buffer offset)
   "Convert a complete 64 byte input vector segment into the given 16
 word MD5 block.  This currently works on (unsigned-byte 8) and
-character simple-arrays, via the functions `fill-block-ub8' and
-`fill-block-char' respectively.  Note that it will not work correctly
-on character simple-arrays if `char-code-limit' is greater than 256."
+character simple-arrays, via the functions FILL-BLOCK-UB8 and
+FILL-BLOCK-CHAR respectively.  Note that it will not work correctly
+on character simple-arrays if CHAR-CODE-LIMIT is greater than 256."
   (declare (type (integer 0 #.(- most-positive-fixnum 64)) offset)
            (type md5-block block)
            (type (simple-array * (*)) buffer)
@@ -431,7 +431,7 @@ on character simple-arrays if `char-code-limit' is greater than 256."
 (declaim (inline md5regs-digest))
 (defun md5regs-digest (regs)
   "Create the final 16 byte message-digest from the MD5 working state
-in `regs'.  Returns a (simple-array (unsigned-byte 8) (16))."
+in REGS.  Returns a (simple-array (unsigned-byte 8) (16))."
   (declare (optimize (speed 3) (safety 0) (space 0) (debug 0)
                      #+lw-int32 (float 0) #+lw-int32 (hcl:fixnum-safety 0))
            (type md5-regs regs))
@@ -474,9 +474,9 @@ in `regs'.  Returns a (simple-array (unsigned-byte 8) (16))."
 
 (declaim (inline copy-to-buffer))
 (defun copy-to-buffer (from from-offset count buffer buffer-offset)
-  "Copy a partial segment from input vector `from' starting at
-`from-offset' and copying `count' elements into the 64 byte buffer
-starting at `buffer-offset'."
+  "Copy a partial segment from input vector FROM starting at
+FROM-OFFSET and copying COUNT elements into the 64 byte buffer
+starting at BUFFER-OFFSET."
   (declare (optimize (speed 3) (safety 0) (space 0) (debug 0)
                      #+lw-int32 (float 0) #+lw-int32 (hcl:fixnum-safety 0))
            (type sb-int:index from-offset)
@@ -510,12 +510,12 @@ starting at `buffer-offset'."
                        from-index))))))
 
 (defun update-md5-state (state sequence &key (start 0) (end (length sequence)))
-  "Update the given md5-state from `sequence', which is either a
+  "Update the given md5-state from SEQUENCE, which is either a
 simple-string or a simple-array with element-type (unsigned-byte 8),
-bounded by `start' and `end', which must be numeric bounding-indices.
+bounded by START and END, which must be numeric bounding-indices.
 Note that usage on simple-strings is DEPRECATED, since this will not
-work correctly if `char-code-limit' is more than 256.  String input
-should be converted to (unsigned-byte 8) simple-arrays with
+work correctly if CHAR-CODE-LIMIT is more than 256.  String input
+should be converted to (UNSIGNED-BYTE 8) simple-arrays with
 external-format conversion routines beforehand."
   (declare (type md5-state state)
            (type (simple-array * (*)) sequence)
@@ -591,8 +591,8 @@ by processing any remaining input in its buffer, with suitable padding
 and appended bit-length, as specified by the MD5 standard.
 
 The resulting MD5 message-digest is returned as an array of sixteen
-(unsigned-byte 8) values.  Calling `update-md5-state' after a call to
-`finalize-md5-state' results in unspecified behaviour."
+(unsigned-byte 8) values.  Calling UPDATE-MD5-STATE after a call to
+FINALIZE-MD5-STATE results in unspecified behaviour."
   (declare (type md5-state state)
            (optimize (speed 3) (safety 1) (space 0) (debug 1) #+lw-int32 (float 0)))
   (locally
@@ -633,7 +633,7 @@ The resulting MD5 message-digest is returned as an array of sixteen
 ;;; High-Level Drivers
 
 (defun md5sum-sequence (sequence &key (start 0) end)
-  "Calculate the MD5 message-digest of data in `sequence', which should
+  "Calculate the MD5 message-digest of data in SEQUENCE, which should
 be a 1d simple-array with element type (unsigned-byte 8).  On CMU CL
 and SBCL non-simple and non-1d arrays with this element-type are also
 supported."
@@ -666,8 +666,8 @@ supported."
 
 (defun md5sum-string (string &key (external-format :default) (start 0) end)
   "Calculate the MD5 message-digest of the binary representation of
-`string' (as octets) in the external format specified by
-`external-format'. The boundaries `start' and `end' refer to character
+STRING (as octets) in the external format specified by
+EXTERNAL-FORMAT. The boundaries START and END refer to character
 positions in the string, not to octets in the resulting binary
 representation.  The permissible external format specifiers are
 determined by the underlying implementation."
@@ -716,16 +716,16 @@ determined by the underlying implementation."
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant +buffer-size+ (* 128 1024)
-    "Size of internal buffer to use for `md5sum-stream' and `md5sum-file'
+    "Size of internal buffer to use for MD5SUM-STREAM and MD5SUM-FILE
 operations.  This should be a multiple of 64, the MD5 block size."))
 
 (deftype buffer-index () `(integer 0 ,+buffer-size+))
 
 (defun md5sum-stream (stream)
-  "Calculate an MD5 message-digest of the contents of `stream'.  Its
+  "Calculate an MD5 message-digest of the contents of STREAM.  Its
 element-type has to be (unsigned-byte 8). Use on character streams is
 DEPRECATED, as this will not work correctly on implementations with
-`char-code-limit' > 256 and ignores character coding issues."
+CHAR-CODE-LIMIT > 256 and ignores character coding issues."
   (declare (optimize (speed 3) (safety 3) (space 0) (debug 1)))
   (locally
       (declare (optimize (safety 1) (debug 0)))
@@ -755,7 +755,7 @@ DEPRECATED, as this will not work correctly on implementations with
                 (stream-element-type stream) stream))))))
 
 (defun md5sum-file (pathname)
-  "Calculate the MD5 message-digest of the file specified by `pathname'."
+  "Calculate the MD5 message-digest of the file specified by PATHNAME."
   (declare (optimize (speed 3) (safety 3) (space 0) (debug 1)))
   (with-open-file (stream pathname :element-type '(unsigned-byte 8))
     (md5sum-stream stream)))

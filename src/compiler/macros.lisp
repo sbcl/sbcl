@@ -1002,7 +1002,7 @@
 ;;; We use WITH-SANE-IO-SYNTAX to provide safe defaults, and provide
 ;;; *COMPILER-PRINT-VARIABLE-ALIST* for user customization.
 (defvar *compiler-print-variable-alist* nil
-  "an association list describing new bindings for special variables
+  "An association list describing new bindings for special variables
 to be used by the compiler for error-reporting, etc. Eg.
 
  ((*PRINT-LENGTH* . 10) (*PRINT-LEVEL* . 6) (*PRINT-PRETTY* . NIL))
@@ -1012,7 +1012,7 @@ during the execution of some debug commands. When evaluating arbitrary
 expressions in the debugger, the normal values of the printer control
 variables are in effect.
 
-Initially empty, *COMPILER-PRINT-VARIABLE-ALIST* is Typically used to
+Initially empty, *COMPILER-PRINT-VARIABLE-ALIST* is typically used to
 specify bindings for printer control variables.")
 
 (defmacro with-compiler-io-syntax (&body forms)

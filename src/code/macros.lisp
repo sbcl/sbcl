@@ -1895,10 +1895,10 @@ EXPERIMENTAL: Interface subject to change."
 Additionally DEFUN, DEFGENERIC, DEFMETHOD, FLET, and LABELS can be also used to
 define CAS-functions analogously to SETF-functions:
 
-  (defvar *foo* nil)
+    (defvar *foo* nil)
 
-  (defun (cas foo) (old new)
-    (cas (symbol-value '*foo*) old new))
+    (defun (cas foo) (old new)
+      (cas (symbol-value '*foo*) old new))
 
 First argument of a CAS function is the expected old value, and the second
 argument of is the new value. Note that the system provides no automatic
@@ -2114,24 +2114,23 @@ PLACE can be any place supported by SB-EXT:COMPARE-AND-SWAP.
 
 Examples:
 
-  ;;; Conses T to the head of FOO-LIST.
-  (defstruct foo list)
-  (defvar *foo* (make-foo))
-  (atomic-update (foo-list *foo*) #'cons t)
+    ;;; Conses T to the head of FOO-LIST.
+    (defstruct foo list)
+    (defvar *foo* (make-foo))
+    (atomic-update (foo-list *foo*) #'cons t)
 
-  (let ((x (cons :count 0)))
-     (mapc #'sb-thread:join-thread
-           (loop repeat 1000
-                 collect (sb-thread:make-thread
-                          (lambda ()
-                            (loop repeat 1000
-                                  do (atomic-update (cdr x) #'1+)
-                                     (sleep 0.00001))))))
-     ;; Guaranteed to be (:COUNT . 1000000) -- if you replace
-     ;; atomic update with (INCF (CDR X)) above, the result becomes
-     ;; unpredictable.
-     x)
-"
+    (let ((x (cons :count 0)))
+       (mapc #'sb-thread:join-thread
+             (loop repeat 1000
+                   collect (sb-thread:make-thread
+                            (lambda ()
+                              (loop repeat 1000
+                                    do (atomic-update (cdr x) #'1+)
+                                       (sleep 0.00001))))))
+       ;; Guaranteed to be (:COUNT . 1000000) -- if you replace
+       ;; atomic update with (INCF (CDR X)) above, the result becomes
+       ;; unpredictable.
+       x)"
   (multiple-value-bind (vars vals old new cas-form read-form)
       (get-cas-expansion place env)
     `(let* (,@(mapcar 'list vars vals)

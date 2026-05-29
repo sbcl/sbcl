@@ -2047,10 +2047,10 @@ experimental and subject to change."
             ("SYS:OUTPUT;**;*.*.*" ,output)))))
 
 (defun set-sbcl-source-location (pathname)
-  "Initialize the SYS logical host based on PATHNAME, which should be
-the top-level directory of the SBCL sources. This will replace any
-existing translations for \"SYS:SRC;\", \"SYS:CONTRIB;\", and
-\"SYS:OUTPUT;\". Other \"SYS:\" translations are preserved."
+  "Initialize the `\\\\SYS` logical host based on PATHNAME, which should
+be the top-level directory of the SBCL sources. This will replace any
+existing translations for `\"SYS:SRC;\"`, `\"SYS:CONTRIB;\"`, and
+`\"SYS:OUTPUT;\"`. Other `\"SYS:\"` translations are preserved."
   (let ((truename (truename pathname))
         (current-translations
          (remove-if (lambda (translation)

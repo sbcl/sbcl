@@ -322,7 +322,8 @@
                           (arg alien-pointer-to-anything-or-nil))
   (define-protocol-class flock alien-flock ()
    ((type :initarg :type :accessor flock-type
-          :documentation "Type of lock; F_RDLCK, F_WRLCK, F_UNLCK.")
+          :documentation "Type of lock; `\\\\F_RDLCK`, `\\\\F_WRLCK`,
+`\\\\F_UNLCK`.")
     (whence :initarg :whence :accessor flock-whence
             :documentation "Flag for starting offset.")
     (start :initarg :start :accessor flock-start
@@ -334,7 +335,8 @@
     ;; so we initialize it to 0.
     (pid :initform 0 :reader flock-pid
          :documentation
-         "Process ID of the process holding the lock; returned with F_GETLK."))
+         "Process ID of the process holding the lock;
+         returned with `\\\\F_GETLK`."))
    (:documentation "Class representing locks used in fcntl(2)."))
   (define-entry-point "fcntl" (fd cmd &optional (arg nil argp))
     (if argp

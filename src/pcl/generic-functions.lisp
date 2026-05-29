@@ -372,9 +372,11 @@ form or a SPECIALIZER instance.
 
 More specifically, SPECIALIZER can be
 * a non-parsed specializer form such as
-  * a symbol naming a class
-  * a list of the form (eql OBJECT)
-  * a list of the form (SPECIALIZER-KIND &rest SPECIFIC-SYNTAX)
+
+    * a symbol naming a class
+    * a list of the form (eql OBJECT)
+    * a list of the form `(SPECIALIZER-KIND &REST SPECIFIC-SYNTAX)`
+
 * an instance of a subclass of SPECIALIZER
 
 When SPECIALIZER cannot be parsed/used as a specializer for

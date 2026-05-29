@@ -28,8 +28,8 @@
 (!def-stream-generic stream-element-type (stream)
   (:documentation
    "Return a type specifier for the kind of object returned by the
-  STREAM. The class FUNDAMENTAL-CHARACTER-STREAM provides a default method
-  which returns CHARACTER."))
+  STREAM. The class SB-GRAY:FUNDAMENTAL-CHARACTER-STREAM provides a
+  default method which returns CHARACTER."))
 
 (defmethod stream-element-type ((stream fundamental-character-stream))
   'character)
@@ -125,9 +125,9 @@
 
 (defgeneric stream-peek-char (stream)
   (:documentation
-   "This is used to implement PEEK-CHAR; this corresponds to PEEK-TYPE of NIL.
-  It returns either a character or :EOF. The default method calls
-  STREAM-READ-CHAR and STREAM-UNREAD-CHAR."))
+   "This is used to implement PEEK-CHAR; this corresponds to `PEEK-TYPE`
+  of NIL. It returns either a character or :EOF. The default method
+  calls STREAM-READ-CHAR and STREAM-UNREAD-CHAR."))
 
 (defmethod stream-peek-char ((stream fundamental-character-input-stream))
   (let ((char (stream-read-char stream)))

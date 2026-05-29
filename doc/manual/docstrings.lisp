@@ -6,12 +6,84 @@
 ;;;; public domain and is provided with absolutely no warranty. See
 ;;;; the COPYING file for more information.
 ;;;;
-;;;; Written by Rudi Schlatte <rudi@constantly.at>, mangled
-;;;; by Nikodemus Siivola.
+;;;; Written by Rudi Schlatte <rudi@constantly.at>, mangled by
+;;;; Nikodemus Siivola. Brought closer to Markdown by Gabor Melis.
+
+;;;; This code can convert a strict subset of Markdown to Texinfo.
+;;;; Supported:
+;;;;
+;;;; - Inline code: `set this with monospace`
+;;;;
+;;;; - Indented code blocks are indented with 4 extra spaces after a
+;;;;   blank line:
+;;;;
+;;;;     Like this:
+;;;;
+;;;;         void main();
+;;;;
+;;;; - Fenced code blocks are indented at the normal level after a
+;;;;   blank line:
+;;;;
+;;;;     ```
+;;;;     void main();
+;;;;     ```
+;;;;
+;;;;     Use fenced code blocks only when you have consecutive code
+;;;;     blocks, which would be collapsed into a single code block
+;;;;     when indented.
+;;;;
+;;;; - Itemized lists (like this one). List items can span multiple
+;;;;   lines.
+;;;;
+;;;;     - Nested lists are indented 4 spaces. A blank line required
+;;;;       before the first one.
+;;;;
+;;;; Codification and Downcasing
+;;;; ---------------------------
+;;;
+;;;; Summary: Some text in docstrings is automatically codified (e.g.
+;;;; FOO -> `FOO`) and most code is downcased.
+;;;;
+;;;; We approximate the semantics of PAX::@CODIFICATION with the
+;;;; settings PAX:*DOCUMENT-UPPERCASE-IS-CODE* and
+;;;; PAX:*DOCUMENT-DOWNCASE-UPPERCASE-CODE* both true.
+;;;;
+;;;; - Fully-qualified all-uppercase string representatation of
+;;;;   symbols are codified (SB-EXT:CAS, :XYZ).
+;;;;
+;;;; - All-uppercase SYMBOL-NAMEs accessible in the package that was
+;;;;   in effect when the definition with the docstring was compiled
+;;;;   are codified.
+;;;;
+;;;; - When at least 3 uppercase characters are followed by a
+;;;;   lowercase character (e.g. SETFable), then the uppercase prefix
+;;;;   is codified with the previous rules.
+;;;;
+;;;; Detecting the package is a heuristic endeavour. See
+;;;; GUESS-PACKAGE-FROM-ARGLIST and PACKAGE-OVERRIDE.
+;;;;
+;;;; When there is no corresponding symbol, the Markdown backtick
+;;;; syntax (`PRINT`) can be used to codify.
+;;;;
+;;;; When there are no lowercase nor #\" characters in inline code (as
+;;;; opposed to code blocks), be it auto-codified or explicitly
+;;;; backticked, it's downcased.
+;;;;
+;;;; When there is a corresponding symbol, but codification or
+;;;; downcasing should not happen, use backslash escapes.
+;;;;
+;;;; Escaping (following PAX::@OVERVIEW-OF-ESCAPING):
+;;;;
+;;;;   PRINT     -> @code{print}    (Should be autolinked, unimplemented)
+;;;;   \PRINT    -> @code{print}    (Prevent autolinking)
+;;;;   \\PRINT   -> PRINT           (Prevent autolinking and codification)
+;;;;   `PRINT`   -> @code{print}    (Should be autolinked, unimplemented)
+;;;;   `\PRINT`  -> @code{print}    (Prevent autolinking)
+;;;;   `\\PRINT` -> @code{PRINT}    (Prevent autolinking and downcasing)
+;;;;
+;;;; Note that in docstrings, the backslashes need to be doubled.
 
 ;;;; TODO
-;;;; * Verbatim text
-;;;; * Quotations
 ;;;; * Method documentation untested
 ;;;; * Method sorting, somehow
 ;;;; * Index for macros & constants?
@@ -19,20 +91,6 @@
 ;;;; * Nesting (currently only nested itemizations work)
 ;;;; * doc -> internal form -> texinfo (so that non-texinfo format are also
 ;;;;   easily generated)
-
-;;;; FIXME: The description below is no longer complete. This
-;;;; should possibly be turned into a contrib with proper documentation.
-
-;;;; Formatting heuristics (tweaked to format SAVE-LISP-AND-DIE sanely):
-;;;;
-;;;; Formats SYMBOL as @code{symbol}, or @var{symbol} if symbol is in
-;;;; the argument list of the defun / defmacro.
-;;;;
-;;;; Lines starting with * or - that are followed by intented lines
-;;;; are marked up with @itemize.
-;;;;
-;;;; Lines containing only a SYMBOL that are followed by indented
-;;;; lines are marked up as @table @code, with the SYMBOL as the item.
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (require 'sb-introspect))
@@ -450,24 +508,43 @@ with #\@. Optionally downcase the result."
 (defun empty-p (line-number lines)
   (and (< -1 line-number (length lines))
        (not (indentation (svref lines line-number)))))
+
 
-;;; line markups
+;;;; Codification
 
-(defvar *not-code* '("ANSI" "CLHS" "UNIX" "SBCL" "BSD" "C" "A" "I"))
-(defvar *code*
-  '(":WINDOW" ":HIDE" ":SHOW-NORMAL" ":SHOW-MAXIMIZED" ":SHOW-MINIMIZED"
-    ":SHOW-NO-ACTIVATE" ":SHOW-MIN-NO-ACTIVE" ":SHOW-NA"
-    ":SB-CORE-COMPRESSION" ":CONSOLE" ":GUI" ":APPLICATION-TYPE"
-    "NODE*" "GUESSED-PC" "SYS" "SPECIALIZER-KIND" "SPECIFIC-SYNTAX"
-    "QUALIFIERS*" "SPECIALIZERS*" "OUTER-NAME" "EXTERNAL-NAME"
-    "GET-FOO" "RELEASE-FOO" "C-CALL" "BODY-FORM" "ALLOCATION"
-    "INITIAL-VALUE" "ARG-NAME" "ARG-TYPE" "FORM" "WHILE"
-    "TO-SEC" "TO-USEC" "STOP-SEC" "STOP-USEC" "DEADLINEP"
-    "FUNDAMENTAL-CHARACTER-STREAM" "SOURCE-PLIST" "PEEK-TYPE"
-    "THREAD-NAME" "THREAD-OBJECT" "NEW-VALUE" "PROCESS"
-    "COLON" "ATSIGN" "GATE" "MAILBOX" "QUEUE" "X" "Y"
-    "INDEX" "SEQUENCE" "ITERATOR" "STATEMENT"
-    "MACROEXPAND-ALL"))
+;;; These wouldn't be necessary if we implemented PAX::@CODIFIABLE and
+;;; PAX::@INTERESTING properly.
+(defvar *not-code* '("A" "I"))
+
+;;; GUESS-PACKAGE-FROM-ARGLIST doesn't always guess right.
+(defvar *docstring-packages*
+  '(("SB-CONCURRENCY:GATEP" "SB-CONCURRENCY")
+    ("SB-CONCURRENCY:MAILBOXP" "SB-CONCURRENCY")
+    ("SB-CONCURRENCY:QUEUEP" "SB-CONCURRENCY")
+    ("SB-EXT:INTERACTIVE-EVAL" "SB-IMPL")
+    ("SB-EXT:PROCESS-P" "SB-IMPL")
+    ("SB-EXT:PROCESS-STATUS-HOOK" "SB-IMPL")
+    ("(SETF SB-EXT:READTABLE-NORMALIZATION)" "SB-IMPL")))
+
+(defun package-override (name)
+  (let ((fully-qualified-name (let ((*package* (find-package :cl)))
+                                (prin1-to-string name))))
+    (second (find fully-qualified-name *docstring-packages*
+                  :key #'first :test #'equal))))
+
+#+nil
+(let ((*texinfo-output* *standard-output*)
+      (*documentation-package* *package*))
+  (write-texinfo-string "`XXXXX`")
+  (write-texinfo-string "`\\XXXXX`")
+  (write-texinfo-string "`\\\\XXXXX`")
+  (write-texinfo-string "`Not allcaps`")
+  (write-texinfo-string "- a
+  c
+
+x
+")
+  (write-texinfo-string "`(X Y*)"))
 
 (defun interesting-name-p (name)
   (let ((name (if (and (plusp (length name))
@@ -500,8 +577,7 @@ with #\@. Optionally downcase the result."
     (flet ((grab (start end)
              (let ((name (subseq line start end)))
                (when (and (not (member name *not-code* :test #'equal))
-                          (or (member name *code* :test #'equal)
-                              (interesting-name-p name)))
+                          (interesting-name-p name))
                  (push (list start end) result))))
            (got-symbol-p (start)
              (let ((end (when (< start (length line))
@@ -528,15 +604,15 @@ with #\@. Optionally downcase the result."
                     (and (char= (char line i) #\:)
                          (or (= (1+ i) (length line))
                              (whitespacep (char line (1+ i)))))))
-           ;; symbol end; remember it if it's not "A" or "I"
-           (when (or (> i (1+ begin)) (not (member (char line begin) '(#\A #\I))))
-             (grab begin i))
+           ;; symbol end
+           (grab begin i)
            (setf begin nil
                  maybe-begin t))
           ((and begin (not (find (char line i) *symbol-characters*)))
            ;; Not a symbol: abort
            (setf begin nil))
-          ((and maybe-begin (not begin) (find (char line i) *symbol-characters*))
+          ((and maybe-begin (not begin)
+                (find (char line i) *symbol-characters*))
            ;; potential symbol begin at this position
            (setf begin i
                  maybe-begin nil))
@@ -568,192 +644,247 @@ variables if the symbol in question is contained in symbols
         (let ((symbol-name (apply #'subseq line symbol/index)))
           (format result (if (member symbol-name *texinfo-variables*
                                      :test #'string=)
+                             ;; FIXME: We don't use @var{} elsewhere.
+                             ;; Should we here?
                              "@var{~A}"
                              "@code{~A}")
                   (string-downcase symbol-name)))
         (setf last (second symbol/index)))
       (write-string (subseq line last) result))))
+
 
-;;; lisp sections
+;;;; SBCL-flavoured Markdown to Texinfo Parser
+;;;; Replaces heuristic codification with strict Markdown rules.
 
-(defun lisp-section-p (line line-number lines)
-  "Returns T if the given LINE looks like start of lisp code --
-i.e. if it starts with whitespace followed by a paren or
-semicolon, and the previous line is empty"
-  (let ((offset (indentation line)))
-    (and offset
-         (plusp offset)
-         (find (find-if-not #'whitespacep line) "(;")
-         (empty-p (1- line-number) lines))))
+(defun blankp (line)
+  "Returns T if the line is empty or contains only whitespace."
+  (null (indentation line)))
 
-(defun collect-lisp-section (lines line-number)
-  (flet ((maybe-line (index)
-           (and (< index (length lines)) (svref lines index))))
-    (let ((lisp (loop for index = line-number then (1+ index)
-                      for line = (maybe-line index)
-                      while (or (indentation line)
-                                ;; Allow empty lines in middle of lisp sections.
-                                (let ((next (1+ index)))
-                                  (lisp-section-p (maybe-line next) next lines)))
-                      collect line)))
-     (values (length lisp) `("@lisp" ,@lisp "@end lisp")))))
+(defun process-inline-markdown (string)
+  "Translates escapes (\*) and backticks (`FOO` -> @code{FOO}), while
+delegating normal text to the existing TEXINFO-LINE heuristic
+codifier."
+  (let ((len (length string))
+        (i 0)
+        (raw-buffer (make-string-output-stream))
+        (out (make-string-output-stream)))
+    (flet ((flush-raw ()
+             (let ((raw (get-output-stream-string raw-buffer)))
+               (when (plusp (length raw))
+                 (write-string (texinfo-line raw) out)))))
+      (loop while (< i len)
+            for char = (char string i)
+            do (cond
+                 ;; Escapes: \FOO
+                 ((char= char #\\)
+                  (flush-raw)
+                  (incf i) ; Skip the backslash
+                  (when (< i len)
+                    (write-char (char string i) out)
+                    (incf i)
+                    ;; Protect the rest of the contiguous word from TEXINFO-LINE
+                    (loop
+                      while (and (< i len)
+                                 (not (member (char string i)
+                                              '(#\Space #\Tab #\Newline
+                                                #\( #\) #\[ #\] #\{ #\}
+                                                #\' #\" #\, #\. #\; #\? #\!))))
+                      do (write-char (char string i) out)
+                         (incf i))
+                    (decf i)))
+                 ;; Backticks: `CODE` with PAX downcasing and escape rules
+                 ((char= char #\`)
+                  (flush-raw)
+                  (incf i)
+                  (let ((code-buffer (make-string-output-stream)))
+                    (loop while (and (< i len) (char/= (char string i) #\`))
+                          do (write-char (char string i) code-buffer)
+                             (incf i))
+                    (let* ((code-str (get-output-stream-string code-buffer))
+                           (slash-count (loop for c across code-str
+                                              while (char= c #\\)
+                                              count t))
+                           ;; Consume up to 2 leading backslashes as PAX escapes
+                           (actual-code (subseq code-str (min slash-count 2))))
+                      (write-string "@code{" out)
+                      (if (< slash-count 2)
+                          ;; 0 or 1 backslash: Downcase if there are
+                          ;; no lowercase letters (1 backslash turns
+                          ;; off autolinking, which is naturally
+                          ;; handled by bypassing TEXINFO-LINE).
+                          (if (and (not (find-if #'lower-case-p actual-code))
+                                   (not (find #\" actual-code)))
+                              (write-string (string-downcase actual-code) out)
+                              (write-string actual-code out))
+                          ;; 2 backslashes turn off autolinking AND downcasing.
+                          (write-string actual-code out))
+                      (write-string "}" out))))
+                 (t
+                  (write-char char raw-buffer)))
+               (incf i))
+      (flush-raw)
+      (get-output-stream-string out))))
 
-;;; itemized sections
+(defun collect-fenced-code (lines starting-line base-indent)
+  "Collects lines enclosed in ``` fences.
+Returns (VALUES CONSUMED-COUNT TEXINFO-LINES)."
+  (let* ((first-line (svref lines starting-line))
+         (trimmed (string-left-trim " " first-line)))
+    (when (and (>= (length trimmed) 3)
+               (string= (subseq trimmed 0 3) "```"))
+      (let ((lang (string-trim " " (subseq trimmed 3)))
+            (consumed 1)
+            (result nil))
+        (loop for index from (1+ starting-line) below (length lines)
+              for line = (svref lines index)
+              for line-trimmed = (string-left-trim " " line)
+              do (incf consumed)
+              if (and (>= (length line-trimmed) 3)
+                      (string= (subseq line-trimmed 0 3) "```"))
+                do (loop-finish) ; Closing fence found
+              else
+                ;; Strip up to the base indentation of the environment
+                do (push (if (and (indentation line) (>= (indentation line) base-indent))
+                             (subseq line base-indent)
+                             line)
+                         result))
+        (let ((env (if (string-equal lang "lisp") "lisp" "example")))
+          (values consumed
+                  `(,(format nil "@~A" env)
+                    ,@(nreverse result)
+                    ,(format nil "@end ~A" env))))))))
+
+(defun collect-indented-code (lines starting-line base-indent)
+  "Collects lines using the classic 4-space indentation rule."
+  ;; An indented code block must be by a blank line (or be the first line).
+  (unless (and (> starting-line 0)
+               (not (blankp (svref lines (1- starting-line)))))
+    (let ((indent (indentation (svref lines starting-line))))
+      (when (and indent (>= indent (+ base-indent 4)))
+        (let ((consumed 0)
+              (result nil))
+          (loop for index from starting-line below (length lines)
+                for line = (svref lines index)
+                for line-indent = (indentation line)
+                do (cond
+                     ((blankp line)
+                      ;; Blank lines are allowed inside indented code blocks
+                      (push "" result)
+                      (incf consumed))
+                     ((>= line-indent (+ base-indent 4))
+                      (push (subseq line (+ base-indent 4)) result)
+                      (incf consumed))
+                     (t
+                      (loop-finish)))) ; Indentation dropped, code block ends
+          ;; Trim trailing empty lines
+          (loop while (and result (string= (car result) ""))
+                do (pop result) (decf consumed))
+          (if result
+              (values consumed `("@example" ,@(nreverse result) "@end example"))
+              nil))))))
 
 (defun maybe-itemize-offset (line)
-  "Return NIL or the indentation offset if LINE looks like it starts
-an item in an itemization."
-  (let* ((offset (indentation line))
-         (char (when offset (char line offset))))
-    (and offset
-         (member char *itemize-start-characters* :test #'char=)
-         (char= #\Space (find-if-not (lambda (c) (char= c char))
-                                     line :start offset))
-         offset)))
+  "Returns the indent if the line starts with a Markdown list marker (- or *)."
+  (let ((indent (indentation line)))
+    (when indent
+      (let ((trimmed (string-left-trim " " line)))
+        (when (and (>= (length trimmed) 2)
+                   (member (char trimmed 0) '(#\- #\*))
+                   (char= (char trimmed 1) #\Space))
+          indent)))))
 
-(defun collect-maybe-itemized-section (lines starting-line)
-  ;; Return index of next line to be processed outside
-  (let ((this-offset (maybe-itemize-offset (svref lines starting-line)))
-        (result nil)
-        (lines-consumed 0))
-    (loop for line-number from starting-line below (length lines)
-       for line = (svref lines line-number)
-       for indentation = (indentation line)
-       for offset = (maybe-itemize-offset line)
-       do (cond
-            ((not indentation)
-             ;; empty line -- inserts paragraph.
-             (push "" result)
-             (incf lines-consumed))
-            ((and offset (> indentation this-offset))
-             ;; nested itemization -- handle recursively
-             ;; FIXME: tables in itemizations go wrong
-             (multiple-value-bind (sub-lines-consumed sub-itemization)
-                 (collect-maybe-itemized-section lines line-number)
-               (when sub-lines-consumed
-                 (incf line-number (1- sub-lines-consumed)) ; +1 on next loop
-                 (incf lines-consumed sub-lines-consumed)
-                 (setf result (append (reverse sub-itemization) result)))))
-            ((and offset (= indentation this-offset))
-             ;; start of new item
-             (push (format nil "@item ~A"
-                           (texinfo-line (subseq line (1+ offset))))
-                   result)
-             (incf lines-consumed))
-            ((and (not offset) (> indentation this-offset))
-             ;; continued item from previous line
-             (push (texinfo-line line) result)
-             (incf lines-consumed))
-            (t
-             ;; end of itemization
-             (loop-finish))))
-    ;; a single-line itemization isn't.
-    (if (> (count-if (lambda (line) (> (length line) 0)) result) 1)
-        (values lines-consumed `("@itemize" ,@(reverse result) "@end itemize"))
-        nil)))
-
-;;; table sections
-
-(defun tabulation-body-p (offset line-number lines)
-  (when (< line-number (length lines))
-    (let ((offset2 (indentation (svref lines line-number))))
-      (and offset2 (< offset offset2)))))
-
-(defun tabulation-p (offset line-number lines direction)
-  (let ((step  (ecase direction
-                 (:backwards (1- line-number))
-                 (:forwards (1+ line-number)))))
-    (when (and (plusp line-number) (< line-number (length lines)))
-      (and (eql offset (indentation (svref lines line-number)))
-           (or (when (eq direction :backwards)
-                 (empty-p step lines))
-               (tabulation-p offset step lines direction)
-               (tabulation-body-p offset step lines))))))
-
-(defun maybe-table-offset (line-number lines)
-  "Return NIL or the indentation offset if LINE looks like it starts
-an item in a tabulation. Ie, if it is (1) indented, (2) preceded by an
-empty line, another tabulation label, or a tabulation body, (3) and
-followed another tabulation label or a tabulation body."
-  (let* ((line (svref lines line-number))
-         (offset (indentation line))
-         (prev (1- line-number))
-         (next (1+ line-number)))
-    (when (and offset (plusp offset))
-      (and (or (empty-p prev lines)
-               (tabulation-body-p offset prev lines)
-               (tabulation-p offset prev lines :backwards))
-           (or (tabulation-body-p offset next lines)
-               (tabulation-p offset next lines :forwards))
-           offset))))
-
-;;; FIXME: This and itemization are very similar: could they share
-;;; some code, mayhap?
-
-(defun collect-maybe-table-section (lines starting-line)
-  ;; Return index of next line to be processed outside
-  (let ((this-offset (maybe-table-offset starting-line lines))
-        (result nil)
-        (lines-consumed 0))
-    (loop for line-number from starting-line below (length lines)
-          for line = (svref lines line-number)
-          for indentation = (indentation line)
-          for offset = (maybe-table-offset line-number lines)
-          do (cond
-               ((not indentation)
-                ;; empty line -- inserts paragraph.
-                (push "" result)
-                (incf lines-consumed))
-               ((and offset (= indentation this-offset))
-                ;; start of new item, or continuation of previous item
-                (if (and result (search "@item" (car result) :test #'char=))
-                    (push (format nil "@itemx ~A" (texinfo-line line))
+(defun collect-markdown-itemize (lines starting-line base-indent)
+  "Collects a list, strictly enforcing the 4-space rule for list bodies."
+  (let ((this-offset (maybe-itemize-offset (svref lines starting-line))))
+    (when (and this-offset (= this-offset base-indent))
+      (let ((result nil)
+            (lines-consumed 0)
+            (child-base (+ base-indent 4)))
+        (loop for line-number = starting-line then (+ starting-line
+                                                      lines-consumed)
+              while (< line-number (length lines))
+              for line = (svref lines line-number)
+              for indent = (indentation line)
+              for offset = (maybe-itemize-offset line)
+              do (cond
+                   ((blankp line)
+                    ;; Blank lines inside lists are buffered
+                    (push "" result)
+                    (incf lines-consumed))
+                   ;; New Item in the same list
+                   ((and offset (= offset base-indent))
+                    (push (format nil "@item ~A"
+                                  (process-inline-markdown
+                                   (subseq line (+ offset 2))))
                           result)
-                    (progn
-                      (push "" result)
-                      (push (format nil "@item ~A" (texinfo-line line))
-                            result)))
-                (incf lines-consumed))
-               ((> indentation this-offset)
-                ;; continued item from previous line
-                (push (texinfo-line line) result)
-                (incf lines-consumed))
-               (t
-                ;; end of itemization
-                (loop-finish))))
-     ;; a single-line table isn't.
-    (if (> (count-if (lambda (line) (> (length line) 0)) result) 1)
-        (values lines-consumed
-                `("" "@table @emph" ,@(reverse result) "@end table" ""))
-        nil)))
+                    (incf lines-consumed))
+                   ;; Indented block/text inside the list item (>= 4 spaces)
+                   ((and indent (>= indent child-base))
+                    (multiple-value-bind (sub-consumed sub-result)
+                        (parse-markdown-blocks lines line-number child-base)
+                      (if sub-consumed
+                          (progn
+                            (setf result (append (reverse sub-result) result))
+                            (incf lines-consumed sub-consumed))
+                          ;; Fallback: normal text continuing the item body
+                          (progn
+                            (push (process-inline-markdown
+                                   (subseq line child-base)) result)
+                            (incf lines-consumed)))))
+                   ;; Normal text continuing the item body (indent >
+                   ;; base-indent, but < child-base)
+                   ((and indent (> indent base-indent))
+                    (push (process-inline-markdown line) result)
+                    (incf lines-consumed))
+                   ;; If we get here, the line is NOT a new bullet,
+                   ;; and it less than 4 spaces of relative
+                   ;; indentation, so the list is over.
+                   (t
+                    (loop-finish))))
+        ;; Trim trailing empty lines so they return to the outer scope.
+        (loop while (and result (string= (car result) ""))
+              do (pop result) (decf lines-consumed))
 
-;;; section markup
+        (values lines-consumed `("@itemize" ,@(reverse result)
+                                 "@end itemize"))))))
 
-(defmacro with-maybe-section (index &rest forms)
+(defun parse-markdown-blocks (lines index base-indent)
+  "Parse the line at INDEX as a Markdown block.
+Return (VALUES CONSUMED RESULT)."
+  (let ((line (svref lines index)))
+    (multiple-value-bind (n-lines-consumed result)
+        (collect-fenced-code lines index base-indent)
+      (cond
+        (n-lines-consumed
+         (values n-lines-consumed result))
+        ((maybe-itemize-offset line)
+         (collect-markdown-itemize lines index (maybe-itemize-offset line)))
+        ((and (indentation line) (>= (indentation line) (+ base-indent 4)))
+         (collect-indented-code lines index base-indent))
+        (t nil)))))
+
+(defmacro with-markdown-section (index &rest forms)
   `(multiple-value-bind (count collected) (progn ,@forms)
-    (when count
-      (dolist (line collected)
-        (write-line line *texinfo-output*))
-      (incf ,index (1- count)))))
+     (when count
+       (dolist (line collected)
+         (write-line line *texinfo-output*))
+       (incf ,index count)
+       t)))
 
 (defun write-texinfo-string (string &optional lambda-list)
-  "Try to guess as much formatting for a raw docstring as possible."
   (let ((*texinfo-variables* (flatten lambda-list))
-        (lines (string-lines (escape-for-texinfo string nil))))
-      (loop for line-number from 0 below (length lines)
-            for line = (svref lines line-number)
-            do (cond
-                 ((with-maybe-section line-number
-                    (and (lisp-section-p line line-number lines)
-                         (collect-lisp-section lines line-number))))
-                 ((with-maybe-section line-number
-                    (and (maybe-itemize-offset line)
-                         (collect-maybe-itemized-section lines line-number))))
-                 ((with-maybe-section line-number
-                    (and (maybe-table-offset line-number lines)
-                         (collect-maybe-table-section lines line-number))))
-                 (t
-                  (write-line (texinfo-line line) *texinfo-output*))))))
+        ;; Note: The heuristic upcaser (e.g., FOO to @code{foo}) can either run on 'string'
+        ;; before escape-for-texinfo, or be integrated into process-inline-markdown.
+        (lines (string-lines (escape-for-texinfo string nil)))
+        (line-number 0))
+    (loop while (< line-number (length lines))
+          for line = (svref lines line-number)
+          do (unless (with-markdown-section line-number
+                       (parse-markdown-blocks lines line-number 0))
+               ;; If it wasn't a block, process it as a normal inline string
+               (write-line (process-inline-markdown line) *texinfo-output*)
+               (incf line-number)))))
+
 
 ;;;; texinfo formatting tools
 
@@ -850,7 +981,7 @@ followed another tabulation label or a tabulation body."
           (format *texinfo-output* "@end itemize~%~%"))))))
 
 (defun texinfo-body (doc)
-  (write-texinfo-string (get-string doc)))
+  (write-texinfo-string (sanitize-docstring (get-string doc))))
 
 (defun texinfo-end (doc)
   (write-line (case (get-kind doc)
@@ -862,7 +993,8 @@ followed another tabulation label or a tabulation body."
 (defun write-texinfo (doc)
   "Writes TexInfo for a DOCUMENTATION instance to *TEXINFO-OUTPUT*."
   (let ((*documentation-package*
-          (or (guess-package-from-arglist (lambda-list doc))
+          (or (package-override (get-name doc))
+              (guess-package-from-arglist (lambda-list doc))
               (let ((p (get-package doc)))
                 (cond ((eq p (find-package :cl))
                        ;; Most of the implementation of CL is done under
@@ -882,6 +1014,51 @@ followed another tabulation label or a tabulation body."
 
 
 ;;;; Utilities lifted from MGL-PAX
+
+(defun sanitize-docstring (docstring)
+  (let ((indentation (docstring-indentation docstring)))
+    (strip-docstring-indent docstring indentation t)))
+
+;;; Return the minimum number of leading spaces in non-blank lines
+;;; after the first.
+(defun docstring-indentation (docstring &key (first-line-special-p t))
+  (let ((n-min-indentation nil))
+    (with-input-from-string (s docstring)
+      (loop for i upfrom 0
+            for line = (read-line s nil nil)
+            while line
+            do (when (and (or (not first-line-special-p) (plusp i))
+                          (not (blankp line)))
+                 (when (or (null n-min-indentation)
+                           (< (n-leading-spaces line) n-min-indentation))
+                   (setq n-min-indentation (n-leading-spaces line))))))
+    (or n-min-indentation 0)))
+
+(defun n-leading-spaces (line)
+  (let ((n 0))
+    (loop for i below (length line)
+          while (char= (aref line i) #\Space)
+          do (incf n))
+    n))
+
+(defun subseq* (seq start)
+  (subseq seq (min (length seq) start)))
+
+(defun strip-docstring-indent (docstring indentation first-line-special-p)
+  (with-output-to-string (out)
+    (with-input-from-string (s docstring)
+      (loop for i upfrom 0
+            do (multiple-value-bind (line missing-newline-p)
+                   (read-line s nil nil)
+                 (unless line
+                   (return))
+                 (write-string (if (and first-line-special-p
+                                        (zerop i))
+                                   line
+                                   (subseq* line indentation))
+                               out)
+                 (unless missing-newline-p
+                   (terpri out)))))))
 
 ;;; Unexported argument names are highly informative about *PACKAGE*
 ;;; at read time. No one ever uses fully-qualified internal symbols

@@ -136,13 +136,15 @@ This is SETFable."
 
 (defmacro with-alien (bindings &body body &environment env)
   "Establish some local alien variables. Each of BINDINGS is of the form:
-     VAR TYPE [ ALLOCATION ] [ INITIAL-VALUE | EXTERNAL-NAME ]
-   ALLOCATION should be one of:
+
+       VAR TYPE [ ALLOCATION ] [ INITIAL-VALUE | EXTERNAL-NAME ]
+
+   `ALLOCATION` should be one of:
      :LOCAL (the default)
        The alien is allocated on the stack, and has dynamic extent.
      :EXTERN
        No alien is allocated, but VAR is established as a local name for
-       the external alien given by EXTERNAL-NAME."
+       the external alien given by `EXTERNAL-NAME`."
   ;; FIXME:
   ;;      :STATIC
   ;;        The alien is allocated on the heap, and has infinite extent. The alien
@@ -274,8 +276,8 @@ This is SETFable."
 (defmacro make-alien (type &optional size &environment env)
   "Allocate an alien of type TYPE in foreign heap, and return an alien
 pointer to it. The allocated memory is not initialized, and may
-contain garbage. The memory is allocated using malloc(3), so it can be
-passed to foreign functions which use free(3), or released using
+contain garbage. The memory is allocated using `malloc`(3), so it can
+be passed to foreign functions which use `free`(3), or released using
 FREE-ALIEN.
 
 For alien stack allocation, see macro WITH-ALIEN.
@@ -283,26 +285,26 @@ For alien stack allocation, see macro WITH-ALIEN.
 The TYPE argument is not evaluated. If SIZE is supplied, how it is
 interpreted depends on TYPE:
 
-  * When TYPE is a foreign array type, an array of that type is
-    allocated, and a pointer to it is returned. Note that you
-    must use DEREF to first access the array through the pointer.
+* When TYPE is a foreign array type, an array of that type is
+  allocated, and a pointer to it is returned. Note that you must use
+  DEREF to first access the array through the pointer.
 
     If supplied, SIZE is used as the first dimension for the array.
 
-  * When TYPE is any other foreign type, then an object for that
-    type is allocated, and a pointer to it is returned. So
-    (make-alien int) returns a (* int).
+* When TYPE is any other foreign type, then an object for that type is
+  allocated, and a pointer to it is returned. So
+  (make-alien int) returns a (* int).
 
     If SIZE is specified, then a block of that many objects is
     allocated, with the result pointing to the first one.
 
 Examples:
 
-  (defvar *foo* (make-alien (array char 10)))
-  (type-of *foo*)                   ; => (alien (* (array (signed 8) 10)))
-  (setf (deref (deref *foo*) 0) 10) ; => 10
+    (defvar *foo* (make-alien (array char 10)))
+    (type-of *foo*)                   ; => (alien (* (array (signed 8) 10)))
+    (setf (deref (deref *foo*) 0) 10) ; => 10
 
-  (make-alien char 12)              ; => (alien (* (signed 8)))"
+    (make-alien char 12)              ; => (alien (* (signed 8)))"
   (let ((alien-type (if (alien-type-p type)
                         type
                         (parse-alien-type type env))))
@@ -379,7 +381,7 @@ Examples:
 (declaim (inline free-alien))
 (defun free-alien (alien)
   "Dispose of the storage pointed to by ALIEN. The ALIEN must have been
-allocated by MAKE-ALIEN, MAKE-ALIEN-STRING or malloc(3)."
+allocated by MAKE-ALIEN, MAKE-ALIEN-STRING or `malloc`(3)."
   (alien-funcall (extern-alien "free" (function (values) system-area-pointer))
                  (alien-sap alien))
   nil)
@@ -406,7 +408,7 @@ allocated by MAKE-ALIEN, MAKE-ALIEN-STRING or malloc(3)."
                                       (external-format :default)
                                       (null-terminate t))
   "Copy part of STRING delimited by START and END into freshly
-allocated foreign memory, freeable using free(3) or FREE-ALIEN.
+allocated foreign memory, freeable using `free`(3) or FREE-ALIEN.
 Returns the allocated string as a (* CHAR) alien, and the number of
 bytes allocated as secondary value.
 
@@ -817,7 +819,7 @@ Only supported on x86-64 and ARM64."
 (defmacro define-alien-routine (name result-type
                                      &rest args
                                      &environment lexenv)
-  "DEFINE-ALIEN-ROUTINE Name Result-Type {(Arg-Name Arg-Type [Style])}*
+  "DEFINE-ALIEN-ROUTINE name result-type {(arg-name arg-type [style])}*
 
 Define a foreign interface function for the routine with the specified NAME.
 Also automatically DECLAIM the FTYPE of the defined function.
@@ -827,10 +829,10 @@ NAME may be either a string, a symbol, or a list of the form (string symbol).
 RESULT-TYPE is the alien type for the function return value. VOID may be
 used to specify a function with no result.
 
-The remaining forms specify individual arguments that are passed to the
-routine. ARG-NAME is a symbol that names the argument, primarily for
-documentation. ARG-TYPE is the C type of the argument. STYLE specifies the
-way that the argument is passed.
+The remaining forms specify individual arguments that are passed to
+the routine. `ARG-NAME` is a symbol that names the argument, primarily
+for documentation. `ARG-TYPE` is the C type of the argument. `STYLE`
+specifies the way that the argument is passed.
 
 :IN
       An :IN argument is simply passed by value. The value to be passed is

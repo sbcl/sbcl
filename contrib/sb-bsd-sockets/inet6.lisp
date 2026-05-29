@@ -9,9 +9,9 @@
 
 Examples:
 
- (make-instance 'sb-bsd-sockets:inet6-socket :type :stream :protocol :tcp)
+    (make-instance 'sb-bsd-sockets:inet6-socket :type :stream :protocol :tcp)
 
- (make-instance 'sb-bsd-sockets:inet6-socket :type :datagram :protocol :udp)
+    (make-instance 'sb-bsd-sockets:inet6-socket :type :datagram :protocol :udp)
 ")))
 
 (defun address-numbers/v6 (address)

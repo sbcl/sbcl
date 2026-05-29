@@ -233,11 +233,11 @@ extent of the block."
 (def-ir1-translator tagbody ((&rest statements) start next result)
   "TAGBODY {tag | statement}*
 
-Define tags for use with GO. The STATEMENTs are evaluated in order,
+Define tags for use with GO. The `STATEMENT`s are evaluated in order,
 skipping TAGs, and NIL is returned. If a statement contains a GO to a
 defined TAG within the lexical scope of the form, then control is
 transferred to the next statement following that tag. A TAG must be an
-integer or a symbol. A STATEMENT must be a list. Other objects are
+integer or a symbol. A `STATEMENT` must be a list. Other objects are
 illegal within the body."
   (let ((segments (and statements
                        (parse-tagbody statements))))
@@ -411,9 +411,10 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
 (def-ir1-translator macrolet ((definitions &rest body) start next result)
   "MACROLET ({(name lambda-list form*)}*) body-form*
 
-Evaluate BODY-FORMs in an environment with the specified local macros
-defined. NAME is the local macro name, LAMBDA-LIST is a DEFMACRO style
-destructuring lambda list, and the FORMS evaluate to the expansion."
+Evaluate `BODY-FORM`s in an environment with the specified local
+macros defined. NAME is the local macro name, LAMBDA-LIST is a
+DEFMACRO style destructuring lambda list, and the `FORM`s evaluate to
+the expansion."
   (funcall-in-macrolet-lexenv
    definitions
    (lambda (&optional funs)
@@ -981,10 +982,10 @@ FORMs are also processed as top level forms."
                           start next result)
   "FLET ({(name lambda-list declaration* form*)}*) declaration* body-form*
 
-Evaluate the BODY-FORMs with local function definitions. The bindings
-do not enclose the definitions; any use of NAME in the FORMS will
-refer to the lexically apparent function definition in the enclosing
-environment."
+Evaluate the `BODY-FORM`s with local function definitions. The
+bindings do not enclose the definitions; any use of NAME in the
+`FORM`s will refer to the lexically apparent function definition in
+the enclosing environment."
   (multiple-value-bind (names defs forms decls)
       (parse-fletish definitions body 'flet)
     (let* ((fvars (mapcar (lambda (name def original)
@@ -1013,9 +1014,9 @@ environment."
 (def-ir1-translator labels ((definitions &body body) start next result)
   "LABELS ({(name lambda-list declaration* form*)}*) declaration* body-form*
 
-Evaluate the BODY-FORMs with local function definitions. The bindings
-enclose the new definitions, so the defined functions can call
-themselves or each other."
+Evaluate the `BODY-FORM`s with local function definitions. The
+bindings enclose the new definitions, so the defined functions can
+call themselves or each other."
   (multiple-value-bind (names defs forms decls)
       (parse-fletish definitions body 'labels)
     (let* ((new-fenv

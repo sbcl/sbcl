@@ -246,7 +246,7 @@ the sexp.")
 the time of compilation. NIL if not compiled from a file.")
   (plist
    nil
-   :documentation "The SOURCE-PLIST from WITH-COMPILATION-UNIT in effect
+   :documentation "The `SOURCE-PLIST` from WITH-COMPILATION-UNIT in effect
 when the file was compiled.")
   ;; Any extra metadata that the caller might be interested in. For
   ;; example, DEFINITION-SOURCE of a method contains the specializers

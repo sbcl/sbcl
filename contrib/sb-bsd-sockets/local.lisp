@@ -6,7 +6,7 @@
 (defclass local-socket (socket)
   ((family :initform sockint::af-local))
   (:documentation
-   "Class representing local domain (AF_LOCAL) sockets,
+   "Class representing local domain (`\\\\AF_LOCAL`) sockets,
 also known as unix-domain sockets."))
 
 (defmethod socket-namestring ((socket local-socket))
@@ -41,8 +41,8 @@ also known as unix-domain sockets."))
 
 (defclass local-abstract-socket (local-socket) ()
   (:documentation
-   "Class representing local domain (AF_LOCAL) sockets with addresses
-in the abstract namespace."))
+   "Class representing local domain (`\\\\AF_LOCAL`) sockets with
+addresses in the abstract namespace."))
 
 (defmethod make-sockaddr-for ((socket local-abstract-socket)
                               &optional sockaddr &rest address)

@@ -2492,9 +2492,9 @@ eg. thread executing
          ;; to be dropped.
          (release-foo foo))))
 
-might miss calling RELEASE-FOO despite GET-FOO having returned true if
-the interrupt occurs inside the cleanup clause, eg. during execution
-of RELEASE-FOO.
+might miss calling `RELEASE-FOO` despite GET-FOO having returned true
+if the interrupt occurs inside the cleanup clause, eg. during
+execution of `RELEASE-FOO`.
 
 Thus, in order to write an asynch unwind safe UNWIND-PROTECT you need
 to use WITHOUT-INTERRUPTS:

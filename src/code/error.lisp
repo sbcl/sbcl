@@ -194,7 +194,7 @@ condition."
 
 ;;;; HANDLER-CASE and IGNORE-ERRORS.
 (sb-xc:defmacro handler-case (form &rest cases)
-  "(HANDLER-CASE form { (type ([var]) body) }* )
+  "(HANDLER-CASE form { (type ([var]) body) }*)
 
 Execute FORM in a context with handlers established for the condition types. A
 peculiar property allows type to be :NO-ERROR. If such a clause occurs, and

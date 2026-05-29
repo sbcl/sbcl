@@ -99,7 +99,7 @@
 
 (define-alien-routine ("os_set_errno" set-errno) void (new-errno int))
 (setf (documentation 'set-errno 'function)
-      "Set the C library pseudo-variable named \"errno\", for obscure syscalls.")
+      "Set the \\C library pseudo-variable named `\\errno` for obscure syscalls.")
 
 ;;; Decode errno into a string.
 #-win32

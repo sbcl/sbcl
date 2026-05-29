@@ -111,79 +111,93 @@ Only global state is preserved: the stack is unwound in the process.
 
 The following &KEY arguments are defined:
 
-  :TOPLEVEL
-     The function to run when the created core file is resumed. The
-     default function handles command line toplevel option processing
-     and runs the top level read-eval-print loop. This function returning
-     is equivalent to (SB-EXT:EXIT :CODE 0) being called.
+- :TOPLEVEL
 
-     TOPLEVEL functions should always provide an ABORT restart: otherwise
-     code they call will run without one.
+    The function to run when the created core file is resumed. The
+    default function handles command line toplevel option processing
+    and runs the top level read-eval-print loop. This function
+    returning is equivalent to (SB-EXT:EXIT :CODE 0) being called.
 
-  :EXECUTABLE
-     If true, arrange to combine the SBCL runtime and the core image
-     to create a standalone executable.  If false (the default), the
-     core image will not be executable on its own. Executable images
-     always behave as if they were passed the --noinform runtime option.~A
+    TOPLEVEL functions should always provide an ABORT restart:
+    otherwise code they call will run without one.
 
-  :SAVE-RUNTIME-OPTIONS
-     If true, values of runtime options --dynamic-space-size and
-     --control-stack-size that were used to start SBCL are stored in
-     the standalone executable, and restored when the executable is
-     run. This also inhibits normal runtime option processing, causing
-     all command line arguments to be passed to the toplevel.
-     If :ACCEPT-RUNTIME-OPTIONS then --dynamic-space-size and
-     --control-stack-size are still processed by the runtime.
-     Meaningless if :EXECUTABLE is NIL.
+- :EXECUTABLE
 
-  :CALLABLE-EXPORTS
-     This should be a list of symbols to be initialized to the
-     appropriate alien callables on startup. All exported symbols should
-     be present as global symbols in the symbol table of the runtime
-     before the saved core is loaded. When this list is non-empty, the
-     :TOPLEVEL argument cannot be supplied.
+    If true, arrange to combine the SBCL runtime and the core image to
+    create a standalone executable. If false (the default), the core
+    image will not be executable on its own. Executable images always
+    behave as if they were passed the `--noinform` runtime option.~A
 
-  :PURIFY
-     If true (the default), then some objects in the restarted core will
-     be memory-mapped as read-only. Among those objects are numeric vectors
-     that were determined to be compile-time constants, and any immutable
-     values according to the language specification such as symbol names.
+- :SAVE-RUNTIME-OPTIONS
 
-  :ROOT-STRUCTURES
-     This should be a list of the main entry points in any newly loaded
-     systems. This need not be supplied, but locality and/or GC performance
-     may be better if they are. This has two different but related meanings:
-     If :PURIFY is true - and only for cheneygc - the root structures
-     are those which anchor the set of objects moved into static space.
-     On gencgc - and only on platforms supporting immobile code - these are
-     the functions and/or function-names which commence a depth-first scan
-     of code when reordering based on the statically observable call chain.
-     The complete set of reachable objects is not affected per se.
-     This argument is meaningless if neither enabling precondition holds.
+    If true, values of runtime options --dynamic-space-size and
+    --control-stack-size that were used to start SBCL are stored in
+    the standalone executable, and restored when the executable is
+    run. This also inhibits normal runtime option processing, causing
+    all command line arguments to be passed to the toplevel. If
+    :ACCEPT-RUNTIME-OPTIONS then --dynamic-space-size and
+    --control-stack-size are still processed by the runtime.
+    Meaningless if :EXECUTABLE is NIL.
 
-  :ENVIRONMENT-NAME
-     This has no purpose; it is accepted only for legacy compatibility.
+- :CALLABLE-EXPORTS
 
-  :COMPRESSION
-     This is only meaningful if the runtime was built with the :SB-CORE-COMPRESSION
-     feature enabled. If NIL (the default), saves to uncompressed core files. If
-     :SB-CORE-COMPRESSION was enabled at build-time, the argument may also be
-     an integer from -7 to 22, corresponding to zstd compression levels, or T
-     (which is equivalent to the default compression level, 9).
+    This should be a list of symbols to be initialized to the
+    appropriate alien callables on startup. All exported symbols
+    should be present as global symbols in the symbol table of the
+    runtime before the saved core is loaded. When this list is
+    non-empty, the :TOPLEVEL argument cannot be supplied.
 
-  :APPLICATION-TYPE
-     Present only on Windows and is meaningful only with :EXECUTABLE T.
-     Specifies the subsystem of the executable, :CONSOLE or :GUI.
-     The notable difference is that :GUI doesn't automatically create a console
-     window. The default is :CONSOLE.
+- :PURIFY
+
+    If true (the default), then some objects in the restarted core
+    will be memory-mapped as read-only. Among those objects are
+    numeric vectors that were determined to be compile-time constants,
+    and any immutable values according to the language specification
+    such as symbol names.
+
+- :ROOT-STRUCTURES
+
+    This should be a list of the main entry points in any newly loaded
+    systems. This need not be supplied, but locality and/or GC
+    performance may be better if they are. This has two different but
+    related meanings: If :PURIFY is true - and only for cheneygc - the
+    root structures are those which anchor the set of objects moved
+    into static space. On gencgc - and only on platforms supporting
+    immobile code - these are the functions and/or function-names
+    which commence a depth-first scan of code when reordering based on
+    the statically observable call chain. The complete set of
+    reachable objects is not affected per se. This argument is
+    meaningless if neither enabling precondition holds.
+
+- :ENVIRONMENT-NAME
+
+    This has no purpose; it is accepted only for legacy compatibility.
+
+- :COMPRESSION
+
+    This is only meaningful if the runtime was built with the
+    `:SB-CORE-COMPRESSION` feature enabled. If NIL (the default),
+    saves to uncompressed core files. If `:SB-CORE-COMPRESSION` was
+    enabled at build-time, the argument may also be an integer from -7
+    to 22, corresponding to zstd compression levels, or T (which is
+    equivalent to the default compression level, 9).
+
+- `:APPLICATION-TYPE`
+
+    Present only on Windows and is meaningful only with :EXECUTABLE T.
+    Specifies the subsystem of the executable, `:CONSOLE` or `:GUI`.
+    The notable difference is that `:GUI` doesn't automatically create
+    a console window. The default is `:CONSOLE`.
 
 The save/load process changes the values of some global variables:
 
-  *STANDARD-OUTPUT*, *DEBUG-IO*, etc.
+- *STANDARD-OUTPUT*, *DEBUG-IO*, etc
+
     Everything related to open streams is necessarily changed, since
     the OS won't let us preserve a stream across save and load.
 
-  *DEFAULT-PATHNAME-DEFAULTS*
+- *DEFAULT-PATHNAME-DEFAULTS*
+
     This is reinitialized to reflect the working directory where the
     saved core is loaded.
 

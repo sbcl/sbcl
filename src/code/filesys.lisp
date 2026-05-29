@@ -618,8 +618,8 @@ directory, or if the directory could not be deleted for any reason.
 
 Both
 
-   \(DELETE-DIRECTORY \"/tmp/foo\")
-   \(DELETE-DIRECTORY \"/tmp/foo/\")
+    (DELETE-DIRECTORY \"/tmp/foo\")
+    (DELETE-DIRECTORY \"/tmp/foo/\")
 
 delete the \"foo\" subdirectory of \"/tmp\", or signal an error if it does not
 exist or if is a file or a symbolic link."

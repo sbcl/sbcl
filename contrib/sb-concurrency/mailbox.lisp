@@ -127,9 +127,9 @@ message could be received."
 from MAILBOX, or returns NIL if no messages are pending.
 
 Note: Concurrent threads may be snarfing messages during the run of
-this function, so even though X,Y appear right next to each other in
-the result, does not necessarily mean that Y was the message sent
-right after X."
+this function, so even `X` and `Y` appearing right next to each other
+in the result does not necessarily mean that `Y` was the message sent
+right after `X`."
   (prog* ((msgs  '())
           (sem   (mailbox-semaphore mailbox))
           (queue (mailbox-queue mailbox))

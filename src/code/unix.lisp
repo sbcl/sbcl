@@ -458,7 +458,7 @@ corresponds to NAME, or NIL if there is none."
   `(signed-byte 32))
 (defun os-exit (code &key abort)
   "Exit the process with CODE. If ABORT is true, exit is performed using _exit(2),
-avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
+avoiding `atexit`(3) hooks, etc. Otherwise `exit`(2) is called."
   (unless (typep code 'exit-code)
     (setf code (if abort 1 0)))
   (if abort

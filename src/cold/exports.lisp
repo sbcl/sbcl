@@ -1066,10 +1066,10 @@ Lisp extension proposal by David N. Gray")
    "private: In theory, this \"contains functions and information
 necessary for system interfacing\" (said cmu-user.tex at the time of
 the SBCL code fork). That probably was and is a good idea, but in
-practice, the distinctions between this package and SB-KERNEL and even
-SB-VM seem to have become somewhat blurred over the years. Some
-anomalies (e.g. SB-IMPL::FIND-IF-IN-CLOSURE being in SB-IMPL instead
-of SB-KERNEL) have been undone, but probably more remain.")
+practice, the distinctions between this package and `SB-KERNEL` and even
+`SB-VM` seem to have become somewhat blurred over the years. Some
+anomalies (e.g. SB-IMPL::FIND-IF-IN-CLOSURE being in `SB-IMPL` instead
+of `SB-KERNEL`) have been undone, but probably more remain.")
   (:use "CL" "SB-EXT" "SB-INT")
   (:export
    ;; FIXME: %PRIMITIVE shouldn't be here. (I now know that %SYS
@@ -1215,9 +1215,9 @@ of SB-KERNEL) have been undone, but probably more remain.")
   ;; SB-ALIEN/SB-C-CALL split. That split went away and was deprecated
   ;; in 0.7.0, so we should get rid of this nickname after a while.
   (:nicknames "SB-C-CALL")
-  (:documentation "public: the ALIEN foreign function interface (If you're
+  (:documentation "public: the `ALIEN` foreign function interface (If you're
 porting CMU CL code, note that this package corresponds roughly to a union
-of the packages ALIEN and C-CALL at the time of the SBCL fork. SB-C-CALL
+of the packages `ALIEN` and `C-CALL` at the time of the SBCL fork. `SB-C-CALL`
 is a deprecated nickname to help ease the transition from older versions
 of SBCL which maintained the CMU-CL-style split into two packages.)")
   (:use "CL" "SB-EXT" "SB-INT" "SB-SYS" "SB-ALIEN-INTERNALS")
@@ -2411,7 +2411,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
 
 (defpackage "SB-SEQUENCE"
   (:documentation "semi-public: implements something which might eventually
-be submitted as a CDR")
+be submitted as a \\CDR")
   (:use)
   (:export "PROTOCOL-UNIMPLEMENTED"
            "PROTOCOL-UNIMPLEMENTED-OPERATION"
@@ -3273,9 +3273,10 @@ structure representations")
 (defpackage "SB-DEBUG"
   (:documentation
    "sorta public: Eventually this should become the debugger interface, with
-basic stuff like BACKTRACE and ARG. For now, the actual supported interface
-is still mixed indiscriminately with low-level internal implementation stuff
-like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUNS*.")
+basic stuff like BACKTRACE and ARG. For now, the actual supported
+interface is still mixed indiscriminately with low-level internal
+implementation stuff like SB-DEBUG:*STACK-TOP-HINT* and unsupported
+stuff like SB-DEBUG::*TRACED-FUNS*.")
   (:use "CL" "SB-EXT" "SB-INT" "SB-SYS" "SB-KERNEL")
   (:export "*BACKTRACE-FRAME-COUNT*"
            "*DEBUG-BEGINNER-HELP-P*"

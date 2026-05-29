@@ -274,15 +274,15 @@ Create new alien callable (old alien callable gets freed)."))
 (defmacro define-alien-callable (name result-type typed-lambda-list
                                  &body body
                                  &environment env)
-  "(define-alien-callable NAME RESULT-TYPE {(ARG-NAME ARG-TYPE)}*
-     {doc-string} {decls}* {FORM}*)
-
-Define an alien function which can be called by alien code. The alien
+  "Define an alien function which can be called by alien code. The alien
 function returned by (alien-callable-function NAME) expects alien
-arguments of the specified ARG-TYPEs and returns an alien of type
-RESULT-TYPE.
+arguments of the specified `ARG-TYPE`s and returns an alien of type
+`RESULT-TYPE`.
 
-If (alien-callable-function NAME) already exists, its value is not
+TYPED-LAMBDA-LIST is a list of `(ARG-NAME ARG-TYPE)` elements, and
+BODY is `{DOC-STRING} {DECL}* {FORM}*`.
+
+If (ALIEN-CALLABLE-FUNCTION NAME) already exists, its value is not
 changed (though it is arranged that an updated version of the Lisp
 callable function will be called, provided that the new type and the
 existing type are compatible). This feature allows for incremental
@@ -301,12 +301,12 @@ redefinition of callable functions."
 (defmacro with-alien-callable (definitions
                                &body body
                                &environment env)
-    "Establish some local alien functions.
-     Each element of DEFINITIONS is of the form:
-     NAME RESULT-TYPE {(ARG-NAME ARG-TYPE)}*
-       {doc-string} {decls}* {FORM}*
+  "Establish some local alien functions.
+  Each element of DEFINITIONS is of the form:
 
-     The resulting alien callable value has dynamic extent."
+      NAME RESULT-TYPE {(ARG-NAME ARG-TYPE)}* {DOC-STRING} {DECL}* {FORM}*
+
+  The resulting alien callable value has dynamic extent."
   (collect ((bindings)
             (declarations)
             (cleanup))

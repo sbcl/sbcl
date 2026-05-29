@@ -6,6 +6,8 @@ changes relative to sbcl-2.6.5:
   * bug fix: TRACE no longer fails when trying to print a return value that
     cannot be printed readble and *PRINT-READABLY* is true.
   * documentation: SB-INTROSPECT is documented.
+  * documentation: fixed many typesetting problems and typos in the user
+    manual.
 
 changes in sbcl-2.6.5 relative to sbcl-2.6.4:
   * minor incompatible change: the condition signalled when an accessed slot

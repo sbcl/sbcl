@@ -340,7 +340,8 @@
 ;;;; which are not needed during self-build.
 
 (defun typexpand-all (type-specifier &optional env)
-  "Takes and expands a type specifier recursively like MACROEXPAND-ALL."
+  "Takes and expands a type specifier recursively like
+`SB-CLTL2:MACROEXPAND-ALL`."
   ;; TYPE-SPECIFIER is of type TYPE-SPECIFIER, but it is preferable to
   ;; defer to VALUES-SPECIFIER-TYPE for the check.
   (declare (type lexenv-designator env) (ignore env))

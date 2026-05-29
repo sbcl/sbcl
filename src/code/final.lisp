@@ -187,13 +187,13 @@
 (defun finalize (object function &key dont-save
                         &aux (function (%coerce-callable-to-fun function)))
   "Arrange for the designated FUNCTION to be called when there
-are no more references to OBJECT, including references in
-FUNCTION itself.
+are no more references to OBJECT, including references in FUNCTION
+itself.
 
 If DONT-SAVE is true, the finalizer will be cancelled when
 SAVE-LISP-AND-DIE is called: this is useful for finalizers
-deallocating system memory, which might otherwise be called
-with addresses from the old image.
+deallocating system memory, which might otherwise be called with
+addresses from the old image.
 
 In a multithreaded environment FUNCTION may be called in any
 thread. In both single and multithreaded environments FUNCTION
@@ -205,33 +205,41 @@ signalled in whichever thread the FUNCTION was called in.
 
 Examples:
 
-  ;;; GOOD, assuming RELEASE-HANDLE is re-entrant.
-  (let* ((handle (get-handle))
-         (object (make-object handle)))
-   (finalize object (lambda () (release-handle handle)))
-   object)
+```
+;;; GOOD, assuming RELEASE-HANDLE is re-entrant.
+(let* ((handle (get-handle))
+       (object (make-object handle)))
+ (finalize object (lambda () (release-handle handle)))
+ object)
+```
 
-  ;;; BAD, finalizer refers to object being finalized, causing
-  ;;; it to be retained indefinitely!
-  (let* ((handle (get-handle))
-         (object (make-object handle)))
-    (finalize object
-              (lambda ()
-                (release-handle (object-handle object)))))
+```
+;;; BAD, finalizer refers to object being finalized, causing
+;;; it to be retained indefinitely!
+(let* ((handle (get-handle))
+       (object (make-object handle)))
+  (finalize object
+            (lambda ()
+              (release-handle (object-handle object)))))
+```
 
-  ;;; BAD, not re-entrant!
-  (defvar *rec* nil)
+```
+;;; BAD, not re-entrant!
+(defvar *rec* nil)
 
-  (defun oops ()
-   (when *rec*
-     (error \"recursive OOPS\"))
-   (let ((*rec* t))
-     (gc))) ; or just cons enough to cause one
+(defun oops ()
+ (when *rec*
+   (error \"recursive OOPS\"))
+ (let ((*rec* t))
+   (gc))) ; or just cons enough to cause one
+```
 
-  (progn
-    (finalize \"oops\" #'oops)
-    (oops)) ; GC causes re-entry to #'oops due to the finalizer
-            ; -> ERROR, caught, WARNING signalled"
+```
+(progn
+  (finalize \"oops\" #'oops)
+  (oops)) ; GC causes re-entry to #'oops due to the finalizer
+          ; -> ERROR, caught, WARNING signalled
+```"
   (declare (sb-c::tlab :system))
   (let ((space (heap-allocated-p object)))
     ;; Rule out immediate, stack, arena, readonly, and static objects.

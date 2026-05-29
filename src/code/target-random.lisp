@@ -156,8 +156,7 @@ This particular SBCL version also accepts an argument of the following type:
 
 This particular SBCL version uses the popular MT19937 PRNG algorithm, and its
 internal state only effectively contains about 19937 bits of information.
-http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
-"
+<http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html>"
   (declare (explicit-check))
   (named-let seed-random-state ((state state))
    (etypecase state

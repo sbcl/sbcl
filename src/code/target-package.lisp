@@ -979,10 +979,11 @@ ACTUAL-PACKAGE must be a package designator.
 
 Returns the designated package.
 
-Signals a continuable error if LOCAL-NICKNAME is already a package local
-nickname for a different package, or if LOCAL-NICKNAME is one of \"CL\",
-\"COMMON-LISP\", or, \"KEYWORD\", or if LOCAL-NICKNAME is a global name or
-nickname for the package to which the nickname would be added.
+Signals a continuable error if LOCAL-NICKNAME is already a package
+local nickname for a different package, or if LOCAL-NICKNAME is one of
+`\"CL\"`, `\"COMMON-LISP\"`, `\"KEYWORD\"`, or if LOCAL-NICKNAME is a
+global name or nickname for the package to which the nickname would be
+added.
 
 When in the designated package, calls to FIND-PACKAGE with the LOCAL-NICKNAME
 will return the package the designated ACTUAL-PACKAGE instead. This also

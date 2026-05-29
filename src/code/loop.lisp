@@ -1981,8 +1981,8 @@ code to be loaded.
 
 (sb-xc:defmacro loop-finish ()
   "Cause the iteration to terminate \"normally\", the same as implicit
-termination by an iteration driving clause, or by use of WHILE or
-UNTIL -- the epilogue code (if any) will be run, and any implicitly
+termination by an iteration driving clause, or by use of `WHILE` or
+`UNTIL` -- the epilogue code (if any) will be run, and any implicitly
 collected result will be returned as the value of the LOOP."
   '(go end-loop))
 
