@@ -14,6 +14,10 @@ ARCH_SRC = arm64-arch.c
 
 OS_SRC = bsd-os.c arm64-bsd-os.c
 
+ifdef LISP_FEATURE_SB_FIBER
+  OS_SRC += fiber.c arm64-fiber.c
+endif
+
 ifdef LISP_FEATURE_GENCGC
   GC_SRC = fullcgc.c gencgc.c traceroot.c
 endif
