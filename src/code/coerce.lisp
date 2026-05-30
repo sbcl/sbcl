@@ -148,7 +148,9 @@
          (vector
           (vector-to-list object))
          (sequence
-          (sb-sequence:make-sequence-like nil (length object) :initial-contents object))))
+          (sb-sequence:make-sequence-like nil (length object) :initial-contents object))
+         (t
+          (coerce-error))))
       (function
        (coerce-to-fun object))
       (t

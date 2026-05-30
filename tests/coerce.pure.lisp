@@ -226,3 +226,8 @@
    (lambda (x y)
      (coerce (the (not real) x) y))
    (not real)))
+
+(with-test (:name :numbero-to-list-error)
+  (assert-error (coerce (opaque-identity 1)
+                        (opaque-identity 'list))
+                type-error))
