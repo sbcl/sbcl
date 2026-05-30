@@ -204,3 +204,23 @@
   (loadw lr-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
   (inst add lr-tn lr-tn 4)
   (inst br lr-tn))
+
+#+sb-fiber
+(progn
+
+(define-assembly-routine (fiber-swap-regs (:return-style :none))
+    ((:temp nl0 unsigned-reg nl0-offset)
+     (:temp nl1 unsigned-reg nl1-offset)
+     (:temp nl2 unsigned-reg nl2-offset))
+  (emit-save-fiber-regs nl0 nl2)
+  (emit-restore-fiber-regs nl1 nl2)
+  (inst ret))
+
+(define-assembly-routine (fiber-tramp (:return-style :none))
+    ((:temp arg unsigned-reg nl0-offset))
+  (let ((r9-tn (make-random-tn (sc-or-lose 'unsigned-reg) r9-offset))) ; r9 == x19
+    (inst mov arg r9-tn))
+  (inst bl (make-fixup "fiber_tramp_c" :foreign))
+  (inst brk 0))
+
+) ; end #+sb-fiber

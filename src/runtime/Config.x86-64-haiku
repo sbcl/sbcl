@@ -13,6 +13,10 @@ ASSEM_SRC = x86-64-assem.S
 ARCH_SRC = x86-64-arch.c
 OS_SRC = haiku-os.c x86-64-haiku-os.c
 
+ifdef LISP_FEATURE_SB_FIBER
+  OS_SRC += fiber.c x86-64-fiber.c
+endif
+
 CFLAGS += -I/boot/system/develop/headers/private/system/arch/x86_64
 LINKFLAGS += -Wl,--export-dynamic
 OS_LIBS += -lbe -lnetwork -lbsd

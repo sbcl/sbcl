@@ -42,6 +42,8 @@
 
 #include "genesis/sbcl.h"
 
+#include "fiber.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1719,7 +1721,10 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
             (context, StaticSymbolFunction(UNDEFINED_ALIEN_VARIABLE_ERROR));
         return 1;
     }
-    else return 0;
+#ifdef LISP_FEATURE_SB_FIBER
+    if (sb_fiber_handle_bs_fault(context, addr, th)) return 1;
+#endif
+    return 0;
 }
 
 #ifndef LISP_FEATURE_WIN32
