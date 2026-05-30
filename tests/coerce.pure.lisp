@@ -189,7 +189,7 @@
   (assert-type
      (lambda (y)
        (coerce "ab" y))
-     (or list (simple-array * (*)) sb-kernel:extended-sequence))
+     (or cons (simple-array * (2)) sb-kernel:extended-sequence))
   (assert-type
    (lambda (x y)
      (coerce (the function x) y))
