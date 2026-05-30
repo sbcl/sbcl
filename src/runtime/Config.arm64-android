@@ -22,6 +22,11 @@ ASSEM_SRC = arm64-assem.S
 ARCH_SRC = arm64-arch.c
 
 OS_SRC = linux-os.c linux-mman.c arm64-linux-os.c android-os.c arm64-android-os.c
+
+ifdef LISP_FEATURE_SB_FIBER
+  OS_SRC += fiber.c arm64-fiber.c
+endif
+
 OS_LIBS = -ldl
 
 CFLAGS += -std=gnu99 -Wunused-parameter -fno-omit-frame-pointer -momit-leaf-frame-pointer

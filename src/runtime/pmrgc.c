@@ -27,6 +27,7 @@
 #include "genesis/gc-tables.h"
 #include "genesis/split-ordered-list.h"
 #include "thread.h"
+#include "fiber.h"
 #include "sys_mmap.inc"
 
 /* forward declarations */
@@ -421,7 +422,8 @@ static void impart_mark_stickiness(lispobj word)
     }
 }
 
-#if !GENCGC_IS_PRECISE || defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC
+#if !GENCGC_IS_PRECISE || defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_PPC \
+    || (defined LISP_FEATURE_ARM64 && defined LISP_FEATURE_SB_FIBER)
 static void preserve_pointer(os_context_register_t object,
                              __attribute__((unused)) void* arg) {
     /* The mark-region GC never filters based on type tags,
@@ -616,6 +618,19 @@ static void pin_call_chain_and_boxed_registers(struct thread* th) {
     }
 }
 #endif
+
+#ifdef LISP_FEATURE_SB_FIBER
+void gc_preserve_fiber_word(lispobj word)
+{
+    /* mr_preserve_object self-filters; no pre-cull needed. */
+    preserve_pointer(word, 0);
+}
+
+void gc_scav_fiber_binding_stack(lispobj *base, lispobj *end)
+{
+    scav_binding_stack(base, end, mr_preserve_object);
+}
+#endif /* LISP_FEATURE_SB_FIBER */
 
 #if !GENCGC_IS_PRECISE
 extern void visit_context_registers(void (*proc)(os_context_register_t, void*),
@@ -883,6 +898,9 @@ garbage_collect_generation(generation_index_t generation, int raise,
 #elif defined reg_LINK_RETURN
             pin_call_chain_and_boxed_registers(th);
 #endif
+#ifdef LISP_FEATURE_SB_FIBER
+            gc_scan_fiber_stacks(th);
+#endif
         }
     }
 
@@ -978,6 +996,9 @@ garbage_collect_generation(generation_index_t generation, int raise,
             scav_binding_stack((lispobj*)th->binding_stack_start,
                                (lispobj*)get_binding_stack_pointer(th),
                                mr_preserve_object);
+#ifdef LISP_FEATURE_SB_FIBER
+            gc_scav_fiber_binding_stacks(th);
+#endif
             /* do the tls as well */
             lispobj* from = &th->lisp_thread;
             lispobj* to = (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th);
