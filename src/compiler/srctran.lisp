@@ -8933,6 +8933,7 @@
            sequence sequence
            (and array (not vector)) (and array (not vector))
            array (and array (not vector))
+           (and array (not simple-array)) (and array (not simple-array))
            (or (and symbol (not null)) function cons) function
            (or character string (and symbol (not null))) character)
           (when exclude
