@@ -8933,6 +8933,7 @@
                     symbol (or symbol (simple-array * (0)) extended-sequence function character)
                     sequence sequence))))
            :numeric nil)))
+    ;; Exclude some types if they are excluded from the input value
     (let ((value (lvar-type value))
           (exclude nil))
       (macrolet ((cases (&body cases)
@@ -8941,18 +8942,24 @@
                               collect `(unless (types-equal-or-intersect (specifier-type ',exclude) value)
                                          (setf exclude
                                                (if exclude
-                                                   (type-intersection exclude (specifier-type ',excluded))
+                                                   (type-union exclude (specifier-type ',excluded))
                                                    (specifier-type ',excluded))))))))
         (unless (or (eq value *universal-type*)
                     (opaque-type-p value))
+          (let* ((negated (type-negation value))
+                 (not-rational (type-intersection negated (specifier-type 'rational))))
+            (unless (eq not-rational *empty-type*)
+              (setf exclude not-rational)))
           (cases
            number number
            real real
-           sequence sequence
+           sequence (or list vector)
+           ;; symbol can be coerced to a function which can be an extended sequence
+           (or (and symbol (not null)) sequence) sequence
            (and array (not vector)) (and array (not vector))
            array (and array (not vector))
            (and array (not simple-array)) (and array (not simple-array))
-           (or (and symbol (not null)) function cons) function
+           (or symbol function sequence) function
            (or character string (and symbol (not null))) character)
           (when exclude
             (setf value-type
