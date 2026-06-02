@@ -1842,14 +1842,14 @@
                 (eq result-element-type *universal-type*))
       (loop for i from 0
             for sequence in sequences
-            for sequence-type = (lvar-type sequence)
-            for element-type = (type-array-element-type sequence-type)
-            do (unless (or (eq element-type *wild-type*)
-                           (types-equal-or-intersect element-type result-element-type))
+            for element-type = (sequence-elements-type sequence)
+            do (when (and element-type
+                          (not (eq element-type *wild-type*))
+                          (not (types-equal-or-intersect element-type result-element-type)))
                  (let ((*compiler-error-context* node))
-                   (compiler-warn "Can't ~a ~s into ~s"
+                   (compiler-warn "Can't ~a elements of type ~s into ~s"
                                   description
-                                  (type-specifier sequence-type)
+                                  (type-specifier element-type)
                                   (if (ctype-p type)
                                       (type-specifier (make-array-type '(*)
                                                                        :specialized-element-type type
