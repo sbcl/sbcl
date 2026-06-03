@@ -1101,3 +1101,10 @@
                                       #'list)
                                   1 #'eq))
                       :allow-style-warnings t))))
+
+(with-test (:name :concatenate-mismatch)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (m)
+                         (concatenate 'string '(1 #\a) m))
+                      :allow-warnings t))))

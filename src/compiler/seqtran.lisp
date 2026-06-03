@@ -1842,19 +1842,38 @@
                 (eq result-element-type *universal-type*))
       (loop for i from 0
             for sequence in sequences
-            for element-type = (sequence-elements-type sequence)
-            do (when (and element-type
-                          (not (eq element-type *wild-type*))
-                          (not (types-equal-or-intersect element-type result-element-type)))
-                 (let ((*compiler-error-context* node))
-                   (compiler-warn "Can't ~a elements of type ~s into ~s"
-                                  description
-                                  (type-specifier element-type)
-                                  (if (ctype-p type)
-                                      (type-specifier (make-array-type '(*)
-                                                                       :specialized-element-type type
-                                                                       :element-type type))
-                                      type))))))))
+            for constant = (and (constant-lvar-p sequence)
+                                (lvar-value sequence))
+            do (if (and constant
+                        (proper-sequence-p constant))
+                   (map nil
+                        (lambda (elt)
+                          (multiple-value-bind (fits really) (ctypep elt result-element-type)
+                            (when (and really (not fits))
+                              (let ((*compiler-error-context* node))
+                                (compiler-warn "Can't ~a ~s, of type ~s, into ~s"
+                                               description
+                                               elt (type-of elt)
+                                               (if (ctype-p type)
+                                                   (type-specifier (make-array-type '(*)
+                                                                                    :specialized-element-type type
+                                                                                    :element-type type))
+                                                   type))
+                                (return)))))
+                        constant)
+                   (let ((element-type (sequence-elements-type sequence)))
+                     (when (and element-type
+                                (not (eq element-type *wild-type*))
+                                (not (types-equal-or-intersect element-type result-element-type)))
+                       (let ((*compiler-error-context* node))
+                         (compiler-warn "Can't ~a elements of type ~s into ~s"
+                                        description
+                                        (type-specifier element-type)
+                                        (if (ctype-p type)
+                                            (type-specifier (make-array-type '(*)
+                                                                             :specialized-element-type type
+                                                                             :element-type type))
+                                            type))))))))))
 
 (defoptimizer (%concatenate-to-string ir2-hook) ((&rest args) node)
   (check-concatenate 'string args node))
@@ -1872,7 +1891,7 @@
 
 (defoptimizer (merge ir2-hook) ((type sequence1 sequence2 predicate &key &allow-other-keys) node)
   (when (constant-lvar-p type)
-   (check-concatenate (lvar-value type) (list sequence1 sequence2) node "merge")))
+    (check-concatenate (lvar-value type) (list sequence1 sequence2) node "merge")))
 
 ;;; Expand simple cases of UB<SIZE>-BASH-COPY inline.  "simple" is
 ;;; defined as those cases where we are doing word-aligned copies from
