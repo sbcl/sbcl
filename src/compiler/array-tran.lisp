@@ -490,6 +490,9 @@
 (defoptimizer (aref derive-type) ((array &rest subscripts))
   (sequence-elements-type array))
 
+(defoptimizer (elt derive-type) ((sequence index))
+  (sequence-elements-type sequence))
+
 (defoptimizer ((setf aref) derive-type) ((new-value array &rest subscripts))
   (assert-new-value-type new-value array))
 

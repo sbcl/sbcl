@@ -1137,3 +1137,12 @@
      ((v '(1 2)) v)
      ((v #(2 3)) v)
      ((v #9*1) v))))
+
+(with-test (:name :elt-constants-type)
+  (assert-type
+   (lambda (x n)
+     (elt (if x
+              #(1 2)
+              '(1 3))
+          n))
+   (integer 1 3)))
