@@ -198,7 +198,9 @@
         (cdr-type *empty-type*)
         cdr-min cdr-max cdr-symbols)
     (if (if (listp sequence)
-            (null sequence)
+            (or (null sequence)
+                (unless (proper-or-dotted-list-p sequence)
+                  (return-from constant-sequence-element-type *universal-type*)))
             (= (array-total-size sequence) 0))
         *empty-type*
         (let ()
