@@ -4656,14 +4656,14 @@
      (loop for x in '(a b c)
            when (eql n x)
            return x))
-   symbol)
+   (member a b c nil))
   (assert-type
    (lambda (n)
      (let ((x '(1 2 (10))))
        (dolist (x x)
          (when (eql x n)
            (return x)))))
-   (or list (integer 1 2)))
+   (or (integer 1 2) (cons (integer 10 10) null) null))
   (assert-type
    (lambda (n)
      (declare (optimize (debug 2)))
