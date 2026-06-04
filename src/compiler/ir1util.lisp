@@ -712,6 +712,9 @@
                               (handle-combination dest))))))))
       (erase lvar nth-value))))
 
+(defun node-single-value-type (node)
+  (single-value-type (node-derived-type node)))
+
 ;;; Update lvar use information so that NODE is no longer a use of its
 ;;; LVAR.
 ;;;

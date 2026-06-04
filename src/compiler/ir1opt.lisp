@@ -40,6 +40,27 @@
         ;; check for EQL types and singleton numeric types
         (values (type-singleton-p type)))))
 
+(defun node-constant (node &optional ignore-types)
+  (when node
+    (let ((type (node-derived-type node)))
+      (labels ((process-ref (ref)
+                 (when (ref-p ref)
+                   (let (leaf)
+                     (if (constant-p (setf leaf (ref-leaf ref)))
+                         (when (or ignore-types
+                                   (ctypep (constant-value leaf) (single-value-type type)))
+                           (values leaf ref))
+                         (process-lvar (lambda-var-ref-lvar ref))))))
+               (process-lvar (lvar)
+                 (when lvar
+                   (process-ref (lvar-uses (principal-lvar lvar)))))
+               (process-node (node)
+                 (cond ((cast-p node)
+                        (process-lvar (cast-value node)))
+                       ((ref-p node)
+                        (process-ref node)))))
+        (process-node node)))))
+
 (defun lvar-constant (lvar &optional ignore-types)
   (declare (type lvar lvar))
   (let ((type (lvar-type lvar)))

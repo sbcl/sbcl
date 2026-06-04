@@ -1156,3 +1156,13 @@
          a
          (error "")))
     (and array (not simple-array))))
+
+(with-test (:name :aref-constants-type)
+  (assert-type
+   (lambda (x n)
+     (aref (if n #(1 -2) #(1 2)) x))
+   (integer -2 2))
+  (assert-type
+   (lambda (x n)
+     (aref (if n (the string n) #(1 2)) x))
+   (or (integer 1 2) character)))
