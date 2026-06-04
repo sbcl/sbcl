@@ -4299,6 +4299,14 @@
 (defoptimizers constants (car cdr) ((cons))
   cons)
 
+(defoptimizers constants (%find-position %find-position-if %find-position-if-not)
+    ((x sequence from-end start end key))
+  sequence)
+
+(defoptimizers constants (remove remove-if remove-if-not)
+    ((x sequence &rest rest))
+  sequence)
+
 (defoptimizer (vector-to-list derive-type) ((vector))
   (when (typep (nth-value 1 (sequence-lvar-dimensions vector)) '(integer 1))
     (specifier-type 'cons)))
