@@ -882,6 +882,11 @@
                      (checked-compile
                       '(lambda (n)
                         (setf (car (aref #((1) (2)) n)) 10))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      '(lambda (x)
+                        (sort (if x (aref #((1) (4)) x)) #'>))
                       :allow-warnings t))))
 
 (with-test (:name :constant-modification-nil)

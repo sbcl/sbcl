@@ -96,6 +96,21 @@
                           use))))))
       (recurse lvar))))
 
+(defun principal-ref (ref &optional casts)
+  (labels ((recurse-lvar (lvar ref)
+             (if lvar
+                 (recurse (lvar-uses lvar) ref)
+                 ref))
+           (recurse (node original-ref)
+             (cond ((ref-p node)
+                    (recurse-lvar (lambda-var-ref-lvar node) node))
+                   ((and casts
+                         (cast-p node))
+                    (recurse-lvar (cast-value node) node))
+                   (t
+                    original-ref))))
+    (recurse ref ref)))
+
 (defun principal-lvar-ref (lvar &optional casts)
   (labels ((recurse (lvar ref)
              (if lvar
@@ -3769,42 +3784,65 @@ is :ANY, the function name is not checked."
                                   (node-lvar ref)))))
                      lvar))
            (uses (lvar-uses lvar)))
-      (cond ((constant-lvar-p lvar)
-             (values :values (list (lvar-value lvar))))
-            ((constant-lvar-uses-p lvar)
-             (values :values (lvar-uses-values lvar)))
-            ((ref-p uses)
-             (let* ((ref (principal-lvar-ref lvar))
-                    (leaf (and ref
-                               (ref-leaf ref))))
-               (when (lambda-var-p leaf)
-                 (let ((seen (or seen (alloc-xset)))
-                       constants)
-                   (add-to-xset lvar seen)
-                   (map-lambda-var-refs-from-calls
-                    (lambda (call lvar)
-                      (unless (xset-member-p lvar seen)
-                        (add-to-xset lvar seen)
-                        (multiple-value-bind (type values) (recurse lvar seen)
-                          (case type
-                            (:values
-                             (push (cons call values) constants))
-                            (:calls
-                             (setf constants (nconc values constants)))))))
-                    leaf)
-                   (when constants
-                     (values :calls constants))))))
-            ((and walk-functions
-                  (combination-p uses)
-                  (eq (combination-kind uses) :known))
-             (let ((fun-info (fun-info-constants (combination-fun-info uses))))
-               (when fun-info
-                 (let ((constants (funcall fun-info uses)))
-                   (when constants
-                     (multiple-value-bind (kind constants)
-                         (recurse constants seen)
-                       (when constants
-                         (values kind constants))))))))))))
+      (flet ((handle-ref (ref)
+               (let* ((ref (principal-ref ref))
+                      (leaf (and ref
+                                 (ref-leaf ref))))
+                 (cond ((lambda-var-p leaf)
+                        (let ((seen (or seen (alloc-xset)))
+                              constants)
+                          (add-to-xset lvar seen)
+                          (map-lambda-var-refs-from-calls
+                           (lambda (call lvar)
+                             (unless (xset-member-p lvar seen)
+                               (add-to-xset lvar seen)
+                               (multiple-value-bind (type values) (recurse lvar seen)
+                                 (case type
+                                   (:values
+                                    (push (cons call values) constants))
+                                   (:calls
+                                    (setf constants (nconc values constants)))))))
+                           leaf)
+                          (when constants
+                            (values :calls constants))))
+                       ((constant-p leaf)
+                        (values :values (list (constant-value leaf)))))))
+             (handle-combination (node)
+               (and (combination-p node)
+                    (eq (combination-kind node) :known)
+                    (let ((fun-info (fun-info-constants (combination-fun-info node))))
+                      (when fun-info
+                        (let ((constants (funcall fun-info node)))
+                          (when constants
+                            (multiple-value-bind (kind constants)
+                                (recurse constants seen)
+                              (when constants
+                                (values kind constants))))))))))
+        (cond ((constant-lvar-p lvar)
+               (values :values (list (lvar-value lvar))))
+              ((constant-lvar-uses-p lvar)
+               (values :values (lvar-uses-values lvar)))
+              ((ref-p uses)
+               (handle-ref uses))
+              (walk-functions
+               (if (consp uses)
+                   (let (constants)
+                     (loop for use in uses
+                           do (multiple-value-bind (kind values)
+                                  (typecase use
+                                    (ref
+                                     (handle-ref use))
+                                    (t
+                                     (handle-combination use)))
+                                (case kind
+                                  (:values
+                                   (setf constants (nconc values constants)))
+                                  (:valls
+                                   (setf constants (nconc values (cdr constants))))
+                                  (t
+                                   (return))))
+                           finally (return (values :values constants))))
+                   (handle-combination uses))))))))
 
 (defun lambda-var-original-name (leaf)
   (let ((home (lambda-var-home leaf)))
