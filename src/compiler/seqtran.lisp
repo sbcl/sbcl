@@ -2156,6 +2156,10 @@
          'seq))
       (give-up-ir1-transform)))
 
+(defun quote-list (list)
+  (loop for e in list
+        collect (list 'quote e)))
+
 (make-defs ((($fun $proper)
              (copy-list nil)
              (list-copy-seq t)))
@@ -2170,6 +2174,17 @@
          (remove-if-not *
           (change-full-call combination 'copy-remove-if-not)
           'seq))
+       (and (constant-lvar-p seq)
+            (let ((list (lvar-value seq)))
+              (when (proper-or-dotted-list-p list)
+                (multiple-value-bind (length dotted) (dotted-list-length list)
+                  (when (<= length 10)
+                    (if dotted
+                        (let ((last (last list)))
+                          `(list* ,@(quote-list (butlast list))
+                                  ',(car last)
+                                  ',(cdr last)))
+                        `(list ,@(quote-list list))))))))
        (when (policy node (or (> speed space) (> instrument-consing 1)))
          ;; If speed is more important than space, or cons profiling is wanted,
          ;; then inline the whole copy loop.

@@ -184,7 +184,7 @@
     (loop until (atom list)
           do (pop list)
              (incf length))
-    length))
+    (values length list)))
 
 (defun constant-sequence-element-type (sequence &optional key)
   (let (min
