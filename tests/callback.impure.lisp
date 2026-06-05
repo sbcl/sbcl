@@ -511,4 +511,4 @@
       (setf (sb-sys:sap-ref-word (car restorer) 0) (cdr restorer)))
     (assert (eql *got-arg* 0d0))
     (assert (= result 42.0d0))
-    (assert (eql (tan 0d0) 0d0))))) ; back to normal
+    (assert (eql (tan (opaque-identity 0d0)) 0d0))))) ; back to normal
