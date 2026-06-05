@@ -491,3 +491,24 @@
           (setq sap (alien-sap callable)))
         (assert (sb-sys:sap= sap (alien-sap callable)))
         (assert (= (alien-funcall callable 1 2) (+ 3 i)))))))
+
+#+(or (and linux arm64) x86-64)
+(progn
+(defvar *got-arg*)
+(define-alien-callable intercepted-tan double ((x double))
+  (setf *got-arg* x)
+  ;; we'd have to do something to get the actual underlying function.
+  ;; For purposes of this test, just return anything.
+  42.0d0)
+(with-test (:name :trace-foreign-call)
+  (let (restorer result)
+    (unwind-protect
+         (progn
+           (setq restorer
+                 (sb-alien-internals:override-alien-linkage-entrypoint
+                  "tan" 'intercepted-tan))
+           (setq result (tan (opaque-identity 0d0))))
+      (setf (sb-sys:sap-ref-word (car restorer) 0) (cdr restorer)))
+    (assert (eql *got-arg* 0d0))
+    (assert (= result 42.0d0))
+    (assert (eql (tan 0d0) 0d0))))) ; back to normal
