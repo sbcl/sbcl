@@ -597,8 +597,9 @@ FIND-DEFINITION-SOURCES-BY-NAME."
      (when (stringp (sb-c::debug-source-namestring debug-source))
        (parse-namestring (sb-c::debug-source-namestring debug-source)))
      :character-offset
-     (if tlf
-         (elt (sb-c::debug-source-start-positions debug-source) tlf))
+     (let ((start-positions (sb-c::debug-source-start-positions debug-source)))
+       (when (and tlf (< tlf (length start-positions)))
+         (elt start-positions tlf)))
      :form-path (if tlf (list tlf))
      :form-number (handler-case (sb-di::code-location-form-number
                                  (sb-di::debug-fun-start-location debug-fun))
