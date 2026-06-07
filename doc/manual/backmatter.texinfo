@@ -1,37 +1,34 @@
-@node Concept Index
+@node function index
 @comment  node-name,  next,  previous,  up
-@appendix Concept Index
+@appendix Function and Macro Index
 
-@printindex cp
+@printindex ff
 
-@node Function Index
+@node variable index
 @comment  node-name,  next,  previous,  up
-@appendix Function Index
+@appendix Variable and Constant Index
 
-@printindex fn
+@printindex vv
 
-@node Variable Index
-@comment  node-name,  next,  previous,  up
-@appendix Variable Index
-
-@printindex vr
-
-@node Type Index
+@node type index
 @comment  node-name,  next,  previous,  up
 @appendix Type Index
 
-@printindex tp
+@printindex tt
 
-@node Colophon
+@node colophon
 @comment  node-name,  next,  previous,  up
 @unnumbered Colophon
 
-This manual is maintained in Texinfo, and automatically translated
-into other forms (e.g. HTML or pdf). If you're @emph{reading} this
-manual in one of these non-Texinfo translated forms, that's fine, but
-if you want to @emph{modify} this manual, you are strongly advised to
-seek out a Texinfo version and modify that instead of modifying a
-translated version. Even better might be to seek out @emph{the}
-Texinfo version (maintained at the time of this writing as part of the
-SBCL project at @uref{http://sbcl.sourceforge.net/}) and submit a
-patch.
+This manual is maintained as part of the @ref{sb manual} contrib.
+@code{SB-MANUAL} can generate Texinfo, which is in turn converted into
+other formats (e.g. HTML or pdf). If you're @emph{reading} this manual
+in one of these, that's fine, but if you want to @emph{modify} this
+manual, you are strongly advised to seek the sources (most live under
+@file{contrib/sb-manual/doc/}) and submit a patch.
+
+@ifinfo
+When viewing Info in Emacs, the reader inserts superfluous ``see''
+words before internal links. Use @code{(setq Info-hide-note-references
+'hide)} to prevent this.
+@end ifinfo

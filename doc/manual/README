@@ -1,0 +1,9 @@
+With the exception of sbcl.texinfo, backmatter.texinfo,
+sbcl-menu.texinf and sbcl-contents.texinfo all other Texinfo files are
+from SB-MANUAL::GENERATE-TEXINFO.
+
+With the exception of variables.texinfo, the generated files are under
+version control, to keep a closer eye on the Markdown-to-Texinfo
+converter, which is young. This is redundant, of course. In the
+fullness of time, in due course, when conditions allow, at the
+appropriate juncture, we may want to revisit this decision.

@@ -1,14 +1,18 @@
 \input texinfo   @c -*-texinfo-*-
 @c %**start of header
 @setfilename sbcl.info
+@paragraphindent 0
 @documentencoding UTF-8
 @c %**end of header
 @afourwide
 @fonttextsize 10
-@include texinfo-macros.texinfo
 @include variables.texinfo
 @set EDITION 0.1
 @settitle SBCL @value{VERSION} User Manual
+
+@defcodeindex ff
+@defcodeindex vv
+@defcodeindex tt
 
 @c for install-info
 @dircategory Software development
@@ -77,51 +81,16 @@ provided with absolutely no warranty. See the @file{COPYING} and
 @insertcopying
 
 @menu
-* Getting Support and Reporting Bugs::
-* Introduction::
-* Starting and Stopping::
-* Compiler::
-* Debugger::
-* Efficiency::
-* Beyond the ANSI Standard::
-* External Formats::
-* Foreign Function Interface::
-* Pathnames::
-* Streams::
-* Package Locks::
-* Threading::
-* Timers::
-* Networking::
-* Profiling::
-* Contributed Modules::
-* Deprecation::
-* Concept Index::
-* Function Index::
-* Variable Index::
-* Type Index::
-* Colophon::
+@include sbcl-menu.texinfo
+* Function and Macro Index: function index.
+* Variable and Constant Index: variable index.
+* Type Index: type index.
+* Colophon: colophon.
 @end menu
 
 @end ifnottex
 
-@include support-and-bugs.texinfo
-@include intro.texinfo
-@include start-stop.texinfo
-@include compiler.texinfo
-@include debugger.texinfo
-@include efficiency.texinfo
-@include beyond-ansi.texinfo
-@include external-formats.texinfo
-@include ffi.texinfo
-@include pathnames.texinfo
-@include streams.texinfo
-@include package-locks.texinfo
-@include threading.texinfo
-@include timers.texinfo
-@include sb-bsd-sockets/sb-bsd-sockets.texinfo
-@include profiling.texinfo
-@include contrib-modules.texinfo
-@include deprecation.texinfo
+@include sbcl-contents.texinfo
 @include backmatter.texinfo
 
 @bye

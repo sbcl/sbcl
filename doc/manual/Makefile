@@ -1,6 +1,7 @@
 SBCLTEXI:=sbcl.texinfo
 ASDFTEXI:=asdf.texinfo
-DOCFILES:=*.texinfo $(ASDFTEXI)
+# The rest of the texinfo files are generated.
+DOCFILES:=sbcl.texinfo backmatter.texinfo $(ASDFTEXI)
 TMPTYPES:=aux cp cps fn fns ky log pg toc tp tps vr vrs
 TMPFILES:=$(foreach target,asdf sbcl,$(foreach type,$(TMPTYPES),$(target).$(type)))
 PSFILES=sbcl.ps asdf.ps
@@ -8,12 +9,8 @@ PDFFILES=sbcl.pdf asdf.pdf
 INFOFILES=sbcl.info asdf.info
 HTMLDIRS=$(basename $(SBCLTEXI)) $(basename $(ASDFTEXI))
 HTMLFILES=sbcl.html asdf.html
-# Place where generated documentation ends up. The value of
-# DOCSTRINGDIR has to end with a slash or you lose (it's passed to
-# Lisp's `pathname' function).
-DOCSTRINGDIR="docstrings/"
 CONTRIB_SRC_DIR="../../contrib/"
-I_FLAGS=-I $(DOCSTRINGDIR) -I $(CONTRIB_SRC_DIR)
+I_FLAGS=-I $(CONTRIB_SRC_DIR)
 
 # SBCL_SYSTEM is an optional argument to this make program. If this
 # variable is set, its contents are used as the command line for
@@ -52,7 +49,7 @@ version.texinfo:
 .PHONY: html
 html: html-stamp
 
-html-stamp: $(DOCFILES) docstrings
+html-stamp: $(DOCFILES) generated-texinfo-files
 	@rm -rf $(HTMLDIRS)
 	@rm -f $(HTMLFILES)
 #	$(MAKEINFO) $(I_FLAGS) --html --css-include=style-multi.css $(SBCLTEXI)
@@ -69,39 +66,39 @@ ps: $(PSFILES)
 	dvips -q -o $@ $<
 
 # DVI generation
-%.dvi: %.texinfo $(DOCFILES) docstrings
+%.dvi: %.texinfo $(DOCFILES) generated-texinfo-files
 	texi2dvi -q $(I_FLAGS) $<
 
 # PDF documentation
 .PHONY: pdf
 pdf: $(PDFFILES)
 
-%.pdf: %.texinfo $(DOCFILES) docstrings
+%.pdf: %.texinfo $(DOCFILES) generated-texinfo-files
 	$(TEXI2PDF) -q $(I_FLAGS) $<
 
 # info docfiles
 .PHONY: info
 info: $(INFOFILES)
 
-%.info: %.texinfo $(DOCFILES) docstrings
+%.info: %.texinfo $(DOCFILES) generated-texinfo-files
 	$(MAKEINFO) $(I_FLAGS) $<
 
 # Texinfo docstring snippets
-docstrings variables.texinfo: tempfiles-stamp
-	sh make-tempfiles.sh "$(SBCL_SYSTEM)" "$(DOCSTRINGDIR)" && touch $(DOCSTRINGDIR)
+generated-texinfo-files: generated-texinfo-stamp
+	sh generate-texinfo.sh "$(SBCL_SYSTEM)"
 
-tempfiles-stamp:
-	touch tempfiles-stamp
+generated-texinfo-stamp:
+	touch generated-texinfo-stamp
 
 .PHONY: clean
 clean:
 	rm -f *~ *.bak *.orig \#*\# .\#* texput.log *.fasl
-	rm -rf $(HTMLDIRS) $(DOCSTRINGDIR)
+	rm -rf $(HTMLDIRS)
 	rm -f  $(HTMLFILES)
 	rm -f contrib-docs.texi-temp
 	rm -f package-locks.texi-temp
 	rm -f variables.texinfo
-	rm -f $(PSFILES) $(PDFFILES) html-stamp tempfiles-stamp
+	rm -f $(PSFILES) $(PDFFILES) html-stamp generated-texinfo-stamp
 	rm -f $(TMPFILES) $(INDEXFILES)
 	rm -f sbcl.info sbcl.info-* asdf.info
 

@@ -3,7 +3,7 @@ core SBCL functionality, or else they'd be built into the main SBCL
 binary automatically. And they're not portable Common Lisp, or they'd
 be put elsewhere (see http://sbcl.sf.net/libs.php for pointers)
 
-There are two kinds of contrib module in this directory:
+There are two kinds of contrib modules in this directory:
 
   * Newer contrib modules conform to the contrib standard (see 
     STANDARDS) and are automatically built and installed along with

@@ -1,7 +1,5 @@
 #!/bin/sh
 
-# Create Texinfo snippets from the documentation of exported symbols.
-
 # This software is part of the SBCL system. See the README file for
 # more information.
 #
@@ -28,17 +26,9 @@ if [ -z "$1" ] ; then
     . $SBCL_TOP/output/build-config
 else
     SBCLRUNTIME="$1"
-    SBCL_CONTRIB_BLOCKLIST=
 fi
-shift
 
-if [ -z "$1" ] ; then
-    DOCSTRINGDIR="${DOCSTRINGDIR:-docstrings/}"
-else
-    DOCSTRINGDIR="$1"
-fi
-shift
-
-${SBCLRUNTIME}                                                          \
-    --noinform --no-sysinit --no-userinit --noprint --disable-debugger  \
-    --script generate-texinfo.lisp "${SBCLRUNTIME}" "${DOCSTRINGDIR}" "${SBCL_CONTRIB_BLOCKLIST}"
+${SBCLRUNTIME}                                                            \
+    --noinform --no-sysinit --no-userinit --noprint --disable-debugger    \
+    --eval '(require :sb-manual)' --eval '(sb-manual::generate-texinfo)' \
+    --quit
