@@ -493,7 +493,8 @@
        (cond (present
               t)
              ((memq x +internal-features+)
-              (warn "~s is no longer present in ~s" x '*features*)))))
+              (unless *read-suppress*
+                (warn "~s is no longer present in ~s" x '*features*))))))
     (t
      (error "invalid feature expression: ~S" x))))
 

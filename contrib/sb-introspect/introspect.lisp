@@ -754,6 +754,7 @@ or a method combination name."
         callees)))
 
 (defun find-function-callers (function &optional (spaces '(:all)))
+  ;; FIXME: :IMMOBILE-SPACE is an internal feature
   "List functions that call FUNCTION by searching SPACES for code objects.
 This can make previously garbage objects live.
 

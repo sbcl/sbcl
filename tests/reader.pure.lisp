@@ -647,3 +647,62 @@
                    (lambda (c)
                      (invoke-restart (find-restart 'symbol c) 'pi))))
     (assert (eq (read-from-string "missing-package::symbol") 'pi))))
+
+(with-test (:name (:read-suppress :present-feature))
+  (assert (equal (multiple-value-list (read-from-string "#-sbcl 1 2"))
+                 '(2 10)))
+  (assert (equal (multiple-value-list (read-from-string "#+sbcl 1 2"))
+                 '(1 9)))
+  (let ((*read-suppress* t))
+    (assert (equal (multiple-value-list
+                    (let ((*read-suppress* t))
+                      (read-from-string "#-sbcl 1 2")))
+                   '(nil 10))))
+  (assert (equal (multiple-value-list
+                  (let ((*read-suppress* t))
+                    (read-from-string "#+sbcl 1 2")))
+                 '(nil 9))))
+
+(with-test (:name (:read-suppress :missing-feature))
+  (assert (equal (multiple-value-list (read-from-string "#-abcd 1 2"))
+                 '(1 9)))
+  (assert (equal (multiple-value-list (read-from-string "#+abcd 1 2"))
+                 '(2 10)))
+  (let ((*read-suppress* t))
+    (assert (equal (multiple-value-list
+                    (let ((*read-suppress* t))
+                      (read-from-string "#-abcd 1 2")))
+                   '(nil 9))))
+  (assert (equal (multiple-value-list
+                  (let ((*read-suppress* t))
+                    (read-from-string "#+abcd 1 2")))
+                 '(nil 10))))
+
+(with-test (:name (:read-suppress :internal-feature))
+  ;; The test harness appends SB-IMPL::+INTERNAL-FEATURES+ to *FEATURES*.
+  (let* ((*features* (set-difference *features* sb-impl::+internal-features+))
+         (name (princ-to-string (first sb-impl::+internal-features+)))
+         (negative (format nil "#-~A 1 2" name))
+         (positive (format nil "#+~A 1 2" name))
+         (negative-read-pos (+ (length name) 5))
+         (positive-read-pos (+ (length name) 6)))
+    (assert-signal
+     (assert (equal (multiple-value-list (read-from-string negative))
+                    `(1 ,negative-read-pos)))
+     warning)
+    (assert-signal
+     (assert (equal (multiple-value-list (read-from-string positive))
+                    `(2 ,positive-read-pos)))
+     warning)
+    (assert-no-signal
+     (assert (equal (multiple-value-list
+                     (let ((*read-suppress* t))
+                       (read-from-string positive)))
+                    `(nil ,positive-read-pos)))
+     warning)
+    (assert-no-signal
+     (assert (equal (multiple-value-list
+                     (let ((*read-suppress* t))
+                       (read-from-string negative)))
+                    `(nil ,negative-read-pos)))
+     warning)))
