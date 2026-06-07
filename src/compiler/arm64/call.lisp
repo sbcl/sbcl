@@ -313,8 +313,8 @@
                                   (next-tn (and next
                                                 (tn-ref-tn next))))
                              (cond ((and next-tn
-                                         (not (sc-is next-tn control-stack))
                                          (neq (tn-kind next-tn) :unused)
+                                         (not (sc-is next-tn control-stack))
                                          (ldp-stp-offset-p (* i n-word-bytes) n-word-bits))
                                     (inst ldp move-temp next-tn
                                           (@ ocfp-tn (* i n-word-bytes)))
