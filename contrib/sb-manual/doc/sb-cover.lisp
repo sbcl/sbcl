@@ -1,0 +1,1 @@
+../../sb-cover/manual.lisp

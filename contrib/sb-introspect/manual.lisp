@@ -1,0 +1,45 @@
+(in-package :sb-manual)
+
+(defsection @sb-introspect (:title "sb-introspect")
+  "The `SB-INTROSPECT` module is about finding definitions, as well
+  as querying their properties and relationships in the running image."
+  (@finding-definitions section)
+  (@sb-introspect-variables section)
+  (@sb-introspect-functions section)
+  (@sb-introspect-types section)
+  (@sb-introspect-allocation section))
+
+(defsection @finding-definitions (:title "Finding Definitions")
+  (sb-introspect:definition-source structure)
+  (sb-introspect:definition-source-pathname function)
+  (sb-introspect:definition-source-form-path function)
+  (sb-introspect:definition-source-form-number function)
+  (sb-introspect:definition-source-character-offset function)
+  (sb-introspect:definition-source-file-write-date function)
+  (sb-introspect:definition-source-plist function)
+  (sb-introspect:find-definition-source function)
+  (sb-introspect:find-definition-sources-by-name function))
+
+(defsection @sb-introspect-variables (:title "Special Variables")
+  (sb-introspect:who-binds function)
+  (sb-introspect:who-references function)
+  (sb-introspect:who-sets function))
+
+(defsection @sb-introspect-functions (:title "Functions")
+  (sb-introspect:function-lambda-list function)
+  (sb-introspect:function-type function)
+  (sb-introspect:method-combination-lambda-list function)
+  (sb-introspect:valid-function-name-p function)
+  (sb-introspect:find-function-callers function)
+  (sb-introspect:find-function-callees function)
+  (sb-introspect:who-calls function)
+  (sb-introspect:who-macroexpands function))
+
+(defsection @sb-introspect-types (:title "Types and Classes")
+  (sb-introspect:deftype-lambda-list function)
+  (sb-introspect:who-specializes-directly function)
+  (sb-introspect:who-specializes-generally function))
+
+(defsection @sb-introspect-allocation (:title "Allocation")
+  (sb-introspect:allocation-information function)
+  (sb-introspect:map-root function))
