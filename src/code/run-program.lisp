@@ -47,7 +47,7 @@
 
 #-win32
 (defun posix-environ ()
-  "Return the Unix environment (\"man environ\") as a list of SIMPLE-STRINGs."
+  "Return the Unix environment as a list of SIMPLE-STRINGs. See `man environ`."
   (c-strings->string-list (extern-alien environ (* c-string))))
 
 #+win32
@@ -290,8 +290,9 @@ PROCESS."
 #-win32
 (defun process-kill (process signal &optional (whom :pid))
   "Hand SIGNAL to PROCESS. If WHOM is :PID, use the kill Unix system call. If
-   WHOM is :PROCESS-GROUP, use the killpg Unix system call.
-   Returns T if successful, otherwise returns NIL and error number (two values)."
+   WHOM is :PROCESS-GROUP, use the `killpg(1)` Unix system call.
+   Returns T if successful, otherwise returns NIL and error
+   number (two values)."
   (let ((pid (process-pid process)))
     (let ((result (ecase whom
                     (:process-group
@@ -774,6 +775,7 @@ The &KEY arguments have the following meanings:
     the current process.
 
 - :ENV
+
     An alternative lossy representation of the new Unix environment,
     for compatibility with CMU CL.
 
@@ -807,7 +809,7 @@ The &KEY arguments have the following meanings:
     - :STREAM: the PROCESS-INPUT slot is filled in with a stream that
       sends its output to the process.
 
--  :IF-INPUT-DOES-NOT-EXIST (when :INPUT is the name of a file)
+- :IF-INPUT-DOES-NOT-EXIST (when :INPUT is the name of a file)
 
     It is one of:
 
@@ -834,12 +836,12 @@ The &KEY arguments have the following meanings:
 
 - :IF-OUTPUT-EXISTS (when :OUTPUT is the name of a file)
 
-   It is one of:
+    It is one of:
 
-   - :ERROR (the default) to generate an error
-   - :SUPERSEDE to supersede the file with output from the program
-   - :APPEND to append output from the program to the file
-   - NIL to return NIL from RUN-PROGRAM, without doing anything
+    - :ERROR (the default) to generate an error
+    - :SUPERSEDE to supersede the file with output from the program
+    - :APPEND to append output from the program to the file
+    - NIL to return NIL from RUN-PROGRAM, without doing anything
 
 - :IF-ERROR-EXISTS
 
@@ -877,11 +879,13 @@ Windows specific options:
     The following options control how the subprocess window should be
     displayed: `:HIDE`, `:SHOW-NORMAL`, `:SHOW-MAXIMIZED`,
     `:SHOW-MINIMIZED`, `:SHOW-NO-ACTIVATE`, `:SHOW-MIN-NO-ACTIVE`,
-    `:SHOW-NA`. Note: console application subprocesses may or may not
-    display a console window depending on whether the SBCL runtime is
-    itself a console or GUI application. Invoke `cmd /c start` to
-    consistently display a console window or use the `:WINDOW` `:HIDE`
-    option to consistently hide the console window."
+    `:SHOW-NA`.
+
+    > _Note_: console application subprocesses may or may not display
+    > a console window depending on whether the SBCL runtime is itself
+    > a console or GUI application. Invoke `cmd /c start` to
+    > consistently display a console window or use the `:WINDOW`
+    > `:HIDE` option to consistently hide the console window."
   (when (and env-p environment-p)
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
   (let* (;; Clear various specials used by GET-DESCRIPTOR-FOR to

@@ -217,9 +217,9 @@ implementation it is ~S." *!default-package-use-list*)
 (defmacro defpackage (package &rest options)
   #.(format nil
      "Defines a new package called PACKAGE. Each of OPTIONS should be one of the
-   following: ~{~&~4T(~S ~A)~}
-   All options except ~{~S, ~}and :DOCUMENTATION can be used multiple
-   times."
+following:~% ~{~%~4T(~S ~A)~}~%
+All options except ~{~S, ~}and :DOCUMENTATION can be used multiple
+times."
      '(:use "{package-name}*"
        :export "{symbol-name}*"
        :import-from "<package-name> {symbol-name}*"

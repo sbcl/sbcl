@@ -58,7 +58,7 @@ are running on, or NIL if we can't find any useful information."
 ;;;; ED
 (declaim (type list *ed-functions*))
 (defvar *ed-functions* '()
-  "See function documentation for ED.")
+  "See ED.")
 
 (defun ed (&optional x)
   "Starts the editor (on a file or a function if named).  Functions
@@ -250,9 +250,9 @@ The arguments specify a sequence of subversion numbers in big endian order.
 They are compared lexicographically with the runtime version, and versions
 are treated as though trailed by an unbounded number of 0s.
 
-For example, (assert-version->= 1 1 4) asserts that the current SBCL is
-version 1.1.4[.0.0...] or greater, and (assert-version->= 1) that it is
-version 1[.0.0...] or greater."
+For example, (ASSERT-VERSION->= 1 1 4) asserts that the current SBCL
+is version 1.1.4[.0.0...] or greater, and (ASSERT-VERSION->= 1) that
+it is version 1[.0.0...] or greater."
   (let ((version (split-version-string (lisp-implementation-version))))
     (unless (version>= version subversions)
       (cerror "Disregard this version requirement."

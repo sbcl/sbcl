@@ -621,8 +621,8 @@ Both
     (DELETE-DIRECTORY \"/tmp/foo\")
     (DELETE-DIRECTORY \"/tmp/foo/\")
 
-delete the \"foo\" subdirectory of \"/tmp\", or signal an error if it does not
-exist or if is a file or a symbolic link."
+delete the `\"foo\"` subdirectory of `\"/tmp\"`, or signal an error if
+it does not exist or if is a file or a symbolic link."
   (declare (type pathname-designator pathspec))
   (labels ((recurse-merged (dir)
              (lambda (sub)

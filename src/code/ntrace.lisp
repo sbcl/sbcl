@@ -686,17 +686,18 @@ functions are called. In its simplest form:
     (TRACE NAME-1 NAME-2 ...)
 
 The NAMEs are not evaluated. Each may be one of the following:
-  * SYMBOL, denoting a function or macro.
-  * FNAME, a valid function name, denoting a function.
-  * `(METHOD FNAME QUALIFIERS* (SPECIALIZERS*))` denoting a method.
-  * `(COMPILER-MACRO SYMBOL)` denoting a compiler macro.
-  * `(LABELS FNAME :IN OUTER-NAME)` or `(FLET FNAME :IN OUTER-NAME)`
-    denoting a local function where `OUTER-NAME` may be any of the
-    previous names for functions, macros, methods or compiler macros.
-    Tracing local functions may require DEBUG policy 3 to inhibit
-    inlining.
-  * STRING denoting all functions fbound to symbols whose home package
-    is the package with the given name.
+
+- SYMBOL, denoting a function or macro.
+- FNAME, a valid function name, denoting a function.
+- `(METHOD FNAME QUALIFIERS* (SPECIALIZERS*))` denoting a method.
+- `(COMPILER-MACRO SYMBOL)` denoting a compiler macro.
+- `(LABELS FNAME :IN OUTER-NAME)` or `(FLET FNAME :IN OUTER-NAME)`
+  denoting a local function where `OUTER-NAME` may be any of the
+  previous names for functions, macros, methods or compiler macros.
+  Tracing local functions may require DEBUG policy 3 to inhibit
+  inlining.
+- STRING denoting all functions fbound to symbols whose home package
+  is the package with the given name.
 
 Options allow modification of the default behavior. Each option is a
 pair of an option keyword and a value form. Global options are
@@ -779,9 +780,9 @@ The following options are defined:
 :CONDITION, :BREAK and :PRINT forms are evaluated in a context which
 mocks up the lexical environment of the called function, so that
 SB-DEBUG:VAR and SB-DEBUG:ARG can be used.
-The -AFTER and -ALL forms can use also use SB-DEBUG:ARG. In forms
-which are evaluated after the function call, (SB-DEBUG:ARG N) returns
-the N-th value returned by the function."
+The `*-AFTER` and `*-ALL` forms can use also use SB-DEBUG:ARG. In forms
+which are evaluated after the function call, `(SB-DEBUG:ARG N)` returns
+the `N`th value returned by the function."
   (if specs
       (expand-trace specs)
       '(%list-traced-funs)))

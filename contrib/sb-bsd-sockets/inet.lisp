@@ -22,7 +22,7 @@
 ;;; getprotobyname if it's available.
 (defun get-protocol-by-name (name)
   "Given a protocol name, return the protocol number, the protocol name, and
-a list of protocol aliases"
+a list of protocol aliases."
   (let ((result (cdr (if (keywordp name)
                          (assoc name *protocols*)
                          (assoc name *protocols* :test #'string-equal)))))

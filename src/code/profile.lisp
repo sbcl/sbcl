@@ -296,9 +296,7 @@
   (values))
 
 (defmacro profile (&rest names)
-  "PROFILE Name*
-
-   If no names are supplied, return the list of profiled functions.
+  "If no names are supplied, return the list of profiled functions.
 
    If names are supplied, wrap profiling code around the named functions.
    As in TRACE, the names are not evaluated. A symbol names a function.

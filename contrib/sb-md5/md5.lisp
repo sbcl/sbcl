@@ -634,7 +634,7 @@ FINALIZE-MD5-STATE results in unspecified behaviour."
 
 (defun md5sum-sequence (sequence &key (start 0) end)
   "Calculate the MD5 message-digest of data in SEQUENCE, which should
-be a 1d simple-array with element type (unsigned-byte 8).  On CMU CL
+be a 1d SIMPLE-ARRAY with element type (UNSIGNED-BYTE 8). On CMU CL
 and SBCL non-simple and non-1d arrays with this element-type are also
 supported."
   (declare (optimize (speed 3) (safety 3) (space 0) (debug 1))
@@ -723,7 +723,7 @@ operations.  This should be a multiple of 64, the MD5 block size."))
 
 (defun md5sum-stream (stream)
   "Calculate an MD5 message-digest of the contents of STREAM.  Its
-element-type has to be (unsigned-byte 8). Use on character streams is
+element-type has to be (UNSIGNED-BYTE 8). Use on character streams is
 DEPRECATED, as this will not work correctly on implementations with
 CHAR-CODE-LIMIT > 256 and ignores character coding issues."
   (declare (optimize (speed 3) (safety 3) (space 0) (debug 1)))

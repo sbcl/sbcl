@@ -56,10 +56,31 @@
         (oops))))))
 
 (defmacro define-alien-variable (name type &environment env)
-  "Define NAME as an external alien variable of type TYPE. NAME should
-be a list of a string holding the alien name and a symbol to use as
-the Lisp name. If NAME is just a symbol or string, then the other name
-is guessed from the one supplied."
+  "Define NAME as an external alien variable of type TYPE.
+  Neither is evaluated.
+
+  In its full form, NAME is `(<ALIEN-NAME-STRING>
+  <LISP-NAME-SYMBOL>)`. If NAME is just a symbol or string, then the
+  other name is guessed from the one supplied as described
+  SB-MANUAL:@EXTERNAL-FOREIGN-VARIABLES.
+
+  The Lisp name of the variable becomes a global alien variable.
+  Global alien variables are effectively \"global symbol macros\"; a
+  reference to the variable fetches the contents of the external
+  variable. Similarly, setting the variable stores new contents -- the
+  new contents must be of the declared TYPE. Someday, they may well be
+  implemented using the ANSI DEFINE-SYMBOL-MACRO mechanism, but as of
+  SBCL 0.7.5, they are still implemented using an older more-or-less
+  parallel mechanism inherited from CMUCL.
+
+  For example, to access a C-level counter `foo`, one could write
+
+      (define-alien-variable \"foo\" int)
+      ;; Now it is possible to get the value of the C variable foo simply by
+      ;; referencing that Lisp variable:
+      (print foo)
+      (setf foo 14)
+      (incf foo)"
   (multiple-value-bind (lisp-name alien-name) (pick-lisp-and-alien-names name)
     (with-auxiliary-alien-types env
       (let ((alien-type (parse-alien-type type env)))
@@ -92,13 +113,14 @@ variable is undefined."
                    (error 'unbound-variable :name symbol))))
 
 (defmacro extern-alien (name type &environment env)
-  "Access the alien variable named NAME, assuming it is of type TYPE.
-This is SETFable."
+  "Return an alien of TYPE which points to an externally defined value of NAME.
+  NAME is not evaluated and may be either a string or a symbol. TYPE
+  is an unevaluated alien type specifier. SETFable."
   (let* ((name (if (and env (constantp name env)) (constant-form-value name env) name))
          (alien-name (possibly-base-stringize
                       (etypecase name
-                       (symbol (guess-alien-name-from-lisp-name name))
-                       (string name))))
+                        (symbol (guess-alien-name-from-lisp-name name))
+                        (string name))))
          (alien-type (parse-alien-type type env))
          (datap (not (alien-fun-type-p alien-type))))
     `(%alien-value (foreign-symbol-sap ,alien-name ,datap) 0 ',alien-type)))
@@ -135,16 +157,40 @@ This is SETFable."
         `(alien-funcall-into ,func-expr ,var ,@args)))))
 
 (defmacro with-alien (bindings &body body &environment env)
-  "Establish some local alien variables. Each of BINDINGS is of the form:
+  "Establish some local alien variables of dynamic extent.
+  Each of BINDINGS is of the form:
 
        VAR TYPE [ ALLOCATION ] [ INITIAL-VALUE | EXTERNAL-NAME ]
 
    `ALLOCATION` should be one of:
-     :LOCAL (the default)
-       The alien is allocated on the stack, and has dynamic extent.
-     :EXTERN
-       No alien is allocated, but VAR is established as a local name for
-       the external alien given by `EXTERNAL-NAME`."
+
+     - :LOCAL (the default): The alien is allocated on the stack, and
+       has dynamic extent.
+
+     - :EXTERN: No alien is allocated, but `VAR` is established as a
+       local name for the external alien given by `EXTERNAL-NAME`.
+
+  `VAR`s are established as symbol-macros; the bindings have lexical
+  scope, and may be assigned with SETQ or SETF.
+
+  The WITH-ALIEN macro also establishes a new scope for named
+  structures and unions. Any TYPE specified for a variable may contain
+  named structure or union types with the slots specified. Within the
+  lexical scope of the binding specifiers and body, a locally defined
+  foreign structure type `FOO` can be referenced by its name using
+  `(STRUCT FOO)`.
+
+  When a foreign function returns a structure by value, using
+  ALIEN-FUNCALL as the `INITIAL-VALUE` allows the returned struct to
+  be stack-allocated directly into the local variable's storage,
+  avoiding heap allocation:
+
+      (with-alien ((result (struct point)
+                           (alien-funcall
+                            (extern-alien \"make_point\"
+                                          (function (struct point) double double))
+                            1.0d0 2.0d0)))
+        (values (slot result 'x) (slot result 'y)))"
   ;; FIXME:
   ;;      :STATIC
   ;;        The alien is allocated on the heap, and has infinite extent. The alien
@@ -259,15 +305,17 @@ This is SETFable."
   (zerop (sap-int (alien-sap x))))
 
 (defmacro sap-alien (sap type &environment env)
-  "Convert the system area pointer SAP to an ALIEN of the specified TYPE (not
-   evaluated.) TYPE must be pointer-like."
+  "Convert the SYSTEM-AREA-POINTER SAP to an ALIEN of the specified
+  TYPE (not evaluated). TYPE must be pointer-like (foreign pointer,
+  array, or record type)."
   (let ((alien-type (parse-alien-type type env)))
     (if (eq (compute-alien-rep-type alien-type) 'system-area-pointer)
         `(%sap-alien ,sap ',alien-type)
         (error "cannot make an alien of type ~S out of a SAP" type))))
 
 (defun alien-sap (alien)
-  "Return a System-Area-Pointer pointing to Alien's data."
+  "Return a SYSTEM-AREA-POINTER pointing to ALIEN's data.
+  ALIEN must be of some foreign pointer, array, or record type."
   (declare (type alien-value alien))
   (alien-value-sap alien))
 
@@ -276,8 +324,8 @@ This is SETFable."
 (defmacro make-alien (type &optional size &environment env)
   "Allocate an alien of type TYPE in foreign heap, and return an alien
 pointer to it. The allocated memory is not initialized, and may
-contain garbage. The memory is allocated using `malloc`(3), so it can
-be passed to foreign functions which use `free`(3), or released using
+contain garbage. The memory is allocated using `malloc(3)`, so it can
+be passed to foreign functions which use `free(3)`, or released using
 FREE-ALIEN.
 
 For alien stack allocation, see macro WITH-ALIEN.
@@ -293,7 +341,7 @@ interpreted depends on TYPE:
 
 * When TYPE is any other foreign type, then an object for that type is
   allocated, and a pointer to it is returned. So
-  (make-alien int) returns a (* int).
+  (MAKE-ALIEN INT) returns a (* INT).
 
     If SIZE is specified, then a block of that many objects is
     allocated, with the result pointing to the first one.
@@ -381,7 +429,7 @@ Examples:
 (declaim (inline free-alien))
 (defun free-alien (alien)
   "Dispose of the storage pointed to by ALIEN. The ALIEN must have been
-allocated by MAKE-ALIEN, MAKE-ALIEN-STRING or `malloc`(3)."
+allocated by MAKE-ALIEN, MAKE-ALIEN-STRING or `malloc(3)`."
   (alien-funcall (extern-alien "free" (function (values) system-area-pointer))
                  (alien-sap alien))
   nil)
@@ -408,7 +456,7 @@ allocated by MAKE-ALIEN, MAKE-ALIEN-STRING or `malloc`(3)."
                                       (external-format :default)
                                       (null-terminate t))
   "Copy part of STRING delimited by START and END into freshly
-allocated foreign memory, freeable using `free`(3) or FREE-ALIEN.
+allocated foreign memory, freeable using `free(3)` or FREE-ALIEN.
 Returns the allocated string as a (* CHAR) alien, and the number of
 bytes allocated as secondary value.
 
@@ -439,7 +487,12 @@ null byte."
 ;;; Extract the value from the named slot from the record ALIEN. If
 ;;; ALIEN is actually a pointer, then DEREF it first.
 (defun slot (alien slot)
-  "Extract SLOT from the Alien STRUCT or UNION ALIEN. May be set with SETF."
+  "Extract the value of the slot named SLOT from a foreign STRUCT or
+  UNION ALIEN. If ALIEN is a pointer to a structure or union, then it
+  is automatically dereferenced. SETFable.
+
+  Note that SLOT is evaluated, and need not be a compile-time
+  constant (but only constant slot accesses are efficiently compiled)."
   (declare (type alien-value alien)
            (type symbol slot))
   (let ((type (alien-value-type alien)))
@@ -528,9 +581,11 @@ null byte."
 
 ;;; Dereference the alien and return the results.
 (defun deref (alien &rest indices)
-  "Dereference an Alien pointer or array. If an array, the indices are used
-   as the indices of the array element to access. If a pointer, one index can
-   optionally be specified, giving the equivalent of C pointer arithmetic."
+  "Dereference an ALIEN pointer or array. When dereferencing a pointer,
+  an optional single index can be specified to give the equivalent of
+  C pointer arithmetic; this index is scaled by the size of the type
+  pointed to. When dereferencing an array, the number of indices must
+  be the same as the number of dimensions in the array type. SETFable."
   (declare (type alien-value alien)
            (type list indices))
   (multiple-value-bind (target-type offset) (deref-guts alien indices)
@@ -633,8 +688,9 @@ null byte."
 ;;;; the ADDR macro
 
 (defmacro addr (expr &environment env)
-  "Return an Alien pointer to the data addressed by Expr, which must be a call
-   to SLOT or DEREF, or a reference to an Alien variable."
+  "Return an Alien pointer to the data addressed by EXPR,
+  which must be a foreign variable, a call to DEREF or SLOT, or a use
+  of EXTERN-ALIEN."
   (let ((form (%macroexpand expr env)))
     (or (typecase form
           (cons
@@ -668,8 +724,11 @@ null byte."
 ;;;; the CAST macro
 
 (defmacro cast (alien type &environment env)
-  "Convert ALIEN to an Alien of the specified TYPE (not evaluated.)  Both types
-   must be Alien array, pointer or function types."
+  "Convert ALIEN to an Alien of the specified TYPE (not evaluated).
+  Both types must be Alien array, pointer or function types.
+
+  Note that the resulting Lisp foreign variable object is not EQ to
+  the argument, but it points to the same foreign memory address."
   `(%cast ,alien ',(parse-alien-type type env)))
 
 (defun %cast (alien target-type)
@@ -756,8 +815,40 @@ null byte."
 ;;;; ALIEN-FUNCALL, DEFINE-ALIEN-ROUTINE
 
 (defun alien-funcall (alien &rest args)
-  "Call the foreign function ALIEN with the specified arguments. ALIEN's
-type specifies the argument and result types."
+  "Call the foreign function ALIEN with ARGS and return its C return value
+  as a Lisp value. ALIEN's foreign type specifies the argument and
+  result types. ALIEN is typically an EXTERN-ALIEN or a value defined
+  with DEFINE-ALIEN-ROUTINE.
+
+  The type of ALIEN must be `(ALIEN (FUNCTION ...))` or `(ALIEN
+  (* (FUNCTION ...)))`. The function type is used to determine how to
+  call the function (as though it was declared with a prototype). The
+  type need not be known at compile time, but only known-type calls
+  are efficiently compiled.
+
+  On Unix-like x86-64 and ARM64 systems, structures may be passed and
+  returned by value. The implementation follows the System V AMD64 ABI
+  and AAPCS64 specifications respectively.
+
+  Here is an example which allocates a `(STRUCT FOO)`, calls a foreign
+  function to initialize it, then returns a Lisp vector of all
+  the `(* (STRUCT FOO))` objects filled in by the foreign call:
+
+      ;; Allocate a foo on the stack.
+      (with-alien ((f (struct foo)))
+        ;; Call some C function to fill in foo fields.
+        (alien-funcall (extern-alien \"mangle_foo\" (function void (* foo)))
+                       (addr f))
+        ;; Find how many foos to use by getting the A field.
+        (let* ((num (slot f 'a))
+               (result (make-array num)))
+          ;; Get a pointer to the array so that we don't have to keep extracting it:
+          (with-alien ((a (* (array (* (struct foo)) 100)) (addr (slot f 'b))))
+            ;; Loop over the first N elements and stash them in the result vector.
+            (dotimes (i num)
+              (setf (svref result i) (deref (deref a) i)))
+            ;; Voila.
+            result)))"
   (declare (type alien-value alien))
   (let ((type (alien-value-type alien)))
     (typecase type
@@ -788,8 +879,23 @@ type specifies the argument and result types."
 #+(or x86-64 arm64)
 (defun alien-funcall-into (alien result-buffer &rest args)
   "Call the foreign function ALIEN, writing the struct result to RESULT-BUFFER.
-RESULT-BUFFER should be a system-area-pointer to appropriately sized memory.
-Only supported on x86-64 and ARM64."
+Returns no values.
+
+RESULT-BUFFER should be a SYSTEM-AREA-POINTER to appropriately sized memory.
+Only supported on x86-64 and ARM64.
+
+Here is an example that calls a C function returning a struct, writing
+the result to a stack-allocated buffer:
+
+    (define-alien-type nil (struct point (x double) (y double)))
+
+    (with-alien ((result (struct point)))
+      (alien-funcall-into
+       (extern-alien \"make_point\"
+                     (function (struct point) double double))
+       (alien-sap (addr result))
+       1.0d0 2.0d0)
+      (values (slot result 'x) (slot result 'y)))"
   (declare (type alien-value alien)
            (type system-area-pointer result-buffer))
   (let ((type (alien-value-type alien)))
@@ -819,43 +925,79 @@ Only supported on x86-64 and ARM64."
 (defmacro define-alien-routine (name result-type
                                      &rest args
                                      &environment lexenv)
-  "DEFINE-ALIEN-ROUTINE name result-type {(arg-name arg-type [style])}*
+  "Define a foreign interface function for the routine with the specified NAME.
+Also automatically DECLAIM the FTYPE of the defined function. The
+semantics of the actual call are the same as for ALIEN-FUNCALL.
 
-Define a foreign interface function for the routine with the specified NAME.
-Also automatically DECLAIM the FTYPE of the defined function.
+This macro is a convenience for automatically generating Lisp
+interfaces to simple foreign functions. The primary feature is the
+parameter style specification, which translates the C
+pass-by-reference idiom into additional return values.
 
-NAME may be either a string, a symbol, or a list of the form (string symbol).
+NAME may be either a string, a symbol, or a list of the
+form `(<FOREIGN-NAME-STRING> <LISP-NAME-SYMBOL>)`.
 
 RESULT-TYPE is the alien type for the function return value. VOID may be
 used to specify a function with no result.
 
-The remaining forms specify individual arguments that are passed to
-the routine. `ARG-NAME` is a symbol that names the argument, primarily
-for documentation. `ARG-TYPE` is the C type of the argument. `STYLE`
-specifies the way that the argument is passed.
+ARGS is a list of `(ARG-NAME ARG-TYPE &OPTIONAL STYLE)` elements.
+`ARG-NAME` is a symbol that names the argument, primarily for
+documentation. `ARG-TYPE` is the C type of the argument.
 
-:IN
-      An :IN argument is simply passed by value. The value to be passed is
-      obtained from argument(s) to the interface function. No values are
-      returned for :In arguments. This is the default mode.
+`STYLE` specifies the way that the argument is passed:
 
-:OUT
-      The specified argument type must be a pointer to a fixed sized object.
-      A pointer to a preallocated object is passed to the routine, and the
-      the object is accessed on return, with the value being returned from
-      the interface function. :OUT and :IN-OUT cannot be used with pointers
-      to arrays, records or functions.
+- :IN: An :IN argument is simply passed by value. The value to be
+  passed is obtained from argument(s) to the interface function. No
+  values are returned for :IN arguments. This is the default mode.
 
-:COPY
-      This is similar to :IN, except that the argument values are stored
-      on the stack, and a pointer to the object is passed instead of
-      the value itself.
+- :OUT: A pass-by-reference output value. The specified argument type
+  must be a pointer to a fixed sized object. An object of the correct
+  size is allocated on the stack, and its address is passed to the
+  foreign function. When the function returns, the contents of this
+  location are returned as one of the values of the Lisp function (and
+  the location is automatically deallocated). :OUT and :IN-OUT cannot
+  be used with pointers to arrays, records or functions.
 
-:IN-OUT
-      This is a combination of :OUT and :COPY. A pointer to the argument is
-      passed, with the object being initialized from the supplied argument
-      and the return value being determined by accessing the object on
-      return."
+- :COPY: This is similar to :IN, except that the argument values are
+  stored on the stack, and a pointer to the object is passed instead
+  of the value itself.
+
+- :IN-OUT: This is a combination of :OUT and :COPY. A pointer to the
+  argument is passed, with the object being initialized from the
+  supplied argument and the return value being determined by accessing
+  the object on return.
+
+> _Note_: Any efficiency-critical foreign interface function should be
+> inline expanded, which can be done by preceding the
+> DEFINE-ALIEN-ROUTINE call with:
+>
+>     (declaim (inline lisp-name))
+>
+> In addition to avoiding the Lisp call overhead, this allows
+> pointers, word-integers and floats to be passed using non-descriptor
+> representations, avoiding consing.
+
+Consider the C function `cfoo` with the following calling
+convention:
+
+    void
+    cfoo (str, a, i)
+        char *str;
+        char *a; /* update */
+        int *i; /* out */
+    {
+      /* body of cfoo(...) */
+    }
+
+This can be described by the following call to DEFINE-ALIEN-ROUTINE:
+
+    (define-alien-routine \"cfoo\" void
+      (str c-string)
+      (a char :in-out)
+      (i int :out))
+
+The Lisp function `cfoo` will have two arguments (`str` and `a`) and
+two return values (`a` and `i`)."
   (binding* (((lisp-name alien-name) (pick-lisp-and-alien-names name))
              ;; The local name is uninterned so that we don't preclude
              ;;   (defconstant kill 9)

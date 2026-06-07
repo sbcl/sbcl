@@ -275,9 +275,9 @@ Create new alien callable (old alien callable gets freed)."))
                                  &body body
                                  &environment env)
   "Define an alien function which can be called by alien code. The alien
-function returned by (alien-callable-function NAME) expects alien
+function returned by (ALIEN-CALLABLE-FUNCTION NAME) expects alien
 arguments of the specified `ARG-TYPE`s and returns an alien of type
-`RESULT-TYPE`.
+RESULT-TYPE.
 
 TYPED-LAMBDA-LIST is a list of `(ARG-NAME ARG-TYPE)` elements, and
 BODY is `{DOC-STRING} {DECL}* {FORM}*`.

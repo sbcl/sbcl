@@ -25,7 +25,12 @@
 #+host-quirks-cmu
 (declaim (notinline position position-if position-if-not))
 
-(defvar *default-source-external-format* :default)
+(defvar *default-source-external-format* :default
+  "If COMPILE-FILE's :EXTERNAL-FORMAT is :DEFAULT, the source file is
+  OPENed with *DEFAULT-SOURCE-EXTERNAL-FORMAT*. :DEFAULT, the default
+  value of this variable, tells OPEN to default to
+  *DEFAULT-EXTERNAL-FORMAT*. Since :DEFAULT is OPEN's default
+  :EXTERNAL-FORMAT, this is all very default.")
 
 (defmacro defglobal (name value &rest doc)
   `(eval-when (:compile-toplevel :load-toplevel :execute)

@@ -417,6 +417,15 @@ any non-negative real number."
     "--end-runtime-options" "--merge-core-pages" "--no-merge-core-pages")
   #'equalp)
 
+(defvar *posix-argv*)
+(setf
+ (documentation '*posix-argv* 'variable)
+ "A list of strings related to the UNIX command line (`argv` in \\C).
+
+ SB-MANUAL:@RUNTIME-OPTIONS are processed and removed by the runtime.
+ The default toplevel (see SB-EXT:SAVE-LISP-AND-DIE) also removes the
+ SB-MANUAL:@TOPLEVEL-OPTIONS that it processes.")
+
 ;;; the default system top level function
 (defun toplevel-init ()
   (/show0 "entering TOPLEVEL-INIT")

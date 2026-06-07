@@ -448,9 +448,7 @@ If current thread is the main thread of the process (see
 MAIN-THREAD-P), signals an error unless ALLOW-EXIT is true, as
 terminating the main thread would terminate the entire process. If
 ALLOW-EXIT is true, returning from the main thread is equivalent to
-calling SB-EXT:EXIT with :CODE 0 and :ABORT NIL.
-
-See also: ABORT-THREAD and SB-EXT:EXIT."
+calling SB-EXT:EXIT with :CODE 0 and :ABORT NIL."
   `(%return-from-thread (multiple-value-call #'sys-tlab-list ,values-form) ,allow-exit))
 
 (defun %return-from-thread (values allow-exit)
@@ -482,9 +480,7 @@ equivalent to calling ABORT-THREAD in other than main threads.
 However, whereas ABORT restart may be rebound, ABORT-THREAD always
 unwinds the entire thread. (Behaviour of the initial ABORT restart for
 main thread depends on the :TOPLEVEL argument to
-SB-EXT:SAVE-LISP-AND-DIE.)
-
-See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
+SB-EXT:SAVE-LISP-AND-DIE.)"
   (let ((self *current-thread*))
     (cond ((main-thread-p self)
            (unless allow-exit
@@ -562,8 +558,9 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 
 ;;;; Mutexes
 
-(setf (documentation 'make-mutex 'function) "Create a mutex."
-      (documentation 'mutex-name 'function) "The name of the mutex. Setfable.")
+(setf (documentation 'make-mutex 'function) "Create a MUTEX.")
+(setf (documentation 'mutex-name 'function)
+      "The name of the MUTEX. SETFable.")
 
 (sb-ext:define-load-time-global **deadlock-lock** nil)
 
@@ -982,26 +979,25 @@ Notes:
 
   - GRAB-MUTEX is not interrupt safe. The correct way to call it is:
 
-      (WITHOUT-INTERRUPTS
-        ...
-        (ALLOW-WITH-INTERRUPTS (GRAB-MUTEX ...))
-        ...)
+          (without-interrupts
+            ...
+            (allow-with-interrupts (grab-mutex ...))
+            ...)
 
     WITHOUT-INTERRUPTS is necessary to avoid an interrupt unwinding the call
     while the mutex is in an inconsistent state while ALLOW-WITH-INTERRUPTS
     allows the call to be interrupted from sleep.
 
-  - (GRAB-MUTEX <mutex> :timeout 0.0) differs from
-    (GRAB-MUTEX <mutex> :waitp nil) in that the former may signal a
-    DEADLINE-TIMEOUT if the global deadline was due already on entering
-    GRAB-MUTEX.
+  - `(GRAB-MUTEX <MUTEX> :TIMEOUT 0.0)` differs from
+    `(GRAB-MUTEX <MUTEX> :WAITP NIL)` in that the former may signal a
+    DEADLINE-TIMEOUT if the global deadline was due already on
+    entering GRAB-MUTEX.
 
     The exact interplay of GRAB-MUTEX and deadlines are reserved to change in
     future versions.
 
   - It is recommended that you use WITH-MUTEX instead of calling GRAB-MUTEX
-    directly.
-"
+    directly."
   (declare (ignorable waitp timeout))
   (or (%try-mutex mutex)
       #+sb-thread
@@ -1139,8 +1135,8 @@ or :ERROR respectively, or release the mutex anyway if :FORCE."
   (print-unreadable-object (waitqueue stream :type t :identity t)
     (format stream "~:[-~;~:*~S~]" (waitqueue-name waitqueue))))
 
-(setf (documentation 'waitqueue-name 'function) "The name of the waitqueue. Setfable."
-      (documentation 'make-waitqueue 'function) "Create a waitqueue.")
+(setf (documentation 'waitqueue-name 'function) "The name of the waitqueue. SETFable."
+      (documentation 'make-waitqueue 'function) "Create a WAITQUEUE.")
 
 (defmacro nlx-protect-futex (protected &body cleanup)
   (declare (ignorable cleanup))
@@ -1297,25 +1293,24 @@ CONDITION-BROADCAST having occurred, the correct way to write code
 that uses CONDITION-WAIT is to loop around the call, checking the
 associated data:
 
-  (defvar *data* nil)
-  (defvar *queue* (make-waitqueue))
-  (defvar *lock* (make-mutex))
+    (defvar *data* nil)
+    (defvar *queue* (make-waitqueue))
+    (defvar *lock* (make-mutex))
 
-  ;; Consumer
-  (defun pop-data (&optional timeout)
-    (with-mutex (*lock*)
-      (loop until *data*
-            do (or (condition-wait *queue* *lock* :timeout timeout)
-                   ;; Lock not held, must unwind without touching *data*.
-                   (return-from pop-data nil)))
-      (pop *data*)))
+    ;; Consumer
+    (defun pop-data (&optional timeout)
+      (with-mutex (*lock*)
+        (loop until *data*
+              do (or (condition-wait *queue* *lock* :timeout timeout)
+                     ;; Lock not held, must unwind without touching *data*.
+                     (return-from pop-data nil)))
+        (pop *data*)))
 
-  ;; Producer
-  (defun push-data (data)
-    (with-mutex (*lock*)
-      (push data *data*)
-      (condition-notify *queue*)))
-"
+    ;; Producer
+    (defun push-data (data)
+      (with-mutex (*lock*)
+        (push data *data*)
+        (condition-notify *queue*)))"
   (declare (explicit-check timeout))
   ;; %CONDITION-WAIT can return 3 values. In most situations the values are never used,
   ;; but the semaphore implementation uses them.
@@ -1376,7 +1371,7 @@ must be held by this thread during this call."
                    (make-waitqueue :name name)))
 
 (defun semaphore-name (semaphore)
-  "The name of the semaphore INSTANCE. Setfable."
+  "The name of the semaphore INSTANCE. SETFable."
   (waitqueue-name (semaphore-queue semaphore)))
 
 (defun (setf semaphore-name) (newval semaphore)
@@ -1410,10 +1405,10 @@ WAIT-ON-SEMAPHORE or TRY-SEMAPHORE."
     (setf (semaphore-notification-%status semaphore-notification) nil)))
 
 (declaim (inline semaphore-count))
-(defun semaphore-count (instance)
-  "Returns the current count of the semaphore INSTANCE."
+(defun semaphore-count (semaphore)
+  "Returns the current count of SEMAPHORE."
   (barrier (:read))
-  (semaphore-%count instance))
+  (semaphore-%count semaphore))
 
 (declaim (ftype (sfunction (semaphore (integer 1) (or boolean real)
                             (or null semaphore-notification) symbol)
@@ -1620,10 +1615,11 @@ on this semaphore, then N of them is woken up."
 
 (defvar sb-ext:*invoke-debugger-hook* nil
   "This is either NIL or a designator for a function of two arguments,
-   to be run when the debugger is about to be entered.  The function is
-   run with *INVOKE-DEBUGGER-HOOK* bound to NIL to minimize recursive
-   errors, and receives as arguments the condition that triggered
-   debugger entry and the previous value of *INVOKE-DEBUGGER-HOOK*
+   to be run when the debugger is about to be entered. The function is
+   run with `*INVOKE-DEBUGGER-HOOK*` bound to NIL to minimize
+   recursive errors, and receives as arguments the condition that
+   triggered debugger entry and the previous value of
+   `*INVOKE-DEBUGGER-HOOK*`.
 
    This mechanism is an SBCL extension similar to the standard *DEBUGGER-HOOK*.
    In contrast to *DEBUGGER-HOOK*, it is observed by INVOKE-DEBUGGER even when
@@ -2129,9 +2125,7 @@ the function returns. The return values of FUNCTION are kept around
 and can be retrieved by JOIN-THREAD.
 
 Invoking the initial ABORT restart established by MAKE-THREAD
-terminates the thread.
-
-See also: RETURN-FROM-THREAD, ABORT-THREAD."
+terminates the thread."
   #-sb-thread (declare (ignore function name arguments))
   #-sb-thread (error "Not supported in unithread builds.")
   #+sb-thread
@@ -2298,8 +2292,8 @@ than one other thread simultaneously. Future changes to JOIN-THREAD may
 directly call the underlying thread library, and not all threading
 implementations consider such usage to be well-defined.
 
-NOTE: Return convention in case of a timeout is experimental and
-subject to change."
+> _Note_: Return convention in case of a timeout is experimental and
+> subject to change."
   (when (eq thread *current-thread*)
     (error 'join-thread-error :thread thread :problem :self-join))
 
@@ -2417,34 +2411,37 @@ correctly.
 
 With those caveats in mind, what you need to know when using it:
 
- * If calling FUNCTION causes a non-local transfer of control (ie. an
-   unwind), all normal cleanup forms will be executed.
+* If calling FUNCTION causes a non-local transfer of control (ie. an
+  unwind), all normal cleanup forms will be executed.
 
-   However, if the interrupt occurs during cleanup forms of an UNWIND-PROTECT,
-   it is just as if that had happened due to a regular GO, THROW, or
-   RETURN-FROM: the interrupted cleanup form and those following it in the
-   same UNWIND-PROTECT do not get executed.
+    However, if the interrupt occurs during cleanup forms of an
+    UNWIND-PROTECT, it is just as if that had happened due to a
+    regular GO, THROW, or RETURN-FROM: the interrupted cleanup form
+    and those following it in the same UNWIND-PROTECT do not get
+    executed.
 
-   SBCL tries to keep its own internals asynch-unwind-safe, but this is
-   frankly an unreasonable expectation for third party libraries, especially
-   given that asynch-unwind-safety does not compose: a function calling
-   only asynch-unwind-safe function isn't automatically asynch-unwind-safe.
+    SBCL tries to keep its own internals asynch-unwind-safe, but this
+    is frankly an unreasonable expectation for third party libraries,
+    especially given that asynch-unwind-safety does not compose: a
+    function calling only asynch-unwind-safe function isn't
+    automatically asynch-unwind-safe.
 
-   This means that in order for an asynch unwind to be safe, the entire
-   callstack at the point of interruption needs to be asynch-unwind-safe.
+    This means that in order for an asynch unwind to be safe, the
+    entire callstack at the point of interruption needs to be
+    asynch-unwind-safe.
 
- * In addition to asynch-unwind-safety you must consider the issue of
-   reentrancy. INTERRUPT-THREAD can cause function that are never normally
-   called recursively to be re-entered during their dynamic contour,
-   which may cause them to misbehave. (Consider binding of special variables,
-   values of global variables, etc.)
+* In addition to asynch-unwind-safety you must consider the issue of
+  reentrancy. INTERRUPT-THREAD can cause function that are never
+  normally called recursively to be re-entered during their dynamic
+  contour, which may cause them to misbehave. (Consider binding of
+  special variables, values of global variables, etc.)
 
 Taken together, these two restrict the \"safe\" things to do using
 INTERRUPT-THREAD to a fairly minimal set. One useful one -- exclusively for
 interactive development use is using it to force entry to debugger to inspect
 the state of a thread:
 
-  (interrupt-thread thread #'break)
+    (interrupt-thread thread #'break)
 
 Short version: be careful out there."
   (unless (%interrupt-thread thread function)
@@ -2481,16 +2478,16 @@ causing it to call SB-THREAD:ABORT-THREAD with :ALLOW-EXIT T.
 The unwind caused by TERMINATE-THREAD is asynchronous, meaning that
 eg. thread executing
 
-  (let (foo)
-     (unwind-protect
-         (progn
-            (setf foo (get-foo))
-            (work-on-foo foo))
-       (when foo
-         ;; An interrupt occurring inside the cleanup clause
-         ;; will cause cleanups from the current UNWIND-PROTECT
-         ;; to be dropped.
-         (release-foo foo))))
+    (let (foo)
+       (unwind-protect
+           (progn
+              (setf foo (get-foo))
+              (work-on-foo foo))
+         (when foo
+           ;; An interrupt occurring inside the cleanup clause
+           ;; will cause cleanups from the current UNWIND-PROTECT
+           ;; to be dropped.
+           (release-foo foo))))
 
 might miss calling `RELEASE-FOO` despite GET-FOO having returned true
 if the interrupt occurs inside the cleanup clause, eg. during
@@ -2499,16 +2496,16 @@ execution of `RELEASE-FOO`.
 Thus, in order to write an asynch unwind safe UNWIND-PROTECT you need
 to use WITHOUT-INTERRUPTS:
 
-  (let (foo)
-    (sb-sys:without-interrupts
-      (unwind-protect
-          (progn
-            (setf foo (sb-sys:allow-with-interrupts
-                        (get-foo)))
-            (sb-sys:with-local-interrupts
-              (work-on-foo foo)))
-       (when foo
-         (release-foo foo)))))
+    (let (foo)
+      (sb-sys:without-interrupts
+        (unwind-protect
+            (progn
+              (setf foo (sb-sys:allow-with-interrupts
+                          (get-foo)))
+              (sb-sys:with-local-interrupts
+                (work-on-foo foo)))
+         (when foo
+           (release-foo foo)))))
 
 Since most libraries using UNWIND-PROTECT do not do this, you should never
 assume that unknown code can safely be terminated using TERMINATE-THREAD."

@@ -729,8 +729,8 @@ environment. The hash function must compute the same hash code for any two
 objects for which NAME returns true, and subsequent calls with already hashed
 objects must always return the same hash code.
 
-Note: The :HASH-FUNCTION keyword argument to MAKE-HASH-TABLE can be used to
-override the specified default hash-function.
+> _Note_: The :HASH-FUNCTION keyword argument to MAKE-HASH-TABLE can
+> be used to override the specified default hash-function.
 
 Attempting to define NAME in a locked package as hash-table test causes a
 package lock violation.

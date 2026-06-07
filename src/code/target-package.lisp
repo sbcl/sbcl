@@ -919,7 +919,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
   (def package-shadowing-symbols package-%shadowing-symbols))
 
 (defun package-local-nicknames (package-designator)
-  "Returns an alist of \(local-nickname . actual-package) describing the
+  "Returns an alist of `(LOCAL-NICKNAME . ACTUAL-PACKAGE)` describing the
 nicknames local to the designated package.
 
 When in the designated package, calls to FIND-PACKAGE with the any of the
@@ -930,9 +930,6 @@ the reader.
 When printing a package prefix for a symbol with a package local nickname, the
 local nickname is used instead of the real name in order to preserve
 print-read consistency.
-
-See also: ADD-PACKAGE-LOCAL-NICKNAME, PACKAGE-LOCALLY-NICKNAMED-BY-LIST,
-REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES.
 
 Experimental: interface subject to change."
   (package-local-nickname-alist
@@ -956,9 +953,6 @@ Experimental: interface subject to change."
 (defun package-locally-nicknamed-by-list (package-designator)
   "Returns a list of packages which have a local nickname for the designated
 package.
-
-See also: ADD-PACKAGE-LOCAL-NICKNAME, PACKAGE-LOCAL-NICKNAMES,
-REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES.
 
 Experimental: interface subject to change."
   (let ((designee (find-undeleted-package-or-lose package-designator))
@@ -993,9 +987,6 @@ reader.
 When printing a package prefix for a symbol with a package local nickname,
 local nickname is used instead of the real name in order to preserve
 print-read consistency.
-
-See also: PACKAGE-LOCAL-NICKNAMES, PACKAGE-LOCALLY-NICKNAMED-BY-LIST,
-REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES.
 
 Experimental: interface subject to change."
   (let ((package (find-undeleted-package-or-lose package-designator)))
@@ -1067,9 +1058,6 @@ Experimental: interface subject to change."
   "If the designated package had OLD-NICKNAME as a local nickname for
 another package, it is removed. Returns true if the nickname existed and was
 removed, and NIL otherwise.
-
-See also: ADD-PACKAGE-LOCAL-NICKNAME, PACKAGE-LOCAL-NICKNAMES,
-PACKAGE-LOCALLY-NICKNAMED-BY-LIST, and the DEFPACKAGE option :LOCAL-NICKNAMES.
 
 Experimental: interface subject to change."
   (let* ((nick (string old-nickname))

@@ -20,8 +20,8 @@
   "Mark the functions named by NAMES as being subject to call counting
 during statistical profiling. If a string is used as a name, it will
 be interpreted as a package name. In this case call counting will be
-done for all functions with names like X or (SETF X), where X is a symbol
-with the package as its home package."
+done for all functions with names like `X` or `(SETF X)`, where `X` is
+a symbol with the package as its home package."
   (dolist (name names)
     (if (stringp name)
         (let ((package (find-package name)))

@@ -5,7 +5,7 @@
 
 Note that native namestring syntax is distinct from Lisp namestring syntax:
 
-  \(pathname \"/foo*/bar\")
+    (pathname \"/foo*/bar\")
 
 is a wild pathname with a pattern-matching directory component.
 SB-EXT:PARSE-NATIVE-NAMESTRING may be used to construct Lisp pathnames that
@@ -15,16 +15,16 @@ namestring syntax.
 
 Note also that POSIX filename syntax does not distinguish the names of files
 from the names of directories: in order to parse the name of a directory in
-POSIX filename syntax into a pathname MY-DEFAULTS for which
+POSIX filename syntax into a pathname `MY-DEFAULTS` for which
 
-  \(merge-pathnames (make-pathname :name \"FOO\" :case :common)
-                    my-defaults)
+    (merge-pathnames (make-pathname :name \"FOO\" :case :common)
+                      my-defaults)
 
 returns a pathname that denotes a file in the directory, supply a true
 :AS-DIRECTORY argument to SB-EXT:PARSE-NATIVE-NAMESTRING. Likewise, to supply
 the name of a directory to a POSIX function in non-directory syntax, supply a
 true :AS-FILE argument to SB-EXT:NATIVE-NAMESTRING."
-   "Designator for a FILENAME: a STRING designating itself, or a
+   "Designator for a [FILENAME][type]: a STRING designating itself, or a
 designator for a PATHNAME designating the corresponding native namestring."
    "Converts FILENAME-DESIGNATOR into a FILENAME.")
   (pathname
@@ -43,8 +43,8 @@ native file descriptor.
 
 Note that mixing I/O operations on a FILE-STREAM with operations directly on its
 descriptor may produce unexpected results if the stream is buffered."
-     "Designator for a FILE-DESCRIPTOR: either a fixnum designating itself, or
-a FILE-STREAM designating the underlying file-descriptor."
+     "Designator for a [FILE-DESCRIPTOR][type]: either a fixnum designating
+itself, or a FILE-STREAM designating the underlying file-descriptor."
      "Converts FILE-DESCRIPTOR-DESIGNATOR into a FILE-DESCRIPTOR.")
   (file-stream
    (sb-sys:fd-stream-fd file-descriptor))

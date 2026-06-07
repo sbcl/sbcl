@@ -57,11 +57,11 @@
 (declaim (ftype (sfunction () unsigned-byte) get-bytes-consed))
 (defun get-bytes-consed ()
   "Return the number of bytes consed since the program began. Typically
-this result will be a consed bignum, so if you have an application (e.g.
-profiling) which can't tolerate the overhead of consing bignums, you'll
-probably want either to hack in at a lower level (as the code in the
-SB-PROFILE package does), or to design a more microefficient interface
-and submit it as a patch."
+this result will be a consed bignum, so if you have an
+application (e.g. profiling) which can't tolerate the overhead of
+consing bignums, you'll probably want either to hack in at a lower
+level (as the code in the `SB-PROFILE` package does), or to design a
+more microefficient interface and submit it as a patch."
   (+ (dynamic-usage)
      *n-bytes-freed-or-purified*))
 
@@ -333,7 +333,7 @@ collection is initiated. This can be set with SETF.
 On GENCGC platforms this is the nursery size, and defaults to 5% of dynamic
 space size.
 
-Note: currently changes to this value are lost when saving core."
+Note that currently, changes to this value are lost when saving core."
   (extern-alien "bytes_consed_between_gcs" os-vm-size-t))
 
 (defun (setf bytes-consed-between-gcs) (val)

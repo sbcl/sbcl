@@ -101,31 +101,30 @@ Readers gain entry to protected regions without waiting, but need to retry if
 a writer operated inside the region while they were reading. This makes frlocks
 very efficient when readers are much more common than writers.
 
-FRlocks are NOT suitable when it is not safe at all for readers and writers to
-operate on the same data in parallel: they provide consistency, not exclusion
-between readers and writers. Hence using an frlock to eg. protect an SBCL
-hash-table is unsafe. If multiple readers operating in parallel with a writer
-would be safe but inconsistent without a lock, frlocks are suitable.
+FRlocks are _not_ suitable when it is not safe at all for readers and writers
+to operate on the same data in parallel: they provide consistency, not
+exclusion between readers and writers. Hence using an frlock to e.g. protect
+an SBCL hash-table is unsafe. If multiple readers operating in parallel with
+a writer would be safe but inconsistent without a lock, frlocks are suitable.
 
 The recommended interface to use is FRLOCK-READ and FRLOCK-WRITE, but those
 needing it can also use a lower-level interface.
 
 Example:
 
-  ;; Values returned by FOO are always consistent so that
-  ;; the third value is the sum of the two first ones.
-  (let ((a 0)
-        (b 0)
-        (c 0)
-        (lk (make-frlock)))
-    (defun foo ()
-       (frlock-read (lk) a b c))
-    (defun bar (x y)
-       (frlock-write (lk)
-         (setf a x
-               b y
-               c (+ x y)))))
-"
+    ;; Values returned by FOO are always consistent so that
+    ;; the third value is the sum of the two first ones.
+    (let ((a 0)
+          (b 0)
+          (c 0)
+          (lk (make-frlock)))
+      (defun foo ()
+         (frlock-read (lk) a b c))
+      (defun bar (x y)
+         (frlock-write (lk)
+           (setf a x
+                 b y
+                 c (+ x y)))))"
   .
   #-new-frlock (
   (mutex (make-mutex :name "FRLock mutex") :type mutex :read-only t)
@@ -212,14 +211,13 @@ Using FRLOCK-READ instead is recommended.
 
 Example:
 
-  (multiple-value-bind (t0 e0) (frlock-read-begin *fr*)
-    (let ((a (get-a))
-          (b (get-b)))
-      (multiple-value-bind (t1 e1) (frlock-read-end *fr*)
-        (if (and (eql t0 t1) (eql e0 e1))
-            (list :a a :b b)
-            :aborted))))
-"
+    (multiple-value-bind (t0 e0) (frlock-read-begin *fr*)
+      (let ((a (get-a))
+            (b (get-b)))
+        (multiple-value-bind (t1 e1) (frlock-read-end *fr*)
+          (if (and (eql t0 t1) (eql e0 e1))
+              (list :a a :b b)
+              :aborted))))"
   (barrier (:read))
   (values (frlock-pre-counter frlock)
           (frlock-epoch frlock)))
@@ -247,7 +245,7 @@ set, and returns that as multiple values."
       ;; 0, they will still be holding on to the old epoch. While it is
       ;; extremely unlikely, it isn't quite "not before heath death of the
       ;; universe" stuff: a 30 bit counter can roll over in a couple of
-      ;; seconds -- and a thread can easily be interrupted by eg. a timer for
+      ;; seconds -- and a thread can easily be interrupted by e.g. a timer for
       ;; that long, so a pathological system could be have a thread in a
       ;; danger-zone every second. Run that system for a year, and it would
       ;; have a 1 in 3 chance of hitting the incipient bug. Adding an epoch
@@ -268,7 +266,7 @@ set, and returns that as multiple values."
 (defun grab-frlock-write-lock (frlock &key (wait-p t) timeout)
   "Acquires FRLOCK for writing, invalidating existing and future read-tokens
 for the duration. Returns T on success, and NIL if the lock wasn't acquired
-due to eg. a timeout. Using FRLOCK-WRITE instead is recommended."
+due to e.g. a timeout. Using FRLOCK-WRITE instead is recommended."
   (without-interrupts
     (allow-with-interrupts (%%grab-frlock-write-lock frlock wait-p timeout))))
 

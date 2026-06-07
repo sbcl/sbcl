@@ -638,7 +638,7 @@ there is no such value.
 The only characters in Unicode with a decimal digit value are those
 that are part of a range of characters that encode the digits 0-9.
 Because of this, `(decimal-digit c) <=> (digit-char-p c 10)` in
-#+sb-unicode builds"
+`#+sb-unicode` builds"
   (sb-impl::ucd-decimal-digit character))
 
 (defun digit-value (character)
@@ -1042,10 +1042,10 @@ The result is not guaranteed to have the same length as the input."
 ;;; (nobrk) prevents a break between `first` and `second`
 ;;; Setting flag=T/state=:nobrk-next prevents a break between `second` and `third`
 
-(defun grapheme-break-class (char)
+(defun grapheme-break-class (character)
   "Returns the grapheme breaking class of CHARACTER, as specified in UAX #29."
-  (let ((cp (when char (char-code char)))
-        (gc (when char (general-category char)))
+  (let ((cp (when character (char-code character)))
+        (gc (when character (general-category character)))
         (not-spacing-mark
          #(#x102B #x102C #x1038 #x1062 #x1063 #x1064 #x1067 #x1068 #x1069
            #x106A #x106B #x106C #x106D #x1083 #x1087 #x1088 #x1089 #x108A
@@ -1053,11 +1053,11 @@ The result is not guaranteed to have the same length as the input."
            #x19B3 #x19B4 #x19B8 #x19B9 #x19BB #x19BC #x19BD #x19BE #x19BF
            #x19C0 #x19C8 #x19C9 #x1A61 #x1A63 #x1A64 #xAA7B #xAA7D)))
     (cond
-      ((not char) nil)
+      ((not character) nil)
       ((= cp 10) :LF)
       ((= cp 13) :CR)
       ((or (and (member gc '(:Zl :Zp :Cc :Cs :Cf))
-                (not (proplist-p char :prepended-concatenation-mark))
+                (not (proplist-p character :prepended-concatenation-mark))
                 (not (<= #x200C cp #x200D))
                 ;; not documented but in the normative file
                 (not (<= #xE0020 cp #xE007F)))
@@ -1068,8 +1068,8 @@ The result is not guaranteed to have the same length as the input."
            (<= #xE0080 cp #xE00FF)
            (<= #xE01F0 cp #xE0FFF)) :control)
       ((or (member gc '(:Mn :Me))
-           (proplist-p char :other-grapheme-extend)
-           (proplist-p char :emoji-modifier))
+           (proplist-p character :other-grapheme-extend)
+           (proplist-p character :emoji-modifier))
        :extend)
       ((= cp #x200D) :zwj)
       ((<= #x1F1E6 cp #x1F1FF) :regional-indicator)
@@ -1078,12 +1078,12 @@ The result is not guaranteed to have the same length as the input."
         (= cp #x0D4E) (= cp #x11941) (= cp #x11D46) (= cp #x11F02)
         ;; Consonant_Prefixed
         (<= #x111C2 cp #x111C3) (= cp #x1193F) (= cp #x11A3A) (<= #x11A84 cp #x11A89)
-        (proplist-p char :prepended-concatenation-mark))
+        (proplist-p character :prepended-concatenation-mark))
        :prepend)
       ((and (or (eql gc :Mc)
                 (eql cp #x0E33) (eql cp #x0EB3))
             (not (binary-search cp not-spacing-mark))) :spacing-mark)
-      ((hangul-syllable-type char)))))
+      ((hangul-syllable-type character)))))
 
 (macrolet ((def (name extendedp)
              `(defun ,name (function string)
@@ -1150,12 +1150,13 @@ grapheme breaking rules specified in UAX #29, returning a list of strings."
     (map-graphemes (lambda (a) (push (subseq a 0) result)) string)
     (nreverse result)))
 
-(defun word-break-class (char)
+(defun word-break-class (character)
   "Returns the word breaking class of CHARACTER, as specified in UAX #29."
   ;; Words use graphemes as characters to deal with the ignore rule
-  (when (listp char) (setf char (car char)))
-  (let ((cp (when char (char-code char)))
-        (gc (when char (general-category char)))
+  (when (listp character)
+    (setf character (car character)))
+  (let ((cp (when character (char-code character)))
+        (gc (when character (general-category character)))
         (newlines
          (coerce-to-ordered-ranges #(#xB #xC #x0085 #x0085 #x2028 #x2029)))
         (also-katakana
@@ -1184,22 +1185,22 @@ grapheme breaking rules specified in UAX #29, returning a list of strings."
          ;; Grepping of Line_Break = ";GL.*Zs"
          #(#x00A0 #x2007 #x202F)))
     (cond
-      ((not char) nil)
+      ((not character) nil)
       ((= cp 10) :LF)
       ((= cp 13) :CR)
       ((ordered-ranges-member cp newlines) :newline)
-      ((or (eql (grapheme-break-class char) :extend)
+      ((or (eql (grapheme-break-class character) :extend)
            (and (eql gc :mc) (not (= cp #x200D)))) :extend)
       ((= cp #x200D) :zwj)
       ((<= #x1F1E6 cp #x1F1FF) :regional-indicator)
       ((and (eql gc :Cf) (not (<= #x200B cp #x200D))) :format)
-      ((or (eql (script char) :katakana)
+      ((or (eql (script character) :katakana)
            (ordered-ranges-member cp also-katakana)) :katakana)
-      ((and (eql (script char) :Hebrew) (eql gc :lo)) :hebrew-letter)
-      ((and (or (alphabetic-p char) (binary-search cp also-aletter))
-            (not (or (ideographic-p char)
-                     (eql (line-break-class char) :sa)
-                     (eql (script char) :hiragana)))) :aletter)
+      ((and (eql (script character) :Hebrew) (eql gc :lo)) :hebrew-letter)
+      ((and (or (alphabetic-p character) (binary-search cp also-aletter))
+            (not (or (ideographic-p character)
+                     (eql (line-break-class character) :sa)
+                     (eql (script character) :hiragana)))) :aletter)
       ((= cp #x27) :single-quote)
       ((= cp #x22) :double-quote)
       ((binary-search cp midnumlet) :midnumlet)
@@ -1296,43 +1297,44 @@ word breaking rules specified in UAX #29. Returns a list of strings"
                 (nobrk))
                (t (brk))))))))))
 
-(defun sentence-break-class (char)
+(defun sentence-break-class (character)
   "Returns the sentence breaking class of CHARACTER, as specified in UAX #29."
-  (when (listp char) (setf char (car char)))
-  (let ((cp (when char (char-code char)))
-        (gc (when char (general-category char)))
+  (when (listp character)
+    (setf character (car character)))
+  (let ((cp (when character (char-code character)))
+        (gc (when character (general-category character)))
         (aterms #(#x002E #x2024 #xFE52 #xFF0E))
         (scontinues
          #(#x002C #x002D #x003A #x055D #x060C #x060D #x07F8 #x1802 #x1808
            #x2013 #x2014 #x3001 #xFE10 #xFE11 #xFE13 #xFE31 #xFE32 #xFE50
            #xFE51 #xFE55 #xFE58 #xFE63 #xFF0C #xFF0D #xFF1A #xFF64)))
     (cond
-      ((not char) nil)
+      ((not character) nil)
       ((= cp 10) :LF)
       ((= cp 13) :CR)
-      ((or (eql (grapheme-break-class char) :extend)
+      ((or (eql (grapheme-break-class character) :extend)
            (= cp #x200D)
            (eql gc :mc))
        :extend)
       ((or (eql cp #x0085) (<= #x2028 cp #x2029)) :sep)
       ((and (eql gc :Cf) (not (<= #x200C cp #x200D))) :format)
-      ((whitespace-p char) :sp)
-      ((and (lowercase-p char)
+      ((whitespace-p character) :sp)
+      ((and (lowercase-p character)
             (not (<= #x10D0 cp #x10FA))
             (not (<= #x10FD cp #x10FF)))
        :lower)
       ((or (eql gc :Lt)
-           (and (uppercase-p char)
+           (and (uppercase-p character)
                 (not (<= #x1C90 cp #x1CBA))
                 (not (<= #x1CBD cp #x1CBF))))
        :upper)
-      ((or (alphabetic-p char) (eql cp #x00A0) (eql cp #x05F3)) :oletter)
+      ((or (alphabetic-p character) (eql cp #x00A0) (eql cp #x05F3)) :oletter)
       ((or (eql gc :Nd) (<= #x066B cp #x066C)) :numeric)
       ((binary-search cp aterms) :aterm)
       ((binary-search cp scontinues) :scontinue)
-      ((proplist-p char :sentence-terminal) :sterm)
+      ((proplist-p character :sentence-terminal) :sterm)
       ((and (or (member gc '(:Po :Ps :Pe :Pf :Pi))
-                (eql (line-break-class char) :qu)))
+                (eql (line-break-class character) :qu)))
        :close)
       (t nil))))
 

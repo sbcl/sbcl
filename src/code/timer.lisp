@@ -494,14 +494,14 @@ condition after at least EXPIRES seconds have passed.
 
 Note that it is never safe to unwind from an asynchronous condition. Consider:
 
-  (defun call-with-foo (function)
-    (let (foo)
-      (unwind-protect
-         (progn
-           (setf foo (get-foo))
-           (funcall function foo))
-       (when foo
-         (release-foo foo)))))
+    (defun call-with-foo (function)
+      (let (foo)
+        (unwind-protect
+           (progn
+             (setf foo (get-foo))
+             (funcall function foo))
+         (when foo
+           (release-foo foo)))))
 
 If TIMEOUT occurs after `GET-FOO` has executed, but before the
 assignment, then `RELEASE-FOO` will be missed. While individual sites

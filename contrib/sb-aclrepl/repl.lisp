@@ -33,7 +33,7 @@
 (defparameter *prompt* #.*default-prompt*
   "The current prompt string or formatter function.")
 (defparameter *use-short-package-name* t
-  "when T, use the shortnest package nickname in a prompt")
+  "When T, use the shortnest package nickname in a prompt")
 (defparameter *dir-stack* nil
   "The top-level directory stack")
 (defparameter *command-char* #\:

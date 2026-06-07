@@ -102,11 +102,11 @@ If DIRECTORY does not exist, it will be created. The main report will be
 printed to the file cover-index.html. The external format of the source
 files can be specified with the EXTERNAL-FORMAT parameter.
 
-If the keyword argument FORM-MODE has the value :CAR, the annotations in
-the coverage report will be placed on the CARs of any cons-forms, while if
-it has the value :WHOLE the whole form will be annotated (the default).
-The former mode shows explicitly which forms were instrumented, while the
-latter mode is generally easier to read.
+If the keyword argument :FORM-MODE has the value :CAR, the annotations
+in the coverage report will be placed on the CARs of any cons-forms,
+while if it has the value :WHOLE the whole form will be annotated (the
+default). The former mode shows explicitly which forms were
+instrumented, while the latter mode is generally easier to read.
 
 The keyword argument IF-MATCHES should be a designator for a function
 of one argument, called for the namestring of each file with code

@@ -1805,38 +1805,38 @@ invoked. In that case it will store into PLACE and start over."
 (defun get-cas-expansion (place &optional environment)
   "Analogous to GET-SETF-EXPANSION. Returns the following six values:
 
- * list of temporary variables
+* list of temporary variables
 
- * list of value-forms whose results those variable must be bound
+* list of value-forms whose results those variable must be bound
 
- * temporary variable for the old value of PLACE
+* temporary variable for the old value of PLACE
 
- * temporary variable for the new value of PLACE
+* temporary variable for the new value of PLACE
 
- * form using the aforementioned temporaries which performs the
-   compare-and-swap operation on PLACE
+* form using the aforementioned temporaries which performs the
+  compare-and-swap operation on PLACE
 
- * form using the aforementioned temporaries with which to perform a volatile
-   read of PLACE
+* form using the aforementioned temporaries with which to perform a volatile
+  read of PLACE
 
 Example:
 
-  (get-cas-expansion '(car x))
-  ; => (#:CONS871), (X), #:OLD872, #:NEW873,
-  ;    (SB-KERNEL:%COMPARE-AND-SWAP-CAR #:CONS871 #:OLD872 :NEW873).
-  ;    (CAR #:CONS871)
+    (get-cas-expansion '(car x))
+    ; => (#:CONS871), (X), #:OLD872, #:NEW873,
+    ;    (SB-KERNEL:%COMPARE-AND-SWAP-CAR #:CONS871 #:OLD872 :NEW873).
+    ;    (CAR #:CONS871)
 
-  (defmacro my-atomic-incf (place &optional (delta 1) &environment env)
-    (multiple-value-bind (vars vals old new cas-form read-form)
-        (get-cas-expansion place env)
-     (let ((delta-value (gensym \"DELTA\")))
-       `(let* (,@(mapcar 'list vars vals)
-               (,old ,read-form)
-               (,delta-value ,delta)
-               (,new (+ ,old ,delta-value)))
-          (loop until (eq ,old (setf ,old ,cas-form))
-                do (setf ,new (+ ,old ,delta-value)))
-          ,new))))
+    (defmacro my-atomic-incf (place &optional (delta 1) &environment env)
+      (multiple-value-bind (vars vals old new cas-form read-form)
+          (get-cas-expansion place env)
+       (let ((delta-value (gensym \"DELTA\")))
+         `(let* (,@(mapcar 'list vars vals)
+                 (,old ,read-form)
+                 (,delta-value ,delta)
+                 (,new (+ ,old ,delta-value)))
+            (loop until (eq ,old (setf ,old ,cas-form))
+                  do (setf ,new (+ ,old ,delta-value)))
+            ,new))))
 
 EXPERIMENTAL: Interface subject to change."
   ;; FIXME: this seems wrong on two points:
@@ -1945,8 +1945,7 @@ SB-MOP:SLOT-VALUE-USING-CLASS, (SETF SB-MOP:SLOT-VALUE-USING-CLASS), or
 SB-MOP:SLOT-BOUNDP-USING-CLASS.
 
 Additionally, the PLACE can be a anything for which a CAS-function has
-been defined. (See SB-EXT:CAS for more information.)
-"
+been defined."
   `(cas ,place ,old ,new))
 
 
@@ -2049,20 +2048,25 @@ been defined. (See SB-EXT:CAS for more information.)
 the increment.
 
 PLACE must access one of the following:
- - a DEFSTRUCT slot with declared type (UNSIGNED-BYTE ~D~:*)
-   or AREF of a (SIMPLE-ARRAY (UNSIGNED-BYTE ~D~:*) (*))
-   The type SB-EXT:WORD can be used for these purposes.
- - CAR or CDR (respectively FIRST or REST) of a CONS.
- - a variable defined using DEFGLOBAL with a proclaimed type of FIXNUM.
-Macroexpansion is performed on PLACE before expanding ATOMIC-INCF.
 
-Incrementing is done using modular arithmetic,
-which is well-defined over two different domains:
+- a DEFSTRUCT slot with declared type (UNSIGNED-BYTE ~D~:*)
+  or AREF of a (SIMPLE-ARRAY (UNSIGNED-BYTE ~D~:*) (*))
+  The type SB-EXT:WORD can be used for these purposes.
+
+- CAR or CDR (respectively FIRST or REST) of a CONS.
+
+- a variable defined using DEFGLOBAL with a proclaimed type of FIXNUM.
+  Macroexpansion is performed on PLACE before expanding ATOMIC-INCF.
+
+Incrementing is done using modular arithmetic, which is well-defined
+over two different domains:
+
  - For structures and arrays, the operation accepts and produces
    an (UNSIGNED-BYTE ~D~:*), and DIFF must be of type (SIGNED-BYTE ~D).
-   ATOMIC-INCF of #x~x by one results in #x0 being stored in PLACE.
+   ATOMIC-INCF of `#x~x` by one results in #x0 being stored in PLACE.
+
  - For other places, the domain is FIXNUM, and DIFF must be a FIXNUM.
-   ATOMIC-INCF of #x~x by one results in #x~x
+   ATOMIC-INCF of `#x~x` by one results in `#x~x`
    being stored in PLACE.
 
 DIFF defaults to 1.
@@ -2078,21 +2082,28 @@ EXPERIMENTAL: Interface subject to change."
 the decrement.
 
 PLACE must access one of the following:
- - a DEFSTRUCT slot with declared type (UNSIGNED-BYTE ~D~:*)
-   or AREF of a (SIMPLE-ARRAY (UNSIGNED-BYTE ~D~:*) (*))
-   The type SB-EXT:WORD can be used for these purposes.
- - CAR or CDR (respectively FIRST or REST) of a CONS.
- - a variable defined using DEFGLOBAL with a proclaimed type of FIXNUM.
+
+- a DEFSTRUCT slot with declared type `(UNSIGNED-BYTE ~D~:*)` or AREF
+  of a `(SIMPLE-ARRAY (UNSIGNED-BYTE ~D~:*) (*))` (the type
+  SB-EXT:WORD can be used for these purposes)
+
+- CAR or CDR (respectively FIRST or REST) of a CONS,
+
+- a variable defined using DEFGLOBAL with a proclaimed type of FIXNUM.
+
 Macroexpansion is performed on PLACE before expanding ATOMIC-DECF.
 
 Decrementing is done using modular arithmetic,
 which is well-defined over two different domains:
+
  - For structures and arrays, the operation accepts and produces
-   an (UNSIGNED-BYTE ~D~:*), and DIFF must be of type (SIGNED-BYTE ~D).
-   ATOMIC-DECF of #x0 by one results in #x~x being stored in PLACE.
+   an (UNSIGNED-BYTE ~D~:*), and DIFF must be of type `(SIGNED-BYTE
+   ~D)`. ATOMIC-DECF of `#x0` by one results in `#x~x` being stored in
+   PLACE.
+
  - For other places, the domain is FIXNUM, and DIFF must be a FIXNUM.
-   ATOMIC-DECF of #x~x by one results in #x~x
-   being stored in PLACE.
+   ATOMIC-DECF of `#x~x` by one results in `#x~x` being stored in
+   PLACE.
 
 DIFF defaults to 1.
 

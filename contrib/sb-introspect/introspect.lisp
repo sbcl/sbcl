@@ -759,7 +759,7 @@ or a method combination name."
 This can make previously garbage objects live.
 
 SPACES should be a list of the symbols :DYNAMIC, :STATIC, :READ-ONLY,
-or :IMMOBILE on #+IMMOBILE-SPACE. The shorthand (:ALL) is also
+or :IMMOBILE on `#+IMMOBILE-SPACE`. The shorthand (:ALL) is also
 accepted."
   (let ((referrers '()))
     (map-caller-code-components
@@ -1160,8 +1160,8 @@ actually contained in the object but found in certain well-known
 indirect containers: FDEFINITIONs, EQL specializers, classes, and
 thread-local symbol values in other threads fall into this category.
 
-NOTE: calling MAP-ROOT with a THREAD does not currently map over
-conservative roots from the thread registers and interrupt contexts.
+> _Note_: calling MAP-ROOT with a THREAD does not currently map over
+> conservative roots from the thread registers and interrupt contexts.
 
 Experimental: interface subject to change."
   (when (typep object '(or bignum float sb-sys:system-area-pointer

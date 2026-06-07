@@ -114,9 +114,10 @@ The following &KEY arguments are defined:
 - :TOPLEVEL
 
     The function to run when the created core file is resumed. The
-    default function handles command line toplevel option processing
-    and runs the top level read-eval-print loop. This function
-    returning is equivalent to (SB-EXT:EXIT :CODE 0) being called.
+    default function handles command line toplevel option
+    processing (see SB-MANUAL:@TOPLEVEL-OPTIONS) and runs the top
+    level read-eval-print loop. This function returning is equivalent
+    to (SB-EXT:EXIT :CODE 0) being called.
 
     TOPLEVEL functions should always provide an ABORT restart:
     otherwise code they call will run without one.
@@ -130,13 +131,13 @@ The following &KEY arguments are defined:
 
 - :SAVE-RUNTIME-OPTIONS
 
-    If true, values of runtime options --dynamic-space-size and
-    --control-stack-size that were used to start SBCL are stored in
+    If true, values of runtime options `--dynamic-space-size` and
+    `--control-stack-size` that were used to start SBCL are stored in
     the standalone executable, and restored when the executable is
     run. This also inhibits normal runtime option processing, causing
     all command line arguments to be passed to the toplevel. If
-    :ACCEPT-RUNTIME-OPTIONS then --dynamic-space-size and
-    --control-stack-size are still processed by the runtime.
+    :ACCEPT-RUNTIME-OPTIONS then `--dynamic-space-size` and
+    `--control-stack-size` are still processed by the runtime.
     Meaningless if :EXECUTABLE is NIL.
 
 - :CALLABLE-EXPORTS
@@ -210,13 +211,16 @@ be SAVE-LISP-AND-DIE friendly by registering a save-hook that quits
 any additional threads, and an init-hook that restarts them.
 
 This implementation is not as polished and painless as you might like:
-  * It corrupts the current Lisp image enough that the current process
-    needs to be killed afterwards. This can be worked around by forking
-    another process that saves the core.
-  * There is absolutely no binary compatibility of core images between
-    different runtime support programs. Even runtimes built from the same
-    sources at different times are treated as incompatible for this
-    purpose.
+
+- It corrupts the current Lisp image enough that the current process
+  needs to be killed afterwards. This can be worked around by forking
+  another process that saves the core.
+
+- There is absolutely no binary compatibility of core images between
+  different runtime support programs. Even runtimes built from the
+  same sources at different times are treated as incompatible for this
+  purpose.
+
 This isn't because we like it this way, but just because there don't
 seem to be good quick fixes for either limitation and no one has been
 sufficiently motivated to do lengthy fixes."

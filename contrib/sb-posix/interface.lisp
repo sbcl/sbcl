@@ -337,7 +337,7 @@
          :documentation
          "Process ID of the process holding the lock;
          returned with `\\\\F_GETLK`."))
-   (:documentation "Class representing locks used in fcntl(2)."))
+   (:documentation "Class representing locks used in `\\fcntl(2)`."))
   (define-entry-point "fcntl" (fd cmd &optional (arg nil argp))
     (if argp
         (etypecase arg
@@ -1072,7 +1072,7 @@ not supported."
   (defun syslog (priority format &rest args)
     "Send a message to the syslog facility, with severity level
 PRIORITY.  The message will be formatted as by CL:FORMAT (rather
-than C's printf) with format string FORMAT and arguments ARGS."
+than C's `printf`) with format string FORMAT and arguments ARGS."
     (flet ((syslog1 (priority message)
              (alien-funcall (extern-alien
                              "syslog" (function void int

@@ -29,7 +29,7 @@ any time."
        (defmacro owner-tid-from-word (word) `(ash ,word -32)))
 
 (defun mutex-value (mutex)
-  "Current owner of the mutex, NIL if the mutex is free. May return a
+  "Current owner of MUTEX, NIL if the mutex is free. May return a
 stale value, use MUTEX-OWNER instead."
   (mutex-owner-lookup (mutex-%owner mutex)))
 
@@ -66,7 +66,7 @@ stale value, use MUTEX-OWNER instead."
                           #-bitpacked-mutex (current-vmthread-id)))
 
 (defun mutex-owner (mutex)
-  "Current owner of the mutex, NIL if the mutex is free. Naturally,
+  "Current owner of MUTEX, NIL if the mutex is free. Naturally,
 this is racy by design (another thread may acquire the mutex after
 this function returns), it is intended for informative purposes. For
 testing whether the current thread is holding a mutex see
@@ -200,8 +200,8 @@ and the MUTEX is not immediately available, sleep until it is available.
 If TIMEOUT is given, it specifies a relative timeout, in seconds, on how long
 the system should try to acquire the lock in the contended case.
 
-If the mutex isn't acquired successfully due to either WAIT-P or TIMEOUT, the
-body is not executed, and WITH-MUTEX returns NIL.
+If the mutex isn't acquired successfully due to either WAIT-P or
+TIMEOUT, BODY is not executed, and WITH-MUTEX returns NIL.
 
 Otherwise body is executed with the mutex held by current thread, and
 WITH-MUTEX returns the values of BODY.
@@ -261,8 +261,8 @@ held by the current thread, sleep until it is available.
 If TIMEOUT is given, it specifies a relative timeout, in seconds, on how long
 the system should try to acquire the lock in the contended case.
 
-If the mutex isn't acquired successfully due to either WAIT-P or TIMEOUT, the
-body is not executed, and WITH-RECURSIVE-LOCK returns NIL.
+If the mutex isn't acquired successfully due to either WAIT-P or
+TIMEOUT, BODY is not executed, and WITH-RECURSIVE-LOCK returns NIL.
 
 Otherwise body is executed with the mutex held by current thread, and
 WITH-RECURSIVE-LOCK returns the values of BODY.

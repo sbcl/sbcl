@@ -178,8 +178,8 @@ to be considered. Possible values are:
 
 - :STATIC
 
-  To find a root of an image-backed object, you want to stop only at a
-  truly :STATIC object.
+    To find a root of an image-backed object, you want to stop only at
+    a truly :STATIC object.
 
 IGNORE is a list of objects to treat as if nonexistent in the heap.
 It can often be useful for finding a path to an interned symbol other than

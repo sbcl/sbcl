@@ -285,11 +285,11 @@
   diagnostic message, it always displays the most specific (innermost)
   responsible form. For example, compiling this function
 
-    (defun bar (x)
-      (let (a)
-        (declare (fixnum a))
-        (setq a (foo x))
-        a))
+      (defun bar (x)
+        (let (a)
+          (declare (fixnum a))
+          (setq a (foo x))
+          a))
 
   gives this error message
 

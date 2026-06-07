@@ -58,23 +58,22 @@ peer."))
    "Close SOCKET, unless it was already closed.
 
 If SOCKET-MAKE-STREAM has been called, calls CLOSE using ABORT on that
-stream.  Otherwise closes the socket file descriptor using
-close(2)."))
+stream. Otherwise closes the socket file descriptor using `close(2)`."))
 
 (defgeneric socket-bind (socket &rest address)
   (:documentation
    "Bind SOCKET to ADDRESS, which may vary according to socket family.
-For the INET family, pass ADDRESS and PORT as two arguments; for FILE
-address family sockets, pass the filename string.  See also bind(2)"))
+For the INET family, pass ADDRESS and PORT as two arguments; for local
+address family sockets, pass the filename string. See also `bind(2)`."))
 
 (defgeneric socket-accept (socket)
   (:documentation
-   "Perform the accept(2) call, returning a newly-created connected
+   "Perform the `accept(2)` call, returning a newly-created connected
 socket and the peer address as multiple values"))
 
 (defgeneric socket-connect (socket &rest address)
   (:documentation
-   "Perform the connect(2) call to connect SOCKET to a remote PEER.
+   "Perform the `connect(2)` call to connect SOCKET to a remote PEER.
 No useful return value."))
 
 (defgeneric socket-receive (socket buffer length
@@ -82,13 +81,13 @@ No useful return value."))
                             oob peek waitall dontwait element-type)
   (:documentation
    "Read LENGTH octets from SOCKET into BUFFER (or a freshly-consed
-buffer if NIL), using recvfrom(2). If LENGTH is NIL, the length of
+buffer if NIL), using `recvfrom(2)`. If LENGTH is NIL, the length of
 BUFFER is used, so at least one of these two arguments must be
 non-NIL. If BUFFER is supplied, it had better be of an element type
 one octet wide. Returns the buffer, its length, and the address of the
 peer that sent it, as multiple values. On datagram sockets, sets
-MSG_TRUNC so that the actual packet length is returned even if the
-buffer was too small."))
+`\\\\MSG_TRUNC` so that the actual packet length is returned even if
+the buffer was too small."))
 
 (defgeneric socket-send (socket buffer length
                          &key
@@ -97,12 +96,12 @@ buffer was too small."))
                          oob eor dontroute dontwait nosignal
                          #+linux confirm #+linux more)
   (:documentation
-   "Send LENGTH octets from BUFFER into SOCKET, using sendto(2). If
+   "Send LENGTH octets from BUFFER into SOCKET, using `sendto(2)`. If
 BUFFER is a string, it will converted to octets according to
 EXTERNAL-FORMAT. If LENGTH is NIL, the length of the octet buffer is
 used. The format of ADDRESS depends on the socket type (for example
 for INET domain sockets it would be a list of an IP address and a
-port). If no socket address is provided, send(2) will be called
+port). If no socket address is provided, `send(2)` will be called
 instead. Returns the number of octets written."))
 
 (defgeneric socket-listen (socket backlog)
@@ -110,7 +109,7 @@ instead. Returns the number of octets written."))
    "Mark SOCKET as willing to accept incoming connections.  The
 integer BACKLOG defines the maximum length that the queue of pending
 connections may grow to before new connection attempts are refused.
-See also listen(2)"))
+See also `listen(2)`."))
 
 (defgeneric socket-shutdown (socket &key direction)
   (:documentation

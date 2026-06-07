@@ -54,7 +54,7 @@ structures are printed with #n#.")
   "The position of the right margin in ems (for pretty-printing).")
 (defvar *print-miser-width* nil
   "If the remaining space between the current column and the right margin
-   is less than this, then print using ``miser-style'' output. Miser
+   is less than this, then print using \"miser-style\" output. Miser
    style conditional newlines are turned on, and all indentations are
    turned off. If NIL, never use miser mode.")
 (defvar *print-pprint-dispatch*

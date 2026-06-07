@@ -1758,20 +1758,21 @@ forms that explicitly control this kind of evaluation.")
 ;;; work! Alas, it doesn't seem to work in CMU CL X86 either..
 (defun var (name &optional (id 0 id-supplied))
   "Return a variable's value if possible. NAME is a simple-string or symbol.
-   If it is a simple-string, it is an initial substring of the variable's name.
-   If name is a symbol, it has the same name and package as the variable whose
-   value this function returns. If the symbol is uninterned, then the variable
-   has the same name as the symbol, but it has no package.
+   If it is a simple-string, it is an initial substring of the
+   variable's name. If name is a symbol, it has the same name and
+   package as the variable whose value this function returns. If the
+   symbol is uninterned, then the variable has the same name as the
+   symbol, but it has no package.
 
-   If name is the initial substring of variables with different names, then
-   this return no values after displaying the ambiguous names. If name
-   determines multiple variables with the same name, then you must use the
-   optional id argument to specify which one you want. If you left id
-   unspecified, then this returns no values after displaying the distinguishing
-   id values.
+   If name is the initial substring of variables with different names,
+   then this returns no values after displaying the ambiguous names.
+   If name determines multiple variables with the same name, then you
+   must use the optional ID argument to specify which one you want. If
+   you left ID unspecified, then this returns no values after
+   displaying the distinguishing id values.
 
-   The result of this function is limited to the availability of variable
-   information. This is SETF'able."
+   The result of this function is limited to the availability of
+   variable information. This is SETFable."
   (define-var-operation :ref))
 (defun (setf var) (value name &optional (id 0 id-supplied))
   (define-var-operation :set value))

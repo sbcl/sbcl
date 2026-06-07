@@ -191,7 +191,15 @@
 
    If FROM-END is NIL, the constructed iterator visits the specified
    elements in the order in which they appear in SEQUENCE. Otherwise,
-   the elements are visited in the opposite order."))
+   the elements are visited in the opposite order.
+
+   The six functions (items 4-9 in the list) have the same contract as
+   the generic functions described in
+   SB-MANUAL:@EXSEQ-SIMPLE-ITERATOR-PROTOCOL. In fact, when there is
+   no specialized method for a particular SEQUENCE subclass,
+   SB-SEQUENCE:MAKE-SEQUENCE-ITERATOR calls
+   SB-SEQUENCE:MAKE-SIMPLE-SEQUENCE-ITERATOR and returns those six
+   generic functions."))
 
 ;;; magic termination value for list :from-end t
 (define-load-time-global *exhausted* (cons nil nil))
@@ -301,9 +309,7 @@
    3. from-end
 
    The returned iterator can be used with the generic iterator
-   functions SEQUENCE:ITERATOR-STEP, SEQUENCE:ITERATOR-STEP,
-   SEQUENCE:ITERATOR-ELEMENT, (SETF SEQUENCE:ITERATOR-ELEMENT),
-   SEQUENCE:ITERATOR-INDEX and SEQUENCE:ITERATOR-COPY."))
+   functions described in SB-MANUAL:@EXSEQ-SIMPLE-ITERATOR-PROTOCOL."))
 
 (defgeneric sequence:iterator-step (sequence iterator from-end)
   (:method ((s list) iterator from-end)

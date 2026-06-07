@@ -133,8 +133,8 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
  (declaim (ftype (function (t) (values (or simple-string null) &optional))
                  posix-getenv))
  (defun posix-getenv (name)
-  "Return the \"value\" part of the environment string \"name=value\" which
-corresponds to NAME, or NIL if there is none."
+  "Return the `value` part of the environment string `name=value` which
+corresponds to NAME, or NIL if there is none. See `getenv(3)`."
   (with-alien ((posix-getenv (function c-string (c-string :not-null t)) :extern "getenv"))
     (acond ((alien-funcall posix-getenv name) (possibly-base-stringize it))))))
 
@@ -458,7 +458,7 @@ corresponds to NAME, or NIL if there is none."
   `(signed-byte 32))
 (defun os-exit (code &key abort)
   "Exit the process with CODE. If ABORT is true, exit is performed using _exit(2),
-avoiding `atexit`(3) hooks, etc. Otherwise `exit`(2) is called."
+avoiding `atexit(3)` hooks, etc. Otherwise `exit(2)` is called."
   (unless (typep code 'exit-code)
     (setf code (if abort 1 0)))
   (if abort

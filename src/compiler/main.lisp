@@ -77,7 +77,7 @@ Following options are defined:
     until the end of the form, instead of giving them at the end of
     each compilation. If OVERRIDE is NIL (the default), then the
     outermost WITH-COMPILATION-UNIT form grabs the undefined warnings.
-    Specifying OVERRIDE true causes that form to grab any enclosed
+    Specifying :OVERRIDE true causes that form to grab any enclosed
     warnings, even if it is enclosed by another WITH-COMPILATION-UNIT.
 
 - :POLICY `<optimize-declaration-form>`
@@ -87,36 +87,37 @@ Following options are defined:
     OPTIMIZE proclamations and calls to
     SB-EXT:RESTRICT-COMPILER-POLICY to the dynamic scope of BODY.
 
-    If OVERRIDE is false, specified POLICY is merged with current
-    global policy. If OVERRIDE is true, current global policy,
-    including any restrictions, is discarded in favor of the specified
-    POLICY.
+    If :OVERRIDE is false, the specified :POLICY is merged with
+    current global policy. If :OVERRIDE is true, current global
+    policy, including any restrictions, is discarded in favor of the
+    specified
+    :POLICY.
 
-    Supplying POLICY NIL is equivalent to the option not being
-    supplied at all, ie. dynamic scoping of policy does not take
+    Supplying :POLICY NIL is equivalent to the option not being
+    supplied at all, i.e. dynamic scoping of policy does not take
     place.
 
     This option is an SBCL-specific experimental extension: Interface
     subject to change.
 
-:SOURCE-NAMESTRING `<namestring-form>`
+- :SOURCE-NAMESTRING `<namestring-form>`
 
-    Attaches the value returned by the Namestring-Form to the internal
-    debug-source information as the namestring of the source file.
-    Normally the namestring of the input-file for COMPILE-FILE is
-    used: this option can be used to provide source-file information
-    for functions compiled using COMPILE, or to override the
-    input-file of COMPILE-FILE.
+    Attaches the value returned by the `<namestring-form>` to the
+    internal debug-source information as the namestring of the source
+    file. Normally the namestring of the input-file for COMPILE-FILE
+    is used: this option can be used to provide source-file
+    information for functions compiled using COMPILE, or to override
+    the input-file of COMPILE-FILE.
 
     If both an outer and an inner WITH-COMPILATION-UNIT provide a
-    SOURCE-NAMESTRING, the inner one takes precedence. Unaffected
-    by :OVERRIDE.
+    :SOURCE-NAMESTRING, the inner one takes precedence. Unaffected by
+    :OVERRIDE.
 
     This is an SBCL-specific extension.
 
 - :SOURCE-PLIST `<plist-form>`
 
-    Attaches the value returned by the Plist-Form to internal
+    Attaches the value returned by the `<plist-form>` to internal
     debug-source information of functions compiled in within the
     dynamic extent of BODY.
 
@@ -153,7 +154,8 @@ Examples:
 ;; proclamation leaks out from WITH-COMPILATION-UNIT.
 (with-compilation-unit (:policy nil)
   (declaim (optimize safety))
-  (load \"foo.lisp\"))"
+  (load \"foo.lisp\"))
+```"
   `(%with-compilation-unit (lambda () ,@body) ,@options))
 
 (defvar *source-plist* nil)

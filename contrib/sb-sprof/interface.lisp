@@ -35,40 +35,49 @@ Returns the values from the last evaluation of BODY.
 
 The following keyword args are recognized:
 
- :SAMPLE-INTERVAL <n>
-   Take a sample every <n> seconds. Default is *SAMPLE-INTERVAL*.
+- :SAMPLE-INTERVAL `<n>`
 
- :MODE <mode>
-   If :CPU, run the profiler in CPU profiling mode. If :ALLOC, run the
-   profiler in allocation profiling mode. If :TIME, run the profiler
-   in wallclock profiling mode.
+    Take a sample every <n> seconds. Default is *SAMPLE-INTERVAL*.
 
- :MAX-SAMPLES <max>
-   If :LOOP is NIL (the default), collect no more than <max> samples.
-   If :LOOP is T, repeat evaluating body until <max> samples are taken.
-   Default is *MAX-SAMPLES*.
+- :MODE `<mode>`
 
- :REPORT <type>
-   If specified, call REPORT with :TYPE <type> at the end.
+    If :CPU, run the profiler in CPU profiling mode. If :ALLOC, run
+    the profiler in allocation profiling mode. If :TIME, run the
+    profiler in wallclock profiling mode.
 
- :RESET <bool>
-   If true, call RESET at the beginning.
+- :MAX-SAMPLES `<max>`
 
- :THREADS <list-form>
-   Form that evaluates to the list threads to profile, or :ALL to indicate
-   that all threads should be profiled. Defaults to all threads.
+    If :LOOP is NIL (the default), collect no more than `<max>`
+    samples. If :LOOP is T, repeat evaluating body until `<max>`
+    samples are taken. Default is *MAX-SAMPLES*.
 
-   :THREADS has no effect on call-counting at the moment.
+- :REPORT `<type>`
 
-   On some platforms (eg. Darwin) the signals used by the profiler are
-   not properly delivered to threads in proportion to their CPU usage
-   when doing :CPU profiling. If you see empty call graphs, or are obviously
-   missing several samples from certain threads, you may be falling afoul
-   of this. In this case using :MODE :TIME is likely to work better.
+    If specified, call REPORT with :TYPE `<type>` at the end.
 
- :LOOP <bool>
-   If false (the default), evaluate BODY only once. If true repeatedly
-   evaluate BODY."
+- :RESET `<bool>`
+
+    If true, call RESET at the beginning.
+
+- :THREADS `<list-form>`
+
+    Form that evaluates to the list threads to profile, or :ALL to
+    indicate that all threads should be profiled. Defaults to all
+    threads.
+
+    :THREADS has no effect on call-counting at the moment.
+
+    On some platforms (e.g. Darwin) the signals used by the profiler
+    are not properly delivered to threads in proportion to their CPU
+    usage when doing :CPU profiling. If you see empty call graphs, or
+    are obviously missing several samples from certain threads, you
+    may be falling afoul of this. In this case using :MODE :TIME is
+    likely to work better.
+
+- :LOOP `<bool>`
+
+    If false (the default), evaluate BODY only once. If true
+    repeatedly evaluate BODY."
   (declare (type report-type report))
   (check-type loop boolean)
   #-sb-thread (unless (eq threads :all) (warn ":THREADS is ignored"))
@@ -121,28 +130,33 @@ inappropriate set of sampled threads, or possibly a profiler bug.~:@>"))
   "Start profiling statistically in the current thread if not already profiling.
 The following keyword args are recognized:
 
-   :SAMPLE-INTERVAL <n>
-     Take a sample every <n> seconds.  Default is *SAMPLE-INTERVAL*.
+- :SAMPLE-INTERVAL `<n>`
 
-   :MODE <mode>
-     If :CPU, run the profiler in CPU profiling mode. If :ALLOC, run
-     the profiler in allocation profiling mode. If :TIME, run the profiler
-     in wallclock profiling mode.
+    Take a sample every `<n>` seconds. Default is *SAMPLE-INTERVAL*.
 
-   :MAX-SAMPLES <max>
-     Maximum number of stack traces to collect.  Default is *MAX-SAMPLES*.
+- :MODE `<mode>`
 
-   :THREADS <list>
-     List threads to profile, or :ALL to indicate that all threads should be
-     profiled. Defaults to :ALL.
+    If :CPU, run the profiler in CPU profiling mode. If :ALLOC, run
+    the profiler in allocation profiling mode. If :TIME, run the
+    profiler in wallclock profiling mode.
 
-     :THREADS has no effect on call-counting at the moment.
+- :MAX-SAMPLES `<max>`
 
-     On some platforms (eg. Darwin) the signals used by the profiler are
-     not properly delivered to threads in proportion to their CPU usage
-     when doing :CPU profiling. If you see empty call graphs, or are obviously
-     missing several samples from certain threads, you may be falling afoul
-     of this."
+    Maximum number of stack traces to collect. Default is
+    *MAX-SAMPLES*.
+
+- :THREADS `<list>`
+
+    List threads to profile, or :ALL to indicate that all threads
+    should be profiled. Defaults to :ALL.
+
+    :THREADS has no effect on call-counting at the moment.
+
+    On some platforms (e.g. Darwin) the signals used by the profiler
+    are not properly delivered to threads in proportion to their CPU
+    usage when doing :CPU profiling. If you see empty call graphs, or
+    are obviously missing several samples from certain threads, you
+    may be falling afoul of this."
   ;; Starting the clock with an interval of zero or negative is meaningless.
   ;; If, by 0, you mean STOP-PROFILING then you should use STOP-PROFILING.
   (declare (type (real (0)) sample-interval))

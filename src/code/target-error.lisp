@@ -1333,6 +1333,10 @@ signalled when an operation on a symbol violates a package lock. The
 symbol that caused the violation is accessed by the function
 SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 
+(setf (documentation #'package-locked-error-symbol t)
+      "Return the symbol that caused the SYMBOL-PACKAGE-LOCKED-ERROR
+      condition.")
+
 (define-condition undefined-alien-error (cell-error) ()
   (:report
    (lambda (condition stream)

@@ -806,7 +806,7 @@
   pointing to them."
   (allocate-cold-descriptor gspace (ash length sb-vm:word-shift) lowtag))
 (defun allocate-otherptr (gspace length widetag)
-  "Allocate LENGTH words in GSPACE and return an ``other-pointer'' descriptor.
+  "Allocate LENGTH words in GSPACE and return an \"other-pointer\" descriptor.
    LENGTH must count the header word itself as 1 word.  The header word is
    initialized with the payload size as (1- LENGTH), and WIDETAG."
   (let* ((page-type (or (and (eq gspace *dynamic*)

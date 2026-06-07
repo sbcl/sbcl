@@ -713,7 +713,7 @@
 
           (with-alien ((res (* (struct c-struct))
                             (c-function 5 \"another Lisp string\" (addr c-struct) ar)))
-            (format t \"~&amp;back from C function~%\")
+            (format t \"~&back from C function~%\")
             (multiple-value-prog1
                 (values (slot res 'x)
                         (slot res 's))

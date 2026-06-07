@@ -7,7 +7,7 @@
   ((family :initform sockint::af-local))
   (:documentation
    "Class representing local domain (`\\\\AF_LOCAL`) sockets,
-also known as unix-domain sockets."))
+also known as Unix-domain sockets."))
 
 (defmethod socket-namestring ((socket local-socket))
   (ignore-errors (socket-name socket)))

@@ -180,18 +180,14 @@ Note that the global function binding may differ from the local one.
 This function returns three values. The first indicates the type of
 function definition or binding:
 
-  NIL
-    There is no apparent definition for NAME.
+- NIL: There is no apparent definition for NAME.
 
-  :FUNCTION
-    NAME refers to a function.
+- :FUNCTION: NAME refers to a function.
 
-  :MACRO
-    NAME refers to a macro.
+- :MACRO: NAME refers to a macro.
 
-  :SPECIAL-FORM
-    NAME refers to a special operator. If the name refers to both a
-    macro and a special operator, the macro takes precedence.
+- :SPECIAL-FORM: NAME refers to a special operator. If the name refers
+  to both a macro and a special operator, the macro takes precedence.
 
 The second value is true if NAME is bound locally.
 
@@ -199,26 +195,23 @@ The third value is an alist describing the declarations that apply to
 the function NAME. Standard declaration specifiers that may appear in
 CARS of the alist include:
 
-  DYNAMIC-EXTENT
-    If the CDR is T, NAME has been declared DYNAMIC-EXTENT. If the CDR
-    is NIL, the alist element may be omitted.
+- DYNAMIC-EXTENT: If the CDR is T, NAME has been declared
+  DYNAMIC-EXTENT. If the CDR is NIL, the alist element may be omitted.
 
-  INLINE
-    The CDR is one of the symbols INLINE, NOTINLINE, or NIL, to
-    indicate if the function has been declared INLINE or NOTINLINE. If
-    the CDR is NIL the alist element may be omitted.
+- INLINE: The CDR is one of the symbols INLINE, NOTINLINE, or NIL, to
+  indicate if the function has been declared INLINE or NOTINLINE. If
+  the CDR is NIL the alist element may be omitted.
 
-  FTYPE
-    The CDR is the type specifier associated with NAME, or the symbol
-    FUNCTION if there is functional type declaration or proclamation
-    associated with NAME. If the CDR is FUNCTION the alist element may
-    be omitted.
+- FTYPE: The CDR is the type specifier associated with NAME, or the
+  symbol FUNCTION if there is functional type declaration or
+  proclamation associated with NAME. If the CDR is FUNCTION the alist
+  element may be omitted.
 
-  SB-EXT:DEPRECATED
-    \(SBCL specific)
-    The CDR is a plist containing the following properties
+- SB-EXT:DEPRECATED: (SBCL specific) The CDR is a plist containing the
+  following properties:
 
-      :STATE ( :EARLY | :LATE | :FINAL )
+    - :STATE ( :EARLY | :LATE | :FINAL )
+
         Use of :EARLY deprecated functions signals a STYLE-WARNING at
         compile-time.
 
@@ -228,14 +221,16 @@ CARS of the alist include:
         Use of :FINAL deprecated functions signals a full WARNING at
         compile-time and an error at runtime.
 
-      :SINCE (SOFTWARE VERSION)
-        VERSION is a string designating the version since which the
-        function has been deprecated. SOFTWARE is NIL or the name of
-        the software to which VERSION refers, e.g. \"SBCL\" for
+    - :SINCE `(SOFTWARE VERSION)`
+
+        `VERSION` is a string designating the version since which the
+        function has been deprecated. `SOFTWARE` is NIL or the name of
+        the software to which `VERSION` refers, e.g. `\"SBCL\"` for
         deprecated functions in SBCL.
 
-      :REPLACEMENTS REPLACEMENTS
-        When this property is present, REPLACEMENTS is a list of
+    - :REPLACEMENTS `REPLACEMENTS`
+
+        When this property is present, `REPLACEMENTS` is a list of
         symbols naming functions that should be used instead of the
         deprecated function.
 
@@ -314,27 +309,20 @@ Note that the global binding may differ from the local one.
 This function returns three values. The first indicated the type of the variable
 binding:
 
-  NIL
-    There is no apparent binding for NAME.
+- NIL: There is no apparent binding for NAME.
 
-  :SPECIAL
-    NAME refers to a special variable.
+- :SPECIAL: NAME refers to a special variable.
 
-  :LEXICAL
-    NAME refers to a lexical variable.
+- :LEXICAL: NAME refers to a lexical variable.
 
-  :SYMBOL-MACRO
-    NAME refers to a symbol macro.
+- :SYMBOL-MACRO: NAME refers to a symbol macro.
 
-  :CONSTANT
-    NAME refers to a named constant defined using DEFCONSTANT, or NAME
-    is a keyword.
+- :CONSTANT: NAME refers to a named constant defined using
+  DEFCONSTANT, or NAME is a keyword.
 
-  :GLOBAL
-    NAME refers to a global variable. (SBCL specific extension.)
+- :GLOBAL: NAME refers to a global variable. (SBCL specific extension.)
 
-  :ALIEN
-    NAME refers to an alien variable. (SBCL specific extension.)
+- :ALIEN NAME refers to an alien variable. (SBCL specific extension.)
 
 The second value is true if NAME is bound locally. This is currently
 always NIL for special variables, although arguably it should be T
@@ -344,30 +332,26 @@ The third value is an alist describing the declarations that apply to
 the function NAME. Standard declaration specifiers that may appear in
 CARS of the alist include:
 
-  DYNAMIC-EXTENT
-    If the CDR is T, NAME has been declared DYNAMIC-EXTENT. If the CDR
-    is NIL, the alist element may be omitted.
+- DYNAMIC-EXTENT: If the CDR is T, NAME has been declared
+  DYNAMIC-EXTENT. If the CDR is NIL, the alist element may be omitted.
 
-  IGNORE
-    If the CDR is T, NAME has been declared IGNORE. If the CDR is NIL,
-    the alist element may be omitted.
+- IGNORE: If the CDR is T, NAME has been declared IGNORE. If the CDR
+  is NIL, the alist element may be omitted.
 
-  TYPE
-    The CDR is the type specifier associated with NAME, or the symbol
-    T if there is explicit type declaration or proclamation associated
-    with NAME. The type specifier may be equivalent to or a supertype
-    of the original declaration. If the CDR is T the alist element may
-    be omitted.
+- TYPE: The CDR is the type specifier associated with NAME, or the
+  symbol T if there is explicit type declaration or proclamation
+  associated with NAME. The type specifier may be equivalent to or a
+  supertype of the original declaration. If the CDR is T the alist
+  element may be omitted.
 
-  SB-EXT:ALWAYS-BOUND
-    \(SBCL specific)
-    If CDR is T, NAME has been declared as SB-EXT:ALWAYS-BOUND
+- SB-EXT:ALWAYS-BOUND: (SBCL specific) If CDR is T, NAME has been
+  declared as SB-EXT:ALWAYS-BOUND.
 
-  SB-EXT:DEPRECATED
-    \(SBCL specific)
-    The CDR is a plist containing the following properties
+- SB-EXT:DEPRECATED: (SBCL specific) The CDR is a plist containing the
+  following properties:
 
-      :STATE ( :EARLY | :LATE | :FINAL )
+    - :STATE ( :EARLY | :LATE | :FINAL )
+
         Use of :EARLY deprecated variables signals a STYLE-WARNING at
         compile-time.
 
@@ -377,14 +361,16 @@ CARS of the alist include:
         Use of :FINAL deprecated variables signals a full WARNING at
         compile-time and an error at runtime.
 
-      :SINCE (SOFTWARE VERSION)
-        VERSION is a string designating the version since which the
-        variable has been deprecated. SOFTWARE is NIL or the name of
-        the software to which VERSION refers, e.g. \"SBCL\" for
+    - :SINCE `(SOFTWARE VERSION)`
+
+        `VERSION` is a string designating the version since which the
+        variable has been deprecated. `SOFTWARE` is NIL or the name of
+        the software to which `VERSION` refers, e.g. `\"SBCL\"` for
         deprecated variables in SBCL.
 
-      :REPLACEMENTS REPLACEMENTS
-        When this property is present, REPLACEMENTS is a list of
+    - :REPLACEMENTS `REPLACEMENTS`
+
+        When this property is present, `REPLACEMENTS` is a list of
         symbols naming variables that should be used instead of the
         deprecated variable.
 

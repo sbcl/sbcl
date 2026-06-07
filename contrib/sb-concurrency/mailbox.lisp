@@ -22,7 +22,7 @@ SEND-MESSAGE adds a message to the mailbox, RECEIVE-MESSAGE waits till
 a message becomes available, whereas RECEIVE-MESSAGE-NO-HANG is a non-blocking
 variant, and RECEIVE-PENDING-MESSAGES empties the entire mailbox in one go.
 
-Messages can be arbitrary objects"
+Messages can be arbitrary objects."
   (queue (missing-arg) :type queue)
   (semaphore (missing-arg) :type semaphore)
   (name nil))
@@ -56,7 +56,7 @@ Messages can be arbitrary objects"
 
 (declaim (ftype (sfunction (mailbox) unsigned-byte) mailbox-count))
 (defun mailbox-count (mailbox)
-  "Returns the number of messages currently in the mailbox."
+  "Returns the number of messages currently in MAILBOX."
   (semaphore-count (mailbox-semaphore mailbox)))
 
 (declaim (ftype (sfunction (mailbox) boolean) mailbox-empty-p))
@@ -66,8 +66,8 @@ Messages can be arbitrary objects"
 
 (declaim (ftype (sfunction (mailbox) list) list-mailbox-messages))
 (defun list-mailbox-messages (mailbox)
-  "Returns a fresh list containing all the messages in the
-mailbox. Does not remove messages from the mailbox."
+  "Returns a fresh list containing all the messages in MAILBOX. Does not
+remove messages from the mailbox."
   (list-queue-contents (mailbox-queue mailbox)))
 
 (declaim (ftype (sfunction (mailbox t) null) send-message))
@@ -126,10 +126,10 @@ message could be received."
   "Removes and returns all (or at most N) currently pending messages
 from MAILBOX, or returns NIL if no messages are pending.
 
-Note: Concurrent threads may be snarfing messages during the run of
-this function, so even `X` and `Y` appearing right next to each other
-in the result does not necessarily mean that `Y` was the message sent
-right after `X`."
+> _Note_: Concurrent threads may be snarfing messages during the run
+> of this function, so even `X` and `Y` appearing right next to each
+> other in the result does not necessarily mean that `Y` was the
+> message sent right after `X`."
   (prog* ((msgs  '())
           (sem   (mailbox-semaphore mailbox))
           (queue (mailbox-queue mailbox))

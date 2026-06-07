@@ -1043,6 +1043,7 @@
   the operations, producing its argument; the declaration is not
   checked. In short: don't use it."
   ;; FIXME: It's not a macro.
+  #+nil
   (sb-ext:truly-the macro)
   "The SB-EXT:FREEZE-TYPE declaration declares that a type will never
   change, which can make type testing (e.g. with TYPEP) more efficient

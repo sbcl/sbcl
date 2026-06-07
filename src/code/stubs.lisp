@@ -176,6 +176,15 @@
   (def %numerator)
   (def %denominator))
 
+;;; Document only those that SB-MANUAL:@UNTYPED-MEMORY singles out as
+;;; examples.
+(setf (documentation 'int-sap 'function)
+      "Creates a SAP pointing at the virtual address `X`.")
+(setf
+ (documentation 'sap-ref-32 'function)
+ "Access the value of the memory location at OFFSET bytes from SAP. SETFable.")
+(setf (documentation 'sap= 'function) "Compare the SAPs X and Y for equality.")
+
 #+sb-simd-pack
 (macrolet ((def (name)
              `(defun ,name (pack)

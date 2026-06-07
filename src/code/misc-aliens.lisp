@@ -87,7 +87,13 @@
 (declaim (maybe-inline get-errno))
 (define-alien-routine ("os_get_errno" get-errno) int)
 (setf (documentation 'get-errno 'function)
-      "Return the value of the C library pseudo-variable named \"errno\".")
+      "Return the value of the \\C library pseudo-variable named `errno`.
+
+Since in modern \\C libraries, `errno` is typically no longer a
+variable, but some bizarre artificial construct which behaves
+superficially like a variable within a given thread, it can no longer
+reliably be accessed through the ordinary DEFINE-ALIEN-VARIABLE
+mechanism.")
 
 (define-alien-routine ("os_set_errno" set-errno) void (new-errno int))
 (setf (documentation 'set-errno 'function)

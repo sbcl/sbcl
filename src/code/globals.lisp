@@ -92,7 +92,9 @@
 (define-thread-local *load-pathname* nil)
 #+ansi-compliant-load-truename (define-thread-local *load-truename* nil)
 
-(defvar *default-external-format* :utf-8)
+(defvar *default-external-format* :utf-8
+  "Most functions interacting with external formats (OPEN, notably)
+  use this default.")
 (defvar *default-source-external-format*
   #+win32 '(:default :newline :crlf)
   #-win32 :default)

@@ -223,41 +223,49 @@
   "Report statistical profiling results.  The following keyword
    args are recognized:
 
-   :TYPE <type>
-      Specifies the type of report to generate.  If :FLAT, show
-      flat report, if :GRAPH show a call graph and a flat report.
-      If nil, don't print out a report.
+  - :TYPE `<type>`
 
-   :STREAM <stream>
+      Specifies the type of report to generate. If :FLAT, show flat
+      report, if :GRAPH show a call graph and a flat report. If nil,
+      don't print out a report.
+
+  - :STREAM `<stream>`
+
       Specify a stream to print the report on.  Default is
       *STANDARD-OUTPUT*.
 
-   :MAX <max>
-      Don't show more than <max> entries in the flat report.
+  - :MAX `<max>`
 
-   :MIN-PERCENT <min-percent>
-      Don't show functions taking less than <min-percent> of the
+      Don't show more than `<max>` entries in the flat report.
+
+  - :MIN-PERCENT `<min-percent>`
+
+      Don't show functions taking less than `<min-percent>` of the
       total time in the flat report.
 
-   :SORT-BY <column>
+  - :SORT-BY `<column>`
+
       If :SAMPLES, sort flat report by number of samples taken.
       If :CUMULATIVE-SAMPLES, sort flat report by cumulative number of samples
       taken (shows how much time each function spent on stack.) Default
       is *REPORT-SORT-BY*.
 
-   :SORT-ORDER <order>
+  - :SORT-ORDER `<order>`
+
       If :DESCENDING, sort flat report in descending order. If :ASCENDING,
       sort flat report in ascending order. Default is *REPORT-SORT-ORDER*.
 
-   :SHOW-PROGRESS <bool>
+  - :SHOW-PROGRESS `<bool>`
+
      If true, print progress messages while generating the call graph.
 
-   :CALL-GRAPH <graph>
-     Print a report from <graph> instead of the latest profiling
+  - :CALL-GRAPH `<graph>`
+
+     Print a report from `<graph>` instead of the latest profiling
      results.
 
 Value of this function is a CALL-GRAPH object representing the
-resulting call-graph, or NIL if there are no samples (eg. right after
+resulting call-graph, or NIL if there are no samples (e.g. right after
 calling RESET.)
 
 Profiling is stopped before the call graph is generated."
