@@ -391,22 +391,25 @@
            ;; Not reading a symbol, not at potential start of symbol
            (setf maybe-begin nil)))))))
 
-(progn
-  (defsection @test-section ())
-  (defsection @test5 ())
-  (assert (equal (locate-symbols "PRINT") '((0 5))))
-  (assert (equal (locate-symbols "CL:PRINT") '((0 8))))
-  (assert (equal (locate-symbols "*FEATURES*") '((0 10))))
-  (assert (equal (locate-symbols "SETFable") '((0 4))))
-  (assert (equal (locate-symbols "SETF-able") '((0 4))))
-  (assert (equal (locate-symbols "nonREADable") '((3 7))))
-  (assert (equal (locate-symbols "NOSUCHSYMBOL-able") '()))
-  (assert (equal (locate-symbols "ASDF-like") '()))
-  (assert (equal (locate-symbols "@TEST-SECTION") '((0 13))))
-  (assert (equal (locate-symbols "SB-MANUAL:@TEST-SECTION") '((0 23))))
-  (assert (equal (locate-symbols "@NOSUCHSECTION") '()))
-  (assert (equal (locate-symbols "@TEST5") '((0 6))))
-  (assert (equal (locate-symbols ":IR1-CONVERT") '((0 12)))))
+(unwind-protect
+     (progn
+       (defsection @test-section ())
+       (defsection @test5 ())
+       (assert (equal (locate-symbols "PRINT") '((0 5))))
+       (assert (equal (locate-symbols "CL:PRINT") '((0 8))))
+       (assert (equal (locate-symbols "*FEATURES*") '((0 10))))
+       (assert (equal (locate-symbols "SETFable") '((0 4))))
+       (assert (equal (locate-symbols "SETF-able") '((0 4))))
+       (assert (equal (locate-symbols "nonREADable") '((3 7))))
+       (assert (equal (locate-symbols "NOSUCHSYMBOL-able") '()))
+       (assert (equal (locate-symbols "ASDF-like") '()))
+       (assert (equal (locate-symbols "@TEST-SECTION") '((0 13))))
+       (assert (equal (locate-symbols "SB-MANUAL:@TEST-SECTION") '((0 23))))
+       (assert (equal (locate-symbols "@NOSUCHSECTION") '()))
+       (assert (equal (locate-symbols "@TEST5") '((0 6))))
+       (assert (equal (locate-symbols ":IR1-CONVERT") '((0 12)))))
+  (makunbound '@test-section)
+  (makunbound '@test5))
 
 
 ;;;; Processing Markdown inline elements
@@ -450,17 +453,23 @@
 
 (defun section-name-p (symbol)
   (when (boundp symbol)
-    (let ((value (symbol-value symbol)))
-      (and (listp value)
-           (eq (first value) 'defsection)))))
+    (if *use-pax*
+        (typep (symbol-value symbol) (dummy 'section))
+        (let ((value (symbol-value symbol)))
+          (and (listp value)
+               (eq (first value) 'defsection))))))
 
 (when (and (not *use-pax*)
            *downcase-uppercase-code*)
-  (assert (equal (codify-and-link "@TEST-SECTION") "@ref{test section}"))
-  (assert (equal (codify-and-link "@NOSUCHSECTION") "@@NOSUCHSECTION"))
-  (assert (equal (codify-and-link ":START") "@code{:start}"))
-  (assert (equal (codify-and-link "[:START") "[@code{:start}"))
-  (assert (equal (codify-and-link "{:START") "@{@code{:start}")))
+  (defsection @test-section ())
+  (unwind-protect
+       (progn
+         (assert (equal (codify-and-link "@TEST-SECTION") "@ref{test section}"))
+         (assert (equal (codify-and-link "@NOSUCHSECTION") "@@NOSUCHSECTION"))
+         (assert (equal (codify-and-link ":START") "@code{:start}"))
+         (assert (equal (codify-and-link "[:START") "[@code{:start}"))
+         (assert (equal (codify-and-link "{:START") "@{@code{:start}")))
+    (makunbound '@test-section)))
 
 ;;; Translate backticks, emphasis and codification escapes, while
 ;;; delegating normal text to CODIFY-AND-LINK.

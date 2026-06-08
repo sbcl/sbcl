@@ -1,5 +1,79 @@
 (in-package :sb-manual)
 
+;;; We don't DEFINE-DUMMY DREF:ARGLIST and DREF:DOCSTRING because we
+;;; don't want SWITCH-TO-PAX affect Texinfo output, which it would
+;;; because DREF:ARGLIST differs from the {incom,re}prehensible
+;;; LAMBDA-LIST*.
+(defun %arglist (xref)
+  (let ((name (xref-name xref))
+        (locative-type (xref-locative-type xref)))
+    (lambda-list* name locative-type)))
+
+(defun %docstring (xref)
+  (values (let ((name (xref-name xref))
+                (locative-type (xref-locative-type xref)))
+            (case locative-type
+              ((function variable declaration)
+               (documentation name locative-type))
+              ((generic-function)
+               (documentation name 'function))
+              ((type class structure condition)
+               (documentation name 'type))
+              (t
+               (cond ((eq locative-type (dummy 'macro))
+                      (documentation (macro-function name) t))
+                     ((eq locative-type (dummy 'setf-function))
+                      (documentation (fdefinition name) t))
+                     ((eq locative-type (dummy 'setf-generic-function))
+                      (documentation (fdefinition name) t))
+                     (t
+                      (assert nil () "Unexpected locative type in ~S."
+                              xref))))))
+          ;; To be compatible with PAX::@PACKAGE-AND-READTABLE, we
+          ;; always return a non-NIL package.
+          (docstring-package xref)))
+
+(defun lambda-list* (name kind)
+  (case kind
+    ((package constant variable type structure class condition method
+              declaration nil)
+     nil)
+    (t
+     ;; KLUDGE: Eugh.
+     ;;
+     ;; believe it or not, the above comment was written before CSR
+     ;; came along and obfuscated this.  (2005-07-04)
+     (when (symbolp name)
+       (labels ((clean (x &key optional key)
+                  (typecase x
+                    (atom x)
+                    ((cons (member &optional))
+                     (cons (car x) (clean (cdr x) :optional t)))
+                    ((cons (member &key))
+                     (cons (car x) (clean (cdr x) :key t)))
+                    ((cons (member &whole &environment))
+                     ;; Skip these
+                     (clean (cdr x) :optional optional :key key))
+                    ((cons cons)
+                     (cons
+                      (cond (key (if (consp (caar x))
+                                     (caaar x)
+                                     (caar x)))
+                            (optional (caar x))
+                            (t (clean (car x))))
+                      (clean (cdr x) :key key :optional optional)))
+                    (cons
+                     (cons
+                      (cond ((or key optional) (car x))
+                            (t (clean (car x))))
+                      (clean (cdr x) :key key :optional optional))))))
+         (multiple-value-bind (ll unknown)
+             (sb-introspect:function-lambda-list name)
+           (if unknown
+               (values nil t)
+               (clean ll))))))))
+
+
 (defun locative-type-to-texinfo (locative-type)
   (case locative-type
     (function
@@ -63,8 +137,8 @@
     (let ((child-sections
             (loop for entry in entries
                   when (and (not (stringp entry))
-                            (eq (xref-locative-type entry) 'section))
-                    collect (resolve entry))))
+                            (eq (xref-locative-type entry) (dummy 'section)))
+                    collect (symbol-value (xref-name entry)))))
       (when child-sections
         (unless top-level-menus-to-file
           (format t "@menu~%"))
@@ -86,19 +160,20 @@
                    (emit-texinfo-for-docstring entry)
                    (format t "~%")))
                 (t
-                 (if (not (eq (xref-locative-type entry) 'section))
+                 (if (not (eq (xref-locative-type entry) (dummy 'section)))
                      (emit-texinfo-for-definition entry)
                      (let ((page (find (xref-name entry) pages
                                        :key #'first)))
                        (when page
                          (format t "@include ~A~%" (second page)))
                        (with-texinfo-to-file (second page)
-                         (emit-texinfo-for-section (resolve entry)
-                                                   :pages pages
-                                                   :depth (1+ depth))))))))))))
+                         (emit-texinfo-for-section
+                          (symbol-value (xref-name entry))
+                          :pages pages
+                          :depth (1+ depth))))))))))))
 
 (defun emit-texinfo-for-definition (xref)
-  (multiple-value-bind (docstring *package*) (docstring xref)
+  (multiple-value-bind (docstring *package*) (%docstring xref)
     (multiple-value-bind (type index)
         (locative-type-to-texinfo (xref-locative-type xref))
       (let* ((name (xref-name xref))
@@ -128,9 +203,9 @@
                 type
                 (let ((*package* (find-package :cl)))
                   (prin1-to-string name))
-                (arglist xref))
+                (%arglist xref))
         (when docstring
-          (emit-texinfo-for-docstring docstring (arglist xref)))
+          (emit-texinfo-for-docstring docstring (%arglist xref)))
         (format t "@end deffn~%")))))
 
 ;;; Remove leading non-alphanumeric characters. They are not important
@@ -185,7 +260,6 @@
         (format nil "~D-~2,'0D" year month))))
 
 (defun generate-texinfo ()
-  (assert (not *use-pax*))
   (let ((*default-pathname-defaults*
           (truename (merge-pathnames
                      "../../doc/manual/"

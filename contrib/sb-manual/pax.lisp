@@ -23,16 +23,18 @@
   (defvar *dummies* ()))
 
 (defmacro defun-dummy ((name package) lambda-list &body body)
-  (unless *use-pax*
-    `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (pushnew '(,name ,package) *dummies* :test #'equal)
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (pushnew '(,name ,package) *dummies* :test #'equal)
+     (declaim (notinline ,name))
+     (unless *use-pax*
        (defun ,name ,lambda-list ,@body))))
 
 (defmacro defmacro-dummy ((name package) lambda-list &body body)
   (unless *use-pax*
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (pushnew '(,name ,package) *dummies* :test #'equal)
-       (defmacro ,name ,lambda-list ,@body))))
+       (unless *use-pax*
+         (defmacro ,name ,lambda-list ,@body)))))
 
 (defparameter *extra-dummies*
   '((argument :pax)
@@ -54,10 +56,13 @@
   (unless *use-pax*
     (require 'mgl-pax)
     ;; Replace dummies with the real symbols.
-    (let ((dummies (loop for (name package) in (append *dummies*
-                                                       *extra-dummies*)
-                         collect (format nil "~A:~A" package name))))
-      (shadowing-import (mapcar #'read-from-string dummies) :sb-manual))
+    (loop for (name package) in (append *dummies* *extra-dummies*)
+          do (let ((new-symbol (read-from-string
+                                (format nil "~A:~A" package name))))
+               (when (and (fboundp new-symbol)
+                          (null (macro-function new-symbol)))
+                 (setf (fdefinition name) (fdefinition new-symbol)))
+               (shadowing-import new-symbol :sb-manual)))
     ;; Arrange for that only SECTIONs will be exported by
     ;; PAX:DEFSECTION.
     (eval-string
@@ -92,6 +97,8 @@
             "(setf (dref-ext:definition-property (dref:dref '~S '~S) 'docstring)
                    (list nil (find-package ~S)))"
             name (subst-extras locative) package))
+  (setq *definition-to-docstring-package*
+        (subst-extras *definition-to-docstring-package*))
   (loop for (from-package to-package) in *package-to-docstring-package*
         do (eval-format
             "(setf (dref-ext:definition-property `(:package ,(find-package ~S))
@@ -154,80 +161,3 @@
 
 (defun-dummy (xref-locative-type :dref) (xref)
   (first (sb-c::ensure-list (second xref))))
-
-(defun-dummy (resolve :dref) (xref)
-  (cond ((eq (xref-locative-type xref) 'section)
-         (or (ignore-errors (symbol-value (xref-name xref)))
-             (assert nil () "Undefined SECTION ~S." (xref-name xref))))
-        (t
-         (assert nil () "Unexpected locative type in ~S." xref))))
-
-(defun-dummy (arglist :dref) (xref)
-  (let ((name (xref-name xref))
-        (locative-type (xref-locative-type xref)))
-    (lambda-list* name locative-type)))
-
-(defun-dummy (docstring :dref) (xref)
-  (values (let ((name (xref-name xref))
-                (locative-type (xref-locative-type xref)))
-            (case locative-type
-              ((function variable declaration)
-               (documentation name locative-type))
-              ((generic-function)
-               (documentation name 'function))
-              ((type class structure condition declaration)
-               (documentation name 'type))
-              (t
-               (cond ((eq locative-type (dummy 'macro))
-                      (documentation (macro-function name) t))
-                     ((eq locative-type (dummy 'setf-function))
-                      (documentation (fdefinition name) t))
-                     ((eq locative-type (dummy 'setf-generic-function))
-                      (documentation (fdefinition name) t))
-                     (t
-                      (assert nil () "Unexpected locative type in ~S."
-                              xref))))))
-          ;; To be compatible with PAX::@PACKAGE-AND-READTABLE, we
-          ;; always return a non-NIL package.
-          (docstring-package xref)))
-
-
-(defun lambda-list* (name kind)
-  (case kind
-    ((package constant variable type structure class condition method
-              declaration nil)
-     nil)
-    (t
-     ;; KLUDGE: Eugh.
-     ;;
-     ;; believe it or not, the above comment was written before CSR
-     ;; came along and obfuscated this.  (2005-07-04)
-     (when (symbolp name)
-       (labels ((clean (x &key optional key)
-                  (typecase x
-                    (atom x)
-                    ((cons (member &optional))
-                     (cons (car x) (clean (cdr x) :optional t)))
-                    ((cons (member &key))
-                     (cons (car x) (clean (cdr x) :key t)))
-                    ((cons (member &whole &environment))
-                     ;; Skip these
-                     (clean (cdr x) :optional optional :key key))
-                    ((cons cons)
-                     (cons
-                      (cond (key (if (consp (caar x))
-                                     (caaar x)
-                                     (caar x)))
-                            (optional (caar x))
-                            (t (clean (car x))))
-                      (clean (cdr x) :key key :optional optional)))
-                    (cons
-                     (cons
-                      (cond ((or key optional) (car x))
-                            (t (clean (car x))))
-                      (clean (cdr x) :key key :optional optional))))))
-         (multiple-value-bind (ll unknown)
-             (sb-introspect:function-lambda-list name)
-           (if unknown
-               (values nil t)
-               (clean ll))))))))
