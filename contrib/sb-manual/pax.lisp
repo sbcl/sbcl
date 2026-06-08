@@ -42,7 +42,8 @@
     (setf-function :dref)
     (setf-generic-function :dref)
     (section :pax)
-    (clhs :pax)))
+    (clhs :pax)
+    (docstring :dref)))
 
 (defun dummy (symbol)
   (let ((*package* (find-package :sb-manual)))
