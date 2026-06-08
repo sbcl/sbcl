@@ -1833,6 +1833,57 @@
 (defoptimizer (vector-push-extend ir2-hook) ((item vector &optional min-extension) node)
   (check-sequence-item item vector node "Can't push ~a into ~a"))
 
+(defun check-concatenate-sequence-type (type result-element-type sequence node &key (description "concatenate")
+                                                                                    (constants t))
+  (when result-element-type
+    (let ((constant (and (constant-lvar-p sequence)
+                         (lvar-value sequence))))
+      (if (and constant
+               (proper-sequence-p constant))
+          (map nil
+               (lambda (elt)
+                 (multiple-value-bind (fits really) (ctypep elt result-element-type)
+                   (when (and really (not fits))
+                     (let ((*compiler-error-context* node))
+                       (compiler-warn "Can't ~a ~s into ~s"
+                                      description
+                                      elt
+                                      (if (ctype-p type)
+                                          (type-specifier (make-array-type '(*)
+                                                                           :specialized-element-type type
+                                                                           :element-type type))
+                                          type))
+                       (return-from check-concatenate-sequence-type)))))
+               constant)
+          (let ((element-type (sequence-elements-type sequence nil constants)))
+            (when (and element-type
+                       (not (eq element-type *wild-type*))
+                       (not (types-equal-or-intersect element-type result-element-type)))
+              (let ((*compiler-error-context* node))
+                (compiler-warn "Can't ~a elements of type ~s into ~s"
+                               description
+                               (type-specifier element-type)
+                               (if (ctype-p type)
+                                   (type-specifier (make-array-type '(*)
+                                                                    :specialized-element-type type
+                                                                    :element-type type))
+                                   type)))))))))
+
+(defun check-concatenate-element-type (type result-element-type element-type node &key (description "concatenate"))
+  (when (and result-element-type
+             element-type
+             (not (eq element-type *wild-type*))
+             (not (types-equal-or-intersect element-type result-element-type)))
+    (let ((*compiler-error-context* node))
+      (compiler-warn "Can't ~a elements of type ~s into ~s"
+                     description
+                     (type-specifier element-type)
+                     (if (ctype-p type)
+                         (type-specifier (make-array-type '(*)
+                                                          :specialized-element-type type
+                                                          :element-type type))
+                         type)))))
+
 (defun check-concatenate (type sequences node &optional (description "concatenate"))
   (let ((result-element-type (if (ctype-p type)
                                  type
@@ -1840,40 +1891,9 @@
                                                               (return-from check-concatenate))))))
     (unless (or (eq result-element-type *wild-type*)
                 (eq result-element-type *universal-type*))
-      (loop for i from 0
-            for sequence in sequences
-            for constant = (and (constant-lvar-p sequence)
-                                (lvar-value sequence))
-            do (if (and constant
-                        (proper-sequence-p constant))
-                   (map nil
-                        (lambda (elt)
-                          (multiple-value-bind (fits really) (ctypep elt result-element-type)
-                            (when (and really (not fits))
-                              (let ((*compiler-error-context* node))
-                                (compiler-warn "Can't ~a ~s, of type ~s, into ~s"
-                                               description
-                                               elt (type-of elt)
-                                               (if (ctype-p type)
-                                                   (type-specifier (make-array-type '(*)
-                                                                                    :specialized-element-type type
-                                                                                    :element-type type))
-                                                   type))
-                                (return)))))
-                        constant)
-                   (let ((element-type (sequence-elements-type sequence)))
-                     (when (and element-type
-                                (not (eq element-type *wild-type*))
-                                (not (types-equal-or-intersect element-type result-element-type)))
-                       (let ((*compiler-error-context* node))
-                         (compiler-warn "Can't ~a elements of type ~s into ~s"
-                                        description
-                                        (type-specifier element-type)
-                                        (if (ctype-p type)
-                                            (type-specifier (make-array-type '(*)
-                                                                             :specialized-element-type type
-                                                                             :element-type type))
-                                            type))))))))))
+      (loop for sequence in sequences
+            do (check-concatenate-sequence-type type result-element-type
+                                                sequence node :description description)))))
 
 (defoptimizer (%concatenate-to-string ir2-hook) ((&rest args) node)
   (check-concatenate 'string args node))

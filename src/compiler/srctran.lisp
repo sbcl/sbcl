@@ -453,30 +453,54 @@
 (defoptimizer (%concatenate-to-vector-subseq externally-checkable-type) ((type &rest args) node lvar)
   (concatenate-subseq-type lvar args))
 
-(defun concatenate-subseq-check-ranges (args node)
-  (loop while args
-        do (let ((arg (pop args)))
-             (when (constant-lvar-p arg)
-               (case (lvar-value arg)
-                 (sb-impl::%subseq
-                  (check-sequence-ranges (pop args) (pop args) (pop args) node))
-                 (sb-impl::%splice
-                  (loop repeat (lvar-value (pop args))
-                        do (pop args)))
-                 (sb-impl::%repeat
-                  (pop args)
-                  (pop args)))))))
+(defun check-concatenate-subseq (type args node)
+  (let* ((result-element-type (and type
+                                   (if (ctype-p type)
+                                       type
+                                       (block nil
+                                         (type-array-element-type (or (careful-specifier-type type)
+                                                                      (return)))))))
+         (result-element-type (unless (or (eq result-element-type *wild-type*)
+                                          (eq result-element-type *universal-type*))
+                                result-element-type)))
+    (loop while args
+          do (let ((arg (pop args)))
+               (when (constant-lvar-p arg)
+                 (case (lvar-value arg)
+                   (sb-impl::%subseq
+                    (let ((sequence (pop args))
+                          (start (pop args))
+                          (end (pop args)))
+                      (check-sequence-ranges sequence start end node)
+                      (check-concatenate-sequence-type type result-element-type sequence node :constants nil)))
+                   (sb-impl::%splice
+                    (loop repeat (lvar-value (pop args))
+                          for elt = (pop args)
+                          do
+                          (check-concatenate-element-type type result-element-type (lvar-type elt) node)))
+                   (sb-impl::%repeat
+                    (pop args)
+                    (let ((elt
+                            (pop args)))
+                      (check-concatenate-element-type type result-element-type (lvar-type elt) node)))
+                   (t
+                    (check-concatenate-sequence-type type result-element-type arg node :constants nil))))))))
 
 (defoptimizer (%concatenate-to-string-subseq ir2-hook) ((&rest args) node)
-  (concatenate-subseq-check-ranges args node))
+  (check-concatenate-subseq 'string args node))
 (defoptimizer (%concatenate-to-base-string-subseq ir2-hook) ((&rest args) node)
-  (concatenate-subseq-check-ranges args node))
+  (check-concatenate-subseq 'base-string args node))
 (defoptimizer (%concatenate-to-list-subseq ir2-hook) ((&rest args) node)
-  (concatenate-subseq-check-ranges args node))
+  (check-concatenate-subseq nil args node))
 (defoptimizer (%concatenate-to-simple-vector-subseq ir2-hook) ((&rest args) node)
-  (concatenate-subseq-check-ranges args node))
-(defoptimizer (%concatenate-to-vector-subseq ir2-hook) ((type &rest args) node)
-  (concatenate-subseq-check-ranges args node))
+  (check-concatenate-subseq nil args node))
+(defoptimizer (%concatenate-to-vector-subseq ir2-hook) ((widetag &rest args) node)
+  (check-concatenate-subseq (and (constant-lvar-p widetag)
+                                 (sb-vm:saetp-ctype
+                                  (find (lvar-value widetag)
+                                        sb-vm:*specialized-array-element-type-properties*
+                                        :key #'sb-vm:saetp-typecode)))
+                            args node))
 
 (defoptimizer (%concatenate-to-list derive-type) ((&rest args))
   (loop for arg in args

@@ -382,25 +382,26 @@
         (setf (getf (leaf-info constant) key)
               (constant-sequence-element-type (constant-value constant) key)))))
 
-(defun sequence-elements-type (sequence &optional key)
-  (or (let ((uses (lvar-uses sequence)))
-        (if (consp uses)
-            (let (other-types
-                  constant-types)
-              (loop for use in uses
-                    do
-                    (let ((type (constant-array-element-type (node-constant use) key)))
-                      (if type
-                          (push type constant-types)
-                          (push (node-single-value-type use) other-types))))
-              (when constant-types
-                (let ((union (sb-kernel::%type-union constant-types)))
-                  (if other-types
-                      (let ((element-type (type-array-element-type (sb-kernel::%type-union other-types))))
-                        (unless (eq element-type *wild-type*)
-                          (type-union union element-type)))
-                      union))))
-            (constant-array-element-type (node-constant uses) key)))
+(defun sequence-elements-type (sequence &optional key (constants t))
+  (or (and constants
+           (let ((uses (lvar-uses sequence)))
+             (if (consp uses)
+                 (let (other-types
+                       constant-types)
+                   (loop for use in uses
+                         do
+                         (let ((type (constant-array-element-type (node-constant use) key)))
+                           (if type
+                               (push type constant-types)
+                               (push (node-single-value-type use) other-types))))
+                   (when constant-types
+                     (let ((union (sb-kernel::%type-union constant-types)))
+                       (if other-types
+                           (let ((element-type (type-array-element-type (sb-kernel::%type-union other-types))))
+                             (unless (eq element-type *wild-type*)
+                               (type-union union element-type)))
+                           union))))
+                 (constant-array-element-type (node-constant uses) key))))
       (if key
           *universal-type*
           (unwild (type-array-element-type (lvar-type sequence))))))
