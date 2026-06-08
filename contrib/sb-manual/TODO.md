@@ -16,8 +16,6 @@ image.
 Alternatively, we could have `sb-bsd-sockets/manual.lisp` as a new
 `SB-BSD-SOCKETS-MANUAL` module. Eh.
 
-# SWITCH-TO-PAX automatically?
-
 # How to deal with repetitive package names?
 
 For example, `SB-ALIEN` is `:USE`d by `SB-MANUAL` so that the section

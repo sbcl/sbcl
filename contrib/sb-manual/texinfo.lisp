@@ -116,13 +116,16 @@
         (funcall fn))
       (funcall fn)))
 
+(defun remove-markup (string)
+  (remove #\\ string))
+
 ;;; Write the Texinfo for SECTION to *STANDARD-OUTPUT*. When recursing
 ;;; into child sections, if a section is in PAGES, then emit an
 ;;; @include and open a new a file for output.
 (defun emit-texinfo-for-section (section &key pages (depth 0)
                                  top-level-menus-to-file
                                  top-level-contents-to-file)
-  (let ((title (section-title section))
+  (let ((title (remove-markup (section-title section)))
         (entries (section-entries section)))
     (format t "@node ~A~%" (texinfo-node-id section))
     (format t "~A ~A~%~%"
@@ -144,7 +147,7 @@
           (format t "@menu~%"))
         (with-texinfo-to-file top-level-menus-to-file
           (dolist (child-section child-sections)
-            (format t "* ~A: ~A.~%" (section-title child-section)
+            (format t "* ~A: ~A.~%" (remove-markup (section-title child-section))
                     (texinfo-node-id child-section))))
         (unless top-level-menus-to-file
           (format t "@end menu~%~%"))))

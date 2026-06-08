@@ -457,7 +457,8 @@
         (typep (symbol-value symbol) (dummy 'section))
         (let ((value (symbol-value symbol)))
           (and (listp value)
-               (eq (first value) 'defsection))))))
+               (listp (first value))
+               (eq (caar value) :%pax-lazy-section))))))
 
 (when (and (not *using-pax*)
            *downcase-uppercase-code*)

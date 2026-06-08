@@ -52,7 +52,24 @@
 (defvar *definition-to-docstring-package*)
 (defvar *package-to-docstring-package*)
 
+(defun resolve-lazy-section (&rest args)
+  (declare (ignore args))
+  (use-pax))
+
 (defun use-pax ()
+  "Ensure that exported variables are `PAX:SECTION`s.
+  It is an error if the `MGL-PAX` library is not loaded.
+
+  Calling this function explicitly is rarely necessary because it is
+  called automatically:
+
+  - when `SB-MANUAL` is loaded, if PAX is present;
+
+  - when `PAX:DOCUMENT` (more precisely, `DREF:LOCATE`) is called on
+    an `SB-MANUAL` section.
+
+  The latter feature requires v0.4.12 of PAX. See the `MGL-PAX`
+  asdf:system."
   (unless *using-pax*
     (assert (find-package '#:mgl-pax))
     ;; Replace dummies with the real symbols.
@@ -75,13 +92,12 @@
       (when (and (char= #\@ (aref (symbol-name symbol) 0))
                  (boundp symbol))
         (let ((value (symbol-value symbol)))
-          (assert (listp value))
-          (assert (eq (first value) 'defsection))
-          (assert (eq (second value) symbol))
+          (assert (and (consp value) (consp (car value ))
+                       (eq (caar value) :%pax-lazy-section)))
           (let ((source-location
                   (sb-int:info :source-location :variable symbol)))
             (eval `(,(read-from-string "pax:defsection")
-                    ,@(subst-extras (rest value))))
+                    ,@(subst-extras (rest (second value)))))
             (setf (sb-int:info :source-location :variable symbol)
                   source-location)))))
     (convert-docstring-package-overrides-to-pax)
@@ -127,26 +143,27 @@
 (defmacro-dummy (defsection pax)
                 (name (&key (package *package*) (export t) title)
                       &body entries)
-  (let ((defsection-form
-          `(defsection ,name (:package ,package :export ,export :title ,title)
-             ,@entries)))
+  (let ((value
+          `((:%pax-lazy-section ,name resolve-lazy-section)
+            (defsection ,name (:package ,package :export ,export :title ,title)
+              ,@entries))))
     `(progn
-       (defparameter ,name ',defsection-form)
+       (defparameter ,name ',value)
        ,@(when export
            `((export ',name :sb-manual))))))
 
 (defun-dummy (section-name :pax) (section)
-  (second section))
+  (second (second section)))
 
 (defun-dummy (section-title :pax) (section)
-  (getf (third section) :title))
+  (getf (third (second section)) :title))
 
 (defun-dummy (section-package :pax) (section)
-  (find-package (getf (third section) :package)))
+  (find-package (getf (third (second section)) :package)))
 
 ;;; This is a list of (NAME LOCATIVE) elements with our dummy DEFSECTION.
 (defun-dummy (section-entries :pax) (section)
-  (nthcdr 3 section))
+  (nthcdr 3 (second section)))
 
 (defun-dummy (xref-name :dref) (xref)
   (first xref))

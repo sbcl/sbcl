@@ -4,14 +4,13 @@
 @section sb-manual
 
 @menu
+* Using PAX: using pax.
 * Browsing Live with PAX: browsing live with pax.
 * Fancy Documentation with PAX: fancy documentation with pax.
 @end menu
 
-The @code{sb-manual} module has the sections of the SBCL user manual in
-Lisp variables. The names of the variables (all start with the
-character @code{@@}) are exported from the @code{sb-manual} package. Sections
-are defined with the @code{defsection} macro:
+The @code{sb-manual} module has the SBCL user manual in forms
+mimicking @code{pax:defsection}:
 
 @example
 (defsection @@example (:title "Example")
@@ -20,23 +19,49 @@ are defined with the @code{defsection} macro:
   (@@subexample section))
 @end example
 
-where @code{defsection} is a dummy implementation of
-@code{pax:defsection} (see @url{https://github.com/melisgl/mgl-pax/}).
-
-In Slime, @code{M-.} on @code{"@@SB-MANUAL"}, @code{"print"}, or on
-@code{"@@subexample"} will take you to the respective definition. This
-makes it easy to navigate the documentation. Normal Lisp definition
-docstrings and section docstrings reference sections following the
-usual convention of uppercasing the name. Docstrings are in a subset
-of Markdown and use very little markup in general, so they are easy
-to read directly in the source.
+The names of the variables holding the documentation are exported
+from the @code{sb-manual} package. Since sections are basically
+variables, in Slime, @code{M-.} on @code{"@@SB-MANUAL"}, @code{"print"}, or
+on @code{"@@subexample"} will take you to the respective definition.
+This makes it easy to navigate the documentation. Normal Lisp
+definition docstrings and section docstrings reference sections
+following the usual convention of uppercasing the name. Docstrings
+are in a subset of Markdown and use very little markup in general,
+so they are easy to read directly in the source.
 
 The official manual in Info, HTML and PDF formats is generated via
 Texinfo generated from these definitions.
 
+@node using pax
+@subsection Using PAX
+
+However, @code{sb-manual::defsection} is but a dummy implementation of
+@code{pax:defsection} to avoid a hard dependency on PAX.
+
+See the @code{mgl-pax} @code{asdf:system} or @url{https://github.com/melisgl/mgl-pax/}.
+
 When PAX is loaded, the dummy @code{defsection} definitions are made
 real, so that PAX can work with them.
 
+@anchor{Function sb-manual use-pax}
+@ffindex @sortas{use-pax sb-manual} use-pax [sb-manual]
+@deffn{Function} sb-manual:use-pax
+Ensure that exported variables are @code{pax:section}s.
+It is an error if the @code{mgl-pax} library is not loaded.
+
+Calling this function explicitly is rarely necessary because it is
+called automatically:
+
+@itemize
+@item when @code{sb-manual} is loaded, if @code{pax} is present;
+
+@item when @code{pax:document} (more precisely, @code{dref:locate}) is called on
+  an @code{sb-manual} section.
+@end itemize
+
+The latter feature requires v0.4.12 of @code{pax}. See the @code{mgl-pax}
+asdf:system.
+@end deffn
 @node browsing live with pax
 @subsection Browsing Live with PAX
 

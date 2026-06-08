@@ -85,6 +85,7 @@
     ("SB-GRAY" "SB-GRAY")
     ("SB-GROVEL" "SB-GROVEL")
     ("SB-INTROSPECT" "SB-INTROSPECT")
+    ("SB-MANUAL" "SB-MANUAL")
     ("SB-MD5" "SB-MD5")
     ("SB-POSIX" "SB-POSIX")
     ("SB-SEQUENCE" "SB-IMPL")
