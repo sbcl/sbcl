@@ -45,6 +45,13 @@
 \\renewcommand*\\l@subsubsection{\\@dottedtocline{3}{4.3em}{4.0em}}
 \\makeatother")
 
+(defun muffle-uninteresting-warnings (condition)
+  (let ((string (princ-to-string condition)))
+    ;; We know that there is no source location for declarations.
+    (when (and (search "No source location" string)
+               (search "DECLARATION" string))
+      (muffle-warning condition))))
+
 (defun make-pax-docs (&optional git-forge-uri)
   (let ((*git-forge-uri* (or (and (plusp (length git-forge-uri))
                                   git-forge-uri)
@@ -60,20 +67,22 @@
         (pax:*document-pandoc-pdf-options*
           (remove "--verbose" pax:*document-pandoc-pdf-options*
                   :test #'equal)))
-    (format t "Git root: ~A~%Git forge URI: ~A~%Output dir: ~A~%"
-            *git-root* *git-forge-uri* *output-dir*)
-    (format t "Generating manual in plain text format~%")
-    (pax:document @sbcl-manual :pages (sbcl-pages* :plain) :format :plain)
-    (format t "Generating manual in Markdown format~%")
-    (pax:document @sbcl-manual :pages (sbcl-pages* :markdown) :format :markdown)
-    (format t "Generating manual in PDF format~%")
-    (pax:document @sbcl-manual :pages (sbcl-pages* :pdf) :format :pdf)
-    (format t "Generating manual in HTML format~%")
-    (pax:update-asdf-system-html-docs @sbcl-manual "sb-manual"
-                                      :pages (sbcl-pages* :html)
-                                      :target-dir (merge-pathnames "html/"
-                                                                   *output-dir*)
-                                      :style :charter)))
+    (handler-bind ((warning #'muffle-uninteresting-warnings))
+      (format t "Git root: ~A~%Git forge URI: ~A~%Output dir: ~A~%"
+              *git-root* *git-forge-uri* *output-dir*)
+      (format t "Generating manual in plain text format~%")
+      (pax:document @sbcl-manual :pages (sbcl-pages* :plain) :format :plain)
+      (format t "Generating manual in Markdown format~%")
+      (pax:document @sbcl-manual :pages (sbcl-pages* :markdown)
+                    :format :markdown)
+      (format t "Generating manual in PDF format~%")
+      (pax:document @sbcl-manual :pages (sbcl-pages* :pdf) :format :pdf)
+      (format t "Generating manual in HTML format~%")
+      (pax:update-asdf-system-html-docs
+       @sbcl-manual "sb-manual"
+       :pages (sbcl-pages* :html)
+       :target-dir (merge-pathnames "html/" *output-dir*)
+       :style :charter))))
 
 #+nil
 (make-pax-docs)
