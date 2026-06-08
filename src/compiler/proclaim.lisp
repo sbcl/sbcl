@@ -496,6 +496,108 @@
     (function '(deprecated function))
     (variable '(deprecated variable))
     (type     '(deprecated type))))
+
+
+;;;; Declarations
+
+;;; Declare extensions, so that (SB-CLTL2:DECLARATION-INFORMATION
+;;; 'DECLARATION) returns them. We could add internal ones, too.
+(declaim (declaration muffle-conditions unmuffle-conditions
+                      enable-package-locks disable-package-locks
+                      global always-bound deprecated))
+#-sb-xc-host
+(setf (documentation 'muffle-conditions 'declaration)
+      "Syntax: `(SB-EXT:MUFFLE-CONDITIONS &REST TYPES)`.
+
+Muffle the diagnostic messages that would be caused by compile-time
+signals of TYPES.")
+
+#-sb-xc-host
+(setf (documentation 'unmuffle-conditions 'declaration)
+      "Syntax: `(SB-EXT:MUFFLE-CONDITIONS &REST TYPES)`.
+
+Cancel the effect of a previous SB-EXT:MUFFLE-CONDITIONS declaration.")
+
+#-sb-xc-host
+(setf (documentation 'sb-ext:disable-package-locks 'declaration)
+      "Syntax: `(SB-EXT:DISABLE-PACKAGE-LOCKS &REST SYMBOLS)`
+
+Disables package locks affecting the named symbols during compilation
+in the lexical scope of the declaration. Disabling locks on symbols
+whose home package is unlocked, or disabling an already disabled lock,
+has no effect.")
+
+#-sb-xc-host
+(setf (documentation 'sb-ext:enable-package-locks 'declaration)
+      "Syntax: `(SB-EXT:ENABLE-PACKAGE-LOCKS &REST SYMBOLS)`
+
+Re-enables package locks affecting the named symbols during
+compilation in the lexical scope of the declaration. Enabling locks
+that were not first disabled with SB-EXT:DISABLE-PACKAGE-LOCKS
+declaration, or enabling locks that are already enabled has no effect.")
+
+#-sb-xc-host
+(setf (documentation 'sb-ext:deprecated 'declaration)
+      "Syntax: `(SB-EXT:DEPRECATED STAGE SINCE &REST OBJECT-CLAUSES)`
+
+stage ::= {:EARLY | :LATE | :FINAL}
+
+since ::= {`<version>` | (`<software>` `<version>`)}
+
+object-clause ::= (namespace `<name>` [:REPLACEMENT `<replacement>`])
+
+namespace ::= {CL:VARIABLE | CL:FUNCTION | CL:TYPE}
+
+where the terminal `<name>` is the name of the deprecated thing,
+`<version>` and `<software>` are strings describing the version in
+which the thing has been deprecated and `<replacement>` is a name or a
+list of names designating things that should be used instead of the
+deprecated thing.
+
+Currently the following namespaces are supported:
+
+- CL:FUNCTION: Declare functions, compiler-macros or macros as
+  deprecated.
+
+    When declaring a function to be in :FINAL deprecation, there
+    should be no actual definition of the function as the declaration
+    emits a stub function that signals a SB-EXT:DEPRECATION-ERROR at
+    run-time when called.
+
+- CL:VARIABLE: Declare special and global variables, constants
+  and symbol-macros as deprecated.
+
+    When declaring a variable to be in :FINAL deprecation, there
+    should be no actual definition of the variable as the declaration
+    emits a symbol-macro that signals a SB-EXT:DEPRECATION-ERROR at
+    run-time when accessed.
+
+- CL:TYPE: Declare named types (i.e. defined via DEFTYPE),
+  standard classes, structure classes and condition classes as
+  deprecated.")
+
+#-sb-xc-host
+(setf (documentation 'sb-ext:global 'declaration)
+      "Syntax: `(SB-EXT:GLOBAL &REST SYMBOLS)`
+
+Only valid as a global proclamation.
+
+Specifies that the named symbols cannot be proclaimed or locally
+declared SPECIAL. Proclaiming an already special or constant variable
+name as SB-EXT:GLOBAL signal an error. Allows more efficient value
+lookup in threaded environments in addition to expressing programmer
+intention.")
+
+#-sb-xc-host
+(setf (documentation 'sb-ext:always-bound 'declaration)
+      "Syntax: `(SB-EXT:ALWAYS-BOUND &REST SYMBOLS)`
+
+Only valid as a global proclamation.
+
+Specifies that the named symbols are always bound. Inhibits MAKUNBOUND
+of the named symbols. Proclaiming an unbound symbol as
+SB-EXT:ALWAYS-BOUND signals an error. Allows the compiler to elide
+boundness checks from value lookups.")
 
 (defun %proclaim (raw-form location)
   (destructuring-bind (&whole form &optional kind &rest args)

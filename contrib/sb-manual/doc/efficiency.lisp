@@ -290,28 +290,8 @@
 (defsection @global-and-always-bound-variables
     (:title "Global and Always-bound Variables")
   (sb-ext:defglobal macro)
-  "- [__declaration__] SB-EXT:GLOBAL
-
-      Syntax: `(SB-EXT:GLOBAL &REST SYMBOLS)`
-
-      Only valid as a global proclamation.
-
-      Specifies that the named symbols cannot be proclaimed or locally
-      declared SPECIAL. Proclaiming an already special or constant
-      variable name as SB-EXT:GLOBAL signal an error. Allows more
-      efficient value lookup in threaded environments in addition to
-      expressing programmer intention.
-
-  - [__declaration__] SB-EXT:ALWAYS-BOUND
-
-      Syntax: `(SB-EXT:ALWAYS-BOUND &REST SYMBOLS)`
-
-      Only valid as a global proclamation.
-
-      Specifies that the named symbols are always bound. Inhibits
-      MAKUNBOUND of the named symbols. Proclaiming an unbound symbol
-      as SB-EXT:ALWAYS-BOUND signals an error. Allows the compiler to
-      elide boundness checks from value lookups.")
+  (sb-ext:global declaration)
+  (sb-ext:always-bound declaration))
 
 (defsection @miscellaneous-efficiency-issues
     (:title "Miscellaneous Efficiency Issues")

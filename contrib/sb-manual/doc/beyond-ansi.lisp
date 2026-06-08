@@ -1007,7 +1007,8 @@
   (sb-ext:delete-directory function)
   (sb-ext:get-time-of-day function)
   (sb-ext:assert-version->= function)
-  (sb-ext:unencapsulated-function function))
+  (sb-ext:unencapsulated-function function)
+  (documentation generic-function))
 
 (defsection @stale-extensions (:title "Stale Extensions")
   "SBCL has inherited from CMUCL various hooks to allow the user to

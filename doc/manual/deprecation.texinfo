@@ -217,9 +217,9 @@ in various namespaces as deprecated.
 the Common Lisp Hyperspec.)
 @end quotation
 
-@itemize
-@item [@strong{declaration}] @code{sb-ext:deprecated}
-
+@anchor{Declaration sb-ext deprecated}
+@ddindex @sortas{deprecated sb-ext} deprecated [sb-ext]
+@deffn{Declaration} sb-ext:deprecated
 Syntax: @code{(sb-ext:deprecated stage since &rest object-clauses)}
 
 stage ::= @{@code{:early} | @code{:late} | @code{:final}@}
@@ -231,36 +231,35 @@ object-clause ::= (namespace @code{<name>} [@code{:replacement} @code{<replaceme
 namespace ::= @{@code{cl:variable} | @code{cl:function} | @code{cl:type}@}
 
 where the terminal @code{<name>} is the name of the deprecated thing,
-@code{<version>} and @code{<software>} are strings describing the version
-in which the thing has been deprecated and @code{<replacement>} is a
-name or a list of names designating things that should be used
-instead of the deprecated thing.
+@code{<version>} and @code{<software>} are strings describing the version in
+which the thing has been deprecated and @code{<replacement>} is a name or a
+list of names designating things that should be used instead of the
+deprecated thing.
 
 Currently the following namespaces are supported:
 
 @itemize
 @item @code{cl:function}: Declare functions, compiler-macros or macros as
-      deprecated.
+  deprecated.
 
 When declaring a function to be in @code{:final} deprecation, there
-should be no actual definition of the function as the
-declaration emits a stub function that signals a
-@code{sb-ext:deprecation-error} at run-time when called.
+should be no actual definition of the function as the declaration
+emits a stub function that signals a @code{sb-ext:deprecation-error} at
+run-time when called.
 
 @item @code{cl:variable}: Declare special and global variables, constants
-      and symbol-macros as deprecated.
+  and symbol-macros as deprecated.
 
 When declaring a variable to be in @code{:final} deprecation, there
-should be no actual definition of the variable as the
-declaration emits a symbol-macro that signals a
-@code{sb-ext:deprecation-error} at run-time when accessed.
+should be no actual definition of the variable as the declaration
+emits a symbol-macro that signals a @code{sb-ext:deprecation-error} at
+run-time when accessed.
 
 @item @code{cl:type}: Declare named types (i.e. defined via @code{deftype}),
-      standard classes, structure classes and condition classes as
-      deprecated.
+  standard classes, structure classes and condition classes as
+  deprecated.
 @end itemize
-@end itemize
-
+@end deffn
 @node deprecation examples
 @section Deprecation Examples
 

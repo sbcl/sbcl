@@ -2647,6 +2647,52 @@ Note that the unencapsulated function may be @code{eq} to the designated
 function even in the presence of encapsulations. For generic
 functions, this is currently always the case.
 @end deffn
+@anchor{Generic function common-lisp documentation}
+@ffindex @sortas{documentation common-lisp} documentation [common-lisp]
+@deffn{Generic function} documentation object doc-type
+Return the documentation string of @code{doc-type} for @code{object},
+or @code{nil} if none exists. In addition to the @code{doc-type}s and methods
+required by ANSI, SBCL's @code{documentation} (and its @code{setf}) supports methods
+with the following signatures:
+
+@itemize
+@item @code{(object symbol) (doc-type (eql declaration))}
+
+@item @code{(object sb-mop:slot-definition) (doc-type (eql t))}
+@end itemize
+
+Since @code{condition}s are implemented as classes in SBCL, the following
+also work:
+
+@itemize
+@item @code{(object condition) (doc-type (eql t))}
+
+@item @code{(object condition) (doc-type (eql 'type))}
+@end itemize
+
+Function documentation is stored separately for function names and objects:
+@code{defun}, @code{lambda}, &co create function objects with the specified documentation
+strings.
+
+@example
+(setf (documentation name 'function) string)
+@end example
+
+sets the documentation string stored under the specified name, and
+
+@example
+(setf (documentation func t) string)
+@end example
+
+sets the documentation string stored in the function object.
+
+@example
+(documentation name 'function)
+@end example
+
+returns the documentation stored under the function name if any, and
+falls back on the documentation in the function object if necessary.
+@end deffn
 @node stale extensions
 @section Stale Extensions
 

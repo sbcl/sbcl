@@ -191,9 +191,10 @@ Name the section `@BIG-AND-BIGGER-WORDS` or something shorter like
 necessary"`, and `"Big and Bigger Words are necessary"` when it's
 rendered, so make sure that they are similar enough.
 
-Also, do not forget that section names live in a flat namespace: they
-are all exported from SB-MANUAL, so their names should be
-recognizable. Thus, it is better to name the section describing
+Note that section names live in a flat namespace: they are all
+exported from SB-MANUAL, and they also show up the Texinf indices
+without the context of their parents. So, their names should be
+globally meaningful. Thus, it is better to name the section describing
 `SB-ACLREPL`'s usage `@SB-ACLREPL-USAGE` than `@USAGE`.
 
 ## Docstring Formatting

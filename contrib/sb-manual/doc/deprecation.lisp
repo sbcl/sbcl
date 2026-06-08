@@ -162,47 +162,8 @@
   in various namespaces as deprecated.
 
   > _Note_: See the `namespace` CLHS glossary entry in the glossary of
-  > the Common Lisp Hyperspec.)
-
-  - [__declaration__] SB-EXT:DEPRECATED
-
-      Syntax: `(SB-EXT:DEPRECATED STAGE SINCE &REST OBJECT-CLAUSES)`
-
-      stage ::= {:EARLY | :LATE | :FINAL}
-
-      since ::= {`<version>` | (`<software>` `<version>`)}
-
-      object-clause ::= (namespace `<name>` [:REPLACEMENT `<replacement>`])
-
-      namespace ::= {CL:VARIABLE | CL:FUNCTION | CL:TYPE}
-
-      where the terminal `<name>` is the name of the deprecated thing,
-      `<version>` and `<software>` are strings describing the version
-      in which the thing has been deprecated and `<replacement>` is a
-      name or a list of names designating things that should be used
-      instead of the deprecated thing.
-
-      Currently the following namespaces are supported:
-
-      - CL:FUNCTION: Declare functions, compiler-macros or macros as
-        deprecated.
-
-          When declaring a function to be in :FINAL deprecation, there
-          should be no actual definition of the function as the
-          declaration emits a stub function that signals a
-          SB-EXT:DEPRECATION-ERROR at run-time when called.
-
-      - CL:VARIABLE: Declare special and global variables, constants
-        and symbol-macros as deprecated.
-
-          When declaring a variable to be in :FINAL deprecation, there
-          should be no actual definition of the variable as the
-          declaration emits a symbol-macro that signals a
-          SB-EXT:DEPRECATION-ERROR at run-time when accessed.
-
-      - CL:TYPE: Declare named types (i.e. defined via DEFTYPE),
-        standard classes, structure classes and condition classes as
-        deprecated.")
+  > the Common Lisp Hyperspec.)"
+  (sb-ext:deprecated declaration))
 
 (defsection @deprecation-examples (:title "Deprecation Examples")
   "Marking functions as deprecated:

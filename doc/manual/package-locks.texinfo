@@ -260,27 +260,26 @@ Exceptions:
 @node package lock dictionary
 @section Package Lock Dictionary
 
-@itemize
-@item [@strong{declaration}] @code{sb-ext:disable-package-locks}
-
+@anchor{Declaration sb-ext disable-package-locks}
+@ddindex @sortas{disable-package-locks sb-ext} disable-package-locks [sb-ext]
+@deffn{Declaration} sb-ext:disable-package-locks
 Syntax: @code{(sb-ext:disable-package-locks &rest symbols)}
 
-Disables package locks affecting the named symbols during
-compilation in the lexical scope of the declaration. Disabling
-locks on symbols whose home package is unlocked, or disabling an
-already disabled lock, has no effect.
-
-@item [@strong{declaration}] @code{sb-ext:enable-package-locks}
-
+Disables package locks affecting the named symbols during compilation
+in the lexical scope of the declaration. Disabling locks on symbols
+whose home package is unlocked, or disabling an already disabled lock,
+has no effect.
+@end deffn
+@anchor{Declaration sb-ext enable-package-locks}
+@ddindex @sortas{enable-package-locks sb-ext} enable-package-locks [sb-ext]
+@deffn{Declaration} sb-ext:enable-package-locks
 Syntax: @code{(sb-ext:enable-package-locks &rest symbols)}
 
 Re-enables package locks affecting the named symbols during
-compilation in the lexical scope of the declaration. Enabling
-locks that were not first disabled with
-@code{sb-ext:disable-package-locks} declaration, or enabling locks that
-are already enabled has no effect.
-@end itemize
-
+compilation in the lexical scope of the declaration. Enabling locks
+that were not first disabled with @code{sb-ext:disable-package-locks}
+declaration, or enabling locks that are already enabled has no effect.
+@end deffn
 @anchor{Condition sb-ext package-lock-violation}
 @ttindex @sortas{package-lock-violation sb-ext} package-lock-violation [sb-ext]
 @deffn{Condition} sb-ext:package-lock-violation

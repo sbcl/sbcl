@@ -47,23 +47,10 @@
           (locally
             (declare (sb-ext:unmuffle-conditions sb-ext:compiler-note))
             ;; this one gives a compiler note
-            (* x -5))))
-
-  - [__declaration__] SB-EXT:MUFFLE-CONDITIONS
-
-      Syntax: `(SB-EXT:MUFFLE-CONDITIONS &REST TYPES)`.
-
-      Muffle the diagnostic messages that would be caused by
-      compile-time signals of TYPES.
-
-  - [__declaration__] SB-EXT:UNMUFFLE-CONDITIONS
-
-      Syntax: `(SB-EXT:MUFFLE-CONDITIONS &REST TYPES)`.
-
-      Cancel the effect of a previous SB-EXT:MUFFLE-CONDITIONS
-      declaration.
-
-  Various details of _how_ the compiler messages are printed can be
+            (* x -5))))"
+  (sb-ext:muffle-conditions declaration)
+  (sb-ext:unmuffle-conditions declaration)
+  "Various details of _how_ the compiler messages are printed can be
   controlled via the alist SB-EXT:*COMPILER-PRINT-VARIABLE-ALIST*."
   (sb-ext:*compiler-print-variable-alist* variable)
   "For information about muffling warnings signaled outside of the

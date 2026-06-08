@@ -606,6 +606,8 @@
 (define-info-type (:source-location :declaration) :type-spec t)
 (define-info-type (:source-location :alien-type) :type-spec t)
 
+(define-info-type (:declaration :documentation) :type-spec string)
+
 ;;; If we used the maximum number of IDs available, a package gets no ID.
 ;;; Any symbols in that package must use SYMBOL-DBINFO for their package.
 ;;; Technically we can't store NIL, because that would be package ID 0,

@@ -406,25 +406,48 @@
     (new-value (slotd standard-slot-definition) (doc-type (eql 't)))
   (setf (slot-value slotd '%documentation) (canonical-docstring new-value)))
 
+;;; declarations
+(defmethod documentation ((x symbol) (doc-type (eql 'declaration)))
+  (values (info :declaration :documentation x)))
+
+(defmethod (setf documentation) (new-value (x symbol)
+                                 (doc-type (eql 'declaration)))
+  (if new-value
+      (setf (info :declaration :documentation x) new-value)
+      (clear-info :declaration :documentation x)))
+
 ;;; Now that we have created the machinery for setting documentation, we can
 ;;; set the documentation for the machinery for setting documentation.
 (setf (documentation 'documentation 'function)
-      "Return the documentation string of Doc-Type for X, or NIL if none
-exists. System doc-types are VARIABLE, FUNCTION, STRUCTURE, TYPE, SETF, and T.
+      "Return the documentation string of DOC-TYPE for OBJECT,
+or NIL if none exists. In addition to the DOC-TYPEs and methods
+required by ANSI, SBCL's DOCUMENTATION (and its SETF) supports methods
+with the following signatures:
+
+- `(OBJECT SYMBOL) (DOC-TYPE (EQL DECLARATION))`
+
+- `(OBJECT SB-MOP:SLOT-DEFINITION) (DOC-TYPE (EQL T))`
+
+Since CONDITIONs are implemented as classes in SBCL, the following
+also work:
+
+- `(OBJECT CONDITION) (DOC-TYPE (EQL T))`
+
+- `(OBJECT CONDITION) (DOC-TYPE (EQL 'TYPE))`
 
 Function documentation is stored separately for function names and objects:
 DEFUN, LAMBDA, &co create function objects with the specified documentation
 strings.
 
- \(SETF (DOCUMENTATION NAME 'FUNCTION) STRING)
+    (setf (documentation name 'function) string)
 
 sets the documentation string stored under the specified name, and
 
- \(SETF (DOCUMENTATION FUNC T) STRING)
+    (setf (documentation func t) string)
 
 sets the documentation string stored in the function object.
 
- \(DOCUMENTATION NAME 'FUNCTION)
+    (documentation name 'function)
 
 returns the documentation stored under the function name if any, and
 falls back on the documentation in the function object if necessary.")

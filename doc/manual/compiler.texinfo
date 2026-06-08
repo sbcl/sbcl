@@ -64,22 +64,21 @@ Local control:
       (* x -5))))
 @end example
 
-@itemize
-@item [@strong{declaration}] @code{sb-ext:muffle-conditions}
-
+@anchor{Declaration sb-ext muffle-conditions}
+@ddindex @sortas{muffle-conditions sb-ext} muffle-conditions [sb-ext]
+@deffn{Declaration} sb-ext:muffle-conditions
 Syntax: @code{(sb-ext:muffle-conditions &rest types)}.
 
-Muffle the diagnostic messages that would be caused by
-compile-time signals of TYPES.
-
-@item [@strong{declaration}] @code{sb-ext:unmuffle-conditions}
-
+Muffle the diagnostic messages that would be caused by compile-time
+signals of @code{types}.
+@end deffn
+@anchor{Declaration sb-ext unmuffle-conditions}
+@ddindex @sortas{unmuffle-conditions sb-ext} unmuffle-conditions [sb-ext]
+@deffn{Declaration} sb-ext:unmuffle-conditions
 Syntax: @code{(sb-ext:muffle-conditions &rest types)}.
 
-Cancel the effect of a previous @code{sb-ext:muffle-conditions}
-declaration.
-@end itemize
-
+Cancel the effect of a previous @code{sb-ext:muffle-conditions} declaration.
+@end deffn
 Various details of @emph{how} the compiler messages are printed can be
 controlled via the alist @code{sb-ext:*compiler-print-variable-alist*}.
 

@@ -13,6 +13,7 @@
 @defcodeindex ff
 @defcodeindex vv
 @defcodeindex tt
+@defcodeindex dd
 
 @c for install-info
 @dircategory Software development
@@ -85,6 +86,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 * Function and Macro Index: function index.
 * Variable and Constant Index: variable index.
 * Type Index: type index.
+* Declaration Index: declaration index.
 * Colophon: colophon.
 @end menu
 

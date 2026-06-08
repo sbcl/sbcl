@@ -171,11 +171,11 @@
   (values (let ((name (xref-name xref))
                 (locative-type (xref-locative-type xref)))
             (case locative-type
-              ((function variable)
+              ((function variable declaration)
                (documentation name locative-type))
               ((generic-function)
                (documentation name 'function))
-              ((type class structure condition)
+              ((type class structure condition declaration)
                (documentation name 'type))
               (t
                (cond ((eq locative-type (dummy 'macro))
@@ -194,7 +194,8 @@
 
 (defun lambda-list* (name kind)
   (case kind
-    ((package constant variable type structure class condition method nil)
+    ((package constant variable type structure class condition method
+              declaration nil)
      nil)
     (t
      ;; KLUDGE: Eugh.

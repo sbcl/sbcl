@@ -16,6 +16,8 @@
      (values "Structure" "ttindex"))
     (type
      (values "Type" "ttindex"))
+    (declaration
+     (values "Declaration" "ddindex"))
     (t
      (cond
        ((eq locative-type (dummy 'macro))
@@ -204,3 +206,6 @@
 
 #+nil
 (generate-texinfo)
+
+#+nil
+(emit-texinfo-for-section @deprecation-declaration)

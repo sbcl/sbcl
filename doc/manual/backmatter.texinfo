@@ -16,6 +16,12 @@
 
 @printindex tt
 
+@node declaration index
+@comment  node-name,  next,  previous,  up
+@appendix Declaration Index
+
+@printindex dd
+
 @node colophon
 @comment  node-name,  next,  previous,  up
 @unnumbered Colophon

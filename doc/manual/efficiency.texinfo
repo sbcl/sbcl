@@ -362,31 +362,31 @@ nor defined as symbol macros.
 
 See also the declarations @code{sb-ext:global} and @code{sb-ext:always-bound}.
 @end deffn
-@itemize
-@item [@strong{declaration}] @code{sb-ext:global}
-
+@anchor{Declaration sb-ext global}
+@ddindex @sortas{global sb-ext} global [sb-ext]
+@deffn{Declaration} sb-ext:global
 Syntax: @code{(sb-ext:global &rest symbols)}
 
 Only valid as a global proclamation.
 
 Specifies that the named symbols cannot be proclaimed or locally
-declared @code{special}. Proclaiming an already special or constant
-variable name as @code{sb-ext:global} signal an error. Allows more
-efficient value lookup in threaded environments in addition to
-expressing programmer intention.
-
-@item [@strong{declaration}] @code{sb-ext:always-bound}
-
+declared @code{special}. Proclaiming an already special or constant variable
+name as @code{sb-ext:global} signal an error. Allows more efficient value
+lookup in threaded environments in addition to expressing programmer
+intention.
+@end deffn
+@anchor{Declaration sb-ext always-bound}
+@ddindex @sortas{always-bound sb-ext} always-bound [sb-ext]
+@deffn{Declaration} sb-ext:always-bound
 Syntax: @code{(sb-ext:always-bound &rest symbols)}
 
 Only valid as a global proclamation.
 
-Specifies that the named symbols are always bound. Inhibits
-@code{makunbound} of the named symbols. Proclaiming an unbound symbol
-as @code{sb-ext:always-bound} signals an error. Allows the compiler to
-elide boundness checks from value lookups.
-@end itemize
-
+Specifies that the named symbols are always bound. Inhibits @code{makunbound}
+of the named symbols. Proclaiming an unbound symbol as
+@code{sb-ext:always-bound} signals an error. Allows the compiler to elide
+boundness checks from value lookups.
+@end deffn
 @node miscellaneous efficiency issues
 @section Miscellaneous Efficiency Issues
 

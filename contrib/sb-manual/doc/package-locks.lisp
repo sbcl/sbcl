@@ -215,25 +215,8 @@
   - Defining it as a hash table test using SB-EXT:DEFINE-HASH-TABLE-TEST.")
 
 (defsection @package-lock-dictionary (:title "Package Lock Dictionary")
-  "- [__declaration__] SB-EXT:DISABLE-PACKAGE-LOCKS
-
-      Syntax: `(SB-EXT:DISABLE-PACKAGE-LOCKS &REST SYMBOLS)`
-
-      Disables package locks affecting the named symbols during
-      compilation in the lexical scope of the declaration. Disabling
-      locks on symbols whose home package is unlocked, or disabling an
-      already disabled lock, has no effect.
-
-  - [__declaration__] SB-EXT:ENABLE-PACKAGE-LOCKS
-
-      Syntax: `(SB-EXT:ENABLE-PACKAGE-LOCKS &REST SYMBOLS)`
-
-      Re-enables package locks affecting the named symbols during
-      compilation in the lexical scope of the declaration. Enabling
-      locks that were not first disabled with
-      SB-EXT:DISABLE-PACKAGE-LOCKS declaration, or enabling locks that
-      are already enabled has no effect."
-
+  (sb-ext:disable-package-locks declaration)
+  (sb-ext:enable-package-locks declaration)
   (sb-ext:package-lock-violation condition)
   (sb-ext:package-locked-error condition)
   (sb-ext:symbol-package-locked-error condition)
