@@ -1,7 +1,7 @@
 (in-package :sb-manual)
 
 ;;; We don't DEFINE-DUMMY DREF:ARGLIST and DREF:DOCSTRING because we
-;;; don't want SWITCH-TO-PAX affect Texinfo output, which it would
+;;; don't want USE-PAX to affect Texinfo output, which it would
 ;;; because DREF:ARGLIST differs from the {incom,re}prehensible
 ;;; LAMBDA-LIST*.
 (defun %arglist (xref)

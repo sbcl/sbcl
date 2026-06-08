@@ -69,7 +69,7 @@
 ;;; To avoid conflicting with PAX's heuristics, DOCSTRING-PACKAGE
 ;;; always returns a non-NIL package. We use a reimplementation of
 ;;; DREF-EXT:DEFINITION-PROPERTY for DREF-EXT:DOCSTRING*, which we
-;;; feed to DOCSTRING-PACKAGE-OVERRIDES-TO-PAX in SWITCH-TO-PAX.
+;;; feed to DOCSTRING-PACKAGE-OVERRIDES-TO-PAX in USE-PAX.
 
 ;;; These map the SYMBOL-PACKAGE of a definition's XREF-NAME to the
 ;;; docstring package.
@@ -103,9 +103,9 @@
     ((trace macro) "SB-DEBUG")))
 
 ;;; For when this file is recompiled in interactive development after
-;;; SWITCH-TO-PAX
+;;; a later, explicit call to USE-PAX
 (eval-when (:load-toplevel :execute)
-  (when *use-pax*
+  (when *using-pax*
     (convert-docstring-package-overrides-to-pax)))
 
 (defun docstring-package (xref)

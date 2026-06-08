@@ -1,9 +1,11 @@
 ;;;; Generate the SBCL manual in various formats in doc/manual/ with PAX
 
-;;; This file is to be LOADed.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (require :mgl-pax/full)
+  (require :sb-manual))
 
-(require :sb-manual)
-(require :mgl-pax/full)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (sb-manual::use-pax))
 
 (in-package :sb-manual)
 
@@ -44,7 +46,6 @@
 \\makeatother")
 
 (defun make-pax-docs (&optional git-forge-uri)
-  (switch-to-pax)
   (let ((*git-forge-uri* (or (and (plusp (length git-forge-uri))
                                   git-forge-uri)
                              "https://github.com/sbcl/sbcl"))

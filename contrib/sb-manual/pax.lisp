@@ -1,7 +1,7 @@
 ;;;; PAX stubs
 ;;;;
 ;;;; Contribs cannot depend on external libraries, so we fake as much
-;;;; of PAX and DRef as necessary. SWITCH-TO-PAX switches to the real
+;;;; of PAX and DRef as necessary. USE-PAX switches to the real
 ;;;; implementation.
 ;;;;
 ;;;; If PAX is not loaded, the dummy DEFSECTION below still gives us
@@ -15,25 +15,25 @@
 (in-package :sb-manual)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *use-pax* nil)
+  (defvar *using-pax* nil)
   ;; A list of (LOCAL-SYMBOL PACKAGE) elements. Originally,
   ;; LOCAL-SYMBOL has home package SB-MANUAL. For example, the element
   ;; (SECTION :PAX) causes PAX:SECTION to be SHADOWING-IMPORTed in
-  ;; SWITCH-TO-PAX.
+  ;; USE-PAX.
   (defvar *dummies* ()))
 
 (defmacro defun-dummy ((name package) lambda-list &body body)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (pushnew '(,name ,package) *dummies* :test #'equal)
      (declaim (notinline ,name))
-     (unless *use-pax*
+     (unless *using-pax*
        (defun ,name ,lambda-list ,@body))))
 
 (defmacro defmacro-dummy ((name package) lambda-list &body body)
-  (unless *use-pax*
+  (unless *using-pax*
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (pushnew '(,name ,package) *dummies* :test #'equal)
-       (unless *use-pax*
+       (unless *using-pax*
          (defmacro ,name ,lambda-list ,@body)))))
 
 (defparameter *extra-dummies*
@@ -52,9 +52,9 @@
 (defvar *definition-to-docstring-package*)
 (defvar *package-to-docstring-package*)
 
-(defun switch-to-pax ()
-  (unless *use-pax*
-    (require 'mgl-pax)
+(defun use-pax ()
+  (unless *using-pax*
+    (assert (find-package '#:mgl-pax))
     ;; Replace dummies with the real symbols.
     (loop for (name package) in (append *dummies* *extra-dummies*)
           do (let ((new-symbol (read-from-string
@@ -86,7 +86,7 @@
                   source-location)))))
     (convert-docstring-package-overrides-to-pax)
     ;; FIXME: register doc?
-    (setq *use-pax* t)))
+    (setq *using-pax* t)))
 
 ;;; Convert *DEFINITION-TO-DOCSTRING-PACKAGE* to
 ;;; DREF:DEFINITION-PROPERTIES and *PACKAGE-TO-DOCSTRING-PACKAGE* to
@@ -94,7 +94,8 @@
 (defun convert-docstring-package-overrides-to-pax ()
   (loop for ((name locative) package) in *definition-to-docstring-package*
         do (eval-format
-            "(setf (dref-ext:definition-property (dref:dref '~S '~S) 'docstring)
+            "(setf (dref-ext:definition-property (dref:xref '~S '~S)~
+                                                 'docstring)
                    (list nil (find-package ~S)))"
             name (subst-extras locative) package))
   (setq *definition-to-docstring-package*

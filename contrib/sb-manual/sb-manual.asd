@@ -39,4 +39,5 @@
                              (:file "sb-rotate-byte")
                              (:file "sb-simd")
                              (:file "sb-simple-streams")
-                             (:file "deprecation")))))
+                             (:file "deprecation")))
+               (:file "late")))

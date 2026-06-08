@@ -453,13 +453,13 @@
 
 (defun section-name-p (symbol)
   (when (boundp symbol)
-    (if *use-pax*
+    (if *using-pax*
         (typep (symbol-value symbol) (dummy 'section))
         (let ((value (symbol-value symbol)))
           (and (listp value)
                (eq (first value) 'defsection))))))
 
-(when (and (not *use-pax*)
+(when (and (not *using-pax*)
            *downcase-uppercase-code*)
   (defsection @test-section ())
   (unwind-protect
