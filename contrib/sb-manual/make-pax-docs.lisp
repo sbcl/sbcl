@@ -34,6 +34,15 @@
        ,@(when source-uri-fn
            `(:source-uri-fn ,source-uri-fn))))))
 
+;;; Adjust the width of section numbers in the PDF table of contents, so
+;;; that e.g "17.10.13" doesn't protude from its box.
+(defparameter *pandoc-pdf-adjusted-table-of-contents
+  "\\makeatletter
+% \\@dottedtocline{level}{indent_before_number}{width_of_number_box}
+\\renewcommand*\\l@subsection{\\@dottedtocline{2}{1.5em}{2.8em}}
+\\renewcommand*\\l@subsubsection{\\@dottedtocline{3}{4.3em}{4.0em}}
+\\makeatother")
+
 (defun make-pax-docs (&optional git-forge-uri)
   (switch-to-pax)
   (let ((*git-forge-uri* (or (and (plusp (length git-forge-uri))
@@ -43,8 +52,12 @@
         (*output-dir* (merge-pathnames "output/" *directory*))
         (pax:*document-downcase-uppercase-code* t)
         (pax:*document-url-versions* '(1))
-        (pax::*document-pandoc-pdf-options*
-          (remove "--verbose" pax::*document-pandoc-pdf-options*
+        (pax:*document-pandoc-pdf-header-includes*
+          (format nil "~A~%~A~%"
+                  pax:*document-pandoc-pdf-header-includes*
+                  *pandoc-pdf-adjusted-table-of-contents))
+        (pax:*document-pandoc-pdf-options*
+          (remove "--verbose" pax:*document-pandoc-pdf-options*
                   :test #'equal)))
     (format t "Git root: ~A~%Git forge URI: ~A~%Output dir: ~A~%"
             *git-root* *git-forge-uri* *output-dir*)
@@ -60,5 +73,6 @@
                                       :target-dir (merge-pathnames "html/"
                                                                    *output-dir*)
                                       :style :charter)))
+
 #+nil
 (make-pax-docs)
