@@ -141,11 +141,16 @@
   system (patches welcome), here is an enumeration of all supported
   Lisp objects corresponding to supported POSIX structures, and the
   supported slots for those structures."
+  #-(or android win32)
   (sb-posix:flock class)
+  #-(or android win32)
   (sb-posix:passwd class)
+  #-(or android win32)
   (sb-posix:group class)
   (sb-posix:stat class)
+  #-win32
   (sb-posix:termios class)
+  #-win32
   (sb-posix:timeval class))
 
 (defsection @sb-posix-idiosyncracies
@@ -153,7 +158,9 @@
   "A few functions in sb-posix don't correspond directly to their C
   counterparts."
   (sb-posix:getcwd function)
+  #-win32
   (sb-posix:readlink function)
+  #-win32
   (sb-posix:syslog function))
 
 (defsection @sb-posix-extensions-to-posix (:title "Extensions to POSIX")
@@ -170,5 +177,7 @@
   database while preventing the keyed accesses (SB-POSIX:GETPWNAM,
   SB-POSIX:GETPWUID, SB-POSIX:GETGRNAM, SB-POSIX:GETGRGID) from
   running until iteration completes."
+  #-(or android win32)
   (sb-posix:do-passwds macro)
+  #-(or android win32)
   (sb-posix:do-groups macro))

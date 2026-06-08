@@ -12,6 +12,7 @@
   (@general-sockets section)
   (@socket-options section)
   (@inet-domain-sockets section)
+  #-win32
   (@local-domain-sockets section)
   (@name-service section))
 
@@ -95,6 +96,7 @@
   (sb-bsd-sockets:make-inet6-address function)
   (sb-bsd-sockets:get-protocol-by-name function))
 
+#-win32
 (defsection @local-domain-sockets (:title "Local Domain Sockets")
   "Local domain (`\\\\AF_LOCAL`) sockets are also known as Unix-domain
   sockets but were renamed by POSIX presumably on the basis that they

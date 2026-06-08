@@ -254,6 +254,7 @@
   session (which it shares with its parent and siblings) and create a
   fresh one."
   (sb-thread:with-new-session macro)
+  #-win32
   (sb-thread:make-listener-thread function)
   "Within a single session, threads arbitrate between themselves for
   the user's attention. A thread may be in one of three notional

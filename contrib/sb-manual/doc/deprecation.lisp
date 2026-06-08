@@ -383,7 +383,7 @@
 
       Historically needed for CLOS code. Deprecated as of 0.9.3.32 in
       August 2005. Deleted as of 1.0.47.8 in April 2011. Plain LAMBDA
-      can be used where SB-KERNEL:INSTANCE-LAMBDA used to be needed.
+      can be used where `SB-KERNEL:INSTANCE-LAMBDA` used to be needed.
 
   - `SB-ALIEN:DEF-ALIEN-ROUTINE`, `SB-ALIEN:DEF-ALIEN-VARIABLE`,
     `SB-ALIEN:DEF-ALIEN-TYPE`
