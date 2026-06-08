@@ -26,8 +26,8 @@
 ;;;   opportunities for codification and linking.
 ;;;
 ;;;
-;;; Markdown Support
-;;; ----------------
+;;; Markdown Formatting
+;;; -------------------
 ;;;
 ;;; The supported Markdown constructs are:
 ;;;
@@ -36,8 +36,6 @@
 ;;; - Strong emphasis: __bold__ -> @strong{bold}
 ;;;
 ;;; - Inline code: `monospace` -> @code{monospace}
-;;;
-;;; - <http...> -> @url{http...}
 ;;;
 ;;; - Itemized lists (like this one). List items can span multiple
 ;;;   lines.
@@ -121,6 +119,17 @@
 ;;; -------
 ;;;
 ;;; - Section references: @SECTION-NAME -> @ref{section name}
+;;;
+;;; - <http...> -> @url{http...}
+;;;
+;;; - [label](uri) -> @uref{uri, label}
+;;;
+;;; - [label][id] -> label
+;;;
+;;;     This just strips Markdown reference links. These are used by
+;;;     PAX to disambiguate, e.g. "[FUNCTION][type]" links to the
+;;;     FUNCTION class only while FUNCTION links to both the class and
+;;;     macro.
 ;;;
 ;;; FIXME:
 ;;;
@@ -587,6 +596,47 @@
                           (out "}")
                           (setf i close-pos))
                         (buffer-codifiable-char char))))
+                 ;; Markdown explicit links: [label](url) -> @uref{url, label}
+                 ;;
+                 ;; Markdown reflinks: [label][id] -> label
+                 ((char= char #\[)
+                  (let* ((close-bracket (position #\] string :start (1+ i)))
+                         (next-char (when (and close-bracket
+                                               (< (1+ close-bracket) len))
+                                      (char string (1+ close-bracket))))
+                         (open-paren (when (eql next-char #\()
+                                       (1+ close-bracket)))
+                         (close-paren (when open-paren
+                                        (position #\) string
+                                                  :start (1+ open-paren))))
+                         (open-bracket2 (when (eql next-char #\[)
+                                          (1+ close-bracket)))
+                         (close-bracket2
+                           (when open-bracket2
+                             (position #\] string :start (1+ open-bracket2)))))
+                    (cond
+                      ;; Explicit link: [label](url)
+                      (close-paren
+                       (flush-codifiable-buffer)
+                       (out "@uref{")
+                       (out-escaped (subseq string (1+ open-paren)
+                                            close-paren))
+                       (out ", ")
+                       (out (process-inline-markdown
+                             (subseq string (1+ i) close-bracket)))
+                       (out "}")
+                       (setf i close-paren))
+                      ;; Reflink: [label][id]
+                      (close-bracket2
+                       (flush-codifiable-buffer)
+                       ;; Process the name, drop the id
+                       (out (process-inline-markdown
+                             (subseq string (1+ i) close-bracket)))
+                       (setf i close-bracket2))
+                      ;; Not a recognized link structure, treat as a
+                      ;; normal character
+                      (t
+                       (buffer-codifiable-char char)))))
                  (t
                   (buffer-codifiable-char char)))
                (incf i))
@@ -600,7 +650,12 @@
   (assert (equal (process-inline-markdown "_PRINT_") "@emph{@code{print}}"))
   (assert (equal (process-inline-markdown "<httpabc>") "@url{httpabc}"))
   (assert (equal (process-inline-markdown "`N`") "@code{n}"))
-  (assert (equal (process-inline-markdown "`N`th") "@code{n}th")))
+  (assert (equal (process-inline-markdown "`N`th") "@code{n}th"))
+  (assert (equal (process-inline-markdown "[x](uri)") "@uref{uri, x}"))
+  (assert (equal (process-inline-markdown "[`x`](uri)") "@uref{uri, @code{x}}"))
+  (assert (equal (process-inline-markdown "[function][type]") "function"))
+  (assert (equal (process-inline-markdown "[`function`][type]")
+                 "@code{function}")))
 
 
 ;;;; Processing Markdown block elements

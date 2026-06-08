@@ -515,7 +515,8 @@
     it supports extensible sequences directly."
   (sb-sequence:emptyp generic-function)
   (sb-sequence:dosequence macro)
-  "The remaining list parallels the _Sequence Dictionary_, `17.3` CLHS."
+  "The remaining list parallels the _Sequence Dictionary_, see
+  [17.3][clhs] in the ANSI spec."
   (sb-sequence:copy-seq generic-function)
   (sb-sequence:fill generic-function)
   (sb-sequence:subseq generic-function)

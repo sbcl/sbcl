@@ -24,7 +24,3 @@ In the generated Texinfo, this can be a tad confusing. In output
 formats with links (e.g. HTML from PAX), this is clearly preferable.
 
 Nicknames, maybe?
-
-# Implement PAX reflinks, e.g. `[function][type]`
-
-See `PAX::@REFLINKS`.

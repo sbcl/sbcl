@@ -67,7 +67,7 @@ asdf:system.
 
 With PAX, you can browse the manual live. The documentation of this
 feature is available at
-@url{https://melisgl.github.io/mgl-pax-world/pax-manual.html#MGL-PAX:@@BROWSING-LIVE-DOCUMENTATION%20MGL-PAX:SECTION}.
+@uref{https://melisgl.github.io/mgl-pax-world/pax-manual.html#MGL-PAX:@@BROWSING-LIVE-DOCUMENTATION%20MGL-PAX:SECTION, online}.
 
 If you are browsing this manual live right now, here is the
 equivalent live link: @code{pax::@@browsing-live-documentation}.

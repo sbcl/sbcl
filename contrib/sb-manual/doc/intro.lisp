@@ -24,8 +24,9 @@
     specified in the _Description_.
 
   - The STRING type is considered to be the union of all types
-    `(ARRAY C (SIZE))` for all non-`NIL` subtypes `C` of CHARACTER,
-     excluding arrays specialized to the empty type.
+    `(ARRAY C (SIZE))` for all non-`NIL` subtypes `C` of
+     [CHARACTER][type], excluding arrays specialized to the empty
+     type.
 
   - The `:ORDER` long form option in DEFINE-METHOD-COMBINATION method
     group specifiers accepts the value NIL as well as

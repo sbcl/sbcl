@@ -32,8 +32,9 @@ exceptions involve internal inconsistencies in the standard.) See
   specified in the @emph{Description}.
 
 @item The @code{string} type is considered to be the union of all types
-  @code{(array c (size))} for all non-@code{nil} subtypes @code{c} of @code{character},
-   excluding arrays specialized to the empty type.
+  @code{(array c (size))} for all non-@code{nil} subtypes @code{c} of
+   @code{character}, excluding arrays specialized to the empty
+   type.
 
 @item The @code{:order} long form option in @code{define-method-combination} method
   group specifiers accepts the value @code{nil} as well as

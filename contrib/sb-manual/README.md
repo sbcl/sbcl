@@ -124,6 +124,44 @@ Note how the code block is indented 8 spaces from the `-` character.
 The required indentation remains the same if the child paragraph above
 is not present.
 
+## Links
+
+### Plain Links
+
+For short links:
+
+    <http://x.y>
+
+### Explicit Links
+
+For overly long links:
+
+    [label](http://x.y/a?b=c)
+
+When generating Texinfo, this is translated to `@url`, which is
+rendered like a HTML link in HTML and PDF, but with `label (see
+<uri>)` in Info.
+
+PAX will generate a normal link except in plain text, where it simply
+drops the URI.
+
+### Reflinks
+
+In PAX-generated output only, `FUNCTION` is autolinked to its
+definitions. If there is more than one, you can dismambiguate:
+
+    [FUNCTION][type]
+
+PAX will produce a single link in this case. If `(FUNCTION CLASS)` is
+documented in some section, then the link will point to that
+documentation. Else, the link will go to the CLHS. The latter can be
+forced:
+
+    [FUNCTION][(clhs type)]
+
+Since we don't link to definitions in Texinfo (except to sections),
+the above examples are translated to `FUNCTION` there.
+
 ## Notes
 
 - In many cases, just write a sentence:

@@ -1008,7 +1008,8 @@ otherwise. Signals an error if @code{sequence} is not a sequence.
 Executes @code{body} with @code{element} subsequently bound to each element of
 @code{sequence}, then returns @code{return}.
 @end deffn
-The remaining list parallels the @emph{Sequence Dictionary}, @code{17.3} @code{clhs}.
+The remaining list parallels the @emph{Sequence Dictionary}, see
+17.3 in the ANSI spec.
 
 @anchor{Generic function sb-sequence copy-seq}
 @ffindex @sortas{copy-seq sb-sequence} copy-seq [sb-sequence]

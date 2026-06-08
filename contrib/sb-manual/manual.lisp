@@ -38,7 +38,7 @@
 (defsection @browsing-live-with-pax (:title "Browsing Live with \\PAX")
   "With \\PAX, you can browse the manual live. The documentation of this
   feature is available at
-  <https://melisgl.github.io/mgl-pax-world/pax-manual.html#MGL-PAX:@BROWSING-LIVE-DOCUMENTATION%20MGL-PAX:SECTION>.
+  [online](https://melisgl.github.io/mgl-pax-world/pax-manual.html#MGL-PAX:@BROWSING-LIVE-DOCUMENTATION%20MGL-PAX:SECTION).
 
   If you are browsing this manual live right now, here is the
   equivalent live link: `PAX::@BROWSING-LIVE-DOCUMENTATION`.
