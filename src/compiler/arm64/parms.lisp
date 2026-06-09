@@ -71,7 +71,7 @@
 
 (gc-space-setup #+(or linux openbsd netbsd freebsd win32)
                      #x2F0000000
-                     #+darwin #x300000000
+                     #+darwin #x7000000000
                      #-darwin :read-only-space-size #-darwin 0
                      :fixedobj-space-start 0
                      :fixedobj-space-size 0
@@ -79,7 +79,7 @@
                      :text-space-size #.(* 2 65536 1024)
                      :dynamic-space-start
                      #-darwin #x1000000000
-                     #+darwin #x7003000000)
+                     #+darwin #x8003000000)
 
 (defconstant alien-linkage-table-growth-direction :up)
 (defconstant alien-linkage-table-entry-size 16)
