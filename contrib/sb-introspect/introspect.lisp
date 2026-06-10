@@ -646,7 +646,7 @@ determined (e.g. because the function was compiled with DEBUG 0)."
         ((typep function 'generic-function)
          (sb-pcl::generic-function-pretty-arglist function))
         (t
-         (let ((raw-result (%fun-lambda-list function)))
+         (let ((raw-result (%fun-lambda-list (sb-ext:unencapsulated-function function))))
            (if (eq raw-result :unknown)
                (values nil t)
                (values raw-result nil))))))
