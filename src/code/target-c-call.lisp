@@ -70,3 +70,11 @@
     ;; COPY-UB8 pins the lisp string, no need to do it here
     (sb-kernel:copy-ub8-from-system-area sap 0 result 0 length)
     result))
+
+(defun %naturalize-base-string/word (word)
+  (declare (type sb-vm:word word))
+  (let* ((length (alien-funcall (extern-alien "strlen" (function size-t unsigned)) word))
+         (result (make-string length :element-type 'base-char)))
+    (with-pinned-objects (result)
+      (sb-impl::memcpy (vector-sap result) (int-sap word) length))
+    result))

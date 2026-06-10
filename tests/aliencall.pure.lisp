@@ -39,3 +39,19 @@
     ;;    53F9FF58         LDR R9, #x1001A10048     ; printf
     ;; 2) 60023FD6         BLR R9
     #+arm64 (assert (= (loop for line in lines count (search "BLR" line)) 2))))
+
+(locally
+(declare (optimize (sb-c::alien-funcall-saves-fp-and-pc 0)))
+(define-alien-routine strerror (c-string :external-format :ascii :element-type base-char)
+  (e int)))
+
+(with-test (:name :return-c-string-optimizer :skipped-on (:not :x86-64))
+  ;; check that the thing actually works
+  (assert (plusp (length (strerror sb-unix:ebadf))))
+  (let ((lines (ctu:disassembly-lines #'strerror)))
+    ;; should tail-call the naturalize function
+    (assert (loop for line in lines
+                  thereis (and (search "JMP" line) (search "%NATURALIZE-BASE-STRING/WORD" line))))
+    ;; no alloc-tramp (no SAP consing), nor BIGNUM consing
+    (assert (loop for line in lines
+                  never (or (search "ALLOC" line) (search "BIGNUM" line))))))

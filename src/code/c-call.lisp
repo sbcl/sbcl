@@ -83,6 +83,8 @@
          :datum nil))
 
 (define-alien-type-method (c-string :naturalize-gen) (type alien)
+  ;; Potentially the SAFETY policy could influence whether to elide
+  ;; the null check on strings whose alien type says non-nullable.
   `(if (zerop (sap-int ,alien))
        ,(if (alien-c-string-type-not-null type)
             `(null-error ',type)
@@ -91,19 +93,32 @@
        ;; conversion, or whether we can just do a cheap byte-by-byte
        ;; copy of the c-string data.
        ;;
-       ;; On SB-UNICODE we can never do the cheap copy, even if the
-       ;; external format and element-type are suitable, since
+       ;; On SB-UNICODE the cheap copy is possible for external-format :ASCII
+       ;; and copying to a base-string. Otherwise it isn't since
        ;; simple-base-strings may not contain ISO-8859-1 characters.
        ;; If we need to check for non-ascii data in the input, we
        ;; might as well go through the usual external-format machinery
        ;; instead of rewriting another version of it.
-       ,(if #+sb-unicode t
-            #-sb-unicode (c-string-needs-conversion-p type)
-            `(c-string-to-string ,alien
-                                 (c-string-external-format ,type)
-                                 (alien-c-string-type-element-type
-                                  ,type))
-            `(%naturalize-c-string ,alien))))
+       ,(let ((conv `(c-string-to-string
+                      ,alien
+                      (c-string-external-format ,type)
+                      ',(alien-c-string-type-element-type type))))
+          #-sb-unicode
+          (if (c-string-needs-conversion-p type) conv `(%naturalize-c-string ,alien))
+          #+sb-unicode
+          (if (or (neq (alien-c-string-type-external-format type) :ascii)
+                  (neq (alien-c-string-type-element-type type) 'base-char)
+                   ;; this test might be unnecessary but if you're asking for maximum
+                   ;; safety then we should check for non-ASCII characters
+                   (sb-c::policy sb-c::*policy* (= safety 3)))
+              conv
+              ;; else "cheap byte-by-byte copy"
+              #-64-bit `(%naturalize-c-string ,alien)
+              ;; even better: avoid SAP consing. The CPU and OS assure that us that
+              ;; userspace can't have bit 63 on for two popular architectures.
+              #+64-bit
+              `(%naturalize-base-string/word #+(or arm64 x86-64) (the fixnum (sap-int ,alien))
+                                             #-(or arm64 x86-64) (sap-int ,alien))))))
 
 (define-alien-type-method (c-string :deport-gen) (type value)
   ;; This SAP taking is safe as DEPORT callers pin the VALUE when

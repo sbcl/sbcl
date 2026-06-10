@@ -2397,6 +2397,8 @@
 ;;;; ALIEN and call-out-to-C stuff
 
 (defknown %alien-funcall ((or string system-area-pointer) alien-type &rest t) *)
+#+64-bit
+(defknown sb-alien-internals:%naturalize-base-string/word (sb-vm:word) simple-base-string)
 
 ;; Used by WITH-PINNED-OBJECTS
 (defknown sb-vm::touch-object (t) (values)

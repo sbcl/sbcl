@@ -963,3 +963,12 @@ specifies the way that the argument is passed.
                (error "(STRUCT ~S) has unexpected size" tag)))))
     (check-size 'sb-unix::timespec)
     (check-size 'sb-unix::timeval)))
+
+;;; The overhead of Lisp may make the distinction between memmove() and memcpy()
+;;; irrelevant, but we may as well promise that the ranges don't overlap when one
+;;; of them is a freshly consed string, for example.
+(declaim (inline sb-impl::memcpy))
+(define-alien-routine ("memcpy" sb-impl::memcpy) system-area-pointer
+  (dest system-area-pointer)
+  (src system-area-pointer)
+  (n sb-unix::size-t))

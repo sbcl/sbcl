@@ -69,14 +69,6 @@
   (dest system-area-pointer)
   (src system-area-pointer)
   (n sb-unix::size-t))
-;;; The overhead of Lisp may make the distinction between memmove() and memcpy()
-;;; irrelevant, but we may as well promise that the ranges don't overlap when one
-;;; of them is a freshly consed string, for example.
-(declaim (inline memcpy))
-(define-alien-routine ("memcpy" memcpy) system-area-pointer
-  (dest system-area-pointer)
-  (src system-area-pointer)
-  (n sb-unix::size-t))
 
 (defun copy-ub8-to-system-area (src src-offset dst dst-offset length)
   (with-pinned-objects (src)

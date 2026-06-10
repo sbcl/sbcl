@@ -1012,7 +1012,7 @@ Lisp extension proposal by David N. Gray")
            "%CAST"
            "%DEREF-ADDR" "%HEAP-ALIEN" "%HEAP-ALIEN-ADDR"
            "%LOCAL-ALIEN-ADDR" "%LOCAL-ALIEN-FORCED-TO-MEMORY-P" "%SAP-ALIEN"
-           "%NATURALIZE-C-STRING"
+           "%NATURALIZE-C-STRING" "%NATURALIZE-BASE-STRING/WORD"
            "%SET-DEREF" "%SET-HEAP-ALIEN" "%SET-LOCAL-ALIEN" "%SET-SLOT"
            "%SLOT-ADDR" "*SAVED-FP*" "*VALUES-TYPE-OKAY*"
            "*ALIEN-TYPE-HASHSETS*"
