@@ -4443,7 +4443,7 @@
     (lower-one-sequence-test node test sequence key)))
 
 (defoptimizers optimizer
-    (substitute nsubstitute subst nsubst)
+    (substitute nsubstitute)
     ((new old sequence &rest args &key
           ((test test-keyword))
           ((test-not test-not-keyword))
@@ -4454,6 +4454,22 @@
                          args)
   (unless test-not
     (lower-item-test node test old sequence key)))
+
+(defoptimizers optimizer
+    (subst nsubst)
+    ((new old sequence &rest args &key
+          ((test test-keyword))
+          ((test-not test-not-keyword))
+          key
+          &allow-other-keys)
+     node)
+  (test-not-complementer test test-keyword test-not test-not-keyword
+                         args)
+  (unless test-not
+    (let ((new-test (change-test-lvar-based-on-item test old)))
+      (when new-test
+        (change-keyword-value (find-global-fun new-test t) :test test node))
+      nil)))
 
 (defoptimizers optimizer
     (mismatch search tree-equal
