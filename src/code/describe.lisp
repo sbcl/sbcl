@@ -614,7 +614,10 @@
                     (let ((fun (macro-function name)))
                       (values fun "a macro" (%fun-lambda-list fun))))
                    (t
-                    (let* ((fun (or function (fdefinition name)))
+                    (when function
+                      (setf function (unencapsulated-function function)))
+                    (let* ((fun (unencapsulated-function (or function
+                                                             (unencapsulated-function (fdefinition name)))))
                            (derived-type (and function
                                               (%fun-ftype function)))
                            (legal-name-p (legal-fun-name-p name))
