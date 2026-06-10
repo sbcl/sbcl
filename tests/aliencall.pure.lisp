@@ -45,7 +45,7 @@
 (define-alien-routine strerror (c-string :external-format :ascii :element-type base-char)
   (e int)))
 
-(with-test (:name :return-c-string-optimizer :skipped-on (:not :x86-64))
+(with-test (:name :return-c-string-optimizer :skipped-on (not (and :sb-unicode :x86-64)))
   ;; check that the thing actually works
   (assert (plusp (length (strerror sb-unix:ebadf))))
   (let ((lines (ctu:disassembly-lines #'strerror)))
