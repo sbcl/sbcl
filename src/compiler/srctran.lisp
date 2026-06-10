@@ -8452,12 +8452,11 @@
              (delay-ir1-optimizer node :constraint))))))
 
 (deftransform length ((sequence) * * :node node)
-  (let ((args (splice-fun-args sequence 'remove-duplicates nil nil)))
-    (cond (args
-           (make-transform-lambda 'sb-impl::length-remove-duplicates args))
-          (t
-           (make-transform-lambda 'sb-impl::length-delete-duplicates
-                                  (splice-fun-args sequence 'delete-duplicates nil))))))
+  (delay-ir1-transform node :ir1-phases)
+  (or (make-transform-lambda 'sb-impl::length-remove-duplicates (splice-fun-args sequence 'remove-duplicates nil nil))
+      (make-transform-lambda 'sb-impl::length-delete-duplicates (splice-fun-args sequence 'delete-duplicates nil nil))
+      (make-transform-lambda 'sb-impl::length-intersection (splice-fun-args sequence 'intersection nil nil))
+      (give-up-ir1-transform)))
 
 ;;; ENDP, NULL and NOT -> %REST-NULL
 ;;;

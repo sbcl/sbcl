@@ -1587,7 +1587,7 @@
   (step-info nil)
   ;; A plist of inline expansions
   (inline-expansions *inline-expansions* :type list :read-only t)
-  ;; Current COMPONENT-REOPTIMIZE-COUNTER set when calling delay-ir1-transform.
+  ;; Current COMPONENT-REOPTIMIZE-COUNTER + -PHASE-COUNTER set in delay-ir1-transform
   (delay-to -1 :type fixnum)
   (constraints-in)
   #+() (constraints-out))

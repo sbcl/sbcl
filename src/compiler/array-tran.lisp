@@ -2804,9 +2804,8 @@
        (delay-ir1-transform node :ir1-phases)
        ;; Handle (make-array n :element-type `(signed-byte ,x))
        ;; without consing
-       (let ((args (splice-fun-args type 'list nil nil)))
-         (when args
-           (make-transform-lambda 'sb-vm::%vector-widetag-and-n-bits-shift-list args)))))
+       (make-transform-lambda 'sb-vm::%vector-widetag-and-n-bits-shift-list
+                              (splice-fun-args type 'list nil nil))))
     (t
      (give-up-ir1-transform "ELEMENT-TYPE is not constant."))))
 

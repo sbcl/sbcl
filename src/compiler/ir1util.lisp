@@ -4231,6 +4231,7 @@ is :ANY, the function name is not checked."
                 (specifier-type 'simple-array))))))))
 
 (defun make-transform-lambda (fun args)
-  (let ((vars (make-gensym-list (length args))))
-    `(lambda ,vars
-       (,fun ,@vars))))
+  (when args
+    (let ((vars (make-gensym-list (length args))))
+      `(lambda ,vars
+         (,fun ,@vars)))))
