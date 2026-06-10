@@ -52,6 +52,7 @@
       (setf *default-c-string-external-format*
             (sb-impl::default-external-format))))
 
+(with-alien ((strlen (function size-t system-area-pointer) :extern))
 (defun %naturalize-c-string (sap)
   (declare (type system-area-pointer sap))
   ;; It can be assumed that any modern implementation of strlen() reads 4, 8, 16,
@@ -63,18 +64,20 @@
   ;; Below that, it's about the same to do a foreign call versus staying in lisp.
   ;; The limiting case of a 0 length string would be faster without the foreign call,
   ;; but pre-checking would slow down every other case.
-  (let* ((length (alien-funcall
-                 (extern-alien "strlen" (function size-t system-area-pointer))
-                 sap))
-         (result (make-string length :element-type 'base-char)))
-    ;; COPY-UB8 pins the lisp string, no need to do it here
-    (sb-kernel:copy-ub8-from-system-area sap 0 result 0 length)
-    result))
+  (let ((length (alien-funcall strlen sap)))
+    (if (= length 0)
+        "" ; #\nul is not standard-char, but all cross-compiled strings are base-string
+        (let ((result (make-string length :element-type 'base-char)))
+          ;; COPY-UB8 pins the lisp string, no need to do it here
+          (sb-kernel:copy-ub8-from-system-area sap 0 result 0 length)
+          result))))
 
 (defun %naturalize-base-string/word (word)
   (declare (type sb-vm:word word))
-  (let* ((length (alien-funcall (extern-alien "strlen" (function size-t unsigned)) word))
-         (result (make-string length :element-type 'base-char)))
-    (with-pinned-objects (result)
-      (sb-impl::memcpy (vector-sap result) (int-sap word) length))
-    result))
+  (let ((length (alien-funcall strlen (int-sap word))))
+    (if (= length 0)
+        "" ; #\nul is not standard-char, but all cross-compiled strings are base-string
+        (let ((result (make-string length :element-type 'base-char)))
+          (with-pinned-objects (result)
+            (sb-impl::memcpy (vector-sap result) (int-sap word) length))
+          result)))))
