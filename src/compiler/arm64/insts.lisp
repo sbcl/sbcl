@@ -3343,7 +3343,7 @@
   (def ushll2 #b1 #b1 #b10100))
 
 (macrolet
-    ((def (name u op &optional right)
+    ((def (name u op &optional right 2d)
        `(define-instruction ,name (segment rd rn size shift)
           ;; Conflicts with simd-modified-imm where immh=0
           ,@(loop for (size pos) in '((4 19)
@@ -3382,7 +3382,11 @@
                       q 0))
                (:4s
                 (setf immh #b100
-                      q 1)))
+                      q 1))
+               ,@(when 2d
+                   `((:2d
+                      (setf immh #b1000
+                            q 1)))))
              (setf immh (logior immh (ldb (byte (1- (integer-length immh)) 3) shift))
                    immb (ldb (byte 3 0) shift))
              (emit-simd-shift-by-imm segment
@@ -3395,7 +3399,8 @@
                                      (fpr-offset rd)))))))
   (def sli #b1 #b01010)
   (def sri #b1 #b01000 t)
-  (def ushr #b1 #b00000 t)
+  (def ushr #b1 #b00000 t t)
+  (def s-shl #b0 #b01010 nil t)
   (def shrn #b0 #b10000 t))
 
 (def-emitter simd-modified-imm
