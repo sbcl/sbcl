@@ -389,6 +389,12 @@
           ":GENCGC and :CHENEYGC are incompatible")
          ("(and sb-safepoint (not (and (or arm64 x86 x86-64) (or darwin linux win32))))"
           ":SB-SAFEPOINT not supported on selected arch/OS")
+         ("(and sb-fiber sb-safepoint)"
+          ":SB-FIBER and :SB-SAFEPOINT are incompatible")
+         ("(and sb-fiber (not (or x86-64 arm64)))"
+          ":SB-FIBER requires :X86-64 or :ARM64")
+         ("(and sb-fiber win32)"
+          ":SB-FIBER is not supported on :WIN32")
          ("(not (or elf mach-o win32))"
           "No execute object file format feature defined")
          ("(and cons-profiling (not sb-thread))" ":CONS-PROFILING requires :SB-THREAD")
