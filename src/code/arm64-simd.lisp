@@ -93,7 +93,7 @@
                                 ((flip) flip)
                                 ((temp)))
                        ((res complex-double-reg complex-double-float))
-                     (inst s-sub temp bits a-mask :4s)
+                     (inst sub temp bits a-mask :4s)
                      (inst cmhs temp z-mask temp :4s)
                      (inst and temp temp flip)
                      (inst eor res bits temp)))))))
@@ -434,13 +434,13 @@
       (inst ldr b (@ b-array 16 :post-index))
 
       ;; Upcase a
-      (inst s-sub temp a a-mask)
+      (inst sub temp a a-mask)
       (inst cmhs temp z-mask temp)
       (inst and temp temp flip)
       (inst eor a a temp)
 
       ;; Upcase b
-      (inst s-sub temp2 b a-mask)
+      (inst sub temp2 b a-mask)
       (inst cmhs temp2 z-mask temp2)
       (inst and temp2 temp2 flip)
       (inst eor b b temp2)
@@ -486,7 +486,7 @@
       (setf base-chars (reg-in-sc base-chars 'complex-double-reg))
 
       ;; Upcase 32-bit wide characters
-      (inst s-sub temp characters a-mask :4s)
+      (inst sub temp characters a-mask :4s)
       (inst cmhs temp z-mask temp :4s)
       (inst and temp temp flip)
       (inst eor characters characters temp)
@@ -496,7 +496,7 @@
       (inst ushll base-chars :4s base-chars :4h 0)
 
       ;; And upcase them too
-      (inst s-sub temp2 base-chars a-mask :4s)
+      (inst sub temp2 base-chars a-mask :4s)
       (inst cmhs temp2 z-mask temp2 :4s)
       (inst and temp2 temp2 flip)
       (inst eor base-chars base-chars temp2)
@@ -948,7 +948,7 @@
                   do
                   (inst cmeq temp bytes newlines :4s)
                   (inst bit last-newlines indexes temp)
-                  (inst s-add indexes indexes increment))
+                  (inst add indexes indexes increment))
 
             (inst add 32-bit-array 32-bit-array 64)
 

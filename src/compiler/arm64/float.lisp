@@ -328,9 +328,9 @@
                       (:generator ,cdcost
                         (inst ,cinst r x y :2d)))))))
   (frob + fadd +/single-float 2 +/double-float 2
-          s-fadd +/complex-single-float 3 +/complex-double-float 3)
+          fadd +/complex-single-float 3 +/complex-double-float 3)
   (frob - fsub -/single-float 2 -/double-float 2
-          s-fsub -/complex-single-float 3 -/complex-double-float 3)
+          fsub -/complex-single-float 3 -/complex-double-float 3)
   (frob * fmul */single-float 4  */double-float 5)
   (frob / fdiv //single-float 12 //double-float 19))
 
@@ -377,16 +377,16 @@
                   ,@(gen double-real-complex-name double-complex-real-name
                          'double-float 'complex-double-float
                          'double-reg 'complex-double-reg ':2d)))))
-  (frob + s-fadd 3 nil
+  (frob + fadd 3 nil
         +/real-complex-single-float +/complex-real-single-float
         +/real-complex-double-float +/complex-real-double-float)
-  (frob - s-fsub 3 nil
+  (frob - fsub 3 nil
         -/real-complex-single-float -/complex-real-single-float
         -/real-complex-double-float -/complex-real-double-float)
-  (frob * s-fmul 6 t
+  (frob * fmul 6 t
         */real-complex-single-float */complex-real-single-float
         */real-complex-double-float */complex-real-double-float)
-  (frob / s-fdiv 20 t
+  (frob / fdiv 20 t
         nil //complex-real-single-float
         nil //complex-real-double-float))
 
@@ -408,9 +408,9 @@
   (frob abs/double-float fabs abs double-reg double-float)
   (frob %negate/single-float fneg %negate single-reg single-float)
   (frob %negate/double-float fneg %negate double-reg double-float)
-  (frob %negate/complex-single-float s-fneg %negate
+  (frob %negate/complex-single-float fneg %negate
         complex-single-reg complex-single-float :2s)
-  (frob %negate/complex-double-float s-fneg %negate
+  (frob %negate/complex-double-float fneg %negate
         complex-double-reg complex-double-float :2d))
 
 
@@ -428,7 +428,7 @@
                 (:arg-types ,type)
                 (:result-types ,type)
                 (:generator 1
-                   (inst s-fneg r x ,complex-inst-size)
+                   (inst fneg r x ,complex-inst-size)
                    (inst ins r 0 x 0 ,real-inst-size)))))
   (frob conjugate/complex-single-float complex-single-reg complex-single-float :s :2s)
   (frob conjugate/complex-double-float complex-double-reg complex-double-float :d :2d))
@@ -454,15 +454,15 @@
                    (inst trn1 real x x ,complex-inst-size)
                    ;;        and [-ix ix]
                    (inst trn2 imag x x ,complex-inst-size)
-                   (inst s-fneg imag imag ,complex-inst-size)
+                   (inst fneg imag imag ,complex-inst-size)
                    (inst ins imag 1 x 1 ,real-inst-size)
                    ,swap-y
                    ;; Then we compute real = [ rx*ry rx*iy]
-                   (inst s-fmul real real y ,complex-inst-size)
+                   (inst fmul real real y ,complex-inst-size)
                    ;;             and imag = [-ix*iy ix*ry]
-                   (inst s-fmul imag imag swap-y ,complex-inst-size)
+                   (inst fmul imag imag swap-y ,complex-inst-size)
                    ;; and finally add those to obtain x * y.
-                   (inst s-fadd r real imag ,complex-inst-size)))))
+                   (inst fadd r real imag ,complex-inst-size)))))
   (frob */complex-single-float complex-single-reg complex-single-float :2s :s 20
         (inst rev64 swap-y y :2s))
   (frob */complex-double-float complex-double-reg complex-double-float :2d :d 25
