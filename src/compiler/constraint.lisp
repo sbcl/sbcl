@@ -187,7 +187,7 @@
     ;; over the whole vector.  Tracking extrema helps a bit.
     ;; [Well, it _should_ help if you do it right. We need sentinel
     ;; values that are not mistakable for actual indices]
-    (min 0 :type fixnum) ; BUG: min of 0 and %constraint-number is always 0
+    (min 0 :type fixnum)
     (max 0 :type fixnum))
 
   #+sb-devel
@@ -234,9 +234,14 @@
     (let ((number (%constraint-number constraint)))
       (conset-grow conset (1+ number))
       (setf (sbit (conset-vector conset) number) 1)
-      (setf (conset-min conset) (min number (conset-min conset)))
-      (when (>= number (conset-max conset))
-        (setf (conset-max conset) (1+ number))))
+      (cond
+        ((eql (conset-min conset) (conset-max conset)) ; it must be empty if so
+         (setf (conset-min conset) number
+               (conset-max conset) (1+ number)))
+        (t
+         (setf (conset-min conset) (min number (conset-min conset)))
+         (when (>= number (conset-max conset))
+           (setf (conset-max conset) (1+ number))))))
     conset)
 
   (defun conset-delete (constraint conset)
@@ -280,12 +285,17 @@
                 ;; Update the extrema.
                 ,(ecase name
                    ((conset-union)
-                    `(setf (conset-min conset-1)
-                           (min (conset-min conset-1)
-                                (conset-min conset-2))
-                           (conset-max conset-1)
-                           (max (conset-max conset-1)
-                                (conset-max conset-2))))
+                    `(let ((empty1 (= (conset-min conset-1) (conset-max conset-1)))
+                           (empty2 (= (conset-min conset-2) (conset-max conset-2))))
+                       (cond (empty2) ; conset-2 is empty. Leave conset-1 bounds unchanged
+                             (empty1  ; conset-1 is empty, inherit conset-2 bounds
+                              (setf (conset-min conset-1) (conset-min conset-2)
+                                    (conset-max conset-1) (conset-max conset-2)))
+                             (t ; Both nonempty
+                              (setf (conset-min conset-1)
+                                    (min (conset-min conset-1) (conset-min conset-2))
+                                    (conset-max conset-1)
+                                    (max (conset-max conset-1) (conset-max conset-2)))))))
                    ((conset-intersection)
                     `(let ((start (max (conset-min conset-1)
                                        (conset-min conset-2)))
