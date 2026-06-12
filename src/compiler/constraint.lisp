@@ -494,7 +494,7 @@
                   (do-anonymous () ((= ,word 0)) ; no NIL block, so RETURN in body gets totally out
                     (let ((,constraint
                            (locally (declare (optimize (insert-array-bounds-checks 0)))
-                             (aref ,universe (count-trailing-zeros ,word)))))
+                             (aref ,universe (+ (* ,index sb-vm:n-word-bits) (count-trailing-zeros ,word))))))
                       ,@body)
                     ;; Clear the lowest 1 bit via the Brian Kernighan technique (allegedly)
                     (setq ,word (logand ,word (sb-vm::+-mod64 ,word -1)))))
