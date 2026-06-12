@@ -185,7 +185,9 @@
     ;; Bit-vectors win over lightweight hashes for copy, union,
     ;; intersection, difference, but lose for iteration if you iterate
     ;; over the whole vector.  Tracking extrema helps a bit.
-    (min 0 :type fixnum)
+    ;; [Well, it _should_ help if you do it right. We need sentinel
+    ;; values that are not mistakable for actual indices]
+    (min 0 :type fixnum) ; BUG: min of 0 and %constraint-number is always 0
     (max 0 :type fixnum))
 
   #+sb-devel
@@ -456,12 +458,38 @@
 ;;; optimisation to avoid useless copies in ADD-TEST-CONSTRAINTS and
 ;;; FIND-BLOCK-TYPE-CONSTRAINTS.
 (defmacro do-conset-elements ((constraint conset &optional result) &body body)
-  (let ((index (gensym "INDEX"))
-        (conset-vector (gensym "CONSET-VECTOR"))
-        (universe (gensym "UNIVERSE")))
+  (let ((index '#:index) ; gensym considered harmful
+        (conset-vector '#:conset-vector)
+        (universe '#:universe)
+        (word '#:word)
+        (minword '#:min)
+        (maxword '#:max))
+    (declare (ignorable word minword maxword))
     `(let ((,conset-vector (conset-vector ,conset))
+           ;; WITH-VECTOR-DATA on the universe and treating it as simple-vector
+           ;; henceforth could be a further optimization.
            (,universe *constraint-universe*))
        (declare (optimize speed))
+       ;; Notice that in the algorithm based on CTZ we don't actually have to restrict the scan
+       ;; strictly between CONSET-MIN and CONSET-MAX, because those are just hints where to find
+       ;; nonzero bits. Interestingly CONSET-MIN seems to have a flaw-  we don't maintain it
+       ;; properly so it is stuck at 0 thus entirely defeating that optimization.
+       #+(and (not sb-xc-host) (or arm64 x86-64)) ; ctz is not implemented everywhere
+       (let ((,minword (floor (conset-min ,conset) sb-vm:n-word-bits))
+             (,maxword (floor (1- (conset-max ,conset)) sb-vm:n-word-bits)))
+         (aver (< (1- (conset-max ,conset)) (length ,universe)))
+         (loop for ,index of-type index-or-minus-1 from ,minword to ,maxword
+             do (let ((,word (%vector-raw-bits ,conset-vector ,index)))
+                  (declare (sb-vm:word ,word))
+                  (do-anonymous () ((= ,word 0)) ; no NIL block, so RETURN in body gets totally out
+                    (let ((,constraint
+                           (locally (declare (optimize (insert-array-bounds-checks 0)))
+                             (aref ,universe (count-trailing-zeros ,word)))))
+                      ,@body)
+                    ;; Clear the lowest 1 bit via the Brian Kernighan technique (allegedly)
+                    (setq ,word (logand ,word (sb-vm::+-mod64 ,word -1)))))
+             finally (return ,result)))
+       #+(or sb-xc-host (not (or arm64 x86-64)))
        (loop for ,index from (conset-min ,conset) below (conset-max ,conset)
              do (when (plusp (sbit ,conset-vector ,index))
                   (let ((,constraint (aref ,universe ,index)))
