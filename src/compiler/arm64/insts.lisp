@@ -19,7 +19,7 @@
             negative-add-sub-immediate-p
             encode-logical-immediate fixnum-encode-logical-immediate
             ldr-str-offset-encodable ldp-stp-offset-p
-            bic-mask extend lsl lsr asr ror @ encode-fp-immediate) "SB-VM")
+            extend lsl lsr asr ror @ encode-fp-immediate) "SB-VM")
   ;; Imports from SB-VM into this package
   (import '(sb-vm::*register-names*
             sb-vm::add-sub-immediate
@@ -796,19 +796,56 @@
                (error 'cannot-encode-immediate-operand :value rm))
              (emit-logical-imm segment size ,opc n immr imms (gpr-offset rn) (gpr-offset rd))))))))
 
-(def-logical-imm-and-reg and #b00
-  (:printer logical-imm ((op #b00) (n 0)))
-  (:printer logical-reg ((op #b00) (n 0))))
-(def-logical-imm-and-reg orr #b01
-  (:printer logical-imm ((op #b01)))
-  (:printer logical-reg ((op #b01)))
-  (:printer logical-imm ((op #b01) (rn 31))
-            '('mov :tab rd  ", " imm))
-  (:printer logical-reg ((op #b01) (rn 31))
-                        '('mov :tab rd ", " rm shift)))
-(def-logical-imm-and-reg eor #b10
-  (:printer logical-imm ((op #b10)))
-  (:printer logical-reg ((op #b10))))
+(defmacro def-logical-imm-and-reg+simd (name opc printers simd-u simd-size simd-op &rest simd-printer)
+  `(define-instruction ,name (segment rd rn rm &optional (size :16b))
+     (:printer simd-three-same ((u ,simd-u) (size ,simd-size) (op ,simd-op))
+               ,@simd-printer)
+     ,@printers
+     (:emitter
+      (if (fp-register-p rd)
+          (emit-simd-three-same segment
+                                (encode-vector-size size)
+                                ,simd-u
+                                ,simd-size
+                                (fpr-offset rm)
+                                ,simd-op
+                                (fpr-offset rn)
+                                (fpr-offset rd))
+          (if (or (register-p rm)
+                  (shifter-operand-p rm))
+              (emit-logical-reg-inst segment ,opc 0 rd rn rm)
+              (let ((size (reg-size rd)))
+                (multiple-value-bind (n immr imms)
+                    (encode-logical-immediate rm (if (= size 1)
+                                                     64
+                                                     32))
+                  (unless n
+                    (error 'cannot-encode-immediate-operand :value rm))
+                  (emit-logical-imm segment size ,opc n immr imms (gpr-offset rn) (gpr-offset rd)))))))))
+
+(def-logical-imm-and-reg+simd and #b00
+  ((:printer logical-imm ((op #b00) (n 0)))
+   (:printer logical-reg ((op #b00) (n 0))))
+  #b0 #b00 #b00011)
+
+(def-logical-imm-and-reg+simd orr #b01
+  ((:printer logical-imm ((op #b01)))
+   (:printer logical-reg ((op #b01)))
+   (:printer logical-imm ((op #b01) (rn 31))
+             '('mov :tab rd  ", " imm))
+   (:printer logical-reg ((op #b01) (rn 31))
+             '('mov :tab rd ", " rm shift)))
+  #b0 #b10 #b00011
+  '((:cond
+      ((rn :same-as rm) 'mov)
+      (t 'orr))
+    :tab rd  ", " rn (:unless (:same-as rn) ", " rm)))
+
+(def-logical-imm-and-reg+simd eor #b10
+  ((:printer logical-imm ((op #b10)))
+   (:printer logical-reg ((op #b10))))
+  #b1 #b00 #b00011)
+
 (def-logical-imm-and-reg ands #b11
   (:printer logical-imm ((op #b11)))
   (:printer logical-reg ((op #b11)))
@@ -826,15 +863,33 @@
      (:emitter
       (emit-logical-reg-inst segment ,opc 1 rd rn rm))))
 
-(defun bic-mask (x)
-  (ldb (byte 64 0) (lognot x)))
+(defmacro def-logical-reg+simd (name opc printers
+                                simd-u simd-size simd-op &rest simd-printer)
+  `(define-instruction ,name (segment rd rn rm &optional (size :16b))
+     ,@printers
+     ,@simd-printer
+     (:emitter
+      (if (fp-register-p rd)
+          (emit-simd-three-same segment
+                                (encode-vector-size size)
+                                ,simd-u
+                                ,simd-size
+                                (fpr-offset rm)
+                                ,simd-op
+                                (fpr-offset rn)
+                                (fpr-offset rd))
+          (emit-logical-reg-inst segment ,opc 1 rd rn rm)))))
 
-(def-logical-reg bic #b00
-  (:printer logical-reg ((op #b00) (n 1))))
-(def-logical-reg orn #b01
-  (:printer logical-reg ((op #b01) (n 1)))
-  (:printer logical-reg ((op #b01) (n 1) (rn 31))
-            '('mvn :tab rd ", " rm shift)))
+(def-logical-reg+simd bic #b00
+  ((:printer logical-reg ((op #b00) (n 1))))
+   #b0 #b01 #b00011)
+
+(def-logical-reg+simd orn #b01
+  ((:printer logical-reg ((op #b01) (n 1)))
+   (:printer logical-reg ((op #b01) (n 1) (rn 31))
+             '('mvn :tab rd ", " rm shift)))
+  #b0 #b11 #b00011)
+
 (def-logical-reg eon #b10
   (:printer logical-reg ((op #b10) (n 1))))
 (def-logical-reg bics #b11
@@ -996,12 +1051,16 @@
 (define-instruction-macro mov-sp (rd rm)
   `(inst add ,rd ,rm 0))
 
-(define-instruction-macro mov (rd rm)
+(define-instruction-macro mov (rd rm &optional (size :16b))
   `(let ((rd ,rd)
-         (rm ,rm))
-     (if (integerp rm)
-         (sb-vm::load-immediate-word rd rm)
-         (inst orr rd zr-tn rm))))
+         (rm ,rm)
+         (size ,size))
+     (cond ((integerp rm)
+            (sb-vm::load-immediate-word rd rm))
+           ((fp-register-p rd)
+            (inst orr rd rm rm size))
+           (t
+            (inst orr rd zr-tn rm)))))
 
 (define-instruction movn (segment rd imm &optional (shift 0))
   (:printer move-wide ((op #b00)))
@@ -2880,12 +2939,6 @@
     (:4s (values 1 #b10))
     (:2d (values 1 #b11))))
 
-(define-instruction-macro s-mov (rd rn &optional (size :16b))
-  `(let ((rd ,rd)
-         (rn ,rn)
-         (size ,size))
-     (inst s-orr rd rn rn size)))
-
 (macrolet ((def (name u size op &rest printer)
              `(define-instruction ,name (segment rd rn rm &optional (size :16b))
                 (:printer simd-three-same ((u ,u) (size ,size) (op ,op))
@@ -2899,16 +2952,6 @@
                                        ,op
                                        (fpr-offset rn)
                                        (fpr-offset rd))))))
-  (def s-and #b0 #b00 #b00011)
-  (def s-bic #b0 #b01 #b00011)
-  (def s-orr #b0 #b10 #b00011
-    '((:cond
-        ((rn :same-as rm) 'mov)
-        (t 'orr))
-      :tab rd  ", " rn (:unless (:same-as rn) ", " rm)))
-  (def s-orn #b0 #b11 #b00011)
-
-  (def s-eor #b1 #b00 #b00011)
   (def bsl #b1 #b01 #b00011)
   (def bit #b1 #b10 #b00011)
   (def bif #b1 #b11 #b00011))
@@ -3400,7 +3443,7 @@
   (def sli #b1 #b01010)
   (def sri #b1 #b01000 t)
   (def ushr #b1 #b00000 t t)
-  (def s-shl #b0 #b01010 nil t)
+  (def shl #b0 #b01010 nil t)
   (def shrn #b0 #b10000 t))
 
 (def-emitter simd-modified-imm

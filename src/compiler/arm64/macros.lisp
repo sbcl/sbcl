@@ -26,12 +26,6 @@
     `(unless (location= ,n-dst ,n-src)
        (inst fmov ,n-dst ,n-src))))
 
-(defmacro move-complex-double (dst src)
-  (once-only ((n-dst dst)
-              (n-src src))
-    `(unless (location= ,n-dst ,n-src)
-       (inst s-mov ,n-dst ,n-src))))
-
 (defun logical-mask (x)
   (cond ((encode-logical-immediate x)
          x)
@@ -609,3 +603,6 @@
         (setf prev-constant nil)
         (load-stack-tn ,temp ,tn)
         ,temp))))
+
+(defun bic-mask (x)
+  (ldb (byte 64 0) (lognot x)))

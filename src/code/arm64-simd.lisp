@@ -95,8 +95,8 @@
                        ((res complex-double-reg complex-double-float))
                      (inst s-sub temp bits a-mask :4s)
                      (inst cmhs temp z-mask temp :4s)
-                     (inst s-and temp temp flip)
-                     (inst s-eor res bits temp)))))))
+                     (inst and temp temp flip)
+                     (inst eor res bits temp)))))))
 
 (defun simd-nreverse8 (result vector start end)
   (declare (optimize speed (safety 0)))
@@ -436,14 +436,14 @@
       ;; Upcase a
       (inst s-sub temp a a-mask)
       (inst cmhs temp z-mask temp)
-      (inst s-and temp temp flip)
-      (inst s-eor a a temp)
+      (inst and temp temp flip)
+      (inst eor a a temp)
 
       ;; Upcase b
       (inst s-sub temp2 b a-mask)
       (inst cmhs temp2 z-mask temp2)
-      (inst s-and temp2 temp2 flip)
-      (inst s-eor b b temp2)
+      (inst and temp2 temp2 flip)
+      (inst eor b b temp2)
 
       (inst cmeq a a b)
       (inst uminv a a :16b)
@@ -488,8 +488,8 @@
       ;; Upcase 32-bit wide characters
       (inst s-sub temp characters a-mask :4s)
       (inst cmhs temp z-mask temp :4s)
-      (inst s-and temp temp flip)
-      (inst s-eor characters characters temp)
+      (inst and temp temp flip)
+      (inst eor characters characters temp)
 
       ;; Widen 8-bit wide characters to 32-bits
       (inst ushll base-chars :8h base-chars :8b 0)
@@ -498,8 +498,8 @@
       ;; And upcase them too
       (inst s-sub temp2 base-chars a-mask :4s)
       (inst cmhs temp2 z-mask temp2 :4s)
-      (inst s-and temp2 temp2 flip)
-      (inst s-eor base-chars base-chars temp2)
+      (inst and temp2 temp2 flip)
+      (inst eor base-chars base-chars temp2)
 
       (inst cmeq base-chars base-chars characters :4s)
       (inst uminv base-chars base-chars :4s)
@@ -696,7 +696,7 @@
                 (check-ascii next-bytes temp DONE)
 
                 LOOP
-                (inst s-mov bytes next-bytes)
+                (inst mov bytes next-bytes)
                 (inst ldr next-bytes (@ byte-array 16))
                 (check-ascii next-bytes temp DONE)
 
@@ -724,7 +724,7 @@
 
                 ;; bit-mask has powers of two for each byte index,
                 ;; adding them together will produce an 8-bit mask.
-                (inst s-and temp2 temp bit-mask)
+                (inst and temp2 temp bit-mask)
 
                 (inst addv temp temp2 :8b)
                 (inst fmov tmp-tn (reg-in-sc temp 'single-reg))
@@ -826,7 +826,7 @@
                 (check-ascii next-bytes temp DONE)
 
                 LOOP
-                (inst s-mov bytes next-bytes)
+                (inst mov bytes next-bytes)
                 (inst ldr next-bytes (@ byte-array 16))
                 (check-ascii next-bytes temp DONE)
 
@@ -851,7 +851,7 @@
 
                 ;; bit-mask has powers of two for each byte index,
                 ;; adding them together will produce an 8-bit mask.
-                (inst s-and temp2 temp bit-mask)
+                (inst and temp2 temp bit-mask)
 
                 (inst addv temp temp2 :8b)
                 (inst fmov tmp-tn (reg-in-sc temp 'single-reg))
@@ -938,9 +938,9 @@
             (inst ldp bytes bytes2 (@ 32-bit-array))
             (inst ldp bytes3 bytes4 (@ 32-bit-array 32))
 
-            (inst s-orr temp bytes bytes2)
-            (inst s-orr temp2 bytes3 bytes4)
-            (inst s-orr temp temp temp2)
+            (inst orr temp bytes bytes2)
+            (inst orr temp2 bytes3 bytes4)
+            (inst orr temp temp temp2)
             (check-ascii temp temp DONE 4)
 
             ;; Find newlines

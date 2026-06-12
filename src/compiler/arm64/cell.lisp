@@ -811,7 +811,7 @@
   (def single single-float single-reg move-float)
   (def double double-float double-reg move-float)
   (def complex-single complex-single-float complex-single-reg move-float)
-  (def complex-double complex-double-float complex-double-reg move-complex-double))
+  (def complex-double complex-double-float complex-double-reg move))
 
 (define-vop (raw-instance-atomic-incf/word)
   (:translate %raw-instance-atomic-incf/word)
