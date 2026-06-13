@@ -10,7 +10,8 @@
                (:file "manual")
                (:module "doc/"
                 :serial t
-                :components ((:file "sbcl")
+                :components ((:file "concepts")
+                             (:file "sbcl")
                              (:file "support-and-bugs")
                              (:file "intro")
                              (:file "start-stop")

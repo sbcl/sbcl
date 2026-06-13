@@ -560,6 +560,8 @@ not @code{load}; hence initialization files can be used to set startup
 @code{*package*} and @code{*readtable*}, and for proclaiming a global optimization
 policy.
 
+@cindex Read-Eval-Print Loop
+@cindex REPL
 @itemize
 @item @strong{System Initialization File:} Defaults to @code{$SBCL_HOME/sbclrc},
   or if that doesn't exist to @code{/etc/sbclrc}. Can be overridden with
@@ -576,8 +578,9 @@ installed third party modules, etc.
 
 The user initialization file is intended for personal
 customizations, such as loading certain modules at startup,
-defining convenience functions to use in the REPL, handling
-automatic recompilation of FASLs (see @ref{fasl format}), etc.
+defining convenience functions to use in the REPL,
+handling automatic recompilation of FASLs (see @ref{fasl format}),
+etc.
 @end itemize
 
 Neither initialization file is required.

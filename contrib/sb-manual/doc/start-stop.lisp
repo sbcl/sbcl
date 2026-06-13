@@ -327,8 +327,9 @@
 
       The user initialization file is intended for personal
       customizations, such as loading certain modules at startup,
-      defining convenience functions to use in the REPL, handling
-      automatic recompilation of FASLs (see @FASL-FORMAT), etc.
+      defining convenience functions to use in the @REPL,
+      handling automatic recompilation of FASLs (see @FASL-FORMAT),
+      etc.
 
   Neither initialization file is required.")
 

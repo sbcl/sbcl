@@ -128,6 +128,7 @@
   (let ((title (remove-markup (section-title section)))
         (entries (section-entries section)))
     (format t "@node ~A~%" (texinfo-node-id section))
+    (write-concept-keys (concept-keys section) *standard-output*)
     (format t "~A ~A~%~%"
             (ecase depth
               (0 "@top")
@@ -286,4 +287,6 @@
 (generate-texinfo)
 
 #+nil
-(emit-texinfo-for-section @deprecation-declaration)
+(emit-texinfo-for-section @sb-aclrepl)
+#+nil
+(emit-texinfo-for-section @starting-and-stopping)

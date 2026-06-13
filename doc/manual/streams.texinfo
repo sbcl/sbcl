@@ -286,7 +286,7 @@ These generic functions are used to implement subclasses of
 Write enough blank space so that the next character will be
 written at the specified column. Returns true if the operation is
 successful, or @code{nil} if it is not supported for this stream. This is
-intended for use by by @code{pprint} and @code{format} ~T. The default method
+intended for use by by @code{pprint} and @code{format} @code{~t}. The default method
 uses @code{stream-line-column} and repeated calls to @code{stream-write-char}
 with a #SPACE character; it returns @code{nil} if @code{stream-line-column}
 returns @code{nil}.
@@ -305,7 +305,7 @@ otherwise. Used by @code{fresh-line}. The default method uses
 Return the column number where the next character
 will be written, or @code{nil} if that is not meaningful for this stream.
 The first column on a line is numbered 0. This function is used in
-the implementation of @code{pprint} and the @code{format} ~T directive. For every
+the implementation of @code{pprint} and the @code{format} @code{~t} directive. For every
 character output stream class that is defined, a method must be
 defined for this function, although it is permissible for it to
 always return @code{nil}.

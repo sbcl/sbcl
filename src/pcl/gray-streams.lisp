@@ -229,7 +229,7 @@
    "Return the column number where the next character
   will be written, or NIL if that is not meaningful for this stream.
   The first column on a line is numbered 0. This function is used in
-  the implementation of PPRINT and the FORMAT ~T directive. For every
+  the implementation of PPRINT and the FORMAT `~T` directive. For every
   character output stream class that is defined, a method must be
   defined for this function, although it is permissible for it to
   always return NIL."))
@@ -329,7 +329,7 @@
    "Write enough blank space so that the next character will be
    written at the specified column. Returns true if the operation is
    successful, or NIL if it is not supported for this stream. This is
-   intended for use by by PPRINT and FORMAT ~T. The default method
+   intended for use by by PPRINT and FORMAT `~T`. The default method
    uses STREAM-LINE-COLUMN and repeated calls to STREAM-WRITE-CHAR
    with a #\\SPACE character; it returns NIL if STREAM-LINE-COLUMN
    returns NIL."))

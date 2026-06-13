@@ -1,3 +1,9 @@
+@node concept index
+@comment  node-name,  next,  previous,  up
+@appendix Concept Index
+
+@printindex cp
+
 @node function index
 @comment  node-name,  next,  previous,  up
 @appendix Function and Macro Index

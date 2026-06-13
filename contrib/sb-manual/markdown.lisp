@@ -5,9 +5,12 @@
 ;;;; the COPYING file for more information.
 ;;;;
 ;;;; Written by Rudi Schlatte <rudi@constantly.at>, mangled by
-;;;; Nikodemus Siivola. Brought closer to Markdown by Gabor Melis.
+;;;; Nikodemus Siivola. Brought closer to Markdown, extended with
+;;;; section linking and concept indexing by Gabor Melis.
 
 (in-package :sb-manual)
+
+(defvar *concept-keys-to-prepend*)
 
 ;;; MARKDOWN-TO-TEXINFO converts a strict subset of Markdown to
 ;;; Texinfo. It also codifies (marks up as code) and downcases
@@ -118,8 +121,6 @@
 ;;; Linking
 ;;; -------
 ;;;
-;;; - Section references: @SECTION-NAME -> @ref{section name}
-;;;
 ;;; - <http...> -> @url{http...}
 ;;;
 ;;; - [label](uri) -> @uref{uri, label}
@@ -131,7 +132,16 @@
 ;;;     FUNCTION class only while FUNCTION links to both the class and
 ;;;     macro.
 ;;;
-;;; FIXME:
+;;; - SECTION references (see DEFSECTION):
+;;;
+;;;     @SECTION-NAME -> @ref{<section name>}
+;;;
+;;; - CONCEPT references (see DEFINE-CONCEPT):
+;;;
+;;;     - pure concept: @CONCEPT-NAME -> "" (no output)
+;;;     - titled concept: @CONCEPT-NAME -> <title>
+;;;
+;;; TODO:
 ;;;
 ;;; - Maybe implement glossary-terms (for books, "safe type", etc).
 (defun markdown-to-texinfo (string &optional lambda-list)
@@ -142,28 +152,33 @@
     (declare (special *texinfo-local-variables*))
     (flet ((flush-paragraph ()
              (when current-paragraph
-               (write-string (process-inline-markdown
-                              (format nil "~{~A~^~%~}"
-                                      (nreverse current-paragraph))))
+               (let* ((*concept-keys-to-prepend* ())
+                      (string (process-inline-markdown
+                               (format nil "~{~A~^~%~}"
+                                       (nreverse current-paragraph)))))
+                 (write-concept-keys *concept-keys-to-prepend* t)
+                 (write-string string))
                (terpri)
                (setf current-paragraph nil))))
       (loop while (< line-number (length lines))
             for line = (svref lines line-number)
-            do (multiple-value-bind (count collected)
-                   (parse-markdown-blocks lines line-number 0)
-                 (cond
-                   (count
-                    (flush-paragraph)
-                    (dolist (c collected)
-                      (write-line c))
-                    (incf line-number count))
-                   ((blankp line)
-                    (flush-paragraph)
-                    (write-line line)
-                    (incf line-number))
-                   (t
-                    (push line current-paragraph)
-                    (incf line-number)))))
+            do (let ((*concept-keys-to-prepend* ()))
+                 (multiple-value-bind (count collected)
+                     (parse-markdown-block lines line-number 0)
+                   (cond
+                     (count
+                      (flush-paragraph)
+                      (write-concept-keys *concept-keys-to-prepend* t)
+                      (dolist (c collected)
+                        (write-line c))
+                      (incf line-number count))
+                     ((blankp line)
+                      (flush-paragraph)
+                      (write-line line)
+                      (incf line-number))
+                     (t
+                      (push line current-paragraph)
+                      (incf line-number))))))
       (flush-paragraph))))
 
 
@@ -330,7 +345,7 @@
 (defparameter *word-characters*
   (format nil "abcdefghijklmnopqrstuvwxyz~
                ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789~
-               *@:-+&=<>#'"))
+               *~~@:-+&=<>#'"))
 
 (defparameter *word-delimiters* " ',.!?;()[]{}")
 
@@ -402,8 +417,8 @@
 
 (unwind-protect
      (progn
-       (defsection @test-section ())
-       (defsection @test5 ())
+       (defsection @test-section (:title "test section"))
+       (defsection @test5 (:title "Test5"))
        (assert (equal (locate-symbols "PRINT") '((0 5))))
        (assert (equal (locate-symbols "CL:PRINT") '((0 8))))
        (assert (equal (locate-symbols "*FEATURES*") '((0 10))))
@@ -430,18 +445,45 @@
     (let ((last 0))
       (dolist (symbol/index (locate-symbols line))
         ;; Flush unwritten text since the end of the previous symbol.
-        (write-string (escape-texinfo (subseq line last (first symbol/index)))
+        (write-string (escape-texinfo (subseq line last
+                                              (first symbol/index)))
                       result)
         (let* ((symbol-name (apply #'subseq line symbol/index))
                (symbol (read-from-string symbol-name)))
-          (if (section-name-p symbol)
-              (format result "@ref{~A}"
-                      (texinfo-node-id (symbol-value symbol)))
-              ;; We could use for @var{} if (HAS-LOCAL-REFERENCE-P SYMBOL).
-              (format result "@code{~A}" (escape-texinfo
-                                          (maybe-downcase symbol-name)))))
+          (cond ((doc-name-p symbol :section)
+                 (format result "@ref{~A}"
+                         (texinfo-node-id (symbol-value symbol))))
+                ((doc-name-p symbol :concept)
+                 (let* ((concept (symbol-value symbol))
+                        (title (doctitle concept)))
+                   (when title
+                     (format result "~A" (escape-texinfo title)))
+                   (setq *concept-keys-to-prepend*
+                         (append *concept-keys-to-prepend*
+                                 (multiplexing-concept-keys concept)))))
+                (t
+                 ;; We could use for @var{} if
+                 ;; (HAS-LOCAL-REFERENCE-P SYMBOL).
+                 (format result "@code{~A}"
+                         (escape-texinfo (maybe-downcase symbol-name))))))
         (setf last (second symbol/index)))
       (write-string (escape-texinfo (subseq line last)) result))))
+
+(defun write-concept-keys (keys stream)
+  (dolist (key keys)
+    (typecase key
+      (list
+       ;; We don't use @subentry because with it Texinfo always
+       ;; presents it as as hierarchical list even if it has only one
+       ;; branch.
+       (format stream "~&@cindex~{ ~A~}~%" key))
+      (symbol
+       (assert (and (boundp key)
+                    (typep (symbol-value key) (dummy 'concept)))
+               () "Variable ~S does not hold a concept." key)
+       (write-concept-keys (concept-keys (symbol-value key)) stream))
+      (t
+       (format stream "~&@cindex ~A~%" key)))))
 
 (defvar *downcase-uppercase-code* t)
 
@@ -460,18 +502,17 @@
               () "Section name ~S contains special texinfo characters." name)
       (substitute #\Space #\- (string-downcase name)))))
 
-(defun section-name-p (symbol)
-  (when (boundp symbol)
-    (if *using-pax*
-        (typep (symbol-value symbol) (dummy 'section))
-        (let ((value (symbol-value symbol)))
-          (and (listp value)
-               (listp (first value))
-               (eq (caar value) :%pax-lazy-section))))))
+(defun doc-name-p (symbol kind)
+  (if *using-pax*
+      (and (boundp symbol)
+           (typep (symbol-value symbol) (dummy (ecase kind
+                                                 (:section 'section)
+                                                 (:concept 'concept)))))
+      (lazy-doc-name-p symbol kind)))
 
 (when (and (not *using-pax*)
            *downcase-uppercase-code*)
-  (defsection @test-section ())
+  (defsection @test-section (:title "Test Section"))
   (unwind-protect
        (progn
          (assert (equal (codify-and-link "@TEST-SECTION") "@ref{test section}"))
@@ -832,7 +873,7 @@
                      ((and indent (>= indent child-base))
                       (flush-paragraph)
                       (multiple-value-bind (sub-consumed sub-result)
-                          (parse-markdown-blocks lines line-number child-base)
+                          (parse-markdown-block lines line-number child-base)
                         (if sub-consumed
                             (progn
                               (setf result (append (reverse sub-result) result))
@@ -859,16 +900,16 @@
 
 ;;; Parse the line at INDEX in LINES as a Markdown block. Return the
 ;;; number of lines consumed and the parse.
-(defun parse-markdown-blocks (lines index base-indent)
+(defun parse-markdown-block (lines index base-indent)
   (let ((line (svref lines index)))
     (multiple-value-bind (n-lines-consumed result)
         (collect-fenced-code lines index base-indent)
       (when n-lines-consumed
-        (return-from parse-markdown-blocks (values n-lines-consumed result))))
+        (return-from parse-markdown-block (values n-lines-consumed result))))
     (multiple-value-bind (n-lines-consumed result)
         (collect-blockquote lines index base-indent)
       (when n-lines-consumed
-        (return-from parse-markdown-blocks (values n-lines-consumed result))))
+        (return-from parse-markdown-block (values n-lines-consumed result))))
     (cond
       ((maybe-itemize-offset line)
        (collect-markdown-itemize lines index (maybe-itemize-offset line)))

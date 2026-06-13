@@ -83,6 +83,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 
 @menu
 @include sbcl-menu.texinfo
+* Concept Index: concept index.
 * Function and Macro Index: function index.
 * Variable and Constant Index: variable index.
 * Type Index: type index.

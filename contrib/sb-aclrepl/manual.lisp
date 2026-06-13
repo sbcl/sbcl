@@ -1,6 +1,6 @@
 (in-package :sb-manual)
 
-(defsection @sb-aclrepl (:title "sb-aclrepl")
+(defsection @sb-aclrepl (:title "sb-aclrepl" :concepts (~repl))
   "The `SB-ACLREPL` module offers an Allegro CL-style
   Read-Eval-Print Loop for SBCL, with integrated inspector. Adding a
   debugger interface is planned.
