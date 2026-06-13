@@ -95,8 +95,8 @@
                        ((res complex-double-reg complex-double-float))
                      (inst sub temp bits a-mask :4s)
                      (inst cmhs temp z-mask temp :4s)
-                     (inst and temp temp flip)
-                     (inst eor res bits temp)))))))
+                     (inst and temp temp flip :16b)
+                     (inst eor res bits temp :16b)))))))
 
 (defun simd-nreverse8 (result vector start end)
   (declare (optimize speed (safety 0)))
@@ -121,10 +121,10 @@
       (inst ldr vl (@ left))
       (inst ldr vr (@ right))
 
-      (inst rev64 vl vl)
-      (inst ext vl vl vl 8)
-      (inst rev64 vr vr)
-      (inst ext vr vr vr 8)
+      (inst rev64 vl vl :16b)
+      (inst ext vl vl vl 8 :16b)
+      (inst rev64 vr vr :16b)
+      (inst ext vr vr vr 8 :16b)
 
       (inst str vr (@ left 16 :post-index))
       (inst str vl (@ right -16 :post-index))
@@ -188,9 +188,9 @@
       (inst ldr vr (@ right))
 
       (inst rev64 vl vl :4s)
-      (inst ext vl vl vl 8)
+      (inst ext vl vl vl 8 :16b)
       (inst rev64 vr vr :4s)
-      (inst ext vr vr vr 8)
+      (inst ext vr vr vr 8 :16b)
 
       (inst str vr (@ left 16 :post-index))
       (inst str vl (@ right -16 :post-index))
@@ -239,8 +239,8 @@
       LOOP
       (inst ldr v (@ source s-i))
 
-      (inst rev64 v v)
-      (inst ext v v v 8)
+      (inst rev64 v v :16b)
+      (inst ext v v v 8 :16b)
       (inst str v (@ target t-i))
 
       (inst add t-i t-i 16)
@@ -294,7 +294,7 @@
       (inst ldr v (@ source s-i))
 
       (inst rev64 v v :4s)
-      (inst ext v v v 8)
+      (inst ext v v v 8 :16b)
       (inst str v (@ target t-i))
 
       (inst add t-i t-i 16)
@@ -434,18 +434,18 @@
       (inst ldr b (@ b-array 16 :post-index))
 
       ;; Upcase a
-      (inst sub temp a a-mask)
-      (inst cmhs temp z-mask temp)
-      (inst and temp temp flip)
-      (inst eor a a temp)
+      (inst sub temp a a-mask :16b)
+      (inst cmhs temp z-mask temp :16b)
+      (inst and temp temp flip :16b)
+      (inst eor a a temp :16b)
 
       ;; Upcase b
-      (inst sub temp2 b a-mask)
-      (inst cmhs temp2 z-mask temp2)
-      (inst and temp2 temp2 flip)
-      (inst eor b b temp2)
+      (inst sub temp2 b a-mask :16b)
+      (inst cmhs temp2 z-mask temp2 :16b)
+      (inst and temp2 temp2 flip :16b)
+      (inst eor b b temp2 :16b)
 
-      (inst cmeq a a b)
+      (inst cmeq a a b :16b)
       (inst uminv a a :16b)
       (inst umov cmp a 0 :b)
       (inst cbz cmp FALSE)
@@ -488,8 +488,8 @@
       ;; Upcase 32-bit wide characters
       (inst sub temp characters a-mask :4s)
       (inst cmhs temp z-mask temp :4s)
-      (inst and temp temp flip)
-      (inst eor characters characters temp)
+      (inst and temp temp flip :16b)
+      (inst eor characters characters temp :16b)
 
       ;; Widen 8-bit wide characters to 32-bits
       (inst ushll base-chars :8h base-chars :8b 0)
@@ -498,8 +498,8 @@
       ;; And upcase them too
       (inst sub temp2 base-chars a-mask :4s)
       (inst cmhs temp2 z-mask temp2 :4s)
-      (inst and temp2 temp2 flip)
-      (inst eor base-chars base-chars temp2)
+      (inst and temp2 temp2 flip :16b)
+      (inst eor base-chars base-chars temp2 :16b)
 
       (inst cmeq base-chars base-chars characters :4s)
       (inst uminv base-chars base-chars :4s)
@@ -696,7 +696,7 @@
                 (check-ascii next-bytes temp DONE)
 
                 LOOP
-                (inst mov bytes next-bytes)
+                (inst mov bytes next-bytes :16b)
                 (inst ldr next-bytes (@ byte-array 16))
                 (check-ascii next-bytes temp DONE)
 
@@ -715,16 +715,16 @@
                 ;; SLI retains the destination parts, matching elements
                 ;; will have FFFF, shifting and inserting will combine
                 ;; them with zeros producing just one FF
-                (inst sli temp temp2 :8h 8)
+                (inst sli temp temp2 8 :8h)
 
                 ;; Count matches
-                (inst ushr temp3 temp :16b 7)
+                (inst ushr temp3 temp 7 :16b)
                 (inst addv temp2 temp3 :8b)
                 (inst fmov count (reg-in-sc temp2 'single-reg))
 
                 ;; bit-mask has powers of two for each byte index,
                 ;; adding them together will produce an 8-bit mask.
-                (inst and temp2 temp bit-mask)
+                (inst and temp2 temp bit-mask :16b)
 
                 (inst addv temp temp2 :8b)
                 (inst fmov tmp-tn (reg-in-sc temp 'single-reg))
@@ -826,7 +826,7 @@
                 (check-ascii next-bytes temp DONE)
 
                 LOOP
-                (inst mov bytes next-bytes)
+                (inst mov bytes next-bytes :16b)
                 (inst ldr next-bytes (@ byte-array 16))
                 (check-ascii next-bytes temp DONE)
 
@@ -842,16 +842,16 @@
                 ;; SLI retains the destination parts, matching elements
                 ;; will have FFFF, shifting and inserting will combine
                 ;; them with zeros producing just one FF
-                (inst sli temp temp2 :8h 8)
+                (inst sli temp temp2 8 :8h)
 
                 ;; Count matches
-                (inst ushr temp3 temp :16b 7)
+                (inst ushr temp3 temp 7 :16b)
                 (inst addv temp2 temp3 :8b)
                 (inst fmov count (reg-in-sc temp2 'single-reg))
 
                 ;; bit-mask has powers of two for each byte index,
                 ;; adding them together will produce an 8-bit mask.
-                (inst and temp2 temp bit-mask)
+                (inst and temp2 temp bit-mask :16b)
 
                 (inst addv temp temp2 :8b)
                 (inst fmov tmp-tn (reg-in-sc temp 'single-reg))
@@ -938,17 +938,17 @@
             (inst ldp bytes bytes2 (@ 32-bit-array))
             (inst ldp bytes3 bytes4 (@ 32-bit-array 32))
 
-            (inst orr temp bytes bytes2)
-            (inst orr temp2 bytes3 bytes4)
-            (inst orr temp temp temp2)
+            (inst orr temp bytes bytes2 :16b)
+            (inst orr temp2 bytes3 bytes4 :16b)
+            (inst orr temp temp temp2 :16b)
             (check-ascii temp temp DONE 4)
 
             ;; Find newlines
             (loop for bytes in (list bytes bytes2 bytes3 bytes4)
                   do
                   (inst cmeq temp bytes newlines :4s)
-                  (inst bit last-newlines indexes temp)
-                  (inst add indexes indexes increment))
+                  (inst bit last-newlines indexes temp :16b)
+                  (inst add indexes indexes increment :16b))
 
             (inst add 32-bit-array 32-bit-array 64)
 
@@ -1005,8 +1005,8 @@
       (inst sub vector-start vector diff)
 
       (inst ldr bytes (@ vector-start))
-      (inst cmeq cmp bytes search)
-      (inst shrn cmp cmp :8b 4)
+      (inst cmeq cmp bytes search :16b)
+      (inst shrn cmp cmp 4 :8b)
 
       (inst fmov length (reg-in-sc cmp 'double-reg))
 
@@ -1023,8 +1023,8 @@
       (inst cmp vector end)
       (inst b :eq DONE)
       (inst ldr bytes (@ vector))
-      (inst cmeq cmp bytes search)
-      (inst shrn cmp cmp :8b 4)
+      (inst cmeq cmp bytes search :16b)
+      (inst shrn cmp cmp 4 :8b)
       (inst fmov length (reg-in-sc cmp 'double-reg))
       (inst cbnz length FOUND)
       (inst add vector vector 16)
@@ -1077,8 +1077,8 @@
       (inst b :le TAIL)
 
       (inst ldr bytes (@ vector))
-      (inst cmeq cmp bytes search)
-      (inst shrn cmp cmp :8b 4)
+      (inst cmeq cmp bytes search :16b)
+      (inst shrn cmp cmp 4 :8b)
       (inst fmov found-bits (reg-in-sc cmp 'double-reg))
       (inst cbnz found-bits FOUND)
 
@@ -1088,8 +1088,8 @@
       ;; Read past the start if needed.
       ;; Vector header and length are 16-byte long, making it safe.
       (inst ldr bytes (@ vector))
-      (inst cmeq cmp bytes search)
-      (inst shrn cmp cmp :8b 4)
+      (inst cmeq cmp bytes search :16b)
+      (inst shrn cmp cmp 4 :8b)
 
       ;; Clear the extra bits
       (inst sub padded padded-length length)
@@ -1150,7 +1150,7 @@
 
       (inst ldr bytes (@ vector-start))
       (inst cmeq cmp bytes search :4s)
-      (inst shrn cmp cmp :8b 4)
+      (inst shrn cmp cmp 4 :8b)
 
       (inst fmov length (reg-in-sc cmp 'double-reg))
 
@@ -1168,7 +1168,7 @@
       (inst b :eq DONE)
       (inst ldr bytes (@ vector))
       (inst cmeq cmp bytes search :4s)
-      (inst shrn cmp cmp :8b 4)
+      (inst shrn cmp cmp 4 :8b)
       (inst fmov length (reg-in-sc cmp 'double-reg))
       (inst cbnz length FOUND)
       (inst add vector vector 16)
@@ -1221,7 +1221,7 @@
       (inst b :le TAIL)
       (inst ldr bytes (@ vector))
       (inst cmeq cmp bytes search :4s)
-      (inst shrn cmp cmp :8b 4)
+      (inst shrn cmp cmp 4 :8b)
       (inst fmov found-bits (reg-in-sc cmp 'double-reg))
       (inst cbnz found-bits FOUND)
       (inst b LOOP)
@@ -1231,7 +1231,7 @@
       ;; Vector header and length are 16-byte long, making it safe.
       (inst ldr bytes (@ vector))
       (inst cmeq cmp bytes search :4s)
-      (inst shrn cmp cmp :8b 4)
+      (inst shrn cmp cmp 4 :8b)
 
       ;; Clear the extra bits
       (inst sub padded padded-length length)

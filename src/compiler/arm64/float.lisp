@@ -172,7 +172,7 @@
     (:results (y :scs (complex-single-reg) :load-if (not (location= x y))))
     (:note "complex single float move")
     (:generator 0
-      (move y x)))
+      (move y x :8b)))
 (define-move-vop complex-single-move :move
   (complex-single-reg) (complex-single-reg))
 
@@ -182,7 +182,7 @@
   (:results (y :scs (complex-double-reg) :load-if (not (location= x y))))
   (:note "complex double float move")
   (:generator 0
-    (move y x)))
+    (move y x :16b)))
 (define-move-vop complex-double-move :move
   (complex-double-reg) (complex-double-reg))
 
@@ -466,7 +466,7 @@
   (frob */complex-single-float complex-single-reg complex-single-float :2s :s 20
         (inst rev64 swap-y y :2s))
   (frob */complex-double-float complex-double-reg complex-double-float :2d :d 25
-        (inst ext swap-y y y 8)))
+        (inst ext swap-y y y 8 :16b)))
 
 (define-vop (fsqrtd)
   (:args (x :scs (double-reg)))
@@ -918,7 +918,7 @@
   (:generator 5
     (sc-case r
       (complex-single-reg
-       (move r real)
+       (move r real :8b)
        (inst ins r 1 imag 0 :s))
       (complex-single-stack
        (let ((nfp (current-nfp-tn vop))
@@ -948,7 +948,7 @@
   (:generator 5
     (sc-case r
       (complex-double-reg
-       (move r real)
+       (move r real :16b)
        (inst ins r 1 imag 0 :d))
       (complex-double-stack
        (let ((nfp (current-nfp-tn vop))
@@ -1045,7 +1045,7 @@
   (def swap-complex/complex-single-float complex-single-reg complex-single-float
     (inst rev64 r x :2s))
   (def swap-complex/complex-double-float complex-double-reg complex-double-float
-    (inst ext r x x 8)))
+    (inst ext r x x 8 :16b)))
 
 (define-vop ()
   (:translate round-double)

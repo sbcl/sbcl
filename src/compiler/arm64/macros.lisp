@@ -13,12 +13,13 @@
 
 ;;; Instruction-like macros.
 
-(defmacro move (dst src)
+(defmacro move (dst src &optional vector-size)
   "Move SRC into DST unless they are location=."
   (once-only ((n-dst dst)
               (n-src src))
     `(unless (location= ,n-dst ,n-src)
-       (inst mov ,n-dst ,n-src))))
+       (inst mov ,n-dst ,n-src ,@(when vector-size
+                                   `(,vector-size))))))
 
 (defmacro move-float (dst src)
   (once-only ((n-dst dst)
