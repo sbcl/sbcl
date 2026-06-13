@@ -65,8 +65,19 @@
                   pax:*document-pandoc-pdf-header-includes*
                   *pandoc-pdf-adjusted-table-of-contents))
         (pax:*document-pandoc-pdf-options*
-          (remove "--verbose" pax:*document-pandoc-pdf-options*
-                  :test #'equal)))
+          '(("-V" "papersize=a4")
+            ("-V" "margin-left=0.8in")
+            ("-V" "margin-right=0.8in")
+            ("-V" "margin-top=1.0in")
+            ("-V" "margin-bottom=1.0in")
+            ("-V" "fontfamily=XCharter")
+            ("-V" "fontsize=10pt")
+            ("-V" "colorlinks=true")
+            ("-V" "linkcolor=blue")
+            ("-V" "urlcolor=Maroon")
+            ("-V" "toccolor=blue")
+            #+nil
+            "--verbose")))
     (handler-bind ((warning #'muffle-uninteresting-warnings))
       (format t "Git root: ~A~%Git forge URI: ~A~%Output dir: ~A~%"
               *git-root* *git-forge-uri* *output-dir*)

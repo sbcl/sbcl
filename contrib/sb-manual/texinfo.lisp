@@ -147,7 +147,8 @@
           (format t "@menu~%"))
         (with-texinfo-to-file top-level-menus-to-file
           (dolist (child-section child-sections)
-            (format t "* ~A: ~A.~%" (remove-markup (section-title child-section))
+            (format t "* ~A: ~A.~%"
+                    (remove-markup (section-title child-section))
                     (texinfo-node-id child-section))))
         (unless top-level-menus-to-file
           (format t "@end menu~%~%"))))
