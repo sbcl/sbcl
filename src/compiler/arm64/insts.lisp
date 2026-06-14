@@ -3101,7 +3101,12 @@
   (def umin #b1 #b01101)
   (def umax #b1 #b01100)
   (def smin #b0 #b01101)
-  (def smax #b0 #b01100))
+  (def smax #b0 #b01100)
+  (def uhadd #b1 #b00000)
+  (def uqadd #b1 #b00001)
+  (def urhadd #b1 #b00010)
+  (def uhsub #b1 #b00100)
+  (def uqsub #b1 #b00101))
 
 (macrolet ((def (name u neg op)
              `(define-instruction ,name (segment rd rn rm size)
