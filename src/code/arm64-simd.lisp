@@ -1008,7 +1008,7 @@
       (inst cmeq cmp bytes search :16b)
       (inst shrn cmp cmp 4 :8b)
 
-      (inst fmov length (reg-in-sc cmp 'double-reg))
+      (inst fmov length cmp)
 
       ;; Discard the matching padding bits, multiplied by 4 because
       ;; each matching byte is 4-bit long after shrn.
@@ -1025,7 +1025,7 @@
       (inst ldr bytes (@ vector))
       (inst cmeq cmp bytes search :16b)
       (inst shrn cmp cmp 4 :8b)
-      (inst fmov length (reg-in-sc cmp 'double-reg))
+      (inst fmov length cmp)
       (inst cbnz length FOUND)
       (inst add vector vector 16)
       (inst b LOOP)
@@ -1079,7 +1079,7 @@
       (inst ldr bytes (@ vector))
       (inst cmeq cmp bytes search :16b)
       (inst shrn cmp cmp 4 :8b)
-      (inst fmov found-bits (reg-in-sc cmp 'double-reg))
+      (inst fmov found-bits cmp)
       (inst cbnz found-bits FOUND)
 
       (inst b LOOP)
@@ -1100,7 +1100,7 @@
       (inst mov length -1)
       (inst lsl padded length padded)
 
-      (inst fmov found-bits (reg-in-sc cmp 'double-reg))
+      (inst fmov found-bits cmp)
       (inst and found-bits found-bits padded)
       (inst cbz found-bits DONE)
 
@@ -1152,7 +1152,7 @@
       (inst cmeq cmp bytes search :4s)
       (inst shrn cmp cmp 4 :8b)
 
-      (inst fmov length (reg-in-sc cmp 'double-reg))
+      (inst fmov length cmp)
 
       ;; Discard the matching padding bits, multiplied by 4 because
       ;; each matching byte is 4-bit long after shrn.
@@ -1169,7 +1169,7 @@
       (inst ldr bytes (@ vector))
       (inst cmeq cmp bytes search :4s)
       (inst shrn cmp cmp 4 :8b)
-      (inst fmov length (reg-in-sc cmp 'double-reg))
+      (inst fmov length cmp)
       (inst cbnz length FOUND)
       (inst add vector vector 16)
       (inst b LOOP)
@@ -1222,7 +1222,7 @@
       (inst ldr bytes (@ vector))
       (inst cmeq cmp bytes search :4s)
       (inst shrn cmp cmp 4 :8b)
-      (inst fmov found-bits (reg-in-sc cmp 'double-reg))
+      (inst fmov found-bits cmp)
       (inst cbnz found-bits FOUND)
       (inst b LOOP)
 
@@ -1242,7 +1242,7 @@
       (inst mov length -1)
       (inst lsl padded length padded)
 
-      (inst fmov found-bits (reg-in-sc cmp 'double-reg))
+      (inst fmov found-bits cmp)
       (inst and found-bits found-bits padded)
       (inst cbz found-bits DONE)
 

@@ -468,6 +468,10 @@
     (format stream "V~d.~a" offset
             (decode-vector-size q (logior #b10 size)))))
 
+(defun print-simd-high-vector (value stream dstate)
+  (declare (ignore dstate))
+  (format stream "V~d.D[1]" value))
+
 (defun print-sys-reg (value stream dstate)
   (declare (ignore dstate))
   (princ (decode-sys-reg value) stream))

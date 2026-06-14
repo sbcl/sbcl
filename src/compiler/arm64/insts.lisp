@@ -121,6 +121,7 @@
   (define-arg-type simd-reg-cmode :printer #'print-simd-reg-cmode)
   (define-arg-type simd-table-regs :printer #'print-simd-table-regs)
   (define-arg-type simd-b-reg :printer #'print-simd-b-reg)
+  (define-arg-type simd-high-vector :printer #'print-simd-high-vector)
 
   (define-arg-type fp-imm :printer #'print-fp-imm)
 
@@ -2528,8 +2529,8 @@
 
 (def-emitter fp-conversion
   (size 1 31)
-  (#b00111100 8 23)
-  (type 1 22)
+  (#b0011110 7 24)
+  (type 2 22)
   (#b1 1 21)
   (opcode 5 16)
   (#b00000 6 10)
@@ -2539,8 +2540,8 @@
 (define-instruction-format (fp-conversion 32
                             :include fp-data-processing
                             :default-printer '(:name :tab rd ", " rn))
-  (op2 :field (byte 8 23) :value #b00111100)
-  (type :field (byte 1 22))
+  (op2 :field (byte 7 24) :value #b0011110)
+  (type :field (byte 2 22))
   (op1 :field (byte 1 21) :value #b1)
   (op :field (byte 5 16))
   (op3 :field (byte 6 10) :value #b0))
@@ -2796,9 +2797,13 @@
   (#b0 :field (byte 5 5))
   (rd :field (byte 5 0) :type 'float-reg))
 
-(define-instruction fmov (segment rd rn)
-  (:printer fp-conversion ((op #b110) (rd nil :type 'reg)))
-  (:printer fp-conversion ((op #b111) (rn nil :type 'reg)))
+(define-instruction fmov (segment rd rn &optional vector-index)
+  (:printer fp-conversion ((op #b00110) (rd nil :type 'reg)))
+  (:printer fp-conversion ((op #b00111) (rn nil :type 'reg)))
+  (:printer fp-conversion ((op #b01110) (rd nil :type 'reg)
+                                        (rn nil :type 'simd-high-vector)))
+  (:printer fp-conversion ((op #b01111) (rn nil :type 'reg)
+                                        (rd nil :type 'simd-high-vector)))
   (:printer fp-data-processing-1 ((op #b0)))
   (:printer fp-immediate ())
   (:emitter
@@ -2814,9 +2819,6 @@
                              (encode-fp-immediate rn)
                              0
                              (fpr-offset rd)))
-         ((or (sc-is rd complex-double-reg)
-              (sc-is rn complex-double-reg))
-          (bug "Implement"))
          ((and (fp-register-p rd)
                (fp-register-p rn))
           (assert (and (eq (tn-sc rd) (tn-sc rn))) (rd rn)
@@ -2828,25 +2830,29 @@
                (fp-register-p rn))
           (let* ((type (fp-reg-type rn))
                  (128-p (= type #b10)))
-            (emit-fp-conversion segment (if 128-p
-                                            1
-                                            type)
+            (when (and 128-p
+                       (not (eql vector-index 1)))
+              (setf 128-p nil
+                    type 1))
+            (emit-fp-conversion segment (min type 1)
                                 type
                                 (if 128-p
-                                    #b01111
-                                    #b110)
+                                    #b01110
+                                    #b00110)
                                 (fpr-offset rn) (gpr-offset rd))))
          ((and (register-p rn)
                (fp-register-p rd))
           (let* ((type (fp-reg-type rd))
                  (128-p (= type #b10)))
-            (emit-fp-conversion segment (if 128-p
-                                            1
-                                            type)
+            (when (and 128-p
+                       (not (eql vector-index 1)))
+              (setf 128-p nil
+                    type 1))
+            (emit-fp-conversion segment (min type 1)
                                 type
                                 (if 128-p
                                     #b01111
-                                    #b111)
+                                    #b00111)
                                 (gpr-offset rn) (fpr-offset rd)))))))
 
 (define-instruction load-from-label (segment dest label &optional lip)
@@ -3093,6 +3099,7 @@
                                          ,op
                                          (fpr-offset rn)
                                          (fpr-offset rd)))))))
+  (def cmtst #b0 #b10001)
   (def cmeq #b1 #b10001)
   (def cmgt #b0 #b00110)
   (def cmge #b0 #b00111)
