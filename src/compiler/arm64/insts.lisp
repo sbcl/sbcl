@@ -3347,7 +3347,7 @@
 (macrolet ((def (name u op)
              `(define-instruction ,name (segment rd rn size)
                 (:printer simd-across-lanes  ((u ,u) (op ,op)
-                                              (rd nil :type 'vhsd)))
+                                              (rd nil :type 'vbhs)))
                 (:emitter
                  (multiple-value-bind (q size) (encode-vector-size size)
                    (emit-simd-across-lanes
