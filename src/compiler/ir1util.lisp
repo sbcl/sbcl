@@ -4235,3 +4235,9 @@ is :ANY, the function name is not checked."
     (let ((vars (make-gensym-list (length args))))
       `(lambda ,vars
          (,fun ,@vars)))))
+
+(defun array-dimensions-specifier-p (x)
+  (and (proper-list-p x)
+       (loop for d in x
+             always (or (typep d 'index)
+                        (eq d '*)))))

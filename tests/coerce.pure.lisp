@@ -219,7 +219,15 @@
   (assert-type
    (lambda (x n)
      (coerce n (if x 'single-float 'double-float)))
-   float))
+   float)
+  (assert-type
+   (lambda (n e)
+     (coerce n `(simple-array ,e (* *))))
+   (simple-array * (* *)))
+  (assert-type
+   (lambda (n e)
+     (coerce n `(array ,e (*))))
+   vector))
 
 (with-test (:name :coerce-excluded-types)
   (assert-type

@@ -8889,6 +8889,16 @@
                        (constant-cons-type (lvar-type type)))
                  (when constant
                    (handle-constant type)))
+               (combination-match type (list* (:constant type) * (:constant dimensions))
+                 (case type
+                   ((array simple-array vector)
+                    (when (typep dimensions '(cons cons null))
+                      (let ((dimensions (car dimensions)))
+                        (when (array-dimensions-specifier-p dimensions)
+                          (make-array-type dimensions
+                                           :element-type *wild-type*
+                                           :complexp (unless (eq type 'simple-array)
+                                                       :maybe))))))))
                (combination-match type ((:or list list*) (:constant type) &rest *)
                  (case type
                    ((array simple-array vector)
