@@ -285,19 +285,19 @@
   (:policy :fast-safe)
   (:translate %memory-barrier)
   (:generator 3
-    (inst dmb)))
+    (inst dmb :ish)))
 
 (define-vop (%read-barrier)
   (:policy :fast-safe)
   (:translate %read-barrier)
   (:generator 3
-    (inst dmb)))
+    (inst dmb :ishld)))
 
 (define-vop (%write-barrier)
   (:policy :fast-safe)
   (:translate %write-barrier)
   (:generator 3
-    (inst dmb)))
+    (inst dmb :ishst)))
 
 (define-vop (%data-dependency-barrier)
   (:policy :fast-safe)
