@@ -915,10 +915,10 @@
       (emit-logical-reg-inst segment ,opc 1 rd rn rm))))
 
 (defmacro def-logical-reg+simd (name opc printers
-                                simd-u simd-size simd-op &rest simd-printer)
+                                simd-u simd-size simd-op)
   `(define-instruction ,name (segment rd rn rm &optional vector-size)
      ,@printers
-     ,@simd-printer
+     (:printer simd-three-same ((u ,simd-u) (size ,simd-size) (op ,simd-op)))
      (:emitter
       (if vector-size
           (emit-simd-three-same segment
