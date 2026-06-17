@@ -673,8 +673,6 @@
     (let* ((n (logand length (- sb-vm:n-word-bytes)))
            (string-sap (vector-sap string))
            (string-offset 0))
-      (declare (optimize sb-c::preserve-single-use-debug-variables
-                         sb-c::preserve-constants))
       (loop for byte-offset below n by sb-vm:n-word-bytes
             do
             (let ((word (sap-ref-word sap byte-offset)))
@@ -1195,7 +1193,7 @@
   :fd-stream-read-n-characters fd-stream-read-n-characters/utf-8
   :write-n-bytes-fun output-bytes/utf-8/lf
   :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff)))
-  :read-c-string-function read-from-c-string/utf-8/lf
+  :read-c-string-function read-from-c-string/utf-8/lf*
   :handle-size nil)
 
 (define-external-format/variable-width (:utf-8) t
@@ -1472,7 +1470,8 @@
               nil))
       (when decode-break-reason
         (c-string-decoding-error :utf-8 sap head decode-break-reason))
-      (when (zerop (char-code |ch|)) (return count)))))
+      (when (zerop (char-code |ch|)) (return count))))
+  (error "~s modified while validating UTF-8" sap))
 
 (declaim (inline word-has-zero-bytes))
 (defun word-has-zero-bytes (word)
@@ -1565,15 +1564,18 @@
              (t (return (values nil nil)))))
          (incf codepoints))))))
 
+
+;;; An entry point with boxed SAP for putting inside ef-read-c-string-fun
+(defun read-from-c-string/utf-8/lf* (sap element-type)
+  (read-from-c-string/utf-8/lf sap element-type))
+
 (defun read-from-c-string/utf-8/lf (sap element-type)
-  (declare (type system-area-pointer sap)
-           (optimize (sb-c:verify-arg-count 0)))
+  (declare (type system-area-pointer sap))
   (locally
       (declare (optimize (speed 3) (safety 0)))
     (multiple-value-bind (length all-ascii) (sb-vm::simd-utf8-strlen sap)
       (unless length
-        (find-bad-utf8 sap)
-        (error "~a modified while validating UTF-8" sap))
+        (find-bad-utf8 sap))
       (let* ((string
                (case element-type
                  (base-char (make-string length :element-type 'base-char))

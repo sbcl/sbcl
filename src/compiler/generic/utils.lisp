@@ -189,7 +189,7 @@
                               sc
                               (elt *float-regs* n))
                (descriptor))))
-        ((unsigned-byte-64 signed-byte-64)
+        ((system-area-pointer unsigned-byte-64 signed-byte-64)
          (let ((n (incf (#-c-stack-is-control-stack fixed-call-args-state-non-descriptors
                          #+c-stack-is-control-stack fixed-call-args-state-descriptors
                          state)))

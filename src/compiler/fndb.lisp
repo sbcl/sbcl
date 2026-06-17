@@ -2606,3 +2606,20 @@
 
 (defknown sb-kernel::single-float-invalid-operation (t single-float) nil (fixed-args))
 (defknown sb-kernel::double-float-invalid-operation (t double-float) nil (fixed-args))
+
+
+(defknown sb-impl::read-from-c-string/utf-8/lf (system-area-pointer t) simple-string
+    (movable flushable fixed-args))
+
+(defknown sb-vm::simd-utf8-strlen (system-area-pointer) (values t t)
+    (movable flushable fixed-args))
+
+(defknown sb-vm::simd-copy-utf8-sap-to-character-string
+    (system-area-pointer (simple-array character (*)) index)
+    t
+    (movable fixed-args))
+
+(defknown sb-impl::find-bad-utf8
+    (system-area-pointer)
+    nil
+    (movable fixed-args))

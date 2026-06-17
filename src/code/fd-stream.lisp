@@ -926,10 +926,13 @@
 (defun sb-alien::c-string-to-string (sap external-format element-type)
   (declare (type system-area-pointer sap)
            (explicit-check :result))
-  (locally
-      (declare (optimize (speed 3) (safety 0)))
-    (let ((external-format (get-external-format-or-lose external-format)))
-      (funcall (ef-read-c-string-fun external-format) sap element-type))))
+  (if (eq external-format :utf-8)
+      (read-from-c-string/utf-8/lf sap element-type)
+      (locally
+          (declare (optimize (speed 3) (safety 0))
+                   (muffle-conditions compiler-note))
+        (let ((external-format (get-external-format-or-lose external-format)))
+          (funcall (ef-read-c-string-fun external-format) sap element-type)))))
 
 (defun get-external-format-or-lose (external-format)
   (or (get-external-format external-format)

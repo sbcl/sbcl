@@ -83,7 +83,7 @@
                                                              simple-base-string)
     (movable flushable))
 (defknown sb-alien::c-string-to-string (system-area-pointer t t) simple-string
-    (movable flushable))
+    (movable fixed-args flushable))
 (defknown sb-alien::c-string-external-format * *
         (movable flushable))
 
