@@ -99,7 +99,9 @@
        ;; If we need to check for non-ascii data in the input, we
        ;; might as well go through the usual external-format machinery
        ;; instead of rewriting another version of it.
-       ,(let ((conv `(c-string-to-string
+       ,(let ((conv `(,(if (sb-c::compiling-p)
+                           'c-string-to-string
+                           'c-string-to-string-boxed-sap)
                       ,alien
                       (c-string-external-format ,type)
                       ',(alien-c-string-type-element-type type))))

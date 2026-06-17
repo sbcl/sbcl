@@ -934,6 +934,9 @@
         (let ((external-format (get-external-format-or-lose external-format)))
           (funcall (ef-read-c-string-fun external-format) sap element-type)))))
 
+(defun sb-alien::c-string-to-string-boxed-sap (sap external-format element-type)
+  (sb-alien::c-string-to-string sap external-format element-type))
+
 (defun get-external-format-or-lose (external-format)
   (or (get-external-format external-format)
       (error "Undefined external-format: ~S" external-format)))

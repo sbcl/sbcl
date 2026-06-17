@@ -4054,7 +4054,9 @@ is :ANY, the function name is not checked."
                 *lexenv*)))
     t))
 
-(defun compiling-p (environment)
+(defun compiling-p (&optional (environment
+                               (and (boundp '*lexenv*)
+                                    (symbol-value '*lexenv*))))
   (and (boundp 'sb-c:*compilation*)
        environment
        #+sb-fasteval
