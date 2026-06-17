@@ -1258,3 +1258,195 @@
       (inst sub found-bits vector vector*)
       (inst lsr res found-bits 1)
       DONE)))
+
+(defun simd-utf8-strlen (sap)
+  (declare (system-area-pointer sap)
+           (optimize speed (safety 0)))
+  (inline-vop
+      (((bytes        sap-reg t) sap)
+       ((ptr          sap-reg t))
+
+       ((total-bytes  signed-reg))
+       ((total-conts  unsigned-reg))
+       ((tmp          unsigned-reg))
+
+       ((tbl1         complex-double-reg))
+       ((tbl2         complex-double-reg))
+       ((tbl3         complex-double-reg))
+       ((tbl4         complex-double-reg))
+
+       ((nibble-mask  complex-double-reg))
+       ((twos         complex-double-reg))
+       ((indexes      complex-double-reg))
+
+       ((errors       complex-double-reg))
+       ((prev         complex-double-reg))
+       ((prev-len     complex-double-reg))
+
+       ((current      complex-double-reg))
+       ((tmp1         complex-double-reg))
+       ((tmp2         complex-double-reg))
+       ((tmp3         complex-double-reg))
+       ((tmp4         complex-double-reg)))
+
+      ((res descriptor-reg t :from :load)
+       (all-ascii descriptor-reg))
+    (flet ((validate ()
+             (assemble ()
+               ;; Skip an all-ASCII block
+               (inst orr tmp1 current prev :16b)
+               (inst umaxv tmp1 tmp1 :16b)
+               (inst fmov tmp (reg-in-sc tmp1 'single-reg))
+               (inst tbz tmp 7 VALIDATED)
+
+               ;; The Keiser, Lemire algorithm
+               (inst ext tmp1 prev current 15 :16b)
+               (inst ushr tmp2 tmp1 4 :16b)
+               (inst and tmp3 tmp1 nibble-mask :16b)
+               (inst ushr tmp4 current 4 :16b)
+
+               (inst tbl tmp2 (list tbl1) tmp2 :16b)
+               (inst tbl tmp3 (list tbl2) tmp3 :16b)
+               (inst tbl tmp4 (list tbl3) tmp4 :16b)
+
+               (inst and tmp2 tmp2 tmp3 :16b)
+               (inst and tmp2 tmp2 tmp4 :16b)
+               (inst orr errors errors tmp2 :16b)
+
+               (inst ushr tmp1 current 4 :16b)
+               (inst tbl tmp1 (list tbl4) tmp1 :16b)
+
+               (inst ext tmp2 prev-len tmp1 15 :16b)
+               (inst ext tmp3 prev-len tmp1 14 :16b)
+               (inst ext tmp4 prev-len tmp1 13 :16b)
+
+               (inst ushr tmp2 tmp2 1 :16b)
+               (inst ushr tmp3 tmp3 2 :16b)
+               (inst ushr tmp4 tmp4 3 :16b)
+
+               (inst orr tmp2 tmp2 tmp3 :16b)
+               (inst orr tmp2 tmp2 tmp4 :16b)
+
+               (inst ushr tmp3 current 6 :16b)
+               (inst cmeq tmp3 tmp3 twos :16b)
+
+               (inst cmtst tmp4 tmp2 tmp2 :16b)
+
+               (inst eor tmp4 tmp3 tmp4 :16b)
+               (inst orr errors errors tmp4 :16b)
+
+               ;; Subtract continuations
+               (inst ushr tmp4 tmp3 7 :16b)
+               (inst addv tmp4 tmp4 :16b)
+               (inst fmov tmp (reg-in-sc tmp4 'single-reg))
+               (inst add total-conts total-conts tmp)
+               VALIDATED)))
+      (assemble ()
+        ;; Align the start and then mask off the extra bits
+        (inst and ptr bytes -16)
+        (inst sub total-bytes bytes ptr)
+
+        (inst ldr current (@ ptr))
+
+        (load-inline-constant indexes :oword #x0F0E0D0C0B0A09080706050403020100)
+
+        ;; Replace the aligned bits with ones, avoiding null termination
+        (inst dup tmp1 total-bytes :16b)
+        (inst cmhi tmp1 tmp1 indexes :16b)
+        (inst bic current current tmp1 :16b)
+        (inst sub current current tmp1 :16b)
+
+        ASCII
+        (inst uminv tmp1 current :16b)
+        (inst fmov tmp (reg-in-sc tmp1 'single-reg))
+        (inst cbz tmp ASCII-TAIL)
+        (inst umaxv tmp1 current :16b)
+        (inst fmov tmp (reg-in-sc tmp1 'single-reg))
+        (inst tbnz tmp 7 NON-ASCII)
+
+
+        (inst ldr current (@ ptr 16 :pre-index))
+        (inst b ASCII)
+
+        ASCII-TAIL
+
+        ;; Find the first zero
+        (inst cmtst tmp1 current current :16b)
+        (inst orr tmp1 tmp1 indexes :16b)
+        (inst uminv tmp1 tmp1 :16b)
+        (inst fmov tmp (reg-in-sc tmp1 'single-reg))
+
+        ;; Zero out the bytes after the first zero
+        (inst dup tmp1 tmp :16b)
+        (inst cmhi tmp1 tmp1 indexes :16b)
+        (inst and current current tmp1 :16b)
+
+        (inst sminv tmp1 current :16b)
+        (inst fmov total-bytes (reg-in-sc tmp1 'single-reg))
+        (inst tbnz total-bytes 7 NON-ASCII)
+
+        (inst add ptr ptr tmp)
+        (inst sub total-bytes ptr bytes)
+        (load-symbol all-ascii t)
+        (inst b RETURN)
+
+        NON-ASCII
+        (inst mov res null-tn)
+        (inst movi nibble-mask #x0f :16b)
+        (inst movi twos 2 :16b)
+        (inst mov total-conts 0)
+
+        (load-inline-constant tbl1 :oword #x38060001000000000000000000000000)
+        (load-inline-constant tbl2 :oword #x2020242020202020202020100000010B)
+        (load-inline-constant tbl3 :oword #x202020203535332B2020202020202020)
+        (load-inline-constant tbl4 :oword #x08040202000000000000000000000000)
+
+        (inst movi errors   0 :16b)
+        (inst movi prev     0 :16b)
+        (inst movi prev-len 0 :16b)
+
+        (inst b START)
+
+        LOOP
+        (inst ldr current (@ ptr))
+
+        START
+        (inst uminv tmp1 current :16b)
+        (inst fmov tmp (reg-in-sc tmp1 'single-reg))
+        (inst cbz tmp TAIL)
+
+        (validate)
+
+        (inst mov prev current :16b)
+        (inst mov prev-len tmp1 :16b)
+
+        (inst add ptr ptr 16)
+        (inst b LOOP)
+
+        TAIL
+        ;; Find the first zero
+        (inst cmtst tmp1 current current :16b)
+        (inst orr tmp1 tmp1 indexes :16b)
+        (inst uminv tmp1 tmp1 :16b)
+        (inst fmov tmp (reg-in-sc tmp1 'single-reg))
+
+        ;; Zero out the bytes after the first zero
+        (inst dup tmp1 tmp :16b)
+        (inst cmhi tmp1 tmp1 indexes :16b)
+        (inst and current current tmp1 :16b)
+        (inst add ptr ptr tmp)
+
+        (validate)
+
+        (inst sub total-bytes ptr bytes)
+        (inst mov all-ascii null-tn)
+
+        (inst umaxv errors errors :16b)
+        (inst fmov tmp (reg-in-sc errors 'single-reg))
+        (inst cbnz tmp DONE)
+
+        (inst sub total-bytes total-bytes total-conts)
+
+        RETURN
+        (inst lsl res total-bytes n-fixnum-tag-bits)
+        DONE))))

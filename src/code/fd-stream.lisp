@@ -1557,7 +1557,8 @@
           fd-stream-read-n-characters
           write-n-bytes-fun
           (newline-variant :lf)
-          (char-encodable-p t))
+          (char-encodable-p t)
+          (read-c-string-function nil custom-read-c-string-function-p))
   (let* ((name (first external-format))
          (suffix (symbolicate name '/ newline-variant))
          (out-function (or write-n-bytes-fun
@@ -1568,7 +1569,8 @@
          (in-char-function (symbolicate "INPUT-CHAR/" suffix))
          (resync-function (symbolicate "RESYNC/" suffix))
          (size-function (symbolicate "BYTES-FOR-CHAR/" suffix))
-         (read-c-string-function (symbolicate "READ-FROM-C-STRING/" suffix))
+         (read-c-string-function (or read-c-string-function
+                                     (symbolicate "READ-FROM-C-STRING/" suffix)))
          (output-c-string-function (symbolicate "OUTPUT-TO-C-STRING/" suffix))
          (n-buffer (gensym "BUFFER")))
     `(progn
@@ -1793,56 +1795,57 @@
                           ,in-expr)
                         nil)
                 (return))))))
-       (defun ,read-c-string-function (sap element-type)
-         (declare (type system-area-pointer sap)
-                  (optimize (sb-c:verify-arg-count 0)))
-         (locally
-             (declare (optimize (speed 3) (safety 0)))
-           (let* ((stream ,name)
-                  (size 0) (head 0) (tail (1- array-dimension-limit)) (byte 0) (|ch| nil)
-                  (decode-break-reason nil)
-                  (length (dotimes (count (1- array-dimension-limit) count)
-                            (setf decode-break-reason
-                                  (block decode-break-reason
-                                    (setf byte (sap-ref-8 sap head)
-                                          size ,(if (consp in-size-expr)
-                                                    (cadr in-size-expr)
-                                                    in-size-expr)
-                                          |ch| ,in-expr)
-                                    (incf head size)
-                                    nil))
-                            (when decode-break-reason
-                              (c-string-decoding-error
-                               ,name sap head decode-break-reason))
-                            (when (zerop (char-code |ch|))
-                              (return count))))
-                  (string (case element-type
-                            (base-char
-                             (make-string length :element-type 'base-char))
-                            (character
-                             (make-string length :element-type 'character))
-                            (t
-                             (make-string length :element-type element-type)))))
-             (declare (ignorable stream byte tail)
-                      (type index head length tail) ;; size
-                      (type (unsigned-byte 8) byte)
-                      (type (or null character) |ch|)
-                      (type string string))
-             (setf head 0)
-             (dotimes (index length string)
-               (setf decode-break-reason
-                     (block decode-break-reason
-                       (setf byte (sap-ref-8 sap head)
-                             size ,(if (consp in-size-expr)
-                                       (cadr in-size-expr)
-                                       in-size-expr)
-                             |ch| ,in-expr)
-                       (incf head size)
-                       nil))
-               (when decode-break-reason
-                 (c-string-decoding-error
-                  ,name sap head decode-break-reason))
-               (setf (aref string index) |ch|)))))
+       ,@(unless custom-read-c-string-function-p
+           `((defun ,read-c-string-function (sap element-type)
+               (declare (type system-area-pointer sap)
+                        (optimize (sb-c:verify-arg-count 0)))
+               (locally
+                   (declare (optimize (speed 3) (safety 0)))
+                 (let* ((stream ,name)
+                        (size 0) (head 0) (tail (1- array-dimension-limit)) (byte 0) (|ch| nil)
+                        (decode-break-reason nil)
+                        (length (dotimes (count (1- array-dimension-limit) count)
+                                  (setf decode-break-reason
+                                        (block decode-break-reason
+                                          (setf byte (sap-ref-8 sap head)
+                                                size ,(if (consp in-size-expr)
+                                                          (cadr in-size-expr)
+                                                          in-size-expr)
+                                                |ch| ,in-expr)
+                                          (incf head size)
+                                          nil))
+                                  (when decode-break-reason
+                                    (c-string-decoding-error
+                                     ,name sap head decode-break-reason))
+                                  (when (zerop (char-code |ch|))
+                                    (return count))))
+                        (string (case element-type
+                                  (base-char
+                                   (make-string length :element-type 'base-char))
+                                  (character
+                                   (make-string length :element-type 'character))
+                                  (t
+                                   (make-string length :element-type element-type)))))
+                   (declare (ignorable stream byte tail)
+                            (type index head length tail) ;; size
+                            (type (unsigned-byte 8) byte)
+                            (type (or null character) |ch|)
+                            (type string string))
+                   (setf head 0)
+                   (dotimes (index length string)
+                     (setf decode-break-reason
+                           (block decode-break-reason
+                             (setf byte (sap-ref-8 sap head)
+                                   size ,(if (consp in-size-expr)
+                                             (cadr in-size-expr)
+                                             in-size-expr)
+                                   |ch| ,in-expr)
+                             (incf head size)
+                             nil))
+                     (when decode-break-reason
+                       (c-string-decoding-error
+                        ,name sap head decode-break-reason))
+                     (setf (aref string index) |ch|)))))))
 
        (defun ,output-c-string-function (string)
          (declare (type simple-string string))
