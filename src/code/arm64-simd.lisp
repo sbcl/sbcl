@@ -1550,10 +1550,10 @@
           (inst movi errors 0 :16b)
 
           (inst movi c-7f  #x7F :4s)
-          (inst movi c-7ff #x7 :4s 8 t)
+          (inst movi c-7ff #x7FF :4s)
+          (inst movi c-ffff #x0000ffff0000ffff :2d)
+          (inst movi c-10ffff #x10ffff :4s)
           (inst movi c-1b  #x1b :4s)
-          (inst movi c-ffff #x00ffff0000ffff :2d)
-          (inst movi c-10ffff #x10 :4s 16 t)
 
           (inst b START)
 

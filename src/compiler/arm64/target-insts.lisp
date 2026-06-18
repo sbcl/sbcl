@@ -344,7 +344,8 @@
                    (if (zerop q)
                        "4H"
                        "8H"))
-                  ((zerop (logand cmode #b1001))
+                  ((or (zerop (logand cmode #b1001))
+                       (= (ldb (byte 3 13) cmode) #b110))
                    (if (zerop q)
                        "2S"
                        "4S"))))))
@@ -378,12 +379,15 @@
                   (t 0)))
           (msl
             (cond ((= (ldb (byte 3 1) cmode) #b110)
-                   (ash 8 (ldb (byte 1 0) cmode))))))
-      (princ (dpb abc (byte 3 5) defgh) stream)
+                   (ash 8 (ldb (byte 1 0) cmode)))))
+          (value (dpb abc (byte 3 5) defgh)))
       (cond (msl
-             (format stream ", MSL #~d" msl))
+             (setf value
+                   (logior (ash value msl)
+                           (ldb (byte msl 0) -1))))
             ((plusp shift)
-             (format stream ", LSL #~d" shift))))))
+             (setf value (ash value shift))))
+      (format stream "~x" value))))
 
 (defun print-64-bit-modified-imm (value stream dstate)
   (declare (ignore dstate))
