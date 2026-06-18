@@ -709,7 +709,7 @@
            (sap (buffer-sap ibuf))
            (n (logand (min (1- (- end start))
                            (1- (- tail head)))
-                      (- 2)))
+                      -2))
            (repeat (ldb (byte 16 0) #x0101010101010101))
            (ascii-mask (* 128 repeat))
            (string-sap (vector-sap string))
@@ -1194,6 +1194,7 @@
   :write-n-bytes-fun output-bytes/utf-8/lf
   :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff)))
   :read-c-string-function read-from-c-string/utf-8/lf*
+  :output-c-string-function output-to-c-string/utf-8/lf
   :handle-size nil)
 
 (define-external-format/variable-width (:utf-8) t
@@ -1352,7 +1353,7 @@
            (sap (buffer-sap ibuf))
            (n (logand (min (1- (- end start))
                            (1- (- tail head)))
-                      (- 2)))
+                      -2))
            (repeat (ldb (byte 16 0) #x0101010101010101))
            (ascii-mask (* 128 repeat))
            (string-sap (vector-sap string))
@@ -1392,7 +1393,7 @@
            (sap (buffer-sap ibuf))
            (n (logand (min (1- (- end start))
                            (1- (- tail head)))
-                      (- 2)))
+                      -2))
            (repeat (ldb (byte 16 0) #x0101010101010101))
            (ascii-mask (* 128 repeat))
            (string-sap (vector-sap string))
@@ -1621,3 +1622,106 @@
                            (incf byte-index 4)))))
                     (incf char-index))))
         string))))
+
+(declaim (ftype (sfunction ((simple-array character (*))) nil)
+                check-utf8-encoding))
+(defun check-utf8-encoding (string)
+  (loop for char across string
+        for code = (char-code char)
+        when (<= #xd800 code #xdfff)
+        do
+        (c-string-encoding-error string code))
+  (error "~s modified while validating UTF-8" string))
+
+(declaim (ftype (sfunction ((simple-array character (*))) (values (or null index) t))
+                simd-character-string-utf8-length))
+(defun simd-character-string-utf8-length (string)
+  (let* ((string-length (length string))
+         (index 0))
+    (declare (index index))
+    #+64-bit
+    (let ((word-length (truncate string-length 2)))
+      ;; SWAR ASCII
+      (loop until (or (>= index word-length)
+                      (logtest (%vector-raw-bits string index) #xFFFFFF80FFFFFF80))
+            do (incf index)))
+    (let ((index (* index 2)))
+      (declare (index index))
+      ;; ASCII-only
+      (loop when (>= index string-length)
+            do (return-from simd-character-string-utf8-length (values index t))
+            until (> (char-code (char string index)) 127)
+            do (incf index))
+      (let ((length index))
+        (declare (index length))
+        (loop until (>= index string-length)
+              do
+              (let ((bits (char-code (char string index))))
+                (incf length
+                      (cond ((< bits 128) 1)
+                            ((< bits 2048) 2)
+                            ((< bits 65536)
+                             (when (<= #xd800 bits #xdfff)
+                               (return-from simd-character-string-utf8-length (values nil nil)))
+                             3)
+                            (t 4)))
+                (incf index)))
+        (values length nil)))))
+
+(defun output-to-c-string/utf-8/lf (string)
+  (declare (type simple-string string)
+           (optimize speed (safety 0)))
+  (cond ((simple-base-string-p string) string)
+        (t
+         (multiple-value-bind (buffer-length ascii-only) (simd-character-string-utf8-length string)
+           (unless buffer-length
+             (check-utf8-encoding string))
+           (let* ((buffer (make-array (1+ buffer-length) :element-type '(unsigned-byte 8)
+                                                         :initial-element 0)))
+             (cond (ascii-only
+                    (let ((byte-index 0))
+                      (declare (index byte-index))
+                      ;; SWAR ASCII
+                      #+64-bit
+                      (with-pinned-objects (buffer)
+                        (let ((sap (vector-sap buffer))
+                              (word-length (truncate buffer-length 2))
+                              (index 0))
+                          (declare (index index))
+                          (loop until (>= index word-length)
+                                do (let* ((word (%vector-raw-bits string index))
+                                          (a (ldb (byte 8 0) word))
+                                          (b (ash word -24)))
+                                     (setf (sap-ref-16 sap (* index 2))
+                                           (logior a b)))
+
+                                   (incf index)
+                                   (incf byte-index 2))))
+                      (loop for i from byte-index below buffer-length
+                            do (setf (aref buffer i)
+                                     (logand (char-code (aref string i)) #xFF)))))
+                   (t
+                    (let ((index 0))
+                      (declare (index index))
+                      (loop for char across string
+                            for bits = (char-code char)
+                            do (cond ((< bits 128)
+                                      (setf (aref buffer index) bits)
+                                      (incf index))
+                                     ((< bits 2048)
+                                      (setf (aref buffer (+ 1 index)) (logior 128 (ldb (byte 6 0) bits))
+                                            (aref buffer index) (logior 192 (ldb (byte 5 6) bits)))
+                                      (incf index 2))
+                                     ((< bits 65536)
+                                      (setf (aref buffer (+ 2 index)) (logior 128 (ldb (byte 6 0) bits))
+                                            (aref buffer (+ 1 index)) (logior 128 (ldb (byte 6 6) bits))
+                                            (aref buffer index) (logior 224 (ldb (byte 4 12) bits)))
+                                      (incf index 3))
+                                     (t
+                                      (setf (aref buffer (+ 3 index)) (logior 128 (ldb (byte 6 0) bits))
+                                            (aref buffer (+ 2 index)) (logior 128 (ldb (byte 6 6) bits))
+                                            (aref buffer (+ 1 index)) (logior 128 (ldb (byte 6 12) bits))
+                                            (aref buffer index) (logior 240 (ldb (byte 3 18) bits)))
+                                      (incf index 4)))))))
+
+             buffer)))))

@@ -918,10 +918,12 @@
 (defun sb-alien::string-to-c-string (string external-format)
   (declare (type simple-string string)
            (explicit-check :result))
-  (locally
-      (declare (optimize (speed 3) (safety 0)))
-    (let ((external-format (get-external-format-or-lose external-format)))
-      (funcall (ef-write-c-string-fun external-format) string))))
+  (if (eq external-format :utf-8)
+      (output-to-c-string/utf-8/lf string)
+      (locally
+          (declare (optimize (speed 3) (safety 0)))
+        (let ((external-format (get-external-format-or-lose external-format)))
+          (funcall (ef-write-c-string-fun external-format) string)))))
 
 (defun sb-alien::c-string-to-string (sap external-format element-type)
   (declare (type system-area-pointer sap)
@@ -1564,7 +1566,8 @@
           write-n-bytes-fun
           (newline-variant :lf)
           (char-encodable-p t)
-          (read-c-string-function nil custom-read-c-string-function-p))
+          (read-c-string-function nil custom-read-c-string-function-p)
+          (output-c-string-function nil custom-output-c-string-function))
   (let* ((name (first external-format))
          (suffix (symbolicate name '/ newline-variant))
          (out-function (or write-n-bytes-fun
@@ -1577,7 +1580,8 @@
          (size-function (symbolicate "BYTES-FOR-CHAR/" suffix))
          (read-c-string-function (or read-c-string-function
                                      (symbolicate "READ-FROM-C-STRING/" suffix)))
-         (output-c-string-function (symbolicate "OUTPUT-TO-C-STRING/" suffix))
+         (output-c-string-function (or output-c-string-function
+                                       (symbolicate "OUTPUT-TO-C-STRING/" suffix)))
          (n-buffer (gensym "BUFFER")))
     `(progn
        (defun ,size-function (|ch|)
@@ -1852,55 +1856,55 @@
                        (c-string-decoding-error
                         ,name sap head decode-break-reason))
                      (setf (aref string index) |ch|)))))))
-
-       (defun ,output-c-string-function (string)
-         (declare (type simple-string string))
-         (cond ,@(and base-string-direct-mapping
-                      `(((simple-base-string-p string)
-                         string)))
-               (t
-                (locally
-                    (declare (optimize (speed 3) (safety 0)))
-                  (block output-nothing
-                    (let* ((length (length string))
-                           (null-size (let* ((|ch| (code-char 0))
-                                             (bits (char-code |ch|)))
-                                        (declare (ignorable |ch| bits))
-                                        (the index ,out-size-expr)))
-                           (buffer-length
-                             (+ (loop for i of-type index below length
+       ,@(unless custom-output-c-string-function
+           `((defun ,output-c-string-function (string)
+               (declare (type simple-string string))
+               (cond ,@(and base-string-direct-mapping
+                            `(((simple-base-string-p string)
+                               string)))
+                     (t
+                      (locally
+                          (declare (optimize (speed 3) (safety 0)))
+                        (block output-nothing
+                          (let* ((length (length string))
+                                 (null-size (let* ((|ch| (code-char 0))
+                                                   (bits (char-code |ch|)))
+                                              (declare (ignorable |ch| bits))
+                                              (the index ,out-size-expr)))
+                                 (buffer-length
+                                   (+ (loop for i of-type index below length
+                                            for |ch| of-type character = (aref string i)
+                                            for bits = (char-code |ch|)
+                                            sum (the index ,out-size-expr) of-type index)
+                                      null-size))
+                                 (tail 0)
+                                 (,n-buffer (make-array buffer-length
+                                                        :element-type '(unsigned-byte 8)))
+                                 ;; For external-format-encoding-error
+                                 (stream ',name))
+                            (declare (type index length buffer-length tail)
+                                     (ignorable stream))
+                            (with-pinned-objects (,n-buffer)
+                              (let ((sap (vector-sap ,n-buffer)))
+                                (declare (system-area-pointer sap))
+                                (loop for i of-type index below length
                                       for |ch| of-type character = (aref string i)
                                       for bits = (char-code |ch|)
-                                      sum (the index ,out-size-expr) of-type index)
-                                null-size))
-                           (tail 0)
-                           (,n-buffer (make-array buffer-length
-                                                  :element-type '(unsigned-byte 8)))
-                           ;; For external-format-encoding-error
-                           (stream ',name))
-                      (declare (type index length buffer-length tail)
-                               (ignorable stream))
-                      (with-pinned-objects (,n-buffer)
-                        (let ((sap (vector-sap ,n-buffer)))
-                          (declare (system-area-pointer sap))
-                          (loop for i of-type index below length
-                                for |ch| of-type character = (aref string i)
-                                for bits = (char-code |ch|)
-                                ,@(when handle-size
-                                    `(for size of-type index = ,out-size-expr))
-                                do (prog1
-                                       ,out-expr
-                                     ,@(when handle-size
-                                         `((incf tail size)))))
-                          (let* ((bits 0)
-                                 (|ch| (code-char bits))
-                                 ,@(when handle-size
-                                     `((size null-size))))
-                            (declare (ignorable bits |ch|
-                                                ,@(when handle-size
-                                                    `(size))))
-                            ,out-expr)))
-                      ,n-buffer))))))
+                                      ,@(when handle-size
+                                          `(for size of-type index = ,out-size-expr))
+                                      do (prog1
+                                             ,out-expr
+                                           ,@(when handle-size
+                                               `((incf tail size)))))
+                                (let* ((bits 0)
+                                       (|ch| (code-char bits))
+                                       ,@(when handle-size
+                                           `((size null-size))))
+                                  (declare (ignorable bits |ch|
+                                                      ,@(when handle-size
+                                                          `(size))))
+                                  ,out-expr)))
+                            ,n-buffer))))))))
 
        (register-external-format
         ',external-format
