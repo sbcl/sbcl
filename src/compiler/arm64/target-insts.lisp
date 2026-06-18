@@ -251,6 +251,19 @@
        (#b10 "4S")
        (#b11 "2D")))))
 
+(defun decode-vector-size-2x (q size)
+  (case q
+    (0
+     (case size
+       (#b00 "4H")
+       (#b01 "2S")
+       (#b10 "1D")))
+    (1
+     (case size
+       (#b00 "8H")
+       (#b01 "4S")
+       (#b10 "2D")))))
+
 (defun print-simd-reg (value stream dstate)
   (declare (ignore dstate))
   (multiple-value-bind (q size offset)
@@ -261,6 +274,17 @@
             (values q 0 offset)))
     (format stream "V~d.~a" offset
             (decode-vector-size q size))))
+
+(defun print-simd-reg-2x (value stream dstate)
+  (declare (ignore dstate))
+  (multiple-value-bind (q size offset)
+      (if (= (length value) 3)
+          (destructuring-bind (q size offset) value
+            (values q size offset))
+          (destructuring-bind (q offset) value
+            (values q 0 offset)))
+    (format stream "V~d.~a" offset
+            (decode-vector-size-2x q size))))
 
 (defun print-simd-immh-reg (value stream dstate)
   (declare (ignore dstate))
@@ -351,10 +375,38 @@
                    0)
                   ((zerop (logand cmode #b1001))
                    (ash cmode 2))
-                  (t 0))))
+                  (t 0)))
+          (msl
+            (cond ((= (ldb (byte 3 1) cmode) #b110)
+                   (ash 8 (ldb (byte 1 0) cmode))))))
       (princ (dpb abc (byte 3 5) defgh) stream)
-      (when (plusp shift)
-        (format stream ", LSL #~d" shift)))))
+      (cond (msl
+             (format stream ", MSL #~d" msl))
+            ((plusp shift)
+             (format stream ", LSL #~d" shift))))))
+
+(defun print-64-bit-modified-imm (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (abc cmode defgh) value
+    (declare (ignore cmode))
+    (let ((a (- (ldb (byte 1 2) abc)))
+          (b (- (ldb (byte 1 1) abc)))
+          (c (- (ldb (byte 1 0) abc)))
+          (d (- (ldb (byte 1 4) defgh)))
+          (e (- (ldb (byte 1 3) defgh)))
+          (f (- (ldb (byte 1 2) defgh)))
+          (g (- (ldb (byte 1 1) defgh)))
+          (h (- (ldb (byte 1 0) defgh)))
+          (value 0))
+      (setf (ldb (byte 8 56) value) a
+            (ldb (byte 8 48) value) b
+            (ldb (byte 8 40) value) c
+            (ldb (byte 8 32) value) d
+            (ldb (byte 8 24) value) e
+            (ldb (byte 8 16) value) f
+            (ldb (byte 8 8) value) g
+            (ldb (byte 8 0) value) h)
+      (format stream "~x" value))))
 
 (defun decode-fp-immediate (imm type)
   (let ((sign (ldb (byte 1 7) imm))

@@ -1635,6 +1635,7 @@
 
 (declaim (ftype (sfunction ((simple-array character (*))) (values (or null index) t))
                 simd-character-string-utf8-length))
+#-arm64
 (defun simd-character-string-utf8-length (string)
   (let* ((string-length (length string))
          (index 0))

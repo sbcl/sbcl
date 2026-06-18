@@ -109,6 +109,7 @@
   (define-arg-type vx.t :printer #'print-vx.t)
 
   (define-arg-type simd-reg :printer #'print-simd-reg)
+  (define-arg-type simd-reg-2x :printer #'print-simd-reg-2x)
 
   (define-arg-type simd-copy-reg :printer #'print-simd-copy-reg)
   (define-arg-type simd-dup-reg :printer #'print-simd-dup-reg)
@@ -118,6 +119,7 @@
   (define-arg-type simd-immh-shift-left :printer #'print-simd-immh-shift-left)
   (define-arg-type simd-immh-shift-right :printer #'print-simd-immh-shift-right)
   (define-arg-type simd-modified-imm :printer #'print-simd-modified-imm)
+  (define-arg-type 64-bit-modified-imm :printer #'print-64-bit-modified-imm)
   (define-arg-type simd-reg-cmode :printer #'print-simd-reg-cmode)
   (define-arg-type simd-table-regs :printer #'print-simd-table-regs)
   (define-arg-type simd-b-reg :printer #'print-simd-b-reg)
@@ -3113,7 +3115,8 @@
   (def uqadd #b1 #b00001)
   (def urhadd #b1 #b00010)
   (def uhsub #b1 #b00100)
-  (def uqsub #b1 #b00101))
+  (def uqsub #b1 #b00101)
+  (def addp #b0 #b10111))
 
 (macrolet ((def (name u neg op)
              `(define-instruction ,name (segment rd rn rm size)
@@ -3383,7 +3386,7 @@
   (op2 :field (byte 5 24) :value #b01110)
   (size :field (byte 2 22))
   (op3 :field (byte 5 17) :value #b10000)
-  (op :field (byte 4 12))
+  (op :field (byte 5 12))
   (op4 :field (byte 2 10) :value #b10)
   (rn :fields (list (byte 1 30) (byte 2 22) (byte 5 5)) :type 'simd-reg)
   (rd :fields (list (byte 1 30) (byte 2 22) (byte 5 0)) :type 'simd-reg))
@@ -3405,6 +3408,24 @@
   (def cnt #b0 #b00101)
   (def rev64 #b0 #b00000 (:8b :16b :4h :8h :2s :4s))
   (def not #b1 #b00101))
+
+(macrolet
+    ((def (name u op)
+       `(define-instruction ,name (segment rd rn size)
+          (:printer simd-two-misc ((u ,u) (op ,op) (rd nil :type 'simd-reg-2x)))
+          (:emitter
+           (multiple-value-bind (q size) (encode-vector-size size)
+             (emit-simd-two-misc segment
+                                 q
+                                 ,u
+                                 size
+                                 ,op
+                                 (fpr-offset rn)
+                                 (fpr-offset rd)))))))
+  (def saddlp #b0 #b00010)
+  (def uaddlp #b1 #b00010)
+  (def sadalp #b0 #b00110)
+  (def uadalp #b1 #b00110))
 
 (macrolet
     ((def (name u op q &optional sizes)
@@ -3583,13 +3604,14 @@
 
 (macrolet
     ((def (name o2 op)
-       `(define-instruction ,name (segment rd imm size &optional (shift 0))
+       `(define-instruction ,name (segment rd imm size &optional (shift 0) ones)
           (:printer simd-modified-imm ((o2 ,o2)
                                        (op ,op)))
           ,@(when (eq name 'movi)
               `((:printer simd-modified-imm ((o2 ,o2)
                                              (op 1)
-                                             (cmode #b1110))
+                                             (cmode #b1110)
+                                             (imm nil :type '64-bit-modified-imm))
                           '('movi :tab rd ", #" imm))))
           (:emitter
            (let ((abc 0)
@@ -3606,16 +3628,37 @@
                               (8 #b1010)
                               (0 #b1000))))
                ((:2s :4s)
-                (setf cmode
-                      (ash (ecase shift
-                             (0 0)
-                             (8 1)
-                             (16 2)
-                             (24 3))
-                           1)))
+                (if ones
+                    (setf cmode
+                          (ecase shift
+                            (8 #b1100)
+                            (16 #b1101)))
+                    (setf cmode
+                          (ash (ecase shift
+                                 (0 0)
+                                 (8 1)
+                                 (16 2)
+                                 (24 3))
+                               1))))
                ((:2d)
-                (setf op 1
-                      cmode #b1110)))
+                (let ((a (the (member 255 0) (ldb (byte 8 56) imm)))
+                      (b (the (member 255 0) (ldb (byte 8 48) imm)))
+                      (c (the (member 255 0) (ldb (byte 8 40) imm)))
+                      (d (the (member 255 0) (ldb (byte 8 32) imm)))
+                      (e (the (member 255 0) (ldb (byte 8 24) imm)))
+                      (f (the (member 255 0) (ldb (byte 8 16) imm)))
+                      (g (the (member 255 0) (ldb (byte 8 8) imm)))
+                      (h (the (member 255 0) (ldb (byte 8 0) imm))))
+                  (setf (ldb (byte 1 2) abc) a
+                        (ldb (byte 1 1) abc) b
+                        (ldb (byte 1 0) abc) c
+                        (ldb (byte 1 4) defgh) d
+                        (ldb (byte 1 3) defgh) e
+                        (ldb (byte 1 2) defgh) f
+                        (ldb (byte 1 1) defgh) g
+                        (ldb (byte 1 0) defgh) h)
+                  (setf op 1
+                        cmode #b1110))))
              (emit-simd-modified-imm segment
                                      (encode-vector-size size)
                                      op

@@ -1450,3 +1450,145 @@
         RETURN
         (inst lsl res total-bytes n-fixnum-tag-bits)
         DONE))))
+
+(defun sb-impl::simd-character-string-utf8-length (string)
+  (declare (optimize speed (safety 0)))
+  (with-pinned-objects-in-registers (string)
+    (inline-vop
+        (((ptr sap-reg t) (vector-sap string))
+         ((length any-reg t) (length string))
+
+         ((chars-left   unsigned-reg))
+         ((tmp          unsigned-reg))
+
+         ((c-7f         complex-double-reg))
+         ((c-7ff        complex-double-reg))
+         ((c-ffff       complex-double-reg))
+         ((c-10ffff     complex-double-reg))
+         ((c-1b         complex-double-reg))
+         ((indexes      complex-double-reg))
+
+         ((extra-len    complex-double-reg))
+         ((errors       complex-double-reg))
+
+         ((current      complex-double-reg))
+         ((tmp1         complex-double-reg))
+         ((mask         complex-double-reg)))
+
+        ((res descriptor-reg t :from :load)
+         (all-ascii descriptor-reg))
+      (flet ((process-chunk ()
+               (assemble ()
+                 ;; ASCII fast path
+                 (inst umaxv tmp1 current :4s)
+                 (inst fmov tmp (reg-in-sc tmp1 'single-reg))
+                 (inst cmp tmp 127)
+                 (inst b :le DONE)
+
+                 (inst cmhi tmp1 current c-10ffff :4s)
+                 (inst orr errors errors tmp1 :16b)
+
+                 ;; Check for surrogates #xD800-#xDFFF
+                 (inst ushr tmp1 current 11 :4s)
+                 (inst cmeq tmp1 tmp1 c-1b :4s)
+                 (inst orr errors errors tmp1 :16b)
+
+                 (inst cmhi tmp1 current c-7f :4s)
+
+                 (inst cmhi mask current c-7ff :4s)
+                 (inst add tmp1 tmp1 mask :4s)
+
+                 (inst cmhi mask current c-ffff :4s)
+                 (inst add tmp1 tmp1 mask :4s)
+
+                 (inst saddlp tmp1 tmp1 :4s)
+                 (inst sub extra-len extra-len tmp1 :2d)
+                 DONE)))
+        (assemble ()
+          (inst mov res 0)
+          (load-inline-constant indexes :oword #x00000003000000020000000100000000)
+          (load-symbol all-ascii t)
+          (inst cbz length DONE)
+
+          (inst lsr chars-left length n-fixnum-tag-bits)
+
+          ASCII-LOOP
+          (inst ldr current (@ ptr 16 :post-index))
+
+          (inst cmp chars-left 4)
+
+          (inst b :lo ASCII-TAIL)
+
+          (inst umaxv tmp1 current :4s)
+          (inst fmov tmp (reg-in-sc tmp1 'single-reg))
+          (inst cmp tmp 127)
+
+          (inst b :hi non-ascii)
+
+          (inst subs chars-left chars-left 4)
+          (inst b :hi ASCII-LOOP)
+
+          ASCII-TAIL
+          (inst mov res length)
+
+          ;; Clear the extra bits
+          (inst dup tmp1 chars-left :4s)
+          (inst cmhi mask tmp1 indexes :4s)
+          (inst and current current mask :16b)
+
+          (inst umaxv tmp1 current :4s)
+          (inst fmov tmp (reg-in-sc tmp1 'single-reg))
+          (inst cmp tmp 127)
+          (inst b :hi non-ascii)
+
+
+          (inst b DONE)
+
+          NON-ASCII
+          (inst mov res null-tn)
+          (inst movi extra-len 0 :16b)
+          (inst movi errors 0 :16b)
+
+          (inst movi c-7f  #x7F :4s)
+          (inst movi c-7ff #x7 :4s 8 t)
+          (inst movi c-1b  #x1b :4s)
+          (inst movi c-ffff #x00ffff0000ffff :2d)
+          (inst movi c-10ffff #x10 :4s 16 t)
+
+          (inst b START)
+
+          LOOP
+          (inst ldr current (@ ptr 16 :post-index))
+
+          START
+
+          (inst cmp chars-left 4)
+          (inst b :lo TAIL)
+
+          (process-chunk)
+
+          (inst subs chars-left chars-left 4)
+          (inst b :hi LOOP)
+
+          TAIL
+
+          (inst dup tmp1 chars-left :4s)
+          (inst cmhi mask tmp1 indexes :4s)
+          (inst and current current mask :16b)
+
+          (process-chunk)
+
+          EXIT
+          (inst umaxv tmp1 errors :4s)
+          (inst fmov tmp (reg-in-sc tmp1 'single-reg))
+          (inst cbnz tmp DONE)
+
+          (inst addp tmp1 extra-len extra-len :2d)
+          (inst fmov tmp (reg-in-sc tmp1 'double-reg))
+
+          (inst add res length (lsl tmp n-fixnum-tag-bits))
+
+          (inst cmp tmp 0)
+          (inst csel all-ascii all-ascii null-tn :eq)
+
+          DONE)))))

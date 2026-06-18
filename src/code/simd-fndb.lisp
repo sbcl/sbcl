@@ -38,3 +38,6 @@
     (fixnum (simple-array * (*)) fixnum fixnum)
     (or (mod #.(1- array-dimension-limit)) null)
     (sb-c::no-verify-arg-count))
+
+(declaim (ftype (sfunction ((simple-array character (*))) (values (or null index) t))
+                sb-impl::simd-character-string-utf8-length))

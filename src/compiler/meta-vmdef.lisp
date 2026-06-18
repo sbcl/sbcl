@@ -2018,7 +2018,7 @@
   ;; redefinition is allowed, but a dup in the cross-compiler is a mistake
   #+sb-xc-host
   (when (gethash (vop-info-name vop-info) *backend-template-names*)
-    (error "Duplicate vop name: ~s" vop-info))
+    (cerror "Continue" "Duplicate vop name: ~s" vop-info))
   (setf (gethash (vop-info-name vop-info) *backend-template-names*)
         vop-info))
 
