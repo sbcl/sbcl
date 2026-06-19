@@ -57,10 +57,12 @@
   (when (plusp value)
     (format stream ", LSL #~d" (* value 16))))
 
-(defun print-2-bit-shift (value stream dstate)
+(defun print-shifted-immediate (value stream dstate)
   (declare (ignore dstate))
-  (when (= value 1)
-    (princ ", LSL #12" stream)))
+  (destructuring-bind (value shift) value
+    (format stream "#~D" (if (= shift 1)
+                             (ash value 12)
+                             value))))
 
 (defun print-extend (value stream dstate)
   (destructuring-bind (kind amount) value

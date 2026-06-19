@@ -67,8 +67,6 @@
 
   (define-arg-type shift :printer #'print-shift)
 
-  (define-arg-type 2-bit-shift :printer #'print-2-bit-shift)
-
   (define-arg-type wide-shift :printer #'print-wide-shift)
 
   (define-arg-type extend :printer #'print-extend)
@@ -80,6 +78,7 @@
   (define-arg-type immediate :sign-extend t :printer #'print-immediate)
 
   (define-arg-type unsigned-immediate :printer #'print-immediate)
+  (define-arg-type shifted-immediate :printer #'print-shifted-immediate)
 
   (define-arg-type logical-immediate :printer #'print-logical-immediate)
 
@@ -415,20 +414,15 @@
 
 (define-instruction-format
     (add-sub-imm 32
-     :default-printer '(:name :tab rd ", " rn ", " imm shift
+     :default-printer '(:name :tab rd ", " rn ", " shifted-imm
                         add-sub-imm-annotation)
      :include add-sub)
   (op2 :field (byte 5 24) :value #b10001)
-  (shift :field (byte 2 22) :type '2-bit-shift)
+  (shift :field (byte 2 22))
+  (shifted-imm :fields (list (byte 12 10) (byte 2 22)) :type 'shifted-immediate)
   (imm :field (byte 12 10) :type 'unsigned-immediate)
   (add-sub-imm-annotation :fields (list (byte 5 5) (byte 2 22) (byte 12 10))
                           :type 'add-sub-imm-annotation))
-
-(define-instruction-format
-    (adds-subs-imm 32
-     :include add-sub-imm
-     :default-printer '(:name :tab rd ", " rn ", " imm shift))
-  (rd :type 'reg))
 
 (define-instruction-format
     (add-sub-shift-reg 32
@@ -589,7 +583,7 @@
   (:printer add-sub-ext-reg ((op #b01) (rd nil :type 'reg)))
   (:printer add-sub-shift-reg ((op #b01)))
   (:printer add-sub-imm ((op #b01) (rd #b11111))
-            '('cmn :tab rn ", " imm shift))
+            '('cmn :tab rn ", " shifted-imm))
   (:printer add-sub-ext-reg ((op #b01) (rd #b11111))
             '('cmn :tab rn ", " rm extend))
   (:printer add-sub-shift-reg ((op #b01) (rd #b11111))
@@ -608,7 +602,7 @@
   (:printer add-sub-ext-reg ((op #b11)))
   (:printer add-sub-shift-reg ((op #b11)))
   (:printer add-sub-imm ((op #b11) (rd #b11111))
-            '('cmp :tab rn ", " imm shift))
+            '('cmp :tab rn ", " shifted-imm))
   (:printer add-sub-ext-reg ((op #b11) (rd #b11111))
             '('cmp :tab rn ", " rm extend))
   (:printer add-sub-shift-reg ((op #b11) (rd #b11111))
