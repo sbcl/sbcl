@@ -1497,6 +1497,7 @@
 
       NON-ASCII
       (inst mov res null-tn)
+      (inst mov all-ascii null-tn)
       (inst movi extra-len 0 :16b)
       (inst movi errors 0 :16b)
 
@@ -1543,11 +1544,7 @@
       (inst cbnz tmp DONE)
 
       (inst addp tmp1 extra-len extra-len :2d)
-      (inst fmov tmp (reg-in-sc tmp1 'double-reg))
+      (inst fmov tmp tmp1)
 
       (inst add res length (lsl tmp n-fixnum-tag-bits))
-
-      (inst cmp tmp 0)
-      (inst csel all-ascii all-ascii null-tn :eq)
-
       DONE)))
