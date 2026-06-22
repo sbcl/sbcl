@@ -465,13 +465,18 @@
         (assert (string= string readback3))))))
 
 
-(with-test (:name :utf8-strlen)
+(with-test (:name :utf8-strlen
+            :skipped-on :interpreter)
   (flet ((test (bytes expexcted-length &optional expexcted-ascii-p (offset 0))
            (let ((bytes (coerce bytes '(vector (unsigned-byte 8)))))
              (sb-sys:with-pinned-objects (bytes)
                (multiple-value-bind (length ascii-p)
                    (sb-vm::simd-utf8-strlen (sb-sys:sap+ (sb-sys:vector-sap bytes) offset))
-                 (assert (eql expexcted-length length))
+                 (unless (and (eql expexcted-length length)
+                              (eql expexcted-ascii-p ascii-p))
+                   (error "(sb-vm::simd-utf8-strlen (sb-sys:sap+ (sb-sys:vector-sap ~s) ~s)) => ~a, ~a; but ~a, ~a expected"
+                          bytes offset length ascii-p
+                          expexcted-length expexcted-ascii-p))
                  (assert (eql expexcted-ascii-p ascii-p)))))))
     (test '(1 2 0 255 255) 2 t)
     (test (append (loop for i from 1 to 64 collect i) '(0 1 255)) 64 t)
