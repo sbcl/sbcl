@@ -467,17 +467,16 @@
 
 (with-test (:name :utf8-strlen
             :skipped-on :interpreter)
-  (flet ((test (bytes expexcted-length &optional expexcted-ascii-p (offset 0))
+  (flet ((test (bytes expected-length &optional expected-ascii-p (offset 0))
            (let ((bytes (coerce bytes '(vector (unsigned-byte 8)))))
              (sb-sys:with-pinned-objects (bytes)
                (multiple-value-bind (length ascii-p)
                    (sb-vm::simd-utf8-strlen (sb-sys:sap+ (sb-sys:vector-sap bytes) offset))
-                 (unless (and (eql expexcted-length length)
-                              (eql expexcted-ascii-p ascii-p))
+                 (unless (and (eql expected-length length)
+                              (eql expected-ascii-p ascii-p))
                    (error "(sb-vm::simd-utf8-strlen (sb-sys:sap+ (sb-sys:vector-sap ~s) ~s)) => ~a, ~a; but ~a, ~a expected"
                           bytes offset length ascii-p
-                          expexcted-length expexcted-ascii-p))
-                 (assert (eql expexcted-ascii-p ascii-p)))))))
+                          expected-length expected-ascii-p)))))))
     (test '(1 2 0 255 255) 2 t)
     (test (append (loop for i from 1 to 64 collect i) '(0 1 255)) 64 t)
     (test '(1 2 0 1 1 1) 2 t)
@@ -506,3 +505,20 @@
     (test '(#x80 #x80 #x80 0) nil)
     (test '(#xe2 #x82 #x41 0) nil)
     (test '(#xf0 #x9f #x92 0) nil)))
+
+#+sb-unicode
+(with-test (:name :character-string-utf8-length)
+  (flet ((test (chars expected-length &optional expected-ascii-p)
+           (let ((string (map 'string #'code-char chars)))
+             (multiple-value-bind (length ascii-p)
+                 (sb-impl::simd-character-string-utf8-length string)
+               (unless (and (eql expected-length length)
+                            (eql expected-ascii-p ascii-p))
+                 (error "(sb-impl::simd-character-string-utf8-length ~a) => ~a, ~a; but ~a, ~a expected"
+                        string length ascii-p
+                        expected-length expected-ascii-p))))))
+    (test '(97 98 99 0) 4 t)
+    (test '(97 224 225 226 227 228 229 65) 14)
+    (test '(54620 0 24291 0 26085) 11)
+    (test '(97 128077 98 9989 65039 65039 65039 65039 65039 65039 65039) 30)
+    (test '(0 #xd800 1) nil)))
