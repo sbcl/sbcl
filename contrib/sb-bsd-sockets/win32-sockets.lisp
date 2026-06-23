@@ -72,5 +72,4 @@
 (defconstant msg-trunc 0)
 (defconstant msg-eor 0)
 (defconstant msg-nosignal 0)
-(defconstant msg-waitall 0)
 (defconstant msg-eor 0)
