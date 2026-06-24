@@ -522,3 +522,27 @@
     (test '(54620 0 24291 0 26085) 11)
     (test '(97 128077 98 9989 65039 65039 65039 65039 65039 65039 65039) 30)
     (test '(0 #xd800 1) nil)))
+
+#+sb-unicode
+(with-test (:name :output-to-c-string/utf-8/lf)
+  (flet ((test (chars expected &optional error-p)
+           (let ((string (map 'string #'code-char chars)))
+             (multiple-value-bind (result error)
+                 (ignore-errors (sb-impl::output-to-c-string/utf-8/lf string))
+               (if error-p
+                   (unless error
+                     (error "(sb-impl::output-to-c-string/utf-8/lf ~a) => ~a; but an error is expected"
+                            string result))
+                   (unless (and (typep result '(simple-array (unsigned-byte 8) (*)))
+                                (equalp result expected))
+                     (error "(sb-impl::output-to-c-string/utf-8/lf ~a) => ~a; but ~a is expected"
+                            chars result expected)))))))
+    (test '(97 98 99)
+          #(97 98 99 0))
+    (test '(97 224 225 226 227 228 229 65)
+          #(97 195 160 195 161 195 162 195 163 195 164 195 165 65 0))
+    (test '(54620 0 24291 0 26085)
+          #(237 149 156 0 229 187 163 0 230 151 165 0))
+    (test '(97 128077 98 9989 65039 65039 65039 65039 65039 65039 65039)
+          #(97 240 159 145 141 98 226 156 133 239 184 143 239 184 143 239 184 143 239 184 143 239 184 143 239 184 143 239 184 143 0))
+    (test '(0 #xd800 1) nil t)))
