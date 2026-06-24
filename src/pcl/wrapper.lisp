@@ -71,7 +71,10 @@
                                               :name (and (symbolp name) name)))
                      (t
                       (bug "Got to T branch in ~S" 'make-wrapper))))))
-        (make-layout (hash-layout-name name) classoid
+       ;; There a difference of opinion as to whether it's more important to achieve
+       ;; reproducible builds or to support contrived edge cases.
+        (make-layout (hash-layout-name nil) ; NIL implies a random hash
+                     classoid
                      :bitmap +layout-all-tagged+
                      :invalid nil :length length
                      :flags (logior +pcl-object-layout-flag+ +strictly-boxed-flag+))))
