@@ -143,7 +143,7 @@
     is desired, it may be explicitly coerced using CAST.
 
   Arrays are accessed using DEREF, passing the indices
-  as additional arguments.  Elements are stored in column-major order
+  as additional arguments.  Elements are stored in row-major order
   (as in C), so the first dimension determines only the size of the
   memory block, and not the layout of the higher dimensions. An array
   whose first dimension is variable may be specified by using NIL as
