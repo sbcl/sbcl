@@ -829,6 +829,7 @@
                 (inst mov bytes next-bytes :16b)
                 (inst ldr next-bytes (@ byte-array 16))
                 (check-ascii next-bytes temp DONE)
+                (inst add byte-array byte-array 16)
 
                 ;; Shift bytes right to find CRLF starting at odd indexes
                 ;; and grab the first byte from the next vector to check if it
