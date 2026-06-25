@@ -522,7 +522,7 @@
       (inst umaxv temp input v-size)
       (inst umov tmp-tn temp 0 size)
       (inst cmp tmp-tn 127)
-      (inst b :hs not-ascii-label))))
+      (inst b :hi not-ascii-label))))
 
 (defun simd-copy-utf8-to-character-string (start end string ibuf)
   (declare (type index start end)
