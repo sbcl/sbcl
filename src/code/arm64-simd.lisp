@@ -948,8 +948,8 @@
             (loop for bytes in (list bytes bytes2 bytes3 bytes4)
                   do
                   (inst cmeq temp bytes newlines :4s)
-                  (inst bit last-newlines indexes temp :16b)
-                  (inst add indexes indexes increment :16b))
+                  (inst bit last-newlines indexes temp :4s)
+                  (inst add indexes indexes increment :4s))
 
             (inst add 32-bit-array 32-bit-array 64)
 
