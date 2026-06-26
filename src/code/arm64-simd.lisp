@@ -1295,9 +1295,9 @@
     (flet ((validate ()
              (assemble ()
                ;; Skip an all-ASCII block
-               (inst orr tmp1 current prev :16b)
-               (inst umaxv tmp1 tmp1 :16b)
-               (inst fmov tmp (reg-in-sc tmp1 'single-reg))
+               (inst orr tmp2 current prev :16b)
+               (inst umaxv tmp2 tmp2 :16b)
+               (inst fmov tmp (reg-in-sc tmp2 'single-reg))
                (inst tbz tmp 7 VALIDATED)
 
                ;; The Keiser, Lemire algorithm
