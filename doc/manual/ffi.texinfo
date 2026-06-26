@@ -181,6 +181,8 @@ the first dimension. Fixed-size arrays can be allocated as array
 elements, structure slots or @code{with-alien} variables. Dynamic arrays
 can only be allocated using @code{make-alien}.
 
+@cindex external format
+@cindex format, external
 @itemize
 @item The foreign type specifier @code{(struct <name> &rest <fields>)}
   describes a structure type with the specified @code{<name>} and
@@ -256,14 +258,14 @@ current (local or global) alien structure type definition of
   declare that no useful value is returned. Using @code{alien-funcall} to
   call a @code{void} foreign function will return zero values.
 
-@item The foreign type specifier @code{(C-STRING &KEY <external-format>
+@item The foreign type specifier @code{(c-string &key <external-format>
   <element-type> <not-null>)} is similar to @code{(* char)} but is
   interpreted as a null-terminated string, and is automatically
   converted into a Lisp string when accessed; or if the pointer is C
   @code{null} or 0, then accessing it gives Lisp @code{nil} unless
   @code{<not-null>} is true, in which case a @code{type-error} is signalled.
 
-External format conversion is automatically done when Lisp
+external format conversion is automatically done when Lisp
 strings are passed to foreign code, or when foreign strings are
 passed to Lisp code. If the type specifier has an explicit
 @code{<external-format>}, that external format will be used.
@@ -974,6 +976,8 @@ Note that the garbage collector moves objects, and won't be able to fix
 up any references in C variables. There are three mechanisms for
 coping with this:
 
+@cindex garbage collector, generational
+@cindex generational garbage collector
 @itemize
 @item @code{sb-ext:purify} moves all live Lisp data into static or read-only
   areas such that it will never be moved (or freed) again in the
@@ -981,11 +985,10 @@ coping with this:
 
 @item @code{sb-sys:with-pinned-objects} is a macro which arranges for some set
   of objects to be pinned in memory for the dynamic extent of its
-  body forms. On ports which use the generational garbage
-  collector (most, as of this writing) this affects exactly the
-  specified objects. On other ports it is implemented by turning off
-  GC for the duration (so could be said to have a whole-world
-  granularity).
+  body forms. On ports which use the generational GC
+  (most, as of this writing) this affects exactly the specified
+  objects. On other ports it is implemented by turning off GC for
+  the duration (so could be said to have a whole-world granularity).
 
 @item Disable GC, using the SB-EXT:WITHOUT-GCING macro.
 @end itemize

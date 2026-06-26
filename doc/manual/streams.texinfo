@@ -38,8 +38,10 @@ streams:
 @node stream external formats
 @section Stream External Formats
 
+@cindex external format
+@cindex format, external
 The function @code{stream-external-format} returns the canonical name of
-the external format (See @ref{external formats}) used by the stream for
+the external format (see @ref{external formats}) used by the stream for
 character-based input and/or output.
 
 When constructing file streams, for example using @code{open} or

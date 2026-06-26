@@ -96,7 +96,7 @@
   such as `signal N is [un]blocked` or just hangs, and you want to
   send a useful bug report then:
 
-  - Compile SBCL with ldb enabled (feature `:sb-ldb`, see
+  - Compile SBCL with @LDB enabled (feature `:SB-LDB`, see
     `base-target-features.lisp-expr`).
 
   - Isolate a smallish test case, run it.

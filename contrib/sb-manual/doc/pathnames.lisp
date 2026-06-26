@@ -1,6 +1,7 @@
 (in-package :sb-manual)
 
-(defsection @pathnames (:title "Pathnames")
+(defsection @pathnames (:title "Pathnames"
+                        :concepts ("pathname"))
   (@lisp-pathnames section)
   (@native-filenames section))
 
@@ -84,7 +85,7 @@
     (:title "The SYS Logical Pathname Host")
   ;; The existence and meaning of SYS: logical pathnames is
   ;; implementation-defined (CLHS 19.3.1.1.1).
-  "The logical pathname host named by `\"SYS\"` exists in SBCL.
+  "The @LOGICAL-PATHNAME host named by `\"SYS\"` exists in SBCL.
   Its LOGICAL-PATHNAME-TRANSLATIONS may be set by the site or the user
   applicable to point to the locations of the system's sources; in
   particular, the core system's source files match the logical

@@ -128,8 +128,8 @@
     regression and unit-test framework.
 
   - __MD5 Sums:__ The @SB-MD5 module provides an implementation of the
-    MD5 message digest algorithm for Common Lisp, using the modular
-    arithmetic optimizations provided by SBCL.")
+    MD5 message digest algorithm for Common Lisp, using the
+    @MODULAR-ARITHMETIC optimizations provided by SBCL.")
 
 (defsection @idiosyncrasies (:title "Idiosyncrasies")
   "The information in this section describes some of the ways that SBCL
@@ -435,9 +435,8 @@
 
   SBCL also inherited some newer architectural features from CMUCL.
   The most important is that on some architectures it has a
-  generational garbage collector (GC), which has various
-  implications (mostly good) for performance. These are discussed in
-  another chapter, @EFFICIENCY.
+  @GENERATIONAL-GC, which has various implications (mostly good) for
+  performance. These are discussed in another chapter, @EFFICIENCY.
 
   SBCL has diverged from CMUCL in that SBCL is now essentially a
   compiler-only implementation of Common Lisp. This is a change in
@@ -463,7 +462,7 @@
   (and has already improved in some other areas), but it takes a while.
 
   On the x86 SBCL -- like the x86 port of CMUCL -- uses a
-  _conservative_ GC. This means that it doesn't maintain a strict
+  _@CONSERVATIVE-GC. This means that it doesn't maintain a strict
   separation between tagged and untagged data, instead treating some
   untagged data (e.g. raw floating point numbers) as possibly-tagged
   data and so not collecting any Lisp objects that they point to. This
@@ -471,9 +470,9 @@
   possibly no worse than the negative consequences of trying to
   implement an exact GC on a processor architecture as register-poor
   as the X86) and also has potentially unlimited consequences for
-  worst-case memory efficiency. In practice, conservative garbage
-  collectors work reasonably well, not getting anywhere near the worst
-  case. But they can occasionally cause odd patterns of memory usage.
+  worst-case memory efficiency. In practice, @CONSERVATIVE-GCs work
+  reasonably well, not getting anywhere near the worst case. But they
+  can occasionally cause odd patterns of memory usage.
 
   The fork from CMUCL was based on a major rewrite of the system
   bootstrap process. CMUCL has for many years tolerated a very unusual

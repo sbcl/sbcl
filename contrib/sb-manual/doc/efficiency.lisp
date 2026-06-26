@@ -1,6 +1,7 @@
 (in-package :sb-manual)
 
-(defsection @efficiency (:title "Efficiency")
+(defsection @efficiency (:title "Efficiency"
+                         :concepts ("efficicency"))
   (@slot-access section)
   (@stack-allocation section)
   (@modular-arithmetic section)
@@ -8,7 +9,8 @@
   (@global-and-always-bound-variables section)
   (@miscellaneous-efficiency-issues section))
 
-(defsection @slot-access (:title "Slot Access")
+(defsection @slot-access (:title "Slot Access"
+                          :concepts (("slot" "access")))
   (@structure-object-slot-access section)
   (@standard-object-slot-access section))
 
@@ -88,7 +90,7 @@
 
       > __Warning__: Stack space is limited, so allocation of a large
       > vector may cause stack overflow. Stack overflow checks are
-      > done except in zero SAFETY policies.
+      > done except in 0 @SAFETY policies.
 
   - closures defined with FLET or LABELS with a bound DYNAMIC-EXTENT
     declaration;
@@ -231,7 +233,10 @@
         (declare (optimize speed (safety 0) (debug 0)))
         (trivial-hof (lambda (a b) (+ a b x)) 92))")
 
-(defsection @modular-arithmetic (:title "Modular Arithmetic")
+(defsection @modular-arithmetic (:title "Modular Arithmetic"
+                                 :concepts ("modular arithmetic"
+                                            ("arithmetic," "modular")
+                                            ("arithmetic," "hardware")))
   "Some numeric functions have a property: n lower bits of the
   result depend only on n lower bits of (all or some) arguments. If
   the compiler sees an expression of form `(LOGAND <EXPR> <MASK>)`,
@@ -272,7 +277,10 @@
         (let ((u (ldb (byte 64 0) (+ a b))))
           (logior u (- (mask-field (byte 1 63) u)))))")
 
-(defsection @recognized-idioms (:title "Recognized Idioms")
+(defsection @recognized-idioms (:title "Recognized Idioms"
+                                :concepts ("modular arithmetic"
+                                           ("arithmetic," "modular")
+                                           ("arithmetic," "hardware")))
   "Common Lisp doesn't directly expose all features present in
   modern hardware. Some code patterns are recognized and turned into
   more efficient hardware instructions without requiring the use of
@@ -335,10 +343,10 @@
   ;; real problems are loop induction, closed over variables and
   ;; aliases.
   "- Since the time the CMUCL manual was written, CMUCL (and thus SBCL)
-    has gotten a generational garbage collector. This means that there
-    are some efficiency implications of various patterns of memory
-    usage which aren't discussed in the CMUCL manual. (Some new
-    material should be written about this.)
+    has gotten a @GENERATIONAL-GC. This means that there are some
+    efficiency implications of various patterns of memory usage which
+    aren't discussed in the CMUCL manual. (Some new material should be
+    written about this.)
 
   - SBCL has some important known efficiency problems. Perhaps the
     most important are

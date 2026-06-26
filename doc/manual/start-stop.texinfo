@@ -382,6 +382,12 @@ system.
 @node runtime options
 @subsection Runtime Options
 
+@cindex LDB
+@cindex disabling LDB
+@cindex LDB, disabling
+@cindex LDB
+@cindex enabling LDB
+@cindex LDB, enabling
 @itemize
 @item @code{--core <corefilename>}
 
@@ -415,7 +421,7 @@ and @code{--disable-debugger} options.
 @item @code{--disable-ldb}
 
 Disable the low-level debugger. Only effective if SBCL is
-compiled with @code{ldb}.
+compiled with LDB. disabling LDB
 
 @item @code{--lose-on-corruption}
 
@@ -425,7 +431,7 @@ corrupt the image. By default, SBCL prints a warning, then tries
 to continue and handle the error in Lisp, but this will not
 always work, and SBCL may malfunction or even hang. With this
 option, upon encountering such an error, SBCL will exit instead
-of invoking @code{ldb} (if present and enabled).
+of invoking LDB (if present and enabled enabling LDB).
 
 @item @code{--script <filename>}
 

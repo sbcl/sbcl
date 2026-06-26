@@ -16,12 +16,17 @@
   (@interpreter section)
   (@advanced-compiler-use-and-efficiency-hints section))
 
-(defsection @diagnostic-messages (:title "Diagnostic Messages")
+(defsection @diagnostic-messages (:title "Diagnostic Messages"
+                                  :concepts (("compiler" "messsage")
+                                             ("messsage," "compiler")))
   (@controlling-verbosity section)
   (@diagnostic-severity section)
   (@understanding-compiler-diagnostics section))
 
-(defsection @controlling-verbosity (:title "Controlling Verbosity")
+(defsection @controlling-verbosity
+    (:title "Controlling Verbosity"
+     :concepts (("compiler" "messsage" "verbosity")
+                ("verbosity" "of compiler messsages")))
   "The compiler can be quite verbose in its diagnostic reporting, rather
   more then some users would prefer -- the amount of noise emitted can
   be controlled, however.
@@ -91,7 +96,10 @@
 ;;   associated with anonymous functions.
 ;; \end{defmac}
 
-(defsection @diagnostic-severity (:title "Diagnostic Severity")
+(defsection @diagnostic-severity
+    (:title "Diagnostic Severity"
+     :concepts (("compiler" "message" "severity")
+                ("severity" "of compiler message")))
   "There are four levels of compiler diagnostic severity:
 
   - error
@@ -137,7 +145,7 @@
   defined anywhere."
   (@parts-of-a-compiler-diagnostic section)
   (@original-and-actual-source section)
-  (@processing-path section))
+  (@processing-paths section))
 
 (defsection @parts-of-a-compiler-diagnostic
     (:title "Parts of a Compiler Diagnostic")
@@ -170,17 +178,17 @@
     they are all printed from the outside in, separated by `=>`s. In
     this example, the problem was in the DEFUN for `FOO`.
 
-  - `(ZOQ Y)` is the _original source_ form responsible for the
+  - `(ZOQ Y)` is the _@ORIGINAL-SOURCE_ form responsible for the
     diagnostic. Original source means that the form directly appeared
     in the original input to the compiler, i.e. in the lambda passed
     to COMPILE or in the top level form read from the source file. In
     this example, the expansion of the `ZOQ` macro was responsible for
     the message.
 
-  - `--> ROQ PLOQ` This is the _processing path_ that the compiler
+  - `--> ROQ PLOQ` This is the _@PROCESSING-PATH_ that the compiler
     used to produce the code that caused the message to be emitted.
     The processing path is a representation of the evaluated forms
-    enclosing the actual source that the compiler encountered when
+    enclosing the @ACTUAL-SOURCE that the compiler encountered when
     processing the original source. The path is the first element of
     each form, or the form itself if the form is not a list. These
     forms result from the expansion of macros or source-to-source
@@ -254,7 +262,9 @@
   intervene between the original source and the actual source, then
   the processing path will also be omitted.")
 
-(defsection @original-and-actual-source (:title "Original and Actual Source")
+(defsection @original-and-actual-source (:title "Original and Actual Source"
+                                         :concepts (@original-source
+                                                    @actual-source))
   "The _original source_ displayed will almost always be a list. If
   the actual source for an message is a symbol, the original source will
   be the immediately enclosing evaluated list form. So even if the
@@ -295,7 +305,8 @@
   this example, the problem is that `A`'s NIL initial value is not a
   FIXNUM.")
 
-(defsection @processing-path (:title "Processing Path")
+(defsection @processing-paths (:title "Processing Paths"
+                               :concepts (@processing-path))
   "The processing path is mainly useful for debugging macros, so if you
   don't write macros, you can probably ignore it. Consider this example:
 
@@ -320,7 +331,8 @@
           ((>= i #:g1) *undefined*)
         (declare (type unsigned-byte i)))
 
-  The rest of the processing path results from the expansion of DO:
+  The rest of the processing path results from the @MACROEXPANSION of
+  DO: ~SOURCE-TRANSFORM
 
       (block nil
         (let ((i 0) (#:g1 n))
@@ -377,10 +389,11 @@
 
   CLOS slot types form a notable exception. Types declared using the
   :TYPE slot option in DEFCLASS are asserted if and only if the class
-  was defined in _safe code_ and the slot access location is in _safe
-  code_ as well. This laxness does not pose any internal consistency
-  issues, as the CLOS slot types are not available for the type
-  inferencer, nor do CLOS slot types provide any efficiency benefits.
+  was defined in _safe code_ ~SAFETY and the slot access location is
+  in _safe code_ as well. This laxness does not pose any internal
+  consistency issues, as the CLOS slot types are not available for the
+  type inferencer, nor do CLOS slot types provide any efficiency
+  benefits.
 
   There are three type checking policies available in SBCL, selectable
   via OPTIMIZE declarations."
@@ -415,7 +428,9 @@
 
       Used when `(= SAFETY 0)`.")
 
-(defsection @precise-type-checking (:title "Precise Type Checking")
+(defsection @precise-type-checking (:title "Precise Type Checking"
+                                    :concepts (("type checking," "precise")
+                                               ("precise" "type checking")))
   "Precise checking means that the check is done as though TYPEP
   had been called with the exact type specifier that appeared in the
   declaration.
@@ -432,7 +447,10 @@
   MEMBER, and other list-style type specifiers.")
 
 (defsection @getting-existing-programs-to-run
-    (:title "Getting Existing Programs to Run")
+    (:title "Getting Existing Programs to Run"
+     :concepts (("existing programs," "getting them to run")
+                ("types," "portability")
+                ("compatibility" "with other Lisps")))
   "Since SBCL's compiler does much more comprehensive type checking than
   most Lisp compilers, SBCL may detect type errors in programs that have
   been debugged using other compilers. These errors are mostly incorrect
@@ -441,7 +459,7 @@
 
   Some incorrect declarations can only be detected by run-time type
   checking. It is very important to initially compile a program with
-  full type checks (high SAFETY optimization) and then test this safe
+  full type checks (high @SAFETY optimization) and then test this safe
   version. After the checking version has been tested, then you can
   consider weakening or eliminating type checks. _This applies even to
   previously debugged programs_ because the SBCL compiler does much
@@ -721,7 +739,10 @@
   (@errors-during-macroexpansion section)
   (@read-errors section))
 
-(defsection @type-errors-at-compile-time (:title "Type Errors at Compile Time")
+(defsection @type-errors-at-compile-time
+    (:title "Type Errors at Compile Time"
+     :concepts (("compile-time" "type error")
+                ("type error," "compile-time")))
   "If the compiler can prove at compile time that some portion of the
   program cannot be executed without a type error, then it will give a
   warning at compile time.
@@ -766,7 +787,8 @@
   an error if it is executed) and gives a warning.")
 
 (defsection @errors-during-macroexpansion
-    (:title "Errors During Macroexpansion")
+    (:title "Errors During Macroexpansion"
+     :concepts (("macroexpansion," "errors during")))
   "The compiler handles errors that happen during macroexpansion, turning
   them into compiler errors. If you want to debug the error (to debug
   a macro), you can set *BREAK-ON-SIGNALS* to ERROR. For example, this
@@ -789,13 +811,18 @@
       ;   (hint: For more precise location, try *BREAK-ON-SIGNALS*.)
       ;   DO step variable is not a symbol: (ATOM CURRENT)")
 
-(defsection @read-errors (:title "Read Errors")
+(defsection @read-errors (:title "Read Errors"
+                          :concepts (("compiler" "read error")
+                                     ("read error," "compiler")))
   "SBCL's compiler does not attempt to recover from read errors when
   reading a source file, but instead just reports the offending
   character position and gives up on the entire source file.")
 
 (defsection @open-coding-and-inline-expansion
-    (:title "Open Coding and Inline Expansion")
+    (:title "Open Coding and Inline Expansion"
+     :concepts ("open-coding"
+                ("inline" "expansion")
+                ("static" "functions")))
   "Since Common Lisp forbids the redefinition of standard functions, the
   compiler can have special knowledge of these standard functions
   embedded in it. This special knowledge is used in various ways (open
@@ -849,7 +876,8 @@
   or compiled as _static call_. Static function call uses a more
   efficient calling convention that forbids redefinition.")
 
-(defsection @interpreter (:title "Interpreter")
+(defsection @interpreter (:title "Interpreter"
+                          :concepts ("interpreter"))
   "By default SBCL implements EVAL by calling the native code
   compiler.
 

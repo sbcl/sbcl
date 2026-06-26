@@ -1,6 +1,7 @@
 (in-package :sb-manual)
 
-(defsection @external-formats (:title "External Formats")
+(defsection @external-formats (:title "External Formats"
+                               :concepts (@external-format))
   "External formats determine the coding of characters from/to sequences
   of octets when exchanging data with the outside world. Examples of
   such exchanges are:

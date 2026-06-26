@@ -1,6 +1,7 @@
 (in-package :sb-manual)
 
-(defsection @deprecation (:title "Deprecation")
+(defsection @deprecation (:title "Deprecation"
+                          :concepts ("deprecation"))
   "In order to support evolution of interfaces in SBCL as well as in user
   code, SBCL allows declaring functions, variables and types as
   deprecated. Users of deprecated things are notified by means of

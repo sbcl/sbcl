@@ -1,6 +1,8 @@
 (in-package :sb-manual)
 
-(defsection @package-locks (:title "Package Locks")
+(defsection @package-locks (:title "Package Locks"
+                            :concepts (("package" "lock")
+                                       ("lock," "package")))
   "None of the following sections apply to SBCL built without package
   locking support.
 
@@ -49,7 +51,7 @@
 
 (defsection @lexical-bindings-and-declarations
     (:title "Lexical Bindings and Declarations")
-  "Lexical bindings or declarations that violate package locks cause a
+  "Lexical bindings or @DECLARATIONs that violate package locks cause a
   compile-time warning, and a runtime PROGRAM-ERROR when the form that
   violates package locks would be executed.
 

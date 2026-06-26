@@ -225,17 +225,17 @@
     declare that no useful value is returned. Using ALIEN-FUNCALL to
     call a VOID foreign function will return zero values.
 
-  - The foreign type specifier `(C-STRING &KEY <external-format>
-    <element-type> <not-null>)` is similar to `(* CHAR)` but is
+  - The foreign type specifier `(C-STRING &KEY <EXTERNAL-FORMAT>
+    <ELEMENT-TYPE> <NOT-NULL>)` is similar to `(* CHAR)` but is
     interpreted as a null-terminated string, and is automatically
     converted into a Lisp string when accessed; or if the pointer is C
     `\\NULL` or 0, then accessing it gives Lisp NIL unless
-    `<not-null>` is true, in which case a TYPE-ERROR is signalled.
+    `<NOT-NULL>` is true, in which case a TYPE-ERROR is signalled.
 
-      External format conversion is automatically done when Lisp
+      @EXTERNAL-FORMAT conversion is automatically done when Lisp
       strings are passed to foreign code, or when foreign strings are
       passed to Lisp code. If the type specifier has an explicit
-      `<external-format>`, that external format will be used.
+      `<EXTERNAL-FORMAT>`, that external format will be used.
       Otherwise SB-EXT:*DEFAULT-C-STRING-EXTERNAL-FORMAT* will be
       used. For example, when the following alien routine is called,
       the Lisp string given as argument is converted to an \\EBCDIC
@@ -249,7 +249,7 @@
       assuming that the `<EXTERNAL-FORMAT>` and `<ELEMENT-TYPE>` of
       the C-STRING type are compatible with the internal
       representation of the string. For an SBCL built with Unicode
-      support that means an `<external-format>` of :ASCII and an
+      support that means an `<EXTERNAL-FORMAT>` of :ASCII and an
       `<ELEMENT-TYPE>` of BASE-CHAR. Without Unicode support the
       `<EXTERNAL-FORMAT>` can also be :ISO-8859-1, and the
       `<ELEMENT-TYPE>` can also be [CHARACTER][type]. If
@@ -615,11 +615,10 @@
 
   - SB-SYS:WITH-PINNED-OBJECTS is a macro which arranges for some set
     of objects to be pinned in memory for the dynamic extent of its
-    body forms. On ports which use the generational garbage
-    collector (most, as of this writing) this affects exactly the
-    specified objects. On other ports it is implemented by turning off
-    GC for the duration (so could be said to have a whole-world
-    granularity).
+    body forms. On ports which use the @GENERATIONAL-GC
+    (most, as of this writing) this affects exactly the specified
+    objects. On other ports it is implemented by turning off GC for
+    the duration (so could be said to have a whole-world granularity).
 
   - Disable GC, using the SB-EXT:WITHOUT-GCING macro."
   (@lisp-as-a-shared-library section))

@@ -22,6 +22,8 @@ naive translation. Efficiency issues are sufficiently varied and
 separate that they have their own chapter, @ref{efficiency}.
 
 @node diagnostic messages
+@cindex compiler messsage
+@cindex messsage, compiler
 @section Diagnostic Messages
 
 @menu
@@ -31,6 +33,8 @@ separate that they have their own chapter, @ref{efficiency}.
 @end menu
 
 @node controlling verbosity
+@cindex compiler messsage verbosity
+@cindex verbosity of compiler messsages
 @subsection Controlling Verbosity
 
 The compiler can be quite verbose in its diagnostic reporting, rather
@@ -102,6 +106,8 @@ For information about muffling warnings signaled outside of the
 compiler, see @ref{customization hooks for users}.
 
 @node diagnostic severity
+@cindex compiler message severity
+@cindex severity of compiler message
 @subsection Diagnostic Severity
 
 There are four levels of compiler diagnostic severity:
@@ -150,7 +156,7 @@ has written, having proved that it is unreachable.
 @menu
 * Parts of a Compiler Diagnostic: parts of a compiler diagnostic.
 * Original and Actual Source: original and actual source.
-* Processing Path: processing path.
+* Processing Paths: processing paths.
 @end menu
 
 The messages emitted by the compiler contain a lot of detail in a
@@ -190,6 +196,11 @@ When processing this program, the compiler will produce this warning:
 In this example we see each of the six possible parts of a compiler
 diagnostic:
 
+@cindex original source
+@cindex source, original
+@cindex processing path
+@cindex actual source
+@cindex source, actual
 @itemize
 @item @code{file: /tmp/foo.lisp} is the name of the file that the compiler
   read the relevant code from. The file name is displayed because it
@@ -295,6 +306,10 @@ intervene between the original source and the actual source, then
 the processing path will also be omitted.
 
 @node original and actual source
+@cindex original source
+@cindex source, original
+@cindex actual source
+@cindex source, actual
 @subsubsection Original and Actual Source
 
 The @emph{original source} displayed will almost always be a list. If
@@ -341,8 +356,9 @@ This message is not saying that there is a problem somewhere in this
 this example, the problem is that @code{a}'s @code{nil} initial value is not a
 @code{fixnum}.
 
-@node processing path
-@subsubsection Processing Path
+@node processing paths
+@cindex processing path
+@subsubsection Processing Paths
 
 The processing path is mainly useful for debugging macros, so if you
 don't write macros, you can probably ignore it. Consider this example:
@@ -374,7 +390,10 @@ Note that @code{do} appears in the processing path. This is because
   (declare (type unsigned-byte i)))
 @end example
 
-The rest of the processing path results from the expansion of @code{do}:
+@cindex macroexpansion
+@cindex source transform
+The rest of the processing path results from the macroexpansion of
+@code{do}: 
 
 @example
 (block nil
@@ -431,12 +450,15 @@ not been proven to always hold are asserted at runtime.
 provide some exceptions to this rule, see
 @ref{implementation limitations}.}
 
+@cindex safety, optimization quality
+@cindex optimization quality safety
 CLOS slot types form a notable exception. Types declared using the
 @code{:type} slot option in @code{defclass} are asserted if and only if the class
-was defined in @emph{safe code} and the slot access location is in @emph{safe
-code} as well. This laxness does not pose any internal consistency
-issues, as the CLOS slot types are not available for the type
-inferencer, nor do CLOS slot types provide any efficiency benefits.
+was defined in @emph{safe code}  and the slot access location is
+in @emph{safe code} as well. This laxness does not pose any internal
+consistency issues, as the CLOS slot types are not available for the
+type inferencer, nor do CLOS slot types provide any efficiency
+benefits.
 
 There are three type checking policies available in SBCL, selectable
 via @code{optimize} declarations.
@@ -477,6 +499,8 @@ Used when @code{(= safety 0)}.
 @end itemize
 
 @node precise type checking
+@cindex type checking, precise
+@cindex precise type checking
 @subsection Precise Type Checking
 
 Precise checking means that the check is done as though @code{typep}
@@ -495,6 +519,9 @@ slots as precisely as possible. This often involves the use of @code{or},
 @code{member}, and other list-style type specifiers.
 
 @node getting existing programs to run
+@cindex existing programs, getting them to run
+@cindex types, portability
+@cindex compatibility with other Lisps
 @subsection Getting Existing Programs to Run
 
 Since SBCL's compiler does much more comprehensive type checking than
@@ -503,9 +530,11 @@ been debugged using other compilers. These errors are mostly incorrect
 declarations, although compile-time type errors can find actual bugs
 if parts of the program have never been tested.
 
+@cindex safety, optimization quality
+@cindex optimization quality safety
 Some incorrect declarations can only be detected by run-time type
 checking. It is very important to initially compile a program with
-full type checks (high @code{safety} optimization) and then test this safe
+full type checks (high safety optimization) and then test this safe
 version. After the checking version has been tested, then you can
 consider weakening or eliminating type checks. @emph{This applies even to
 previously debugged programs} because the SBCL compiler does much
@@ -787,6 +816,8 @@ Examples:
 @end menu
 
 @node type errors at compile time
+@cindex compile-time type error
+@cindex type error, compile-time
 @subsection Type Errors at Compile Time
 
 If the compiler can prove at compile time that some portion of the
@@ -837,6 +868,7 @@ executed), so it compiles the erroneous code (which will always signal
 an error if it is executed) and gives a warning.
 
 @node errors during macroexpansion
+@cindex macroexpansion, errors during
 @subsection Errors During Macroexpansion
 
 The compiler handles errors that happen during macroexpansion, turning
@@ -866,6 +898,8 @@ gives this error:
 @end example
 
 @node read errors
+@cindex compiler read error
+@cindex read error, compiler
 @subsection Read Errors
 
 SBCL's compiler does not attempt to recover from read errors when
@@ -873,6 +907,9 @@ reading a source file, but instead just reports the offending
 character position and gives up on the entire source file.
 
 @node open coding and inline expansion
+@cindex open-coding
+@cindex inline expansion
+@cindex static functions
 @section Open Coding and Inline Expansion
 
 Since Common Lisp forbids the redefinition of standard functions, the
@@ -941,6 +978,7 @@ or compiled as @emph{static call}. Static function call uses a more
 efficient calling convention that forbids redefinition.
 
 @node interpreter
+@cindex interpreter
 @section Interpreter
 
 By default SBCL implements @code{eval} by calling the native code

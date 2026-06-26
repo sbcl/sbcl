@@ -1,6 +1,7 @@
 (in-package :sb-manual)
 
-(defsection @beyond-the-ansi-standard (:title "Beyond the ANSI Standard")
+(defsection @beyond-the-ansi-standard (:title "Beyond the ANSI Standard"
+                                       :concepts (("reader" "extensions")))
   "SBCL is derived from CMUCL, which implements many extensions to the
   ANSI standard. SBCL doesn't support as many extensions as CMUCL, but
   it still has quite a few. See @CONTRIBUTED-MODULES."
@@ -30,10 +31,12 @@
   (@decimal-syntax-for-rationals section))
 
 (defsection @extended-package-prefix-syntax
-    (:title "Extended Package Prefix Syntax")
+    (:title "Extended Package Prefix Syntax"
+     :concepts (("extended" "package prefix syntax")
+                ("package prefix syntax," "extended")))
   "SBCL supports extended package prefix syntax, which allows specifying
   an alternate package instead of *PACKAGE* for the reader to use as
-  the default package for interning symbols:
+  the default package for @INTERNING-SYMBOLS:
 
       <package-name>::<form-with-interning-into-package>
 
@@ -43,11 +46,14 @@
 
   *PACKAGE* is not rebound during the course of reading a form with
   extended package prefix syntax; if `FOO::BAR` would cause a
-  read-time package lock violation, so does `FOO::(BAR)`.")
+  read-time @PACKAGE-LOCK violation, so does `FOO::(BAR)`.")
 
-(defsection @symbol-name-normalization (:title "Symbol Name Normalization")
+(defsection @symbol-name-normalization
+    (:title "Symbol Name Normalization"
+     :concepts (("symbol name" "normalization")
+                ("normalization" "of symbol name")))
   "SBCL also extends the reader to normalize all symbols to _Normalization
-  Form KC_ in builds with Unicode enabled. Whether symbols are
+  Form KC_ in builds with @UNICODE enabled. Whether symbols are
   normalized is controlled by"
   (sb-ext:readtable-normalization function)
   "Symbols created by INTERN and similar functions are not affected by
@@ -55,7 +61,9 @@
   are not normalized are escaped during printing.")
 
 (defsection @decimal-syntax-for-rationals
-    (:title "Decimal Syntax for Rationals")
+    (:title "Decimal Syntax for Rationals"
+     :concepts ("decimal syntax for rationals"
+                ("rational," "decimal syntax")))
   "SBCL supports a decimal syntax for rationals, modelled after the
   standard syntax for floating-point numbers. If a number with
   floating-point syntax has an exponent marker of `r` or `R`
@@ -74,7 +82,10 @@
   however, rational numbers are printed in their standard syntax,
   irrespective of the value of *READ-DEFAULT-FLOAT-FORMAT*.")
 
-(defsection @package-local-nicknames (:title "Package-Local Nicknames")
+(defsection @package-local-nicknames
+    (:title "Package-Local Nicknames"
+     :concepts (("package-local" "nicknames")
+                ("nicknames," "package-local")))
   "SBCL allows giving packages local nicknames: they allow short and
   easy-to-use names to be used without fear of name conflict associated
   with normal nicknames.
@@ -118,7 +129,8 @@
   the following variable."
   (sb-ext:*on-package-variance* variable))
 
-(defsection @garbage-collection (:title "Garbage Collection")
+(defsection @garbage-collection (:title "Garbage Collection"
+                                 :concepts ("garbage collection"))
   "SBCL provides additional garbage collection functionality not
   specified by ANSI."
   (sb-ext:gc function)
@@ -128,14 +140,16 @@
   (@introspection-and-tuning section)
   (@tracing-live-objects-back-to-roots section))
 
-(defsection @finalization (:title "Finalization")
+(defsection @finalization (:title "Finalization"
+                           :concepts ("finalization"))
   "Finalization allows code to be executed after an object has been
   garbage collected. This is useful for example for releasing foreign
   memory associated with a Lisp object."
   (sb-ext:finalize function)
   (sb-ext:cancel-finalization function))
 
-(defsection @weak-pointers (:title "Weak Pointers")
+(defsection @weak-pointers (:title "Weak Pointers"
+                            :concepts ("weak pointers"))
   "Weak pointers allow references to objects to be maintained without
   keeping them from being garbage collected: useful for building caches
   among other things.
@@ -234,7 +248,7 @@
 
   - SLOT-VALUE and SLOT-BOUNDP function as expected, including (for
     SLOT-VALUE) calling and respecting the return value of
-    SLOT-UNBOUND if the slot is unbound;
+    SLOT-UNBOUND if the slot is unbound; ~UNBOUND-SLOT
 
   - `(SETF SLOT-VALUE)` functions as expected, including performing
     type checks to verify that the new value is of an appropriate type
@@ -440,8 +454,8 @@
     methods convert between classes and proper names and between lists
     of the form `(EQL <x>)` and interned eql specializer objects.
 
-  - Distinguishing unbound instance allocated slots from bound ones
-    when using SB-MOP:STANDARD-INSTANCE-ACCESS and
+  - Distinguishing unbound instance allocated slots ~UNBOUND-SLOT from
+    bound ones when using SB-MOP:STANDARD-INSTANCE-ACCESS and
     SB-MOP:FUNCALLABLE-STANDARD-INSTANCE-ACCESS is possible by
     comparison to the symbol-macro SB-PCL:+SLOT-UNBOUND+.")
 
@@ -633,7 +647,8 @@
   (sb-ext:process-close function)
   (sb-ext:process-kill function))
 
-(defsection @unicode-support (:title "Unicode Support")
+(defsection @unicode-support (:title "Unicode Support"
+                              :concepts (@unicode))
   "SBCL provides support for working with Unicode text and querying the
   standard Unicode database for information about individual codepoints.
   Unicode-related functions are located in the `SB-UNICODE` package.
@@ -702,7 +717,8 @@
   (sb-unicode:sentence-break-class function)
   (sb-unicode:line-break-class function))
 
-(defsection @string-operations (:title "String operations")
+(defsection @string-operations (:title "String operations"
+                                :concepts (("normalization" "of strings")))
   "SBCL can normalize strings using:"
   (sb-unicode:normalize-string function)
   (sb-unicode:normalized-p function)
@@ -781,7 +797,7 @@
   the condition accessor SB-EXT:NAME-CONFLICT-SYMBOLS.")
 
 (defsection @hash-table-extensions (:title "Hash Table Extensions")
-  "Hash table extensions supported by SBCL are all controlled by keyword
+  "@HASH-TABLE extensions supported by SBCL are all controlled by keyword
   arguments to MAKE-HASH-TABLE."
   (make-hash-table function)
   (sb-ext:define-hash-table-test macro)
@@ -789,7 +805,8 @@
   (sb-ext:hash-table-synchronized-p function)
   (sb-ext:hash-table-weakness function))
 
-(defsection @random-number-generation (:title "Random Number Generation")
+(defsection @random-number-generation (:title "Random Number Generation"
+                                       :concepts ("random number generation"))
   "The initial value of *RANDOM-STATE* is the same each time SBCL
   is started. This makes it possible for user code to obtain
   repeatable pseudo random numbers using only standard-provided
@@ -883,7 +900,8 @@
   (@asynchronous-timeouts section)
   (@operations-supporting-timeouts-and-deadlines section))
 
-(defsection @timeout-parameters (:title "Timeout Parameters")
+(defsection @timeout-parameters (:title "Timeout Parameters"
+                                 :concepts (("timeout" "parameters")))
   "Certain operations accept :TIMEOUT keyword arguments. These only
   affect the specific operation and must be specified at each call
   site by passing a :TIMEOUT keyword argument and a corresponding
@@ -916,7 +934,10 @@
   ;; here.
   )
 
-(defsection @synchronous-timeouts (:title "Synchronous Timeouts")
+(defsection @synchronous-timeouts (:title "Synchronous Timeouts"
+                                   :concepts (("synchronous" "timeout")
+                                              ("timeout," "synchronous")
+                                              "deadline"))
   "Deadlines, in contrast to timeout parameters, are established for a
   dynamic scope using the SB-SYS:WITH-DEADLINE macro and indirectly
   affect operations within that scope. In case of nested uses, the
@@ -957,7 +978,9 @@
   three seconds, a SB-SYS:DEADLINE-TIMEOUT condition will be signaled
   after the SLEEP call has been executing for one second.")
 
-(defsection @asynchronous-timeouts (:title "Asynchronous Timeouts")
+(defsection @asynchronous-timeouts (:title "Asynchronous Timeouts"
+                                    :concepts (("asynchronous" "timeout")
+                                               ("timeout," "asynchronous")))
   "Asynchronous timeouts are established for a dynamic scope using the
   SB-EXT:WITH-TIMEOUT macro:"
   (sb-ext:with-timeout macro)
@@ -1038,8 +1061,8 @@
   is well suited to the program's memory usage pattern. It also allows
   permanent code to be frozen at fixed addresses, a precondition for
   using copy-on-write to share code between multiple Lisp processes.
-  This is less important with modern generational garbage collectors,
-  but not all SBCL platforms use such a garbage collector.
+  This is less important with modern @GENERATIONAL-GC, but not all
+  SBCL platforms use such a garbage collector.
 
   The SB-EXT:TRULY-THE special form declares the type of the result of
   the operations, producing its argument; the declaration is not

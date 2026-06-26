@@ -249,8 +249,8 @@
 
 (declaim (inline readtable-normalization))
 (defun readtable-normalization (readtable)
-  "Returns T if READTABLE normalizes symbols to NFKC, and NIL otherwise.
-The READTABLE-NORMALIZATION of the standard readtable is T."
+  "Returns T if READTABLE normalizes symbols to SB-MANUAL::@NFKC, and NIL
+otherwise. The READTABLE-NORMALIZATION of the standard readtable is T."
   (%readtable-normalization readtable))
 
 (defun (setf readtable-normalization) (new-value readtable)

@@ -115,8 +115,9 @@ If you run into a signal related bug, you are getting fatal errors
 such as @code{signal N is [un]blocked} or just hangs, and you want to
 send a useful bug report then:
 
+@cindex LDB
 @itemize
-@item Compile SBCL with ldb enabled (feature @code{:sb-ldb}, see
+@item Compile SBCL with LDB enabled (feature @code{:sb-ldb}, see
   @code{base-target-features.lisp-expr}).
 
 @item Isolate a smallish test case, run it.

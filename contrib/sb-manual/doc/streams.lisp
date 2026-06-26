@@ -30,7 +30,7 @@
 
 (defsection @stream-external-formats (:title "Stream External Formats")
   "The function STREAM-EXTERNAL-FORMAT returns the canonical name of
-  the external format (See @EXTERNAL-FORMATS) used by the stream for
+  the @EXTERNAL-FORMAT (see @EXTERNAL-FORMATS) used by the stream for
   character-based input and/or output.
 
   When constructing file streams, for example using OPEN or

@@ -1,6 +1,7 @@
 (in-package :sb-manual)
 
-(defsection @profiling (:title "Profiling")
+(defsection @profiling (:title "Profiling"
+                        :concepts ("profiling"))
   "SBCL includes both a deterministic profiler, that can collect
   statistics on individual functions, and a more \"modern\",
   statistical profiler.
@@ -9,7 +10,9 @@
   (@deterministic-profiler section)
   (@statistical-profiler section))
 
-(defsection @deterministic-profiler (:title "Deterministic Profiler")
+(defsection @deterministic-profiler
+    (:title "Deterministic Profiler"
+     :concepts (("profiling," "deterministic")))
   "The package `SB-PROFILE` provides a classic, per-function-call
   profiler.
 
@@ -20,7 +23,8 @@
   (sb-profile:report function)
   (sb-profile:reset function))
 
-(defsection @statistical-profiler (:title "Statistical Profiler")
+(defsection @statistical-profiler (:title "Statistical Profiler"
+                                   :concepts (("profiling," "statistical")))
   "The `SB-SPROF` module, loadable by
 
       (require :sb-sprof)
@@ -134,8 +138,8 @@
   __Platform support__
 
   Allocation profiling is only supported on SBCL builds that use the
-  generational garbage collector. Tracking of call stacks at a depth
-  of more than two levels is only supported on x86 and x86-64.
+  @GENERATIONAL-GC. Tracking of call stacks at a depth of more than
+  two levels is only supported on x86 and x86-64.
 
   __Macros__"
   (sb-sprof:with-profiling macro)

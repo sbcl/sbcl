@@ -1,6 +1,7 @@
 (in-package :sb-manual)
 
-(defsection @debugger (:title "Debugger")
+(defsection @debugger (:title "Debugger"
+                       :concepts ("debugger"))
   "This chapter documents the debugging facilities of SBCL, including
   the debugger, single-stepper and TRACE, and the effect of `(OPTIMIZE
   DEBUG)` declarations."
@@ -98,7 +99,8 @@
   debugger by using the SB-EXT:*DEBUG-PRINT-VARIABLE-ALIST*."
   (sb-ext:*debug-print-variable-alist* variable))
 
-(defsection @stack-frames (:title "Stack Frames")
+(defsection @stack-frames (:title "Stack Frames"
+                           :concepts ("stack frame"))
   "A _stack frame_ is the run-time representation of a call to a
   function; the frame stores the state that a function needs to
   remember what it is doing. Frames have:
@@ -209,7 +211,14 @@
   lambdas will appear as `(LAMBDA <LAMBDA-LIST>)`."
   (@entry-point-details section))
 
-(defsection @entry-point-details (:title "Entry Point Details")
+(defsection @entry-point-details
+    (:title "Entry Point Details"
+     :concepts (("external" "entry point")
+                ("entry point," "external")
+                ("block compilation," "debugger implications")
+                ("external," "stack frame kind")
+                ("optional," "stack frame kind")
+                ("cleanup," "stack frame kind")))
   "Sometimes the compiler introduces new functions that are used to
   implement a user function, but are not directly specified in the
   source. This is mostly done for argument type and count checking.
@@ -224,7 +233,7 @@
 
 (defsection @debug-tail-recursion (:title "Debug Tail Recursion")
   "The compiler is _properly tail recursive_. If a function call is
-  in a tail-recursive position, the stack frame will be deallocated
+  in a @TAIL-RECURSIVE position, the stack frame will be deallocated
   _at the time of the call_, rather than after the call returns.
   Consider this backtrace:
 
@@ -263,7 +272,9 @@
   )
 
 (defsection @unknown-locations-and-interrupts
-    (:title "Unknown Locations and Interrupts")
+    (:title "Unknown Locations and Interrupts"
+     :concepts (("unknown code location")
+                ("code location" "unknown")))
   "The debugger operates using special debugging information attached to
   the compiled code. This debug information tells the debugger what it
   needs to know about the locations in the code where the debugger can
@@ -278,10 +289,10 @@
   - There is inadequate debug information due to the value of the
     DEBUG optimization quality. See @DEBUGGER-POLICY-CONTROL.
 
-  - The debugger was entered because of an interrupt such as `C-c`.
+  - The debugger was entered because of an @INTERRUPT such as `C-c`.
 
-  - A hardware error such as a bus error occurred in code that was
-    compiled unsafely due to the value of the SAFETY
+  - A hardware error ~RUN-TIME-ERROR such as a bus error occurred in
+    code that was compiled unsafely due to the value of the SAFETY
     optimization quality."
   ;; FIXME: reinstate link when section on optimize qualities exists.
   ;; @OPTIMIZE-DECLARATION.
@@ -296,7 +307,9 @@
   be located. If this happens, return from the interrupt and try
   again.")
 
-(defsection @variable-access (:title "Variable Access")
+(defsection @variable-access (:title "Variable Access"
+                              :concepts (("debug" "variables")
+                                         ("variable," "debugger access")))
   "There are two ways to access the current frame's local variables in
   the debugger: `list-locals` and SB-DEBUG:VAR.
 
@@ -331,7 +344,10 @@
   (@variable-value-availability section)
   (@note-on-lexical-variable-access section))
 
-(defsection @variable-value-availability (:title "Variable Value Availability")
+(defsection @variable-value-availability
+    (:title "Variable Value Availability"
+     :concepts (("variable," "value availabilty in debugger")
+                ("debug variable," "value availabilty")))
   "The value of a variable may be unavailable to the debugger in portions
   of the program where Lisp says that the variable is defined. If a
   variable value is not available, the debugger will not let you read
@@ -353,10 +369,10 @@
 
   The value of a variable may be unavailable for these reasons:
 
-  - The value of the DEBUG optimization quality may have omitted debug
-    information needed to determine whether the variable is available.
-    Unless a variable is an argument, its value will only be available
-    when DEBUG is at least 2.
+  - The value of the @DEBUG optimization quality may have omitted
+    debug information needed to determine whether the variable is
+    available. Unless a variable is an argument, its value will only
+    be available when DEBUG is at least 2.
 
   - The compiler did lifetime analysis and determined that the value
     was no longer needed, even though its scope had not been exited.
@@ -418,7 +434,9 @@
   proved the variable could never take on. This may result in bad
   things happening.")
 
-(defsection @source-location-printing (:title "Source Location Printing")
+(defsection @source-location-printing
+    (:title "Source Location Printing"
+     :concepts (("source location" "in debugger")))
   "One of the debugger's capabilities is source level debugging of
   compiled code.  These commands display the source location for the
   current frame:
@@ -525,7 +543,7 @@
 
 (defsection @source-location-availability
     (:title "Source Location Availability")
-  "Source location information is only available when the DEBUG
+  "Source location information is only available when the @DEBUG
   optimization quality is at least 2. If source location information
   is unavailable, the source commands will give an error message.
 
@@ -537,11 +555,11 @@
       Unknown location: using block start.
 
   and then proceed to print the source location for the start of the
-  _basic block_ enclosing the code location. It's a bit complicated to
+  _@BASIC-BLOCK_ enclosing the code location. It's a bit complicated to
   explain exactly what a basic block is, but here are some properties
   of the block start location:
 
-  - The block start location may be the same as the true location.
+  - The @BLOCK-START location may be the same as the true location.
 
   - The block start location will never be later in the program's flow
     of control than the true location.
@@ -561,9 +579,11 @@
   and the next conditional (but watch out because the compiler may
   have changed the program on you.)")
 
-(defsection @debugger-policy-control (:title "Debugger Policy Control")
+(defsection @debugger-policy-control (:title "Debugger Policy Control"
+                                      :concepts (("debugger" "policy")
+                                                 ("policy," "debugger")))
   "The compilation policy specified by OPTIMIZE declarations
-  affects the behavior seen in the debugger. The DEBUG quality
+  affects the behavior seen in the debugger. The @DEBUG quality
   directly affects the debugger by controlling the amount of debugger
   information dumped. Other optimization qualities have indirect but
   observable effects due to changes in the way compilation is done.
@@ -629,9 +649,9 @@
   functions are inline expanded. If a function is inline expanded,
   then there will be no frame to represent the call, and the arguments
   will be treated like any other local variable. Functions may also be
-  _semi-inline_, in which case there is a frame to represent the call,
-  but the call is to an optimized local version of the function, not
-  to the original function."
+  _@SEMI-INLINE_, in which case there is a frame to represent the
+  call, but the call is to an optimized local version of the function,
+  not to the original function."
   ;; FIXME: link to section about inline expansion when it exists
   ;; (@INLINE-EXPANSION).
   )
@@ -684,7 +704,8 @@
     bottom. Only shows `<n>` frames if specified. The printing is
     controlled by SB-DEBUG:*DEBUG-PRINT-VARIABLE-ALIST*.")
 
-(defsection @breakpoint-commands (:title "Breakpoint Commands")
+(defsection @breakpoint-commands (:title "Breakpoint Commands"
+                                  :concepts ("breakpoint"))
   "SBCL supports setting of breakpoints inside compiled functions and
   stepping of compiled code. Breakpoints can only be set at known
   locations (see @UNKNOWN-LOCATIONS-AND-INTERRUPTS), so these commands
@@ -801,7 +822,9 @@
   > stepping may be improved enough to subsume the instrumentation
   > based stepping commands, which have much higher overhead.")
 
-(defsection @function-tracing (:title "Function Tracing")
+(defsection @function-tracing (:title "Function Tracing"
+                               :concepts ("tracing"
+                                          ("function," "tracing")))
   "The tracer causes selected functions to print their arguments and
   their results whenever they are called.  Options allow conditional
   printing of the trace information and conditional breakpoints on
@@ -830,7 +853,9 @@
   (sb-debug:*trace-encapsulate-default* variable)
   (sb-debug:*trace-report-default* variable))
 
-(defsection @single-stepping (:title "Single Stepping")
+(defsection @single-stepping (:title "Single Stepping"
+                              :concepts ("stepper"
+                                         "single-stepping"))
   "SBCL includes an instrumentation based single-stepper for compiled
   code, that can be invoked via the STEP macro, or from within the
   debugger. See @DEBUGGER-POLICY-CONTROL, for details on enabling
@@ -857,7 +882,13 @@
   (step macro))
 
 (defsection @enabling-and-disabling-the-debugger
-    (:title "Enabling and Disabling the Debugger")
+    (:title "Enabling and Disabling the Debugger"
+     :concepts (("debugger," "enabling")
+                ("debugger," "disabling")
+                ("enabling" "debugger")
+                ("disabling" "debugger")
+                ~enabling-ldb
+                ~disabling-ldb))
   "In certain contexts (e.g. non-interactive applications), it may be
   desirable to turn off the SBCL debugger (and possibly re-enable it).
   The functions here control the debugger."

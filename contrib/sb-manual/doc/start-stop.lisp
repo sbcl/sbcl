@@ -174,7 +174,7 @@
   - `--disable-ldb`
 
       Disable the low-level debugger. Only effective if SBCL is
-      compiled with LDB.
+      compiled with @LDB. ~DISABLING-LDB
 
   - `--lose-on-corruption`
 
@@ -184,7 +184,7 @@
       to continue and handle the error in Lisp, but this will not
       always work, and SBCL may malfunction or even hang. With this
       option, upon encountering such an error, SBCL will exit instead
-      of invoking LDB (if present and enabled).
+      of invoking @LDB (if present and enabled ~ENABLING-LDB).
 
   - `--script <filename>`
 
