@@ -423,13 +423,6 @@
 ;; but it should also be EQ to (MEMBER NIL T)
 (assert (eq (specifier-type '(member nil t)) (specifier-type 'boolean)))
 
-#+x86-64
-(progn
-  (assert (= (sb-vm::immediate-constant-sc #c(0.0f0 0.0f0))
-             sb-vm::fp-complex-single-zero-sc-number))
-  (assert (= (sb-vm::immediate-constant-sc #c(0.0d0 0.0d0))
-             sb-vm::fp-complex-double-zero-sc-number)))
-
 ;;; Unparse a union of (up to) 3 things depending on :sb-unicode as 2 things.
 (assert (sb-kernel::brute-force-type-specifier-equalp
          (type-specifier (specifier-type '(or string null)))

@@ -218,11 +218,6 @@
   ;; non-immediate constants in the constant pool
   (constant constant)
 
-  (fp-single-zero immediate-constant)
-  (fp-double-zero immediate-constant)
-  (fp-complex-single-zero immediate-constant)
-  (fp-complex-double-zero immediate-constant)
-
   (fp-single-immediate immediate-constant)
   (fp-double-immediate immediate-constant)
   (fp-complex-single-immediate immediate-constant)
@@ -318,26 +313,26 @@
   ;; non-descriptor SINGLE-FLOATs
   (single-reg float-registers
               :locations #.*float-regs*
-              :constant-scs (fp-single-zero fp-single-immediate)
+              :constant-scs (fp-single-immediate)
               :save-p t
               :alternate-scs (single-stack))
 
   ;; non-descriptor DOUBLE-FLOATs
   (double-reg float-registers
               :locations #.*float-regs*
-              :constant-scs (fp-double-zero fp-double-immediate)
+              :constant-scs (fp-double-immediate)
               :save-p t
               :alternate-scs (double-stack))
 
   (complex-single-reg float-registers
                       :locations #.*float-regs*
-                      :constant-scs (fp-complex-single-zero fp-complex-single-immediate)
+                      :constant-scs (fp-complex-single-immediate)
                       :save-p t
                       :alternate-scs (complex-single-stack))
 
   (complex-double-reg float-registers
                       :locations #.*float-regs*
-                      :constant-scs (fp-complex-double-zero fp-complex-double-immediate)
+                      :constant-scs (fp-complex-double-immediate)
                       :save-p t
                       :alternate-scs (complex-double-stack))
 
@@ -500,17 +495,13 @@
        immediate-sc-number))
     #+compact-instance-header (layout immediate-sc-number)
     (single-float
-       (if (eql value 0f0) fp-single-zero-sc-number fp-single-immediate-sc-number))
+     fp-single-immediate-sc-number)
     (double-float
-       (if (eql value 0d0) fp-double-zero-sc-number fp-double-immediate-sc-number))
+     fp-double-immediate-sc-number)
     ((complex single-float)
-       (if (eql value #c(0f0 0f0))
-            fp-complex-single-zero-sc-number
-            fp-complex-single-immediate-sc-number))
+     fp-complex-single-immediate-sc-number)
     ((complex double-float)
-       (if (eql value #c(0d0 0d0))
-            fp-complex-double-zero-sc-number
-            fp-complex-double-immediate-sc-number))
+     fp-complex-double-immediate-sc-number)
     ;; This case has to follow the numeric cases because proxy floating-point numbers
     ;; are host structs. Or we could implement and use something like SB-XC:TYPECASE
     (structure-object

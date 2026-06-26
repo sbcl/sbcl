@@ -685,11 +685,11 @@
                      (index :scs (any-reg immediate))
                      (value :scs (,result-sc ,@(case result-sc
                                                 (single-reg
-                                                 '(fp-single-immediate fp-single-zero))
+                                                 '(fp-single-immediate))
                                                 (double-reg
-                                                 '(fp-double-zero))
+                                                 '((fp-double-immediate (eql (tn-value tn) 0d0))))
                                                 (complex-single-reg
-                                                 '(fp-complex-single-zero))
+                                                 '((fp-complex-single-immediate (eql (tn-value tn) #c(0f0 0f0)))))
                                                 ((unsigned-reg signed-reg)
                                                  '((immediate (plausible-signed-imm32-operand-p (tn-value tn)))))))))
               (:arg-types * tagged-num ,result-type)

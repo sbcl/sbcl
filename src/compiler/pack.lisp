@@ -1315,11 +1315,15 @@
                (load-scs (svref (car scs)
                                 (sc-number
                                  (tn-sc (or load-tn tn))))))
-          (if load-tn
-              (aver (eq load-scs t))
-              (unless (eq load-scs t)
-                (setf (tn-ref-load-tn op)
-                      (pack-load-tn load-scs op))))))))
+          (cond (load-tn
+                 (aver (eq load-scs t)))
+                (t
+                 ;; conditional sc
+                 (when (functionp load-scs)
+                   (setf load-scs (funcall load-scs tn)))
+                 (unless (eq load-scs t)
+                   (setf (tn-ref-load-tn op)
+                         (pack-load-tn load-scs op)))))))))
 
   (do ((scs scs (cdr scs))
        (op ops (tn-ref-across op)))
