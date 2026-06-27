@@ -164,6 +164,8 @@ fi
 if [ ! \( -f $SBCL_RELEASE_DIR/sbcl-$VERSION-source.tar -o -f $SBCL_RELEASE_DIR/sbcl-$VERSION-source.tar.bz2 \) ]; then
   cd $SBCL_DIR
   $SBCL_DIR/generate-version.sh
+  ## verify that the generated version is what we expect (has no appended hash)
+  grep -v '^;' version.lisp-expr | grep \"$VERSION\"
   mkdir -p CVS
   sh ./distclean.sh
   rm -rf .git
