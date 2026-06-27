@@ -218,17 +218,7 @@
   ;; non-immediate constants in the constant pool
   (constant constant)
 
-  (fp-single-immediate immediate-constant)
-  (fp-double-immediate immediate-constant)
-  (fp-complex-single-immediate immediate-constant)
-  (fp-complex-double-immediate immediate-constant)
-
-  #+sb-simd-pack (int-sse-immediate immediate-constant)
-  #+sb-simd-pack (double-sse-immediate immediate-constant)
-  #+sb-simd-pack (single-sse-immediate immediate-constant)
-  #+sb-simd-pack-256 (int-avx2-immediate immediate-constant)
-  #+sb-simd-pack-256 (double-avx2-immediate immediate-constant)
-  #+sb-simd-pack-256 (single-avx2-immediate immediate-constant)
+  (fp-immediate immediate-constant)
   (immediate immediate-constant)
 
   ;;
@@ -313,26 +303,26 @@
   ;; non-descriptor SINGLE-FLOATs
   (single-reg float-registers
               :locations #.*float-regs*
-              :constant-scs (fp-single-immediate)
+              :constant-scs (fp-immediate)
               :save-p t
               :alternate-scs (single-stack))
 
   ;; non-descriptor DOUBLE-FLOATs
   (double-reg float-registers
               :locations #.*float-regs*
-              :constant-scs (fp-double-immediate)
+              :constant-scs (fp-immediate)
               :save-p t
               :alternate-scs (double-stack))
 
   (complex-single-reg float-registers
                       :locations #.*float-regs*
-                      :constant-scs (fp-complex-single-immediate)
+                      :constant-scs (fp-immediate)
                       :save-p t
                       :alternate-scs (complex-single-stack))
 
   (complex-double-reg float-registers
                       :locations #.*float-regs*
-                      :constant-scs (fp-complex-double-immediate)
+                      :constant-scs (fp-immediate)
                       :save-p t
                       :alternate-scs (complex-double-stack))
 
@@ -344,19 +334,19 @@
   #+sb-simd-pack
   (int-sse-reg float-registers
                :locations #.*float-regs*
-               :constant-scs (int-sse-immediate)
+               :constant-scs (fp-immediate)
                :save-p t
                :alternate-scs (int-sse-stack))
   #+sb-simd-pack
   (double-sse-reg float-registers
                   :locations #.*float-regs*
-                  :constant-scs (double-sse-immediate)
+                  :constant-scs (fp-immediate)
                   :save-p t
                   :alternate-scs (double-sse-stack))
   #+sb-simd-pack
   (single-sse-reg float-registers
                   :locations #.*float-regs*
-                  :constant-scs (single-sse-immediate)
+                  :constant-scs (fp-immediate)
                   :save-p t
                   :alternate-scs (single-sse-stack))
   (ymm-reg float-registers :locations #.*float-regs*)
@@ -365,19 +355,19 @@
   #+sb-simd-pack-256
   (int-avx2-reg float-registers
                :locations #.*float-regs*
-               :constant-scs (int-avx2-immediate)
+               :constant-scs (fp-immediate)
                :save-p t
                :alternate-scs (int-avx2-stack))
   #+sb-simd-pack-256
   (double-avx2-reg float-registers
                   :locations #.*float-regs*
-                  :constant-scs (double-avx2-immediate)
+                  :constant-scs (fp-immediate)
                   :save-p t
                   :alternate-scs (double-avx2-stack))
   #+sb-simd-pack-256
   (single-avx2-reg float-registers
                   :locations #.*float-regs*
-                  :constant-scs (single-avx2-immediate)
+                  :constant-scs (fp-immediate)
                   :save-p t
                   :alternate-scs (single-avx2-stack))
 
@@ -494,14 +484,10 @@
                        (not (sb-c::producing-fasl-file)))))
        immediate-sc-number))
     #+compact-instance-header (layout immediate-sc-number)
-    (single-float
-     fp-single-immediate-sc-number)
-    (double-float
-     fp-double-immediate-sc-number)
-    ((complex single-float)
-     fp-complex-single-immediate-sc-number)
-    ((complex double-float)
-     fp-complex-double-immediate-sc-number)
+    ((or float (complex float)
+         #+(and sb-simd-pack (not sb-xc-host)) simd-pack
+         #+(and sb-simd-pack-256 (not sb-xc-host)) simd-pack-256)
+     fp-immediate-sc-number)
     ;; This case has to follow the numeric cases because proxy floating-point numbers
     ;; are host structs. Or we could implement and use something like SB-XC:TYPECASE
     (structure-object
@@ -514,19 +500,7 @@
                #-sb-xc-host (and (eq (heap-allocated-p value) :static)
                                  (< (get-lisp-obj-address value)
                                     (get-lisp-obj-address sb-lockless:+tail+))))
-       immediate-sc-number))
-    #+(and sb-simd-pack (not sb-xc-host))
-    (simd-pack
-     (typecase value
-       ((simd-pack double-float) double-sse-immediate-sc-number)
-       ((simd-pack single-float) single-sse-immediate-sc-number)
-       (t int-sse-immediate-sc-number)))
-    #+(and sb-simd-pack-256 (not sb-xc-host))
-    (simd-pack-256
-     (typecase value
-       ((simd-pack-256 double-float) double-avx2-immediate-sc-number)
-       ((simd-pack-256 single-float) single-avx2-immediate-sc-number)
-       (t int-avx2-immediate-sc-number)))))
+       immediate-sc-number))))
 
 (defun boxed-immediate-sc-p (sc)
   (eql sc immediate-sc-number))

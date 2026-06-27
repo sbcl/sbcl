@@ -15,10 +15,7 @@
   (ea (frame-byte-offset (+ (tn-offset tn) 3)) base))
 
 (defun float-avx2-p (tn)
-  (sc-is tn single-avx2-reg single-avx2-stack single-avx2-immediate
-            double-avx2-reg double-avx2-stack double-avx2-immediate))
-(defun int-avx2-p (tn)
-  (sc-is tn int-avx2-reg int-avx2-stack int-avx2-immediate))
+  (sc-is tn single-avx2-reg double-avx2-reg single-avx2-stack double-avx2-stack))
 
 #+sb-xc-host
 (progn ; the host compiler will complain about absence of these
@@ -28,7 +25,7 @@
   (defun %simd-pack-256-3 (x) (error "Called %SIMD-PACK-256-3 ~S" x)))
 
 (define-move-fun (load-int-avx2-immediate 1) (vop x y)
-                 ((int-avx2-immediate) (int-avx2-reg))
+                 ((fp-immediate) (int-avx2-reg))
   (let* ((x  (tn-value x))
          (p0 (%simd-pack-256-0 x))
          (p1 (%simd-pack-256-1 x))
@@ -43,7 +40,7 @@
            (inst vmovdqu y (register-inline-constant x))))))
 
 (define-move-fun (load-float-avx2-immediate 1) (vop x y)
-  ((single-avx2-immediate double-avx2-immediate)
+  ((fp-immediate)
    (single-avx2-reg double-avx2-reg))
   (let* ((x  (tn-value x))
          (p0 (%simd-pack-256-0 x))

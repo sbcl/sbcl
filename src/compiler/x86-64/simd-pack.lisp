@@ -15,18 +15,15 @@
   (ea (frame-byte-offset (1+ (tn-offset tn))) base))
 
 (defun float-sse-p (tn)
-  (sc-is tn single-sse-reg single-sse-stack single-sse-immediate
-            double-sse-reg double-sse-stack double-sse-immediate))
-(defun int-sse-p (tn)
-  (sc-is tn int-sse-reg int-sse-stack int-sse-immediate))
+  (sc-is tn single-sse-reg single-sse-stack double-sse-reg double-sse-stack))
 
 #+sb-xc-host
 (progn ; the host compiler will complain about absence of these
   (defun %simd-pack-low (x) (error "Called %SIMD-PACK-LOW ~S" x))
   (defun %simd-pack-high (x) (error "Called %SIMD-PACK-HIGH ~S" x)))
 
-(define-move-fun (load-int-sse-immediate 1) (vop x y)
-  ((int-sse-immediate) (int-sse-reg))
+(define-move-fun (load-sse-immediate 1) (vop x y)
+  ((fp-immediate) (int-sse-reg))
   (let* ((x  (tn-value x))
          (lo (%simd-pack-low x))
          (hi (%simd-pack-high x)))
@@ -39,7 +36,7 @@
            (inst movdqa y (register-inline-constant x))))))
 
 (define-move-fun (load-float-sse-immediate 1) (vop x y)
-  ((single-sse-immediate double-sse-immediate)
+  ((fp-immediate)
    (single-sse-reg double-sse-reg))
   (let* ((x  (tn-value x))
          (lo (%simd-pack-low x))

@@ -783,7 +783,7 @@
 
 (define-vop (data-vector-set-with-offset/simple-array-single-float-c dvset)
   (:args (object :scs (descriptor-reg))
-         (value :scs (single-reg fp-single-immediate)))
+         (value :scs (single-reg fp-immediate)))
   (:info index addend)
   (:arg-types simple-array-single-float (:constant low-index)
               (:constant (constant-displacement other-pointer-lowtag
@@ -791,7 +791,7 @@
               single-float)
   (:generator 4
    (unpoison-element object (+ index addend))
-    (if (sc-is value fp-single-immediate)
+    (if (sc-is value fp-immediate)
         (inst mov :dword (float-ref-ea object index addend 4)
               (single-float-bits (tn-value value)))
         (inst movss (float-ref-ea object index addend 4) value))))
@@ -834,7 +834,7 @@
 
 (define-vop (data-vector-set-with-offset/simple-array-double-float-c dvset)
   (:args (object :scs (descriptor-reg))
-         (value :scs (double-reg (fp-double-immediate
+         (value :scs (double-reg (fp-immediate
                                   (eql (tn-value tn) 0d0)))))
   (:info index addend)
   (:arg-types simple-array-double-float (:constant low-index)
@@ -843,7 +843,7 @@
               double-float)
   (:generator 19
     (unpoison-element object (+ index addend))
-    (if (sc-is value fp-double-immediate)
+    (if (sc-is value fp-immediate)
         (inst mov :qword (float-ref-ea object index addend 8) 0)
         (inst movsd (float-ref-ea object index addend 8) value))))
 
