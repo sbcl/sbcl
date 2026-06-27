@@ -436,7 +436,7 @@
                       (evex-encode-mm opcode-prefix))
               ;; P2: W vvvv 1 pp
               (logior (ash w 7)
-                      (ash (logxor vvvv #b1111) 3)
+                      (ash (logandc1 vvvv #b1111) 3)
                       #b100  ; bit 2 always 1
                       (vex-encode-pp pp))
               ;; P3: z L'L b V' aaa
