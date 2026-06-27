@@ -1712,5 +1712,25 @@
 (#(1E21A5F9 2A6BF857 80D0C591 AC841474 CB6BDBB0)
  "(SB-VM::SIGNED-BYTE-64 SB-VM::UNSIGNED-BYTE-64 SYSTEM-AREA-POINTER SINGLE-FLOAT DOUBLE-FLOAT)"
  "((& (+ (>> val 4) (>> val 10)) 7))")
+(#(6 8 A 18 26)
+ "(5 4 3 12 19)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 2 7 0)))
+  (let ((b (>> (<< val 26) 30)))
+   (let ((a (& (>> val 1) #x3)))
+    (^ a (aref tab b))))))")
+(#(0 2 4 1E 20 22 28 2A)
+ "(15 16 20 21 2 17 1 0)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 7 1 7)))
+  (+= val #xcafb35e5)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 3) #x3)))
+   (let ((a (>> (u32+ val (<< val 29)) 30)))
+    (^ a (aref tab b))))))")
+(#(0 2 4 6 8 A E 10 12 14 16 18 1A 1C 1E 20 22 24 28 2A 2C 2E 7A)
+ "(61 4 3 10 7 8 9 5 14 13 12 11 23 22 21 20 18 17 2 16 15 0 1)"
+ "((let ((tab #a((16) (unsigned-byte 8) 0 13 1 7 13 7 21 15 16 9 22 17 21 0 18 22)))
+  (let ((b (& (>> val 1) #xf)))
+   (let ((a (>> (<< val 25) 28)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF

@@ -426,7 +426,7 @@
                (index :scs (any-reg unsigned-reg signed-reg immediate))
                (value :scs (,@scs ,(case el-type
                                      (double-float
-                                      '(double-immediate (eql (tn-value tn) 0d0)))
+                                      '(fp-immediate (eql (tn-value tn) 0d0)))
                                      (t
                                       'zero)))))
         (:arg-types ,type tagged-num ,el-type)
@@ -439,7 +439,7 @@
                   (emit-gengc-barrier object nil tmp-tn t))))
           ,@(case el-type
               (double-float
-               '((when (sc-is value double-immediate)
+               '((when (sc-is value fp-immediate)
                    (setf value zr-tn)))))
           (sc-case index
             (immediate
@@ -497,7 +497,7 @@
                                  &optional translate)
   (multiple-value-bind (immediate-sc immediate-value)
       (case el-type
-        (single-float (values 'single-immediate 0f0))
+        (single-float (values 'fp-immediate 0f0))
         (t (values 'immediate 0)))
     (let ((value `((value :scs (,@scs (,immediate-sc
                                        (eql (tn-value tn) ,immediate-value))))))

@@ -182,32 +182,28 @@
 
   ;; **** Things that can go in the floating point registers.
 
-  (single-immediate immediate-constant)
-  (double-immediate immediate-constant)
+  (fp-immediate immediate-constant)
 
   (single-reg float-registers
               :locations #.(loop for i below 32 collect i)
-              :constant-scs (single-immediate)
+              :constant-scs (fp-immediate)
               :save-p t
               :alternate-scs (single-stack))
   (double-reg float-registers
               :locations #.(loop for i below 32 collect i)
-              :constant-scs (double-immediate)
+              :constant-scs (fp-immediate)
               :save-p t
               :alternate-scs (double-stack))
 
-  (complex-single-immediate immediate-constant)
-  (complex-double-immediate immediate-constant)
-
   (complex-single-reg float-registers
                       :locations #.(loop for i below 32 collect i)
-                      :constant-scs (complex-single-immediate)
+                      :constant-scs (fp-immediate)
                       :save-p t
                       :alternate-scs (complex-single-stack))
 
   (complex-double-reg float-registers
                       :locations #.(loop for i below 32 collect i)
-                      :constant-scs (complex-double-immediate)
+                      :constant-scs (fp-immediate)
                       :save-p t
                       :alternate-scs (complex-double-stack))
 
@@ -254,14 +250,8 @@
      (if (static-symbol-p value)
          immediate-sc-number
          nil))
-    (double-float
-     double-immediate-sc-number)
-    (single-float
-     single-immediate-sc-number)
-    ((complex double-float)
-     complex-double-immediate-sc-number)
-    ((complex single-float)
-     complex-single-immediate-sc-number)
+    ((or float (complex float))
+     fp-immediate-sc-number)
     (structure-object
      (when (eq value sb-lockless:+tail+)
        immediate-sc-number))))

@@ -775,10 +775,10 @@
                         `((,move-macro result value))))))
          (multiple-value-bind (immediate-sc immediate-value)
              (case name
-               (single (values 'single-immediate 0f0))
-               (double (values 'double-immediate 0d0))
-               (complex-single (values 'complex-single-immediate #c(0f0 0f0)))
-               ;(complex-double (values 'complex-double-immediate #c(0d0 0d0)))
+               (single (values 'fp-immediate 0f0))
+               (double (values 'fp-immediate 0d0))
+               (complex-single (values 'fp-immediate #c(0f0 0f0)))
+               ;(complex-double (values 'fp-immediate #c(0d0 0d0)))
                (t (values 'immediate 0)))
            `(progn
               (define-vop ()
