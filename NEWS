@@ -9,18 +9,20 @@ changes relative to sbcl-2.6.5:
   * platform support:
     ** fix the build on big-endian 64-bit PowerPC with ELFv2.  (thanks to
        Piotr Kubaj)
-    ** move the static space address for Darwin on ARM64.  (lp#2156072,
+    ** move the static space address for macOS 27 on ARM64.  (lp#2156072,
        reported by Gary Palter)
-    ** improvements to UTF-8 conversion routines on ARM64.
     ** optimizations to SB-THREAD:BARRIER for ARM64.  (thanks to Sahil Kang)
     ** fix a compiler crash in MULTIPLE-VALUE-LIST in argument forms on ARM64.
        (lp#2155788, reported by Gary Palter)
   * bug fix: TRACE no longer fails when trying to print a return value that
-    cannot be printed readble and *PRINT-READABLY* is true.
+    cannot be printed readably and *PRINT-READABLY* is true.
   * optimization: the compiler is more precise in its type derivation of
     COERCE given constraints on its inputs.
   * optimization: the compiler is better able to derive the return types of
     AREF and ELT.
+  * optimization: faster encoding and decoding of UTF-8 C strings.
+  * optimization: (length (intersection a b)) doesn't cons an intermediate
+    list.
   * documentation: the manual now includes a section for SB-INTROSPECT, which
     has also seen improvement in its documentation strings and comments.
   * documentation: fixed many typesetting problems and typos in the user
