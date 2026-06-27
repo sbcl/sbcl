@@ -670,3 +670,13 @@
                                              (lambda (b) (+ b 1)))
                                  1))))
              1)))
+
+(with-test (:name :complex-constants-to-locals)
+  (assert (= (count 'sb-vm::move-from-complex-double
+                    (ir2-vops '(lambda ()
+                                (flet ((f (p)
+                                         p))
+                                  (let ((p #c(1d0 2d0)))
+                                    (f p)
+                                    (f p))))))
+             0)))

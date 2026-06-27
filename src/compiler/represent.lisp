@@ -477,7 +477,7 @@
                        (cond
                          ((not write-p)
                           (or
-                           (coerce-from-constant op temp load-scs)
+                           (coerce-from-constant op-tn op temp load-scs)
                            (emit-move (or (maybe-move-from-fixnum+-1 op-tn temp
                                                                      op)
                                           res)
@@ -628,10 +628,12 @@
                                                   ,most-positive-fixnum)))
              (template-or-lose 'sb-vm::move-from-fixnum-1))))))
 
-(defun coerce-from-constant (x-tn-ref y &optional load-scs)
+(defun coerce-from-constant (x x-tn-ref y &optional load-scs)
   (when (and (sc-is y sb-vm::descriptor-reg sb-vm::control-stack)
              (tn-ref-type x-tn-ref))
-    (multiple-value-bind (constantp value) (type-singleton-p (tn-ref-type x-tn-ref))
+    (multiple-value-bind (constantp value) (if (constant-tn-p x)
+                                               (values t (tn-value x))
+                                               (type-singleton-p (tn-ref-type x-tn-ref)))
       (when constantp
         (let ((constant (find-constant value)))
           (cond #+(or arm64 x86-64)
@@ -852,7 +854,7 @@
                        (eq (tn-kind y) :normal))
                   (delete-vop vop))
                  ((eq res info))
-                 ((coerce-from-constant args y))
+                 ((coerce-from-constant x args y))
                  (res
                   (or
                    (jump-over-move-coercion vop x y block)
