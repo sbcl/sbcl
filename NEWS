@@ -3,9 +3,26 @@
 changes relative to sbcl-2.6.5:
   * minor incompatible change: FDEFINITION now returns the outermost wrapper
     (added e.g. by TRACE, PROFILE) like SYMBOL-FUNCTION.  (lp#799533)
+  * minor incompatible change: in unsafe code, C strings with :EXTERNAL-FORMAT
+    :ASCII are copied directly as byte-sized quantities without checking
+    whether the top bit of the byte is set.
+  * platform support:
+    ** fix the build on big-endian 64-bit PowerPC with ELFv2.  (thanks to
+       Piotr Kubaj)
+    ** move the static space address for Darwin on ARM64.  (lp#2156072,
+       reported by Gary Palter)
+    ** improvements to UTF-8 conversion routines on ARM64.
+    ** optimizations to SB-THREAD:BARRIER for ARM64.  (thanks to Sahil Kang)
+    ** fix a compiler crash in MULTIPLE-VALUE-LIST in argument forms on ARM64.
+       (lp#2155788, reported by Gary Palter)
   * bug fix: TRACE no longer fails when trying to print a return value that
     cannot be printed readble and *PRINT-READABLY* is true.
-  * documentation: SB-INTROSPECT is documented.
+  * optimization: the compiler is more precise in its type derivation of
+    COERCE given constraints on its inputs.
+  * optimization: the compiler is better able to derive the return types of
+    AREF and ELT.
+  * documentation: the manual now includes a section for SB-INTROSPECT, which
+    has also seen improvement in its documentation strings and comments.
   * documentation: fixed many typesetting problems and typos in the user
     manual.
 
