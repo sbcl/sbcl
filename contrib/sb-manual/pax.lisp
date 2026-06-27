@@ -10,7 +10,13 @@
 ;;;;
 ;;;; When PAX is loaded, we have PAX::@BROWSING-LIVE-DOCUMENTATION for
 ;;;; low-latency, interactive documentation work and
-;;;; PAX::@GENERATING-DOCUMENTATION for autolinked documentation.
+;;;; PAX::@GENERATING-DOCUMENTATION for autolinked documentation
+;;;; (also, see make-pax-docs.sh and http://fixnum.com).
+;;;;
+;;;; For browsing, use this setup:
+;;;;
+;;;;     (setq pax:*document-downcase-uppercase-code* t
+;;;;           pax:*browse-context* :pax-world)
 
 (in-package :sb-manual)
 

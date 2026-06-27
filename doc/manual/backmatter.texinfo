@@ -39,6 +39,10 @@ in one of these, that's fine, but if you want to @emph{modify} this
 manual, you are strongly advised to seek the sources (most live under
 @file{contrib/sb-manual/doc/}) and submit a patch.
 
+Also, see @url{https://fixnum.com/} for the unoffical, PAX-generated
+version with a lot more links, default values of arguments, and the
+initial values of variables.
+
 @ifinfo
 When viewing Info in Emacs, the reader inserts superfluous ``see''
 words before internal links. Use @code{(setq Info-hide-note-references
