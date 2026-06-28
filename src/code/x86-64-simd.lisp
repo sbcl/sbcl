@@ -2024,3 +2024,114 @@
         (inst mov res total-bytes)
         DONE
         (inst vzeroupper)))))
+
+(def-variant sb-impl::simd-character-string-utf8-length :avx2 (string)
+  (with-pinned-objects (string)
+    (inline-vop
+        (((ptr sap-reg t) (vector-sap string))
+         ((length any-reg t) (length string))
+
+         ((chars-left   unsigned-reg))
+         ((tmp          unsigned-reg))
+
+         ;; 128-bit registers because strings are double-word aligned
+         ((c-7f         int-sse-reg))
+         ((c-7ff        int-sse-reg))
+         ((c-ffff       int-sse-reg))
+         ((c-1b         int-sse-reg))
+
+         ((extra-len    int-sse-reg))
+         ((errors       int-sse-reg))
+
+         ((current      int-sse-reg))
+         ((tmp1         int-sse-reg))
+         ((mask         int-sse-reg)))
+
+        ((res descriptor-reg t :from :load)
+         (all-ascii descriptor-reg t :from :load))
+
+      (inst mov res length)
+      (load-symbol all-ascii t)
+
+      (inst test length length)
+      (inst jmp :z DONE)
+
+      (inst mov chars-left length)
+      (inst shr chars-left n-fixnum-tag-bits)
+
+      (inst vmovdqa c-7f (register-inline-constant
+                          :sse (concat-ub 32 (loop repeat 4 collect #x7F))))
+
+      ASCII-LOOP
+      (inst vmovdqa current (ea ptr))
+      (inst add ptr 16)
+
+      (inst vpcmpgtd tmp1 current c-7f)
+      (inst vptest tmp1 tmp1)
+      (inst jmp :nz NON-ASCII)
+
+      (inst sub chars-left 4)
+      (inst jmp :g ASCII-LOOP)
+      (inst jmp DONE)
+
+      NON-ASCII
+      (inst mov res null-tn)
+      (inst mov all-ascii null-tn)
+
+      (inst vpxor extra-len extra-len extra-len)
+      (inst vpxor errors errors errors)
+
+      (inst vmovdqa c-7ff (register-inline-constant
+                           :sse (concat-ub 32 (loop repeat 4 collect #x7FF))))
+      (inst vmovdqa c-ffff (register-inline-constant
+                            :sse (concat-ub 32 (loop repeat 4 collect #xFFFF))))
+      (inst vmovdqa c-1b (register-inline-constant
+                          :sse (concat-ub 32 (loop repeat 4 collect #x1B))))
+
+      (inst jmp START)
+
+      LOOP
+      (inst sub chars-left 4)
+      (inst jmp :le EXIT)
+      (inst vmovdqa current (ea ptr))
+      (inst add ptr 16)
+
+      ;; ASCII fast path
+      (inst vpcmpgtd tmp1 current c-7f)
+      (inst vptest tmp1 tmp1)
+      (inst jmp :z LOOP)
+
+      START
+      ;; Check for surrogates #xD800-#xDFFF
+      (inst vpsrld tmp1 current 11)
+      (inst vpcmpeqd tmp1 tmp1 c-1b)
+      (inst vpor errors errors tmp1)
+
+      (inst vpcmpgtd tmp1 current c-7f)
+
+      (inst vpcmpgtd mask current c-7ff)
+      (inst vpaddd tmp1 tmp1 mask)
+
+      (inst vpcmpgtd mask current c-ffff)
+      (inst vpaddd tmp1 tmp1 mask)
+
+      (inst vpsubd extra-len extra-len tmp1)
+
+      (inst jmp LOOP)
+
+      EXIT
+      (inst vptest errors errors)
+      (inst jmp :nz DONE)
+
+      (inst vpshufd tmp1 extra-len #b01001110)
+      (inst vpaddd tmp1 tmp1 extra-len)
+      (inst vpshufd mask tmp1 #b10110001)
+      (inst vpaddd tmp1 tmp1 mask)
+
+      (inst vmovd tmp tmp1)
+
+      (inst shl tmp n-fixnum-tag-bits)
+      (inst add tmp length)
+      (inst mov res tmp)
+
+      DONE)))
