@@ -1064,9 +1064,8 @@
                                                                                  collect 4))))
             (inst movdqa indexes (register-inline-constant :sse
                                                            (concat-ub 32 '(3 2 1 0))))
-            (inst movdqa last-newlines (register-inline-constant :sse
-                                                                 (concat-ub 32 (loop repeat 4
-                                                                                     collect -1))))
+            (inst pcmpeqb last-newlines last-newlines) ;; #xFF....
+
             (inst add byte-array* tail)
             (move byte-array byte-array*)
             (inst add end byte-array*)
@@ -1189,9 +1188,7 @@
                                                                                  collect 8))))
             (inst vmovdqu indexes (register-inline-constant :avx2
                                                            (concat-ub 32 '(7 6 5 4 3 2 1 0))))
-            (inst vmovdqu last-newlines (register-inline-constant :avx2
-                                                                 (concat-ub 32 (loop repeat 8
-                                                                                     collect -1))))
+            (inst vpcmpeqb last-newlines last-newlines last-newlines) ;; #xFF....
 
             (inst add byte-array* tail)
             (move byte-array byte-array*)
