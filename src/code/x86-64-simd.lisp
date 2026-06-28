@@ -1801,3 +1801,229 @@
       (move res 32-bit-array)
       (inst shr res 1)
       DONE)))
+
+(def-variant simd-utf8-strlen :avx2 (sap)
+  (declare (system-area-pointer sap))
+  (inline-vop
+      (((bytes        sap-reg t) sap)
+       ((ptr          sap-reg t))
+
+       ((total-bytes  unsigned-reg))
+       ((total-conts  unsigned-reg))
+       ((tmp          unsigned-reg))
+
+       ((tbl1         int-avx2-reg))
+       ((tbl2         int-avx2-reg))
+       ((tbl3         int-avx2-reg))
+       ((tbl4         int-avx2-reg))
+
+       ((mask-0f      int-avx2-reg))
+       ((mask-c0      int-avx2-reg))
+       ((zeros        int-avx2-reg))
+
+       ((errors       int-avx2-reg))
+       ((prev         int-avx2-reg))
+       ((prev-len     int-avx2-reg))
+
+       ((current      int-avx2-reg))
+       ((tmp1         int-avx2-reg))
+       ((tmp2         int-avx2-reg))
+       ((tmp3         int-avx2-reg))
+       ((tmp4         int-avx2-reg))
+       ((total-conts-vec int-avx2-reg)))
+
+      ((res descriptor-reg t :from :load)
+       (all-ascii descriptor-reg))
+    (flet ((validate ()
+             (assemble ()
+               ;; Skip an all-ASCII block
+               (inst vpor tmp2 current prev)
+               (inst vpmovmskb tmp tmp2)
+               (inst test tmp tmp)
+               (inst jmp :z VALIDATED)
+
+               ;; The Keiser, Lemire algorithm
+               (inst vperm2i128 tmp1 prev current #x21)
+               (inst vpalignr tmp1 current tmp1 15)
+
+               (inst vpsrlw tmp2 tmp1 4)
+               (inst vpand tmp2 tmp2 mask-0f)
+
+               (inst vpand tmp3 tmp1 mask-0f)
+
+               (inst vpsrlw tmp1 current 4)
+               (inst vpand tmp1 tmp1 mask-0f)
+
+               (inst vpshufb tmp2 tbl1 tmp2)
+               (inst vpshufb tmp3 tbl2 tmp3)
+               (inst vpand tmp2 tmp2 tmp3)
+               (inst vpshufb tmp3 tbl3 tmp1)
+               (inst vpand tmp2 tmp2 tmp3)
+               (inst vpor errors errors tmp2)
+
+               (inst vpshufb tmp1 tbl4 tmp1)
+
+               (inst vperm2i128 tmp2 prev-len tmp1 #x21)
+
+               (inst vpalignr tmp4 tmp1 tmp2 13)
+               (inst vpalignr tmp3 tmp1 tmp2 14)
+               (inst vpalignr tmp2 tmp1 tmp2 15)
+
+               (inst vmovdqa prev-len tmp1)
+
+               (inst vpcmpeqb tmp1 tmp1 tmp1)
+               (inst vpaddb tmp3 tmp3 tmp1)
+               (inst vpaddb tmp1 tmp1 tmp1)
+               (inst vpaddb tmp4 tmp4 tmp1)
+
+               (inst vpcmpgtb tmp2 tmp2 zeros)
+               (inst vpcmpgtb tmp3 tmp3 zeros)
+               (inst vpcmpgtb tmp4 tmp4 zeros)
+
+               (inst vpor tmp2 tmp2 tmp3)
+               (inst vpor tmp2 tmp2 tmp4)
+
+               (inst vpcmpgtb tmp3 mask-c0 current)
+
+               (inst vpxor tmp4 tmp3 tmp2)
+               (inst vpor errors errors tmp4)
+
+               ;; Subtract continuations
+               (inst vpsubb tmp4 zeros tmp3)
+               (inst vpsadbw tmp4 tmp4 zeros)
+               (inst vpaddq total-conts-vec total-conts-vec tmp4)
+               VALIDATED)))
+      (assemble ()
+        ;; Align the start and then mask off the extra bits
+        (inst mov ptr bytes)
+        (inst and ptr -32)
+        (inst mov total-bytes bytes)
+        (inst sub total-bytes ptr)
+
+        (inst vmovdqu tmp2 (register-inline-constant :avx2 #x1F1E1D1C1B1A191817161514131211100F0E0D0C0B0A09080706050403020100))
+
+        (inst vmovq tmp1 total-bytes)
+        (inst vpbroadcastb tmp1 tmp1)
+        (inst vpcmpgtb tmp1 tmp1 tmp2)
+
+        ;; Replace the aligned bits with ones, avoiding null termination
+        (inst vmovdqa current (ea ptr))
+        (inst vpandn current tmp1 current)
+        (inst vpsubb current current tmp1)
+
+        (inst vpxor zeros zeros zeros)
+        ASCII
+        (inst vpcmpeqb tmp1 current zeros)
+        (inst vpmovmskb tmp tmp1)
+        (inst test tmp tmp)
+        (inst jmp :nz ASCII-TAIL)
+
+        (inst vpmovmskb tmp current)
+        (inst test tmp tmp)
+        (inst jmp :nz NON-ASCII)
+
+        (inst add ptr 32)
+        (inst vmovdqa current (ea ptr))
+        (inst jmp ASCII)
+
+        ASCII-TAIL
+        (inst bsf tmp tmp)
+
+        (inst vpmovmskb total-bytes current)
+        (inst test total-bytes total-bytes)
+        (inst jmp :z ALL-ASCII-DONE)
+
+        (inst bsf total-bytes total-bytes)
+        (inst cmp total-bytes tmp)
+        (inst jmp :b NON-ASCII)
+
+        ALL-ASCII-DONE
+        (inst add ptr tmp)
+        (inst sub ptr bytes)
+        (inst mov total-bytes ptr)
+        (load-symbol all-ascii t)
+        (inst jmp RETURN)
+
+        NON-ASCII
+        (inst mov res null-tn)
+        (inst mov all-ascii null-tn)
+        (zeroize total-conts)
+        (inst vpxor total-conts-vec total-conts-vec total-conts-vec)
+
+        (inst vmovdqu tbl1 (register-inline-constant
+                            :avx2
+                            #x3806000100000000000000000000000038060001000000000000000000000000))
+        (inst vmovdqu tbl2 (register-inline-constant
+                            :avx2
+                            #x2020242020202020202020100000010B2020242020202020202020100000010B))
+        (inst vmovdqu tbl3 (register-inline-constant
+                            :avx2
+                            #x202020203535332B2020202020202020202020203535332B2020202020202020))
+        (inst vmovdqu tbl4 (register-inline-constant
+                            :avx2
+                            #x0302010100000000000000000000000003020101000000000000000000000000))
+
+        (inst vmovdqu mask-0f (register-inline-constant
+                               :avx2
+                               #x0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F))
+        (inst vmovdqu mask-c0 (register-inline-constant
+                               :avx2
+                               #xC0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0))
+
+        (inst vpxor errors errors errors)
+        (inst vpxor prev prev prev)
+        (inst vpxor prev-len prev-len prev-len)
+
+        (inst jmp START)
+
+        LOOP
+        (inst vmovdqa current (ea ptr))
+
+        START
+        (inst vpcmpeqb tmp1 current zeros)
+        (inst vpmovmskb tmp tmp1)
+        (inst test tmp tmp)
+        (inst jmp :nz TAIL)
+
+        (validate)
+
+        (inst vmovdqa prev current)
+        (inst add ptr 32)
+        (inst jmp LOOP)
+
+        TAIL
+        (inst bsf tmp tmp)
+
+        (inst vmovdqu tmp3 (register-inline-constant
+                            :avx2
+                            #x1F1E1D1C1B1A191817161514131211100F0E0D0C0B0A09080706050403020100))
+        (inst vmovq tmp2 tmp)
+        (inst vpbroadcastb tmp2 tmp2)
+
+        (inst vpcmpgtb tmp1 tmp2 tmp3)
+        (inst vpand current current tmp1)
+
+        (inst add ptr tmp)
+
+        (validate)
+
+        (inst sub ptr bytes)
+        (inst mov total-bytes ptr)
+
+        (inst vptest errors errors)
+        (inst jmp :nz DONE)
+
+        (inst vextracti128 tmp1 total-conts-vec 1)
+        (inst vpaddq tmp1 tmp1 total-conts-vec)
+        (inst vpunpckhqdq tmp2 tmp1 tmp1)
+        (inst vpaddq tmp1 tmp1 tmp2)
+        (inst vmovq tmp tmp1)
+        (inst add total-conts tmp)
+
+        (inst sub total-bytes total-conts)
+
+        RETURN
+        (inst shl total-bytes n-fixnum-tag-bits)
+        (inst mov res total-bytes)
+        DONE
+        (inst vzeroupper)))))
