@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.6.5:
+changes in sbcl-2.6.6 relative to sbcl-2.6.5:
   * minor incompatible change: FDEFINITION now returns the outermost wrapper
     (added e.g. by TRACE, PROFILE) like SYMBOL-FUNCTION.  (lp#799533)
   * minor incompatible change: in unsafe code, C strings with :EXTERNAL-FORMAT
