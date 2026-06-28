@@ -159,6 +159,22 @@
             (#b11
              (format stream ", #~D]!" imm)))))))
 
+(defun print-struct-imm-writeback (value stream dstate)
+  (destructuring-bind (q writeback rm opcode) value
+    (if (eq writeback 0)
+        (princ "]" stream)
+        (cond ((= rm #b11111)
+               (format stream "], #~D"
+                       (ash (case opcode
+                              (#b0111 8)
+                              ((#b1010 #b1000) 16)
+                              ((#b0110 #b0100) 24)
+                              ((#b0010 #b0000) 32))
+                            q)))
+              (t
+               (princ "], " stream)
+               (print-x-reg rm stream dstate))))))
+
 (defun print-w-reg (value stream dstate)
   (declare (ignore dstate))
   (princ "W" stream)
@@ -553,6 +569,33 @@
 (defun print-simd-high-vector (value stream dstate)
   (declare (ignore dstate))
   (format stream "V~d.D[1]" value))
+
+(defun print-simd-ld-st-n-regs (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (q size op r offset) value
+    (let ((len (ecase (logior (ash r 4) op)
+                 (#b00111 1)            ; ld1-1
+                 (#b01010 2)            ; ld1-2
+                 (#b00110 3)            ; ld1-3
+                 (#b00010 4)            ; ld1-4
+                 (#b01100 1)            ; ld1r
+                 (#b01000 2)            ; ld2
+                 (#b11100 2)            ; ld2r
+                 (#b00100 3)            ; ld3
+                 (#b01110 3)            ; ld3r
+                 (#b00000 4)            ; ld4
+                 (#b11110 4)))          ; ld4r
+          (size (ecase size
+                  (0 (if (zerop q) :8b :16b))
+                  (1 (if (zerop q) :4h :8h))
+                  (2 (if (zerop q) :2s :4s))
+                  (3 (if (zerop q) :1d :2d)))))
+      (format stream "{")
+      (loop for i below len
+            do (format stream " V~d.~a" (+ i offset) size)
+               (unless (= i (1- len))
+                 (write-char #\, stream)))
+      (format stream " }"))))
 
 (defun print-sys-reg (value stream dstate)
   (declare (ignore dstate))

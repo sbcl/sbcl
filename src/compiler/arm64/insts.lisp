@@ -126,7 +126,8 @@
   (define-arg-type simd-table-regs :printer #'print-simd-table-regs)
   (define-arg-type simd-b-reg :printer #'print-simd-b-reg)
   (define-arg-type simd-high-vector :printer #'print-simd-high-vector)
-
+  (define-arg-type simd-ld-st-n-regs :printer #'print-simd-ld-st-n-regs)
+  (define-arg-type struct-imm-writeback :printer #'print-struct-imm-writeback)
   (define-arg-type fp-imm :printer #'print-fp-imm)
 
   (define-arg-type sys-reg :printer #'print-sys-reg)
@@ -1965,6 +1966,115 @@
 (def-ldaddb ldaddah 1 1 0)
 (def-ldaddb ldaddalh 1 1 1)
 
+(def-emitter ld-st-simd
+  (#b0 1 31)
+  (q 1 30)
+  (o2 6 24)
+  (writeback 1 23)
+  (l 1 22)
+  (r 1 21)
+  (rm 5 16)
+  (op 4 12)
+  (size 2 10)
+  (rn 5 5)
+  (rt 5 0))
+
+(define-instruction-format
+    (ld-st-n-simd 32
+     :default-printer '(:name :tab rt ", [" rn imm-writeback))
+  (op1 :field (byte 1 31) :value #b0)
+  (q :field (byte 1 30))
+  (op2 :field (byte 6 24))
+  (l :field (byte 1 22))
+  (r :field (byte 1 21))
+  (op :field (byte 4 12))
+  (size :field (byte 2 10))
+  (imm-writeback :fields (list (byte 1 30) (byte 1 23) (byte 5 16) (byte 4 12))
+                 :type 'struct-imm-writeback)
+  (rn :field (byte 5 5) :type 'x-reg-sp)
+  (rt :fields (list (byte 1 30) ; q
+                    (byte 2 10) ; size
+                    (byte 4 12) ; op
+                    (byte 1 21) ; r
+                    (byte 5 0)) ; rt
+      :type 'simd-ld-st-n-regs)
+  (ldr-str-annotation :fields (list (byte 5 5)) :type 'ldr-str-annotation))
+
+(defmacro def-ldst-struct (name op op2 l r &optional registers)
+  `(define-instruction ,name (segment registers address size)
+     ,@(loop for op in (ensure-list op)
+             collect
+             `(:printer ld-st-n-simd ((op2 ,op2) (l ,l) (r ,r) (op ,op))))
+     (:emitter
+      (let ((n (length registers)))
+       ,@(when registers
+           `((assert (= n ,registers))))
+       (let ((first (pop registers))
+             (op ,(if (listp op)
+                      `(nth (length registers) ',op)
+                      op)))
+         (assert first)
+         (unless (loop for reg in registers
+                       for i from (1+ (fpr-offset first))
+                       always (= (fpr-offset reg) i))
+           (error "Registers must be consecutive"))
+         (multiple-value-bind (q size) (encode-vector-size size)
+           (let ((base (memory-operand-base address))
+                 (offset (memory-operand-offset address))
+                 (mode (memory-operand-mode address)))
+             (unless (eql offset 0)
+               (assert (eq mode :post-index))
+               (when (integerp offset)
+                 (assert (= offset
+                            (ash (* n 8) q)))))
+             (when (eq mode :post-index)
+               (assert (or (register-p offset)
+                           (integerp offset))))
+             (emit-ld-st-simd segment
+                              q
+                              ,op2
+                              (if (eq mode :post-index)
+                                  1
+                                  0)
+                              ,l
+                              ,r
+                              (if (eq mode :post-index)
+                                  (if (integerp offset)
+                                      #b11111
+                                      (gpr-offset offset))
+                                  0)
+                              op
+                              size
+                              (gpr-offset base)
+                              (fpr-offset first)))))))))
+
+(def-ldst-struct ld1 (#b0111 #b1010 #b0110 #b0010) #b001100 1 0)
+(def-ldst-struct ld2 #b1000 #b001100 1 0 2)
+(def-ldst-struct ld3 #b0100 #b001100 1 0 3)
+(def-ldst-struct ld4 #b0000 #b001100 1 0 4)
+
+(def-ldst-struct st1 (#b0111 #b1010 #b0110 #b0010) #b001100 0 0)
+(def-ldst-struct st2 #b1000 #b001100 0 0 2)
+(def-ldst-struct st3 #b0100 #b001100 0 0 3)
+(def-ldst-struct st4 #b0000 #b001100 0 0 4)
+
+
+
+;; (def-ldst-struct ld1r #b1100 #b001101 1 0 1)
+;; (def-ldst-struct ld2r #b1100 #b001101 1 1 2)
+
+;; (def-ldst-struct ld3r #b1110 #b001101 1 0 3)
+
+;; (def-ldst-struct ld4r #b1110 #b001101 1 1 4)
+
+
+;; (def-ldst-struct st1r #b1100 #b0011010 0 0 1)
+;; (def-ldst-struct st2r #b1100 #b001101 0 1 2)
+;; (def-ldst-struct st3r #b1110 #b001101 0 0 3)
+;; (def-ldst-struct st4r #b1110 #b001101 0 1 4)
+
+
+
 ;;;
 
 (def-emitter cond-branch
@@ -3113,6 +3223,7 @@
     (:8h (values 1 #b01))
     (:2s (values 0 #b10))
     (:4s (values 1 #b10))
+    (:1d (values 0 #b11))
     (:2d (values 1 #b11))))
 
 (macrolet ((def (name u size op &rest printer)

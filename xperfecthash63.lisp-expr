@@ -1735,5 +1735,16 @@
 (#(0 991CAE6F 9E1CB64E C60DEABC D10DFC0D D5FEF962 D6D10A2B DFFF0920)
  "(:|2D| NIL :|2S| :|4S| :|8H| :|4H| :|16B| :|8B|)"
  "((& (^ val (>> val 31)) 7))")
+(#(991CAE6F 9E1CB64E B8149077 C60DEABC D10DFC0D D5FEF962 D6D10A2B DFFF0920)
+ "(:|2D| :|1D| :|4S| :|2S| :|8H| :|4H| :|16B| :|8B|)"
+ "((& (+ (>> val 4) (>> val 27)) 7))")
+(#(0 4 8 C E 10 14 18 1C 38 3C)
+ "(30 0 14 4 28 8 12 2 6 10 7)"
+ "((let ((tab #a((8) (unsigned-byte 8) 1 8 0 8 5 0 0 5)))
+  (+= val #xda0af00d)
+  (^= val (>> val 4))
+  (let ((b (& val #x7)))
+   (let ((a (>> (u32+ val (<< val 25)) 29)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF
