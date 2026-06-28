@@ -333,24 +333,48 @@
 (defun print-simd-reg-cmode (value stream dstate)
   (declare (ignore dstate))
   (destructuring-bind (q cmode offset op) value
+    (if (and (eql q 0)
+             (eql cmode #b1110)
+             (eql op 1))
+        (format stream "D~d" offset)
+        (format stream "V~d.~a" offset
+                (cond ((eq cmode #b1110)
+                       (if (eq op 1)
+                           (if (zerop q)
+                               ""
+                               "2D")
+                           (if (zerop q)
+                               "8B"
+                               "16B")))
+                      ((eq (logandc2 cmode #b10) #b1000)
+                       (if (zerop q)
+                           "4H"
+                           "8H"))
+                      ((or (zerop (logand cmode #b1001))
+                           (= (ldb (byte 3 13) cmode) #b110))
+                       (if (zerop q)
+                           "2S"
+                           "4S")))))))
+
+(defun print-simd-fp-imm (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (op abc defgh) value
+    (let ((value (dpb abc (byte 3 5) defgh)))
+      (format stream "~s" (decode-fp-immediate value (case op
+                                                       (1 'double-float)
+                                                       (0 'single-float)))))))
+
+(defun print-simd-fmov-imm-reg (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (q op offset) value
     (format stream "V~d.~a" offset
-            (cond ((eq cmode #b1110)
-                   (if (eq op 1)
-                       (if (zerop q)
-                           ""
-                           "2D")
-                       (if (zerop q)
-                           "8B"
-                           "16B")))
-                  ((eq (logandc2 cmode #b10) #b1000)
-                   (if (zerop q)
-                       "4H"
-                       "8H"))
-                  ((or (zerop (logand cmode #b1001))
-                       (= (ldb (byte 3 13) cmode) #b110))
-                   (if (zerop q)
-                       "2S"
-                       "4S"))))))
+            (case op
+              (0
+               (case q
+                 (0 "2S")
+                 (1 "4S")))
+              (1
+               "2D")))))
 
 (defun print-simd-table-regs (value stream dstate)
   (declare (ignore dstate))

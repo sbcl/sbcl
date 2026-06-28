@@ -1732,5 +1732,8 @@
   (let ((b (& (>> val 1) #xf)))
    (let ((a (>> (<< val 25) 28)))
     (^ a (aref tab b))))))")
+(#(0 991CAE6F 9E1CB64E C60DEABC D10DFC0D D5FEF962 D6D10A2B DFFF0920)
+ "(:|2D| NIL :|2S| :|4S| :|8H| :|4H| :|16B| :|8B|)"
+ "((& (^ val (>> val 31)) 7))")
 )
 ;; EOF

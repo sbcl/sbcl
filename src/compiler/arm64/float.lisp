@@ -41,8 +41,29 @@
            (inst fmov y zr-tn))
           ((encode-fp-immediate x)
            (inst fmov y x))
+          ((when (and (typep x '(complex float))
+                      (eql (realpart x) (imagpart x)))
+             (let* ((real (realpart x))
+                    (vector-size (typecase real
+                                   (double-float :2d)
+                                   (t :2s))))
+               (cond ((encode-fp-immediate real)
+                      (inst fmov y real vector-size)
+                      t)
+                     ((let ((bits (if (double-float-p real)
+                                      (ldb (byte 64 0)
+                                           (double-float-bits real))
+                                      (ldb (byte 32 0)
+                                           (single-float-bits real)))))
+                        (when (movi-immediate-p bits vector-size)
+                          (inst movi y bits vector-size)
+                          t)))))))
+          ((and (typep x '(complex float))
+                (member (imagpart x) '(0f0 0d0))
+                (encode-fp-immediate (realpart x)))
+           (inst fmov y (realpart x)))
           ((block nil
-             (load-immediate-word tmp-tn (typecase x
+             (load-immediate-word tmp-tn (etypecase x
                                            (double-float
                                             (double-float-bits x))
                                            (single-float
@@ -52,8 +73,10 @@
                                                  (logior (ash (single-float-bits (imagpart x)) 32)
                                                          (ldb (byte 32 0)
                                                               (single-float-bits (realpart x))))))
-                                           (t
-                                            (return)))
+                                           ((complex double-float)
+                                            (if (eql (imagpart x) 0d0)
+                                                (double-float-bits (realpart x))
+                                                (return))))
                                   t))
            (inst fmov y tmp-tn))
           (t

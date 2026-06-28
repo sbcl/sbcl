@@ -18,6 +18,7 @@
             add-sub-immediate-p fixnum-add-sub-immediate-p
             negative-add-sub-immediate-p
             encode-logical-immediate fixnum-encode-logical-immediate
+            movi-immediate-p
             ldr-str-offset-encodable ldp-stp-offset-p
             extend lsl lsr asr ror @ encode-fp-immediate) "SB-VM")
   ;; Imports from SB-VM into this package
@@ -120,6 +121,8 @@
   (define-arg-type simd-modified-imm :printer #'print-simd-modified-imm)
   (define-arg-type 64-bit-modified-imm :printer #'print-64-bit-modified-imm)
   (define-arg-type simd-reg-cmode :printer #'print-simd-reg-cmode)
+  (define-arg-type simd-fp-imm :printer #'print-simd-fp-imm)
+  (define-arg-type simd-fmov-imm-reg :printer #'print-simd-fmov-imm-reg)
   (define-arg-type simd-table-regs :printer #'print-simd-table-regs)
   (define-arg-type simd-b-reg :printer #'print-simd-b-reg)
   (define-arg-type simd-high-vector :printer #'print-simd-high-vector)
@@ -2793,6 +2796,26 @@
   (#b0 :field (byte 5 5))
   (rd :field (byte 5 0) :type 'float-reg))
 
+(define-instruction-format (simd-modified-imm 32
+                            :default-printer '(:name :tab rd ", #" imm))
+  (o1 :field (byte 1 31) :value #b0)
+  (q :field (byte 1 30))
+  (op :field (byte 1 29))
+  (op2 :field (byte 10 19) :value #b0111100000)
+  (cmode :field (byte 4 12))
+  (o2 :field (byte 1 11))
+  (op3 :field (byte 1 10) :value #b1)
+  (imm :fields (list (byte 3 16) (byte 4 12) (byte 5 5)) :type 'simd-modified-imm)
+  (rd :fields (list (byte 1 30) (byte 4 12) (byte 5 0) (byte 1 29)) :type 'simd-reg-cmode))
+
+(define-instruction-format (simd-modified-fp-imm 32
+                            :include simd-modified-imm
+                            :default-printer '(:name :tab rd ", #" imm))
+  (imm :fields (list (byte 1 29) (byte 3 16) (byte 5 5)) :type 'simd-fp-imm)
+  (cmode :value #b1111)
+  (o2 :value 0)
+  (rd :fields (list (byte 1 30)  (byte 1 29) (byte 5 0)) :type 'simd-fmov-imm-reg))
+
 (define-instruction fmov (segment rd rn &optional vector-index)
   (:printer fp-conversion ((op #b00110) (rd nil :type 'reg)))
   (:printer fp-conversion ((op #b00111) (rn nil :type 'reg)))
@@ -2802,19 +2825,46 @@
                                         (rd nil :type 'simd-high-vector)))
   (:printer fp-data-processing-1 ((op #b0)))
   (:printer fp-immediate ())
+  (:printer simd-modified-fp-imm ())
   (:emitter
-   (cond ((double-float-p rn)
-          (aver (sc-is rd double-reg))
-          (emit-fp-immediate segment 0 0 #b01
-                             (encode-fp-immediate rn)
-                             0
-                             (fpr-offset rd)))
-         ((single-float-p rn)
-          (aver (sc-is rd single-reg))
-          (emit-fp-immediate segment 0 0 #b00
-                             (encode-fp-immediate rn)
-                             0
-                             (fpr-offset rd)))
+   (cond ((floatp rn)
+          (sc-case rd
+            ((complex-single-reg complex-double-reg)
+             (if vector-index
+                 (let* ((imm (encode-fp-immediate rn))
+                        (abc (ldb (byte 3 5) imm))
+                        (defgh (ldb (byte 5 0) imm)))
+                   (emit-simd-modified-imm segment
+                                           (encode-vector-size vector-index)
+                                           (ecase vector-index
+                                             ((:4s :2s) 0)
+                                             (:2d 1))
+                                           abc
+                                           #b1111
+                                           0
+                                           defgh
+                                           (fpr-offset rd)))
+                 (sc-case rd
+                   (complex-double-reg
+                    (emit-fp-immediate segment 0 0 #b01
+                                       (encode-fp-immediate rn)
+                                       0
+                                       (fpr-offset rd)))
+                   (complex-single-reg
+                    (emit-fp-immediate segment 0 0 #b00
+                                       (encode-fp-immediate rn)
+                                       0
+                                       (fpr-offset rd))))))
+            (double-reg
+             (emit-fp-immediate segment 0 0 #b01
+                                (encode-fp-immediate rn)
+                                0
+                                (fpr-offset rd)))
+            (single-reg
+             (emit-fp-immediate segment 0 0 #b00
+                                (encode-fp-immediate rn)
+                                0
+                                (fpr-offset rd)))))
          ((and (fp-register-p rd)
                (fp-register-p rn))
           (assert (and (eq (tn-sc rd) (tn-sc rn))) (rd rn)
@@ -3584,29 +3634,50 @@
   (defgh 5 5)
   (rd 5 0))
 
-(define-instruction-format (simd-modified-imm 32
-                            :default-printer '(:name :tab rd ", #" imm))
-  (o1 :field (byte 1 31) :value #b0)
-  (q :field (byte 1 30))
-  (op :field (byte 1 29))
-  (op2 :field (byte 10 19) :value #b0111100000)
-  (cmode :field (byte 4 12))
-  (o2 :field (byte 1 11))
-  (op3 :field (byte 1 10) :value #b1)
-  (imm :fields (list (byte 3 16) (byte 4 12) (byte 5 5)) :type 'simd-modified-imm)
-  (rd :fields (list (byte 1 30) (byte 4 12) (byte 5 0) (byte 1 29)) :type 'simd-reg-cmode))
+(defun movi-immediate-p (value &optional size)
+  (ecase size
+    ((:8b :16b :4h :8h)
+     (typep value '(unsigned-byte 8)))
+    ((:4s :2s)
+     (cond ((typep value '(unsigned-byte 8)))
+           ((typep value '(unsigned-byte 16))
+            (let ((low (ldb (byte 8 0) value)))
+              (or (zerop low)
+                  (= low #xFF))))
+           ((typep value '(unsigned-byte 24))
+            (let ((low (ldb (byte 16 0) value)))
+              (or (zerop low)
+                  (= low #xFFFF))))
+           ((typep value '(unsigned-byte 32))
+            (zerop (ldb (byte 24 0) value)))))
+    ((nil :2d)
+     (and
+      (typep (ldb (byte 8 56) value) '(member 255 0))
+      (typep (ldb (byte 8 48) value) '(member 255 0))
+      (typep (ldb (byte 8 32) value) '(member 255 0))
+      (typep (ldb (byte 8 24) value) '(member 255 0))
+      (typep (ldb (byte 8 16) value) '(member 255 0))
+      (typep (ldb (byte 8 8) value) '(member 255 0))
+      (typep (ldb (byte 8 0) value) '(member 255 0))))))
 
 (macrolet
-    ((def (name o2 op)
-       `(define-instruction ,name (segment rd imm size)
-          (:printer simd-modified-imm ((o2 ,o2)
-                                       (op ,op)))
+    ((def (name o2 op cmodes)
+       `(define-instruction ,name (segment rd imm &optional size)
+          ,@(loop for cmode in cmodes
+                  for fields = (loop for bit in cmode
+                                     for i downfrom 15
+                                     unless (eq bit 'x)
+                                     collect `(byte 1 ,i))
+                  for bits = (remove 'x cmode)
+                  collect `(:printer simd-modified-imm ((o2 ,o2)
+                                                        (op ,op)
+                                                        (cmodes ',bits
+                                                                :fields (list ,@fields)))))
           ,@(when (eq name 'movi)
               `((:printer simd-modified-imm ((o2 ,o2)
                                              (op 1)
                                              (cmode #b1110)
-                                             (imm nil :type '64-bit-modified-imm))
-                          '('movi :tab rd ", #" imm))))
+                                             (imm nil :type '64-bit-modified-imm)))))
           (:emitter
            (let ((abc 0)
                  (defgh 0)
@@ -3615,8 +3686,9 @@
              (setf abc (ldb (byte 3 5) imm)
                    defgh (ldb (byte 5 0) imm))
              (ecase size
-               ((:8b :16b)
-                (setf cmode #b1110))
+               ,@(when (eq name 'movi)
+                   `(((:8b :16b)
+                      (setf cmode #b1110))))
                ((:4h :8h)
                 (cond ((typep imm '(unsigned-byte 8))
                        (setf cmode #b1000))
@@ -3652,35 +3724,44 @@
                                    defgh (ldb (byte 5 24) imm)
                                    cmode #b0110))))
                     (error "~x bad immediate" imm)))
-               ((:2d)
-                (let ((a (the (member 255 0) (ldb (byte 8 56) imm)))
-                      (b (the (member 255 0) (ldb (byte 8 48) imm)))
-                      (c (the (member 255 0) (ldb (byte 8 40) imm)))
-                      (d (the (member 255 0) (ldb (byte 8 32) imm)))
-                      (e (the (member 255 0) (ldb (byte 8 24) imm)))
-                      (f (the (member 255 0) (ldb (byte 8 16) imm)))
-                      (g (the (member 255 0) (ldb (byte 8 8) imm)))
-                      (h (the (member 255 0) (ldb (byte 8 0) imm))))
-                  (setf (ldb (byte 1 2) abc) a
-                        (ldb (byte 1 1) abc) b
-                        (ldb (byte 1 0) abc) c
-                        (ldb (byte 1 4) defgh) d
-                        (ldb (byte 1 3) defgh) e
-                        (ldb (byte 1 2) defgh) f
-                        (ldb (byte 1 1) defgh) g
-                        (ldb (byte 1 0) defgh) h)
-                  (setf op 1
-                        cmode #b1110))))
+               ,@(when (eq name 'movi)
+                   `(((nil :2d)
+                      (let ((a (the (member 255 0) (ldb (byte 8 56) imm)))
+                            (b (the (member 255 0) (ldb (byte 8 48) imm)))
+                            (c (the (member 255 0) (ldb (byte 8 40) imm)))
+                            (d (the (member 255 0) (ldb (byte 8 32) imm)))
+                            (e (the (member 255 0) (ldb (byte 8 24) imm)))
+                            (f (the (member 255 0) (ldb (byte 8 16) imm)))
+                            (g (the (member 255 0) (ldb (byte 8 8) imm)))
+                            (h (the (member 255 0) (ldb (byte 8 0) imm))))
+                        (setf (ldb (byte 1 2) abc) a
+                              (ldb (byte 1 1) abc) b
+                              (ldb (byte 1 0) abc) c
+                              (ldb (byte 1 4) defgh) d
+                              (ldb (byte 1 3) defgh) e
+                              (ldb (byte 1 2) defgh) f
+                              (ldb (byte 1 1) defgh) g
+                              (ldb (byte 1 0) defgh) h)
+                        (setf op 1
+                              cmode #b1110))))))
              (emit-simd-modified-imm segment
-                                     (encode-vector-size size)
+                                     (if size
+                                         (encode-vector-size size)
+                                         0)
                                      op
                                      abc
                                      cmode
                                      ,o2
                                      defgh
                                      (fpr-offset rd)))))))
-  (def movi 0 0)
-  (def mvni 0 1))
+
+  (def movi 0 0 ((0 x x 0)
+                 (1 0 x 0)
+                 (1 1 0 x)
+                 (1 1 1 0)))
+  (def mvni 0 1 ((0 x x 0)
+                 (1 0 x 0)
+                 (1 1 0 x))))
 
 (def-emitter fp-cond-select
   (0 1 31)
