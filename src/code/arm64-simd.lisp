@@ -584,6 +584,52 @@
       (setf (sb-impl::buffer-head ibuf) (+ head copied))
       (+ start copied))))
 
+#+sb-unicode
+(defun simd-copy-utf8-sap-to-character-string (sap string length)
+  (declare (optimize speed (safety 0))
+           (system-area-pointer sap)
+           (index length))
+  (let ((n (logand length -16)))
+    (with-pinned-objects-in-registers (string)
+      (inline-vop (((byte-array* sap-reg t) sap)
+                   ((byte-array sap-reg t))
+                   ((32-bit-array sap-reg t) (vector-sap string))
+                   ((end unsigned-reg))
+                   ((n any-reg) n)
+                   ((bytes complex-double-reg))
+                   ((16-bits complex-double-reg))
+                   ((16-bits-2 complex-double-reg))
+                   ((32-bits complex-double-reg t :offset 4))
+                   ((32-bits-2 complex-double-reg t :offset 5))
+                   ((32-bits-3 complex-double-reg t :offset 6))
+                   ((32-bits-4 complex-double-reg t :offset 7)))
+          ()
+        (inst add end byte-array* (lsr n 1))
+        (inst mov byte-array byte-array*)
+        (inst b start)
+
+        LOOP
+        (inst ldr bytes (@ byte-array 16 :post-index))
+
+        (inst ushll 16-bits :8h bytes :8b)
+        (inst ushll 32-bits :4s 16-bits :4h)
+
+        (inst ushll2 16-bits-2 :8h bytes :16b)
+        (inst ushll2 32-bits-2 :4s 16-bits :8h)
+
+        (inst ushll 32-bits-3 :4s 16-bits-2 :4h)
+        (inst ushll2 32-bits-4 :4s 16-bits-2 :8h)
+        (inst st1 (list 32-bits 32-bits-2 32-bits-3 32-bits-4) (@ 32-bit-array 64 :post-index) :4s)
+
+        start
+        (inst cmp byte-array end)
+        (inst b :lt LOOP)
+
+        DONE))
+    (loop for i from n below length
+          do (setf (aref string i)
+                   (code-char (sap-ref-8 sap i))))))
+
 (defun simd-copy-utf8-to-base-string (start end string ibuf)
   (declare (type index start end)
            (optimize speed (safety 0)))

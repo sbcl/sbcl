@@ -664,7 +664,7 @@
       (truly-the index (values (truncate string-offset 4))))))
 
 ;;; No validations
-#+(and sb-unicode 64-bit little-endian)
+#+(and sb-unicode 64-bit little-endian (not arm64))
 (defun sb-vm::simd-copy-utf8-sap-to-character-string (sap string length)
   (declare (index length)
            (simple-character-string string)
@@ -673,6 +673,7 @@
     (let* ((n (logand length (- sb-vm:n-word-bytes)))
            (string-sap (vector-sap string))
            (string-offset 0))
+      (declare (fixnum string-offset))
       (loop for byte-offset below n by sb-vm:n-word-bytes
             do
             (let ((word (sap-ref-word sap byte-offset)))
@@ -692,12 +693,10 @@
                     (dpb (ldb (byte 8 56) word)
                          (byte 8 32)
                          (ldb (byte 8 48) word))))
-            (incf string-offset (* 4 sb-vm:n-word-bytes))
-            finally (let ((string-offset (truncate string-offset 4)))
-                      (loop for i from n below length
-                            do (setf (aref string string-offset)
-                                     (code-char (sap-ref-8 sap i)))
-                            (incf string-offset)))))))
+            (incf string-offset (* 4 sb-vm:n-word-bytes)))
+      (loop for i from n below length
+            do (setf (aref string i)
+                     (code-char (sap-ref-8 sap i)))))))
 
 #+(and sb-unicode 64-bit little-endian)
 (defun sb-vm::simd-copy-utf8-crlf-to-character-string-with-size (start end string ibuf size-buffer)
