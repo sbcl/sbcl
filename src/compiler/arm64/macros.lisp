@@ -427,6 +427,8 @@
                (value :scs (,@scs ,(case el-type
                                      (double-float
                                       '(fp-immediate (eql (tn-value tn) 0d0)))
+                                     (complex-single-float
+                                      '(fp-immediate (eql (tn-value tn) #c(0f0 0f0))))
                                      (t
                                       'zero)))))
         (:arg-types ,type tagged-num ,el-type)
@@ -438,7 +440,7 @@
               '((when barrier
                   (emit-gengc-barrier object nil tmp-tn t))))
           ,@(case el-type
-              (double-float
+              ((double-float complex-single-float)
                '((when (sc-is value fp-immediate)
                    (setf value zr-tn)))))
           (sc-case index
