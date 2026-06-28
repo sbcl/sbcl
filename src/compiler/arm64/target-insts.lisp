@@ -304,6 +304,11 @@
     (format stream "V~d.~a" offset
             (decode-vector-size-2x q size))))
 
+(defun print-simd-float-pair-reg (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (size offset) value
+    (format stream "V~d.~a" offset (if (= size 1) "2S" "2D"))))
+
 (defun print-simd-immh-reg (value stream dstate)
   (declare (ignore dstate))
   (if (= (length value) 2)
