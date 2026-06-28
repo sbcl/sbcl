@@ -744,7 +744,6 @@
                    ((32-bits-2 int-sse-reg))
                    ((end unsigned-reg))
                    ((n unsigned-reg) n)
-                   ((temp))
                    ((32-bits-4 int-sse-reg))
                    ((zero)))
           ((res unsigned-reg unsigned-num))
