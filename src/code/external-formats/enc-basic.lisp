@@ -664,7 +664,7 @@
       (truly-the index (values (truncate string-offset 4))))))
 
 ;;; No validations
-#+(and sb-unicode 64-bit little-endian (not arm64))
+#+(and sb-unicode 64-bit little-endian (not (or arm64 x86-64)))
 (defun sb-vm::simd-copy-utf8-sap-to-character-string (sap string length)
   (declare (index length)
            (simple-character-string string)

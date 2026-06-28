@@ -729,6 +729,82 @@
       (+ start copied))))
 
 #+sb-unicode
+(defun simd-copy-utf8-sap-to-character-string (sap string length)
+  (declare (optimize speed (safety 0))
+           (system-area-pointer sap)
+           (index length))
+  (let ((n (logand length -16)))
+    (with-pinned-objects (string)
+      (inline-vop (((byte-array* sap-reg t) sap)
+                   ((byte-array sap-reg t))
+                   ((32-bit-array sap-reg t) (vector-sap string))
+                   ((bytes int-sse-reg))
+                   ((16-bits int-sse-reg))
+                   ((32-bits int-sse-reg))
+                   ((32-bits-2 int-sse-reg))
+                   ((end unsigned-reg))
+                   ((n unsigned-reg) n)
+                   ((temp))
+                   ((32-bits-4 int-sse-reg))
+                   ((zero)))
+          ((res unsigned-reg unsigned-num))
+        (let ((16-bits-2 bytes)
+              (32-bits-3 bytes))
+          (assemble ()
+            (inst mov byte-array byte-array*)
+            (inst lea end (ea byte-array* n))
+            (inst pxor zero zero)
+            (inst jmp start)
+
+
+            LOOP
+            (inst movdqu bytes (ea byte-array))
+            (inst add byte-array 16)
+
+            (move 16-bits bytes)
+            (inst punpcklbw 16-bits zero)
+            (move 32-bits-2 16-bits)
+
+
+            (move 32-bits 16-bits)
+            (inst punpcklwd 32-bits zero)
+
+            (inst movdqa (ea 32-bit-array) 32-bits)
+            (inst psrldq 32-bits-2 8)
+            (inst punpcklwd 32-bits-2 zero)
+
+            (inst movdqa (ea 16 32-bit-array) 32-bits-2)
+
+            (move 16-bits-2 bytes)
+
+            (inst psrldq 16-bits-2 8)
+            (inst punpcklbw 16-bits-2 zero)
+            (move 32-bits-4 16-bits-2)
+            (move 32-bits-3 16-bits-2)
+
+            (inst punpcklwd 32-bits-3 zero)
+
+            (inst movdqa (ea 32 32-bit-array) 32-bits-3)
+            (inst psrldq 32-bits-4 8)
+            (inst punpcklwd 32-bits-4 zero)
+
+            (inst movdqa (ea 48 32-bit-array) 32-bits-4)
+
+            (inst add 32-bit-array (* 16 4))
+
+            START
+            (inst cmp byte-array end)
+            (inst jmp :l LOOP)
+
+            DONE))
+
+        (inst sub byte-array byte-array*)
+        (move res byte-array)))
+    (loop for i from n below length
+          do (setf (aref string i)
+                   (code-char (sap-ref-8 sap i))))))
+
+#+sb-unicode
 (defun simd-copy-utf8-to-base-string (start end string ibuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
