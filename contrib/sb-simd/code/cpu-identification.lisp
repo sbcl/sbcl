@@ -70,3 +70,6 @@
 
   (defun fma-supported-p ()
     nil))
+
+(defun neon-supported-p ()
+  #+arm64 t)

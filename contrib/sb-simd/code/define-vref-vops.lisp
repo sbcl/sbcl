@@ -96,3 +96,75 @@
                         #'sb-simd-internals:vref-record-p)
                   collect `(define-vref-vop ,(sb-simd-internals:vref-record-name vref-record))))))
   (define-vref-vops))
+
+#+arm64
+(macrolet
+    ((define-vref-vop (vref-record-name)
+       (with-accessors ((name sb-simd-internals:vref-record-name)
+                        (vop sb-simd-internals:vref-record-vop)
+                        (vop-c sb-simd-internals:vref-record-vop-c)
+                        (mnemonic sb-simd-internals:vref-record-mnemonic)
+                        (value-record sb-simd-internals:vref-record-value-record)
+                        (vector-record sb-simd-internals:vref-record-vector-record)
+                        (store sb-simd-internals:store-record-p))
+           (sb-simd-internals:find-function-record vref-record-name)
+         (let* ((vector-type (sb-simd-internals:value-record-type vector-record))
+                (vector-primitive-type (sb-simd-internals:value-record-primitive-type vector-record))
+                (value-scs (sb-simd-internals:value-record-scs value-record))
+                (value-type (sb-simd-internals:value-record-type value-record))
+                (value-primitive-type (sb-simd-internals:value-record-primitive-type value-record))
+                (scalar-record
+                  (etypecase value-record
+                    (sb-simd-internals:simd-record (sb-simd-internals:simd-record-scalar-record value-record))
+                    (sb-simd-internals:value-record value-record)))
+                (bits-per-element (sb-simd-internals:value-record-bits scalar-record))
+                (bytes-per-element (ceiling bits-per-element 8))
+                (shift (1- (integer-length bytes-per-element))))
+             `(progn
+                (defknown ,vop (,@(when store `(,value-type)) ,vector-type index (integer 0 0))
+                    (values ,value-type &optional)
+                    (always-translatable)
+                  :overwrite-fndb-silently t)
+                (define-vop (,vop)
+                  (:translate ,vop)
+                  (:policy :fast-safe)
+                  (:args ,@(when store `((value :scs (,@value-scs zero))))
+                         (object :scs (descriptor-reg))
+                         (index :scs (any-reg unsigned-reg signed-reg immediate)))
+                  (:arg-types ,@(when store `(,value-primitive-type))
+                              ,vector-primitive-type
+                              tagged-num
+                              (:constant (integer 0 0)))
+                  (:info addend) ; always zero
+                  ,@(unless store
+                      `((:results (value :scs ,value-scs))
+                        (:result-types ,value-primitive-type)))
+                  (:generator 2
+                    (let ((addend addend))
+                      (declare (ignore addend))
+                      (sc-case index
+                        (immediate
+                         (inst ,(if store 'str 'ldr)
+                               value
+                               (@ object (load-store-offset
+                                          (+ (ash (tn-value index) ,shift)
+                                             (- (ash vector-data-offset word-shift)
+                                                other-pointer-lowtag))))))
+                        (t
+                         (let ((shift ,shift))
+                           (when (sc-is index any-reg)
+                             (decf shift n-fixnum-tag-bits))
+                           (inst add tmp-tn object (if (minusp shift)
+                                                       (asr index (- shift))
+                                                       (lsl index shift))))
+                         (inst ,(if store 'str 'ldr)
+                               value
+                               (@ tmp-tn (load-store-offset (- (ash vector-data-offset word-shift)
+                                                               other-pointer-lowtag)))))))))))))
+     (define-vref-vops ()
+       `(progn
+          ,@(loop for vref-record
+                    in (sb-simd-internals:filter-available-function-records
+                        #'sb-simd-internals:vref-record-p)
+                  collect `(define-vref-vop ,(sb-simd-internals:vref-record-name vref-record))))))
+  (define-vref-vops))

@@ -59,13 +59,19 @@
 
 (defmacro define-test (test-name &body body)
   "Define a test function and add it to *TESTS*."
-  (let ((name (intern-test-name test-name)))
+  (let ((name (intern-test-name test-name))
+        (instruction-set (sb-simd-internals:find-instruction-set
+                          (symbol-package test-name)
+                          nil)))
     `(prog1 ',name
        (defun ,name ()
          (declare (optimize (debug 3) (safety 3)))
          (with-test-harness
            (enter-test ',name)
-           ,@body))
+           ,(if (or (not instruction-set)
+                    (sb-simd-internals:instruction-set-available-p instruction-set))
+                `(progn ,@body)
+                nil)))
        (pushnew ',name *tests*))))
 
 (defun enter-test (test-name)

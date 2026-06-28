@@ -664,7 +664,7 @@ For structures:
 
 @item @code{slot-value} and @code{slot-boundp} function as expected, including (for
   @code{slot-value}) calling and respecting the return value of
-  @code{slot-unbound} if the slot is unbound; 
+  @code{slot-unbound} if the slot is unbound;
 
 @item @code{(setf slot-value)} functions as expected, including performing
   type checks to verify that the new value is of an appropriate type

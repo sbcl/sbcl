@@ -14,10 +14,6 @@
           (t
            (error "Unexpected error: ~A" c)))))
 
-(when (zerop (sb-alien:extern-alien "avx2_supported" int))
-  (format t "~&Skipping test of sb-simd~%")
-  (invoke-restart 'run-tests::skip-file))
-
 (with-compilation-unit ()
   (dolist (file '("packages.lisp"
                   "numbers.lisp"

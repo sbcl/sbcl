@@ -555,7 +555,9 @@ echo "(lambda (features) (set-difference (union features (list :${sbcl_arch}$WIT
 
 # Automatically block sb-simd on non-x86 platforms, at least for now.
 case "$sbcl_arch" in
-    x86-64) ;; *) SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST sb-simd" ;;
+    x86-64) ;;
+    arm64) ;;
+    *) SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST sb-simd" ;;
 esac
 case "$sbcl_os" in
     linux) ;; *) SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST sb-perf" ;;
@@ -751,6 +753,9 @@ case "$sbcl_arch" in
         printf ' :immobile-space' >> $ltf
     esac
     ;;
+  arm64)
+      printf ' :sb-simd-pack' >> $ltf # not mandatory
+      ;;
   ppc)
     if [ "$sbcl_os" = "darwin" ]; then
         # We provide a dlopen shim, so a little lie won't hurt

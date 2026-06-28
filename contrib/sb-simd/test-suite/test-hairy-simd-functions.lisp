@@ -7,3 +7,5 @@
 (in-package #:sb-simd-avx)
 
 (in-package #:sb-simd-avx2)
+
+(in-package #:sb-simd-neon)

@@ -16,6 +16,7 @@
 (define-inline sb-simd-sse:p128 (x) (the sb-simd-sse:p128 x))
 (define-inline sb-simd-avx:p128 (x) (the sb-simd-avx:p128 x))
 (define-inline sb-simd-avx:p256 (x) (the sb-simd-avx:p256 x))
+(define-inline sb-simd-neon:p128 (x) (the sb-simd-neon:p128 x))
 
 (macrolet
     (;; We cannot call known functions directly in the definition of a

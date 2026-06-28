@@ -181,21 +181,21 @@
 (defun scalar-record-p (x)
   (typep x '(and value-record (not simd-record))))
 
-#-simd-pack-256
+#-sb-simd-pack-256
 (progn
   (defstruct phony-simd-pack-256)
   (deftype simd-pack-256 (&optional element-type)
     (declare (ignore element-type))
     'phony-simd-pack-256))
 
-(defmethod decode-record-definition ((_ (eql 'simd-record)) expr):w
+(defmethod decode-record-definition ((_ (eql 'simd-record)) expr)
   (destructuring-bind (name scalar-record-name bits primitive-type scs) expr
     (let ((simd-pack-type
             (let ((base-type
                     (ecase bits
                       (128 (find-symbol "SIMD-PACK" "SB-EXT"))
                       (256 (or (find-symbol "SIMD-PACK-256" "SB-EXT")
-                               #-simd-pack-256
+                               #-sb-simd-pack-256
                                'simd-pack-256)))))
               (cond ((not base-type) 't)
                     ((not scalar-record-name) base-type)
@@ -508,7 +508,7 @@
     :reader instruction-record-always-translatable)
    ;; How the instruction is turned into a VOP.
    (%encoding
-    :type (member :standard :sse :sse+xmm0 :custom :fake-vop :move :fma)
+    :type (member :standard :sse :sse+xmm0 :custom :fake-vop :move :fma :neon-rmw)
     :initarg :encoding
     :initform :standard
     :reader instruction-record-encoding)
