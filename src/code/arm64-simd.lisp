@@ -62,7 +62,7 @@
 ;;; This doesn't prevent the var from going to the stack, but none of
 ;;; the routines should do that.
 (defmacro with-pinned-objects-in-registers (vars &body body)
-  `(multiple-value-prog1 ,@body
+  `(multiple-value-prog1 (progn ,@body)
      ,@(loop for var in vars
              collect `(touch-object ,var))))
 
@@ -629,6 +629,57 @@
     (loop for i from n below length
           do (setf (aref string i)
                    (code-char (sap-ref-8 sap i))))))
+
+(defun simd-copy-character-string-to-utf8-byte-array (byte-array string length)
+  (declare (index length)
+           (simple-character-string string)
+           ((simple-array (unsigned-byte 8) (*)) byte-array)
+           (optimize speed (safety 0)))
+  (with-pinned-objects-in-registers (string byte-array)
+    (inline-vop (((byte-array sap-reg t) (vector-sap byte-array))
+                 ((32-bit-array sap-reg t) (vector-sap string))
+                 ((n unsigned-reg) (logand (+ (* length 4) 15) -16))
+                 ((bytes complex-double-reg t :offset 1))
+                 ((bytes2 complex-double-reg t :offset 2))
+                 ((bytes3 complex-double-reg t :offset 3))
+                 ((bytes4 complex-double-reg t :offset 4)))
+        ()
+      (inst cmp n 64)
+      (inst b :lt TAIL)
+
+      LOOP
+
+      (inst ld1 (list bytes bytes2 bytes3 bytes4) (@ 32-bit-array 64 :post-index) :4s)
+
+      (inst uzp1 bytes2 bytes bytes2 :8h)
+      (inst uzp1 bytes4 bytes3 bytes4 :8h)
+      (inst uzp1 bytes4 bytes2 bytes4 :16b)
+      (inst str  bytes4 (@ byte-array 16 :post-index))
+      (inst sub n n 64)
+      (inst cmp n 64)
+      (inst b :ge LOOP)
+
+      TAIL
+      (inst cbz n DONE)
+      (inst movi bytes2 0 :2d)
+      (inst movi bytes3 0 :2d)
+
+      (inst tbz n 5 ONE)
+      (inst tbz n 4 TWO)
+
+      (inst ldr bytes3 (@ 32-bit-array 32))
+      (inst uzp1 bytes3 bytes3 bytes2 :8h)
+      TWO
+      (inst ldr bytes2 (@ 32-bit-array 16))
+      ONE
+      (inst ldr bytes (@ 32-bit-array))
+
+      (inst uzp1 bytes2 bytes bytes2 :8h)
+      (inst uzp1 bytes3 bytes2 bytes3 :16b)
+      (inst str  bytes3 (@ byte-array))
+
+      DONE))
+  byte-array)
 
 (defun simd-copy-utf8-to-base-string (start end string ibuf)
   (declare (type index start end)

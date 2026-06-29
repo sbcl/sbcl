@@ -1670,38 +1670,46 @@
                 (incf index)))
         (values length nil)))))
 
+#+(and 64-bit sb-unicode (not arm64))
+(defun sb-vm::simd-copy-character-string-to-utf8-byte-array (byte-array string length)
+  (declare (index length)
+           (simple-character-string string)
+           ((simple-array (unsigned-byte 8) (*)) byte-array)
+           (optimize speed (safety 0)))
+  (let ((byte-index 0))
+    (declare (index byte-index))
+    ;; SWAR ASCII
+    #+64-bit
+    (with-pinned-objects (byte-array)
+      (let ((sap (vector-sap byte-array))
+            (word-length (truncate length 2))
+            (index 0))
+        (declare (index index))
+        (loop until (>= index word-length)
+              do (let* ((word (%vector-raw-bits string index))
+                        (a (ldb (byte 8 0) word))
+                        (b (ash word -24)))
+                   (setf (sap-ref-16 sap (* index 2))
+                         (logior a b)))
+
+                 (incf index)
+                 (incf byte-index 2))))
+    (loop for i from byte-index below length
+          do (setf (aref byte-array i)
+                   (logand (char-code (aref string i)) #xFF)))))
+
 (defun output-to-c-string/utf-8/lf (string)
   (declare (type simple-string string)
            (optimize speed (safety 0)))
-  (cond ((simple-base-string-p string) string)
+  (cond ((base-string-p string) string)
         (t
          (multiple-value-bind (buffer-length ascii-only) (simd-character-string-utf8-length string)
            (unless buffer-length
              (check-utf8-encoding string))
-           (let* ((buffer (make-array (1+ buffer-length) :element-type '(unsigned-byte 8)
-                                                         :initial-element 0)))
+           (let ((buffer (make-array (1+ buffer-length) :element-type '(unsigned-byte 8)
+                                                        :initial-element 0)))
              (cond (ascii-only
-                    (let ((byte-index 0))
-                      (declare (index byte-index))
-                      ;; SWAR ASCII
-                      #+64-bit
-                      (with-pinned-objects (buffer)
-                        (let ((sap (vector-sap buffer))
-                              (word-length (truncate buffer-length 2))
-                              (index 0))
-                          (declare (index index))
-                          (loop until (>= index word-length)
-                                do (let* ((word (%vector-raw-bits string index))
-                                          (a (ldb (byte 8 0) word))
-                                          (b (ash word -24)))
-                                     (setf (sap-ref-16 sap (* index 2))
-                                           (logior a b)))
-
-                                   (incf index)
-                                   (incf byte-index 2))))
-                      (loop for i from byte-index below buffer-length
-                            do (setf (aref buffer i)
-                                     (logand (char-code (aref string i)) #xFF)))))
+                    (sb-vm::simd-copy-character-string-to-utf8-byte-array buffer string buffer-length))
                    (t
                     (let ((index 0))
                       (declare (index index))
