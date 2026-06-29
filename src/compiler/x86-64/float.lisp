@@ -87,8 +87,8 @@
           (etypecase x
             (single-float (inst movss y c))
             (double-float (inst movsd y c))
-            (complex-single-float (inst movq y c))
-            (complex-double-float (inst movupd y c)))))))
+            ((complex single-float) (inst movq y c))
+            ((complex double-float) (inst movupd y c)))))))
 
 (define-move-fun (load-single 2) (vop x y)
   ((single-stack) (single-reg))
