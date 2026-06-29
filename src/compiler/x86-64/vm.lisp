@@ -376,6 +376,7 @@
                   :constant-scs (fp-immediate)
                   :save-p t
                   :alternate-scs (single-sse-stack))
+  #+sb-simd-pack-256
   (ymm-reg float-registers :locations #.*float-regs*)
   ;; These next 3 should probably be named to YMM-{INT,SINGLE,DOUBLE}-REG
   ;; but I think there are 3rd-party libraries that expect these names.
@@ -398,6 +399,7 @@
                   :save-p t
                   :alternate-scs (single-avx2-stack))
   ;; ZMM SCs use all 32 registers (16-31 require EVEX encoding)
+  #+sb-simd-pack-512
   (zmm-reg float-registers :locations #.*zmm-regs*)
   #+sb-simd-pack-512
   (int-avx512-reg float-registers
@@ -438,9 +440,10 @@
                                  int-sse-stack single-sse-stack double-sse-stack))
 #+sb-simd-pack-256
 (defparameter *hword-sc-names* '(ymm-reg int-avx2-reg single-avx2-reg double-avx2-reg
-                                   int-avx2-stack single-avx2-stack double-avx2-stack))
-(defparameter *zword-sc-names* '(zmm-reg
-                                 #+sb-simd-pack-512 int-avx512-reg
+                                   int-avx2-stack single-avx2-stack
+                                 double-avx2-stack))
+#+sb-simd-pack-512
+(defparameter *zword-sc-names* '(#+sb-simd-pack-512 int-avx512-reg
                                  #+sb-simd-pack-512 single-avx512-reg
                                  #+sb-simd-pack-512 double-avx512-reg
                                  #+sb-simd-pack-512 int-avx512-stack
@@ -451,11 +454,12 @@
   . #.(mapcar (lambda (class-spec)
                 (let ((size
                         (case (car class-spec)
-                          (#.*zword-sc-names*   :zword)
                           #+sb-simd-pack
                           (#.*oword-sc-names*   :oword)
                           #+sb-simd-pack-256
                           (#.*hword-sc-names*   :hword)
+                          #+sb-simd-pack-512
+                          (#.*zword-sc-names*   :zword)
                           (#.*qword-sc-names*   :qword)
                           (#.*float-sc-names*   :float)
                           (#.*double-sc-names*  :double)
@@ -501,6 +505,10 @@
 (defun xmm-tn-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'float-registers)))
+(defun zmm-tn-p (tn)
+  (member (tn-sc tn) (list (sc-or-lose 'single-avx512-reg)
+                           (sc-or-lose 'double-avx512-reg)
+                           (sc-or-lose 'int-avx512-reg))))
 ;;; Return true if THING is on the stack (in whatever storage class).
 (defun stack-tn-p (thing)
   (and (tn-p thing)
@@ -541,7 +549,8 @@
     #+compact-instance-header (layout immediate-sc-number)
     ((or float (complex float)
          #+(and sb-simd-pack (not sb-xc-host)) simd-pack
-         #+(and sb-simd-pack-256 (not sb-xc-host)) simd-pack-256)
+         #+(and sb-simd-pack-256 (not sb-xc-host)) simd-pack-256
+         #+(and sb-simd-pack-512 (not sb-xc-host)) simd-pack-512)
      fp-immediate-sc-number)
     ;; This case has to follow the numeric cases because proxy floating-point numbers
     ;; are host structs. Or we could implement and use something like SB-XC:TYPECASE

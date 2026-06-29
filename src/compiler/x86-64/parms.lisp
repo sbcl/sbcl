@@ -199,6 +199,7 @@
 ;;; Bit indices into *CPU-FEATURE-BITS*
 (defconstant cpu-has-ymm-registers   0)
 (defconstant cpu-has-popcnt          1)
+(defconstant cpu-has-zmm-registers   2) ;; fixme512 which bit: 3?
 
 #+sb-simd-pack
 (progn
@@ -221,4 +222,9 @@
       #(simd-pack-256-single simd-pack-256-double
         simd-pack-256-ub8 simd-pack-256-ub16 simd-pack-256-ub32 simd-pack-256-ub64
         simd-pack-256-sb8 simd-pack-256-sb16 simd-pack-256-sb32 simd-pack-256-sb64)
+    #'equalp)
+  (defconstant-eqx +simd-pack-512-primtypes+
+      #(simd-pack-512-single simd-pack-512-double
+        simd-pack-512-ub8 simd-pack-512-ub16 simd-pack-512-ub32 simd-pack-512-ub64
+        simd-pack-512-sb8 simd-pack-512-sb16 simd-pack-512-sb32 simd-pack-512-sb64)
     #'equalp))

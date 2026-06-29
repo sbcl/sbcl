@@ -391,7 +391,7 @@
  ("src/compiler/target-dstate" :not-host)
  ("src/compiler/asm-target/insts")
  #+avx2 ("src/compiler/{arch}/avx2-insts")
- #+avx2 ("src/compiler/{arch}/avx512-insts")
+ #+avx512 ("src/compiler/{arch}/avx512-insts")
  ("src/compiler/{arch}/macros")
 
  ("src/assembly/{arch}/support")
@@ -400,6 +400,7 @@
  ("src/compiler/{arch}/float")
  #+sb-simd-pack ("src/compiler/{arch}/simd-pack")
  #+sb-simd-pack-256 ("src/compiler/{arch}/simd-pack-256")
+ #+sb-simd-pack-512 ("src/compiler/{arch}/simd-pack-512")
  ("src/compiler/{arch}/sap")
  ("src/compiler/{arch}/char")
  ("src/compiler/{arch}/system")

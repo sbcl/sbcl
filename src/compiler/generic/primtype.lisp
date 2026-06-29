@@ -194,6 +194,39 @@
          simd-pack-256-sb16
          simd-pack-256-sb32
          simd-pack-256-sb64)))
+#+sb-simd-pack-512
+(progn
+  (!def-primitive-type simd-pack-512-single (single-avx512-reg descriptor-reg)
+    :type (simd-pack-512 single-float))
+  (!def-primitive-type simd-pack-512-double (double-avx512-reg descriptor-reg)
+    :type (simd-pack-512 double-float))
+  (!def-primitive-type simd-pack-512-ub8 (int-avx512-reg descriptor-reg)
+    :type (simd-pack-512 (unsigned-byte 8)))
+  (!def-primitive-type simd-pack-512-ub16 (int-avx512-reg descriptor-reg)
+    :type (simd-pack-512 (unsigned-byte 16)))
+  (!def-primitive-type simd-pack-512-ub32 (int-avx512-reg descriptor-reg)
+    :type (simd-pack-512 (unsigned-byte 32)))
+  (!def-primitive-type simd-pack-512-ub64 (int-avx512-reg descriptor-reg)
+    :type (simd-pack-512 (unsigned-byte 64)))
+  (!def-primitive-type simd-pack-512-sb8 (int-avx512-reg descriptor-reg)
+    :type (simd-pack-512 (signed-byte 8)))
+  (!def-primitive-type simd-pack-512-sb16 (int-avx512-reg descriptor-reg)
+    :type (simd-pack-512 (signed-byte 16)))
+  (!def-primitive-type simd-pack-512-sb32 (int-avx512-reg descriptor-reg)
+    :type (simd-pack-512 (signed-byte 32)))
+  (!def-primitive-type simd-pack-512-sb64 (int-avx512-reg descriptor-reg)
+    :type (simd-pack-512 (signed-byte 64)))
+  (!def-primitive-type-alias simd-pack-512
+   '(:or simd-pack-512-single
+         simd-pack-512-double
+         simd-pack-512-ub8
+         simd-pack-512-ub16
+         simd-pack-512-ub32
+         simd-pack-512-ub64
+         simd-pack-512-sb8
+         simd-pack-512-sb16
+         simd-pack-512-sb32
+         simd-pack-512-sb64)))
 
 ;;; primitive other-pointer array types
 (/show0 "primtype.lisp 96")
@@ -498,6 +531,14 @@
            (if (= (logcount mask) 1)
                (values (primitive-type-or-lose
                         (svref +simd-pack-256-primtypes+ (simd-pack-mask->tag mask)))
+                       t)
+               (any))))
+        #+sb-simd-pack-512
+        (simd-pack-512-type
+         (let ((mask (simd-pack-512-type-tag-mask type)))
+           (if (= (logcount mask) 1)
+               (values (primitive-type-or-lose
+                        (svref +simd-pack-512-primtypes+ (simd-pack-mask->tag mask)))
                        t)
                (any))))
         (cons-type

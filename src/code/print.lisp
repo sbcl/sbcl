@@ -2067,6 +2067,56 @@ variable: an unreadable object representing the error is printed instead.")
              ((simd-pack-256 (signed-byte 64))
               (multiple-value-call #'format stream "~S~@{ ~20@D~}" 'simd-pack-256
                 (%simd-pack-256-sb64s pack))))))))
+
+#+sb-simd-pack-512
+(defmethod print-object ((pack simd-pack-512) stream)
+  (cond ((and *print-readably* *read-eval*)
+         (format stream "#.(~S #b~3,'0B #x~16,'0D #x~16,'0D #x~16,'0D #x~16,'0D #x~16,'0D #x~16,'0D #x~16,'0D #x~16,'0D)"
+                 '%make-simd-pack-512
+                 (%simd-pack-512-tag pack)
+                 (%simd-pack-512-0 pack)
+                 (%simd-pack-512-1 pack)
+                 (%simd-pack-512-2 pack)
+                 (%simd-pack-512-3 pack)
+                 (%simd-pack-512-4 pack)
+                 (%simd-pack-512-5 pack)
+                 (%simd-pack-512-6 pack)
+                 (%simd-pack-512-7 pack)))
+        (*print-readably*
+         (print-not-readable-error pack stream))
+        (t
+         (print-unreadable-object (pack stream)
+           (etypecase pack
+             ((simd-pack-512 double-float)
+              (multiple-value-call #'format stream "~S~@{ ~,13E~}" 'simd-pack-512
+                (%simd-pack-512-doubles pack)))
+             ((simd-pack-512 single-float)
+              (multiple-value-call #'format stream "~S~@{ ~,7E~}" 'simd-pack-512
+                (%simd-pack-512-singles pack)))
+             ((simd-pack-512 (unsigned-byte 8))
+              (multiple-value-call #'format stream "~S~@{ ~3D~}" 'simd-pack-512
+                (%simd-pack-512-ub8s pack)))
+             ((simd-pack-512 (unsigned-byte 16))
+              (multiple-value-call #'format stream "~S~@{ ~5D~}" 'simd-pack-512
+                (%simd-pack-512-ub16s pack)))
+             ((simd-pack-512 (unsigned-byte 32))
+              (multiple-value-call #'format stream "~S~@{ ~10D~}" 'simd-pack-512
+                (%simd-pack-512-ub32s pack)))
+             ((simd-pack-512 (unsigned-byte 64))
+              (multiple-value-call #'format stream "~S~@{ ~20D~}" 'simd-pack-512
+                (%simd-pack-512-ub64s pack)))
+             ((simd-pack-512 (signed-byte 8))
+              (multiple-value-call #'format stream "~S~@{ ~4@D~}" 'simd-pack-512
+                (%simd-pack-512-sb8s pack)))
+             ((simd-pack-512 (signed-byte 16))
+              (multiple-value-call #'format stream "~S~@{ ~6@D~}" 'simd-pack-512
+                (%simd-pack-512-sb16s pack)))
+             ((simd-pack-512 (signed-byte 32))
+              (multiple-value-call #'format stream "~S~@{ ~11@D~}" 'simd-pack-512
+                (%simd-pack-512-sb32s pack)))
+             ((simd-pack-512 (signed-byte 64))
+              (multiple-value-call #'format stream "~S~@{ ~20@D~}" 'simd-pack-512
+                (%simd-pack-512-sb64s pack))))))))
 
 ;;;; functions
 

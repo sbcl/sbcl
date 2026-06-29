@@ -118,6 +118,7 @@
   (def-type-predicate-wrapper single-float-p)
   #+sb-simd-pack (def-type-predicate-wrapper simd-pack-p)
   #+sb-simd-pack-256 (def-type-predicate-wrapper simd-pack-256-p)
+  #+sb-simd-pack-512 (def-type-predicate-wrapper simd-pack-512-p)
   (def-type-predicate-wrapper %instancep)
   (def-type-predicate-wrapper funcallable-instance-p)
   (def-type-predicate-wrapper symbolp)
@@ -211,7 +212,7 @@
                          :complexp (if (typep object 'simple-array) nil :maybe)
                          :element-type etype
                          :specialized-element-type etype))))
-    ((or complex #+sb-simd-pack simd-pack #+sb-simd-pack-256 simd-pack-256)
+    ((or complex #+sb-simd-pack simd-pack #+sb-simd-pack-256 simd-pack-256 #+sb-simd-pack-512 simd-pack-512)
      (type-specifier (ctype-of object)))
     (simple-fun 'compiled-function)
     (t

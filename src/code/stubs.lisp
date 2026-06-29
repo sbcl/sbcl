@@ -158,6 +158,12 @@
         (%make-simd-pack-256-double (a b c d))
         (%make-simd-pack-256-ub64 (a b c d))
         (%simd-pack-256-tag))
+  #+sb-simd-pack-512
+  (def* (%make-simd-pack-512 (tag p0 p1 p2 p3 p4 p5 p6 p7))
+        (%make-simd-pack-512-single (a b c d e f g h i j k l m n p q))
+        (%make-simd-pack-512-double (a b c d e f g h))
+        (%make-simd-pack-512-ub64 (a b c d e f g h))
+        (%simd-pack-512-tag))
   #+(or sb-thread x86-64) (def sb-vm::current-thread-offset-sap)
   (def current-sp ())
   (def current-fp ())
@@ -202,6 +208,20 @@
   (def %simd-pack-256-1)
   (def %simd-pack-256-2)
   (def %simd-pack-256-3))
+
+#+sb-simd-pack-512
+(macrolet ((def (name)
+             `(defun ,name (pack)
+                (sb-vm::simd-pack-512-dispatch pack
+                  (,name pack)))))
+  (def %simd-pack-512-0)
+  (def %simd-pack-512-1)
+  (def %simd-pack-512-2)
+  (def %simd-pack-512-3)
+  (def %simd-pack-512-4)
+  (def %simd-pack-512-5)
+  (def %simd-pack-512-6)
+  (def %simd-pack-512-7))
 
 (defun spin-loop-hint ()
   "Hints the processor that the current thread is spin-looping."

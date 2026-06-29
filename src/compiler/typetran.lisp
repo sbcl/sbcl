@@ -1203,6 +1203,16 @@
                    `(eql (%simd-pack-256-tag ,object) ,(sb-vm::simd-pack-mask->tag mask))
                    `(logbitp (%simd-pack-256-tag ,object) ,mask))))))
 
+#+sb-simd-pack-512
+(defun source-transform-simd-pack-512-typep (object type)
+  (let ((mask (simd-pack-512-type-tag-mask type)))
+    (if (= mask sb-kernel::+simd-pack-wild+)
+        `(simd-pack-512-p ,object)
+        `(and (simd-pack-512-p ,object)
+              ,(if (= (logcount mask) 1)
+                   `(eql (%simd-pack-512-tag ,object) ,(sb-vm::simd-pack-mask->tag mask))
+                   `(logbitp (%simd-pack-512-tag ,object) ,mask))))))
+
 ;;; Return the predicate and type from the most specific entry in
 ;;; *TYPE-PREDICATES* that is a supertype of TYPE.
 (defun find-supertype-predicate (type)
@@ -1753,6 +1763,9 @@
        #+sb-simd-pack-256
        (simd-pack-256-type
         (source-transform-simd-pack-256-typep object ctype))
+       #+sb-simd-pack-512
+       (simd-pack-512-type
+        (source-transform-simd-pack-512-typep object ctype))
        (t nil)))
    `(%typep ,object ',type)))
 

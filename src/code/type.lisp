@@ -1366,7 +1366,8 @@
                (loop for class in '(character-set classoid member named
                                     numeric-union
                                     #+sb-simd-pack simd-pack
-                                    #+sb-simd-pack-256 simd-pack-256)
+                                    #+sb-simd-pack-256 simd-pack-256
+                                    #+sb-simd-pack-512 simd-pack-512)
                      sum (ash 1 (type-class-name->id class))))
              (quick-fail-complex-= ()
                ;; Fail if neither arg is in a class that defines a COMPLEX-= method
@@ -5456,6 +5457,44 @@ expansion happened."
       (if (eql intersection 0) *empty-type* (%make-simd-pack-256-type intersection))))
 
   (!define-superclasses simd-pack-256 ((simd-pack-256)) !cold-init-forms))
+
+#+sb-simd-pack-512
+(progn
+  (define-type-class simd-pack-512 :enumerable nil :might-contain-other-types nil)
+
+  ;; Though this involves a recursive call to parser, parsing context need not
+  ;; be passed down, because an unknown-type condition is an immediate failure.
+  (def-type-translator simd-pack-512 (&optional (element-type-spec '*))
+    (simd-type-parser-helper element-type-spec 'simd-pack-512 #'%make-simd-pack-512-type))
+
+  (define-type-method (simd-pack-512 :negate) (type)
+    (let ((not-pack (make-negation-type (specifier-type 'simd-pack-512)))
+          (mask (logxor (simd-pack-512-type-tag-mask type) +simd-pack-wild+)))
+      (if (eql mask 0)
+          not-pack
+          (type-union not-pack (%make-simd-pack-512-type mask)))))
+
+  (define-type-method (simd-pack-512 :unparse) (flags type)
+    (simd-type-unparser-helper 'simd-pack-512 (simd-pack-512-type-tag-mask type)))
+
+  (define-type-method (simd-pack-512 :simple-subtypep) (type1 type2)
+    (declare (type simd-pack-512-type type1 type2))
+    (values (zerop (logandc2 (simd-pack-512-type-tag-mask type1)
+                             (simd-pack-512-type-tag-mask type2)))
+            t))
+
+  (define-type-method (simd-pack-512 :simple-union2) (type1 type2)
+    (declare (type simd-pack-512-type type1 type2))
+    (%make-simd-pack-512-type (logior (simd-pack-512-type-tag-mask type1)
+                                      (simd-pack-512-type-tag-mask type2))))
+
+  (define-type-method (simd-pack-512 :simple-intersection2) (type1 type2)
+    (declare (type simd-pack-512-type type1 type2))
+    (let ((intersection (logand (simd-pack-512-type-tag-mask type1)
+                                (simd-pack-512-type-tag-mask type2))))
+      (if (eql intersection 0) *empty-type* (%make-simd-pack-512-type intersection))))
+
+  (!define-superclasses simd-pack-512 ((simd-pack-512)) !cold-init-forms))
 
 ;;;; utilities shared between cross-compiler and target system
 

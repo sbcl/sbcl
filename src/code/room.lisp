@@ -990,6 +990,7 @@ We could try a few things to mitigate this:
             ,.(make-case '(or float (complex float) bignum
                            #+sb-simd-pack simd-pack
                            #+sb-simd-pack-256 simd-pack-256
+                           #+sb-simd-pack-512 simd-pack-512
                            system-area-pointer)) ; nothing to do
             ,.(make-case 'weak-pointer
                  #+weak-vector-readbarrier

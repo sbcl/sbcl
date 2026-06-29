@@ -74,6 +74,7 @@
 
     #+sb-simd-pack (simd-pack "unboxed")
     #+sb-simd-pack-256 (simd-pack-256 "unboxed")
+    #+sb-simd-pack-512 (simd-pack-512 "unboxed")
     (filler "filler" "lose" "filler")
 
     (simple-array "array")

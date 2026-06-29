@@ -4585,7 +4585,7 @@ static char *event_printf_format[] = {~{~%  ~S~^,~}~%};~%#endif~2%"
           (mapcar #'get-primitive-obj
                   '(bignum ratio single-float double-float
                     complex complex-single-float complex-double-float
-                    simd-pack simd-pack-256))))
+                    simd-pack simd-pack-256 simd-pack-512))))
 
 (defun write-c-headers (c-header-dir-name)
   (macrolet ((out-to (name &body body) ; write boilerplate and inclusion guard

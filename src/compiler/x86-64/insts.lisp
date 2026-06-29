@@ -21,12 +21,12 @@
   (import 'sb-assem::&prefix)
   ;; Imports from SB-VM into this package
   #+sb-simd-pack-256
-  (import '(sb-vm::int-avx2-reg sb-vm::double-avx2-reg sb-vm::single-avx2-reg))
+  (import '(sb-vm::ymm-reg sb-vm::int-avx2-reg sb-vm::double-avx2-reg sb-vm::single-avx2-reg))
+  #+sb-simd-pack-512
+  (import '(sb-vm::zmm-reg sb-vm::int-avx512-reg sb-vm::double-avx512-reg sb-vm::single-avx512-reg))
   (import '(sb-vm::tn-byte-offset sb-vm::tn-reg sb-vm::reg-name
             sb-vm::frame-byte-offset sb-vm::rip-tn sb-vm::rbp-tn
             sb-vm::gpr-tn-p sb-vm::stack-tn-p sb-c::tn-reads sb-c::tn-writes
-            sb-vm::ymm-reg sb-vm::zmm-reg
-            sb-vm::int-avx512-reg sb-vm::double-avx512-reg sb-vm::single-avx512-reg
             sb-vm::linkage-addr->name
             sb-vm::registers sb-vm::float-registers sb-vm::stack))) ; SB names
 
@@ -1030,6 +1030,13 @@
 ;;; Return true if THING is an XMM register.
 (defun xmm-register-p (thing)
   (and (register-p thing) (not (is-gpr-id-p (reg-id thing)))))
+;;; Return true if THING is an YMM register.
+(defun ymm-register-p (thing)
+  (and (register-p thing) (is-ymm-id-p (reg-id thing))))
+
+;;; Return true if THING is an ZMM register.
+(defun zmm-register-p (thing)
+  (and (register-p thing) (is-zmm-id-p (reg-id thing))))
 
 ;;; Return true if THING is AL, AX, EAX, or RAX
 (defun accumulator-p (thing)
@@ -1105,14 +1112,14 @@
   (ecase regset
     (:xmm
      (svref (load-time-value
-             (coerce (loop for i from 0 below 16
+             (coerce (loop for i from 0 below 32
                         collect (!make-reg (make-fpr-id i :xmm)))
                      'vector)
              t)
             number))
     (:ymm
      (svref (load-time-value
-             (coerce (loop for i from 0 below 16
+             (coerce (loop for i from 0 below 32
                         collect (!make-reg (make-fpr-id i :ymm)))
                      'vector)
              t)
@@ -3356,7 +3363,11 @@
       #+(and sb-simd-pack-256 (not sb-xc-host))
       (simd-pack-256
        (setq constant
-             (sb-vm::%simd-pack-256-inline-constant first)))))
+             (sb-vm::%simd-pack-256-inline-constant first)))
+      #+(and sb-simd-pack-512 (not sb-xc-host))
+      (simd-pack-512
+       (setq constant
+             (sb-vm::%simd-pack-512-inline-constant first)))))
   (destructuring-bind (type value) constant
     (ecase type
       ((:byte :word :dword :qword)

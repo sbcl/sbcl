@@ -1101,6 +1101,14 @@ between the ~A definition and the ~A definition"
       ;; KLUDGE: doesn't work without AVX2 support from the CPU
       ;; (%make-simd-pack-256-ub64 42 42 42 42)
       sb-pcl:+slot-unbound+)
+     #+sb-simd-pack-512
+     (simd-pack-512
+      :translation simd-pack-512
+      :codes (,sb-vm:simd-pack-512-widetag)
+      :prototype-form
+      ;; KLUDGE: doesn't work without AVX512 support from the CPU
+      ;; (%make-simd-pack-512-ub64 42 42 42 42 42 42 42 42)
+      sb-pcl:+slot-unbound+)
      (real :translation real :inherits (number) :prototype-form 0)
      (float :translation float :inherits (real number) :prototype-form 0f0)
      (single-float

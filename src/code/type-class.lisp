@@ -347,6 +347,8 @@
       (simd-pack     simd-pack-type)
       #+sb-simd-pack-256
       (simd-pack-256 simd-pack-256-type)
+      #+sb-simd-pack-512
+      (simd-pack-512 simd-pack-512-type)
       ;; clearly alien-type-type is not consistent with the (FOO FOO-TYPE) theme
       (alien         alien-type-type)))
   (defun ctype-instance->type-class (name)
@@ -748,7 +750,7 @@
                           ,(ecase name ; Compute or propagate the flag bits
                              (hairy-type ctype-contains-hairy)
                              (unknown-type (logior ctype-contains-unknown ctype-contains-hairy))
-                             ((simd-pack-type simd-pack-256-type alien-type-type) 0)
+                             ((simd-pack-type simd-pack-256-type simd-pack-512-type alien-type-type) 0)
                              (negation-type '(type-flags type))
                              (array-type '(type-flags element-type)))
                           ,@(cdr private-ctor-args))))))))
@@ -1269,6 +1271,14 @@
 #+sb-simd-pack-256
 (def-type-model (simd-pack-256-type
                  (:constructor* %make-simd-pack-256-type (tag-mask)))
+  (tag-mask (missing-arg)
+   :test = :hasher identity ; the tag-mask is its own hash
+   :type (and (unsigned-byte #.(length +simd-pack-element-types+))
+              (not (eql 0)))))
+
+#+sb-simd-pack-512
+(def-type-model (simd-pack-512-type
+                 (:constructor* %make-simd-pack-512-type (tag-mask)))
   (tag-mask (missing-arg)
    :test = :hasher identity ; the tag-mask is its own hash
    :type (and (unsigned-byte #.(length +simd-pack-element-types+))

@@ -105,6 +105,9 @@ static int readonly_unboxed_obj_p(lispobj* obj)
 #ifdef SIMD_PACK_256_WIDETAG
     case SIMD_PACK_256_WIDETAG:
 #endif
+#ifdef SIMD_PACK_512_WIDETAG
+    case SIMD_PACK_512_WIDETAG:
+#endif
         return 1;
     case RATIO_WIDETAG: case COMPLEX_RATIONAL_WIDETAG:
         return fixnump(obj[1]) && fixnump(obj[2]);

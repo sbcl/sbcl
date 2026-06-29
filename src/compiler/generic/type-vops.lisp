@@ -187,6 +187,8 @@
 (define-type-vop simd-pack-p (simd-pack-widetag))
 #+sb-simd-pack-256
 (define-type-vop simd-pack-256-p (simd-pack-256-widetag))
+#+sb-simd-pack-512
+(define-type-vop simd-pack-512-p (simd-pack-512-widetag))
 
 ;;; Not type vops, but generic over all backends
 (macrolet ((def (name lowtag)

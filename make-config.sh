@@ -735,7 +735,7 @@ case "$sbcl_arch" in
     fi
     ;;
   x86-64)
-    printf ' :sb-simd-pack :sb-simd-pack-256 :avx2' >> $ltf # not mandatory
+    printf ' :sb-simd-pack :sb-simd-pack-256 :avx2 :sb-simd-pack-512 :avx512' >> $ltf # not mandatory
 
     if $android; then
         $GNUMAKE -C tools-for-build avx2 2> /dev/null

@@ -102,6 +102,10 @@
     (simd-pack-256-type
      (and (simd-pack-256-p object)
           (logbitp (%simd-pack-256-tag object) (simd-pack-256-type-tag-mask type))))
+    #+sb-simd-pack-512
+    (simd-pack-512-type
+     (and (simd-pack-512-p object)
+          (logbitp (%simd-pack-512-tag object) (simd-pack-512-type-tag-mask type))))
     (character-set-type
      (test-character-type type))
     (negation-type
@@ -278,7 +282,8 @@
          member-type
          character-set-type
          #+sb-simd-pack simd-pack-type
-         #+sb-simd-pack-256 simd-pack-256-type)
+         #+sb-simd-pack-256 simd-pack-256-type
+          #+sb-simd-pack-512 simd-pack-512-type)
      (values (%%typep obj type)
              t))
     (array-type
@@ -478,6 +483,8 @@ Experimental."
       (simd-pack (simd-subtype (%simd-pack-tag x) simd-pack))
       #+sb-simd-pack-256
       (simd-pack-256 (simd-subtype (%simd-pack-256-tag x) simd-pack-256))
+      #+sb-simd-pack-512
+      (simd-pack-512 (simd-subtype (%simd-pack-512-tag x) simd-pack-512))
       (t
        (classoid-of x)))))
 

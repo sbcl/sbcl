@@ -233,6 +233,83 @@ os_context_ymm_register_addr(os_context_t *context, int offset)
 #endif
 }
 
+#define _YMM   2
+#define _KMM   5
+#define _ZMM   6
+#define _ZMMHI 7
+
+/**
+ * Resolves the byte offset of an extended xstate.
+ */
+static int32_t _xfeature_offset(uint64_t xcomp_bv, int xfeature) {
+    // If bit 63 is 0, the kernel is running in legacy UNCOMPACTED mode
+    if ((xcomp_bv & (1ull << 63)) == 0) {
+        switch (xfeature) {
+            case _YMM:   return 576;
+            case _KMM:   return 1088;
+            case _ZMM:   return 1152;
+            case _ZMMHI: return 2112;
+            default:     return -1;
+        }
+    }
+
+    // Compacted mode boundary validation
+    if ((xcomp_bv & (1ull << xfeature)) == 0)
+        return -2; // not currently allocated or tracked
+
+    // Packed streams start immediately after the 64-byte XSAVE header
+    int32_t offset = 512 + 64;
+
+    for (int i = 2; i < xfeature; i++) {
+        if (xcomp_bv & (1ull << i)) {
+
+            if (i == _ZMM || i == _ZMMHI)
+              offset = ALIGN_UP(offset, 64);
+
+            switch (i) {
+                case _YMM:   offset += 256;  break; // 16 bytes * 16 registers
+                case _KMM:   offset += 64;   break; //  8 bytes * 8  registers
+                case _ZMM:   offset += 512;  break; // 32 bytes * 16 registers
+                case _ZMMHI: offset += 1024; break; // 64 bytes * 16 registers
+                default: break;
+            }
+        }
+    }
+
+    if (xfeature == _ZMM || xfeature == _ZMMHI)
+      offset = ALIGN_UP(offset, 64);
+
+    return offset;
+}
+
+uint32_t *
+os_context_zmm_register_addr(os_context_t *context, int reg)
+{
+    if (!context || !context->uc_mcontext.fpregs)
+        return NULL;
+
+    uint8_t *xstate_base = (uint8_t *)context->uc_mcontext.fpregs;
+
+     /* Read the tracking vector from the XSAVE header (offset 520) */
+    uint64_t xcomp_bv = *(uint64_t *)(xstate_base + 512 + 8);
+
+     /* pointer to the upper 256 bits (Bits 256-511) */
+    if (reg >= 0 && reg < 16) {
+        int32_t offset = _xfeature_offset(xcomp_bv, _ZMM);
+        if (offset < 0) return NULL;
+        return (uint32_t *)(xstate_base + offset + (reg * 32));
+    }
+
+     /* ZMM16 to ZMM31 - 512-bit linear layout (Bits 0-511) */
+    else if (reg > 15 && reg < 32) {
+        int32_t offset = _xfeature_offset(xcomp_bv, _ZMMHI);
+        if (offset < 0) return NULL;
+        return (uint32_t *)(xstate_base + offset + ((reg - 16) * 64));
+    }
+
+    return NULL;
+}
+
 sigset_t *
 os_context_sigmask_addr(os_context_t *context)
 {

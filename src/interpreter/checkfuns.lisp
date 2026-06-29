@@ -58,7 +58,8 @@
            ((or named-type numeric-union-type member-type classoid
                 character-set-type unknown-type hairy-type
                 alien-type-type #+sb-simd-pack simd-pack-type
-                                #+sb-simd-pack-256 simd-pack-256-type)
+                                #+sb-simd-pack-256 simd-pack-256-type
+                                #+sb-simd-pack-512 simd-pack-512-type)
             type)
            (fun-designator-type (specifier-type '(or function symbol)))
            (fun-type (specifier-type 'function))

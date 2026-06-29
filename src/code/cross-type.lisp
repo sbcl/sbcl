@@ -135,7 +135,8 @@
        ;; But the empty (OR) should match nothing, so, what's up with that?
        ;; Maybe we can define host-side types named simd-pack-blah deftyped to NIL?
        ((or #+sb-simd-pack simd-pack-type
-            #+sb-simd-pack-256 simd-pack-256-type)
+            #+sb-simd-pack-256 simd-pack-256-type
+            #+sb-simd-pack-512 simd-pack-512-type)
         (values nil t))
        (character-set-type
         ;; provided that CHAR-CODE doesn't fail, the answer is certain
