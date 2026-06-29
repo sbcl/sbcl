@@ -78,16 +78,17 @@
    (fp-immediate) (double-reg)
    (fp-immediate) (complex-single-reg)
    (fp-immediate) (complex-double-reg))
-  (if (member (tn-value x) '(0f0 0d0 #c(0d0 0d0) #c(0f0 0f0)))
-      (sc-case y
-        ((single-reg complex-single-reg) (inst xorps y y))
-        ((double-reg complex-double-reg) (inst xorpd y y)))
-      (let ((x (register-inline-constant (tn-value x))))
+  (let ((x (tn-value x)))
+    (if (member x '(0f0 0d0 #c(0d0 0d0) #c(0f0 0f0)))
         (sc-case y
-          (single-reg (inst movss y x))
-          (double-reg (inst movsd y x))
-          (complex-single-reg (inst movq y x))
-          (complex-double-reg (inst movapd y x))))))
+          ((single-reg complex-single-reg) (inst xorps y y))
+          ((double-reg complex-double-reg) (inst xorpd y y)))
+        (let ((c (register-inline-constant x)))
+          (etypecase x
+            (single-float (inst movss y c))
+            (double-float (inst movsd y c))
+            (complex-single-float (inst movq y c))
+            (complex-double-float (inst movupd y c)))))))
 
 (define-move-fun (load-single 2) (vop x y)
   ((single-stack) (single-reg))
