@@ -342,12 +342,10 @@
                   (:arg-types ,ptype ,ptype)
                   (:result-types ,ptype))
                 (define-vop (,comm-name float-op)
-                  (:args (x :scs (,sc fp-immediate)
-                            :target r
-                            :load-if (not (sc-is x fp-immediate)))
+                  (:args (x :scs (,sc)
+                            :target r)
                          (y :scs (,sc fp-immediate)
-                            :target r
-                            :load-if (not (sc-is y fp-immediate))))
+                            :target r))
                   (:results (r :scs (,sc)))
                   (:arg-types ,ptype ,ptype)
                   (:result-types ,ptype)))))
@@ -475,11 +473,9 @@
                           `(define-vop (,real-complex-name float-op)
                              (:translate ,op)
                              (:args (x :scs (,real-sc fp-immediate)
-                                       :target r
-                                       :load-if (not (sc-is x fp-immediate)))
+                                       :target r)
                                     (y :scs (,complex-sc fp-immediate)
-                                       ,@(when commutativep '(:target r))
-                                       :load-if (not (sc-is y fp-immediate))))
+                                       ,@(when commutativep '(:target r))))
                              (:arg-types ,real-type ,complex-type)
                              (:results (r :scs (,complex-sc)
                                           ,@(unless commutativep '(:from (:argument 0)))))
@@ -500,11 +496,9 @@
                           `(define-vop (,complex-real-name float-op)
                              (:translate ,op)
                              (:args (x :scs (,complex-sc fp-immediate)
-                                       :target r
-                                       :load-if (not (sc-is x fp-immediate)))
+                                       :target r)
                                     (y :scs (,real-sc fp-immediate)
-                                       ,@(when commutativep '(:target r))
-                                       :load-if (not (sc-is y fp-immediate))))
+                                       ,@(when commutativep '(:target r))))
                              (:arg-types ,complex-type ,real-type)
                              (:results (r :scs (,complex-sc)
                                           ,@(unless commutativep '(:from (:argument 0)))))
@@ -526,12 +520,10 @@
                           `(define-vop (,real-complex-name float-op)
                              (:translate ,op)
                              (:args (x :scs (,real-sc fp-immediate)
-                                       :target dup
-                                       :load-if (not (sc-is x fp-immediate)))
+                                       :target dup)
                                     (y :scs (,complex-sc fp-immediate)
                                        :target r
-                                       :to  :result
-                                       :load-if (not (sc-is y fp-immediate))))
+                                       :to :result))
                              (:arg-types ,real-type ,complex-type)
                              (:temporary (:sc ,complex-sc :target r
                                           :from (:argument 0)
@@ -569,11 +561,9 @@
                              (:translate ,op)
                              (:args (x :scs (,complex-sc fp-immediate)
                                        :target r
-                                       :to  :result
-                                       :load-if (not (sc-is x fp-immediate)))
+                                       :to :result)
                                     (y :scs (,real-sc fp-immediate)
-                                       :target dup
-                                       :load-if (not (sc-is y fp-immediate))))
+                                       :target dup))
                              (:arg-types ,complex-type ,real-type)
                              (:temporary (:sc ,complex-sc :target r
                                           :from (:argument 1)
@@ -611,11 +601,9 @@
                           `(define-vop (,real-complex-name float-op)
                              (:translate ,op)
                              (:args (x :scs (,real-sc fp-immediate)
-                                       :target r
-                                       :load-if (not (sc-is x fp-immediate)))
+                                       :target r)
                                     (y :scs (,complex-sc fp-immediate)
-                                       :to :result
-                                       :load-if (not (sc-is y fp-immediate))))
+                                       :to :result))
                              (:arg-types ,real-type ,complex-type)
                              (:results (r :scs (,complex-sc) :from (:argument 0)))
                              (:result-types ,complex-type)
@@ -641,8 +629,7 @@
                                        :target r
                                        :to :eval)
                                     (y :scs (,real-sc fp-immediate)
-                                       :target dup
-                                       :load-if (not (sc-is y fp-immediate))))
+                                       :target dup))
                              (:arg-types ,complex-type ,real-type)
                              (:temporary (:sc ,complex-sc :from (:argument 1))
                                          dup)
@@ -700,11 +687,9 @@
   (:translate /)
   (:args (x :scs (complex-single-reg fp-immediate)
             :to (:result 0)
-            :target r
-            :load-if (not (sc-is x fp-immediate)))
+            :target r)
          (y :scs (single-reg fp-immediate)
-            :target dup
-            :load-if (not (sc-is y fp-immediate))))
+            :target dup))
   (:arg-types complex-single-float single-float)
   (:temporary (:sc complex-single-reg :from (:argument 1)) dup)
   (:results (r :scs (complex-single-reg)))
@@ -935,23 +920,19 @@
 
 (define-vop (single-float-compare float-compare)
   (:args (x :scs (single-reg))
-         (y :scs (single-reg single-stack fp-immediate)
-            :load-if (not (sc-is y single-stack fp-immediate))))
+         (y :scs (single-reg single-stack fp-immediate)))
   (:arg-types single-float single-float))
 (define-vop (double-float-compare float-compare)
   (:args (x :scs (double-reg))
-         (y :scs (double-reg double-stack descriptor-reg fp-immediate)
-            :load-if (not (sc-is y double-stack descriptor-reg fp-immediate))))
+         (y :scs (double-reg double-stack descriptor-reg fp-immediate)))
   (:arg-types double-float double-float))
 
 (define-vop (=/single-float single-float-compare)
   (:translate =)
   (:args (x :scs (single-reg single-stack fp-immediate)
-            :target xmm
-            :load-if (not (sc-is x single-stack fp-immediate)))
+            :target xmm)
          (y :scs (single-reg single-stack fp-immediate)
-            :target xmm
-            :load-if (not (sc-is y single-stack fp-immediate))))
+            :target xmm))
   (:temporary (:sc single-reg :from :eval) xmm)
   (:conditional not :p :ne)
   (:vop-var vop)
@@ -978,12 +959,10 @@
 
 (define-vop (=/double-float double-float-compare)
   (:translate =)
-  (:args (x :scs (double-reg double-stack fp-immediate descriptor-reg)
-            :target xmm
-            :load-if (not (sc-is x double-stack fp-immediate descriptor-reg)))
+  (:args (x :scs (double-reg double-stack descriptor-reg)
+            :target xmm)
          (y :scs (double-reg double-stack fp-immediate descriptor-reg)
-            :target xmm
-            :load-if (not (sc-is y double-stack fp-immediate descriptor-reg))))
+            :target xmm))
   (:temporary (:sc double-reg :from :eval) xmm)
   (:conditional not :p :ne)
   (:vop-var vop)
@@ -1018,12 +997,10 @@
              `(progn
                 (define-vop (,complex-complex-name float-compare)
                   (:translate =)
-                  (:args (x :scs (,complex-sc fp-immediate)
-                            :target cmp
-                            :load-if (not (sc-is x fp-immediate)))
+                  (:args (x :scs (,complex-sc)
+                            :target cmp)
                          (y :scs (,complex-sc fp-immediate)
-                            :target cmp
-                            :load-if (not (sc-is y fp-immediate))))
+                            :target cmp))
                   (:arg-types ,complex-type ,complex-type)
                   (:temporary (:sc ,complex-sc :from :eval) cmp)
                   (:temporary (:sc unsigned-reg) bits)
@@ -1045,19 +1022,15 @@
                     (inst cmp :byte bits ,mask)))
                 (define-vop (,complex-real-name ,complex-complex-name)
                   (:args (x :scs (,complex-sc fp-immediate)
-                            :target cmp
-                            :load-if (not (sc-is x fp-immediate)))
+                            :target cmp)
                          (y :scs (,real-sc fp-immediate)
-                            :target cmp
-                            :load-if (not (sc-is y fp-immediate))))
+                            :target cmp))
                   (:arg-types ,complex-type ,real-type))
                 (define-vop (,real-complex-name ,complex-complex-name)
                   (:args (x :scs (,real-sc fp-immediate)
-                            :target cmp
-                            :load-if (not (sc-is x fp-immediate)))
+                            :target cmp)
                          (y :scs (,complex-sc fp-immediate)
-                            :target cmp
-                            :load-if (not (sc-is y fp-immediate))))
+                            :target cmp))
                   (:arg-types ,real-type ,complex-type)))))
   (define-complex-float-= =/complex-single-float =/complex-real-single-float =/real-complex-single-float
     single-reg  single-float
