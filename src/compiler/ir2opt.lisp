@@ -341,6 +341,12 @@
                         do
                         (let ((next (tn-ref-next ref)))
                           (change-tn-ref-tn ref y)
+                          (setf ref next)))
+                  (loop with ref = (tn-reads x)
+                        while ref
+                        do
+                        (let ((next (tn-ref-next ref)))
+                          (change-tn-ref-tn ref y)
                           (setf ref next))))
                 (delete-vop vop)
                 ;; Deleting the copy may make it look like that register
