@@ -214,15 +214,15 @@
 ;;; Primary composition information is stored in a hash table local to
 ;;; PRIMARY-COMPOSITION, with (+ (ash codepoint1 21) codepoint2) as
 ;;; keys and the composition as the value
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (sb-c:defknown misc-index (character) (integer 0 #.(- (length sb-unicode::+character-misc-database+) +misc-width+))
+      (sb-c:foldable sb-c:flushable sb-c::no-verify-arg-count)
+    :overwrite-fndb-silently t))
 
 (defun misc-index (char)
   (misc-index-from-char-code (char-code char)
                              sb-unicode::+character-high-pages+
                              sb-unicode::+character-low-pages+))
-
-(aver (csubtypep (global-ftype 'misc-index)
-                 (specifier-type '(sfunction (t) (unsigned-byte 16)))))
-(proclaim `(ftype ,(type-specifier (global-ftype 'misc-index)) misc-index))
 
 (declaim (ftype (sfunction (t) (unsigned-byte 8)) ucd-general-category)
          (inline ucd-general-category))
