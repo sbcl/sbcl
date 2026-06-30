@@ -270,7 +270,7 @@ where a is the intended low-order byte and d the high-order byte."
 
 (deftype md5-regs ()
   "The working state of the MD5 algorithm, which contains the 4 32-bit
-registers `\\\\A`, `\\\\B`, `\\\\C` and `\\\\D`."
+registers A, B, C and D."
   `(ub32-vector 4))
 
 (defmacro md5-regs-a (regs)
@@ -286,13 +286,13 @@ registers `\\\\A`, `\\\\B`, `\\\\C` and `\\\\D`."
   `(ub32-aref ,regs 3))
 
 (defconstant +md5-magic-a+ (assemble-ub32 #x01 #x23 #x45 #x67)
-  "Initial value of Register `\\\\A` of the MD5 working state.")
+  "Initial value of Register A of the MD5 working state.")
 (defconstant +md5-magic-b+ (assemble-ub32 #x89 #xab #xcd #xef)
-  "Initial value of Register `\\\\B` of the MD5 working state.")
+  "Initial value of Register B of the MD5 working state.")
 (defconstant +md5-magic-c+ (assemble-ub32 #xfe #xdc #xba #x98)
-  "Initial value of Register `\\\\C` of the MD5 working state.")
+  "Initial value of Register C of the MD5 working state.")
 (defconstant +md5-magic-d+ (assemble-ub32 #x76 #x54 #x32 #x10)
-  "Initial value of Register `\\\\D` of the MD5 working state.")
+  "Initial value of Register D of the MD5 working state.")
 
 (declaim (inline initial-md5-regs))
 (defun initial-md5-regs ()
@@ -314,8 +314,8 @@ registers `\\\\A`, `\\\\B`, `\\\\C` and `\\\\D`."
 
 (defun update-md5-block (regs block)
   "This is the core part of the MD5 algorithm.  It takes a complete 16
-word block of input, and updates the working state in `\\\\A`,
-`\\\\B`, `\\\\C`, and `\\\\D` accordingly."
+word block of input, and updates the working state in registers A,
+B, C, and D accordingly."
   (declare (type md5-regs regs)
            (type md5-block block)
            (optimize (speed 3) (safety 0) (space 0) (debug 0) #+lw-int32 (float 0)))
