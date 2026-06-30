@@ -1,58 +1,5 @@
 (in-package :sb-manual)
 
-;;; Before processing Markdown, the docstring indentation is
-;;; normalized by stripping the longest run of leading spaces common
-;;; to all non-blank lines except the first. This is compatible with
-;;; PAX (see PAX::@MARKDOWN-SUPPORT).
-(defun reindent-docstring (docstring)
-  (let ((indentation (docstring-indentation docstring)))
-    (strip-docstring-indent docstring indentation t)))
-
-
-;;;; Utilities lifted from DRef and MGL-PAX
-
-;;; Return the minimum number of leading spaces in non-blank lines
-;;; after the first.
-(defun docstring-indentation (docstring &key (first-line-special-p t))
-  (let ((n-min-indentation nil))
-    (with-input-from-string (s docstring)
-      (loop for i upfrom 0
-            for line = (read-line s nil nil)
-            while line
-            do (when (and (or (not first-line-special-p) (plusp i))
-                          (not (blankp line)))
-                 (when (or (null n-min-indentation)
-                           (< (n-leading-spaces line) n-min-indentation))
-                   (setq n-min-indentation (n-leading-spaces line))))))
-    (or n-min-indentation 0)))
-
-(defun n-leading-spaces (line)
-  (let ((n 0))
-    (loop for i below (length line)
-          while (char= (aref line i) #\Space)
-          do (incf n))
-    n))
-
-(defun subseq* (seq start)
-  (subseq seq (min (length seq) start)))
-
-(defun strip-docstring-indent (docstring indentation first-line-special-p)
-  (with-output-to-string (out)
-    (with-input-from-string (s docstring)
-      (loop for i upfrom 0
-            do (multiple-value-bind (line missing-newline-p)
-                   (read-line s nil nil)
-                 (unless line
-                   (return))
-                 (write-string (if (and first-line-special-p
-                                        (zerop i))
-                                   line
-                                   (subseq* line indentation))
-                               out)
-                 (unless missing-newline-p
-                   (terpri out)))))))
-
-
 ;;;; Determining the package for parsing docstrings
 ;;;;
 ;;;; The package for parsing is the package that was in effect when

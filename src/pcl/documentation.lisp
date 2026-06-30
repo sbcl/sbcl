@@ -216,7 +216,45 @@
                 (t
                  x)))
         (documentation (call-next-method)))
-    (maybe-add-deprecation-note namespace name documentation)))
+    (maybe-add-deprecation-note namespace name
+                                (normalize-sbcl-docstring x name doc-type
+                                                          documentation))))
+
+(defvar *normalize-sbcl-docstrings* t)
+
+(defun normalize-sbcl-docstring (object name doc-type docstring)
+  (if (and *normalize-sbcl-docstrings*
+           docstring
+           (sbcl-definition-name-p object name doc-type))
+      (string-right-trim '(#\Newline) (markdown-to-plain-text
+                                       (reindent-docstring docstring)))
+      docstring))
+
+(defun non-setf-name (name)
+  (if (and (consp name)
+           (eq (first name) 'setf)
+           (consp (cdr name)))
+      (second name)
+      name))
+
+(defun sbcl-package-name-p (name)
+  (when (stringp name)
+    (or (string= name "COMMON-LISP")
+        (and (>= (length name) 3)
+             (string= name "SB-" :end1 3)))))
+
+(defun sbcl-definition-name-p (object name doc-type)
+  (and (member doc-type '(t compiler-macro function method-combination setf
+                          structure type variable declaration))
+       (if (and (packagep object) (eq doc-type t))
+           (sbcl-package-name-p (package-name name))
+           (let ((name (non-setf-name name)))
+             (if (null name)
+                 (null object)
+                 (when (symbolp name)
+                   (let ((package (symbol-package name)))
+                     (when package
+                       (sbcl-package-name-p (package-name package))))))))))
 
 ;;; functions, macros, and special forms
 
@@ -467,3 +505,210 @@ comparison.")
 
 (dolist (args (prog1 *!docstrings* (makunbound '*!docstrings*)))
   (apply #'(setf documentation) args))
+
+;;;; Markdown to plain text along the lines of SB-MANUAL::MARKDOWN-TO-TEXINFO
+
+(defun markdown-to-plain-text (string)
+  (markdown-lines-to-plain-text (string-lines string) 0))
+
+(defun markdown-lines-to-plain-text (lines base-indent)
+  (with-output-to-string (out)
+    (let ((buf nil))
+      (labels ((flush ()
+                 (write-md-paragraph buf out)
+                 (setq buf nil)))
+        (loop for l below (length lines)
+              for line = (svref lines l)
+              do (let ((n (write-md-block lines l base-indent out #'flush)))
+                   (if n
+                       (incf l (1- n))
+                       (push line buf))))
+        (flush)))))
+
+(defun string-lines (string)
+  (coerce (with-input-from-string (s string)
+            (loop for line = (read-line s nil nil)
+                  while line collect line))
+          'vector))
+
+(defun whitespacep (char)
+  (find char #(#\Tab #\Space #\Page #\Newline #\Return)))
+
+(defun indentation (line)
+  (position-if-not #'whitespacep line))
+
+(defun blankp (line)
+  (null (indentation line)))
+
+(defun write-md-paragraph (reversed-lines out)
+  (when reversed-lines
+    (let* ((str (format nil "~{~A~^~%~}" (reverse reversed-lines)))
+           (len (length str))
+           (bound t))
+      (loop for i below len
+            for c = (char str i)
+            do (cond
+                 ((and bound (char= c #\\))
+                  (when (and (< (1+ i) len)
+                             (char= (char str (1+ i)) #\\))
+                    (incf i))
+                  (setf bound nil))
+                 ((char= c #\`)
+                  (incf i)
+                  (loop repeat 2
+                        while (< i len)
+                        while (char= (char str i) #\\)
+                        do (incf i))
+                  (loop while (< i len)
+                        while (char/= (char str i) #\`)
+                        do (write-char (char str i) out)
+                           (incf i))
+                  (setq bound nil))
+                 (t
+                  (write-char c out)
+                  (setq bound (whitespacep c)))))
+      (terpri out))))
+
+(defun write-md-block (lines index base-indent out flush-fn)
+  (or (write-md-fenced-code lines index base-indent out flush-fn)
+      (write-md-indented-code lines index base-indent out flush-fn)
+      (write-md-blockquote lines index base-indent out flush-fn)
+      (write-md-markdown-itemize lines index base-indent out flush-fn)))
+
+(defun write-md-fenced-code (lines start base-indent out flush-fn)
+  (declare (ignore base-indent))
+  (let* ((line (svref lines start))
+         (i (indentation line)))
+    (when (and i (>= (length line) (+ i 3))
+               (string= line "```" :start1 i :end1 (+ i 3)))
+      (funcall flush-fn)
+      (loop for l from (1+ start) below (length lines)
+            for line = (svref lines l)
+            for ind = (indentation line)
+            if (and ind (>= (length line) (+ ind 3))
+                    (string= line "```" :start1 ind :end1 (+ ind 3)))
+              do (return (- (1+ l) start))
+            else do (write-line line out)
+            finally (return (- l start))))))
+
+(defun write-md-indented-code (lines start base-indent out flush-fn)
+  (when (or (zerop start)
+            (blankp (svref lines (1- start))))
+    (let ((i (indentation (svref lines start))))
+      (when (and i (>= i (+ base-indent 4)))
+        (funcall flush-fn)
+        (loop for l from start below (length lines)
+              for line = (svref lines l)
+              for ind = (indentation line)
+              while (or (null ind)
+                        (>= ind (+ base-indent 4)))
+              do (write-line line out)
+              finally (return (- l start)))))))
+
+(defun write-md-blockquote (lines start base-indent out flush-fn)
+  (when (or (zerop start)
+            (blankp (svref lines (1- start))))
+    (let ((i (indentation (svref lines start))))
+      (when (and i (<= i (+ base-indent 3))
+                 (char= (char (svref lines start) i) #\>))
+        (funcall flush-fn)
+        (let (stripped prefixes)
+          (loop for l from start below (length lines)
+                for line = (svref lines l)
+                for ind = (indentation line)
+                while (and ind (<= ind (+ base-indent 3))
+                           (char= (char line ind) #\>))
+                do (let ((c-start (if (and (< (1+ ind) (length line))
+                                           (char= (char line (1+ ind)) #\Space))
+                                      (+ ind 2) (1+ ind))))
+                     (push (subseq line c-start) stripped)
+                     (push (subseq line 0 c-start) prefixes)))
+          (let ((inner (markdown-lines-to-plain-text
+                        (coerce (nreverse stripped) 'vector) 0)))
+            (loop for prefix in (nreverse prefixes)
+                  for line across (string-lines inner)
+                  do (write-string prefix out)
+                     (write-line line out)))
+          (length prefixes))))))
+
+(defun maybe-itemize-offset (line)
+  (let ((i (indentation line)))
+    (when (and i (< (1+ i) (length line))
+               (find (char line i) "-*")
+               (char= (char line (1+ i)) #\Space))
+      i)))
+
+(defun write-md-markdown-itemize (lines start base-indent out flush-fn)
+  (when (eql (maybe-itemize-offset (svref lines start)) base-indent)
+    (funcall flush-fn)
+    (let ((child (+ base-indent 4))
+          (buf nil))
+      (labels ((flush ()
+                 (write-md-paragraph buf out)
+                 (setq buf nil)))
+        (loop for l from start below (length lines)
+              for line = (svref lines l)
+              for ind = (indentation line)
+              do (cond ((blankp line)
+                        (flush)
+                        (write-line line out))
+                       ((eql (maybe-itemize-offset line) base-indent)
+                        (flush)
+                        (push line buf))
+                       ((>= ind child)
+                        (let ((n (write-md-block lines l child out #'flush)))
+                          (if n
+                              (incf l (1- n))
+                              (push line buf))))
+                       ((> ind base-indent)
+                        (push line buf))
+                       (t
+                        (loop-finish)))
+              finally (flush)
+                      (return (- l start)))))))
+
+
+;;; Normalize docstring indentation by stripping the longest run of
+;;; leading spaces common to all non-blank lines except the first.
+(defun reindent-docstring (docstring)
+  (let ((indentation (docstring-indentation docstring)))
+    (strip-docstring-indent docstring indentation t)))
+
+;;; Return the minimum number of leading spaces in non-blank lines
+;;; after the first.
+(defun docstring-indentation (docstring &key (first-line-special-p t))
+  (let ((n-min-indentation nil))
+    (with-input-from-string (s docstring)
+      (loop for i upfrom 0
+            for line = (read-line s nil nil)
+            while line
+            do (when (and (or (not first-line-special-p) (plusp i))
+                          (not (blankp line)))
+                 (when (or (null n-min-indentation)
+                           (< (n-leading-spaces line) n-min-indentation))
+                   (setq n-min-indentation (n-leading-spaces line))))))
+    (or n-min-indentation 0)))
+
+(defun n-leading-spaces (line)
+  (let ((n 0))
+    (loop for i below (length line)
+          while (char= (aref line i) #\Space)
+          do (incf n))
+    n))
+
+(defun strip-docstring-indent (docstring indentation first-line-special-p)
+  (with-output-to-string (out)
+    (with-input-from-string (s docstring)
+      (loop for i upfrom 0
+            do (multiple-value-bind (line missing-newline-p)
+                   (read-line s nil nil)
+                 (unless line
+                   (return))
+                 (write-string (if (and first-line-special-p
+                                        (zerop i))
+                                   line
+                                   (subseq line (min (length line)
+                                                     indentation)))
+                               out)
+                 (unless missing-newline-p
+                   (terpri out)))))))

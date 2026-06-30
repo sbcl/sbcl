@@ -10,28 +10,29 @@
     (lambda-list* name locative-type)))
 
 (defun %docstring (xref)
-  (values (let ((name (xref-name xref))
-                (locative-type (xref-locative-type xref)))
-            (case locative-type
-              ((function variable declaration)
-               (documentation name locative-type))
-              ((generic-function)
-               (documentation name 'function))
-              ((type class structure condition)
-               (documentation name 'type))
-              (t
-               (cond ((eq locative-type (dummy 'macro))
-                      (documentation (macro-function name) t))
-                     ((eq locative-type (dummy 'setf-function))
-                      (documentation (fdefinition name) t))
-                     ((eq locative-type (dummy 'setf-generic-function))
-                      (documentation (fdefinition name) t))
-                     (t
-                      (assert nil () "Unexpected locative type in ~S."
-                              xref))))))
-          ;; To be compatible with PAX::@PACKAGE-AND-READTABLE, we
-          ;; always return a non-NIL package.
-          (docstring-package xref)))
+  (let ((sb-pcl::*normalize-sbcl-docstrings* nil))
+    (values (let ((name (xref-name xref))
+                  (locative-type (xref-locative-type xref)))
+              (case locative-type
+                ((function variable declaration)
+                 (documentation name locative-type))
+                ((generic-function)
+                 (documentation name 'function))
+                ((type class structure condition)
+                 (documentation name 'type))
+                (t
+                 (cond ((eq locative-type (dummy 'macro))
+                        (documentation (macro-function name) t))
+                       ((eq locative-type (dummy 'setf-function))
+                        (documentation (fdefinition name) t))
+                       ((eq locative-type (dummy 'setf-generic-function))
+                        (documentation (fdefinition name) t))
+                       (t
+                        (assert nil () "Unexpected locative type in ~S."
+                                xref))))))
+            ;; To be compatible with PAX::@PACKAGE-AND-READTABLE, we
+            ;; always return a non-NIL package.
+            (docstring-package xref))))
 
 (defun lambda-list* (name kind)
   (case kind

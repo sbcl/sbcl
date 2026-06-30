@@ -194,23 +194,6 @@
         (t
          (cons (car list) (flatten (cdr list))))))
 
-(defun whitespacep (char)
-  (find char #(#\tab #\space #\page #\newline #\return)))
-
-;;; Split STRING into a vector of lines.
-(defun string-lines (string)
-  (coerce (with-input-from-string (s string)
-            (loop for line = (read-line s nil nil)
-               while line collect line))
-          'vector))
-
-;;; Position of the first non-SPACE character in LINE.
-(defun indentation (line)
-  (position-if-not (lambda (c) (char= c #\Space)) line))
-
-(defun blankp (line)
-  (null (indentation line)))
-
 (defun flatten-to-string (list)
   (format nil "~{~A~^-~}" (flatten list)))
 
