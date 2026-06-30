@@ -1670,7 +1670,7 @@
                 (incf index)))
         (values length nil)))))
 
-#+(and 64-bit sb-unicode (not arm64))
+#-arm64
 (defun sb-vm::simd-copy-character-string-to-utf8-byte-array (byte-array string length)
   (declare (index length)
            (simple-character-string string)
