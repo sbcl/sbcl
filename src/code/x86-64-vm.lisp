@@ -128,7 +128,15 @@
                  (sapz #+linux (alien-sap (context-zmm-register-addr context index))
                        #-linux sap))
              (if integer
-                 (error "Integer not yet implemented")
+                 (values (logior (sap-ref-64 sap 0)
+                                 (ash (sap-ref-64 sap 8) 64)
+                                 (ash (sap-ref-64 sapy 0) 128)
+                                 (ash (sap-ref-64 sapy 8) 192)
+                                 (ash (sap-ref-64 sapz 0) 256)
+                                 (ash (sap-ref-64 sapz 8) 320)
+                                 (ash (sap-ref-64 sapz 16) 384)
+                                 (ash (sap-ref-64 sapz 24) 448))
+                         64)
                  (%make-simd-pack-512-ub64
                   (sap-ref-64 sap 0)
                   (sap-ref-64 sap 8)
@@ -142,7 +150,15 @@
            (let ((sapz #+linux (alien-sap (context-zmm-register-addr context index))
                        #-linux sap))
              (if integer
-                 (error "Integer not yet implemented")
+                 (values (logior (sap-ref-64 sapz 0)
+                                 (ash (sap-ref-64 sapz 8) 64)
+                                 (ash (sap-ref-64 sapz 16) 128)
+                                 (ash (sap-ref-64 sapz 24) 192)
+                                 (ash (sap-ref-64 sapz 32) 256)
+                                 (ash (sap-ref-64 sapz 40) 320)
+                                 (ash (sap-ref-64 sapz 48) 384)
+                                 (ash (sap-ref-64 sapz 56) 448))
+                         64)
                  (%make-simd-pack-512-ub64
                   (sap-ref-64 sapz 0)
                   (sap-ref-64 sapz 8)
