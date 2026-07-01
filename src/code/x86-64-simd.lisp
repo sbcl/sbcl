@@ -803,6 +803,60 @@
           do (setf (aref string i)
                    (code-char (sap-ref-8 sap i))))))
 
+(def-variant simd-copy-character-string-to-utf8-byte-array :avx2 (byte-array string length)
+  (declare (index length)
+           (simple-character-string string)
+           ((simple-array (unsigned-byte 8) (*)) byte-array)
+           (optimize speed (safety 0)))
+  (with-pinned-objects (string byte-array)
+    (inline-vop (((byte-array sap-reg t) (vector-sap byte-array))
+                 ((32-bit-array sap-reg t) (vector-sap string))
+                 ((n unsigned-reg) (logand (+ (* length 4) 15) -16))
+                 ((bytes1 int-avx2-reg))
+                 ((bytes2 int-avx2-reg)))
+        ()
+      (inst sub n 64)
+      (inst jmp :b TAIL)
+
+      LOOP
+      (inst vmovdqu bytes1 (ea 32-bit-array))
+
+      (inst vpackusdw bytes1 bytes1 (ea 32 32-bit-array))
+      (inst vpermq bytes1 bytes1 216)
+      (inst vpackuswb bytes1 bytes1 bytes1)
+      (inst vpermq bytes1 bytes1 216)
+
+      (inst add 32-bit-array 64)
+
+      (inst vmovdqa (ea byte-array) (reg-in-sc bytes1 'int-sse-reg))
+      (inst add byte-array 16)
+      (inst sub n 64)
+      (inst jmp :ae LOOP)
+
+      TAIL
+      (inst add :dword n 64)
+      (inst jmp :z DONE)
+      (inst vpxor bytes2 bytes2 bytes2)
+
+      (inst cmp :dword n 32)
+      (inst jmp :l ONE)
+      (inst vmovdqu bytes1 (ea 32-bit-array))
+      (inst jmp :e NARROW)
+      (inst vmovdqa (reg-in-sc bytes2 'int-sse-reg) (ea 32 32-bit-array))
+      (inst jmp NARROW)
+      ONE
+      (inst vmovdqa (reg-in-sc bytes1 'int-sse-reg) (ea 32-bit-array))
+
+      NARROW
+      (inst vpackusdw bytes1 bytes1 bytes2)
+      (inst vpermq bytes1 bytes1 216)
+      (inst vpackuswb bytes1 bytes1 bytes1)
+      (inst vpermq bytes1 bytes1 216)
+      (inst vmovdqa (ea byte-array) (reg-in-sc bytes1 'int-sse-reg))
+
+      DONE
+      (inst vzeroupper))))
+
 #+sb-unicode
 (defun simd-copy-utf8-to-base-string (start end string ibuf)
   (declare (type index start end)
