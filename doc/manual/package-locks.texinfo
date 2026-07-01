@@ -54,7 +54,7 @@ bound to one of the implementation packages of the locked package.
 
 Unless explicitly altered by @code{defpackage},
 @code{sb-ext:add-implementation-package}, or
-@code{sb-ext:remove-implementation-package} each package is its own
+@code{sb-ext:remove-implementation-package}, each package is its own
 (only) implementation package.
 
 @node package lock violations
@@ -73,8 +73,8 @@ Lexical bindings or declarations that violate package locks cause a
 compile-time warning, and a runtime @code{program-error} when the form that
 violates package locks would be executed.
 
-A complete listing of operators affect by this is: @code{let}, @code{let*}, @code{flet},
-@code{labels}, @code{macrolet}, and @code{symbol-macrolet}, @code{declare}.
+A complete listing of operators affected by this is: @code{let}, @code{let*},
+@code{flet}, @code{labels}, @code{macrolet}, @code{symbol-macrolet}, @code{declare}.
 
 Package locks affecting both lexical bindings and declarations can
 be disabled locally with the @code{sb-ext:disable-package-locks}
@@ -98,7 +98,7 @@ Example:
 @node other operations
 @subsubsection Other Operations
 
-If an non-lexical operation violates a package lock, a continuable
+If a non-lexical operation violates a package lock, a continuable
 error that is of a subtype of @code{sb-ext:package-lock-violation}
 (subtype of @code{package-error}) is signalled when the operation is
 attempted.
@@ -169,7 +169,7 @@ operations signal errors of type @code{sb-ext:package-locked-error}.
 
 @item Adding a new package local nickname to a package.
 
-@item Removing an existing package local nickname to a package.
+@item Removing an existing package local nickname from a package.
 @end itemize
 
 @node operations on symbols
@@ -319,7 +319,7 @@ if @code{package} doesn't designate a valid package.
 @ffindex @sortas{lock-package sb-ext} lock-package [sb-ext]
 @deffn{Function} sb-ext:lock-package package
 Locks @code{package} and returns @code{t}. Has no effect if @code{package} was already
-locked. Signals an error if @code{package} is not a valid package designator
+locked. Signals an error if @code{package} is not a valid package designator.
 @end deffn
 @anchor{Function sb-ext unlock-package}
 @ffindex @sortas{unlock-package sb-ext} unlock-package [sb-ext]

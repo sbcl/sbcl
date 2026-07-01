@@ -584,7 +584,7 @@ Only valid as a global proclamation.
 
 Specifies that the named symbols cannot be proclaimed or locally
 declared SPECIAL. Proclaiming an already special or constant variable
-name as SB-EXT:GLOBAL signal an error. Allows more efficient value
+name as SB-EXT:GLOBAL signals an error. Allows more efficient value
 lookup in threaded environments in addition to expressing programmer
 intention.")
 

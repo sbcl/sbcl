@@ -42,7 +42,7 @@
 
   Unless explicitly altered by DEFPACKAGE,
   SB-EXT:ADD-IMPLEMENTATION-PACKAGE, or
-  SB-EXT:REMOVE-IMPLEMENTATION-PACKAGE each package is its own
+  SB-EXT:REMOVE-IMPLEMENTATION-PACKAGE, each package is its own
   (only) implementation package.")
 
 (defsection @package-lock-violations (:title "Package Lock Violations")
@@ -55,8 +55,8 @@
   compile-time warning, and a runtime PROGRAM-ERROR when the form that
   violates package locks would be executed.
 
-  A complete listing of operators affect by this is: LET, LET*, FLET,
-  LABELS, MACROLET, and SYMBOL-MACROLET, DECLARE.
+  A complete listing of operators affected by this is: LET, LET*,
+  FLET, LABELS, MACROLET, SYMBOL-MACROLET, DECLARE.
 
   Package locks affecting both lexical bindings and declarations can
   be disabled locally with the SB-EXT:DISABLE-PACKAGE-LOCKS
@@ -76,7 +76,7 @@
              ,@body)))")
 
 (defsection @other-operations (:title "Other Operations")
-  "If an non-lexical operation violates a package lock, a continuable
+  "If a non-lexical operation violates a package lock, a continuable
   error that is of a subtype of SB-EXT:PACKAGE-LOCK-VIOLATION
   (subtype of PACKAGE-ERROR) is signalled when the operation is
   attempted.
@@ -140,7 +140,7 @@
 
   - Adding a new package local nickname to a package.
 
-  - Removing an existing package local nickname to a package.")
+  - Removing an existing package local nickname from a package.")
 
 (defsection @operations-on-symbols (:title "Operations on Symbols")
   "Following actions cause a package lock violation if the home package

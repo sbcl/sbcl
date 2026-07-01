@@ -894,7 +894,7 @@ Examples:
 
   - :TEST
 
-      Determines how keys are compared. Must a designator for one of
+      Determines how keys are compared. Must be a designator for one of
       the standard hash table tests, or a hash table test defined
       using SB-EXT:DEFINE-HASH-TABLE-TEST. Additionally, when an
       explicit HASH-FUNCTION is provided (see below), any two argument

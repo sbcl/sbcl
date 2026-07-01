@@ -51,7 +51,7 @@ If @code{t}, then exit when the EOF character is entered.
 @anchor{Variable sb-aclrepl *use-short-package-name*}
 @vvindex @sortas{use-short-package-name* sb-aclrepl} *use-short-package-name* [sb-aclrepl]
 @deffn{Variable} sb-aclrepl:*use-short-package-name*
-When @code{t}, use the shortnest package nickname in a prompt
+When @code{t}, use the shortest package nickname in a prompt.
 @end deffn
 @anchor{Variable sb-aclrepl *max-history*}
 @vvindex @sortas{max-history* sb-aclrepl} *max-history* [sb-aclrepl]

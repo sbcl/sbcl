@@ -92,8 +92,8 @@
 
   A local nickname is valid only when inside the package for which it
   has been specified. Different packages can use same local nickname
-  for different global names, or different local nickname for same
-  global name.
+  for different global names, or different local nicknames for the
+  same global name.
 
   The symbol :PACKAGE-LOCAL-NICKNAMES in *FEATURES* denotes the
   support for this feature.

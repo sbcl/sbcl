@@ -127,7 +127,7 @@ INSTALLING SBCL
   If you don't already have an SBCL binary installed as "sbcl" on your
   system, you'll need to tell make.sh what Lisp to use as the
   cross-compilation host (cf. make.sh for detailed instructions on
-  how to cross compile). For example, to use CMUCL (assuming has
+  how to cross compile). For example, to use CMUCL (assuming it has
   been installed under its default name "lisp") as the
   cross-compilation host:
 
@@ -146,9 +146,9 @@ INSTALLING SBCL
     $ cd ./doc/manual && make
 
   This builds the Info, HTML and PDF documentation from the Texinfo
-  sources. The manual includes documentation string from the build
-  SBCL, but if SBCL itself has not been yet built, but one if found
-  installed documentation strings from the installed version are used.
+  sources. The manual includes documentation strings from the built
+  SBCL. If SBCL itself has not been built yet, but an installed one
+  is found, documentation strings from the installed version are used.
 
   Now you should have the same src/runtime/sbcl and output/sbcl.core
   files that come with the binary distribution, and you can install

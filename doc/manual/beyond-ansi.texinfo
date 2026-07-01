@@ -122,8 +122,8 @@ with normal nicknames.
 
 A local nickname is valid only when inside the package for which it
 has been specified. Different packages can use same local nickname
-for different global names, or different local nickname for same
-global name.
+for different global names, or different local nicknames for the
+same global name.
 
 The symbol @code{:package-local-nicknames} in @code{*features*} denotes the
 support for this feature.
@@ -157,7 +157,7 @@ Example:
 Returns an alist of @code{(local-nickname . actual-package)} describing the
 nicknames local to the designated package.
 
-When in the designated package, calls to @code{find-package} with the any of the
+When in the designated package, calls to @code{find-package} with any of the
 local-nicknames will return the corresponding actual-package instead. This
 also affects all implied calls to @code{find-package}, including those performed by
 the reader.
@@ -2120,7 +2120,7 @@ Create and return a new hash table. The keywords are as follows:
 @itemize
 @item @code{:test}
 
-Determines how keys are compared. Must a designator for one of
+Determines how keys are compared. Must be a designator for one of
 the standard hash table tests, or a hash table test defined
 using @code{sb-ext:define-hash-table-test}. Additionally, when an
 explicit @code{hash-function} is provided (see below), any two argument
@@ -2647,7 +2647,7 @@ Both
 @end example
 
 delete the @code{"foo"} subdirectory of @code{"/tmp"}, or signal an error if
-it does not exist or if is a file or a symbolic link.
+it does not exist or if it is a file or a symbolic link.
 @end deffn
 @anchor{Function sb-ext get-time-of-day}
 @ffindex @sortas{get-time-of-day sb-ext} get-time-of-day [sb-ext]

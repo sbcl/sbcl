@@ -618,7 +618,7 @@ if PACKAGE doesn't designate a valid package."
 
 (defun lock-package (package)
   "Locks PACKAGE and returns T. Has no effect if PACKAGE was already
-locked. Signals an error if PACKAGE is not a valid package designator"
+locked. Signals an error if PACKAGE is not a valid package designator."
   (flet ((unoptimize (table)
            (dovector (x (symtbl-cells table))
              ;; By some small miracle this was mostly correct for NIL
@@ -922,7 +922,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
   "Returns an alist of `(LOCAL-NICKNAME . ACTUAL-PACKAGE)` describing the
 nicknames local to the designated package.
 
-When in the designated package, calls to FIND-PACKAGE with the any of the
+When in the designated package, calls to FIND-PACKAGE with any of the
 local-nicknames will return the corresponding actual-package instead. This
 also affects all implied calls to FIND-PACKAGE, including those performed by
 the reader.
