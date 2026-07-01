@@ -2493,7 +2493,7 @@
           (sap-ref-double nfp (number-stack-offset 0))
           (sap-ref-double nfp (number-stack-offset 8)))))
       #+sb-simd-pack-256
-      ((#.sb-vm::ymm-reg-sc-number #.sb-vm::int-avx2-reg-sc-number)
+      (#.sb-vm::int-avx2-reg-sc-number
        (escaped-float-value simd-pack-256-int))
       #+sb-simd-pack-256
       ((#.sb-vm::single-avx2-reg-sc-number)
@@ -2530,7 +2530,7 @@
           (sap-ref-double nfp (number-stack-offset 16))
           (sap-ref-double nfp (number-stack-offset 24)))))
       #+sb-simd-pack-512
-      ((#.sb-vm::zmm-reg-sc-number #.sb-vm::int-avx512-reg-sc-number)
+      (#.sb-vm::int-avx512-reg-sc-number
        (escaped-float-value simd-pack-512-int))
       #+sb-simd-pack-512
       ((#.sb-vm::single-avx512-reg-sc-number)
@@ -2782,7 +2782,7 @@
            (setf (sap-ref-double nfp (number-stack-offset 0)) a
                  (sap-ref-double nfp (number-stack-offset 8)) b))))
       #+sb-simd-pack-256
-      ((#.sb-vm::ymm-reg-sc-number #.sb-vm::int-avx2-reg-sc-number)
+      (#.sb-vm::int-avx2-reg-sc-number
        (set-escaped-float-value simd-pack-256-int value))
       #+sb-simd-pack-256
       ((#.sb-vm::single-avx2-reg-sc-number)

@@ -21,9 +21,9 @@
   (import 'sb-assem::&prefix)
   ;; Imports from SB-VM into this package
   #+sb-simd-pack-256
-  (import '(sb-vm::ymm-reg sb-vm::int-avx2-reg sb-vm::double-avx2-reg sb-vm::single-avx2-reg))
+  (import '(sb-vm::int-avx2-reg sb-vm::double-avx2-reg sb-vm::single-avx2-reg))
   #+sb-simd-pack-512
-  (import '(sb-vm::zmm-reg sb-vm::int-avx512-reg sb-vm::double-avx512-reg sb-vm::single-avx512-reg))
+  (import '(sb-vm::int-avx512-reg sb-vm::double-avx512-reg sb-vm::single-avx512-reg))
   (import '(sb-vm::tn-byte-offset sb-vm::tn-reg sb-vm::reg-name
             sb-vm::frame-byte-offset sb-vm::rip-tn sb-vm::rbp-tn
             sb-vm::gpr-tn-p sb-vm::stack-tn-p sb-c::tn-reads sb-c::tn-writes
@@ -1163,14 +1163,12 @@
                   ((eq (sb-name (sc-sb (tn-sc operand))) 'registers)
                    (tn-reg operand))
                   ((memq (sc-name (tn-sc operand))
-                         '(zmm-reg
-                           int-avx512-reg
+                         '(int-avx512-reg
                            double-avx512-reg
                            single-avx512-reg))
                    (get-fpr :zmm (tn-offset operand)))
                   ((memq (sc-name (tn-sc operand))
-                         '(ymm-reg
-                           int-avx2-reg
+                         '(int-avx2-reg
                            double-avx2-reg
                            single-avx2-reg))
                    (get-fpr :ymm (tn-offset operand)))

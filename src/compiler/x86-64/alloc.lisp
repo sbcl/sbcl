@@ -219,8 +219,7 @@
       (flet ((used-p (tn)
                (do ((tn tn (sb-c::tn-next tn)))
                    ((null tn))
-                 (when (sc-is tn zmm-reg
-                              int-avx512-reg
+                 (when (sc-is tn int-avx512-reg
                               double-avx512-reg
                               single-avx512-reg)
                    (return-from zmm-registers-used-p t)))))

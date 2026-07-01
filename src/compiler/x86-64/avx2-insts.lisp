@@ -1500,11 +1500,11 @@ REG is the source (encoded in ModR/M.r/m).
                                  :w ,w
                                  :l ,(ecase sizing
                                        ((xmm/ymm-vmx/y xmm/ymm-vmx)
-                                        `(if (is-ymm-id-p (reg-id dst))
+                                        `(if (ymm-register-p dst)
                                              1
                                              0))
                                        (xmm-vmx/y
-                                        `(if (eq (sc-name (tn-sc (ea-index vm))) 'ymm-reg)
+                                        `(if (ymm-register-p (ea-index vm))
                                              1
                                              0)))
                                  :vm t)))))

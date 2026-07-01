@@ -377,10 +377,6 @@
                   :save-p t
                   :alternate-scs (single-sse-stack))
   #+sb-simd-pack-256
-  (ymm-reg float-registers :locations #.*float-regs*)
-  ;; These next 3 should probably be named to YMM-{INT,SINGLE,DOUBLE}-REG
-  ;; but I think there are 3rd-party libraries that expect these names.
-  #+sb-simd-pack-256
   (int-avx2-reg float-registers
                :locations #.*float-regs*
                :constant-scs (fp-immediate)
@@ -399,8 +395,6 @@
                   :save-p t
                   :alternate-scs (single-avx2-stack))
   ;; ZMM SCs use all 32 registers (16-31 require EVEX encoding)
-  #+sb-simd-pack-512
-  (zmm-reg float-registers :locations #.*zmm-regs*)
   #+sb-simd-pack-512
   (int-avx512-reg float-registers
                   :locations #.*zmm-regs*

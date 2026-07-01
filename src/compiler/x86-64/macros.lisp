@@ -36,7 +36,7 @@
        (aver (xmm-tn-p src))
        (inst movaps dst src))
       #+sb-simd-pack-256
-      ((ymm-reg int-avx2-reg)
+      (int-avx2-reg
        (aver (xmm-tn-p src))
        (inst vmovdqa dst src))
       #+sb-simd-pack-256
@@ -45,7 +45,7 @@
        (inst vmovaps dst src))
       ;; fixme512: check if this is correct
       #+sb-simd-pack-512
-      ((zmm-reg int-avx512-reg)
+      (int-avx512-reg
        (aver (xmm-tn-p src))
        (inst vmovdqu dst src))
       #+sb-simd-pack-512
