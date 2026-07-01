@@ -213,6 +213,20 @@
 (define-vop (sb-c::end-pseudo-atomic)
   (:generator 1 (emit-end-pseudo-atomic)))
 
+(defun zmm-registers-used-p ()
+  (when (and #+sb-xc-host (boundp '*component-being-compiled*))
+    (let ((comp (component-info *component-being-compiled*)))
+      (flet ((used-p (tn)
+               (do ((tn tn (sb-c::tn-next tn)))
+                   ((null tn))
+                 (when (sc-is tn zmm-reg
+                              int-avx512-reg
+                              double-avx512-reg
+                              single-avx512-reg)
+                   (return-from zmm-registers-used-p t)))))
+        (used-p (sb-c::ir2-component-normal-tns comp))
+        (used-p (sb-c::ir2-component-wired-tns comp))))))
+
 ;;; Emit code to allocate an object with a size in bytes given by
 ;;; SIZE into ALLOC-TN. The size may be an integer of a TN.
 ;;; NODE may be used to make policy-based decisions.
@@ -224,8 +238,11 @@
 ;;; 2. where to put the result
 ;;; 3. node (for determining immobile-space-p) and a scratch register or two
 (defun emit-allocation (node thread-temp type size lowtag alloc-tn temp
-                        &key scale overflow (systemp (system-tlab-p type node)))
+                        &key scale overflow (systemp (system-tlab-p type node))
+                             (avx512 :default))
   (declare (ignorable thread-temp))
+  (when (eq avx512 :default)
+    (setf avx512 (zmm-registers-used-p)))
   (flet ((fallback (size)
            ;; Call an allocator trampoline and get the result in the proper register.
            ;; There are 2 choices of trampoline to invoke alloc() or alloc_list()
@@ -238,9 +255,13 @@
                   (inst push size)))
            (invoke-asm-routine
             'call
-            (if systemp
-                (if (eql type +cons-primtype+) 'sys-list-alloc-tramp 'sys-alloc-tramp)
-                (if (eql type +cons-primtype+) 'list-alloc-tramp 'alloc-tramp))
+            (if avx512
+                (if systemp
+                    (if (eql type +cons-primtype+) 'sys-list-alloc-tramp-avx512 'sys-alloc-tramp-avx512)
+                    (if (eql type +cons-primtype+) 'list-alloc-tramp-avx512 'alloc-tramp-avx512))
+                (if systemp
+                    (if (eql type +cons-primtype+) 'sys-list-alloc-tramp 'sys-alloc-tramp)
+                    (if (eql type +cons-primtype+) 'list-alloc-tramp 'alloc-tramp)))
             node)
            (inst pop alloc-tn)))
     (let* ((NOT-INLINE (gen-label))
@@ -248,12 +269,12 @@
            (free-pointer (thread-slot-ea
                           (if systemp
                               (if (eql type +cons-primtype+)
-                                   thread-sys-cons-tlab-slot
-                                   thread-sys-mixed-tlab-slot)
-                               (if (eql type +cons-primtype+)
-                                   thread-cons-tlab-slot
-                                   thread-mixed-tlab-slot))
-                           #+gs-seg thread-temp))
+                                  thread-sys-cons-tlab-slot
+                                  thread-sys-mixed-tlab-slot)
+                              (if (eql type +cons-primtype+)
+                                  thread-cons-tlab-slot
+                                  thread-mixed-tlab-slot))
+                          #+gs-seg thread-temp))
            (end-addr (ea (sb-x86-64-asm::ea-segment free-pointer)
                          (+ n-word-bytes (ea-disp free-pointer))
                          (ea-base free-pointer))))
@@ -326,7 +347,7 @@
 ;;; below the region's free pointer. Right now we can do the inits either inside or outside
 ;;; of pseudo-atomic because all pages except CONS are prezeroed.
 (defun emit-alloc-other (node thread-temp widetag nwords result-tn
-                         &optional alloc-temps init
+                         &key alloc-temps init (avx512 :default)
                          &aux (bytes (pad-data-block nwords)))
   (declare (dynamic-extent init))
   #+bignum-assertions
@@ -337,11 +358,13 @@
         (alloc-temp (if (listp alloc-temps) (car alloc-temps) alloc-temps)))
     (allocating ()
       (cond (alloc-temp
-             (emit-allocation node thread-temp widetag bytes 0 result-tn alloc-temp)
+             (emit-allocation node thread-temp widetag bytes 0 result-tn alloc-temp
+                              :avx512 avx512)
              (storew* header result-tn 0 0 t)
              (inst or :byte result-tn other-pointer-lowtag))
             (t
-             (emit-allocation node thread-temp widetag bytes other-pointer-lowtag result-tn nil)
+             (emit-allocation node thread-temp widetag bytes other-pointer-lowtag result-tn nil
+                              :avx512 avx512)
              (storew* header result-tn 0 other-pointer-lowtag t)))
       (when init
         (funcall init)))))
@@ -746,7 +769,7 @@
         (let ((nbytes (calc-shadow-bits-size result)))
           (allocating ()
             ;; Allocate the bits into RESULT
-            (allocation simple-bit-vector-widetag nbytes 0 result temp nil)
+            (allocation simple-bit-vector-widetag nbytes 0 result temp nil )
             (inst mov :byte (ea result) simple-bit-vector-widetag)
             (inst mov :dword (vector-len-ea result 0)
                   (if (sc-is length immediate) (fixnumize (tn-value length)) length))
@@ -998,8 +1021,9 @@
   (:args (name :scs (descriptor-reg) :to :eval))
   (:results (result :scs (descriptor-reg) :from :argument))
   (:generator 37
-    (alloc-other fdefn-widetag fdefn-size result nil
-      (lambda () (storew name result fdefn-name-slot other-pointer-lowtag)))))
+    (alloc-other fdefn-widetag fdefn-size result
+                 :init (lambda ()
+                         (storew name result fdefn-name-slot other-pointer-lowtag)))))
 
 (define-allocator (make-closure)
   (:info label length stack-allocate-p)
@@ -1048,10 +1072,11 @@
                 :load-if (not (reg-or-legal-imm32-p value))))
   (:results (result :scs (descriptor-reg) :from :eval))
   (:generator 10
-    (alloc-other value-cell-widetag value-cell-size result nil
-      (lambda ()
-        (storew (encode-value-if-immediate value)
-                result value-cell-value-slot other-pointer-lowtag)))))
+    (alloc-other value-cell-widetag value-cell-size result
+                 :init
+                 (lambda ()
+                   (storew (encode-value-if-immediate value)
+                           result value-cell-value-slot other-pointer-lowtag)))))
 
 ;;;; automatic allocators for primitive objects
 

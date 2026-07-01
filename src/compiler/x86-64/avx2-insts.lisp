@@ -461,7 +461,7 @@ EVEX uses independent bit3 (R/B) and bit4 (R'/X) for 32-register encoding."
                  ((is-ymm-id-p (reg-id r)) #b01)
                  ((xmm-register-p r)       #b00))))
     (let ((ll (cond (ll ll)
-                    ;; Skip k-registers — they pass xmm-register-p but
+                    ;; Skip k-registers - they pass xmm-register-p but
                     ;; aren't XMM/YMM/ZMM, so fpr-size returns wrong value
                     ((and reg (xmm-register-p reg)
                               (not (is-kreg-id-p (reg-id reg))))
@@ -580,8 +580,8 @@ THING is the destination (NDD, encoded in vvvv).
 REG is the source (encoded in ModR/M.r/m).
 /I is encoded in ModR/M.reg bits 5:3."
   (aver (<= 0 /i 7))
-  ;; thing = destination → goes in vvvv (NDD encoding)
-  ;; reg = source → goes in r/m
+  ;; thing = destination -> goes in vvvv (NDD encoding)
+  ;; reg = source -> goes in r/m
   (multiple-value-bind (ll r x b r-prime v-prime)
       (determine-evex-flags reg nil ll thing)
     (let ((vvvv-num (if thing (reg-id-num (reg-id thing)) 0)))

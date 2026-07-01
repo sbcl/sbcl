@@ -533,7 +533,7 @@
   (def vprord    #x72 0 0)
   (def vprorq    #x72 0 1))
 
-;;; vpsraq — dual form (register + immediate)
+;;; vpsraq - dual form (register + immediate)
 (define-instruction vpsraq (segment dst src src2/imm)
   (:emitter
    (if (integerp src2/imm)
@@ -649,7 +649,7 @@
   (def vpbroadcastmb2q #x2a 1)
   (def vpbroadcastmw2d #x3a 0))
 
-;;; Broadcast from GPR (EVEX.512.66.0F38 — separate opcodes from xmm-source forms)
+;;; Broadcast from GPR (EVEX.512.66.0F38 - separate opcodes from xmm-source forms)
 ;;; vpbroadcastd zmm, r32 uses opcode #x7C W=0
 ;;; vpbroadcastq zmm, r64 uses opcode #x7C W=1
 ;;; Encoding: ModR/M.reg = ZMM dst, ModR/M.r/m = GPR src
@@ -695,7 +695,7 @@
   (def kaddd  #x66 #x4a 1)
   (def kaddq  #xf2 #x4a 1))
 
-;;; Compare-to-k (kdst, src1, src2, imm8) — k-reg in ModR/M reg
+;;; Compare-to-k (kdst, src1, src2, imm8) - k-reg in ModR/M reg
 (macrolet ((def (name prefix opcode w)
              `(define-instruction ,name (segment dst src1 src2 imm)
                 ,@(avx512-inst-printer-list 'ymm-ymm/mem-imm prefix opcode
@@ -713,7 +713,7 @@
   (def vpcmpq   #x66 #x1f 1)
   (def vpcmpuq  #x66 #x1e 1))
 
-;;; Test-to-k (kdst, src1, src2) — k-reg in ModR/M reg
+;;; Test-to-k (kdst, src1, src2) - k-reg in ModR/M reg
 (macrolet ((def (name prefix opcode w)
              `(define-instruction ,name (segment dst src1 src2)
                 ,@(avx512-inst-printer-list 'ymm-ymm/mem prefix opcode
@@ -744,7 +744,7 @@
   (def vpblendmb #x66 0)
   (def vpblendmw #x66 1))
 
-;;; Compare byte/word to k — k-reg in ModR/M reg
+;;; Compare byte/word to k - k-reg in ModR/M reg
 (macrolet ((def (name prefix opcode w)
              `(define-instruction ,name (segment dst src1 src2 imm)
                 ,@(avx512-inst-printer-list 'ymm-ymm/mem-imm prefix opcode
@@ -762,7 +762,7 @@
   (def vpcmpw    #x66 #x3f 1)
   (def vpcmpuw   #x66 #x3e 1))
 
-;;; Test byte/word to k — k-reg in ModR/M reg
+;;; Test byte/word to k - k-reg in ModR/M reg
 (macrolet ((def (name prefix opcode w)
              `(define-instruction ,name (segment dst src1 src2)
                 ,@(avx512-inst-printer-list 'ymm-ymm/mem prefix opcode

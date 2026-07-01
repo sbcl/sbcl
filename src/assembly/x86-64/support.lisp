@@ -69,11 +69,17 @@
 (defmacro call-reg-specific-asm-routine (node prefix tn &optional (suffix ""))
   `(invoke-asm-routine
     'call
-    (aref ,(map 'vector
-                (lambda (x)
-                  (unless (member x '(rsp rbp) :test 'string=)
-                    (symbolicate prefix x suffix)))
-                +qword-register-names+)
+    (aref (if (zmm-registers-used-p)
+              ,(map 'vector
+                    (lambda (x)
+                      (unless (member x '(rsp rbp) :test 'string=)
+                        (symbolicate prefix x suffix '-avx512)))
+                    +qword-register-names+)
+              ,(map 'vector
+                    (lambda (x)
+                      (unless (member x '(rsp rbp) :test 'string=)
+                        (symbolicate prefix x suffix)))
+                    +qword-register-names+))
           (tn-offset ,tn))
     ,node))
 
@@ -100,15 +106,29 @@
        (inst ret)))
     ((:none :full-call-no-return))))
 
-(defconstant xsave-area-size (+ 512 64 256))
 (defconstant xsave-area-alignment 64)
+(defconstant xsave-area-size (+ 512 64 256))
+
+;; uncompacted XSAVE size for AVX-512:
+;; Legacy      (512) + Header (64) = 576
+;; YMM (256)   at offset 576       = 832
+;; GAP (256)   Intel MPX           = 1088
+;; KMM (64)    at offset 1088      = 1152
+;; ZMM (0-15)  (512) at 1152       = 1664
+;; GAP         (448) at 1664       = 2112
+;; ZMM (16-31) (1024) at 2112      = 3136
+(defconstant xsave-avx512-area-size (+ 512 64 256 256 64 512 448 1024))
 
 ;;; Save or restore all FPRs at the stack pointer as it existed just prior
 ;;; to the call to the asm routine.
-(defun call-fpr-save/restore-routine (selector)
-  (let ((routine (ecase selector
-                   (:save 'fpr-save)
-                   (:restore 'fpr-restore))))
+(defun call-fpr-save/restore-routine (selector &key avx512)
+  (let ((routine (if avx512
+                     (ecase selector
+                       (:save 'fpr-save-avx512)
+                       (:restore 'fpr-restore-avx512))
+                     (ecase selector
+                       (:save 'fpr-save)
+                       (:restore 'fpr-restore)))))
     (if (or (not (boundp 'sb-c:*component-being-compiled*))
             (code-immobile-p sb-c:*component-being-compiled*))
         ;; direct call from asm routine or immobile code
@@ -131,7 +151,8 @@
 ;;; After the customary 2-instruction prologue of "PUSH RBP ; MOV RBP,RSP"
 ;;; there is a correct chain of saved RBP values, but 1 word up from the current RBP
 ;;; is probably not a saved program counter, and will look weird to treat it as such.
-(defmacro with-registers-preserved ((convention &key eflags except (frame-reg 'rbp))
+(defmacro with-registers-preserved ((convention &key eflags except (frame-reg 'rbp)
+                                                     avx512)
                                     &body body)
   ;: Convention:
   ;;   C    = save GPRs that C call can change
@@ -184,12 +205,16 @@
              `((inst and rsp-tn ,(- fpr-align))))
          (regs-pushlist ,@gprs)
          ,@(when save-fpr
-             `((inst sub rsp-tn ,(+ alignment-bytes xsave-area-size))
-               (call-fpr-save/restore-routine :save)))
+             `((inst sub rsp-tn ,(+ alignment-bytes (if avx512
+                                                        xsave-avx512-area-size
+                                                        xsave-area-size)))
+               (call-fpr-save/restore-routine :save :avx512 ,avx512)))
          (assemble () ,@body)
          ,@(when save-fpr
-             `((call-fpr-save/restore-routine :restore)
-               (inst add rsp-tn ,(+ alignment-bytes xsave-area-size))))
+             `((call-fpr-save/restore-routine :restore :avx512 ,avx512)
+               (inst add rsp-tn ,(+ alignment-bytes (if avx512
+                                                        xsave-avx512-area-size
+                                                        xsave-area-size)))))
          (regs-poplist ,@gprs)
          ,@(cond ((and (eq frame-tn 'rbp-tn) (not eflags))
                   '((inst leave)))

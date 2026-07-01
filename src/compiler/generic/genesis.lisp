@@ -269,7 +269,7 @@
   (defvar *immobile-space-map* nil))
 ;; Vector capacity must be adequate for the number of asm routines, but (KLUDGE)
 ;; the exact count of routines is unknown until make-host-2 is done.
-#+x86-64 (defconstant asm-jump-vect-nelems 112) ; arb
+#+x86-64 (defconstant asm-jump-vect-nelems 186) ; arb
 #-linkage-space (defvar *c-callable-syms*)
 
 (defstruct page

@@ -114,7 +114,7 @@ void tune_asm_routines_for_microarch(void)
     consts->text_card_marks = (lispobj)text_page_touched_bits;
 #endif
 
-    unsigned int eax, ebx, ecx, edx;
+    unsigned int eax, ebx, ecx, edx, xcr0;
     unsigned int cpuid_fn1_ecx = 0;
 
     cpuid(0, 0, &eax, &ebx, &ecx, &edx);
@@ -123,15 +123,18 @@ void tune_asm_routines_for_microarch(void)
         cpuid(1, 0, &eax, &ebx, &ecx, &edx);
         cpuid_fn1_ecx = ecx;
         if ((ecx & avx_mask) == avx_mask) {
-            xgetbv(&eax, &edx);
-            if ((eax & 0x06) == 0x06) { // YMM and XMM
+
+            xgetbv(&xcr0, &edx);
+            if ((xcr0 & 0x06) == 0x06) { // YMM and XMM
                 avx_supported = 1;
-                if ((eax & 5) == 5 && (eax & 7) == 7) { // ZMM
-                    avx512_supported = 1;
-                }
+
                 cpuid(7, 0, &eax, &ebx, &ecx, &edx);
                 if  (ebx & 0x20)  {
                     avx2_supported = 1;
+                }
+                if ((ebx & (1u << 16)) &&       // AVX512F
+                    ((xcr0 & 0xE6) == 0xE6)) {  // OS supports ZMM
+                    avx512_supported = 1;
                 }
             }
         }
