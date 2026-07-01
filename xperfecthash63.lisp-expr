@@ -1820,5 +1820,16 @@
   (let ((b (& val #xf)))
    (let ((a (>> (u32+ val (<< val 23)) 28)))
     (^ a (aref tab b))))))")
+(#(208FE110 3B4ABA52 6C7BFBCB AB4685DD AEC88182 D110413A E0C5F126 E9E0577D)
+ "(ARRAY-TYPE NEGATION-TYPE ALIEN-TYPE-TYPE SIMD-PACK-512-TYPE SIMD-PACK-256-TYPE SIMD-PACK-TYPE UNKNOWN-TYPE HAIRY-TYPE)"
+ "((& (+ val (>> val 29)) 7))")
+(#(0 2 4 6 8 A E 10 12 14 16 18 1A 1C 1E 20 22 24 26 28 2A 2E 30 32 34 36 38 3A 3C 7A)
+ "(61 4 3 10 7 8 9 5 14 13 12 11 26 25 24 23 16 17 15 29 30 28 27 21 20 2 19 18 0 1)"
+ "((let ((tab #a((16) (unsigned-byte 8) 21 0 16 13 18 3 24 15 1 9 11 28 26 4 20 29)))
+  (+= val #x2c45f2cb)
+  (^= val (>> val 4))
+  (let ((b (& val #xf)))
+   (let ((a (>> (u32+ val (<< val 23)) 28)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF

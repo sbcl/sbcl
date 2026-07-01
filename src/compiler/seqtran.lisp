@@ -2609,6 +2609,87 @@
       (index-into-sequence-derive-type sequence start end)
     (make-numeric-type 'integer 0 (- max min))))
 
+;;; This transform has to deal with unused bits in the
+;;; last data word of a simple-bit-vector can be random.
+(deftransform count ((item sequence &key (start 0) end test)
+                     (bit bit-vector &rest t)
+                     * :policy (>= speed space) :important nil)
+  (when (and test
+             (not (lvar-fun-is test '(eq eql))))
+    (give-up-ir1-transform))
+  (if (and (or (not start) (lvar-value-is start 0))
+           (eq end nil)
+           (lvar-csubtypep sequence simple-bit-vector))
+      `(let* ((length (vector-length sequence))
+              (count 0)
+              (words (floor length sb-vm:n-word-bits)))
+         (declare (index count))
+         (declare (optimize (speed 3) (safety 0)))
+         (dotimes (i words)
+           (incf count (logcount (%vector-raw-bits sequence i))))
+         (let ((remainder (mod length sb-vm:n-word-bits)))
+           (unless (zerop remainder)
+             (incf count (logcount (shift-towards-end (%vector-raw-bits sequence words)
+                                                      (- sb-vm:n-word-bits remainder))))))
+         ,(if (constant-lvar-p item)
+              (if (zerop (lvar-value item)) '(- length count) 'count)
+              '(if (zerop item) (- length count) count)))
+      `(let ((count 0))
+         (declare (index count))
+         (with-array-data ((raw-bv sequence) (real-start start) (real-end end) :check-fill-pointer t)
+           (multiple-value-bind (start-words start-remainder)
+               (floor real-start sb-vm:n-word-bits)
+             (multiple-value-bind (end-words end-remainder)
+                 (floor real-end sb-vm:n-word-bits)
+               (cond
+                 ((= start-words end-words)
+                  ;; Less than a word.  Careful that SHL/SHR are masked to 5 bits, so
+                  ;; (count 1 #*111 :start 0 :end 0) would generate a shift of 64 here,
+                  ;; which is a NOP, so catch that first and avoid it!
+                  (unless (= start-remainder end-remainder)
+                    (incf count
+                          (logcount
+                           (shift-towards-end
+                            (shift-towards-start (%vector-raw-bits raw-bv start-words)
+                                                 start-remainder)
+                            (+ start-remainder (- sb-vm:n-word-bits end-remainder)))))))
+                 (t
+                  (unless (zerop start-remainder)
+                    (incf count (logcount (shift-towards-start
+                                           (%vector-raw-bits raw-bv start-words)
+                                           start-remainder)))
+                    (incf start-words))
+                  (loop for word-offset of-type index from start-words below end-words
+                        do (incf count (logcount (%vector-raw-bits raw-bv word-offset))))
+                  (unless (zerop end-remainder)
+                    (let ((num-1s (logcount (shift-towards-end
+                                             (%vector-raw-bits raw-bv end-words)
+                                             (- sb-vm:n-word-bits end-remainder)))))
+                      (incf count num-1s)))))
+               ,(if (constant-lvar-p item)
+                    (if (zerop (lvar-value item)) '(- real-end real-start count) 'count)
+                    '(if (zerop item) (- real-end real-start count) count))))))))
+
+(deftransform count ((item sequence &key test key) (t (not bit-vector) &rest t) *
+                     :important nil)
+  (when (not (types-equal-or-intersect (lvar-type item) (sequence-element-type sequence key)))
+    ;; When array cannot store the thing we are searching for, punt, user gets an
+    ;; Item of type X can't be found in a sequence of type Y message in later count transforms
+    (give-up-ir1-transform))
+  `(let ((count 0)
+         ,@(and key
+                `((key (%coerce-callable-to-fun key)))))
+     (declare (index count))
+     (flet ((counter (x) (when (funcall ,(if test 'test ''eql)
+                                        item
+                                        ,(if key
+                                             `(funcall key x)
+                                             `x))
+                           (incf count))))
+       (declare (dynamic-extent #'counter))
+       (map nil #'counter sequence))
+     count))
+
 (defoptimizer (sb-impl::length-remove-duplicates derive-type) ((sequence &key &allow-other-keys))
   (multiple-value-bind (max min) (sequence-lvar-dimensions sequence)
     (make-numeric-type 'integer
