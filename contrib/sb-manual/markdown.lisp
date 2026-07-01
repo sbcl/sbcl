@@ -425,8 +425,8 @@
 
 ;;;; Processing Markdown inline elements
 
-;;; Format symbols either as Texinfo code or as variables if the
-;;; symbol in question is contained in symbols *TEXINFO-LOCAL-VARIABLES*.
+;;; Format symbols either as Texinfo @code{}, link sections, and
+;;; handle concepts.
 (defun codify-and-link (line)
   (with-output-to-string (result)
     (let ((last 0))
@@ -529,12 +529,12 @@
                     (out-escaped (char string i))
                     (incf i)
                     ;; Protect the rest of the contiguous word from
-                    ;; CODIFY-AND-LINK up until
+                    ;; CODIFY-AND-LINK.
                     (loop
                       while (and (< i len)
                                  (not (or (whitespacep (char string i))
                                           (find (char string i)
-                                                " ,.!?;()'[]{}\""))))
+                                                ",.!?;()'[]{}\""))))
                       do (out-escaped (char string i))
                          (incf i))
                     (decf i)))

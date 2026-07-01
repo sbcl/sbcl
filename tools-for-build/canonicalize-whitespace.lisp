@@ -87,7 +87,7 @@
         (print file)
         (write-sequence new stream)))))
 
-(defvar *source-types* '("lisp" "lisp-expr" "c" "h" "asd" "texinfo"))
+(defvar *source-types* '("lisp" "lisp-expr" "c" "h" "asd"))
 
 (defvar *exceptions* '("compile-file-pos-utf16be"))
 
