@@ -393,7 +393,7 @@ Note that @code{do} appears in the processing path. This is because
 @cindex macroexpansion
 @cindex source transform
 The rest of the processing path results from the macroexpansion of
-@code{do}:
+@code{do}: 
 
 @example
 (block nil

@@ -1,5 +1,14 @@
 (in-package :sb-manual)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun documentation-generation-date-string (&key long)
+    (multiple-value-bind (second minute hour day month year)
+        (decode-universal-time (get-universal-time))
+      (if long
+          (format nil "~D-~2,'0D-~2,'0D ~2,'0D:~2,'0D:~2,'0D"
+                  year month day hour minute second)
+          (format nil "~D-~2,'0D" year month)))))
+
 (defsection @sbcl-manual (:title "SBCL Manual")
   ;; This docstring is not used in the Texinfo version (see
   ;; EMIT-TEXINFO-FOR-SECTION).

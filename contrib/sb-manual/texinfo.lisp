@@ -257,14 +257,6 @@
      "../../contrib/sb-simple-streams/sb-simple-streams.texinfo")
     (@deprecation "deprecation.texinfo")))
 
-(defun documentation-generation-date-string (&key long)
-  (multiple-value-bind (second minute hour day month year)
-      (decode-universal-time (get-universal-time))
-    (if long
-        (format nil "~D-~2,'0D-~2,'0D ~2,'0D:~2,'0D:~2,'0D"
-                year month day hour minute second)
-        (format nil "~D-~2,'0D" year month))))
-
 (defun generate-texinfo ()
   (let ((*default-pathname-defaults*
           (truename (merge-pathnames

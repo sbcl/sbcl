@@ -144,6 +144,10 @@
 ;;; TODO:
 ;;;
 ;;; - Maybe implement glossary-terms (for books, "safe type", etc).
+;;;
+;;; Also, see SB-PCL::NORMALIZE-SBCL-DOCSTRING, an expedient docstring
+;;; to plain text converter that supports the subset of this
+;;; functionality necessary for the docstrings in SBCL core.
 (defun markdown-to-texinfo (string &optional lambda-list)
   (let ((*texinfo-local-variables* (flatten lambda-list))
         (lines (string-lines string))
@@ -484,14 +488,6 @@
                              name))
               () "Section name ~S contains special texinfo characters." name)
       (substitute #\Space #\- (string-downcase name)))))
-
-(defun doc-name-p (symbol kind)
-  (if *using-pax*
-      (and (boundp symbol)
-           (typep (symbol-value symbol) (dummy (ecase kind
-                                                 (:section 'section)
-                                                 (:concept 'concept)))))
-      (lazy-doc-name-p symbol kind)))
 
 (when (and (not *using-pax*)
            *downcase-uppercase-code*)

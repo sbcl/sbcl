@@ -3,6 +3,7 @@
     (defpackage :sb-manual
       (:use :cl :sb-alien)
       (:export #:use-pax)
+      #+sb-doc
       (:import-from #:sb-pcl
        #:string-lines #:whitespacep #:indentation #:blankp
        #:reindent-docstring))))

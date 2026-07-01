@@ -5,8 +5,8 @@
   :components ((:file "package")
                (:file "pax")
                (:file "docstring")
-               (:file "markdown")
-               (:file "texinfo")
+               (:file "markdown" :if-feature :sb-doc)
+               (:file "texinfo" :if-feature :sb-doc)
                (:file "manual")
                (:module "doc/"
                 :serial t

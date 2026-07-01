@@ -319,3 +319,11 @@
   (if (doc-name-p name :concept)
       (symbol-value name)
       (error "Undefined ~S ~S." 'concept name)))
+
+(defun doc-name-p (symbol kind)
+  (if *using-pax*
+      (and (boundp symbol)
+           (typep (symbol-value symbol) (dummy (ecase kind
+                                                 (:section 'section)
+                                                 (:concept 'concept)))))
+      (lazy-doc-name-p symbol kind)))
