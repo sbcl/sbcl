@@ -1267,7 +1267,7 @@ NOTE: This interface is experimental and subject to change."
 ;;; When you deprecate something, note it here till it is fully gone: makes it
 ;;; easier to keep things progressing orderly. Also add the relevant section
 ;;; (or update it when deprecation proceeds) in the manual, in
-;;; deprecated.texinfo.
+;;; SB-MANUAL:@DEPRECATION.
 ;;;
 ;;; EARLY:
 ;;; - SOCKINT::WIN32-BIND                          since 1.2.10 (03/2015)    -> Late: 08/2015

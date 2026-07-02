@@ -215,7 +215,7 @@ in various namespaces as deprecated.
 
 @quotation
 @emph{Note}: See the @code{namespace} @code{clhs} glossary entry in the glossary of
-the Common Lisp Hyperspec.)
+the Common Lisp HyperSpec.)
 @end quotation
 
 @anchor{Declaration sb-ext deprecated}

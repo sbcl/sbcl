@@ -1,0 +1,26 @@
+Files:
+
+- doc/sbcl.1: man page
+
+- doc/manual/sbcl.{info*,pdf,html}: The user manual. See the "INSTALL"
+  file on how to build them.
+
+A prebuilt manual for the latest release is available for download in
+HTML and PDF formats at <https://www.sbcl.org>.
+
+Sections of the manual are defined and exported from the SB-MANUAL
+package (available after (REQUIRE :SB-MANUAL)). The top-level section
+is SB-MANUAL:@SBCL-MANUAL. You can browse these directly (e.g. with
+Slime's M-.) if the SBCL sources are available. Note that all other
+formats (including the intermediate Texinfo) are generated from these
+sections and the docstrings of individual Lisp definitions (of e.g.
+functions, variables).
+
+> An alternative, unofficial (and unsupported by the SBCL project)
+> rendering of the manual is available at <https://fixnum.com> in
+> HTML, PDF, Markdown and plain text for the latest development
+> version. This version is heavily linked both internally and to the
+> HyperSpec, and documents e.g. the default values of arguments and
+> the initial values of variables. It is generated with MGL-PAX v0.5+
+> (<https://fixnum.com/pax-manual.html>), which also supports browsing
+> the documentation live.

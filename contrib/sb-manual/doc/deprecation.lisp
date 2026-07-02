@@ -163,7 +163,7 @@
   in various namespaces as deprecated.
 
   > _Note_: See the `namespace` CLHS glossary entry in the glossary of
-  > the Common Lisp Hyperspec.)"
+  > the Common Lisp HyperSpec.)"
   (sb-ext:deprecated declaration))
 
 (defsection @deprecation-examples (:title "Deprecation Examples")

@@ -71,11 +71,13 @@ SBCL uses Launchpad to track bugs. The bug database is available at
 @url{https://bugs.launchpad.net/sbcl}
 
 Reporting bugs there requires registering at Launchpad. However,
-bugs can also be reported on the mailing list @code{sbcl-bugs},
-which is moderated but does @emph{not} require subscribing.
+bugs can also be reported on the mailing list @code{sbcl-bugs}, which is
+moderated but does @emph{not} require subscribing. Simply send email to
+@uref{mailto:sbcl-bugs@@lists.sourceforge.net, @code{sbcl-bugs@@lists.sourceforge.net}}
+and the bug will be checked and added to Launchpad by SBCL
+maintainers.
 
-Simply send email to @code{sbcl-bugs@@lists.sourceforge.net} and the bug
-will be checked and added to Launchpad by SBCL maintainers.
+See the @code{HACKING} file on how to send patches.
 
 @node how to report bugs effectively
 @subsection How to Report Bugs Effectively

@@ -457,7 +457,7 @@
       (write-string (escape-texinfo (subseq line last)) result))))
 
 (defun write-concept-keys (keys stream)
-  (dolist (key keys)
+  (dolist (key (remove-duplicates keys :test #'equal))
     (typecase key
       (list
        ;; We don't use @subentry because with it Texinfo always

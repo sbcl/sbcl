@@ -14,4 +14,8 @@ Historical note: before Launchpad was adopted this file contained a
 list of currently open bugs. If you run into an SBCL bug number in the
 range 1-431 inclusive, it refers to that list.
 
-Refer to User Manual for more details.
+Refer to the User Manual for more details at
+
+  https://www.sbcl.org/manual/#Reporting-Bugs
+
+or SB-MANUAL:@REPORTING-BUGS.

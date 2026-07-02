@@ -216,7 +216,7 @@
                           (coerce-error)))))
                  ;; If RES has the wrong type, that means that rule of
                  ;; canonical representation for complex rationals was
-                 ;; invoked. According to the Hyperspec, (coerce 7/2
+                 ;; invoked. According to the HyperSpec, (coerce 7/2
                  ;; 'complex) returns 7/2. Thus, if the object was a
                  ;; rational, there is no error here.
                  (unless (or (typep res output-type-spec)

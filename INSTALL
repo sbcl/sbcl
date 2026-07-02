@@ -145,10 +145,10 @@ INSTALLING SBCL
 
     $ cd ./doc/manual && make
 
-  This builds the Info, HTML and PDF documentation from the Texinfo
-  sources. The manual includes documentation strings from the built
-  SBCL. If SBCL itself has not been built yet, but an installed one
-  is found, documentation strings from the installed version are used.
+  This builds the Info, HTML and PDF documentation from the SB-MANUAL
+  contrib. The manual includes documentation strings from the built
+  SBCL. If SBCL itself has not been built yet, but an installed one is
+  found, documentation strings from the installed version are used.
 
   Now you should have the same src/runtime/sbcl and output/sbcl.core
   files that come with the binary distribution, and you can install
@@ -230,7 +230,7 @@ INSTALLING SBCL
       files under "src/runtime", down- or upgrading GCC may help.
 
     * Ask for help on the mailing lists referenced from
-      <http://www.sbcl.org/>.
+      <https://www.sbcl.org/>.
 
 2.4. Tracking SBCL sources
 
@@ -288,9 +288,7 @@ INSTALLING SBCL
     by e.g. testing during the monthly freeze periods, and most
     importantly by reporting any problems.
 
-    For further support, see Getting Support and Reporting Bugs
-    in the manual, or
+    For further support, see "Getting Support and Reporting Bugs"
+    (SB-MANUAL:@SUPPORT-AND-BUGS) in the manual locally or at
 
-      http://www.sbcl.org/manual/Getting-Support-and-Reporting-Bugs.html
-
-    if you do not have the manual for some reason.
+      https://www.sbcl.org/manual/#Getting-Support-and-Reporting-Bugs

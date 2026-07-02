@@ -3,9 +3,9 @@ documentation might not be refused.:-)
 
 There is a Unix man page, sbcl.1.
 
-There is a user manual in texinfo format, in doc/manual/. (In
-binary distributions, the compiled-into-HTML translations are also
-included.) 
+There is a user manual in Texinfo format, in doc/manual/, generated
+from the SB-MANUAL contrib. (In binary distributions, the
+compiled-into-HTML translations are also included.)
 
 Much of the documentation for supported extensions is in their Lisp
 doc strings. For example, to find out how to use the SAVE-LISP-AND-DIE

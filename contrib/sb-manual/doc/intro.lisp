@@ -259,7 +259,7 @@
   SLIME can be downloaded from <https://slime.common-lisp.dev/>.")
 
 (defsection @language-reference (:title "Language Reference")
-  "_\\CLHS_ (Common Lisp Hyperspec) is a hypertext version of the ANSI
+  "_\\CLHS_ (Common Lisp HyperSpec) is a hypertext version of the ANSI
   standard, made freely available by LispWorks -- an invaluable
   reference.
 
@@ -315,7 +315,9 @@
 
 (defsection @internals-documentation (:title "Internals Documentation")
   "If you're interested in the development of the SBCL system itself,
-  then subscribing to `sbcl-devel` is a good idea.
+  then subscribing to
+  [sbcl-devel@lists.sourceforge.net](mailto:sbcl-devel@lists.sourceforge.net)
+  is a good idea.
 
   SBCL internals documentation -- besides comments in the source -- is
   available in the Web Archive:
@@ -462,7 +464,7 @@
   (and has already improved in some other areas), but it takes a while.
 
   On the x86 SBCL -- like the x86 port of CMUCL -- uses a
-  _@CONSERVATIVE-GC. This means that it doesn't maintain a strict
+  _@CONSERVATIVE-GC_. This means that it doesn't maintain a strict
   separation between tagged and untagged data, instead treating some
   untagged data (e.g. raw floating point numbers) as possibly-tagged
   data and so not collecting any Lisp objects that they point to. This

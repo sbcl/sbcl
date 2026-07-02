@@ -382,7 +382,6 @@ system.
 @node runtime options
 @subsection Runtime Options
 
-@cindex LDB
 @cindex disabling LDB
 @cindex LDB, disabling
 @cindex LDB

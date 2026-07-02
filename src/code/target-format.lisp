@@ -673,9 +673,9 @@
 ;;; errors. As for now, we let the user get away with it, and merely guarantee
 ;;; that at least one significant digit will appear.
 
-;;; Raymond Toy writes: The Hyperspec seems to say that the exponent
+;;; Raymond Toy writes: The HyperSpec seems to say that the exponent
 ;;; marker is always printed. Make it so. Also, the original version
-;;; causes errors when printing infinities or NaN's. The Hyperspec is
+;;; causes errors when printing infinities or NaN's. The HyperSpec is
 ;;; silent here, so let's just print out infinities and NaN's instead
 ;;; of causing an error.
 (defun format-exp-aux (stream number w d e k ovf pad marker atsign)

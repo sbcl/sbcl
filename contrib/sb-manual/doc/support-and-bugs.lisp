@@ -56,11 +56,13 @@
   <https://bugs.launchpad.net/sbcl>
 
   Reporting bugs there requires registering at Launchpad. However,
-  bugs can also be reported on the mailing list `sbcl-bugs`,
-  which is moderated but does _not_ require subscribing.
+  bugs can also be reported on the mailing list `sbcl-bugs`, which is
+  moderated but does _not_ require subscribing. Simply send email to
+  [`sbcl-bugs@lists.sourceforge.net`](mailto:sbcl-bugs@lists.sourceforge.net)
+  and the bug will be checked and added to Launchpad by SBCL
+  maintainers.
 
-  Simply send email to `sbcl-bugs@lists.sourceforge.net` and the bug
-  will be checked and added to Launchpad by SBCL maintainers."
+  See the `\\\\HACKING` file on how to send patches."
   (@how-to-report-bugs-effectively section)
   (@how-to-report-signal-related-bugs section))
 

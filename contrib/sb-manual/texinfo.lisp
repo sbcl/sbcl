@@ -223,6 +223,9 @@
   (markdown-to-texinfo (reindent-docstring docstring) arglist))
 
 
+;;; Currently, we have the Texinfo file under version control to keep
+;;; a closer eye on the Markdown-to-Texinfo converter, which is young.
+;;; When that's no longer the case, this is no longer needed.
 (defparameter *pages*
   '((@support-and-bugs "support-and-bugs.texinfo")
     (@introduction "intro.texinfo")

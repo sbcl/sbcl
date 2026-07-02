@@ -49,7 +49,8 @@ We aren't always as well-educated as we'd like to be...
 
 Ready-to-apply patches should be submitted via Launchpad: please add
 the tag "review" to the associated bug (create new bug with name if
-there isn't one about the issue yet.)
+there isn't one about the issue yet). Alternatively, they may be sent
+to the sbcl-bugs mailing list.
 
 Patches requiring more widespread discussion and feedback should be
 sent to the sbcl-devel mailing list.

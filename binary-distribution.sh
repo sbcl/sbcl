@@ -19,6 +19,7 @@ tar -cf $b-binary.tar \
     $b/src/runtime/sbcl.mk \
     `grep '^LIBSBCL=' $b/src/runtime/sbcl.mk | cut -d= -f2- | while read lib; do echo $b/src/runtime/$lib; done` \
     $b/BUGS $b/COPYING $b/CREDITS $b/INSTALL $b/NEWS $b/README \
+    $b/DOCUMENTATION \
     $b/install.sh $b/find-gnumake.sh $b/sbcl-pwd.sh $b/run-sbcl.sh \
     $b/doc/sbcl.1 \
     $b/pubring.pgp \
