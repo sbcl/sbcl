@@ -476,7 +476,8 @@
                    (sb-vm::simd-utf8-strlen (sb-sys:sap+ (sb-sys:vector-sap bytes) offset))
                  (unless (and (eql expected-length length)
                               (eql expected-ascii-p ascii-p)
-                              (eql expected-byte-length byte-length))
+                              (or (not expected-length)
+                                  (eql expected-byte-length byte-length)))
                    (error "(sb-vm::simd-utf8-strlen (sb-sys:sap+ (sb-sys:vector-sap ~s) ~s)) => ~a, ~a, ~a; but ~a, ~a, ~a expected"
                           bytes offset length byte-length ascii-p
                           expected-length expected-byte-length expected-ascii-p)))))))
