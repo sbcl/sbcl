@@ -468,15 +468,18 @@
 (with-test (:name :utf8-strlen
             :skipped-on :interpreter)
   (flet ((test (bytes expected-length &optional expected-ascii-p (offset 0))
-           (let ((bytes (coerce bytes '(vector (unsigned-byte 8)))))
+           (let* ((bytes (coerce bytes '(vector (unsigned-byte 8))))
+                  (expected-byte-length (- (position 0 bytes :start offset) offset)))
+             (assert expected-byte-length)
              (sb-sys:with-pinned-objects (bytes)
-               (multiple-value-bind (length ascii-p)
+               (multiple-value-bind (length byte-length ascii-p)
                    (sb-vm::simd-utf8-strlen (sb-sys:sap+ (sb-sys:vector-sap bytes) offset))
                  (unless (and (eql expected-length length)
-                              (eql expected-ascii-p ascii-p))
-                   (error "(sb-vm::simd-utf8-strlen (sb-sys:sap+ (sb-sys:vector-sap ~s) ~s)) => ~a, ~a; but ~a, ~a expected"
-                          bytes offset length ascii-p
-                          expected-length expected-ascii-p)))))))
+                              (eql expected-ascii-p ascii-p)
+                              (eql expected-byte-length byte-length))
+                   (error "(sb-vm::simd-utf8-strlen (sb-sys:sap+ (sb-sys:vector-sap ~s) ~s)) => ~a, ~a, ~a; but ~a, ~a, ~a expected"
+                          bytes offset length byte-length ascii-p
+                          expected-length expected-byte-length expected-ascii-p)))))))
     (test '(1 2 0 255 255) 2 t)
     (test (append (loop for i from 1 to 64 collect i) '(0 1 255)) 64 t)
     (test '(1 2 0 1 1 1) 2 t)

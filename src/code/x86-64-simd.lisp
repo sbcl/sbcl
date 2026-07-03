@@ -729,7 +729,7 @@
       (+ start copied))))
 
 #+sb-unicode
-(defun simd-copy-utf8-sap-to-character-string (sap string length)
+(defun simd-copy-ascii-sap-to-character-string (sap string length)
   (declare (optimize speed (safety 0))
            (system-area-pointer sap)
            (index length))
@@ -1934,7 +1934,6 @@
       (((bytes        sap-reg t) sap)
        ((ptr          sap-reg t))
 
-       ((total-bytes  unsigned-reg))
        ((total-conts  unsigned-reg))
        ((tmp          unsigned-reg))
 
@@ -1958,8 +1957,9 @@
        ((tmp4         int-avx2-reg))
        ((total-conts-vec int-avx2-reg)))
 
-      ((res descriptor-reg t :from :load)
-       (all-ascii descriptor-reg))
+      ((char-length descriptor-reg t :from :load)
+       (byte-length unsigned-reg positive-fixnum :from :load)
+       (all-ascii descriptor-reg t))
     (flet ((validate ()
              (assemble ()
                ;; Skip an all-ASCII block
@@ -2023,12 +2023,12 @@
         ;; Align the start and then mask off the extra bits
         (inst mov ptr bytes)
         (inst and ptr -32)
-        (inst mov total-bytes bytes)
-        (inst sub total-bytes ptr)
+        (inst mov byte-length bytes)
+        (inst sub byte-length ptr)
 
         (inst vmovdqu tmp2 (register-inline-constant :avx2 #x1F1E1D1C1B1A191817161514131211100F0E0D0C0B0A09080706050403020100))
 
-        (inst vmovq tmp1 total-bytes)
+        (inst vmovq tmp1 byte-length)
         (inst vpbroadcastb tmp1 tmp1)
         (inst vpcmpgtb tmp1 tmp1 tmp2)
 
@@ -2055,24 +2055,25 @@
         ASCII-TAIL
         (inst bsf tmp tmp)
 
-        (inst vpmovmskb total-bytes current)
-        (inst test total-bytes total-bytes)
+        (inst vpmovmskb byte-length current)
+        (inst test byte-length byte-length)
         (inst jmp :z ALL-ASCII-DONE)
 
-        (inst bsf total-bytes total-bytes)
-        (inst cmp total-bytes tmp)
+        (inst bsf byte-length byte-length)
+        (inst cmp byte-length tmp)
         (inst jmp :b NON-ASCII)
 
         ALL-ASCII-DONE
         (inst add ptr tmp)
         (inst sub ptr bytes)
-        (inst mov total-bytes ptr)
+        (inst mov byte-length ptr)
+        (inst mov char-length byte-length)
+        (inst shl char-length 1)
         (load-symbol all-ascii t)
-        (inst jmp RETURN)
+        (inst jmp DONE)
 
         NON-ASCII
-        (inst mov res null-tn)
-        (inst mov all-ascii null-tn)
+        (inst mov char-length null-tn)
         (zeroize total-conts)
         (inst vpxor total-conts-vec total-conts-vec total-conts-vec)
 
@@ -2134,10 +2135,10 @@
         (validate)
 
         (inst sub ptr bytes)
-        (inst mov total-bytes ptr)
+        (inst mov byte-length ptr)
 
         (inst vptest errors errors)
-        (inst jmp :nz DONE)
+        (inst jmp :nz ERROR)
 
         (inst vextracti128 tmp1 total-conts-vec 1)
         (inst vpaddq tmp1 tmp1 total-conts-vec)
@@ -2146,11 +2147,11 @@
         (inst vmovq tmp tmp1)
         (inst add total-conts tmp)
 
-        (inst sub total-bytes total-conts)
-
-        RETURN
-        (inst shl total-bytes n-fixnum-tag-bits)
-        (inst mov res total-bytes)
+        (inst mov char-length byte-length)
+        (inst sub char-length total-conts)
+        (inst shl char-length 1)
+        ERROR
+        (inst mov all-ascii null-tn)
         DONE
         (inst vzeroupper)))))
 
