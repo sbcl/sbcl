@@ -1695,7 +1695,6 @@
                    ((p32-2 complex-double-reg))
                    ((mask-2 complex-double-reg))
                    ((mask-bf complex-double-reg))
-                   ((ones complex-double-reg))
                    ((count complex-double-reg))
                    ((temp complex-double-reg)))
                   ((byte-index unsigned-reg positive-fixnum :from :load)
@@ -1704,7 +1703,6 @@
                 (inst mov char-index 0)
                 (load-inline-constant (reg-in-sc powers 'double-reg) :qword (concat-ub 8 '(128 64 32 16 8 4 2 1)))
                 (inst movi mask-2 2 :8b)
-                (inst movi ones 1 :8b)
                 (inst movi mask-bf #xBF :8h)
                 (inst b start)
 
@@ -1723,9 +1721,8 @@
                 (inst ushr sh current 6 :8b)
                 (inst cmeq continuations sh mask-2 :8b)
                 (inst bic starts powers continuations :8b)
-                (inst bic count ones continuations :8b)
                 (inst addv starts starts :8b)
-                (inst addv count count :8b)
+                (inst addv count continuations :8b)
                 (inst umov tmp starts 0 :b)
 
                 (inst ushll current16 :8h current :8b 0)
@@ -1734,7 +1731,7 @@
                 ;; next16 is shifted by one,
                 ;; construct a codepoint from two overlapping bytes,
                 ;; i.e. (dpb b0 (byte 5 6) b1)
-                (inst shl lead current16 6 :8h)
+                (inst ushll lead :8h current :8b 6)
                 (inst bic lead #xf800 :8h)
                 (inst bic next16 #xc0 :8h)
                 (inst orr combined lead next16 :8h)
@@ -1754,18 +1751,21 @@
                 (inst add ptr 32-bit-array (lsl char-index 2))
                 (inst stp p32-1 p32-2 (@ ptr))
 
-                (inst umov tmp count 0 :b)
+                (inst smov tmp count 0 :b)
                 (inst add byte-index byte-index 8)
-                (inst add char-index char-index tmp)
+                (inst add char-index char-index 8)
+                (inst add char-index char-index tmp) ;; subtract continuations
+
                 start
                 (inst cmp byte-index n)
                 (inst b :le LOOP)
 
                 ;; In the last iteration, did it consume 9 or 8 bytes?
                 (inst umov tmp current 7 :b)
+                ;; the last current byte is a leading byte, meaning
+                ;; the first next byte is a continuation byte
                 (inst cmp tmp #xC0)
-                (inst b :lt DONE)
-                (inst add byte-index byte-index 1)
+                (inst csinc byte-index byte-index byte-index :lt)
 
                 DONE))))
     (loop while (< byte-index length) do
