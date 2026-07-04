@@ -1,3 +1,6 @@
+###################################################
+### THIS FILE IS MACHINE-GENERATED. DO NOT EDIT ###
+###################################################
 SBCL=src/runtime/sbcl
 ARGS=--core output/sbcl.core --noinform --disable-debugger --noprint --no-userinit --no-sysinit
 SCRIPT1=crossbuild-runner/pass-1.lisp
@@ -90,7 +93,7 @@ obj/xbuild/x86-linux.core: obj/xbuild/x86-linux/xc.core
 	$(SBCL) $(ARGS) x86-linux < $(SCRIPT2)
 
 obj/xbuild/x86-64/xc.core: $(DEPS1)
-	$(SBCL) $(ARGS) x86-64 x86-64 "(:WIN32 :SB-THREAD :SB-SAFEPOINT	:LITTLE-ENDIAN :AVX2 :AVX512 :GENCGC :SB-SIMD-PACK :SB-SIMD-PACK-256 :SB-SIMD-PACK-512)" < $(SCRIPT1)
+	$(SBCL) $(ARGS) x86-64 x86-64 "(:WIN32 :SB-THREAD :SB-SAFEPOINT :LITTLE-ENDIAN :AVX2 :AVX512 :GENCGC :SB-SIMD-PACK :SB-SIMD-PACK-256 :SB-SIMD-PACK-512)" < $(SCRIPT1)
 obj/xbuild/x86-64.core: obj/xbuild/x86-64/xc.core
 	$(SBCL) $(ARGS) x86-64 < $(SCRIPT2)
 
@@ -100,7 +103,7 @@ obj/xbuild/x86-64-linux.core: obj/xbuild/x86-64-linux/xc.core
 	$(SBCL) $(ARGS) x86-64-linux < $(SCRIPT2)
 
 obj/xbuild/x86-64-darwin/xc.core: $(DEPS1)
-	$(SBCL) $(ARGS) x86-64-darwin x86-64 "(:DARWIN :BSD :UNIX :MACH-O :LITTLE-ENDIAN :AVX2 :GENCGC :SB-SIMD-PACK :SB-SIMD-PACK-256 :OS-PROVIDES-CLOCK-GETTIME)" < $(SCRIPT1)
+	$(SBCL) $(ARGS) x86-64-darwin x86-64 "(:DARWIN :BSD :UNIX :MACH-O :LITTLE-ENDIAN :AVX2 :AVX512 :GENCGC :SB-SIMD-PACK :SB-SIMD-PACK-256 :SB-SIMD-PACK-512 :OS-PROVIDES-CLOCK-GETTIME)" < $(SCRIPT1)
 obj/xbuild/x86-64-darwin.core: obj/xbuild/x86-64-darwin/xc.core
 	$(SBCL) $(ARGS) x86-64-darwin < $(SCRIPT2)
 

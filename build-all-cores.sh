@@ -49,15 +49,15 @@
               ("x86-ascii" :little-endian :largefile (not :sb-unicode))
               ("x86-thread" :little-endian :largefile :sb-thread)
               ("x86-linux" :little-endian :largefile :sb-thread :linux :unix :elf :sb-thread))
-    ("x86-64" ("x86-64" :little-endian :avx2 :gencgc :sb-simd-pack :sb-simd-pack-256 :avx512 :sb-simd-pack-512)
-              ("x86-64-linux" :linux :unix :elf :little-endian :avx2 :gencgc :sb-simd-pack :sb-simd-pack-256
-                               :avx512 :sb-simd-pack-512 (not :sb-eval) :sb-fasteval)
-              ("x86-64-darwin" :darwin :bsd :unix :mach-o :little-endian :avx2 :gencgc
-                               :sb-simd-pack :sb-simd-pack-256)
-              ("x86-64-imm" :little-endian :avx2 :gencgc :sb-simd-pack :sb-simd-pack-256
-                             :avx512 :sb-simd-pack-512 :immobile-space (not :sb-unicode))
-              ("x86-64-permgen" :little-endian :avx2 :gencgc :sb-simd-pack :sb-simd-pack-256 :avx512 :sb-simd-pack-512
-                                :permgen))))
+    ("x86-64" ("x86-64" :little-endian :avx2 :avx512 :gencgc :sb-simd-pack :sb-simd-pack-256 :sb-simd-pack-512)
+              ("x86-64-linux" :linux :unix :elf :little-endian :avx2 :avx512 :gencgc
+                               :sb-simd-pack :sb-simd-pack-256 :sb-simd-pack-512 (not :sb-eval) :sb-fasteval)
+              ("x86-64-darwin" :darwin :bsd :unix :mach-o :little-endian :avx2 :avx512 :gencgc
+                               :sb-simd-pack :sb-simd-pack-256 :sb-simd-pack-512)
+              ("x86-64-imm" :little-endian :avx2 :avx512 :gencgc :sb-simd-pack :sb-simd-pack-256
+                            :sb-simd-pack-512 :immobile-space (not :sb-unicode))
+              ("x86-64-permgen" :little-endian :avx2 :avx512 :gencgc :sb-simd-pack
+                                :sb-simd-pack-256 :sb-simd-pack-512 :permgen))))
 
 (setq sb-ext:*evaluator-mode* :compile)
 (defun interpolate (string substitutions)
@@ -92,7 +92,10 @@
   ((new
     (with-output-to-string (makefile)
       (format makefile
-          "SBCL=src/runtime/sbcl
+          "###################################################
+### THIS FILE IS MACHINE-GENERATED. DO NOT EDIT ###
+###################################################
+SBCL=src/runtime/sbcl
 ARGS=--core output/sbcl.core --noinform --disable-debugger --noprint --no-userinit --no-sysinit
 SCRIPT1=crossbuild-runner/pass-1.lisp
 SCRIPT2=crossbuild-runner/pass-2.lisp

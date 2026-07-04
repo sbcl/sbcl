@@ -1,19 +1,24 @@
 (
-(#(0 2 4 6 8 A E 10 12 14 16 18 1A 1C 1E 20 22 24 2A 2C 32 34 7A)
- "(61 4 3 10 7 8 9 5 14 13 12 11 26 25 22 21 18 17 2 16 15 0 1)"
- "((let ((tab #a((16) (unsigned-byte 8) 0 13 1 7 15 13 15 21 9 0 16 18 16 0 18 22)))
+(#(0 2 4 6 8 A E 10 12 14 16 18 1A 1C 1E 20 22 24 28 2A 2C 2E 7A)
+ "(61 4 3 10 7 8 9 5 14 13 12 11 23 22 21 20 18 17 2 16 15 0 1)"
+ "((let ((tab #a((16) (unsigned-byte 8) 0 13 1 7 13 7 21 15 16 9 22 17 21 0 18 22)))
   (let ((b (& (>> val 1) #xf)))
    (let ((a (>> (<< val 25) 28)))
     (^ a (aref tab b))))))")
-(#(0 2 4 1E 20 22 2A 2C)
- "(15 16 21 22 2 17 1 0)"
- "((& (+ (>> val 1) (>> val 3) (>> val 4)) 7))")
-(#(0 2 4 44 46 48)
- "(35 34 2 36 1 0)"
- "((& (+ (>> val 1) (>> val 6)) 7))")
-(#(0 2 4 46 48)
- "(35 2 36 1 0)"
- "((& (>> val 1) 7))")
+(#(0 2 4 1E 20 22 28 2A)
+ "(15 16 20 21 2 17 1 0)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 7 1 7)))
+  (+= val #xcafb35e5)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 3) #x3)))
+   (let ((a (>> (u32+ val (<< val 29)) 30)))
+    (^ a (aref tab b))))))")
+(#(0 2 4 30 32 34)
+ "(25 24 2 26 1 0)"
+ "((& (+ (>> val 1) (>> val 4)) 7))")
+(#(0 2 4 32 34)
+ "(25 2 26 1 0)"
+ "((& (- (>> val 1) (>> val 3)) 7))")
 (#(0 2 A C E 10 1E)
  "(8 7 0 15 1 5 6)"
  "((let ((tab #a((4) (unsigned-byte 8) 0 4 7 0)))
@@ -23,6 +28,14 @@
 (#(0 4 5 C D)
  "(NIL 13 12 4 5)"
  "((& (- val (>> val 2)) 7))")
+(#(0 4 8 C E 10 14 18 1C 38 3C)
+ "(30 0 14 4 28 8 12 2 6 10 7)"
+ "((let ((tab #a((8) (unsigned-byte 8) 1 8 0 8 5 0 0 5)))
+  (+= val #xda0af00d)
+  (^= val (>> val 4))
+  (let ((b (& val #x7)))
+   (let ((a (>> (u32+ val (<< val 25)) 29)))
+    (^ a (aref tab b))))))")
 (#(0 58AA11D 33FB65F5 DE12C038)
  "#(:OFFSET :POST-INDEX 0 :PRE-INDEX)"
  "((& (>> val 2) 3))")
@@ -66,6 +79,12 @@
 (#(0 20DD4ACE 39B7D934 CBAC3F17 D8915102 DFC40BAC F522715E)
  "(:APPEND :SUPERSEDE :RENAME-AND-DELETE :RENAME NIL :ERROR :NEW-VERSION)"
  "((& (- val (>> val 24)) 7))")
+(#(0 235ED22C 2BCE7F62 4A8C210D 56B428A2 72E2CBDA 75E7305A 80D0C591 9BAC0C5C A8892768 AC841474 E48D4754)
+ "(RATIONAL INTEGER EQL FLOAT COMPLEX REAL NIL DOUBLE-FLOAT SINGLE-FLOAT MOD SIGNED-BYTE UNSIGNED-BYTE)"
+ "((let ((tab #a((8) (unsigned-byte 8) 8 8 0 2 0 15 5 0)))
+  (let ((b (& (>> val 5) #x7)))
+   (let ((a (>> (<< val 5) 29)))
+    (^ a (aref tab b))))))")
 (#(0 235ED22C 72E2CBDA 75E7305A)
  "(NIL FLOAT RATIONAL INTEGER)"
  "((& (>> val 23) 3))")
@@ -81,6 +100,12 @@
 (#(0 2AFFE954 35870C8A C9EACDAD)
  "(:UNSPECIFIC :WILD :NEWEST NIL)"
  "((& (>> val 2) 3))")
+(#(0 2BCE7F62 4A8C210D 56B428A2 80D0C591 9BAC0C5C A8892768 AC841474 E48D4754)
+ "(EQL COMPLEX REAL NIL DOUBLE-FLOAT SINGLE-FLOAT MOD SIGNED-BYTE UNSIGNED-BYTE)"
+ "((let ((tab #a((8) (unsigned-byte 8) 3 12 0 0 0 2 0 0)))
+  (let ((b (& val #x7)))
+   (let ((a (>> val 29)))
+    (^ a (aref tab b))))))")
 (#(0 2C62CDF1 2FBB375F 57DA1CEC 7E1E0B08 EA6D3871)
  "(:RESULT-TYPES NIL :CONDITIONAL :ARG-TYPES :ARG-CHECK :GUARD)"
  "((& (+ (>> val 6) (>> val 14)) 7))")
@@ -117,6 +142,9 @@
 (#(0 711B9D42 71DECFF1 AB57C9E9)
  "(:AUTO :IMMOBILE :DYNAMIC NIL)"
  "((& (>> val 18) 3))")
+(#(0 991CAE6F 9E1CB64E C60DEABC D10DFC0D D5FEF962 D6D10A2B DFFF0920)
+ "(:|2D| NIL :|2S| :|4S| :|8H| :|4H| :|16B| :|8B|)"
+ "((& (^ val (>> val 31)) 7))")
 (#(0 B1478F0B B31CDF30 D506BD28)
  "(NIL NOTINLINE MAYBE-INLINE INLINE)"
  "((& (- val (>> val 4)) 3))")
@@ -162,49 +190,12 @@
   (let ((b (& (>> val 1) #x3)))
    (let ((a (>> (<< val 26) 30)))
     (^ a (aref tab b))))))")
-(#(6 8 A 18 28)
- "(5 4 3 12 20)"
- "((let ((tab #a((4) (unsigned-byte 8) 0 3 0 4)))
-  (let ((b (& (>> val 1) #x3)))
-   (let ((a (>> (<< val 26) 30)))
-    (^ a (aref tab b))))))")
-(#(6 8 10 24 26 30)
- "(19 18 3 24 8 4)"
- "((let ((tab #a((4) (unsigned-byte 8) 0 2 7 1)))
+(#(6 8 A 18 26)
+ "(5 4 3 12 19)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 2 7 0)))
   (let ((b (>> (<< val 26) 30)))
    (let ((a (& (>> val 1) #x3)))
     (^ a (aref tab b))))))")
-(#(6 A 12 24 26 32)
- "(19 18 3 25 9 5)"
- "((let ((tab #a((4) (unsigned-byte 8) 0 3 7 1)))
-  (let ((b (>> (<< val 26) 30)))
-   (let ((a (& (>> val 1) #x3)))
-    (^ a (aref tab b))))))")
-(#(6 C 14 24 26)
- "(19 18 3 10 6)"
- "((let ((tab #a((4) (unsigned-byte 8) 0 6 2 0)))
-  (let ((b (>> (<< val 26) 30)))
-   (let ((a (& (>> val 1) #x3)))
-    (^ a (aref tab b))))))")
-(#(6 E 16 24 26)
- "(19 18 3 11 7)"
- "((let ((tab #a((4) (unsigned-byte 8) 0 5 0 0)))
-  (+= val #xd7f616cc)
-  (^= val (>> val 4))
-  (let ((b (& val #x3)))
-   (let ((a (>> (u32+ val (<< val 26)) 30)))
-    (^ a (aref tab b))))))")
-(#(6 24 26 28 2A 2E)
- "(19 23 20 21 18 3)"
- "((let ((tab #a((4) (unsigned-byte 8) 2 0 7 3)))
-  (+= val #xaf3e5965)
-  (^= val (>> val 4))
-  (let ((b (& (>> val 1) #x3)))
-   (let ((a (>> (u32+ val (<< val 25)) 30)))
-    (^ a (aref tab b))))))")
-(#(8 A 10 12 30 32)
- "(24 25 9 8 5 4)"
- "((& (^ (>> val 1) (>> val 4)) 7))")
 (#(8 E 10 16 26)
  "(11 19 7 8 4)"
  "((let ((tab #a((4) (unsigned-byte 8) 0 2 7 0)))
@@ -223,26 +214,21 @@
   (let ((b (& (>> val 1) #x7)))
    (let ((a (>> (<< val 26) 29)))
     (^ a (aref tab b))))))")
-(#(18 1A 1C 38 3A 3C)
- "(28 12 30 29 14 13)"
- "((let ((tab #a((4) (unsigned-byte 8) 0 7 5 2)))
-  (+= val #x6e27ea10)
-  (^= val (>> val 4))
-  (let ((b (& (>> val 1) #x3)))
-   (let ((a (>> (u32+ val (<< val 21)) 30)))
-    (^ a (aref tab b))))))")
-(#(1E 20 22 3E 40 42)
- "(31 15 33 32 17 16)"
- "((let ((tab #a((4) (unsigned-byte 8) 0 2 0 4)))
+(#(1E 20 22 40 42 44)
+ "(17 16 15 34 33 32)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 2 7 4)))
   (let ((b (& (>> val 1) #x3)))
    (let ((a (>> (<< val 25) 30)))
     (^ a (aref tab b))))))")
-(#(38 3A 3C 54 56 58)
- "(30 29 28 44 43 42)"
- "((& (- (>> val 1) (>> val 5)) 7))")
-(#(3E 40 42 5C 5E 60)
- "(33 32 31 48 47 46)"
- "((let ((tab #a((4) (unsigned-byte 8) 7 2 1 0)))
+(#(24 26 28 46 48 4A)
+ "(20 19 18 37 36 35)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 7 5 2)))
+  (let ((b (& (>> val 1) #x3)))
+   (let ((a (>> (<< val 25) 30)))
+    (^ a (aref tab b))))))")
+(#(2A 2C 2E 4C 4E 50)
+ "(23 22 21 40 39 38)"
+ "((let ((tab #a((4) (unsigned-byte 8) 7 5 0 2)))
   (let ((b (& (>> val 1) #x3)))
    (let ((a (>> (<< val 25) 30)))
     (^ a (aref tab b))))))")
@@ -544,9 +530,6 @@
 (#(95A3EE5 6D3D4FDE 73D11A29 84B90ACE A3CDD395)
  "(:INITFORM :INITARG :WRITER :READER :ACCESSOR)"
  "((& (>> val 26) 7))")
-(#(9644560 33601DB2 7EF33DF1 E3C8B122)
- "(SB-VM::YMM-REG SB-VM::INT-AVX2-REG SB-VM::DOUBLE-AVX2-REG SB-VM::SINGLE-AVX2-REG)"
- "((& (>> val 6) 3))")
 (#(98ECFCF 5595EEC3 634EB941 AAD616AD BD0BBA8D E6D49D13 FBF09527)
  "#(((:TYPE SB-C::CLAMBDA) (:TYPE SB-C::OPTIONAL-DISPATCH) (:TYPE SB-C::FUNCTIONAL) (:TYPE CONSTANT)) ((:TYPE SB-C::LAMBDA-VAR)) ((:TYPE SB-C::DEFINED-FUN)) ((:TYPE SB-C::GLOBAL-VAR)))"
  "((& (- (>> val 7) (>> val 26)) 7))")
@@ -694,9 +677,9 @@
 (#(E786994 2B3B8431 59B25748 691ED00E 7132711D 73EA8DF2 9B4FDEF8 A4BC5E38)
  "(:NON-LOCAL-ENTRY :SINGLE-VALUE-RETURN :CALL-SITE :BLOCK-START :NON-LOCAL-EXIT :INTERNAL-ERROR :KNOWN-RETURN :UNKNOWN-RETURN)"
  "((& (- (>> val 12) (>> val 29)) 7))")
-(#(EA1E569 42D83FFB 6634E9C8 825503B8 8D9B0A28 ADDD7F24 B9B79FF6)
- "(:ALLOW-OTHER-KEYS :FUNCTION :FORM :PLIST :START-POSITIONS :CREATED :NAMESTRING)"
- "((& (- (>> val 1) (>> val 15)) 7))")
+(#(EA1E569 42D83FFB 6634E9C8 825503B8 8D9B0A28 ADDD7F24)
+ "(:ALLOW-OTHER-KEYS :FORM :PLIST :START-POSITIONS :CREATED :NAMESTRING)"
+ "((& (^ (>> val 10) (>> val 28)) 7))")
 (#(EA1E569 42D83FFB 6634E9C8 8D9B0A28 ADDD7F24)
  "(:ALLOW-OTHER-KEYS :PLIST :START-POSITIONS :CREATED :NAMESTRING)"
  "((& (- (>> val 5) (>> val 20)) 7))")
@@ -711,9 +694,9 @@
  "((& (- (>> val 1) (>> val 7)) 7))")
 (#(11131BE7 168C60FD 2D45A4CF 2E16A006 32030766 3AA6053C 44273B23 444AF531 47AA782C 5302EDCF 538C4003 5595EEC3 58D40BEE
    5CB9F779 634EB941 646135D9 6964D143 7058717C 7CFF98EB 7F255BE9 83A1A47F 86C51BD4 90EC2354 977E07FB 99AE692E B9D57393
-   C7C3FCCE CFFE5CF3 D3774C34 E8C239EF FC8EAFE7)
- "(UNDEFINED-CLASSOID BUILT-IN-CLASSOID CONDITION-CLASSOID STRUCTURE-CLASSOID STANDARD-CLASSOID STATIC-CLASSOID CLASSOID SIMD-PACK-256-TYPE SIMD-PACK-TYPE CONSTANT-TYPE VALUES-TYPE FUN-TYPE FUN-DESIGNATOR-TYPE ARGS-TYPE CONS-TYPE NUMERIC-UNION-TYPE NEGATION-TYPE ALIEN-TYPE-TYPE NAMED-TYPE UNKNOWN-TYPE HAIRY-TYPE MEMBER-TYPE ARRAY-TYPE CHARACTER-SET-TYPE COMPOUND-TYPE UNION-TYPE INTERSECTION-TYPE CTYPE SB-C::LVAR SB-C::LAMBDA-VAR CONSTANT)"
- "((let ((tab #a((16) (unsigned-byte 8) 21 15 22 22 21 7 31 22 11 16 13 21 0 13 13 0)))
+   BC6DB7AE C7C3FCCE CFFE5CF3 D3774C34 E8C239EF FC8EAFE7)
+ "(UNDEFINED-CLASSOID BUILT-IN-CLASSOID CONDITION-CLASSOID STRUCTURE-CLASSOID STANDARD-CLASSOID STATIC-CLASSOID CLASSOID SIMD-PACK-512-TYPE SIMD-PACK-256-TYPE SIMD-PACK-TYPE CONSTANT-TYPE VALUES-TYPE FUN-TYPE FUN-DESIGNATOR-TYPE ARGS-TYPE CONS-TYPE NUMERIC-UNION-TYPE NEGATION-TYPE ALIEN-TYPE-TYPE NAMED-TYPE UNKNOWN-TYPE HAIRY-TYPE MEMBER-TYPE ARRAY-TYPE CHARACTER-SET-TYPE COMPOUND-TYPE UNION-TYPE INTERSECTION-TYPE CTYPE SB-C::LVAR SB-C::LAMBDA-VAR CONSTANT)"
+ "((let ((tab #a((16) (unsigned-byte 8) 31 7 31 3 15 16 31 13 18 31 13 27 0 13 18 0)))
   (let ((b (& (>> val 9) #xf)))
    (let ((a (>> (<< val 7) 28)))
     (^ a (aref tab b))))))")
@@ -726,9 +709,9 @@
    (let ((a (>> (<< val 7) 28)))
     (^ a (aref tab b))))))")
 (#(11131BE7 168C60FD 2D45A4CF 2E16A006 32030766 3AA6053C 444AF531 47AA782C 5302EDCF 5CB9F779 6964D143 7058717C 83A1A47F
-   86C51BD4 977E07FB B9D57393 C7C3FCCE CFFE5CF3)
- "#(((:TYPE VALUES-TYPE)) ((:TYPE FUN-DESIGNATOR-TYPE) (:TYPE FUN-TYPE)) ((:TYPE NUMERIC-UNION-TYPE)) ((:TYPE UNION-TYPE) (:TYPE INTERSECTION-TYPE) (:TYPE COMPOUND-TYPE)) ((:TYPE MEMBER-TYPE)) ((:TYPE ARRAY-TYPE)) ((:TYPE UNKNOWN-TYPE) (:TYPE HAIRY-TYPE)) ((:TYPE NEGATION-TYPE)) ((:TYPE CONSTANT-TYPE)) ((:TYPE CONS-TYPE)) ((:TYPE CHARACTER-SET-TYPE)) ((:TYPE SIMD-PACK-TYPE)) ((:TYPE SIMD-PACK-256-TYPE)) ((:TYPE ALIEN-TYPE-TYPE)))"
- "((let ((tab #a((16) (unsigned-byte 8) 0 13 0 0 9 0 13 1 0 15 0 24 0 12 28 0)))
+   86C51BD4 977E07FB B9D57393 BC6DB7AE C7C3FCCE CFFE5CF3)
+ "#(((:TYPE VALUES-TYPE)) ((:TYPE FUN-DESIGNATOR-TYPE) (:TYPE FUN-TYPE)) ((:TYPE NUMERIC-UNION-TYPE)) ((:TYPE UNION-TYPE) (:TYPE INTERSECTION-TYPE) (:TYPE COMPOUND-TYPE)) ((:TYPE MEMBER-TYPE)) ((:TYPE ARRAY-TYPE)) ((:TYPE UNKNOWN-TYPE) (:TYPE HAIRY-TYPE)) ((:TYPE NEGATION-TYPE)) ((:TYPE CONSTANT-TYPE)) ((:TYPE CONS-TYPE)) ((:TYPE CHARACTER-SET-TYPE)) ((:TYPE SIMD-PACK-TYPE)) ((:TYPE SIMD-PACK-256-TYPE)) ((:TYPE SIMD-PACK-512-TYPE)) ((:TYPE ALIEN-TYPE-TYPE)))"
+ "((let ((tab #a((16) (unsigned-byte 8) 0 13 0 0 9 0 13 1 0 21 0 24 0 19 1 0)))
   (let ((b (& val #xf)))
    (let ((a (>> val 28)))
     (^ a (aref tab b))))))")
@@ -740,9 +723,9 @@
    (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
 (#(11131BE7 168C60FD 2D45A4CF 2E16A006 3AA6053C 444AF531 5302EDCF 5CB9F779 6964D143 7058717C 83A1A47F 86C51BD4 977E07FB
-   B9D57393 C7C3FCCE CFFE5CF3 D3774C34)
- "#(((:TYPE UNKNOWN-TYPE) (:TYPE HAIRY-TYPE) (:TYPE SIMD-PACK-256-TYPE) (:TYPE SIMD-PACK-TYPE) (:TYPE CHARACTER-SET-TYPE) (:TYPE MEMBER-TYPE) (:TYPE NUMERIC-UNION-TYPE)) ((:TYPE VALUES-TYPE) (:TYPE FUN-TYPE) (:TYPE FUN-DESIGNATOR-TYPE) (:TYPE ARGS-TYPE)) ((:TYPE CONS-TYPE)) ((:TYPE ARRAY-TYPE)) ((:TYPE UNION-TYPE) (:TYPE INTERSECTION-TYPE) (:TYPE COMPOUND-TYPE)) ((:TYPE NEGATION-TYPE)))"
- "((let ((tab #a((16) (unsigned-byte 8) 0 0 0 0 7 0 15 0 0 21 0 0 0 1 2 0)))
+   B9D57393 BC6DB7AE C7C3FCCE CFFE5CF3 D3774C34)
+ "#(((:TYPE UNKNOWN-TYPE) (:TYPE HAIRY-TYPE) (:TYPE SIMD-PACK-512-TYPE) (:TYPE SIMD-PACK-256-TYPE) (:TYPE SIMD-PACK-TYPE) (:TYPE CHARACTER-SET-TYPE) (:TYPE MEMBER-TYPE) (:TYPE NUMERIC-UNION-TYPE)) ((:TYPE VALUES-TYPE) (:TYPE FUN-TYPE) (:TYPE FUN-DESIGNATOR-TYPE) (:TYPE ARGS-TYPE)) ((:TYPE CONS-TYPE)) ((:TYPE ARRAY-TYPE)) ((:TYPE UNION-TYPE) (:TYPE INTERSECTION-TYPE) (:TYPE COMPOUND-TYPE)) ((:TYPE NEGATION-TYPE)))"
+ "((let ((tab #a((16) (unsigned-byte 8) 0 0 0 0 7 0 15 0 0 21 0 9 0 16 5 0)))
   (let ((b (& val #xf)))
    (let ((a (>> val 28)))
     (^ a (aref tab b))))))")
@@ -946,6 +929,9 @@
 (#(1E21A5F9 236BED52 2A6BF857 60BC6EF6 80D0C591 A245F357 AC841474 CB6BDBB0)
  "(SYSTEM-AREA-POINTER SB-VM::UNSIGNED-BYTE-63 SB-VM::UNSIGNED-BYTE-64 SB-VM::SIGNED-BYTE-64 COMPLEX-SINGLE-FLOAT COMPLEX-DOUBLE-FLOAT SINGLE-FLOAT DOUBLE-FLOAT)"
  "((& (- (>> val 8) (>> val 28)) 7))")
+(#(1E21A5F9 2A6BF857 80D0C591 AC841474 CB6BDBB0)
+ "(SB-VM::SIGNED-BYTE-64 SB-VM::UNSIGNED-BYTE-64 SYSTEM-AREA-POINTER SINGLE-FLOAT DOUBLE-FLOAT)"
+ "((& (+ (>> val 4) (>> val 10)) 7))")
 (#(1E21A5F9 7CFF71F8 A8892768 B9B79FF6 DB5C8A6A EF881CEA)
  "(LOGICAL-PATHNAME PATHNAME WEAK-POINTER SYSTEM-AREA-POINTER FUNCTION COMPLEX)"
  "((& (- (>> val 8) (>> val 15)) 7))")
@@ -979,9 +965,9 @@
 (#(203C7904 42226AC9 80576A93 EAD18698)
  "(:SECTION-RELATIVE :LINE-RELATIVE :SECTION :LINE)"
  "((>> val 30))")
-(#(208FE110 3B4ABA52 6C7BFBCB AB4685DD AEC88182 D110413A E0C5F126)
- "(ARRAY-TYPE NEGATION-TYPE ALIEN-TYPE-TYPE SIMD-PACK-256-TYPE SIMD-PACK-TYPE UNKNOWN-TYPE HAIRY-TYPE)"
- "((& (- (>> val 6) (>> val 29)) 7))")
+(#(208FE110 3B4ABA52 6C7BFBCB AB4685DD AEC88182 D110413A E0C5F126 E9E0577D)
+ "(ARRAY-TYPE NEGATION-TYPE ALIEN-TYPE-TYPE SIMD-PACK-512-TYPE SIMD-PACK-256-TYPE SIMD-PACK-TYPE UNKNOWN-TYPE HAIRY-TYPE)"
+ "((& (+ val (>> val 29)) 7))")
 (#(20DD4ACE 56B00232 7584640E 75F567F4 90CA5ADC)
  "(ERROR WARN STYLE-WARN SB-C:COMPILER-WARN SB-C:COMPILER-STYLE-WARN)"
  "((& (- (>> val 4) (>> val 8)) 7))")
@@ -991,6 +977,18 @@
 (#(20E8209B 21E9089F 3FE1B094 42D83FFB F8818B27)
  "(:ALLOW-OTHER-KEYS :SYSTEMP :OVERFLOW :STACK-ALLOCATE-P :FLAG-TN)"
  "((& (+ (>> val 12) (>> val 18)) 7))")
+(#(20E8209B 3FE1B094 42D83FFB B6CE09C5 DC90D22E)
+ "(:ALLOW-OTHER-KEYS :AVX512 :SYSTEMP :OVERFLOW :SCALE)"
+ "((& (- (>> val 3) (>> val 4)) 7))")
+(#(20F3DEB2 27DEC9AD 2DF3F329 42D83FFB 497F147D 5023D356 8CDBDD0D 9B1DBA5A A005BD53 A569A1AB C425F32A)
+ "(:ALLOW-OTHER-KEYS :DISP-N :VM :EVEX-B :Z :AAA :VVVV :W :OPCODE-PREFIX :LL :REMAINING-BYTES)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 0 2 13 0 9 0 5)))
+  (let ((b (& (>> val 7) #x7)))
+   (let ((a (>> (<< val 5) 29)))
+    (^ a (aref tab b))))))")
+(#(20F3DEB2 27DEC9AD 2DF3F329 42D83FFB 497F147D 9B1DBA5A A569A1AB)
+ "(:ALLOW-OTHER-KEYS :EVEX-B :Z :AAA :OPCODE-PREFIX :W :LL)"
+ "((& (>> val 25) 7))")
 (#(20F3DEB2 29F3ECDD 2AF3EE70 35F3FFC1 36F40154 38F4047A 39F4060D 3BF40933 3DF40C59 3FF40F7F 57344F50 672DACBB 731427B9
    732570DA 941DAF55 A42F11A6 BE197445 BF1975D8 C61980DD C8198403 C9198596 CA198729 CC198A4F D119922E D3FFFF01 D82AE654
    DA19A059 DB19A1EC DE000EBF E822B0BF)
@@ -1018,12 +1016,12 @@
 (#(235ED22C 2BCE7F62 611D1FAD 75E7305A 80D0C591 AC841474 D0F360C2 D2F86037)
  "(FLOAT RATIONAL REAL LONG-FLOAT DOUBLE-FLOAT SINGLE-FLOAT SHORT-FLOAT *)"
  "((& (- (>> val 11) (>> val 15)) 7))")
-(#(235ED22C 2BCE7F62 72E2CBDA 75E7305A 80D0C591 AC841474)
- "(REAL FLOAT DOUBLE-FLOAT SINGLE-FLOAT RATIONAL INTEGER)"
- "((& (+ (>> val 5) (>> val 6)) 7))")
 (#(235ED22C 42D83FFB 75E7305A A8892768 E06FC299)
  "(:ALLOW-OTHER-KEYS :UNSIGNED :COMPLEX :FLOAT :RATIONAL)"
  "((& val 7))")
+(#(235ED22C 72E2CBDA 75E7305A 80D0C591 AC841474)
+ "(DOUBLE-FLOAT SINGLE-FLOAT FLOAT RATIONAL INTEGER)"
+ "((& (+ (>> val 1) (>> val 23)) 7))")
 (#(236A976D 3F90074C 42D83FFB 4C9563A8 5393DAD1 71FB8EC1 7E1E0B08 B169B946 E940F22A)
  "(:ALLOW-OTHER-KEYS :CONVENTION :INTO-STUB :STUB :VARARGS :ARG-TYPES :RESULT-TYPE :ALIGNMENT :BITS)"
  "((let ((tab #a((8) (unsigned-byte 8) 0 5 15 2 0 5 0 0)))
@@ -1100,9 +1098,10 @@
 (#(2664D2D2 80F378DD 95181988 99795732 9D771EE7 AD7DF3DC D2B54CD1)
  "(SAP-REF-8 SAP-REF-16 SAP-REF-32 SAP-REF-64 SIGNED-SAP-REF-64 SAP-REF-SAP SAP-REF-LISPOBJ)"
  "((& (^ val (>> val 31)) 7))")
-(#(27168950 5A0CB91B 60BC6EF6 7B3F916F 80D0C591 847A59C4 92FE1EC2 A245F357 AC841474 C17B6FA5 C3E68CAD CF5ABDAB F28A2060)
- "(:JUMP-TABLE :COMPLEX-DOUBLE-FLOAT :COMPLEX-SINGLE-FLOAT :DOUBLE-FLOAT :SINGLE-FLOAT :AVX2 :HWORD :SSE :OWORD :QWORD :DWORD :WORD :BYTE)"
- "((let ((tab #a((8) (unsigned-byte 8) 4 0 2 0 11 11 5 9)))
+(#(27168950 5A0CB91B 60BC6EF6 7B3F916F 80D0C591 847A59C4 92FE1EC2 A245F357 AC841474 B6CE09C5 B7C3E8EA C17B6FA5 C3E68CAD
+   CF5ABDAB F28A2060)
+ "(:JUMP-TABLE :COMPLEX-DOUBLE-FLOAT :COMPLEX-SINGLE-FLOAT :DOUBLE-FLOAT :SINGLE-FLOAT :AVX512 :ZWORD :AVX2 :HWORD :SSE :OWORD :QWORD :DWORD :WORD :BYTE)"
+ "((let ((tab #a((8) (unsigned-byte 8) 5 0 2 0 8 13 15 1)))
   (let ((b (& (>> val 5) #x7)))
    (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
@@ -1112,9 +1111,9 @@
 (#(27168950 833A59FE 92FE1EC2 CF5ABDAB F28A2060)
  "(:DO-NOT-SET :QWORD :DWORD :WORD :BYTE)"
  "((& (+ (>> val 1) (>> val 25)) 7))")
-(#(27168950 847A59C4 92FE1EC2 C17B6FA5 CF5ABDAB F28A2060)
- "(:HWORD :OWORD :QWORD :DWORD :WORD :BYTE)"
- "((& (>> val 13) 7))")
+(#(27168950 847A59C4 92FE1EC2 B7C3E8EA C17B6FA5 CF5ABDAB F28A2060)
+ "(:ZWORD :HWORD :OWORD :QWORD :DWORD :WORD :BYTE)"
+ "((& (^ (>> val 1) (>> val 26)) 7))")
 (#(27168950 92FE1EC2 CF5ABDAB F28A2060)
  "#(:QWORD :DWORD :WORD :BYTE)"
  "((& (>> val 7) 3))")
@@ -1131,12 +1130,27 @@
   (let ((b (& val #x7)))
    (let ((a (>> val 29)))
     (^ a (aref tab b))))))")
-(#(27DEC9AD 2DF3F329 36F40154 42D83FFB 5023D356 591C658C A005BD53 C425F32A)
- "(:ALLOW-OTHER-KEYS :VM :IS4 :VVVV :W :OPCODE-PREFIX :L :REMAINING-BYTES)"
- "((& (+ val (>> val 1)) 7))")
+(#(27DEC9AD 2DF3F329 36F40154 42D83FFB 5023D356 591C658C A005BD53 B869BF94 C425F32A)
+ "(:ALLOW-OTHER-KEYS :VM :IS4 :VVVV :EVEX-W :W :OPCODE-PREFIX :L :REMAINING-BYTES)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 5 0 5 0 2 10 0)))
+  (let ((b (& val #x7)))
+   (let ((a (>> val 29)))
+    (^ a (aref tab b))))))")
+(#(27DEC9AD 2DF3F329 36F40154 42D83FFB B869BF94)
+ "(:ALLOW-OTHER-KEYS :OPCODE-PREFIX :EVEX-W :W :L)"
+ "((& (- val (>> val 15)) 7))")
+(#(27DEC9AD 2DF3F329 402C2D11 42D83FFB 8F0E568A 9127DEAB 9B1DBA5A B7131B20 C26EC306)
+ "(:ALLOW-OTHER-KEYS :NDS :LL :W :XMMREG-MEM-SIZE :REG-MEM-SIZE :OPCODE-PREFIX :PRINTER :MORE-FIELDS)"
+ "((let ((tab #a((8) (unsigned-byte 8) 8 2 2 0 0 3 7 5)))
+  (let ((b (& (>> val 11) #x7)))
+   (let ((a (>> (<< val 31) 29)))
+    (^ a (aref tab b))))))")
 (#(28BA26DE 4067C9DE A6A1DD56 E76579F3)
  "(:INVERT :PRESERVE :DOWNCASE :UPCASE)"
  "((>> val 30))")
+(#(29F3ECDD 32F3FB08 38F4047A)
+ "#(:B :H :S)"
+ "((& val 3))")
 (#(29F3ECDD 32F3FB08 38F4047A 3EF40DEC)
  "#(:B :H :S :D)"
  "((& (>> val 4) 3))")
@@ -1471,11 +1485,11 @@
 (#(4503BB3B 50C23A77 8EFF6827 E5E8B47F F31FD5F8)
  "(:MANDATORY :LITERAL :MISER :FILL :LINEAR)"
  "((& (+ val (>> val 9)) 7))")
-(#(46F0B1CF 60BC6EF6 75B31507 7750373E 80D0C591 A245F357 A8262B71 AC841474 BEF0B826 CFE6BA49)
- "(SIMD-PACK-256-DOUBLE SIMD-PACK-256-SINGLE SIMD-PACK-256-INT SIMD-PACK-DOUBLE SIMD-PACK-SINGLE SIMD-PACK-INT COMPLEX-DOUBLE-FLOAT COMPLEX-SINGLE-FLOAT DOUBLE-FLOAT SINGLE-FLOAT)"
- "((let ((tab #a((8) (unsigned-byte 8) 8 0 13 0 3 5 7 2)))
-  (let ((b (& (>> val 20) #x7)))
-   (let ((a (>> (<< val 31) 29)))
+(#(46F0B1CF 60BC6EF6 75B31507 7750373E 80D0C591 A245F357 A77EB735 A8262B71 ABF50F40 AC841474 BEF0B826 CFE6BA49 D6F62294)
+ "(SIMD-PACK-512-DOUBLE SIMD-PACK-512-SINGLE SIMD-PACK-512-INT SIMD-PACK-256-DOUBLE SIMD-PACK-256-SINGLE SIMD-PACK-256-INT SIMD-PACK-DOUBLE SIMD-PACK-SINGLE SIMD-PACK-INT COMPLEX-DOUBLE-FLOAT COMPLEX-SINGLE-FLOAT DOUBLE-FLOAT SINGLE-FLOAT)"
+ "((let ((tab #a((8) (unsigned-byte 8) 5 13 15 0 0 8 3 7)))
+  (let ((b (& (>> val 27) #x7)))
+   (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
 (#(4899E277 52383212 712E187F AEF17DD1 C37C7C73 C53C5D56 D3880CF4 E456475A ECDCC3EF)
  "(&ALLOW-OTHER-KEYS &AUX &BODY &ENVIRONMENT &KEY &MORE &OPTIONAL &REST &WHOLE)"
@@ -1667,6 +1681,9 @@
 (#(98A9616D B39B1FAB CA8CA715 CC2284AB DE0A9C1B)
  "(:BY :BELOW :ABOVE :DOWNTO :TO)"
  "((& (+ (>> val 3) (>> val 19)) 7))")
+(#(991CAE6F 9E1CB64E B8149077 C60DEABC D10DFC0D D5FEF962 D6D10A2B DFFF0920)
+ "(:|2D| :|1D| :|4S| :|2S| :|8H| :|4H| :|16B| :|8B|)"
+ "((& (+ (>> val 4) (>> val 27)) 7))")
 (#(991CAE6F 9E1CB64E C60DEABC D10DFC0D D5FEF962 D6D10A2B DFFF0920)
  "(:|2D| :|4S| :|2S| :|8H| :|4H| :|16B| :|8B|)"
  "((& (^ val (>> val 2)) 7))")
@@ -1688,148 +1705,5 @@
 (#(A49305EF D0241AE7 E55E7F8C EE9A5410)
  "(SB-PCL::%CLASS SB-PCL::%PARAMETER SB-PCL::%VARIABLE-REBINDING SPECIAL)"
  "((& (>> val 8) 3))")
-(#(359CB801 4D28C61A 53351B33 A2DD0906 B9B79FF6)
- "(FUNCTION SB-IMPL::PREDICATE SB-IMPL::KEY SB-IMPL::TEST SB-IMPL::TEST-NOT)"
- "((& (^ (>> val 3) (>> val 6)) 7))")
-(#(0 2BCE7F62 4A8C210D 56B428A2 80D0C591 9BAC0C5C A8892768 AC841474 E48D4754)
- "(EQL COMPLEX REAL NIL DOUBLE-FLOAT SINGLE-FLOAT MOD SIGNED-BYTE UNSIGNED-BYTE)"
- "((let ((tab #a((8) (unsigned-byte 8) 3 12 0 0 0 2 0 0)))
-  (let ((b (& val #x7)))
-   (let ((a (>> val 29)))
-    (^ a (aref tab b))))))")
-(#(235ED22C 72E2CBDA 75E7305A 80D0C591 AC841474)
- "(DOUBLE-FLOAT SINGLE-FLOAT FLOAT RATIONAL INTEGER)"
- "((& (+ (>> val 1) (>> val 23)) 7))")
-(#(0 235ED22C 2BCE7F62 4A8C210D 56B428A2 72E2CBDA 75E7305A 80D0C591 9BAC0C5C A8892768 AC841474 E48D4754)
- "(RATIONAL INTEGER EQL FLOAT COMPLEX REAL NIL DOUBLE-FLOAT SINGLE-FLOAT MOD SIGNED-BYTE UNSIGNED-BYTE)"
- "((let ((tab #a((8) (unsigned-byte 8) 8 8 0 2 0 15 5 0)))
-  (let ((b (& (>> val 5) #x7)))
-   (let ((a (>> (<< val 5) 29)))
-    (^ a (aref tab b))))))")
-(#(EA1E569 42D83FFB 6634E9C8 825503B8 8D9B0A28 ADDD7F24)
- "(:ALLOW-OTHER-KEYS :FORM :PLIST :START-POSITIONS :CREATED :NAMESTRING)"
- "((& (^ (>> val 10) (>> val 28)) 7))")
-(#(1E21A5F9 2A6BF857 80D0C591 AC841474 CB6BDBB0)
- "(SB-VM::SIGNED-BYTE-64 SB-VM::UNSIGNED-BYTE-64 SYSTEM-AREA-POINTER SINGLE-FLOAT DOUBLE-FLOAT)"
- "((& (+ (>> val 4) (>> val 10)) 7))")
-(#(6 8 A 18 26)
- "(5 4 3 12 19)"
- "((let ((tab #a((4) (unsigned-byte 8) 0 2 7 0)))
-  (let ((b (>> (<< val 26) 30)))
-   (let ((a (& (>> val 1) #x3)))
-    (^ a (aref tab b))))))")
-(#(0 2 4 1E 20 22 28 2A)
- "(15 16 20 21 2 17 1 0)"
- "((let ((tab #a((4) (unsigned-byte 8) 0 7 1 7)))
-  (+= val #xcafb35e5)
-  (^= val (>> val 4))
-  (let ((b (& (>> val 3) #x3)))
-   (let ((a (>> (u32+ val (<< val 29)) 30)))
-    (^ a (aref tab b))))))")
-(#(0 2 4 6 8 A E 10 12 14 16 18 1A 1C 1E 20 22 24 28 2A 2C 2E 7A)
- "(61 4 3 10 7 8 9 5 14 13 12 11 23 22 21 20 18 17 2 16 15 0 1)"
- "((let ((tab #a((16) (unsigned-byte 8) 0 13 1 7 13 7 21 15 16 9 22 17 21 0 18 22)))
-  (let ((b (& (>> val 1) #xf)))
-   (let ((a (>> (<< val 25) 28)))
-    (^ a (aref tab b))))))")
-(#(0 991CAE6F 9E1CB64E C60DEABC D10DFC0D D5FEF962 D6D10A2B DFFF0920)
- "(:|2D| NIL :|2S| :|4S| :|8H| :|4H| :|16B| :|8B|)"
- "((& (^ val (>> val 31)) 7))")
-(#(991CAE6F 9E1CB64E B8149077 C60DEABC D10DFC0D D5FEF962 D6D10A2B DFFF0920)
- "(:|2D| :|1D| :|4S| :|2S| :|8H| :|4H| :|16B| :|8B|)"
- "((& (+ (>> val 4) (>> val 27)) 7))")
-(#(0 4 8 C E 10 14 18 1C 38 3C)
- "(30 0 14 4 28 8 12 2 6 10 7)"
- "((let ((tab #a((8) (unsigned-byte 8) 1 8 0 8 5 0 0 5)))
-  (+= val #xda0af00d)
-  (^= val (>> val 4))
-  (let ((b (& val #x7)))
-   (let ((a (>> (u32+ val (<< val 25)) 29)))
-    (^ a (aref tab b))))))")
-(#(11131BE7 168C60FD 2D45A4CF 2E16A006 32030766 3AA6053C 444AF531 47AA782C 5302EDCF 5CB9F779 6964D143 7058717C 83A1A47F
-   86C51BD4 977E07FB B9D57393 CFFE5CF3)
- "#(((:TYPE VALUES-TYPE)) ((:TYPE FUN-DESIGNATOR-TYPE) (:TYPE FUN-TYPE)) ((:TYPE NUMERIC-UNION-TYPE)) ((:TYPE UNION-TYPE) (:TYPE INTERSECTION-TYPE) (:TYPE COMPOUND-TYPE)) ((:TYPE MEMBER-TYPE)) ((:TYPE ARRAY-TYPE)) ((:TYPE UNKNOWN-TYPE) (:TYPE HAIRY-TYPE)) ((:TYPE NEGATION-TYPE)) ((:TYPE CONSTANT-TYPE)) ((:TYPE CONS-TYPE)) ((:TYPE CHARACTER-SET-TYPE)) ((:TYPE SIMD-PACK-TYPE)) ((:TYPE ALIEN-TYPE-TYPE)))"
- "((let ((tab #a((16) (unsigned-byte 8) 0 13 0 0 9 0 13 1 0 15 0 4 0 17 0 0)))
-  (let ((b (& val #xf)))
-   (let ((a (>> val 28)))
-    (^ a (aref tab b))))))")
-(#(11131BE7 168C60FD 2D45A4CF 2E16A006 3AA6053C 444AF531 5302EDCF 5CB9F779 6964D143 7058717C 83A1A47F 86C51BD4 977E07FB
-   B9D57393 CFFE5CF3 D3774C34)
- "#(((:TYPE UNKNOWN-TYPE) (:TYPE HAIRY-TYPE) (:TYPE SIMD-PACK-TYPE) (:TYPE CHARACTER-SET-TYPE) (:TYPE MEMBER-TYPE) (:TYPE NUMERIC-UNION-TYPE)) ((:TYPE VALUES-TYPE) (:TYPE FUN-TYPE) (:TYPE FUN-DESIGNATOR-TYPE) (:TYPE ARGS-TYPE)) ((:TYPE CONS-TYPE)) ((:TYPE ARRAY-TYPE)) ((:TYPE UNION-TYPE) (:TYPE INTERSECTION-TYPE) (:TYPE COMPOUND-TYPE)) ((:TYPE NEGATION-TYPE)))"
- "((let ((tab #a((8) (unsigned-byte 8) 3 12 0 12 0 12 15 0)))
-  (let ((b (& (>> val 6) #x7)))
-   (let ((a (>> (<< val 5) 29)))
-    (^ a (aref tab b))))))")
-(#(11131BE7 168C60FD 2D45A4CF 2E16A006 32030766 3AA6053C 44273B23 444AF531 47AA782C 5302EDCF 538C4003 5595EEC3 58D40BEE
-   5CB9F779 634EB941 646135D9 6964D143 7058717C 7CFF98EB 7F255BE9 83A1A47F 86C51BD4 90EC2354 977E07FB 99AE692E B9D57393
-   CFFE5CF3 D3774C34 E8C239EF FC8EAFE7)
- "(UNDEFINED-CLASSOID BUILT-IN-CLASSOID CONDITION-CLASSOID STRUCTURE-CLASSOID STANDARD-CLASSOID STATIC-CLASSOID CLASSOID SIMD-PACK-TYPE CONSTANT-TYPE VALUES-TYPE FUN-TYPE FUN-DESIGNATOR-TYPE ARGS-TYPE CONS-TYPE NUMERIC-UNION-TYPE NEGATION-TYPE ALIEN-TYPE-TYPE NAMED-TYPE UNKNOWN-TYPE HAIRY-TYPE MEMBER-TYPE ARRAY-TYPE CHARACTER-SET-TYPE COMPOUND-TYPE UNION-TYPE INTERSECTION-TYPE CTYPE SB-C::LVAR SB-C::LAMBDA-VAR CONSTANT)"
- "((let ((tab #a((16) (unsigned-byte 8) 21 31 22 3 15 7 31 22 11 24 13 21 0 13 18 0)))
-  (let ((b (& (>> val 9) #xf)))
-   (let ((a (>> (<< val 7) 28)))
-    (^ a (aref tab b))))))")
-(#(90D0AD8D A836E4F7 BE9D3FB8 D3F36C41)
- "(SB-VM::NEON-REG SB-VM::INT-NEON-REG SB-VM::SINGLE-NEON-REG SB-VM::DOUBLE-NEON-REG)"
- "((& (>> val 2) 3))")
-(#(1607B33C 380E1F3F 90D0AD8D A4EDA9A1 A836E4F7 BE9D3FB8 D3F36C41 FD00B976)
- "(SB-VM::COMPLEX-DOUBLE-REG SB-VM::SINGLE-NEON-REG SB-VM::DOUBLE-NEON-REG SB-VM::INT-NEON-REG SB-VM::NEON-REG SB-VM::COMPLEX-SINGLE-REG SB-VM::DOUBLE-REG SB-VM::SINGLE-REG)"
- "((& (- (>> val 2) (>> val 9)) 7))")
-(#(C 2E 34 36 38 3A 3C)
- "(26 30 29 28 27 23 6)"
- "((& (+ (>> val 1) (>> val 2) (>> val 4)) 7))")
-(#(29F3ECDD 32F3FB08 38F4047A)
- "#(:B :H :S)"
- "((& val 3))")
-(#(6 8 A 16 2C)
- "(5 4 3 11 22)"
- "((let ((tab #a((4) (unsigned-byte 8) 2 3 6 0)))
-  (let ((b (& (>> val 1) #x3)))
-   (let ((a (>> (<< val 26) 30)))
-    (^ a (aref tab b))))))")
-(#(6 8 A 18 2C)
- "(5 4 3 12 22)"
- "((let ((tab #a((4) (unsigned-byte 8) 0 2 1 4)))
-  (let ((b (& (>> val 1) #x3)))
-   (let ((a (>> (<< val 26) 30)))
-    (^ a (aref tab b))))))")
-(#(1E 20 22 38 3A 3C)
- "(17 16 15 30 29 28)"
- "((let ((tab #a((4) (unsigned-byte 8) 0 7 2 1)))
-  (let ((b (& (>> val 1) #x3)))
-   (let ((a (>> (<< val 26) 30)))
-    (^ a (aref tab b))))))")
-(#(8 E 10 16 2C)
- "(11 22 7 8 4)"
- "((let ((tab #a((4) (unsigned-byte 8) 0 0 6 2)))
-  (let ((b (& (>> val 1) #x3)))
-   (let ((a (>> (<< val 26) 30)))
-    (^ a (aref tab b))))))")
-(#(0 2 4 24 26 28 2E 30)
- "(18 19 23 24 2 20 1 0)"
- "((let ((tab #a((4) (unsigned-byte 8) 7 0 1 7)))
-  (+= val #x762d9085)
-  (^= val (>> val 4))
-  (let ((b (& val #x3)))
-   (let ((a (>> (u32+ val (<< val 26)) 30)))
-    (^ a (aref tab b))))))")
-(#(0 2 4 6 8 A E 10 12 14 16 18 1A 1C 1E 20 22 24 26 28 2A 2E 30 32 34 36 3A 3C 7A)
- "(61 4 3 10 7 8 9 5 14 13 12 11 26 25 24 23 16 17 15 29 30 27 21 20 2 19 18 0 1)"
- "((let ((tab #a((16) (unsigned-byte 8) 15 0 21 16 9 3 18 13 1 11 20 23 24 4 26 29)))
-  (+= val #x2c45f2cb)
-  (^= val (>> val 4))
-  (let ((b (& val #xf)))
-   (let ((a (>> (u32+ val (<< val 23)) 28)))
-    (^ a (aref tab b))))))")
-(#(208FE110 3B4ABA52 6C7BFBCB AB4685DD AEC88182 D110413A E0C5F126 E9E0577D)
- "(ARRAY-TYPE NEGATION-TYPE ALIEN-TYPE-TYPE SIMD-PACK-512-TYPE SIMD-PACK-256-TYPE SIMD-PACK-TYPE UNKNOWN-TYPE HAIRY-TYPE)"
- "((& (+ val (>> val 29)) 7))")
-(#(0 2 4 6 8 A E 10 12 14 16 18 1A 1C 1E 20 22 24 26 28 2A 2E 30 32 34 36 38 3A 3C 7A)
- "(61 4 3 10 7 8 9 5 14 13 12 11 26 25 24 23 16 17 15 29 30 28 27 21 20 2 19 18 0 1)"
- "((let ((tab #a((16) (unsigned-byte 8) 21 0 16 13 18 3 24 15 1 9 11 28 26 4 20 29)))
-  (+= val #x2c45f2cb)
-  (^= val (>> val 4))
-  (let ((b (& val #xf)))
-   (let ((a (>> (u32+ val (<< val 23)) 28)))
-    (^ a (aref tab b))))))")
 )
 ;; EOF
