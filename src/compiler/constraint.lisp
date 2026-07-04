@@ -167,6 +167,22 @@
   (defun conset-difference (conset1 conset2)
     (sset-difference conset1 conset2) (values)))
 
+;;; Consets are still some of the worst-performing things in the compiler.
+;;; Profiling a particularly slow-compiling file shows the top 10 functions below:
+;;;            Self        Total        Cumul
+;;;   Nr  Count     %  Count     %  Count     %    Calls  Function
+;;; ------------------------------------------------------------------------
+;;;    1    985  20.7    985  20.7    985  20.7        -  SB-C::CONSET-ADJOIN
+;;;    2    939  19.7    939  19.7   1924  40.4        -  SB-KERNEL:%ADJOIN-EQ
+;;;    3    621  13.0    621  13.0   2545  53.5        -  SB-IMPL::GETHASH/EQ-HASH/COMMON
+;;;    4    476  10.0   1112  23.4   3021  63.5        -  SB-C::FIND-CONSTRAINT
+;;;    5    231   4.9   2465  51.8   3252  68.3        -  (FLET SB-C::BODY-FUN :IN SB-C::INHERIT-CONSTRAINTS)
+;;;    6    189   4.0   1570  33.0   3441  72.3        -  SB-C::JOIN-TYPE-CONSTRAINTS
+;;;    7    177   3.7    403   8.5   3618  76.0        -  SB-C::TYPE-FROM-CONSTRAINTS
+;;;    8    173   3.6   1278  26.8   3791  79.6        -  SB-C::FIND-OR-CREATE-CONSTRAINT
+;;;    9     66   1.4    210   4.4   3857  81.0        -  (FLET SB-C::BODY-FUN :IN SB-C::TYPE-FROM-CONSTRAINTS)
+;;;   10     58   1.2    123   2.6   3915  82.2        -  SB-KERNEL::%TYPE-INTERSECTION
+
 (locally
     ;; This is performance critical for the compiler, and benefits
     ;; from the following declarations.  Probably you'll want to
@@ -338,12 +354,30 @@
     (defconsetop conset-intersection bit-and)
     (defconsetop conset-difference bit-andc2)))
 
+;;; [the remark about types not being hash-consed is actually obsolete]
 ;;; Constraints are hash-consed. Unfortunately, types aren't, so we have
 ;;; to over-approximate and then linear search through the potential hits.
 ;;; LVARs can only be found in EQL (not-p = NIL) constraints, while constant
 ;;; and lambda-vars can only be found in EQL constraints.
+;;;
+;;; *Not* checking the type of Y on entry to FIND-CONSTRAINT is a performance improvement.
+;;; On one hand, this is no different from EXPLICIT-CHECK in a defknown of a function that
+;;; dispatches internally, but on the other it would be nicer if the compiler could figure
+;;; out that it's doing a ton of duplicated work in first asserting Y's type and then doing
+;;; an ETYPECASE on it which covers everything (and omits VECTOR-LENGTH-CONSTRAINT).
+;;; So it will correctly fail on bad inputs. But also, the asm code for the check for the
+;;; type CONSTRAINT-Y is particularly lousy for some reason, namely:
+;;;   (disassemble '(lambda (y) (the constraint-y y))) => about 25 instructions (100 bytes)
+;;; versus the types individually:
+;;;   (disassemble '(lambda (y) (the ctype y))) => hierarchical test, about 5 instructions
+;;;   (disassemble '(lambda (y) (the lvar y))) => layout EQ test, about 5 instructions
+;;;   (disassemble '(lambda (y) (the (or constant lambda-var) y))) => similarly quick
+;;;
+;;; Unfortunately, given the complete set of types to check for CONSTRAINT-Y, the compiler
+;;; chooses to use an MPH-based lookup which only makes sense in theory - in practice it's
+;;; both redundant and worse. This function's asm code got 15% smaller by omitting the decl.
 (defun find-constraint (kind x y not-p)
-  (declare (type lambda-var x) (type constraint-y y) (type boolean not-p))
+  (declare (type lambda-var x) #|(type constraint-y y)|# (type boolean not-p))
   (etypecase y
     (ctype
        (awhen (lambda-var-ctype-constraints x)
@@ -417,9 +451,11 @@
 ;;; guaranteeing that all equivalent constraints are EQ. This
 ;;; shouldn't be called on LAMBDA-VARs with no CONSTRAINTS set.
 (defun find-or-create-constraint (kind x y not-p)
-  (declare (type lambda-var x) (type constraint-y y) (type boolean not-p))
+  ;; See FIND-CONSTRAINT about why it's best not to assert the type of Y here
+  (declare (type lambda-var x) #|(type constraint-y y)|# (type boolean not-p))
   (or (find-constraint kind x y not-p)
       (let ((new (make-constraint (length *constraint-universe*)
+                                  ;; MAKE-CONSTRAINT will type-check Y
                                   kind x y not-p)))
         (vector-push-extend new *constraint-universe*
                             (1+ (length *constraint-universe*)))
