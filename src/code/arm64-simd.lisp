@@ -1693,8 +1693,6 @@
                    ((packed complex-double-reg))
                    ((p32-1 complex-double-reg))
                    ((p32-2 complex-double-reg))
-                   ((mask-3f complex-double-reg))
-                   ((mask-1f complex-double-reg))
                    ((mask-2 complex-double-reg))
                    ((mask-bf complex-double-reg))
                    ((ones complex-double-reg))
@@ -1708,8 +1706,6 @@
                 (inst movi mask-2 2 :8b)
                 (inst movi ones 1 :8b)
                 (inst movi mask-bf #xBF :8h)
-                (inst movi mask-3f #x3f :8h)
-                (inst movi mask-1f #x1f :8h)
                 (inst b start)
 
                 LOOP
@@ -1738,10 +1734,10 @@
                 ;; next16 is shifted by one,
                 ;; construct a codepoint from two overlapping bytes,
                 ;; i.e. (dpb b0 (byte 5 6) b1)
-                (inst and lead current16 mask-1f :8h)
-                (inst shl lead lead 6 :8h)
-                (inst and continuations next16 mask-3f :8h)
-                (inst orr combined lead continuations :8h)
+                (inst shl lead current16 6 :8h)
+                (inst bic lead #xf800 :8h)
+                (inst bic next16 #xc0 :8h)
+                (inst orr combined lead next16 :8h)
 
                 ;; Select either the combined two bytes or one ascii byte
                 (inst cmhi is-lead16 current16 mask-bf :8h)

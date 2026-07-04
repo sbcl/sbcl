@@ -368,18 +368,20 @@
         (format stream "D~d" offset)
         (format stream "V~d.~a" offset
                 (cond ((eq cmode #b1110)
-                       (if (eq op 1)
-                           (if (zerop q)
-                               ""
-                               "2D")
-                           (if (zerop q)
-                               "8B"
-                               "16B")))
-                      ((eq (logandc2 cmode #b10) #b1000)
+                          (if (eq op 1)
+                              (if (zerop q)
+                                  ""
+                                  "2D")
+                              (if (zerop q)
+                                  "8B"
+                                  "16B")))
+                      ((or (eq (logand cmode #b1101) #b1001)
+                           (eq (logandc2 cmode #b10) #b1000))
                        (if (zerop q)
                            "4H"
                            "8H"))
-                      ((or (zerop (logand cmode #b1001))
+                      ((or (eq (logand cmode #b1001) #b0001)
+                           (zerop (logand cmode #b1001))
                            (= (ldb (byte 3 13) cmode) #b110))
                        (if (zerop q)
                            "2S"
@@ -425,9 +427,21 @@
 
 (defun print-simd-modified-imm (value stream dstate)
   (declare (ignore dstate))
-  (destructuring-bind (abc cmode defgh) value
+  (destructuring-bind (abc defgh cmode) value
     (let ((shift
-            (cond ((eq cmode #b1110)
+            (cond ((eq cmode #b1001)
+                   0)
+                  ((eq cmode #b1011)
+                   8)
+                  ((eq cmode #b0001)
+                   0)
+                  ((eq cmode #b0011)
+                   8)
+                  ((eq cmode #b0101)
+                   16)
+                  ((eq cmode #b0111)
+                   24)
+                  ((eq cmode #b1110)
                    0)
                   ((zerop (logand cmode #b1001))
                    (ash cmode 2))

@@ -959,10 +959,6 @@
                                 (fpr-offset rd))
           (emit-logical-reg-inst segment ,opc 1 rd rn rm)))))
 
-(def-logical-reg+simd bic #b00
-  ((:printer logical-reg ((op #b00) (n 1))))
-   #b0 #b01 #b00011)
-
 (def-logical-reg+simd orn #b01
   ((:printer logical-reg ((op #b01) (n 1)))
    (:printer logical-reg ((op #b01) (n 1) (rn 31))
@@ -3017,7 +3013,7 @@
   (cmode :field (byte 4 12))
   (o2 :field (byte 1 11))
   (op3 :field (byte 1 10) :value #b1)
-  (imm :fields (list (byte 3 16) (byte 4 12) (byte 5 5)) :type 'simd-modified-imm)
+  (imm :fields (list (byte 3 16) (byte 5 5) (byte 4 12)) :type 'simd-modified-imm)
   (rd :fields (list (byte 1 30) (byte 4 12) (byte 5 0) (byte 1 29)) :type 'simd-reg-cmode))
 
 (define-instruction-format (simd-modified-fp-imm 32
@@ -3112,6 +3108,117 @@
                                     #b01111
                                     #b00111)
                                 (gpr-offset rn) (fpr-offset rd)))))))
+
+(defun emit-simd-orr/bic-imm (segment op rd imm vector-size)
+  (let (cmode)
+    (ecase vector-size
+      ((:4h :8h)
+       (cond ((typep imm '(unsigned-byte 8))
+              (setf cmode #b1001))
+             ((and (typep imm '(unsigned-byte 16))
+                   (zerop (ldb (byte 8 0) imm)))
+              (setf imm (ldb (byte 8 8) imm)
+                    cmode #b1011))
+             (t
+              (error "~x bad immediate" imm))))
+      ((:2s :4s)
+       (cond ((typep imm '(unsigned-byte 8))
+              (setf cmode #b0001))
+             ((and (typep imm '(unsigned-byte 16))
+                   (zerop (ldb (byte 8 0) imm)))
+              (setf imm (ldb (byte 8 8) imm)
+                    cmode #b0011))
+             ((and (typep imm '(unsigned-byte 24))
+                   (zerop (ldb (byte 16 0) imm)))
+              (setf imm (ldb (byte 8 16) imm)
+                    cmode #b0101))
+             ((and (typep imm '(unsigned-byte 32))
+                   (zerop (ldb (byte 24 0) imm)))
+              (setf imm (ldb (byte 8 24) imm)
+                    cmode #b0111))
+             (t
+              (error "~x bad immediate" imm)))))
+    (emit-simd-modified-imm segment
+                            (encode-vector-size vector-size)
+                            op
+                            (ldb (byte 3 5) imm)
+                            cmode
+                            0
+                            (ldb (byte 5 0) imm)
+                            (fpr-offset rd))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun simd-modified-imm-printer (op cmodes)
+    (loop for cmode in cmodes
+          for fields = (loop for bit in cmode
+                             for i downfrom 15
+                             unless (eq bit 'x)
+                             collect `(byte 1 ,i))
+          for bits = (remove 'x cmode)
+          collect `(:printer simd-modified-imm ((o2 0)
+                                                (op ,op)
+                                                (cmodes ',bits
+                                                        :fields (list ,@fields)))))))
+
+(macrolet ((def (name simd-op cmodes)
+             `(define-instruction ,name (segment rd &rest args)
+                (:printer logical-reg ((op 0) (n 1)))
+                (:printer simd-three-same ((u 0) (size 1) (op 3)))
+                ,@(simd-modified-imm-printer simd-op cmodes)
+                (:emitter
+                 (if (and (keywordp (car (last args)))
+                          (= (length args) 2))
+                     (destructuring-bind (imm vector-size) args
+                       (emit-simd-orr/bic-imm segment ,simd-op rd imm vector-size))
+                     (destructuring-bind (rn rm &optional vector-size) args
+                       (if vector-size
+                           (emit-simd-three-same segment
+                                                 (encode-vector-size vector-size)
+                                                 0 1 (fpr-offset rm) 3
+                                                 (fpr-offset rn) (fpr-offset rd))
+                           (emit-logical-reg-inst segment 0 1 rd rn rm))))))))
+  (def bic 1 ((1 0 x 1)
+              (0 x x 1))))
+
+(macrolet ((def (name simd-op cmodes)
+             `(define-instruction ,name (segment rd &rest args)
+                (:printer simd-three-same ((u 0) (size 2) (op 3))
+                          '((:cond ((rn :same-as rm) 'mov) (t 'orr)) :tab rd ", " rn
+                            (:unless (:same-as rn) ", " rm)))
+                (:printer logical-imm ((op 1)))
+                (:printer logical-reg ((op 1)))
+                (:printer logical-imm ((op 1) (rn 31))
+                          '('mov :tab rd ", " imm))
+                (:printer logical-reg ((op 1) (rn 31))
+                          '('mov :tab rd ", " rm shift))
+                ,@(simd-modified-imm-printer simd-op cmodes)
+                (:emitter
+                 (if (and (keywordp (car (last args)))
+                          (= (length args) 2))
+                     (destructuring-bind (imm vector-size) args
+                       (emit-simd-orr/bic-imm segment ,simd-op rd imm vector-size))
+                     (destructuring-bind (rn rm &optional vector-size) args
+                       (if vector-size
+                           (emit-simd-three-same segment
+                                                 (encode-vector-size vector-size)
+                                                 0 2 (fpr-offset rm) 3
+                                                 (fpr-offset rn) (fpr-offset rd))
+                           (if (or (register-p rm) (shifter-operand-p rm))
+                               (emit-logical-reg-inst segment 1 0 rd rn rm)
+                               (let ((size (reg-size rd)))
+                                 (multiple-value-bind (n immr imms)
+                                     (encode-logical-immediate rm
+                                                               (if (= size 1)
+                                                                   64
+                                                                   32))
+                                   (unless n
+                                     (error 'cannot-encode-immediate-operand
+                                            :value rm))
+                                   (emit-logical-imm segment size 1 n immr imms
+                                                     (gpr-offset rn)
+                                                     (gpr-offset rd))))))))))))
+  (def orr 0 ((1 0 x 1)
+              (0 x x 1))))
+
 
 (define-instruction load-from-label (segment dest label &optional lip)
   (:vop-var vop)
@@ -4129,20 +4236,11 @@
       (typep (ldb (byte 8 0) value) '(member 255 0))))))
 
 (macrolet
-    ((def (name o2 op cmodes)
+    ((def (name op cmodes)
        `(define-instruction ,name (segment rd imm &optional size)
-          ,@(loop for cmode in cmodes
-                  for fields = (loop for bit in cmode
-                                     for i downfrom 15
-                                     unless (eq bit 'x)
-                                     collect `(byte 1 ,i))
-                  for bits = (remove 'x cmode)
-                  collect `(:printer simd-modified-imm ((o2 ,o2)
-                                                        (op ,op)
-                                                        (cmodes ',bits
-                                                                :fields (list ,@fields)))))
+          ,@(simd-modified-imm-printer op cmodes)
           ,@(when (eq name 'movi)
-              `((:printer simd-modified-imm ((o2 ,o2)
+              `((:printer simd-modified-imm ((o2 0)
                                              (op 1)
                                              (cmode #b1110)
                                              (imm nil :type '64-bit-modified-imm)))))
@@ -4219,17 +4317,17 @@
                                      op
                                      abc
                                      cmode
-                                     ,o2
+                                     0
                                      defgh
                                      (fpr-offset rd)))))))
 
-  (def movi 0 0 ((0 x x 0)
-                 (1 0 x 0)
-                 (1 1 0 x)
-                 (1 1 1 0)))
-  (def mvni 0 1 ((0 x x 0)
-                 (1 0 x 0)
-                 (1 1 0 x))))
+  (def movi 0 ((0 x x 0)
+               (1 0 x 0)
+               (1 1 0 x)
+               (1 1 1 0)))
+  (def mvni 1 ((0 x x 0)
+               (1 0 x 0)
+               (1 1 0 x))))
 
 (def-emitter fp-cond-select
   (0 1 31)
