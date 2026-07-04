@@ -338,7 +338,11 @@
     (aver (integerp offset)))
 
   (when (shifter-operand-p offset)
-    (aver (integerp (shifter-operand-operand offset))))
+    (aver (integerp (shifter-operand-operand offset)))
+    (when (eq (shifter-operand-function-code offset) 0)
+      (setf offset (extend (shifter-operand-register offset)
+                           :lsl
+                           (shifter-operand-operand offset)))))
 
   (make-memory-operand base offset mode))
 
@@ -1527,7 +1531,7 @@
      :include ldr-str)
   (op4 :field (byte 1 21) :value 1)
   (rm :field (byte 5 16) :type 'x-reg)
-  (option :fields (list (byte 3 13) (byte 1 12)) :type 'ldr-str-extend)
+  (option :fields (list (byte 2 30) (byte 1 26) (byte 1 23) (byte 3 13) (byte 1 12)) :type 'ldr-str-extend)
   (op5 :field (byte 2 10) :value #b10)
   (ldr-str-annotation :field (byte 5 16) :type 'ldr-str-reg-annotation))
 
@@ -3378,7 +3382,7 @@
                           ,@printer)
                 (:emitter
                  (emit-simd-three-same segment
-                                       (encode-vector-size size)
+                                       (encode-vector-size (the (member :16b :8b) size))
                                        ,u
                                        ,size
                                        (fpr-offset rm)

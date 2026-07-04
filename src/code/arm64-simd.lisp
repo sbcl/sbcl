@@ -1045,7 +1045,7 @@
             (loop for bytes in (list bytes bytes2 bytes3 bytes4)
                   do
                   (inst cmeq temp bytes newlines :4s)
-                  (inst bit last-newlines indexes temp :4s)
+                  (inst bit last-newlines indexes temp :16b)
                   (inst add indexes indexes increment :4s))
 
             (inst add 32-bit-array 32-bit-array 64)
@@ -1726,9 +1726,8 @@
                 ;; suitable for the lookup table
                 (inst ushr sh current 6 :8b)
                 (inst cmeq continuations sh mask-2 :8b)
-                (inst not starts continuations :8b)
-                (inst and count starts ones :8b)
-                (inst and starts starts powers :8b)
+                (inst bic starts powers continuations :8b)
+                (inst bic count ones continuations :8b)
                 (inst addv starts starts :8b)
                 (inst addv count count :8b)
                 (inst umov tmp starts 0 :b)
@@ -1741,18 +1740,16 @@
                 ;; i.e. (dpb b0 (byte 5 6) b1)
                 (inst and lead current16 mask-1f :8h)
                 (inst shl lead lead 6 :8h)
-                (inst and continuations next16 mask-3f :16b)
-                (inst orr combined lead continuations :16b)
+                (inst and continuations next16 mask-3f :8h)
+                (inst orr combined lead continuations :8h)
 
                 ;; Select either the combined two bytes or one ascii byte
                 (inst cmhi is-lead16 current16 mask-bf :8h)
                 (inst bsl is-lead16 combined current16 :16b)
 
                 ;; Remove the gaps left over from using two bytes as one codepoint
-                (inst add ptr table (lsl tmp 4))
-                (inst ldr shuf (@ ptr))
+                (inst ldr shuf (@ table (lsl tmp 4)))
                 (inst tbl packed (list is-lead16) shuf :16b)
-
 
                 ;; Widen
                 (inst ushll p32-1 :4s packed :4h 0)
