@@ -55,27 +55,7 @@
 
 ;;; Primary hash.
 (declaim (inline sset-hash1))
-(defun sset-hash1 (element)
-  #+sb-xc-host
-  (let ((result (sset-element-number element)))
-    ;; This is performance critical, and it's not certain that the host
-    ;; compiler does modular arithmetic optimization. Instad use
-    ;; something that most CL implementations will do efficiently.
-    (the fixnum (logxor (the fixnum result)
-                        (the fixnum (ash result -9))
-                        (the fixnum (ash result -5)))))
-  #-sb-xc-host
-  (let ((result (sset-element-number element)))
-    (declare (type sb-vm:word result))
-    ;; We only use the low-order bits.
-    (macrolet ((set-result (form)
-                 `(setf result (ldb (byte #.sb-vm:n-word-bits 0) ,form))))
-      (set-result (+ result (ash result -19)))
-      (set-result (logxor result (ash result -13)))
-      (set-result (+ result (ash result -9)))
-      (set-result (logxor result (ash result -5)))
-      (set-result (+ result (ash result -2)))
-      (logand most-positive-fixnum result))))
+(defun sset-hash1 (element) (mix (sset-element-number element) 0))
 
 ;;; Secondary hash (for double hash probing). Needs to return an odd
 ;;; number.
