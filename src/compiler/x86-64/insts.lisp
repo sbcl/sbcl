@@ -2871,14 +2871,13 @@
     (:emitter
      (cond ((or (gpr-p src) (gpr-p dst))
             (move-xmm<->gpr segment dst src :qword))
+           ((xmm-register-p dst)
+            (emit-sse-inst segment dst src #xf3 #x7e
+                           :operand-size :do-not-set))
            (t
-            (cond ((xmm-register-p dst)
-                   (emit-sse-inst segment dst src #xf3 #x7e
-                                  :operand-size :do-not-set))
-                  (t
-                   (aver (xmm-register-p src))
-                   (emit-sse-inst segment src dst #x66 #xd6
-                                  :operand-size :do-not-set))))))
+            (aver (xmm-register-p src))
+            (emit-sse-inst segment src dst #x66 #xd6
+                           :operand-size :do-not-set))))
     . #.(append (sse-inst-printer 'xmm-xmm/mem #xf3 #x7e)
                 (sse-inst-printer 'xmm-xmm/mem #x66 #xd6
                                   :printer '(:name :tab reg/mem ", " reg)))))

@@ -1170,12 +1170,11 @@ REG is the source (encoded in ModR/M.r/m).
     (:emitter
      (cond ((or (gpr-p src) (gpr-p dst))
             (move-ymm<->gpr segment dst src 1))
+           ((xmm-register-p dst)
+            (emit-avx2-inst segment src dst #xf3 #x7e :l 0))
            (t
-            (cond ((xmm-register-p dst)
-                   (emit-avx2-inst segment dst src #xf3 #x7e :l 0))
-                  (t
-                   (aver (xmm-register-p src))
-                   (emit-avx2-inst segment src dst #x66 #xd6 :l 0))))))
+            (aver (xmm-register-p src))
+            (emit-avx2-inst segment dst src #x66 #xd6 :l 0))))
     . #.(append (avx2-inst-printer-list 'ymm-ymm/mem #x66 #x6e
                                         :w 1
                                         :more-fields '((reg/mem nil :type 'sized-reg/mem-default-qword)))

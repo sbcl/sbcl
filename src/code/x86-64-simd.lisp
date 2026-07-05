@@ -2265,3 +2265,167 @@
       (inst mov res tmp)
 
       DONE)))
+
+(def-variant simd-copy-utf8-sap-to-character-string :avx2 (sap string length)
+  (declare (optimize speed (safety 0))
+           (type system-area-pointer sap)
+           (type index length)
+           (type (simple-array character (*)) string))
+  (let ((byte-index 0)
+        (char-index 0)
+        (table (load-time-value (let ((table (make-array (* 256 16) :element-type '(unsigned-byte 8)
+                                                                    :initial-element #xFF)))
+                                  (loop for row below 256
+                                        do (loop with indexes = (loop for i below 8
+                                                                      when (logbitp i row)
+                                                                      collect (* i 2)
+                                                                      and
+                                                                      collect (1+ (* i 2)))
+                                                 for column below 16
+                                                 for index = (pop indexes)
+                                                 when index
+                                                 do
+                                                 (setf (aref table (+ (* row 16) column)) index)))
+                                  table))))
+    (declare (type index byte-index char-index))
+    (when (>= length 9)
+      (with-pinned-objects (string table)
+        (setf (values byte-index char-index)
+              (inline-vop
+                  (((byte-array sap-reg t) sap)
+                   ((32-bit-array sap-reg t) (vector-sap string))
+                   ((table sap-reg t) (vector-sap table))
+                   ((n unsigned-reg) (- length 9))
+                   ((tmp unsigned-reg))
+                   ((current complex-double-reg))
+                   ((next complex-double-reg))
+                   ((combined complex-double-reg))
+                   ((packed complex-double-reg))
+                   ((temp complex-double-reg))
+                   ((mask-c0 complex-double-reg))
+                   ((mask-80 complex-double-reg))
+                   ((mask-df complex-double-reg))
+                   ((mask-3f complex-double-reg))
+                   ((mask-07ff complex-double-reg))
+                   ((mask-bf complex-double-reg)))
+                  ((byte-index unsigned-reg positive-fixnum :from :load)
+                   (char-index unsigned-reg positive-fixnum :from :load))
+                (inst mov tmp #xC0)
+                (inst vmovd temp tmp)
+                (inst vpbroadcastb mask-c0 temp)
+
+                (inst mov tmp #x80)
+                (inst vmovd temp tmp)
+                (inst vpbroadcastb mask-80 temp)
+
+                (inst mov tmp #xDF)
+                (inst vmovd temp tmp)
+                (inst vpbroadcastb mask-df temp)
+
+                (inst mov tmp #x3F)
+                (inst vmovd temp tmp)
+                (inst vpbroadcastw mask-3f temp)
+
+                (inst mov tmp #x7FF)
+                (inst vmovd temp tmp)
+                (inst vpbroadcastw mask-07ff temp)
+
+                (inst mov tmp #xBF)
+                (inst vmovd temp tmp)
+                (inst vpbroadcastw mask-bf temp)
+                (zeroize byte-index)
+                (zeroize char-index)
+
+                (inst jmp start)
+
+                LOOP
+                (inst vmovq current (ea byte-array byte-index))
+                (inst vmovq next (ea 1 byte-array byte-index))
+
+                ;; Check for 3 or 4 bytes
+                (inst vpsubusb temp current mask-df)
+                (inst vptest temp temp)
+                (inst jmp :nz DONE)
+
+                ;; Build a bit pattern of non-continuation bytes
+                ;; suitable for the lookup table
+                (inst vpand temp current mask-c0)
+                (inst vpcmpeqb temp temp mask-80)
+                (inst vpmovmskb tmp temp)
+                (inst xor :dword tmp #xFF)
+
+                (inst shl :dword tmp 4)
+                (inst vmovdqu temp (ea table tmp))
+
+                (inst vpmovzxbw packed current)
+                (inst vpmovzxbw next next)
+
+                ;; next is shifted by one,
+                ;; construct a codepoint from two overlapping bytes,
+                ;; i.e. (dpb b0 (byte 5 6) b1)
+                (inst vpsllw combined packed 6)
+                (inst vpand combined combined mask-07ff)
+                (inst vpand next next mask-3f)
+                (inst vpor combined combined next)
+
+                ;; Select either the combined two bytes or one ascii byte
+                (inst vpcmpgtw next packed mask-bf)
+                (inst vpblendvb packed packed combined next)
+
+                ;; Remove the gaps left over from using two bytes as one codepoint
+                (inst vpshufb packed packed temp)
+
+                (inst popcnt :dword tmp tmp)
+
+                ;; Widen
+                (let ((ymm-combined (reg-in-sc combined 'int-avx2-reg)))
+                  (inst vpmovzxwd ymm-combined packed)
+                  (inst vmovdqu (ea 32-bit-array char-index 4) ymm-combined))
+
+                (inst add byte-index 8)
+                (inst add char-index tmp)
+
+                start
+                (inst cmp byte-index n)
+                (inst jmp :le LOOP)
+
+                ;; In the last iteration, did it consume 9 or 8 bytes?
+                (inst vpextrb tmp current 7)
+                ;; the last current byte is a leading byte, meaning
+                ;; the first next byte is a continuation byte
+                (inst cmp tmp #xC0)
+                (inst jmp :l DONE)
+                (inst inc byte-index)
+
+                DONE
+                (inst vzeroupper)))))
+    (loop while (< byte-index length) do
+          (let ((b0 (sap-ref-8 sap byte-index)))
+            (cond
+              ((< b0 #x80)
+               (setf (schar string char-index) (code-char b0))
+               (incf byte-index 1))
+              ((< b0 #xE0)
+               (let ((b1 (sap-ref-8 sap (+ byte-index 1))))
+                 (setf (schar string char-index)
+                       (code-char (dpb b0 (byte 5 6) b1)))
+                 (incf byte-index 2)))
+              ((< b0 #xF0)
+               (let ((b1 (sap-ref-8 sap (+ byte-index 1)))
+                     (b2 (sap-ref-8 sap (+ byte-index 2))))
+                 (setf (schar string char-index)
+                       (code-char (dpb b0 (byte 4 12)
+                                       (dpb b1 (byte 6 6) b2))))
+                 (incf byte-index 3)))
+              (t
+               (let ((b1 (sap-ref-8 sap (+ byte-index 1)))
+                     (b2 (sap-ref-8 sap (+ byte-index 2)))
+                     (b3 (sap-ref-8 sap (+ byte-index 3))))
+                 (setf (schar string char-index)
+                       (code-char (dpb b0 (byte 3 18)
+                                       (dpb b1 (byte 6 12)
+                                            (dpb b2 (byte 6 6) b3)))))
+                 (incf byte-index 4)))))
+          (incf char-index))
+
+    char-index))
