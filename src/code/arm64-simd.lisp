@@ -1653,11 +1653,11 @@
            (type (simple-array character (*)) string))
   (let ((byte-index 0)
         (char-index 0)
-        (table (load-time-value (let ((table (make-array (* 256 16) :element-type '(unsigned-byte 8)
-                                                                    :initial-element #xFF)))
-                                  (loop for row below 256
+        (table (load-time-value (let ((table (make-array (* #b10101011 16) :element-type '(unsigned-byte 8)
+                                                                           :initial-element #xFF)))
+                                  (loop for row to #b10101010 ;; highest possible inverted index for compressing 1/2 bytes
                                         do (loop with indexes = (loop for i below 8
-                                                                      when (logbitp i row)
+                                                                      unless (logbitp i row)
                                                                       collect (* i 2)
                                                                       and
                                                                       collect (1+ (* i 2)))
@@ -1720,7 +1720,7 @@
                 ;; suitable for the lookup table
                 (inst ushr sh current 6 :8b)
                 (inst cmeq continuations sh mask-2 :8b)
-                (inst bic starts powers continuations :8b)
+                (inst and starts powers continuations :8b)
                 (inst addv starts starts :8b)
                 (inst addv count continuations :8b)
                 (inst umov tmp starts 0 :b)

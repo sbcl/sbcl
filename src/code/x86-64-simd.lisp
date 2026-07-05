@@ -2273,11 +2273,11 @@
            (type (simple-array character (*)) string))
   (let ((byte-index 0)
         (char-index 0)
-        (table (load-time-value (let ((table (make-array (* 256 16) :element-type '(unsigned-byte 8)
-                                                                    :initial-element #xFF)))
-                                  (loop for row below 256
+        (table (load-time-value (let ((table (make-array (* #b10101011 16) :element-type '(unsigned-byte 8)
+                                                                           :initial-element #xFF)))
+                                  (loop for row to #b10101010  ;; highest possible inverted index for compressing 1/2 bytes
                                         do (loop with indexes = (loop for i below 8
-                                                                      when (logbitp i row)
+                                                                      unless (logbitp i row)
                                                                       collect (* i 2)
                                                                       and
                                                                       collect (1+ (* i 2)))
@@ -2340,7 +2340,7 @@
 
                 LOOP
                 (inst vmovq current (ea byte-array byte-index))
-                (inst vmovq next (ea 1 byte-array byte-index))
+                (inst vpmovzxbw next (ea 1 byte-array byte-index))
 
                 ;; Check for 3 or 4 bytes
                 (inst vpsubusb temp current mask-df)
@@ -2352,13 +2352,9 @@
                 (inst vpand temp current mask-c0)
                 (inst vpcmpeqb temp temp mask-80)
                 (inst vpmovmskb tmp temp)
-                (inst xor :dword tmp #xFF)
 
                 (inst shl :dword tmp 4)
-                (inst vmovdqu temp (ea table tmp))
-
                 (inst vpmovzxbw packed current)
-                (inst vpmovzxbw next next)
 
                 ;; next is shifted by one,
                 ;; construct a codepoint from two overlapping bytes,
@@ -2372,9 +2368,11 @@
                 (inst vpcmpgtw next packed mask-bf)
                 (inst vpblendvb packed packed combined next)
 
-                ;; Remove the gaps left over from using two bytes as one codepoint
-                (inst vpshufb packed packed temp)
 
+                ;; Remove the gaps left over from using two bytes as one codepoint
+                (inst vpshufb packed packed (ea table tmp))
+
+                (inst xor :dword tmp #xFF0) ;; Count non-continuation bytes
                 (inst popcnt :dword tmp tmp)
 
                 ;; Widen
@@ -2397,8 +2395,8 @@
                 (inst jmp :l DONE)
                 (inst inc byte-index)
 
-                DONE
-                (inst vzeroupper)))))
+                (inst vzeroupper)
+                DONE))))
     (loop while (< byte-index length) do
           (let ((b0 (sap-ref-8 sap byte-index)))
             (cond
