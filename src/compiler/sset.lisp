@@ -146,10 +146,8 @@
         for hash of-type index = (logand mask (sset-hash1 element)) then
           (logand mask (+ hash secondary-hash))
         for current = (aref vector hash)
-        do (cond ((eql current 0)
-                  (return nil))
-                 ((eq current element)
-                  (return t)))))
+        do (cond ((eq current element) (return t))
+                 ((eql current 0) (return nil)))))
 
 (declaim (ftype (sfunction (sset sset) boolean) sset=))
 (defun sset= (set1 set2)
