@@ -201,8 +201,6 @@
     ;; Bit-vectors win over lightweight hashes for copy, union,
     ;; intersection, difference, but lose for iteration if you iterate
     ;; over the whole vector.  Tracking extrema helps a bit.
-    ;; [Well, it _should_ help if you do it right. We need sentinel
-    ;; values that are not mistakable for actual indices]
     (min 0 :type fixnum)
     (max 0 :type fixnum))
 
@@ -518,8 +516,7 @@
        (declare (optimize speed))
        ;; Notice that in the algorithm based on CTZ we don't actually have to restrict the scan
        ;; strictly between CONSET-MIN and CONSET-MAX, because those are just hints where to find
-       ;; nonzero bits. Interestingly CONSET-MIN seems to have a flaw-  we don't maintain it
-       ;; properly so it is stuck at 0 thus entirely defeating that optimization.
+       ;; nonzero bits.
        #+(and (not sb-xc-host) (or arm64 x86-64)) ; ctz is not implemented everywhere
        (let ((,minword (floor (conset-min ,conset) sb-vm:n-word-bits))
              (,maxword (floor (1- (conset-max ,conset)) sb-vm:n-word-bits)))
