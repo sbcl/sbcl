@@ -2427,3 +2427,162 @@
           (incf char-index))
 
     char-index))
+
+(def-variant simd-copy-character-string-to-utf8-byte-array :avx2 (byte-array string byte-array-length)
+  (declare (ignore byte-array-length)
+           (simple-character-string string)
+           ((simple-array (unsigned-byte 8) (*)) byte-array)
+           (optimize speed (safety 0)))
+  (let ((table (load-time-value (let ((table (make-array (* 256 16) :element-type '(unsigned-byte 8)
+                                                                    :initial-element #xFF)))
+                                  (loop for row below 256
+                                        do (loop with indexes = (loop for i below 8
+                                                                      collect (* i 2)
+                                                                      unless (logbitp i row)
+                                                                      collect (1+ (* i 2)))
+                                                 for column below 16
+                                                 for index = (pop indexes)
+                                                 when index
+                                                 do
+                                                 (setf (aref table (+ (* row 16) column)) index)))
+                                  table)))
+        (length (length string)))
+    (with-pinned-objects (string byte-array table)
+      (multiple-value-bind (byte-index char-index)
+          (inline-vop (((byte-array sap-reg t) (vector-sap byte-array))
+                       ((32-bit-array sap-reg t) (vector-sap string))
+                       ((n signed-reg) (logand (+ (* length 4) 15) -16))
+                       ((table sap-reg t) (vector-sap table))
+                       ((tmp unsigned-reg))
+                       ((temp complex-double-reg))
+                       ((bytes complex-double-reg))
+                       ((mask-3f complex-double-reg))
+                       ((mask-7f complex-double-reg))
+                       ((mask-7ff int-avx2-reg))
+                       ((low-bytes complex-double-reg))
+                       ((high-bytes complex-double-reg))
+                       ((utf8-mask complex-double-reg))
+                       ((zero complex-double-reg))
+                       ((ascii complex-double-reg)))
+              ((byte-index unsigned-reg positive-fixnum :from :load)
+               (char-index unsigned-reg positive-fixnum :from :load))
+
+            (inst mov tmp #x3F)
+            (inst vmovd temp tmp)
+            (inst vpbroadcastw mask-3f temp)
+
+            (inst mov tmp #b1000000011000000)
+            (inst vmovd temp tmp)
+            (inst vpbroadcastw utf8-mask temp)
+
+            (inst mov tmp #x7f)
+            (inst vmovd temp tmp)
+            (inst vpbroadcastw mask-7f temp)
+
+            (inst mov tmp #x7ff)
+            (inst vmovd temp tmp)
+            (inst vpbroadcastd mask-7ff temp)
+            (inst vpxor zero zero zero)
+            (flet ((convert (size)
+                     (let ((bytes (reg-in-sc bytes size))
+                           (temp (reg-in-sc temp size)))
+                       (inst vmovdqu bytes (ea 32-bit-array char-index))
+                       ;; Stop if anything is 3-4 bytes in utf8
+                       (inst vpcmpgtd temp bytes mask-7ff)
+                       (inst vptest temp temp)
+                       (inst jmp :nz DONE)
+                       ;; Narrow to 16 bits
+                       (cond ((eq size 'int-avx2-reg)
+                              (inst vpackusdw bytes bytes bytes)
+                              (inst vpermq bytes bytes 216))
+                             (t
+                              (inst vpackusdw bytes bytes zero))))
+
+                     (inst vpcmpgtw ascii mask-7f bytes)
+
+                     ;; Construct
+                     ;; (logior
+                     ;;  #x80C0
+                     ;;  (dpb (ldb (byte 6 0) bits)
+                     ;;       (byte 8 8)
+                     ;;       (ldb (byte 5 6) bits)))
+                     ;; For each 16-bits
+                     (inst vpsrlw low-bytes bytes 6)
+                     (inst vpor low-bytes low-bytes utf8-mask)
+                     (inst vpand high-bytes mask-3f bytes)
+                     (inst vpsllw high-bytes high-bytes 8)
+                     (inst vpor high-bytes high-bytes low-bytes)
+
+                     ;; Either select two bytes or one byte
+                     (inst vpblendvb bytes high-bytes bytes ascii)
+                     ;; Shrink the mask from 16 bits to 8 bits
+                     (inst vpacksswb ascii ascii ascii)
+                     ;; Remove the zero second byte from ascii words
+                     (inst vpmovmskb tmp ascii)
+                     (inst and tmp 255)
+                     (inst shl :dword tmp 4)
+                     (inst vpshufb bytes bytes (ea table tmp))
+                     (if (eq size 'int-avx2-reg)
+                         (inst vmovdqu (ea byte-index byte-array) bytes)
+                         (inst vmovq (ea byte-index byte-array) bytes))))
+              (assemble ()
+                (zeroize byte-index)
+                (zeroize char-index)
+
+                (inst sub n 32)
+                (inst jmp :b TAIL)
+                LOOP
+                (convert 'int-avx2-reg)
+
+                (inst add byte-index 16)
+                (inst add char-index 32)
+                (inst popcnt tmp tmp)
+                (inst sub byte-index tmp)
+                (inst sub n 32)
+                (inst jmp :ae LOOP)
+
+                TAIL
+                (inst cmp :dword n -32)
+                (inst jmp :z DONE)
+                (convert 'int-sse-reg)
+                (inst add char-index 16)))
+            DONE
+            (inst vzeroupper))
+        (setf char-index (truncate char-index 4))
+        (let ((sap (vector-sap byte-array)))
+          (loop while (< char-index length)
+                do
+                (let ((bits (char-code (char string char-index))))
+                  (cond ((< bits 128)
+                         (setf (aref byte-array byte-index) bits)
+                         (incf byte-index))
+                        ((< bits 2048)
+                         (setf (sap-ref-16 sap byte-index)
+                               (logior
+                                #x80C0
+                                (dpb (ldb (byte 6 0) bits)
+                                     (byte 8 8)
+                                     (ldb (byte 5 6) bits))))
+                         (incf byte-index 2))
+                        ((< bits 65536)
+                         (setf (sap-ref-16 sap (1+ byte-index))
+                               (logior
+                                #x8080
+                                (dpb (ldb (byte 6 0) bits)
+                                     (byte 8 8)
+                                     (ldb (byte 6 6) bits))))
+                         (setf (aref byte-array byte-index) (logior 224 (ldb (byte 4 12) bits)))
+                         (incf byte-index 3))
+                        (t
+                         (setf (sap-ref-32 sap byte-index)
+                               (logior
+                                #x808080F0
+                                (dpb (ldb (byte 6 0) bits)
+                                     (byte 8 24)
+                                     (dpb (ldb (byte 6 6) bits)
+                                          (byte 8 16)
+                                          (dpb (ldb (byte 6 12) bits)
+                                               (byte 8 8)
+                                               (ldb (byte 3 18) bits))))))
+                         (incf byte-index 4)))
+                  (incf char-index))))))))

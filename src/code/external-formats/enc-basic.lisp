@@ -1707,7 +1707,7 @@
                    (logand (char-code (aref string i)) #xFF)))))
 
 #-little-endian
-(defun simd-copy-character-string-to-utf8-byte-array (byte-array string length)
+(defun sb-vm::simd-copy-character-string-to-utf8-byte-array (byte-array string length)
   (declare ((simple-array character (*)) string)
            ((simple-array (unsigned-byte 8) (*)) byte-array)
            (optimize speed (safety 0)))
@@ -1738,7 +1738,7 @@
                       (incf index 4)))))))
 
 #+little-endian
-(defun simd-copy-character-string-to-utf8-byte-array (byte-array string length)
+(defun sb-vm::simd-copy-character-string-to-utf8-byte-array (byte-array string length)
   (declare ((simple-array character (*)) string)
            ((simple-array (unsigned-byte 8) (*)) byte-array)
            (optimize speed (safety 0)))
@@ -1779,8 +1779,7 @@
                                        (byte 8 16)
                                        (dpb (ldb (byte 6 12) bits)
                                             (byte 8 8)
-                                            (ldb (byte 3 18) bits))))
-                             ))
+                                            (ldb (byte 3 18) bits))))))
                       (incf index 4)))))))
 
 (defun output-to-c-string/utf-8/lf (string)
@@ -1795,5 +1794,5 @@
                                                         :initial-element 0)))
              (if ascii-only
                  (sb-vm::simd-copy-character-string-to-ascii-byte-array buffer string buffer-length)
-                 (simd-copy-character-string-to-utf8-byte-array buffer string buffer-length))
+                 (sb-vm::simd-copy-character-string-to-utf8-byte-array buffer string buffer-length))
              buffer)))))
