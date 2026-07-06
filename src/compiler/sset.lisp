@@ -114,7 +114,7 @@
                          (setf (aref vector hash) element)))
                   (return t))
                  ((eql current -1)
-                  (setf deleted-index hash))
+                  (unless deleted-index (setf deleted-index hash)))
                  ((eq current element)
                   (return nil)))))
 
