@@ -1643,10 +1643,17 @@
 
 (def-load-store strb 0 #b00)
 (def-load-store ldrb 0 #b01)
-(def-load-store ldrsb 0 #b10)
 (def-load-store strh 1 #b00)
 (def-load-store ldrh 1 #b01)
-(def-load-store ldrsh 1 #b10)
+;; The sign-extending load instructions use 'size' to convey the size
+;; of the data being loaded, and 'opc' to indicate whether the destination
+;; is an X register or W register. So these instructions suffer from two bugs:
+;; 1) Because we've hardwired the opc to #b10 we can only target the
+;;    full-sized register, which is typically what we want anyway
+;; 2) because Rt is printed using PRINT-REG-FLOAT-REG it incorrectly
+;;    interprets the size field as the W register size
+(def-load-store ldrsb #b00 #b10)
+(def-load-store ldrsh #b01 #b10)
 (def-load-store ldrsw #b10 #b10)
 
 (def-load-store str nil #b00
