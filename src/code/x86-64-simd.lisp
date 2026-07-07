@@ -803,7 +803,7 @@
           do (setf (aref string i)
                    (code-char (sap-ref-8 sap i))))))
 
-(def-variant simd-copy-character-string-to-utf8-byte-array :avx2 (byte-array string length)
+(def-variant simd-copy-character-string-to-ascii-byte-array :avx2 (byte-array string length)
   (declare (index length)
            (simple-character-string string)
            ((simple-array (unsigned-byte 8) (*)) byte-array)

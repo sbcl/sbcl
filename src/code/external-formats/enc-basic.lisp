@@ -1679,7 +1679,7 @@
         (values length nil)))))
 
 #-arm64
-(defun sb-vm::simd-copy-character-string-to-utf8-byte-array (byte-array string length)
+(defun sb-vm::simd-copy-character-string-to-ascii-byte-array (byte-array string length)
   (declare (index length)
            (simple-character-string string)
            ((simple-array (unsigned-byte 8) (*)) byte-array)
@@ -1706,6 +1706,83 @@
           do (setf (aref byte-array i)
                    (logand (char-code (aref string i)) #xFF)))))
 
+#-little-endian
+(defun simd-copy-character-string-to-utf8-byte-array (byte-array string length)
+  (declare ((simple-array character (*)) string)
+           ((simple-array (unsigned-byte 8) (*)) byte-array)
+           (optimize speed (safety 0)))
+  (declare (ignore length))
+  (let ((index 0))
+    (declare (index index))
+    (with-pinned-objects (byte-array)
+      (loop with sap = (vector-sap byte-array)
+            for char across string
+            for bits = (char-code char)
+            do (cond ((< bits 128)
+                      (setf (aref byte-array index) bits)
+                      (incf index))
+                     ((< bits 2048)
+                      (setf (aref byte-array (+ 1 index)) (logior 128 (ldb (byte 6 0) bits))
+                            (aref byte-array index) (logior 192 (ldb (byte 5 6) bits)))
+                      (incf index 2))
+                     ((< bits 65536)
+                      (setf (aref byte-array (+ 2 index)) (logior 128 (ldb (byte 6 0) bits))
+                            (aref byte-array (+ 1 index)) (logior 128 (ldb (byte 6 6) bits))
+                            (aref byte-array index) (logior 224 (ldb (byte 4 12) bits)))
+                      (incf index 3))
+                     (t
+                      (setf (aref byte-array (+ 3 index)) (logior 128 (ldb (byte 6 0) bits))
+                            (aref byte-array (+ 2 index)) (logior 128 (ldb (byte 6 6) bits))
+                            (aref byte-array (+ 1 index)) (logior 128 (ldb (byte 6 12) bits))
+                            (aref byte-array index) (logior 240 (ldb (byte 3 18) bits)))
+                      (incf index 4)))))))
+
+#+little-endian
+(defun simd-copy-character-string-to-utf8-byte-array (byte-array string length)
+  (declare ((simple-array character (*)) string)
+           ((simple-array (unsigned-byte 8) (*)) byte-array)
+           (optimize speed (safety 0)))
+  (declare (ignore length))
+  (let ((index 0))
+    (declare (index index))
+    (with-pinned-objects (byte-array)
+      (loop with sap = (vector-sap byte-array)
+            for char across string
+            for bits = (char-code char)
+            do (cond ((< bits 128)
+                      (setf (aref byte-array index) bits)
+                      (incf index))
+                     ((< bits 2048)
+                      (setf (sap-ref-16 sap index)
+                            (logior
+                             #x80C0
+                             (dpb (ldb (byte 6 0) bits)
+                                  (byte 8 8)
+                                  (ldb (byte 5 6) bits))))
+                      (incf index 2))
+                     ((< bits 65536)
+                      (setf (sap-ref-16 sap (1+ index))
+                            (logior
+                             #x8080
+                             (dpb (ldb (byte 6 0) bits)
+                                  (byte 8 8)
+                                  (ldb (byte 6 6) bits))))
+                      (setf (aref byte-array index) (logior 224 (ldb (byte 4 12) bits)))
+                      (incf index 3))
+                     (t
+                      (setf (sap-ref-32 sap index)
+                            (logior
+                             #x808080F0
+                             (dpb (ldb (byte 6 0) bits)
+                                  (byte 8 24)
+                                  (dpb (ldb (byte 6 6) bits)
+                                       (byte 8 16)
+                                       (dpb (ldb (byte 6 12) bits)
+                                            (byte 8 8)
+                                            (ldb (byte 3 18) bits))))
+                             ))
+                      (incf index 4)))))))
+
 (defun output-to-c-string/utf-8/lf (string)
   (declare (type simple-string string)
            (optimize speed (safety 0)))
@@ -1716,30 +1793,7 @@
              (check-utf8-encoding string))
            (let ((buffer (make-array (1+ buffer-length) :element-type '(unsigned-byte 8)
                                                         :initial-element 0)))
-             (cond (ascii-only
-                    (sb-vm::simd-copy-character-string-to-utf8-byte-array buffer string buffer-length))
-                   (t
-                    (let ((index 0))
-                      (declare (index index))
-                      (loop for char across string
-                            for bits = (char-code char)
-                            do (cond ((< bits 128)
-                                      (setf (aref buffer index) bits)
-                                      (incf index))
-                                     ((< bits 2048)
-                                      (setf (aref buffer (+ 1 index)) (logior 128 (ldb (byte 6 0) bits))
-                                            (aref buffer index) (logior 192 (ldb (byte 5 6) bits)))
-                                      (incf index 2))
-                                     ((< bits 65536)
-                                      (setf (aref buffer (+ 2 index)) (logior 128 (ldb (byte 6 0) bits))
-                                            (aref buffer (+ 1 index)) (logior 128 (ldb (byte 6 6) bits))
-                                            (aref buffer index) (logior 224 (ldb (byte 4 12) bits)))
-                                      (incf index 3))
-                                     (t
-                                      (setf (aref buffer (+ 3 index)) (logior 128 (ldb (byte 6 0) bits))
-                                            (aref buffer (+ 2 index)) (logior 128 (ldb (byte 6 6) bits))
-                                            (aref buffer (+ 1 index)) (logior 128 (ldb (byte 6 12) bits))
-                                            (aref buffer index) (logior 240 (ldb (byte 3 18) bits)))
-                                      (incf index 4)))))))
-
+             (if ascii-only
+                 (sb-vm::simd-copy-character-string-to-ascii-byte-array buffer string buffer-length)
+                 (simd-copy-character-string-to-utf8-byte-array buffer string buffer-length))
              buffer)))))

@@ -630,7 +630,7 @@
           do (setf (aref string i)
                    (code-char (sap-ref-8 sap i))))))
 
-(defun simd-copy-character-string-to-utf8-byte-array (byte-array string length)
+(defun simd-copy-character-string-to-ascii-byte-array (byte-array string length)
   (declare (index length)
            (simple-character-string string)
            ((simple-array (unsigned-byte 8) (*)) byte-array)
