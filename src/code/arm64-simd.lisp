@@ -825,9 +825,9 @@
 
                 (inst addv temp temp2 :8b)
                 (inst fmov tmp-tn (reg-in-sc temp 'single-reg))
-                (inst ldr (reg-in-sc shuffle-mask 'double-reg) (@ shuffle-table (extend tmp-tn :lsl 3)))
+                (inst ldr shuffle-mask (@ shuffle-table (lsl tmp-tn 3)) :d)
                 (inst tbl temp (list bytes) shuffle-mask :8b)
-                (inst str (reg-in-sc temp 'double-reg) (@ char-array 8 :post-index))
+                (inst str temp (@ char-array 8 :post-index) :d)
                 (inst sub char-array char-array count)
 
                 ;; Second half
@@ -841,10 +841,10 @@
                 (inst addv temp2 temp2 :8b)
                 (inst fmov tmp-tn (reg-in-sc temp2 'single-reg))
 
-                (inst ldr (reg-in-sc shuffle-mask2 'double-reg) (@ shuffle-table (extend tmp-tn :lsl 3)))
+                (inst ldr shuffle-mask2 (@ shuffle-table (lsl tmp-tn 3)) :d)
                 (inst ins bytes 0 bytes 1 :d)
                 (inst tbl temp (list bytes) shuffle-mask2 :8b)
-                (inst str (reg-in-sc temp 'double-reg) (@ char-array 8 :post-index))
+                (inst str temp (@ char-array 8 :post-index) :d)
                 (inst sub char-array char-array count)
 
                 (inst cmp byte-array end)
@@ -953,7 +953,7 @@
 
                 (inst addv temp temp2 :8b)
                 (inst fmov tmp-tn (reg-in-sc temp 'single-reg))
-                (inst ldr (reg-in-sc shuffle-mask 'double-reg) (@ shuffle-table (extend tmp-tn :lsl 3)))
+                (inst ldr shuffle-mask (@ shuffle-table (lsl tmp-tn 3)) :d)
                 (inst tbl temp (list bytes) shuffle-mask :8b)
 
                 ;; Widen
@@ -974,7 +974,7 @@
                 (inst addv temp2 temp2 :8b)
                 (inst fmov tmp-tn (reg-in-sc temp2 'single-reg))
 
-                (inst ldr (reg-in-sc shuffle-mask2 'double-reg) (@ shuffle-table (extend tmp-tn :lsl 3)))
+                (inst ldr shuffle-mask2 (@ shuffle-table (lsl tmp-tn 3)) :d)
                 (inst ins bytes 0 bytes 1 :d)
                 (inst tbl temp (list bytes) shuffle-mask2 :8b)
 
@@ -1820,12 +1820,11 @@
         (length (length string)))
     (with-pinned-objects-in-registers (string byte-array table)
       (multiple-value-bind (byte-index char-index)
-          (inline-vop (((byte-array* sap-reg t) (vector-sap byte-array))
-                       ((32-bit-array* sap-reg t) (vector-sap string))
+          (inline-vop (((32-bit-array* sap-reg t :target 32-bit-array) (vector-sap string))
+                       ((byte-array sap-reg t) (vector-sap byte-array))
                        ((n signed-reg) (logand (+ (* length 4) 15) -16))
                        ((table sap-reg t) (vector-sap table))
-                       ((byte-array sap-reg t))
-                       ((32-bit-array sap-reg t))
+                       ((32-bit-array sap-reg t :from (:argument 0)))
                        ((tmp unsigned-reg))
                        ((temp complex-double-reg))
                        ((bytes complex-double-reg))
@@ -1836,15 +1835,14 @@
                        ((utf8-mask complex-double-reg))
                        ((shuf complex-double-reg))
                        ((ascii complex-double-reg))
-                       ((powers complex-double-reg))
+                       ((powers double-reg))
                        ((ascii-count complex-double-reg)))
               ((byte-index unsigned-reg positive-fixnum :from :load)
                (char-index unsigned-reg positive-fixnum :from :load))
             (inst movi c-80 #x80 :8h)
-            (move byte-array byte-array*)
             (move 32-bit-array 32-bit-array*)
             (load-inline-constant utf8-mask :oword #x80C080C080C080C080C080C080C080C0)
-            (load-inline-constant (reg-in-sc powers 'double-reg) :qword (concat-ub 8 '(128 64 32 16 8 4 2 1)))
+            (load-inline-constant powers :qword (concat-ub 8 '(128 64 32 16 8 4 2 1)))
 
             (flet ((convert (size)
                      (multiple-value-bind (h-size b-size)
@@ -1887,7 +1885,6 @@
                        (inst cmhi ascii c-80 bytes h-size)
                        ;; Shrink the mask from 16 bits to 8 bits
                        (inst xtn low-bytes ascii :8b)
-
                        (inst addv ascii-count low-bytes :8b)
                        (inst and low-bytes powers low-bytes :8b)
 

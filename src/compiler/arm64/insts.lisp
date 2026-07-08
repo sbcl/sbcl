@@ -1667,7 +1667,7 @@
   (:printer ldr-str-reg ((size #b00) (op #b10) (v 1)))
   (:printer ldr-str-unscaled-imm ((size #b00) (op #b10) (v 1))))
 
-(define-instruction ldr (segment dst address)
+(define-instruction ldr (segment dst address &optional vector-size)
   (:printer ldr-str-unsigned-imm ((op #b01)))
   (:printer ldr-str-reg ((op #b01)))
   (:printer ldr-str-unscaled-imm ((op #b01)))
@@ -1694,7 +1694,7 @@
                                            (ash (- (label-position address) posn) -2)
                                            (reg-offset dst)))))
      (t
-      (emit-load-store nil 1 segment dst address)))))
+      (emit-load-store nil 1 segment dst address vector-size)))))
 
 (def-emitter ldr-str-pair
   (opc 2 30)
