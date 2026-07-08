@@ -1737,7 +1737,7 @@
                             (aref byte-array index) (logior 240 (ldb (byte 3 18) bits)))
                       (incf index 4)))))))
 
-#+little-endian
+#+(and little-endian (not arm64))
 (defun sb-vm::simd-copy-character-string-to-utf8-byte-array (byte-array string length)
   (declare ((simple-array character (*)) string)
            ((simple-array (unsigned-byte 8) (*)) byte-array)

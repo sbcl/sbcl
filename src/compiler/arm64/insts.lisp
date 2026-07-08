@@ -1553,7 +1553,7 @@
         (and (zerop rem)
              (typep qout '(unsigned-byte 12))))))
 
-(defun emit-load-store (size opc segment dst address)
+(defun emit-load-store (size opc segment dst address &optional vector-size)
   (let* ((base (memory-operand-base address))
          (offset (memory-operand-offset address))
          (mode (memory-operand-mode address))
@@ -1563,7 +1563,9 @@
          (v  (if fp
                  1
                  0))
-         (size (cond (fp
+         (size (cond (vector-size
+                      (position vector-size '(:b :h :s :d)))
+                     (fp
                       (sc-case dst
                         ((#+sb-simd-pack neon-reg
                           #+sb-simd-pack sb-vm::int-neon-reg
@@ -1633,13 +1635,13 @@
            (error "Invalid STR/LDR arguments: ~s ~s" dst address)))))
 
 (defmacro def-load-store (name size opc &rest printers)
-  `(define-instruction ,name (segment dst address)
+  `(define-instruction ,name (segment dst address &optional vector-size)
      (:printer ldr-str-unsigned-imm ((size ,size) (op ,opc) (v 0)))
      (:printer ldr-str-reg ((size ,size) (op ,opc) (v 0)))
      (:printer ldr-str-unscaled-imm ((size ,size) (op ,opc) (v 0)))
      ,@printers
      (:emitter
-      (emit-load-store ,size ,opc segment dst address))))
+      (emit-load-store ,size ,opc segment dst address vector-size))))
 
 (def-load-store strb 0 #b00)
 (def-load-store ldrb 0 #b01)

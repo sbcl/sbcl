@@ -382,7 +382,7 @@
                            "8H"))
                       ((or (eq (logand cmode #b1001) #b0001)
                            (zerop (logand cmode #b1001))
-                           (= (ldb (byte 3 13) cmode) #b110))
+                           (= (ldb (byte 3 1) cmode) #b110))
                        (if (zerop q)
                            "2S"
                            "4S")))))))
@@ -460,7 +460,7 @@
 
 (defun print-64-bit-modified-imm (value stream dstate)
   (declare (ignore dstate))
-  (destructuring-bind (abc cmode defgh) value
+  (destructuring-bind (abc defgh cmode) value
     (declare (ignore cmode))
     (let ((a (- (ldb (byte 1 2) abc)))
           (b (- (ldb (byte 1 1) abc)))
