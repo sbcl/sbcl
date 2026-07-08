@@ -2296,6 +2296,7 @@
                    ((32-bit-array sap-reg t) (vector-sap string))
                    ((table sap-reg t) (vector-sap table))
                    ((n unsigned-reg) (- length 9))
+                   ((string-length unsigned-reg) (logand (+ (length string) 3) -4))
                    ((tmp unsigned-reg))
                    ((current complex-double-reg))
                    ((next complex-double-reg))
@@ -2365,8 +2366,10 @@
 
                 ;; Remove the gaps left over from using two bytes as one codepoint
                 (inst vpshufb packed packed (ea table tmp))
-
                 (inst xor :dword tmp #xFF0) ;; Count non-continuation bytes
+                (inst cmp string-length 8)
+                (inst jmp :l TAIL-16)
+
                 (inst popcnt :dword tmp tmp)
 
                 ;; Widen
@@ -2376,6 +2379,7 @@
 
                 (inst add byte-index 8)
                 (inst add char-index tmp)
+                (inst sub string-length tmp)
 
                 start
                 (inst cmp byte-index n)
@@ -2383,6 +2387,21 @@
 
                 ;; In the last iteration, did it consume 9 or 8 bytes?
                 (inst vpextrb tmp current 7)
+                (inst jmp ADJUST)
+                TAIL-16
+                (inst and :dword tmp #xF0)
+                (inst popcnt :dword tmp tmp)
+
+                ;; Widen
+                (inst vpmovzxwd combined packed)
+                (inst vmovdqu (ea 32-bit-array char-index 4) combined)
+
+                (inst add byte-index 4)
+                (inst add char-index tmp)
+
+                ;; In the last iteration, did it consume 5 or 4 bytes?
+                (inst vpextrb tmp current 3)
+                ADJUST
                 ;; the last current byte is a leading byte, meaning
                 ;; the first next byte is a continuation byte
                 (inst cmp tmp #xC0)

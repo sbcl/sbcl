@@ -1676,6 +1676,7 @@
                    ((32-bit-array sap-reg t) (vector-sap string))
                    ((table sap-reg t) (vector-sap table))
                    ((n unsigned-reg) (- length 9))
+                   ((string-length unsigned-reg) (logand (+ (length string) 3) -4))
                    ((tmp unsigned-reg))
                    ((ptr unsigned-reg))
                    ((current double-reg))
@@ -1720,7 +1721,6 @@
                 (inst cmeq continuations sh mask-2 :8b)
                 (inst and starts powers continuations :8b)
                 (inst addv starts starts :8b)
-                (inst addv count continuations :8b)
                 (inst umov tmp starts 0 :b)
 
                 (inst ushll current16 :8h current :8b 0)
@@ -1742,22 +1742,42 @@
 
                 ;; Widen
                 (inst ushll p32-1 :4s packed :4h 0)
+                (inst add ptr 32-bit-array (lsl char-index 2))
+
+                (inst sub tmp string-length char-index)
+                (inst cmp tmp 8)
+                (inst b :lt tail-16)
+
                 (inst ushll2 p32-2 :4s packed :8h 0)
 
-                (inst add ptr 32-bit-array (lsl char-index 2))
+                (inst addv count continuations :8b)
                 (inst stp p32-1 p32-2 (@ ptr))
-
                 (inst smov tmp count 0 :b)
                 (inst add byte-index byte-index 8)
                 (inst add char-index char-index 8)
                 (inst add char-index char-index tmp) ;; subtract continuations
 
-                start
+                START
                 (inst cmp byte-index n)
                 (inst b :le LOOP)
 
                 ;; In the last iteration, did it consume 9 or 8 bytes?
                 (inst umov tmp current 7 :b)
+                (inst b ADJUST)
+
+                TAIL-16
+                (inst movi mask-2 #xFFFFFFFF)
+                (inst and continuations continuations mask-2 :8b)
+                (inst addv count continuations :8b)
+                (inst smov tmp count 0 :b)
+                (inst str p32-1 (@ ptr))
+                (inst add byte-index byte-index 4)
+                (inst add char-index char-index 4)
+                (inst add char-index char-index tmp)
+
+                ;; In the last iteration, did it consume 5 or 4 bytes?
+                (inst umov tmp current 3 :b)
+                ADJUST
                 ;; the last current byte is a leading byte, meaning
                 ;; the first next byte is a continuation byte
                 (inst cmp tmp #xC0)
