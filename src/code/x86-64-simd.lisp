@@ -2470,7 +2470,7 @@
                        ((temp complex-double-reg))
                        ((bytes complex-double-reg))
                        ((mask-3f complex-double-reg))
-                       ((mask-7f complex-double-reg))
+                       ((mask-80 complex-double-reg))
                        ((mask-7ff int-avx2-reg))
                        ((low-bytes complex-double-reg))
                        ((high-bytes complex-double-reg))
@@ -2488,9 +2488,9 @@
             (inst vmovd temp tmp)
             (inst vpbroadcastw utf8-mask temp)
 
-            (inst mov tmp #x7f)
+            (inst mov tmp #x80)
             (inst vmovd temp tmp)
-            (inst vpbroadcastw mask-7f temp)
+            (inst vpbroadcastw mask-80 temp)
 
             (inst mov tmp #x7ff)
             (inst vmovd temp tmp)
@@ -2511,7 +2511,7 @@
                              (t
                               (inst vpackusdw bytes bytes zero))))
 
-                     (inst vpcmpgtw ascii mask-7f bytes)
+                     (inst vpcmpgtw ascii mask-80 bytes)
 
                      ;; Construct
                      ;; (logior
