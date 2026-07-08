@@ -1685,8 +1685,6 @@
                    ((continuations complex-double-reg))
                    ((starts complex-double-reg))
                    ((current16 complex-double-reg))
-                   ((next16 complex-double-reg))
-                   ((lead complex-double-reg))
                    ((combined complex-double-reg))
                    ((is-lead16 complex-double-reg))
                    ((shuf complex-double-reg))
@@ -1726,15 +1724,13 @@
                 (inst umov tmp starts 0 :b)
 
                 (inst ushll current16 :8h current :8b 0)
-                (inst ushll next16 :8h next :8b 0)
+                (inst ushll combined :8h next :8b 0)
 
-                ;; next16 is shifted by one,
+                ;; next is shifted by one,
                 ;; construct a codepoint from two overlapping bytes,
                 ;; i.e. (dpb b0 (byte 5 6) b1)
-                (inst ushll lead :8h current :8b 6)
-                (inst bic lead #xf800 :8h)
-                (inst bic next16 #xc0 :8h)
-                (inst orr combined lead next16 :8h)
+                (inst sli combined current16 6 :8h)
+                (inst bic combined #xF800 :8h)
 
                 ;; Select either the combined two bytes or one ascii byte
                 (inst cmhi is-lead16 current16 mask-bf :8h)
@@ -1875,12 +1871,10 @@
                        ;;  (dpb (ldb (byte 6 0) bits)
                        ;;       (byte 8 8)
                        ;;       (ldb (byte 5 6) bits)))
-                       ;; For each 16-bits
-                       (inst ushr low-bytes bytes 6 h-size)
-                       (inst orr low-bytes low-bytes utf8-mask h-size)
-                       (inst shl high-bytes bytes 8 h-size)
+                       (inst ushr high-bytes bytes 6 h-size)
+                       (inst sli high-bytes bytes 8 h-size)
                        (inst bic high-bytes #xC000 h-size)
-                       (inst orr high-bytes low-bytes high-bytes h-size)
+                       (inst orr high-bytes high-bytes utf8-mask h-size)
 
                        (inst cmhi ascii c-80 bytes h-size)
                        ;; Shrink the mask from 16 bits to 8 bits
