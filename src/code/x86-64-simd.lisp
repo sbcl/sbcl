@@ -2266,7 +2266,7 @@
 
       DONE)))
 
-(def-variant simd-copy-utf8-sap-to-character-string :avx2 (sap string length)
+(defun simd-copy-utf8-sap-to-character-string (sap string length)
   (declare (optimize speed (safety 0))
            (type system-area-pointer sap)
            (type index length)
@@ -2305,8 +2305,7 @@
                    ((mask-c0 complex-double-reg))
                    ((mask-80 complex-double-reg))
                    ((mask-df complex-double-reg))
-                   ((mask-3f complex-double-reg))
-                   ((mask-07ff complex-double-reg))
+                   ((mask-3080 complex-double-reg))
                    ((mask-bf complex-double-reg)))
                   ((byte-index unsigned-reg positive-fixnum :from :load)
                    (char-index unsigned-reg positive-fixnum :from :load))
@@ -2322,13 +2321,9 @@
                 (inst vmovd temp tmp)
                 (inst vpbroadcastb mask-df temp)
 
-                (inst mov tmp #x3F)
+                (inst mov tmp #x3080)
                 (inst vmovd temp tmp)
-                (inst vpbroadcastw mask-3f temp)
-
-                (inst mov tmp #x7FF)
-                (inst vmovd temp tmp)
-                (inst vpbroadcastw mask-07ff temp)
+                (inst vpbroadcastw mask-3080 temp)
 
                 (inst mov tmp #xBF)
                 (inst vmovd temp tmp)
@@ -2360,9 +2355,8 @@
                 ;; construct a codepoint from two overlapping bytes,
                 ;; i.e. (dpb b0 (byte 5 6) b1)
                 (inst vpsllw combined packed 6)
-                (inst vpand combined combined mask-07ff)
-                (inst vpand next next mask-3f)
-                (inst vpor combined combined next)
+                (inst vpxor combined combined next)
+                (inst vpxor combined combined mask-3080)
 
                 ;; Select either the combined two bytes or one ascii byte
                 (inst vpcmpgtw next packed mask-bf)
