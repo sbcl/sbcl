@@ -1476,3 +1476,10 @@
                    (search "FROZENTHING" line))
           (setq saw-layout t))))
     (assert (and saw-layout (eql comparisons 1)))))
+
+(with-test (:name :alien-deref-sign-extend-once-only)
+  (let ((lines (disassembly-lines
+                '(lambda ()
+                  (declare (optimize (debug 0)))
+                  (deref (alien-funcall (extern-alien "f" (function (* char)))) 0)))))
+    (assert (eql (loop for line in lines count (search "MOVSX" line)) 1))))

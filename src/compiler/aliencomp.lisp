@@ -534,6 +534,38 @@
 
 ;;;; NATURALIZE/DEPORT/EXTRACT/DEPOSIT magic
 
+;;; The implementation of (integer :naturalize-gen) in {arm64,x86-64}/c-call
+;;; deals with function return convention where a result smaller than a full register
+;;; can leave trash in all the unused bits. Naive application of that unfortunately
+;;; pessimizes (DEREF x) where X is a pointer to integer, because memory loads all
+;;; performs sign-extension, then naturalize sign-extends again as shown:
+;;;     4C0FBE30         MOVSX R14, BYTE PTR [RAX]
+;;;     490FBED6         MOVSX RDX, R14B
+;;;
+;;;     4C0FBF30         MOVSX R14, WORD PTR [RAX]
+;;;     490FBFD6         MOVSX RDX, R14W
+;;;
+;;;     4C6330           MOVSX R14, DWORD PTR [RAX]
+;;;     4963D6           MOVSX RDX, R14D
+;;; And similarly for the arm64 disassembly.
+;;;
+;;; There is no way to undo the bad asm code (other than perhaps a peephole optimization)
+;;; because the NATURALIZE method receives zero semantic information - it does not know
+;;; that the underlying alien value came from SAP-REF. Its lexical var named ALIEN receives
+;;; the literal symbol ALIEN, and not the form which generated it. So the only place to infer
+;;; that naturalize is effectively a no-op is in the naturalize transform.
+#+(or arm64 x86-64)
+(defun is-sign-extending-load-p (object type)
+  (let ((bits (sb-alien::alien-integer-type-bits type)))
+    (eq (case bits
+          (8  'sb-sys:signed-sap-ref-8)
+          (16 'sb-sys:signed-sap-ref-16)
+          (32 'sb-sys:signed-sap-ref-32))
+        (combination-is (lvar-use object)
+                        '(sb-sys:signed-sap-ref-8
+                          sb-sys:signed-sap-ref-16
+                          sb-sys:signed-sap-ref-32)))))
+
 (flet ((%computed-lambda (compute-lambda type)
          (declare (type function compute-lambda))
          (unless (constant-lvar-p type)
@@ -546,7 +578,23 @@
            (error (condition)
                   (compiler-error "~A" condition)))))
   (deftransform naturalize ((object type))
-    (%computed-lambda #'compute-naturalize-lambda type))
+    ;; The problem detailed at IS-SIGN-EXTENDING-LOAD-P is probably true for any ABI with
+    ;; the same non-requirement to clear upper bits of smaller-than-register results.
+    ;; And I suspect that this logic is generally sound and need not be guarded
+    ;; by a reader conditional, however I am not that brave.
+    ;; Arguably this could go into the DEREF transform, but as it happens I have other
+    ;; diffs affecting DEREF and I want to keep them separate for reasons.
+    ;; (Maybe not good reasons. We'll see after they're both done.)
+    (cond #+(or arm64 x86-64)
+          ((and (combination-p (lvar-use object))
+                (constant-lvar-p type)
+                (let ((type (lvar-value type)))
+                  (and (alien-integer-type-p type)
+                       (alien-integer-type-signed type)
+                       (is-sign-extending-load-p object type))))
+           '(lambda (alien ignore) (declare (ignore ignore)) alien))
+          (t
+           (%computed-lambda #'compute-naturalize-lambda type))))
   (deftransform deport ((alien type))
     (%computed-lambda #'compute-deport-lambda type))
   (deftransform deport-alloc ((alien type))
