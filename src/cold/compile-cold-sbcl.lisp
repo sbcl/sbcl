@@ -13,6 +13,24 @@
 
 (in-package "SB-COLD")
 
+#+(or sbcl ecl ccl clisp cmucl)
+(when (probe-file (perfect-hash-generator-program))
+  (pushnew :use-host-hash-generator cl:*features*)
+  (setq *perfect-hash-generator-mode* :RECORD))
+
+(defun maybe-save-perfect-hashfuns-for-playback ()
+  ;; Check again for corruption
+  (let ((uniqueness-checker (make-hash-table :test 'equalp)))
+    (dolist (entry *perfect-hash-generator-memo*)
+      (let ((array (cdar entry)))
+        (assert (not (gethash array uniqueness-checker)))
+        (setf (gethash array uniqueness-checker) t))))
+  #+(and use-host-hash-generator sbcl)
+  (when (eq *perfect-hash-generator-mode* :record)
+    (save-perfect-hashfuns (perfect-hash-generator-journal :output)
+                           *perfect-hash-generator-memo*))
+  t)
+
 ;;; FIXME: I think it's a mistake that we load muffler twice in
 ;;; make-host-2 (once for the host, once for XC), because the host
 ;;; should produce no new warnings, and because it's really hard

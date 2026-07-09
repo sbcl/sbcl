@@ -901,15 +901,13 @@
                    ;; normal build writes the file in place
                    stem)))))
 
+(defvar *perfect-hash-generator-program*)
 (defun perfect-hash-generator-program ()
-  ;; The path depends on what the host is, not what the target is
-  #+unix "tools-for-build/perfecthash"
-  #+win32 "tools-for-build/perfecthash.exe")
-
-#+(or sbcl ecl ccl clisp cmucl)
-(when (probe-file (perfect-hash-generator-program))
-  (pushnew :use-host-hash-generator cl:*features*)
-  (setq *perfect-hash-generator-mode* :RECORD))
+  (cond ((boundp '*perfect-hash-generator-program*) *perfect-hash-generator-program*)
+        (t
+         ;; The path depends on what the host is, not what the target is
+         #+unix "tools-for-build/perfecthash"
+         #+win32 "tools-for-build/perfecthash.exe")))
 
 ;;; I want this to work using the host-native readtable if sb-cold:*xc-readtable*
 ;;; isn't established. The caller should bind *READTABLE* to ours if reading
@@ -951,7 +949,6 @@
           (error "hash generator duplicates: ~D" errors))))))
 (compile 'preload-perfect-hash-generator)
 
-#+use-host-hash-generator
 (defun run-perfecthash (input)
   (with-output-to-string (result)
     (flet (#+sbcl
@@ -1024,6 +1021,9 @@
                (values (ccl:external-process-output-stream process)
                        (ccl:external-process-input-stream process)
                        process))))
+      #-(or sbcl cmu clisp ccl ecl)
+      (progn (error "Can't run MPH generator") "")
+      #+(or sbcl cmu clisp ccl ecl)
       (multiple-value-bind (input-stream output-stream process) (launch)
         (format output-stream "~{~X~%~}" (coerce input 'list))
         (close output-stream)
@@ -1033,9 +1033,8 @@
         (close input-stream)
         (wait process)))))
 
-
 (defun emulate-generate-perfect-hash-sexpr (array identifier digest)
-  (declare #-use-host-hash-generator (ignore identifier))
+  (declare (ignorable identifier))
   ;; Entries are written to disk with hashes sorted in ascending order so that
   ;; comparing as sets can be done using EQUALP.
   ;; Sort nondestructively in case something else looks at the value as supplied.
@@ -1047,7 +1046,6 @@
     (ecase *perfect-hash-generator-mode*
       (:playback
        (error "perfect hash file is missing a needed entry for ~x" array))
-      #+use-host-hash-generator
       (:record
        ;; This will only display anything when we didn't have the data,
        ;; so it's actually not too "noisy" in a normal build.
@@ -1150,19 +1148,6 @@
             (push entry entries))))
       (setq entries (sort entries #'compare :key #'cdar))
       (save-perfect-hashfuns destination entries))))
-
-(defun maybe-save-perfect-hashfuns-for-playback ()
-  ;; Check again for corruption
-  (let ((uniqueness-checker (make-hash-table :test 'equalp)))
-    (dolist (entry *perfect-hash-generator-memo*)
-      (let ((array (cdar entry)))
-        (assert (not (gethash array uniqueness-checker)))
-        (setf (gethash array uniqueness-checker) t))))
-  #+(and use-host-hash-generator sbcl)
-  (when (eq *perfect-hash-generator-mode* :record)
-    (save-perfect-hashfuns (perfect-hash-generator-journal :output)
-                           *perfect-hash-generator-memo*))
-  t)
 
 ;;;; Please avoid writing "consecutive" (un-nested) reader conditionals
 ;;;; in this file, whether for the same or different feature test.
