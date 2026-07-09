@@ -1843,7 +1843,7 @@
                                                    (setf (aref table (+ (* row 16) column)) index)))
                                     table)))
          (length (length string)))
-    (with-pinned-objects-in-registers (string byte-array table)
+    (with-pinned-objects-in-registers (string byte-array table table2)
       (multiple-value-bind (byte-index char-index)
           (inline-vop (((32-bit-array* sap-reg t :target 32-bit-array) (vector-sap string))
                        ((byte-array sap-reg t) (vector-sap byte-array))
@@ -1857,7 +1857,7 @@
                        ((c-80 complex-double-reg))
                        ((low-bytes complex-double-reg))
                        ((high-bytes complex-double-reg))
-                       ((2byte-mask-16b complex-double-reg))
+                       ((2byte-mask-8h complex-double-reg))
                        ((2byte-mask-4s complex-double-reg))
                        ((shuf complex-double-reg))
                        ((ascii complex-double-reg))
@@ -1879,12 +1879,13 @@
                        ((c-8080E0 complex-double-reg t))
                        ((c-10000 complex-double-reg t))
                        ((c-800 complex-double-reg t))
-                       ((c-80-4s complex-double-reg t)))
+                       ((c-80-4s complex-double-reg t))
+                       ((c-3f1f complex-double-reg t)))
               ((byte-index unsigned-reg positive-fixnum :from :load)
                (char-index unsigned-reg positive-fixnum :from :load))
             (inst movi c-80 #x80 :8h)
             (move 32-bit-array 32-bit-array*)
-            (load-inline-constant 2byte-mask-16b :oword #x80C080C080C080C080C080C080C080C0)
+            (load-inline-constant 2byte-mask-8h :oword #x80C080C080C080C080C080C080C080C0)
             (load-inline-constant powers :qword (concat-ub 8 '(128 64 32 16 8 4 2 1)))
 
             (flet ((convert (size full-length)
@@ -1925,7 +1926,7 @@
                          (inst ushr high-bytes bytes 6 h-size)
                          (inst sli high-bytes bytes 8 h-size)
                          (inst bic high-bytes #xC000 h-size)
-                         (inst orr high-bytes high-bytes 2byte-mask-16b h-size)
+                         (inst orr high-bytes high-bytes 2byte-mask-8h h-size)
 
                          (inst cmhi ascii c-80 bytes h-size)
                          ;; Shrink the mask from 16 bits to 8 bits
@@ -1976,27 +1977,22 @@
                      (inst and r3 r3 c-3f3f0f :16b)
                      (inst orr r3 r3 c-8080E0 :16b)
 
-                     ;; Select 3 or 4 bytes
-                     (inst cmhi ascii c-10000 bytes :4s)
-
-                     (inst bsl ascii r3 r4 :16b)
-                     (move r4 ascii :4s)
-
                      ;; Process a 2 byte sequence
-                     (inst ushr r2 bytes 6 :4s)
-                     (inst sli r2 bytes 8 :4s)
-                     (inst bic r2 #xC000 :4s)
-                     (inst bic r2 #xFF0000 :4s)
+                     (inst tbl r2 (list f3 bytes) shuf-mask1 :16b)
+                     (inst and r2 r2 c-3f1f :16b)
                      (inst orr r2 r2 2byte-mask-4s :16b)
 
-                     ;; Put it into the result
-                     (inst cmhi ascii c-800 bytes :4s)
-                     (inst bsl ascii r2 r4 :16b)
+                     ;; Select 3 or 4 bytes
+                     (inst cmhi ascii c-10000 bytes :4s)
+                     (inst bsl ascii r3 r4 :16b)
+
+                     ;; Add 2 bytes
+                     (inst cmhi temp c-800 bytes :4s)
+                     (inst bsl temp r2 ascii :16b)
 
                      ;; And the same for ascii
-                     (move r4 ascii :4s)
                      (inst cmhi ascii c-80-4s bytes :4s)
-                     (inst bsl ascii bytes r4 :16b)
+                     (inst bsl ascii bytes temp :16b)
 
                      ;; Now need to remove zeros
                      ;; each 4-byte lane needs to remove 1-3 zeros from higher bits,
@@ -2043,15 +2039,17 @@
                 (inst cbz n DONE)
 
                 (convert 16 START-FULL-LENGTH)
-                (inst b done)
+                (inst b DONE)
+
                 START-FULL-LENGTH
                 (load-inline-constant shuf-mask1 :oword #x3C2C1C0C382818083424140430201000)
                 (load-inline-constant mul-mask :oword #x40000000100000000400000001)
-                (load-inline-constant 2byte-mask-4s :oword #x80C0000080C0000080C0000080C0)
+                (inst ushll 2byte-mask-4s :4s 2byte-mask-8h :4h 0)
                 (load-inline-constant c-3f3f3f07 :oword #x3F3F3F073F3F3F073F3F3F073F3F3F07)
                 (load-inline-constant c-808080F0 :oword #x808080F0808080F0808080F0808080F0)
                 (load-inline-constant c-3f3f0f :oword #x3F3F0F003F3F0F003F3F0F003F3F0F)
                 (load-inline-constant c-8080E0 :oword #x8080E0008080E0008080E0008080E0)
+                (load-inline-constant c-3f1f :oword #x3F1F00003F1F00003F1F00003F1F)
                 (inst movi c-10000 #x10000 :4s)
                 (inst movi c-800 #x800 :4s)
                 (inst movi c-80-4s #x80 :4s)
