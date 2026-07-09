@@ -13,11 +13,13 @@
                  (look-for
                   (format nil ", LSL #~D]" left-shift)))
              ;; some line should have an LDR with an "extended" index
-             (assert
-              (= (count-if (lambda (line)
-                             (and (search "LDR" line) (search look-for line)))
-                           lines)
-                 1)))))
+             (unless
+                 (= (count-if (lambda (line)
+                                (and (search "LDR" line) (search look-for line)))
+                              lines)
+                    1)
+               (error "~{~a~%~}" lines)
+               ))))
     (try 'unsigned-short 1)
     (try 'unsigned-int   2)
     (try 'unsigned-long  3)))
