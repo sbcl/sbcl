@@ -295,6 +295,13 @@ echo "android=$android; export android" >> output/build-config
 
 # And now, sorting out the per-target dependencies...
 
+# The target OS is normally detected with `uname`.  Set SBCL_OS to
+# override the detection, for cross-OS builds whose target binaries
+# are run by an emulator on the build host (e.g. SBCL_OS=win32 with
+# SBCL_RUNNER set to a script that runs them with Wine).
+if [ -n "$SBCL_OS" ]; then
+    sbcl_os="$SBCL_OS"
+else
 case `uname` in
     Linux)
         sbcl_os="linux"
@@ -339,6 +346,7 @@ case `uname` in
         exit 1
         ;;
 esac
+fi
 
 link_or_copy() {
    if [ "$sbcl_os" = "win32" ] ; then
