@@ -2266,7 +2266,7 @@
 
       DONE)))
 
-(defun simd-copy-utf8-sap-to-character-string (sap string length)
+(def-variant simd-copy-utf8-sap-to-character-string :avx2 (sap string length)
   (declare (optimize speed (safety 0))
            (type system-area-pointer sap)
            (type index length)
@@ -2275,7 +2275,7 @@
         (char-index 0)
         (table (load-time-value (let ((table (make-array (* #b10101011 16) :element-type '(unsigned-byte 8)
                                                                            :initial-element #xFF)))
-                                  (loop for row to #b10101010  ;; highest possible inverted index for compressing 1/2 bytes
+                                  (loop for row to #b10101010 ;; highest possible inverted index for compressing 1/2 bytes
                                         do (loop with indexes = (loop for i below 8
                                                                       unless (logbitp i row)
                                                                       collect (* i 2)
@@ -2385,9 +2385,7 @@
                 (inst cmp byte-index n)
                 (inst jmp :le LOOP)
 
-                ;; In the last iteration, did it consume 9 or 8 bytes?
-                (inst vpextrb tmp current 7)
-                (inst jmp ADJUST)
+                (inst jmp DONE)
                 TAIL-16
                 (inst and :dword tmp #xF0)
                 (inst popcnt :dword tmp tmp)
@@ -2399,50 +2397,43 @@
                 (inst add byte-index 4)
                 (inst add char-index tmp)
 
-                ;; In the last iteration, did it consume 5 or 4 bytes?
-                (inst vpextrb tmp current 3)
-                ADJUST
-                ;; the last current byte is a leading byte, meaning
-                ;; the first next byte is a continuation byte
-                (inst cmp tmp #xC0)
-                (inst jmp :l DONE)
-                (inst inc byte-index)
-
-                (inst vzeroupper)
-                DONE))))
-    (loop while (< byte-index length) do
-          (let ((b0 (sap-ref-8 sap byte-index)))
-            (cond
-              ((< b0 #x80)
-               (setf (schar string char-index) (code-char b0))
-               (incf byte-index 1))
-              ((< b0 #xE0)
-               (let ((b1 (sap-ref-8 sap (+ byte-index 1))))
-                 (setf (schar string char-index)
-                       (code-char (dpb b0 (byte 5 6) b1)))
-                 (incf byte-index 2)))
-              ((< b0 #xF0)
-               (let ((b1 (sap-ref-8 sap (+ byte-index 1)))
-                     (b2 (sap-ref-8 sap (+ byte-index 2))))
-                 (setf (schar string char-index)
-                       (code-char (dpb b0 (byte 4 12)
-                                       (dpb b1 (byte 6 6) b2))))
-                 (incf byte-index 3)))
-              (t
-               (let ((b1 (sap-ref-8 sap (+ byte-index 1)))
-                     (b2 (sap-ref-8 sap (+ byte-index 2)))
-                     (b3 (sap-ref-8 sap (+ byte-index 3))))
-                 (setf (schar string char-index)
-                       (code-char (dpb b0 (byte 3 18)
-                                       (dpb b1 (byte 6 12)
-                                            (dpb b2 (byte 6 6) b3)))))
-                 (incf byte-index 4)))))
-          (incf char-index))
-
-    char-index))
+                DONE
+                (inst vzeroupper)))))
+    (when (< byte-index length)
+      (when (= (ldb (byte 2 6) (sap-ref-8 sap byte-index)) #b10)
+        ;; A continuation byte consumed by the previous byte in the simd loop
+        (incf byte-index))
+      (loop while (< byte-index length) do
+            (let ((b0 (sap-ref-8 sap byte-index)))
+              (cond
+                ((< b0 #x80)
+                 (setf (schar string char-index) (code-char b0))
+                 (incf byte-index))
+                ((< b0 #xE0)
+                 (let ((b1 (sap-ref-8 sap (+ byte-index 1))))
+                   (setf (schar string char-index)
+                         (code-char (dpb b0 (byte 5 6) b1)))
+                   (incf byte-index 2)))
+                ((< b0 #xF0)
+                 (let ((b1 (sap-ref-8 sap (+ byte-index 1)))
+                       (b2 (sap-ref-8 sap (+ byte-index 2))))
+                   (setf (schar string char-index)
+                         (code-char (dpb b0 (byte 4 12)
+                                         (dpb b1 (byte 6 6) b2))))
+                   (incf byte-index 3)))
+                (t
+                 (let ((b1 (sap-ref-8 sap (+ byte-index 1)))
+                       (b2 (sap-ref-8 sap (+ byte-index 2)))
+                       (b3 (sap-ref-8 sap (+ byte-index 3))))
+                   (setf (schar string char-index)
+                         (code-char (dpb b0 (byte 3 18)
+                                         (dpb b1 (byte 6 12)
+                                              (dpb b2 (byte 6 6) b3)))))
+                   (incf byte-index 4))))
+              (incf char-index))))))
 
 (def-variant simd-copy-character-string-to-utf8-byte-array :avx2 (byte-array string byte-array-length)
-  (declare (ignore byte-array-length)
+  (declare (index byte-array-length)
            (simple-character-string string)
            ((simple-array (unsigned-byte 8) (*)) byte-array)
            (optimize speed (safety 0)))
@@ -2465,6 +2456,7 @@
           (inline-vop (((byte-array sap-reg t) (vector-sap byte-array))
                        ((32-bit-array sap-reg t) (vector-sap string))
                        ((n signed-reg) (logand (+ (* length 4) 15) -16))
+                       ((byte-array-length unsigned-reg) (logand (+ byte-array-length 15) -16))
                        ((table sap-reg t) (vector-sap table))
                        ((tmp unsigned-reg))
                        ((temp complex-double-reg))
@@ -2497,15 +2489,20 @@
             (inst vpbroadcastd mask-7ff temp)
             (inst vpxor zero zero zero)
             (flet ((convert (size)
-                     (let ((bytes (reg-in-sc bytes size))
-                           (temp (reg-in-sc temp size)))
+                     (inst cmp byte-array-length (/ size 2))
+                     (inst jmp :l DONE)
+                     (let* ((sc (ecase size
+                                  (32 'int-avx2-reg)
+                                  (16 'int-sse-reg)))
+                            (bytes (reg-in-sc bytes sc))
+                            (temp (reg-in-sc temp sc)))
                        (inst vmovdqu bytes (ea 32-bit-array char-index))
                        ;; Stop if anything is 3-4 bytes in utf8
                        (inst vpcmpgtd temp bytes mask-7ff)
                        (inst vptest temp temp)
                        (inst jmp :nz DONE)
                        ;; Narrow to 16 bits
-                       (cond ((eq size 'int-avx2-reg)
+                       (cond ((eq size 32)
                               (inst vpackusdw bytes bytes bytes)
                               (inst vpermq bytes bytes 216))
                              (t
@@ -2535,7 +2532,7 @@
                      (inst and tmp 255)
                      (inst shl :dword tmp 4)
                      (inst vpshufb bytes bytes (ea table tmp))
-                     (if (eq size 'int-avx2-reg)
+                     (if (eq size 32)
                          (inst vmovdqu (ea byte-index byte-array) bytes)
                          (inst vmovq (ea byte-index byte-array) bytes))))
               (assemble ()
@@ -2545,19 +2542,21 @@
                 (inst sub n 32)
                 (inst jmp :b TAIL)
                 LOOP
-                (convert 'int-avx2-reg)
+                (convert 32)
 
                 (inst add byte-index 16)
                 (inst add char-index 32)
                 (inst popcnt tmp tmp)
                 (inst sub byte-index tmp)
+                (inst sub byte-array-length 16)
+                (inst add byte-array-length tmp)
                 (inst sub n 32)
                 (inst jmp :ae LOOP)
 
                 TAIL
                 (inst cmp :dword n -32)
                 (inst jmp :z DONE)
-                (convert 'int-sse-reg)
+                (convert 16)
                 (inst add char-index 16)))
             DONE
             (inst vzeroupper))

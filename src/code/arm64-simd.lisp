@@ -1761,9 +1761,7 @@
                 (inst cmp byte-index n)
                 (inst b :le LOOP)
 
-                ;; In the last iteration, did it consume 9 or 8 bytes?
-                (inst umov tmp current 7 :b)
-                (inst b ADJUST)
+                (inst b DONE)
 
                 TAIL-16
                 (inst movi mask-2 #xFFFFFFFF)
@@ -1774,49 +1772,44 @@
                 (inst add byte-index byte-index 4)
                 (inst add char-index char-index 4)
                 (inst add char-index char-index tmp)
-
-                ;; In the last iteration, did it consume 5 or 4 bytes?
-                (inst umov tmp current 3 :b)
-                ADJUST
-                ;; the last current byte is a leading byte, meaning
-                ;; the first next byte is a continuation byte
-                (inst cmp tmp #xC0)
-                (inst csinc byte-index byte-index byte-index :lt)
-
                 DONE))))
-    (loop while (< byte-index length) do
-          (let ((b0 (sap-ref-8 sap byte-index)))
-            (cond
-              ((< b0 #x80)
-               (setf (schar string char-index) (code-char b0))
-               (incf byte-index 1))
-              ((< b0 #xE0)
-               (let ((b1 (sap-ref-8 sap (+ byte-index 1))))
-                 (setf (schar string char-index)
-                       (code-char (dpb b0 (byte 5 6) b1)))
-                 (incf byte-index 2)))
-              ((< b0 #xF0)
-               (let ((b1 (sap-ref-8 sap (+ byte-index 1)))
-                     (b2 (sap-ref-8 sap (+ byte-index 2))))
-                 (setf (schar string char-index)
-                       (code-char (dpb b0 (byte 4 12)
-                                       (dpb b1 (byte 6 6) b2))))
-                 (incf byte-index 3)))
-              (t
-               (let ((b1 (sap-ref-8 sap (+ byte-index 1)))
-                     (b2 (sap-ref-8 sap (+ byte-index 2)))
-                     (b3 (sap-ref-8 sap (+ byte-index 3))))
-                 (setf (schar string char-index)
-                       (code-char (dpb b0 (byte 3 18)
-                                       (dpb b1 (byte 6 12)
-                                            (dpb b2 (byte 6 6) b3)))))
-                 (incf byte-index 4)))))
-          (incf char-index))
+    (when (< byte-index length)
+      (when (= (ldb (byte 2 6) (sap-ref-8 sap byte-index)) #b10)
+        ;; A continuation byte consumed by the previous byte in the simd loop
+        (incf byte-index))
+      (loop while (< byte-index length) do
+            (let ((b0 (sap-ref-8 sap byte-index)))
+              (cond
+                ((< b0 #x80)
+                 (setf (schar string char-index) (code-char b0))
+                 (incf byte-index))
+                ((< b0 #xE0)
+                 (let ((b1 (sap-ref-8 sap (+ byte-index 1))))
+                   (setf (schar string char-index)
+                         (code-char (dpb b0 (byte 5 6) b1)))
+                   (incf byte-index 2)))
+                ((< b0 #xF0)
+                 (let ((b1 (sap-ref-8 sap (+ byte-index 1)))
+                       (b2 (sap-ref-8 sap (+ byte-index 2))))
+                   (setf (schar string char-index)
+                         (code-char (dpb b0 (byte 4 12)
+                                         (dpb b1 (byte 6 6) b2))))
+                   (incf byte-index 3)))
+                (t
+                 (let ((b1 (sap-ref-8 sap (+ byte-index 1)))
+                       (b2 (sap-ref-8 sap (+ byte-index 2)))
+                       (b3 (sap-ref-8 sap (+ byte-index 3))))
+                   (setf (schar string char-index)
+                         (code-char (dpb b0 (byte 3 18)
+                                         (dpb b1 (byte 6 12)
+                                              (dpb b2 (byte 6 6) b3)))))
+                   (incf byte-index 4))))
+              (incf char-index))))
 
     char-index))
 
 (defun simd-copy-character-string-to-utf8-byte-array (byte-array string byte-array-length)
-  (declare (ignore byte-array-length)
+  (declare (index byte-array-length)
            (simple-character-string string)
            ((simple-array (unsigned-byte 8) (*)) byte-array)
            (optimize speed (safety 0)))
@@ -1839,6 +1832,7 @@
           (inline-vop (((32-bit-array* sap-reg t :target 32-bit-array) (vector-sap string))
                        ((byte-array sap-reg t) (vector-sap byte-array))
                        ((n signed-reg) (logand (+ (* length 4) 15) -16))
+                       ((byte-array-length unsigned-reg) (logand (+ byte-array-length 15) -16))
                        ((table sap-reg t) (vector-sap table))
                        ((32-bit-array sap-reg t :from (:argument 0)))
                        ((tmp unsigned-reg))
@@ -1861,6 +1855,8 @@
             (load-inline-constant powers :qword (concat-ub 8 '(128 64 32 16 8 4 2 1)))
 
             (flet ((convert (size)
+                     (inst cmp byte-array-length (/ size 2))
+                     (inst b :lt DONE)
                      (multiple-value-bind (h-size b-size)
                          (ecase size
                            (32
@@ -1918,7 +1914,9 @@
                        (when (eq size 32)
                          (inst smov tmp ascii-count 0 :b)
                          (inst add byte-index byte-index 16)
-                         (inst add byte-index byte-index tmp)))))
+                         (inst add byte-index byte-index tmp)
+                         (inst sub byte-array-length byte-array-length 16)
+                         (inst sub byte-array-length byte-array-length tmp)))))
               (assemble ()
                 (inst mov byte-index 0)
                 (inst mov char-index 0)

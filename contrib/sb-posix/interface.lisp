@@ -559,6 +559,8 @@ not supported."
 
  (define-call "munmap" int minusp
    (start sb-sys:system-area-pointer) (length unsigned))
+ (define-call "mprotect" int minusp
+   (addr system-area-pointer) (length size-t) (prot unsigned))
 
  (define-call "msync" int minusp
    (addr sb-sys:system-area-pointer) (length unsigned) (flags int)))
