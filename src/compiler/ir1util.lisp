@@ -339,6 +339,22 @@
                       do (return (values (lvar-dest lvar) lvar ref))))
               (values dest lvar)))))))
 
+(defun mv-let-arg-vars (arg fun &optional (call (let-combination fun)))
+  (when call
+    (multiple-value-bind (start length)
+        (loop with position = 0
+              for lvar in (basic-combination-args call)
+              for n-values = (nth-value 1 (values-types
+                                           (lvar-derived-type lvar)))
+              when (eq lvar arg)
+              return (values position n-values)
+              do
+              (if (integerp n-values)
+                  (incf position n-values)
+                  (return)))
+      (when start
+        (values (nthcdr start (lambda-vars fun))
+                length)))))
 
 (defun mv-bind-vars (lvar &optional single-use)
   (when (and lvar
@@ -349,7 +365,7 @@
                  (eq (basic-combination-kind dest) :local))
         (let ((fun (combination-lambda dest)))
           (when (functional-kind-eq fun mv-let)
-            (lambda-vars fun)))))))
+            (mv-let-arg-vars lvar fun dest)))))))
 
 (defun mv-bind-dest (lvar nth-value &optional single-use)
   (let ((vars (mv-bind-vars lvar single-use)))
@@ -368,7 +384,7 @@
                  (eq (basic-combination-kind dest) :local))
         (let ((fun (combination-lambda dest)))
           (when (functional-kind-eq fun mv-let)
-            (let ((var (nth nth-value (lambda-vars fun))))
+            (let ((var (nth nth-value (mv-let-arg-vars lvar fun dest))))
               (and var
                    (notany #'node-lvar (leaf-refs var))))))))))
 
@@ -700,12 +716,14 @@
                                              do (derive-node-type ref type :from-scratch t)
                                                 (erase (node-lvar ref) 0)))))
                               (if (functional-kind-eq fun mv-let)
-                                  (if nth-value
-                                      (erase-var (nth nth-value (lambda-vars fun))
-                                                 (values-type-nth nth-value lvar-type))
-                                      (mapc #'erase-var
-                                            (lambda-vars fun)
-                                            (values-type-in lvar-type (length (lambda-vars fun)))))
+                                  (multiple-value-bind (vars length) (mv-let-arg-vars lvar fun dest)
+                                    (if nth-value
+                                        (erase-var (nth nth-value vars)
+                                                   (values-type-nth nth-value lvar-type))
+                                        (loop repeat length
+                                              for var in vars
+                                              for type in (values-type-in lvar-type length)
+                                              do (erase-var var type))))
                                   (erase-var
                                    (nth (position-or-lose lvar
                                                           (basic-combination-args dest))
@@ -3714,7 +3732,8 @@ is :ANY, the function name is not checked."
                                           (when (and (functional-p fun)
                                                      (functional-kind-eq fun mv-let))
                                             (let* ((arg (position leaf/lvar (combination-args dest)))
-                                                   (var (and arg (nth arg (lambda-vars fun)))))
+                                                   (var (and arg
+                                                             (nth arg (mv-let-arg-vars dest-lvar fun mv)))))
                                               (recur var)
                                               t)))))))))
                           (t

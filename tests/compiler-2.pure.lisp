@@ -5121,3 +5121,28 @@
                       (self-call (1- a))))
                :name 'self-call))))
     (assert (not (member 'self-call (ctu:find-named-callees fun))))))
+
+(with-test (:name :mv-bind-unused-p-multiple-args)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x y)
+         (multiple-value-call #'values t -1 (floor x y)))
+    ((5 3) (values t -1 1 2)))
+  (checked-compile-and-assert
+      ()
+      `(lambda (x y)
+         (multiple-value-call (lambda (a b c d)
+                                (values a b c d)) -1 t (floor x y)))
+    ((3 5) (values -1 t 0 3)))
+  (checked-compile-and-assert
+      ()
+      `(lambda (x y)
+         (multiple-value-call (lambda (a b c d)
+                                (declare (ignore a b))
+                                (values c d)) -1 t (floor x y)))
+    ((3 5) (values  0 3)))
+  (assert (equal (ctu:ir1-named-calls `(lambda (x y)
+                                         (multiple-value-call (lambda (a b c d)
+                                                                (declare (ignore d))
+                                                                (values a b c)) -1 t (floor x y))))
+                 '(sb-kernel::floor1))))
