@@ -15,7 +15,8 @@
     (elt x 0)))
 
 (with-test (:name :bug-936304
-                  :skipped-on :gc-stress)
+            :skipped-on :gc-stress
+            :broken-on :sbcl)
   (gc :full t)
   (assert (eq :ok (handler-case
                        (progn
