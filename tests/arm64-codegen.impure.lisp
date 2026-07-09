@@ -8,7 +8,7 @@
                   (ctu:disassembly-lines
                    `(lambda (i)
                       (declare (optimize (debug 0)))
-                      (let ((a (alien-funcall (extern-alien "f" (function (* ,type))))))
+                      (let ((a (alien-funcall (extern-alien "f" (function (* (unsigned ,type)))))))
                         (deref a (sb-ext:truly-the sb-int:index i))))))
                  (look-for
                   (format nil ", LSL #~D]" left-shift)))
@@ -20,6 +20,6 @@
                     1)
                (error "~{~a~%~}" lines)
                ))))
-    (try 'unsigned-short 1)
-    (try 'unsigned-int   2)
-    (try 'unsigned-long  3)))
+    (try 16 1)
+    (try 32 2)
+    (try 64 3)))
