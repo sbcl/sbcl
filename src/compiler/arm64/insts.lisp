@@ -1271,39 +1271,34 @@
   (rn :field (byte 5 5) :type 'reg)
   (rd :field (byte 5 0) :type 'reg))
 
-(defmacro def-data-processing-1 (name opc &optional 32-bit-opcode)
-  `(define-instruction ,name (segment rd rn)
+(defmacro def-data-processing-1+simd (name opc simd-u simd-op &optional simd-size)
+  `(define-instruction ,name (segment rd rn &optional vector-size)
      (:printer data-processing-1 ((op ,opc)))
+     (:printer simd-two-misc ((u ,simd-u) (op ,simd-op)
+                                          ,@(if simd-size
+                                                `((size ,simd-size)))))
      (:emitter
-      (emit-data-processing-1 segment
-                              (reg-size rd)
-                              ,(if 32-bit-opcode
-                                   `(sc-case rd
-                                     (32-bit-reg
-                                      ,32-bit-opcode)
-                                      (t
-                                       ,opc))
-                                   opc)
-                              (gpr-offset rn)
-                              (gpr-offset rd)))))
+      (if vector-size
+          (multiple-value-bind (q ,@(unless simd-size `(size)))
+              (encode-vector-size vector-size)
+            (emit-simd-two-misc segment q ,simd-u
+                                ,(or simd-size 'size)
+                                ,simd-op
+                                (fpr-offset rn) (fpr-offset rd)))
+          (emit-data-processing-1 segment
+                                  (reg-size rd)
+                                  ,opc
+                                  (gpr-offset rn)
+                                  (gpr-offset rd))))))
 
-(def-data-processing-1 rbit #b000)
-(def-data-processing-1 clz #b100)
-(def-data-processing-1 cls #b101)
-
-(define-instruction rev16 (segment rd rn &optional vector-size)
-  (:printer simd-two-misc ((u 0) (op 1)))
-  (:printer data-processing-1 ((op 1)))
-  (:emitter
-   (if vector-size
-       (multiple-value-bind (q size) (encode-vector-size (the (member :8b :16b) vector-size))
-         (emit-simd-two-misc segment q #b0 size #b00001
-                             (fpr-offset rn) (fpr-offset rd)))
-       (emit-data-processing-1 segment
-                               (reg-size rd)
-                               #b001
-                               (gpr-offset rn)
-                               (gpr-offset rd)))))
+(def-data-processing-1+simd rbit #b000
+  1 #b00101 #b01)
+(def-data-processing-1+simd clz #b100
+  1 #b00100)
+(def-data-processing-1+simd cls #b101
+  0 #b00100)
+(def-data-processing-1+simd rev16 #b001
+  0 #b00001)
 
 (define-instruction rev32 (segment rd rn &optional vector-size)
   (:printer data-processing-1 ((size 1) (op #b10)))
@@ -1314,7 +1309,7 @@
          (emit-simd-two-misc segment q #b1 size #b00000
                              (fpr-offset rn) (fpr-offset rd)))
        (emit-data-processing-1 segment
-                               (reg-size rd)
+                               1
                                #b10
                                (gpr-offset rn)
                                (gpr-offset rd)))))
