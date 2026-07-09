@@ -1483,3 +1483,18 @@
                   (declare (optimize (debug 0)))
                   (deref (alien-funcall (extern-alien "f" (function (* char)))) 0)))))
     (assert (eql (loop for line in lines count (search "MOVSX" line)) 1))))
+
+(with-test (:name :alien-deref-indexed)
+  (let ((lines (disassembly-lines
+                '(lambda (i)
+                  (declare (optimize (debug 0)))
+                  (let ((a (alien-funcall (extern-alien "f" (function (* unsigned-int))))))
+                    (deref a (sb-ext:truly-the sb-int:index i)))))))
+    ;; some line should have a MOV instruction with a base and scaled index,
+    ;; it should have a #\+ and #\* operation in the effective address.
+    ;; Since the index is a tagged fixnum, the scale should be 2 which
+    ;; equates to 4 in bytes.
+    (assert
+     (some (lambda (line)
+             (and (search "MOV" line) (search "+R" line) (search "*2]" line)))
+           lines))))

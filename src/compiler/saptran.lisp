@@ -113,6 +113,17 @@
   (defsapref sap-ref-long       long-float) ; actually DOUBLE-FLOAT
 ) ; MACROLET
 
+;;; These are not settable, but could be made to be
+(macrolet ((defsaprefx (n)
+             `(progn
+                (defknown ,(symbolicate "%SAP-REF-" n "-INDEXED")
+                    (system-area-pointer fixnum) (unsigned-byte ,n) (flushable always-translatable))
+                (defknown ,(symbolicate "%SIGNED-SAP-REF-" n "-INDEXED")
+                    (system-area-pointer fixnum) (signed-byte ,n) (flushable always-translatable)))))
+  (defsaprefx 16)
+  (defsaprefx 32)
+  (defsaprefx 64))
+
 
 ;;;; transforms for converting sap relation operators
 

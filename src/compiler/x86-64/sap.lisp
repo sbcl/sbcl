@@ -396,6 +396,43 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
      (inst movq newval-temp newval)
      (inst cmpxchg :lock (sap+offset-to-ea sap offset nil) newval-temp)
      (inst movq result rax))))
+
+(define-vop (%sap-ref-indexed)
+  (:translate %sap-ref-16-indexed %sap-ref-32-indexed %sap-ref-64-indexed)
+  (:policy :fast-safe)
+  (:args (sap :scs (sap-reg))
+         (index :scs (any-reg signed-reg unsigned-reg)))
+  (:arg-types system-area-pointer tagged-num)
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:node-var node)
+  (:generator 1
+    (ecase (sb-c::combination-fun-source-name node)
+      (%sap-ref-16-indexed
+       (inst movzx '(:word :qword) result (ea sap index (index-scale 2 index))))
+      (%sap-ref-32-indexed
+       (inst mov :dword result (ea sap index (index-scale 4 index))))
+      (%sap-ref-64-indexed
+       (inst mov :qword result (ea sap index (index-scale 8 index)))))))
+
+(define-vop (%signed-sap-ref-indexed)
+  (:translate %signed-sap-ref-16-indexed %signed-sap-ref-32-indexed
+              %signed-sap-ref-64-indexed)
+  (:policy :fast-safe)
+  (:args (sap :scs (sap-reg))
+         (index :scs (any-reg signed-reg unsigned-reg)))
+  (:arg-types system-area-pointer tagged-num)
+  (:results (result :scs (signed-reg)))
+  (:result-types signed-num)
+  (:node-var node)
+  (:generator 1
+    (ecase (sb-c::combination-fun-source-name node)
+      (%signed-sap-ref-16-indexed
+       (inst movsx '(:word :qword) result (ea sap index (index-scale 2 index))))
+      (%signed-sap-ref-32-indexed
+       (inst movsx '(:dword :qword) result (ea sap index (index-scale 4 index))))
+      (%signed-sap-ref-64-indexed
+       (inst mov :qword result (ea sap index (index-scale 8 index)))))))
 
 ;;; noise to convert normal lisp data objects into SAPs
 

@@ -302,6 +302,37 @@
     single-reg single-float :single)
   (def-system-ref-and-set sap-ref-double %set-sap-ref-double
     double-reg double-float :double))
+
+(define-vop (%sap-ref-indexed)
+  (:translate %sap-ref-16-indexed %sap-ref-32-indexed %sap-ref-64-indexed)
+  (:policy :fast-safe)
+  (:args (sap :scs (sap-reg))
+         (index :scs (signed-reg unsigned-reg)))
+  (:arg-types system-area-pointer untagged-num)
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:node-var node)
+  (:generator 1
+    (ecase (sb-c::combination-fun-source-name node)
+      (%sap-ref-16-indexed (inst ldrh result (@ sap (extend index :lsl 1))))
+      (%sap-ref-32-indexed (inst ldr (32-bit-reg result) (@ sap (extend index :lsl 2))))
+      (%sap-ref-64-indexed (inst ldr result (@ sap (extend index :lsl 3)))))))
+
+(define-vop (%signed-sap-ref-indexed)
+  (:translate %signed-sap-ref-16-indexed %signed-sap-ref-32-indexed
+              %signed-sap-ref-64-indexed)
+  (:policy :fast-safe)
+  (:args (sap :scs (sap-reg))
+         (index :scs (signed-reg unsigned-reg)))
+  (:arg-types system-area-pointer untagged-num)
+  (:results (result :scs (signed-reg)))
+  (:result-types signed-num)
+  (:node-var node)
+  (:generator 1
+    (ecase (sb-c::combination-fun-source-name node)
+      (%signed-sap-ref-16-indexed (inst ldrsh result (@ sap (extend index :lsl 1))))
+      (%signed-sap-ref-32-indexed (inst ldrsw result (@ sap (extend index :lsl 2))))
+      (%signed-sap-ref-64-indexed (inst ldr result (@ sap (extend index :lsl 2)))))))
 
 ;;; Noise to convert normal lisp data objects into SAPs.
 (define-vop (vector-sap)

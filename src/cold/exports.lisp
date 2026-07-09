@@ -1159,6 +1159,11 @@ of `SB-KERNEL`) have been undone, but probably more remain.")
    "SAP-REF-8"
    "SAP-REF-DOUBLE" "SAP-REF-LISPOBJ" "SAP-REF-LONG"
    "SAP-REF-SAP" "SAP-REF-SINGLE"
+   ;; The "internal" sap ref accessors are only to aid compiling DEREF
+   ;; and not for users.
+   "%SAP-REF-16-INDEXED" "%SIGNED-SAP-REF-16-INDEXED"
+   "%SAP-REF-32-INDEXED" "%SIGNED-SAP-REF-32-INDEXED"
+   "%SAP-REF-64-INDEXED" "%SIGNED-SAP-REF-64-INDEXED"
    "SAP<" "SAP<=" "SAP=" "SAP>" "SAP>="
    "SCRUB-CONTROL-STACK" "SERVE-ALL-EVENTS"
    "SIGNAL-DEADLINE"

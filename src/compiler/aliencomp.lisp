@@ -254,10 +254,29 @@
 (deftransform deref ((alien &rest indices))
   (multiple-value-bind (indices-args offset-expr element-type)
       (compute-deref-guts alien indices)
-    `(lambda (alien ,@indices-args)
-       (%alien-value (alien-sap alien)
-                     ,offset-expr
-                     ',element-type))))
+    ;; DEREF with a variable index off a (* int) was doing two extra shifts- one to
+    ;; premultiply the index, one to untag. We can try to fold at least one shift
+    ;; into the effective address of the load. arm64 can only choose to scale the
+    ;; index by 1 or by the element size though. x86-64 can remove both shifts
+    ;; because if the index is a tagged fixnum, the scale can simply be halved.
+    (if (and (= (length indices) 1)
+             (sb-alien::alien-integer-type-p element-type)
+             (not (constant-lvar-p (car indices)))
+             (or (and (vop-existsp :translate %sap-ref-16-indexed)
+                      (= (sb-alien::alien-integer-type-bits element-type) 16))
+                 (and (vop-existsp :translate %sap-ref-32-indexed)
+                      (= (sb-alien::alien-integer-type-bits element-type) 32))
+                 (and (vop-existsp :translate %sap-ref-64-indexed)
+                      (= (sb-alien::alien-integer-type-bits element-type) 64))))
+        (let* ((signed (sb-alien::alien-integer-type-signed element-type))
+               (accessor
+                (case (sb-alien::alien-integer-type-bits element-type)
+                  (16 (if signed '%signed-sap-ref-16-indexed '%sap-ref-16-indexed))
+                  (32 (if signed '%signed-sap-ref-32-indexed '%sap-ref-32-indexed))
+                  (64 (if signed '%signed-sap-ref-64-indexed '%sap-ref-64-indexed)))))
+          `(lambda (alien index) (,accessor (alien-sap alien) index)))
+        `(lambda (alien ,@indices-args)
+           (%alien-value (alien-sap alien) ,offset-expr ',element-type)))))
 
 #+nil ;; ### Again, the value might be coerced.
 (defoptimizer (%set-deref derive-type) ((alien value &rest noise))
