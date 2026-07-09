@@ -88,12 +88,12 @@ maybetime sh make-target-2.sh
 maybetime sh make-target-contrib.sh
 
 # Confirm that default evaluation strategy is :INTERPRET if sb-fasteval was built
-src/runtime/sbcl --core output/sbcl.core --lose-on-corruption --noinform \
+$SBCL_RUNNER src/runtime/sbcl --core output/sbcl.core --lose-on-corruption --noinform \
   --no-sysinit --no-userinit --disable-debugger \
   --eval '(when (find-package "SB-INTERPRETER") (assert (eq *evaluator-mode* :interpret)))' \
   --quit
 
-./src/runtime/sbcl --core output/sbcl.core \
+$SBCL_RUNNER ./src/runtime/sbcl --core output/sbcl.core \
  --lose-on-corruption --noinform $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit --eval '
     (progn
       #-sb-devel
