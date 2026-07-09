@@ -65,13 +65,20 @@
 
 (compile 'decode-test)
 
+(defun fill-random-string (string)
+  (map-into string (lambda ()
+                     (code-char (case (random 4)
+                                  (0 (random 128))
+                                  (1 (+ 128 (random (- 2048 128))))
+                                  (2 (+ 2048 (random (- 50000 2048))))
+                                  (3 (+ 65536 (random (- char-code-limit 65536)))))))))
+
 (with-test (:name :decode-test)
   (loop for length from 1 to 32
         for string = (make-string length)
         do
         (loop repeat (* 500 #+slow 10)
-              do (map-into string (lambda ()
-                                    (code-char (random 4096))))
+              do (fill-random-string string)
                  (let* ((octets (sb-ext:string-to-octets string))
                         (bytes (make-protected-array (length octets) '(unsigned-byte 8) nil)))
                    (unwind-protect
@@ -97,8 +104,7 @@
         do
         (unwind-protect
              (loop repeat (* 500 #+slow 10)
-                   do (map-into string (lambda ()
-                                         (code-char (random 4096))))
+                   do (fill-random-string string)
                       (let* ((octets (sb-ext:string-to-octets string))
                              (result (encode-test string (length octets))))
                         (unless (equalp result octets)

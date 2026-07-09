@@ -250,7 +250,7 @@
 
   (defregtn null descriptor-reg)
   (defregtn lexenv descriptor-reg)
-  (defregtn tmp any-reg)
+  (defregtn tmp unsigned-reg)
   (defregtn cardtable any-reg)
 
   (defregtn nargs any-reg)
