@@ -160,6 +160,7 @@
  ("undefined-classoid-bug.test.sh"
   "tests/undefined-classoid-bug-1.lisp"
   "tests/undefined-classoid-bug-2.lisp")
+ ("utf-8.impure.lisp" "contrib/sb-posix.fasl")
  ("x86-64-codegen.impure.lisp"
   "tests/typep-golden-data.txt")
   )
