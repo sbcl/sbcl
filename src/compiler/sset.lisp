@@ -28,14 +28,12 @@
   (number nil :type (or index null)))
 
 (defstruct (sset (:copier nil)
-                 (:constructor %make-sset (vector free count)))
+                 (:constructor %make-sset (vector limit count)))
   ;; Vector containing the set values. 0 is used for empty (since
   ;; initializing a vector with 0 is cheaper than with NIL).
   (vector #() :type simple-vector)
-  ;; How many elements can be inserted before rehashing.
-  ;; This is not the actual amount of free elements, but a ratio
-  ;; calculated from +sset-rehash-threshold+.
-  (free 0 :type index)
+  ;; The threshold count above which we double the vector.
+  (limit 0 :type index)
   ;; How many elements are currently members of the set.
   (count 0 :type index))
 (defun make-sset ()
@@ -70,39 +68,33 @@
 ;;; Double the size of the hash vector of SET.
 (defun sset-grow (set)
   (let* ((vector (sset-vector set))
-         (length (if (zerop (length vector))
-                     2
-                     (* (length vector) 2)))
+         (length (* (length vector) 2))
          (new-vector (make-array length
-                                 :initial-element 0)))
+                                 :initial-element 0))
+         (new-limit (- length (truncate length +sset-rehash-threshold+))))
     (setf (sset-vector set) new-vector
-          ;; SSET-ADJOIN below will decrement this and shouldn't reach zero
-          (sset-free set) length
+          (sset-limit set) new-limit
           (sset-count set) 0)
     (loop for element across vector
           do (unless (fixnump element)
-               (sset-adjoin element set)))
-    ;; Now the real amount of elements which can be inserted before rehashing
-    (setf (sset-free set) (- (sset-free set)
-                             (max 1 (truncate length
-                                              +sset-rehash-threshold+))))))
-
+               (sset-adjoin element set)))))
 
 ;;; Destructively add ELEMENT to SET. If ELEMENT was not in the set,
 ;;; then we return true, otherwise we return false.
 (declaim (ftype (sfunction (sset-element sset) boolean) sset-adjoin))
 (defun sset-adjoin (element set)
-  (when (= (sset-free set) 0)
-    (sset-grow set))
+  (when (zerop (length (sset-vector set)))
+    (setf (sset-vector set) (make-array 2 :initial-element 0)
+          (sset-limit set) 1))
   (loop with vector = (sset-vector set)
         with mask of-type index = (1- (length vector))
         for hash of-type index = (logand mask (sset-hash element)) then
           (logand mask (1+ hash))
         for current = (aref vector hash)
         do (cond ((eql current 0)
-                  (incf (sset-count set))
-                  (decf (sset-free set))
                   (setf (aref vector hash) element)
+                  (when (> (incf (sset-count set)) (sset-limit set))
+                    (sset-grow set))
                   (return t))
                  ((eq current element)
                   (return nil)))))
@@ -122,7 +114,6 @@
                     (return nil))
                    ((eq current element)
                     (decf (sset-count set))
-                    (incf (sset-free set))
                     (loop with i of-type index = hash
                           do (loop for j of-type index = (logand mask (1+ i)) then
                                      (logand mask (1+ j))
@@ -171,7 +162,7 @@
 ;;; Return a new copy of SET.
 (declaim (ftype (sfunction (sset) sset) copy-sset))
 (defun copy-sset (set)
-  (%make-sset (copy-seq (sset-vector set)) (sset-free set) (sset-count set)))
+  (%make-sset (copy-seq (sset-vector set)) (sset-limit set) (sset-count set)))
 
 ;;; Perform the appropriate set operation on SET1 and SET2 by
 ;;; destructively modifying SET1. We return true if SET1 was modified,

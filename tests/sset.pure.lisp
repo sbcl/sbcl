@@ -110,3 +110,26 @@
       (assert (not (sset-member e2 d)))
       (assert (not (sset-member e3 d)))
       (loop for x across (sset-vector d) do (assert (not (eql x -1)))))))
+
+(with-test (:name :sset-growth-optimization)
+  (let ((set (make-sset))
+        (e1 (make-dummy-test-element 1))
+        (e2 (make-dummy-test-element 2)))
+    ;; Initially empty, limit is 0
+    (assert (zerop (sb-c::sset-limit set)))
+    (assert (= (length (sset-vector set)) 0))
+
+    ;; Adjoin e1. Should grow to size 2, and count reaches limit.
+    (assert (sset-adjoin e1 set))
+    (assert (= (sb-c::sset-count set) (sb-c::sset-limit set)))
+    (assert (= (length (sset-vector set)) 2))
+
+    ;; Adjoin e1 again. Should NOT grow.
+    (assert (not (sset-adjoin e1 set)))
+    (assert (= (sb-c::sset-count set) (sb-c::sset-limit set)))
+    (assert (= (length (sset-vector set)) 2))
+
+    ;; Adjoin e2. Should grow to size 4.
+    (assert (sset-adjoin e2 set))
+    (assert (= (length (sset-vector set)) 4))))
+
