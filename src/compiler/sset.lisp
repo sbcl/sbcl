@@ -30,8 +30,7 @@
 (defstruct (sset (:copier nil)
                  (:constructor %make-sset (vector free count)))
   ;; Vector containing the set values. 0 is used for empty (since
-  ;; initializing a vector with 0 is cheaper than with NIL), -1
-  ;; is a tombstone left in place of a deleted element.
+  ;; initializing a vector with 0 is cheaper than with NIL).
   (vector #() :type simple-vector)
   ;; How many elements can be inserted before rehashing.
   ;; This is not the actual amount of free elements, but a ratio
@@ -55,17 +54,14 @@
               ,@body)
          finally (return ,result)))
 
-;;; Primary hash.
-(declaim (inline sset-hash1))
-(defun sset-hash1 (element) (mix (sset-element-number element) 0))
-
-;;; Secondary hash (for double hash probing). Needs to return an odd
-;;; number.
-(declaim (inline sset-hash2))
-(defun sset-hash2 (element)
-  (let ((number (sset-element-number element)))
-    (declare (fixnum number))
-    (logior 1 number)))
+;;; There is no "Primary" or "Secondary" hash now. Just the hash.
+;;; We use Linear Probing (step size = 1) with Knuth's Backward Shift Deletion
+;;; algorithm instead of leaving tombstones. And we rely on MIX to produce
+;;; a sufficiently good hash that linear probing is a reasonable strategy.
+;;; (Any probing strategy other than linear does not so readily admit a
+;;; deletion technique which shifts other elements on top of the deleted one.)
+(declaim (inline sset-hash))
+(defun sset-hash (element) (mix (sset-element-number element) 0))
 
 ;;; Rehash the sset when the proportion of free cells in the set is
 ;;; lower than this, the value is a reciprocal.
@@ -99,22 +95,15 @@
   (when (= (sset-free set) 0)
     (sset-grow set))
   (loop with vector = (sset-vector set)
-        with mask of-type fixnum = (1- (length vector))
-        with secondary-hash = (sset-hash2 element)
-        with deleted-index
-        for hash of-type index = (logand mask (sset-hash1 element)) then
-          (logand mask (+ hash secondary-hash))
+        with mask of-type index = (1- (length vector))
+        for hash of-type index = (logand mask (sset-hash element)) then
+          (logand mask (1+ hash))
         for current = (aref vector hash)
         do (cond ((eql current 0)
                   (incf (sset-count set))
-                  (cond (deleted-index
-                         (setf (aref vector deleted-index) element))
-                        (t
-                         (decf (sset-free set))
-                         (setf (aref vector hash) element)))
+                  (decf (sset-free set))
+                  (setf (aref vector hash) element)
                   (return t))
-                 ((eql current -1)
-                  (unless deleted-index (setf deleted-index hash)))
                  ((eq current element)
                   (return nil)))))
 
@@ -122,20 +111,34 @@
 ;;; then return true, otherwise return false.
 (declaim (ftype (sfunction (sset-element sset) boolean) sset-delete))
 (defun sset-delete (element set)
-  (when (zerop (length (sset-vector set)))
-    (return-from sset-delete nil))
-  (loop with vector = (sset-vector set)
-        with mask fixnum = (1- (length vector))
-        with secondary-hash = (sset-hash2 element)
-        for hash of-type index = (logand mask (sset-hash1 element)) then
-          (logand mask (+ hash secondary-hash))
-        for current = (aref vector hash)
-        do (cond ((eql current 0)
-                  (return nil))
-                 ((eq current element)
-                  (decf (sset-count set))
-                  (setf (aref vector hash) -1)
-                  (return t)))))
+  (let ((vector (sset-vector set)))
+    (when (zerop (length vector))
+      (return-from sset-delete nil))
+    (loop with mask of-type index = (1- (length vector))
+          for hash of-type index = (logand mask (sset-hash element)) then
+            (logand mask (1+ hash))
+          for current = (aref vector hash)
+          do (cond ((eql current 0)
+                    (return nil))
+                   ((eq current element)
+                    (decf (sset-count set))
+                    (incf (sset-free set))
+                    (loop with i of-type index = hash
+                          do (loop for j of-type index = (logand mask (1+ i)) then
+                                     (logand mask (1+ j))
+                                   for candidate = (aref vector j)
+                                   do (cond ((eql candidate 0)
+                                             (setf (aref vector i) 0)
+                                             (return-from sset-delete t))
+                                            ((>= (the fixnum
+                                                      (logand mask
+                                                              (- j (logand mask (sset-hash candidate)))))
+                                                 (the fixnum
+                                                      (logand mask (- j i))))
+                                             (setf (aref vector i) candidate
+                                                   i j)
+                                             (return)))))
+                    (return t))))))
 
 ;;; Return true if ELEMENT is in SET, false otherwise.
 (declaim (ftype (sfunction (sset-element sset) boolean) sset-member))
@@ -144,9 +147,8 @@
     (return-from sset-member nil))
   (loop with vector = (sset-vector set)
         with mask fixnum = (1- (length vector))
-        with secondary-hash = (sset-hash2 element)
-        for hash of-type index = (logand mask (sset-hash1 element)) then
-          (logand mask (+ hash secondary-hash))
+        for hash of-type index = (logand mask (sset-hash element)) then
+          (logand mask (1+ hash))
         for current = (aref vector hash)
         do (cond ((eq current element) (return t))
                  ((eql current 0) (return nil)))))
@@ -183,26 +185,24 @@
              (when (sset-adjoin element set1)
                (setf modified t)))
         finally (return modified)))
+
 (defun sset-intersection (set1 set2)
-  (loop with modified = nil
-        for element across (sset-vector set1)
-        for index of-type index from 0
-        do (unless (fixnump element)
-             (unless (sset-member element set2)
-               (decf (sset-count set1))
-               (setf (aref (sset-vector set1) index) -1
-                     modified t)))
-        finally (return modified)))
+  (let ((to-delete nil))
+    (do-sset-elements (element set1)
+      (unless (sset-member element set2)
+        (push element to-delete)))
+    (when to-delete
+      (dolist (element to-delete t)
+        (sset-delete element set1)))))
+
 (defun sset-difference (set1 set2)
-  (loop with modified = nil
-        for element across (sset-vector set1)
-        for index of-type index from 0
-        do (unless (fixnump element)
-             (when (sset-member element set2)
-               (decf (sset-count set1))
-               (setf (aref (sset-vector set1) index) -1
-                     modified t)))
-        finally (return modified)))
+  (let ((to-delete nil))
+    (do-sset-elements (element set1)
+      (when (sset-member element set2)
+        (push element to-delete)))
+    (when to-delete
+      (dolist (element to-delete t)
+        (sset-delete element set1)))))
 
 ;;; Destructively modify SET1 to include its union with the difference
 ;;; of SET2 and SET3. We return true if SET1 was modified, false

@@ -252,8 +252,13 @@
         ;; Kill any elements in IN that are copies of a TN we are clobbering.
         (do ((res-ref (vop-results vop) (tn-ref-across res-ref)))
             ((null res-ref))
-          (do-sset-elements (tn in)
-            (when (eq (tn-is-copy-of tn) (tn-ref-tn res-ref))
+          ;; DO-SSET-ELEMENTS no longer allows deleting the item you're looking at,
+          ;; because SSET-DELETE rearranges items instead of depositing tombstones.
+          (let ((to-delete nil))
+            (do-sset-elements (tn in)
+              (when (eq (tn-is-copy-of tn) (tn-ref-tn res-ref))
+                (push tn to-delete)))
+            (dolist (tn to-delete)
               (sset-delete tn in))))
         ;; If this VOP is a copy, add the copy TN to IN.
         (when this-copy (sset-adjoin this-copy in)))))

@@ -513,7 +513,7 @@ possibly temporarily, because it might be used internally.")
    "MAKE-SSET"
    "SSET" "SSET-ELEMENT"
    "SSET-ADJOIN" "SSET-DELETE" "SSET-EMPTY" "SSET-COUNT"
-   "SSET-MEMBER"
+   "SSET-MEMBER" "SSET-DIFFERENCE"
 
    ;; key-only hash lookup which saves space over a hash-table
    "MAKE-HASHSET" "HASHSET-INSERT" "HASHSET-REMOVE" "HASHSET-FIND"

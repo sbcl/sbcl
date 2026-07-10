@@ -1,0 +1,82 @@
+from Gemini -
+
+This large dataset provides a highly reliable profile of SSET usage in real-world compilation workloads.
+Based on this data, we compare the current Double Hashing with Tombstones design against the proposed
+Linear Probing with Knuth Deletion (New SSET) design.
+
+Aggregated Metrics Summary
+Metric                              Value
+Total Files Analyzed                1,492
+Total SSETs Allocated          23,689,952
+Total SSET API Calls          232,174,147
+Average Allocated Vector Size        6.75
+Average Active Element Count         3.22
+Max Allocated Vector Size          16,384 (1 occurrence)
+Max Active Element Count            1,772
+
+SSET API Operation Breakdown
+Adjoin (Insert):              116,764,137 (50.29%)
+Member (Lookup):               77,723,416 (33.48%)
+Delete:                        22,734,716 (9.79%)
+Set Operations (Union/Intersection/Diff):
+                               14,951,878 (6.44%)
+
+Key Findings & Analysis
+1. SSETs are Extremely Small
+The size distribution of the SSET hash vectors is heavily skewed towards tiny sizes:
+￼
+=== Global Vector Size Distribution ===
+  Size    0 (Empty): 12,082,756 (51.00%)  [Cumulative: 51.00%]
+  Size    2        :  3,096,767 (13.07%)  [Cumulative: 64.08%]
+  Size    4        :  2,783,510 (11.75%)  [Cumulative: 75.83%]
+  Size    8        :  2,186,659 ( 9.23%)  [Cumulative: 85.06%]
+  Size   16        :  1,878,172 ( 7.93%)  [Cumulative: 92.98%]
+  Size   32        :  1,078,565 ( 4.55%)  [Cumulative: 97.54%]
+  Size   64        :    424,278 ( 1.79%)  [Cumulative: 99.33%]
+  -------------------------------------------------------------
+  Size >= 128      :    158,945 ( 0.67%)  [Cumulative: 100.00%]
+92.98% of all SSETs have a vector size of 16 or less.
+97.54% have a vector size of 32 or less.
+The average active element count is only 3.22.
+
+NOTE
+On modern 64-bit systems, a cache line is 64 bytes, which holds exactly 8 pointers.
+A simple-vector of size 2, 4, or 8 (along with its header) fits entirely within a single cache line.
+Even a vector of size 16 fits in just two cache lines.
+
+2. Linear Probing Cache Win
+Because SSETs are tiny, Linear Probing is highly optimal:
+
+* A linear scan of a size 2–16 vector will almost always result in zero cache misses
+  after the first element is accessed.
+* Double Hashing requires computing two separate hash values (calling sset-hash2)
+  and probing non-sequential slots, which increases instruction count and can cause
+  additional cache line lookups for larger vectors.
+
+3. Negligible Knuth Deletion Cost
+The primary drawback of the new SSET is that sset-delete using the Knuth shifting algorithm is 
+O(N) because it needs to shift elements to fill deleted slots, whereas the old tombstone
+deletion is O(1).
+
+* Our data shows the Delete ratio (Delete / (Adjoin + Member)) is only 11.69%.
+  Since 93% of SSETs have size <= 16 the maximum number of elements that ever need to be shifted
+  during a delete is bounded by a very small constant (typically <= 3)
+  Shifting 3 pointers in cache-resident memory takes only a few CPU instructions.
+
+* The O(N) worst-case cost of Knuth deletion is practically non-existent in this workload.
+
+4. Better Lookup Paths (No Tombstone Bloat)
+In the old SSET, deleted elements are marked with a tombstone (-1). Over time, if a set
+undergoes many adjoins and deletes, the table fills up with tombstones. This increases the
+probe sequence length for subsequent lookups (Member), as they must scan past tombstones.
+
+The new SSET completely eliminates tombstones, ensuring lookup paths are always bounded by
+the actual active elements currently in the set.
+
+Recommendation
+We should proceed with the new-sset (Linear Probing with Knuth deletion).
+
+The data shows that SSETs are too small to benefit from double-hashing's collision distribution
+properties. Instead, they are the perfect size to benefit from linear probing's cache locality
+and low overhead. The cost of Knuth deletion is entirely mitigated by the small table sizes
+and low deletion frequency.
