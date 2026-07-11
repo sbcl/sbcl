@@ -845,25 +845,37 @@
            ;; by doing (and (not (fixnump x)) (realp x))
            (when (or (numeric-union-type-p type)
                      (find-if #'numeric-union-type-p (union-type-types type)))
-             (let ((numeric-type (if (numeric-union-type-p type)
-                                     type
-                                     (let ((numeric (remove-if-not #'numeric-union-type-p (union-type-types type))))
-                                       (when numeric
-                                         (sb-kernel::%type-union numeric))))))
-               (when numeric-type
-                 (flet ((add-missing (whole test)
-                          (when (csubtypep numeric-type whole)
-                            (let ((diff (type-difference whole numeric-type)))
-                              (when (numeric-type-p diff)
-                                `(and (not (typep ,object ',(type-specifier diff)))
-                                      (or (,test ,object)
-                                          ,@(when (union-type-p type)
-                                              (let ((left (remove-if #'numeric-union-type-p (union-type-types type))))
-                                                (and left
-                                                     `((typep ,object '(or ,@(mapcar #'type-specifier left))))))))))))))
-                   (or (add-missing (specifier-type 'real) 'realp)
-                       (add-missing (specifier-type 'number) 'numberp)
-                       (add-missing (specifier-type 'rational) 'rationalp)))))))
+             (flet ((numeric-p (type)
+                      (or (numeric-union-type-p type)
+                          ;; (eql complex) goes to a member type
+                          (csubtypep type (specifier-type 'number))
+                          (and (negation-type-p type)
+                               (csubtypep (negation-type-type type) (specifier-type 'number))))))
+               (let ((numeric-type (if (numeric-union-type-p type)
+                                       type
+                                       (let ((numeric (remove-if-not #'numeric-p (union-type-types type))))
+                                         (when numeric
+                                           (sb-kernel::%type-union numeric))))))
+                 (when (and numeric-type
+                            (not (csubtypep numeric-type (specifier-type 'integer))))
+                   (flet ((add-missing (whole test &optional lowered)
+                            (when (csubtypep numeric-type whole)
+                              (let ((diff (type-difference whole numeric-type)))
+                                (when (or (member-type-p diff)
+                                          (and (numeric-union-type-p diff)
+                                               (or (not lowered)
+                                                   (numeric-type-p diff)
+                                                   (csubtypep diff lowered))))
+                                  `(and (not (typep ,object ',(type-specifier diff)))
+                                        (or (,test ,object)
+                                            ,@(when (union-type-p type)
+                                                (let ((left (remove-if #'numeric-p (union-type-types type))))
+                                                  (and left
+                                                       `((typep ,object '(or ,@(mapcar #'type-specifier left))))))))))))))
+                     (or (add-missing (specifier-type 'real) 'realp)
+                         (add-missing (specifier-type 'number) 'numberp)
+                         (add-missing (specifier-type 'rational) 'rationalp
+                                      (specifier-type 'integer)))))))))
           ;; Turn disjoint singlegton numeric types into a single
           ;; call to MEMBER
           ((flet ((transform-numeric (type)

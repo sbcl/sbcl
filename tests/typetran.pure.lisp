@@ -62,3 +62,20 @@
     ;; were delayed until the EQ as the vop would do, it would incorrectly get T as the answer.
     (assert (not (way4 x y)))
     (assert (eq (sb-kernel:layout-of x) (sb-kernel:layout-of y)))))
+
+(with-test (:name :or-complex-members)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (typep x '(and number (not (eql #C(1 2d0))))))
+    ((1) t)
+    ((#C(1 2d0)) nil)
+    ((#C(1 3d0)) t))
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (typep x '(or real (complex single-float) (complex rational) (eql #C(1 2d0)))))
+    ((1) t)
+    ((#C(1 2)) t)
+    ((#C(1 3d0)) nil)
+    ((#C(1 2d0)) t)))
