@@ -35,6 +35,9 @@
 
 (defun context-float-register (context index format &optional integer)
   (declare (ignorable context index integer))
+  ;; Don't make the whole thing use avx512 registers
+  #+sb-simd-pack-512
+  (declare (notinline %make-simd-pack-512-ub64 %make-simd-pack-512-single %make-simd-pack-512-double))
   #-(or darwin linux openbsd win32 sunos (and freebsd x86-64))
   (progn
     (warn "stub CONTEXT-FLOAT-REGISTER")
@@ -245,6 +248,9 @@
 
 (defun %set-context-float-register (context index format value)
   (declare (ignorable context index format))
+  ;; Don't make the whole thing use avx512 registers
+  #+sb-simd-pack-512
+  (declare (notinline %simd-pack-512-singles %simd-pack-512-doubles %simd-pack-512-ub64s))
   #-(or linux win32)
   (progn
     (warn "stub %SET-CONTEXT-FLOAT-REGISTER")

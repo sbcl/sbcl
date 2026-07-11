@@ -2439,6 +2439,9 @@
                    #-c-stack-is-control-stack
                    (* (sb-c:sc+offset-offset sc+offset) n-word-bytes)
                    ,offset)))
+    ;; Don't make the whole thing use avx512 registers
+    #+sb-simd-pack-512
+    (declare (notinline %make-simd-pack-512-ub64 %make-simd-pack-512-single %make-simd-pack-512-double))
     (ecase (sb-c:sc+offset-scn sc+offset)
       ((#.any-reg-sc-number
         #.descriptor-reg-sc-number)
@@ -2731,6 +2734,9 @@
                    #-c-stack-is-control-stack
                    (* (sb-c:sc+offset-offset sc+offset) n-word-bytes)
                    ,offset)))
+    ;; Don't make the whole thing use avx512 registers
+    #+sb-simd-pack-512
+    (declare (notinline %make-simd-pack-512-ub64 %make-simd-pack-512-single %make-simd-pack-512-double))
     (ecase (sb-c:sc+offset-scn sc+offset)
       ((#.any-reg-sc-number
         #.descriptor-reg-sc-number)
