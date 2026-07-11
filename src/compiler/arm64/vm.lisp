@@ -366,4 +366,7 @@
         bic-fixnum-encode-immediate
         logical-immediate-or-word-mask
         sb-arm64-asm::ldr-str-offset-encodable
+        sb-arm64-asm::ldr-str-8-offset-encodable
+        sb-arm64-asm::ldr-str-16-offset-encodable
+        sb-arm64-asm::ldr-str-32-offset-encodable
         power-of-two-p))

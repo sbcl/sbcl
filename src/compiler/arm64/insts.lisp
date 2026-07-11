@@ -19,7 +19,9 @@
             negative-add-sub-immediate-p
             encode-logical-immediate fixnum-encode-logical-immediate
             movi-immediate-p
-            ldr-str-offset-encodable ldp-stp-offset-p
+            ldr-str-offset-encodable ldr-str-8-offset-encodable
+            ldr-str-16-offset-encodable ldr-str-32-offset-encodable
+            ldp-stp-offset-p
             extend lsl lsr asr ror @ encode-fp-immediate) "SB-VM")
   ;; Imports from SB-VM into this package
   #+sb-simd-pack
@@ -1548,6 +1550,10 @@
       (multiple-value-bind (qout rem) (truncate offset (truncate size 8))
         (and (zerop rem)
              (typep qout '(unsigned-byte 12))))))
+;; kludge for SATISFIES types in sap.lisp
+(defun ldr-str-8-offset-encodable (offset) (ldr-str-offset-encodable offset 8))
+(defun ldr-str-16-offset-encodable (offset) (ldr-str-offset-encodable offset 16))
+(defun ldr-str-32-offset-encodable (offset) (ldr-str-offset-encodable offset 32))
 
 (defun emit-load-store (size opc segment dst address &optional vector-size)
   (let* ((base (memory-operand-base address))
