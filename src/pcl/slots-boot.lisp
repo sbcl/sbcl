@@ -27,6 +27,16 @@
 (defun ensure-accessor (fun-name)
   (when (member fun-name *!temporary-ensure-accessor-functions* :test 'equal)
     (error "ENSURE-ACCESSOR ~S called more than once!?" fun-name))
+  ;; In order to allow building PCL with *DERIVE-FUNCTION-TYPES* we have to avoid ever
+  ;; calling SB-C::FTYPE-FROM-DEFINITION on a fake accessor. If that were to happen,
+  ;; the compiler would think the accessor is a non-returning function.
+  ;; These should all return a single value but they have to exacty match what
+  ;; gets derived later on, or else you cause a proclamation mismatch warning.
+  (proclaim `(ftype ,(ecase (car (last fun-name))
+                       (reader `(function (t) *))
+                       (writer `(function (t t) *))
+                       (boundp `(function (t) *)))
+                    ,fun-name))
   (push fun-name *!temporary-ensure-accessor-functions*)
   #| We don't really need "fast" global slot accessors while building PCL.
   ;; With few exceptions, all methods use a permutation vector for slot access.

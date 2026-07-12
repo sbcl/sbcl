@@ -164,9 +164,7 @@ sb-kernel::
                              (or (search "src/pcl" stem)
                                  (search "src/code/aprof" stem)
                                  (search "src/code/ntrace" stem)))
-                            (sb-ext:*derive-function-types*
-                              (unless (search "/pcl/" stem)
-                                t)))
+                            (sb-ext:*derive-function-types* t))
                         (ensure-directories-exist output)
                         ;; Like PROCLAIM-TARGET-OPTIMIZATION in 'compile-cold-sbcl'
                         ;; We should probably stash a copy of the POLICY instance from
