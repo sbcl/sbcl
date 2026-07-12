@@ -78,6 +78,7 @@
   (define-arg-type extend :printer #'print-extend)
 
   (define-arg-type ldr-str-extend :printer #'print-ldr-str-extend)
+  (define-arg-type prfop :printer #'print-prfop)
 
   (define-arg-type scaled-immediate :printer #'print-scaled-immediate)
 
@@ -1573,14 +1574,17 @@
                          (logior #b10
                                  (fp-reg-type dst)))))
                      (size)
-                     ((sc-is dst 32-bit-reg)
+                     ((and (not (integerp dst))
+                           (sc-is dst 32-bit-reg))
                       #b10)
                      (t #b11)))
          (scale (if fp
                     (logior (ash (ldb (byte 1 1) opc) 2)
                             size)
                     size))
-         (dst (reg-offset dst)))
+         (dst (if (integerp dst)
+                  dst
+                  (reg-offset dst))))
     (cond ((and (or
                  (and (fixup-p offset)
                       (eq (fixup-flavor offset) :symbol-tls-index))
@@ -1690,6 +1694,35 @@
                                            (reg-offset dst)))))
      (t
       (emit-load-store nil 1 segment dst address vector-size)))))
+
+(define-instruction prfm (segment type address)
+  (:printer ldr-str-unsigned-imm ((op #b10)
+                                  (rt nil :type 'prfop)))
+  (:printer ldr-str-reg ((op #b10)
+                         (rt nil :type 'prfop)))
+  (:printer ldr-str-unscaled-imm ((op #b10)
+                                  (rt nil :type 'prfop)))
+  (:emitter
+   (let ((rt (getf '(:pldl1keep #b00000
+                     :pldl1strm #b00001
+                     :pldl2keep #b00010
+                     :pldl2strm #b00011
+                     :pldl3keep #b00100
+                     :pldl3strm #b00101
+                     :plil1keep #b01000
+                     :plil1strm #b01001
+                     :plil2keep #b01010
+                     :plil2strm #b01011
+                     :plil3keep #b01100
+                     :plil3strm #b01101
+                     :pstl1keep #b10000
+                     :pstl1strm #b10001
+                     :pstl2keep #b10010
+                     :pstl2strm #b10011
+                     :pstl3keep #b10100
+                     :pstl3strm #b10101)
+                   type)))
+     (emit-load-store nil #b10 segment rt address))))
 
 (def-emitter ldr-str-pair
   (opc 2 30)

@@ -251,6 +251,31 @@
                            (#b10 "Q"))
                          reg)))))))
 
+(defun print-prfop (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (size opc rt) value
+    (declare (ignore size opc))
+    (princ (getf '(#b00000 pldl1keep
+                   #b00001 pldl1strm
+                   #b00010 pldl2keep
+                   #b00011 pldl2strm
+                   #b00100 pldl3keep
+                   #b00101 pldl3strm
+                   #b01000 plil1keep
+                   #b01001 plil1strm
+                   #b01010 plil2keep
+                   #b01011 plil2strm
+                   #b01100 plil3keep
+                   #b01101 plil3strm
+                   #b10000 pstl1keep
+                   #b10001 pstl1strm
+                   #b10010 pstl2keep
+                   #b10011 pstl2strm
+                   #b10100 pstl3keep
+                   #b10101 pstl3strm)
+                 rt)
+           stream)))
+
 (defun print-float-reg (value stream dstate)
   (multiple-value-bind (type value)
       (if (consp value)
