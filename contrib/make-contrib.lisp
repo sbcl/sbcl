@@ -134,6 +134,8 @@
         ;; foreign-glue contains macros needed to compile the generated file
         (let ((*evaluator-mode* :compile)) (load "../sb-grovel/foreign-glue")))
       (let (wcu-warnings)
+        ;; SETQ is fine, we're going to exit this image soon enough
+        (setq sb-ext:*derive-function-types* t)
         (handler-bind (((and warning (not style-warning))
                         (lambda (c)
                           (unless (ignorable-warning-p c)
