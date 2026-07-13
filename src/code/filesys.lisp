@@ -677,13 +677,16 @@ it does not exist or if it is a file or a symbolic link."
                                       *physical-host*
                                       *default-pathname-defaults*
                                       :as-directory directory))
+           (dir-existsp (dir)
+             ;; X_OK implies a searchable directory. Not defined on #+win32
+             #+unix (sb-unix:unix-access (namestring dir) (logior sb-unix:r_ok sb-unix:x_ok))
+             #-unix (probe-file dir))
+           (file-existsp (file)
+             #+unix (sb-unix:unix-access (namestring file) sb-unix:r_ok)
+             #-unix (probe-file file))
            (probe (path)
-             (let ((contrib (merge-pathnames "contrib/" path)))
-               ;; X_OK implies a searchable directory. Not defined on #+win32
-               (when #+unix (sb-unix:unix-access (namestring contrib)
-                                                 (logior sb-unix:r_ok sb-unix:x_ok))
-                     #-unix (probe-file contrib)
-                 path)))
+             (when (dir-existsp (merge-pathnames "contrib/" path))
+               path))
            (try-runtime-home (path)
              (or (probe path)
                  (probe (merge-pathnames "../lib/sbcl/" path)))))
@@ -696,13 +699,21 @@ it does not exist or if it is a file or a symbolic link."
                                        "")))
           (probe (parse "."))
           ;; Handle a symlink
-          (let ((runtime (extern-alien "sbcl_runtime" c-string)))
-            (and runtime
-                 (let ((truename (probe-file (parse runtime nil))))
-                   (when truename
-                    (try-runtime-home (make-pathname :name nil
-                                                     :type nil
-                                                     :defaults truename))))))))))
+          (let* ((runtime (extern-alien "sbcl_runtime" c-string))
+                 (pn (and runtime (parse runtime nil))))
+            (and pn
+                 (file-existsp pn) ; how could it not exist? It is the executing program
+                 (let ((pn (try-runtime-home (make-pathname :name nil
+                                                            :type nil
+                                                            :defaults pn))))
+                   ;; When sbcl_runtime gets assigned, it should have no symlinks within it, so there
+                   ;; is presumably no reason to call TRUENAME here. That doesn't matter, but what does
+                   ;; is that in the sitution where the contrib dir doesn't exist relative to the executable,
+                   ;; there was still a needless storm of lstat() calls - 15 in my case - from eagerly
+                   ;; calling realpath on the executable in a filesystem where that takes many round-trips
+                   ;; to a file server. I'm optimistically hoping that the install-test case added
+                   ;; in git rev 71f7507fc1 is still testing what it intended to.
+                   (when pn (truename pn)))))))))
 
 (defun user-homedir-namestring (&optional username)
   (flet ((not-empty (x)
