@@ -596,6 +596,13 @@
 
 ;;;; tools to compile SBCL sources to create the cross-compiler
 
+(defun delete-if-exists (pathname)
+  ;; The used to be expressed as (WHEN (PROBE-FILE X) (DELETE-FILE X))
+  ;; which is potentially 100x more costly in terms of filesystem operations
+  ;; depending on how many times PROBE-FILE decided to invoke lstat.
+  (handler-case (delete-file pathname)
+    (file-error (c) (declare (ignore c)) t)))
+
 ;;; a wrapper for compilation/assembly, used mostly to centralize
 ;;; the procedure for finding full filenames from "stems"
 ;;;
@@ -653,8 +660,7 @@
     ;; delete any preexisting object file in order to avoid confusing
     ;; ourselves later should we happen to bail out of compilation
     ;; with an error.
-    (when (and (not *compile-for-effect-only*) (probe-file obj))
-      (delete-file obj))
+    (unless *compile-for-effect-only* (delete-if-exists obj))
 
     ;; Original comment:
     ;;
@@ -683,8 +689,7 @@
     ;; and some compilers (e.g. OpenMCL) will complain if they're
     ;; asked to write over a file that exists already (and isn't
     ;; recognizeably a fasl file), so
-    (when (probe-file tmp-obj)
-      (delete-file tmp-obj))
+    (delete-if-exists tmp-obj)
 
     ;; Try to use the compiler to generate a new temporary object file.
     (flet ((report-recompile-restart (stream)
@@ -742,10 +747,9 @@
 
     ;; If we get to here, compilation succeeded, so it's OK to rename
     ;; the temporary output file to the permanent object file.
-    (cond ((not *compile-for-effect-only*)
-           (rename-file-a-la-unix tmp-obj obj))
-          ((probe-file tmp-obj)
-           (delete-file tmp-obj)))      ; clean up the trash
+    (if *compile-for-effect-only*
+        (delete-if-exists tmp-obj)
+        (rename-file-a-la-unix tmp-obj obj))
 
     ;; nice friendly traditional return value
     (pathname obj)))
