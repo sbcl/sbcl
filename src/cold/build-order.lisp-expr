@@ -43,6 +43,10 @@
 
  ("src/code/cross-early" :c-headers :not-target)
 
+ ;; assembly files generally don't depend on anything that hasn't already
+ ;; been baked in to the cross-compiler
+ ("src/assembly/master" :assem :not-host)
+
  ;; This comes early because it's useful for debugging everywhere.
  ("src/code/show" :c-headers)
  ("src/compiler/early-constantp" :c-headers)
@@ -416,8 +420,6 @@
  ("src/assembly/{arch}/array")
  ("src/assembly/{arch}/arith")
  ("src/assembly/{arch}/alloc")
- ;; assembly files are all loaded by genesis before any compiled files.
- ("src/assembly/master" :assem :not-host)
 
  ("src/compiler/float-tran")
  ("src/compiler/array-tran")
