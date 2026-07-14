@@ -1813,72 +1813,15 @@
            (simple-character-string string)
            ((simple-array (unsigned-byte 8) (*)) byte-array)
            (optimize speed (safety 0)))
-  (let* ((table (load-time-value
-                 (let* ((table-size 256)
-                        (table (make-array (* table-size 16) :element-type '(unsigned-byte 8)
-                                                             :initial-element #xFF)))
-                   ;; A table for selecting 1 or 2 byte utf8
-                   ;; indexed by an 8 bit mask each bit with a set bit representing 1-byte characters
-                   (loop for row below table-size
-                         do (loop with dest-index = 0
-                                  for lane below 8
-                                  do
-                                  (cond ((logbitp lane row)
-                                         (setf (aref table (+ (* row 16) dest-index)) (* lane 2))
-                                         (incf dest-index))
-                                        ((setf (aref table (+ (* row 16) dest-index)) (+ 16 (* lane 2)))
-                                         (setf (aref table (+ (* row 16) (1+ dest-index))) (+ 16 1 (* lane 2)))
-                                         (incf dest-index 2)))))
-                   table)))
-         (table2 (load-time-value
-                  (let* ((table-size 256)
-                         (row-size (* 16 3))
-                         (table (make-array (* table-size row-size) :element-type '(unsigned-byte 8)
-                                                                    :initial-element 0)))
-
-                    ;; A table with three masks per entry
-                    ;; indexed by 4x2 bits represting the number of utf8 bytes for character - 1
-                    (loop for i below (* table-size row-size)
-                          when (< (mod i row-size) 16)
-                          ;; fill the TBL part with an out of bounds index to get back zeros
-                          do (setf (aref table i) #xFF))
-                    (loop for row below table-size
-                          do (loop with dest-index = 0
-                                   for lane below 4
-                                   for bytes = (1+ (ldb (byte 2 (* lane 2)) row))
-                                   for zeros = (- 4 bytes)
-                                   do (loop for b below bytes
-                                            for reg-index = (+ zeros b)
-                                            for src-index = (+ (* reg-index 16) (* lane 4))
-                                            for lead-p = (= b 0)
-                                            for and-mask = (if lead-p
-                                                               (case bytes
-                                                                 (1 #x7F)
-                                                                 (2 #x1F)
-                                                                 (3 #x0F)
-                                                                 (4 #x07))
-                                                               #x3F)
-                                            for orr-mask = (if lead-p
-                                                               (case bytes
-                                                                 (1 #x00)
-                                                                 (2 #xC0)
-                                                                 (3 #xE0)
-                                                                 (4 #xF0))
-                                                               #x80)
-                                            do (setf (aref table (+ (* row row-size) dest-index)) src-index) ;; tbl
-                                               (setf (aref table (+ (* row row-size) 16 dest-index)) and-mask) ;; and
-                                               (setf (aref table (+ (* row row-size) 32 dest-index)) orr-mask) ;; orr
-                                               (incf dest-index))))
-                    table)))
-         (length (length string)))
-    (with-pinned-objects-in-registers (string byte-array table table2)
+  (let* ((length (length string)))
+    (with-pinned-objects-in-registers (string byte-array)
       (multiple-value-bind (byte-index char-index)
           (inline-vop (((32-bit-array* sap-reg t :target 32-bit-array) (vector-sap string))
                        ((byte-array sap-reg t) (vector-sap byte-array))
                        ((n signed-reg) (logand (+ (* length 4) 15) -16))
                        ((byte-array-length unsigned-reg) (logand (+ byte-array-length 15) -16))
-                       ((table sap-reg t) (vector-sap table))
-                       ((table2 sap-reg t) (vector-sap table2))
+                       ((table any-reg t))
+                       ((full-table any-reg t))
                        ((32-bit-array sap-reg t :from (:argument 0)))
                        ((tmp unsigned-reg))
                        ((ptr unsigned-reg))
@@ -1909,8 +1852,64 @@
             (move 32-bit-array 32-bit-array*)
             (load-inline-constant 2byte-mask-8h :oword #x80C080C080C080C080C080C080C080C0)
             (load-inline-constant powers :qword (concat-ub 8 '(128 64 32 16 8 4 2 1)))
+            (flet ((make-table ()
+                     (let* ((table-size 256)
+                            (table (make-array (* table-size 16) :element-type '(unsigned-byte 8)
+                                                                 :initial-element #xFF)))
+                       ;; A table for selecting 1 or 2 byte utf8
+                       ;; indexed by an 8 bit mask each bit with a set bit representing 1-byte characters
+                       (loop for row below table-size
+                             do (loop with dest-index = 0
+                                      for lane below 8
+                                      do
+                                      (cond ((logbitp lane row)
+                                             (setf (aref table (+ (* row 16) dest-index)) (* lane 2))
+                                             (incf dest-index))
+                                            ((setf (aref table (+ (* row 16) dest-index)) (+ 16 (* lane 2)))
+                                             (setf (aref table (+ (* row 16) (1+ dest-index))) (+ 16 1 (* lane 2)))
+                                             (incf dest-index 2)))))
+                       table))
+                   (make-full-table ()
+                     (let* ((table-size 256)
+                            (row-size (* 16 3))
+                            (table (make-array (* table-size row-size) :element-type '(unsigned-byte 8)
+                                                                       :initial-element 0)))
 
-            (flet ((convert (size full-length)
+                       ;; A table with three masks per entry
+                       ;; indexed by 4x2 bits represting the number of utf8 bytes for character - 1
+                       (loop for i below (* table-size row-size)
+                             when (< (mod i row-size) 16)
+                             ;; fill the TBL part with an out of bounds index to get back zeros
+                             do (setf (aref table i) #xFF))
+                       (loop for row below table-size
+                             do (loop with dest-index = 0
+                                      for lane below 4
+                                      for bytes = (1+ (ldb (byte 2 (* lane 2)) row))
+                                      for zeros = (- 4 bytes)
+                                      do (loop for b below bytes
+                                               for reg-index = (+ zeros b)
+                                               for src-index = (+ (* reg-index 16) (* lane 4))
+                                               for lead-p = (= b 0)
+                                               for and-mask = (if lead-p
+                                                                  (case bytes
+                                                                    (1 #x7F)
+                                                                    (2 #x1F)
+                                                                    (3 #x0F)
+                                                                    (4 #x07))
+                                                                  #x3F)
+                                               for orr-mask = (if lead-p
+                                                                  (case bytes
+                                                                    (1 #x00)
+                                                                    (2 #xC0)
+                                                                    (3 #xE0)
+                                                                    (4 #xF0))
+                                                                  #x80)
+                                               do (setf (aref table (+ (* row row-size) dest-index)) src-index) ;; tbl
+                                                  (setf (aref table (+ (* row row-size) 16 dest-index)) and-mask) ;; and
+                                                  (setf (aref table (+ (* row row-size) 32 dest-index)) orr-mask) ;; orr
+                                                  (incf dest-index))))
+                       table))
+                   (convert (size full-length)
                      (assemble ()
                        (multiple-value-bind (h-size b-size)
                            (ecase size
@@ -2001,7 +2000,7 @@
 
                      ;; Multiply by 48 (3 * 16)
                      (inst add tmp tmp (lsl tmp 1))
-                     (inst add ptr table2 (lsl tmp 4))
+                     (inst add ptr full-table (lsl tmp 4))
 
                      (inst ld1 (list shuf-mask and-mask orr-mask) (@ ptr) :16b)
 
@@ -2022,6 +2021,7 @@
                      (inst add char-index char-index 16)
                      (inst sub n n 16)))
               (assemble ()
+                (load-inline-constant table (make-table))
                 (inst mov byte-index 0)
                 (inst mov char-index 0)
 
@@ -2043,7 +2043,7 @@
                 (inst movi c-10000 #x10000 :4s)
                 (inst movi c-800 #x800 :4s)
                 (inst movi c-80-4s #x80 :4s)
-
+                (load-inline-constant full-table (make-full-table))
                 FULL-LENGTH
                 (convert-full)
 

@@ -551,7 +551,10 @@
                               ,value (@ tmp-tn (- (* ,offset n-word-bytes) ,lowtag))))))))))))))
 
 (defun load-inline-constant (dst &rest constant-descriptor)
-  (inst load-from-label dst (cdr (apply #'register-inline-constant constant-descriptor))))
+  (let ((label (cdr (apply #'register-inline-constant constant-descriptor))))
+   (if (vectorp (car constant-descriptor))
+       (inst adr dst label)
+       (inst load-from-label dst label))))
 
 ;;;
 

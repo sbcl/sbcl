@@ -1779,5 +1779,14 @@
   (let ((b (& val #xf)))
    (let ((a (>> (u32+ val (<< val 23)) 28)))
     (^ a (aref tab b))))))")
+(#(428DC20 B445B28 27168950 5A0CB91B 60BC6EF6 80D0C591 8DECED5A 92FE1EC2 A245F357 AC841474 C17B6FA5 C6B4780F CF5ABDAB F28A2060)
+ "(:BYTE-ARRAY :JUMP-TABLE :FIXUP :COMPLEX-DOUBLE-FLOAT :COMPLEX-SINGLE-FLOAT :DOUBLE-FLOAT :SINGLE-FLOAT :CHARACTER :BASE-CHAR :OWORD :QWORD :DWORD :WORD :BYTE)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 0 8 14 12 7 11 3)))
+  (let ((b (& val #x7)))
+   (let ((a (>> (<< val 5) 29)))
+    (^ a (aref tab b))))))")
+(#(428DC20 27168950 5A0CB91B 8DECED5A 92FE1EC2 C17B6FA5 CF5ABDAB F28A2060)
+ "(:OWORD :BYTE-ARRAY :JUMP-TABLE :FIXUP :QWORD :DWORD :WORD :BYTE)"
+ "((& (- val (>> val 10)) 7))")
 )
 ;; EOF

@@ -4601,6 +4601,8 @@
        (setq constant
              (list :oword (logior (%simd-pack-low first)
                                   (ash (%simd-pack-high first) 64)))))
+      ((simple-array (unsigned-byte 8) (*))
+       (setf constant (list :byte-array first)))
       .
       #+sb-xc-host
       ((complex
@@ -4644,7 +4646,7 @@
          (cons :oword
                (logior (ash (ldb (byte 64 0) (double-float-bits (imagpart value))) 64)
                        (ldb (byte 64 0) (double-float-bits (realpart value))))))
-        ((:fixup :jump-table)
+        ((:fixup :jump-table :byte-array)
          (cons type value))))))
 
 (defun inline-constant-value (constant)
@@ -4652,11 +4654,12 @@
         (size  (ecase (car constant)
                  ((:byte :word :dword :qword) (car constant))
                  ((:fixup :jump-table) :qword)
+                 (:byte-array (length (cdr constant)))
                  ((:oword) :oword))))
     (values label (cons size label))))
 
-(defun size-nbyte (size)
-  (ecase size
+(defun size-nbyte (constant)
+  (ecase (car constant)
     (:byte  1)
     ;; These keywords are completely wrong for AARCH64 but I don't want to touch them.
     ;; The correct definitions would have :HWORD (halfword) for 2 bytes, :WORD for 4,
@@ -4664,11 +4667,12 @@
     (:word  2)
     (:dword 4)
     ((:qword :fixup :jump-table) 8)
-    (:oword 16)))
+    (:oword 16)
+    (:byte-array
+     (length (cdr constant)))))
 
 (defun sort-inline-constants (constants)
-  (stable-sort constants #'> :key (lambda (constant)
-                                    (size-nbyte (caar constant)))))
+  (stable-sort constants #'> :key (lambda (c) (size-nbyte (car c)))))
 
 (sb-assem::%def-inst-encoder
  '.layout-id
@@ -4679,9 +4683,11 @@
 (defun emit-inline-constant (section constant label)
   (let* ((type (car constant))
          (val (cdr constant))
-         (size (size-nbyte type)))
+         (size (size-nbyte constant)))
     (emit section
-          `(.align ,(integer-length (1- size)))
+          `(.align ,(if (eq type :byte-array)
+                        4
+                        (integer-length (1- size))))
           label
           (cond ((typep val '(cons (eql :layout-id)))
                  `(.layout-id ,(cadr val)))
@@ -4691,6 +4697,8 @@
                  `(dword ,(apply #'make-fixup val)))
                 ((eq type :jump-table)
                  `(.lispword ,@(coerce val 'list)))
+                ((eq type :byte-array)
+                 `(.byte ,@(coerce val 'list)))
                 (t
                  ;; Could add pseudo-ops for .WORD, .INT, .QUAD, .OCTA just like gcc has.
                  ;; But it works fine to emit as a sequence of bytes
