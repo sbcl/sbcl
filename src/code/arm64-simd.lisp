@@ -1646,138 +1646,260 @@
       (inst add res length (lsl tmp n-fixnum-tag-bits))
       DONE)))
 
-(defun simd-copy-utf8-sap-to-character-string (sap string length)
-  (declare (optimize speed (safety 0))
-           (type system-area-pointer sap)
-           (type index length)
-           (type (simple-array character (*)) string))
-  (let ((byte-index 0)
-        (char-index 0)
-        (table (load-time-value (let ((table (make-array (* #b10101011 16) :element-type '(unsigned-byte 8)
-                                                                           :initial-element #xFF)))
-                                  (loop for row to #b10101010 ;; highest possible inverted index for compressing 1/2 bytes
-                                        do (loop with indexes = (loop for i below 8
-                                                                      unless (logbitp i row)
-                                                                      collect (* i 2)
-                                                                      and
-                                                                      collect (1+ (* i 2)))
-                                                 for column below 16
-                                                 for index = (pop indexes)
-                                                 when index
-                                                 do
-                                                 (setf (aref table (+ (* row 16) column)) index)))
-                                  table))))
-    (declare (type index byte-index char-index))
-    (with-pinned-objects-in-registers (string table)
-      (when (>= length 9)
-        (setf (values byte-index char-index)
-              (inline-vop
-                  (((byte-array sap-reg t) sap)
-                   ((32-bit-array sap-reg t) (vector-sap string))
-                   ((table sap-reg t) (vector-sap table))
-                   ((n unsigned-reg) (- length 9))
-                   ((string-length unsigned-reg) (logand (+ (length string) 3) -4))
-                   ((tmp unsigned-reg))
-                   ((ptr unsigned-reg))
-                   ((current double-reg))
-                   ((next double-reg))
-                   ((powers complex-double-reg))
-                   ((sh complex-double-reg))
-                   ((continuations complex-double-reg))
-                   ((starts complex-double-reg))
-                   ((current16 complex-double-reg))
-                   ((combined complex-double-reg))
-                   ((is-lead16 complex-double-reg))
-                   ((shuf complex-double-reg))
-                   ((packed complex-double-reg))
-                   ((p32-1 complex-double-reg))
-                   ((p32-2 complex-double-reg))
-                   ((mask-2 complex-double-reg))
-                   ((mask-bf complex-double-reg))
-                   ((count complex-double-reg))
-                   ((temp complex-double-reg)))
-                  ((byte-index unsigned-reg positive-fixnum :from :load)
-                   (char-index unsigned-reg positive-fixnum :from :load))
-                (inst mov byte-index 0)
-                (inst mov char-index 0)
-                (load-inline-constant (reg-in-sc powers 'double-reg) :qword (concat-ub 8 '(128 64 32 16 8 4 2 1)))
-                (inst movi mask-2 2 :8b)
-                (inst movi mask-bf #xBF :8h)
-                (inst b start)
+(defun simd-copy-utf8-sap-to-character-string (sap string byte-array-length)
+  (declare (index byte-array-length)
+           (system-area-pointer sap)
+           (simple-character-string string)
+           (optimize speed (safety 0)))
+  (with-pinned-objects-in-registers (string )
+    (multiple-value-bind (byte-index char-index)
+        (inline-vop (((byte-array* sap-reg t :target byte-array) sap)
+                     ((string sap-reg t) (vector-sap string))
+                     ((table any-reg t))
+                     ((full-table any-reg t))
+                     ((string-length unsigned-reg) (logand (+ (length string) 3) -4))
+                     ((byte-array sap-reg t :from (:argument 0)))
+                     ((byte-array-length unsigned-reg) byte-array-length)
+                     ((index unsigned-reg))
+                     ((suffix unsigned-reg))
+                     ((produced unsigned-reg))
+                     ((ptr any-reg))
+                     ((bytes complex-double-reg t))
+                     ((bytes16 complex-double-reg t))
+                     ((next complex-double-reg t))
+                     ((temp complex-double-reg))
+                     ((temp2 complex-double-reg t :offset 11))
+                     ((temp3 complex-double-reg t :offset 12))
+                     ((temp-upper complex-double-reg))
+                     ((c-c0 complex-double-reg))
+                     ((c-2 complex-double-reg))
+                     ((c-bf complex-double-reg))
+                     ((powers complex-double-reg))
+                     ((mask-s0 complex-double-reg))
+                     ((mask-s1 complex-double-reg))
+                     ((mask-s2 complex-double-reg))
+                     ((mask-s3 complex-double-reg))
+                     ((shuf-low complex-double-reg t :offset 1))
+                     ((shuf-high complex-double-reg t :offset 2))
+                     ((chars-low complex-double-reg t :offset 5))
+                     ((chars-high complex-double-reg t :offset 6))
+                     ((s1 complex-double-reg t :offset 8))
+                     ((s2 complex-double-reg t :offset 9))
+                     ((s3 complex-double-reg t :offset 10))
+                     ((tag-clear complex-double-reg))
+                     ((sh complex-double-reg))
+                     ((continuations complex-double-reg))
+                     ((starts complex-double-reg))
+                     ((combined complex-double-reg))
+                     ((is-lead16 complex-double-reg))
+                     ((shuf complex-double-reg))
+                     ((packed complex-double-reg))
+                     ((count complex-double-reg)))
+            ((byte-index unsigned-reg positive-fixnum :from :load)
+             (char-index unsigned-reg positive-fixnum :from :load))
 
-                LOOP
-                (inst add ptr byte-array byte-index)
-                (inst ldr current (@ ptr))
-                (inst ldr next (@ ptr 1))
+          (assemble ()
+            (move byte-array byte-array*)
+            (inst mov byte-index 0)
+            (inst mov char-index 0)
+            (load-inline-constant powers :oword #x80402010080402018040201008040201)
+            (inst movi c-2 2 :8b)
+            (inst movi c-bf #xBF :8h)
+            (load-inline-constant table
+                                  (let ((table (make-array (* #b10101011 16) :element-type '(unsigned-byte 8)
+                                                                             :initial-element #xFF)))
+                                    (loop for row to #b10101010 ;; highest possible inverted index for compressing 1/2 bytes
+                                          do (loop with indexes = (loop for i below 8
+                                                                        unless (logbitp i row)
+                                                                        collect (* i 2)
+                                                                        and
+                                                                        collect (1+ (* i 2)))
+                                                   for column below 16
+                                                   for index = (pop indexes)
+                                                   when index
+                                                   do
+                                                   (setf (aref table (+ (* row 16) column)) index)))
+                                    table))
+            (flet ((convert-1-2 (full)
+                     (assemble ()
+                       LOOP
+                       (inst sub tmp-tn byte-array-length byte-index)
+                       (inst cmp tmp-tn 9)
+                       (inst b :lt DONE)
 
-                (inst umaxv temp current :8b)
-                (inst umov tmp temp 0 :b)
-                (inst cmp tmp #xE0) ;; 3 or 4 bytes
-                (inst b :ge DONE)
+                       (inst add ptr byte-array byte-index)
+                       (inst ldr (reg-in-sc bytes 'double-reg) (@ ptr))
+                       (inst ldr (reg-in-sc next 'double-reg) (@ ptr 1))
 
-                ;; Build a bit pattern of non-continuation bytes
-                ;; suitable for the lookup table
-                (inst ushr sh current 6 :8b)
-                (inst cmeq continuations sh mask-2 :8b)
-                (inst and starts powers continuations :8b)
-                (inst addv starts starts :8b)
-                (inst umov tmp starts 0 :b)
+                       (inst umaxv temp bytes :8b)
+                       (inst umov tmp-tn temp 0 :b)
+                       (inst cmp tmp-tn #xE0) ;; 3 or 4 bytes
+                       (inst b :ge full)
 
-                (inst ushll current16 :8h current :8b 0)
-                (inst ushll combined :8h next :8b 0)
+                       ;; Build a bit pattern of non-continuation bytes
+                       ;; suitable for the lookup table
+                       (inst ushr sh bytes 6 :8b)
+                       (inst cmeq continuations sh c-2 :8b)
+                       (inst and starts powers continuations :8b)
+                       (inst addv starts starts :8b)
+                       (inst umov tmp-tn starts 0 :b)
 
-                ;; next is shifted by one,
-                ;; construct a codepoint from two overlapping bytes,
-                ;; i.e. (dpb b0 (byte 5 6) b1)
-                (inst sli combined current16 6 :8h)
-                (inst bic combined #xF800 :8h)
+                       (inst ushll bytes16 :8h bytes :8b 0)
+                       (inst ushll combined :8h next :8b 0)
 
-                ;; Select either the combined two bytes or one ascii byte
-                (inst cmhi is-lead16 current16 mask-bf :8h)
-                (inst bsl is-lead16 combined current16 :16b)
+                       ;; next is shifted by one,
+                       ;; construct a codepoint from two overlapping bytes,
+                       ;; i.e. (dpb b0 (byte 5 6) b1)
+                       (inst sli combined bytes16 6 :8h)
+                       (inst bic combined #xF800 :8h)
 
-                ;; Remove the gaps left over from using two bytes as one codepoint
-                (inst ldr shuf (@ table (lsl tmp 4)))
-                (inst tbl packed (list is-lead16) shuf :16b)
+                       ;; Select either the combined two bytes or one ascii byte
+                       (inst cmhi is-lead16 bytes16 c-bf :8h)
+                       (inst bsl is-lead16 combined bytes16 :16b)
 
-                ;; Widen
-                (inst ushll p32-1 :4s packed :4h 0)
-                (inst add ptr 32-bit-array (lsl char-index 2))
+                       ;; Remove the gaps left over from using two bytes as one codepoint
+                       (inst ldr shuf (@ table (lsl tmp-tn 4)))
+                       (inst tbl packed (list is-lead16) shuf :16b)
 
-                (inst sub tmp string-length char-index)
-                (inst cmp tmp 8)
-                (inst b :lt tail-16)
+                       ;; Widen
+                       (inst ushll s1 :4s packed :4h 0)
+                       (inst add ptr string (lsl char-index 2))
 
-                (inst ushll2 p32-2 :4s packed :8h 0)
+                       (inst sub tmp-tn string-length char-index)
+                       (inst cmp tmp-tn 8)
+                       (inst b :lt tail-16)
 
-                (inst addv count continuations :8b)
-                (inst stp p32-1 p32-2 (@ ptr))
-                (inst smov tmp count 0 :b)
+                       (inst ushll2 s2 :4s packed :8h 0)
+
+                       (inst addv count continuations :8b)
+                       (inst stp s1 s2 (@ ptr))
+                       (inst smov tmp-tn count 0 :b)
+                       (inst add byte-index byte-index 8)
+                       (inst add char-index char-index 8)
+                       (inst add char-index char-index tmp-tn) ;; subtract continuations
+
+                       (inst b LOOP))))
+              (assemble ()
+                (convert-1-2 START-FULL)
+
+                START-FULL
+                (inst movi c-c0 #xC0 :16b)
+
+                (load-inline-constant tag-clear :oword #x070F1F1F3F3F3F3F7F7F7F7F7F7F7F7F)
+                (load-inline-constant full-table (coerce (loop for index below (ash 1 10)
+                                                               for low-index = (ldb (byte 8 0) index)
+                                                               for suffix = (ldb (byte 2 8) index)
+                                                               append (let* ((starts (loop for i to 7
+                                                                                           when (logbitp i low-index)
+                                                                                           collect i)))
+                                                                        (loop for lane below 8
+                                                                              for start = (pop starts)
+                                                                              for next = (car starts)
+
+                                                                              for sources = (when start
+                                                                                              (loop for i from (1- (or next
+                                                                                                                       (+ suffix 8))) downto start
+                                                                                                    collect i))
+                                                                              append (loop for byte below 4
+                                                                                           collect (or (pop sources) #xFF)))))
+                                                         '(vector (unsigned-byte 8))))
+                (inst movi mask-s0 #xFF :4s)
+                (inst movi mask-s1 #xFF00 :4s)
+                (inst movi mask-s2 #xFF0000 :4s)
+                (inst movi mask-s3 #xFF000000 :4s)
+
+                FULL-LOOP
+                (inst sub tmp-tn string-length char-index)
+                (inst cmp tmp-tn 8)
+                (inst b :lt DONE)
+
+                (inst sub tmp-tn byte-array-length byte-index)
+                (inst cmp tmp-tn 16)
+                (inst b :lt DONE)
+
+                ;; Process the leading bytes in the first 8 bytes, loading 16 bytes
+                ;; so that the last leading byte might drag in 3 more bytes
+                (inst ldr bytes (@ byte-array byte-index))
+
+                ;; Identify leading bytes
+                (inst cmge temp bytes c-c0 :16b)
+
+                ;; Turn them into an 8 bit index
+                (inst and temp2 temp powers :16b)
+                (inst addv temp3 temp2 :8b)
+                (inst umov index temp3 0 :b)
+
+                ;; Need to know where the last leading byte ends
+                (inst ext temp-upper temp2 temp2 8 :16b)
+                (inst addv temp3 temp-upper :8b)
+                (inst umov suffix temp3 0 :b)
+
+                ;; Count the number of bits to the next leading byte, turning it into a 2 bit suffix
+                (inst rbit suffix suffix)
+                (inst clz suffix suffix)
+
+                ;; Add the size of the last character, ensuring that only 2 bits are added
+                (inst bfm index suffix 56 1)
+
+                (inst add ptr full-table (lsl index 5))
+                (inst ld1 (list shuf-low shuf-high) (@ ptr) :16b)
+
+                (inst addv temp2 temp :8b)
+                ;; A negated number of produced characters
+                (inst smov produced temp2 0 :b)
+
+                ;; Use the high 4 bits of each byte to get an and-mask that
+                ;; will clear their tags
+                (inst ushr temp bytes 4 :16b)
+                (inst tbl temp (list tag-clear) temp :16b)
+                (inst and bytes bytes temp :16b)
+
+                ;; Shuffle the bytes into 4-byte lanes
+                (inst tbl chars-low (list bytes) shuf-low :16b)
+                (inst tbl chars-high (list bytes) shuf-high :16b)
+
+                ;; Isolate each byte in a lane and shift it into place to get a codepoint
+                (flet ((decode-lane (chars)
+                         (inst and s1 chars mask-s1 :16b)
+                         (inst and s2 chars mask-s2 :16b)
+                         (inst and s3 chars mask-s3 :16b)
+                         (inst and chars chars mask-s0 :16b)
+
+                         (inst usra chars s1 2 :4s)
+                         (inst usra chars s2 4 :4s)
+                         (inst usra chars s3 6 :4s)))
+
+                  (decode-lane chars-low)
+                  (decode-lane chars-high))
+                (inst add ptr string (lsl char-index 2))
+                (inst st1 (list chars-low chars-high) (@ ptr) :16b)
+
                 (inst add byte-index byte-index 8)
-                (inst add char-index char-index 8)
-                (inst add char-index char-index tmp) ;; subtract continuations
-
-                START
-                (inst cmp byte-index n)
-                (inst b :le LOOP)
-
-                (inst b DONE)
-
-                TAIL-16
-                (inst movi mask-2 #xFFFFFFFF)
-                (inst and continuations continuations mask-2 :8b)
-                (inst addv count continuations :8b)
-                (inst smov tmp count 0 :b)
-                (inst str p32-1 (@ ptr))
-                (inst add byte-index byte-index 4)
-                (inst add char-index char-index 4)
-                (inst add char-index char-index tmp)
-                DONE))))
-    (when (< byte-index length)
-      (when (= (ldb (byte 2 6) (sap-ref-8 sap byte-index)) #b10)
-        ;; A continuation byte consumed by the previous byte in the simd loop
-        (incf byte-index))
-      (loop while (< byte-index length) do
+                (inst sub char-index char-index produced)
+                ;; Can't re-enter the 1-2 loop if there were
+                ;; continuation bytes into the next word, (and can't
+                ;; add suffix to byte-index, as it will kill out of
+                ;; order execution)
+                (inst cbnz suffix full-loop)
+                (convert-1-2 FULL-LOOP)))
+            TAIL-16
+            (inst cmp tmp-tn 8)
+            (inst b :lt DONE)
+            (inst movi c-2 #xFFFFFFFF)
+            (inst and continuations continuations c-2 :8b)
+            (inst addv count continuations :8b)
+            (inst smov tmp-tn count 0 :b)
+            (inst str s1 (@ ptr))
+            (inst add byte-index byte-index 4)
+            (inst add char-index char-index 4)
+            (inst add char-index char-index tmp-tn)
+            DONE))
+      (loop while (and (< byte-index byte-array-length)
+                       (<= #x80 (sap-ref-8 sap byte-index) #xbf))
+            ;; Remove any continuations consumed by the above loop
+            do (incf byte-index))
+      (loop while (< byte-index byte-array-length)
+            do
             (let ((b0 (sap-ref-8 sap byte-index)))
               (cond
                 ((< b0 #x80)
@@ -1804,9 +1926,7 @@
                                          (dpb b1 (byte 6 12)
                                               (dpb b2 (byte 6 6) b3)))))
                    (incf byte-index 4))))
-              (incf char-index))))
-
-    char-index))
+              (incf char-index))))))
 
 (defun simd-copy-character-string-to-utf8-byte-array (byte-array string byte-array-length)
   (declare (index byte-array-length)
