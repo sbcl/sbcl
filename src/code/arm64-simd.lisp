@@ -1672,7 +1672,6 @@
                      ((temp3 complex-double-reg t :offset 12))
                      ((temp-upper complex-double-reg))
                      ((c-c0 complex-double-reg))
-                     ((c-2 complex-double-reg))
                      ((c-bf complex-double-reg))
                      ((powers complex-double-reg))
                      ((mask-s0 complex-double-reg))
@@ -1687,7 +1686,6 @@
                      ((s2 complex-double-reg t :offset 9))
                      ((s3 complex-double-reg t :offset 10))
                      ((tag-clear complex-double-reg))
-                     ((sh complex-double-reg))
                      ((continuations complex-double-reg))
                      ((starts complex-double-reg))
                      ((combined complex-double-reg))
@@ -1703,7 +1701,6 @@
             (inst mov byte-index 0)
             (inst mov char-index 0)
             (load-inline-constant powers :oword #x80402010080402018040201008040201)
-            (inst movi c-2 2 :8b)
             (inst movi c-bf #xBF :8h)
             (load-inline-constant table
                                   (let ((table (make-array (* #b10101011 16) :element-type '(unsigned-byte 8)
@@ -1738,8 +1735,7 @@
 
                        ;; Build a bit pattern of non-continuation bytes
                        ;; suitable for the lookup table
-                       (inst ushr sh bytes 6 :8b)
-                       (inst cmeq continuations sh c-2 :8b)
+                       (inst cmge continuations c-c0 bytes :8b)
                        (inst and starts powers continuations :8b)
                        (inst addv starts starts :8b)
                        (inst umov tmp-tn starts 0 :b)
@@ -1885,8 +1881,8 @@
             TAIL-16
             (inst cmp tmp-tn 8)
             (inst b :lt DONE)
-            (inst movi c-2 #xFFFFFFFF)
-            (inst and continuations continuations c-2 :8b)
+            (inst movi temp #xFFFFFFFF)
+            (inst and continuations continuations temp :8b)
             (inst addv count continuations :8b)
             (inst smov tmp-tn count 0 :b)
             (inst str s1 (@ ptr))
