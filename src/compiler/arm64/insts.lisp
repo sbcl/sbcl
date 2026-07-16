@@ -4487,6 +4487,21 @@
                                 (fpr-offset rn)
                                 (fpr-offset rd)))))
 
+(macrolet ((def (name op u)
+             `(define-instruction ,name (segment rd rn rm size)
+                (:printer simd-three-extension ((op ,op) (u ,u)))
+                (:emitter
+                 (emit-simd-three-extension segment
+                                            (encode-vector-size size)
+                                            ,u
+                                            #b10
+                                            (fpr-offset rm)
+                                            ,op
+                                            (fpr-offset rn)
+                                            (fpr-offset rd))))))
+  (def sdot #b0010 0)
+  (def udot #b0010 1))
+
 (def-emitter simd-table
   (#b0 1 31)
   (q 1 30)

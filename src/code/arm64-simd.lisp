@@ -1673,17 +1673,14 @@
                      ((c-c0 complex-double-reg))
                      ((c-bf complex-double-reg))
                      ((powers complex-double-reg))
-                     ((mask-s0 complex-double-reg))
-                     ((mask-s1 complex-double-reg))
-                     ((mask-s2 complex-double-reg))
-                     ((mask-s3 complex-double-reg))
+                     ((c-ff complex-double-reg))
+                     ((c-4 complex-double-reg))
                      ((shuf-low complex-double-reg t :offset 1))
                      ((shuf-high complex-double-reg t :offset 2))
                      ((chars-low complex-double-reg t :offset 5))
                      ((chars-high complex-double-reg t :offset 6))
                      ((s1 complex-double-reg t :offset 8))
                      ((s2 complex-double-reg t :offset 9))
-                     ((s3 complex-double-reg t :offset 10))
                      ((tag-clear complex-double-reg))
                      ((continuations complex-double-reg))
                      ((starts complex-double-reg))
@@ -1779,7 +1776,8 @@
 
                 START-FULL
                 (inst movi c-c0 #xC0 :16b)
-
+                (inst movi c-ff #xFF :8h)
+                (inst movi c-4 4 :4s)
                 (load-inline-constant tag-clear :oword #x070F1F1F3F3F3F3F7F7F7F7F7F7F7F7F)
                 (load-inline-constant full-table (coerce (loop for index below (ash 1 10)
                                                                for low-index = (ldb (byte 8 0) index)
@@ -1798,10 +1796,6 @@
                                                                               append (loop for byte below 4
                                                                                            collect (or (pop sources) #xFF)))))
                                                          '(vector (unsigned-byte 8))))
-                (inst movi mask-s0 #xFF :4s)
-                (inst movi mask-s1 #xFF00 :4s)
-                (inst movi mask-s2 #xFF0000 :4s)
-                (inst movi mask-s3 #xFF000000 :4s)
 
                 FULL-LOOP
                 (inst sub tmp-tn string-length char-index)
@@ -1853,21 +1847,28 @@
                 (inst tbl chars-low (list bytes) shuf-low :16b)
                 (inst tbl chars-high (list bytes) shuf-high :16b)
 
-                ;; Isolate each byte in a lane and shift it into place to get a codepoint
                 (flet ((decode-lane (chars)
-                         (inst and s1 chars mask-s1 :16b)
-                         (inst and s2 chars mask-s2 :16b)
-                         (inst and s3 chars mask-s3 :16b)
-                         (inst and chars chars mask-s0 :16b)
+                         ;; Perform
+                         ;; A + B<<6 + C<<12 + D<<18
+                         ;; =>
+                         ;; A + B<<6 + ((C + D<<6) << 12)
 
-                         (inst usra chars s1 2 :4s)
-                         (inst usra chars s2 4 :4s)
-                         (inst usra chars s3 6 :4s)))
+                         ;; [D, 0, B, 0]
+                         (inst bic s1 chars c-ff :16b)
+                         ;; [0, C, 0, A]
+                         (inst and s2 chars c-ff :16b)
+                         ;; Combine into two 12-bit blocks per 32-bit lane: [L1, L0]
+                         (inst usra s2 s1 2 :8h)
+                         ;; Shift L0 left by 4, leave L1 alone: [L1, L0 << 4]
+                         (inst ushl s2 s2 c-4 :8h)
+                         ;; Shift each 32-bit lane right by 4
+                         (inst ushr chars s2 4 :4s)))
 
                   (decode-lane chars-low)
-                  (decode-lane chars-high))
-                (inst add ptr string (lsl char-index 2))
-                (inst st1 (list chars-low chars-high) (@ ptr) :16b)
+                  (decode-lane chars-high)
+                  (inst add ptr string (lsl char-index 2))
+                  (inst st1 (list chars-low chars-high) (@ ptr) :16b))
+
 
                 (inst add byte-index byte-index 8)
                 (inst sub char-index char-index produced)
