@@ -1672,7 +1672,7 @@
                      ((temp3 complex-double-reg t :offset 12))
                      ((c-c0 complex-double-reg))
                      ((c-bf complex-double-reg))
-                     ((powers complex-double-reg))
+                     ((powers double-reg))
                      ((c-ff complex-double-reg))
                      ((c-4 complex-double-reg))
                      ((shuf-low complex-double-reg t :offset 1))
@@ -1696,7 +1696,7 @@
             (move byte-array byte-array*)
             (inst mov byte-index 0)
             (inst mov char-index 0)
-            (load-inline-constant powers :oword #xFFFFFFFFFFFFFFFF8040201008040201)
+            (load-inline-constant powers :qword #x8040201008040201)
             (inst movi c-bf #xBF :8h)
             (load-inline-constant table
                                   (let ((table (make-array (* #b10101011 16) :element-type '(unsigned-byte 8)
@@ -1814,13 +1814,12 @@
                 (inst cmge temp bytes c-c0 :16b)
 
                 ;; Turn them into an 8 bit index
-                (inst and temp2 temp powers :16b)
+                (inst and temp2 temp powers :8b)
                 (inst addv temp3 temp2 :8b)
                 (inst umov index temp3 0 :b)
 
                 ;; Need to know where the last leading byte ends
-                ;; the high 8 bytes of temp2 is the unchanged result of CMGE
-                (inst umov suffix temp2 1 :d)
+                (inst umov suffix temp 1 :d)
                 ;; Count the number of bytes to the next leading byte, turning it into a 2 bit suffix
                 (inst rbit suffix suffix)
                 (inst clz suffix suffix)
