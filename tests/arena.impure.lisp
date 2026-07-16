@@ -727,3 +727,23 @@
            (sb-thread:join-thread thread)
            (assert (heap-allocated-p (sb-thread:thread-name thread))))
       (destroy-arena arena))))
+
+(defstruct fleemazoid a b c d e f g)
+(defun get-a-slot (inst sym) (slot-value (the fleemazoid inst) sym))
+;; Just in case we decide that this file can run in --evaluator-mode interpret
+;; (which it currently can't) ensure that slot-value uses the layout slot mapper.
+(compile 'get-a-slot)
+(test-util:with-test (:name :slot-mapper-not-in-arena)
+  (let ((a (sb-vm:new-arena 65536)))
+    (sb-vm:with-arena (a)
+      (get-a-slot (make-fleemazoid :c "hi-c") 'c))
+    (destroy-arena a)
+    ;; There's no way to know when the background compile is done, we can't really
+    ;; do any better than to wait a little. Deciding based on whether the finalizer's
+    ;; work queue is empty constitutes a data race- it grabs an item and then compiles,
+    ;; so you don't know when COMPILE is actually done.
+    (sleep .1)
+    (let ((fun (sb-kernel::layout-slot-mapper (sb-kernel:find-layout 'fleemazoid))))
+      (assert (sb-kernel:simple-fun-p fun))
+      (let ((name (sb-kernel:%simple-fun-name fun)))
+        (assert (sb-ext:heap-allocated-p name))))))

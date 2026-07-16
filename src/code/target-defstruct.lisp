@@ -614,6 +614,7 @@
                   (h (progn ,@body)))
              (if (< h ,nbuckets) ,resultform)))))))
 
+;;; Unclear why this is in SB-PCL package. It's used more from here.
 (declaim (inline sb-pcl::search-struct-slot-name-vector))
 (defun sb-pcl::search-struct-slot-name-vector (mapper slot-name)
   (declare (optimize (sb-c::insert-array-bounds-checks 0)))
@@ -665,6 +666,7 @@
 ;;; until the function is called (which may never occur), and secondly the caller
 ;;; is never delayed by waiting for the compiler.
 (defun install-struct-slot-mapper (layout)
+  (declare (sb-c::tlab :system))
   (let* ((dd (layout-dd layout))
          (slots (dd-slots dd))
          (keys (map 'vector #'dsd-name slots))
@@ -683,6 +685,7 @@
       (return-from install-struct-slot-mapper
         (setf (layout-slot-mapper layout) vector)))
     (let ((me (%make-slot-mapper-fn))
+          (name `(slot-mapper ,(dd-name dd)))
           (pairs (map 'list #'cons keys values)))
       (setf (sb-kernel:%funcallable-instance-fun me)
             (lambda (symbol)
@@ -692,13 +695,13 @@
               (let ((old (layout-slot-mapper layout)))
                 (if (neq old me) ; if it's not ME, then it's either the second stage mapper
                     ;; or else a compiled perfect-hash-based mapper. Either way, punt.
-                    (funcall old symbol)
-                    (let* ((new (make-second-stage-slot-mapper vector))
+                    (funcall (the function old) symbol)
+                    (let* ((new (lambda (symbol)
+                                  (sb-pcl::search-struct-slot-name-vector vector symbol)))
                            (actual-old
                             (%layout-slot-cas layout (get-dsd-index layout slot-mapper) me new)))
                       (when (eq actual-old me)
-                        (install-hash-based-slot-mapper
-                         layout pairs unique-hashes `(slot-mapper ,(dd-name dd))))
+                        (install-hash-based-slot-mapper layout pairs unique-hashes name))
                       (funcall new symbol))))))
       (setf (layout-slot-mapper layout) me))))
 
