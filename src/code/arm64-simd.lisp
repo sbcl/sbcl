@@ -1957,7 +1957,7 @@
                        ((shuf-mask complex-double-reg t :offset 6))
                        ((and-mask complex-double-reg t :offset 7))
                        ((orr-mask complex-double-reg t :offset 8))
-                       ((mul-mask complex-double-reg t))
+                       ((shift-mask complex-double-reg t))
                        ((c-10000 complex-double-reg t))
                        ((c-800 complex-double-reg t))
                        ((c-80-4s complex-double-reg t)))
@@ -2108,8 +2108,9 @@
 
                      (inst addv r4 temp :4s) ;; total length in utf-8 bytes - 4
 
-                     ;; Multiply by 1 4 16 64, getting a shifted two-bit mask for each lane
-                     (inst mul temp mul-mask temp :4s)
+                     ;; Shift by 0 2 4 6
+                     (inst ushl temp temp shift-mask :4s)
+                     ;; combine into an 8-bit mask, 2 bits per lane
                      (inst addv temp temp :4s)
                      (inst umov tmp temp 0 :b)
 
@@ -2154,7 +2155,7 @@
                 (inst b DONE)
 
                 START-FULL-LENGTH
-                (load-inline-constant mul-mask :oword #x40000000100000000400000001)
+                (load-inline-constant shift-mask :oword #x6000000040000000200000000)
                 (inst movi c-10000 #x10000 :4s)
                 (inst movi c-800 #x800 :4s)
                 (inst movi c-80-4s #x80 :4s)
