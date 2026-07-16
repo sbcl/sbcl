@@ -1670,7 +1670,6 @@
                      ((temp complex-double-reg))
                      ((temp2 complex-double-reg t :offset 11))
                      ((temp3 complex-double-reg t :offset 12))
-                     ((temp-upper complex-double-reg))
                      ((c-c0 complex-double-reg))
                      ((c-bf complex-double-reg))
                      ((powers complex-double-reg))
@@ -1700,7 +1699,7 @@
             (move byte-array byte-array*)
             (inst mov byte-index 0)
             (inst mov char-index 0)
-            (load-inline-constant powers :oword #x80402010080402018040201008040201)
+            (load-inline-constant powers :oword #xFFFFFFFFFFFFFFFF8040201008040201)
             (inst movi c-bf #xBF :8h)
             (load-inline-constant table
                                   (let ((table (make-array (* #b10101011 16) :element-type '(unsigned-byte 8)
@@ -1826,13 +1825,13 @@
                 (inst umov index temp3 0 :b)
 
                 ;; Need to know where the last leading byte ends
-                (inst ext temp-upper temp2 temp2 8 :16b)
-                (inst addv temp3 temp-upper :8b)
-                (inst umov suffix temp3 0 :b)
-
-                ;; Count the number of bits to the next leading byte, turning it into a 2 bit suffix
+                ;; the high 8 bytes of temp2 is the unchanged result of CMGE
+                (inst umov suffix temp2 1 :d)
+                ;; Count the number of bytes to the next leading byte, turning it into a 2 bit suffix
                 (inst rbit suffix suffix)
                 (inst clz suffix suffix)
+                ;; Bytes to bits
+                (inst lsr suffix suffix 3)
 
                 ;; Add the size of the last character, ensuring that only 2 bits are added
                 (inst bfm index suffix 56 1)
@@ -1992,7 +1991,7 @@
                                                                        :initial-element 0)))
 
                        ;; A table with three masks per entry
-                       ;; indexed by 4x2 bits represting the number of utf8 bytes for character - 1
+                       ;; indexed by 4x2 bits representing the number of utf8 bytes for character - 1
                        (loop for i below (* table-size row-size)
                              when (< (mod i row-size) 16)
                              ;; fill the TBL part with an out of bounds index to get back zeros
