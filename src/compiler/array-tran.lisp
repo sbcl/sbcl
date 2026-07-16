@@ -379,8 +379,10 @@
 (defun constant-array-element-type (constant key)
   (when constant
     (or (getf (leaf-info constant) key)
-        (setf (getf (leaf-info constant) key)
-              (constant-sequence-element-type (constant-value constant) key)))))
+        (let ((value (constant-value constant)))
+          (when (typep value '(or array list))
+            (setf (getf (leaf-info constant) key)
+                  (constant-sequence-element-type (constant-value constant) key)))))))
 
 (defun sequence-elements-type (sequence &optional key (constants t))
   (or (and constants
