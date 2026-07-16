@@ -4017,7 +4017,6 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
       (write-bigvec-as-sequence data core-file :end n-data-bytes)
       (force-output core-file)
       (file-position core-file posn))
-    (format t "~&lisp linkage table: page=~D n-entries=~D~%" data-page n-table-entries)
     (write-words core-file
                  ;; 5 = number of words in this core header entry
                  lisp-linkage-space-core-entry-type-code 5

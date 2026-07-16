@@ -17,6 +17,7 @@
 
 ;; This avoids muffling "could not optimize away %SAP-ALIEN"
 ;; and "SAP to pointer conversion" in case we care.
+(fmakunbound 'unable-to-optimize-note-p)
 (defun unable-to-optimize-note-p (condition)
   (and (string= (type-of condition) "SIMPLE-COMPILER-NOTE")
        (let ((fc (simple-condition-format-control condition)))
@@ -30,6 +31,7 @@
 (defvar *optional-and-key-warning-condition*
   (find-symbol "&OPTIONAL-AND-&KEY-IN-LAMBDA-LIST" "SB-KERNEL"))
 
+(fmakunbound 'optional+key-style-warning-p)
 (defun optional+key-style-warning-p (condition)
   #+sbcl
   (when *optional-and-key-warning-condition*
