@@ -927,7 +927,7 @@
                          (where-from :defined)
                          (kind :global-function))
                (:constructor make-defined-fun
-                   (%source-name type &optional where-from
+                   (%source-name type where-from
                     &key kind
                          inline-expansion inlinep
                          same-block-p functional))

@@ -1146,7 +1146,8 @@
                       (let ((defined-fun
                              (sb-c::make-defined-fun
                               fname
-                              (sb-int:global-ftype fname))))
+                              (sb-int:global-ftype fname)
+                              :defined)))
                         (setf (sb-c::defined-fun-inlinep defined-fun) inlinep)
                         (push (cons fname defined-fun) funs))))))))
             (ftype
