@@ -9,10 +9,7 @@
         (when val
           (format t "~&target ~S = ~S~%" sym  val))))))
 (in-package "SB-COLD")
-#+sbcl
-(declaim (sb-ext:muffle-conditions
-          sb-ext:compiler-note
-          (satisfies optional+key-style-warning-p)))
+#+sbcl (declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
 (progn
   (setf *host-obj-prefix* (if (boundp 'cl-user::*sbcl-host-obj-prefix*)
                               (symbol-value 'cl-user::*sbcl-host-obj-prefix*)

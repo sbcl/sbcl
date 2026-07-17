@@ -300,6 +300,13 @@
 ;;;             if the function returns T.
 ;;;   :BEFORE-VOP
 ;;;           - an ordinary transform placed before VOP transforms.
+(locally
+;; suppress the "optional & key" warning in our lambda lists
+#+(and sb-xc-host host-quirks-sbcl) (declare (host-sb-ext:muffle-conditions style-warning))
+;; This ought to be (MUFFLE-CONDITIONS SB-KERNEL:&OPTIONAL-AND-&KEY-IN-LAMBDA-LIST)
+;; for more finesse, however, the host lisp sees this condition class name, and honestly
+;; I can't explain that. We have to just say STYLE-WARNING. So it goes.
+#-sb-xc-host (declare (muffle-conditions style-warning))
 (defmacro deftransform (name (lambda-list &optional (arg-types '*)
                                                     (result-type '*)
                               &key result policy node defun-only
@@ -384,6 +391,7 @@
                      `(%deftransform ',name ,(if policy '#'policy-test) ',type
                                      #',transform-name ,important))
                    names)))))
+) ; end LOCALLY
 
 
 (defun make-optimizer-name (name)

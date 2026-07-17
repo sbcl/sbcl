@@ -1,7 +1,11 @@
 (defvar *config-name* (second sb-ext:*posix-argv*))
 (defvar *sbcl-local-target-features-file*
   (format nil "obj/xbuild/~A/local-target-features" *config-name*))
-(load "src/cold/shared.lisp")
+(let ((sb-c::*handled-conditions* sb-c::*handled-conditions*))
+  ;; As many useless notes emanate from loading shared as we have configs,
+  ;; at (compile nil (read-from-file customizer-file-name))
+  (declaim (muffle-conditions compiler-note))
+  (load "src/cold/shared.lisp"))
 (in-package "SB-COLD")
 (let* ((build-dir (format nil "obj/xbuild/~A/" cl-user::*config-name*))
        (objroot (format nil "~A/from-xc/" build-dir)))

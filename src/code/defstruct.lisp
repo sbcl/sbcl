@@ -922,6 +922,10 @@ unless :NAMED is also specified.")))
 (defun parse-1-dsd (proto-classoid defstruct spec &optional included-slot
                     &aux accessor-name (always-boundp t) (safe-p t)
                          ctype rsd-index index)
+  ;; suppress the "optional & key" warning in the DESTRUCTURING-BIND below
+  #+(and sb-xc-host host-quirks-sbcl) (declare (host-sb-ext:muffle-conditions style-warning))
+  ;; Just like in src/code/macros we'd prefer a more fine-grained suppression
+  ;; using SB-KERNEL:&OPTIONAL-AND-&KEY-IN-LAMBDA-LIST but it doesn't work.
   #-sb-xc-host (declare (muffle-conditions style-warning))
   (multiple-value-bind (name default default-p type type-p read-only ro-p)
       (typecase spec

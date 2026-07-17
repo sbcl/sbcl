@@ -232,14 +232,7 @@
         ext:*gc-verbose* nil))
 
 #+sbcl
-(progn
-  (setq cl:*compile-print* nil)
-  (load (find-bootstrap-file "^muffler"))
-  ;; Let's just say we never care to see these.
-  (declaim (sb-ext:muffle-conditions
-            (satisfies unable-to-optimize-note-p)
-            (satisfies optional+key-style-warning-p)
-            sb-ext:code-deletion-note)))
+(setq cl:*compile-print* nil)
 
 ;;;; special read-macros for building the cold system (and even for
 ;;;; building some of our tools for building the cold system)
