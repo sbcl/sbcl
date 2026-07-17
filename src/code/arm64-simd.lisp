@@ -1782,9 +1782,9 @@
                 (load-inline-constant full-table (coerce (loop for index below (ash 1 10)
                                                                for low-index = (ldb (byte 8 0) index)
                                                                for suffix = (ldb (byte 2 8) index)
-                                                               append (let* ((starts (loop for i to 7
-                                                                                           when (logbitp i low-index)
-                                                                                           collect i)))
+                                                               append (let ((starts (loop for i to 7
+                                                                                          when (logbitp i low-index)
+                                                                                          collect i)))
                                                                         (loop for lane below 8
                                                                               for start = (pop starts)
                                                                               for next = (car starts)
