@@ -65,13 +65,16 @@
 
 (compile 'decode-test)
 
-(defun fill-random-string (string)
-  (map-into string (lambda ()
-                     (code-char (case (random 4)
-                                  (0 (random 128))
-                                  (1 (+ 128 (random (- 2048 128))))
-                                  (2 (+ 2048 (random (- 50000 2048))))
-                                  (3 (+ 65536 (random (- char-code-limit 65536)))))))))
+(defun fill-random-string (string &optional ascii)
+  (map-into string (if ascii
+                       (lambda ()
+                         (code-char (random 128)))
+                       (lambda ()
+                         (code-char (case (random 4)
+                                      (0 (random 128))
+                                      (1 (+ 128 (random (- 2048 128))))
+                                      (2 (+ 2048 (random (- 50000 2048))))
+                                      (3 (+ 65536 (random (- char-code-limit 65536))))))))))
 
 (with-test (:name :decode-test)
   (loop for length from 1 to 32
@@ -110,4 +113,55 @@
                         (unless (equalp result octets)
                           (error "(encode-test ~s ~a) => ~a /= ~a" string (length octets)
                                  result octets))))
+          (free-protected-array string))))
+
+(defun encode-test.ascii (string byte-length)
+  (let ((byte-array (make-protected-array byte-length '(unsigned-byte 8) nil)))
+    (unwind-protect
+         (progn (sb-vm::simd-copy-character-string-to-ascii-byte-array byte-array
+                                                                      string
+                                                                      byte-length)
+                (copy-seq byte-array))
+      (free-protected-array byte-array))))
+
+(defun decode-test.ascii (vector string-length)
+  (sb-sys:with-pinned-objects (vector)
+    (let* ((length (length vector))
+           (string (make-protected-array string-length 'character nil)))
+      (unwind-protect
+           (progn (sb-vm::simd-copy-ascii-sap-to-character-string (sb-sys:vector-sap vector)
+                                                                 string
+                                                                 length)
+                  (copy-seq string))
+
+        (free-protected-array string)))))
+
+(compile 'encode-test.ascii)
+(compile 'decode-test.ascii)
+
+(with-test (:name :decode-test.ascii)
+  (loop for length from 1 to 128
+        for string = (make-string length)
+        do
+        (fill-random-string string t)
+        (let* ((octets (sb-ext:string-to-octets string))
+               (bytes (make-protected-array (length octets) '(unsigned-byte 8) nil)))
+          (unwind-protect
+               (progn (replace bytes octets)
+                      (assert (equal (decode-test.ascii bytes length)
+                                     string)))
+            (free-protected-array bytes)))))
+
+(with-test (:name :encode-test.ascii)
+  (loop for length from 1 to 128
+        for string = (make-protected-array length 'character nil)
+        do
+        (unwind-protect
+           (progn
+             (fill-random-string string t)
+             (let* ((octets (sb-ext:string-to-octets string))
+                    (result (encode-test.ascii string (length octets))))
+               (unless (equalp result octets)
+                 (error "(encode-test ~s ~a) => ~a /= ~a" string (length octets)
+                        result octets))))
           (free-protected-array string))))
