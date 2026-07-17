@@ -698,6 +698,14 @@
             do (setf (aref string i)
                      (code-char (sap-ref-8 sap i)))))))
 
+#-(and sb-unicode 64-bit little-endian (or arm64 x86-64))
+(defun simd-copy-ascii-sap-to-character-string (sap string length)
+  (declare (index length)
+           (simple-character-string string)
+           (optimize speed (safety 0)))
+  (loop for i below length
+        do (setf (aref string i) (code-char (sap-ref-8 sap i)))))
+
 #+(and sb-unicode 64-bit little-endian)
 (defun sb-vm::simd-copy-utf8-crlf-to-character-string-with-size (start end string ibuf size-buffer)
   (declare (type index start end)
@@ -1620,15 +1628,11 @@
               (character (make-string char-length :element-type 'character))
               (t (make-string char-length :element-type element-type)))))
       (if all-ascii
-          (cond #+(and sb-unicode 64-bit little-endian)
-                ((typep string '(array character))
+          (cond ((typep string '(array character))
                  (sb-vm::simd-copy-ascii-sap-to-character-string sap string char-length))
-                ((typep string 'base-string)
-                 (with-pinned-objects (string)
-                   (sb-impl::memcpy (vector-sap string) sap char-length)))
                 (t
-                 (loop for i below char-length
-                       do (setf (aref string i) (code-char (sap-ref-8 sap i))))))
+                 (with-pinned-objects (string)
+                   (sb-impl::memcpy (vector-sap string) sap char-length))))
           (sb-vm::simd-copy-utf8-sap-to-character-string sap string byte-length))
       string)))
 

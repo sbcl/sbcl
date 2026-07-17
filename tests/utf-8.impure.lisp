@@ -75,6 +75,9 @@
                                       (1 (+ 128 (random (- 2048 128))))
                                       (2 (+ 2048 (random (- 50000 2048))))
                                       (3 (+ 65536 (random (- char-code-limit 65536))))))))))
+(defun strlen (bytes)
+  (sb-vm::simd-utf8-strlen (sb-sys:vector-sap bytes)))
+(compile 'strlen)
 
 (with-test (:name :decode-test)
   (loop for length from 1 to 32
@@ -88,6 +91,29 @@
                         (progn (replace bytes octets)
                                (assert (equal (decode-test bytes length)
                                               string)))
+                     (free-protected-array bytes))))))
+
+(with-test (:name :strlen-test)
+  (loop for length from 1 to 32
+        for string = (make-protected-array length 'character nil)
+        do
+        (loop repeat (* 500 #+slow 10)
+              do (fill-random-string string)
+                 (let* ((octets (sb-ext:string-to-octets string :null-terminate t))
+                        (octet-length (1- (length octets)))
+                        (bytes (make-protected-array (length octets) '(unsigned-byte 8) nil)))
+                   (unwind-protect
+                        (progn
+                          (replace bytes octets)
+                          (multiple-value-bind (strlen-chars strlen-bytes) (strlen bytes)
+                            (unless (or (and (= strlen-chars length)
+                                             (= strlen-bytes octet-length))
+                                        (find #\Nul string))
+                              (error "(strlen ~s) => ~a, ~a /= ~a, ~a" string strlen-chars strlen-bytes length octet-length)))
+                          (let ((utf-length (sb-impl::simd-character-string-utf8-length string)))
+                            (unless (= utf-length octet-length)
+                              (error "(sb-impl::simd-character-string-utf8-length ~s) => ~a /= ~a"
+                                     string utf-length octet-length))))
                      (free-protected-array bytes))))))
 
 (defun encode-test (string byte-length)
@@ -140,7 +166,7 @@
 (compile 'decode-test.ascii)
 
 (with-test (:name :decode-test.ascii)
-  (loop for length from 1 to 128
+  (loop for length from 1 to 256
         for string = (make-string length)
         do
         (fill-random-string string t)
@@ -153,7 +179,7 @@
             (free-protected-array bytes)))))
 
 (with-test (:name :encode-test.ascii)
-  (loop for length from 1 to 128
+  (loop for length from 1 to 256
         for string = (make-protected-array length 'character nil)
         do
         (unwind-protect
