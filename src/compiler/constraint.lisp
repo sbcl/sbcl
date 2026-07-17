@@ -510,14 +510,13 @@
         (maxword '#:max))
     (declare (ignorable word minword maxword))
     `(let ((,conset-vector (conset-vector ,conset))
-           ;; WITH-VECTOR-DATA on the universe and treating it as simple-vector
-           ;; henceforth could be a further optimization.
-           (,universe *constraint-universe*))
+           (,universe
+             #-sb-xc-host (the simple-vector (sb-kernel:%array-data *constraint-universe*))
+             #+sb-xc-host *constraint-universe*))
        (declare (optimize speed))
-       ;; Notice that in the algorithm based on CTZ we don't actually have to restrict the scan
-       ;; strictly between CONSET-MIN and CONSET-MAX, because those are just hints where to find
-       ;; nonzero bits.
-       #+(and (not sb-xc-host) (or arm64 x86-64)) ; ctz is not implemented everywhere
+       #-sb-xc-host
+       ;; Aligning to word boundaries is valid because MIN and MAX are merely hints about where
+       ;; nonzero bits exist.
        (let ((,minword (floor (conset-min ,conset) sb-vm:n-word-bits))
              (,maxword (floor (1- (conset-max ,conset)) sb-vm:n-word-bits)))
          (aver (< (1- (conset-max ,conset)) (length ,universe)))
@@ -527,12 +526,21 @@
                   (do-anonymous () ((= ,word 0)) ; no NIL block, so RETURN in body gets totally out
                     (let ((,constraint
                            (locally (declare (optimize (insert-array-bounds-checks 0)))
-                             (aref ,universe (+ (* ,index sb-vm:n-word-bits) (count-trailing-zeros ,word))))))
-                      ,@body)
-                    ;; Clear the lowest 1 bit via the Brian Kernighan technique (allegedly)
-                    (setq ,word (logand ,word (sb-vm::+-mod64 ,word -1)))))
+                             (aref ,universe
+                                   ;; COUNT-TRAILING-ZEROS produces slightly better code than
+                                   ;; INTEGER-LENGTH.  Either iteration direction is ok.
+                                   (logior (sb-c::if-vop-existsp (:translate count-trailing-zeros)
+                                             (prog1 (count-trailing-zeros ,word)
+                                               ;; Clear the lowest 1 bit via the Brian Kernighan
+                                               ;; technique (allegedly)
+                                               (setq ,word (logand ,word (sb-vm::+-mod64 ,word -1))))
+                                             (let ((bit (1- (integer-length ,word))))
+                                               (setq ,word (logxor ,word (ash 1 bit)))
+                                               bit))
+                                           (* ,index sb-vm:n-word-bits))))))
+                      ,@body)))
              finally (return ,result)))
-       #+(or sb-xc-host (not (or arm64 x86-64)))
+       #+sb-xc-host
        (loop for ,index from (conset-min ,conset) below (conset-max ,conset)
              do (when (plusp (sbit ,conset-vector ,index))
                   (let ((,constraint (aref ,universe ,index)))
