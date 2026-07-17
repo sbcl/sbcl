@@ -33,6 +33,7 @@
 (defparameter *all-configurations*
   '(("arm"    ("arm" :little-endian :largefile))
     ("arm64"  ("arm64" :little-endian :sb-thread)
+              ("arm64+simd" :little-endian :sb-thread :sb-simd-pack)
               ("arm64-darwin" :darwin :bsd :unix :mach-o :little-endian :sb-thread :darwin-jit)
               ("arm64-reloc"  :little-endian :sb-thread :relocatable-static-space :immobile-space)
               ("arm64-immobile-space" :little-endian :sb-thread :immobile-space))

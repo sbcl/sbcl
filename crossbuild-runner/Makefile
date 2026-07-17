@@ -17,6 +17,11 @@ obj/xbuild/arm64/xc.core: $(DEPS1)
 obj/xbuild/arm64.core: obj/xbuild/arm64/xc.core
 	$(SBCL) $(ARGS) arm64 < $(SCRIPT2)
 
+obj/xbuild/arm64+simd/xc.core: $(DEPS1)
+	$(SBCL) $(ARGS) arm64+simd arm64 "(:UNIX :LINUX :ELF :OS-PROVIDES-CLOCK-GETTIME :LITTLE-ENDIAN :SB-THREAD :SB-SIMD-PACK)" < $(SCRIPT1)
+obj/xbuild/arm64+simd.core: obj/xbuild/arm64+simd/xc.core
+	$(SBCL) $(ARGS) arm64+simd < $(SCRIPT2)
+
 obj/xbuild/arm64-darwin/xc.core: $(DEPS1)
 	$(SBCL) $(ARGS) arm64-darwin arm64 "(:DARWIN :BSD :UNIX :MACH-O :LITTLE-ENDIAN :SB-THREAD :DARWIN-JIT :OS-PROVIDES-CLOCK-GETTIME)" < $(SCRIPT1)
 obj/xbuild/arm64-darwin.core: obj/xbuild/arm64-darwin/xc.core
