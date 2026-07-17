@@ -73,7 +73,12 @@
                            (concatenate 'string (stem-remap-target stem)
                                         ".trace")
                            srcname))))
-        (target-compile-stem stem flags)))))
+        (handler-bind ((simple-error (lambda (c)
+                                       (when (eql (search "Duplicate vop name"
+                                                          (simple-condition-format-control c))
+                                                  0)
+                                         (continue c)))))
+         (target-compile-stem stem flags))))))
 
 (when (and (eq (car sb-thread::*thread-local-specials*) :not-final)
            (not (equal (cdr sb-thread::*thread-local-specials*)

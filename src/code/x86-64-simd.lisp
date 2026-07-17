@@ -2567,21 +2567,27 @@
     (with-pinned-objects (string byte-array)
       (multiple-value-bind (byte-index char-index)
           (inline-vop (((byte-array sap-reg t) (vector-sap byte-array))
-                       ((32-bit-array sap-reg t) (vector-sap string))
+                       ((string sap-reg t) (vector-sap string))
                        ((n signed-reg) (logand (+ (* length 4) 15) -16))
                        ((byte-array-length unsigned-reg) (logand (+ byte-array-length 15) -16))
                        ((table sap-reg t))
+                       ((full-table sap-reg t))
                        ((tmp unsigned-reg))
                        ((temp complex-double-reg))
                        ((bytes complex-double-reg))
-                       ((mask-3f complex-double-reg))
-                       ((mask-80 complex-double-reg))
-                       ((mask-7ff int-avx2-reg))
+                       ((c-3f complex-double-reg))
+                       ((c-80 complex-double-reg))
+                       ((c-7ff int-avx2-reg))
+                       ((c-7f complex-double-reg))
+                       ((c-ffff complex-double-reg))
                        ((low-bytes complex-double-reg))
                        ((high-bytes complex-double-reg))
                        ((utf8-mask complex-double-reg))
                        ((zero complex-double-reg))
-                       ((ascii complex-double-reg)))
+                       ((ascii complex-double-reg))
+                       ((shuf-mask))
+                       ((and-mask))
+                       ((orr-mask)))
               ((byte-index unsigned-reg positive-fixnum :from :load)
                (char-index unsigned-reg positive-fixnum :from :load))
 
@@ -2601,7 +2607,7 @@
                                table)))
             (inst mov tmp #x3F)
             (inst vmovd temp tmp)
-            (inst vpbroadcastw mask-3f temp)
+            (inst vpbroadcastw c-3f temp)
 
             (inst mov tmp #b1000000011000000)
             (inst vmovd temp tmp)
@@ -2609,13 +2615,47 @@
 
             (inst mov tmp #x80)
             (inst vmovd temp tmp)
-            (inst vpbroadcastw mask-80 temp)
+            (inst vpbroadcastw c-80 temp)
 
             (inst mov tmp #x7ff)
             (inst vmovd temp tmp)
-            (inst vpbroadcastd mask-7ff temp)
+            (inst vpbroadcastd c-7ff temp)
+
             (inst vpxor zero zero zero)
-            (flet ((convert (size)
+
+            (flet ((make-full-table ()
+                     (let* ((table-size 256)
+                            (row-size 64)
+                            (table (make-array (* table-size row-size) :element-type '(unsigned-byte 8)
+                                                                       :initial-element 0)))
+                       (loop for row below table-size
+                             for dest-index = 0
+                             do (loop
+                                  for lane below 4
+                                  for bytes = (1+ (ldb (byte 2 (* lane 2)) row))
+                                  do (loop for b below bytes
+                                           for src-index = (+ (* lane 4) (- bytes 1 b))
+                                           for lead-p = (= b 0)
+                                           for and-mask = (if lead-p
+                                                              (case bytes
+                                                                (1 #x7F) (2 #x1F) (3 #x0F) (4 #x07))
+                                                              #x3F)
+                                           for orr-mask = (if lead-p
+                                                              (case bytes
+                                                                (1 #x00) (2 #xC0) (3 #xE0) (4 #xF0))
+                                                              #x80)
+                                           do (setf (aref table (+ (* row row-size) dest-index)) src-index)
+                                              (setf (aref table (+ (* row row-size) 16 dest-index)) and-mask)
+                                              (setf (aref table (+ (* row row-size) 32 dest-index)) orr-mask)
+                                              (incf dest-index)))
+                                (loop for i from dest-index below 16
+                                      do (setf (aref table (+ (* row row-size) i)) #xFF)
+                                         (setf (aref table (+ (* row row-size) 16 i)) 0)
+                                         (setf (aref table (+ (* row row-size) 32 i)) 0))
+                                (setf (aref table (+ (* row row-size) 48)) dest-index))
+                       table))
+
+                   (convert (size full)
                      (inst cmp byte-array-length (/ size 2))
                      (inst jmp :l DONE)
                      (let* ((sc (ecase size
@@ -2623,11 +2663,11 @@
                                   (16 'int-sse-reg)))
                             (bytes (reg-in-sc bytes sc))
                             (temp (reg-in-sc temp sc)))
-                       (inst vmovdqu bytes (ea 32-bit-array char-index))
+                       (inst vmovdqu bytes (ea string char-index))
                        ;; Stop if anything is 3-4 bytes in utf8
-                       (inst vpcmpgtd temp bytes mask-7ff)
+                       (inst vpcmpgtd temp bytes c-7ff)
                        (inst vptest temp temp)
-                       (inst jmp :nz DONE)
+                       (inst jmp :nz full)
                        ;; Narrow to 16 bits
                        (cond ((eq size 32)
                               (inst vpackusdw bytes bytes bytes)
@@ -2635,7 +2675,7 @@
                              (t
                               (inst vpackusdw bytes bytes zero))))
 
-                     (inst vpcmpgtw ascii mask-80 bytes)
+                     (inst vpcmpgtw ascii c-80 bytes)
 
                      ;; Construct
                      ;; (logior
@@ -2646,7 +2686,7 @@
                      ;; For each 16-bits
                      (inst vpsrlw low-bytes bytes 6)
                      (inst vpor low-bytes low-bytes utf8-mask)
-                     (inst vpand high-bytes mask-3f bytes)
+                     (inst vpand high-bytes c-3f bytes)
                      (inst vpsllw high-bytes high-bytes 8)
                      (inst vpor high-bytes high-bytes low-bytes)
 
@@ -2656,35 +2696,125 @@
                      (inst vpacksswb ascii ascii ascii)
                      ;; Remove the zero second byte from ascii words
                      (inst vpmovmskb tmp ascii)
-                     (inst and tmp 255)
+                     (inst and :dword tmp 255)
                      (inst shl :dword tmp 4)
                      (inst vpshufb bytes bytes (ea table tmp))
                      (if (eq size 32)
                          (inst vmovdqu (ea byte-index byte-array) bytes)
-                         (inst vmovq (ea byte-index byte-array) bytes))))
+                         (inst vmovq (ea byte-index byte-array) bytes))
+                     (inst add char-index size)
+                     (when (eq size 32)
+                       (inst popcnt :dword tmp tmp)
+                       (inst add byte-index 16)
+                       (inst sub byte-index tmp)
+                       (inst sub byte-array-length 16)
+                       (inst add byte-array-length tmp)
+                       (inst sub n size)))
+                   (convert-full ()
+                     (inst cmp byte-array-length 16)
+                     (inst jmp :l DONE)
+                     (symbol-macrolet ((t1 low-bytes)
+                                       (t2 high-bytes)
+                                       (t3 ascii))
+
+                       ;; Compute utf8 lengths -1
+                       (inst vpcmpgtd t1 bytes c-7f)
+                       (inst vpcmpgtd t2 bytes c-7ff)
+                       (inst vpcmpgtd t3 bytes c-ffff)
+
+                       (inst vpaddd temp t1 t2)
+                       (inst vpaddd temp temp t3)
+
+                       ;; Negate
+                       (inst vpsubd temp zero temp)
+
+                       ;; Build an 8-bit index mask
+                       ;; Pack four 32-bit values down to four 8-bit values in the lowest 32 bits
+                       (inst vpackusdw temp temp temp)
+                       (inst vpackuswb temp temp temp)
+                       (inst vmovd tmp temp)
+
+                       ;; Multiplying by 1 + 2^6 + 2^12 + 2^18
+                       ;; shifts two bits per byte into the upper byte
+                       (inst imul :dword tmp tmp #x01041040)
+                       (inst shr :dword tmp 24)
+                       (inst shl :dword tmp 6)
+
+                       (inst vmovdqu shuf-mask (ea 0 full-table tmp))
+                       (inst vmovdqu and-mask  (ea 16 full-table tmp))
+                       (inst vmovdqu orr-mask  (ea 32 full-table tmp))
+                       (inst movzx '(:byte :dword) tmp (ea 48 full-table tmp)) ;; number of produced bytes
+
+                       ;; Spread the character to all 4 bytes
+                       (inst vpslld t1 bytes 6)
+                       (inst vpslld t2 bytes 4)
+                       (inst vpslld t3 bytes 2)
+
+                       (inst vpand t1 t1 (register-inline-constant :oword #xFF000000FF000000FF000000FF000000))
+                       (inst vpand t2 t2 (register-inline-constant :oword #x00FF000000FF000000FF000000FF0000))
+                       (inst vpand t3 t3 (register-inline-constant :oword #x0000FF000000FF000000FF000000FF00))
+                       (inst vpand bytes bytes (register-inline-constant :oword #x000000FF000000FF000000FF000000FF))
+
+                       (inst vpor t2 t2 t3)
+                       (inst vpor bytes bytes t1)
+                       (inst vpor bytes bytes t2)
+
+                       ;; Shuffle the bytes into place
+                       (inst vpshufb bytes bytes shuf-mask)
+
+                       (inst vpand bytes bytes and-mask)
+                       (inst vpor bytes bytes orr-mask)
+
+                       (inst vmovdqu (ea byte-index byte-array) bytes)
+
+                       (inst add byte-index tmp)
+                       (inst sub byte-array-length tmp)
+                       (inst add char-index 16)
+                       (inst sub n 16))))
+
               (assemble ()
                 (zeroize byte-index)
                 (zeroize char-index)
 
-                (inst sub n 32)
-                (inst jmp :b TAIL)
+                (inst cmp n 32)
+                (inst jmp :l TAIL)
                 LOOP
-                (convert 32)
-
-                (inst add byte-index 16)
-                (inst add char-index 32)
-                (inst popcnt tmp tmp)
-                (inst sub byte-index tmp)
-                (inst sub byte-array-length 16)
-                (inst add byte-array-length tmp)
-                (inst sub n 32)
-                (inst jmp :ae LOOP)
+                (convert 32 START-FULL-LENGTH)
+                (inst cmp n 32)
+                (inst jmp :ge LOOP)
 
                 TAIL
-                (inst cmp :dword n -32)
+                (inst test n n)
                 (inst jmp :z DONE)
-                (convert 16)
-                (inst add char-index 16)))
+
+                (convert 16 START-FULL-LENGTH)
+                (inst jmp DONE)
+
+                START-FULL-LENGTH
+                (inst lea full-table (register-inline-constant (make-full-table)))
+
+                (inst mov tmp #xFFFF)
+                (inst vmovd temp tmp)
+                (inst vpbroadcastd c-ffff temp)
+
+                (inst mov tmp #x7f)
+                (inst vmovd temp tmp)
+                (inst vpbroadcastd c-7f temp)
+
+                FULL-LENGTH
+                (convert-full)
+
+                (inst cmp n 32)
+                (inst jmp :l TAIL2)
+                LOOP2
+                (convert 32 FULL-LENGTH)
+                (inst cmp n 32)
+                (inst jmp :ge LOOP2)
+
+                TAIL2
+                (inst test n n)
+                (inst jmp :z DONE)
+                (convert 16 FULL-LENGTH)))
             DONE
             (inst vzeroupper))
         (setf char-index (truncate char-index 4))
