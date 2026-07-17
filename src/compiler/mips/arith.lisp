@@ -299,24 +299,18 @@
   (:translate integer-length)
   (:note "inline (signed-byte 32) integer-length")
   (:policy :fast-safe)
-  (:args (arg :scs (signed-reg) :target shift))
+  (:args (arg :scs (signed-reg)))
   (:arg-types signed-num)
-  (:results (res :scs (any-reg)))
-  (:result-types positive-fixnum)
-  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) shift)
-  (:generator 30
-      (move shift arg)
-      (inst bgez shift test)
-      (zeroize res)
-      (inst b test)
-      (inst nor shift shift)
-
-      LOOP
-      (inst addu res (fixnumize 1))
-
-      TEST
-      (inst bne shift loop)
-      (inst srl shift 1)))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 5
+    (move temp arg)
+    (inst sra temp 31)
+    (inst xor temp arg) ; invert if negative
+    (inst clz res temp)
+    (inst li temp 32)
+    (inst subu res temp res)))
 
 (define-vop (unsigned-byte-32-count)
   (:translate logcount)

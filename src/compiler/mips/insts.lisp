@@ -188,6 +188,7 @@
 (defconstant cop1-op #b010001)
 (defconstant cop2-op #b010010)
 (defconstant cop3-op #b010011)
+(defconstant special2-op #b011100)
 
 
 
@@ -568,6 +569,17 @@
   (:emitter
    (emit-shift-inst segment #b10 dst src1 src2)))
 
+(define-instruction clz (segment dst src)
+  (:declare (type tn dst src))
+  (:printer register ((op special2-op) (shamt nil) (funct #b100000)) '(:name :tab rd ", " rs))
+  (:dependencies (reads src) (writes dst))
+  (:delay 0)
+  (:emitter
+   ;; "To be compliant with the MIPS32 and MIPS64 Architecture, software must place the same GPR number
+   ;; in both the rt and rd fields of the instruction. The operation of the instruction is UNPREDICTABLE
+   ;; if the rt and rd fields of the instruction contain different values."
+   (let ((d (reg-tn-encoding dst)))
+     (emit-register-inst segment special2-op (reg-tn-encoding src) d d 0 #b100000))))
 
 ;;;; Floating point math.
 
