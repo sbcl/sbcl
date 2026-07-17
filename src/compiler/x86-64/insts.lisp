@@ -3364,7 +3364,9 @@
       #+(and sb-simd-pack-512 (not sb-xc-host))
       (simd-pack-512
        (setq constant
-             (sb-vm::%simd-pack-512-inline-constant first)))))
+             (sb-vm::%simd-pack-512-inline-constant first)))
+      ((simple-array (unsigned-byte 8) (*))
+       (setf constant (list :byte-array first)))))
   (destructuring-bind (type value) constant
     (ecase type
       ((:byte :word :dword :qword)
@@ -3399,8 +3401,8 @@
        (cons :oword
              (logior (ash (ldb (byte 64 0) (double-float-bits (imagpart value))) 64)
                      (ldb (byte 64 0) (double-float-bits (realpart value))))))
-      ((:jump-table)
-       (cons :jump-table value)))))
+      ((:jump-table :byte-array)
+       (cons type value)))))
 
 (defun inline-constant-value (constant)
   (declare (ignore constant)) ; weird!
@@ -3410,6 +3412,7 @@
 (defun align-of (constant)
   (case (car constant)
     (:jump-table n-word-bytes)
+    (:byte-array (* n-word-bytes 2))
     (t (size-nbyte (car constant)))))
 
 (defun sort-inline-constants (constants)
@@ -3434,9 +3437,11 @@
               ;; Could add pseudo-ops for .WORD, .INT, .OCTA just like gcc has.
               ;; But it works fine to emit as a sequence of bytes
               `(.byte ,@(let ((val (cdr constant)))
-                          (loop repeat size
-                                collect (prog1 (ldb (byte 8 0) val)
-                                          (setf val (ash val -8))))))))))
+                          (if (eq (car constant) :byte-array)
+                              (coerce val 'list)
+                              (loop repeat size
+                                    collect (prog1 (ldb (byte 8 0) val)
+                                              (setf val (ash val -8)))))))))))
 
 #+sb-xc-host (declaim (ftype function sb-fasl::asm-routine-vector-elt-addr))
 ;;; Return an address which when added to NULL-TN and dereferenced will yield ADDR

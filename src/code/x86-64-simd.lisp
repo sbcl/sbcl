@@ -2272,29 +2272,15 @@
            (type index length)
            (type (simple-array character (*)) string))
   (let ((byte-index 0)
-        (char-index 0)
-        (table (load-time-value (let ((table (make-array (* #b10101011 16) :element-type '(unsigned-byte 8)
-                                                                           :initial-element #xFF)))
-                                  (loop for row to #b10101010 ;; highest possible inverted index for compressing 1/2 bytes
-                                        do (loop with indexes = (loop for i below 8
-                                                                      unless (logbitp i row)
-                                                                      collect (* i 2)
-                                                                      and
-                                                                      collect (1+ (* i 2)))
-                                                 for column below 16
-                                                 for index = (pop indexes)
-                                                 when index
-                                                 do
-                                                 (setf (aref table (+ (* row 16) column)) index)))
-                                  table))))
+        (char-index 0))
     (declare (type index byte-index char-index))
     (when (>= length 9)
-      (with-pinned-objects (string table)
+      (with-pinned-objects (string)
         (setf (values byte-index char-index)
               (inline-vop
                   (((byte-array sap-reg t) sap)
                    ((32-bit-array sap-reg t) (vector-sap string))
-                   ((table sap-reg t) (vector-sap table))
+                   ((table sap-reg t))
                    ((n unsigned-reg) (- length 9))
                    ((string-length unsigned-reg) (logand (+ (length string) 3) -4))
                    ((tmp unsigned-reg))
@@ -2310,6 +2296,22 @@
                    ((mask-bf complex-double-reg)))
                   ((byte-index unsigned-reg positive-fixnum :from :load)
                    (char-index unsigned-reg positive-fixnum :from :load))
+                (inst lea table
+                      (register-inline-constant
+                       (let ((table (make-array (* #b10101011 16) :element-type '(unsigned-byte 8)
+                                                                  :initial-element #xFF)))
+                         (loop for row to #b10101010 ;; highest possible inverted index for compressing 1/2 bytes
+                               do (loop with indexes = (loop for i below 8
+                                                             unless (logbitp i row)
+                                                             collect (* i 2)
+                                                             and
+                                                             collect (1+ (* i 2)))
+                                        for column below 16
+                                        for index = (pop indexes)
+                                        when index
+                                        do
+                                        (setf (aref table (+ (* row 16) column)) index)))
+                         table)))
                 (inst mov tmp #xC0)
                 (inst vmovd temp tmp)
                 (inst vpbroadcastb mask-c0 temp)
@@ -2437,27 +2439,14 @@
            (simple-character-string string)
            ((simple-array (unsigned-byte 8) (*)) byte-array)
            (optimize speed (safety 0)))
-  (let ((table (load-time-value (let ((table (make-array (* 256 16) :element-type '(unsigned-byte 8)
-                                                                    :initial-element #xFF)))
-                                  (loop for row below 256
-                                        do (loop with indexes = (loop for i below 8
-                                                                      collect (* i 2)
-                                                                      unless (logbitp i row)
-                                                                      collect (1+ (* i 2)))
-                                                 for column below 16
-                                                 for index = (pop indexes)
-                                                 when index
-                                                 do
-                                                 (setf (aref table (+ (* row 16) column)) index)))
-                                  table)))
-        (length (length string)))
-    (with-pinned-objects (string byte-array table)
+  (let ((length (length string)))
+    (with-pinned-objects (string byte-array)
       (multiple-value-bind (byte-index char-index)
           (inline-vop (((byte-array sap-reg t) (vector-sap byte-array))
                        ((32-bit-array sap-reg t) (vector-sap string))
                        ((n signed-reg) (logand (+ (* length 4) 15) -16))
                        ((byte-array-length unsigned-reg) (logand (+ byte-array-length 15) -16))
-                       ((table sap-reg t) (vector-sap table))
+                       ((table sap-reg t))
                        ((tmp unsigned-reg))
                        ((temp complex-double-reg))
                        ((bytes complex-double-reg))
@@ -2472,6 +2461,20 @@
               ((byte-index unsigned-reg positive-fixnum :from :load)
                (char-index unsigned-reg positive-fixnum :from :load))
 
+            (inst lea table (register-inline-constant
+                             (let ((table (make-array (* 256 16) :element-type '(unsigned-byte 8)
+                                                                 :initial-element #xFF)))
+                               (loop for row below 256
+                                     do (loop with indexes = (loop for i below 8
+                                                                   collect (* i 2)
+                                                                   unless (logbitp i row)
+                                                                   collect (1+ (* i 2)))
+                                              for column below 16
+                                              for index = (pop indexes)
+                                              when index
+                                              do
+                                              (setf (aref table (+ (* row 16) column)) index)))
+                               table)))
             (inst mov tmp #x3F)
             (inst vmovd temp tmp)
             (inst vpbroadcastw mask-3f temp)
