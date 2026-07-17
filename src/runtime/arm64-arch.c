@@ -147,7 +147,7 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     if ((orig_inst >> 24) == 0b01010100) {
         // Cond branch
         if (condition_holds(context, orig_inst & 0b1111))
-            next_pc += sign_extend((orig_inst >> 5) & (1 << 19)-1, 19);
+            next_pc += sign_extend((orig_inst >> 5) & ((1 << 19)-1), 19);
         else
             next_pc += 1;
     }
@@ -156,7 +156,7 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
         if ((orig_inst >> 31) & 1) { // BL
             *os_context_register_addr(context, reg_LR) = (uword_t)(pc + 1);
         }
-        next_pc += sign_extend(orig_inst & (1 << 26)-1, 26);
+        next_pc += sign_extend(orig_inst & ((1 << 26)-1), 26);
     }
     else if (((orig_inst >> 25) & 0b1111111) == 0b1101011) {
         int rt;
@@ -182,7 +182,7 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
         // CBZ
         bool op = (orig_inst >> 24) & 0b1;
         int size = (orig_inst >> 31) & 0b1;
-        int offset = sign_extend((orig_inst >> 5) & (1 << 19)-1, 19);
+        int offset = sign_extend((orig_inst >> 5) & ((1 << 19)-1), 19);
         int rt = orig_inst & 0b11111;
         uword_t val = (*os_context_register_addr(context, rt));
         if (!size) {
@@ -199,7 +199,7 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
         bool op = (orig_inst >> 24) & 0b1;
         int b40 = (orig_inst >> 19) & 0b11111;
         int bit_pos = (b5 << 5) | b40;
-        int offset = sign_extend((orig_inst >> 5) & (1 << 14)-1, 14);
+        int offset = sign_extend((orig_inst >> 5) & ((1 << 14)-1), 14);
         int rt = orig_inst & 0b11111;
         if (((*os_context_register_addr(context, rt) >> bit_pos) & 0b1) ^ op)
             next_pc += offset;
@@ -210,7 +210,7 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
         // LDR (literal)
         int opc = (orig_inst >> 30) & 0b11;
         int rt = orig_inst & 0b11111;
-        int offset = sign_extend((orig_inst >> 5) & (1 << 19)-1, 19);
+        int offset = sign_extend((orig_inst >> 5) & ((1 << 19)-1), 19);
         unsigned int *new_pc = pc + offset;
 
         if (opc == 0b01)
@@ -226,7 +226,7 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
         // SIMD LDR (literal)
         int opc = (orig_inst >> 30) & 0b11;
         int rt = orig_inst & 0b11111;
-        int offset = sign_extend((orig_inst >> 5) & (1 << 19)-1, 19);
+        int offset = sign_extend((orig_inst >> 5) & ((1 << 19)-1), 19);
         unsigned int *new_pc = pc + offset;
 
         if (opc == 0b00) {
