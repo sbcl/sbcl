@@ -1952,15 +1952,13 @@
                        ((f3 complex-double-reg t :offset 3))
                        ((bytes complex-double-reg t :offset 4))
                        ((bytes2 complex-double-reg t :offset 5))
-                       ((m1 complex-double-reg t))
                        ((r4 complex-double-reg t))
+                       ((length1 complex-double-reg t :offset 10))
+                       ((length2 complex-double-reg t :offset 11))
                        ((shuf-mask complex-double-reg t :offset 6))
                        ((and-mask complex-double-reg t :offset 7))
                        ((orr-mask complex-double-reg t :offset 8))
-                       ((shift-mask complex-double-reg t))
-                       ((c-10000 complex-double-reg t))
-                       ((c-800 complex-double-reg t))
-                       ((c-80-4s complex-double-reg t)))
+                       ((shift-mask complex-double-reg t)))
               ((byte-index unsigned-reg positive-fixnum :from :load)
                (char-index unsigned-reg positive-fixnum :from :load))
             (inst movi c-80 #x80 :8h)
@@ -2098,14 +2096,9 @@
                      (inst ushr f3 bytes 6 :4s)
 
                      ;; Compute utf8 lengths - 1
-                     (inst movi temp 3 :4s)
-                     (inst cmhi m1 c-80-4s bytes :4s)
-                     (inst add temp temp m1 :4s)
-                     (inst cmhi m1 c-800 bytes :4s)
-                     (inst add temp temp m1 :4s)
-                     (inst cmhi m1 c-10000 bytes :4s)
-                     (inst add temp temp m1 :4s)
-
+                     (inst clz temp bytes :4s)
+                     ;; Map leading zeros to utf8 lengths
+                     (inst tbl temp (list length1 length2) temp :16b)
                      (inst addv r4 temp :4s) ;; total length in utf-8 bytes - 4
 
                      ;; Shift by 0 2 4 6
@@ -2156,10 +2149,9 @@
 
                 START-FULL-LENGTH
                 (load-inline-constant shift-mask :oword #x6000000040000000200000000)
-                (inst movi c-10000 #x10000 :4s)
-                (inst movi c-800 #x800 :4s)
-                (inst movi c-80-4s #x80 :4s)
                 (load-inline-constant full-table (make-full-table))
+                (inst movi length1 3 :16b)
+                (load-inline-constant length2 :oword #x00000000000000010101010202020202)
                 FULL-LENGTH
                 (convert-full)
 
