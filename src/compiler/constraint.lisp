@@ -133,6 +133,8 @@
 ;;; really lose compared to SSETs, here's the conset API as a wrapper
 ;;; around SSETs:
 #+nil
+(eval-when (:compile-toplevel :execute) (push :conset-is-sset sb-xc:*features*))
+#+conset-is-sset
 (progn
   (deftype conset () 'sset)
   (declaim (ftype (sfunction (conset) boolean) conset-empty))
@@ -146,15 +148,11 @@
   (defun make-conset () (make-sset))
   (defmacro do-conset-elements ((constraint conset &optional result) &body body)
     `(do-sset-elements (,constraint ,conset ,result) ,@body))
-  (defmacro do-conset-intersection
-      ((constraint conset1 conset2 &optional result) &body body)
-    `(do-conset-elements (,constraint ,conset1 ,result)
-       (when (conset-member ,constraint ,conset2)
-         ,@body)))
   (defun conset-empty (conset) (sset-empty conset))
   (defun copy-conset (conset) (copy-sset conset))
   (defun conset-member (constraint conset) (sset-member constraint conset))
   (defun conset-adjoin (constraint conset) (sset-adjoin constraint conset))
+  (defun conset-delete (constraint conset) (sset-delete constraint conset))
   (defun conset= (conset1 conset2) (sset= conset1 conset2))
   ;; Note: CP doesn't ever care whether union, intersection, and
   ;; difference change the first set.  (This is an important degree of
@@ -183,6 +181,7 @@
 ;;;    9     66   1.4    210   4.4   3857  81.0        -  (FLET SB-C::BODY-FUN :IN SB-C::TYPE-FROM-CONSTRAINTS)
 ;;;   10     58   1.2    123   2.6   3915  82.2        -  SB-KERNEL::%TYPE-INTERSECTION
 
+#-conset-is-sset
 (locally
     ;; This is performance critical for the compiler, and benefits
     ;; from the following declarations.  Probably you'll want to
@@ -501,6 +500,7 @@
 ;;; equality or emptiness testing.  There's also union, but that's only an
 ;;; optimisation to avoid useless copies in ADD-TEST-CONSTRAINTS and
 ;;; FIND-BLOCK-TYPE-CONSTRAINTS.
+#-conset-is-sset
 (defmacro do-conset-elements ((constraint conset &optional result) &body body)
   (let ((index '#:index) ; gensym considered harmful
         (conset-vector '#:conset-vector)
@@ -557,25 +557,28 @@
                                               &body body)
   (let ((min (gensym "MIN"))
         (max (gensym "MAX")))
+    (declare (ignorable min max))
     (once-only ((conset conset)
                 (constraints constraints))
       `(flet ((body (,symbol)
                 (declare (type constraint ,symbol))
                 ,@body))
          (when ,constraints
-           (let ((,min (conset-min ,conset))
-                 (,max (conset-max ,conset))
+           (let (#-conset-is-sset (,min (conset-min ,conset))
+                 #-conset-is-sset (,max (conset-max ,conset))
                  (vector #-sb-xc-host (truly-the simple-vector (%array-data ,constraints))
-                          #+sb-xc-host ,constraints))
-             #-sb-xc-host
-             (declare (optimize (insert-array-bounds-checks 0)))
+                         #+sb-xc-host ,constraints))
+             #-sb-xc-host (declare (optimize (insert-array-bounds-checks 0)))
              (loop for i below (length ,constraints)
                    for constraint = (aref vector i)
-                   do (let ((number (truly-the index (constraint-number (truly-the constraint constraint)))))
-                        (when (and (<= ,min number)
-                                   (< number ,max)
-                                   (conset-member constraint ,conset))
-                          (body constraint))))))
+                   when #-conset-is-sset
+                        (let ((number (truly-the index (constraint-number
+                                                        (truly-the constraint constraint)))))
+                          (and (<= ,min number)
+                               (< number ,max)
+                               (conset-member constraint ,conset)))
+                        #+conset-is-sset (conset-member constraint ,conset)
+                   do (body constraint))))
          ,result))))
 
 (defmacro do-eql-vars ((symbol (var constraints) &optional result) &body body)
