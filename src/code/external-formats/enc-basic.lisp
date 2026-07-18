@@ -698,8 +698,8 @@
             do (setf (aref string i)
                      (code-char (sap-ref-8 sap i)))))))
 
-#-(and sb-unicode 64-bit little-endian (or arm64 x86-64))
-(defun simd-copy-ascii-sap-to-character-string (sap string length)
+#-(and sb-unicode 64-bit little-endian)
+(defun sb-vm::simd-copy-ascii-sap-to-character-string (sap string length)
   (declare (index length)
            (simple-character-string string)
            (optimize speed (safety 0)))
