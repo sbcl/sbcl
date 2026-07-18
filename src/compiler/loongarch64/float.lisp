@@ -416,11 +416,13 @@
                     (if not-p
                         (inst bceqz 5 target)
                         (inst bcnez 5 target)))))))
-  (frob < fcmp.clt.s fcmp.clt.d nil </single-float </double-float)
-  (frob <= fcmp.cle.s fcmp.cle.d nil <=/single-float <=/double-float)
-  (frob > fcmp.clt.s fcmp.clt.d t >/single-float >/double-float)
-  (frob >= fcmp.cle.s fcmp.cle.d t >=/single-float >=/double-float)
-  (frob = fcmp.ceq.s fcmp.ceq.d nil =/single-float =/double-float))
+  (frob < fcmp.slt.s fcmp.slt.d nil </single-float </double-float)
+  (frob quiet< fcmp.clt.s fcmp.clt.d nil quiet</single-float quiet</double-float)
+  (frob <= fcmp.sle.s fcmp.sle.d nil <=/single-float <=/double-float)
+  (frob > fcmp.slt.s fcmp.slt.d t >/single-float >/double-float)
+  (frob >= fcmp.sle.s fcmp.sle.d t >=/single-float >=/double-float)
+  (frob = fcmp.seq.s fcmp.seq.d nil =/single-float =/double-float)
+  (frob quiet= fcmp.ceq.s fcmp.ceq.d nil quiet=/single-float quiet=/double-float))
 
 (macrolet ((frob (name translate
                        from-sc from-type from-format

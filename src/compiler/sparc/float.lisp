@@ -756,7 +756,7 @@
   (:args (x) (y))
   (:conditional)
   (:info target not-p)
-  (:variant-vars format yep nope)
+  (:variant-vars format yep nope quiet)
   (:policy :fast-safe)
   (:note "inline float comparison")
   (:vop-var vop)
@@ -764,9 +764,15 @@
   (:generator 3
     (note-this-location vop :internal-error)
     (ecase format
-      (:single (inst fcmps x y))
-      (:double (inst fcmpd x y))
-      (:long (inst fcmpq x y)))
+      (:single (if quiet
+                   (inst fcmps x y)
+                   (inst fcmpes x y)))
+      (:double (if quiet
+                   (inst fcmpd x y)
+                   (inst fcmped x y)))
+      (:long (if quiet
+                 (inst fcmpq x y)
+                 (inst fcmpeq x y))))
     ;; The SPARC V9 doesn't need an instruction between a
     ;; floating-point compare and a floating-point branch.
     (unless (member :sparc-v9 *backend-subfeatures*)
@@ -784,21 +790,23 @@
   #+long-float
   (frob long-float-compare long-reg long-float))
 
-(macrolet ((frob (translate yep nope sname dname #+long-float lname)
+(macrolet ((frob (translate yep nope sname dname #+long-float lname &optional quiet)
              `(progn
                 (define-vop (,sname single-float-compare)
                   (:translate ,translate)
-                  (:variant :single ,yep ,nope))
+                  (:variant :single ,yep ,nope ,quiet))
                 (define-vop (,dname double-float-compare)
                   (:translate ,translate)
-                  (:variant :double ,yep ,nope))
+                  (:variant :double ,yep ,nope ,quiet))
                 #+long-float
                 (define-vop (,lname long-float-compare)
                   (:translate ,translate)
-                  (:variant :long ,yep ,nope)))))
+                  (:variant :long ,yep ,nope ,quiet)))))
   (frob < :l :ge </single-float </double-float #+long-float </long-float)
+  (frob quiet< :l :ge quiet</single-float quiet</double-float #+long-float quiet</long-float t)
   (frob > :g :le >/single-float >/double-float #+long-float >/long-float)
-  (frob = :eq :ne =/single-float =/double-float #+long-float =/long-float))
+  (frob = :eq :ne =/single-float =/double-float #+long-float =/long-float)
+  (frob quiet= :eq :ne quiet=/single-float quiet=/double-float #+long-float quiet=/long-float t))
 
 #+long-float
 (deftransform eql ((x y) (long-float long-float))

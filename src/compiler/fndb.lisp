@@ -232,6 +232,9 @@
 (defknown (max min) (real &rest real) real
   (movable foldable flushable))
 
+(defknown (quiet= quiet<) (real real) boolean
+  (movable foldable flushable))
+
 (defknown (+ *) (&rest number) number
   (movable foldable flushable commutative))
 (defknown - (number &rest number) number

@@ -345,17 +345,17 @@
     (clear-info :source-location :declaration s)))
 
 (defun sqrt-double-float (number)
-  (if (< number 0)
+  (if (quiet< number 0)
       (complex 0d0 (sqrt (- number)))
       (sqrt number)))
 
 (defun sqrt-single-float (number)
-  (if (< number 0)
+  (if (quiet< number 0)
       (complex 0f0 (sqrt (- number)))
       (sqrt number)))
 
 (defun log-double-float (number)
-  (if (< number 0)
+  (if (quiet< number 0)
       (complex (log (- number)) pi)
       (log number)))
 
@@ -365,18 +365,18 @@
       (log number)))
 
 (defun log-double-float2 (number base)
-  (if (zerop base)
+  (if (quiet= base 0d0)
       0d0
-      (if (or (< base 0)
-              (< number 0))
+      (if (or (quiet< base 0)
+              (quiet< number 0))
           (/ (log number) (log base))
           (truly-the double-float (log number base)))))
 
 (defun log-single-float2 (number base)
-  (if (zerop base)
+  (if (quiet= base 0d0)
       0.0
-      (if (or (< base 0)
-              (< number 0))
+      (if (or (quiet< base 0)
+              (quiet< number 0))
           (/ (log number) (log base))
           (truly-the single-float (log number base)))))
 
@@ -513,7 +513,7 @@
                              'single-float)))))
           (((foreach single-float double-float))
            ;; IEEE 754 says (log -0.0) should be -inf
-           (if (< number 0.0)
+           (if (quiet< number 0.0)
                (complex (log (- number)) (coerce pi '(dispatch-type number)))
                (log number)))
           ((complex)
@@ -530,7 +530,7 @@
                   (coerce (%sqrt (- (coerce number 'double-float))) 'single-float))
          (coerce (%sqrt (coerce number 'double-float)) 'single-float)))
     (((foreach single-float double-float))
-     (if (minusp number)
+     (if (quiet< number 0)
          (complex (coerce 0.0 '(dispatch-type number))
                   (sqrt (- number)))
           (sqrt number)))

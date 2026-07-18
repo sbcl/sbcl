@@ -530,7 +530,7 @@
   (deftransform log ((x) ($type) * :node node)
     (let ((cast (cast-or-check-bound-type node (specifier-type 'real))))
       (if cast
-          `(if (< x 0)
+          `(if (quiet< x 0)
                (sb-vm::op-not-type1-error x '(,(type-specifier cast) . log))
                ($log x))
           (give-up-ir1-transform))))
@@ -538,10 +538,10 @@
   (deftransform log ((x y) ($type $type) * :node node)
     (let ((cast (cast-or-check-bound-type node (specifier-type 'real))))
       (if cast
-          `(if (= y 0)
+          `(if (quiet= y 0)
                (coerce 0 '$type)
-               (if (or (< x 0)
-                       (< y 0))
+               (if (or (quiet< x 0)
+                       (quiet< y 0))
                    (sb-vm::op-not-type2-error x y '(,(type-specifier cast) . log))
                    (/ ($log x) ($log y))))
           (give-up-ir1-transform))))
@@ -549,7 +549,7 @@
   (deftransform sqrt ((x) ($type) * :node node)
     (let ((cast (cast-or-check-bound-type node (specifier-type 'real))))
       (if cast
-          `(if (< x 0)
+          `(if (quiet< x 0)
                (sb-vm::op-not-type1-error x '(,(type-specifier cast) . sqrt))
                ($sqrt x))
           (give-up-ir1-transform)))))
@@ -557,7 +557,7 @@
 (deftransform sqrt ((x) (rational) * :node node)
   (let ((cast (cast-or-check-bound-type node (specifier-type 'real))))
     (if cast
-        `(if (< x 0)
+        `(if (quiet< x 0)
              (sb-vm::op-not-type1-error x '(,(type-specifier cast) . sqrt))
              (%single-float (%sqrt (%double-float x))))
         (give-up-ir1-transform))))
@@ -1574,7 +1574,7 @@
               (csubtypep (lvar-type y) (specifier-type 'single-float))
               (let ((x (lvar-value x)))
                 (when (and (safe-single-coercion-p x)
-                           (= x (coerce x 'single-float)))
+                           (sb-xc:= x (coerce x 'single-float)))
                   `(,(lvar-fun-name (basic-combination-fun node)) ,(coerce x 'single-float) y)))))
         (t
          `(,(lvar-fun-name (basic-combination-fun node)) x (%double-float y)))))
@@ -1586,7 +1586,7 @@
               (csubtypep (lvar-type x) (specifier-type 'single-float))
               (let ((y (lvar-value y)))
                 (when (and (safe-single-coercion-p y)
-                           (= y (coerce y 'single-float)))
+                           (sb-xc:= y (coerce y 'single-float)))
                   `(,(lvar-fun-name (basic-combination-fun node)) x ,(coerce y 'single-float))))))
         (t
          `(,(lvar-fun-name (basic-combination-fun node)) (%double-float x) y))))
@@ -1643,8 +1643,14 @@
                                                         ,most-positive-exactly-double-float-integer))
                                            double-float))
                         #'real-double-float-contagion-cmp nil)))
-  (dolist (op '(= < > <= >=))
+  (dolist (op '(= < > <= >= quiet< quiet=))
     (def op)))
+
+(make-defs (($fun < =))
+  (defoptimizer (quiet$fun constraint-propagate-if) ((x y))
+    (values nil nil
+            (list (list '$fun x (lvar-type y)))
+            (list (list '$fun x (lvar-type y) t)))))
 
 (%deftransform '= nil '(function ((complex double-float) single-float))
                #'double-float-real-contagion nil)

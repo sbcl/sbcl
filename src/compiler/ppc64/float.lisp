@@ -442,7 +442,7 @@
   (:args (x) (y))
   (:conditional)
   (:info target not-p)
-  (:variant-vars format yep nope)
+  (:variant-vars format yep nope quiet)
   (:policy :fast-safe)
   (:note "inline float comparison")
   (:vop-var vop)
@@ -451,7 +451,9 @@
     (note-this-location vop :internal-error)
     (ecase format
       ((:single :double)
-       (inst fcmpo :cr1 x y)))
+       (if quiet
+           (inst fcmpu :cr1 x y)
+           (inst fcmpo :cr1 x y))))
     (inst b?  :cr1 (if not-p nope yep) target)))
 
 (macrolet ((frob (name sc ptype)
@@ -462,17 +464,19 @@
   (frob single-float-compare single-reg single-float)
   (frob double-float-compare double-reg double-float))
 
-(macrolet ((frob (translate yep nope sname dname)
+(macrolet ((frob (translate yep nope sname dname &optional quiet)
              `(progn
                 (define-vop (,sname single-float-compare)
                   (:translate ,translate)
-                  (:variant :single ,yep ,nope))
+                  (:variant :single ,yep ,nope ,quiet))
                 (define-vop (,dname double-float-compare)
                   (:translate ,translate)
-                  (:variant :double ,yep ,nope)))))
+                  (:variant :double ,yep ,nope ,quiet)))))
   (frob < :lt :ge </single-float </double-float)
+  (frob quiet< :lt :ge quiet</single-float quiet</double-float t)
   (frob > :gt :le >/single-float >/double-float)
-  (frob = :eq :ne =/single-float =/double-float))
+  (frob = :eq :ne =/single-float =/double-float)
+  (frob quiet= :eq :ne quiet=/single-float quiet=/double-float t))
 
 
 ;;;; Conversion:

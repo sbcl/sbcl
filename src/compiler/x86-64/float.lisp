@@ -937,6 +937,8 @@
   (:temporary (:sc single-reg :from :eval) xmm)
   (:conditional not :p :ne)
   (:vop-var vop)
+  (:variant-vars quiet)
+  (:variant nil)
   (:generator 3
     (when (or (location= y xmm)
               (and (not (xmm-tn-p x)) (xmm-tn-p y)))
@@ -953,7 +955,9 @@
       (fp-immediate
        (setf y (register-inline-constant (tn-value y))))
       (t))
-    (inst comiss xmm y)
+    (if quiet
+        (inst ucomiss xmm y)
+        (inst comiss xmm y))
     ;; if PF&CF, there was a NaN involved => not equal
     ;; otherwise, ZF => equal
     ))
@@ -966,6 +970,8 @@
             :target xmm))
   (:temporary (:sc double-reg :from :eval) xmm)
   (:conditional not :p :ne)
+  (:variant-vars quiet)
+  (:variant nil)
   (:vop-var vop)
   (:generator 3
     (when (or (location= y xmm)
@@ -989,7 +995,9 @@
       (descriptor-reg
        (setf y (ea-for-df-desc y)))
       (t))
-    (inst comisd xmm y)))
+    (if quiet
+        (inst ucomisd xmm y)
+        (inst comisd xmm y))))
 
 (macrolet ((define-complex-float-= (complex-complex-name complex-real-name real-complex-name
                                     real-sc real-type
@@ -1049,6 +1057,8 @@
                   (:info)
                   (:vop-var vop)
                   (:conditional ,@flags)
+                  (:variant-vars quiet)
+                  (:variant nil)
                   (:generator 3
                     (note-float-location ',op vop x y)
                     (sc-case y
@@ -1063,11 +1073,15 @@
                              (change-vop-flags vop '(,flip))
                              (rotatef x y))
                            `(t)))
-                    (inst comisd x y)))
+                    (if quiet
+                        (inst ucomisd x y)
+                        (inst comisd x y))))
                 (define-vop (,single-name single-float-compare)
                   (:translate ,op)
                   (:info)
                   (:conditional ,@flags)
+                  (:variant-vars quiet)
+                  (:variant nil)
                   (:generator 3
                     (note-float-location ',op vop x y)
                     (sc-case y
@@ -1080,8 +1094,9 @@
                              (change-vop-flags vop '(,flip))
                              (rotatef x y))
                            `(t)))
-
-                    (inst comiss x y))))))
+                    (if quiet
+                        (inst ucomiss x y)
+                        (inst comiss x y)))))))
   ;;   UNORDERED:    ZF,PF,CF <- 111;
   ;;   GREATER_THAN: ZF,PF,CF <- 000;
   ;;   LESS_THAN:    ZF,PF,CF <- 001;
@@ -1093,6 +1108,19 @@
   (define <= <=single-float <=double-float (not :p :a) :nb)
   (define >= >=single-float >=double-float (:nb)))
 
+
+(define-vop (quiet<double-float <double-float)
+  (:translate quiet<)
+  (:variant t))
+(define-vop (quiet<single-float <single-float)
+  (:translate quiet<)
+  (:variant t))
+(define-vop (quiet=/double-float =/double-float)
+  (:translate quiet=)
+  (:variant t))
+(define-vop (quiet=/single-float =/single-float)
+  (:translate quiet=)
+  (:variant t))
 
 ;;;; conversion
 

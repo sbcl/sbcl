@@ -530,8 +530,10 @@
                   (:translate ,translate)
                   (:variant :double ,op ,complement)))))
   (frob < :lt nil </single-float </double-float)
+  (frob quiet< :ult nil quiet</single-float quiet</double-float)
   (frob > :ngt t >/single-float >/double-float)
-  (frob = :seq nil =/single-float =/double-float))
+  (frob = :seq nil =/single-float =/double-float)
+  (frob quiet= :eq nil quiet=/single-float quiet=/double-float))
 
 
 ;;;; Conversion:

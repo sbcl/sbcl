@@ -2394,7 +2394,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "INLINE-VOP"
            "WRAP-IF" "COND-DISPATCH"
            "MAKE-DEFS"
-           "COPY-REMOVE" "COPY-REMOVE-IF" "COPY-REMOVE-IF-NOT")
+           "COPY-REMOVE" "COPY-REMOVE-IF" "COPY-REMOVE-IF-NOT"
+           "QUIET=" "QUIET<")
   #+sb-simd-pack
   (:export "SIMD-PACK"
            "SIMD-PACK-P"

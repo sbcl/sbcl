@@ -1174,28 +1174,38 @@
   (:save-p :compute-only)
   (:note "inline float comparison")
   (:ignore temp)
+  (:variant-vars quiet)
+  (:variant nil)
   (:generator 3
-     (note-this-location vop :internal-error)
-     (cond
+    (note-this-location vop :internal-error)
+    (cond
       ;; x is in ST0; y is in any reg.
       ((zerop (tn-offset x))
-       (inst fucom y))
+       (if quiet
+           (inst fucom y)
+           (inst fcom y)))
       ;; y is in ST0; x is in another reg.
       ((zerop (tn-offset y))
-       (inst fucom x))
+       (if quiet
+           (inst fucom x)
+           (inst fcom x)))
       ;; x and y are the same register, not ST0
       ((location= x y)
        (inst fxch x)
-       (inst fucom fr0-tn)
+       (if quiet
+           (inst fucom fr0-tn)
+           (inst fcom fr0-tn))
        (inst fxch x))
       ;; x and y are different registers, neither ST0.
       (t
        (inst fxch x)
-       (inst fucom y)
+       (if quiet
+           (inst fucom y)
+           (inst fcom y))
        (inst fxch x)))
-     (inst fnstsw)                      ; status word to ax
-     (inst and ah-tn #x45)              ; C3 C2 C0
-     (inst cmp ah-tn #x40)))
+    (inst fnstsw)                       ; status word to ax
+    (inst and ah-tn #x45)               ; C3 C2 C0
+    (inst cmp ah-tn #x40)))
 
 (define-vop (=/single-float =/float)
   (:translate =)
@@ -1208,6 +1218,14 @@
   (:args (x :scs (double-reg))
          (y :scs (double-reg)))
   (:arg-types double-float double-float))
+
+(define-vop (quiet=/single-float =/single-float)
+  (:variant t)
+  (:translate quiet=))
+
+(define-vop (quiet=/double-float =/double-float)
+  (:variant t)
+  (:translate quiet=))
 
 #+long-float
 (define-vop (=/long-float =/float)
@@ -1227,40 +1245,54 @@
   (:policy :fast-safe)
   (:note "inline float comparison")
   (:ignore temp)
+  (:variant-vars quiet)
+  (:variant nil)
   (:generator 3
     ;; Handle a few special cases.
     (cond
-     ;; y is ST0.
-     ((and (sc-is y single-reg) (zerop (tn-offset y)))
+      ;; y is ST0.
+      ((and (sc-is y single-reg) (zerop (tn-offset y)))
+       (sc-case x
+         (single-reg
+          (if quiet
+              (inst fucom x)
+              (inst fcom x)))
+         ((single-stack descriptor-reg)
+          (if quiet
+              (inst fucom (if (sc-is x single-stack)
+                             (ea-for-sf-stack x)
+                             (ea-for-sf-desc x)))
+              (inst fcom (if (sc-is x single-stack)
+                             (ea-for-sf-stack x)
+                             (ea-for-sf-desc x))))))
+       (inst fnstsw)                    ; status word to ax
+       (inst and ah-tn #x45))
+
+      ;; general case when y is not in ST0
+      (t
+       ;; x to ST0
       (sc-case x
         (single-reg
-         (inst fcom x))
+         (unless (zerop (tn-offset x))
+           (copy-fp-reg-to-fr0 x)))
         ((single-stack descriptor-reg)
+         (inst fstp fr0)
          (if (sc-is x single-stack)
-             (inst fcom (ea-for-sf-stack x))
-           (inst fcom (ea-for-sf-desc x)))))
-      (inst fnstsw)                     ; status word to ax
-      (inst and ah-tn #x45))
-
-     ;; general case when y is not in ST0
-     (t
-      ;; x to ST0
-      (sc-case x
-         (single-reg
-          (unless (zerop (tn-offset x))
-                  (copy-fp-reg-to-fr0 x)))
-         ((single-stack descriptor-reg)
-          (inst fstp fr0)
-          (if (sc-is x single-stack)
-              (inst fld (ea-for-sf-stack x))
-            (inst fld (ea-for-sf-desc x)))))
+             (inst fld (ea-for-sf-stack x))
+             (inst fld (ea-for-sf-desc x)))))
       (sc-case y
         (single-reg
-         (inst fcom y))
+         (if quiet
+             (inst fucom y)
+             (inst fcom y)))
         ((single-stack descriptor-reg)
-         (if (sc-is y single-stack)
-             (inst fcom (ea-for-sf-stack y))
-           (inst fcom (ea-for-sf-desc y)))))
+         (if quiet
+             (inst fucom (if (sc-is y single-stack)
+                            (ea-for-sf-stack y)
+                            (ea-for-sf-desc y)))
+             (inst fcom (if (sc-is y single-stack)
+                            (ea-for-sf-stack y)
+                            (ea-for-sf-desc y))))))
       (inst fnstsw)                     ; status word to ax
       (inst and ah-tn #x45)             ; C3 C2 C0
       (inst cmp ah-tn #x01)))))
@@ -1276,43 +1308,72 @@
   (:policy :fast-safe)
   (:note "inline float comparison")
   (:ignore temp)
+  (:variant-vars quiet)
+  (:variant nil)
   (:generator 3
     ;; Handle a few special cases
     (cond
-     ;; y is ST0.
-     ((and (sc-is y double-reg) (zerop (tn-offset y)))
+      ;; y is ST0.
+      ((and (sc-is y double-reg) (zerop (tn-offset y)))
+       (sc-case x
+         (double-reg
+          (if quiet
+              (inst fucom x)
+              (inst fcomd x)))
+         ((double-stack descriptor-reg)
+          (if quiet
+              (inst fucom
+                    (if (sc-is x double-stack)
+                        (ea-for-df-stack x)
+                        (ea-for-df-desc x)))
+              (inst fcomd
+                    (if (sc-is x double-stack)
+                        (ea-for-df-stack x)
+                        (ea-for-df-desc x))))))
+       (inst fnstsw)                    ; status word to ax
+       (inst and ah-tn #x45))
+
+      ;; General case when y is not in ST0.
+      (t
+       ;; x to ST0
       (sc-case x
         (double-reg
-         (inst fcomd x))
+         (unless (zerop (tn-offset x))
+           (copy-fp-reg-to-fr0 x)))
         ((double-stack descriptor-reg)
+         (inst fstp fr0)
          (if (sc-is x double-stack)
-             (inst fcomd (ea-for-df-stack x))
-           (inst fcomd (ea-for-df-desc x)))))
-      (inst fnstsw)                     ; status word to ax
-      (inst and ah-tn #x45))
-
-     ;; General case when y is not in ST0.
-     (t
-      ;; x to ST0
-      (sc-case x
-         (double-reg
-          (unless (zerop (tn-offset x))
-                  (copy-fp-reg-to-fr0 x)))
-         ((double-stack descriptor-reg)
-          (inst fstp fr0)
-          (if (sc-is x double-stack)
-              (inst fldd (ea-for-df-stack x))
-            (inst fldd (ea-for-df-desc x)))))
+             (inst fldd (ea-for-df-stack x))
+             (inst fldd (ea-for-df-desc x)))))
       (sc-case y
         (double-reg
-         (inst fcomd y))
+         (if quiet
+             (inst fucom y)
+             (inst fcomd y)))
         ((double-stack descriptor-reg)
-         (if (sc-is y double-stack)
-             (inst fcomd (ea-for-df-stack y))
-           (inst fcomd (ea-for-df-desc y)))))
+         (if quiet
+             (inst fucom
+                   (if (sc-is y double-stack)
+                       (ea-for-df-stack y)
+                       (ea-for-df-desc y)))
+             (inst fcomd
+                   (if (sc-is y double-stack)
+                       (ea-for-df-stack y)
+                       (ea-for-df-desc y))))))
       (inst fnstsw)                     ; status word to ax
       (inst and ah-tn #x45)             ; C3 C2 C0
       (inst cmp ah-tn #x01)))))
+
+(define-vop (quiet<double-float <double-float)
+  (:args (x :scs (double-reg))
+         (y :scs (double-reg)))
+  (:translate quiet<)
+  (:variant t))
+(define-vop (quiet<single-float <single-float)
+  (:args (x :scs (single-reg))
+         (y :scs (single-reg)))
+  (:translate quiet<)
+  (:variant t))
 
 #+long-float
 (define-vop (<long-float)

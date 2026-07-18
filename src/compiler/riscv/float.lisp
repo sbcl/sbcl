@@ -472,10 +472,12 @@
                         (inst beq temp zero-tn target)
                         (inst bne temp zero-tn target)))))))
   (frob < flt nil </single-float </double-float)
+  (frob quiet< flt nil quiet</single-float quiet</double-float)
   (frob <= fle nil <=/single-float <=/double-float)
   (frob > flt t >/single-float >/double-float)
   (frob >= fle t >=/single-float >=/double-float)
-  (frob = feq nil =/single-float =/double-float))
+  (frob = feq nil =/single-float =/double-float)
+  (frob quiet= feq nil quiet=/single-float quiet=/double-float))
 
 
 ;;;; Conversion:

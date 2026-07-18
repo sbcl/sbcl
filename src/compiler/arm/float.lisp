@@ -371,7 +371,7 @@
 
 (define-vop (float-compare)
   (:args (x) (y))
-  (:variant-vars format is-=)
+  (:variant-vars format quiet)
   (:policy :fast-safe)
   (:note "inline float comparison")
   (:vop-var vop)
@@ -380,11 +380,11 @@
     (note-this-location vop :internal-error)
     (ecase format
       (:single
-       (if is-=
+       (if quiet
            (inst fcmps x y)
            (inst fcmpes x y)))
       (:double
-       (if is-=
+       (if quiet
            (inst fcmpd x y)
            (inst fcmped x y))))
     (inst fmstat)))
@@ -397,25 +397,27 @@
   (frob single-float-compare single-reg single-float)
   (frob double-float-compare double-reg double-float))
 
-(macrolet ((frob (translate cond sname dname is-=)
+(macrolet ((frob (translate cond sname dname quiet)
              `(progn
                 (define-vop (,sname single-float-compare)
                   (:translate ,translate)
                   (:conditional ,cond)
-                  (:variant :single ,is-=))
+                  (:variant :single ,quiet))
                 (define-vop (,dname double-float-compare)
                   (:translate ,translate)
                   (:conditional ,cond)
-                  (:variant :double  ,is-=)))))
+                  (:variant :double  ,quiet)))))
   (frob < :mi </single-float </double-float nil)
+  (frob quiet< :mi quiet</single-float quiet</double-float t)
   (frob > :gt >/single-float >/double-float nil)
-  (frob = :eq =/single-float =/double-float t))
+  (frob = :eq =/single-float =/double-float t)
+  (frob quiet= :eq quiet=/single-float quiet=/double-float t))
 
 (define-vop (float-compare-zero)
   (:args (x))
   (:info y)
   (:ignore y)
-  (:variant-vars format is-=)
+  (:variant-vars format quiet)
   (:policy :fast-safe)
   (:note "inline float comparison")
   (:vop-var vop)
@@ -424,11 +426,11 @@
     (note-this-location vop :internal-error)
     (ecase format
       (:single
-       (if is-=
+       (if quiet
            (inst fcmpzs x)
            (inst fcmpezs x)))
       (:double
-       (if is-=
+       (if quiet
            (inst fcmpzd x)
            (inst fcmpezd x))))
     (inst fmstat)))
@@ -442,19 +444,21 @@
   (frob double-float-compare-zero double-reg double-float
         (double-float -0d0 0d0)))
 
-(macrolet ((frob (translate cond sname dname is-=)
+(macrolet ((frob (translate cond sname dname quiet)
              `(progn
                 (define-vop (,sname single-float-compare-zero)
                   (:translate ,translate)
                   (:conditional ,cond)
-                  (:variant :single ,is-=))
+                  (:variant :single ,quiet))
                 (define-vop (,dname double-float-compare-zero)
                   (:translate ,translate)
                   (:conditional ,cond)
-                  (:variant :double ,is-=)))))
+                  (:variant :double ,quiet)))))
   (frob < :mi </single-float-zero </double-float-zero nil)
+  (frob quiet< :mi quiet</single-float-zero quiet</double-float-zero t)
   (frob > :gt >/single-float-zero >/double-float-zero nil)
-  (frob = :eq eql/single-float-zero eql/double-float-zero t))
+  (frob = :eq eql/single-float-zero eql/double-float-zero t)
+  (frob quiet= :eq quiet=/single-float-zero quiet=/double-float-zero t))
 
 ;;;; Conversion:
 
