@@ -2465,9 +2465,7 @@
                 (inst shl :dword tmp2 8)
                 (inst or :dword index tmp2)
 
-                (inst shl index 5)
-                (inst vmovdqu x2 (ea full-table index))    ; shuf-low
-                (inst vmovdqu x3 (ea 16 full-table index)) ; shuf-high
+                (inst shl :dword index 5)
 
                 ;; Use the high 4 bits of each byte to get an and-mask that
                 ;; will clear their tags
@@ -2478,9 +2476,8 @@
                 (inst vpand current current x4)
 
                 ;; Shuffle the bytes into 4-byte lanes
-                (inst vmovdqa next current)
-                (inst vpshufb current current x2) ; chars-low
-                (inst vpshufb next next x3)       ; chars-high
+                (inst vpshufb next current (ea 16 full-table index))    ; chars-high
+                (inst vpshufb current current (ea full-table index)) ; chars-low
 
                 (flet ((decode-lane (chars)
                          ;; Perform
