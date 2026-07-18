@@ -2292,9 +2292,9 @@
                      ((c-c0 complex-double-reg t))
                      ((c-df complex-double-reg t))
                      ((c-bf complex-double-reg t))
-                     ((c-00ff complex-double-reg t))
                      ((c-0f complex-double-reg t))
-                     ((c-shift complex-double-reg t))
+                     ((c-00ff int-avx2-reg t))
+                     ((c-shift int-avx2-reg t))
                      ((c-3080 complex-double-reg t))
                      ((tag-clear complex-double-reg t)))
             ((byte-index unsigned-reg positive-fixnum :from :load)
@@ -2475,23 +2475,24 @@
                 (inst vpshufb x4 tag-clear x4)
                 (inst vpand current current x4)
 
-                ;; Shuffle the bytes into 4-byte lanes
-                (inst vpshufb next current (ea 16 full-table index))    ; chars-high
-                (inst vpshufb current current (ea full-table index)) ; chars-low
+                (let ((current (reg-in-sc current 'int-avx2-reg))
+                      (x2 (reg-in-sc x2 'int-avx2-reg))
+                      (x3 (reg-in-sc x3 'int-avx2-reg)))
+                  ;; Duplicate the low bits, for vpshufb
+                  (inst vinserti128 current current current 1)
 
-                (flet ((decode-lane (chars)
-                         ;; Perform
-                         ;; A + B<<6 + C<<12 + D<<18
-                         (inst vpand x2 c-00ff chars)
-                         (inst vpandn x3 c-00ff chars)
-                         (inst vpsrlw x3 x3 2)
-                         (inst vpaddw x2 x2 x3)
-                         (inst vpmaddwd chars x2 c-shift)))
-                  (decode-lane current)
-                  (decode-lane next))
+                  ;; Shuffle the bytes into 4-byte lanes
+                  (inst vpshufb current current (ea full-table index))
 
-                (inst vmovdqu (ea string char-index 4) current)
-                (inst vmovdqu (ea 16 string char-index 4) next)
+                  ;; Perform
+                  ;; A + B<<6 + C<<12 + D<<18
+                  (inst vpand x2 c-00ff current)
+                  (inst vpandn x3 c-00ff current)
+                  (inst vpsrlw x3 x3 2)
+                  (inst vpaddw x2 x2 x3)
+                  (inst vpmaddwd current x2 c-shift)
+
+                  (inst vmovdqu (ea string char-index 4) current))
 
                 (inst add byte-index 8)
                 (inst add char-index produced)
