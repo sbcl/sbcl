@@ -2090,7 +2090,7 @@
                      (inst cmp byte-array-length 16)
                      (inst b :lt DONE)
 
-                     ;; Spread the character to all 4 bytes
+                     ;; Remove the low bits for each of the possible 4 resulting bytes
                      (inst ushr f1 bytes 18 :4s)
                      (inst ushr f2 bytes 12 :4s)
                      (inst ushr f3 bytes 6 :4s)

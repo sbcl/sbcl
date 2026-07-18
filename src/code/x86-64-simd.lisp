@@ -2584,10 +2584,7 @@
                        ((high-bytes complex-double-reg))
                        ((utf8-mask complex-double-reg))
                        ((zero complex-double-reg))
-                       ((ascii complex-double-reg))
-                       ((shuf-mask))
-                       ((and-mask))
-                       ((orr-mask)))
+                       ((ascii complex-double-reg)))
               ((byte-index unsigned-reg positive-fixnum :from :load)
                (char-index unsigned-reg positive-fixnum :from :load))
 
@@ -2740,11 +2737,6 @@
                        (inst shr :dword tmp 24)
                        (inst shl :dword tmp 6)
 
-                       (inst vmovdqu shuf-mask (ea 0 full-table tmp))
-                       (inst vmovdqu and-mask  (ea 16 full-table tmp))
-                       (inst vmovdqu orr-mask  (ea 32 full-table tmp))
-                       (inst movzx '(:byte :dword) tmp (ea 48 full-table tmp)) ;; number of produced bytes
-
                        ;; Spread the character to all 4 bytes
                        (inst vpslld t1 bytes 6)
                        (inst vpslld t2 bytes 4)
@@ -2760,10 +2752,10 @@
                        (inst vpor bytes bytes t2)
 
                        ;; Shuffle the bytes into place
-                       (inst vpshufb bytes bytes shuf-mask)
-
-                       (inst vpand bytes bytes and-mask)
-                       (inst vpor bytes bytes orr-mask)
+                       (inst vpshufb bytes bytes (ea 0 full-table tmp))
+                       (inst vpand bytes bytes (ea 16 full-table tmp))
+                       (inst vpor bytes bytes (ea 32 full-table tmp))
+                       (inst movzx '(:byte :dword) tmp (ea 48 full-table tmp)) ;; number of produced bytes
 
                        (inst vmovdqu (ea byte-index byte-array) bytes)
 
