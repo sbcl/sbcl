@@ -178,6 +178,11 @@
         finally (return modified)))
 
 (defun sset-intersection (set1 set2)
+  ;; If SET2 is _significantly_ smaller than SET1 it would make sense to
+  ;; iterate over SET2 looking for the elements that are in SET1.
+  ;; However, to do that means consing a new temporary SSET, performing
+  ;; the operation, then moving the temporary on top of SET1.
+  ;; I don't feel like doing all that.
   (let ((to-delete nil))
     (do-sset-elements (element set1)
       (unless (sset-member element set2)
@@ -187,13 +192,28 @@
         (sset-delete element set1)))))
 
 (defun sset-difference (set1 set2)
-  (let ((to-delete nil))
-    (do-sset-elements (element set1)
-      (when (sset-member element set2)
-        (push element to-delete)))
-    (when to-delete
-      (dolist (element to-delete t)
-        (sset-delete element set1)))))
+  ;; If sets are EQ, the algorithms below are either terribly broken (if you pick
+  ;; the first cond clause) or terribly stupid (if you pick the second).
+  ;; The result should technically be an empty set, but we don't need it.
+  (aver (neq set1 set2))
+  ;; If SET2 is smaller than SET1, or possibly even larger by an allowance,
+  ;; we should prefer to scan all of it, calling SSET-DELETE on each item.
+  ;; This technique never conses a list of items to delete.
+  ;; When SET1 drives iteration, we can not both delete from and iterate over it,
+  ;; so we necessarily cons an intermediate list.
+  (cond ((<= (ash (sset-count set2) -1) (sset-count set1)) ; allow 2x larger SET2
+         (let (modified)
+           (do-sset-elements (element set2 modified)
+             (when (sset-delete element set1)
+               (setq modified t)))))
+        (t
+         (let ((to-delete nil))
+           (do-sset-elements (element set1)
+             (when (sset-member element set2)
+               (push element to-delete)))
+           (when to-delete
+             (dolist (element to-delete t)
+               (sset-delete element set1)))))))
 
 ;;; Destructively modify SET1 to include its union with the difference
 ;;; of SET2 and SET3. We return true if SET1 was modified, false

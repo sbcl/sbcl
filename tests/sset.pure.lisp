@@ -133,3 +133,48 @@
     (assert (sset-adjoin e2 set))
     (assert (= (length (sset-vector set)) 4))))
 
+(with-test (:name :sset-difference-comprehensive)
+  (let ((elems (loop for i from 1 to 20 collect (make-dummy-test-element i))))
+    ;; 1. Small set2, large set1 (Branch 1: set2 <= 2*set1)
+    (let ((s1 (make-sset))
+          (s2 (make-sset)))
+      (dolist (e (subseq elems 0 10)) (sset-adjoin e s1))
+      (dolist (e (subseq elems 3 6))  (sset-adjoin e s2)) ; s2 has 3 elements
+      (assert (sset-difference s1 s2)) ; modified = t
+      (assert (= (sset-count s1) 7))
+      (assert (not (sset-member (elt elems 3) s1)))
+      (assert (not (sset-member (elt elems 4) s1)))
+      (assert (not (sset-member (elt elems 5) s1)))
+      (assert (sset-member (elt elems 0) s1))
+      ;; No modification when subtracting disjoint set
+      (let ((s3 (make-sset)))
+        (sset-adjoin (elt elems 3) s3)
+        (assert (not (sset-difference s1 s3))) ; modified = nil
+        (assert (= (sset-count s1) 7))))
+
+    ;; 2. Large set2, small set1 (Branch 2: set2 > 2*set1)
+    (let ((s1 (make-sset))
+          (s2 (make-sset)))
+      (dolist (e (subseq elems 0 3))  (sset-adjoin e s1)) ; s1 has 3 elements
+      (dolist (e (subseq elems 2 15)) (sset-adjoin e s2)) ; s2 has 13 elements
+      (assert (sset-difference s1 s2)) ; modified = t
+      (assert (= (sset-count s1) 2)) ; element 2 removed
+      (assert (not (sset-member (elt elems 2) s1)))
+      (assert (sset-member (elt elems 0) s1))
+      (assert (sset-member (elt elems 1) s1)))
+
+    ;; 3. (sset-difference s s) - self difference triggers aver error
+    (let ((s (make-sset)))
+      (dolist (e (subseq elems 0 5)) (sset-adjoin e s))
+      (assert-error (sset-difference s s)))
+
+    ;; 4. Empty set operations
+    (let ((s1 (make-sset))
+          (s2 (make-sset)))
+      (sset-adjoin (elt elems 0) s1)
+      ;; Subtract empty from non-empty
+      (assert (not (sset-difference s1 s2))) ; modified = nil
+      (assert (= (sset-count s1) 1))
+      ;; Subtract non-empty from empty
+      (assert (not (sset-difference s2 s1))) ; modified = nil
+      (assert (sset-empty s2)))))
