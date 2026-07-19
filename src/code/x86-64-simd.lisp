@@ -2322,7 +2322,6 @@
             (inst vmovd x2 tmp)
             (inst vpbroadcastb c-c0 x2)
 
-
             (inst mov tmp #xDF)
             (inst vmovd x2 tmp)
             (inst vpbroadcastb c-df x2)
@@ -2357,7 +2356,6 @@
                        ;; suitable for the lookup table
                        (inst vpcmpgtb x3 c-c0 current)
                        (inst vpmovmskb tmp2 x3)
-                       (inst and :dword tmp2 #xFF)
 
                        (inst shl :dword tmp2 4)
                        (inst vpmovzxbw x3 current)
@@ -2398,9 +2396,6 @@
                 (convert-1-2 START-FULL)
 
                 START-FULL
-                (inst mov tmp #xC0)
-                (inst vmovd c-c0 tmp)
-                (inst vpbroadcastb c-c0 c-c0)
 
                 (inst mov tmp #xFF)
                 (inst vmovd c-00ff tmp)
@@ -2454,16 +2449,14 @@
                 (inst vpcmpgtb x2 current c-c0)
                 ;; Turn them into an 8 bit index
                 (inst vpmovmskb tmp x2)
-                (inst mov :dword index tmp)
-                (inst and :dword index #xFF)
+                (inst movzx '(:byte :dword) index tmp)
                 (inst popcnt :dword produced index)
 
                 ;; Count the number of bytes to the next leading byte, turning it into a 2 bit suffix
-                (inst mov :dword tmp2 tmp)
-                (inst shr :dword tmp2 8)
-                (inst tzcnt :dword tmp2 tmp2)
-                (inst shl :dword tmp2 8)
-                (inst or :dword index tmp2)
+                (inst shr :dword tmp 8)
+                (inst tzcnt :dword tmp tmp)
+                (inst shl :dword tmp 8)
+                (inst or :dword index tmp)
 
                 (inst shl :dword index 5)
 
@@ -2501,7 +2494,7 @@
                 ;; continuation bytes into the next word, (and can't
                 ;; add suffix to byte-index, as it will kill out of
                 ;; order execution)
-                (inst test :dword tmp2 tmp2)
+                (inst test :dword tmp tmp)
                 (inst jmp :nz FULL-LOOP)
                 (convert-1-2 FULL-LOOP)))
 
@@ -2571,6 +2564,7 @@
                        ((table sap-reg t))
                        ((full-table sap-reg t))
                        ((tmp unsigned-reg))
+                       ((multiplier unsigned-reg))
                        ((temp complex-double-reg))
                        ((bytes complex-double-reg))
                        ((c-3f complex-double-reg))
@@ -2688,10 +2682,10 @@
                      ;; Either select two bytes or one byte
                      (inst vpblendvb bytes high-bytes bytes ascii)
                      ;; Shrink the mask from 16 bits to 8 bits
-                     (inst vpacksswb ascii ascii ascii)
+                     (inst vpacksswb ascii ascii zero)
                      ;; Remove the zero second byte from ascii words
                      (inst vpmovmskb tmp ascii)
-                     (inst and :dword tmp 255)
+
                      (inst shl :dword tmp 4)
                      (inst vpshufb bytes bytes (ea table tmp))
                      (if (eq size 32)
@@ -2724,16 +2718,14 @@
                        (inst vpsubd temp zero temp)
 
                        ;; Build an 8-bit index mask
-                       ;; Pack four 32-bit values down to four 8-bit values in the lowest 32 bits
+                       ;; Narrow to 16 bits, making a 64-bit mask
                        (inst vpackusdw temp temp temp)
-                       (inst vpackuswb temp temp temp)
-                       (inst vmovd tmp temp)
+                       (inst vmovq tmp temp)
 
                        ;; Multiplying by 1 + 2^6 + 2^12 + 2^18
                        ;; shifts two bits per byte into the upper byte
-                       (inst imul :dword tmp tmp #x01041040)
-                       (inst shr :dword tmp 24)
-                       (inst shl :dword tmp 6)
+                       (inst imul tmp multiplier)
+                       (inst shr tmp (- 56 6)) ;; shift left 6 for the table entry size
 
                        ;; Spread the character to all 4 bytes
                        (inst vpslld t1 bytes 6)
@@ -2790,6 +2782,8 @@
                 (inst mov tmp #x7f)
                 (inst vmovd temp tmp)
                 (inst vpbroadcastd c-7f temp)
+                (inst mov multiplier #x0100040010004000)
+
 
                 FULL-LENGTH
                 (convert-full)
