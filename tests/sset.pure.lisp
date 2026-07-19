@@ -178,3 +178,59 @@
       ;; Subtract non-empty from empty
       (assert (not (sset-difference s2 s1))) ; modified = nil
       (assert (sset-empty s2)))))
+
+(with-test (:name :sset-intersection-comprehensive)
+  (let ((elems (loop for i from 1 to 20 collect (make-dummy-test-element i))))
+    ;; 1. Small set2, large set1 (Branch 1: set2 <= set1/2)
+    (let ((s1 (make-sset))
+          (s2 (make-sset)))
+      (dolist (e (subseq elems 0 10)) (sset-adjoin e s1)) ; s1 has 10 elements (0..9)
+      (dolist (e (subseq elems 3 6))  (sset-adjoin e s2)) ; s2 has 3 elements (3..5)
+      (assert (sset-intersection s1 s2)) ; modified = t
+      (assert (= (sset-count s1) 3))
+      (assert (sset-member (elt elems 3) s1))
+      (assert (sset-member (elt elems 4) s1))
+      (assert (sset-member (elt elems 5) s1))
+      (assert (not (sset-member (elt elems 0) s1)))
+      (assert (not (sset-member (elt elems 9) s1)))
+
+      ;; Intersecting with small disjoint set empties s1
+      (let ((s3 (make-sset)))
+        (dolist (e (subseq elems 15 17)) (sset-adjoin e s3)) ; s3 has 2 elements (15, 16)
+        (assert (sset-intersection s1 s3)) ; modified = t
+        (assert (sset-empty s1))))
+
+    ;; 2. Large set2, small set1 (Branch 2: set2 > set1/2)
+    (let ((s1 (make-sset))
+          (s2 (make-sset)))
+      (dolist (e (subseq elems 0 4))  (sset-adjoin e s1)) ; s1 has 4 elements (0..3)
+      (dolist (e (subseq elems 2 12)) (sset-adjoin e s2)) ; s2 has 10 elements (2..11)
+      (assert (sset-intersection s1 s2)) ; modified = t
+      (assert (= (sset-count s1) 2)) ; elements 2 and 3 kept
+      (assert (sset-member (elt elems 2) s1))
+      (assert (sset-member (elt elems 3) s1))
+      (assert (not (sset-member (elt elems 0) s1)))
+
+      ;; Intersecting when set2 contains all elements of set1 (unmodified = nil)
+      (let ((s4 (make-sset)))
+        (dolist (e (subseq elems 0 10)) (sset-adjoin e s4)) ; contains all of s1
+        (assert (not (sset-intersection s1 s4))) ; modified = nil
+        (assert (= (sset-count s1) 2))))
+
+    ;; 3. (eq set1 set2) returns nil (unmodified)
+    (let ((s1 (make-sset)))
+      (dolist (e (subseq elems 0 5)) (sset-adjoin e s1))
+      (assert (not (sset-intersection s1 s1)))
+      (assert (= (sset-count s1) 5)))
+
+    ;; 4. Empty set operations
+    (let ((s1 (make-sset))
+          (s2 (make-sset)))
+      (sset-adjoin (elt elems 0) s1)
+      ;; Intersect non-empty with empty (s2 <= s1/2 => returns t, s1 becomes empty)
+      (assert (sset-intersection s1 s2))
+      (assert (sset-empty s1))
+      ;; Intersect empty with non-empty (returns nil)
+      (sset-adjoin (elt elems 0) s2)
+      (assert (not (sset-intersection s1 s2)))
+      (assert (sset-empty s1)))))

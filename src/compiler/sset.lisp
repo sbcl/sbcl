@@ -156,6 +156,7 @@
 
 ;;; Return true if SET contains no elements, false otherwise.
 (declaim (ftype (sfunction (sset) boolean) sset-empty))
+(declaim (inline sset-empty))
 (defun sset-empty (set)
   (zerop (sset-count set)))
 
@@ -178,18 +179,34 @@
         finally (return modified)))
 
 (defun sset-intersection (set1 set2)
-  ;; If SET2 is _significantly_ smaller than SET1 it would make sense to
-  ;; iterate over SET2 looking for the elements that are in SET1.
-  ;; However, to do that means consing a new temporary SSET, performing
-  ;; the operation, then moving the temporary on top of SET1.
-  ;; I don't feel like doing all that.
-  (let ((to-delete nil))
-    (do-sset-elements (element set1)
-      (unless (sset-member element set2)
-        (push element to-delete)))
-    (when to-delete
-      (dolist (element to-delete t)
-        (sset-delete element set1)))))
+  (cond
+    ((or (sset-empty set1) (eq set1 set2)) nil)
+    ;; Consing can always be bounded by the cardinality of the smaller set,
+    ;; we just have to decide whether to collect items to ADJOIN vs DELETE.
+    ;; In the situation where SET2 is empty (and SET1 is not, because empty was
+    ;; ruled out above), this correctly pick the first of the following two COND
+    ;; clauses, doing zero consing.
+    ;; When SET2 is no more than half the size of SET1, collecting kept elements
+    ;; by scanning SET2 conses at most |SET2| items, whereas scanning SET1
+    ;; conses at least |SET1| - |SET2| items.
+    ((<= (sset-count set2) (ash (sset-count set1) -1))
+     (let ((to-keep nil))
+       (do-sset-elements (element set2)
+         (when (sset-member element set1)
+           (push element to-keep)))
+       (fill (sset-vector set1) 0)
+       (setf (sset-count set1) 0)
+       ;; Since |SET2| < |SET1|, SET1 is guaranteed to shrink, so we always return T.
+       (dolist (element to-keep t)
+         (sset-adjoin element set1))))
+    (t
+     (let ((to-delete nil))
+       (do-sset-elements (element set1)
+         (unless (sset-member element set2)
+           (push element to-delete)))
+       (when to-delete
+         (dolist (element to-delete t)
+           (sset-delete element set1)))))))
 
 (defun sset-difference (set1 set2)
   ;; If sets are EQ, the algorithms below are either terribly broken (if you pick
