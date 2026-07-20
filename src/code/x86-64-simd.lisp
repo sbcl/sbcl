@@ -1929,7 +1929,8 @@
       DONE)))
 
 (def-variant simd-utf8-strlen :avx2 (sap)
-  (declare (system-area-pointer sap))
+  (declare (system-area-pointer sap)
+           (optimize speed (safety 0)))
   (inline-vop
       (((bytes        sap-reg t) sap)
        ((ptr          sap-reg t))
@@ -1960,14 +1961,55 @@
       ((char-length descriptor-reg t :from :load)
        (byte-length unsigned-reg positive-fixnum :from :load)
        (all-ascii descriptor-reg t))
-    (flet ((validate ()
+    (flet ((validate (&optional last)
              (assemble ()
                ;; Skip an all-ASCII block
-               (inst vpor tmp2 current prev)
+               (inst vpmaxub tmp2 current prev)
                (inst vpmovmskb tmp tmp2)
                (inst test tmp tmp)
                (inst jmp :z VALIDATED)
 
+               (inst vpsubusb tmp2 tmp2 (register-inline-constant
+                                         :avx2
+                                         #xDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDF))
+               (inst vptest tmp2 tmp2)
+               (inst jmp :nz full)
+
+               ;; 1/2 bytes
+               (inst vpcmpgtb tmp2 zeros current) ;; non-ascii
+
+               (inst vpcmpgtb tmp3 mask-c0 current) ;; continuations
+               ;; 2-byte leading bytes
+               (inst vpcmpgtb tmp4 current (register-inline-constant
+                                            :avx2
+                                            #xC1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1))
+               (inst vpand tmp4 tmp4 tmp2) ;; it's a signed comparison, remove ascii
+
+               ;; Find #xC0 or #xC1, which are overlong
+               (inst vpandn tmp1 tmp3 tmp2) ;; neither ascii or continuations
+               (inst vpxor tmp1 tmp1 tmp4) ;; nor a valid leading byte
+
+               ;; Continuations must follow leading bytes,
+               ;; they must align with the shifted input
+
+               (inst vpcmpgtb tmp2 prev-len zeros)
+
+               ;; Identify leading non-ascii bytes, shifted left by
+               ;; one byte, with the previous byte shifted in
+               (inst vperm2i128 tmp2 tmp2 tmp4 #x21)
+               (inst vpalignr tmp2 tmp4 tmp2 15)
+               (inst vpxor tmp2 tmp2 tmp3)
+
+               (inst vpor tmp1 tmp1 tmp2)
+               (inst vpor errors errors tmp1)
+
+               (inst vpsubb tmp2 zeros tmp3)
+               (inst vpsadbw tmp2 tmp2 zeros)
+               (inst vpaddq total-conts-vec total-conts-vec tmp2)
+               (unless last
+                 (inst vpsubb prev-len zeros tmp4)) ;; set to 1
+               (inst jmp VALIDATED)
+               FULL
                ;; The Keiser, Lemire algorithm
                (inst vperm2i128 tmp1 prev current #x21)
                (inst vpalignr tmp1 current tmp1 15)
@@ -1994,8 +2036,8 @@
                (inst vpalignr tmp4 tmp1 tmp2 13)
                (inst vpalignr tmp3 tmp1 tmp2 14)
                (inst vpalignr tmp2 tmp1 tmp2 15)
-
-               (inst vmovdqa prev-len tmp1)
+               (unless last
+                 (inst vmovdqa prev-len tmp1))
 
                (inst vpcmpeqb tmp1 tmp1 tmp1)
                (inst vpaddb tmp3 tmp3 tmp1)
@@ -2132,7 +2174,7 @@
 
         (inst add ptr tmp)
 
-        (validate)
+        (validate t)
 
         (inst sub ptr bytes)
         (inst mov byte-length ptr)

@@ -3543,23 +3543,41 @@
   (def bit #b1 #b10 #b00011)
   (def bif #b1 #b11 #b00011))
 
-(macrolet ((def (name u op)
+(macrolet ((def (name u op &optional zero-u zero)
              `(define-instruction ,name (segment rd rn rm size)
-                (:printer simd-three-same-sized ((u ,u) (op ,op)))
+                ,@(when op
+                    `((:printer simd-three-same-sized ((u ,u) (op ,op)))))
+                ,@(when zero
+                    `((:printer simd-two-misc ((u ,zero-u) (op ,zero))
+                                '(:name :tab rd ", " rn ", " "#0"))))
                 (:emitter
                  (multiple-value-bind (q size) (encode-vector-size size)
-                   (emit-simd-three-same segment
-                                         q
-                                         ,u
-                                         size
-                                         (fpr-offset rm)
-                                         ,op
-                                         (fpr-offset rn)
-                                         (fpr-offset rd)))))))
+                   (cond ,@(when zero
+                             `(((eql rm 0)
+                                (emit-simd-two-misc segment
+                                                    q
+                                                    ,zero-u
+                                                    size
+                                                    ,zero
+                                                    (fpr-offset rn)
+                                                    (fpr-offset rd)))))
+                         (t
+                          ,(if op
+                               `(emit-simd-three-same segment
+                                                      q
+                                                      ,u
+                                                      size
+                                                      (fpr-offset rm)
+                                                      ,op
+                                                      (fpr-offset rn)
+                                                      (fpr-offset rd))
+                               `(error "Can be compared only with zero, not ~s" rm)))))))))
   (def cmtst #b0 #b10001)
-  (def cmeq #b1 #b10001)
-  (def cmgt #b0 #b00110)
-  (def cmge #b0 #b00111)
+  (def cmeq #b1 #b10001 0 #b01001)
+  (def cmgt #b0 #b00110 0 #b01000)
+  (def cmge #b0 #b00111 1 #b01000)
+  (def cmlt nil nil 0 #b01010)
+  (def cmle nil nil 1 #b01001)
   (def cmhi #b1 #b00110)
   (def cmhs #b1 #b00111)
   (def umin #b1 #b01101)

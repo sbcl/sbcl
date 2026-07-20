@@ -642,9 +642,15 @@
          (context (sb-di:error-context)))
     (multiple-value-bind (value size)
         (sb-di::sub-access-debug-var-slot nil raw-x *current-internal-error-context* t)
-      (if size
-          (format t "~7a = ~v,'0,'|,32:x ~a~%" tn-name (* size 2) value context)
-          (format t "~7a = ~a ~a~%" tn-name value context)))))
+      (cond ((not size)
+             (format t "~7a = ~a ~a~%" tn-name value context))
+            ((> size 16)
+             (let ((a (ldb (byte (* size 4) (* size 4)) value))
+                   (b (ldb (byte (* size 4) 0) value)))
+               (format t "~7a = ~v,'0x|~v,'0x ~a~%" tn-name size a size b context)))
+            (t
+             (format t "~7a = ~v,'0x ~a~%" tn-name (* size 2)
+                     value context))))))
 
 ;;;; INTERNAL-ERROR signal handler
 

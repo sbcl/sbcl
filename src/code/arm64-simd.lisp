@@ -1375,7 +1375,8 @@
        ((nibble-mask  complex-double-reg))
        ((twos         complex-double-reg))
        ((indexes      complex-double-reg))
-
+       ((c-c1         complex-double-reg))
+       ((c-c0         complex-double-reg))
        ((errors       complex-double-reg))
        ((prev         complex-double-reg))
        ((prev-len     complex-double-reg))
@@ -1389,16 +1390,49 @@
       ((char-length descriptor-reg t :from :load)
        (byte-length unsigned-reg positive-fixnum :from :load)
        (all-ascii descriptor-reg))
-    (flet ((validate ()
+    (flet ((validate (&optional last)
              (assemble ()
                ;; Skip an all-ASCII block
-               (inst orr tmp2 current prev :16b)
+               (inst umax tmp2 current prev :16b)
                (inst umaxv tmp2 tmp2 :16b)
-               (inst fmov tmp (reg-in-sc tmp2 'single-reg))
+               (inst umov tmp tmp2 0 :b)
                (inst tbz tmp 7 VALIDATED)
 
-               ;; The Keiser, Lemire algorithm
                (inst ext tmp1 prev current 15 :16b)
+
+               (inst tbnz tmp 5 full)
+
+               ;;; 1/2 bytes
+
+               ;; Identify continuations
+               (inst cmgt tmp3 c-c0 current :16b)
+
+               ;; Identify leading non-ascii bytes, shifted left by
+               ;; one byte, with the previous byte shifted in
+               (inst cmhi tmp1 tmp1 c-c1 :16b)
+
+               (inst cmhi tmp4 current c-c1 :16b)
+
+               ;; Continuations must follow leading bytes,
+               ;; they must align with the shifted input
+               (inst eor tmp1 tmp1 tmp3 :16b) ;; errors 1
+
+               ;; Find #xC0 or #xC1, which are overlong
+               (inst cmhs tmp2 current c-c0 :16b) ;; >= c0
+               (inst bic tmp2 tmp2 tmp4 :16b) ;; tmp4 has a mask for > c1
+
+               (inst orr tmp1 tmp1 tmp2 :16b) ;; combine errors
+               (inst orr errors errors tmp1 :16b)
+
+               (inst addv tmp3 tmp3 :16b)
+               (inst smov tmp tmp3 0 :b)
+               (inst sub total-conts total-conts tmp)
+               (inst and prev-len tmp4 twos :16b)
+
+               (inst b validated)
+
+               FULL
+               ;; The Keiser, Lemire algorithm
                (inst ushr tmp2 tmp1 4 :16b)
                (inst and tmp3 tmp1 nibble-mask :16b)
                (inst ushr tmp4 current 4 :16b)
@@ -1434,10 +1468,11 @@
                (inst orr errors errors tmp4 :16b)
 
                ;; Subtract continuations
-               (inst ushr tmp4 tmp3 7 :16b)
-               (inst addv tmp4 tmp4 :16b)
-               (inst fmov tmp (reg-in-sc tmp4 'single-reg))
-               (inst add total-conts total-conts tmp)
+               (inst addv tmp4 tmp3 :16b)
+               (inst smov tmp tmp4 0 :b)
+               (inst sub total-conts total-conts tmp)
+               (unless last
+                 (inst mov prev-len tmp1 :16b))
                VALIDATED)))
       (assemble ()
         ;; Align the start and then mask off the extra bits
@@ -1503,6 +1538,8 @@
         (inst movi errors   0 :16b)
         (inst movi prev     0 :16b)
         (inst movi prev-len 0 :16b)
+        (inst movi c-c0 #xc0 :16b)
+        (inst movi c-c1 #xc1 :16b)
 
         (inst b START)
 
@@ -1517,7 +1554,6 @@
         (validate)
 
         (inst mov prev current :16b)
-        (inst mov prev-len tmp1 :16b)
 
         (inst add ptr ptr 16)
         (inst b LOOP)
@@ -1535,7 +1571,7 @@
         (inst and current current tmp1 :16b)
         (inst add ptr ptr tmp)
 
-        (validate)
+        (validate t)
 
         (inst sub byte-length ptr bytes)
         (inst mov all-ascii null-tn)
