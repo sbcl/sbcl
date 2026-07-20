@@ -2345,7 +2345,6 @@
                        (inst jmp :l DONE)
 
                        (inst vmovq current (ea byte-array byte-index))
-                       (inst vpmovzxbw next (ea 1 byte-array byte-index))
 
                        ;; Check for 3 or 4 bytes
                        (inst vpsubusb x2 current c-df)
@@ -2356,9 +2355,11 @@
                        ;; suitable for the lookup table
                        (inst vpcmpgtb x3 c-c0 current)
                        (inst vpmovmskb tmp2 x3)
-
                        (inst shl :dword tmp2 4)
+
+                       ;; Widen to 16-bits
                        (inst vpmovzxbw x3 current)
+                       (inst vpmovzxbw next (ea 1 byte-array byte-index))
 
                        ;; next is shifted by one,
                        ;; construct a codepoint from two overlapping bytes,
@@ -2370,7 +2371,6 @@
                        ;; Select either the x4 two bytes or one ascii byte
                        (inst vpcmpgtw next x3 c-bf)
                        (inst vpblendvb x3 x3 x4 next)
-
 
                        ;; Remove the gaps left over from using two bytes as one codepoint
                        (inst vpshufb x3 x3 (ea table tmp2))
@@ -2397,16 +2397,16 @@
 
                 START-FULL
 
-                (inst mov tmp #xFF)
-                (inst vmovd c-00ff tmp)
+                (inst mov tmp2 #xFF)
+                (inst vmovd c-00ff tmp2)
                 (inst vpbroadcastw c-00ff c-00ff)
 
-                (inst mov tmp #x0F)
-                (inst vmovd c-0f tmp)
+                (inst mov tmp2 #x0F)
+                (inst vmovd c-0f tmp2)
                 (inst vpbroadcastb c-0f c-0f)
 
-                (inst mov tmp #x10000001)
-                (inst vmovd c-shift tmp)
+                (inst mov tmp2 #x10000001)
+                (inst vmovd c-shift tmp2)
                 (inst vpbroadcastd c-shift c-shift)
 
                 (inst lea full-table
@@ -2429,16 +2429,17 @@
                 (inst vmovdqa tag-clear (register-inline-constant
                                          :sse #x070F1F1F3F3F3F3F7F7F7F7F7F7F7F7F))
 
-
                 FULL-LOOP
+                (move tmp byte-array-length)
+                (inst sub tmp byte-index)
+
+                FULL-LOOP-LENGTH-COMPUTED
+                (inst cmp tmp 16)
+                (inst jmp :l DONE)
+
                 (move tmp string-length)
                 (inst sub tmp char-index)
                 (inst cmp tmp 8)
-                (inst jmp :l DONE)
-
-                (move tmp byte-array-length)
-                (inst sub tmp byte-index)
-                (inst cmp tmp 16)
                 (inst jmp :l DONE)
 
                 ;; Process the leading bytes in the first 8 bytes, loading 16 bytes
@@ -2496,7 +2497,7 @@
                 ;; order execution)
                 (inst test :dword tmp tmp)
                 (inst jmp :nz FULL-LOOP)
-                (convert-1-2 FULL-LOOP)))
+                (convert-1-2 FULL-LOOP-LENGTH-COMPUTED)))
 
 
             TAIL-16

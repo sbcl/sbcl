@@ -66,15 +66,21 @@
 (compile 'decode-test)
 
 (defun fill-random-string (string &optional ascii)
-  (map-into string (if ascii
-                       (lambda ()
-                         (code-char (random 128)))
-                       (lambda ()
-                         (code-char (case (random 4)
-                                      (0 (random 128))
-                                      (1 (+ 128 (random (- 2048 128))))
-                                      (2 (+ 2048 (random (- 50000 2048))))
-                                      (3 (+ 65536 (random (- char-code-limit 65536))))))))))
+  (loop with i = 0
+        for width = (if ascii
+                        0
+                        (random 4))
+        while (< i (length string))
+        do (loop repeat (1+ (random (- (length string) i)))
+                 for char = (case width
+                              (0 (random 128))
+                              (1 (+ 128 (random (- 2048 128))))
+                              (2 (+ 2048 (random (- 50000 2048))))
+                              (3 (+ 65536 (random (- char-code-limit 65536)))))
+                 do (setf (aref string i) (code-char char))
+                 (incf i)))
+  string)
+
 (defun strlen (bytes)
   (sb-vm::simd-utf8-strlen (sb-sys:vector-sap bytes)))
 (compile 'strlen)

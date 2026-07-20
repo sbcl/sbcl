@@ -1662,7 +1662,6 @@
                      ((byte-array-length unsigned-reg) byte-array-length)
                      ((index unsigned-reg))
                      ((suffix unsigned-reg))
-                     ((produced unsigned-reg))
                      ((ptr any-reg))
                      ((bytes complex-double-reg t))
                      ((bytes16 complex-double-reg t))
@@ -1694,6 +1693,7 @@
 
           (assemble ()
             (move byte-array byte-array*)
+            (inst movi c-c0 #xC0 :16b)
             (inst mov byte-index 0)
             (inst mov char-index 0)
             (load-inline-constant powers :qword #x8040201008040201)
@@ -1721,13 +1721,15 @@
                        (inst b :lt DONE)
 
                        (inst add ptr byte-array byte-index)
-                       (inst ldr (reg-in-sc bytes 'double-reg) (@ ptr))
-                       (inst ldr (reg-in-sc next 'double-reg) (@ ptr 1))
+                       (inst ldr bytes (@ ptr) :d)
+
 
                        (inst umaxv temp bytes :8b)
-                       (inst umov tmp-tn temp 0 :b)
-                       (inst cmp tmp-tn #xE0) ;; 3 or 4 bytes
+                       (inst umov index temp 0 :b)
+                       (inst cmp index #xE0) ;; 3 or 4 bytes
                        (inst b :ge full)
+
+                       (inst ldr next (@ ptr 1) :d)
 
                        ;; Build a bit pattern of non-continuation bytes
                        ;; suitable for the lookup table
@@ -1775,7 +1777,6 @@
                 (convert-1-2 START-FULL)
 
                 START-FULL
-                (inst movi c-c0 #xC0 :16b)
                 (inst movi c-ff #xFF :8h)
                 (inst movi c-4 4 :4s)
                 (load-inline-constant tag-clear :oword #x070F1F1F3F3F3F3F7F7F7F7F7F7F7F7F)
@@ -1798,13 +1799,16 @@
                                                          '(vector (unsigned-byte 8))))
 
                 FULL-LOOP
+                (inst sub tmp-tn byte-array-length byte-index)
+                FULL-LOOP-LENGTH-COMPUTED
+                (inst cmp tmp-tn 16)
+                (inst b :lt DONE)
+
                 (inst sub tmp-tn string-length char-index)
                 (inst cmp tmp-tn 8)
                 (inst b :lt DONE)
 
-                (inst sub tmp-tn byte-array-length byte-index)
-                (inst cmp tmp-tn 16)
-                (inst b :lt DONE)
+
 
                 ;; Process the leading bytes in the first 8 bytes, loading 16 bytes
                 ;; so that the last leading byte might drag in 3 more bytes
@@ -1834,7 +1838,7 @@
 
                 (inst addv temp2 temp :8b)
                 ;; A negated number of produced characters
-                (inst smov produced temp2 0 :b)
+                (inst smov suffix temp2 0 :b)
 
                 ;; Use the high 4 bits of each byte to get an and-mask that
                 ;; will clear their tags
@@ -1870,13 +1874,13 @@
 
 
                 (inst add byte-index byte-index 8)
-                (inst sub char-index char-index produced)
+                (inst sub char-index char-index suffix)
                 ;; Can't re-enter the 1-2 loop if there were
                 ;; continuation bytes into the next word, (and can't
                 ;; add suffix to byte-index, as it will kill out of
                 ;; order execution)
                 (inst cbnz suffix full-loop)
-                (convert-1-2 FULL-LOOP)))
+                (convert-1-2 FULL-LOOP-LENGTH-COMPUTED)))
             TAIL-16
             (inst cmp tmp-tn 8)
             (inst b :lt DONE)
