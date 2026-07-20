@@ -1764,11 +1764,13 @@
     #8#
     #9=
     (:export
+     #:two-arg-u8.32-sat-
      ;; f32.8
      ;; f64.4
      #:f64.4-reverse
      #:f64.4-permute4x64
      ;; u8.16
+     #:u8.16-alignr
      ;; u16.8
      ;; u32.4
      #:u32.4-shiftl
@@ -1779,6 +1781,7 @@
      ;; s8.16
      ;; s16.8
      ;; s32.4
+     #:s8.16-sad
      #:s32.4-shiftl
      #:s32.4-shiftr
      ;; s64.2
@@ -1802,6 +1805,8 @@
      #:u8.32>=
      #:u8.32<=
      #:u8.32-avg
+     #:u8.32-sad
+     #:u8.32-alignr
      #:u8.32-packus
      #:u8.32-unpackhi
      #:u8.32-unpacklo
