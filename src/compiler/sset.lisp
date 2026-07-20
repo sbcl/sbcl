@@ -59,7 +59,7 @@
 ;;; (Any probing strategy other than linear does not so readily admit a
 ;;; deletion technique which shifts other elements on top of the deleted one.)
 (declaim (inline sset-hash))
-(defun sset-hash (element) (mix (sset-element-number element) 0))
+(defun sset-hash (element-number) (mix element-number 0))
 
 ;;; Rehash the sset when the proportion of free cells in the set is
 ;;; lower than this, the value is a reciprocal.
@@ -83,13 +83,18 @@
 ;;; then we return true, otherwise we return false.
 (declaim (ftype (sfunction (sset-element sset) boolean) sset-adjoin))
 (defun sset-adjoin (element set)
-  (when (zerop (length (sset-vector set)))
-    (setf (sset-vector set) (make-array 2 :initial-element 0)
-          (sset-limit set) 1))
-  (loop with vector = (sset-vector set)
-        with mask of-type index = (1- (length vector))
-        for hash of-type index = (logand mask (sset-hash element)) then
-          (logand mask (1+ hash))
+  #-sb-xc-host (declare (optimize (insert-array-bounds-checks 0)))
+  ;; This FIXNUM test could be expressed as (THE (NOT NULL) ...) but I think the
+  ;; decision is best left to the backend as to whether that's cheaper than FIXNUMP.
+  (let ((sset-hash (sset-hash (the fixnum (sset-element-number element))))
+        (vector (sset-vector set)))
+    (when (zerop (length vector))
+      (setf vector (make-array 2 :initial-element 0)
+            (sset-vector set) vector
+            (sset-limit set) 1))
+    (loop
+        with mask = (truly-the index (1- (length vector)))
+        for hash of-type index = (logand mask sset-hash) then (logand mask (1+ hash))
         for current = (aref vector hash)
         do (cond ((eql current 0)
                   (setf (aref vector hash) element)
@@ -97,49 +102,57 @@
                     (sset-grow set))
                   (return t))
                  ((eq current element)
-                  (return nil)))))
+                  (return nil))))))
 
 ;;; Destructively remove ELEMENT from SET. If element was in the set,
 ;;; then return true, otherwise return false.
 (declaim (ftype (sfunction (sset-element sset) boolean) sset-delete))
 (defun sset-delete (element set)
+  #-sb-xc-host (declare (optimize (insert-array-bounds-checks 0)))
   (when (zerop (sset-count set))
     (return-from sset-delete nil))
-  (let ((vector (sset-vector set)))
-    (loop with mask of-type index = (1- (length vector))
-          for hash of-type index = (logand mask (sset-hash element)) then
-            (logand mask (1+ hash))
+  (let* ((sset-hash (sset-hash (the fixnum (sset-element-number element))))
+         (vector (sset-vector set))
+         ;; COUNT nonzero implies LENGTH >= 1 (actually, >= 2 because a storage vector
+         ;; of 1 is impossible), but the compiler doesn't know this and consequently was
+         ;; verifying that MASK is non-negative.
+         (mask (truly-the index (1- (length vector)))))
+    (loop for hash of-type index = (logand mask sset-hash) then (logand mask (1+ hash))
           for current = (aref vector hash)
           do (cond ((eql current 0)
                     (return nil))
                    ((eq current element)
-                    (decf (sset-count set))
-                    (loop with i of-type index = hash
-                          do (loop for j of-type index = (logand mask (1+ i)) then
-                                     (logand mask (1+ j))
-                                   for candidate = (aref vector j)
-                                   do (cond ((eql candidate 0)
-                                             (setf (aref vector i) 0)
-                                             (return-from sset-delete t))
-                                            ((>= (the fixnum
-                                                      (logand mask
-                                                              (- j (logand mask (sset-hash candidate)))))
-                                                 (the fixnum
-                                                      (logand mask (- j i))))
-                                             (setf (aref vector i) candidate
-                                                   i j)
-                                             (return)))))
-                    (return t))))))
+                    ;; COUNT was nonzero, so it can't become negative.
+                    ;; Compiler isn't inferring that, so inform it.
+                    (setf (sset-count set) (truly-the index (1- (sset-count set))))
+                    (do ((i hash)) (nil)
+                      (do ((j (logand mask (1+ i)) (logand mask (1+ j)))) (nil)
+                        (declare (index j))
+                        (let ((candidate (aref vector j)))
+                          (when (eql candidate 0)
+                            (setf (aref vector i) 0)
+                            (return-from sset-delete t))
+                          ;; If nonzero then CANDIDATE is an SSET-ELEMENT, and since it was
+                          ;; previously inserted it must have an element-number.
+                          (let ((n (truly-the fixnum
+                                    (sset-element-number (truly-the sset-element candidate)))))
+                            (when (>= (logand mask (- j (logand mask (sset-hash n))))
+                                      (logand mask (- j i)))
+                              (setf (aref vector i) candidate i j)
+                              (return)))))))))))
 
 ;;; Return true if ELEMENT is in SET, false otherwise.
 (declaim (ftype (sfunction (sset-element sset) boolean) sset-member))
 (defun sset-member (element set)
+  #-sb-xc-host (declare (optimize (insert-array-bounds-checks 0)))
   (when (zerop (sset-count set))
     (return-from sset-member nil))
   (loop with vector = (sset-vector set)
-        with mask fixnum = (1- (length vector))
-        for hash of-type index = (logand mask (sset-hash element)) then
-          (logand mask (1+ hash))
+        with mask = (truly-the index (1- (length vector)))
+        ;; There's an unavoidable test for fixnump on the sset-element-number of ELEMENT
+        ;; because the slot is nullable.
+        for hash of-type index = (logand mask (sset-hash (sset-element-number element)))
+          then (logand mask (1+ hash))
         for current = (aref vector hash)
         do (cond ((eq current element) (return t))
                  ((eql current 0) (return nil)))))
