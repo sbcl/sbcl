@@ -103,9 +103,9 @@
 ;;; then return true, otherwise return false.
 (declaim (ftype (sfunction (sset-element sset) boolean) sset-delete))
 (defun sset-delete (element set)
+  (when (zerop (sset-count set))
+    (return-from sset-delete nil))
   (let ((vector (sset-vector set)))
-    (when (zerop (length vector))
-      (return-from sset-delete nil))
     (loop with mask of-type index = (1- (length vector))
           for hash of-type index = (logand mask (sset-hash element)) then
             (logand mask (1+ hash))
@@ -134,7 +134,7 @@
 ;;; Return true if ELEMENT is in SET, false otherwise.
 (declaim (ftype (sfunction (sset-element sset) boolean) sset-member))
 (defun sset-member (element set)
-  (when (zerop (length (sset-vector set)))
+  (when (zerop (sset-count set))
     (return-from sset-member nil))
   (loop with vector = (sset-vector set)
         with mask fixnum = (1- (length vector))
