@@ -303,6 +303,88 @@
       (assert (eq (funcall fun -3) 'GOOD))
       (assert assignment))))
 
+;;; The example in 5.1 of Fluet and Weeks "Contification using
+;;; Dominators", which the A_cont analysis can handle, but A_call
+;;; cannot. In this case, FM, F, G and H all have the same
+;;; continuation.
+#+sb-devel
+(with-test (:name (:assignment-convert :fluet-weeks-5.1
+                                       :fails-on :sbcl))
+  (let ((converted '()))
+    (let ((fun (inspect-ir
+                '(lambda (b x y flag)
+                  (labels ((fm (n x)
+                             (if flag
+                                 (f (1- n) (1+ x) t)
+                                 (g (1+ n) (1- x) t)))
+                           (f (n x flag1)
+                             (if flag1
+                                 (g (* 2 n) (- 2 x) nil)
+                                 (h (* n n))))
+                           (g (n x flag2)
+                             (if flag2
+                                 (f (1+ n) (+ x 2) nil)
+                                 (h (* n x))))
+                           (h (y)
+                             (* y y)))
+                    (+ 2
+                       (h 4)
+                       (if (= b 5)
+                           (fm x x)
+                           (fm b y)))))
+                (lambda (component)
+                  (dolist (lambda (sb-c::component-lambdas component))
+                    (dolist (lambda-let (sb-c::lambda-lets lambda))
+                      (when (sb-c::functional-kind-eq lambda-let sb-c::assignment)
+                        (push lambda-let converted))))))))
+      (assert (= (funcall fun 1 2 3 t) 18))
+      (assert (= (funcall fun 1 2 3 nil) 99))
+      (assert (= (length converted) 4))))) ; F, G, FM, H
+
+;;; The example in 5.2 of Fluet and Weeks "Contification via
+;;; Dominators", which both the A_cont analysis and A_call analyses
+;;; cannot handle. In light of this, they present the maximal A_dom
+;;; analysis. In this case, F, G1, G2 and H all have the same
+;;; continuation.
+#+sb-devel
+(with-test (:name (:assignment-convert :fluet-weeks-5.2
+                                       :fails-on :sbcl))
+  (let ((converted '()))
+    (let ((fun (inspect-ir
+                '(lambda (b x y flag)
+                  (labels ((fm (n x flag1)
+                             (if flag1
+                                 (f (1- n) (1+ x))
+                                 (f (1+ n) (1- x))))
+                           (f (n x)
+                             (cond ((= flag 0)
+                                    (g1 (* 2 n) x))
+                                   ((= flag 1)
+                                    (g1 (* n x) x))
+                                   ((= flag 2)
+                                    (g2 (* 2 n) x))
+                                   ((= flag 3)
+                                    (g2 (* n x) x))))
+                           (g1 (n x)
+                             (h (* n x)))
+                           (g2 (n x)
+                             (h (- n x)))
+                           (h (y)
+                             (* y y)))
+                    (+ 2
+                       (fm x x t)
+                       (fm b y nil))))
+                (lambda (component)
+                  (dolist (lambda (sb-c::component-lambdas component))
+                    (dolist (lambda-let (sb-c::lambda-lets lambda))
+                      (when (sb-c::functional-kind-eq lambda-let sb-c::assignment)
+                        (push lambda-let converted))))))))
+      (assert (= (funcall fun 1 2 3 0) 102))
+      (assert (= (funcall fun 1 2 3 1) 147))
+      (assert (= (funcall fun 1 2 3 2) 7))
+      (assert (= (funcall fun 1 2 3 3) 6))
+      (assert (= (length converted) 4))))) ; F, G1, G2, H
+
 (with-test (:name :empty-special-bindings)
   (assert (not (find 'sb-c::%special-unbind
                      (ir-calls
