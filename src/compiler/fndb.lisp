@@ -2614,11 +2614,11 @@
 (defknown sb-impl::read-from-c-string/utf-8/lf (system-area-pointer t) simple-string
     (movable flushable fixed-args))
 
-(defknown sb-vm::simd-utf8-strlen (system-area-pointer) (values (or null index) index t)
+(defknown sb-vm::utf8-strlen (system-area-pointer) (values (or null index) index t)
     (movable flushable fixed-args))
 
-(defknown (sb-vm::simd-copy-utf8-sap-to-character-string
-           sb-vm::simd-copy-ascii-sap-to-character-string)
+(defknown (sb-vm::utf8-sap-to-character-string
+           sb-vm::ascii-sap-to-character-string)
     (system-area-pointer (simple-array character (*)) index)
     t
     (movable fixed-args))

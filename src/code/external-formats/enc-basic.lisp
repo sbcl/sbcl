@@ -618,8 +618,8 @@
   (def :crlf define-utf8-string/crlf utf8->string/crlf bytes-per-utf8-character/crlf simple-get-utf8-char/crlf))
 
 #+(and sb-unicode 64-bit little-endian
-       (not (or arm64 x86-64))) ;; have true simd definitions
-(defun sb-vm::simd-copy-utf8-to-character-string (start end string ibuf)
+       (not (or arm64 x86-64))) ;; have simd definitions
+(defun sb-vm::utf8-to-character-string (start end string ibuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects (string)
@@ -665,7 +665,7 @@
 
 ;;; No validations
 #+(and sb-unicode 64-bit little-endian (not (or arm64 x86-64)))
-(defun sb-vm::simd-copy-ascii-sap-to-character-string (sap string length)
+(defun sb-vm::ascii-sap-to-character-string (sap string length)
   (declare (index length)
            (simple-character-string string)
            (optimize speed (safety 0)))
@@ -699,7 +699,7 @@
                      (code-char (sap-ref-8 sap i)))))))
 
 #-(and sb-unicode 64-bit little-endian)
-(defun sb-vm::simd-copy-ascii-sap-to-character-string (sap string length)
+(defun sb-vm::ascii-sap-to-character-string (sap string length)
   (declare (index length)
            (simple-character-string string)
            (optimize speed (safety 0)))
@@ -707,7 +707,7 @@
         do (setf (aref string i) (code-char (sap-ref-8 sap i)))))
 
 #+(and sb-unicode 64-bit little-endian)
-(defun sb-vm::simd-copy-utf8-crlf-to-character-string-with-size (start end string ibuf size-buffer)
+(defun sb-vm::utf8-crlf-to-character-string-with-size (start end string ibuf size-buffer)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects (string size-buffer)
@@ -757,8 +757,8 @@
       size-offset)))
 
 #+(and sb-unicode 64-bit little-endian
-       (not (or arm64 x86-64))) ;; have true simd definitions
-(defun sb-vm::simd-copy-utf8-to-base-string (start end string ibuf)
+       (not (or arm64 x86-64))) ;; have simd definitions
+(defun sb-vm::utf8-to-base-string (start end string ibuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects (string)
@@ -900,9 +900,9 @@
     (do ()
         (())
       #+(and sb-unicode 64-bit little-endian)
-      (let ((new-index (sb-vm::simd-copy-utf8-to-character-string index end string (fd-stream-ibuf stream))))
+      (let ((new-index (sb-vm::utf8-to-character-string index end string (fd-stream-ibuf stream))))
         ;; Make sure to change this 1 whenever
-        ;; simd-copy-utf8-to-character-string starts processing more than
+        ;; utf8-to-character-string starts processing more than
         ;; just ascii characters.
         (fill size-buffer 1 :start index :end new-index)
         (setf index new-index))
@@ -945,7 +945,7 @@
         (())
       #+(and sb-unicode 64-bit little-endian)
       (setf index
-            (sb-vm::simd-copy-utf8-crlf-to-character-string-with-size index end string (fd-stream-ibuf stream) size-buffer))
+            (sb-vm::utf8-crlf-to-character-string-with-size index end string (fd-stream-ibuf stream) size-buffer))
       (let* ((ibuf (fd-stream-ibuf stream))
              (head (buffer-head ibuf))
              (tail (buffer-tail ibuf))
@@ -1009,26 +1009,26 @@
                    (go loop)))))
   (def fd-stream-read-sequence/utf-8-to-string
       (simple-array character (*))
-    sb-vm::simd-copy-utf8-to-character-string
+    sb-vm::utf8-to-character-string
     :lf)
   #+sb-unicode
   (def fd-stream-read-sequence/utf-8-to-base-string
     simple-base-string
-    sb-vm::simd-copy-utf8-to-base-string
+    sb-vm::utf8-to-base-string
     :lf)
   (def fd-stream-read-sequence/utf-8-crlf-to-character-string
       (simple-array character (*))
-    sb-vm::simd-copy-utf8-crlf-to-character-string
+    sb-vm::utf8-crlf-to-character-string
     :crlf)
   #+sb-unicode
   (def fd-stream-read-sequence/utf-8-crlf-to-base-string
     simple-base-string
-    sb-vm::simd-copy-utf8-crlf-to-base-string
+    sb-vm::utf8-crlf-to-base-string
     :crlf))
 
 #+(and sb-unicode 64-bit little-endian
        (not (or arm64 x86-64)))
-(defun sb-vm::simd-copy-character-string-to-utf8 (start end string obuf)
+(defun sb-vm::character-string-to-utf8 (start end string obuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects (string)
@@ -1081,7 +1081,7 @@
           (when (and (typep string '(simple-array character (*)))
                      (>= (- end start) 16))
             (multiple-value-bind (new-start newline)
-                (truly-the (values index fixnum &optional) (sb-vm::simd-copy-character-string-to-utf8 start end string obuf))
+                (truly-the (values index fixnum &optional) (sb-vm::character-string-to-utf8 start end string obuf))
               (setf start new-start)
               (when (>= newline 0)
                 (setf last-newline newline))))
@@ -1350,8 +1350,8 @@
   :handle-size nil)
 
 #+(and sb-unicode 64-bit little-endian
-       (not arm64)) ;; have true simd definitions or might be redefined with def-variant
-(defun sb-vm::simd-copy-utf8-crlf-to-base-string (start end string ibuf)
+       (not arm64)) ;; have simd definitions or might be redefined with def-variant
+(defun sb-vm::utf8-crlf-to-base-string (start end string ibuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects (string)
@@ -1390,8 +1390,8 @@
       (truly-the index string-offset))))
 
 #+(and sb-unicode 64-bit little-endian
-       (not arm64)) ;; have true simd definitions or might be redefined with def-variant
-(defun sb-vm::simd-copy-utf8-crlf-to-character-string (start end string ibuf)
+       (not arm64)) ;; have simd definitions or might be redefined with def-variant
+(defun sb-vm::utf8-crlf-to-character-string (start end string ibuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects (string)
@@ -1506,7 +1506,7 @@
   (zerop (rem (sap-int sap) sb-vm:n-word-bytes)))
 
 #-arm64
-(defun sb-vm::simd-utf8-strlen (sap)
+(defun sb-vm::utf8-strlen (sap)
   (declare (type system-area-pointer sap)
            (optimize speed (safety 0)))
   (macrolet ((return-if-not-cont (x)
@@ -1525,7 +1525,7 @@
        (let ((b0 (sap-ref-8 sap index)))
          (cond ((< b0 #x80)
                 (when (zerop b0)
-                  (return-from sb-vm::simd-utf8-strlen (values index index t)))
+                  (return-from sb-vm::utf8-strlen (values index index t)))
                 (incf index 1))
                (t
                 (return)))))
@@ -1578,7 +1578,7 @@
   (read-from-c-string/utf-8/lf sap element-type))
 
 #-arm64
-(defun sb-vm::simd-copy-utf8-sap-to-character-string (sap string byte-length)
+(defun sb-vm::utf8-sap-to-character-string (sap string byte-length)
   (declare (optimize speed (safety 0))
            (type system-area-pointer sap)
            (type index byte-length)
@@ -1619,7 +1619,7 @@
 (defun read-from-c-string/utf-8/lf (sap element-type)
   (declare (type system-area-pointer sap)
            (optimize (speed 3) (safety 0)))
-  (multiple-value-bind (char-length byte-length all-ascii) (sb-vm::simd-utf8-strlen sap)
+  (multiple-value-bind (char-length byte-length all-ascii) (sb-vm::utf8-strlen sap)
     (unless char-length
       (find-bad-utf8 sap))
     (let ((string
@@ -1629,11 +1629,11 @@
               (t (make-string char-length :element-type element-type)))))
       (if all-ascii
           (cond ((typep string '(array character))
-                 (sb-vm::simd-copy-ascii-sap-to-character-string sap string char-length))
+                 (sb-vm::ascii-sap-to-character-string sap string char-length))
                 (t
                  (with-pinned-objects (string)
                    (sb-impl::memcpy (vector-sap string) sap char-length))))
-          (sb-vm::simd-copy-utf8-sap-to-character-string sap string byte-length))
+          (sb-vm::utf8-sap-to-character-string sap string byte-length))
       string)))
 
 (declaim (ftype (sfunction ((simple-array character (*))) nil)
@@ -1647,9 +1647,9 @@
   (error "~s modified while validating UTF-8" string))
 
 (declaim (ftype (sfunction ((simple-array character (*))) (values (or null index) t))
-                simd-character-string-utf8-length))
+                character-string-utf8-length))
 #-arm64
-(defun simd-character-string-utf8-length (string)
+(defun character-string-utf8-length (string)
   (let* ((string-length (length string))
          (index 0))
     (declare (index index))
@@ -1663,7 +1663,7 @@
       (declare (index index))
       ;; ASCII-only
       (loop when (>= index string-length)
-            do (return-from simd-character-string-utf8-length (values index t))
+            do (return-from character-string-utf8-length (values index t))
             until (> (char-code (char string index)) 127)
             do (incf index))
       (let ((length index))
@@ -1676,14 +1676,14 @@
                             ((< bits 2048) 2)
                             ((< bits 65536)
                              (when (<= #xd800 bits #xdfff)
-                               (return-from simd-character-string-utf8-length (values nil nil)))
+                               (return-from character-string-utf8-length (values nil nil)))
                              3)
                             (t 4)))
                 (incf index)))
         (values length nil)))))
 
 #-arm64
-(defun sb-vm::simd-copy-character-string-to-ascii-byte-array (byte-array string length)
+(defun sb-vm::character-string-to-ascii-byte-array (byte-array string length)
   (declare (index length)
            (simple-character-string string)
            ((simple-array (unsigned-byte 8) (*)) byte-array)
@@ -1711,7 +1711,7 @@
                    (logand (char-code (aref string i)) #xFF)))))
 
 #-little-endian
-(defun sb-vm::simd-copy-character-string-to-utf8-byte-array (byte-array string length)
+(defun sb-vm::character-string-to-utf8-byte-array (byte-array string length)
   (declare ((simple-array character (*)) string)
            ((simple-array (unsigned-byte 8) (*)) byte-array)
            (optimize speed (safety 0)))
@@ -1742,7 +1742,7 @@
                       (incf index 4)))))))
 
 #+(and little-endian (not arm64))
-(defun sb-vm::simd-copy-character-string-to-utf8-byte-array (byte-array string length)
+(defun sb-vm::character-string-to-utf8-byte-array (byte-array string length)
   (declare ((simple-array character (*)) string)
            ((simple-array (unsigned-byte 8) (*)) byte-array)
            (optimize speed (safety 0)))
@@ -1791,12 +1791,12 @@
            (optimize speed (safety 0)))
   (cond ((base-string-p string) string)
         (t
-         (multiple-value-bind (buffer-length ascii-only) (simd-character-string-utf8-length string)
+         (multiple-value-bind (buffer-length ascii-only) (character-string-utf8-length string)
            (unless buffer-length
              (check-utf8-encoding string))
            (let ((buffer (make-array (1+ buffer-length) :element-type '(unsigned-byte 8)
                                                         :initial-element 0)))
              (if ascii-only
-                 (sb-vm::simd-copy-character-string-to-ascii-byte-array buffer string buffer-length)
-                 (sb-vm::simd-copy-character-string-to-utf8-byte-array buffer string buffer-length))
+                 (sb-vm::character-string-to-ascii-byte-array buffer string buffer-length)
+                 (sb-vm::character-string-to-utf8-byte-array buffer string buffer-length))
              buffer)))))

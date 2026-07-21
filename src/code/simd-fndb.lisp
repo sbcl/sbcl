@@ -40,4 +40,4 @@
     (sb-c::no-verify-arg-count))
 
 (declaim (ftype (sfunction ((simple-array character (*))) (values (or null index) t))
-                sb-impl::simd-character-string-utf8-length))
+                sb-impl::character-string-utf8-length))

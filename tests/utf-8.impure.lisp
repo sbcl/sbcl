@@ -56,9 +56,9 @@
     (let* ((length (length vector))
            (string (make-protected-array string-length 'character nil)))
       (unwind-protect
-           (progn (sb-vm::simd-copy-utf8-sap-to-character-string (sb-sys:vector-sap vector)
-                                                                 string
-                                                                 length)
+           (progn (sb-vm::utf8-sap-to-character-string (sb-sys:vector-sap vector)
+                                                       string
+                                                       length)
                   (copy-seq string))
 
         (free-protected-array string)))))
@@ -82,7 +82,7 @@
   string)
 
 (defun strlen (bytes)
-  (sb-vm::simd-utf8-strlen (sb-sys:vector-sap bytes)))
+  (sb-vm::utf8-strlen (sb-sys:vector-sap bytes)))
 (compile 'strlen)
 
 (with-test (:name :decode-test)
@@ -116,18 +116,18 @@
                                              (= strlen-bytes octet-length))
                                         (find #\Nul string))
                               (error "(strlen ~s) => ~a, ~a /= ~a, ~a" string strlen-chars strlen-bytes length octet-length)))
-                          (let ((utf-length (sb-impl::simd-character-string-utf8-length string)))
+                          (let ((utf-length (sb-impl::character-string-utf8-length string)))
                             (unless (= utf-length octet-length)
-                              (error "(sb-impl::simd-character-string-utf8-length ~s) => ~a /= ~a"
+                              (error "(sb-impl::character-string-utf8-length ~s) => ~a /= ~a"
                                      string utf-length octet-length))))
                      (free-protected-array bytes))))))
 
 (defun encode-test (string byte-length)
   (let ((byte-array (make-protected-array byte-length '(unsigned-byte 8) nil)))
     (unwind-protect
-         (progn (sb-vm::simd-copy-character-string-to-utf8-byte-array byte-array
-                                                                      string
-                                                                      byte-length)
+         (progn (sb-vm::character-string-to-utf8-byte-array byte-array
+                                                            string
+                                                            byte-length)
                 (copy-seq byte-array))
       (free-protected-array byte-array))))
 
@@ -150,9 +150,9 @@
 (defun encode-test.ascii (string byte-length)
   (let ((byte-array (make-protected-array byte-length '(unsigned-byte 8) nil)))
     (unwind-protect
-         (progn (sb-vm::simd-copy-character-string-to-ascii-byte-array byte-array
-                                                                      string
-                                                                      byte-length)
+         (progn (sb-vm::character-string-to-ascii-byte-array byte-array
+                                                             string
+                                                             byte-length)
                 (copy-seq byte-array))
       (free-protected-array byte-array))))
 
@@ -161,9 +161,9 @@
     (let* ((length (length vector))
            (string (make-protected-array string-length 'character nil)))
       (unwind-protect
-           (progn (sb-vm::simd-copy-ascii-sap-to-character-string (sb-sys:vector-sap vector)
-                                                                 string
-                                                                 length)
+           (progn (sb-vm::ascii-sap-to-character-string (sb-sys:vector-sap vector)
+                                                        string
+                                                        length)
                   (copy-seq string))
 
         (free-protected-array string)))))

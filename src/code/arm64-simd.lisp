@@ -524,7 +524,7 @@
       (inst cmp tmp-tn 127)
       (inst b :hi not-ascii-label))))
 
-(defun simd-copy-utf8-to-character-string (start end string ibuf)
+(defun utf8-to-character-string (start end string ibuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects-in-registers (string)
@@ -585,7 +585,7 @@
       (+ start copied))))
 
 #+sb-unicode
-(defun simd-copy-ascii-sap-to-character-string (sap string length)
+(defun ascii-sap-to-character-string (sap string length)
   (declare (optimize speed (safety 0))
            (system-area-pointer sap)
            (index length))
@@ -630,7 +630,7 @@
           do (setf (aref string i)
                    (code-char (sap-ref-8 sap i))))))
 
-(defun simd-copy-character-string-to-ascii-byte-array (byte-array string length)
+(defun character-string-to-ascii-byte-array (byte-array string length)
   (declare (index length)
            (simple-character-string string)
            ((simple-array (unsigned-byte 8) (*)) byte-array)
@@ -681,7 +681,7 @@
       DONE))
   byte-array)
 
-(defun simd-copy-utf8-to-base-string (start end string ibuf)
+(defun utf8-to-base-string (start end string ibuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects-in-registers (string)
@@ -729,7 +729,7 @@
             do (setf result (logior (ash result size) ub)))
       result)))
 
-(defun simd-copy-utf8-crlf-to-base-string (start end string ibuf)
+(defun utf8-crlf-to-base-string (start end string ibuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (let* ((head (sb-impl::buffer-head ibuf))
@@ -856,7 +856,7 @@
             (setf (sb-impl::buffer-head ibuf) new-head)
             (truly-the index (+ start copied)))))))
 
-(defun simd-copy-utf8-crlf-to-character-string (start end string ibuf)
+(defun utf8-crlf-to-character-string (start end string ibuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (let* ((head (sb-impl::buffer-head ibuf))
@@ -993,7 +993,7 @@
             (setf (sb-impl::buffer-head ibuf) new-head)
             (truly-the index (+ start (ash copied -2))))))))
 
-(defun simd-copy-character-string-to-utf8 (start end string obuf)
+(defun character-string-to-utf8 (start end string obuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects-in-registers (string)
@@ -1357,7 +1357,7 @@
       (inst lsr res found-bits 1)
       DONE)))
 
-(defun simd-utf8-strlen (sap)
+(defun utf8-strlen (sap)
   (declare (system-area-pointer sap)
            (optimize speed (safety 0)))
   (inline-vop
@@ -1402,7 +1402,7 @@
 
                (inst tbnz tmp 5 full)
 
-               ;;; 1/2 bytes
+;;; 1/2 bytes
 
                ;; Identify continuations
                (inst cmgt tmp3 c-c0 current :16b)
@@ -1584,7 +1584,7 @@
         (inst lsl char-length tmp-tn n-fixnum-tag-bits)
         DONE))))
 
-(defun sb-impl::simd-character-string-utf8-length (string)
+(defun sb-impl::character-string-utf8-length (string)
   (declare (optimize speed (safety 0)))
   (with-pinned-objects-in-registers (string)
     (inline-vop
@@ -1682,7 +1682,7 @@
       (inst add res length (lsl tmp n-fixnum-tag-bits))
       DONE)))
 
-(defun simd-copy-utf8-sap-to-character-string (sap string byte-array-length)
+(defun utf8-sap-to-character-string (sap string byte-array-length)
   (declare (index byte-array-length)
            (system-area-pointer sap)
            (simple-character-string string)
@@ -1963,7 +1963,7 @@
                    (incf byte-index 4))))
               (incf char-index))))))
 
-(defun simd-copy-character-string-to-utf8-byte-array (byte-array string byte-array-length)
+(defun character-string-to-utf8-byte-array (byte-array string byte-array-length)
   (declare (index byte-array-length)
            (simple-character-string string)
            ((simple-array (unsigned-byte 8) (*)) byte-array)

@@ -473,12 +473,12 @@
              (assert expected-byte-length)
              (sb-sys:with-pinned-objects (bytes)
                (multiple-value-bind (length byte-length ascii-p)
-                   (sb-vm::simd-utf8-strlen (sb-sys:sap+ (sb-sys:vector-sap bytes) offset))
+                   (sb-vm::utf8-strlen (sb-sys:sap+ (sb-sys:vector-sap bytes) offset))
                  (unless (and (eql expected-length length)
                               (eql expected-ascii-p ascii-p)
                               (or (not expected-length)
                                   (eql expected-byte-length byte-length)))
-                   (error "(sb-vm::simd-utf8-strlen (sb-sys:sap+ (sb-sys:vector-sap ~s) ~s)) => ~a, ~a, ~a; but ~a, ~a, ~a expected"
+                   (error "(sb-vm::utf8-strlen (sb-sys:sap+ (sb-sys:vector-sap ~s) ~s)) => ~a, ~a, ~a; but ~a, ~a, ~a expected"
                           bytes offset length byte-length ascii-p
                           expected-length expected-byte-length expected-ascii-p)))))))
     (test '(1 2 0 255 255) 2 t)
@@ -515,10 +515,10 @@
   (flet ((test (chars expected-length &optional expected-ascii-p)
            (let ((string (map 'string #'code-char chars)))
              (multiple-value-bind (length ascii-p)
-                 (sb-impl::simd-character-string-utf8-length string)
+                 (sb-impl::character-string-utf8-length string)
                (unless (and (eql expected-length length)
                             (eql expected-ascii-p ascii-p))
-                 (error "(sb-impl::simd-character-string-utf8-length ~a) => ~a, ~a; but ~a, ~a expected"
+                 (error "(sb-impl::character-string-utf8-length ~a) => ~a, ~a; but ~a, ~a expected"
                         string length ascii-p
                         expected-length expected-ascii-p))))))
     (test '(97 98 99 0) 4 t)

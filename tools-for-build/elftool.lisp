@@ -1586,10 +1586,10 @@ lisp_fun_linkage_space: .zero ~:*~D
              (member str '(sb-vm::simd-reverse32 sb-vm::simd-reverse8
                            sb-vm::simd-nreverse32 sb-vm::simd-nreverse8
                            #+sb-unicode
-                           sb-vm::simd-copy-utf8-crlf-to-character-string
+                           sb-vm::utf8-crlf-to-character-string
                            #+sb-unicode
-                           sb-vm::simd-copy-utf8-crlf-to-base-string
-                           sb-vm::simd-copy-character-string-to-utf8
+                           sb-vm::utf8-crlf-to-base-string
+                           sb-vm::character-string-to-utf8
                            sb-vm::simd-position32 sb-vm::simd-position32-from-end
                            sb-vm::simd-position8 sb-vm::simd-position8-from-end)
                      :test 'string=)))))))

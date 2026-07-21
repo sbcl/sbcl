@@ -642,7 +642,7 @@
       DONE)))
 
 #+sb-unicode
-(defun simd-copy-utf8-to-character-string (start end string ibuf)
+(defun utf8-to-character-string (start end string ibuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects (string)
@@ -729,7 +729,7 @@
       (+ start copied))))
 
 #+sb-unicode
-(defun simd-copy-ascii-sap-to-character-string (sap string length)
+(defun ascii-sap-to-character-string (sap string length)
   (declare (optimize speed (safety 0))
            (system-area-pointer sap)
            (index length))
@@ -803,7 +803,7 @@
           do (setf (aref string i)
                    (code-char (sap-ref-8 sap i))))))
 
-(def-variant simd-copy-character-string-to-ascii-byte-array :avx2 (byte-array string length)
+(def-variant character-string-to-ascii-byte-array :avx2 (byte-array string length)
   (declare (index length)
            (simple-character-string string)
            ((simple-array (unsigned-byte 8) (*)) byte-array)
@@ -858,7 +858,7 @@
       (inst vzeroupper))))
 
 #+sb-unicode
-(defun simd-copy-utf8-to-base-string (start end string ibuf)
+(defun utf8-to-base-string (start end string ibuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects (string)
@@ -904,7 +904,7 @@
       (+ start copied))))
 
 #+sb-unicode
-(def-variant simd-copy-utf8-crlf-to-base-string :ssse3+popcnt (start end string ibuf)
+(def-variant utf8-crlf-to-base-string :ssse3+popcnt (start end string ibuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (let* ((head (sb-impl::buffer-head ibuf))
@@ -1015,7 +1015,7 @@
             (truly-the index (+ start copied)))))))
 
 #+sb-unicode
-(def-variant simd-copy-utf8-crlf-to-character-string :ssse3+popcnt (start end string ibuf)
+(def-variant utf8-crlf-to-character-string :ssse3+popcnt (start end string ibuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (let* ((head (sb-impl::buffer-head ibuf))
@@ -1153,7 +1153,7 @@
             (setf (sb-impl::buffer-head ibuf) new-head)
             (truly-the index (+ start (truncate copied 4))))))))
 
-(defun simd-copy-character-string-to-utf8 (start end string obuf)
+(defun character-string-to-utf8 (start end string obuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects (string)
@@ -1281,7 +1281,7 @@
                     (truly-the index (+ start last-newline))
                     -1))))))
 
-(def-variant simd-copy-character-string-to-utf8 :avx2 (start end string obuf)
+(def-variant character-string-to-utf8 :avx2 (start end string obuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects (string)
@@ -1928,7 +1928,7 @@
       (inst shr res 1)
       DONE)))
 
-(def-variant simd-utf8-strlen :avx2 (sap)
+(def-variant utf8-strlen :avx2 (sap)
   (declare (system-area-pointer sap)
            (optimize speed (safety 0)))
   (inline-vop
@@ -2197,7 +2197,7 @@
         DONE
         (inst vzeroupper)))))
 
-(def-variant sb-impl::simd-character-string-utf8-length :avx2 (string)
+(def-variant sb-impl::character-string-utf8-length :avx2 (string)
   (with-pinned-objects (string)
     (inline-vop
         (((ptr sap-reg t) (vector-sap string))
@@ -2308,7 +2308,7 @@
 
       DONE)))
 
-(def-variant simd-copy-utf8-sap-to-character-string :avx2 (sap string byte-array-length)
+(def-variant utf8-sap-to-character-string :avx2 (sap string byte-array-length)
   (declare (index byte-array-length)
            (system-area-pointer sap)
            (simple-character-string string)
@@ -2592,7 +2592,7 @@
                    (incf byte-index 4))))
               (incf char-index))))))
 
-(def-variant simd-copy-character-string-to-utf8-byte-array :avx2 (byte-array string byte-array-length)
+(def-variant character-string-to-utf8-byte-array :avx2 (byte-array string byte-array-length)
   (declare (index byte-array-length)
            (simple-character-string string)
            ((simple-array (unsigned-byte 8) (*)) byte-array)
