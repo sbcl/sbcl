@@ -335,27 +335,17 @@
   (:translate integer-length)
   (:note #.(format nil "inline (signed-byte ~a) integer-length" n-machine-word-bits))
   (:policy :fast-safe)
-  (:args (arg :scs (signed-reg) :target shift))
+  (:args (arg :scs (signed-reg)))
   (:arg-types signed-num)
-  (:results (res :scs (any-reg)))
-  (:result-types positive-fixnum)
-  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) shift)
-  (:generator 30
-    (let ((loop (gen-label))
-          (test (gen-label)))
-      (move shift arg)
-      (move res zero-tn)
-      (inst bge shift zero-tn test)
-
-      (inst s_xori shift shift -1)
-      (inst j test)
-
-      (emit-label loop)
-      (inst srli.d shift shift 1)
-      (inst addi.d res res (fixnumize 1))
-
-      (emit-label test)
-      (inst bne shift zero-tn loop))))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:generator 5
+    (inst srai.d temp arg 63) ; blast the sign bit across the word
+    (inst xor temp temp arg)
+    (inst clz.d res temp)
+    (inst li temp 64)
+    (inst sub.d res temp res)))
 
 (define-vop (unsigned-byte-64-count)
   (:translate logcount)

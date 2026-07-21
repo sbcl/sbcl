@@ -584,7 +584,12 @@
   (define-la-am-instruction llacq.w #b0011100001010111100000)
   (define-la-am-instruction screl.w #b0011100001010111100001)
   (define-la-am-instruction llacq.d #b0011100001010111100010)
-  (define-la-am-instruction screl.d #b0011100001010111100011))
+  (define-la-am-instruction screl.d #b0011100001010111100011)
+  ;; Piggybacking on the atomic memory ops even though these aren't such.
+  (define-la-am-instruction ctz.w   #b0000000000000000000111)
+  (define-la-am-instruction ctz.d   #b0000000000000000001011)
+  (define-la-am-instruction clz.w   #b0000000000000000000101)
+  (define-la-am-instruction clz.d   #b0000000000000000001001))
 
 (define-instruction-macro fstore (&optional format fd rj offset)
   `(case ,format
