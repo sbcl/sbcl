@@ -524,65 +524,302 @@
       (inst cmp tmp-tn 127)
       (inst b :hi not-ascii-label))))
 
-(defun utf8-to-character-string (start end string ibuf)
-  (declare (type index start end)
-           (optimize speed (safety 0)))
-  (with-pinned-objects-in-registers (string)
-    (let* ((head (sb-impl::buffer-head ibuf))
-           (tail (sb-impl::buffer-tail ibuf))
-           (left (- end start))
-           (result-characters (logand left -16))
-           (string-bytes (logand (- tail head) -16))
-           (n (min result-characters string-bytes))
-           (string-start (truly-the fixnum (* start 4)))
-           (copied
-             (inline-vop (((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
-                          ((byte-array sap-reg t))
-                          ((32-bit-array sap-reg t) (vector-sap string))
-                          ((string-start any-reg) string-start)
-                          ((end unsigned-reg))
-                          ((head any-reg) head)
-                          ((n any-reg) n)
-                          ((bytes complex-double-reg))
-                          ((16-bits complex-double-reg))
-                          ((16-bits-2 complex-double-reg))
-                          ((32-bits complex-double-reg))
-                          ((32-bits-2 complex-double-reg))
-                          ((32-bits-3 complex-double-reg))
-                          ((32-bits-4 complex-double-reg))
-                          ((temp complex-double-reg)))
-                 ((res unsigned-reg unsigned-num))
-               (inst add byte-array* byte-array* (lsr head 1))
-               (inst mov byte-array byte-array*)
-               (inst add end byte-array* (lsr n 1))
-               (inst add 32-bit-array 32-bit-array (lsr string-start 1))
-               (inst b start)
+(make-defs ((($suffix $sized)
+             (-sized t)
+             (|| nil)))
+ (defun utf8-to-character-string$suffix (start end string ibuf ($when $sized
+                                                                size-buffer))
+   (declare (type index start end)
+            (optimize speed (safety 0))
+            ($when $sized
+             (sb-impl::ansi-stream-csize-buffer size-buffer)))
+   (with-pinned-objects-in-registers (string ($when $sized size-buffer))
+     (let* ((head (sb-impl::buffer-head ibuf))
+            (tail (sb-impl::buffer-tail ibuf))
+            (left (- end start))
+            (string-end (- left (/ 32 4)))
+            (byte-end (- tail head 16)))
+       (multiple-value-bind (copied written)
+           (inline-vop (((byte-start any-reg) head)
+                        ((string-start any-reg) start)
+                        ((byte-end any-reg) byte-end)
+                        ((string-end any-reg) string-end)
+                        ((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
+                        ((byte-array sap-reg t))
+                        ((string* sap-reg t) (vector-sap string))
+                        ((string sap-reg t))
+                        ($when $sized
+                         ((size-buffer sap-reg t) (vector-sap size-buffer)))
 
-               LOOP
-               (inst ldr bytes (@ byte-array))
-               (check-ascii bytes temp DONE)
+                        ((index unsigned-reg t :from (:argument 1)))
+                        ((suffix unsigned-reg t :from (:argument 1)))
+                        ((char-count unsigned-reg t))
+                        ((full-table any-reg t))
 
-               (inst add byte-array byte-array 16)
+                        ((bytes complex-double-reg))
+                        ((tbl1         complex-double-reg))
+                        ((tbl2         complex-double-reg))
+                        ((tbl3         complex-double-reg))
+                        ((tbl4         complex-double-reg))
 
-               (inst ushll 16-bits :8h bytes :8b)
-               (inst ushll 32-bits :4s 16-bits :4h)
+                        ((nibble-mask  complex-double-reg))
+                        ((twos         complex-double-reg))
+                        ((c-c1         complex-double-reg))
+                        ((c-c0         complex-double-reg))
+                        ((c-ff complex-double-reg))
+                        ((c-4 complex-double-reg))
+                        ((errors       complex-double-reg))
+                        ((powers double-reg))
+                        ((prev         complex-double-reg))
+                        ((prev-len     complex-double-reg))
 
-               (inst ushll2 16-bits-2 :8h bytes :16b)
-               (inst ushll2 32-bits-2 :4s 16-bits :8h)
+                        ((temp1         complex-double-reg))
+                        ((temp2         complex-double-reg))
+                        ((temp3         complex-double-reg))
+                        ((temp4         complex-double-reg))
 
-               (inst ushll 32-bits-3 :4s 16-bits-2 :4h)
-               (inst ushll2 32-bits-4 :4s 16-bits-2 :8h)
-               (inst stp 32-bits 32-bits-2 (@ 32-bit-array 64 :post-index))
-               (inst stp 32-bits-3 32-bits-4 (@ 32-bit-array -32))
+                        ((shuf-low complex-double-reg t :offset 1))
+                        ((shuf-high complex-double-reg t :offset 2))
+                        ((chars-low complex-double-reg t :offset 5))
+                        ((chars-high complex-double-reg t :offset 6))
+                        ((tag-clear complex-double-reg))
+                        ((s1 complex-double-reg t :offset 8))
+                        ((s2 complex-double-reg t :offset 9))
+                        ($when $sized
+                               ((length1 complex-double-reg t :offset 10))
+                               ((length2 complex-double-reg t :offset 11))))
+               ((copied unsigned-reg positive-fixnum)
+                (written unsigned-reg positive-fixnum))
 
-               start
-               (inst cmp byte-array end)
-               (inst b :lt LOOP)
 
-               DONE
-               (inst sub res byte-array byte-array*))))
-      (setf (sb-impl::buffer-head ibuf) (+ head copied))
-      (+ start copied))))
+             (inst add byte-array* byte-array* (lsr byte-start 1))
+             (inst mov byte-array byte-array*)
+             (inst add byte-end byte-array* (lsr byte-end 1))
+
+             (inst add string-end string* (lsl string-end (- 2 n-fixnum-tag-bits)))
+             (inst add string string* (lsl string-start (- 2 n-fixnum-tag-bits)))
+             ($when $sized
+               (inst add size-buffer size-buffer (lsr string-start 1))
+               (inst movi twos 1 :16b))
+
+             (inst b start)
+
+             ASCII-LOOP
+             (inst ldr bytes (@ byte-array))
+             (inst umaxv temp1 bytes :16b)
+             (inst umov tmp-tn temp1 0 :b)
+             (inst tbnz tmp-tn 7 NOT-ASCII)
+
+             (inst add byte-array byte-array 16)
+
+             (inst ushll temp1 :8h bytes :8b)
+             (inst ushll temp2 :4s temp1 :4h)
+             (inst ushll2 temp4 :4s temp1 :8h)
+
+             (inst stp temp2 temp4 (@ string 64 :post-index))
+
+             (inst ushll2 temp1 :8h bytes :16b)
+             (inst ushll temp2 :4s temp1 :4h)
+             (inst ushll2 temp4 :4s temp1 :8h)
+
+             (inst stp temp2 temp4 (@ string -32))
+             ($when $sized
+                    (inst str twos (@ size-buffer 16 :post-index))) ;; actually ones
+
+             start
+             (inst cmp byte-array byte-end)
+             (inst b :ge DONE)
+             (inst cmp string string-end)
+             (inst b :ge DONE)
+             (inst b ASCII-LOOP)
+
+             NOT-ASCII
+             (inst movi nibble-mask #x0f :16b)
+             (inst movi twos 2 :16b)
+
+             (load-inline-constant tbl1 :oword #x38060001000000000000000000000000)
+             (load-inline-constant tbl2 :oword #x2020242020202020202020100000010B)
+             (load-inline-constant tbl3 :oword #x202020203535332B2020202020202020)
+             (load-inline-constant tbl4 :oword #x08040202000000000000000000000000)
+
+             (inst movi errors   0 :16b)
+             (inst movi prev     0 :16b)
+             (inst movi prev-len 0 :16b)
+             (inst movi c-c0 #xc0 :16b)
+             (inst movi c-c1 #xc1 :16b)
+             (inst movi c-ff #xFF :8h)
+             (inst movi c-4 4 :4s)
+             (inst mov suffix 0)
+
+             ($when $sized
+              (inst movi length1 4 :16b)
+              (load-inline-constant length2 :oword #x01010101010101020202020303030303))
+
+             (load-inline-constant powers :qword #x8040201008040201)
+
+             (load-inline-constant tag-clear :oword #x070F1F1F3F3F3F3F7F7F7F7F7F7F7F7F)
+             (load-inline-constant full-table (coerce (loop for index below (ash 1 10)
+                                                            for low-index = (ldb (byte 8 0) index)
+                                                            for suffix = (ldb (byte 2 8) index)
+                                                            append (let ((starts (loop for i to 7
+                                                                                       when (logbitp i low-index)
+                                                                                       collect i)))
+                                                                     (loop for lane below 8
+                                                                           for start = (pop starts)
+                                                                           for next = (car starts)
+
+                                                                           for sources = (when start
+                                                                                           (loop for i from (1- (or next
+                                                                                                                    (+ suffix 8))) downto start
+                                                                                                 collect i))
+                                                                           append (loop for byte below 4
+                                                                                        collect (or (pop sources) #xFF)))))
+                                                      '(vector (unsigned-byte 8))))
+
+             (flet ((validate ()
+                      (assemble ()
+                        ;; The Keiser, Lemire algorithm
+                        (inst ext temp1 prev bytes 15 :16b)
+                        (inst ushr temp2 temp1 4 :16b)
+                        (inst and temp3 temp1 nibble-mask :16b)
+                        (inst ushr temp4 bytes 4 :16b)
+
+                        (inst tbl temp2 (list tbl1) temp2 :16b)
+                        (inst tbl temp3 (list tbl2) temp3 :16b)
+                        (inst tbl temp4 (list tbl3) temp4 :16b)
+
+                        (inst and temp2 temp2 temp3 :16b)
+                        (inst and temp2 temp2 temp4 :16b)
+                        (inst orr errors errors temp2 :16b)
+
+                        (inst ushr temp1 bytes 4 :16b)
+                        (inst tbl temp1 (list tbl4) temp1 :16b)
+
+                        (inst ext temp2 prev-len temp1 15 :16b)
+                        (inst ext temp3 prev-len temp1 14 :16b)
+                        (inst ext temp4 prev-len temp1 13 :16b)
+
+                        (inst ushr temp2 temp2 1 :16b)
+                        (inst ushr temp3 temp3 2 :16b)
+                        (inst ushr temp4 temp4 3 :16b)
+
+                        (inst orr temp2 temp2 temp3 :16b)
+                        (inst orr temp2 temp2 temp4 :16b)
+
+                        (inst cmgt temp3 c-c0 bytes :16b) ;; continuations
+
+                        (inst cmtst temp4 temp2 temp2 :16b)
+
+                        (inst eor temp4 temp3 temp4 :16b)
+                        (inst orr errors errors temp4 :16b)
+
+                        (inst umaxv temp4 errors :16b)
+                        (inst umov tmp-tn temp4 0 :b)
+                        (inst cbnz tmp-tn ERROR)
+
+                        ;; convert-full consumes only 8
+                        (inst ext prev-len prev-len temp1 8 :16b)
+                        (inst ext prev prev bytes 8 :16b)
+
+                        VALIDATED))
+                    (convert-full ()
+                      ;; Process the leading bytes in the first 8 bytes, loading 16 bytes
+                      ;; so that the last leading byte might drag in 3 more bytes
+
+                      ;; Identify leading bytes
+                      (inst cmge temp1 bytes c-c0 :16b)
+
+                      ;; Turn them into an 8 bit index
+                      (inst and temp2 temp1 powers :8b)
+                      (inst addv temp3 temp2 :8b)
+                      (inst umov index temp3 0 :b)
+
+                      ;; Need to know where the last leading byte ends
+                      (inst umov suffix temp1 1 :d)
+                      ;; Count the number of bytes to the next leading byte, turning it into a 2 bit suffix
+                      (inst rbit suffix suffix)
+                      (inst clz suffix suffix)
+                      ;; Bytes to bits
+                      (inst lsr suffix suffix 3)
+
+                      ;; Add the size of the last character, ensuring that only 2 bits are added
+                      (inst bfm index suffix 56 1)
+
+                      (inst add tmp-tn full-table (lsl index 5))
+                      (inst ld1 (list shuf-low shuf-high) (@ tmp-tn) :16b)
+
+                      (inst addv temp2 temp1 :8b)
+                      ;; A negated number of produced characters
+                      (inst smov char-count temp2 0 :b)
+
+                      ;; Use the high 4 bits of each byte to get an and-mask that
+                      ;; will clear their tags
+                      (inst ushr temp1 bytes 4 :16b)
+                      (inst tbl temp1 (list tag-clear) temp1 :16b)
+                      (inst and bytes bytes temp1 :16b)
+
+                      ;; Shuffle the bytes into 4-byte lanes
+                      (inst tbl chars-low (list bytes) shuf-low :16b)
+                      (inst tbl chars-high (list bytes) shuf-high :16b)
+
+                      (flet ((decode-lane (chars)
+                               ;; Perform
+                               ;; A + B<<6 + C<<12 + D<<18
+                               ;; =>
+                               ;; A + B<<6 + ((C + D<<6) << 12)
+
+                               ;; [D, 0, B, 0]
+                               (inst bic s1 chars c-ff :16b)
+                               ;; [0, C, 0, A]
+                               (inst and s2 chars c-ff :16b)
+                               ;; Combine into two 12-bit blocks per 32-bit lane: [L1, L0]
+                               (inst usra s2 s1 2 :8h)
+                               ;; Shift L0 left by 4, leave L1 alone: [L1, L0 << 4]
+                               (inst ushl s2 s2 c-4 :8h)
+                               ;; Shift each 32-bit lane right by 4
+                               (inst ushr chars s2 4 :4s)))
+
+                        (decode-lane chars-low)
+                        (decode-lane chars-high)
+                        (inst st1 (list chars-low chars-high) (@ string) :16b))
+
+
+                      (inst add byte-array byte-array 8)
+                      (inst sub string string (lsl char-count 2))
+                      ($when $sized
+                             (inst clz chars-low chars-low :4s)
+                             (inst clz chars-high chars-high :4s)
+                             (inst uzp1 temp2 chars-low chars-high :8h)
+                             (inst xtn temp2 temp2 :8b)
+                             (inst tbl temp2 (list length1 length2) temp2 :8b)
+                             (inst str temp2 (@ size-buffer) :d)
+                             (inst sub size-buffer size-buffer char-count))))
+               (assemble ()
+                 FULL-LOOP
+                 (inst ldr bytes (@ byte-array))
+                 (validate)
+                 ;; (convert-full)
+                 ;; (inst cmp byte-array byte-end)
+                 ;; (inst b :ge FULL-DONE)
+                 ;; (inst cmp string string-end)
+                 ;; (inst b :ge FULL-DONE)
+                 (convert-full)
+                 (inst cmp byte-array byte-end)
+                 (inst b :ge FULL-DONE)
+                 (inst cmp string string-end)
+                 (inst b :ge FULL-DONE)
+                 (inst b FULL-LOOP)))
+
+             ERROR
+             FULL-DONE
+
+             (inst add byte-array byte-array suffix) ;; strip any consumed continuations bytes
+             DONE
+             (inst sub copied byte-array byte-array*)
+             (inst sub written string string*)
+             (inst lsr written written 2))
+         (setf (sb-impl::buffer-head ibuf) (+ head copied))
+         (truly-the index written))))))
 
 #+sb-unicode
 (defun ascii-sap-to-character-string (sap string length)

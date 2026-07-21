@@ -900,10 +900,12 @@
     (do ()
         (())
       #+(and sb-unicode 64-bit little-endian)
-      (let ((new-index (sb-vm::utf8-to-character-string index end string (fd-stream-ibuf stream))))
+      (let ((new-index #+arm64 (sb-vm::utf8-to-character-string-sized index end string (fd-stream-ibuf stream) size-buffer)
+                       #-arm64 (sb-vm::utf8-to-character-string index end string (fd-stream-ibuf stream))))
         ;; Make sure to change this 1 whenever
         ;; utf8-to-character-string starts processing more than
         ;; just ascii characters.
+        #-arm64
         (fill size-buffer 1 :start index :end new-index)
         (setf index new-index))
       (let* ((ibuf (fd-stream-ibuf stream))
