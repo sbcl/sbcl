@@ -1383,7 +1383,8 @@
        ((tmp1         complex-double-reg))
        ((tmp2         complex-double-reg))
        ((tmp3         complex-double-reg))
-       ((tmp4         complex-double-reg)))
+       ((tmp4         complex-double-reg))
+       ((cont complex-double-reg)))
 
       ((char-length descriptor-reg t :from :load)
        (byte-length unsigned-reg positive-fixnum :from :load)
@@ -1398,12 +1399,16 @@
 
                (inst ext tmp1 prev current 15 :16b)
 
+               ;; Identify continuations
+               (inst cmgt cont c-c0 current :16b)
+
+               (inst addv tmp3 cont :16b)
+               (inst smov tmp-tn tmp3 0 :b)
+               (inst sub total-conts total-conts tmp-tn)
+
                (inst tbnz tmp 5 full)
 
                ;; 1/2 bytes
-
-               ;; Identify continuations
-               (inst cmgt tmp3 c-c0 current :16b)
 
                ;; Identify leading non-ascii bytes, shifted left by
                ;; one byte, with the previous byte shifted in
@@ -1413,7 +1418,7 @@
 
                ;; Continuations must follow leading bytes,
                ;; they must align with the shifted input
-               (inst eor tmp1 tmp1 tmp3 :16b) ;; errors 1
+               (inst eor tmp1 tmp1 cont :16b) ;; errors 1
 
                ;; Find #xC0 or #xC1, which are overlong
                (inst cmhs tmp2 current c-c0 :16b) ;; >= c0
@@ -1422,9 +1427,6 @@
                (inst orr tmp1 tmp1 tmp2 :16b) ;; combine errors
                (inst orr errors errors tmp1 :16b)
 
-               (inst addv tmp3 tmp3 :16b)
-               (inst smov tmp tmp3 0 :b)
-               (inst sub total-conts total-conts tmp)
                (inst and prev-len tmp4 twos :16b)
 
                (inst b validated)
@@ -1457,18 +1459,11 @@
                (inst orr tmp2 tmp2 tmp3 :16b)
                (inst orr tmp2 tmp2 tmp4 :16b)
 
-               (inst ushr tmp3 current 6 :16b)
-               (inst cmeq tmp3 tmp3 twos :16b)
-
                (inst cmtst tmp4 tmp2 tmp2 :16b)
 
-               (inst eor tmp4 tmp3 tmp4 :16b)
+               (inst eor tmp4 cont tmp4 :16b)
                (inst orr errors errors tmp4 :16b)
 
-               ;; Subtract continuations
-               (inst addv tmp4 tmp3 :16b)
-               (inst smov tmp tmp4 0 :b)
-               (inst sub total-conts total-conts tmp)
                (unless last
                  (inst mov prev-len tmp1 :16b))
                VALIDATED)))
