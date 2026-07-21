@@ -19,19 +19,20 @@
     ((:arg symbol (descriptor-reg) l0-offset)
      (:temp free-tls-index (any-reg) l1-offset)
      (:temp temp (non-descriptor-reg) nl1-offset)
+     (:temp const (non-descriptor-reg) nl2-offset)
      (:res tls-index (unsigned-reg) nl0-offset))
   (inst addi.d free-tls-index null-tn (+ (static-symbol-offset '*free-tls-index*)
                                        (ash symbol-value-slot word-shift)
                                        (- other-pointer-lowtag)))
   (pseudo-atomic (temp)
     ACQUIRE-LOCK
-    (inst li temp 1)
-    (inst slli.d temp temp (1- n-word-bits))
+    (inst li const 1)
+    (inst slli.d const const (1- n-word-bits))
     WITH-LOCK-BIT
     (loadw tls-index free-tls-index)
     ;; The MSB (i.e. sign) is the semaphore.
     (inst blt tls-index zero-tn WITH-LOCK-BIT)
-    (inst amor_db.d temp temp free-tls-index)
+    (inst amor_db.d temp const free-tls-index)
     (inst bne tls-index temp ACQUIRE-LOCK)
 
     ;; With the spinlock now held, see if the symbol's tls-index has
