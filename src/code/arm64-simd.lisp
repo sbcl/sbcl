@@ -815,37 +815,36 @@
                 (inst sli temp temp2 8 :8h)
 
                 ;; Count matches
-                (inst ushr temp3 temp 7 :16b)
-                (inst addv temp2 temp3 :8b)
-                (inst fmov count (reg-in-sc temp2 'single-reg))
+                (inst addv temp2 temp :8b)
+                (inst smov count temp2 0 :b)
 
                 ;; bit-mask has powers of two for each byte index,
                 ;; adding them together will produce an 8-bit mask.
                 (inst and temp2 temp bit-mask :16b)
 
-                (inst addv temp temp2 :8b)
-                (inst fmov tmp-tn (reg-in-sc temp 'single-reg))
+                (inst addv temp3 temp2 :8b)
+                (inst umov tmp-tn temp3 0 :b)
                 (inst ldr shuffle-mask (@ shuffle-table (lsl tmp-tn 3)) :d)
-                (inst tbl temp (list bytes) shuffle-mask :8b)
-                (inst str temp (@ char-array 8 :post-index) :d)
-                (inst sub char-array char-array count)
+                (inst tbl temp3 (list bytes) shuffle-mask :8b)
+                (inst str temp3 (@ char-array 8 :post-index) :d)
+                (inst add char-array char-array count)
 
                 ;; Second half
 
                 ;; Count matches
-                (inst ins temp3 0 temp3 1 :d)
+                (inst ins temp3 0 temp 1 :d)
                 (inst addv temp3 temp3 :8b)
-                (inst fmov count (reg-in-sc temp3 'single-reg))
+                (inst smov count temp3 0 :b)
 
                 (inst ins temp2 0 temp2 1 :d)
                 (inst addv temp2 temp2 :8b)
-                (inst fmov tmp-tn (reg-in-sc temp2 'single-reg))
+                (inst umov tmp-tn temp2 0 :b)
 
                 (inst ldr shuffle-mask2 (@ shuffle-table (lsl tmp-tn 3)) :d)
                 (inst ins bytes 0 bytes 1 :d)
                 (inst tbl temp (list bytes) shuffle-mask2 :8b)
                 (inst str temp (@ char-array 8 :post-index) :d)
-                (inst sub char-array char-array count)
+                (inst add char-array char-array count)
 
                 (inst cmp byte-array end)
                 (inst b :lt LOOP)
@@ -943,36 +942,35 @@
                 (inst sli temp temp2 8 :8h)
 
                 ;; Count matches
-                (inst ushr temp3 temp 7 :16b)
-                (inst addv temp2 temp3 :8b)
-                (inst fmov count (reg-in-sc temp2 'single-reg))
+                (inst addv temp2 temp :8b)
+                (inst smov count temp2 0 :b)
 
                 ;; bit-mask has powers of two for each byte index,
                 ;; adding them together will produce an 8-bit mask.
                 (inst and temp2 temp bit-mask :16b)
 
-                (inst addv temp temp2 :8b)
-                (inst fmov tmp-tn (reg-in-sc temp 'single-reg))
+                (inst addv temp3 temp2 :8b)
+                (inst umov tmp-tn temp3 0 :b)
                 (inst ldr shuffle-mask (@ shuffle-table (lsl tmp-tn 3)) :d)
-                (inst tbl temp (list bytes) shuffle-mask :8b)
+                (inst tbl temp3 (list bytes) shuffle-mask :8b)
 
                 ;; Widen
-                (inst ushll 16-bits :8h temp :8b)
+                (inst ushll 16-bits :8h temp3 :8b)
                 (inst ushll 32-bits :4s 16-bits :4h)
                 (inst ushll2 32-bits-2 :4s 16-bits :8h)
                 (inst stp 32-bits 32-bits-2 (@ char-array 32 :post-index))
-                (inst sub char-array char-array (lsl count 2))
+                (inst add char-array char-array (lsl count 2))
 
                 ;; Second half
 
                 ;; Count matches
-                (inst ins temp3 0 temp3 1 :d)
+                (inst ins temp3 0 temp 1 :d)
                 (inst addv temp3 temp3 :8b)
-                (inst fmov count (reg-in-sc temp3 'single-reg))
+                (inst smov count temp3 0 :b)
 
                 (inst ins temp2 0 temp2 1 :d)
                 (inst addv temp2 temp2 :8b)
-                (inst fmov tmp-tn (reg-in-sc temp2 'single-reg))
+                (inst umov tmp-tn temp2 0 :b)
 
                 (inst ldr shuffle-mask2 (@ shuffle-table (lsl tmp-tn 3)) :d)
                 (inst ins bytes 0 bytes 1 :d)
@@ -982,7 +980,7 @@
                 (inst ushll 32-bits :4s 16-bits :4h)
                 (inst ushll2 32-bits-2 :4s 16-bits :8h)
                 (inst stp 32-bits 32-bits-2 (@ char-array 32 :post-index))
-                (inst sub char-array char-array (lsl count 2))
+                (inst add char-array char-array (lsl count 2))
 
                 (inst cmp byte-array end)
                 (inst b :lt LOOP)
@@ -1402,7 +1400,7 @@
 
                (inst tbnz tmp 5 full)
 
-;;; 1/2 bytes
+               ;; 1/2 bytes
 
                ;; Identify continuations
                (inst cmgt tmp3 c-c0 current :16b)
