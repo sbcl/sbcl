@@ -2867,6 +2867,16 @@ be submitted as a \\CDR")
 
            "MAP-PACKED-XREF-DATA" "MAP-SIMPLE-FUNS"))
 
+#+adaptive-conset
+(defpackage "SB-INTEGER-SPARSE-SET"
+  (:use "CL" "SB-INT" "SB-EXT")
+  (:import-from "SB-C" "INSERT-ARRAY-BOUNDS-CHECKS")
+  (:export "MAKE-INT-SSET" "COPY-INT-SSET"
+           "DO-INT-SSET-ELEMENTS" "INT-SSET="
+           "INT-SSET-ADJOIN" "INT-SSET-DELETE" "INT-SSET-MEMBER"
+           "INT-SSET-UNION" "INT-SSET-INTERSECTION" "INT-SSET-DIFFERENCE"
+           "INT-SSET-EMPTY" "INT-SSET-COUNT"))
+
 (defpackage "SB-REGALLOC"
   (:documentation "private: implementation of the compiler's register allocator")
   (:use "CL" "SB-EXT" "SB-INT" "SB-KERNEL" "SB-SYS" "SB-C")

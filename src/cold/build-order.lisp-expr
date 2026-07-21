@@ -199,6 +199,7 @@
  ("src/code/specializable-array" :not-target)
 
  ("src/compiler/sset" :c-headers)
+ #+adaptive-conset ("src/compiler/int-sset" :not-host)
  ;; for e.g. BLOCK-ANNOTATION, needed by "compiler/vop"
  ("src/compiler/node" :c-headers :block-compile)
  ;; This has ASSEMBLY-UNIT-related stuff needed by core.lisp.
