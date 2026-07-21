@@ -1966,7 +1966,7 @@
                ;; Skip an all-ASCII block
                (inst vpmaxub tmp2 current prev)
                (inst vpmovmskb tmp tmp2)
-               (inst test tmp tmp)
+               (inst test :dword tmp tmp)
                (inst jmp :z VALIDATED)
 
                (inst vpsubusb tmp2 tmp2 (register-inline-constant
@@ -2083,11 +2083,11 @@
         ASCII
         (inst vpcmpeqb tmp1 current zeros)
         (inst vpmovmskb tmp tmp1)
-        (inst test tmp tmp)
+        (inst test :dword tmp tmp)
         (inst jmp :nz ASCII-TAIL)
 
         (inst vpmovmskb tmp current)
-        (inst test tmp tmp)
+        (inst test :dword tmp tmp)
         (inst jmp :nz NON-ASCII)
 
         (inst add ptr 32)
@@ -2095,14 +2095,14 @@
         (inst jmp ASCII)
 
         ASCII-TAIL
-        (inst bsf tmp tmp)
+        (inst bsf :dword tmp tmp)
 
         (inst vpmovmskb byte-length current)
-        (inst test byte-length byte-length)
+        (inst test :dword byte-length byte-length)
         (inst jmp :z ALL-ASCII-DONE)
 
-        (inst bsf byte-length byte-length)
-        (inst cmp byte-length tmp)
+        (inst bsf :dword byte-length byte-length)
+        (inst cmp :dword byte-length tmp)
         (inst jmp :b NON-ASCII)
 
         ALL-ASCII-DONE
@@ -2151,7 +2151,7 @@
         START
         (inst vpcmpeqb tmp1 current zeros)
         (inst vpmovmskb tmp tmp1)
-        (inst test tmp tmp)
+        (inst test :dword tmp tmp)
         (inst jmp :nz TAIL)
 
         (validate)
@@ -2161,7 +2161,7 @@
         (inst jmp LOOP)
 
         TAIL
-        (inst bsf tmp tmp)
+        (inst bsf :dword tmp tmp)
 
         (inst vmovdqu tmp3 (register-inline-constant
                             :avx2
