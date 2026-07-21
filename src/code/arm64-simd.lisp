@@ -1507,15 +1507,15 @@
         (inst cmtst tmp1 current current :16b)
         (inst orr tmp1 tmp1 indexes :16b)
         (inst uminv tmp1 tmp1 :16b)
-        (inst fmov tmp (reg-in-sc tmp1 'single-reg))
+        (inst umov tmp tmp1 0 :b)
 
         ;; Zero out the bytes after the first zero
-        (inst dup tmp1 tmp :16b)
+        (inst dup tmp1 tmp1 :16b 0)
         (inst cmhi tmp1 tmp1 indexes :16b)
         (inst and current current tmp1 :16b)
 
         (inst sminv tmp1 current :16b)
-        (inst fmov byte-length (reg-in-sc tmp1 'single-reg))
+        (inst umov byte-length tmp1 0 :b)
         (inst tbnz byte-length 7 NON-ASCII)
 
         (inst add ptr ptr tmp)
