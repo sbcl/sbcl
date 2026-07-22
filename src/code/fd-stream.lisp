@@ -126,7 +126,7 @@
   (original nil :type (or simple-string null))
   (delete-original nil)       ; for :if-exists :rename-and-delete
   ;;; the number of bytes per element
-  (element-size 1 :type index)
+  (element-size 1 :type (and (integer 1) index))
   ;; the type of element being transfered
   (element-type 'base-char)
   ;; coarse characterization of the element type. see description of
