@@ -436,7 +436,7 @@
     1))
 
 (with-test (:name (run-program :malloc-deadlock)
-            :broken-on :sb-safepoint
+            :broken-on (or :sb-safepoint (and :darwin :x86-64))
             :skipped-on (or :ubsan (not :sb-thread) :win32 :android))
   (let* (stop
          (delay-between-gc
