@@ -1,5 +1,26 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.6.6:
+  * new contrib module: SB-MANUAL contains the SBCL manual in docstrings of
+    section definitions, which tie together the docstrings of normal Lisp
+    definitions. The manual can thus be explored interactively in the usual
+    way (e.g. with Slime's M-.), and it is browsable with the MGL-PAX library
+    (out of tree). Also, https://fixnum.com/ (similarly unrelated to the SBCL
+    project) provides alternative renderings of the SBCL manual as heavily
+    linked PDF and HTML documents as well as Markdown and plain text.
+  * new feature: DOCUMENTATION supports DOC-TYPE DECLARATION.
+  * bug fix: READing with *READ-SUPPRESS* T no longer emits warnings like
+    "<internal-feature> no longer present on *FEATURES*".
+  * documentation: many typos and typesetting issues were fixed.
+  * documentation: SB-MANUAL:@FOREIGN-FUNCTION-INTERFACE now correctly states
+    that arrays are row-major (not column-major).  (lp#2158033, thanks to Scott
+    L. Burson)
+  * documentation: internally, docstrings now conform to a subset of Markdown,
+    but DOCUMENTATION (and thus DESCRIBE) strips some of this markup. The
+    official manual is still generated from Texinfo, but the Texinfo files are
+    generated from SB-MANUAL.
+  * documentation: the manual now has a separate index for declarations.
+
 changes in sbcl-2.6.6 relative to sbcl-2.6.5:
   * minor incompatible change: FDEFINITION now returns the outermost wrapper
     (added e.g. by TRACE, PROFILE) like SYMBOL-FUNCTION.  (lp#799533)
