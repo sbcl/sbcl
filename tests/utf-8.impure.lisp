@@ -197,3 +197,76 @@
                  (error "(encode-test ~s ~a) => ~a /= ~a" string (length octets)
                         result octets))))
           (free-protected-array string))))
+
+(defun validate-utf8 (vector)
+  (macrolet ((return-if-not-cont (x)
+               `(let ((x ,x))
+                  (unless (<= #x80 x #xBF)
+                    (return index))
+                  x)))
+    (let ((index 0)
+          (length (length vector)))
+      (loop while (< index length)
+            do
+            (let ((b0 (aref vector index)))
+              (cond
+                ;; ASCII
+                ((< b0 #x80)
+                 (incf index 1))
+                ;; 2 bytes
+                ((<= #xC2 b0 #xDF)
+                 (when (>= (+ index 1) length)
+                   (return index))
+                 (return-if-not-cont (aref vector (+ index 1)))
+                 (incf index 2))
+
+                ;; 3 bytes
+                ((<= #xE0 b0 #xEF)
+                 (when (>= (+ index 2) length)
+                   (return index))
+                 (let ((b1 (return-if-not-cont (aref vector (+ index 1))))
+                       (b2 (return-if-not-cont (aref vector (+ index 2)))))
+                   (declare (ignore b2 ))
+                   (unless (if (= b0 #xE0)
+                               (<= #xA0 b1 #xBF) ; Overlong
+                               (if (= b0 #xED)
+                                   (<= #x80 b1 #x9F) ; Surrogate halves
+                                   t))
+                     (return index)))
+                 (incf index 3))
+                ;; 4 bytes
+                ((<= #xF0 b0 #xF4)
+                 (when (>= (+ index 3) length)
+                   (return index))
+                 (let ((b1 (return-if-not-cont (aref vector (+ index 1))))
+                       (b2 (return-if-not-cont (aref vector (+ index 2))))
+                       (b3 (return-if-not-cont (aref vector (+ index 3)))))
+                   (declare (ignore b2 b3))
+                   (unless (if (= b0 #xF0)
+                               (<= #x90 b1 #xBF) ; Overlong
+                               (if (= b0 #xF4)
+                                   (<= #x80 b1 #x8F) ; Too Large
+                                   t))
+                     (return index)))
+                 (incf index 4))
+                (t (return index))))))))
+
+
+(with-test (:name :utf8-to-character-string)
+  (let ((vector (make-array sb-impl::+bytes-per-buffer+ :element-type '(unsigned-byte 8)))
+        (ibuf (sb-impl::alloc-buffer))
+        (string (make-protected-array 512 'character nil)))
+    (setf (sb-impl::buffer-tail ibuf) sb-impl::+bytes-per-buffer+)
+    (loop repeat (* 512 #+slow 10)
+          do
+          (map-into vector (lambda () (random 256)))
+          (setf (sb-impl::buffer-head ibuf) 0
+                (sb-impl::buffer-tail ibuf) sb-impl::+bytes-per-buffer+)
+          (sb-kernel:copy-ub8-to-system-area vector 0 (sb-impl::buffer-sap ibuf) 0 (length vector))
+          (let* ((bad (validate-utf8 vector))
+                 (chars (sb-vm::utf8-to-character-string 0 (length string) string ibuf))
+                 (bytes (sb-impl::buffer-head ibuf))
+                 (decoded (octets-to-string vector :end bad)))
+            (when bad
+              (assert (>= bad bytes)))
+            (assert (string= string decoded :end1 chars :end2 chars))))))
