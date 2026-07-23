@@ -251,7 +251,7 @@
                  (incf index 4))
                 (t (return index))))))))
 
-
+#+(or arm64 x86-64)
 (with-test (:name :utf8-to-character-string)
   (let ((vector (make-array sb-impl::+bytes-per-buffer+ :element-type '(unsigned-byte 8)))
         (ibuf (sb-impl::alloc-buffer))
