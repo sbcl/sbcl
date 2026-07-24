@@ -13,7 +13,7 @@ changes relative to sbcl-2.6.6:
     ** the SB-SIMD contrib now supports ARM64.  (Thanks to Sylvia Harrington)
     ** AVX512 instructions are now supported on X86-64.  (Thanks to Robert
        Smith and Arthur Miller)
-    ** addtional support for SIMD instructions on ARM64 and X86-64.  (Thanks
+    ** additional support for SIMD instructions on ARM64 and X86-64.  (Thanks
        to Arthur Miller)
     ** fix miscompilation of SAP-REF-N on ARM64.  (Thanks to Hayley Patton)
     ** implement INTEGER-LENGTH on primitive types without a loop on MIPS and
