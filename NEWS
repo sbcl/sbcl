@@ -9,8 +9,34 @@ changes relative to sbcl-2.6.6:
     project) provides alternative renderings of the SBCL manual as heavily
     linked PDF and HTML documents as well as Markdown and plain text.
   * new feature: DOCUMENTATION supports DOC-TYPE DECLARATION.
+  * platform support:
+    ** the SB-SIMD contrib now supports ARM64.  (Thanks to Sylvia Harrington)
+    ** AVX512 instructions are now supported on X86-64.  (Thanks to Robert
+       Smith and Arthur Miller)
+    ** addtional support for SIMD instructions on ARM64 and X86-64.  (Thanks
+       to Arthur Miller)
+    ** fix miscompilation of SAP-REF-N on ARM64.  (Thanks to Hayley Patton)
+    ** implement INTEGER-LENGTH on primitive types without a loop on MIPS and
+       LoongArch.
   * bug fix: READing with *READ-SUPPRESS* T no longer emits warnings like
     "<internal-feature> no longer present on *FEATURES*".
+  * bug fix: compiler type-error when compiling calls to CONCATENATE with
+    conditional known non-sequence arguments.  (lp#2160747)
+  * bug fix: (EQL <complex>) types were not being treated as numeric by the
+    type system.  (lp#2160429)
+  * bug fix: improve the handling of quiet (non-signalling) NaN inputs to LOG.
+    (lp#2160268, reported by Woodrow Kiang)
+  * bug fix: miscompilation of MULTIPLE-VALUE-CALL.  (lp#2160207, reported by
+    Vasily Postnicov)
+  * optimization: passing constant complex numbers to local functions can be
+    done without consing.
+  * optimization: where available, use enhanced SIMD routines for UTF-8
+    conversions.
+  * optimization: compiler transforms of COUNT are applicable with a wider
+    variety of keyword arguments.
+  * optimization: remove at least one redundant instruction from SB-ALIEN:DEREF.
+  * optimization: the sparse set implementation in the compiler has been tuned
+    to improve performance on real-world workloads.
   * documentation: many typos and typesetting issues were fixed.
   * documentation: SB-MANUAL:@FOREIGN-FUNCTION-INTERFACE now correctly states
     that arrays are row-major (not column-major).  (lp#2158033, thanks to Scott
