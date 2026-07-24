@@ -890,8 +890,8 @@
       (when n-lines-consumed
         (return-from parse-markdown-block (values n-lines-consumed result))))
     (cond
-      ((maybe-itemize-offset line)
-       (collect-markdown-itemize lines index (maybe-itemize-offset line)))
       ((and (indentation line) (>= (indentation line) (+ base-indent 4)))
        (collect-indented-code lines index base-indent))
+      ((maybe-itemize-offset line)
+       (collect-markdown-itemize lines index (maybe-itemize-offset line)))
       (t nil))))

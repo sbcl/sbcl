@@ -944,11 +944,9 @@ Consider this definition of the factorial function:
 
 This debugger session demonstrates the use of breakpoints:
 
-@itemize
-@item (break)  ; invoke debugger
-@end itemize
-
 @example
+* (break)  ; invoke debugger
+
 debugger invoked on a SIMPLE-CONDITION in thread 11184: break
 
 restarts (invokable by number or by possibly-abbreviated name):

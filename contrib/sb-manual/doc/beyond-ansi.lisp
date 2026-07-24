@@ -192,8 +192,8 @@
       * (defvar *my-string* (list 1 2 \"my string\"))
       *MY-STRING*
 
-       * (sb-ext:search-roots (sb-ext:make-weak-pointer (third *my-string*)))
-       -> ((SIMPLE-VECTOR 3)) #x10004E9EAF[2] -> (SYMBOL) #x5044100F[1] -> (CONS) #x100181FAE7[1] -> (CONS) #x100181FAF7[1] -> (CONS) #x100181FB07[0] -> #x100181F9AF
+      * (sb-ext:search-roots (sb-ext:make-weak-pointer (third *my-string*)))
+      -> ((SIMPLE-VECTOR 3)) #x10004E9EAF[2] -> (SYMBOL) #x5044100F[1] -> (CONS) #x100181FAE7[1] -> (CONS) #x100181FAF7[1] -> (CONS) #x100181FB07[0] -> #x100181F9AF
 
   The single line of output on *STANDARD-OUTPUT* shows the path from a
   root to `\"my string\"`: the path starts with SBCL's internal

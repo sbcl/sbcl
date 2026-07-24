@@ -590,15 +590,13 @@ Experimental: subject to change without prior notice.
 @end deffn
 An example of using this could look like this:
 
-@itemize
-@item (defvar *my-string* (list 1 2 "my string"))
-@end itemize
-    *MY-STRING*
+@example
+* (defvar *my-string* (list 1 2 "my string"))
+*MY-STRING*
 
-@itemize
-@item (sb-ext:search-roots (sb-ext:make-weak-pointer (third *my-string*)))
-@end itemize
-     -> ((@code{simple-vector} 3)) #x10004E9EAF[2] -> (@code{symbol}) #x5044100F[1] -> (@code{cons}) #x100181FAE7[1] -> (@code{cons}) #x100181FAF7[1] -> (@code{cons}) #x100181FB07[0] -> #x100181F9AF
+* (sb-ext:search-roots (sb-ext:make-weak-pointer (third *my-string*)))
+-> ((SIMPLE-VECTOR 3)) #x10004E9EAF[2] -> (SYMBOL) #x5044100F[1] -> (CONS) #x100181FAE7[1] -> (CONS) #x100181FAF7[1] -> (CONS) #x100181FB07[0] -> #x100181F9AF
+@end example
 
 The single line of output on @code{*standard-output*} shows the path from a
 root to @code{"my string"}: the path starts with SBCL's internal
@@ -608,25 +606,25 @@ package system data structures followed by the symbol
 The @code{:print :verbose} argument produces similar behavior but
 describes the path elements in more detail:
 
-@itemize
-@item (sb-ext:search-roots (sb-ext:make-weak-pointer (third *my-string*))
-                   :print :verbose)
-@end itemize
-    Path to "my string":
-     6       10004E9EAF [   2] a (simple-vector 3)
-     0         5044100F [   1] COMMON-LISP-USER::*MY-STRING*
-     0       100181FAE7 [   1] a cons
-     0       100181FAF7 [   1] a cons
-     0       100181FB07 [   0] a cons
+@example
+* (sb-ext:search-roots (sb-ext:make-weak-pointer (third *my-string*))
+                       :print :verbose)
+Path to "my string":
+ 6       10004E9EAF [   2] a (simple-vector 3)
+ 0         5044100F [   1] COMMON-LISP-USER::*MY-STRING*
+ 0       100181FAE7 [   1] a cons
+ 0       100181FAF7 [   1] a cons
+ 0       100181FB07 [   0] a cons
+@end example
 
 The @code{:print nil} argument is a bit different:
 
-@itemize
-@item (sb-ext:search-roots (sb-ext:make-weak-pointer (third *my-string*))
-                   :print nil)
-@end itemize
-    (("my string" @code{:static} (#(*MY-STRING* 0 0) . 2) (*MY-STRING* . 1)
-      ((1 2 "my string") . 1) ((2 "my string") . 1) (("my string") . 0)))
+@example
+* (sb-ext:search-roots (sb-ext:make-weak-pointer (third *my-string*))
+                       :print nil)
+(("my string" :STATIC (#(*MY-STRING* 0 0) . 2) (*MY-STRING* . 1)
+  ((1 2 "my string") . 1) ((2 "my string") . 1) (("my string") . 0)))
+@end example
 
 
 There is no output on @code{*standard-output*}, and the return value is a
