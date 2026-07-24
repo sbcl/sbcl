@@ -126,6 +126,10 @@
    #:row-major-aref-record-p
    #:setf-row-major-aref-record
    #:setf-row-major-aref-record-p
+   #:sap-ref-record
+   #:sap-ref-record-p
+   #:setf-sap-ref-record
+   #:setf-sap-ref-record-p
    #:instruction-record
    #:instruction-record-p
    #:instruction-record-name
@@ -151,6 +155,7 @@
    #:vref-record-value-record
    #:vref-record-vector-record
    #:vref-record-aref
+   #:vref-record-sap-ref
    #:vref-record-row-major-aref
    #:load-record
    #:load-record-p
@@ -162,6 +167,7 @@
    #:load-record-value-record
    #:load-record-vector-record
    #:load-record-aref
+   #:load-record-sap-ref
    #:load-record-row-major-aref
    #:store-record
    #:store-record-p
@@ -173,6 +179,7 @@
    #:store-record-value-record
    #:store-record-vector-record
    #:store-record-aref
+   #:store-record-sap-ref
    #:store-record-row-major-aref
    #:reffer-record
    #:reffer-record-p
@@ -327,6 +334,7 @@
      #:f32-incf
      #:f32-decf
      #:f32-aref
+     #:f32-sap-ref
      #:f32-row-major-aref
      ;; f64
      #:f64
@@ -356,6 +364,7 @@
      #:f64-incf
      #:f64-decf
      #:f64-aref
+     #:f64-sap-ref
      #:f64-row-major-aref
      ;; u1
      #:u1
@@ -386,6 +395,7 @@
      #:u8-incf
      #:u8-decf
      #:u8-aref
+     #:u8-sap-ref
      #:u8-row-major-aref
      ;; u16
      #:u16
@@ -410,6 +420,7 @@
      #:u16-incf
      #:u16-decf
      #:u16-aref
+     #:u16-sap-ref
      #:u16-row-major-aref
      ;; u32
      #:u32
@@ -434,6 +445,7 @@
      #:u32-incf
      #:u32-decf
      #:u32-aref
+     #:u32-sap-ref
      #:u32-row-major-aref
      ;; u64
      #:u64
@@ -458,6 +470,7 @@
      #:u64-incf
      #:u64-decf
      #:u64-aref
+     #:u64-sap-ref
      #:u64-row-major-aref
      ;; s8
      #:s8
@@ -482,6 +495,7 @@
      #:s8-incf
      #:s8-decf
      #:s8-aref
+     #:s8-sap-ref
      #:s8-row-major-aref
      ;; s16
      #:s16
@@ -506,6 +520,7 @@
      #:s16-incf
      #:s16-decf
      #:s16-aref
+     #:s16-sap-ref
      #:s16-row-major-aref
      ;; s32
      #:s32
@@ -532,6 +547,7 @@
      #:s32-incf
      #:s32-decf
      #:s32-aref
+     #:s32-sap-ref
      #:s32-row-major-aref
      ;; s64
      #:s64
@@ -556,6 +572,7 @@
      #:s64-incf
      #:s64-decf
      #:s64-aref
+     #:s64-sap-ref
      #:s64-row-major-aref
      ;; Simple Strings
      #+sb-unicode
@@ -620,8 +637,7 @@
      #:f32>=
      #:f32-incf
      #:f32-decf
-     #:f32-aref
-     #:f32-row-major-aref)
+     #:f32-aref #:f32-row-major-aref #:f32-sap-ref)
     #0#
     #1#
     #2=
@@ -662,8 +678,8 @@
      #:f32.4-unpacklo
      #:f32.4-incf
      #:f32.4-decf
-     #:f32.4-aref #:f32.4-row-major-aref
-     #:f32.4-non-temporal-aref #:f32.4-non-temporal-row-major-aref))
+     #:f32.4-aref #:f32.4-row-major-aref  #:f32.4-sap-ref
+     #:f32.4-non-temporal-aref #:f32.4-non-temporal-row-major-aref #:f32.4-non-temporal-sap-ref))
 
   (defpackage #:sb-simd-sse2
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-sse)
@@ -691,7 +707,8 @@
      #:f64-incf
      #:f64-decf
      #:f64-aref
-     #:f64-row-major-aref)
+     #:f64-row-major-aref
+     #:f64-sap-ref)
     #0#
     #1#
     #2#
@@ -746,8 +763,8 @@
      #:f64.2-movemask
      #:f64.2-incf
      #:f64.2-decf
-     #:f64.2-aref #:f64.2-row-major-aref
-     #:f64.2-non-temporal-aref #:f64.2-non-temporal-row-major-aref
+     #:f64.2-aref #:f64.2-row-major-aref #:f64.2-sap-ref
+     #:f64.2-non-temporal-aref #:f64.2-non-temporal-row-major-aref #:f64.2-non-temporal-sap-ref
      ;; u8.16
      #:make-u8.16
      #:u8.16
@@ -777,8 +794,8 @@
      ;; #:u8.16-shiftr
      #:u8.16-incf
      #:u8.16-decf
-     #:u8.16-aref #:u8.16-row-major-aref
-     #:u8.16-non-temporal-aref #:u8.16-non-temporal-row-major-aref
+     #:u8.16-aref #:u8.16-row-major-aref #:u8.16-sap-ref
+     #:u8.16-non-temporal-aref #:u8.16-non-temporal-row-major-aref #:u8.16-non-temporal-sap-ref
      ;; u16.8
      #:make-u16.8
      #:u16.8
@@ -809,8 +826,8 @@
      #:u16.8-elt
      #:u16.8-shufflehi
      #:u16.8-shufflelo
-     #:u16.8-aref #:u16.8-row-major-aref
-     #:u16.8-non-temporal-aref #:u16.8-non-temporal-row-major-aref
+     #:u16.8-aref #:u16.8-row-major-aref #:u16.8-sap-ref
+     #:u16.8-non-temporal-aref #:u16.8-non-temporal-row-major-aref #:u16.8-non-temporal-sap-ref
      ;; u32.4
      #:make-u32.4
      #:u32.4
@@ -838,8 +855,8 @@
      #:u32.4-shiftr
      #:u32.4-incf
      #:u32.4-decf
-     #:u32.4-aref #:u32.4-row-major-aref
-     #:u32.4-non-temporal-aref #:u32.4-non-temporal-row-major-aref
+     #:u32.4-aref #:u32.4-row-major-aref #:u32.4-sap-ref
+     #:u32.4-non-temporal-aref #:u32.4-non-temporal-row-major-aref #:u32.4-non-temporal-sap-ref
      #+sb-unicode
      #:u32.4-string-ref
      #+sb-unicode
@@ -864,8 +881,8 @@
      #:u64.2-shiftr
      #:u64.2-incf
      #:u64.2-decf
-     #:u64.2-aref #:u64.2-row-major-aref
-     #:u64.2-non-temporal-aref #:u64.2-non-temporal-row-major-aref
+     #:u64.2-aref #:u64.2-row-major-aref #:u64.2-sap-ref
+     #:u64.2-non-temporal-aref #:u64.2-non-temporal-row-major-aref #:u64.2-non-temporal-sap-ref
      ;; s8.16
      #:make-s8.16
      #:s8.16
@@ -888,8 +905,8 @@
      #:s8.16-unpackhi
      #:s8.16-unpacklo
      #:s8.16-movemask
-     #:s8.16-aref #:s8.16-row-major-aref
-     #:s8.16-non-temporal-aref #:s8.16-non-temporal-row-major-aref
+     #:s8.16-aref #:s8.16-row-major-aref #:s8.16-sap-ref
+     #:s8.16-non-temporal-aref #:s8.16-non-temporal-row-major-aref #:s8.16-non-temporal-sap-ref
      ;; s16.8
      #:make-s16.8
      #:s16.8
@@ -918,8 +935,8 @@
      #:s16.8-shufflelo
      #:s16.8-shiftl
      #:s16.8-shiftr
-     #:s16.8-aref #:s16.8-row-major-aref
-     #:s16.8-non-temporal-aref #:s16.8-non-temporal-row-major-aref
+     #:s16.8-aref #:s16.8-row-major-aref #:s16.8-sap-ref
+     #:s16.8-non-temporal-aref #:s16.8-non-temporal-row-major-aref #:s16.8-non-temporal-sap-ref
      ;; s32.4
      #:make-s32.4
      #:s32.4
@@ -947,8 +964,8 @@
      #:s32.4-shuffle
      #:s32.4-shiftl
      #:s32.4-shiftr
-     #:s32.4-aref #:s32.4-row-major-aref
-     #:s32.4-non-temporal-aref #:s32.4-non-temporal-row-major-aref
+     #:s32.4-aref #:s32.4-row-major-aref #:s32.4-sap-ref
+     #:s32.4-non-temporal-aref #:s32.4-non-temporal-row-major-aref #:s32.4-non-temporal-sap-ref
      ;; s64.2
      #:make-s64.2
      #:s64.2
@@ -967,8 +984,8 @@
      #:s64.2-movemask
      #:s64.2-shiftl
      #:s64.2-shiftr
-     #:s64.2-aref #:s64.2-row-major-aref
-     #:s64.2-non-temporal-aref #:s64.2-non-temporal-row-major-aref))
+     #:s64.2-aref #:s64.2-row-major-aref #:s64.2-sap-ref
+     #:s64.2-non-temporal-aref #:s64.2-non-temporal-row-major-aref #:s64.2-non-temporal-sap-ref))
 
   (defpackage #:sb-simd-sse3
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-sse2)
@@ -1013,16 +1030,16 @@
   (defpackage #:sb-simd-sse4.1
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-ssse3)
     (:shadow
-     #:f32.4-non-temporal-aref #:f32.4-non-temporal-row-major-aref
-     #:f64.2-non-temporal-aref #:f64.2-non-temporal-row-major-aref
-     #:u8.16-non-temporal-aref #:u8.16-non-temporal-row-major-aref
-     #:u16.8-non-temporal-aref #:u16.8-non-temporal-row-major-aref
-     #:u32.4-non-temporal-aref #:u32.4-non-temporal-row-major-aref
-     #:u64.2-non-temporal-aref #:u64.2-non-temporal-row-major-aref
-     #:s8.16-non-temporal-aref #:s8.16-non-temporal-row-major-aref
-     #:s16.8-non-temporal-aref #:s16.8-non-temporal-row-major-aref
-     #:s32.4-non-temporal-aref #:s32.4-non-temporal-row-major-aref
-     #:s64.2-non-temporal-aref #:s64.2-non-temporal-row-major-aref)
+     #:f32.4-non-temporal-aref #:f32.4-non-temporal-row-major-aref #:f32.4-non-temporal-sap-ref
+     #:f64.2-non-temporal-aref #:f64.2-non-temporal-row-major-aref #:f64.2-non-temporal-sap-ref
+     #:u8.16-non-temporal-aref #:u8.16-non-temporal-row-major-aref #:u8.16-non-temporal-sap-ref
+     #:u16.8-non-temporal-aref #:u16.8-non-temporal-row-major-aref #:u16.8-non-temporal-sap-ref
+     #:u32.4-non-temporal-aref #:u32.4-non-temporal-row-major-aref #:u32.4-non-temporal-sap-ref
+     #:u64.2-non-temporal-aref #:u64.2-non-temporal-row-major-aref #:u64.2-non-temporal-sap-ref
+     #:s8.16-non-temporal-aref #:s8.16-non-temporal-row-major-aref #:s8.16-non-temporal-sap-ref
+     #:s16.8-non-temporal-aref #:s16.8-non-temporal-row-major-aref #:s16.8-non-temporal-sap-ref
+     #:s32.4-non-temporal-aref #:s32.4-non-temporal-row-major-aref #:s32.4-non-temporal-sap-ref
+     #:s64.2-non-temporal-aref #:s64.2-non-temporal-row-major-aref #:s64.2-non-temporal-sap-ref)
     #0#
     #1#
     #2#
@@ -1142,6 +1159,7 @@
      #:f32-incf
      #:f32-decf
      #:f32-aref
+     #:f32-sap-ref
      #:f32-row-major-aref
      ;; f64
      #:f64
@@ -1166,6 +1184,7 @@
      #:f64-incf
      #:f64-decf
      #:f64-aref
+     #:f64-sap-ref
      #:f64-row-major-aref)
     #8=
     (:export
@@ -1231,8 +1250,8 @@
      #:f32.4-decf
      #:f32.4-dupeven
      #:f32.4-dupodd
-     #:f32.4-aref #:f32.4-row-major-aref
-     #:f32.4-non-temporal-aref #:f32.4-non-temporal-row-major-aref
+     #:f32.4-aref #:f32.4-row-major-aref #:f32.4-sap-ref
+     #:f32.4-non-temporal-aref #:f32.4-non-temporal-row-major-aref #:f32.4-non-temporal-sap-ref
      ;; f64.2
      #:make-f64.2
      #:f64.2
@@ -1279,8 +1298,8 @@
      #:f64.2-movemask
      #:f64.2-incf
      #:f64.2-decf
-     #:f64.2-aref #:f64.2-row-major-aref
-     #:f64.2-non-temporal-aref #:f64.2-non-temporal-row-major-aref
+     #:f64.2-aref #:f64.2-row-major-aref #:f64.2-sap-ref
+     #:f64.2-non-temporal-aref #:f64.2-non-temporal-row-major-aref #:f64.2-non-temporal-sap-ref
      ;; f32.8
      #:make-f32.8
      #:f32.8
@@ -1335,8 +1354,8 @@
      #:f32.8-round
      #:f32.8-incf
      #:f32.8-decf
-     #:f32.8-aref #:f32.8-row-major-aref
-     #:f32.8-non-temporal-aref #:f32.8-non-temporal-row-major-aref
+     #:f32.8-aref #:f32.8-row-major-aref #:f32.8-sap-ref
+     #:f32.8-non-temporal-aref #:f32.8-non-temporal-row-major-aref #:f32.8-non-temporal-sap-ref
      ;; f64.4
      #:make-f64.4
      #:f64.4
@@ -1389,8 +1408,8 @@
      #:f64.4-round
      #:f64.4-incf
      #:f64.4-decf
-     #:f64.4-aref #:f64.4-row-major-aref
-     #:f64.4-non-temporal-aref #:f64.4-non-temporal-row-major-aref
+     #:f64.4-aref #:f64.4-row-major-aref #:f64.4-sap-ref
+     #:f64.4-non-temporal-aref #:f64.4-non-temporal-row-major-aref #:f64.4-non-temporal-sap-ref
      ;; u8.16
      #:make-u8.16
      #:u8.16
@@ -1415,8 +1434,8 @@
      #:u8.16-unpacklo
      #:u8.16-movemask
      #:u8.16-shuffle
-     #:u8.16-aref #:u8.16-row-major-aref
-     #:u8.16-non-temporal-aref #:u8.16-non-temporal-row-major-aref
+     #:u8.16-aref #:u8.16-row-major-aref #:u8.16-sap-ref
+     #:u8.16-non-temporal-aref #:u8.16-non-temporal-row-major-aref #:u8.16-non-temporal-sap-ref
      ;; u16.8
      #:make-u16.8
      #:u16.8
@@ -1444,8 +1463,8 @@
      #:u16.8-movemask
      #:u16.8-shufflehi
      #:u16.8-shufflelo
-     #:u16.8-aref #:u16.8-row-major-aref
-     #:u16.8-non-temporal-aref #:u16.8-non-temporal-row-major-aref
+     #:u16.8-aref #:u16.8-row-major-aref #:u16.8-sap-ref
+     #:u16.8-non-temporal-aref #:u16.8-non-temporal-row-major-aref #:u16.8-non-temporal-sap-ref
      ;; u32.4
      #:make-u32.4
      #:u32.4
@@ -1470,10 +1489,12 @@
      #:u32.4-unpacklo
      #:u32.4-movemask
      #:u32.4-permute
-     #:u32.4-aref #:u32.4-row-major-aref
-     #:u32.4-non-temporal-aref #:u32.4-non-temporal-row-major-aref
+     #:u32.4-aref #:u32.4-row-major-aref #:u32.4-sap-ref
+     #:u32.4-non-temporal-aref #:u32.4-non-temporal-row-major-aref #:u32.4-non-temporal-sap-ref
      #+sb-unicode
      #:u32.4-string-ref
+     #+sb-unicode
+     #:u32.4-string-sap-ref
      #+sb-unicode
      #:u32.4-row-major-string-ref
      ;; u64.2
@@ -1500,8 +1521,8 @@
      #:u64.2-unpacklo
      #:u64.2-movemask
      #:u64.2-permute
-     #:u64.2-aref #:u64.2-row-major-aref
-     #:u64.2-non-temporal-aref #:u64.2-non-temporal-row-major-aref
+     #:u64.2-aref #:u64.2-row-major-aref #:u64.2-sap-ref
+     #:u64.2-non-temporal-aref #:u64.2-non-temporal-row-major-aref #:u64.2-non-temporal-sap-ref
      ;; u8.32
      #:make-u8.32
      #:u8.32
@@ -1510,8 +1531,8 @@
      #:u8.32-broadcast
      #:u8.16-from-u8.32
      #:u8.32-insert-u8.16
-     #:u8.32-aref #:u8.32-row-major-aref
-     #:u8.32-non-temporal-aref #:u8.32-non-temporal-row-major-aref
+     #:u8.32-aref #:u8.32-row-major-aref #:u8.32-sap-ref
+     #:u8.32-non-temporal-aref #:u8.32-non-temporal-row-major-aref #:u8.32-non-temporal-sap-ref
      ;; u16.16
      #:make-u16.16
      #:u16.16
@@ -1520,8 +1541,8 @@
      #:u16.16-broadcast
      #:u16.8-from-u16.16
      #:u16.16-insert-u16.8
-     #:u16.16-aref #:u16.16-row-major-aref
-     #:u16.16-non-temporal-aref #:u16.16-non-temporal-row-major-aref
+     #:u16.16-aref #:u16.16-row-major-aref #:u16.16-sap-ref
+     #:u16.16-non-temporal-aref #:u16.16-non-temporal-row-major-aref #:u16.16-non-temporal-sap-ref
      ;; u32.8
      #:make-u32.8
      #:u32.8
@@ -1530,10 +1551,12 @@
      #:u32.8-broadcast
      #:u32.8-permute
      #:u32.8-insert-u32.4
-     #:u32.8-aref #:u32.8-row-major-aref
-     #:u32.8-non-temporal-aref #:u32.8-non-temporal-row-major-aref
+     #:u32.8-aref #:u32.8-row-major-aref #:u32.8-sap-ref
+     #:u32.8-non-temporal-aref #:u32.8-non-temporal-row-major-aref #:u32.8-non-temporal-sap-ref
      #+sb-unicode
      #:u32.8-string-ref
+     #+sb-unicode
+     #:u32.8-string-sap-ref
      #+sb-unicode
      #:u32.8-row-major-string-ref
      ;; u64.4
@@ -1545,8 +1568,8 @@
      #:u64.4-permute
      #:u64.2-from-u64.4
      #:u64.4-insert-u64.2
-     #:u64.4-aref #:u64.4-row-major-aref
-     #:u64.4-non-temporal-aref #:u64.4-non-temporal-row-major-aref
+     #:u64.4-aref #:u64.4-row-major-aref #:u64.4-sap-ref
+     #:u64.4-non-temporal-aref #:u64.4-non-temporal-row-major-aref #:u64.4-non-temporal-sap-ref
      ;; s8.16
      #:make-s8.16
      #:s8.16
@@ -1571,8 +1594,8 @@
      #:s8.16-unpacklo
      #:s8.16-movemask
      #:s8.16-shuffle
-     #:s8.16-aref #:s8.16-row-major-aref
-     #:s8.16-non-temporal-aref #:s8.16-non-temporal-row-major-aref
+     #:s8.16-aref #:s8.16-row-major-aref #:s8.16-sap-ref
+     #:s8.16-non-temporal-aref #:s8.16-non-temporal-row-major-aref #:s8.16-non-temporal-sap-ref
      ;; s16.8
      #:make-s16.8
      #:s16.8
@@ -1602,8 +1625,8 @@
      #:s16.8-movemask
      #:s16.8-shufflehi
      #:s16.8-shufflelo
-     #:s16.8-aref #:s16.8-row-major-aref
-     #:s16.8-non-temporal-aref #:s16.8-non-temporal-row-major-aref
+     #:s16.8-aref #:s16.8-row-major-aref #:s16.8-sap-ref
+     #:s16.8-non-temporal-aref #:s16.8-non-temporal-row-major-aref #:s16.8-non-temporal-sap-ref
      ;; s32.4
      #:make-s32.4
      #:s32.4
@@ -1632,8 +1655,8 @@
      #:s32.4-unpacklo
      #:s32.4-movemask
      #:s32.4-permute
-     #:s32.4-aref #:s32.4-row-major-aref
-     #:s32.4-non-temporal-aref #:s32.4-non-temporal-row-major-aref
+     #:s32.4-aref #:s32.4-row-major-aref #:s32.4-sap-ref
+     #:s32.4-non-temporal-aref #:s32.4-non-temporal-row-major-aref #:s32.4-non-temporal-sap-ref
      ;; s64.2
      #:s64.2
      #:make-s64.2
@@ -1661,8 +1684,8 @@
      #:s64.2-unpacklo
      #:s64.2-movemask
      #:s64.2-permute
-     #:s64.2-aref #:s64.2-row-major-aref
-     #:s64.2-non-temporal-aref #:s64.2-non-temporal-row-major-aref
+     #:s64.2-aref #:s64.2-row-major-aref #:s64.2-sap-ref
+     #:s64.2-non-temporal-aref #:s64.2-non-temporal-row-major-aref #:s64.2-non-temporal-sap-ref
      ;; s8.32
      #:make-s8.32
      #:s8.32
@@ -1672,8 +1695,8 @@
      #:s8.16-from-s8.32
      #:s8.32-insert-s8.16
      #:s8.32-permute128
-     #:s8.32-aref #:s8.32-row-major-aref
-     #:s8.32-non-temporal-aref #:s8.32-non-temporal-row-major-aref
+     #:s8.32-aref #:s8.32-row-major-aref #:s8.32-sap-ref
+     #:s8.32-non-temporal-aref #:s8.32-non-temporal-row-major-aref #:s8.32-non-temporal-sap-ref
      ;; s16.16
      #:make-s16.16
      #:s16.16
@@ -1683,8 +1706,8 @@
      #:s16.8-from-s16.16
      #:s16.16-insert-s16.8
      #:s16.16-permute128
-     #:s16.16-aref #:s16.16-row-major-aref
-     #:s16.16-non-temporal-aref #:s16.16-non-temporal-row-major-aref
+     #:s16.16-aref #:s16.16-row-major-aref #:s16.16-sap-ref
+     #:s16.16-non-temporal-aref #:s16.16-non-temporal-row-major-aref #:s16.16-non-temporal-sap-ref
      ;; s32.8
      #:make-s32.8
      #:s32.8
@@ -1696,8 +1719,8 @@
      #:s32.8-insert-s32.4
      #:s32.8-permute128
      #:s32.8-permute
-     #:s32.8-aref #:s32.8-row-major-aref
-     #:s32.8-non-temporal-aref #:s32.8-non-temporal-row-major-aref
+     #:s32.8-aref #:s32.8-row-major-aref #:s32.8-sap-ref
+     #:s32.8-non-temporal-aref #:s32.8-non-temporal-row-major-aref #:s32.8-non-temporal-sap-ref
      ;; s64.4
      #:make-s64.4
      #:s64.4
@@ -1708,8 +1731,8 @@
      #:s64.4-insert-s64.2
      #:s64.4-permute
      #:s64.4-permute128
-     #:s64.4-aref #:s64.4-row-major-aref
-     #:s64.4-non-temporal-aref #:s64.4-non-temporal-row-major-aref))
+     #:s64.4-aref #:s64.4-row-major-aref #:s64.4-sap-ref
+     #:s64.4-non-temporal-aref #:s64.4-non-temporal-row-major-aref #:s64.4-non-temporal-sap-ref))
 
   (defpackage #:sb-simd-avx2
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx)
@@ -1739,26 +1762,26 @@
      #:f64.4-reverse
      #:s64.2-shiftl
      #:s64.2-shiftr
-     #:f32.4-non-temporal-aref #:f32.4-non-temporal-row-major-aref
-     #:f64.2-non-temporal-aref #:f64.2-non-temporal-row-major-aref
-     #:f32.8-non-temporal-aref #:f32.8-non-temporal-row-major-aref
-     #:f64.4-non-temporal-aref #:f64.4-non-temporal-row-major-aref
-     #:u8.16-non-temporal-aref #:u8.16-non-temporal-row-major-aref
-     #:u16.8-non-temporal-aref #:u16.8-non-temporal-row-major-aref
-     #:u32.4-non-temporal-aref #:u32.4-non-temporal-row-major-aref
-     #:u64.2-non-temporal-aref #:u64.2-non-temporal-row-major-aref
-     #:s8.16-non-temporal-aref #:s8.16-non-temporal-row-major-aref
-     #:s16.8-non-temporal-aref #:s16.8-non-temporal-row-major-aref
-     #:s32.4-non-temporal-aref #:s32.4-non-temporal-row-major-aref
-     #:s64.2-non-temporal-aref #:s64.2-non-temporal-row-major-aref
-     #:u8.32-non-temporal-aref  #:u8.32-non-temporal-row-major-aref
-     #:u16.16-non-temporal-aref #:u16.16-non-temporal-row-major-aref
-     #:u32.8-non-temporal-aref  #:u32.8-non-temporal-row-major-aref
-     #:u64.4-non-temporal-aref  #:u64.4-non-temporal-row-major-aref
-     #:s8.32-non-temporal-aref  #:s8.32-non-temporal-row-major-aref
-     #:s16.16-non-temporal-aref #:s16.16-non-temporal-row-major-aref
-     #:s32.8-non-temporal-aref  #:s32.8-non-temporal-row-major-aref
-     #:s64.4-non-temporal-aref  #:s64.4-non-temporal-row-major-aref)
+     #:f32.4-non-temporal-aref  #:f32.4-non-temporal-row-major-aref   #:f32.4-non-temporal-sap-ref
+     #:f64.2-non-temporal-aref  #:f64.2-non-temporal-row-major-aref   #:f64.2-non-temporal-sap-ref
+     #:f32.8-non-temporal-aref  #:f32.8-non-temporal-row-major-aref   #:f32.8-non-temporal-sap-ref
+     #:f64.4-non-temporal-aref  #:f64.4-non-temporal-row-major-aref   #:f64.4-non-temporal-sap-ref
+     #:u8.16-non-temporal-aref  #:u8.16-non-temporal-row-major-aref   #:u8.16-non-temporal-sap-ref
+     #:u16.8-non-temporal-aref  #:u16.8-non-temporal-row-major-aref   #:u16.8-non-temporal-sap-ref
+     #:u32.4-non-temporal-aref  #:u32.4-non-temporal-row-major-aref   #:u32.4-non-temporal-sap-ref
+     #:u64.2-non-temporal-aref  #:u64.2-non-temporal-row-major-aref   #:u64.2-non-temporal-sap-ref
+     #:s8.16-non-temporal-aref  #:s8.16-non-temporal-row-major-aref   #:s8.16-non-temporal-sap-ref
+     #:s16.8-non-temporal-aref  #:s16.8-non-temporal-row-major-aref   #:s16.8-non-temporal-sap-ref
+     #:s32.4-non-temporal-aref  #:s32.4-non-temporal-row-major-aref   #:s32.4-non-temporal-sap-ref
+     #:s64.2-non-temporal-aref  #:s64.2-non-temporal-row-major-aref   #:s64.2-non-temporal-sap-ref
+     #:u8.32-non-temporal-aref  #:u8.32-non-temporal-row-major-aref   #:u8.32-non-temporal-sap-ref
+     #:u16.16-non-temporal-aref #:u16.16-non-temporal-row-major-aref #:u16.16-non-temporal-sap-ref
+     #:u32.8-non-temporal-aref  #:u32.8-non-temporal-row-major-aref   #:u32.8-non-temporal-sap-ref
+     #:u64.4-non-temporal-aref  #:u64.4-non-temporal-row-major-aref   #:u64.4-non-temporal-sap-ref
+     #:s8.32-non-temporal-aref  #:s8.32-non-temporal-row-major-aref   #:s8.32-non-temporal-sap-ref
+     #:s16.16-non-temporal-aref #:s16.16-non-temporal-row-major-aref #:s16.16-non-temporal-sap-ref
+     #:s32.8-non-temporal-aref  #:s32.8-non-temporal-row-major-aref   #:s32.8-non-temporal-sap-ref
+     #:s64.4-non-temporal-aref  #:s64.4-non-temporal-row-major-aref   #:s64.4-non-temporal-sap-ref)
     #0#
     #1#
     #8#

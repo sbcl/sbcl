@@ -16,9 +16,12 @@
                         (mnemonic sb-simd-internals:vref-record-mnemonic)
                         (value-record sb-simd-internals:vref-record-value-record)
                         (vector-record sb-simd-internals:vref-record-vector-record)
-                        (store sb-simd-internals:store-record-p))
+                        (store sb-simd-internals:store-record-p)
+                        (sap-ref sb-simd-internals:vref-record-sap-ref))
            (sb-simd-internals:find-function-record vref-record-name)
-         (let* ((vector-type (sb-simd-internals:value-record-type vector-record))
+         (let* ((sap-vop (when sap-ref (sb-simd-internals:mksym (symbol-package name) (if store "%SET-" "%") sap-ref)))
+                (sap-vop-c (when sap-ref (sb-simd-internals:mksym (symbol-package name) (if store "%SET-" "%") sap-ref "-C")))
+                (vector-type (sb-simd-internals:value-record-type vector-record))
                 (vector-primitive-type (sb-simd-internals:value-record-primitive-type vector-record))
                 (value-scs (sb-simd-internals:value-record-scs value-record))
                 (value-type (sb-simd-internals:value-record-type value-record))
@@ -88,7 +91,45 @@
                        (if store
                            `((inst ,mnemonic ,ea value)
                              (move result value))
-                           `((inst ,mnemonic result ,ea)))))))))))
+                           `((inst ,mnemonic result ,ea))))))
+                ,@(when sap-ref
+                    `((sb-c:defknown ,sap-vop (,@(when store `(,value-type))
+                                               sb-alien:system-area-pointer index ,displacement)
+                          (values ,value-type &optional) (always-translatable) :overwrite-fndb-silently t)
+                      (define-vop (,sap-vop)
+                        (:translate ,sap-vop)
+                        (:policy :fast-safe)
+                        (:args ,@(when store `((value :scs ,value-scs :target result)))
+                               (sap :scs (sap-reg))
+                               (index :scs ,index-scs))
+                        (:info addend)
+                        (:arg-types ,@(when store `(,value-primitive-type))
+                                    sb-alien:system-area-pointer positive-fixnum
+                                    (:constant ,displacement))
+                        (:results (result :scs ,value-scs))
+                        (:result-types ,value-primitive-type)
+                        (:generator 2
+                          ,@(let ((ea `(ea (* addend ,bytes-per-element) sap index ,scale)))
+                              (if store
+                                  `((inst ,mnemonic ,ea value) (move result value))
+                                  `((inst ,mnemonic result ,ea))))))
+                      (define-vop (,sap-vop-c)
+                        (:translate ,sap-vop)
+                        (:policy :fast-safe)
+                        (:args ,@(when store `((value :scs ,value-scs :target result)))
+                               (sap :scs (sap-reg)))
+                        (:info index addend)
+                        (:arg-types ,@(when store `(,value-primitive-type))
+                                    sb-alien:system-area-pointer
+                                    (:constant low-index)
+                                    (:constant ,displacement))
+                        (:results (result :scs ,value-scs))
+                        (:result-types ,value-primitive-type)
+                        (:generator 1
+                          ,@(let ((ea `(ea (* ,bytes-per-element (+ index addend)) sap)))
+                              (if store
+                                  `((inst ,mnemonic ,ea value) (move result value))
+                                  `((inst ,mnemonic result ,ea)))))))))))))
      (define-vref-vops ()
        `(progn
           ,@(loop for vref-record

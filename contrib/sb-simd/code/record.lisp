@@ -367,8 +367,28 @@
    (%name :reader aref-record-name)
    (%instruction-set :reader aref-record-instruction-set)))
 
+(defclass sap-ref-record (function-record)
+  ((%result-records
+    :type list
+    :initarg :result-records
+    :initform (required-argument :result-records)
+    :reader function-record-result-records)
+   ;; A function record, denoting the underlying primitive load or store
+   ;; operation of that record.  This primitive always accepts a
+   ;; one-dimensional array and a single row-major index as arguments.
+   (%primitive
+    :type (or function-record null)
+    :initarg :primitive
+    :initform nil
+    :reader reffer-record-primitive)
+   (%name :reader sap-ref-record-name)
+   (%instruction-set :reader sap-ref-record-instruction-set)))
+
 (defun aref-record-p (x)
   (typep x 'aref-record))
+
+(defun sap-ref-record-p (x)
+  (typep x 'sap-ref-record))
 
 (defmethod function-record-required-argument-records
     ((aref-record aref-record))
@@ -377,6 +397,11 @@
 (defmethod function-record-rest-argument-record
     ((aref-record aref-record))
   (find-value-record 'sb-simd:index))
+
+(defmethod function-record-required-argument-records
+    ((record sap-ref-record))
+  (list (find-value-record 'sb-alien:system-area-pointer)
+        (find-value-record 'sb-simd:index)))
 
 (defclass row-major-aref-record (reffer-record)
   (;; Define aliases for inherited slots.
@@ -399,10 +424,38 @@
 (defun setf-aref-record-p (x)
   (typep x 'setf-aref-record))
 
+(defclass setf-sap-ref-record (function-record)
+  (;; Define aliases for inherited slots.
+   (%name :reader setf-sap-ref-record-name)
+   (%instruction-set :reader setf-sap-ref-record-instruction-set)
+   ;; A value record, describing which kinds of objects are loaded or stored.
+   (%result-records
+    :type list
+    :initarg :result-records
+    :initform (required-argument :result-records)
+    :reader function-record-result-records)
+   ;; A function record, denoting the underlying primitive load or store
+   ;; operation of that record.  This primitive always accepts a
+   ;; one-dimensional array and a single row-major index as arguments.
+   (%primitive
+    :type (or function-record null)
+    :initarg :primitive
+    :initform nil
+    :reader reffer-record-primitive)))
+
+(defun setf-sap-ref-record-p (x)
+  (typep x 'setf-sap-ref-record))
+
 (defmethod function-record-required-argument-records
     ((setf-aref-record setf-aref-record))
   (list (function-record-result-record setf-aref-record)
         (reffer-record-array-record setf-aref-record)))
+
+(defmethod function-record-required-argument-records
+    ((setf-sap-ref-record setf-sap-ref-record))
+  (list (function-record-result-record setf-sap-ref-record)
+        (find-value-record 'sb-alien:system-area-pointer)
+        (find-value-record 'sb-simd:index)))
 
 (defmethod function-record-rest-argument-record
     ((setf-aref-record setf-aref-record))
@@ -423,7 +476,7 @@
         (find-value-record 'sb-simd:index)))
 
 (defmethod decode-record-definition ((_ (eql 'reffer-record)) expr)
-  (destructuring-bind (type array-type aref row-major-aref) expr
+  (destructuring-bind (type array-type aref row-major-aref &optional sap-ref) expr
     `(let ((.value-record. (find-value-record ',type))
            (.array-record. (find-value-record ',array-type)))
        (let ((.primitive. (make-instance 'row-major-aref-record
@@ -443,7 +496,14 @@
            :name '(setf ,aref)
            :array-record .array-record.
            :primitive .primitive.
-           :result-records (list .value-record.))))))
+           :result-records (list .value-record.)))
+       ,@(when sap-ref
+           `((make-instance 'sap-ref-record
+                            :name ',sap-ref
+                            :result-records (list .value-record.))
+             (make-instance 'setf-sap-ref-record
+                            :name '(setf ,sap-ref)
+                            :result-records (list .value-record.)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -601,7 +661,12 @@
     :type function-name
     :initarg :row-major-aref
     :initform (required-argument :row-major-aref)
-    :reader vref-record-row-major-aref)))
+    :reader vref-record-row-major-aref)
+   (%sap-ref
+    :type function-name
+    :initarg :sap-ref
+    :initform (required-argument :sap-ref)
+    :reader vref-record-sap-ref)))
 
 (defun vref-record-p (x)
   (typep x 'vref-record))
@@ -612,14 +677,15 @@
         :mnemonic (vref-record-mnemonic vref-record)
         :vector-record (vref-record-vector-record vref-record)
         :aref (vref-record-aref vref-record)
-        :row-major-aref (vref-record-row-major-aref vref-record)))
+        :row-major-aref (vref-record-row-major-aref vref-record)
+        :sap-ref (vref-record-sap-ref vref-record)))
 
 (defmethod function-record-result-records ((vref-record vref-record))
   (list
    (vref-record-value-record vref-record)))
 
 (defun decode-vref-record-definition (expr instance)
-  (destructuring-bind (name mnemonic value-type vector-type array-type aref row-major-aref &rest rest) expr
+  (destructuring-bind (name mnemonic value-type vector-type array-type aref row-major-aref sap-ref &rest rest) expr
     `(let* ((.value-record. (find-value-record ',value-type))
             (.vector-record. (find-value-record ',vector-type))
             (.array-record. (find-value-record ',array-type))
@@ -633,6 +699,7 @@
                 :vector-record .vector-record.
                 :aref ',aref
                 :row-major-aref ',row-major-aref
+                :sap-ref ',sap-ref
                 ,@rest)))
        ,(if (eq instance 'load-record)
             `(make-instance 'row-major-aref-record
@@ -655,6 +722,15 @@
                :name '(setf ,aref)
                :array-record .array-record.
                :primitive .primitive.
+               :result-records (list .value-record.)))
+       ,(if (eq instance 'load-record)
+            `(make-instance 'sap-ref-record
+               :name ',sap-ref
+               :primitive .primitive.
+               :result-records (list .value-record.))
+            `(make-instance 'setf-sap-ref-record
+               :name '(setf ,sap-ref)
+               :primitive .primitive.
                :result-records (list .value-record.))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -671,7 +747,8 @@
    (%value-record :reader load-record-value-record)
    (%vector-record :reader load-record-vector-record)
    (%aref :reader load-record-aref)
-   (%row-major-aref :reader load-record-row-major-aref)))
+   (%row-major-aref :reader load-record-row-major-aref)
+   (%sap-ref :reader load-record-sap-ref)))
 
 (defun load-record-p (x)
   (typep x 'load-record))
@@ -697,7 +774,8 @@
    (%value-record :reader store-record-value-record)
    (%vector-record :reader store-record-vector-record)
    (%aref :reader store-record-aref)
-   (%row-major-aref :reader store-record-row-major-aref)))
+   (%row-major-aref :reader store-record-row-major-aref)
+   (%sap-ref :reader store-record-sap-ref)))
 
 (defun store-record-p (x)
   (typep x 'store-record))
