@@ -1764,7 +1764,7 @@
     #8#
     #9=
     (:export
-     #:two-arg-u8.32-sat-
+     #:u8.32-sat-
      ;; f32.8
      ;; f64.4
      #:f64.4-reverse

@@ -512,6 +512,7 @@
    (s64.4-if s64.4-blend))
   (:reducers
    (u8.32- two-arg-u8.32- 0)
+   (u8.32-sat- two-arg-u8.32-sat- 0)
    (u16.16- two-arg-u16.16- 0)
    (u32.8- two-arg-u32.8- 0)
    (u64.4- two-arg-u64.4- 0)
