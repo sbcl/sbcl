@@ -2165,6 +2165,7 @@
                         (loop
                          (let ((new (+ v 1)))
                            (setf v new)))))))
+
 (with-test (:name :join-equality-constraints-loop)
   (checked-compile
    `(lambda (data n d j)
@@ -2190,3 +2191,16 @@
              (go g826)))
 
         (do ((index22 0 d)) ((or j index22)))))))
+
+(with-test (:name :delete-redundant-set-delay)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (let ((b 0))
+           (let ((c b))
+             (if (eql a 0)
+                 (setf b c))
+             a)))
+    ((0) 0)
+    ((1) 1)
+    ((2) 2)))

@@ -4262,3 +4262,8 @@ is :ANY, the function name is not checked."
        (loop for d in x
              always (or (typep d 'index)
                         (eq d '*)))))
+(defun delete-set (set)
+  (let ((var (set-var set)))
+    (setf (lambda-var-sets var)
+          (delq1 set (lambda-var-sets var)))
+    (delete-filter set (node-lvar set) (set-value set))))

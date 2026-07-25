@@ -53,6 +53,7 @@
 (declaim (type (and (vector t) (not simple-array)) *constraint-universe*))
 (defvar *constraint-universe*)
 (defvar *blocks-to-terminate*)
+(defvar *sets-to-delete*)
 (defvar *constraint-blocks*)
 (defvar *constraint-blocks-p*)
 
@@ -1335,18 +1336,19 @@
   (let ((var (set-var set)))
     (when (and (lambda-var-p var)
                (lambda-var-eq-constraints var))
-      (let* ((value (set-value set))
-             (ref (principal-lvar-use value)))
-        (when (and (ref-p ref)
-                   (eq (ref-leaf ref) var))
-          (let ((constraint (gethash (node-lvar ref)
-                                     (lambda-var-eq-constraints var))))
-            (when (and constraint
-                       (conset-member constraint in))
-              (setf (lambda-var-sets var)
-                    (delq1 set (lambda-var-sets var)))
-              (delete-filter set (node-lvar set) value)
-              t)))))))
+      (or (member set *sets-to-delete*)
+          (let* ((value (set-value set))
+                 (ref (principal-lvar-use value)))
+            (when (and (ref-p ref)
+                       (eq (ref-leaf ref) var))
+              (let ((constraint (gethash (node-lvar ref)
+                                         (lambda-var-eq-constraints var))))
+                (when (and constraint
+                           (conset-member constraint in))
+                  ;; Don't delete here because it might lead to block
+                  ;; deletion and disturb the computed constraints
+                  (push set *sets-to-delete*)
+                  t))))))))
 
 ;;;; Flow analysis
 
@@ -1778,6 +1780,7 @@
         (setf (if-consequent-constraints last) nil))))
 
   (let (*blocks-to-terminate*
+        *sets-to-delete*
         *constraint-blocks-p*)
     (dolist (block (find-and-propagate-constraints component))
       (unless (block-delete-p block)
@@ -1787,5 +1790,6 @@
                (memq :constraints *compile-trace-targets*))
       (print-constraints component))
     (loop for node in *blocks-to-terminate*
-          do (maybe-terminate-block node nil)))
+          do (maybe-terminate-block node nil))
+    (mapc #'delete-set *sets-to-delete*))
   (values))
