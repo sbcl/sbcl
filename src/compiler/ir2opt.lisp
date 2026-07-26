@@ -1,4 +1,4 @@
-;;;; This file implements some optimisations at the IR2 level.
+;;; This file implements some optimisations at the IR2 level.
 ;;;; Currently, the pass converts branches to conditional moves,
 ;;;; deletes subsequently dead blocks and then reoptimizes jumps.
 
@@ -1082,6 +1082,23 @@
            ,@(gen 'vop-results results))
       ,@(bind-info body))))
 
+(defmacro vop-bind-tn-refs (args results vop &body body)
+  (flet ((gen (accessor operands)
+           (loop for op in operands
+                 and tn-ref = `(,accessor ,vop) then `(tn-ref-across ,op)
+                 until (eq op :info)
+                 collect `(,op ,tn-ref)))
+         (bind-info (body)
+           (let ((info (cdr (member :info args))))
+             (if info
+                 `((loop named #:vop-bind
+                         with ,info = (vop-codegen-info ,vop)
+                         return (progn ,@body)))
+                 body))))
+    `(let* (,@(gen 'vop-args args)
+            ,@(gen 'vop-results results))
+       ,@(bind-info body))))
+
 (defun tn-reader (tn &key single-writer
                           single-reader)
   (let ((reads (tn-reads tn))
@@ -1300,6 +1317,34 @@
                                       vop
                                       (list symbols))
             (mapc #'delete-vop binds)))))))
+
+#+arm64
+(defoptimizers vop-optimize (sb-vm::dpb-c/fixnum sb-vm::dpb-c/signed-unsigned) (vop)
+  ;; bfm usually has fewer execution units and might have higher
+  ;; latency, and might require a move or untagging, prefer ORR when
+  ;; possible
+  (vop-bind-tn-refs (new integer :info size posn) (res) vop
+    (let* ((new-type (tn-ref-type new))
+           (integer-type (tn-ref-type integer))
+           (new-width (unsigned-type-width new-type))
+           (integer-width (unsigned-type-width integer-type)))
+      (when (and size posn
+                 new-width integer-width
+                 (<= new-width size)
+                 (<= integer-width posn))
+        (emit-and-insert-vop (vop-node vop)
+                             (vop-block vop)
+                             (template-or-lose
+                              (if (and (csubtypep integer-type (specifier-type 'fixnum))
+                                       (csubtypep (tn-ref-type res) (specifier-type 'fixnum)))
+                                  'sb-vm::dpb-c/orr/any-reg
+                                  'sb-vm::dpb-c/orr/signed-reg))
+                             (reference-tn-refs new nil)
+                             (reference-tn-refs res t)
+                             vop
+                             (list posn))
+        (delete-vop vop)))
+    nil))
 
 (defun very-temporary-p (tn)
   (let ((writes (tn-writes tn))

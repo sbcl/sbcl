@@ -471,17 +471,20 @@
       )))
 
 
-(defun unsigned-mask-width (type)
+(defun unsigned-type-width (type)
   (let* ((int (type-approximate-interval type))
-         (high (interval-high int)))
-    (when high
+         (high (interval-high int))
+         (low (interval-low int)))
+    (when (and high
+               low
+               (>= low 0))
       (integer-length high))))
 
 (deftransform logand ((x y) (t (constant-arg integer)) word
                       :node node :important nil)
   ;; Reduce constant width
   (let* ((mask (lvar-value y))
-         (cut (ldb (byte (unsigned-mask-width (single-value-result-type node t)) 0)
+         (cut (ldb (byte (unsigned-type-width (single-value-result-type node t)) 0)
                    mask)))
     (if (= cut mask)
         (give-up-ir1-transform)
@@ -493,7 +496,7 @@
   (or (combination-match (:node node)
           (logand (:type unsigned-byte a) (logand x (:constant b)))
         (block nil
-          (let* ((width (or (unsigned-mask-width (lvar-type a))
+          (let* ((width (or (unsigned-type-width (lvar-type a))
                             (return)))
                  (full-mask (if (constant-lvar-p a)
                                 (lvar-value a)
@@ -523,7 +526,7 @@
       (combination-match (:node node)
           (logand (:type unsigned-byte a) (logior * (:constant b)))
         (block nil
-          (let* ((width (or (unsigned-mask-width (lvar-type a))
+          (let* ((width (or (unsigned-type-width (lvar-type a))
                             (return)))
                  (full-mask (ldb (byte width 0) -1))
                  (mask (if (constant-lvar-p a)
@@ -553,7 +556,7 @@
       (combination-match (:node node)
           (logand (:type unsigned-byte a) (logxor * (:constant b)))
         (block nil
-          (let* ((width (or (unsigned-mask-width (lvar-type a))
+          (let* ((width (or (unsigned-type-width (lvar-type a))
                             (return)))
                  (full-mask (ldb (byte width 0) -1))
                  (mask (if (constant-lvar-p a)
@@ -575,7 +578,7 @@
       (combination-match (:node node)
           (logand (:type unsigned-byte a) (mask-signed-field (:constant sign) b))
         (block nil
-          (let ((width (or (unsigned-mask-width (lvar-type a))
+          (let ((width (or (unsigned-type-width (lvar-type a))
                            (return))))
             (when (> sign width)
               (extract-lvar-n b 1 node))))))

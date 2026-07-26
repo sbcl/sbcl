@@ -491,16 +491,24 @@
                                      &optional (node (gensym))
                                      &rest vars)
                          &body body)
-  (let* ((name (list (car names) kind))
+  (let* ((name (if (eq kind 'vop-optimize)
+                   (list kind (car names))
+                   (list (car names) kind)))
          (optimizer-name (make-optimizer-name name)))
     `(progn
        (defoptimizer ,name
            (,lambda-list ,node ,@vars)
          ,@body)
-       ,@(loop for name in (cdr names)
-               collect `(setf (,(package-symbolicate #.(find-package "SB-C") "FUN-INFO-" kind)
-                               (fun-info-or-lose ',name))
-                              #',optimizer-name)))))
+       ,@(if (eq kind 'vop-optimize)
+             (loop for name in (cdr names)
+                   collect
+                   `(set-vop-optimizer (template-or-lose ',name)
+                                       #',optimizer-name))
+             (loop for name in (cdr names)
+                   collect
+                   `(setf (,(package-symbolicate #.(find-package "SB-C") "FUN-INFO-" kind)
+                           (fun-info-or-lose ',name))
+                          #',optimizer-name))))))
 
 ;;;; IR groveling macros
 
