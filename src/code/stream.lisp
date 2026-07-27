@@ -1762,7 +1762,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   (declare (type string-output-stream stream))
   (let* ((length (max (string-output-stream-index stream)
                       (string-output-stream-index-cache stream)))
-         (prev (nreverse (string-output-stream-prev stream)))
+         (prev (string-output-stream-prev stream))
          (this (string-output-stream-buffer stream))
          (next (string-output-stream-next stream))
          (base-string-p (neq (string-output-stream-unicode-p stream) t))
@@ -1800,7 +1800,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (flet ((copy (fun scale)
              (let ((start 0)) ; index into RESULT
                (declare (index start))
-               (dolist (buffer prev)
+               (dolist (buffer (nreverse prev))
                  ;; It doesn't look as though we should have to pass RESULT
                  ;; in to FUN to avoid closure consing, but indeed we do.
                  (funcall fun result buffer start scale)
@@ -1810,6 +1810,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                (dolist (buffer next)
                  (funcall fun result buffer start scale)
                  (incf start (length buffer))))))
+      (declare (inline copy))
       (if (and (eq (string-output-stream-element-type stream) '*)
                base-string-p)
           ;; This is the most common case, arising from WRITE-TO-STRING,
@@ -1828,7 +1829,9 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                                            system-area-pointer system-area-pointer unsigned)
                                  :extern))
               (copy (lambda (result source start scale)
-                      (declare (index start))
+                      (declare (optimize speed)
+                               (index start)
+                               (simple-string source))
                       (let* ((nchars (min (- length start) (length source)))
                              (nbytes (the index (ash (the index nchars) scale))))
                         (with-pinned-objects (source)
