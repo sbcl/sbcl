@@ -1242,6 +1242,7 @@ Experimental: interface subject to change."
                (len (length vec)))
           (when (functionp magic)
             (let ((perfect-hash (funcall magic name-hash)))
+              (declare (type fixnum perfect-hash))
               (when (< perfect-hash len)
                 (let ((symbol (truly-the symbol (svref vec perfect-hash))))
                   (when (and (eql (symbol-name-hash symbol) name-hash)
