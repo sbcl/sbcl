@@ -194,10 +194,7 @@
   (defstruct (conset
               (:constructor make-conset ())
               (:copier %copy-conset))
-    (vector (make-array
-             (power-of-two-ceiling (length *constraint-universe*))
-             :element-type 'bit :initial-element 0)
-            :type simple-bit-vector)
+    (vector #* :type simple-bit-vector)
     ;; Bit-vectors win over lightweight hashes for copy, union,
     ;; intersection, difference, but lose for iteration if you iterate
     ;; over the whole vector.  Tracking extrema helps a bit.
@@ -223,12 +220,9 @@
     (declare (type index new-size))
     (setf (conset-vector conset)
           (replace (the simple-bit-vector
-                      (make-array
-                       (power-of-two-ceiling new-size)
-                      :element-type 'bit
-                      :initial-element 0))
-                   (the simple-bit-vector
-                     (conset-vector conset)))))
+                      (make-array (align-up new-size (* 2 sb-vm:n-word-bits))
+                                  :element-type 'bit :initial-element 0))
+                   (conset-vector conset))))
 
   (declaim (inline conset-grow))
   (defun conset-grow (conset new-size)
