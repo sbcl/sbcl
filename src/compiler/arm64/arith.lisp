@@ -217,27 +217,78 @@
   :negative-op sub)
 (define-binop - 4 sub :constant-test abs-add-sub-immediate-p :constant-fixnum-test fixnum-abs-add-sub-immediate-p
   :negative-op add)
-(define-binop logand 2 and
-  :constant-fixnum-test fixnum
-  :constant-fixnum-transform (lambda (x)
-                               (cond ((encode-logical-immediate x)
-                                      x)
-                                     ((let ((tagged (logior x fixnum-tag-mask)))
-                                        (and (encode-logical-immediate tagged)
-                                             tagged)))
-                                     ((and (typep x '(unsigned-byte 32))
-                                           (encode-logical-immediate x 32))
-                                      (setf r (32-bit-reg r))
-                                      x)
-                                     ((and (typep x '(unsigned-byte 32))
-                                           (let ((tagged (logior x fixnum-tag-mask)))
-                                             (when (encode-logical-immediate tagged 32)
-                                               (setf r (32-bit-reg r))
-                                               tagged))))
-                                     (t
-                                      (load-immediate-word tmp-tn x nil t)))))
 (define-binop logior 2 orr)
 (define-binop logxor 2 eor)
+
+(define-vop (fast-logand/fixnum=>fixnum fast-fixnum-binop)
+  (:translate logand)
+  (:generator 2
+    (inst and r x y)))
+
+(define-vop (fast-logand/signed=>signed fast-signed-binop)
+  (:translate logand)
+  (:generator 3
+    (inst and r x y)))
+
+(define-vop (fast-logand/unsigned=>unsigned fast-unsigned-binop)
+  (:translate logand)
+  (:generator 3
+    (inst and r x y)))
+
+(define-vop (fast-logand-c/fixnum=>fixnum fast-fixnum-binop-c)
+  (:arg-types tagged-num (:constant fixnum))
+  (:arg-refs x-ref)
+  (:translate logand)
+  (:generator 1
+    (block nil
+      (let* ((y-untagged y)
+             (y (fixnumize y))
+             (imm
+               (cond ((encode-logical-immediate y) y)
+                     ((let ((tagged (logior y fixnum-tag-mask)))
+                        (and (encode-logical-immediate tagged) tagged)))
+                     ((and (typep y '(unsigned-byte 32)) (encode-logical-immediate y 32)) (setf r (32-bit-reg r)) y)
+                     ((and (typep y '(unsigned-byte 32))
+                           (let ((tagged (logior y fixnum-tag-mask)))
+                             (when (encode-logical-immediate tagged 32) (setf r (32-bit-reg r)) tagged))))
+                     ((load-immediate-word tmp-tn y t t))
+                     ;; Use BIC if the inverted constant can be loaded with one instruction
+                     ((let* ((width (or (sb-c::unsigned-type-width (tn-ref-type x-ref))
+                                        n-fixnum-bits))
+                             (inverted (ash (ldb (byte width 0) (lognot y-untagged)) n-fixnum-tag-bits)))
+                        (when (load-immediate-word tmp-tn inverted t t)
+                          (inst bic r x tmp-tn)
+                          (return))))
+                     ((load-immediate-word tmp-tn y nil t)))))
+        (inst and r x imm)))))
+
+(define-vop (fast-logand-c/signed=>signed fast-signed-binop-c)
+  (:translate logand)
+  (:arg-refs x-ref)
+  (:arg-types signed-num (:constant integer))
+  (:generator 2
+    (block nil
+      (let* ((imm
+               (cond ((encode-logical-immediate y) y)
+                     ((and (typep y '(unsigned-byte 32)) (encode-logical-immediate y 32)) (setf r (32-bit-reg r)) y)
+                     ((load-immediate-word tmp-tn y t))
+                     ;; Use BIC if the inverted constant can be loaded with one instruction
+                     ((let* ((width (or (sb-c::unsigned-type-width (tn-ref-type x-ref))
+                                        64))
+                             (inverted (ldb (byte width 0) (lognot y))))
+                        (when (load-immediate-word tmp-tn inverted t)
+                          (inst bic r x tmp-tn)
+                          (return))))
+                     ((load-immediate-word tmp-tn y nil)))))
+        (inst and r x imm)))))
+
+(define-vop (fast-logand-c/unsigned=>unsigned fast-signed-binop-c)
+  (:translate logand)
+  (:args (x :scs (unsigned-reg)))
+  (:info y)
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:arg-types unsigned-num (:constant (satisfies encode-logical-immediate))))
 
 (define-vop (fast-/unsigned-signed fast-safe-arith-op)
   (:translate -)
