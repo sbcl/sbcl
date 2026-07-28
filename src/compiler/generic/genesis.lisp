@@ -2236,9 +2236,8 @@ core and return a descriptor to it."
                 (if (symbolp name) (cold-intern name) name))))
     (let ((existing (read-wordindexed fdefn sb-vm:fdefn-fun-slot)))
       (unless (or (cold-null existing) (descriptor= existing function))
-        (cerror "Overwrite" "Function multiply defined: ~S. Was ~x is ~x" name
-                 (descriptor-bits existing)
-                 (descriptor-bits function))))
+        (error "Function multiply defined: ~S. Was ~x is ~x" name
+               (descriptor-bits existing) (descriptor-bits function))))
     (write-wordindexed fdefn sb-vm:fdefn-fun-slot function)
     (write-wordindexed/raw
      fdefn sb-vm:fdefn-raw-addr-slot
@@ -2250,6 +2249,10 @@ core and return a descriptor to it."
     fdefn)
   #+linkage-space
   (let ((fname (if (symbolp name) (cold-intern name) (ensure-cold-fdefn name))))
+    (let ((existing (read-bits-wordindexed fname sb-vm:fdefn-fun-slot)))
+      (unless (or (zerop existing) (= existing (descriptor-bits function)))
+        (error "Function multiply defined: ~S. Was ~x is ~x" name
+               existing (descriptor-bits function))))
     (write-wordindexed fname sb-vm:fdefn-fun-slot function)
     fname))
 
