@@ -133,8 +133,8 @@
 ;;; for constraint propagation, or if bit-vectors on some XC host
 ;;; really lose compared to SSETs, here's the conset API as a wrapper
 ;;; around SSETs:
-#+nil
-(eval-when (:compile-toplevel :execute) (push :conset-is-sset sb-xc:*features*))
+#-conset-is-sset
+(eval-when (:compile-toplevel :execute) (pushnew :bitmapped-conset sb-xc:*features*))
 #+conset-is-sset
 (progn
   (deftype conset () 'sset)
@@ -182,7 +182,7 @@
 ;;;    9     66   1.4    210   4.4   3857  81.0        -  (FLET SB-C::BODY-FUN :IN SB-C::TYPE-FROM-CONSTRAINTS)
 ;;;   10     58   1.2    123   2.6   3915  82.2        -  SB-KERNEL::%TYPE-INTERSECTION
 
-#-conset-is-sset
+#+bitmapped-conset
 (locally
     ;; This is performance critical for the compiler, and benefits
     ;; from the following declarations.  Probably you'll want to
@@ -495,7 +495,7 @@
 ;;; equality or emptiness testing.  There's also union, but that's only an
 ;;; optimisation to avoid useless copies in ADD-TEST-CONSTRAINTS and
 ;;; FIND-BLOCK-TYPE-CONSTRAINTS.
-#-conset-is-sset
+#+bitmapped-conset
 (defmacro do-conset-elements ((constraint conset &optional result) &body body)
   (let ((index '#:index) ; gensym considered harmful
         (conset-vector '#:conset-vector)
@@ -550,29 +550,28 @@
 (defmacro do-conset-constraints-intersection ((symbol (conset constraints) &optional result)
                                               &body body)
   (let ((min (gensym "MIN"))
-        (max (gensym "MAX")))
+        (max (gensym "MAX"))
+        (vect '#:v)
+        (i '#:i))
     (declare (ignorable min max))
     (once-only ((conset conset)
                 (constraints constraints))
-      `(flet ((body (,symbol)
-                (declare (type constraint ,symbol))
-                ,@body))
+      `(progn
          (when ,constraints
-           (let (#-conset-is-sset (,min (conset-min ,conset))
-                 #-conset-is-sset (,max (conset-max ,conset))
-                 (vector #-sb-xc-host (truly-the simple-vector (%array-data ,constraints))
+           (let (#+bitmapped-conset (,min (conset-min ,conset))
+                 #+bitmapped-conset (,max (conset-max ,conset))
+                 (,vect  #-sb-xc-host (truly-the simple-vector (%array-data ,constraints))
                          #+sb-xc-host ,constraints))
              #-sb-xc-host (declare (optimize (insert-array-bounds-checks 0)))
-             (loop for i below (length ,constraints)
-                   for constraint = (aref vector i)
-                   when #-conset-is-sset
-                        (let ((number (truly-the index (constraint-number
-                                                        (truly-the constraint constraint)))))
-                          (and (<= ,min number)
-                               (< number ,max)
-                               (conset-member constraint ,conset)))
-                        #+conset-is-sset (conset-member constraint ,conset)
-                   do (body constraint))))
+             ;; CONSTRAINTS has a fill-pointer. DOVECTOR would wrongly visit the
+             ;; entirety of the underlying simple-vector.
+             (loop for ,i below (length ,constraints)
+                   for ,symbol = (truly-the constraint (aref ,vect ,i))
+                   when #+bitmapped-conset
+                        (let ((n (truly-the index (constraint-number ,symbol))))
+                          (and (<= ,min n) (< n ,max) (conset-member ,symbol ,conset)))
+                        #-bitmapped-conset (conset-member ,symbol ,conset)
+                   do (progn ,@body))))
          ,result))))
 
 (defmacro do-eql-vars ((symbol (var constraints) &optional result) &body body)
