@@ -2592,11 +2592,7 @@
            (eq (node-home-lambda ref)
                (lambda-home (lambda-var-home var))))
       (let ((ref-type (single-value-type (node-derived-type ref))))
-        (cond ((or (csubtypep (single-value-type (lvar-type arg)) ref-type)
-                   ;; Can't impart the same type to multiple uses, as
-                   ;; they are coming from different branches with
-                   ;; different derived values.
-                   (consp (lvar-uses lvar)))
+        (cond ((csubtypep (single-value-type (lvar-type arg)) ref-type)
                (substitute-lvar-uses lvar arg
                                      ;; Really it is (EQ (LVAR-USES LVAR) REF):
                                      t)
@@ -2605,10 +2601,9 @@
                (let* ((value (make-lvar))
                       (cast (insert-cast-before ref value ref-type
                                                 **zero-typecheck-policy**)))
-                 (setf (cast-%type-check cast) nil)
-                 (substitute-lvar-uses value arg
-                                       ;; FIXME
-                                       t)
+                 (setf (cast-%type-check cast) nil
+                       (cast-silent-conflict cast) t)
+                 (substitute-lvar-uses value arg t)
                  (%delete-lvar-use ref)
                  (add-lvar-use cast lvar)))))
       (delete-ref ref)
