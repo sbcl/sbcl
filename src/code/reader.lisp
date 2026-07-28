@@ -924,14 +924,15 @@ FROM-READTABLE defaults to the standard Lisp readtable when NIL."
                stream "More than one object follows . in list.")))))))
 
 (defun read-string (stream closech)
-  ;; This accumulates chars until it sees same char that invoked it.
-  ;; We avoid copying any given input character more than twice-
-  ;; once to a temp buffer and then to the result. In the worst case,
-  ;; we can waste space equal the unwasted space, if the final character
-  ;; causes allocation of a new buffer for just that character,
-  ;; because the buffer size is doubled each time it overflows.
-  ;; (Would be better to peek at the frc-buffer if the stream has one.)
-  ;; Scratch vectors are GC-able as soon as this function returns though.
+  ;; Accumulate chars until an unescaped CLOSECH. We avoid copying any
+  ;; given input character more than twice: once into a temp buffer
+  ;; and then to the result. In the worst case, the total size of the
+  ;; chained buffers is 3 times the length of the result string (if
+  ;; the final character causes allocation of a new buffer for just
+  ;; that character) because the buffer size is doubled each time it
+  ;; overflows. (Would be better to peek at the frc-buffer if the
+  ;; stream has one.) Scratch vectors are GC-able as soon as this
+  ;; function returns though.
   (declare (character closech))
   (macrolet ((scan (read-a-char eofp &optional finish)
                `(loop (let ((char ,read-a-char))
@@ -946,6 +947,7 @@ FROM-READTABLE defaults to the standard Lisp readtable when NIL."
                         (when (>= ptr lim)
                           (unless suppress
                             (push buf chain)
+                            (incf total-chain-length lim)
                             (setq lim (the index (ash lim 1))
                                   buf (make-array lim :element-type 'character)))
                           (setq ptr 0))
@@ -960,8 +962,10 @@ FROM-READTABLE defaults to the standard Lisp readtable when NIL."
            (lim (length buf))
            (ptr 0)
            (only-base-chars t)
+           (total-chain-length 0)
            (chain))
-      (declare (type (simple-array character (*)) buf))
+      (declare (type (simple-array character (*)) buf)
+               (type index ptr total-chain-length))
       (reset-read-buffer token-buf)
       (if (ansi-stream-p stream)
           (prepare-for-fast-read-char stream
@@ -970,20 +974,18 @@ FROM-READTABLE defaults to the standard Lisp readtable when NIL."
           (scan (read-char stream nil +EOF+) (eq char +EOF+)))
       (if suppress
           ""
-          (let* ((sum (loop for buf in chain sum (length buf)))
-                 (result
-                  (make-array (+ sum ptr)
-                              :element-type (if only-base-chars
-                                                (%readtable-string-preference rt)
-                                                'character))))
-            (setq ptr sum)
+          (let* ((element-type (if only-base-chars
+                                   (%readtable-string-preference rt)
+                                   'character))
+                 (result (make-array (+ total-chain-length ptr)
+                                     :element-type element-type)))
+            (setq ptr total-chain-length)
             ;; Now work backwards from the end
             (replace result buf :start1 ptr)
             (dolist (buf chain result)
               (declare (type (simple-array character (*)) buf))
-              (let ((len (length buf)))
-                (decf ptr len)
-                (replace result buf :start1 ptr))))))))
+              (decf ptr (length buf))
+              (replace result buf :start1 ptr)))))))
 
 (defun read-right-paren (stream ignore)
   (declare (ignore ignore))
