@@ -1042,11 +1042,13 @@
                                                    (constant-arg (mod #.n-word-bits))
                                                    signed-word) *)) *
                     :vop t)
-  (not (and (constant-lvar-p new)
-            (let* ((size (lvar-value size))
-                   (new (ldb (byte size 0) (lvar-value new))))
-              (or (zerop new)
-                  (= (logcount new) size))))))
+  (not (or (and (constant-lvar-p new)
+                (let* ((size (lvar-value size))
+                       (new (ldb (byte size 0) (lvar-value new))))
+                  (or (zerop new)
+                      (= (logcount new) size))))
+           (and (constant-lvar-p integer)
+                (zerop (lvar-value integer))))))
 
 (define-vop (dpb-c/orr/any-reg)
   (:args (new :scs (unsigned-reg signed-reg any-reg))
