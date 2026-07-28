@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.6.6:
+changes in sbcl-2.6.7 relative to sbcl-2.6.6:
   * new contrib module: SB-MANUAL contains the SBCL manual in docstrings of
     section definitions, which tie together the docstrings of normal Lisp
     definitions. The manual can thus be explored interactively in the usual
