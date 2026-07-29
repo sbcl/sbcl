@@ -3248,12 +3248,19 @@ expansion happened."
     (new-ctype character-set-type 0 pairs)))
 
 (defun character-set-type-from-characters (characters)
-  ;; Constructor asserts that pairs are properly sorted
-  (make-character-set-type (mapcar (lambda (x)
+  ;; IF isn't strictly needed, because MAKE-CHARACTER-SET-TYPE can return *EMPTY-TYPE*,
+  ;; however the MEMBER translator unconditionally calls CHARACTER-SET-TYPE-FROM-CHARACTERS
+  ;; on NIL all the time, which is bothersome when trying to discern why so many character
+  ;; set types arise.  User code almost can't make an empty one (it can, but rarely).
+  (if characters
+      (make-character-set-type
+                           (mapcar (lambda (x)
                                      (let ((code (sb-xc:char-code x)))
                                        (cons code code)))
+                                   ;; Constructor asserts that pairs are properly sorted
                                    (sort (delete-duplicates characters) #'<
-                                         :key #'sb-xc:char-code))))
+                                         :key #'sb-xc:char-code)))
+      *empty-type*))
 
 (declaim (ftype (sfunction (t &key (:complexp t)
                                    (:element-type t)
@@ -5217,12 +5224,18 @@ expansion happened."
             (chars (loop named outer
                          for (low . high) in pairs
                          nconc (loop for code from low upto high
-                                     collect (code-char code)
+                                     collect code
                                      when (minusp (decf count))
                                      do (return-from outer t)))))
        (if (eq chars t)
            `(character-set ,pairs)
-           `(member ,@chars))))))
+           ;; Until we know we're unparsing as MEMBER, don't call CODE-CHAR. This is a subtle
+           ;; boon to the cross-compiler which was otherwise unable to print any diagnostic
+           ;; involving certain character-sets. Think about it: we manipulate sets containing
+           ;; non-standard characters, the most prevalent being #\NULL. Unparsing such sets
+           ;; would fail with "The value 0 is not of type (OR (INTEGER 10 10) (INTEGER 32 126))"
+           ;; thereby turning your debug session into a yak-shaving exercise.
+           `(member ,@(mapcar #'code-char chars)))))))
 
 (define-type-method (character-set :singleton-p) (type)
   (let* ((pairs (character-set-type-pairs type))
