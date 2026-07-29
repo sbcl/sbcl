@@ -328,17 +328,19 @@
                            (h (y)
                              (* y y)))
                     (+ 2
-                       (h 4)
-                       (if (= b 5)
-                           (fm x x)
-                           (fm b y)))))
+                       (cond ((= b 5)
+                              (fm x x))
+                             ((= (mod b 10) 9)
+                              (h x))
+                             (t
+                              (fm b y))))))
                 (lambda (component)
                   (dolist (lambda (sb-c::component-lambdas component))
                     (dolist (lambda-let (sb-c::lambda-lets lambda))
                       (when (sb-c::functional-kind-eq lambda-let sb-c::assignment)
                         (push lambda-let converted))))))))
-      (assert (= (funcall fun 1 2 3 t) 18))
-      (assert (= (funcall fun 1 2 3 nil) 99))
+      (assert (= (funcall fun 1 2 3 t) 2))
+      (assert (= (funcall fun 1 2 3 nil) 83))
       (assert (= (length converted) 4))))) ; F, G, FM, H
 
 ;;; The example in 5.2 of Fluet and Weeks "Contification via
