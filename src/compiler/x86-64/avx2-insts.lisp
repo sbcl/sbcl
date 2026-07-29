@@ -381,7 +381,8 @@
                     (xmm-size thing))
                    (t
                     0)))
-          (r (if (null reg)
+          (r (if (or (null reg)
+                     (integerp reg))
                  0
                  (reg-7-p (reg-id reg))))
           (x (cond ((and (ea-p thing)
@@ -1690,46 +1691,52 @@ REG is the source (encoded in ModR/M.r/m).
      (emit-sse-inst-2byte segment dst src #xf3 #x38 #xf6
                           :operand-size size))))
 
-;;;; BMI2 instructions (VEX-encoded GPR operations)
+;;;; BMI1/2 instructions (VEX-encoded GPR operations)
 ;;;; All use VEX.LZ (L=0). W=1 for 64-bit, W=0 for 32-bit.
 
 ;;; Shifts with shift count in GPR (no flag side effects, not serialized on CL)
 ;;; SHRX/SHLX/SARX r64a, r/m64, r64b
 ;;;   dst = reg field, src = r/m, count = vvvv
-(macrolet ((def (name prefix)
-             `(define-instruction ,name (segment &prefix prefix dst src count)
-                ,@(avx2-inst-printer-list 'vex-gpr prefix #xF7
+(macrolet ((def (name prefix opcode third-op-name)
+             `(define-instruction ,name (segment &prefix prefix dst src ,third-op-name)
+                ,@(avx2-inst-printer-list 'vex-gpr prefix opcode
+                                          :printer '(:name :tab reg ", " reg/mem ", " vvvv)
                                           :nds t
                                           :opcode-prefix #x0f38)
                 (:emitter
-                 (emit-avx2-inst segment src dst ,prefix #xF7
+                 (emit-avx2-inst segment src dst ,prefix ,opcode
                                  :opcode-prefix #x0f38
-                                 :vvvv count
+                                 :vvvv ,third-op-name
                                  :l 0
                                  :w (ecase (pick-operand-size prefix dst src)
                                       (:qword 1)
                                       (:dword 0)))))))
-  (def shrx #xF2)
-  (def shlx #x66)
-  (def sarx #xF3))
+  (def shrx #xF2 #xF7 count)
+  (def shlx #x66 #xF7 count)
+  (def sarx #xF3 #xF7 count)
+  (def bzhi nil #xF5 position)
+  (def bextr nil #xF7 control))
 
 ;;; PEXT/PDEP r64a, r64b, r/m64
 ;;;   dst = reg field, src = vvvv, mask = r/m
-(macrolet ((def (name prefix)
-             `(define-instruction ,name (segment &prefix prefix dst src mask)
-                ,@(avx2-inst-printer-list 'vex-gpr prefix #xF5
+(macrolet ((def (name prefix opcode &optional (third-op-name 'src2)
+                                              printer)
+             `(define-instruction ,name (segment &prefix prefix dst src ,third-op-name)
+                ,@(avx2-inst-printer-list 'vex-gpr prefix opcode
                                           :nds t
+                                          :printer printer
                                           :opcode-prefix #x0f38)
                 (:emitter
-                 (emit-avx2-inst segment mask dst ,prefix #xF5
+                 (emit-avx2-inst segment ,third-op-name dst ,prefix ,opcode
                                  :opcode-prefix #x0f38
                                  :vvvv src
                                  :l 0
-                                 :w (ecase (pick-operand-size prefix dst mask)
+                                 :w (ecase (pick-operand-size prefix dst src)
                                       (:qword 1)
                                       (:dword 0)))))))
-  (def pext #xF3)
-  (def pdep #xF2))
+  (def pext #xF3 #xF5 mask)
+  (def pdep #xF2 #xF5 mask)
+  (def andn nil #xF2))
 
 ;;; RORX r64a, r/m64, imm8
 ;;;   dst = reg field, src = r/m, count = imm8, no vvvv
@@ -1746,4 +1753,21 @@ REG is the source (encoded in ModR/M.r/m).
   . #.(avx2-inst-printer-list 'vex-gpr #xF2 #xF0
                               :opcode-prefix #x0f3a
                               :printer '(:name :tab reg ", " reg/mem)))
+(macrolet ((def (name reg)
+             `(define-instruction ,name (segment &prefix prefix dst src)
+                ,@(avx2-inst-printer-list 'vex-gpr nil #xF3
+                                          :opcode-prefix #x0f38
+                                          :more-fields `((reg ,reg))
+                                          :printer '(:name :tab vvvv ", " reg/mem))
+                (:emitter
+                 (emit-avx2-inst segment src ,reg nil #xF3
+                                 :opcode-prefix #x0f38
+                                 :vvvv dst
+                                 :l 0
+                                 :w (ecase (pick-operand-size prefix dst src)
+                                      (:qword 1)
+                                      (:dword 0)))))))
+  (def blsr 1)
+  (def blsmsk 2)
+  (def blsi 3))
 

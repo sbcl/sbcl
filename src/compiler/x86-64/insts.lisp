@@ -1527,6 +1527,41 @@
         (t
             (error "bogus arguments to MOV: ~S ~S" dst src))))
 
+(define-instruction-format (movbe 32
+                            :default-printer
+                            `(:name :tab reg ", " reg/mem))
+  (prefix  :field (byte 16 0)    :value #x380F)
+  (op      :field (byte 8 16))
+  (reg/mem :fields (list (byte 2 30) (byte 3 24))
+                                :type 'reg/mem)
+  (reg     :field (byte 3 27)   :type 'reg))
+
+(define-instruction movbe (segment &prefix prefix dst src)
+  (:printer movbe ((op #xF0))
+            '(:name :tab reg ", " reg/mem))
+  (:printer movbe ((op #xF1))
+            '(:name :tab reg/mem ", " reg))
+  (:emitter
+   (let* ((size (pick-operand-size prefix dst src))
+          (src (sized-thing src size))
+          (dst (sized-thing dst size)))
+     (when (eq size :byte)
+       (error "MOVBE does not support 8-bit operands: ~S ~S" dst src))
+     (cond ((and (gpr-p dst) (not (gpr-p src)))
+            (emit-prefixes segment src dst size)
+            (emit-byte segment #x0F)
+            (emit-byte segment #x38)
+            (emit-byte segment #xF0)
+            (emit-ea segment src dst))
+           ((and (gpr-p src) (not (gpr-p dst)))
+            (emit-prefixes segment dst src size)
+            (emit-byte segment #x0F)
+            (emit-byte segment #x38)
+            (emit-byte segment #xF1)
+            (emit-ea segment dst src))
+           (t
+            (error "Invalid arguments to MOVBE: ~S ~S (requires one GPR and one memory operand)" dst src))))))
+
 ;;; MOVABS is not a mnemonic according to the CPU vendors, but every (dis)assembler
 ;;; in popular use chooses this mnemonic instead of MOV with an 8-byte operand.
 ;;; (Even with Intel-compatible syntax, LLVM produces MOVABS).
