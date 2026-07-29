@@ -155,10 +155,13 @@
   (defun conset-adjoin (constraint conset) (sset-adjoin constraint conset))
   (defun conset-delete (constraint conset) (sset-delete constraint conset))
   (defun conset= (conset1 conset2) (sset= conset1 conset2))
-  ;; Note: CP doesn't ever care whether union, intersection, and
-  ;; difference change the first set.  (This is an important degree of
-  ;; freedom, since some ways of implementing sets lose a great deal
-  ;; when these operations are required to track changes.)
+  ;; Note: CP doesn't need the boolean result from {union, intersection, difference}
+  ;; indicating whether CONSET1 actually changed due to the operation.
+  ;; Hence we return 0 values to explicitly discard the result of the SSET call.
+  ;; The #+bitmapped-conset approach doesn't even try to compute a similar result.
+  ;; (This is an important degree of freedom, since some ways of implementing sets
+  ;; suffer in performance when algebraic operations are required to compute
+  ;; a truth value based on whether the operation had an effect.)
   (defun conset-union (conset1 conset2)
     (sset-union conset1 conset2) (values))
   (defun conset-intersection (conset1 conset2)
