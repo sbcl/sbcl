@@ -196,3 +196,25 @@
                 ,(make-symbol (map 'string #'code-char '(18689 30023 3247 59527 37241 35427))))
         standard-char)
        p1))))
+
+(defun good-example (x y)
+  (declare (fixnum x))
+  (let ((bits (logand x 7)))
+    (case bits
+      (0 (print 'foo))
+      (1 (cons 'a y))
+      (2 (cons y 'zook))
+      (3 "hi"))))
+
+(defun failing-example (x y)
+  (declare (fixnum x))
+  (let ((bits (logand x 3)))
+    (case bits
+      (0 (print 'foo))
+      (1 (cons 'a y))
+      (2 (cons y 'zook))
+      (3 "hi"))))
+
+(with-test (:name :should-use-jump-table)
+  (assert (= (sb-kernel:code-jump-table-words (sb-kernel:fun-code-header #'good-example)) 5))
+  (assert (= (sb-kernel:code-jump-table-words (sb-kernel:fun-code-header #'failing-example)) 5)))

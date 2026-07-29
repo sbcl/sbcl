@@ -10286,6 +10286,23 @@
          (lvar (first (combination-args node)))
          (otherwise (and last-if
                          (if-alternative last-if))))
+    (let ((diff (type-difference (lvar-type lvar)
+                                 (specifier-type `(member ,@keys)))))
+      ;; If it's an exhaustive case add the missing case back,
+      ;; that way the hash doesn't need to be checked for collisions.
+      ;; Also the missing case may be needed to meet the threshold
+      ;; minimum number of items to create a jump table.
+      (multiple-value-bind (p value) (type-singleton-p diff)
+        (when (and p
+                   (typecase (car keys)
+                     (sb-xc:fixnum (fixnump value))
+                     (symbol (symbolp value))
+                     (character (characterp value))))
+          (push value keys)
+          (setf targets (append targets (list otherwise))
+                key-lists (append key-lists
+                                  (list (list value)))
+                otherwise nil))))
     (cond ((not (and keys
                      (sb-impl::should-attempt-hash-based-case-dispatch keys)
                      (not (key-lists-for-or-eq-transform-p key-lists))))
@@ -10314,22 +10331,6 @@
                                           (otherwise . ,otherwise)))
                            t))
            t)
-          ((let ((diff (type-difference (lvar-type lvar)
-                                        (specifier-type `(member ,@keys)))))
-             ;; If it's an exhaustive case add the missing case back,
-             ;; that way the hash doesn't need to be checked for collisions.
-             (multiple-value-bind (p value) (type-singleton-p diff)
-               (when (and p
-                          (typecase (car keys)
-                            (sb-xc:fixnum (fixnump value))
-                            (symbol (symbolp value))
-                            (character (characterp value))))
-                 (push value keys)
-                 (setf targets (append targets (list otherwise))
-                       key-lists (append key-lists
-                                         (list (list value)))
-                       otherwise nil)))
-             nil))
           ((or-eq-to-aref keys key-lists targets last-if chains otherwise))
           (t
            (multiple-value-bind (code new-targets)
