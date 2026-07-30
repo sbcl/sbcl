@@ -308,8 +308,8 @@
 ;;; cannot. In this case, FM, F, G and H all have the same
 ;;; continuation.
 #+sb-devel
-(with-test (:name (:assignment-convert :fluet-weeks-5.1
-                                       :fails-on :sbcl))
+(with-test (:name (:assignment-convert :fluet-weeks-5.1)
+            :fails-on :sbcl)
   (let ((converted '()))
     (let ((fun (inspect-ir
                 '(lambda (b x y flag)
@@ -349,8 +349,8 @@
 ;;; analysis. In this case, F, G1, G2 and H all have the same
 ;;; continuation.
 #+sb-devel
-(with-test (:name (:assignment-convert :fluet-weeks-5.2
-                                       :fails-on :sbcl))
+(with-test (:name (:assignment-convert :fluet-weeks-5.2)
+            :fails-on :sbcl)
   (let ((converted '()))
     (let ((fun (inspect-ir
                 '(lambda (b x y flag)

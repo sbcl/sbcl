@@ -21,7 +21,7 @@
 (require :sb-posix)
 
 (defconstant +page-size+ (extern-alien "os_reported_page_size" int))
-
+(setf *random-state* (make-random-state t))
 (defun free-protected-array (vector)
   (let* ((addr (sb-sys:sap-int (sb-sys:vector-sap vector)))
          (rw (logand addr (- +page-size+))))
@@ -257,7 +257,7 @@
         (ibuf (sb-impl::alloc-buffer))
         (string (make-protected-array 512 'character nil)))
     (setf (sb-impl::buffer-tail ibuf) sb-impl::+bytes-per-buffer+)
-    (loop repeat (* 512 #+slow 10)
+    (loop repeat (* 256 #+slow 10)
           do
           (map-into vector (lambda () (random 256)))
           (setf (sb-impl::buffer-head ibuf) 0
@@ -269,4 +269,64 @@
                  (decoded (octets-to-string vector :end bad)))
             (when bad
               (assert (>= bad bytes)))
-            (assert (string= string decoded :end1 chars :end2 chars))))))
+            (assert (string= string decoded :end1 chars :end2 chars))))
+    (let ((random-string (make-string sb-impl::+bytes-per-buffer+)))
+      (loop repeat (* 256 #+slow 10)
+            do
+            (fill-random-string random-string)
+            (replace vector (string-to-octets random-string))
+            (setf (sb-impl::buffer-head ibuf) 0
+                  (sb-impl::buffer-tail ibuf) sb-impl::+bytes-per-buffer+)
+            (sb-kernel:copy-ub8-to-system-area vector 0 (sb-impl::buffer-sap ibuf) 0 (length vector))
+            (let* ((bad (validate-utf8 vector))
+                   (chars (sb-vm::utf8-to-character-string 0 (length string) string ibuf))
+                   (bytes (sb-impl::buffer-head ibuf))
+                   (decoded (octets-to-string vector :end bad)))
+              (when bad
+                (assert (>= bad bytes)))
+              (assert (string= string decoded :end1 chars :end2 chars)))))))
+
+#+(or arm64 x86-64)
+(with-test (:name :utf8-crlf-to-character-string)
+  (let ((vector (make-array 1024 :element-type '(unsigned-byte 8)))
+        (ibuf (sb-impl::alloc-buffer))
+        (string (make-protected-array 512 'character nil)))
+    (setf (sb-impl::buffer-tail ibuf) sb-impl::+bytes-per-buffer+)
+    (loop repeat (* 256 #+slow 10)
+          do
+          (map-into vector (lambda () (random 256)))
+          (let ((crlf (random (1- (length vector)))))
+            (setf (aref vector crlf) #xd)
+            (setf (aref vector (1+ crlf)) #xa))
+
+          (setf (sb-impl::buffer-head ibuf) 0
+                (sb-impl::buffer-tail ibuf) 1024)
+          (sb-kernel:copy-ub8-to-system-area vector 0 (sb-impl::buffer-sap ibuf) 0 (length vector))
+          (let* ((bad (validate-utf8 vector))
+                 (chars (sb-vm::utf8-crlf-to-character-string 0 (length string) string ibuf))
+                 (bytes (sb-impl::buffer-head ibuf))
+                 (decoded (octets-to-string vector :end bad)))
+            (when bad
+              (assert (>= bad bytes)))
+            (assert (string= string decoded :end1 chars :end2 chars))))
+    (let ((random-string (make-string sb-impl::+bytes-per-buffer+)))
+     (loop repeat (* 256 #+slow 10)
+           do
+           (fill-random-string random-string)
+           (replace vector (string-to-octets random-string))
+           (let ((crlf (random (1- (length vector)))))
+             (setf (aref vector crlf) #xd)
+             (setf (aref vector (1+ crlf)) #xa))
+
+           (setf (sb-impl::buffer-head ibuf) 0
+                 (sb-impl::buffer-tail ibuf) 1024)
+           (sb-kernel:copy-ub8-to-system-area vector 0 (sb-impl::buffer-sap ibuf) 0 (length vector))
+           (let* ((bad (validate-utf8 vector))
+                  (chars (sb-vm::utf8-crlf-to-character-string 0 (length string) string ibuf))
+                  (bytes (sb-impl::buffer-head ibuf))
+                  (decoded (octets-to-string vector :end bad
+                                                    :external-format '(:utf8 :newline :crlf))))
+             (when bad
+               (assert (>= bad bytes)))
+             (unless (string= string decoded :end1 chars :end2 chars)
+               (error "~s" vector)))))))

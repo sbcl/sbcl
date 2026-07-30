@@ -100,15 +100,13 @@
                (#b111 "SXTX"))
              stream))
     (when (plusp amount)
-     (if vector
-         (format stream " #~a" (cond ((= opc 1)
-                                      4)
-                                     (t
-                                      size)
-                                   ))
-         (format stream " #~a" (if (= size #b11)
-                                   3
-                                   2))))))
+      (if vector
+          (format stream " #~a" (if (= opc 1)
+                                    4
+                                    size))
+          (format stream " #~a" (if (= size #b11)
+                                    3
+                                    2))))))
 
 (defun print-immediate (value stream dstate)
   (declare (ignore dstate))

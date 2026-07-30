@@ -1615,9 +1615,16 @@
                  (register shift extend)
                (if (extend-p offset)
                    (values (extend-register offset)
-                           (if (> (extend-operand offset) 0)
-                               1
-                               0)
+                           (cond ((> (extend-operand offset) 0)
+                                  (let ((allowed-offset (if (and fp
+                                                                 (not vector-size))
+                                                            4
+                                                            size)))
+                                   (unless (= (extend-operand offset) allowed-offset)
+                                     (error "Offset can only be 0 or ~a, not ~a" allowed-offset (extend-operand offset))))
+                                  1)
+                                 (t
+                                  0))
                            (ecase (extend-kind offset)
                              (:uxtw #b010)
                              (:lsl #b011)
