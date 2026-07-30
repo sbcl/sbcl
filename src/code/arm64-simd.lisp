@@ -537,7 +537,7 @@
      (let* ((head (sb-impl::buffer-head ibuf))
             (tail (sb-impl::buffer-tail ibuf))
             (left (- end start))
-            (string-end (- left (/ 32 4)))
+            (string-end (- left (/ 64 4)))
             (byte-end (- tail head 16)))
        (multiple-value-bind (copied written)
            (inline-vop (((byte-start any-reg) head)
@@ -563,7 +563,6 @@
                         ((tbl4         complex-double-reg))
 
                         ((nibble-mask  complex-double-reg))
-                        ((ones         complex-double-reg))
                         ((c-c0         complex-double-reg))
                         ((c-ff complex-double-reg))
                         ((c-4 complex-double-reg))
@@ -585,6 +584,7 @@
                         ((s1 complex-double-reg t :offset 8))
                         ((s2 complex-double-reg t :offset 9))
                         ($when $sized
+                               ((ones complex-double-reg))
                                ((length1 complex-double-reg t :offset 10))
                                ((length2 complex-double-reg t :offset 11))))
                ((copied unsigned-reg positive-fixnum)
@@ -809,7 +809,6 @@
 
              ERROR
              FULL-DONE
-
              (inst add byte-array byte-array suffix) ;; strip any consumed continuations bytes
              DONE
              (inst sub copied byte-array byte-array*)
@@ -1096,7 +1095,7 @@
      (let* ((head (sb-impl::buffer-head ibuf))
             (tail (sb-impl::buffer-tail ibuf))
             (left (- end start))
-            (string-end (- left (/ 32 4)))
+            (string-end (- left (/ 64 4)))
             (byte-end (- tail head 32)))
        (multiple-value-bind (copied written)
            (inline-vop (((byte-start any-reg) head)
