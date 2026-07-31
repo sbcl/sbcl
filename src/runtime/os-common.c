@@ -272,12 +272,12 @@ bool gc_managed_heap_space_p(lispobj addr)
 void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len,
                       int is_readonly_space)
 {
+    static int buggy_map_private;
 #if defined LISP_FEATURE_MIPS
     /* Of the few MIPS machines I have access to, one definitely exhibits a
      * horrible bug that mmap() persists MAP_PRIVATE pages back to disk,
      * even though we alwayas open a core file as O_RDONLY. This is a kooky criterion
      * to restrict the test by, but I didn't want it to be more general */
-    static int buggy_map_private;
     if (!buggy_map_private) {
         struct utsname name;
         uname(&name);
@@ -290,6 +290,7 @@ void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm
             buggy_map_private = -1;
         }
     }
+#endif
     if (buggy_map_private == 1) {
         off_t old = lseek(fd, 0, SEEK_CUR);
         lseek(fd, offset, SEEK_SET);
@@ -297,7 +298,6 @@ void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm
         lseek(fd, old, SEEK_SET);
         return addr;
     }
-#endif
     int fail = 0;
     os_vm_address_t actual;
     int protection = 0, sharing = MAP_PRIVATE;
