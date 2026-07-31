@@ -1166,6 +1166,10 @@
 
               (inst add string-end string* (lsl string-end (- 2 n-fixnum-tag-bits)))
               (inst add string string* (lsl string-start (- 2 n-fixnum-tag-bits)))
+
+              (inst cmp byte-array byte-end)
+              (inst b :ge DONE)
+
               (inst mov tmp-tn #x0A0D)
               (inst dup crlf-mask tmp-tn :8h)
               (load-inline-constant powers :oword #x80402010080402018040201008040201)
