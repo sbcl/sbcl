@@ -369,12 +369,18 @@
          :symbol)))
 
 (defun remove-moves (tn)
-  (or (let ((write (sb-c::tn-writes tn)))
-        (when (and write (not (tn-ref-next write)))
-          (let ((vop (tn-ref-vop write)))
-            (when (and vop (eq (vop-name vop) 'move))
-              (remove-moves (tn-ref-tn (vop-args vop)))))))
-      tn))
+  (declare (type tn tn))
+  (labels ((remove-move (tn &optional seen)
+             (or
+              (unless (member tn seen)
+                (let ((write (sb-c::tn-writes tn)))
+                  (when (and write (not (tn-ref-next write)))
+                    (let ((vop (tn-ref-vop write)))
+                      (when (and vop (eq (vop-name vop) 'move))
+                        (remove-move (tn-ref-tn (vop-args vop))
+                                     (cons tn seen)))))))
+              tn)))
+    (remove-move tn)))
 
 ;;; Note that this is a allowed to fail by returning NIL.
 ;;; So it's really testing "CERTAINLY-STACK-CONSED-P", which is
