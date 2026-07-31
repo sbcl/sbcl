@@ -3736,6 +3736,9 @@
 (define-instruction ext (segment rd rn rm index size)
   (:printer simd-extract ())
   (:emitter
+   (ecase size
+     (:8b (the (mod 8) index))
+     (:16b (the (mod 16) index)))
    (emit-simd-extract segment
                       (encode-vector-size size)
                       (fpr-offset rm)

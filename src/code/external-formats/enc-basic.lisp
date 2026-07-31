@@ -706,8 +706,8 @@
   (loop for i below length
         do (setf (aref string i) (code-char (sap-ref-8 sap i)))))
 
-#+(and sb-unicode 64-bit little-endian)
-(defun sb-vm::utf8-crlf-to-character-string-with-size (start end string ibuf size-buffer)
+#+(and sb-unicode 64-bit little-endian (not arm64))
+(defun sb-vm::utf8-crlf-to-character-string-sized (start end string ibuf size-buffer)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects (string size-buffer)
@@ -947,7 +947,7 @@
         (())
       #+(and sb-unicode 64-bit little-endian)
       (setf index
-            (sb-vm::utf8-crlf-to-character-string-with-size index end string (fd-stream-ibuf stream) size-buffer))
+            (sb-vm::utf8-crlf-to-character-string-sized index end string (fd-stream-ibuf stream) size-buffer))
       (let* ((ibuf (fd-stream-ibuf stream))
              (head (buffer-head ibuf))
              (tail (buffer-tail ibuf))

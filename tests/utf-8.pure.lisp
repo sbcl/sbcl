@@ -388,6 +388,7 @@
     (loop for x from 78 by 78 below 2048
           do (setf (aref string x) #\Newline))
     (setf (aref string 24) #\LATIN_SMALL_LETTER_E_WITH_ACUTE) ; 2-bytes in UTF-8
+    (setf (aref string 23) #\Nul)
     (with-open-file (s *test-path* :direction :output :external-format :utf-8 :if-exists :supersede)
       (write-sequence string s))
     (with-open-file (s *test-path* :external-format :utf-8)
@@ -409,6 +410,7 @@
   (let ((string (make-string 2048 :initial-element #\x)))
     (loop for x from 78 by 78 below 2048
           do (setf (aref string x) #\Newline))
+    (setf (aref string 23) #\Nul)
     (setf (aref string 24) #\LATIN_SMALL_LETTER_E_WITH_ACUTE) ; 2-bytes in UTF-8
     (with-open-file (s *test-path* :direction :output
                        :external-format '(:utf-8 :newline :crlf) :if-exists :supersede)
