@@ -623,6 +623,12 @@
         do (setq res (logxor (ash res -1) (type-%bits type)))
         ;; This returns a positive number so that it can be passed to MIX
         finally (return (ldb (byte (1- ctype-hash-size) 0) res))))
+(defun mix-hash-ctype-list (types)
+  (declare (optimize (speed 3) (safety 0)))
+  (loop with res of-type (and sb-xc:fixnum unsigned-byte) = 0
+        for type in types
+        do (setq res (mix (type-hash-value type) res))
+        finally (return (ldb (byte (1- ctype-hash-size) 0) res))))
 
 (defun hash-ctype-set (types) ; ctype list hashed order-insensitively
   (let ((hash (type-%bits (car types)))
@@ -643,7 +649,7 @@
   (and (= (length a) (length b)) (every (lambda (x) (memq x b)) a)))
 
 (define-load-time-global *ctype-list-hashset*
-  (make-hashset 32 #'list-elts-eq #'hash-ctype-list :weakness t :synchronized t))
+  (make-hashset 32 #'list-elts-eq #'mix-hash-ctype-list :weakness t :synchronized t))
 (define-load-time-global *ctype-set-hashset*
   (make-hashset 32 #'ctype-set= #'hash-ctype-set :weakness t :synchronized t))
 
