@@ -399,4 +399,5 @@
  ;;   :sunos      = We're intended to run under Solaris user environment
  ;;                 with the SunOS kernel.
  ;;   :win32      = We're intended to under some version of Microsoft Windows.
- )
+
+ :bitmapped-conset)
