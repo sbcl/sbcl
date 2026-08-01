@@ -530,14 +530,17 @@
                              (aref ,universe
                                    ;; COUNT-TRAILING-ZEROS produces slightly better code than
                                    ;; INTEGER-LENGTH.  Either iteration direction is ok.
-                                   (logior (sb-c::if-vop-existsp (:translate count-trailing-zeros)
-                                             (prog1 (count-trailing-zeros ,word)
-                                               ;; Clear the lowest 1 bit via the Brian Kernighan
-                                               ;; technique (allegedly)
-                                               (setq ,word (logand ,word (sb-vm::+-mod64 ,word -1))))
-                                             (let ((bit (1- (integer-length ,word))))
-                                               (setq ,word (logxor ,word (ash 1 bit)))
-                                               bit))
+                                   (logior (let ((bit
+                                                   (sb-c::if-vop-existsp (:translate count-trailing-zeros)
+                                                     (prog1 (count-trailing-zeros ,word)
+                                                       ;; Clear the lowest 1 bit via the Brian Kernighan
+                                                       ;; technique (allegedly)
+                                                       (setq ,word (logand ,word (sb-vm::+-mod64 ,word -1))))
+                                                     (let ((bit (1- (integer-length ,word))))
+                                                       (setq ,word (logxor ,word (ash 1 bit)))
+                                                       bit))))
+                                             #+little-endian bit
+                                             #+big-endian (- sb-vm:n-word-bits 1 bit))
                                            (* ,index sb-vm:n-word-bits))))))
                       ,@body)))
              finally (return ,result)))
