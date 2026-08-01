@@ -167,22 +167,6 @@
   (defun conset-difference (conset1 conset2)
     (sset-difference conset1 conset2) (values)))
 
-;;; Consets are still some of the worst-performing things in the compiler.
-;;; Profiling a particularly slow-compiling file shows the top 10 functions below:
-;;;            Self        Total        Cumul
-;;;   Nr  Count     %  Count     %  Count     %    Calls  Function
-;;; ------------------------------------------------------------------------
-;;;    1    985  20.7    985  20.7    985  20.7        -  SB-C::CONSET-ADJOIN
-;;;    2    939  19.7    939  19.7   1924  40.4        -  SB-KERNEL:%ADJOIN-EQ
-;;;    3    621  13.0    621  13.0   2545  53.5        -  SB-IMPL::GETHASH/EQ-HASH/COMMON
-;;;    4    476  10.0   1112  23.4   3021  63.5        -  SB-C::FIND-CONSTRAINT
-;;;    5    231   4.9   2465  51.8   3252  68.3        -  (FLET SB-C::BODY-FUN :IN SB-C::INHERIT-CONSTRAINTS)
-;;;    6    189   4.0   1570  33.0   3441  72.3        -  SB-C::JOIN-TYPE-CONSTRAINTS
-;;;    7    177   3.7    403   8.5   3618  76.0        -  SB-C::TYPE-FROM-CONSTRAINTS
-;;;    8    173   3.6   1278  26.8   3791  79.6        -  SB-C::FIND-OR-CREATE-CONSTRAINT
-;;;    9     66   1.4    210   4.4   3857  81.0        -  (FLET SB-C::BODY-FUN :IN SB-C::TYPE-FROM-CONSTRAINTS)
-;;;   10     58   1.2    123   2.6   3915  82.2        -  SB-KERNEL::%TYPE-INTERSECTION
-
 #+bitmapped-conset
 (locally
     ;; This is performance critical for the compiler, and benefits
