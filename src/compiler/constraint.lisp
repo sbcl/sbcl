@@ -133,8 +133,6 @@
 ;;; for constraint propagation, or if bit-vectors on some XC host
 ;;; really lose compared to SSETs, here's the conset API as a wrapper
 ;;; around SSETs:
-#-conset-is-sset
-(eval-when (:compile-toplevel :execute) (pushnew :bitmapped-conset sb-xc:*features*))
 #+conset-is-sset
 (progn
   (deftype conset () 'sset)
@@ -185,7 +183,7 @@
 ;;;    9     66   1.4    210   4.4   3857  81.0        -  (FLET SB-C::BODY-FUN :IN SB-C::TYPE-FROM-CONSTRAINTS)
 ;;;   10     58   1.2    123   2.6   3915  82.2        -  SB-KERNEL::%TYPE-INTERSECTION
 
-#+bitmapped-conset
+#-conset-is-sset
 (locally
     ;; This is performance critical for the compiler, and benefits
     ;; from the following declarations.  Probably you'll want to
