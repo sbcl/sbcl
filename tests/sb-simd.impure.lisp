@@ -20,8 +20,14 @@
                   "utilities.lisp"
                   "test-suite.lisp"
                   "test-arefs.lisp"
+                  #+x86-64 "test-arefs-x86-64.lisp"
+                  #+arm64 "test-arefs-arm64.lisp"
                   "test-simple-simd-functions.lisp"
+                  #+x86-64 "test-simple-simd-functions-x86-64.lisp"
+                  #+arm64 "test-simple-simd-functions-arm64.lisp"
                   "test-horizontal-functions.lisp"
+                  #+x86-64 "test-horizontal-functions-x86-64.lisp"
+                  #+arm64 "test-horizontal-functions-arm64.lisp"
                   "test-hairy-simd-functions.lisp"
                   "test-packages.lisp"))
     (load (merge-pathnames file #P"../contrib/sb-simd/test-suite/"))))

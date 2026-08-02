@@ -603,12 +603,14 @@
      #:u16-odd-bits
      #:u32-odd-bits))
 
+  #+x86-64
   (defpackage #:sb-simd-x86-64
     (:use #:common-lisp #:sb-simd-internals #:sb-simd)
     #0#
     #1=
     (:export #:imm1 #:imm2 #:imm3 #:imm4 #:imm5 #:imm6 #:imm7 #:imm8))
 
+  #+x86-64
   (defpackage #:sb-simd-sse
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-x86-64)
     (:shadow
@@ -681,6 +683,7 @@
      #:f32.4-aref #:f32.4-row-major-aref  #:f32.4-sap-ref
      #:f32.4-non-temporal-aref #:f32.4-non-temporal-row-major-aref #:f32.4-non-temporal-sap-ref))
 
+  #+x86-64
   (defpackage #:sb-simd-sse2
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-sse)
     (:shadow
@@ -987,6 +990,7 @@
      #:s64.2-aref #:s64.2-row-major-aref #:s64.2-sap-ref
      #:s64.2-non-temporal-aref #:s64.2-non-temporal-row-major-aref #:s64.2-non-temporal-sap-ref))
 
+  #+x86-64
   (defpackage #:sb-simd-sse3
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-sse2)
     #0#
@@ -1000,6 +1004,7 @@
      #:f32.4-ldup
      #:f64.2-hadd))
 
+  #+x86-64
   (defpackage #:sb-simd-ssse3
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-sse3)
     #0#
@@ -1027,6 +1032,7 @@
      #:s32.4-hadd
      #:s32.4-hsub))
 
+  #+x86-64
   (defpackage #:sb-simd-sse4.1
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-ssse3)
     (:shadow
@@ -1107,6 +1113,7 @@
      #:s64.2/=
      #:s64.2-elt))
 
+  #+x86-64
   (defpackage #:sb-simd-sse4.2
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-sse4.1)
     #0#
@@ -1129,6 +1136,7 @@
      #:s64.2<
      #:s64.2<=))
 
+  #+x86-64
   (defpackage #:sb-simd-avx
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-x86-64)
     #0#
@@ -1734,6 +1742,7 @@
      #:s64.4-aref #:s64.4-row-major-aref #:s64.4-sap-ref
      #:s64.4-non-temporal-aref #:s64.4-non-temporal-row-major-aref #:s64.4-non-temporal-sap-ref))
 
+  #+x86-64
   (defpackage #:sb-simd-avx2
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx)
     (:shadow
@@ -2065,6 +2074,7 @@
      #:s64.4-incf
      #:s64.4-decf))
 
+  #+x86-64
   (defpackage #:sb-simd-fma
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx2)
     #0#
@@ -2110,12 +2120,14 @@
      #:f64.4-fmaddsub
      #:f64.4-fmsubadd))
 
+  #+arm64
   (defpackage #:sb-simd-arm64
     (:use #:common-lisp #:sb-simd-internals #:sb-simd)
     #0#
     #11=
     (:export #:imm1 #:imm2 #:imm3 #:imm4 #:imm5 #:imm6 #:imm7 #:imm8))
 
+  #+arm64
   (defpackage #:sb-simd-neon
     (:use #:common-lisp #:sb-simd-internals #:sb-simd-arm64)
     #0#
@@ -2660,4 +2672,5 @@
              "SB-SIMD-INTERNALS" "SB-SIMD-SSE" "SB-SIMD-SSE2"
              "SB-SIMD-SSE3" "SB-SIMD-SSE4.1" "SB-SIMD-SSE4.2"
              "SB-SIMD-SSSE3" "SB-SIMD-X86-64"))
-  (setf (sb-int:system-package-p (find-package p)) t))
+  (when (find-package p)
+    (setf (sb-int:system-package-p (find-package p)) t)))

@@ -1,0 +1,56 @@
+
+(in-package #:sb-simd-sse)
+
+(sb-simd-test-suite:define-horizontal-test f32.4-horizontal-and f32-and)
+(sb-simd-test-suite:define-horizontal-test f32.4-horizontal-or  f32-or)
+(sb-simd-test-suite:define-horizontal-test f32.4-horizontal-xor f32-xor)
+(sb-simd-test-suite:define-horizontal-test f32.4-horizontal-max f32-max)
+(sb-simd-test-suite:define-horizontal-test f32.4-horizontal-min f32-min)
+(sb-simd-test-suite:define-horizontal-test f32.4-horizontal+ f32+)
+(sb-simd-test-suite:define-horizontal-test f32.4-horizontal* f32*)
+
+(in-package #:sb-simd-sse2)
+
+(sb-simd-test-suite:define-horizontal-test f64.2-horizontal-and f64-and)
+(sb-simd-test-suite:define-horizontal-test f64.2-horizontal-or  f64-or)
+(sb-simd-test-suite:define-horizontal-test f64.2-horizontal-xor f64-xor)
+(sb-simd-test-suite:define-horizontal-test f64.2-horizontal-max f64-max)
+(sb-simd-test-suite:define-horizontal-test f64.2-horizontal-min f64-min)
+(sb-simd-test-suite:define-horizontal-test f64.2-horizontal+ f64+)
+(sb-simd-test-suite:define-horizontal-test f64.2-horizontal* f64*)
+
+(in-package #:sb-simd-avx)
+
+(sb-simd-test-suite:define-horizontal-test f32.4-horizontal-and f32-and)
+(sb-simd-test-suite:define-horizontal-test f32.4-horizontal-or  f32-or)
+(sb-simd-test-suite:define-horizontal-test f32.4-horizontal-xor f32-xor)
+(sb-simd-test-suite:define-horizontal-test f32.4-horizontal-max f32-max)
+(sb-simd-test-suite:define-horizontal-test f32.4-horizontal-min f32-min)
+(sb-simd-test-suite:define-horizontal-test f32.4-horizontal+ f32+)
+(sb-simd-test-suite:define-horizontal-test f32.4-horizontal* f32*)
+
+(sb-simd-test-suite:define-horizontal-test f64.2-horizontal-and f64-and)
+(sb-simd-test-suite:define-horizontal-test f64.2-horizontal-or  f64-or)
+(sb-simd-test-suite:define-horizontal-test f64.2-horizontal-xor f64-xor)
+(sb-simd-test-suite:define-horizontal-test f64.2-horizontal-max f64-max)
+(sb-simd-test-suite:define-horizontal-test f64.2-horizontal-min f64-min)
+(sb-simd-test-suite:define-horizontal-test f64.2-horizontal+ f64+)
+(sb-simd-test-suite:define-horizontal-test f64.2-horizontal* f64*)
+
+(sb-simd-test-suite:define-horizontal-test f32.8-horizontal-and f32-and)
+(sb-simd-test-suite:define-horizontal-test f32.8-horizontal-or  f32-or)
+(sb-simd-test-suite:define-horizontal-test f32.8-horizontal-xor f32-xor)
+(sb-simd-test-suite:define-horizontal-test f32.8-horizontal-max f32-max)
+(sb-simd-test-suite:define-horizontal-test f32.8-horizontal-min f32-min)
+(sb-simd-test-suite:define-horizontal-test f32.8-horizontal+ f32+)
+(sb-simd-test-suite:define-horizontal-test f32.8-horizontal* f32*)
+
+(sb-simd-test-suite:define-horizontal-test f64.4-horizontal-and f64-and)
+(sb-simd-test-suite:define-horizontal-test f64.4-horizontal-or  f64-or)
+(sb-simd-test-suite:define-horizontal-test f64.4-horizontal-xor f64-xor)
+(sb-simd-test-suite:define-horizontal-test f64.4-horizontal-max f64-max)
+(sb-simd-test-suite:define-horizontal-test f64.4-horizontal-min f64-min)
+(sb-simd-test-suite:define-horizontal-test f64.4-horizontal+ f64+)
+(sb-simd-test-suite:define-horizontal-test f64.4-horizontal* f64*)
+
+(in-package #:sb-simd-avx2)

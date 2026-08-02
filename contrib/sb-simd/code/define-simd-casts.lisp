@@ -13,9 +13,12 @@
 
 ;;; The pXXX SIMD types are special - we define their 'cast' function
 ;;; manually.
-(define-inline sb-simd-sse:p128 (x) (the sb-simd-sse:p128 x))
-(define-inline sb-simd-avx:p128 (x) (the sb-simd-avx:p128 x))
-(define-inline sb-simd-avx:p256 (x) (the sb-simd-avx:p256 x))
+#+x86-64
+(progn
+ (define-inline sb-simd-sse:p128 (x) (the sb-simd-sse:p128 x))
+ (define-inline sb-simd-avx:p128 (x) (the sb-simd-avx:p128 x))
+ (define-inline sb-simd-avx:p256 (x) (the sb-simd-avx:p256 x)))
+#+arm64
 (define-inline sb-simd-neon:p128 (x) (the sb-simd-neon:p128 x))
 
 (macrolet

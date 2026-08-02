@@ -37,21 +37,25 @@
                     (sb-simd:f64
                      `((sb-c:deftransform ,name ((x) (single-float) *)
                          '(coerce x 'double-float))))
+                    #+x86-64
                     (sb-simd-sse:f32
                      `((sb-c:deftransform ,name ((x) (double-float) *)
                          '(sb-kernel:%single-float x))
                        (sb-c:deftransform ,name ((x) ((signed-byte 64)) *)
                          '(sb-simd-sse::f32-from-s64 x))))
+                    #+x86-64
                     (sb-simd-sse2:f64
                      `((sb-c:deftransform ,name ((x) (single-float) *)
                          '(sb-simd-sse2::f64-from-f32 x))
                        (sb-c:deftransform ,name ((x) ((signed-byte 64)) *)
                          '(sb-simd-sse2::f64-from-s64 x))))
+                    #+x86-64
                     (sb-simd-avx:f32
                      `((sb-c:deftransform ,name ((x) (double-float) *)
                          '(sb-simd-avx::f32-from-f64 x))
                        (sb-c:deftransform ,name ((x) ((signed-byte 64)) *)
                          '(sb-simd-avx::f32-from-s64 x))))
+                    #+x86-64
                     (sb-simd-avx:f64
                      `((sb-c:deftransform ,name ((x) (single-float) *)
                          '(sb-simd-avx::f64-from-f32 x))
@@ -65,20 +69,25 @@
                        `((double-float (coerce x 'single-float))
                          (real (coerce x ',name))))
                       (sb-simd:f64
-                       `((sb-simd-sse2:f32 (coerce x 'double-float))
+                       `(#+x86-64
+                         (sb-simd-sse2:f32 (coerce x 'double-float))
                          (real (coerce x ',name))))
+                      #+x86-64
                       (sb-simd-sse:f32
                        `((double-float (sb-kernel:%single-float x))
                          (sb-simd-sse:s64 (call-vop sb-simd-sse::f32-from-s64 x))
                          (real (coerce x ',name))))
+                      #+x86-64
                       (sb-simd-sse2:f64
                        `((sb-simd-sse2:f32 (call-vop sb-simd-sse2::f64-from-f32 x))
                          (sb-simd-sse2:s64 (call-vop sb-simd-sse2::f64-from-s64 x))
                          (real (coerce x ',name))))
+                      #+x86-64
                       (sb-simd-avx:f32
                        `((sb-simd-avx:f64 (call-vop sb-simd-avx::f32-from-f64 x))
                          (sb-simd-avx:s64 (call-vop sb-simd-avx::f32-from-s64 x))
                          (real (coerce x ',name))))
+                      #+x86-64
                       (sb-simd-avx:f64
                        `((sb-simd-avx:f32 (call-vop sb-simd-avx::f64-from-f32 x))
                          (sb-simd-avx:s64 (call-vop sb-simd-avx::f64-from-s64 x))
