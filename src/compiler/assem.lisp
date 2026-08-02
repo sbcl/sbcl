@@ -1653,7 +1653,7 @@
            ;; By using an unusual convention of a symbol with #\: in its name,
            ;; FIND-SYMBOL reliably tests whether a macro is defined without further
            ;; using FBOUNDP or MACRO-FUNCTION.
-           (let ((macro (find-symbol (format nil "M:~A" op)
+           (let ((macro (find-symbol (format nil "M:~A" (string op))
                                      *backend-instruction-set-package*)))
              (when macro
                (return-from inst `(,macro ,@args))))
