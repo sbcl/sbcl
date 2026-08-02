@@ -143,11 +143,10 @@
     ((define-vref-vop (vref-record-name)
        (with-accessors ((name sb-simd-internals:vref-record-name)
                         (vop sb-simd-internals:vref-record-vop)
-                        (vop-c sb-simd-internals:vref-record-vop-c)
-                        (mnemonic sb-simd-internals:vref-record-mnemonic)
                         (value-record sb-simd-internals:vref-record-value-record)
                         (vector-record sb-simd-internals:vref-record-vector-record)
-                        (store sb-simd-internals:store-record-p))
+                        (store sb-simd-internals:store-record-p)
+                        (sap-ref sb-simd-internals:vref-record-sap-ref))
            (sb-simd-internals:find-function-record vref-record-name)
          (let* ((vector-type (sb-simd-internals:value-record-type vector-record))
                 (vector-primitive-type (sb-simd-internals:value-record-primitive-type vector-record))
@@ -160,7 +159,9 @@
                     (sb-simd-internals:value-record value-record)))
                 (bits-per-element (sb-simd-internals:value-record-bits scalar-record))
                 (bytes-per-element (ceiling bits-per-element 8))
-                (shift (1- (integer-length bytes-per-element))))
+                (shift (1- (integer-length bytes-per-element)))
+                (sap-vop (when sap-ref
+                           (sb-simd-internals:mksym (symbol-package name) (if store "%SET-" "%") sap-ref))))
              `(progn
                 (defknown ,vop (,@(when store `(,value-type)) ,vector-type index (integer 0 0))
                     (values ,value-type &optional)
@@ -201,7 +202,32 @@
                          (inst ,(if store 'str 'ldr)
                                value
                                (@ tmp-tn (load-store-offset (- (ash vector-data-offset word-shift)
-                                                               other-pointer-lowtag)))))))))))))
+                                                               other-pointer-lowtag)))))))))
+              ,@(when sap-vop
+                  `((sb-c:defknown ,sap-vop (,@(when store `(,value-type))
+                                             sb-sys:system-area-pointer index (integer 0 0))
+                        (values ,value-type &optional)
+                        (always-translatable)
+                      :overwrite-fndb-silently t)
+                    (define-vop (,sap-vop)
+                      (:translate ,sap-vop)
+                      (:policy :fast-safe)
+                      (:args ,@(when store `((value :scs (,@value-scs zero))))
+                             (sap :scs (sap-reg))
+                             (offset :scs (signed-reg)))
+                      (:info addend)
+                      (:arg-types ,@(when store `(,value-primitive-type))
+                                  system-area-pointer
+                                  signed-num
+                                  (:constant (integer 0 0)))
+                      ,@(unless store
+                          `((:results (value :scs ,value-scs))
+                            (:result-types ,value-primitive-type)))
+                      (:generator 1
+                       (let ((addend addend))
+                         (declare (ignore addend))
+                         (inst ,(if store 'str 'ldr) value
+                               (@ sap offset)))))))))))
      (define-vref-vops ()
        `(progn
           ,@(loop for vref-record
