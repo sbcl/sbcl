@@ -1121,6 +1121,9 @@
            in-mode)))
       (:close
        (set-closed-flame stream))
+      ((:get-file-position :set-file-position)
+       ;; Unclear to which stream it should apply
+       nil)
       (t
        (or (if in-ansi-stream-p
                (call-ansi-stream-misc in operation arg1)
@@ -1217,6 +1220,9 @@
       (:unread (when left (unread-char arg1 current)))
       (:close
        (set-closed-flame stream))
+      (:get-file-position
+       (when current
+         (file-position current)))
       (t
        (when left
          (if (ansi-stream-p current)

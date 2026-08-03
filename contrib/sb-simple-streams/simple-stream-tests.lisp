@@ -779,8 +779,7 @@ Nothing to see here, move along.")
 (deftest two-way-stream-16
     ;; FILE-POSITION (via STREAM-MISC-DISPATCH)
     (with-sc-test-stream (synonym)
-      (eql (file-position (make-two-way-stream synonym synonym))
-           (file-position synonym)))
+      (null (file-position (make-two-way-stream synonym synonym))))
   T)
 
 ;; SYNONYM-STREAM tests repeated for ECHO-STREAM, where applicable
@@ -850,8 +849,7 @@ Nothing to see here, move along.")
 (deftest echo-stream-16
     ;; FILE-POSITION (via STREAM-MISC-DISPATCH)
     (with-sc-test-stream (*synonym*)
-      (eql (file-position (make-echo-stream *synonym* *synonym*))
-           (file-position *synonym*)))
+      (null (file-position (make-echo-stream *synonym* *synonym*))))
   T)
 
 ;; SYNONYM-STREAM tests repeated for CONCATENATED-STREAM, where applicable

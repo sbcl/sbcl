@@ -1788,5 +1788,11 @@
 (#(A49305EF D0241AE7 E55E7F8C EE9A5410)
  "(SB-PCL::%CLASS SB-PCL::%PARAMETER SB-PCL::%VARIABLE-REBINDING SPECIAL)"
  "((& (>> val 8) 3))")
+(#(0 2 A 1A 1E)
+ "(5 15 1 13 0)"
+ "((let ((tab #a((4) (unsigned-byte 8) 2 0 0 7)))
+  (let ((b (& (>> val 1) #x3)))
+   (let ((a (>> (<< val 27) 30)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF

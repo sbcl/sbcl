@@ -220,6 +220,9 @@
            in-mode)))
       (:close
        (set-closed-flame stream))
+      ((:get-file-position :set-file-position)
+       ;; Unclear to which stream it should apply
+       nil)
       (t
        (or (if in-ansi-stream-p
                (call-ansi-stream-misc in operation arg1)
