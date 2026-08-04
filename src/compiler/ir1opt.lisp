@@ -1233,13 +1233,16 @@
 
 (defun find-active-let-lambda (node)
   (declare (type node node))
-  (loop for env = (node-lexenv node) then (lexenv-parent env)
-        while env
-        do (let ((l (lexenv-lambda env)))
-             (when (and l
-                        (functional-kind-eq l let)
-                        (not (functional-kind-eq l zombie)))
-               (return l)))))
+  (let ((home (node-home-lambda node)))
+    (loop for env = (node-lexenv node) then (lexenv-parent env)
+          while env
+          do (let ((l (lexenv-lambda env)))
+               (when l
+                 (unless (eq (lambda-home l) home)
+                   (return nil))
+                 (when (and (functional-kind-eq l let)
+                            (not (functional-kind-eq l zombie)))
+                   (return l)))))))
 
 (defun add-variable-to-let-lambda (let-lambda v)
   (declare (type clambda let-lambda)
