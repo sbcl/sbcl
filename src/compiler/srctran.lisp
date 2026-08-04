@@ -3612,6 +3612,21 @@
            (delay-ir1-transform node :ir1-phases)
            (give-up-ir1-transform "not a word-sized integer")))))))
 
+;; (zerop (ldb (byte s p) n)) == (zerop (logand n (ash (1- (ash 1 s)) p)))
+;; Use this only with fixnum mask so the equality test is also between fixnums.
+(deftransform %ldb ((size posn integer)
+                    ((constant-arg bit-index) (constant-arg bit-index) integer)
+                    * :node node)
+  (let* ((posn (lvar-value posn))
+         (size (lvar-value size))
+         (mask (ash (1- (ash 1 size)) posn)))
+    (if (and (combination-matches '= '(* 0) (node-dest node))
+             (<= mask most-positive-fixnum))
+        (progn
+          (erase-node-type node (specifier-type 'unsigned-byte))
+          `(logand integer ,mask))
+        (give-up-ir1-transform))))
+
 (deftransform %mask-field ((size posn int) ((integer 0 #.sb-vm:n-word-bits) fixnum integer) word)
   "convert to inline logical operations"
   `(logand int (ash (ash ,most-positive-word (- size ,sb-vm:n-word-bits)) posn)))
