@@ -1220,6 +1220,182 @@
             (show-type-derivation combination res))
           (coerce-to-values res))))))
 
+(defun collect-lvar-vars (lvar)
+  (declare (type lvar lvar))
+  (let ((use (principal-lvar-use lvar)))
+    (cond ((ref-p use)
+           (let ((leaf (ref-leaf use)))
+             (when (lambda-var-p leaf)
+               (list leaf))))
+          ((combination-p use)
+           (mapcan #'collect-lvar-vars (basic-combination-args use)))
+          (t nil))))
+
+(defun find-active-let-lambda (node)
+  (declare (type node node))
+  (loop for env = (node-lexenv node) then (lexenv-parent env)
+        while env
+        do (let ((l (lexenv-lambda env)))
+             (when (and l
+                        (functional-kind-eq l let)
+                        (not (functional-kind-eq l zombie)))
+               (return l)))))
+
+(defun add-variable-to-let-lambda (let-lambda v)
+  (declare (type clambda let-lambda)
+           (type lambda-var v))
+  (setf (lambda-var-home v) let-lambda)
+  (setf (lambda-vars let-lambda) (append (lambda-vars let-lambda) (list v)))
+  ;; Update the call to the LET lambda
+  (let* ((ref (car (leaf-refs let-lambda)))
+         (call (and ref
+                    (node-lvar ref)
+                    (lvar-dest (node-lvar ref)))))
+    (when (and call (combination-p call))
+      (let ((dummy-lvar (make-lvar)))
+        (setf (lvar-dest dummy-lvar) call)
+        (setf (basic-combination-args call)
+              (append (basic-combination-args call) (list dummy-lvar)))
+        (setf (lvar-dest dummy-lvar) call)))))
+
+;; Reuse of SYMBOL-VALUE of a special var would be nice,
+;; but SYMBOL-VALUE it is not represented as a call in IR1
+(define-load-time-global *elidable-memory-loads*
+    '(car cdr %instance-ref %raw-instance-ref/word %raw-instance-ref/signed-word
+      sap-ref-16 signed-sap-ref-16 sb-sys::%sap-ref-16-indexed sb-sys::%signed-sap-ref-16-indexed
+      sap-ref-32 signed-sap-ref-32 sb-sys::%sap-ref-32-indexed sb-sys::%signed-sap-ref-32-indexed
+      sap-ref-64 signed-sap-ref-64 sb-sys::%sap-ref-64-indexed sb-sys::%signed-sap-ref-64-indexed
+      sb-alien:deref
+      sb-alien:alien-sap))
+
+;;; Look for any node equivalent to MATCH consdering nodes in reverse starting at FROM.
+;;; Memory loads from the same object+slot or SAP+offset could be equivalent.
+;;; Nothing else can be equivalent (until I enhance this)
+(defun find-equivalent-node-backwards (match from)
+  (labels ((lvar-equivalent-p (l1 l2)
+             (declare (type lvar l1 l2))
+             (cond ((eq l1 l2) t)
+                   ((and (constant-lvar-p l1) (constant-lvar-p l2))
+                    (eql (lvar-value l1) (lvar-value l2)))
+                   (t
+                    (let ((u1 (principal-lvar-use l1))
+                          (u2 (principal-lvar-use l2)))
+                      (cond ((and (ref-p u1) (ref-p u2))
+                             (eq (ref-leaf u1) (ref-leaf u2)))
+                            ((and (combination-p u1) (combination-p u2)
+                                  (eq (basic-combination-kind u1) :known)
+                                  (eq (basic-combination-kind u2) :known))
+                             (combination-equivalent-p u1 u2))
+                            (t nil))))))
+           (combination-equivalent-p (c1 c2)
+             (declare (type combination c1 c2))
+             (and (eq (basic-combination-fun-info c1) (basic-combination-fun-info c2))
+                  (let ((args1 (basic-combination-args c1))
+                        (args2 (basic-combination-args c2)))
+                    (and (= (length args1) (length args2))
+                         (every #'lvar-equivalent-p args1 args2))))))
+    (do ((node from (ctran-use (node-prev node)))) ((null node))
+      (when (and (combination-p node)
+                 (eq (combination-kind node) :known)
+                 (node-lvar node)
+                 (combination-equivalent-p node match))
+        (return node))
+      (typecase node
+        ((or cset ref cast combination cif))
+        (t
+         ;; Return :FAIL to abort quickly. This could choose to fail if a non-flushable
+         ;; combination is seen, but for now I'm deferring that soundness check.
+         (return-from find-equivalent-node-backwards :fail))))))
+
+;;; Attmpt to find a COMBINATION equivalent to THIS preceding it in node order, the value
+;;; of which can be substituted for the call to THIS, actually making the substitution.
+;;; Looking backwards at most a few blocks tends to work well enough, and inportantly
+;;; limits the work. Scanning only the current block is inadequate as the example
+;;; in :LOOP-OVER-DEREF shows. The immediate predecessor is still not enough, because the
+;;; predecessor could have been split, leaving a tiny block where the only node is
+;;; a trivial operation.
+(defun try-reuse-expr-value (this)
+  (declare (type combination this))
+  (binding*
+      ((home-lambda (find-active-let-lambda this) :exit-if-null)
+       (lookback 0)
+       (c1
+        ;; In this block, explicitly go back a node so that FIND-BACKWARDS doesn't consider THIS
+        ;; as equivalent to itself. Failing that, try predecessor blocks, but only as long as
+        ;; pred is unique since we have no information about nodes that dominate THIS.
+        (or (find-equivalent-node-backwards this (ctran-use (node-prev this)))
+            (do ((pred (block-pred (node-block this))))
+                ((or (> lookback 3) (not (singleton-p pred))))
+              (incf lookback)
+              (let ((node (block-last (car pred))))
+                (when (null node) (return))
+                (awhen (find-equivalent-node-backwards this node) (return it))
+                (setq pred (block-pred (node-block node))))))
+        :exit-if-null)
+       (vars ; can't use :exit-if-null here because VARS can be and usually is NIL
+        (unless (eq c1 :fail)
+          (mapcan #'collect-lvar-vars (basic-combination-args c1)))))
+    (when (eq c1 :fail)
+      (return-from try-reuse-expr-value nil))
+    (labels ((all-flushable (ctran end-node)
+               (declare (ctran ctran) (type (or node null) end-node))
+               (loop (let ((node (ctran-next ctran)))
+                       (cond ((eq node end-node) (return t))
+                             ((not (ok-to-flush node)) (return nil))
+                             ((and (not end-node) (not (node-next node))) (return t)))
+                       (setq ctran (node-next node)))))
+             (ok-to-flush (node)
+               (cond ((set-p node) (not (member (set-var node) vars)))
+                     ((combination-p node) (flushable-combination-p node))
+                     ((basic-combination-p node) nil)
+                     (t t)))) ; anything else the backwards search allowed is ok
+      ;; When lookback>0 it's possible for the equivalent node to be the final node
+      ;; of its block, in which case its NODE-NEXT is null.
+      (let* ((this-block (node-block this))
+             (pred (car (block-pred this-block))))
+        (unless (if (= lookback 0)
+                    (all-flushable (node-next c1) this)
+                    (and
+                     ;; Check prev block from C1 to its end of block, and current block up to THIS
+                     (acond ((node-next c1) (all-flushable it nil)) (t t))
+                     (all-flushable (block-start this-block) this)
+                     ;; All check all of one or both intervening blocks
+                     (or (< lookback 2)
+                         (all-flushable (block-start pred) nil))
+                     (or (< lookback 3)
+                         (all-flushable (block-start (car (block-pred pred))) nil))))
+          (return-from try-reuse-expr-value nil))))
+    ;; Substitute C1's result in for THIS
+    (binding* ((lvar-c1 (node-lvar c1) :exit-if-null)
+               (consumer-1 (lvar-dest lvar-c1) :exit-if-null)
+               (c2 this)
+               (lvar-c2 (node-lvar c2) :exit-if-null)
+               (v (make-lambda-var (gensym "REUSED-VAL")
+                                   :type (single-value-type (node-derived-type c1))))
+               (lvar-new (make-lvar)))
+      (add-variable-to-let-lambda home-lambda v)
+
+      ;; 1. Redirect consumer-1 to read from lvar-new
+      (substitute-lvar lvar-new lvar-c1)
+
+      (with-ir1-environment-from-node c1
+        ;; 2. Make C1 write to a new LVAR, and link it to a CSET on V
+        (let ((lvar-c1-new (make-lvar)))
+          (%delete-lvar-use c1)
+          (use-lvar c1 lvar-c1-new)
+          ;; 3. Create S1 (set V = lvar-c1-new) and insert after C1
+          (let ((s1 (make-set v lvar-c1-new)))
+            (setf (lvar-dest lvar-c1-new) s1)
+            (push s1 (basic-var-sets v))
+            (insert-node-after c1 s1))))
+
+      ;; 4. Insert ref1 before consumer-1, writing to lvar-new
+      (insert-ref-before v consumer-1 lvar-new)
+      ;; 5. Insert ref2 before C2, stealing C2's lvar
+      (insert-ref-before v c2 t)
+      ;; C2 is now dead and will be flushed by the caller!
+      t)))
+
 ;;; Do IR1 optimizations on a COMBINATION node.
 (defun ir1-optimize-combination (node &aux (show *show-transforms-p*))
   (declare (type combination node))
@@ -1305,6 +1481,9 @@
                        (not (node-lvar node)))
                   (return-from ir1-optimize-combination (flush-node node)))
                  ((fold-call-derived-to-constant node)
+                  (return-from ir1-optimize-combination))
+                 ((and (combination-is node *elidable-memory-loads*)
+                       (try-reuse-expr-value node))
                   (return-from ir1-optimize-combination)))
            (when (and (ir1-attributep (fun-info-attributes info) commutative)
                       (= (length args) 2)
