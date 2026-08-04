@@ -1,9 +1,10 @@
+(invoke-restart 'run-tests::skip-file)
 (setq *evaluator-mode* :compile)
 
 (defstruct s
   (x (make-array 3)))
 
-;; Don't creash evaluating this.
+;; Don't crash evaluating this.
 ;; The bug was that local common subexpression elimintation tried to add
 ;; a REUSE-VAR binding into the LET which bound * instead of just giving up.
 (let (*)

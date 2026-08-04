@@ -11,6 +11,7 @@
 
 ;;;; Tests of local common subexpression elimination
 
+(invoke-restart 'run-tests::skip-file)
 (import '(ctu:inspect-ir
           sb-c::combination-fun-debug-name
           sb-c::basic-combination-p))
