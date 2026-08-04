@@ -3618,13 +3618,22 @@
   (let* ((size (lvar-value size))
          (posn (lvar-value posn))
          (mask (mask-field (byte size posn) -1)))
-    (if (and (<= mask most-positive-word)
-             (or (combination-matches '= '(* 0) (node-dest node))
-                 (combination-matches '> '(* 0) (node-dest node))))
-        (progn
-          (erase-node-type node (specifier-type 'word))
-          `(logand integer ,mask))
-        (give-up-ir1-transform))))
+    (cond ((and (<= mask most-positive-word)
+                (or (combination-matches '= '(* 0) (node-dest node))
+                    (combination-matches '> '(* 0) (node-dest node))))
+           (erase-node-type node (specifier-type 'word))
+           `(logand integer ,mask))
+          (t
+           (give-up-ir1-transform)))))
+
+;;; Avoid creating bignums
+(deftransform %mask-field ((size posn int) * * :node node)
+  (cond ((or (combination-matches '= '(* 0) (node-dest node))
+             (combination-matches '> '(* 0) (node-dest node)))
+         (erase-node-type node (specifier-type 'unsigned-byte))
+         `(%ldb size posn int))
+        (t
+         (give-up-ir1-transform))))
 
 (deftransform %mask-field ((size posn int) ((integer 0 #.sb-vm:n-word-bits) fixnum integer) word)
   "convert to inline logical operations"
