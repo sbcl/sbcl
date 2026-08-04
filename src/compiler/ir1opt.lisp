@@ -1240,8 +1240,7 @@
                (when l
                  (unless (eq (lambda-home l) home)
                    (return nil))
-                 (when (and (functional-kind-eq l let)
-                            (not (functional-kind-eq l zombie)))
+                 (when (functional-kind-eq l let)
                    (return l)))))))
 
 (defun add-variable-to-let-lambda (let-lambda v)
