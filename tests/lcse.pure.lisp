@@ -232,3 +232,35 @@
     (if (car cons)
         (princ (cdr cons))
         nil)))
+
+(defvar *a*)
+(defvar *b*)
+
+(macrolet ((guts-of-g ()
+             '(let ((x 0))
+                (opaque-identity x)
+                (opaque-identity (incf x (random 2)))
+                (let ((a *a*))
+                  (list (car a) *b* (car a))))))
+(defun g-regular () (guts-of-g))
+(defun g-safe ()
+  (declare (optimize safety))
+  ;; Don't treat (CAR A) as a common subexpression if the ref of *B*
+  ;; could perform memory stores.
+  (guts-of-g)))
+(compile 'g-regular)
+(compile 'g-safe)
+
+(defun try-trapping-ref (safep)
+  (setf *a* (cons 5 'foo))
+  (handler-bind ((cell-error
+                  (lambda (c)
+                    (declare (ignore c))
+                    (setf (car *a*) -1)
+                    (use-value 32))))
+    (if safep (g-safe) (g-regular))))
+
+(with-test (:name :test-trapping-ref)
+  (assert (equal (try-trapping-ref nil) '(5 32 5))))
+(with-test (:name :test-trapping-ref-safe)
+  (assert (equal (try-trapping-ref t) '(5 32 -1))))

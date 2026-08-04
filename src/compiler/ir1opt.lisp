@@ -1350,6 +1350,14 @@
                (cond ((set-p node) (not (member (set-var node) vars)))
                      ((combination-p node) (flushable-combination-p node))
                      ((basic-combination-p node) nil)
+                     ((ref-p node)
+                      (let ((leaf (ref-leaf node)))
+                        (if (and (global-var-p leaf)
+                                 (member (global-var-kind leaf) '(:special :global))
+                                 (not (always-boundp (leaf-source-name leaf) node))
+                                 (policy node (= safety 3)))
+                            nil
+                            t)))
                      (t t)))) ; anything else the backwards search allowed is ok
       ;; When lookback>0 it's possible for the equivalent node to be the final node
       ;; of its block, in which case its NODE-NEXT is null.
