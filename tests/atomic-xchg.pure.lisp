@@ -1,3 +1,6 @@
+(unless (vop-existsp "SB-KERNEL:%RAW-INSTANCE-CAS/SIGNED-WORD")
+  (invoke-restart 'run-tests::skip-file))
+
 (defstruct s (f 0 :type fixnum) (w 0 :type word) (sw 0 :type signed-word))
 
 (defun swapw (mystruct v) (sb-vm:%atomic-exchange (s-w mystruct) v))

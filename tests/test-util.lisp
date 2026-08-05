@@ -347,13 +347,19 @@
       (really-invoke-debugger condition))))
 
 (defun vop-existsp (name &optional (query :translate))
-  (ecase query
-    (:named
-     (gethash name sb-c::*backend-template-names*))
-    (:translate
-     (let ((info (sb-int:info :function :info name)))
-       (when info
-         (sb-c::fun-info-templates info))))))
+  (let ((name (if (stringp name)
+                  (let ((colon (position #\: name)))
+                    (find-symbol (subseq name (1+ colon))
+                                 (subseq name 0 colon)))
+                  name)))
+    (when name
+      (ecase query
+        (:named
+         (gethash name sb-c::*backend-template-names*))
+        (:translate
+         (let ((info (sb-int:info :function :info name)))
+           (when info
+             (sb-c::fun-info-templates info))))))))
 
 (defun skipped-p (x)
   (typecase x

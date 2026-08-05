@@ -152,14 +152,14 @@
     (assert (= (- (ash 1 sb-vm:n-word-bits) 2) (box-word box)))))
 
 (with-test (:name :cas-raw-instance-ref-word
-            :skipped-on (not (or :x86 :x86-64)))
+            :implemented-on (:vop-existsp "SB-KERNEL:%RAW-INSTANCE-CAS/WORD"))
   (let ((foo (make-box :word 42)))
     ;; basic smoke test - not checking for atomicity or anything
     (assert (eql (cas (box-word foo) 42 43) 42))
     (assert (eql (cas (box-word foo) 43 44) 43))))
 
 (with-test (:name :atomic-incf-full-call-lp1381867
-            :skipped-on (not (or :x86 :x86-64 :ppc)))
+            :implemented-on (:vop-existsp "SB-KERNEL:%RAW-INSTANCE-ATOMIC-INCF/WORD"))
   ;; contortions to avoid reader errors
   (let* ((%riai/w (intern "%RAW-INSTANCE-ATOMIC-INCF/WORD" "SB-KERNEL"))
          (form
@@ -729,7 +729,7 @@
   (setf small-generation-limit 1)))
 
 (test-util:with-test (:name :cas-aref
-                      :skipped-on (not (or :arm64 :x86-64)))
+                      :implemented-on (or :arm64 :x86-64))
   (dolist (bits '(8 16 32 #+64-bit 64))
     (let ((unsigned (make-array '(3 3) :element-type `(unsigned-byte ,bits)
                                 :initial-element 0))
@@ -744,7 +744,7 @@
       (assert (equalp unsigned #2A((1 2 3) (4 5 6) (7 8 9))))
       (assert (equalp signed #2A((-4 -3 -2) (-1 0 1) (2 3 4)))))))
 
-(test-util:with-test (:name :cas-aref-float :skipped-on (not :x86-64))
+(test-util:with-test (:name :cas-aref-float :implemented-on :x86-64)
   (dolist (et '(single-float double-float))
     (let ((a (make-array 4 :element-type et)))
       (dotimes (i 4)

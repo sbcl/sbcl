@@ -1778,7 +1778,7 @@ invoked. In that case it will store into PLACE and start over."
              ((t) '%instance-cas)
              #+(or arm64 loongarch64 ppc ppc64 riscv x86 x86-64)
              ((word) '%raw-instance-cas/word)
-             #+(or arm64 loongarch64 riscv x86 x86-64)
+             #+(or arm64 loongarch64 ppc ppc64 riscv x86 x86-64)
              ((sb-vm:signed-word) '%raw-instance-cas/signed-word))))
     (unless casser
       (error "Cannot use COMPARE-AND-SWAP with structure accessor ~
