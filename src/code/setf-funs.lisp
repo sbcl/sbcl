@@ -78,3 +78,43 @@
   get subseq
   ;; Have explicit redundant definitions...
   bit sbit aref gethash)
+
+(in-package "SB-VM")
+(export '%atomic-exchange)
+(defmacro %atomic-exchange (place value)
+  ;; Given PLACE which is of a very restricted kind - (STRUCT-SLOT-ACCESSOR instance)
+  ;; atomically swap VALUE and return the old, unconditionally.
+  (destructuring-bind (accessor instance) place
+    (let* ((info (the (cons defstruct-description defstruct-slot-description)
+                      (info :function :source-transform accessor)))
+           (dsd (cdr info))
+           (disp (- (ash (+ instance-slots-offset (dsd-index dsd)) word-shift)
+                    instance-pointer-lowtag))
+           (type (dsd-type dsd)))
+      (declare (ignorable disp type))
+      #+(or arm64 riscv64 x86-64)
+      (multiple-value-bind (sc primtype)
+          (ecase (dsd-raw-type dsd)
+            (t (if (eq type 'fixnum)
+                   (values 'any-reg 'tagged-num)
+                   (values 'descriptor-reg 't)))
+            (signed-word (values 'signed-reg 'signed-num))
+            (word (values 'unsigned-reg 'unsigned-num)))
+        `(truly-the ,type
+          (inline-vop (((instance descriptor-reg t) (the ,(dd-name (car info)) ,instance))
+                       ((val ,sc ,primtype) (the ,type ,value))
+                       ((temp)))
+                      ((res ,sc ,primtype))
+           #+arm64 (progn (inst add temp instance ,disp)
+                          (inst swpal val res temp))
+           #+riscv (progn (inst addi temp instance ,disp)
+                          (inst amoswap res val temp :aq :rl))
+           #+x86-64 (progn (move temp val)
+                           (inst xchg temp (ea ,disp instance)) ; LOCK is implicit
+                           (move res temp)))))
+      #-(or arm64 riscv64 x86-64)
+      `(let* ((.instance. ,instance) ; GET-CAS-EXPANSION exists. I don't care
+              (.new. ,value)
+              (.old. (,accessor .instance.)))
+         (loop until (eq .old. (setf .old. (cas ,place .old. .new.))))
+         .old.))))

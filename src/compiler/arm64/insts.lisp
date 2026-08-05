@@ -2032,6 +2032,11 @@
 (def-ldatomic ldseta #b001100 1 0)
 (def-ldatomic ldsetal #b001100 1 1)
 
+(def-ldatomic swp #b100000 0 0)
+(def-ldatomic swpa #b100000 1 0)
+(def-ldatomic swpal #b100000 1 1)
+(def-ldatomic swpl #b100000 0 1)
+
 (define-instruction-format (ldaddb 32)
   (size :field (byte 2 30))
   (op2 :field (byte 6 24) :value #b111000)
