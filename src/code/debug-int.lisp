@@ -2616,9 +2616,11 @@
           (sap-ref-single nfp (number-stack-offset 4)))))
       (#.complex-double-stack-sc-number
        (with-nfp (nfp)
-         (complex
-          (sap-ref-double nfp (number-stack-offset))
-          (sap-ref-double nfp (number-stack-offset 8)))))
+         (let ((offset (number-stack-offset #+stack-grows-downward-not-upward
+                                            (- sb-vm:n-word-bytes))))
+           (complex
+            (sap-ref-double nfp offset)
+            (sap-ref-double nfp (+ offset 8))))))
       #+long-float
       (#.complex-long-stack-sc-number
        (with-nfp (nfp)
@@ -2898,16 +2900,18 @@
                (the single-float (realpart value)))))
       (#.complex-double-stack-sc-number
        (with-nfp (nfp)
-         (setf (sap-ref-double nfp (number-stack-offset))
-               #+(or x86 x86-64)
-               (realpart (the (complex double-float) value))
-               #-(or x86 x86-64)
-               (the double-float (realpart value)))
-         (setf (sap-ref-double nfp (number-stack-offset 8))
-               #+(or x86 x86-64)
-               (imagpart (the (complex double-float) value))
-               #-(or x86 x86-64)
-               (the double-float (realpart value)))))
+         (let ((offset (number-stack-offset #+stack-grows-downward-not-upward
+                                            (- sb-vm:n-word-bytes))))
+           (setf (sap-ref-double nfp offset)
+                 #+(or x86 x86-64)
+                 (realpart (the (complex double-float) value))
+                 #-(or x86 x86-64)
+                 (the double-float (realpart value)))
+           (setf (sap-ref-double nfp (+ offset 8))
+                 #+(or x86 x86-64)
+                 (imagpart (the (complex double-float) value))
+                 #-(or x86 x86-64)
+                 (the double-float (realpart value))))))
       #+long-float
       (#.complex-long-stack-sc-number
        (with-nfp (nfp)
