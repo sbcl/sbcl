@@ -215,6 +215,7 @@
                    ,@(or signed=>signed `((move r x) (inst ,op r y)))))
                 (define-vop (,(symbolicate 'fast- translate '-c/signed=>signed)
                              fast-signed-binop-c)
+                  (:arg-refs x-ref)
                   (:translate ,translate)
                   (:generator ,untagged-penalty
                    ,@(or c/signed=>signed `((move r x) (inst ,op r (constantize y))))))
@@ -229,6 +230,7 @@
                                            translate
                                            '-c/unsigned=>unsigned)
                              fast-unsigned-binop-c)
+                  (:arg-refs x-ref)
                   (:translate ,translate)
                   (:generator ,untagged-penalty
                    ,@(or c/unsigned=>unsigned
@@ -258,14 +260,24 @@
                 (inst mov (if gpr-r-p :dword :qword) r x))
               (inst and :dword r y))
              ((and (not (plausible-signed-imm32-operand-p y))
-                   (let* ((int (sb-c::type-approximate-interval (tn-ref-type x-ref)))
-                          (mask (logandc1 (logior y fixnum-tag-mask)
-                                          (ldb (byte (+ (integer-length (sb-c::interval-high int)) n-fixnum-tag-bits) 0) -1))))
-                     (when (and (>= (sb-c::interval-low int) 0)
-                                (= (logcount mask) 1))
-                       (move r x)
-                       (inst btr r (1- (integer-length mask)))
-                       t))))
+                   (let* ((width (sb-c::unsigned-type-width (tn-ref-type x-ref)))
+                          (extra-ones (and width
+                                           (dpb -1 (byte (- 64 (1+ width)) (1+ width)) y))))
+                     ;; Try filling the zeros in the mask with ones where the integer already has zeros,
+                     ;; which might sign-extend the mask into a negative 32-bit immediate
+                     (cond ((plausible-signed-imm32-operand-p extra-ones)
+                            (move r x)
+                            (inst and r extra-ones)
+                            t)
+                           (t
+                            (let* ((int (sb-c::type-approximate-interval (tn-ref-type x-ref)))
+                                   (mask (logandc1 (logior y fixnum-tag-mask)
+                                                   (ldb (byte (+ (integer-length (sb-c::interval-high int)) n-fixnum-tag-bits) 0) -1))))
+                              (when (and (>= (sb-c::interval-low int) 0)
+                                         (= (logcount mask) 1))
+                                (move r x)
+                                (inst btr r (1- (integer-length mask)))
+                                t)))))))
              (t
               (move r x)
               (inst and r (constantize y))))))
@@ -282,6 +294,16 @@
              ((and gpr-r-p
                    (eql y (1- (expt 2 8))))
               (inst movzx '(:byte :dword) r x))
+             ((and (not (plausible-signed-imm32-operand-p y))
+                   (let* ((width (sb-c::unsigned-type-width (tn-ref-type x-ref)))
+                          (extra-ones (and width
+                                           (dpb -1 (byte (- 64 width) width) y))))
+                     ;; Try filling the zeros in the mask with ones where the integer already has zeros,
+                     ;; which might sign-extend the mask into a negative 32-bit immediate
+                     (when (plausible-signed-imm32-operand-p extra-ones)
+                       (move r x)
+                       (inst and r extra-ones)
+                       t))))
              ((and (not (plausible-signed-imm32-operand-p y))
                    (= (logcount (logandc1 y most-positive-word)) 1))
               (move r x)
@@ -300,6 +322,16 @@
              ((and gpr-r-p
                    (eql y (1- (expt 2 8))))
               (inst movzx '(:byte :dword) r x))
+             ((and (not (plausible-signed-imm32-operand-p y))
+                   (let* ((width (sb-c::unsigned-type-width (tn-ref-type x-ref)))
+                          (extra-ones (and width
+                                           (dpb -1 (byte (- 64 width) width) y))))
+                     ;; Try filling the zeros in the mask with ones where the integer already has zeros,
+                     ;; which might sign-extend the mask into a negative 32-bit immediate
+                     (when (plausible-signed-imm32-operand-p extra-ones)
+                       (move r x)
+                       (inst and r extra-ones)
+                       t))))
              ((and (not (plausible-signed-imm32-operand-p y))
                    (= (logcount (logandc1 y most-positive-word)) 1))
               (move r x)
