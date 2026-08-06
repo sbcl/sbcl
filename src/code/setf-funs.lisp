@@ -97,7 +97,7 @@
         (return-from %atomic-exchange
           (multiple-value-bind (sc primtype)
               (ecase (dsd-raw-type dsd)
-                (t (if (eq type 'fixnum)
+                (t (if (subtypep type 'fixnum)
                        (values 'any-reg 'tagged-num)
                        (values 'descriptor-reg 't)))
                 (signed-word (values 'signed-reg 'signed-num))
