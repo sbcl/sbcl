@@ -305,7 +305,7 @@
           (let* ((bad (validate-utf8 vector))
                  (chars (sb-vm::utf8-crlf-to-character-string 0 (length string) string ibuf))
                  (bytes (sb-impl::buffer-head ibuf))
-                 (decoded (octets-to-string vector :end bad)))
+                 (decoded (octets-to-string vector :end bad :external-format '(:utf8 :newline :crlf))))
             (when bad
               (assert (>= bad bytes)))
             (assert (string= string decoded :end1 chars :end2 chars))))
