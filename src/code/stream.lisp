@@ -2472,8 +2472,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                         (setf iterator (funcall step seq iterator from-end))
                      finally (return i)))))
     (cond
-      ((typep seq 'list)
-       (read-list (compute-read-function nil)))
       ((and (ansi-stream-p stream)
             (ansi-stream-cin-buffer stream)
             (typep seq 'simple-string))
@@ -2489,6 +2487,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                (read-vector/fast data offset-start offset-end offset)
                (read-vector (compute-read-function (array-element-type data))
                             data offset-start offset-end end)))))
+      ((typep seq 'list)
+       (read-list (compute-read-function nil)))
       (t
        (read-generic-sequence (compute-read-function nil))))))
 
