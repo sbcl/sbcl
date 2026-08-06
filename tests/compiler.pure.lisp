@@ -6252,3 +6252,114 @@
      `(lambda ()
         (let ((x (error "fail")))
           x)))))
+
+;;; lp#486416: a local function's parameter types were computed by
+;;; unioning the argument types across its call sites, starting from T
+;;; and narrowing. That cannot converge once the argument flow has a
+;;; cycle in it: a call that hands a parameter back to itself
+;;; contributes the parameter's own current type, so the union comes
+;;; out (UNION <whatever> T) = T on every round and stays there. The
+;;; same loop therefore got two different answers depending on how it
+;;; was written,
+;;;
+;;;   (do ((i n (1- i)) (x (list 1) x)) ((zerop i) x))     => CONS
+;;;   (labels ((rec (i x) (if (zerop i) x (rec (1- i) x))))
+;;;     (rec n (list 1)))                                  => T
+;;;
+;;; because the DO loop assigns to X, and PROPAGATE-FROM-SETS derives
+;;; a variable's type from the values assigned to it, which do not
+;;; depend on the variable's own type. The equations are now also
+;;; solved from the other end of the lattice, upward from the empty
+;;; type, which converges on the cyclic case too.
+(with-test (:name (:local-call-arg-type :cycle))
+  (flet ((derived (form &rest args)
+           (apply (checked-compile form) args)))
+    ;; The parameter is handed straight back to itself.
+    (assert (eq 'cons
+                (derived '(lambda (n)
+                           (labels ((rec (i x)
+                                      (if (zerop i)
+                                          (ctu:compiler-derived-type x)
+                                          (rec (1- i) x))))
+                             (rec n (list 1))))
+                         0)))
+    ;; The cycle runs through a second function, so it is not enough to
+    ;; ignore arguments that reference the callee's own parameters.
+    (assert (eq 'cons
+                (derived '(lambda (n)
+                           (labels ((a (i x)
+                                      (if (zerop i)
+                                          (ctu:compiler-derived-type x)
+                                          (b (1- i) x)))
+                                    (b (i x) (a (1- i) x)))
+                             (a n (list 1))))
+                         0)))
+    ;; Two entering edges of different types: the answer is the union
+    ;; of them, not either one on its own.
+    (assert (eq 'list
+                (derived '(lambda (n p)
+                           (labels ((rec (i x)
+                                      (if (zerop i)
+                                          (ctu:compiler-derived-type x)
+                                          (rec (1- i) x))))
+                             (if p (rec n (list 1)) (rec n nil))))
+                         0 t)))
+    ;; The back edge carries a type no entering edge does, and it
+    ;; reaches the parameter through an argument that merges it with a
+    ;; reference to the parameter itself.
+    (assert (eq 'list
+                (derived '(lambda (n p)
+                           (labels ((rec (i x)
+                                      (if (zerop i)
+                                          (ctu:compiler-derived-type x)
+                                          (rec (1- i) (if p x nil)))))
+                             (rec n (list 1))))
+                         0 nil)))
+    ;; FIXME: In an ideal world, we would derive UNSIGNED-BYTE here
+    ;; like the corresponding imperative loop would.
+    (assert (eq 'number
+                (derived '(lambda (k)
+                           (labels ((rec (i n)
+                                      (if (zerop i)
+                                          (ctu:compiler-derived-type n)
+                                          (rec (1- i) (1+ n)))))
+                             (rec k 0)))
+                         0)))))
+
+;;; Check that a local function's return type depending on optimistic
+;;; type propagation derives to a tight result as well.
+(with-test (:name (:local-call-arg-type :return-type))
+  (flet ((result-type (form)
+           (let ((type (sb-kernel:%simple-fun-type (checked-compile form))))
+             (second (third type)))))
+    (assert (eq 'cons (result-type '(lambda (p)
+                                     (labels ((rec (x) (if p (rec x) x)))
+                                       (rec (list 1)))))))
+    (assert (eq 'cons (result-type '(lambda (n)
+                                     (labels ((rec (i x)
+                                                (if (zerop i) x (rec (1- i) x))))
+                                       (rec n (list 1)))))))
+    (assert (eq 'cons (result-type '(lambda (n)
+                                     (labels ((a (i x)
+                                                (if (zerop i) x (b (1- i) x)))
+                                              (b (i x) (a (1- i) x)))
+                                       (a n (list 1)))))))
+    ;; The value comes back through a non-tail call, so the result is
+    ;; not simply the parameter's type.
+    (assert (eq 'cons (result-type '(lambda (p)
+                                     (labels ((rec (x) (if p (list (rec x)) x)))
+                                       (rec (list 1)))))))))
+
+;;; The note lp#486416 was reported for: FN is declared FUNCTION at the
+;;; outer call, but the declaration did not survive the trip around the
+;;; recursion, so the FUNCALL was compiled as a full call through
+;;; FDEFINITION.
+(with-test (:name (:local-call-arg-type :lp486416))
+  (checked-compile '(lambda (x fn)
+                     (declare (optimize speed) (type function fn) (type fixnum x))
+                     (labels ((recurse (x fn)
+                                (if (zerop x)
+                                    (funcall fn x)
+                                    (recurse (the fixnum (1- x)) fn))))
+                       (recurse x fn)))
+                   :allow-notes nil))

@@ -1434,6 +1434,7 @@
       (ecase kind
         (:local
          (let ((fun (combination-lambda node)))
+           (accumulate-optimistic-arg-types node fun)
            (if (functional-kind-eq fun let)
                (propagate-let-args node fun)
                (propagate-local-call-args node fun))))
@@ -3049,6 +3050,182 @@
   (values))
 
 (declaim (end-block))
+
+;;;; types of local call arguments that flow in a cycle
+
+;;;; Ordinary forward type propagation in IR1 as in
+;;;; PROPAGATE-LOCAL-CALL-ARGS starts at T and iteratively unions and
+;;;; narrows across call sites. While these intermediate types are
+;;;; conservative and hence always sound, this presents a precision
+;;;; problem in the presence of cyclical dataflow. For example, in
+;;;; local functions whose parameters end up eventually feeding
+;;;; arguments of calls to themselves, the union of the argument types
+;;;; stays fixed at T nd nothing further can be derived. This is
+;;;; particularly harmful for loops expressed as recursive functions
+;;;; which frequently take this shape.
+;;;;
+;;;; To solve this impasse, we track optimistic types on parameter
+;;;; variables which start out as holding the empty type. Such types
+;;;; are pushed around the flow graphand and iterated upward to the
+;;;; least fixpoint and must not be propagated elsewhere or published
+;;;; until then, as these intermediate types underapproximate the
+;;;; real type and are not sound.
+
+;;; True if we can tell what FUN's parameters might be just by looking
+;;; at its local calls. We can't do anything when FUN has an XEP.
+(defun optimistic-type-propagatable-fun-p (fun)
+  (declare (type clambda fun))
+  (and (not (functional-entry-fun fun))
+       (not (lambda-optional-dispatch fun))
+       (let ((vars (lambda-vars fun))
+             (refs (leaf-refs fun)))
+         (and refs
+              ;; &OPTIONAL, &REST and &KEY parameters are not filled in
+              ;; from the argument list position by position.
+              (notany #'lambda-var-arg-info vars)
+              (dolist (ref refs t)
+                (let ((dest (node-dest ref)))
+                  (unless (and (combination-p dest)
+                               (eq (combination-kind dest) :local)
+                               (eq (basic-combination-fun dest) (node-lvar ref))
+                               (= (length (basic-combination-args dest))
+                                  (length vars)))
+                    (return nil))))))))
+
+;;; Return whether VAR is eligible for optimistic parameter type
+;;; inference. If it is, initialize the optimistic type of VAR to the
+;;; empty type if needed. Set variables are currently too hairy to
+;;; handle.
+(defun init-variable-optimistic-type (var)
+  (declare (type lambda-var var))
+  (or (lambda-var-optimistic-type var)
+      (let ((home (lambda-var-home var)))
+        (when (and home
+                   (not (basic-var-sets var))
+                   (not (lambda-var-deleted var))
+                   (optimistic-type-propagatable-fun-p home))
+          (setf (lambda-var-optimistic-type var) *empty-type*)
+          (setf (lambda-optimistic-pending home) t)
+          (dolist (ref (leaf-refs home))
+            (let ((dest (node-dest ref)))
+              (when (and dest (combination-p dest) (node-prev dest))
+                (reoptimize-node dest))))
+          t))))
+
+;;; Return the lambda variable referenced by USE if it is eligible for
+;;; optimistic type inference.
+(defun optimistic-var (use)
+  (and (ref-p use)
+       (let ((leaf (ref-leaf use)))
+         (and (lambda-var-p leaf)
+              (init-variable-optimistic-type leaf)
+              leaf))))
+
+;;; Return the optimistic type of the lvar ARG by taking into account
+;;; any variable references which may have optimistic types. Otherwise
+;;; fall back to any derived types.
+(defun optimistic-arg-types (arg)
+  (declare (type (or null lvar) arg))
+  (if (null arg)
+      (list *universal-type*)
+      (let* ((has-optimistic-p nil)
+             (types (mapcar (lambda (use)
+                              (let ((var (optimistic-var use)))
+                                (cond (var
+                                       (setf has-optimistic-p t)
+                                       (lambda-var-optimistic-type var))
+                                      (t
+                                       (single-value-type (node-derived-type use))))))
+                            (ensure-list (lvar-uses arg)))))
+        ;; Fall back to LVAR-TYPE if no tracked parameters were
+        ;; present, since it takes casts into account as well.
+        (if has-optimistic-p
+            types
+            (list (lvar-type arg))))))
+
+;;; Note that anything affected by the optimistic type of VAR is
+;;; pending for reanalysis.
+(defun note-optimistic-change (var)
+  (dolist (ref (leaf-refs var))
+    (let* ((lvar (node-lvar ref))
+           (dest (and lvar (lvar-dest lvar))))
+      (when (and dest
+                 (combination-p dest)
+                 (eq (combination-kind dest) :local)
+                 (neq lvar (basic-combination-fun dest)))
+        (let ((callee (combination-lambda dest)))
+          (when callee
+            (setf (lambda-optimistic-pending callee) t)))
+        (reoptimize-lvar lvar)))))
+
+;;; Compute the union of the optimistic types of every variable of FUN
+;;; across all calls and update those types whenever there is a reason
+;;; to do so. If any types ended up growing, we note that things have
+;;; changed.
+(defun accumulate-optimistic-arg-types (call fun)
+  (declare (type basic-combination call) (type clambda fun))
+  (let* ((vars (lambda-vars fun))
+         (requested (shiftf (lambda-optimistic-pending fun) nil)))
+    (when (and (or requested
+                   (some (lambda (arg) (and arg (lvar-reoptimize arg)))
+                         (basic-combination-args call))
+                   (some (lambda (var) (null (lambda-var-optimistic-type var)))
+                         vars))
+               (optimistic-type-propagatable-fun-p fun))
+      (dolist (var vars)
+        (init-variable-optimistic-type var))
+      (let ((accum-types (make-array (length vars) :initial-element *empty-type*)))
+        (declare (dynamic-extent accum-types))
+
+        (dolist (ref (leaf-refs fun))
+          (let ((dest (node-dest ref)))
+            (when dest
+              (loop for var in vars
+                    for arg in (basic-combination-args dest)
+                    for i from 0
+                    when (lambda-var-optimistic-type var)
+                      do (dolist (type (optimistic-arg-types arg))
+                           (setf (aref accum-types i)
+                                 (type-union (aref accum-types i) type)))))))
+
+        (loop for var in vars
+              for new across accum-types
+              when (lambda-var-optimistic-type var)
+                do (unless (type= new (lambda-var-optimistic-type var))
+                     (setf (lambda-var-optimistic-type var) new)
+                     (note-optimistic-change var))))))
+  (values))
+
+;;; Check whether any functions in COMPONENT are still waiting for the
+;;; optimistic types of any of their variables to reach fixpoint. If
+;;; the types have settled, then publish the types by propagating them
+;;; to their corresponding variable refs (which in turn may cause
+;;; reoptimization of the component).
+;;;
+;;; If the optimistic type of a variable is empty, its function must
+;;; be unreachable and will be cleaned up later.
+(defun publish-optimistic-types (component)
+  (declare (type component component))
+  (flet ((check (fun)
+           (when (lambda-optimistic-pending fun)
+             (return-from publish-optimistic-types nil)))
+         (propagate (fun)
+           (unless (functional-kind-eq fun deleted zombie)
+             (dolist (var (lambda-vars fun))
+               (let ((type (lambda-var-optimistic-type var)))
+                 (when (and type (neq type *empty-type*))
+                   ;; It shouldn't be possible for FUN to acquire an
+                   ;; XEP once we've decided its parameters are
+                   ;; eligible for optimistic type propagation.
+                   (aver (not (functional-entry-fun fun)))
+                   (propagate-to-refs var type)))))))
+    (dolist (fun (component-lambdas component))
+      (check fun)
+      (mapc #'check (lambda-lets fun)))
+    (dolist (fun (component-lambdas component))
+      (propagate fun)
+      (mapc #'propagate (lambda-lets fun))))
+  (values))
 
 (defun count-values (call &optional min)
   (loop for arg in (basic-combination-args call)

@@ -1229,6 +1229,9 @@
   ;; all the lambdas that have been LET-substituted in this lambda.
   ;; This is only non-null in lambdas that aren't LETs.
   (lets nil :type list)
+  ;; True if any of this lambdas variables are still in the process of
+  ;; having their optimistic types reach fixpoint.
+  (optimistic-pending nil :type boolean)
   ;; all the ENTRY nodes in this function and its LETs, or null in a LET
   (entries nil :type list)
   ;; all the DYNAMIC-EXTENT nodes in this function and its LETs, or
@@ -1438,6 +1441,14 @@
   (equality-constraints    nil :type (or null (vector t)))
   (equality-constraints-hash nil :type (or null hash-table))
   (vector-length-constraint nil)
+  ;; The type we are assuming for this variable while doing local call
+  ;; argument type propagation. This is an under-approximation
+  ;; starting from the empty type which local call propagation
+  ;; steadily accumulates into until fixpoint and must not be used
+  ;; anywhere else during the process. Only once fixpoint is reached
+  ;; do we publish the type. Null if there is no need to do a fixpoint
+  ;; analysis.
+  (optimistic-type nil :type (or null ctype))
   source-form)
 
 (defprinter (lambda-var :identity t)
