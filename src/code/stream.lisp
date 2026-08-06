@@ -213,15 +213,20 @@
           (let ((char-size (if (fd-stream-p stream)
                                (fd-stream-char-size stream)
                                (external-format-char-size (stream-external-format stream)))))
-            (- res
-               (etypecase char-size
-                 (fixnum
-                  (* (truly-the (unsigned-byte 8) char-size) delta))
-                 (function
-                  (loop with buffer = (ansi-stream-csize-buffer stream)
-                        with start = (ansi-stream-in-index stream)
-                        for i from start below +ansi-stream-in-buffer-length+
-                        sum (aref buffer i) of-type fixnum)))))))))
+            (etypecase char-size
+              (fixnum
+               (- res (* (truly-the (unsigned-byte 8) char-size) delta)))
+              (function
+               (let ((size-buffer (ansi-stream-csize-buffer stream)))
+                 (if size-buffer
+                     (- res
+                        (loop with start = (ansi-stream-in-index stream)
+                              for i from start below +ansi-stream-in-buffer-length+
+                              sum (aref size-buffer i) of-type fixnum))
+                     (+
+                      (- res
+                         (buffer-head (fd-stream-ibuf stream)))
+                      (funcall char-size stream)))))))))))
 
 ;;; You're not allowed to specify NIL for the position but we were permitting
 ;;; it, which made it impossible to test for a bad call that tries to assign
@@ -649,7 +654,14 @@
                  ;; we resynced or were given something instead
                  (t
                   (setf (aref ibuf index) value)
-                  (setf (aref sizebuf index) size)
+                  (if sizebuf
+                      (setf (aref sizebuf index) size)
+                      (setf (ansi-stream-char-buffer-byte-position-at stream) index
+                            (ansi-stream-char-buffer-start stream) (if (zerop size) ;; a replacement used
+                                                                       +ansi-stream-in-buffer-length+
+                                                                       index)
+                            (ansi-stream-char-buffer-byte-position-start stream)
+                            (setf (ansi-stream-char-buffer-byte-position stream) (- (buffer-head (fd-stream-ibuf stream)) size))))
                   (when (ansi-stream-input-char-pos stream)
                     (decf (ansi-stream-input-char-pos stream) index)
                     (setf (form-tracking-stream-last-newline stream) index))
@@ -669,12 +681,16 @@
                 ibuf +ansi-stream-in-buffer-extra+
                 ibuf start
                 count)
-             (replace sizebuf sizebuf :start1 start :end1 (+ start count)
-                                      :start2 +ansi-stream-in-buffer-extra+))
+             (if sizebuf
+                 (replace sizebuf sizebuf :start1 start :end1 (+ start count)
+                                          :start2 +ansi-stream-in-buffer-extra+)
+                 (incf (ansi-stream-char-buffer-start stream) (- start +ansi-stream-in-buffer-extra+))))
+
            (when (ansi-stream-input-char-pos stream)
              (decf (ansi-stream-input-char-pos stream) start)
              (setf (form-tracking-stream-last-newline stream) start))
-           (setf (ansi-stream-in-index stream) start)))))
+           (setf (ansi-stream-char-buffer-byte-position-at stream) (ansi-stream-char-buffer-start stream)
+                 (ansi-stream-in-index stream) start)))))
 
 ;;; This is similar to FAST-READ-CHAR-REFILL, but we don't have to
 ;;; leave room for unreading.

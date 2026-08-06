@@ -706,56 +706,6 @@
   (loop for i below length
         do (setf (aref string i) (code-char (sap-ref-8 sap i)))))
 
-#+(and sb-unicode 64-bit little-endian (not arm64))
-(defun sb-vm::utf8-crlf-to-character-string-sized (start end string ibuf size-buffer)
-  (declare (type index start end)
-           (optimize speed (safety 0)))
-  (with-pinned-objects (string size-buffer)
-    (let* ((head (buffer-head ibuf))
-           (tail (buffer-tail ibuf))
-           (sap (buffer-sap ibuf))
-           (n (logand (min (1- (- end start))
-                           (1- (- tail head)))
-                      -2))
-           (repeat (ldb (byte 16 0) #x0101010101010101))
-           (ascii-mask (* 128 repeat))
-           (string-sap (vector-sap string))
-           (size-sap (vector-sap size-buffer))
-           (size-offset start)
-           (string-offset (* start 4))
-           (end (+ head n)))
-      (declare (index string-offset size-offset))
-      (declare (optimize sb-c::preserve-single-use-debug-variables
-                         sb-c::preserve-constants))
-      (loop while (< head end)
-            do
-            (let ((word (sap-ref-16 sap head)))
-              (when (logtest word ascii-mask)
-                (return))
-              (cond ((= word #x0A0D)
-                     (setf (sap-ref-32 string-sap string-offset) 10
-                           (sap-ref-8 size-sap size-offset) 2)
-                     (incf head 2)
-                     (incf string-offset 4)
-                     (incf size-offset 1))
-                    ((= (ash word -8) 13)
-                     (setf (sap-ref-32 string-sap string-offset) (ldb (byte 8 0) word)
-                           (sap-ref-8 size-sap size-offset) 1)
-                     (incf head 1)
-                     (incf string-offset 4)
-                     (incf size-offset 1))
-                    (t
-                     (setf (sap-ref-64 string-sap string-offset)
-                           (dpb (ldb (byte 8 8) word)
-                                (byte 32 32)
-                                (ldb (byte 8 0) word))
-                           (sap-ref-16 size-sap size-offset) #x0101)
-                     (incf head 2)
-                     (incf string-offset 8)
-                     (incf size-offset 2)))))
-      (setf (buffer-head ibuf) head)
-      size-offset)))
-
 #+(and sb-unicode 64-bit little-endian
        (not (or arm64 x86-64))) ;; have simd definitions
 (defun sb-vm::utf8-to-base-string (start end string ibuf)
@@ -878,11 +828,51 @@
        (incf index))
      (setf (buffer-head ibuf) head)))
 
+(make-defs (($newline || -crlf))
+ (defun count-utf8$newline-byte-to-chars (stream)
+   (declare (optimize speed))
+   (let* ((ibuf (fd-stream-ibuf stream))
+          (sap (buffer-sap ibuf))
+          (index (ansi-stream-char-buffer-byte-position stream))
+          (codepoint (ansi-stream-char-buffer-byte-position-at stream))
+          (target-codepoint (ansi-stream-in-index stream)))
+     (declare (index index codepoint))
+     (when (<= (ansi-stream-in-index stream)
+               (ansi-stream-char-buffer-start stream)) ;; reading from "instead"
+       (return-from count-utf8$newline-byte-to-chars
+         (ansi-stream-char-buffer-byte-position-start stream)))
+     (when (< target-codepoint codepoint) ;; unread-char happened
+       ;; start from scratch
+       (setf index (ansi-stream-char-buffer-byte-position-start stream)
+             codepoint (ansi-stream-char-buffer-start stream)))
+     (loop
+      (when (>= codepoint target-codepoint)
+        (setf (ansi-stream-char-buffer-byte-position-at stream) (ansi-stream-in-index stream)
+              (ansi-stream-char-buffer-byte-position stream) index)
+        (return index))
+      (let ((byte (sap-ref-8 sap index))
+            ($when (eq '$newline '-crlf)
+                   (tail (buffer-tail ibuf))))
+        (cond ((< byte #x80)
+              (incf index)
+              ($when (eq '$newline '-crlf)
+                     (when (and (= byte 13)
+                                (< index tail)
+                                (= (sap-ref-8 sap index) 10))
+                       (incf index))))
+             ((< byte #xe0)
+              (incf index 2))
+             ((< byte #xf0)
+              (incf index 3))
+             (t
+              (incf index 4))))
+      (incf codepoint)))))
+
 (defun fd-stream-read-n-characters/utf-8 (stream string size-buffer start end &aux (index start))
+  (declare (ignore size-buffer))
   (declare (type fd-stream stream)
            (type index start end index)
-           (type ansi-stream-cin-buffer string)
-           (type ansi-stream-csize-buffer size-buffer))
+           (type ansi-stream-cin-buffer string))
   (when (fd-stream-eof-forced-p stream)
     (setf (fd-stream-eof-forced-p stream) nil)
     (return-from fd-stream-read-n-characters/utf-8 start))
@@ -890,24 +880,20 @@
       ((= (fill-pointer instead) 0)
        (setf (fd-stream-listen stream) nil))
     (setf (aref string index) (vector-pop instead))
-    (setf (aref size-buffer index) 0)
     (incf index)
     (when (= end index)
       (when (= (fill-pointer instead) 0)
         (setf (fd-stream-listen stream) nil))
       (return-from fd-stream-read-n-characters/utf-8 index)))
+
   (block outer
     (do ()
         (())
+      (setf (ansi-stream-char-buffer-byte-position-start stream)
+            (setf (ansi-stream-char-buffer-byte-position stream) (buffer-head (fd-stream-ibuf stream)))
+            (ansi-stream-char-buffer-start stream) index)
       #+(and sb-unicode 64-bit little-endian)
-      (let ((new-index #+arm64 (sb-vm::utf8-to-character-string-sized index end string (fd-stream-ibuf stream) size-buffer)
-                       #-arm64 (sb-vm::utf8-to-character-string index end string (fd-stream-ibuf stream))))
-        ;; Make sure to change this 1 whenever
-        ;; utf8-to-character-string starts processing more than
-        ;; just ascii characters.
-        #-arm64
-        (fill size-buffer 1 :start index :end new-index)
-        (setf index new-index))
+      (setf index (sb-vm::utf8-to-character-string index end string (fd-stream-ibuf stream)))
       (let* ((ibuf (fd-stream-ibuf stream))
              (head (buffer-head ibuf))
              (tail (buffer-tail ibuf))
@@ -918,17 +904,16 @@
                  (unless (> index start)
                    (stream-decoding-error-and-handle stream reason 1))
                  (return-from outer index)))
-          (utf8-char-loop :size-buffer t
-                          :eof nil))
+          (utf8-char-loop :eof nil))
         (when (or (> index start)
                   (null (catch 'eof-input-catcher (refill-input-buffer stream))))
           (return index))))))
 
 (defun fd-stream-read-n-characters/utf-8/crlf (stream string size-buffer start end &aux (index start))
+  (declare (ignore size-buffer))
   (declare (type fd-stream stream)
            (type index start end index)
-           (type ansi-stream-cin-buffer string)
-           (type ansi-stream-csize-buffer size-buffer))
+           (type ansi-stream-cin-buffer string))
   (when (fd-stream-eof-forced-p stream)
     (setf (fd-stream-eof-forced-p stream) nil)
     (return-from fd-stream-read-n-characters/utf-8/crlf start))
@@ -936,7 +921,6 @@
       ((= (fill-pointer instead) 0)
        (setf (fd-stream-listen stream) nil))
     (setf (aref string index) (vector-pop instead))
-    (setf (aref size-buffer index) 0)
     (incf index)
     (when (= end index)
       (when (= (fill-pointer instead) 0)
@@ -945,9 +929,12 @@
   (block outer
     (do ()
         (())
+      (setf (ansi-stream-char-buffer-byte-position-start stream)
+            (setf (ansi-stream-char-buffer-byte-position stream) (buffer-head (fd-stream-ibuf stream)))
+            (ansi-stream-char-buffer-start stream) index)
       #+(and sb-unicode 64-bit little-endian)
       (setf index
-            (sb-vm::utf8-crlf-to-character-string-sized index end string (fd-stream-ibuf stream) size-buffer))
+            (sb-vm::utf8-crlf-to-character-string index end string (fd-stream-ibuf stream)))
       (let* ((ibuf (fd-stream-ibuf stream))
              (head (buffer-head ibuf))
              (tail (buffer-tail ibuf))
@@ -958,7 +945,7 @@
                  (unless (> index start)
                    (stream-decoding-error-and-handle stream reason 1))
                  (return-from outer index)))
-          (utf8-char-loop :size-buffer t :crlf t :eof nil))
+          (utf8-char-loop :crlf t :eof nil))
         (when (or (> index start)
                   (null (catch 'eof-input-catcher (refill-input-buffer stream))))
           (return index))))))
@@ -1204,7 +1191,8 @@
   :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff)))
   :read-c-string-function read-from-c-string/utf-8/lf*
   :output-c-string-function output-to-c-string/utf-8/lf
-  :handle-size nil)
+  :handle-size nil
+  :count-chars #'count-utf8-byte-to-chars)
 
 (define-external-format/variable-width (:utf-8) t
   #+sb-unicode (code-char #xfffd) #-sb-unicode #\?
@@ -1349,6 +1337,7 @@
   :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff)))
   :fd-stream-read-n-characters fd-stream-read-n-characters/utf-8/crlf
   :newline-variant :crlf
+  :count-chars #'count-utf8-crlf-byte-to-chars
   :handle-size nil)
 
 #+(and sb-unicode 64-bit little-endian

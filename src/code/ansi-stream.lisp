@@ -134,6 +134,12 @@
   ;; FILE-POSITION.)
   (in-buffer nil :type (or ansi-stream-in-buffer null))
   (cin-buffer nil :type (or ansi-stream-cin-buffer null))
+  ;; Various char-buffer positions needed to calculate the difference
+  ;; between bytes and characters
+  (char-buffer-byte-position-at 0 :type index)
+  (char-buffer-byte-position 0 :type index)
+  (char-buffer-byte-position-start 0 :type index)
+  (char-buffer-start 0 :type index)
   (csize-buffer nil :type (or ansi-stream-csize-buffer null))
   (in-index +ansi-stream-in-buffer-length+
             :type (integer 0 #.+ansi-stream-in-buffer-length+))

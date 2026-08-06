@@ -907,7 +907,8 @@
   (read-c-string-fun (missing-arg) :type function)
   (write-c-string-fun (missing-arg) :type function)
   (octets-to-string-fun (missing-arg) :type function)
-  (string-to-octets-fun (missing-arg) :type function))
+  (string-to-octets-fun (missing-arg) :type function)
+  (count-chars nil :type (or null function)))
 (declaim (freeze-type external-format))
 
 (defun ef-char-size (ef-entry)
@@ -1567,7 +1568,8 @@
           (newline-variant :lf)
           (char-encodable-p t)
           (read-c-string-function nil custom-read-c-string-function-p)
-          (output-c-string-function nil custom-output-c-string-function))
+          (output-c-string-function nil custom-output-c-string-function)
+          count-chars)
   (let* ((name (first external-format))
          (suffix (symbolicate name '/ newline-variant))
          (out-function (or write-n-bytes-fun
@@ -1926,7 +1928,8 @@
                                 (apply ',octets-to-string-sym rest))
         :string-to-octets-fun (lambda (&rest rest)
                                 (declare (dynamic-extent rest))
-                                (apply ',string-to-octets-sym rest))))))
+                                (apply ',string-to-octets-sym rest))
+        :count-chars ,count-chars))))
 
 ;;;; utility functions (misc routines, etc)
 
@@ -2038,10 +2041,13 @@
                          (or (atomic-pop *available-char-buffers*)
                              (make-array +ansi-stream-in-buffer-length+
                                          :element-type 'character)))
-                   (setf (ansi-stream-csize-buffer fd-stream)
-                         (or (atomic-pop *available-ub8-buffers*)
-                             (make-array +ansi-stream-in-buffer-length+
-                                         :element-type '(unsigned-byte 8))))))
+                   (if (ef-count-chars external-format-entry)
+                       (setf (fd-stream-char-size fd-stream)
+                             (ef-count-chars external-format-entry))
+                       (setf (ansi-stream-csize-buffer fd-stream)
+                             (or (atomic-pop *available-ub8-buffers*)
+                                 (make-array +ansi-stream-in-buffer-length+
+                                             :element-type '(unsigned-byte 8)))))))
                 ((equal target-type '(unsigned-byte 8))
                  (setf (ansi-stream-in-buffer fd-stream)
                        (make-array +ansi-stream-in-buffer-length+
