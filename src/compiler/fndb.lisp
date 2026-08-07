@@ -1752,7 +1752,7 @@
 (defknown read-delimited-list (character &optional stream-designator t) list ())
 ;; FIXME: add a type-deriver => (values (or string eof-value) boolean)
 (defknown read-line (&optional stream-designator t t t) (values t boolean) ())
-(defknown unread-char (character &optional stream-designator) t ())
+(defknown unread-char (character &optional stream-designator) null ())
 (defknown peek-char (&optional (or character (member nil t))
                                stream-designator t t t) t
   ()
