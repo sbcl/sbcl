@@ -1502,13 +1502,6 @@
   (when external-format
     (get-external-format external-format)))
 
-(defun variable-width-external-format-p (ef-entry)
-  ;; TODO: I'm pretty sure this is always true
-  (and ef-entry (not (null (ef-resync-fun ef-entry)))))
-
-(defun bytes-for-char-fun (ef-entry)
-  (if ef-entry (ef-bytes-for-char-fun ef-entry) (constantly 1)))
-
 (defmacro define-unibyte-mapping-external-format
     (canonical-name (&rest other-names) &body exceptions)
   (let ((->code-name (symbolicate canonical-name '->code-mapper))
@@ -1951,6 +1944,7 @@
         :count-chars ,(if (integerp in-size-expr)
                           in-size-expr
                           `#',count-chars-function)))))
+
 
 ;;;; utility functions (misc routines, etc)
 

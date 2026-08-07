@@ -1171,24 +1171,6 @@
   :handle-size nil
   :count-chars count-utf8-byte-to-chars)
 
-(DEFUN COUNT-CHARS/UTF-8/CR (STREAM)
-   (LET* ((IBUF (FD-STREAM-IBUF STREAM))
-          (SAP (BUFFER-SAP IBUF))
-          (TAIL (BUFFER-TAIL IBUF))
-          (HEAD (ANSI-STREAM-CHAR-BUFFER-BYTE-POSITION STREAM))
-          (CODEPOINT (ANSI-STREAM-CHAR-BUFFER-BYTE-POSITION-AT STREAM))
-          (TARGET-CODEPOINT (ANSI-STREAM-IN-INDEX STREAM)))
-     (DECLARE (INDEX HEAD CODEPOINT)
-              (IGNORABLE TAIL))
-     (BLOCK DECODE-BREAK-REASON
-       (LOOP (WHEN (>= CODEPOINT TARGET-CODEPOINT) (RETURN HEAD))
-             (LET ((BYTE (SAP-REF-8 SAP HEAD)))
-               (INCF HEAD (COND ((< BYTE 128) 1) ((< BYTE 194) (RETURN-FROM DECODE-BREAK-REASON 1)) ((< BYTE 224) 2) ((< BYTE 240) 3) (T 4))))
-             (INCF CODEPOINT)))))
-
-(DEFUN %COUNT-CHARS/UTF-8/CR (STREAM)
-  (COUNT-CHARS/UTF-8/CR STREAM))
-
 (define-external-format/variable-width (:utf-8) t
   #+sb-unicode (code-char #xfffd) #-sb-unicode #\?
   (let ((bits (char-code |ch|)))
@@ -1252,8 +1234,7 @@
   string/cr->utf8
   :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff)))
   :newline-variant :cr
-  :handle-size nil
-  :count-chars %COUNT-CHARS/UTF-8/CR)
+  :handle-size nil)
 
 (define-external-format/variable-width (:utf-8 :utf8) t
   #+sb-unicode (code-char #xfffd) #-sb-unicode #\?
@@ -1467,15 +1448,6 @@
         (c-string-decoding-error :utf-8 sap head decode-break-reason))
       (when (zerop (char-code |ch|)) (return count))))
   (error "~s modified while validating UTF-8" sap))
-
-(declaim (inline word-has-zero-bytes))
-(defun word-has-zero-bytes (word)
-  (declare (word word)
-           (optimize speed))
-  (let* ((ones (ldb (byte sb-vm:n-word-bits 0) #x0101010101010101))
-         (high-bits (* ones #x80)))
-    (logtest (logandc2 (- word ones) word)
-             high-bits)))
 
 (declaim (inline word-has-zero-or-negative-bytes))
 (defun word-has-zero-or-negative-bytes (word)
