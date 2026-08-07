@@ -206,44 +206,46 @@
   (let ((res (truly-the (or null index) (call-ansi-stream-misc stream :get-file-position)))
         (delta (- +ansi-stream-in-buffer-length+
                   (ansi-stream-in-index stream))))
-    (if (eql delta 0)
-        res
-        (when res
-          (let ((char-size (if (fd-stream-p stream)
-                               (fd-stream-char-size stream)
-                               (external-format-char-size (stream-external-format stream)))))
-            ;; For variable width encodings, count how many
-            ;; bytes between the previous position and the
-            ;; current position in the current character
-            ;; buffer
-            (+
-             (- res
-                (buffer-head (fd-stream-ibuf stream)))
+    (cond ((eql delta 0)
+           res)
+          ((ansi-stream-in-buffer stream)
+           (- res delta))
+          (res
+           (let ((char-size (if (fd-stream-p stream)
+                                (fd-stream-char-size stream)
+                                (external-format-char-size (stream-external-format stream)))))
+             ;; For variable width encodings, count how many
+             ;; bytes between the previous position and the
+             ;; current position in the current character
+             ;; buffer
+             (+
+              (- res
+                 (buffer-head (fd-stream-ibuf stream)))
 
-             (cond ((<= (ansi-stream-in-index stream)
-                        (ansi-stream-char-buffer-start stream))
-                    ;; reading from "instead"
-                    (ansi-stream-char-buffer-byte-position-start stream))
-                   (t
-                    (etypecase char-size
-                      (fixnum
-                       (+ (ansi-stream-char-buffer-byte-position-start stream)
-                          (* (- (ansi-stream-in-index stream)
-                                (ansi-stream-char-buffer-start stream))
-                             (truly-the (unsigned-byte 8) char-size))))
-                      (function
-                       (let ((codepoint (ansi-stream-char-buffer-byte-position-at stream))
-                             (target-codepoint (ansi-stream-in-index stream)))
-                         (when (< target-codepoint codepoint) ;; unread-char happened
-                           ;; start from scratch
-                           (setf (ansi-stream-char-buffer-byte-position stream)
-                                 (ansi-stream-char-buffer-byte-position-start stream)
-                                 (ansi-stream-char-buffer-byte-position-at stream)
-                                 (ansi-stream-char-buffer-start stream)))
-                         (let ((byte (funcall char-size stream)))
-                           (setf (ansi-stream-char-buffer-byte-position-at stream) (ansi-stream-in-index stream)
-                                 (ansi-stream-char-buffer-byte-position stream) byte)
-                           byte))))))))))))
+              (cond ((<= (ansi-stream-in-index stream)
+                         (ansi-stream-char-buffer-start stream))
+                     ;; reading from "instead"
+                     (ansi-stream-char-buffer-byte-position-start stream))
+                    (t
+                     (etypecase char-size
+                       (fixnum
+                        (+ (ansi-stream-char-buffer-byte-position-start stream)
+                           (* (- (ansi-stream-in-index stream)
+                                 (ansi-stream-char-buffer-start stream))
+                              (truly-the (unsigned-byte 8) char-size))))
+                       (function
+                        (let ((codepoint (ansi-stream-char-buffer-byte-position-at stream))
+                              (target-codepoint (ansi-stream-in-index stream)))
+                          (when (< target-codepoint codepoint) ;; unread-char happened
+                            ;; start from scratch
+                            (setf (ansi-stream-char-buffer-byte-position stream)
+                                  (ansi-stream-char-buffer-byte-position-start stream)
+                                  (ansi-stream-char-buffer-byte-position-at stream)
+                                  (ansi-stream-char-buffer-start stream)))
+                          (let ((byte (funcall char-size stream)))
+                            (setf (ansi-stream-char-buffer-byte-position-at stream) (ansi-stream-in-index stream)
+                                  (ansi-stream-char-buffer-byte-position stream) byte)
+                            byte))))))))))))
 
 ;;; You're not allowed to specify NIL for the position but we were permitting
 ;;; it, which made it impossible to test for a bad call that tries to assign

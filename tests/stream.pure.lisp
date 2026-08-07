@@ -561,3 +561,8 @@
   (with-open-file (i "zero")
     (with-open-file (o (or #+win32 "nul" "/dev/null") :if-exists :append :direction :output)
       (assert (null (file-position (make-two-way-stream i o)))))))
+
+(with-test (:name :binary-buffered-file-position)
+  (with-open-file (s "zero" :element-type '(unsigned-byte 8))
+    (read-sequence (make-list 10) s)
+    (assert (= (file-position s) 10))))
