@@ -790,10 +790,7 @@
                       (n-bin #'mock-fd-stream-n-bin-fun)
                       (cin-buffer
                        (make-array sb-impl::+ansi-stream-in-buffer-length+
-                                   :element-type 'character))
-                      (csize-buffer
-                       (make-array sb-impl::+ansi-stream-in-buffer-length+
-                                   :element-type '(unsigned-byte 8)))))
+                                   :element-type 'character))))
   buffer-chain)
 
 (defun make-mock-fd-stream (buffer-chain)
@@ -801,14 +798,13 @@
   (%make-mock-fd-stream
    (mapcar (lambda (x) (substitute #\Newline #\| x)) buffer-chain)))
 
-(defun mock-fd-stream-n-bin-fun (stream char-buf size-buf start end &optional eof-err-p)
+(defun mock-fd-stream-n-bin-fun (stream char-buf start end &optional eof-err-p)
   (cond ((mock-fd-stream-buffer-chain stream)
          (let* ((chars (pop (mock-fd-stream-buffer-chain stream)))
                 (n-chars (length chars)))
            ;; make sure the mock object is being used as expected.
            (assert (>= end (length chars)))
            (replace char-buf chars :start1 start)
-           (fill size-buf 1 :start start :end (+ start n-chars))
            (+ start n-chars)))
         (t
          (sb-impl::eof-or-lose stream eof-err-p start))))

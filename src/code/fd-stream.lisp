@@ -56,11 +56,6 @@
 
 ;;; Array of decoded characters, when required.
 (define-load-time-global *available-char-buffers* ())
-;;; Array of element type (unsigned-byte 8) could serve two needs:
-;;; - storing length-in-octets of each character for maintaining char pos
-;;    vs. byte pos involving non-fixed-width EFs.
-;;; - holding data for streams of element type UB8 (not done)
-(define-load-time-global *available-ub8-buffers* ())
 
 (defconstant +bytes-per-buffer+ (* 32 1024)
   "Default number of bytes per buffer.")
@@ -908,13 +903,8 @@
   (write-c-string-fun (missing-arg) :type function)
   (octets-to-string-fun (missing-arg) :type function)
   (string-to-octets-fun (missing-arg) :type function)
-  (count-chars nil :type (or null function)))
+  (count-chars nil :type (or fixnum function)))
 (declaim (freeze-type external-format))
-
-(defun ef-char-size (ef-entry)
-  (if (variable-width-external-format-p ef-entry)
-      (bytes-for-char-fun ef-entry)
-      (funcall (bytes-for-char-fun ef-entry) #\x)))
 
 (defun sb-alien::string-to-c-string (string external-format)
   (declare (type simple-string string)
@@ -972,7 +962,7 @@
               'character
               1
               (ef-write-n-bytes-fun entry)
-              (ef-char-size entry)
+              (ef-count-chars entry)
               (ef-replacement entry))))
   (dolist (entry *output-routines*)
     (when (and (subtypep type (first entry))
@@ -1340,7 +1330,7 @@
               'character
               1
               (ef-read-n-chars-fun entry)
-              (ef-char-size entry)
+              (ef-count-chars entry)
               (ef-replacement entry))))
   (dolist (entry *input-routines*)
     (when (and (subtypep type (first entry))
@@ -1392,10 +1382,9 @@
 ;;; Note that this blocks in UNIX-READ. It is generally used where
 ;;; there is a definite amount of reading to be done, so blocking
 ;;; isn't too problematical.
-(defun fd-stream-read-n-bytes (stream buffer sbuffer start end eof-error-p)
+(defun fd-stream-read-n-bytes (stream buffer start end eof-error-p)
   (declare (type fd-stream stream))
   (declare (type index start end))
-  (declare (ignore sbuffer))
   (aver (= (length (fd-stream-instead stream)) 0))
   (let* ((ibuf (fd-stream-ibuf stream))
          (sap (buffer-sap ibuf))
@@ -1569,7 +1558,7 @@
           (char-encodable-p t)
           (read-c-string-function nil custom-read-c-string-function-p)
           (output-c-string-function nil custom-output-c-string-function)
-          count-chars)
+          (count-chars nil count-chars-p))
   (let* ((name (first external-format))
          (suffix (symbolicate name '/ newline-variant))
          (out-function (or write-n-bytes-fun
@@ -1584,6 +1573,8 @@
                                      (symbolicate "READ-FROM-C-STRING/" suffix)))
          (output-c-string-function (or output-c-string-function
                                        (symbolicate "OUTPUT-TO-C-STRING/" suffix)))
+         (count-chars-function (or count-chars
+                                   (symbolicate "COUNT-CHARS/" suffix)))
          (n-buffer (gensym "BUFFER")))
     `(progn
        (defun ,size-function (|ch|)
@@ -1661,11 +1652,10 @@
                (sap (buffer-sap obuf)))
            ,out-expr))
        ,@(unless fd-stream-read-n-characters
-           `((defun ,in-function (stream buffer sbuffer start end &aux (index start))
+           `((defun ,in-function (stream buffer start end &aux (index start))
                (declare (type fd-stream stream)
                         (type index index start end)
                         (type ansi-stream-cin-buffer buffer)
-                        (type ansi-stream-csize-buffer sbuffer)
                         (optimize (sb-c:verify-arg-count 0)))
                (when (fd-stream-eof-forced-p stream)
                  (setf (fd-stream-eof-forced-p stream) nil)
@@ -1674,7 +1664,6 @@
                    ((= (fill-pointer instead) 0)
                     (setf (fd-stream-listen stream) nil))
                  (setf (aref buffer index) (vector-pop instead))
-                 (setf (aref sbuffer index) 0)
                  (incf index)
                  (when (= index end)
                    (when (= (fill-pointer instead) 0)
@@ -1715,6 +1704,12 @@
                                          size-info))
                                    in-size-expr)))
                    (declare (type index head tail))
+                   ,(if (integerp in-size-expr)
+                        `(setf (ansi-stream-char-buffer-byte-position-start stream) head
+                               (ansi-stream-char-buffer-start stream) index)
+                        `(setf (ansi-stream-char-buffer-byte-position-start stream) head
+                               (ansi-stream-char-buffer-byte-position stream) head
+                               (ansi-stream-char-buffer-start stream) index))
                    ;; Copy data from stream buffer into user's buffer.
                    (do ((size nil nil))
                        ((or (= tail head)
@@ -1736,7 +1731,6 @@
                                (when (> size (- tail head))
                                  (return))
                                (setf (aref buffer index) ,in-expr)
-                               (setf (aref sbuffer index) size)
                                (incf index)
                                (incf head size))
                              nil))
@@ -1908,6 +1902,31 @@
                                   ,out-expr)))
                             ,n-buffer))))))))
 
+       ,@(unless (or count-chars-p
+                     (integerp in-size-expr))
+           `((defun ,count-chars-function (stream)
+               (let* ((ibuf (fd-stream-ibuf stream))
+                      (sap (buffer-sap ibuf))
+                      (tail (buffer-tail ibuf))
+                      (head (ansi-stream-char-buffer-byte-position stream))
+                      (codepoint (ansi-stream-char-buffer-byte-position-at stream))
+                      (target-codepoint (ansi-stream-in-index stream)))
+                 (declare (index head codepoint)
+                          (ignorable tail))
+                 (block decode-break-reason ;; shouldn't be reachable
+                   (loop
+                    (when (>= codepoint target-codepoint)
+                      (return head))
+                    (let (,@(if (member 1 (ensure-list
+                                           (if (consp in-size-expr)
+                                               (car in-size-expr)
+                                               in-size-expr)))
+                                `((byte (sap-ref-8 sap head)))))
+                      (incf head
+                            ,(if (consp in-size-expr)
+                                 (cadr in-size-expr)
+                                 in-size-expr)))
+                    (incf codepoint)))))))
        (register-external-format
         ',external-format
         :newline-variant ,newline-variant
@@ -1929,7 +1948,9 @@
         :string-to-octets-fun (lambda (&rest rest)
                                 (declare (dynamic-extent rest))
                                 (apply ',string-to-octets-sym rest))
-        :count-chars ,count-chars))))
+        :count-chars ,(if (integerp in-size-expr)
+                          in-size-expr
+                          `#',count-chars-function)))))
 
 ;;;; utility functions (misc routines, etc)
 
@@ -2040,14 +2061,7 @@
                    (setf (ansi-stream-cin-buffer fd-stream)
                          (or (atomic-pop *available-char-buffers*)
                              (make-array +ansi-stream-in-buffer-length+
-                                         :element-type 'character)))
-                   (if (ef-count-chars external-format-entry)
-                       (setf (fd-stream-char-size fd-stream)
-                             (ef-count-chars external-format-entry))
-                       (setf (ansi-stream-csize-buffer fd-stream)
-                             (or (atomic-pop *available-ub8-buffers*)
-                                 (make-array +ansi-stream-in-buffer-length+
-                                             :element-type '(unsigned-byte 8)))))))
+                                         :element-type 'character)))))
                 ((equal target-type '(unsigned-byte 8))
                  (setf (ansi-stream-in-buffer fd-stream)
                        (make-array +ansi-stream-in-buffer-length+
@@ -2123,10 +2137,6 @@
 ;;; it as closed.
 (defun release-fd-stream-resources (fd-stream)
   (declare (sb-c::tlab :system)) ; so ATOMIC-PUSH goes to the heap
-  (let ((buffer (ansi-stream-csize-buffer fd-stream)))
-    (when buffer
-      (setf (ansi-stream-csize-buffer fd-stream) nil)
-      (atomic-push buffer *available-ub8-buffers*)))
   (let ((buffer (ansi-stream-cin-buffer fd-stream)))
     (when buffer
       (setf (ansi-stream-cin-buffer fd-stream) nil)

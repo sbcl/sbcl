@@ -22,7 +22,7 @@
 ;;;
 ;;; In:                 Stream, Eof-Errorp, Eof-Value
 ;;; Bin:                Stream, Eof-Errorp, Eof-Value
-;;; N-Bin:              Stream, Buffer, Size-Buffer, Start, Numbytes, Eof-Errorp
+;;; N-Bin:              Stream, Buffer, Start, Numbytes, Eof-Errorp
 ;;; Cout:               Stream, Character
 ;;; Bout:               Stream, Integer
 ;;; Sout:               Stream, String, Start, End
@@ -93,9 +93,6 @@
 (deftype ansi-stream-cin-buffer ()
   `(simple-array character (,+ansi-stream-in-buffer-length+)))
 
-(deftype ansi-stream-csize-buffer ()
-  `(simple-array (unsigned-byte 8) (,+ansi-stream-in-buffer-length+)))
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defun %stream-opcode (name)
   (ecase name
@@ -129,9 +126,7 @@
   ;;
   ;; (If a stream does not have an input buffer, then the IN-BUFFER
   ;; slot must must be NIL, and the IN-INDEX must be
-  ;; +ANSI-STREAM-IN-BUFFER-LENGTH+.  If a stream has a CIN-BUFFER, it
-  ;; must also have a CSIZE-BUFFER for the implementation of
-  ;; FILE-POSITION.)
+  ;; +ANSI-STREAM-IN-BUFFER-LENGTH+.
   (in-buffer nil :type (or ansi-stream-in-buffer null))
   (cin-buffer nil :type (or ansi-stream-cin-buffer null))
   ;; Various char-buffer positions needed to calculate the difference
@@ -140,7 +135,7 @@
   (char-buffer-byte-position 0 :type index)
   (char-buffer-byte-position-start 0 :type index)
   (char-buffer-start 0 :type index)
-  (csize-buffer nil :type (or ansi-stream-csize-buffer null))
+
   (in-index +ansi-stream-in-buffer-length+
             :type (integer 0 #.+ansi-stream-in-buffer-length+))
 
@@ -154,7 +149,7 @@
   ;; source buffer into characters of the destination buffer.
   (n-bin #'ill-bin :type                        ; n-byte input function
    (sfunction (stream (or (simple-unboxed-array (*)) system-area-pointer)
-                      (or ansi-stream-csize-buffer null) index index
+                      index index
                       ;; EOF-ERROR-P, not used by character streams
                       &optional t)
               index))

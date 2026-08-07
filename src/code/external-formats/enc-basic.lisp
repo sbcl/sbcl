@@ -736,8 +736,7 @@
       (setf (buffer-head ibuf) head)
       (truly-the index string-offset))))
 
-(defmacro utf8-char-loop (&key size-buffer
-                               crlf
+(defmacro utf8-char-loop (&key crlf
                                (eof t))
   `(do ()
        ((or (= tail head)
@@ -752,19 +751,15 @@
                                  (cond ((and (<= new-head tail)
                                              (= (sap-ref-8 sap (1+ head)) 10))
                                         (incf head 2)
-                                        ,@(when size-buffer
-                                            `((setf (aref size-buffer index) 2)))
                                         10)
                                        ,@(and eof
-                                          `((eof nil)))
+                                              `((eof nil)))
                                        (t
                                         ,@(and eof
                                                `((setf requested-refill t)))
                                         (return))))))))
                 ((< byte 128)
                  (incf head)
-                 ,@(when size-buffer
-                     `((setf (aref size-buffer index) 1)))
                  byte)
                 ((< byte 194)
                  (decode-break 1))
@@ -779,8 +774,6 @@
                          (unless (<= 128 byte2 191)
                            (decode-break 2))
                          (dpb byte (byte 5 6) byte2))
-                     ,@(when size-buffer
-                         `((setf (aref size-buffer index) 2)))
                      (setf head new-head))))
                 ((< byte 240)
                  (let ((new-head (+ head 3)))
@@ -799,8 +792,6 @@
                            (decode-break 3))
                          (dpb byte (byte 4 12)
                               (dpb byte2 (byte 6 6) byte3)))
-                     ,@(when size-buffer
-                         `((setf (aref size-buffer index) 3)))
                      (setf head new-head))))
                 (t
                  (let ((new-head (+ head 4)))
@@ -822,8 +813,6 @@
                          (dpb byte (byte 3 18)
                               (dpb byte2 (byte 6 12)
                                    (dpb byte3 (byte 6 6) byte4))))
-                     ,@(when size-buffer
-                         `((setf (aref size-buffer index) 4)))
                      (setf head new-head)))))))
        (incf index))
      (setf (buffer-head ibuf) head)))
@@ -858,8 +847,7 @@
                 (incf index 4))))
        (incf codepoint)))))
 
-(defun fd-stream-read-n-characters/utf-8 (stream string size-buffer start end &aux (index start))
-  (declare (ignore size-buffer))
+(defun fd-stream-read-n-characters/utf-8 (stream string start end &aux (index start))
   (declare (type fd-stream stream)
            (type index start end index)
            (type ansi-stream-cin-buffer string))
@@ -899,8 +887,7 @@
                   (null (catch 'eof-input-catcher (refill-input-buffer stream))))
           (return index))))))
 
-(defun fd-stream-read-n-characters/utf-8/crlf (stream string size-buffer start end &aux (index start))
-  (declare (ignore size-buffer))
+(defun fd-stream-read-n-characters/utf-8/crlf (stream string start end &aux (index start))
   (declare (type fd-stream stream)
            (type index start end index)
            (type ansi-stream-cin-buffer string))
@@ -1182,7 +1169,25 @@
   :read-c-string-function read-from-c-string/utf-8/lf*
   :output-c-string-function output-to-c-string/utf-8/lf
   :handle-size nil
-  :count-chars #'count-utf8-byte-to-chars)
+  :count-chars count-utf8-byte-to-chars)
+
+(DEFUN COUNT-CHARS/UTF-8/CR (STREAM)
+   (LET* ((IBUF (FD-STREAM-IBUF STREAM))
+          (SAP (BUFFER-SAP IBUF))
+          (TAIL (BUFFER-TAIL IBUF))
+          (HEAD (ANSI-STREAM-CHAR-BUFFER-BYTE-POSITION STREAM))
+          (CODEPOINT (ANSI-STREAM-CHAR-BUFFER-BYTE-POSITION-AT STREAM))
+          (TARGET-CODEPOINT (ANSI-STREAM-IN-INDEX STREAM)))
+     (DECLARE (INDEX HEAD CODEPOINT)
+              (IGNORABLE TAIL))
+     (BLOCK DECODE-BREAK-REASON
+       (LOOP (WHEN (>= CODEPOINT TARGET-CODEPOINT) (RETURN HEAD))
+             (LET ((BYTE (SAP-REF-8 SAP HEAD)))
+               (INCF HEAD (COND ((< BYTE 128) 1) ((< BYTE 194) (RETURN-FROM DECODE-BREAK-REASON 1)) ((< BYTE 224) 2) ((< BYTE 240) 3) (T 4))))
+             (INCF CODEPOINT)))))
+
+(DEFUN %COUNT-CHARS/UTF-8/CR (STREAM)
+  (COUNT-CHARS/UTF-8/CR STREAM))
 
 (define-external-format/variable-width (:utf-8) t
   #+sb-unicode (code-char #xfffd) #-sb-unicode #\?
@@ -1247,7 +1252,8 @@
   string/cr->utf8
   :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff)))
   :newline-variant :cr
-  :handle-size nil)
+  :handle-size nil
+  :count-chars %COUNT-CHARS/UTF-8/CR)
 
 (define-external-format/variable-width (:utf-8 :utf8) t
   #+sb-unicode (code-char #xfffd) #-sb-unicode #\?
@@ -1327,7 +1333,7 @@
   :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff)))
   :fd-stream-read-n-characters fd-stream-read-n-characters/utf-8/crlf
   :newline-variant :crlf
-  :count-chars #'count-utf8-crlf-byte-to-chars
+  :count-chars count-utf8-crlf-byte-to-chars
   :handle-size nil)
 
 #+(and sb-unicode 64-bit little-endian

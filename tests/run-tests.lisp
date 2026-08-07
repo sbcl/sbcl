@@ -279,7 +279,6 @@
       sb-impl::*package-names-cookie*
       sb-impl::*available-buffers*
       sb-impl::*available-char-buffers*
-      sb-impl::*available-ub8-buffers*
       sb-impl::*token-buf-pool*
       sb-impl::*user-hash-table-tests*
       sb-impl::*pn-dir-table*

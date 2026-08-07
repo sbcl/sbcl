@@ -195,15 +195,14 @@
   (setf (ansi-stream-misc stream) #'closed-flame-saved))
 
 ;;;; for file position and file length
+(declaim (inline external-format-char-size))
 (defun external-format-char-size (external-format)
-  (ef-char-size (get-external-format external-format)))
+  (ef-count-chars (get-external-format external-format)))
 
 ;;; Call the MISC method with the :GET-FILE-POSITION operation.
 (declaim (inline !ansi-stream-ftell)) ; named for the stdio inquiry function
 (defun !ansi-stream-ftell (stream)
   (declare (type stream stream))
-  ;; FIXME: It would be good to comment on the stuff that is done here...
-  ;; FIXME: This doesn't look interrupt safe.
   (let ((res (truly-the (or null index) (call-ansi-stream-misc stream :get-file-position)))
         (delta (- +ansi-stream-in-buffer-length+
                   (ansi-stream-in-index stream))))
@@ -213,36 +212,38 @@
           (let ((char-size (if (fd-stream-p stream)
                                (fd-stream-char-size stream)
                                (external-format-char-size (stream-external-format stream)))))
-            (etypecase char-size
-              (fixnum
-               (- res (* (truly-the (unsigned-byte 8) char-size) delta)))
-              (function
-               (let ((size-buffer (ansi-stream-csize-buffer stream)))
-                 (if size-buffer
-                     (- res
-                        (loop with start = (ansi-stream-in-index stream)
-                              for i from start below +ansi-stream-in-buffer-length+
-                              sum (aref size-buffer i) of-type fixnum))
-                     (+
-                      (- res
-                         (buffer-head (fd-stream-ibuf stream)))
-                      (let ((codepoint (ansi-stream-char-buffer-byte-position-at stream))
-                            (target-codepoint (ansi-stream-in-index stream)))
-                        (cond ((<= (ansi-stream-in-index stream)
-                                   (ansi-stream-char-buffer-start stream))
-                               ;; reading from "instead"
-                               (ansi-stream-char-buffer-byte-position-start stream))
-                              (t
-                               (when (< target-codepoint codepoint) ;; unread-char happened
-                                 ;; start from scratch
-                                 (setf (ansi-stream-char-buffer-byte-position stream)
-                                       (ansi-stream-char-buffer-byte-position-start stream)
-                                       (ansi-stream-char-buffer-byte-position-at stream)
-                                       (ansi-stream-char-buffer-start stream)))
-                               (let ((byte (funcall char-size stream)))
-                                 (setf (ansi-stream-char-buffer-byte-position-at stream) (ansi-stream-in-index stream)
-                                       (ansi-stream-char-buffer-byte-position stream) byte)
-                                 byte))))))))))))))
+            ;; For variable width encodings, count how many
+            ;; bytes between the previous position and the
+            ;; current position in the current character
+            ;; buffer
+            (+
+             (- res
+                (buffer-head (fd-stream-ibuf stream)))
+
+             (cond ((<= (ansi-stream-in-index stream)
+                        (ansi-stream-char-buffer-start stream))
+                    ;; reading from "instead"
+                    (ansi-stream-char-buffer-byte-position-start stream))
+                   (t
+                    (etypecase char-size
+                      (fixnum
+                       (+ (ansi-stream-char-buffer-byte-position-start stream)
+                          (* (- (ansi-stream-in-index stream)
+                                (ansi-stream-char-buffer-start stream))
+                             (truly-the (unsigned-byte 8) char-size))))
+                      (function
+                       (let ((codepoint (ansi-stream-char-buffer-byte-position-at stream))
+                             (target-codepoint (ansi-stream-in-index stream)))
+                         (when (< target-codepoint codepoint) ;; unread-char happened
+                           ;; start from scratch
+                           (setf (ansi-stream-char-buffer-byte-position stream)
+                                 (ansi-stream-char-buffer-byte-position-start stream)
+                                 (ansi-stream-char-buffer-byte-position-at stream)
+                                 (ansi-stream-char-buffer-start stream)))
+                         (let ((byte (funcall char-size stream)))
+                           (setf (ansi-stream-char-buffer-byte-position-at stream) (ansi-stream-in-index stream)
+                                 (ansi-stream-char-buffer-byte-position stream) byte)
+                           byte))))))))))))
 
 ;;; You're not allowed to specify NIL for the position but we were permitting
 ;;; it, which made it impossible to test for a bad call that tries to assign
@@ -612,9 +613,9 @@
                  (%byte-blt in-buffer index buffer start num-buffered)
                  (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
                  (funcall (ansi-stream-n-bin stream)
-                          stream buffer nil
+                          stream buffer
                           (+ start num-buffered) end eof-error-p))))
-        (funcall (ansi-stream-n-bin stream) stream buffer nil start end eof-error-p))))
+        (funcall (ansi-stream-n-bin stream) stream buffer start end eof-error-p))))
 
 ;;; This function is called by the FAST-READ-CHAR expansion to refill
 ;;; the IN-BUFFER for text streams. There is definitely an IN-BUFFER,
@@ -626,11 +627,9 @@
   (when (ansi-stream-input-char-pos stream)
     (update-input-char-pos stream))
   (let* ((ibuf (ansi-stream-cin-buffer stream))
-         (sizebuf (ansi-stream-csize-buffer stream))
          (count (- (funcall (ansi-stream-n-bin stream)
                             stream
                             ibuf
-                            sizebuf
                             +ansi-stream-in-buffer-extra+
                             +ansi-stream-in-buffer-length+)
                    +ansi-stream-in-buffer-extra+))
@@ -670,14 +669,12 @@
                  ;; we resynced or were given something instead
                  (t
                   (setf (aref ibuf index) value)
-                  (if sizebuf
-                      (setf (aref sizebuf index) size)
-                      (setf (ansi-stream-char-buffer-byte-position-at stream) index
-                            (ansi-stream-char-buffer-start stream) (if (zerop size) ;; a replacement used
-                                                                       +ansi-stream-in-buffer-length+
-                                                                       index)
-                            (ansi-stream-char-buffer-byte-position-start stream)
-                            (setf (ansi-stream-char-buffer-byte-position stream) (- (buffer-head (fd-stream-ibuf stream)) size))))
+                  (setf (ansi-stream-char-buffer-byte-position-at stream) index
+                        (ansi-stream-char-buffer-start stream) (if (zerop size) ;; a replacement used
+                                                                   +ansi-stream-in-buffer-length+
+                                                                   index)
+                        (ansi-stream-char-buffer-byte-position-start stream)
+                        (setf (ansi-stream-char-buffer-byte-position stream) (- (buffer-head (fd-stream-ibuf stream)) size)))
                   (when (ansi-stream-input-char-pos stream)
                     (decf (ansi-stream-input-char-pos stream) index)
                     (setf (form-tracking-stream-last-newline stream) index))
@@ -697,10 +694,7 @@
                 ibuf +ansi-stream-in-buffer-extra+
                 ibuf start
                 count)
-             (if sizebuf
-                 (replace sizebuf sizebuf :start1 start :end1 (+ start count)
-                                          :start2 +ansi-stream-in-buffer-extra+)
-                 (incf (ansi-stream-char-buffer-start stream) (- start +ansi-stream-in-buffer-extra+))))
+             (incf (ansi-stream-char-buffer-start stream) (- start +ansi-stream-in-buffer-extra+)))
 
            (when (ansi-stream-input-char-pos stream)
              (decf (ansi-stream-input-char-pos stream) start)
@@ -713,7 +707,7 @@
 (defun fast-read-byte-refill (stream eof-error-p eof-value)
   (let* ((ibuf (ansi-stream-in-buffer stream))
          (count (funcall (ansi-stream-n-bin stream) stream
-                         ibuf nil 0 +ansi-stream-in-buffer-length+
+                         ibuf 0 +ansi-stream-in-buffer-length+
                          nil))
          (start (- +ansi-stream-in-buffer-length+ count)))
     (declare (type index start count))
@@ -1032,12 +1026,11 @@
 (macrolet ((in-fun (name fun &rest args)
              `(defun ,name (stream ,@args)
                 (declare (optimize (safety 1) (sb-c:verify-arg-count 0)))
-                ,@(when (member 'sbuffer args) '((declare (ignore sbuffer))))
                 (,fun (symbol-value (synonym-stream-symbol stream))
-                      ,@(remove 'sbuffer args)))))
+                      ,@args))))
   (in-fun synonym-in read-char eof-error-p eof-value)
   (in-fun synonym-bin read-byte eof-error-p eof-value)
-  (in-fun synonym-n-bin read-n-bytes buffer sbuffer start end eof-error-p))
+  (in-fun synonym-n-bin read-n-bytes buffer start end eof-error-p))
 
 (defun synonym-misc (stream operation arg1)
   (declare (optimize (safety 1)))
@@ -1114,11 +1107,10 @@
 
 (macrolet ((in-fun (name fun &rest args)
              `(defun ,name (stream ,@args)
-                ,@(when (member 'sbuffer args) '((declare (ignore sbuffer))))
-                (,fun (two-way-stream-input-stream stream) ,@(remove 'sbuffer args)))))
+                (,fun (two-way-stream-input-stream stream) ,@args))))
   (in-fun two-way-in read-char eof-error-p eof-value)
   (in-fun two-way-bin read-byte eof-error-p eof-value)
-  (in-fun two-way-n-bin read-n-bytes buffer sbuffer start end eof-error-p))
+  (in-fun two-way-n-bin read-n-bytes buffer start end eof-error-p))
 
 (defun two-way-misc (stream operation arg1)
   (let* ((in (two-way-stream-input-stream stream))
@@ -1210,8 +1202,7 @@
   (in-fun concatenated-in read-char)
   (in-fun concatenated-bin read-byte))
 
-(defun concatenated-n-bin (stream buffer sbuffer start end eof-errorp)
-  (declare (ignore sbuffer))
+(defun concatenated-n-bin (stream buffer start end eof-errorp)
   (do ((streams (concatenated-stream-list stream) (cdr streams))
        (current-start start))
       ((null streams)
@@ -1313,8 +1304,7 @@
   (in-fun echo-in read-char write-char eof-error-p eof-value)
   (in-fun echo-bin read-byte write-byte eof-error-p eof-value))
 
-(defun echo-n-bin (stream buffer sbuffer start end eof-error-p)
-  (declare (ignore sbuffer))
+(defun echo-n-bin (stream buffer start end eof-error-p)
   (let ((index start))
     ;; Note: before ca 1.0.27.18, the logic for handling unread
     ;; characters never could have worked, so probably nobody has ever
@@ -2748,7 +2738,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   ;; before we're ready (or after we think it's been deinitialized).
   ;; This uses the internal %MAKUNBOUND because the CL: function would
   ;; rightly complain that *AVAILABLE-BUFFERS* is proclaimed always bound.
-  (%makunbound '*available-ub8-buffers*)
   (%makunbound '*available-char-buffers*)
   (%makunbound '*available-buffers*))
 
@@ -2782,8 +2771,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     ;; Use the internal %BOUNDP for similar reason to that cited above-
     ;; BOUNDP on a known global transforms to the constant T.
     (aver (not (%boundp '*available-buffers*)))
-    (setf *available-char-buffers* nil
-          *available-ub8-buffers* nil)
+    (setf *available-char-buffers* nil)
     (setf *available-buffers* nil))
   (%with-output-to-string (*error-output*)
     (multiple-value-bind (in out err)
