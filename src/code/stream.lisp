@@ -226,7 +226,23 @@
                      (+
                       (- res
                          (buffer-head (fd-stream-ibuf stream)))
-                      (funcall char-size stream)))))))))))
+                      (let ((codepoint (ansi-stream-char-buffer-byte-position-at stream))
+                            (target-codepoint (ansi-stream-in-index stream)))
+                        (cond ((<= (ansi-stream-in-index stream)
+                                   (ansi-stream-char-buffer-start stream))
+                               ;; reading from "instead"
+                               (ansi-stream-char-buffer-byte-position-start stream))
+                              (t
+                               (when (< target-codepoint codepoint) ;; unread-char happened
+                                 ;; start from scratch
+                                 (setf (ansi-stream-char-buffer-byte-position stream)
+                                       (ansi-stream-char-buffer-byte-position-start stream)
+                                       (ansi-stream-char-buffer-byte-position-at stream)
+                                       (ansi-stream-char-buffer-start stream)))
+                               (let ((byte (funcall char-size stream)))
+                                 (setf (ansi-stream-char-buffer-byte-position-at stream) (ansi-stream-in-index stream)
+                                       (ansi-stream-char-buffer-byte-position stream) byte)
+                                 byte))))))))))))))
 
 ;;; You're not allowed to specify NIL for the position but we were permitting
 ;;; it, which made it impossible to test for a bad call that tries to assign
