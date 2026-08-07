@@ -1461,17 +1461,10 @@
 
 ;;;; tail local calls and assignments
 
-;;; Return T if the cleanup definitely won't generate any cleanup
-;;; code. Currently we recognize lexical entry points that are only
-;;; used locally (if at all).
-(defun harmless-cleanup-p (cleanup)
-  (case (cleanup-kind cleanup)
-    ((:block :tagbody)
-     (null (entry-exits (cleanup-mess-up cleanup))))
-    (t nil)))
-
-;;; Return T if there are no cleanups between BLOCK1 and
-;;; BLOCK2, or if they definitely won't generate any cleanup code.
+;;; Return T if there are no cleanups between BLOCK1 and BLOCK2, or if
+;;; they definitely won't generate any cleanup code. Currently we
+;;; recognize lexical entry points that are only used locally (if at
+;;; all).
 (defun only-harmless-cleanups (block1 block2)
   (declare (type cblock block1 block2))
   (or (eq block1 block2)
@@ -1479,16 +1472,11 @@
         (do-nested-cleanups (cleanup block1 t)
           (when (eq cleanup cleanup2)
             (return t))
-          (unless (harmless-cleanup-p cleanup)
-            (return nil))))))
-
-;;; Return the innermost cleanup enclosing NODE which would actually
-;;; generate any cleanup code, or NIL if there is none.
-(defun node-real-enclosing-cleanup (node)
-  (declare (type node node))
-  (do-nested-cleanups (cleanup node nil)
-    (unless (harmless-cleanup-p cleanup)
-      (return cleanup))))
+          (case (cleanup-kind cleanup)
+            ((:block :tagbody)
+             (when (entry-exits (cleanup-mess-up cleanup))
+               (return nil)))
+            (t (return nil)))))))
 
 ;;; If a potentially TR local call really is TR, then convert it to
 ;;; jump directly to the called function. We also call
@@ -1672,7 +1660,7 @@
                    (lvar (and (valued-node-p call)
                               (node-lvar call)))
                    (env (node-home-lambda call))
-                   (cleanup (node-real-enclosing-cleanup call)))
+                   (cleanup (node-enclosing-cleanup call)))
                (aver env)
                (cond ((null return-env)
                       (setq return-ctran ctran
@@ -1681,11 +1669,19 @@
                             return-cleanup cleanup)
                       t)
                      (t
-                      ;; We can only convert multiple outside calls when
-                      ;; they are all in the same environment, so we don't
-                      ;; muck up tail sets. This is not a conceptual
-                      ;; restriction though; it may be possible to lift
-                      ;; this if things are reworked.
+                      ;; We can only convert multiple outside calls
+                      ;; when they are all in the same environment, so
+                      ;; we don't muck up tail sets. This is not a
+                      ;; conceptual restriction though; it may be
+                      ;; possible to lift this if things are
+                      ;; reworked. The cleanup checking here is also
+                      ;; overly conservative. A better approach would
+                      ;; be to check for harmful cleanups with respect
+                      ;; to the messiest common ancestor, though care
+                      ;; would need to be taken with cleanup emission
+                      ;; as merging lambdas will anchor to a specific
+                      ;; predecessor's lexenv/cleanup, not to the
+                      ;; ancestor's.
                       (and (or (eq (node-derived-type call) *empty-type*)
                                (and (eq return-ctran ctran)
                                     (eq return-lvar lvar)))

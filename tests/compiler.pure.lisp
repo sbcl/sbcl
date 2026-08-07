@@ -6363,3 +6363,19 @@
                                     (recurse (the fixnum (1- x)) fn))))
                        (recurse x fn)))
                    :allow-notes nil))
+
+(with-test (:name (:assignment-convert :lp2162990))
+  (checked-compile-and-assert ()
+    `(lambda (a)
+       (block done
+         (let ((done (lambda (&rest values) (return-from done (values-list values))))
+               (l (lambda ())))
+           (flet ((c (f)
+                    (funcall f)))
+             (declare (inline c))
+             (if a
+                 (c l)
+                 (c l)))
+           (funcall done nil))))
+    ((t) nil)
+    ((nil) nil)))

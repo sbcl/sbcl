@@ -308,7 +308,12 @@
 ;;; cannot. In this case, FM, F, G and H all have the same
 ;;; continuation.
 #+sb-devel
-(with-test (:name (:assignment-convert :fluet-weeks-5.1))
+(with-test (:name (:assignment-convert :fluet-weeks-5.1)
+            ;; Unfortunately, this test and the next few almost work
+            ;; but are defeated by the block tags inserted by LABELS
+            ;; since we don't have smart enough cleanup logic in the
+            ;; assignment conversion code.
+            :fails-on :sbcl)
   (let ((converted '()))
     (let ((fun (inspect-ir
                 '(lambda (b x y flag)
@@ -342,7 +347,8 @@
 ;;; A modified version of the above test, but with an outside call for
 ;;; H.
 #+sb-devel
-(with-test (:name (:assignment-convert :fluet-weeks-5.1-modified))
+(with-test (:name (:assignment-convert :fluet-weeks-5.1-modified)
+            :fails-on :sbcl)
   (let ((converted '()))
     (let ((fun (inspect-ir
                 '(lambda (b x y flag)
@@ -382,7 +388,8 @@
 ;;; analysis. In this case, F, G1, G2 and H all have the same
 ;;; continuation.
 #+sb-devel
-(with-test (:name (:assignment-convert :fluet-weeks-5.2))
+(with-test (:name (:assignment-convert :fluet-weeks-5.2)
+            :fails-on :sbcl)
   (let ((converted '()))
     (let ((fun (inspect-ir
                 '(lambda (b x y flag)
