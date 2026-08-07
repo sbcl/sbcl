@@ -1789,6 +1789,9 @@
 (defknown read-byte (stream &optional t t) t ()
   :derive-type (read-elt-type-deriver nil 'integer nil))
 
+(defknown fast-read-byte-refill (stream t t) t ()
+  :derive-type (read-elt-type-deriver nil '(unsigned-byte 8) nil))
+
 (defknown (prin1 print princ) (t &optional stream-designator)
   t
   (any)
