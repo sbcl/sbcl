@@ -1421,13 +1421,17 @@
                        ((string sap-reg t))
 
                        ((newlines complex-double-reg))
-                       ((bytes complex-double-reg))
-                       ((bytes2 complex-double-reg))
-                       ((bytes3 complex-double-reg))
-                       ((bytes4 complex-double-reg))
+                       ((f1 complex-double-reg t :offset 1))
+                       ((f2 complex-double-reg t :offset 2))
+                       ((f3 complex-double-reg t :offset 3))
+                       ((bytes complex-double-reg t :offset 4))
+                       ((bytes2 complex-double-reg t :offset 5))
+                       ((bytes3 complex-double-reg t :offset 6))
+                       ((bytes4 complex-double-reg t :offset 7))
                        ((temp complex-double-reg))
                        ((temp2 complex-double-reg))
                        ((indexes))
+                       ((byte-indexes))
                        ((increment))
                        ((last-newlines))
 
@@ -1436,15 +1440,13 @@
                        ((full-table any-reg t))
                        ((shift-mask complex-double-reg))
                        ((c-1b complex-double-reg))
-                       ((f1 complex-double-reg t :offset 1))
-                       ((f2 complex-double-reg t :offset 2))
-                       ((f3 complex-double-reg t :offset 3))
+
                        ((r4 complex-double-reg t))
-                       ((length1 complex-double-reg t :offset 10))
-                       ((length2 complex-double-reg t :offset 11))
-                       ((shuf-mask complex-double-reg t :offset 6))
-                       ((and-mask complex-double-reg t :offset 7))
-                       ((orr-mask complex-double-reg t :offset 8)))
+                       ((length1 complex-double-reg t :offset 8))
+                       ((length2 complex-double-reg t :offset 9))
+                       ((shuf-mask complex-double-reg t :offset 10))
+                       ((and-mask complex-double-reg t :offset 11))
+                       ((orr-mask complex-double-reg t :offset 12)))
               ((read unsigned-reg positive-fixnum :from :load)
                (written unsigned-reg positive-fixnum :from :load)
                (last-newline signed-reg signed-num))
@@ -1487,17 +1489,14 @@
                                                   (setf (aref table (+ (* row row-size) 16 dest-index)) and-mask) ;; and
                                                   (setf (aref table (+ (* row row-size) 32 dest-index)) orr-mask) ;; orr
                                                   (incf dest-index))))
-                       table))
-                   (find-newlines (bytes)
-                     (inst cmeq temp bytes newlines :4s)
-                     (inst bit last-newlines indexes temp :16b)
-                     (inst add indexes indexes increment :4s)))
+                       table)))
              (assemble ()
 
-               (inst movi newlines 10 :4s)
-               (inst movi increment 4 :4s)
+               (inst movi newlines 10 :16b)
+               (inst movi increment 16 :4s)
                (inst mvni last-newlines 0 :4s)
                (load-inline-constant indexes :oword (concat-ub 32 '(3 2 1 0)))
+               (load-inline-constant byte-indexes :oword (concat-ub 8 '(15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0)))
 
                (inst add byte-end byte-array* (asr byte-end 1))
                (inst add byte-array byte-array* (lsr byte-start 1))
@@ -1515,14 +1514,24 @@
                (inst orr temp temp temp2 :16b)
                (check-ascii temp temp FULL-START 4)
 
-               (mapc #'find-newlines (list bytes bytes2 bytes3 bytes4))
-
-               (inst add string string 64)
-
                (inst uzp1 bytes2 bytes bytes2 :8h)
                (inst uzp1 bytes4 bytes3 bytes4 :8h)
                (inst uzp1 bytes4 bytes2 bytes4 :16b)
                (inst str  bytes4 (@ byte-array 16 :post-index))
+
+               (inst cmeq temp bytes4 newlines :16b)
+               ;; if anything found set the first S to #xFFFFFFFF
+               (inst umaxv f1 temp :16b)
+               (inst cmgt f1 f1 0 :2s)
+               (inst and temp temp byte-indexes :16b)
+               (inst umaxv temp temp :16b)
+               (inst add temp2 temp indexes :4s)
+               (inst bit last-newlines temp2 f1 :16b)
+
+               (inst add indexes indexes increment :4s)
+
+               (inst add string string 64)
+
                start
                (inst cmp byte-array byte-end)
                (inst b :hi DONE)
@@ -1531,6 +1540,9 @@
                (inst b ASCII-LOOP)
 
                FULL-START
+               (inst add string-end string-end 48) ;; now it reads 16 bytes instead of 64
+               (inst movi newlines 10 :4s)
+               (inst movi increment 4 :4s)
                (load-inline-constant shift-mask :oword #x6000000040000000200000000)
                (load-inline-constant full-table (make-full-table))
                (inst movi c-1b  #x1b :4s)
@@ -1546,7 +1558,9 @@
                  (inst umov tmp temp 0 :b)
                  (inst cbnz tmp DONE)
 
-                 (mapc #'find-newlines (list bytes))
+                 (inst cmeq temp bytes newlines :4s)
+                 (inst bit last-newlines indexes temp :16b)
+                 (inst add indexes indexes increment :4s)
 
                  ;; Remove the low bits for each of the possible 4 resulting bytes
                  (inst ushr f1 bytes 18 :4s)
@@ -1578,9 +1592,8 @@
                  (inst and bytes bytes and-mask :16b)
                  (inst orr bytes bytes orr-mask :16b)
 
-                 (inst str bytes (@ byte-array))
+                 (inst str bytes (@ byte-array 4 :post-index))
 
-                 (inst add byte-array byte-array 4)
                  (inst add byte-array byte-array tmp-tn)
                  (inst add string string 16))
 
