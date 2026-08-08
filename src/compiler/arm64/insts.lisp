@@ -4212,7 +4212,7 @@
   (def ushll2 #b1 #b1 #b10100))
 
 (macrolet
-    ((def (name u op &optional right 2d)
+    ((def (name u op &optional right 2d q)
        `(define-instruction ,name (segment rd rn shift size)
           ;; Conflicts with simd-modified-imm where immh=0
           ,@(loop for (size pos) in '((4 19)
@@ -4221,6 +4221,7 @@
                                       (1 22))
                   collect
                   `(:printer simd-shift-by-imm ((u ,u) (op ,op)
+                                                       ,@(and q `((q ,q)))
                                                 (immh #b1 :field (byte ,size ,pos))
                                                 ,@(if right
                                                       `((shift nil :type 'simd-immh-shift-right)))
@@ -4234,28 +4235,33 @@
                              `(ldb (byte 6 0) (- shift))
                              `shift)))
              (ecase size
-               (:8b
-                (setf immh #b1
-                      q 0))
-               (:16b
-                (setf immh #b1
-                      q 1))
-               (:4h
-                (setf immh #b10
-                      q 0))
-               (:8h
-                (setf immh #b10
-                      q 1))
-               (:2s
-                (setf immh #b100
-                      q 0))
-               (:4s
-                (setf immh #b100
-                      q 1))
-               ,@(when 2d
-                   `((:2d
-                      (setf immh #b1000
-                            q 1)))))
+               ,@(remove-if (lambda (x)
+                              (member (car x)
+                                      (case q
+                                        (1 '(:8b :4h :2s))
+                                        (0 '(:16b :8h :4s :2d)))))
+                  `((:8b
+                     (setf immh #b1
+                           q 0))
+                    (:16b
+                     (setf immh #b1
+                           q 1))
+                    (:4h
+                     (setf immh #b10
+                           q 0))
+                    (:8h
+                     (setf immh #b10
+                           q 1))
+                    (:2s
+                     (setf immh #b100
+                           q 0))
+                    (:4s
+                     (setf immh #b100
+                           q 1))
+                    ,@(when 2d
+                        `((:2d
+                           (setf immh #b1000
+                                 q 1)))))))
              (setf immh (logior immh (ldb (byte (1- (integer-length immh)) 3) shift))
                    immb (ldb (byte 3 0) shift))
              (emit-simd-shift-by-imm segment
@@ -4279,7 +4285,17 @@
   (def urshr #b1 #b00100 t t)
   (def ursra #b1 #b00110 t t)
   (def sqshlu #b1 #b01100 nil t)
-  (def uqshrn #b1 #b10010 t t))
+  (def uqshrn #b1 #b10010 t t)
+  (def sqshrn #b0 #b10010 t t 0)
+  (def sqshrn2 #b0 #b10010 t t 1)
+  (def sqrshrn #b0 #b10011 t t 0)
+  (def sqrshrn2 #b0 #b10011 t t 1)
+  (def sqshrun #b1 #b10000 t t 0)
+  (def sqshrun2 #b1 #b10000 t t 1)
+  (def sqrshrun #b1 #b10001 t t 0)
+  (def sqrshrun2 #b1 #b10001 t t 1)
+  (def uqrshrn #b1 #b10011 t t 0)
+  (def uqrshrn2 #b1 #b10011 t t 1))
 
 (def-emitter simd-modified-imm
   (#b0 1 31)
