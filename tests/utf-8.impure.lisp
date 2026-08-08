@@ -291,42 +291,96 @@
   (let ((vector (make-array 1024 :element-type '(unsigned-byte 8)))
         (ibuf (sb-impl::alloc-buffer))
         (string (make-protected-array 512 'character nil)))
-    (setf (sb-impl::buffer-tail ibuf) sb-impl::+bytes-per-buffer+)
-    (loop repeat (* 256 #+slow 10)
-          do
-          (map-into vector (lambda () (random 256)))
-          (let ((crlf (random (1- (length vector)))))
-            (setf (aref vector crlf) #xd)
-            (setf (aref vector (1+ crlf)) #xa))
+    (unwind-protect
+         (progn
+       (setf (sb-impl::buffer-tail ibuf) sb-impl::+bytes-per-buffer+)
+       (loop repeat (* 256 #+slow 10)
+             do
+             (map-into vector (lambda () (random 256)))
+             (let ((crlf (random (1- (length vector)))))
+               (setf (aref vector crlf) #xd)
+               (setf (aref vector (1+ crlf)) #xa))
 
-          (setf (sb-impl::buffer-head ibuf) 0
-                (sb-impl::buffer-tail ibuf) 1024)
-          (sb-kernel:copy-ub8-to-system-area vector 0 (sb-impl::buffer-sap ibuf) 0 (length vector))
-          (let* ((bad (validate-utf8 vector))
-                 (chars (sb-vm::utf8-crlf-to-character-string 0 (length string) string ibuf))
-                 (bytes (sb-impl::buffer-head ibuf))
-                 (decoded (octets-to-string vector :end bad :external-format '(:utf8 :newline :crlf))))
-            (when bad
-              (assert (>= bad bytes)))
-            (assert (string= string decoded :end1 chars :end2 chars))))
-    (let ((random-string (make-string sb-impl::+bytes-per-buffer+)))
-     (loop repeat (* 256 #+slow 10)
-           do
-           (fill-random-string random-string)
-           (replace vector (string-to-octets random-string))
-           (let ((crlf (random (1- (length vector)))))
-             (setf (aref vector crlf) #xd)
-             (setf (aref vector (1+ crlf)) #xa))
+             (setf (sb-impl::buffer-head ibuf) 0
+                   (sb-impl::buffer-tail ibuf) 1024)
+             (sb-kernel:copy-ub8-to-system-area vector 0 (sb-impl::buffer-sap ibuf) 0 (length vector))
+             (let* ((bad (validate-utf8 vector))
+                    (chars (sb-vm::utf8-crlf-to-character-string 0 (length string) string ibuf))
+                    (bytes (sb-impl::buffer-head ibuf))
+                    (decoded (octets-to-string vector :end bad :external-format '(:utf8 :newline :crlf))))
+               (when bad
+                 (assert (>= bad bytes)))
+               (assert (string= string decoded :end1 chars :end2 chars))))
+       (let ((random-string (make-string sb-impl::+bytes-per-buffer+)))
+         (loop repeat (* 256 #+slow 10)
+               do
+               (fill-random-string random-string)
+               (replace vector (string-to-octets random-string))
+               (let ((crlf (random (1- (length vector)))))
+                 (setf (aref vector crlf) #xd)
+                 (setf (aref vector (1+ crlf)) #xa))
 
-           (setf (sb-impl::buffer-head ibuf) 0
-                 (sb-impl::buffer-tail ibuf) 1024)
-           (sb-kernel:copy-ub8-to-system-area vector 0 (sb-impl::buffer-sap ibuf) 0 (length vector))
-           (let* ((bad (validate-utf8 vector))
-                  (chars (sb-vm::utf8-crlf-to-character-string 0 (length string) string ibuf))
-                  (bytes (sb-impl::buffer-head ibuf))
-                  (decoded (octets-to-string vector :end bad
-                                                    :external-format '(:utf8 :newline :crlf))))
-             (when bad
-               (assert (>= bad bytes)))
-             (unless (string= string decoded :end1 chars :end2 chars)
-               (error "~s" vector)))))))
+               (setf (sb-impl::buffer-head ibuf) 0
+                     (sb-impl::buffer-tail ibuf) 1024)
+               (sb-kernel:copy-ub8-to-system-area vector 0 (sb-impl::buffer-sap ibuf) 0 (length vector))
+               (let* ((bad (validate-utf8 vector))
+                      (chars (sb-vm::utf8-crlf-to-character-string 0 (length string) string ibuf))
+                      (bytes (sb-impl::buffer-head ibuf))
+                      (decoded (octets-to-string vector :end bad
+                                                        :external-format '(:utf8 :newline :crlf))))
+                 (when bad
+                   (assert (>= bad bytes)))
+                 (unless (string= string decoded :end1 chars :end2 chars)
+                   (error "~s" vector))))))
+      (free-protected-array string))))
+
+(with-test (:name :character-string-to-utf8)
+  (flet ((run-test (string obuf vector)
+           (loop repeat (* 256 #+slow 10)
+                 do
+                 (if (zerop (random 4))
+                     (fill-random-string string t)
+                     (fill-random-string string))
+
+                 (dotimes (i (random 5))
+                   (setf (char string (random (length string))) #\Newline))
+
+                 ;; Surrogates
+                 (dotimes (i (random 3))
+                   (setf (char string (random (length string)))
+                         (code-char (+ #xD800 (random 2048)))))
+
+                 (let* ((start (random 64))
+                        (end (max start (- (length string) (random 64))))
+                        (initial-tail (random 64)))
+
+                   (setf (sb-impl::buffer-head obuf) 0
+                         (sb-impl::buffer-tail obuf) initial-tail)
+
+                   (multiple-value-bind (read last-newline)
+                       (sb-vm::character-string-to-utf8 start end string obuf)
+
+                     (let* ((new-tail (sb-impl::buffer-tail obuf))
+                            (bytes-written (- new-tail initial-tail))
+                            (expected-octets (string-to-octets string :start start :end read))
+                            (expected-newline (position #\Newline string :start start :end read :from-end t)))
+
+                       (sb-kernel:copy-ub8-from-system-area (sb-impl::buffer-sap obuf) initial-tail vector 0 bytes-written)
+
+                       (assert (equalp (subseq vector 0 bytes-written) expected-octets) ()
+                               "Mismatch in octets: start ~a end ~a read ~a bytes ~a~% expected ~s~% got ~s"
+                               start end read bytes-written expected-octets (subseq vector 0 bytes-written))
+                       (assert (eql last-newline (or expected-newline -1)) ()
+                               "Mismatch in last-newline: expected ~a, got ~a" expected-newline last-newline)))))))
+
+    (let ((vector (make-array sb-impl::+bytes-per-buffer+ :element-type '(unsigned-byte 8)))
+          (obuf (sb-impl::alloc-buffer))
+          (string (make-protected-array 512 'character nil)))
+      (unwind-protect
+           (run-test string obuf vector)
+        (free-protected-array string)))
+
+    (let ((vector (make-array sb-impl::+bytes-per-buffer+ :element-type '(unsigned-byte 8)))
+          (obuf (sb-impl::alloc-buffer))
+          (random-string (make-string sb-impl::+bytes-per-buffer+ :element-type 'character)))
+      (run-test random-string obuf vector))))
