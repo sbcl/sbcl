@@ -1431,12 +1431,10 @@
                        ((temp complex-double-reg))
                        ((temp2 complex-double-reg))
                        ((indexes))
-                       ((byte-indexes))
                        ((increment))
                        ((last-newlines))
 
                        ((tmp unsigned-reg))
-                       ((ptr unsigned-reg))
                        ((full-table any-reg t))
                        ((shift-mask complex-double-reg))
                        ((c-1b complex-double-reg))
@@ -1446,10 +1444,11 @@
                        ((length2 complex-double-reg t :offset 9))
                        ((shuf-mask complex-double-reg t :offset 10))
                        ((and-mask complex-double-reg t :offset 11))
-                       ((orr-mask complex-double-reg t :offset 12)))
+                       ((orr-mask complex-double-reg t :offset 12))
+                       ((zeros complex-double-reg)))
               ((read unsigned-reg positive-fixnum :from :load)
-               (written unsigned-reg positive-fixnum :from :load)
-               (last-newline signed-reg signed-num))
+               (written unsigned-reg positive-fixnum)
+               (last-newline signed-reg signed-num :from :load))
             (flet ((make-full-table ()
                      (let* ((table-size 256)
                             (row-size (* 16 3))
@@ -1493,10 +1492,10 @@
              (assemble ()
 
                (inst movi newlines 10 :16b)
-               (inst movi increment 16 :4s)
+               (inst movi increment 4 :4s)
                (inst mvni last-newlines 0 :4s)
+               (inst movi zeros 0 :4s)
                (load-inline-constant indexes :oword (concat-ub 32 '(3 2 1 0)))
-               (load-inline-constant byte-indexes :oword (concat-ub 8 '(15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0)))
 
                (inst add byte-end byte-array* (asr byte-end 1))
                (inst add byte-array byte-array* (lsr byte-start 1))
@@ -1519,14 +1518,12 @@
                (inst uzp1 bytes4 bytes2 bytes4 :16b)
                (inst str  bytes4 (@ byte-array 16 :post-index))
 
+               ;; Save the base index of newlines
                (inst cmeq temp bytes4 newlines :16b)
-               ;; if anything found set the first S to #xFFFFFFFF
-               (inst umaxv f1 temp :16b)
-               (inst cmgt f1 f1 0 :2s)
-               (inst and temp temp byte-indexes :16b)
-               (inst umaxv temp temp :16b)
-               (inst add temp2 temp indexes :4s)
-               (inst bit last-newlines temp2 f1 :16b)
+               ;; Extend matches to 4s
+               (inst cmhi f1 temp zeros :4s)
+               ;; Save the index of newlines
+               (inst bit last-newlines indexes f1 :16b)
 
                (inst add indexes indexes increment :4s)
 
@@ -1541,8 +1538,10 @@
 
                FULL-START
                (inst add string-end string-end 48) ;; now it reads 16 bytes instead of 64
+               (inst dup indexes indexes :4s 0)
                (inst movi newlines 10 :4s)
-               (inst movi increment 4 :4s)
+               (inst movi increment 1 :4s)
+
                (load-inline-constant shift-mask :oword #x6000000040000000200000000)
                (load-inline-constant full-table (make-full-table))
                (inst movi c-1b  #x1b :4s)
@@ -1560,6 +1559,7 @@
 
                  (inst cmeq temp bytes newlines :4s)
                  (inst bit last-newlines indexes temp :16b)
+
                  (inst add indexes indexes increment :4s)
 
                  ;; Remove the low bits for each of the possible 4 resulting bytes
@@ -1581,9 +1581,9 @@
 
                  ;; Multiply by 48 (3 * 16)
                  (inst add tmp tmp (lsl tmp 1))
-                 (inst add ptr full-table (lsl tmp 4))
+                 (inst add tmp full-table (lsl tmp 4))
 
-                 (inst ld1 (list shuf-mask and-mask orr-mask) (@ ptr) :16b)
+                 (inst ld1 (list shuf-mask and-mask orr-mask) (@ tmp) :16b)
 
                  (inst umov tmp-tn r4 0 :b)
 
@@ -1606,16 +1606,33 @@
                (inst b full-loop)
 
                DONE
-               (inst sub written byte-array byte-array*)
                (inst sub read string string*)
                (inst lsr read read 2)
+
                (inst smaxv temp last-newlines :4s)
-               (inst smov last-newline temp 0 :s))))
+               (inst smov last-newline temp 0 :s)
+               (inst tbnz last-newline 63 NO-NL)
+
+               ;; Find the actual position of the newline, its index&-4 was saved
+               (inst movi newlines 10 :4s)
+               (load-inline-constant indexes :oword (concat-ub 32 '(3 2 1 0)))
+
+               (inst add string* string* (lsl string-start (- 2 n-fixnum-tag-bits)))
+               (inst ldr temp (@ string* (lsl last-newline 4)))
+
+               (inst cmeq temp temp newlines :4s)
+               (inst and temp temp indexes :4s)
+
+               (inst umaxv temp temp :4s)
+               (inst umov tmp-tn temp 0 :b)
+               (inst add last-newline tmp-tn (lsl last-newline 2))
+               (inst add last-newline last-newline (lsr string-start n-fixnum-tag-bits))
+               NO-NL
+
+               (inst sub written byte-array byte-array*))))
         (setf (sb-impl::buffer-tail obuf) written)
         (values read
-                (if (>= last-newline 0)
-                    (truly-the index (+ start last-newline))
-                    -1))))))
+                (truly-the fixnum last-newline))))))
 
 (defun simd-position8 (element vector start end)
   (declare (type index start end)
