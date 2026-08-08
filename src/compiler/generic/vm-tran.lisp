@@ -268,7 +268,7 @@
            (let ((data (truly-the (simple-array ,element-type-specifier 1) data)))
              ,(if stringp
                   `(if (simple-base-string-p data)
-                       (data-vector-set (truly-the (simple-array base-char (*)) data) index (the base-char ,new-value))
+                       (data-vector-set (truly-the (simple-array base-char (*)) data) index (the* (base-char :silent-conflict t) ,new-value))
                        (data-vector-set (truly-the (simple-array character (*)) data) index (the character ,new-value)))
                   `(data-vector-set data index ,new-value))
              ,truly-new-value))))))

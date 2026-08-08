@@ -334,6 +334,7 @@
                    (error "~s" vector))))))
       (free-protected-array string))))
 
+#+(or arm64 x86-64)
 (with-test (:name :character-string-to-utf8)
   (flet ((run-test (string obuf vector)
            (loop repeat (* 256 #+slow 10)

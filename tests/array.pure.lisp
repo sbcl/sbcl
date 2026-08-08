@@ -1166,3 +1166,9 @@
    (lambda (x n)
      (aref (if n (the string n) #(1 2)) x))
    (or (integer 1 2) character)))
+
+#+sb-unicode
+(with-test (:name :char-base-char-warning)
+  (checked-compile
+   `(lambda (s)
+      (setf (char s 0) (code-char 233)))))
