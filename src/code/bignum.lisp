@@ -102,6 +102,11 @@
 (defconstant digit-size sb-vm:n-word-bits)
 
 (defconstant all-ones-digit most-positive-word)
+
+(eval-when (:compile-toplevel)
+  ;; DECLAIM would also eval this form at load-time (cold-init-time) which
+  ;; is too soon to actually work.
+  (sb-xc:proclaim '(muffle-conditions compiler-note)))
 
 #+bignum-assertions
 (progn
@@ -290,7 +295,6 @@
 (defun %normalize-bignum (result len)
   (declare (type bignum result)
            (type bignum-length len)
-           (muffle-conditions compiler-note)
            (inline %normalize-bignum-buffer))
   #+bignum-assertions (aver (= (%bignum-length result) len))
   (let ((newlen (%normalize-bignum-buffer result len)))
@@ -558,7 +562,6 @@
 (sb-c::unless-vop-existsp (:named sb-vm::*/signed=>integer)
   (defun multiply-fixnums (a b)
     (declare (fixnum a b))
-    (declare (muffle-conditions compiler-note)) ; returns lispobj, so what.
     (let* ((a-minusp (minusp a))
            (b-minusp (minusp b)))
       (multiple-value-bind (high low)
@@ -708,7 +711,6 @@
 ;;; paper, but uses some clever bit-twiddling nicked from Nickle to do it.
 (declaim (inline bmod))
 (defun bmod (u v)
-  (declare (muffle-conditions compiler-note)) ; returns lispobj, so what.
   (let ((ud (%bignum-ref u 0))
         (vd (%bignum-ref v 0))
         (umask 0)
@@ -1133,8 +1135,7 @@
 ;;; locals established by the macro.
 (defun bignum-ashift-right (bignum count)
   (declare (type bignum bignum)
-           (type unsigned-byte count)
-           (muffle-conditions compiler-note))
+           (type unsigned-byte count))
   (let ((bignum-len (%bignum-length bignum)))
     (cond ((fixnump count)
            (multiple-value-bind (digits n-bits) (truncate count digit-size)
@@ -1386,9 +1387,7 @@
 
 (declaim (inline bignum-negate-last-two))
 (defun bignum-negate-last-two (bignum &optional (len (%bignum-length bignum)))
-  (declare (bignum-length len)
-           #+sb-xc
-           (muffle-conditions compiler-note))
+  (declare (bignum-length len))
   (sb-c::if-vop-existsp (:named sb-vm::bignum-negate-last-two-loop)
     (sb-sys:%primitive sb-vm::bignum-negate-last-two-loop bignum len)
     (let* ((last1 0)
@@ -1414,7 +1413,6 @@
 (defun double-float-from-bits (bits exp plusp)
   (declare (fixnum exp))
   ;; "float to pointer coercion -> return value"
-  (declare (muffle-conditions compiler-note))
   (let ((hi (dpb exp
                  sb-vm:double-float-hi-exponent-byte
                  (logandc2 (ecase sb-vm:n-word-bits
@@ -1486,6 +1484,7 @@
          (flet ((const (name)
                   (package-symbolicate :sb-vm type '- name)))
            `(defun ,name (bignum)
+              (declare (muffle-conditions compiler-note))
               (let ((bignum-length (%bignum-length bignum)))
                 ;; word-sized bignums shouldn't reach here
                 (declare ((integer 2) bignum-length))
@@ -1795,9 +1794,7 @@
   (declare (type bit-index byte-pos)
            (type (integer 0 #.sb-vm:n-word-bits) byte-size-left)
            (bignum bignum)
-           (optimize speed)
-           #+sb-xc
-           (muffle-conditions compiler-note))
+           (optimize speed))
   (multiple-value-bind (word-index bit-index) (floor byte-pos digit-size)
     (let ((one (%bignum-ref bignum word-index)))
       (cond ((<= bit-index byte-size-left) ; contained in one word
@@ -1896,7 +1893,6 @@
 ;;; reduction in readability that was introduced. --JES, 2004-08-07
 (defun bignum-truncate (x y)
   (declare (type bignum x y))
-  (declare (muffle-conditions compiler-note)) ; returns lispobj, so what.
   (let (truncate-x truncate-y)
     (labels
         ;; This returns a guess for the next division step. Y1 is the
@@ -2161,7 +2157,6 @@
   (declare (type bignum x)
            (type (or word sb-vm:signed-word) y)
            (optimize (safety 0)))
-  (declare (muffle-conditions compiler-note)) ; returns lispobj, so what.
   (labels
       ((bignum-truncate-single-digit (x len-x y)
          (declare (type bignum-length len-x)
@@ -2246,8 +2241,7 @@
 ;;; bignum by a base into a preallocated quotient bignum.
 (declaim (inline bignum-truncate-single-digit-to))
 (defun bignum-truncate-single-digit-to (x y q len)
-  (declare (muffle-conditions compiler-note)
-           (type bignum x q)
+  (declare (type bignum x q)
            (type word y)
            (bignum-index len)
            (optimize speed (safety 0)))
@@ -2298,6 +2292,11 @@
                `(defun ,(symbolicate 'unary-truncate- type '-to-bignum-div) (quot number divisor)
                   (declare (inline ,decode))
                   (if (zerop divisor)
+                      ;; Considering that this whole file silences compiler notes, it seems like a
+                      ;; DECLARE shouldn't be needed here. But I think block compilation causes
+                      ;; MAYBE-EMIT-COERCE-EFFICIENCY-NOTE to occur at a time when some specials
+                      ;; aren't bound as they are during earlier phases, resulting in
+                      ;; get-handled-conditions doing the wrong thing.
                       (locally (declare (muffle-conditions compiler-note))
                         (error 'division-by-zero :operation 'truncate
                                                  :operands (list number divisor)))
@@ -2325,7 +2324,7 @@
 (defun truncate-double-float-to-bignum-truncating-div (quot number divisor)
   (declare (inline sb-kernel:integer-decode-double-float))
   (if (zerop divisor)
-      (locally (declare (muffle-conditions compiler-note)) (error 'division-by-zero :operation 'truncate :operands (list number divisor)))
+      (error 'division-by-zero :operation 'truncate :operands (list number divisor))
       (multiple-value-bind (bits exp sign)
           (sb-kernel:integer-decode-double-float quot)
         (let ((truncated
