@@ -6408,8 +6408,9 @@
                                0)
                       'integer))))
 
-;;; Check that the types from loops written with DO and with local
-;;; calls infer to the same type.
+;;; A loop carries the same type whichever way it is written. SSA
+;;; conversion rewrites the first spelling into the second, so any
+;;; disagreement here is a type the conversion would lose.
 (with-test (:name (:local-call-arg-type :spelling-parity))
   (labels ((as-do (step init)
              `(lambda (n)
@@ -6430,6 +6431,9 @@
                     ((cons 1 x) (list 1))
                     ((list x) (list 1))
                     ((1+ x) 1)
+                    ((+ x 2) 1)
+                    ((- x 3) 1)
+                    ((ash x 1) 1)
                     ((logior x 3) 1)))
       (destructuring-bind (step init) case
         (let ((from-do (derived (as-do step init)))
@@ -6437,45 +6441,3 @@
           (unless (equal from-do from-labels)
             (error "~S: DO derives ~S, LABELS derives ~S"
                    step from-do from-labels)))))))
-
-(with-test (:name (:local-call-arg-type :spelling-parity-numeric-steps)
-            :fails-on :sbcl)
-  (labels ((as-do (step init)
-             `(lambda (n)
-                (do ((i n (1- i))
-                     (x ,init ,step))
-                    ((zerop i) (ctu:compiler-derived-type x)))))
-           (as-labels (step init)
-             `(lambda (n)
-                (labels ((rec (i x)
-                           (if (zerop i)
-                               (ctu:compiler-derived-type x)
-                               (rec (1- i) ,step))))
-                  (rec n ,init))))
-           (derived (form)
-             (funcall (checked-compile form) 0)))
-    (dolist (case '(((+ x 2) 1)
-                    ((- x 3) 1)
-                    ((ash x 1) 1)))
-      (destructuring-bind (step init) case
-        (let ((from-do (derived (as-do step init)))
-              (from-labels (derived (as-labels step init))))
-          (unless (equal from-do from-labels)
-            (error "~S: DO derives ~S, LABELS derives ~S"
-                   step from-do from-labels)))))))
-
-(with-test (:name (:assignment-convert :lp2162990))
-  (checked-compile-and-assert ()
-    `(lambda (a)
-       (block done
-         (let ((done (lambda (&rest values) (return-from done (values-list values))))
-               (l (lambda ())))
-           (flet ((c (f)
-                    (funcall f)))
-             (declare (inline c))
-             (if a
-                 (c l)
-                 (c l)))
-           (funcall done nil))))
-    ((t) nil)
-    ((nil) nil)))

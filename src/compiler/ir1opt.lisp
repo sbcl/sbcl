@@ -2967,9 +2967,23 @@
             and type in union
             when type do
             (let ((type (sb-kernel::%type-union type)))
-              (if (basic-var-sets var)
-                  (setf (leaf-defined-type var) type)
-                  (propagate-to-refs var type))))
+              (cond ((basic-var-sets var)
+                     (setf (leaf-defined-type var) type))
+                    ;; A parameter being solved for optimistically has
+                    ;; PUBLISH-OPTIMISTIC-TYPES as its one authority,
+                    ;; the way a variable with sets has
+                    ;; PROPAGATE-FROM-SETS. Narrowing it from here as
+                    ;; well is not simply redundant: this union is
+                    ;; recomputed from arguments derived from the
+                    ;; variable itself, so around a loop it sharpens a
+                    ;; step on every visit and never settles, and being
+                    ;; the narrower of the two it is the one that
+                    ;; survives. The optimistic side reaches the same
+                    ;; answers convergently, and constraint propagation
+                    ;; sharpens the references from there.
+                    ((lambda-var-optimistic-type var))
+                    (t
+                     (propagate-to-refs var type)))))
 
       ;; It's possible to discover new inline calls which may have
       ;; incompatible argument types, so don't allow reuse of this

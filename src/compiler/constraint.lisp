@@ -1450,14 +1450,41 @@
          (:local
           (let ((fun (combination-lambda node))
                 (call-in (combination-constraints-in node)))
-
-            (when (and (functional-kind-eq fun nil assignment optional cleanup)
-                       (not (and call-in
-                                 (conset= call-in gen))))
-              (setf (combination-constraints-in node)
-                    (copy-conset gen))
-              (when *constraint-blocks-p*
-                (enqueue-block-for-constraints (lambda-block fun))))))))))
+            (when (functional-kind-eq fun nil assignment optional cleanup)
+              ;; Binding the parameters is an assignment to them, and
+              ;; carries the same two obligations a CSET does: the
+              ;; callee learns the argument's type, and whatever was
+              ;; known of the parameter here stops holding. The second
+              ;; matters when the call is recursive, since then the
+              ;; parameter is one this very block has constraints about.
+              ;;
+              ;; COMPUTE-BLOCK-IN joins these across the call sites, so
+              ;; a parameter carried around a loop is refined a step per
+              ;; round exactly as a variable assigned in one is. Without
+              ;; it a local function's parameters reach its body with
+              ;; nothing said about them beyond their LEAF-DEFINED-TYPE,
+              ;; and a loop written as a local call gets coarser types
+              ;; at its references than the same loop written with an
+              ;; assignment.
+              (let ((new (copy-conset gen))
+                    (vars (lambda-vars fun))
+                    (args (combination-args node)))
+                ;; Every parameter is unbound before any is bound, the
+                ;; arguments being evaluated in the caller.
+                (loop for var in vars
+                      for val in args
+                      when (and val (lambda-var-constraints var))
+                      do (conset-clear-lambda-var new var))
+                (loop for var in vars
+                      for val in args
+                      when (and val (lambda-var-constraints var))
+                      do (let ((type (lvar-type val)))
+                           (when (type-for-constraints-p type)
+                             (conset-add-constraint new 'typep var type nil))))
+                (unless (and call-in (conset= call-in new))
+                  (setf (combination-constraints-in node) new)
+                  (when *constraint-blocks-p*
+                    (enqueue-block-for-constraints (lambda-block fun))))))))))))
   gen)
 
 (defun constraint-propagate-if (block gen)
