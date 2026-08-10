@@ -488,24 +488,25 @@ Please check that all strings which were not recognizable to the compiler
                (and (boundp symbol) (not (keywordp symbol)))))))))
    :verbose nil :print nil)
   (unintern 'sb-impl::shake-packages 'sb-impl)
-  (let ((sum-delta-ext 0)
-        (sum-delta-int 0))
-    (format t "~&~26TExternal   |    Internal~%")
-    (dolist (entry counts)
-      (let* ((ext (sb-impl::package-external-symbol-count (car entry)))
-             (int (sb-impl::package-internal-symbol-count (car entry)))
-             (delta-ext (- ext (cadr entry)))
-             (delta-int (- int (caddr entry))))
-        (incf sum-delta-ext delta-ext)
-        (incf sum-delta-int delta-int)
-        (assert (<= delta-ext 0))
-        (assert (<= delta-int 0))
-        (format t "~20a | ~5d (~5@d) | ~5d (~5@d)~%"
-                (package-name (car entry))
-                ext delta-ext int delta-int)))
-    (format t "~28t (~5@d) |       (~5@d) = (~d)~%"
-            sum-delta-ext sum-delta-int
-            (+ sum-delta-ext sum-delta-int))))
+  (when (zerop (extern-alien "lisp_startup_options" char))
+    (let ((sum-delta-ext 0)
+          (sum-delta-int 0))
+      (format t "~&~26TExternal   |    Internal~%")
+      (dolist (entry counts)
+        (let* ((ext (sb-impl::package-external-symbol-count (car entry)))
+               (int (sb-impl::package-internal-symbol-count (car entry)))
+               (delta-ext (- ext (cadr entry)))
+               (delta-int (- int (caddr entry))))
+          (incf sum-delta-ext delta-ext)
+          (incf sum-delta-int delta-int)
+          (assert (<= delta-ext 0))
+          (assert (<= delta-int 0))
+          (format t "~20a | ~5d (~5@d) | ~5d (~5@d)~%"
+                  (package-name (car entry))
+                  ext delta-ext int delta-int)))
+      (format t "~28t (~5@d) |       (~5@d) = (~d)~%"
+              sum-delta-ext sum-delta-int
+              (+ sum-delta-ext sum-delta-int)))))
 
 (scan-format-control-strings)
 
