@@ -514,15 +514,20 @@
       DONE)))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun check-ascii (input temp not-ascii-label &optional (size 1))
+  (defun check-ascii (input temp not-ascii-label size &key not (gpr tmp-tn))
     ;; Check for ASCII by looking at the largest byte
-    (multiple-value-bind (v-size size) (ecase size
-                                         (1 (values :16b :b))
-                                         (4 (values :4s :s)))
-      (inst umaxv temp input v-size)
-      (inst umov tmp-tn temp 0 size)
-      (inst cmp tmp-tn 127)
-      (inst b :hi not-ascii-label))))
+    (inst umaxv temp input size)
+    (inst umov gpr temp 0 (ecase size
+                            ((:8b :16b) :b)
+                            ((:2s :4s) :s)))
+    (case size
+      ((:8b :16b)
+       (if not
+           (inst tbz gpr 7 not-ascii-label)
+           (inst tbnz gpr 7 not-ascii-label)))
+      ((:2s :4s)
+       (inst cmp gpr 127)
+       (inst b (if not :ls :hi) not-ascii-label)))))
 
 (defun utf8-to-character-string (start end string ibuf)
   (declare (type index start end)
@@ -589,9 +594,7 @@
 
             ASCII-LOOP
             (inst ldr bytes (@ byte-array))
-            (inst umaxv temp1 bytes :16b)
-            (inst umov tmp-tn temp1 0 :b)
-            (inst tbnz tmp-tn 7 NOT-ASCII)
+            (check-ascii bytes temp1 NOT-ASCII :16b)
 
             (inst add byte-array byte-array 16)
 
@@ -905,7 +908,7 @@
 
                LOOP
                (inst ldr bytes (@ byte-array))
-               (check-ascii bytes temp DONE)
+               (check-ascii bytes temp DONE :16b)
                (inst add byte-array byte-array 16)
                (inst str bytes (@ char-array 16 :post-index))
 
@@ -986,12 +989,12 @@
                                                            (loop for i downfrom 7 to 0
                                                                  collect (ash 1 i)))))
                 (inst ldr next-bytes (@ byte-array))
-                (check-ascii next-bytes temp DONE)
+                (check-ascii next-bytes temp DONE :16b)
 
                 LOOP
                 (inst mov bytes next-bytes :16b)
                 (inst ldr next-bytes (@ byte-array 16))
-                (check-ascii next-bytes temp DONE)
+                (check-ascii next-bytes temp DONE :16b)
 
                 (inst add byte-array byte-array 16)
 
@@ -1142,9 +1145,7 @@
             (inst mov bytes s1 :16b)
             (inst ldr s1 (@ byte-array 16))
 
-            (inst umaxv temp1 bytes :16b)
-            (inst umov tmp-tn temp1 0 :b)
-            (inst tbnz tmp-tn 7 NOT-ASCII)
+            (check-ascii bytes temp1 NOT-ASCII :16b)
 
             (inst add byte-array byte-array 16)
 
@@ -1511,7 +1512,7 @@
                (inst orr temp bytes bytes2 :16b)
                (inst orr temp2 bytes3 bytes4 :16b)
                (inst orr temp temp temp2 :16b)
-               (check-ascii temp temp FULL-START 4)
+               (check-ascii temp temp FULL-START :4s)
 
                (inst uzp1 bytes2 bytes bytes2 :8h)
                (inst uzp1 bytes4 bytes3 bytes4 :8h)
@@ -1961,9 +1962,7 @@
              (assemble ()
                ;; Skip an all-ASCII block
                (inst umax tmp2 current prev :16b)
-               (inst umaxv tmp2 tmp2 :16b)
-               (inst umov tmp tmp2 0 :b)
-               (inst tbz tmp 7 VALIDATED)
+               (check-ascii tmp2 tmp2 VALIDATED :16b :not t :gpr tmp)
 
                (inst ext tmp1 prev current 15 :16b)
 
@@ -2054,10 +2053,7 @@
         (inst uminv tmp1 current :16b)
         (inst fmov tmp (reg-in-sc tmp1 'single-reg))
         (inst cbz tmp ASCII-TAIL)
-        (inst umaxv tmp1 current :16b)
-        (inst fmov tmp (reg-in-sc tmp1 'single-reg))
-        (inst tbnz tmp 7 NON-ASCII)
-
+        (check-ascii current tmp1 NON-ASCII :16b)
 
         (inst ldr current (@ ptr 16 :pre-index))
         (inst b ASCII)
@@ -2075,9 +2071,7 @@
         (inst cmhi tmp1 tmp1 indexes :16b)
         (inst and current current tmp1 :16b)
 
-        (inst sminv tmp1 current :16b)
-        (inst umov byte-length tmp1 0 :b)
-        (inst tbnz byte-length 7 NON-ASCII)
+        (check-ascii current tmp1 NON-ASCII :16b)
 
         (inst add ptr ptr tmp)
         (inst sub byte-length ptr bytes)
@@ -2180,11 +2174,8 @@
       ASCII-LOOP
       (inst ldr current (@ ptr 16 :post-index))
 
-      (inst umaxv tmp1 current :4s)
-      (inst fmov tmp (reg-in-sc tmp1 'single-reg))
-      (inst cmp tmp 127)
+      (check-ascii current tmp1 NON-ASCII :4s)
 
-      (inst b :hi NON-ASCII)
       (inst subs chars-left chars-left 4)
       (inst b :gt ASCII-LOOP)
       (inst b DONE)
@@ -2208,10 +2199,7 @@
       (inst ldr current (@ ptr 16 :post-index))
 
       ;; ASCII fast path
-      (inst umaxv tmp1 current :4s)
-      (inst fmov tmp (reg-in-sc tmp1 'single-reg))
-      (inst cmp tmp 127)
-      (inst b :le LOOP)
+      (check-ascii current tmp1 LOOP :4s :not t)
 
       START
       ;; Check for surrogates #xD800-#xDFFF
