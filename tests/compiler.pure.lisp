@@ -6315,9 +6315,7 @@
                                           (rec (1- i) (if p x nil)))))
                              (rec n (list 1))))
                          0 nil)))
-    ;; FIXME: In an ideal world, we would derive UNSIGNED-BYTE here
-    ;; like the corresponding imperative loop would.
-    (assert (eq 'number
+    (assert (eq 'unsigned-byte
                 (derived '(lambda (k)
                            (labels ((rec (i n)
                                       (if (zerop i)
@@ -6363,6 +6361,108 @@
                                     (recurse (the fixnum (1- x)) fn))))
                        (recurse x fn)))
                    :allow-notes nil))
+
+;;; Test basic iteration-as-local-call type inference.
+(with-test (:name (:local-call-arg-type :stepped-by-known-function))
+  (flet ((derived (form &rest args)
+           (apply (checked-compile form) args)))
+    (assert (eq 'cons
+                (derived '(lambda (n)
+                           (labels ((rec (i x)
+                                      (if (zerop i)
+                                          (ctu:compiler-derived-type x)
+                                          (rec (1- i) (nreverse x)))))
+                             (rec n (list 1 2 3))))
+                         0)))
+    (assert (eq 'cons
+                (derived '(lambda (n)
+                           (do ((i n (1- i))
+                                (x (list 1 2 3) (nreverse x)))
+                               ((zerop i) (ctu:compiler-derived-type x))))
+                         0)))
+    (assert (eq 'cons
+                (derived '(lambda (n)
+                           (labels ((rec (i x)
+                                      (if (zerop i)
+                                          (ctu:compiler-derived-type x)
+                                          (rec (1- i) (cons 1 x)))))
+                             (rec n (list 1))))
+                         0)))
+    (assert (eq 'cons
+                (derived '(lambda (n)
+                           (labels ((rec (i x)
+                                      (if (zerop i)
+                                          (ctu:compiler-derived-type x)
+                                          (rec (1- i) (list x)))))
+                             (rec n (list 1))))
+                         0)))
+    ;; ASH does not converge until the bounds are dropped, so only the
+    ;; class of the type survives. The imperative loop does no better
+    ;; here; see :SPELLING-PARITY-NUMERIC-STEPS.
+    (assert (subtypep (derived '(lambda (k)
+                                 (labels ((rec (i n)
+                                            (if (zerop i)
+                                                (ctu:compiler-derived-type n)
+                                                (rec (1- i) (ash n 1)))))
+                                   (rec k 1)))
+                               0)
+                      'integer))))
+
+;;; Check that the types from loops written with DO and with local
+;;; calls infer to the same type.
+(with-test (:name (:local-call-arg-type :spelling-parity))
+  (labels ((as-do (step init)
+             `(lambda (n)
+                (do ((i n (1- i))
+                     (x ,init ,step))
+                    ((zerop i) (ctu:compiler-derived-type x)))))
+           (as-labels (step init)
+             `(lambda (n)
+                (labels ((rec (i x)
+                           (if (zerop i)
+                               (ctu:compiler-derived-type x)
+                               (rec (1- i) ,step))))
+                  (rec n ,init))))
+           (derived (form)
+             (funcall (checked-compile form) 0)))
+    (dolist (case '(((nreverse x) (list 1 2 3))
+                    ((cdr x) (list 1 2 3))
+                    ((cons 1 x) (list 1))
+                    ((list x) (list 1))
+                    ((1+ x) 1)
+                    ((logior x 3) 1)))
+      (destructuring-bind (step init) case
+        (let ((from-do (derived (as-do step init)))
+              (from-labels (derived (as-labels step init))))
+          (unless (equal from-do from-labels)
+            (error "~S: DO derives ~S, LABELS derives ~S"
+                   step from-do from-labels)))))))
+
+(with-test (:name (:local-call-arg-type :spelling-parity-numeric-steps)
+            :fails-on :sbcl)
+  (labels ((as-do (step init)
+             `(lambda (n)
+                (do ((i n (1- i))
+                     (x ,init ,step))
+                    ((zerop i) (ctu:compiler-derived-type x)))))
+           (as-labels (step init)
+             `(lambda (n)
+                (labels ((rec (i x)
+                           (if (zerop i)
+                               (ctu:compiler-derived-type x)
+                               (rec (1- i) ,step))))
+                  (rec n ,init))))
+           (derived (form)
+             (funcall (checked-compile form) 0)))
+    (dolist (case '(((+ x 2) 1)
+                    ((- x 3) 1)
+                    ((ash x 1) 1)))
+      (destructuring-bind (step init) case
+        (let ((from-do (derived (as-do step init)))
+              (from-labels (derived (as-labels step init))))
+          (unless (equal from-do from-labels)
+            (error "~S: DO derives ~S, LABELS derives ~S"
+                   step from-do from-labels)))))))
 
 (with-test (:name (:assignment-convert :lp2162990))
   (checked-compile-and-assert ()

@@ -2353,6 +2353,8 @@
 (declaim (start-block ir1-optimize-set constant-reference-p delete-let
                       propagate-let-args propagate-local-call-args
                       propagate-to-refs propagate-from-sets
+                      converged-type-of-combination
+                      maybe-infer-iteration-var-type
                       ir1-optimize-mv-combination
                       substitute-single-use-lvar))
 
@@ -2443,91 +2445,93 @@
          (when (memq source-name '(- +))
            source-name))))
 
-(defun %analyze-set-uses (sets var initial-type)
+(defun %analyze-set-uses (values var initial-type)
   (let ((some-plusp nil)
         (some-minusp nil)
         (set-types '())
         (every-set-type-suitable-p t))
-    (dolist (set sets)
-      (let* ((set-use (principal-lvar-use (set-value set)))
-             (function (%inc-or-dec-p set-use)))
-        (unless function ; every use must be + or -
+    (dolist (value values)
+      (multiple-value-bind (step function) (iteration-step-value value var)
+        (unless function ; every value must be ({+,-} VAR STEP)
           (return-from %analyze-set-uses nil))
-        (let ((args (basic-combination-args set-use)))
-          ;; Every use must be of the form ({+,-} VAR STEP).
-          (unless (and (proper-list-of-length-p args 2 2)
-                       (let ((first (principal-lvar-use (first args))))
-                         (and (ref-p first)
-                              (eq (ref-leaf first) var))))
+        (let ((step-type (weaken-numeric-union-type (lvar-type step)))
+              (set-type (weaken-numeric-union-type (lvar-type value))))
+          ;; In ({+,-} VAR STEP), the type of STEP must be a numeric
+          ;; type matching INITIAL-TYPE.
+          (unless (and (numeric-type-p step-type)
+                       (or (numtype-aspects-eq initial-type step-type)
+                           ;; Detect cases like (LOOP FOR 1.0 to 5.0
+                           ;; ...), where the initial and the step
+                           ;; are of different types, and the step
+                           ;; is less contagious.
+                           (let ((contagion-type (numeric-contagion initial-type
+                                                                    step-type
+                                                                    ;; Adding integers will produce integers
+                                                                    :rational nil)))
+                             (and (numeric-type-p contagion-type)
+                                  (numtype-aspects-eq initial-type contagion-type)))))
             (return-from %analyze-set-uses nil))
-          (let ((step-type (weaken-numeric-union-type (lvar-type (second args))))
-                (set-type (weaken-numeric-union-type (lvar-type (set-value set)))))
-            ;; In ({+,-} VAR STEP), the type of STEP must be a numeric
-            ;; type matching INITIAL-TYPE.
-            (unless (and (numeric-type-p step-type)
-                         (or (numtype-aspects-eq initial-type step-type)
-                             ;; Detect cases like (LOOP FOR 1.0 to 5.0
-                             ;; ...), where the initial and the step
-                             ;; are of different types, and the step
-                             ;; is less contagious.
-                             (let ((contagion-type (numeric-contagion initial-type
-                                                                      step-type
-                                                                      ;; Adding integers will produce integers
-                                                                      :rational nil)))
-                               (and (numeric-type-p contagion-type)
-                                    (numtype-aspects-eq initial-type contagion-type)))))
-              (return-from %analyze-set-uses nil))
-            ;; Track the directions of the increments/decrements.
-            (let ((non-negative-p (csubtypep step-type (specifier-type '(real 0 *))))
-                  (non-positive-p (csubtypep step-type (specifier-type '(real * 0)))))
-              (cond ((or (and (eq function '+) non-negative-p)
-                         (and (eq function '-) non-positive-p))
-                     (setf some-plusp t))
-                    ((or (and (eq function '-) non-negative-p)
-                         (and (eq function '+) non-positive-p))
-                     (setf some-minusp t))
-                    (t ; Can't tell direction
-                     (setf some-plusp t some-minusp t))))
-            ;; Ultimately, the derived types of the sets must match
-            ;; INITIAL-TYPE if we are going to derive new bounds.
-            (unless (and (numeric-type-p set-type)
-                         (numtype-aspects-eq set-type initial-type))
-              (setf every-set-type-suitable-p nil))
-            (push set-type set-types)))))
+          ;; Track the directions of the increments/decrements.
+          (let ((non-negative-p (csubtypep step-type (specifier-type '(real 0 *))))
+                (non-positive-p (csubtypep step-type (specifier-type '(real * 0)))))
+            (cond ((or (and (eq function '+) non-negative-p)
+                       (and (eq function '-) non-positive-p))
+                   (setf some-plusp t))
+                  ((or (and (eq function '-) non-negative-p)
+                       (and (eq function '+) non-positive-p))
+                   (setf some-minusp t))
+                  (t ; Can't tell direction
+                   (setf some-plusp t some-minusp t))))
+          ;; Ultimately, the derived types of the stepped values must
+          ;; match INITIAL-TYPE if we are going to derive new bounds.
+          (unless (and (numeric-type-p set-type)
+                       (numtype-aspects-eq set-type initial-type))
+            (setf every-set-type-suitable-p nil))
+          (push set-type set-types))))
     (values (cond ((and some-plusp (not some-minusp)) '+)
                   ((and some-minusp (not some-plusp)) '-)
                   (t '*))
             set-types every-set-type-suitable-p)))
 
-(defun sets-numeric-contagion (sets var initial-type)
+(defun sets-numeric-contagion (values var initial-type)
   (let (union)
-    (dolist (set sets)
-      (let* ((set-use (principal-lvar-use (set-value set)))
-             (function (%inc-or-dec-p set-use)))
-        (unless function                ; every use must be + or -
+    (dolist (value values)
+      (multiple-value-bind (step function) (iteration-step-value value var)
+        (unless function                ; every value must be ({+,-} VAR STEP)
           (return-from sets-numeric-contagion nil))
-        (let ((args (basic-combination-args set-use)))
-          ;; Every use must be of the form ({+,-} VAR STEP).
-          (unless (and (proper-list-of-length-p args 2 2)
-                       (let ((first (principal-lvar-use (first args))))
-                         (and (ref-p first)
-                              (eq (ref-leaf first) var))))
-            (return-from sets-numeric-contagion nil))
-          (let ((step-type (lvar-type (second args))))
-            (setf union (if union
-                            (type-union union step-type)
-                            step-type))))))
+        (let ((step-type (lvar-type step)))
+          (setf union (if union
+                          (type-union union step-type)
+                          step-type)))))
     (type-union initial-type
                 (numeric-contagion initial-type union
                                    ;; Adding integers will produce integers
                                    :rational nil))))
 
-(defun maybe-infer-iteration-var-type (var initial-type)
-  (binding* ((sets (lambda-var-sets var) :exit-if-null)
+;;; If VALUE is computed as ({+,-} VAR STEP), one round of stepping a
+;;; loop variable, return the STEP lvar and which function it is. VALUE
+;;; is the lvar the new value arrives on: the value of a SETQ, or the
+;;; argument a local call passes to VAR's own parameter position.
+(defun iteration-step-value (value var)
+  (let* ((use (principal-lvar-use value))
+         (function (%inc-or-dec-p use)))
+    (when function
+      (let ((args (basic-combination-args use)))
+        (when (and (proper-list-of-length-p args 2 2)
+                   (let ((first (principal-lvar-use (first args))))
+                     (and (ref-p first)
+                          (eq (ref-leaf first) var))))
+          (values (second args) function))))))
+
+;;; Infer the type of VAR from the direction in which it is stepped,
+;;; keeping the bound it moves away from and dropping the one it moves
+;;; towards. VALUES are the lvars the stepped values arrive on.
+(defun maybe-infer-iteration-var-type (var values initial-type)
+  (binding* ((values values :exit-if-null)
              (initial-type (weaken-numeric-union-type initial-type))
              ((direction set-types every-set-type-suitable-p)
               (when (numeric-type-p initial-type)
-                (%analyze-set-uses sets var initial-type))))
+                (%analyze-set-uses values var initial-type))))
     (if direction
         (labels ((leftmost (x y cmp cmp=)
                    (cond ((eq x nil) nil)
@@ -2562,7 +2566,7 @@
                  (values nil nil)))
             (modified-numeric-type initial-type :low low
                                                 :high high)))
-        (sets-numeric-contagion sets var initial-type))))
+        (sets-numeric-contagion values var initial-type))))
 
 (deftransform + ((x y) * * :result result)
   "check for iteration variable reoptimization"
@@ -2590,50 +2594,61 @@
   (let ((combination (principal-lvar-ref-use (set-value set) t)))
     (when (and (combination-p combination)
                (eq (combination-kind combination) :known))
-      (let* ((info (combination-fun-info combination))
-             (deriver (and info
-                           (fun-info-derive-type info)))
-             (args (combination-args combination))
-             (var-args))
-        (when deriver
-          (map-combination-args-and-types
-           (lambda (arg type lvars &optional annotation)
-             (declare (ignore lvars annotation))
-             (let ((arg-var (or (lvar-lambda-var arg)
-                                (let ((use (lvar-uses arg)))
-                                  (and (cast-p use)
-                                       (lvar-lambda-var (cast-value use)))))))
-               (when (eq arg-var var)
-                 (setf initial-type
-                       ;; Type derivers expect the right types
-                       (type-intersection initial-type type))
-                 (push arg var-args))))
-           combination)
-          (when (and var-args
-                     (neq initial-type *empty-type*))
-            (labels ((derive (type)
-                       (single-value-type
-                        (or
-                         (combination-derive-type-for-arg-types combination
-                                                                (loop for arg in args
-                                                                      collect (if (memq arg var-args)
-                                                                                  type
-                                                                                  arg)))
-                         (return-from set-type-of-combination))))
-                     (converges-p (initial-type)
-                       (let ((derived (derive initial-type)))
-                         (when derived
-                           ;; Does it converge to the same type again?
-                           (let* ((union (type-union derived initial-type))
-                                  (again-derived (derive union)))
-                             (when (type= derived again-derived)
-                               union))))))
-              ;; Some functions preserve bounds, like LOGIOR
-              (or (converges-p initial-type)
-                  ;; remove bounds or the types won't converge
-                  (let ((simple (simplify-numeric-type initial-type)))
-                    (unless (eq simple initial-type)
-                      (converges-p simple)))))))))))
+      (converged-type-of-combination var combination initial-type))))
+
+;;; The type VAR converges to when its value is fed back through
+;;; COMBINATION, a known function of VAR, starting from INITIAL-TYPE.
+;;; NIL if it does not converge. (SETQ X (NREVERSE X)) is the shape, as
+;;; is a local call handing (NREVERSE X) to X's own parameter position.
+;;;
+;;; Feeding a type derived from a variable back into that variable is
+;;; where iterating a union upward would need widening. This does not
+;;; iterate: it derives once, unions, derives again, and takes the
+;;; result only if the second derivation agrees with the first, so what
+;;; it returns is a fixpoint it has checked. Numeric bounds are the
+;;; usual reason for not converging, so failing that it tries again
+;;; with the bounds dropped.
+(defun converged-type-of-combination (var combination initial-type)
+  (let* ((info (combination-fun-info combination))
+         (deriver (and info
+                       (fun-info-derive-type info)))
+         (args (combination-args combination))
+         (var-args))
+    (when deriver
+      (map-combination-args-and-types
+       (lambda (arg type lvars &optional annotation)
+         (declare (ignore lvars annotation))
+         (when (eq (combination-arg-lambda-var arg) var)
+           (setf initial-type
+                 ;; Type derivers expect the right types
+                 (type-intersection initial-type type))
+           (push arg var-args)))
+       combination)
+      (when (and var-args
+                 (neq initial-type *empty-type*))
+        (labels ((derive (type)
+                   (single-value-type
+                    (or
+                     (combination-derive-type-for-arg-types combination
+                                                            (loop for arg in args
+                                                                  collect (if (memq arg var-args)
+                                                                              type
+                                                                              arg)))
+                     (return-from converged-type-of-combination))))
+                 (converges-p (initial-type)
+                   (let ((derived (derive initial-type)))
+                     (when derived
+                       ;; Does it converge to the same type again?
+                       (let* ((union (type-union derived initial-type))
+                              (again-derived (derive union)))
+                         (when (type= derived again-derived)
+                           union))))))
+          ;; Some functions preserve bounds, like LOGIOR
+          (or (converges-p initial-type)
+              ;; remove bounds or the types won't converge
+              (let ((simple (simplify-numeric-type initial-type)))
+                (unless (eq simple initial-type)
+                  (converges-p simple)))))))))
 
 ;;; Figure out the type of a LET variable that has sets. We compute
 ;;; the union of the INITIAL-TYPE and the types of all the set
@@ -2655,7 +2670,8 @@
                 (unless (values-subtypep old-type type)
                   (derive-node-type set (make-single-value-type type))))
               (setf (node-reoptimize set) nil)))))
-    (let ((res-type (or (maybe-infer-iteration-var-type var initial-type)
+    (let ((res-type (or (maybe-infer-iteration-var-type
+                         var (mapcar #'set-value sets) initial-type)
                         (apply #'type-union initial-type types))))
       (propagate-to-refs var res-type)))
   (values))
@@ -3114,6 +3130,14 @@
 
 ;;; Return the lambda variable referenced by USE if it is eligible for
 ;;; optimistic type inference.
+;;; The LAMBDA-VAR ARG references, looking through a cast.
+(defun combination-arg-lambda-var (arg)
+  (and arg
+       (or (lvar-lambda-var arg)
+           (let ((use (lvar-uses arg)))
+             (and (cast-p use)
+                  (lvar-lambda-var (cast-value use)))))))
+
 (defun optimistic-var (use)
   (and (ref-p use)
        (let ((leaf (ref-leaf use)))
@@ -3142,6 +3166,41 @@
         (if has-optimistic-p
             types
             (list (lvar-type arg))))))
+
+;;; True if ARG carries VAR forward from its own previous value rather
+;;; than delivering an unrelated one: the local call spelling of
+;;; (SETQ X (NREVERSE X)) or (SETQ I (1+ I)). What such an argument
+;;; contributes has to be computed from VAR's optimistic type, since its
+;;; LVAR-TYPE was derived from a VAR that is still T.
+(defun optimistic-step-p (arg var)
+  (let ((use (and arg (principal-lvar-ref-use arg t))))
+    (and (combination-p use)
+         (eq (combination-kind use) :known)
+         (let ((info (combination-fun-info use)))
+           (and info (fun-info-derive-type info)))
+         (some (lambda (a) (eq (combination-arg-lambda-var a) var))
+               (combination-args use))
+         t)))
+
+;;; The optimistic type of VAR, given BASE, the union of what its
+;;; arguments contribute outright, and STEPS, the lvars of the arguments
+;;; that step it from its own previous value.
+;;;
+;;; The same answers PROPAGATE-FROM-SETS reaches for a variable with
+;;; assignments, and in the same order, since a step is the same thing
+;;; whether it arrives by SETQ or as an argument: a loop counter's
+;;; bounds if the steps are increments, otherwise a checked fixpoint if
+;;; there is a single step to derive through, otherwise the plain union.
+(defun optimistic-assumed-type (var base steps)
+  (or (and steps
+           (neq base *empty-type*)
+           (or (maybe-infer-iteration-var-type var steps base)
+               (and (not (cdr steps))
+                    (converged-type-of-combination
+                     var (principal-lvar-ref-use (car steps) t) base))))
+      (let ((type base))
+        (dolist (step steps type)
+          (setf type (type-union type (lvar-type step)))))))
 
 ;;; Note that anything affected by the optimistic type of VAR is
 ;;; pending for reanalysis.
@@ -3174,8 +3233,9 @@
                (optimistic-type-propagatable-fun-p fun))
       (dolist (var vars)
         (init-variable-optimistic-type var))
-      (let ((accum-types (make-array (length vars) :initial-element *empty-type*)))
-        (declare (dynamic-extent accum-types))
+      (let ((accum-types (make-array (length vars) :initial-element *empty-type*))
+            (steps (make-array (length vars) :initial-element nil)))
+        (declare (dynamic-extent accum-types steps))
 
         (dolist (ref (leaf-refs fun))
           (let ((dest (node-dest ref)))
@@ -3184,16 +3244,21 @@
                     for arg in (basic-combination-args dest)
                     for i from 0
                     when (lambda-var-optimistic-type var)
-                      do (dolist (type (optimistic-arg-types arg))
-                           (setf (aref accum-types i)
-                                 (type-union (aref accum-types i) type)))))))
+                      do (cond ((optimistic-step-p arg var)
+                                (push arg (aref steps i)))
+                               (t
+                                (dolist (type (optimistic-arg-types arg))
+                                  (setf (aref accum-types i)
+                                        (type-union (aref accum-types i) type)))))))))
 
         (loop for var in vars
-              for new across accum-types
+              for i from 0
               when (lambda-var-optimistic-type var)
-                do (unless (type= new (lambda-var-optimistic-type var))
-                     (setf (lambda-var-optimistic-type var) new)
-                     (note-optimistic-change var))))))
+                do (let ((new (optimistic-assumed-type var (aref accum-types i)
+                                                       (aref steps i))))
+                     (unless (type= new (lambda-var-optimistic-type var))
+                       (setf (lambda-var-optimistic-type var) new)
+                       (note-optimistic-change var)))))))
   (values))
 
 ;;; Check whether any functions in COMPONENT are still waiting for the
