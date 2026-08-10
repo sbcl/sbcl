@@ -6408,9 +6408,8 @@
                                0)
                       'integer))))
 
-;;; A loop carries the same type whichever way it is written. SSA
-;;; conversion rewrites the first spelling into the second, so any
-;;; disagreement here is a type the conversion would lose.
+;;; Check that the types from loops written with DO and with local
+;;; calls infer to the same type.
 (with-test (:name (:local-call-arg-type :spelling-parity))
   (labels ((as-do (step init)
              `(lambda (n)

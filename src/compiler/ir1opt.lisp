@@ -2598,16 +2598,15 @@
 
 ;;; The type VAR converges to when its value is fed back through
 ;;; COMBINATION, a known function of VAR, starting from INITIAL-TYPE.
-;;; NIL if it does not converge. (SETQ X (NREVERSE X)) is the shape, as
-;;; is a local call handing (NREVERSE X) to X's own parameter position.
+;;; Return NIL if doing this will not converge.
 ;;;
 ;;; Feeding a type derived from a variable back into that variable is
-;;; where iterating a union upward would need widening. This does not
-;;; iterate: it derives once, unions, derives again, and takes the
-;;; result only if the second derivation agrees with the first, so what
-;;; it returns is a fixpoint it has checked. Numeric bounds are the
-;;; usual reason for not converging, so failing that it tries again
-;;; with the bounds dropped.
+;;; where iterating a union upward would need widening to prevent
+;;; ascending up the type lattice forever. To avoid that, we do only
+;;; one step, and take the result of deriving and unioning only if the
+;;; second derivation agrees with the first to get a fast
+;;; fixpiint. Numeric bounds are the usual reason for not converging,
+;;; so failing that it tries again with the bounds dropped.
 (defun converged-type-of-combination (var combination initial-type)
   (let* ((info (combination-fun-info combination))
          (deriver (and info
@@ -2969,18 +2968,9 @@
             (let ((type (sb-kernel::%type-union type)))
               (cond ((basic-var-sets var)
                      (setf (leaf-defined-type var) type))
-                    ;; A parameter being solved for optimistically has
-                    ;; PUBLISH-OPTIMISTIC-TYPES as its one authority,
-                    ;; the way a variable with sets has
-                    ;; PROPAGATE-FROM-SETS. Narrowing it from here as
-                    ;; well is not simply redundant: this union is
-                    ;; recomputed from arguments derived from the
-                    ;; variable itself, so around a loop it sharpens a
-                    ;; step on every visit and never settles, and being
-                    ;; the narrower of the two it is the one that
-                    ;; survives. The optimistic side reaches the same
-                    ;; answers convergently, and constraint propagation
-                    ;; sharpens the references from there.
+                    ;; If we are still optimistically solving for the
+                    ;; type of VAR, do not propagate the conservative
+                    ;; type to its refs yet.
                     ((lambda-var-optimistic-type var))
                     (t
                      (propagate-to-refs var type)))))
@@ -3142,8 +3132,6 @@
                 (reoptimize-node dest))))
           t))))
 
-;;; Return the lambda variable referenced by USE if it is eligible for
-;;; optimistic type inference.
 ;;; The LAMBDA-VAR ARG references, looking through a cast.
 (defun combination-arg-lambda-var (arg)
   (and arg
@@ -3152,6 +3140,8 @@
              (and (cast-p use)
                   (lvar-lambda-var (cast-value use)))))))
 
+;;; Return the lambda variable referenced by USE if it is eligible for
+;;; optimistic type inference.
 (defun optimistic-var (use)
   (and (ref-p use)
        (let ((leaf (ref-leaf use)))
@@ -3181,11 +3171,8 @@
             types
             (list (lvar-type arg))))))
 
-;;; True if ARG carries VAR forward from its own previous value rather
-;;; than delivering an unrelated one: the local call spelling of
-;;; (SETQ X (NREVERSE X)) or (SETQ I (1+ I)). What such an argument
-;;; contributes has to be computed from VAR's optimistic type, since its
-;;; LVAR-TYPE was derived from a VAR that is still T.
+;;; Return true if ARG carries VAR forward from its own previous value
+;;; rather than delivering an unrelated one.
 (defun optimistic-step-p (arg var)
   (let ((use (and arg (principal-lvar-ref-use arg t))))
     (and (combination-p use)
@@ -3196,15 +3183,9 @@
                (combination-args use))
          t)))
 
-;;; The optimistic type of VAR, given BASE, the union of what its
-;;; arguments contribute outright, and STEPS, the lvars of the arguments
-;;; that step it from its own previous value.
-;;;
-;;; The same answers PROPAGATE-FROM-SETS reaches for a variable with
-;;; assignments, and in the same order, since a step is the same thing
-;;; whether it arrives by SETQ or as an argument: a loop counter's
-;;; bounds if the steps are increments, otherwise a checked fixpoint if
-;;; there is a single step to derive through, otherwise the plain union.
+;;; Return the optimistic type of VAR, given BASE, the union of what
+;;; its arguments contribute outright, and STEPS, the lvars of the
+;;; arguments that step it from its own previous value.
 (defun optimistic-assumed-type (var base steps)
   (or (and steps
            (neq base *empty-type*)

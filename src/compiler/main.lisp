@@ -423,24 +423,18 @@ necessary, since type inference may take arbitrarily long to converge.")
           (publish-optimistic-types component))
         (cond ((component-reoptimize component)
                (setf reoptimized t)
-               ;; A pass that found nothing itself and only published
-               ;; optimistic types does not count against the iteration
-               ;; budget. Publishing is how a parameter's type gets
-               ;; sharper a step at a time, and charging a step to the
-               ;; budget leaves a loop written as a local call short of
-               ;; what PROPAGATE-FROM-SETS reaches for the same loop
-               ;; written with an assignment, which refines within a
-               ;; pass and so costs nothing. Types only narrow, so there
-               ;; are finitely many such passes.
+               ;; Don't count optimistic type publishing towards the
+               ;; iteration budget, as it is cheaper than the rest of
+               ;; ir1 optimization.
                (when walk-reoptimized
                  (incf count))
-             (when (and (>= count *max-optimize-iterations*)
-                        (not (component-reanalyze component))
-                        (eq (component-reoptimize component) :maybe))
-               (maybe-mumble "*")
-               (event ir1-optimize-maxed-out)
-               (ir1-optimize-last-effort component)
-               (return)))
+               (when (and (>= count *max-optimize-iterations*)
+                          (not (component-reanalyze component))
+                          (eq (component-reoptimize component) :maybe))
+                 (maybe-mumble "*")
+                 (event ir1-optimize-maxed-out)
+                 (ir1-optimize-last-effort component)
+                 (return)))
               (t
                (return))))
       (when (setq fastp (>= count *max-optimize-iterations*))
