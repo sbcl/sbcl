@@ -2050,10 +2050,10 @@
         (inst sub current current tmp1 :16b)
 
         ASCII
-        (inst uminv tmp1 current :16b)
-        (inst fmov tmp (reg-in-sc tmp1 'single-reg))
-        (inst cbz tmp ASCII-TAIL)
-        (check-ascii current tmp1 NON-ASCII :16b)
+        (inst sminv tmp1 current :16b)
+        (inst smov tmp tmp1 0 :b)
+        (inst cmp tmp 0) ;; either a null or a non-ascii character
+        (inst b :le ASCII-TAIL)
 
         (inst ldr current (@ ptr 16 :pre-index))
         (inst b ASCII)

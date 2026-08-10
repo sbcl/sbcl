@@ -2081,31 +2081,26 @@
 
         (inst vpxor zeros zeros zeros)
         ASCII
-        (inst vpcmpeqb tmp1 current zeros)
+        ;; If everything is greater than zero then it's ascii without a null
+        (inst vpcmpgtb tmp1 current zeros)
         (inst vpmovmskb tmp tmp1)
-        (inst test :dword tmp tmp)
+        (inst xor :dword tmp -1) ;; affects flags, unlike NOT
         (inst jmp :nz ASCII-TAIL)
-
-        (inst vpmovmskb tmp current)
-        (inst test :dword tmp tmp)
-        (inst jmp :nz NON-ASCII)
 
         (inst add ptr 32)
         (inst vmovdqa current (ea ptr))
         (inst jmp ASCII)
 
         ASCII-TAIL
-        (inst bsf :dword tmp tmp)
+        (inst vpmovmskb byte-length current) ;; non-ascii mask
 
-        (inst vpmovmskb byte-length current)
-        (inst test :dword byte-length byte-length)
-        (inst jmp :z ALL-ASCII-DONE)
+        (inst bsf :dword tmp tmp) ;; the first 0 or non-ascii bit
 
-        (inst bsf :dword byte-length byte-length)
-        (inst cmp :dword byte-length tmp)
-        (inst jmp :b NON-ASCII)
+        ;; If the first set bit is present in the non-ascii mask then
+        ;; the null-terminator is after it (or absent)
+        (inst bt :dword byte-length tmp)
+        (inst jmp :c NON-ASCII)
 
-        ALL-ASCII-DONE
         (inst add ptr tmp)
         (inst sub ptr bytes)
         (inst mov byte-length ptr)
