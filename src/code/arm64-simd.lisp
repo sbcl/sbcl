@@ -2149,17 +2149,15 @@
          ((chars-left   unsigned-reg))
          ((tmp          unsigned-reg))
 
-         ((c-7f         complex-double-reg))
-         ((c-7ff        complex-double-reg))
-         ((c-ffff       complex-double-reg))
          ((c-1b         complex-double-reg))
+         ((length1      complex-double-reg t :offset 0))
+         ((length2      complex-double-reg t :offset 1))
 
          ((extra-len    complex-double-reg))
          ((errors       complex-double-reg))
 
          ((current      complex-double-reg))
-         ((tmp1         complex-double-reg))
-         ((mask         complex-double-reg)))
+         ((tmp1         complex-double-reg)))
 
         ((res descriptor-reg t :from :load)
          (all-ascii descriptor-reg t :from :load))
@@ -2186,10 +2184,10 @@
       (inst movi extra-len 0 :16b)
       (inst movi errors 0 :16b)
 
-      (inst movi c-7f  #x7F :4s)
-      (inst movi c-7ff #x7FF :4s)
-      (inst movi c-ffff #x0000ffff0000ffff :2d)
       (inst movi c-1b  #x1b :4s)
+
+      (load-inline-constant length1 :oword #x03030303030303030303030303030300)
+      (load-inline-constant length2 :oword #x00000000000000010101010202020202)
 
       (inst b START)
 
@@ -2207,16 +2205,9 @@
       (inst cmeq tmp1 tmp1 c-1b :4s)
       (inst orr errors errors tmp1 :16b)
 
-      (inst cmhi tmp1 current c-7f :4s)
-
-      (inst cmhi mask current c-7ff :4s)
-      (inst add tmp1 tmp1 mask :4s)
-
-      (inst cmhi mask current c-ffff :4s)
-      (inst add tmp1 tmp1 mask :4s)
-
-      (inst saddlp tmp1 tmp1 :4s)
-      (inst sub extra-len extra-len tmp1 :2d)
+      (inst clz tmp1 current :4s)
+      (inst tbl tmp1 (list length1 length2) tmp1 :16b)
+      (inst uadalp extra-len tmp1 :4s)
 
       (inst b LOOP)
 
