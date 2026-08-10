@@ -2207,7 +2207,7 @@
          ((c-ffff       int-sse-reg))
          ((c-1b         int-sse-reg))
 
-         ((extra-len    int-sse-reg))
+         ((extra-len    int-avx2-reg))
          ((errors       int-sse-reg))
 
          ((current      int-sse-reg))
@@ -2281,24 +2281,28 @@
       (inst vpcmpgtd mask current c-ffff)
       (inst vpaddd tmp1 tmp1 mask)
 
-      (inst vpsubd extra-len extra-len tmp1)
+      (let ((tmp1 (reg-in-sc tmp1 'int-avx2-reg)))
+        (inst vpmovsxdq tmp1 tmp1)
+        (inst vpsubq extra-len extra-len tmp1))
 
       (inst jmp LOOP)
 
       EXIT
       (inst vptest errors errors)
-      (inst jmp :nz DONE)
+      (inst jmp :nz DONE-FULL)
 
-      (inst vpshufd tmp1 extra-len #b01001110)
-      (inst vpaddd tmp1 tmp1 extra-len)
-      (inst vpshufd mask tmp1 #b10110001)
-      (inst vpaddd tmp1 tmp1 mask)
+      (inst vextracti128 tmp1 extra-len 1)
+      (inst vpaddq tmp1 tmp1 extra-len)
+      (inst vpshufd tmp2 tmp1 #b01001110)
+      (inst vpaddq tmp1 tmp1 tmp2)
 
-      (inst vmovd tmp tmp1)
+      (inst vmovq tmp tmp1)
 
       (inst shl tmp n-fixnum-tag-bits)
       (inst add tmp length)
       (inst mov res tmp)
+      DONE-FULL
+      (inst vzeroupper)
 
       DONE)))
 

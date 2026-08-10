@@ -66,9 +66,14 @@
                     (sap-ref-double sap 8))))
       #+sb-simd-pack
       (simd-pack-int
-       (%make-simd-pack-ub64
-        (sap-ref-64 sap 0)
-        (sap-ref-64 sap 8)))
+       (if integer
+           (values (dpb (sap-ref-64 sap 8)
+                        (byte 64 64)
+                        (sap-ref-64 sap 0))
+                   16)
+           (%make-simd-pack-ub64
+            (sap-ref-64 sap 0)
+            (sap-ref-64 sap 8))))
       #+sb-simd-pack
       (simd-pack-single
        (%make-simd-pack-single
