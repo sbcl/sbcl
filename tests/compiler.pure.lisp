@@ -6441,3 +6441,19 @@
           (unless (equal from-do from-labels)
             (error "~S: DO derives ~S, LABELS derives ~S"
                    step from-do from-labels)))))))
+
+(with-test (:name (:assignment-convert :lp2162990))
+  (checked-compile-and-assert ()
+    `(lambda (a)
+       (block done
+         (let ((done (lambda (&rest values) (return-from done (values-list values))))
+               (l (lambda ())))
+           (flet ((c (f)
+                    (funcall f)))
+             (declare (inline c))
+             (if a
+                 (c l)
+                 (c l)))
+           (funcall done nil))))
+    ((t) nil)
+    ((nil) nil)))
