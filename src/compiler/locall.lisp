@@ -1653,40 +1653,39 @@
         (return-ctran nil)
         (return-lvar nil)
         (return-env nil)
-        (return-cleanup nil))
-    (flet ((return-point-agrees-p (call)
-             (let ((ctran (or (node-next call)
-                              (block-start (first (block-succ (node-block call))))))
+        (return-cleanup nil)
+        (return-harmless nil))
+    (flet ((return-point-agrees-p (call fun)
+             (let ((ctran (if (node-tail-p call)
+                              :tail
+                              (or (node-next call)
+                                  (block-start (first (block-succ (node-block call)))))))
                    (lvar (and (valued-node-p call)
                               (node-lvar call)))
                    (env (node-home-lambda call))
-                   (cleanup (node-enclosing-cleanup call)))
+                   (cleanup (node-enclosing-cleanup call))
+                   (harmless (only-harmless-cleanups (node-block call)
+                                                     (lambda-block fun))))
                (aver env)
                (cond ((null return-env)
                       (setq return-ctran ctran
                             return-lvar lvar
                             return-env env
-                            return-cleanup cleanup)
+                            return-cleanup cleanup
+                            return-harmless harmless)
                       t)
                      (t
                       ;; We can only convert multiple outside calls
                       ;; when they are all in the same environment, so
                       ;; we don't muck up tail sets. This is not a
                       ;; conceptual restriction though; it may be
-                      ;; possible to lift this if things are
-                      ;; reworked. The cleanup checking here is also
-                      ;; overly conservative. A better approach would
-                      ;; be to check for harmful cleanups with respect
-                      ;; to the messiest common ancestor, though care
-                      ;; would need to be taken with cleanup emission
-                      ;; as merging lambdas will anchor to a specific
-                      ;; predecessor's lexenv/cleanup, not to the
-                      ;; ancestor's.
+                      ;; possible to lift this if things are reworked.
                       (and (or (eq (node-derived-type call) *empty-type*)
                                (and (eq return-ctran ctran)
                                     (eq return-lvar lvar)))
                            (eq return-env env)
-                           (eq return-cleanup cleanup)))))))
+                           (or (eq return-cleanup cleanup)
+                               (and return-harmless harmless))))))))
       (dolist (fun group)
         (unless (ok-initial-convert-p fun)
           (return-from maybe-convert-group-to-assignment nil))
@@ -1700,7 +1699,7 @@
               (cond ((memq (node-home-lambda ref) group)
                      (unless (node-tail-p call)
                        (return-from maybe-convert-group-to-assignment nil)))
-                    ((return-point-agrees-p call)
+                    ((return-point-agrees-p call fun)
                      (push call outside-calls))
                     (t
                      (return-from maybe-convert-group-to-assignment nil)))))
