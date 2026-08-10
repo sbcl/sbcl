@@ -2212,6 +2212,7 @@
 
          ((current      int-sse-reg))
          ((tmp1         int-sse-reg))
+         ((tmp2         int-sse-reg))
          ((mask         int-sse-reg)))
 
         ((res descriptor-reg t :from :load)
@@ -2270,11 +2271,9 @@
 
       START
       ;; Check for surrogates #xD800-#xDFFF
-      (inst vpsrld tmp1 current 11)
-      (inst vpcmpeqd tmp1 tmp1 c-1b)
-      (inst vpor errors errors tmp1)
-
-      (inst vpcmpgtd tmp1 current c-7f)
+      (inst vpsrld tmp2 current 11)
+      (inst vpcmpeqd tmp2 tmp2 c-1b)
+      (inst vpor errors errors tmp2)
 
       (inst vpcmpgtd mask current c-7ff)
       (inst vpaddd tmp1 tmp1 mask)
