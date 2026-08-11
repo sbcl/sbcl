@@ -2149,7 +2149,8 @@
          ((chars-left   unsigned-reg))
          ((tmp          unsigned-reg))
 
-         ((c-1b         complex-double-reg))
+         ((c-d800       complex-double-reg))
+
          ((length1      complex-double-reg t :offset 0))
          ((length2      complex-double-reg t :offset 1))
 
@@ -2182,9 +2183,9 @@
       (inst mov res null-tn)
       (inst mov all-ascii null-tn)
       (inst movi extra-len 0 :16b)
-      (inst movi errors 0 :16b)
+      (inst mvni errors 0 :4s)
 
-      (inst movi c-1b  #x1b :4s)
+      (inst movi c-d800 #xd800 :4s)
 
       (load-inline-constant length1 :oword #x03030303030303030303030303030300)
       (load-inline-constant length2 :oword #x00000000000000010101010202020202)
@@ -2201,9 +2202,8 @@
 
       START
       ;; Check for surrogates #xD800-#xDFFF
-      (inst ushr tmp1 current 11 :4s)
-      (inst cmeq tmp1 tmp1 c-1b :4s)
-      (inst orr errors errors tmp1 :16b)
+      (inst sub tmp1 current c-d800 :4s)
+      (inst umin errors errors tmp1 :4s)
 
       (inst clz tmp1 current :4s)
       (inst tbl tmp1 (list length1 length2) tmp1 :16b)
@@ -2212,9 +2212,10 @@
       (inst b LOOP)
 
       EXIT
-      (inst umaxv tmp1 errors :4s)
-      (inst fmov tmp (reg-in-sc tmp1 'single-reg))
-      (inst cbnz tmp DONE)
+      (inst uminv tmp1 errors :4s)
+      (inst umov tmp tmp1 0 :s)
+      (inst cmp tmp #x07FF)
+      (inst b :le DONE)
 
       (inst addp tmp1 extra-len extra-len :2d)
       (inst fmov tmp tmp1)

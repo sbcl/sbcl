@@ -2205,7 +2205,7 @@
          ((c-7f         int-sse-reg))
          ((c-7ff        int-sse-reg))
          ((c-ffff       int-sse-reg))
-         ((c-1b         int-sse-reg))
+         ((c-d800       int-sse-reg))
 
          ((extra-len    int-avx2-reg))
          ((errors       int-sse-reg))
@@ -2247,14 +2247,14 @@
       (inst mov all-ascii null-tn)
 
       (inst vpxor extra-len extra-len extra-len)
-      (inst vpxor errors errors errors)
+      (inst vpcmpeqd errors errors errors)
 
       (inst vmovdqa c-7ff (register-inline-constant
                            :sse (concat-ub 32 (loop repeat 4 collect #x7FF))))
       (inst vmovdqa c-ffff (register-inline-constant
                             :sse (concat-ub 32 (loop repeat 4 collect #xFFFF))))
-      (inst vmovdqa c-1b (register-inline-constant
-                          :sse (concat-ub 32 (loop repeat 4 collect #x1B))))
+      (inst vmovdqa c-d800 (register-inline-constant
+                          :sse (concat-ub 32 (loop repeat 4 collect #xd800))))
 
       (inst jmp START)
 
@@ -2271,9 +2271,8 @@
 
       START
       ;; Check for surrogates #xD800-#xDFFF
-      (inst vpsrld tmp2 current 11)
-      (inst vpcmpeqd tmp2 tmp2 c-1b)
-      (inst vpor errors errors tmp2)
+      (inst vpsubd tmp2 current c-d800)
+      (inst vpminud errors errors tmp2)
 
       (inst vpcmpgtd mask current c-7ff)
       (inst vpaddd tmp1 tmp1 mask)
@@ -2288,8 +2287,15 @@
       (inst jmp LOOP)
 
       EXIT
-      (inst vptest errors errors)
-      (inst jmp :nz DONE-FULL)
+      ;; Do an unsigned comparison with #x7FF
+      (inst vpxor tmp1 errors
+            (register-inline-constant :sse (concat-ub 32 (loop repeat 4 collect #x80000000)))) ;; flip the sign bit
+      (inst vpcmpgtd tmp1 tmp1
+            (register-inline-constant :sse (concat-ub 32 (loop repeat 4 collect #x800007FF))))
+
+      (inst vmovmskps tmp tmp1)
+      (inst cmp tmp #xF)
+      (inst jmp :ne DONE-FULL)
 
       (inst vextracti128 tmp1 extra-len 1)
       (inst vpaddq tmp1 tmp1 extra-len)
