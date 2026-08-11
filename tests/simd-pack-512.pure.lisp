@@ -274,12 +274,13 @@
                    'simd-pack-512))))
 
 (with-test (:name :simd-pack-512-type-errors)
-  ;; Bignum overflow
-  (assert-error (sb-ext:%make-simd-pack-512-ub64
-                 (1+ (ldb (byte 64 0) -1)) 0 0 0 0 0 0 0)
-                type-error)
-  ;; Float mismatch
-  (assert-error (sb-ext:%make-simd-pack-512-single
-                 1d0 0f0 0f0 0f0 0f0 0f0 0f0 0f0
-                 0f0 0f0 0f0 0f0 0f0 0f0 0f0 0f0)
-                type-error))
+  (locally (declare (muffle-conditions warning))
+    ;; Bignum overflow
+    (assert-error (sb-ext:%make-simd-pack-512-ub64
+                   (1+ (ldb (byte 64 0) -1)) 0 0 0 0 0 0 0)
+                  type-error)
+    ;; Float mismatch
+    (assert-error (sb-ext:%make-simd-pack-512-single
+                   1d0 0f0 0f0 0f0 0f0 0f0 0f0 0f0
+                   0f0 0f0 0f0 0f0 0f0 0f0 0f0 0f0)
+                  type-error)))

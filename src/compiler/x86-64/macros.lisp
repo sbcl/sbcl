@@ -43,11 +43,10 @@
       ((single-avx2-reg double-avx2-reg)
        (aver (xmm-tn-p src))
        (inst vmovaps dst src))
-      ;; fixme512: check if this is correct
       #+sb-simd-pack-512
       (int-avx512-reg
        (aver (xmm-tn-p src))
-       (inst vmovdqu dst src))
+       (inst vmovdqu64 dst src))
       #+sb-simd-pack-512
       ((single-avx512-reg double-avx512-reg)
        (aver (xmm-tn-p src))
