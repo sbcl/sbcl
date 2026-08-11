@@ -2014,6 +2014,7 @@
                (inst and tmp3 tmp1 nibble-mask :16b)
                (inst ushr tmp4 current 4 :16b)
 
+               (inst tbl tmp1 (list tbl4) tmp4 :16b)
                (inst tbl tmp2 (list tbl1) tmp2 :16b)
                (inst tbl tmp3 (list tbl2) tmp3 :16b)
                (inst tbl tmp4 (list tbl3) tmp4 :16b)
@@ -2022,19 +2023,13 @@
                (inst and tmp2 tmp2 tmp4 :16b)
                (inst orr errors errors tmp2 :16b)
 
-               (inst ushr tmp1 current 4 :16b)
-               (inst tbl tmp1 (list tbl4) tmp1 :16b)
-
                (inst ext tmp2 prev-len tmp1 15 :16b)
                (inst ext tmp3 prev-len tmp1 14 :16b)
                (inst ext tmp4 prev-len tmp1 13 :16b)
 
                (inst ushr tmp2 tmp2 1 :16b)
-               (inst ushr tmp3 tmp3 2 :16b)
-               (inst ushr tmp4 tmp4 3 :16b)
-
-               (inst orr tmp2 tmp2 tmp3 :16b)
-               (inst orr tmp2 tmp2 tmp4 :16b)
+               (inst usra tmp2 tmp3 2 :16b)
+               (inst usra tmp2 tmp4 3 :16b)
 
                (inst cmtst tmp4 tmp2 tmp2 :16b)
 
