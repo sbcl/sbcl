@@ -27,7 +27,7 @@
 (defun context-float-register (context index format &optional integer)
   (declare (ignorable context index))
   (aver (not integer))
-  #+linux
+  #+(or linux freebsd)
   (let ((sap (alien-sap (context-float-register-addr context index))))
     (ecase format
       (single-float
@@ -40,14 +40,14 @@
       (complex-double-float
        (complex (sap-ref-double sap 0)
                 (sap-ref-double sap 8)))))
-  #-linux
+  #-(or linux freebsd)
   (progn
     (warn "stub CONTEXT-FLOAT-REGISTER")
     (coerce 0 format)))
 
 (defun %set-context-float-register (context index format value)
   (declare (type (alien (* os-context-t)) context))
-  #+linux
+  #+(or linux freebsd)
   (let ((sap (alien-sap (context-float-register-addr context index))))
     (ecase format
       (single-float
@@ -64,14 +64,14 @@
            (declare (type (complex double-float) value))
          (setf (sap-ref-double sap 0) (realpart value)
                (sap-ref-double sap 8) (imagpart value))))))
-  #-linux
+  #-(or linux freebsd)
   (error "%set-context-float-register not working yet? ~S" (list context index format value)))
 
 ;;; Given a signal context, return the floating point modes word in
 ;;; the same format as returned by FLOATING-POINT-MODES.
 ;;;
 ;;; FIXME: surely this must be accessible under some other operating systems?
-#+linux
+#+(or linux freebsd)
 (define-alien-routine ("os_context_fp_control" context-floating-point-modes)
     (unsigned 32)
   (context (* os-context-t)))
