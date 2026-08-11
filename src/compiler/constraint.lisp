@@ -1061,19 +1061,6 @@
                 (make-numeric-union-type :low bound)
                 (make-numeric-union-type :high bound))))))))
 
-;;; Return true if LEAF is "visible" from NODE.
-(defun leaf-visible-from-node-p (leaf node)
-  (cond
-    ((lambda-var-p leaf)
-     (and (find leaf (lexenv-vars (node-lexenv node))
-                :key #'cdr :test #'eq)
-          t))
-   ;; FIXME: Check on FUNCTIONALs (CLAMBDAs and OPTIONAL-DISPATCHes),
-   ;; not just LAMBDA-VARs.
-   (t
-    ;; Assume everything else is globally visible.
-    t)))
-
 (defun contiguous-numeric-set-type (xset)
   (cond ((xset-empty-p xset)
          nil)
