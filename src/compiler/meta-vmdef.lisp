@@ -1835,7 +1835,8 @@
             (infos)
             (temps)
             (results)
-            (result-types))
+            (result-types)
+            (label-tags))
     (flet ((sc-to-primtype (sc)
              (case sc
                (sb-vm::any-reg
@@ -1883,6 +1884,10 @@
             do (cond ((eq name :info)
                       (infos this-sc)
                       (input arg))
+                     ((eq name :label)
+                      (label-tags this-sc)
+                      (infos this-sc)
+                      (input `(jump-target ',this-sc)))
                      (arg
                       (args (list* name :scs (list sc) rest))
                       (let ((type (or type (sc-to-primtype sc))))
@@ -1901,25 +1906,35 @@
                            prev)
             do (results (list* name :scs (list sc) rest))
                (result-types (or type (sc-to-primtype sc))))
-      `(truly-the
-        (values ,@(mapcar #'primtype-to-type (result-types)) &optional)
-        (inline-%primitive
-         ,(eval (%define-vop nil nil
-                             (delete nil
-                                     (list* (and (args)
-                                                 (list* :args (args)))
-                                            (and (arg-types)
-                                                 (list* :arg-types (arg-types)))
-                                            (and (results)
-                                                 (list* :results (results)))
-                                            (and (result-types)
-                                                 (list* :result-types (result-types)))
-                                            (and (infos)
-                                                 (list* :info (infos)))
-                                            (list* :generator 0 body)
-                                            (temps)))
-                             nil))
-         ,@(input))))))
+      (let ((form
+              `(truly-the
+                (values ,@(mapcar #'primtype-to-type (result-types)) &optional)
+                (inline-%primitive
+                 ,(eval (%define-vop nil nil
+                                     (delete nil
+                                             (list* (and (args)
+                                                         (list* :args (args)))
+                                                    (and (arg-types)
+                                                         (list* :arg-types (arg-types)))
+                                                    (and (results)
+                                                         (list* :results (results)))
+                                                    (and (result-types)
+                                                         (list* :result-types (result-types)))
+                                                    (and (infos)
+                                                         (list* :info (infos)))
+                                                    (list* :generator 0
+                                                           (if (label-tags)
+                                                               `((let ,(loop for tag in (label-tags)
+                                                                             collect `(,tag (block-label ,tag)))
+                                                                   ,@body))
+                                                               body))
+                                                    (temps)))
+                                     nil))
+                 ,@(input)))))
+        (if (label-tags)
+            `(multiple-value-prog1 ,form
+               (vop-jumper ,@(label-tags)))
+            form)))))
 
 (macrolet
     ((def ()

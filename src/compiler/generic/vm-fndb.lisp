@@ -863,6 +863,7 @@
     (values (simple-array * (*)) (or null index)))
 
 (defknown restart-point (t) t ())
+(defknown jump-target (t) t ())
 
 ;;; formerly in 'float-tran'
 

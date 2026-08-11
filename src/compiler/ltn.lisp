@@ -1066,6 +1066,8 @@
           (ltn-analyze-known-call node))))
       (cif (ltn-analyze-if node))
       (jump-table (ltn-analyze-jump-table node))
+      (vop-jumper
+       (setf (node-tail-p node) nil))
       (creturn) ;; delay to FLUSH-FULL-CALL-TAIL-TRANSFERS
       ((or bind entry))
       (exit (ltn-analyze-exit node))

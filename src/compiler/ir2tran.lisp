@@ -2351,6 +2351,13 @@
 (defoptimizer (restart-point ir2-convert) ((location) node block)
   (setf (restart-location-label (lvar-value location))
         (block-label (ir2-block-block block))))
+
+(defoptimizer (jump-target ir2-convert) ((tag) node)
+  (let ((ctran (second (or (lexenv-find (lvar-value tag) tags :test #'eql
+                                                              :lexenv (node-lexenv node))
+                           (compiler-error "attempt to GO to nonexistent tag: ~S"
+                                           tag)))))
+    (replace-combination-with-constant  (ctran-block ctran) node)))
 
 ;;; Convert the code in a component into VOPs.
 (defun ir2-convert (component)
@@ -2509,6 +2516,8 @@
         (jump-table
          (when (lvar-info (jump-table-index node))
            (ir2-convert-jump-table node 2block)))
+        (vop-jumper
+         (vop branch node 2block (block-label (vop-jumper-default node))))
         (bind
          (let ((fun (bind-lambda node)))
            (when (eq (lambda-home fun) fun)

@@ -87,6 +87,24 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
                     (link-blocks start-block block))
                   collect (cons index block))))))
 
+(def-ir1-translator vop-jumper ((&rest targets) start next result)
+  (declare (inline make-vop-jumper))
+  (let ((node (make-vop-jumper)))
+    (link-node-to-previous-ctran node start)
+    (let ((start-block (ctran-block start)))
+      (setf (block-last start-block) node)
+      (setf (vop-jumper-default node)
+            (ctran-starts-block next))
+      (link-blocks start-block (vop-jumper-default node))
+      (loop for tag in targets
+            for (nil ctran) = (or (lexenv-find tag tags :test #'eql)
+                                  (compiler-error "attempt to GO to nonexistent tag: ~S"
+                                                  tag))
+            for block = (ctran-block ctran)
+            do
+            (unless (memq block (block-succ start-block))
+              (link-blocks start-block block))))))
+
 ;;; then or else can be already converted blocks
 (def-ir1-translator if-to-blocks ((test then &optional else) start next result)
   (flet ((to-block (x)

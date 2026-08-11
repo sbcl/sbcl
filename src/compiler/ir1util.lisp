@@ -1875,6 +1875,11 @@
        (unless (cdr (block-succ block))
          (flush-dest (jump-table-index last))
          (unlink-node last)))
+      (vop-jumper
+       (when (eq (vop-jumper-default last) old)
+         (setf (vop-jumper-default last) new))
+       (unless (memq new (block-succ block))
+         (link-blocks block new)))
       (t
        (unless (memq new (block-succ block))
          (link-blocks block new)))))
@@ -2435,6 +2440,7 @@
       (ref (delete-ref node))
       (cif (flush-dest (if-test node)))
       (jump-table (flush-dest (jump-table-index node)))
+      (vop-jumper)
       ;; The next two cases serve to maintain the invariant that a LET
       ;; always has a well-formed COMBINATION, REF and BIND. We delete
       ;; the lambda whenever we delete any of these, but we must be

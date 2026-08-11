@@ -1542,6 +1542,11 @@
   index
   targets)
 
+(defstruct (vop-jumper (:include multiple-successors-node)
+                       (:constructor make-vop-jumper ())
+                       (:copier nil))
+  (default nil))
+
 (defstruct (cset (:include valued-node
                            (derived-type (make-single-value-type *universal-type*)))
                  (:conc-name set-)

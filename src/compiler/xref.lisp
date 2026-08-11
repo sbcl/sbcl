@@ -81,7 +81,7 @@
   (declare (type node node))
   (etypecase node
     ((or creturn cif entry mv-combination cast exit
-         enclose cdynamic-extent jump-table))
+         enclose cdynamic-extent jump-table vop-jumper))
     (combination
      (let ((name (combination-fun-debug-name node)))
        (when (equal name '(cas symbol-value))
