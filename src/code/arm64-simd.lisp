@@ -1406,235 +1406,244 @@
 (defun character-string-to-utf8 (start end string obuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
-  (with-pinned-objects-in-registers (string)
-    (let* ((length (sb-impl::buffer-length obuf))
-           (tail (sb-impl::buffer-tail obuf))
-           (string-end (- end (/ 64 4)))
-           (byte-end (- length 16)))
-      (multiple-value-bind (read written last-newline)
-          (inline-vop (((byte-start any-reg) tail)
-                       ((string-start any-reg) start)
-                       ((byte-end any-reg) byte-end)
-                       ((string-end any-reg) string-end)
-                       ((byte-array* sap-reg t) (sb-impl::buffer-sap obuf))
-                       ((byte-array sap-reg t))
-                       ((string* sap-reg t) (vector-sap string))
-                       ((string sap-reg t))
+  (prog* ((length (sb-impl::buffer-length obuf))
+          (tail (sb-impl::buffer-tail obuf))
+          (string-end (- end (/ 64 4)))
+          (byte-end (- length 16)))
+     (multiple-value-bind (read written last-newline)
+         (with-pinned-objects-in-registers (string)
+           (inline-vop (((byte-start any-reg) tail)
+                        ((string-start any-reg) start)
+                        ((byte-end any-reg) byte-end)
+                        ((string-end any-reg) string-end)
+                        ((byte-array* sap-reg t) (sb-impl::buffer-sap obuf))
+                        ((byte-array sap-reg t))
+                        ((string* sap-reg t) (vector-sap string))
+                        ((string sap-reg t))
 
-                       ((newlines complex-double-reg))
-                       ((f1 complex-double-reg t :offset 1))
-                       ((f2 complex-double-reg t :offset 2))
-                       ((f3 complex-double-reg t :offset 3))
-                       ((bytes complex-double-reg t :offset 4))
-                       ((bytes2 complex-double-reg t :offset 5))
-                       ((bytes3 complex-double-reg t :offset 6))
-                       ((bytes4 complex-double-reg t :offset 7))
-                       ((temp complex-double-reg))
-                       ((temp2 complex-double-reg))
-                       ((indexes))
-                       ((increment))
-                       ((last-newlines))
+                        ((newlines complex-double-reg))
+                        ((f1 complex-double-reg t :offset 1))
+                        ((f2 complex-double-reg t :offset 2))
+                        ((f3 complex-double-reg t :offset 3))
+                        ((bytes complex-double-reg t :offset 4))
+                        ((bytes2 complex-double-reg t :offset 5))
+                        ((bytes3 complex-double-reg t :offset 6))
+                        ((bytes4 complex-double-reg t :offset 7))
+                        ((temp complex-double-reg))
+                        ((temp2 complex-double-reg))
+                        ((indexes))
+                        ((increment))
+                        ((last-newlines))
+                        ((errors))
 
-                       ((tmp unsigned-reg))
-                       ((full-table any-reg t))
-                       ((shift-mask complex-double-reg))
-                       ((c-d800 complex-double-reg))
+                        ((tmp unsigned-reg))
+                        ((full-table any-reg t))
+                        ((shift-mask complex-double-reg))
+                        ((c-d800 complex-double-reg))
 
-                       ((r4 complex-double-reg t))
-                       ((length1 complex-double-reg t :offset 8))
-                       ((length2 complex-double-reg t :offset 9))
-                       ((shuf-mask complex-double-reg t :offset 10))
-                       ((and-mask complex-double-reg t :offset 11))
-                       ((orr-mask complex-double-reg t :offset 12))
-                       ((zeros complex-double-reg)))
-              ((read unsigned-reg positive-fixnum :from :load)
-               (written unsigned-reg positive-fixnum)
-               (last-newline signed-reg signed-num :from :load))
-            (flet ((make-full-table ()
-                     (let* ((table-size 256)
-                            (row-size (* 16 3))
-                            (table (make-array (* table-size row-size) :element-type '(unsigned-byte 8)
-                                                                       :initial-element 0)))
+                        ((r4 complex-double-reg t))
+                        ((length1 complex-double-reg t :offset 8))
+                        ((length2 complex-double-reg t :offset 9))
+                        ((shuf-mask complex-double-reg t :offset 10))
+                        ((and-mask complex-double-reg t :offset 11))
+                        ((orr-mask complex-double-reg t :offset 12))
+                        ((zeros complex-double-reg))
+                        ((:label error)))
+               ((read unsigned-reg positive-fixnum :from :load)
+                (written unsigned-reg positive-fixnum)
+                (last-newline signed-reg signed-num :from :load))
+             (flet ((make-full-table ()
+                      (let* ((table-size 256)
+                             (row-size (* 16 3))
+                             (table (make-array (* table-size row-size) :element-type '(unsigned-byte 8)
+                                                                        :initial-element 0)))
 
-                       ;; A table with three masks per entry
-                       ;; indexed by 4x2 bits representing the number of utf8 bytes for character - 1
-                       (loop for i below (* table-size row-size)
-                             when (< (mod i row-size) 16)
-                             ;; fill the TBL part with an out of bounds index to get back zeros
-                             do (setf (aref table i) #xFF))
-                       (loop for row below table-size
-                             do (loop with dest-index = 0
-                                      for lane below 4
-                                      for bytes = (1+ (ldb (byte 2 (* lane 2)) row))
-                                      for zeros = (- 4 bytes)
-                                      do (loop for b below bytes
-                                               for reg-index = (+ zeros b)
-                                               for src-index = (+ (* reg-index 16) (* lane 4))
-                                               for lead-p = (= b 0)
-                                               for and-mask = (if lead-p
-                                                                  (case bytes
-                                                                    (1 #x7F)
-                                                                    (2 #x1F)
-                                                                    (3 #x0F)
-                                                                    (4 #x07))
-                                                                  #x3F)
-                                               for orr-mask = (if lead-p
-                                                                  (case bytes
-                                                                    (1 #x00)
-                                                                    (2 #xC0)
-                                                                    (3 #xE0)
-                                                                    (4 #xF0))
-                                                                  #x80)
-                                               do (setf (aref table (+ (* row row-size) dest-index)) src-index) ;; tbl
-                                                  (setf (aref table (+ (* row row-size) 16 dest-index)) and-mask) ;; and
-                                                  (setf (aref table (+ (* row row-size) 32 dest-index)) orr-mask) ;; orr
-                                                  (incf dest-index))))
-                       table)))
-             (assemble ()
+                        ;; A table with three masks per entry
+                        ;; indexed by 4x2 bits representing the number of utf8 bytes for character - 1
+                        (loop for i below (* table-size row-size)
+                              when (< (mod i row-size) 16)
+                              ;; fill the TBL part with an out of bounds index to get back zeros
+                              do (setf (aref table i) #xFF))
+                        (loop for row below table-size
+                              do (loop with dest-index = 0
+                                       for lane below 4
+                                       for bytes = (1+ (ldb (byte 2 (* lane 2)) row))
+                                       for zeros = (- 4 bytes)
+                                       do (loop for b below bytes
+                                                for reg-index = (+ zeros b)
+                                                for src-index = (+ (* reg-index 16) (* lane 4))
+                                                for lead-p = (= b 0)
+                                                for and-mask = (if lead-p
+                                                                   (case bytes
+                                                                     (1 #x7F)
+                                                                     (2 #x1F)
+                                                                     (3 #x0F)
+                                                                     (4 #x07))
+                                                                   #x3F)
+                                                for orr-mask = (if lead-p
+                                                                   (case bytes
+                                                                     (1 #x00)
+                                                                     (2 #xC0)
+                                                                     (3 #xE0)
+                                                                     (4 #xF0))
+                                                                   #x80)
+                                                do (setf (aref table (+ (* row row-size) dest-index)) src-index) ;; tbl
+                                                   (setf (aref table (+ (* row row-size) 16 dest-index)) and-mask) ;; and
+                                                   (setf (aref table (+ (* row row-size) 32 dest-index)) orr-mask) ;; orr
+                                                   (incf dest-index))))
+                        table)))
+               (assemble ()
 
-               (inst movi newlines 10 :16b)
-               (inst movi increment 4 :4s)
-               (inst mvni last-newlines 0 :4s)
-               (inst movi zeros 0 :4s)
-               (load-inline-constant indexes :oword (concat-ub 32 '(3 2 1 0)))
+                 (inst movi newlines 10 :16b)
+                 (inst movi increment 4 :4s)
+                 (inst mvni last-newlines 0 :4s)
+                 (inst movi zeros 0 :4s)
+                 (load-inline-constant indexes :oword (concat-ub 32 '(3 2 1 0)))
 
-               (inst add byte-end byte-array* (asr byte-end 1))
-               (inst add byte-array byte-array* (lsr byte-start 1))
+                 (inst add byte-end byte-array* (asr byte-end 1))
+                 (inst add byte-array byte-array* (lsr byte-start 1))
 
-               (inst add string-end string* (lsl string-end (- 2 n-fixnum-tag-bits)))
-               (inst add string string* (lsl string-start (- 2 n-fixnum-tag-bits)))
-               (inst b start)
+                 (inst add string-end string* (lsl string-end (- 2 n-fixnum-tag-bits)))
+                 (inst add string string* (lsl string-start (- 2 n-fixnum-tag-bits)))
+                 (inst b start)
 
-               ASCII-LOOP
-               (inst ldp bytes bytes2 (@ string))
-               (inst ldp bytes3 bytes4 (@ string 32))
+                 ASCII-LOOP
+                 (inst ldp bytes bytes2 (@ string))
+                 (inst ldp bytes3 bytes4 (@ string 32))
 
-               (inst orr temp bytes bytes2 :16b)
-               (inst orr temp2 bytes3 bytes4 :16b)
-               (inst orr temp temp temp2 :16b)
-               (check-ascii temp temp FULL-START :4s)
+                 (inst orr temp bytes bytes2 :16b)
+                 (inst orr temp2 bytes3 bytes4 :16b)
+                 (inst orr temp temp temp2 :16b)
+                 (check-ascii temp temp FULL-START :4s)
 
-               (inst uzp1 bytes2 bytes bytes2 :8h)
-               (inst uzp1 bytes4 bytes3 bytes4 :8h)
-               (inst uzp1 bytes4 bytes2 bytes4 :16b)
-               (inst str  bytes4 (@ byte-array 16 :post-index))
+                 (inst uzp1 bytes2 bytes bytes2 :8h)
+                 (inst uzp1 bytes4 bytes3 bytes4 :8h)
+                 (inst uzp1 bytes4 bytes2 bytes4 :16b)
+                 (inst str  bytes4 (@ byte-array 16 :post-index))
 
-               ;; Save the base index of newlines
-               (inst cmeq temp bytes4 newlines :16b)
-               ;; Extend matches to 4s
-               (inst cmhi f1 temp zeros :4s)
-               ;; Save the index of newlines
-               (inst bit last-newlines indexes f1 :16b)
-
-               (inst add indexes indexes increment :4s)
-
-               (inst add string string 64)
-
-               start
-               (inst cmp byte-array byte-end)
-               (inst b :hi DONE)
-               (inst cmp string string-end)
-               (inst b :hi DONE)
-               (inst b ASCII-LOOP)
-
-               FULL-START
-               (inst add string-end string-end 48) ;; now it reads 16 bytes instead of 64
-               (inst dup indexes indexes :4s 0)
-               (inst movi newlines 10 :4s)
-               (inst movi increment 1 :4s)
-
-               (load-inline-constant shift-mask :oword #x6000000040000000200000000)
-               (load-inline-constant full-table (make-full-table))
-               (inst movi c-d800  #xd800 :4s)
-               (inst movi length1 3 :16b)
-               (load-inline-constant length2 :oword #x00000000000000010101010202020202)
-
-               FULL-LOOP
-               (progn
-                 ;; Check for surrogates #xD800-#xDFFF
-                 (inst sub temp bytes c-d800 :4s)
-                 (inst uminv temp temp :4s)
-                 (inst umov tmp temp 0 :s)
-                 (inst cmp tmp #x7ff)
-
-                 (inst b :ls DONE)
-
-                 (inst cmeq temp bytes newlines :4s)
-                 (inst bit last-newlines indexes temp :16b)
+                 ;; Save the base index of newlines
+                 (inst cmeq temp bytes4 newlines :16b)
+                 ;; Extend matches to 4s
+                 (inst cmhi f1 temp zeros :4s)
+                 ;; Save the index of newlines
+                 (inst bit last-newlines indexes f1 :16b)
 
                  (inst add indexes indexes increment :4s)
 
-                 ;; Remove the low bits for each of the possible 4 resulting bytes
-                 (inst ushr f1 bytes 18 :4s)
-                 (inst ushr f2 bytes 12 :4s)
-                 (inst ushr f3 bytes 6 :4s)
+                 (inst add string string 64)
 
-                 ;; Compute utf8 lengths - 1
-                 (inst clz temp bytes :4s)
-                 ;; Map leading zeros to utf8 lengths
-                 (inst tbl temp (list length1 length2) temp :16b)
-                 (inst addv r4 temp :4s) ;; total length in utf-8 bytes - 4
+                 start
+                 (inst cmp byte-array byte-end)
+                 (inst b :hi DONE)
+                 (inst cmp string string-end)
+                 (inst b :hi DONE)
+                 (inst b ASCII-LOOP)
 
-                 ;; Shift by 0 2 4 6
-                 (inst ushl temp temp shift-mask :4s)
-                 ;; combine into an 8-bit mask, 2 bits per lane
-                 (inst addv temp temp :4s)
-                 (inst umov tmp temp 0 :b)
+                 FULL-START
+                 (inst add string-end string-end 48) ;; now it reads 16 bytes instead of 64
+                 (inst dup indexes indexes :4s 0)
+                 (inst movi newlines 10 :4s)
+                 (inst movi increment 1 :4s)
+                 (inst mvni errors 0 :4s)
 
-                 ;; Multiply by 48 (3 * 16)
-                 (inst add tmp tmp (lsl tmp 1))
-                 (inst add tmp full-table (lsl tmp 4))
+                 (load-inline-constant shift-mask :oword #x6000000040000000200000000)
+                 (load-inline-constant full-table (make-full-table))
+                 (inst movi c-d800  #xd800 :4s)
+                 (inst movi length1 3 :16b)
+                 (load-inline-constant length2 :oword #x00000000000000010101010202020202)
 
-                 (inst ld1 (list shuf-mask and-mask orr-mask) (@ tmp) :16b)
+                 FULL-LOOP
+                 (progn
+                   ;; Check for surrogates #xD800-#xDFFF
+                   (inst sub temp bytes c-d800 :4s)
+                   (inst umin errors errors temp :4s)
 
-                 (inst umov tmp-tn r4 0 :b)
+                   (inst cmeq temp bytes newlines :4s)
+                   (inst bit last-newlines indexes temp :16b)
 
-                 (inst tbl bytes (list f1 f2 f3 bytes) shuf-mask :16b)
+                   (inst add indexes indexes increment :4s)
 
-                 (inst and bytes bytes and-mask :16b)
-                 (inst orr bytes bytes orr-mask :16b)
+                   ;; Remove the low bits for each of the possible 4 resulting bytes
+                   (inst ushr f1 bytes 18 :4s)
+                   (inst ushr f2 bytes 12 :4s)
+                   (inst ushr f3 bytes 6 :4s)
 
-                 (inst str bytes (@ byte-array 4 :post-index))
+                   ;; Compute utf8 lengths - 1
+                   (inst clz temp bytes :4s)
+                   ;; Map leading zeros to utf8 lengths
+                   (inst tbl temp (list length1 length2) temp :16b)
+                   (inst addv r4 temp :4s) ;; total length in utf-8 bytes - 4
 
-                 (inst add byte-array byte-array tmp-tn)
-                 (inst add string string 16))
+                   ;; Shift by 0 2 4 6
+                   (inst ushl temp temp shift-mask :4s)
+                   ;; combine into an 8-bit mask, 2 bits per lane
+                   (inst addv temp temp :4s)
+                   (inst umov tmp temp 0 :b)
 
-               (inst cmp byte-array byte-end)
-               (inst b :hi DONE)
-               (inst cmp string string-end)
-               (inst b :hi DONE)
+                   ;; Multiply by 48 (3 * 16)
+                   (inst add tmp tmp (lsl tmp 1))
+                   (inst add tmp full-table (lsl tmp 4))
 
-               (inst ldr bytes (@ string))
-               (inst b full-loop)
+                   (inst ld1 (list shuf-mask and-mask orr-mask) (@ tmp) :16b)
 
-               DONE
-               (inst sub read string string*)
-               (inst lsr read read 2)
+                   (inst umov tmp-tn r4 0 :b)
 
-               (inst smaxv temp last-newlines :4s)
-               (inst smov last-newline temp 0 :s)
-               (inst tbnz last-newline 63 NO-NL)
+                   (inst tbl bytes (list f1 f2 f3 bytes) shuf-mask :16b)
 
-               ;; Find the actual position of the newline, its index&-4 was saved
-               (inst movi newlines 10 :4s)
-               (load-inline-constant indexes :oword (concat-ub 32 '(3 2 1 0)))
+                   (inst and bytes bytes and-mask :16b)
+                   (inst orr bytes bytes orr-mask :16b)
 
-               (inst add string* string* (lsl string-start (- 2 n-fixnum-tag-bits)))
-               (inst ldr temp (@ string* (lsl last-newline 4)))
+                   (inst str bytes (@ byte-array 4 :post-index))
 
-               (inst cmeq temp temp newlines :4s)
-               (inst and temp temp indexes :4s)
+                   (inst add byte-array byte-array tmp-tn)
+                   (inst add string string 16))
 
-               (inst umaxv temp temp :4s)
-               (inst umov tmp-tn temp 0 :b)
-               (inst add last-newline tmp-tn (lsl last-newline 2))
-               (inst add last-newline last-newline (lsr string-start n-fixnum-tag-bits))
-               NO-NL
+                 (inst cmp byte-array byte-end)
+                 (inst b :hi DONE-FULL)
+                 (inst cmp string string-end)
+                 (inst b :hi DONE-FULL)
 
-               (inst sub written byte-array byte-array*))))
-        (setf (sb-impl::buffer-tail obuf) written)
-        (values read
-                (truly-the fixnum last-newline))))))
+                 (inst ldr bytes (@ string))
+                 (inst b full-loop)
+
+                 DONE-FULL
+                 (inst uminv temp errors :4s)
+                 (inst umov tmp temp 0 :s)
+                 (inst cmp tmp #x7FF)
+                 (inst b :le ERROR)
+
+                 DONE
+                 (inst sub read string string*)
+                 (inst lsr read read 2)
+
+                 (inst smaxv temp last-newlines :4s)
+                 (inst smov last-newline temp 0 :s)
+                 (inst tbnz last-newline 63 NO-NL)
+
+                 ;; Find the actual position of the newline, its index&-4 was saved
+                 (inst movi newlines 10 :4s)
+                 (load-inline-constant indexes :oword (concat-ub 32 '(3 2 1 0)))
+
+                 (inst add string* string* (lsl string-start (- 2 n-fixnum-tag-bits)))
+                 (inst ldr temp (@ string* (lsl last-newline 4)))
+
+                 (inst cmeq temp temp newlines :4s)
+                 (inst and temp temp indexes :4s)
+
+                 (inst umaxv temp temp :4s)
+                 (inst umov tmp-tn temp 0 :b)
+                 (inst add last-newline tmp-tn (lsl last-newline 2))
+                 (inst add last-newline last-newline (lsr string-start n-fixnum-tag-bits))
+                 NO-NL
+
+                 (inst sub written byte-array byte-array*)))))
+       (setf (sb-impl::buffer-tail obuf) written)
+       (return (values read
+                       (truly-the fixnum last-newline))))
+   error
+     ;; Surrogates should rarely happen, return as if no work was done
+     ;; and let the scalar loop handle it.
+     (return (values start -1))))
 
 (defun simd-position8 (element vector start end)
   (declare (type index start end)
