@@ -1560,15 +1560,17 @@
             (emit-move node block arg-count-tn (leaf-info (first vars))))
           (dolist (arg (rest vars))
             (let ((arg-type (pop arg-types)))
-              (when (leaf-refs arg)
-                (let ((pass (if fixed-arg-state
-                                (sb-vm::fixed-call-arg-location arg-type fixed-arg-state)
-                                (standard-arg-location n)))
-                      (home (leaf-info arg)))
-                  (if (and (lambda-var-indirect arg)
-                           (lambda-var-explicit-value-cell arg))
-                      (emit-make-value-cell node block pass home)
-                      (emit-move node block pass home)))))
+              (if (leaf-refs arg)
+                  (let ((pass (if fixed-arg-state
+                                  (sb-vm::fixed-call-arg-location arg-type fixed-arg-state)
+                                  (standard-arg-location n)))
+                        (home (leaf-info arg)))
+                    (if (and (lambda-var-indirect arg)
+                             (lambda-var-explicit-value-cell arg))
+                        (emit-make-value-cell node block pass home)
+                        (emit-move node block pass home)))
+                  (when fixed-arg-state
+                    (sb-vm::fixed-call-arg-location arg-type fixed-arg-state))))
             (incf n)))))
     #-fp-and-pc-standard-save
     (emit-move node block (make-old-fp-passing-location)
