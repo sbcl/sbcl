@@ -656,7 +656,7 @@
            (copied
              (inline-vop (((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
                           ((byte-array sap-reg t))
-                          ((32-bit-array sap-reg t) (vector-sap string))
+                          ((string sap-reg t) (vector-sap string))
                           ((bytes int-sse-reg))
                           ((16-bits int-sse-reg))
                           ((32-bits int-sse-reg))
@@ -674,7 +674,7 @@
                   (inst add byte-array* head)
                   (inst mov byte-array byte-array*)
                   (inst lea end (ea byte-array* n))
-                  (inst add 32-bit-array string-start)
+                  (inst add string string-start)
                   (inst pxor zero zero)
                   (inst jmp start)
 
@@ -694,11 +694,11 @@
                   (move 32-bits 16-bits)
                   (inst punpcklwd 32-bits zero)
 
-                  (inst movdqu (ea 32-bit-array) 32-bits)
+                  (inst movdqu (ea string) 32-bits)
                   (inst psrldq 32-bits-2 8)
                   (inst punpcklwd 32-bits-2 zero)
 
-                  (inst movdqu (ea 16 32-bit-array) 32-bits-2)
+                  (inst movdqu (ea 16 string) 32-bits-2)
 
                   (move 16-bits-2 bytes)
 
@@ -709,13 +709,13 @@
 
                   (inst punpcklwd 32-bits-3 zero)
 
-                  (inst movdqu (ea 32 32-bit-array) 32-bits-3)
+                  (inst movdqu (ea 32 string) 32-bits-3)
                   (inst psrldq 32-bits-4 8)
                   (inst punpcklwd 32-bits-4 zero)
 
-                  (inst movdqu (ea 48 32-bit-array) 32-bits-4)
+                  (inst movdqu (ea 48 string) 32-bits-4)
 
-                  (inst add 32-bit-array (* 16 4))
+                  (inst add string (* 16 4))
 
                   START
                   (inst cmp byte-array end)
@@ -727,6 +727,264 @@
                (move res byte-array))))
       (setf (sb-impl::buffer-head ibuf) (+ head copied))
       (+ start copied))))
+
+(def-variant utf8-to-character-string :avx2 (start end string ibuf)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (let* ((head (sb-impl::buffer-head ibuf))
+         (tail (sb-impl::buffer-tail ibuf))
+         (string-end (- end (/ 64 4)))
+         (byte-end (- tail 16)))
+    (multiple-value-bind (copied written)
+        (inline-vop (((byte-start unsigned-reg t :target byte-array) head)
+                     ((string-start any-reg) start)
+                     ((byte-end unsigned-reg) byte-end)
+                     ((string-end any-reg) string-end)
+                     ((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
+                     ((string* sap-reg t) (vector-sap string))
+
+                     ((bytes int-sse-reg))
+                     ((temp int-sse-reg))
+                     ((temp2 int-sse-reg))
+                     ((temp3 int-sse-reg))
+                     ((temp4 int-sse-reg))
+                     ((len int-sse-reg))
+                     ((prev int-sse-reg))
+                     ((prev-len int-sse-reg))
+
+                     ((tmp unsigned-reg))
+                     ((index unsigned-reg))
+                     ((produced unsigned-reg))
+
+                     ((full-table unsigned-reg t))
+
+                     ((c-c0 complex-double-reg t))
+                     ((c-0f complex-double-reg t))
+                     ((c-00ff int-avx2-reg t))
+
+                     ((tbl1         complex-double-reg))
+                     ((tbl2         complex-double-reg))
+                     ((tbl3         complex-double-reg))
+                     ((tbl4         complex-double-reg))
+
+                     ((tag-clear complex-double-reg t)))
+            ((byte-array unsigned-reg positive-fixnum :from (:argument 0))
+             (string unsigned-reg positive-fixnum :from :load))
+          (assemble ()
+            (inst lea byte-array (ea byte-array* byte-start))
+            (inst add byte-end byte-array*)
+
+            (inst lea string-end (ea string* string-end (ash 1 (- 2 n-fixnum-tag-bits))))
+            (inst lea string  (ea string* string-start (ash 1 (- 2 n-fixnum-tag-bits))))
+
+            (inst jmp start)
+
+            LOOP
+            (inst vmovdqu bytes (ea byte-array))
+
+            (inst vpmovmskb tmp bytes) ;; any high bit set? not ascii
+            (inst test :dword tmp tmp)
+            (inst jmp :nz FULL-START)
+
+            (inst add byte-array 16)
+
+            (inst vpmovzxbd temp2 bytes)
+            (inst vmovdqu (ea string) temp2)
+
+            (inst vpsrldq temp bytes 4)
+            (inst vpmovzxbd temp2 temp)
+            (inst vmovdqu (ea 16 string) temp2)
+
+            (inst vpsrldq temp bytes 8)
+            (inst vpmovzxbd temp2 temp)
+            (inst vmovdqu (ea 32 string) temp2)
+
+            (inst vpsrldq temp bytes 12)
+            (inst vpmovzxbd temp2 temp)
+            (inst vmovdqu (ea 48 string) temp2)
+
+            (inst add string (* 16 4))
+
+            START
+            (inst cmp byte-array byte-end)
+            (inst jmp :a DONE)
+
+            (inst cmp string string-end)
+            (inst jmp :a DONE)
+            (inst jmp LOOP)
+
+            FULL-START
+
+            (inst add string-end 32) ;; now it writes 32 bytes instead of 64
+            (inst mov tmp #xFF)
+            (inst vmovd c-00ff tmp)
+            (inst vpbroadcastw c-00ff c-00ff)
+
+            (inst mov tmp #x0F)
+            (inst vmovd c-0f tmp)
+            (inst vpbroadcastb c-0f c-0f)
+
+            (inst mov tmp #xC0)
+            (inst vmovd temp tmp)
+            (inst vpbroadcastb c-c0 temp)
+            (inst vmovdqu tbl1 (register-inline-constant
+                                :sse
+                            #x38060001000000000000000000000000))
+            (inst vmovdqu tbl2 (register-inline-constant
+                                :sse
+                                #x2020242020202020202020100000010B))
+            (inst vmovdqu tbl3 (register-inline-constant
+                                :sse
+                                #x202020203535332B2020202020202020))
+            (inst vmovdqu tbl4 (register-inline-constant
+                                :sse
+                                #x03020101000000000000000000000000))
+            (inst vpxor prev prev prev)
+            (inst vpxor prev-len prev-len prev-len)
+
+            (inst lea full-table
+                  (register-inline-constant
+                   (coerce (loop for index below (ash 1 10)
+                                 for low-index = (ldb (byte 8 0) index)
+                                 for tmp = (ldb (byte 2 8) index)
+                                 append (let ((starts (loop for i to 7
+                                                            when (logbitp i low-index)
+                                                            collect i)))
+                                          (loop for lane below 8
+                                                for start = (pop starts)
+                                                for next = (car starts)
+                                                for sources = (when start
+                                                                (loop for i from (1- (or next (+ tmp 8))) downto start
+                                                                      collect i))
+                                                append (loop for byte below 4
+                                                             collect (or (pop sources) #xFF)))))
+                           '(vector (unsigned-byte 8)))))
+            (inst vmovdqa tag-clear (register-inline-constant
+                                     :sse #x070F1F1F3F3F3F3F7F7F7F7F7F7F7F7F))
+            (zeroize tmp)
+
+            FULL-LOOP
+            (flet ((validate ()
+                     (assemble ()
+                       ;; The Keiser, Lemire algorithm
+                       (inst vpalignr temp bytes prev 15)
+
+                       (inst vpsrlw temp2 temp 4)
+                       (inst vpand temp2 temp2 c-0f)
+                       (inst vpand temp3 temp c-0f)
+
+                       (inst vpsrlw temp bytes 4)
+                       (inst vpand temp temp c-0f)
+
+                       (inst vpshufb temp2 tbl1 temp2)
+                       (inst vpshufb temp3 tbl2 temp3)
+                       (inst vpand temp2 temp2 temp3)
+                       (inst vpshufb temp3 tbl3 temp)
+                       (inst vpand temp2 temp2 temp3) ;; errors 1
+
+                       ;; Check that the leading bytes are followed by the
+                       ;; correct amount of continuations
+                       (inst vpshufb len tbl4 temp)
+
+                       (inst vpalignr temp4 len prev-len 13)
+                       (inst vpalignr temp3 len prev-len 14)
+                       (inst vpalignr temp len prev-len 15)
+
+                       (inst vpcmpeqb prev prev prev)
+                       (inst vpaddb temp3 temp3 prev)
+                       (inst vpaddb prev prev prev)
+                       (inst vpaddb temp4 temp4 prev)
+
+                       (inst vpcmpgtb temp temp (register-inline-constant :sse 0))
+                       (inst vpcmpgtb temp3 temp3 (register-inline-constant :sse 0))
+                       (inst vpcmpgtb temp4 temp4 (register-inline-constant :sse 0))
+
+                       (inst vpor temp temp temp3)
+                       (inst vpor temp temp temp4)
+
+                       (inst vpcmpgtb temp3 c-c0 bytes)
+
+                       (inst vpxor temp4 temp3 temp) ;; errors 2
+
+                       (inst vpor temp2 temp2 temp4)
+
+                       (inst vptest temp2 temp2)
+
+                       (inst jmp :nz DONE-FULL)
+                       (inst vpalignr prev bytes prev 8)
+                       (inst vpalignr prev-len len prev-len 8)
+                       VALIDATED)))
+              (validate)
+              (progn
+                ;; Process the leading bytes in the first 8 bytes, loading 16 bytes
+                ;; so that the last leading byte might drag in 3 more bytes
+
+                ;; Identify leading bytes
+                (inst vpcmpgtb temp2 bytes c-c0)
+                ;; Turn them into an 8 bit index
+                (inst vpmovmskb tmp temp2)
+                (inst movzx '(:byte :dword) index tmp)
+                (inst popcnt :dword produced index)
+
+                ;; Count the number of bytes to the next leading byte, turning it into a 2 bit suffix
+                (inst shr :dword tmp 8)
+                (inst tzcnt :dword tmp tmp)
+                (inst shl :dword tmp 8)
+                (inst or :dword index tmp)
+
+                (inst shl :dword index 5)
+
+                ;; Use the high 4 bits of each byte to get an and-mask that
+                ;; will clear their tags
+                (inst vpsrlw temp4 bytes 4)
+                (inst vpand temp4 temp4 c-0f)
+
+                (inst vpshufb temp4 tag-clear temp4)
+                (inst vpand bytes bytes temp4)
+
+                (let ((bytes (reg-in-sc bytes 'int-avx2-reg))
+                      (temp2 (reg-in-sc temp2 'int-avx2-reg))
+                      (temp3 (reg-in-sc temp3 'int-avx2-reg)))
+                  ;; Duplicate the low bits, for vpshufb
+                  (inst vinserti128 bytes bytes bytes 1)
+
+                  ;; Shuffle the bytes into 4-byte lanes
+                  (inst vpshufb bytes bytes (ea full-table index))
+
+                  ;; Perform
+                  ;; A + B<<6 + C<<12 + D<<18
+                  (inst vpand temp2 c-00ff bytes)
+                  (inst vpandn temp3 c-00ff bytes)
+                  (inst vpsrlw temp3 temp3 2)
+                  (inst vpaddw temp2 temp2 temp3)
+                  (inst vpmaddwd bytes temp2
+                        (register-inline-constant
+                         :avx2
+                         (concat-ub 32 (loop repeat 8 collect #x10000001))))
+
+                  (inst vmovdqu (ea string) bytes))
+
+                (inst add byte-array 8)
+                (inst lea string (ea string produced 4))))
+            (inst cmp byte-array byte-end)
+            (inst jmp :a DONE-FULL)
+
+            (inst cmp string string-end)
+            (inst jmp :a DONE-FULL)
+            (inst vmovdqu bytes (ea byte-array))
+
+            (inst jmp FULL-LOOP)
+            DONE-FULL
+            (inst shr :dword tmp 8)
+
+            (inst add byte-array tmp) ;; strip any consumed continuation bytes
+            (inst vzeroupper)
+            DONE
+            (inst sub string string*)
+            (inst shr string 2)
+            (inst sub byte-array byte-array*)))
+      (setf (sb-impl::buffer-head ibuf) copied)
+      (truly-the index written))))
 
 #+sb-unicode
 (defun ascii-sap-to-character-string (sap string length)
