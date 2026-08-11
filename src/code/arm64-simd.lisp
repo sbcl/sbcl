@@ -1438,7 +1438,7 @@
                        ((tmp unsigned-reg))
                        ((full-table any-reg t))
                        ((shift-mask complex-double-reg))
-                       ((c-1b complex-double-reg))
+                       ((c-d800 complex-double-reg))
 
                        ((r4 complex-double-reg t))
                        ((length1 complex-double-reg t :offset 8))
@@ -1545,18 +1545,19 @@
 
                (load-inline-constant shift-mask :oword #x6000000040000000200000000)
                (load-inline-constant full-table (make-full-table))
-               (inst movi c-1b  #x1b :4s)
+               (inst movi c-d800  #xd800 :4s)
                (inst movi length1 3 :16b)
                (load-inline-constant length2 :oword #x00000000000000010101010202020202)
 
                FULL-LOOP
                (progn
                  ;; Check for surrogates #xD800-#xDFFF
-                 (inst ushr temp bytes 11 :4s)
-                 (inst cmeq temp temp c-1b :4s)
-                 (inst umaxv temp temp :4s)
-                 (inst umov tmp temp 0 :b)
-                 (inst cbnz tmp DONE)
+                 (inst sub temp bytes c-d800 :4s)
+                 (inst uminv temp temp :4s)
+                 (inst umov tmp temp 0 :s)
+                 (inst cmp tmp #x7ff)
+
+                 (inst b :ls DONE)
 
                  (inst cmeq temp bytes newlines :4s)
                  (inst bit last-newlines indexes temp :16b)
