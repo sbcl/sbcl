@@ -324,6 +324,10 @@
     (format stream "V~d.~a" offset
             (decode-vector-size q size))))
 
+(defun print-simd-reg-d (value stream dstate)
+  (declare (ignore dstate))
+  (format stream "D~d" value))
+
 (defun print-simd-reg-2x (value stream dstate)
   (declare (ignore dstate))
   (multiple-value-bind (q size offset)

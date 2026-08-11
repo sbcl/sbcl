@@ -117,6 +117,7 @@
   (define-arg-type vx.t :printer #'print-vx.t)
 
   (define-arg-type simd-reg :printer #'print-simd-reg)
+  (define-arg-type simd-reg-d :printer #'print-simd-reg-d)
   (define-arg-type simd-reg-2x :printer #'print-simd-reg-2x)
 
   (define-arg-type simd-copy-reg :printer #'print-simd-copy-reg)
@@ -560,12 +561,16 @@
   `(define-instruction ,name (segment rd rn rm &optional vector-size)
      ,@printers
      (:printer simd-three-same-sized ((u ,simd-u) (op ,simd-op)))
+     (:printer simd-three-same-scalar-d ((u ,simd-u) (op ,simd-op)))
      (:emitter
       (if vector-size
-          (multiple-value-bind (q size) (encode-vector-size vector-size)
+          (multiple-value-bind (q size) (encode-vector-size/scalar vector-size)
             (emit-simd-three-same segment
                                   q
                                   ,simd-u
+                                  (case vector-size
+                                    (:d 1)
+                                    (t 0))
                                   size
                                   (fpr-offset rm)
                                   ,simd-op
@@ -632,6 +637,29 @@
              '('neg :tab rd ", " rm shift)))
   #b1 #b10000)
 
+
+(define-instruction neg (segment rd rm &optional vector-size)
+  (:printer simd-two-misc ((u 1) (op #b01011)))
+  (:printer simd-two-misc-scalar-d ((u 1) (op #b01011)))
+  (:emitter
+   (if vector-size
+       (multiple-value-bind (q size) (encode-vector-size/scalar vector-size)
+         (emit-simd-two-misc segment
+                               q
+                               1
+                               (case vector-size
+                                 (:d 1)
+                                 (t 0))
+                               size
+                               #b01011
+                               (fpr-offset rm)
+                               (fpr-offset rd)))
+       (assemble (segment)
+         (inst sub rd (if (sc-is rd 32-bit-reg)
+                          wzr-tn
+                          zr-tn)
+               rm)))))
+
 (def-add-sub subs #b11
   (:printer add-sub-imm ((op #b11)))
   (:printer add-sub-ext-reg ((op #b11)))
@@ -662,14 +690,6 @@
                     wzr-tn
                     zr-tn)
            rn rm)))
-
-(define-instruction-macro neg (rd rm)
-  `(let ((rd ,rd)
-         (rm ,rm))
-     (inst sub rd (if (sc-is rd 32-bit-reg)
-                      wzr-tn
-                      zr-tn)
-           rm)))
 
 (define-instruction-macro negs (rd rm)
   `(let ((rd ,rd)
@@ -888,6 +908,7 @@
           (emit-simd-three-same segment
                                 (encode-vector-size vector-size)
                                 ,simd-u
+                                0
                                 ,simd-size
                                 (fpr-offset rm)
                                 ,simd-op
@@ -955,6 +976,7 @@
           (emit-simd-three-same segment
                                 (encode-vector-size vector-size)
                                 ,simd-u
+                                0
                                 ,simd-size
                                 (fpr-offset rm)
                                 ,simd-op
@@ -1285,6 +1307,7 @@
           (multiple-value-bind (q ,@(unless simd-size `(size)))
               (encode-vector-size vector-size)
             (emit-simd-two-misc segment q ,simd-u
+                                0
                                 ,(or simd-size 'size)
                                 ,simd-op
                                 (fpr-offset rn) (fpr-offset rd)))
@@ -1309,7 +1332,7 @@
   (:emitter
    (if vector-size
        (multiple-value-bind (q size) (encode-vector-size (the (member :8b :16b :4h :8h) vector-size))
-         (emit-simd-two-misc segment q #b1 size #b00000
+         (emit-simd-two-misc segment q #b1 0 size #b00000
                              (fpr-offset rn) (fpr-offset rd)))
        (emit-data-processing-1 segment
                                1
@@ -1424,6 +1447,7 @@
          (emit-simd-three-same segment
                                q
                                #b0
+                               0
                                size
                                (fpr-offset rm)
                                #b10011
@@ -2963,6 +2987,7 @@
             (emit-simd-two-misc segment
                                 q
                                 ,simd-u
+                                0
                                 size
                                 ,simd-op
                                 (fpr-offset rn)
@@ -3228,7 +3253,7 @@
                        (if vector-size
                            (emit-simd-three-same segment
                                                  (encode-vector-size vector-size)
-                                                 0 1 (fpr-offset rm) 3
+                                                 0 0 1 (fpr-offset rm) 3
                                                  (fpr-offset rn) (fpr-offset rd))
                            (emit-logical-reg-inst segment 0 1 rd rn rm))))))))
   (def bic 1 ((1 0 x 1)
@@ -3255,7 +3280,7 @@
                        (if vector-size
                            (emit-simd-three-same segment
                                                  (encode-vector-size vector-size)
-                                                 0 2 (fpr-offset rm) 3
+                                                 0 0 2 (fpr-offset rm) 3
                                                  (fpr-offset rn) (fpr-offset rd))
                            (if (or (register-p rm) (shifter-operand-p rm))
                                (emit-logical-reg-inst segment 1 0 rd rn rm)
@@ -3413,7 +3438,8 @@
   (#b0 1 31)
   (q 1 30)
   (u 1 29)
-  (#b01110 5 24)
+  (scalar 1 28)
+  (#b1110 4 24)
   (size 2 22)
   (#b1 1 21)
   (rm 5 16)
@@ -3470,6 +3496,14 @@
   (rn :fields (list (byte 1 30) (byte 2 22) (byte 5 5)) :type 'simd-reg)
   (rd :fields (list (byte 1 30) (byte 2 22) (byte 5 0)) :type 'simd-reg))
 
+(define-instruction-format (simd-three-same-scalar-d 32
+                            :include simd-three-same
+                            :default-printer '(:name :tab rd ", " rn ", " rm))
+  (op4 :field (byte 5 24) :value #b11110)
+  (rm :field (byte 5 16) :type 'simd-reg-d)
+  (rn :field (byte 5 5) :type 'simd-reg-d)
+  (rd :field (byte 5 0) :type 'simd-reg-d))
+
 (define-instruction-format (simd-three-same-float 32
                             :default-printer '(:name :tab rd ", " rn ", " rm))
   (op3 :field (byte 1 31) :value #b0)
@@ -3509,6 +3543,18 @@
     (:1d (values 0 #b11))
     (:2d (values 1 #b11))))
 
+(defun encode-vector-size/scalar (size)
+  (ecase size
+    (:8b (values 0 0))
+    (:16b (values 1 0))
+    (:4h (values 0 #b01))
+    (:8h (values 1 #b01))
+    (:2s (values 0 #b10))
+    (:4s (values 1 #b10))
+    (:1d (values 0 #b11))
+    (:2d (values 1 #b11))
+    (:d (values 1 #b11))))
+
 (defun encode-vector-float-size (size)
   (ecase size
     (:2s (values 0 0))
@@ -3546,6 +3592,7 @@
                  (emit-simd-three-same segment
                                        (encode-vector-size (the (member :16b :8b) size))
                                        ,u
+                                       0
                                        ,size
                                        (fpr-offset rm)
                                        ,op
@@ -3569,6 +3616,7 @@
                                 (emit-simd-two-misc segment
                                                     q
                                                     ,zero-u
+                                                    0
                                                     size
                                                     ,zero
                                                     (fpr-offset rn)
@@ -3578,6 +3626,7 @@
                                `(emit-simd-three-same segment
                                                       q
                                                       ,u
+                                                      0
                                                       size
                                                       (fpr-offset rm)
                                                       ,op
@@ -4041,7 +4090,8 @@
     (#b0 1 31)
   (q 1 30)
   (u 1 29)
-  (#b01110 5 24)
+  (scalar 1 28)
+  (#b1110 4 24)
   (size 2 22)
   (#b10000 5 17)
   (op 5 12)
@@ -4062,6 +4112,12 @@
   (rn :fields (list (byte 1 30) (byte 2 22) (byte 5 5)) :type 'simd-reg)
   (rd :fields (list (byte 1 30) (byte 2 22) (byte 5 0)) :type 'simd-reg))
 
+(define-instruction-format (simd-two-misc-scalar-d 32
+                            :include simd-two-misc)
+  (op2 :field (byte 5 24) :value #b11110)
+  (rn :field (byte 5 5) :type 'simd-reg-d)
+  (rd :field (byte 5 0) :type 'simd-reg-d))
+
 (macrolet
     ((def (name u op &optional (sizes '(:8b :16b)))
        `(define-instruction ,name (segment rd rn size)
@@ -4072,6 +4128,7 @@
              (emit-simd-two-misc segment
                                  q
                                  ,u
+                                 0
                                  size
                                  ,op
                                  (fpr-offset rn)
@@ -4088,6 +4145,7 @@
            (emit-simd-two-misc segment
                                ,q
                                #b0
+                               0
                                #b01
                                ,op
                                (fpr-offset rn)
@@ -4106,6 +4164,7 @@
              (emit-simd-two-misc segment
                                  q
                                  ,u
+                                 0
                                  size
                                  ,op
                                  (fpr-offset rn)
@@ -4126,6 +4185,7 @@
              (emit-simd-two-misc segment
                                  ,q
                                  ,u
+                                 0
                                  size
                                  ,op
                                  (fpr-offset rn)
