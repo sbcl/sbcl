@@ -661,6 +661,7 @@
                        (inst and temp3 temp1 nibble-mask :16b)
                        (inst ushr temp4 bytes 4 :16b)
 
+                       (inst tbl temp1 (list tbl4) temp4 :16b)
                        (inst tbl temp2 (list tbl1) temp2 :16b)
                        (inst tbl temp3 (list tbl2) temp3 :16b)
                        (inst tbl temp4 (list tbl3) temp4 :16b)
@@ -668,19 +669,15 @@
                        (inst and temp2 temp2 temp3 :16b)
                        (inst and s1 temp2 temp4 :16b)
 
-                       (inst ushr temp1 bytes 4 :16b)
-                       (inst tbl temp1 (list tbl4) temp1 :16b)
-
+                       ;; Check that the leading bytes are followed by
+                       ;; the correct amount of continuations
                        (inst ext temp2 prev-len temp1 15 :16b)
                        (inst ext temp3 prev-len temp1 14 :16b)
                        (inst ext temp4 prev-len temp1 13 :16b)
 
                        (inst ushr temp2 temp2 1 :16b)
-                       (inst ushr temp3 temp3 2 :16b)
-                       (inst ushr temp4 temp4 3 :16b)
-
-                       (inst orr temp2 temp2 temp3 :16b)
-                       (inst orr temp2 temp2 temp4 :16b)
+                       (inst usra temp2 temp3 2 :16b)
+                       (inst usra temp2 temp4 3 :16b)
 
                        (inst cmgt temp3 c-c0 bytes :16b) ;; continuations
 
@@ -2023,6 +2020,8 @@
                (inst and tmp2 tmp2 tmp4 :16b)
                (inst orr errors errors tmp2 :16b)
 
+               ;; Check that the leading bytes are followed by the
+               ;; correct amount of continuations
                (inst ext tmp2 prev-len tmp1 15 :16b)
                (inst ext tmp3 prev-len tmp1 14 :16b)
                (inst ext tmp4 prev-len tmp1 13 :16b)
