@@ -728,6 +728,7 @@
       (setf (sb-impl::buffer-head ibuf) (+ head copied))
       (+ start copied))))
 
+#+sb-unicode
 (def-variant utf8-to-character-string :avx2 (start end string ibuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
@@ -829,7 +830,7 @@
             (inst vpbroadcastb c-c0 temp)
             (inst vmovdqu tbl1 (register-inline-constant
                                 :sse
-                            #x38060001000000000000000000000000))
+                                #x38060001000000000000000000000000))
             (inst vmovdqu tbl2 (register-inline-constant
                                 :sse
                                 #x2020242020202020202020100000010B))
