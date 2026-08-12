@@ -789,20 +789,13 @@
 
             (inst add byte-array 16)
 
-            (inst vpmovzxbd temp2 bytes)
-            (inst vmovdqu (ea string) temp2)
+            (let ((temp2 (reg-in-sc temp2 'int-avx2-reg)))
+              (inst vpmovzxbd temp2 bytes)
+              (inst vmovdqu (ea string) temp2)
 
-            (inst vpsrldq temp bytes 4)
-            (inst vpmovzxbd temp2 temp)
-            (inst vmovdqu (ea 16 string) temp2)
-
-            (inst vpsrldq temp bytes 8)
-            (inst vpmovzxbd temp2 temp)
-            (inst vmovdqu (ea 32 string) temp2)
-
-            (inst vpsrldq temp bytes 12)
-            (inst vpmovzxbd temp2 temp)
-            (inst vmovdqu (ea 48 string) temp2)
+              (inst vpsrldq temp bytes 8)
+              (inst vpmovzxbd temp2 temp)
+              (inst vmovdqu (ea 32 string) temp2))
 
             (inst add string (* 16 4))
 
