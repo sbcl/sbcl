@@ -761,7 +761,7 @@
 
                      ((c-c0 complex-double-reg t))
                      ((c-0f complex-double-reg t))
-                     ((zeros complex-double-reg t))
+                     ((high-nibbles complex-double-reg t))
 
                      ((tbl1         complex-double-reg))
                      ((tbl2         complex-double-reg))
@@ -853,7 +853,6 @@
             (inst vmovdqa tag-clear (register-inline-constant
                                      :sse #x070F1F1F3F3F3F3F7F7F7F7F7F7F7F7F))
             (zeroize tmp)
-            (inst vpxor zeros zeros zeros)
             FULL-LOOP
             (flet ((validate ()
                      (assemble ()
@@ -864,36 +863,31 @@
                        (inst vpand temp2 temp2 c-0f)
                        (inst vpand temp3 temp c-0f)
 
-                       (inst vpsrlw temp bytes 4)
-                       (inst vpand temp temp c-0f)
+                       (inst vpsrlw high-nibbles bytes 4)
+                       (inst vpand high-nibbles high-nibbles c-0f)
 
                        (inst vpshufb temp2 tbl1 temp2)
                        (inst vpshufb temp3 tbl2 temp3)
                        (inst vpand temp2 temp2 temp3)
-                       (inst vpshufb temp3 tbl3 temp)
+                       (inst vpshufb temp3 tbl3 high-nibbles)
                        (inst vpand temp2 temp2 temp3) ;; errors 1
 
                        ;; Check that the leading bytes are followed by the
                        ;; correct amount of continuations
-                       (inst vpshufb len tbl4 temp)
+                       (inst vpshufb len tbl4 high-nibbles)
 
                        (inst vpalignr temp4 len prev-len 13)
                        (inst vpalignr temp3 len prev-len 14)
                        (inst vpalignr temp len prev-len 15)
 
-                       (inst vpcmpeqb prev prev prev)
-                       (inst vpaddb temp3 temp3 prev)
-                       (inst vpaddb prev prev prev)
-                       (inst vpaddb temp4 temp4 prev)
-
-                       (inst vpcmpgtb temp temp zeros)
-                       (inst vpcmpgtb temp3 temp3 zeros)
-                       (inst vpcmpgtb temp4 temp4 zeros)
+                       (inst vpcmpgtb temp temp (register-inline-constant :sse 0))
+                       (inst vpcmpgtb temp3 temp3 (register-inline-constant :sse #x01010101010101010101010101010101))
+                       (inst vpcmpgtb temp4 temp4 (register-inline-constant :sse #x02020202020202020202020202020202))
 
                        (inst vpor temp temp temp3)
                        (inst vpor temp temp temp4)
 
-                       (inst vpcmpgtb temp3 c-c0 bytes)
+                       (inst vpcmpgtb temp3 c-c0 bytes) ;; continuations
 
                        (inst vpxor temp4 temp3 temp) ;; errors 2
 
@@ -902,6 +896,8 @@
                        (inst vptest temp2 temp2)
 
                        (inst jmp :nz DONE-FULL)
+
+                       ;; convert-full consumes only 8
                        (inst vpalignr prev bytes prev 8)
                        (inst vpalignr prev-len len prev-len 8)
                        VALIDATED)))
@@ -927,10 +923,8 @@
 
                 ;; Use the high 4 bits of each byte to get an and-mask that
                 ;; will clear their tags
-                (inst vpsrlw temp4 bytes 4)
-                (inst vpand temp4 temp4 c-0f)
 
-                (inst vpshufb temp4 tag-clear temp4)
+                (inst vpshufb temp4 tag-clear high-nibbles)
                 (inst vpand bytes bytes temp4)
 
                 (let ((bytes (reg-in-sc bytes 'int-avx2-reg))
@@ -2924,8 +2918,7 @@
                 (inst vpand current current x4)
 
                 (let ((current (reg-in-sc current 'int-avx2-reg))
-                      (x2 (reg-in-sc x2 'int-avx2-reg))
-                      (x3 (reg-in-sc x3 'int-avx2-reg)))
+                      (x2 (reg-in-sc x2 'int-avx2-reg)))
                   ;; Duplicate the low bits, for vpshufb
                   (inst vinserti128 current current current 1)
 
