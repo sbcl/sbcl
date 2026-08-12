@@ -75,7 +75,7 @@
          (info (fun-info-or-lose name))
          (transforms (fun-info-transforms info))
          (old (find-if (lambda (transform)
-                         (and (case important (eq important :vop)
+                         (and (case important
                                     (:vop
                                      (typep transform 'vop-transform))
                                     (:before-vop
