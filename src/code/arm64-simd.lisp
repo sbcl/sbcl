@@ -535,9 +535,8 @@
   (with-pinned-objects-in-registers (string)
     (let* ((head (sb-impl::buffer-head ibuf))
            (tail (sb-impl::buffer-tail ibuf))
-           (left (- end start))
-           (string-end (- left (/ 64 4)))
-           (byte-end (- tail head 16)))
+           (string-end (- end (/ 64 4)))
+           (byte-end (- tail 16)))
       (multiple-value-bind (copied written)
           (inline-vop (((byte-start any-reg) head)
                        ((string-start any-reg) start)
@@ -582,10 +581,8 @@
               ((copied unsigned-reg positive-fixnum)
                (written unsigned-reg positive-fixnum))
 
-
-            (inst add byte-array* byte-array* (lsr byte-start 1))
-            (inst mov byte-array byte-array*)
             (inst add byte-end byte-array* (asr byte-end 1))
+            (inst add byte-array byte-array* (lsr byte-start 1))
 
             (inst add string-end string* (lsl string-end (- 2 n-fixnum-tag-bits)))
             (inst add string string* (lsl string-start (- 2 n-fixnum-tag-bits)))
@@ -777,7 +774,7 @@
             (inst sub copied byte-array byte-array*)
             (inst sub written string string*)
             (inst lsr written written 2))
-        (setf (sb-impl::buffer-head ibuf) (+ head copied))
+        (setf (sb-impl::buffer-head ibuf) copied)
         (truly-the index written)))))
 
 #+sb-unicode
@@ -1057,9 +1054,8 @@
   (with-pinned-objects-in-registers (string)
     (let* ((head (sb-impl::buffer-head ibuf))
            (tail (sb-impl::buffer-tail ibuf))
-           (left (- end start))
-           (string-end (- left (/ 64 4)))
-           (byte-end (- tail head 32)))
+           (string-end (- end (/ 64 4)))
+           (byte-end (- tail 32)))
       (multiple-value-bind (copied written)
           (inline-vop (((byte-start any-reg) head)
                        ((string-start any-reg) start)
@@ -1107,10 +1103,8 @@
               ((copied unsigned-reg positive-fixnum)
                (written unsigned-reg positive-fixnum))
 
-
-            (inst add byte-array* byte-array* (lsr byte-start 1))
-            (inst mov byte-array byte-array*)
             (inst add byte-end byte-array* (asr byte-end 1))
+            (inst add byte-array byte-array* (lsr byte-start 1))
 
             (inst add string-end string* (lsl string-end (- 2 n-fixnum-tag-bits)))
             (inst add string string* (lsl string-start (- 2 n-fixnum-tag-bits)))
@@ -1397,7 +1391,7 @@
             (inst sub copied byte-array byte-array*)
             (inst sub written string string*)
             (inst lsr written written 2))
-        (setf (sb-impl::buffer-head ibuf) (+ head copied))
+        (setf (sb-impl::buffer-head ibuf) copied)
         (truly-the index written)))))
 
 (defun character-string-to-utf8 (start end string obuf)
