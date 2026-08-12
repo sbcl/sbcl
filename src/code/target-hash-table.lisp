@@ -1976,7 +1976,9 @@ multiple threads accessing the same hash-table without locking."
             ;; have been cleared already in another thread.
             (when (or (/= (kv-vector-rehash-stamp old-kv-vector) initial-stamp)
                       (not (zerop (kv-vector-rehash-stamp new-kv-vector))))
-              (setq new-index-vector (make-index-vector new-n-buckets))))
+              (setq new-index-vector
+                    (allocating-for-hash-table (table)
+                      (make-index-vector new-n-buckets)))))
 
           ;; Preserve only the 'hashing' bit on the OLD-KV-VECTOR so that
           ;; its high-water-mark can meaningfully be reduced to 0 when done.
