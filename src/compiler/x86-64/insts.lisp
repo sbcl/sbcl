@@ -2829,6 +2829,13 @@
    (emit-regular-2byte-sse-inst segment dst src #x66 #x38 #x2a))
   . #.(2byte-sse-inst-printer '2byte-xmm-xmm/mem #x66 #x38 #x2a))
 
+(define-instruction lddqu (segment dst src)
+  (:printer ext-xmm-xmm/mem ((prefix #xF2) (op #xF0)))
+  (:emitter
+   (aver (xmm-register-p dst))
+   (aver (ea-p src))
+   (emit-regular-sse-inst segment dst src #xF2 #xF0)))
+
 ;;; Move a 32-bit value (MOVD) or 64-bit value (MOVQ)
 ;;; MOVD has encodings for xmm <-> r/m32.
 ;;; MOVQ has encodings for xmm <-> r/m64 and xmm <-> xmm/m64.

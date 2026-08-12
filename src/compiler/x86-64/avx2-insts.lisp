@@ -1137,6 +1137,15 @@ REG is the source (encoded in ModR/M.r/m).
   (def vmovlpd #x66 #x12 #x13 :force-to-mem t :l 0 :nds t)
   (def vmovlps nil  #x12 #x13 :reg-reg-name vmovhlps :l 0 :nds t))
 
+(define-instruction vlddqu (segment dst src)
+  (:emitter
+   (aver (xmm-register-p dst))
+   (aver (ea-p src))
+   (emit-avx2-inst segment src dst #xf2 #xf0 :opcode-prefix 15 :evex-w 0 :l nil))
+  .
+  #.(avx2-inst-printer-list 'ymm-ymm/mem #xf2 #xf0))
+
+
 (macrolet ((def (name prefix)
              `(define-instruction ,name (segment dst src &optional src2)
                 ,@(avx2-inst-printer-list 'ymm-ymm/mem-dir prefix #b0001000)
