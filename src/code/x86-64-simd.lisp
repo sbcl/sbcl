@@ -761,7 +761,7 @@
 
                      ((c-c0 complex-double-reg t))
                      ((c-0f complex-double-reg t))
-                     ((c-00ff int-avx2-reg t))
+                     ((zeros complex-double-reg t))
 
                      ((tbl1         complex-double-reg))
                      ((tbl2         complex-double-reg))
@@ -810,9 +810,6 @@
             FULL-START
 
             (inst add string-end 32) ;; now it writes 32 bytes instead of 64
-            (inst mov tmp #xFF)
-            (inst vmovd c-00ff tmp)
-            (inst vpbroadcastw c-00ff c-00ff)
 
             (inst mov tmp #x0F)
             (inst vmovd c-0f tmp)
@@ -856,7 +853,7 @@
             (inst vmovdqa tag-clear (register-inline-constant
                                      :sse #x070F1F1F3F3F3F3F7F7F7F7F7F7F7F7F))
             (zeroize tmp)
-
+            (inst vpxor zeros zeros zeros)
             FULL-LOOP
             (flet ((validate ()
                      (assemble ()
@@ -889,9 +886,9 @@
                        (inst vpaddb prev prev prev)
                        (inst vpaddb temp4 temp4 prev)
 
-                       (inst vpcmpgtb temp temp (register-inline-constant :sse 0))
-                       (inst vpcmpgtb temp3 temp3 (register-inline-constant :sse 0))
-                       (inst vpcmpgtb temp4 temp4 (register-inline-constant :sse 0))
+                       (inst vpcmpgtb temp temp zeros)
+                       (inst vpcmpgtb temp3 temp3 zeros)
+                       (inst vpcmpgtb temp4 temp4 zeros)
 
                        (inst vpor temp temp temp3)
                        (inst vpor temp temp temp4)
@@ -937,8 +934,7 @@
                 (inst vpand bytes bytes temp4)
 
                 (let ((bytes (reg-in-sc bytes 'int-avx2-reg))
-                      (temp2 (reg-in-sc temp2 'int-avx2-reg))
-                      (temp3 (reg-in-sc temp3 'int-avx2-reg)))
+                      (temp2 (reg-in-sc temp2 'int-avx2-reg)))
                   ;; Duplicate the low bits, for vpshufb
                   (inst vinserti128 bytes bytes bytes 1)
 
@@ -947,14 +943,8 @@
 
                   ;; Perform
                   ;; A + B<<6 + C<<12 + D<<18
-                  (inst vpand temp2 c-00ff bytes)
-                  (inst vpandn temp3 c-00ff bytes)
-                  (inst vpsrlw temp3 temp3 2)
-                  (inst vpaddw temp2 temp2 temp3)
-                  (inst vpmaddwd bytes temp2
-                        (register-inline-constant
-                         :avx2
-                         (concat-ub 32 (loop repeat 8 collect #x10000001))))
+                  (inst vpmaddubsw temp2 bytes (register-inline-constant :avx2 (concat-ub 32 (loop repeat 8 collect #x40014001))))
+                  (inst vpmaddwd bytes temp2 (register-inline-constant :avx2 (concat-ub 32 (loop repeat 8 collect #x10000001))))
 
                   (inst vmovdqu (ea string) bytes))
 
@@ -2757,8 +2747,8 @@
                      ((c-df complex-double-reg t))
                      ((c-bf complex-double-reg t))
                      ((c-0f complex-double-reg t))
-                     ((c-00ff int-avx2-reg t))
-                     ((c-shift int-avx2-reg t))
+                     ((c-4001 int-avx2-reg t))
+                     ((c-10000001 int-avx2-reg t))
                      ((c-3080 complex-double-reg t))
                      ((tag-clear complex-double-reg t)))
             ((byte-index unsigned-reg positive-fixnum :from :load)
@@ -2861,17 +2851,17 @@
 
                 START-FULL
 
-                (inst mov tmp2 #xFF)
-                (inst vmovd c-00ff tmp2)
-                (inst vpbroadcastw c-00ff c-00ff)
+                (inst mov tmp2 #x4001)
+                (inst vmovd c-4001 tmp2)
+                (inst vpbroadcastw c-4001 c-4001)
 
                 (inst mov tmp2 #x0F)
                 (inst vmovd c-0f tmp2)
                 (inst vpbroadcastb c-0f c-0f)
 
                 (inst mov tmp2 #x10000001)
-                (inst vmovd c-shift tmp2)
-                (inst vpbroadcastd c-shift c-shift)
+                (inst vmovd c-10000001 tmp2)
+                (inst vpbroadcastd c-10000001 c-10000001)
 
                 (inst lea full-table
                       (register-inline-constant
@@ -2944,11 +2934,8 @@
 
                   ;; Perform
                   ;; A + B<<6 + C<<12 + D<<18
-                  (inst vpand x2 c-00ff current)
-                  (inst vpandn x3 c-00ff current)
-                  (inst vpsrlw x3 x3 2)
-                  (inst vpaddw x2 x2 x3)
-                  (inst vpmaddwd current x2 c-shift)
+                  (inst vpmaddubsw x2 current c-4001)
+                  (inst vpmaddwd current x2 c-10000001)
 
                   (inst vmovdqu (ea string char-index 4) current))
 
