@@ -1539,7 +1539,6 @@
                         ((c-7f complex-double-reg))
                         ((c-ffff complex-double-reg))
                         ((c-d800 complex-double-reg))
-                        ((zero complex-double-reg))
 
                         ((multiplier unsigned-reg))
 
@@ -1662,8 +1661,6 @@
 
                    (inst mov multiplier #x0100040010004000)
 
-                   (inst vpxor zero zero zero)
-
                    (inst vmovdqu increment (register-inline-constant :avx2
                                                                      (concat-ub 32 (loop repeat 4 collect 4))))
 
@@ -1691,7 +1688,7 @@
                      (inst vpaddd temp temp t3)
 
                      ;; Negate
-                     (inst vpsubd temp zero temp)
+                     (inst vpabsd temp temp)
 
                      ;; Build an 8-bit index mask
                      ;; Narrow to 16 bits, making a 64-bit mask
