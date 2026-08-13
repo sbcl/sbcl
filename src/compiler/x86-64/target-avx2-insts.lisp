@@ -39,6 +39,11 @@
     (when stream
       (write-string name stream))))
 
+(defun print-kreg/mem (value stream dstate)
+  (if (machine-ea-p value)
+      (print-mem-ref :ref value :qword stream dstate)
+      (print-kreg value stream dstate)))
+
 (defun print-ymmreg/mem (value stream dstate)
   (if (machine-ea-p value)
       (print-mem-ref :ref value nil stream dstate)
@@ -80,12 +85,9 @@
   (print-xmmreg/mem-with-width
    value (inst-operand-size-default-qword dstate) t stream dstate))
 
-(defconstant-eqx +opmask-reg-names+
-    #("K0" "K1" "K2" "K3" "K4" "K5" "K6" "K7")
-  #'equalp)
-
-(defun print-opmask-reg (value stream dstate)
+#+sb-simd-pack-512
+(defun print-opmask-register (value stream dstate)
   (declare (ignore dstate))
-  (let ((name (svref +opmask-reg-names+ (logand value 7))))
+  (let ((name (svref +mask-register-names+ (logand value 7))))
     (if stream
         (write-string name stream))))

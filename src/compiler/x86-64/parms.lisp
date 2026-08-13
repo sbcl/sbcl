@@ -199,7 +199,7 @@
 ;;; Bit indices into *CPU-FEATURE-BITS*
 (defconstant cpu-has-ymm-registers   0)
 (defconstant cpu-has-popcnt          1)
-(defconstant cpu-has-zmm-registers   2) ;; fixme512 which bit: 3?
+(defconstant cpu-has-zmm-registers   2)
 
 #+sb-simd-pack
 (progn

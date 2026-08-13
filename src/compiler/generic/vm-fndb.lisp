@@ -492,6 +492,13 @@
 
 #+sb-simd-pack-512
 (progn
+  (defknown simd-pack-512-mask-p (t) boolean (foldable movable flushable))
+  (defknown %make-simd-pack-512-mask ((unsigned-byte 64))
+      simd-pack-512-mask
+      (flushable movable foldable))
+  (defknown %simd-pack-512-mask-value (simd-pack-512-mask)
+      (unsigned-byte 64)
+      (flushable movable foldable))
   (defknown simd-pack-512-p (t) boolean (foldable movable flushable))
   (defknown %simd-pack-512-tag (simd-pack-512) fixnum (movable flushable))
   (defknown %make-simd-pack-512 (fixnum (unsigned-byte 64) (unsigned-byte 64)
@@ -499,6 +506,10 @@
                                         (unsigned-byte 64) (unsigned-byte 64)
                                         (unsigned-byte 64) (unsigned-byte 64))
       simd-pack-512
+      (flushable movable foldable))
+  (defknown %simd-pack-512-single-item (simd-pack-512 (integer 0 15)) single-float
+      (flushable movable foldable))
+  (defknown %simd-pack-512-double-item (simd-pack-512 (integer 0 7)) double-float
       (flushable movable foldable))
   (defknown %make-simd-pack-512-double (double-float double-float double-float double-float
                                         double-float double-float double-float double-float)

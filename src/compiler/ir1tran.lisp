@@ -342,7 +342,8 @@
                             system-area-pointer
                             #+sb-simd-pack simd-pack
                             #+sb-simd-pack-256 simd-pack-256
-                            #+sb-simd-pack-512 simd-pack-512))
+                            #+sb-simd-pack-512 simd-pack-512
+                            #+sb-simd-pack-512 simd-pack-512-mask))
       ;; STANDARD-OBJECT layouts use MAKE-LOAD-FORM, but all other layouts
       ;; have the same status as symbols - composite objects but leaflike.
       (and (typep obj 'layout) (not (layout-for-pcl-obj-p obj)))

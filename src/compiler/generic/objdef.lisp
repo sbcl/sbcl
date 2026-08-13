@@ -468,6 +468,13 @@ during backtrace.
   (p6 :c-type "long" :type (unsigned-byte 64))
   (p7 :c-type "long" :type (unsigned-byte 64)))
 
+#+sb-simd-pack-512
+(define-primitive-object (simd-pack-512-mask
+                          :lowtag other-pointer-lowtag
+                          :size simd-pack-512-mask-size
+                          :widetag simd-pack-512-mask-widetag)
+    (value :c-type "long" :type (unsigned-byte 64)))
+
 ;;; Define some slots that precede 'struct thread' so that each may be read
 ;;; using a small negative 1-byte displacement.
 (defconstant-eqx +thread-header-slot-names+ #()

@@ -1,5 +1,9 @@
 (in-package "SB-X86-64-ASM")
 
+(define-arg-type k-vvvv-reg
+  :prefilter #'invert-4
+  :printer #'print-kreg)
+
 (define-arg-type ymmreg
   :prefilter #'prefilter-reg-r
   :printer #'print-ymmreg)
@@ -113,8 +117,23 @@
 
 ;; Opmask register k0-k7
 (define-arg-type opmask-reg
-  :printer #'print-opmask-reg)
+  :printer #'print-opmask-register)
 
+;;; K register in a ModR/M register field.
+(define-arg-type kreg
+  :prefilter (lambda (dstate value)
+               (declare (ignore dstate))
+               (get-fpr :kreg value))
+  :printer #'print-kreg)
+
+;;; K register or memory in a ModR/M r/m field.
+;;; This is only valid for instructions whose r/m operand can be K or memory.
+(define-arg-type kreg/mem
+  :prefilter (lambda (dstate mod r/m)
+               (if (= mod #b11)
+                   (get-fpr :kreg r/m)
+                   (decode-mod-r/m dstate mod r/m 'gpr)))
+  :printer #'print-kreg/mem)
 
 (define-instruction-format (vex2 16)
                            (vex :field (byte 8 0) :value #xC5)
@@ -213,6 +232,48 @@
                                 :default-printer '(:name :tab reg ", " reg/mem))
   (reg :field (byte 3 (+ start 11))
        :type 'reg))
+
+(define-vex-instruction-format (kreg-kreg/mem 16
+                                :default-printer '(:name :tab reg ", " reg/mem))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'kreg/mem)
+  (reg     :field (byte 3 (+ start 11))
+           :type 'kreg))
+
+(define-vex-instruction-format (kreg-reg/mem 16
+                                :default-printer '(:name :tab reg ", " reg/mem))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'reg/mem)
+  (reg     :field (byte 3 (+ start 11))
+           :type 'kreg))
+
+(define-vex-instruction-format (reg-kreg/mem 16
+                                :default-printer '(:name :tab reg ", " reg/mem))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'kreg/mem)
+  (reg     :field (byte 3 (+ start 11))
+           :type 'reg))
+
+(define-vex-instruction-format (kreg-kreg/mem-k 16
+                                :default-printer '(:name :tab reg ", " vvvv ", " reg/mem))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'kreg/mem)
+  (reg     :field (byte 3 (+ start 11))
+           :type 'kreg)
+  (vvvv    :type 'k-vvvv-reg))
+
+(define-vex-instruction-format (kreg-kreg/mem-imm 16
+                                :default-printer '(:name :tab reg ", " reg/mem ", " imm))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'kreg/mem)
+  (reg     :field (byte 3 (+ start 11))
+           :type 'kreg)
+  (imm     :type 'imm-byte))
 
 ;;; EVEX instruction formats for disassembly
 ;;; EVEX prefix is 4 bytes (32 bits):
@@ -477,7 +538,7 @@ EVEX uses independent bit3 (R/B) and bit4 (R'/X) for 32-register encoding."
           ;; R from reg (ModR/M reg field) - bit 3
           (r (if (null reg) 0 (reg-bit3 (reg-id reg))))
           ;; R' from reg - bit 4
-          (r-prime (if (null reg) 0 (reg-bit4 (reg-id reg))))
+          (r-prime (if (or (null reg) (k-register-p reg)) 0 (reg-bit4 (reg-id reg))))
           ;; X from EA index, or bit 4 of r/m reg for register-direct
           ;; In EVEX, X doubles as B' (bit 4 of r/m) when mod=11 (reg-direct)
           (x (cond ((and (ea-p thing)

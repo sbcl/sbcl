@@ -272,7 +272,9 @@
   (cond ((built-in-classoid-p type)
          (case (classoid-name type)
            (system-area-pointer sb-vm:sap-widetag)
-           (fdefn sb-vm:fdefn-widetag)))
+           (fdefn sb-vm:fdefn-widetag)
+           #+sb-simd-pack-512
+           (simd-pack-512-mask sb-vm:simd-pack-512-mask-widetag)))
         ((numeric-type-p type)
          (cond ((type= type (specifier-type '(complex single-float)))
                 sb-vm:complex-single-float-widetag)

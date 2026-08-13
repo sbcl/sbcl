@@ -283,7 +283,7 @@
          character-set-type
          #+sb-simd-pack simd-pack-type
          #+sb-simd-pack-256 simd-pack-256-type
-          #+sb-simd-pack-512 simd-pack-512-type)
+         #+sb-simd-pack-512 simd-pack-512-type)
      (values (%%typep obj type)
              t))
     (array-type
@@ -485,6 +485,8 @@ Experimental."
       (simd-pack-256 (simd-subtype (%simd-pack-256-tag x) simd-pack-256))
       #+sb-simd-pack-512
       (simd-pack-512 (simd-subtype (%simd-pack-512-tag x) simd-pack-512))
+      #+sb-simd-pack-512
+      (simd-pack-512-mask (specifier-type 'simd-pack-512-mask))
       (t
        (classoid-of x)))))
 

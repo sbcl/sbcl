@@ -2069,6 +2069,17 @@ variable: an unreadable object representing the error is printed instead.")
                 (%simd-pack-256-sb64s pack))))))))
 
 #+sb-simd-pack-512
+(defmethod print-object ((mask simd-pack-512-mask) stream)
+  (let ((value (%simd-pack-512-mask-value mask)))
+    (cond ((and *print-readably* *read-eval*)
+           (format stream "#.(~S #x~16,'0X)" '%make-simd-pack-512-mask value))
+          (*print-readably*
+           (print-not-readable-error mask stream))
+          (t
+           (print-unreadable-object (mask stream)
+             (format stream "~S ~20D" 'simd-pack-512-mask value))))))
+
+#+sb-simd-pack-512
 (defmethod print-object ((pack simd-pack-512) stream)
   (cond ((and *print-readably* *read-eval*)
          (format stream "#.(~S #b~3,'0B #x~16,'0D #x~16,'0D #x~16,'0D #x~16,'0D #x~16,'0D #x~16,'0D #x~16,'0D #x~16,'0D)"

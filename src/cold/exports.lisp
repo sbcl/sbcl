@@ -453,6 +453,9 @@
   (:export
    "SIMD-PACK-512"
    "SIMD-PACK-512-P"
+   "SIMD-PACK-512-MASK"
+   "SIMD-PACK-512-MASK-P"
+   "%MAKE-SIMD-PACK-512-MASK"
    "%MAKE-SIMD-PACK-512-UB32"
    "%MAKE-SIMD-PACK-512-UB64"
    "%MAKE-SIMD-PACK-512-DOUBLE"
@@ -1600,6 +1603,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            #+sb-simd-pack "%MAKE-SIMD-PACK"
            #+sb-simd-pack-256 "%MAKE-SIMD-PACK-256"
            #+sb-simd-pack-512 "%MAKE-SIMD-PACK-512"
+           #+sb-simd-pack-512 "%MAKE-SIMD-PACK-512-MASK"
            "%MAKE-STRUCTURE-INSTANCE"
            "%MAKE-STRUCTURE-INSTANCE-ALLOCATOR"
            "%MAP" "%MAP-FOR-EFFECT-ARITY-1"
@@ -1926,6 +1930,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            #+sb-simd-pack     "OBJECT-NOT-SIMD-PACK-ERROR"
            #+sb-simd-pack-256 "OBJECT-NOT-SIMD-PACK-256-ERROR"
            #+sb-simd-pack-512 "OBJECT-NOT-SIMD-PACK-512-ERROR"
+           #+sb-simd-pack-512 "OBJECT-NOT-SIMD-PACK-512-MASK-ERROR"
            "OBJECT-NOT-SIMPLE-ARRAY-COMPLEX-SINGLE-FLOAT-ERROR"
            "OBJECT-NOT-SIMPLE-ARRAY-DOUBLE-FLOAT-ERROR"
            "OBJECT-NOT-SIMPLE-ARRAY-ERROR"
@@ -2419,6 +2424,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%SIMD-PACK-256-2" "%SIMD-PACK-256-3")
   #+sb-simd-pack-512
   (:export "%SIMD-PACK-512-TAG"
+           "%SIMD-PACK-512-MASK-VALUE"
            "%SIMD-PACK-512-0" "%SIMD-PACK-512-1"
            "%SIMD-PACK-512-2" "%SIMD-PACK-512-3"
            "%SIMD-PACK-512-4" "%SIMD-PACK-512-5"
@@ -3264,6 +3270,7 @@ structure representations")
    "SIMD-PACK-256-WIDETAG")
   #+sb-simd-pack-512
   (:export
+   "+MASK-REGISTER-NAMES+"
    "SIMD-PACK-512-TAG-SLOT"
    "SIMD-PACK-512-P0-SLOT"
    "SIMD-PACK-512-P1-SLOT"
@@ -3274,7 +3281,10 @@ structure representations")
    "SIMD-PACK-512-P6-SLOT"
    "SIMD-PACK-512-P7-SLOT"
    "SIMD-PACK-512-SIZE"
-   "SIMD-PACK-512-WIDETAG"))
+   "SIMD-PACK-512-WIDETAG"
+   "SIMD-PACK-512-MASK-WIDETAG"
+   "SIMD-PACK-512-MASK-SIZE"
+   "SIMD-PACK-512-MASK-VALUE-SLOT"))
 
 (defpackage "SB-DISASSEM"
   (:documentation "private: stuff related to the implementation of the disassembler")

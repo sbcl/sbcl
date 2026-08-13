@@ -69,7 +69,7 @@
 (defmacro call-reg-specific-asm-routine (node prefix tn &optional (suffix ""))
   `(invoke-asm-routine
     'call
-    (aref (if (zmm-registers-used-p)
+    (aref (if (avx512-state-used-p)
               ,(map 'vector
                     (lambda (x)
                       (unless (member x '(rsp rbp) :test 'string=)

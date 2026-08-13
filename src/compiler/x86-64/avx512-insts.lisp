@@ -298,32 +298,135 @@
 
 ;;; Opmask instructions
 ;;; KMOV - Move to/from opmask registers
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun kmov-printer-list (format-stem prefix opcode w &key printer)
+    (let ((pp (vex-encode-pp prefix))
+          (m-mmmm (vex-encode-m-mmmm #x0F)))
+      (flet ((make-printer (inst-format fields)
+               `(:printer ,inst-format ,fields
+                          ,@(when printer `(',printer)))))
+        (if (eql w 1)
+            (list
+             (make-printer
+              (symbolicate "VEX3-" format-stem)
+              `((pp ,pp)
+                (m-mmmm ,m-mmmm)
+                (w ,w)
+                (op ,opcode))))
+            (list
+             (make-printer
+              (symbolicate "VEX2-" format-stem)
+              `((pp ,pp)
+                (op ,opcode)))
+             (make-printer
+              (symbolicate "VEX3-" format-stem)
+              `((pp ,pp)
+                (m-mmmm ,m-mmmm)
+                (w ,w)
+                (op ,opcode)))))))))
+
 ;;; These use VEX encoding (not EVEX), with k registers in ModR/M fields
-(macrolet ((def (name prefix opcode-from opcode-to w)
+(macrolet ((def (name kk-prefix gr-prefix store-mem-prefix load-mem-prefix
+                     op-k-k op-k-r op-r-k op-m-k op-k-m w)
              `(define-instruction ,name (segment dst src)
                 (:emitter
-                 (cond ((k-register-p dst)
-                        ;; k <- k/m or k <- gpr
-                        (emit-vex segment nil src dst ,prefix #x0F nil ,w)
-                        (emit-bytes segment ,opcode-from)
-                        (emit-ea segment src dst))
-                       (t
-                        ;; m <- k or gpr <- k
-                        (emit-vex segment nil dst src ,prefix #x0F nil ,w)
-                        (emit-bytes segment ,opcode-to)
-                        (emit-ea segment dst src)))))))
-  (def kmovw nil  #x90 #x91 0)
-  (def kmovb #x66 #x90 #x91 0)
-  (def kmovd #x66 #x90 #x91 1)
-  (def kmovq #xf2 #x90 #x91 1))
+                 (cond
+                   ((and (k-register-p dst) (k-register-p src))
+                    ;; VEX: k1 <- k2
+                    (emit-vex segment nil src dst ,kk-prefix #x0F 0 ,w)
+                    (emit-bytes segment ,op-k-k)
+                    (emit-ea segment src dst))
+
+                   ((and (k-register-p dst) (gpr-p src))
+                    ;; VEX: k1 <- r32/r64
+                    (emit-vex segment nil src dst ,gr-prefix #x0F 0 ,w)
+                    (emit-bytes segment ,op-k-r)
+                    (emit-ea segment src dst))
+
+                   ((and (gpr-p dst) (k-register-p src))
+                    ;; VEX: r32/r64 <- k1
+                    (emit-vex segment nil src dst ,gr-prefix #x0F 0 ,w)
+                    (emit-bytes segment ,op-r-k)
+                    (emit-ea segment src dst))
+
+                   ((and (k-register-p dst) (or (ea-p src) (tn-p src)))
+                    ;; VEX: k1 <- m16/m32/m64
+                    (emit-vex segment nil src dst ,load-mem-prefix #x0F 0 ,w)
+                    (emit-bytes segment ,op-k-m)
+                    (emit-ea segment src dst))
+
+                   ((and (or (ea-p dst) (tn-p dst)) (k-register-p src))
+                    ;; VEX: m16/m32/m64 <- k1
+                    (emit-vex segment nil dst src ,store-mem-prefix #x0F 0 ,w)
+                    (emit-bytes segment ,op-m-k)
+                    (emit-ea segment dst src))
+
+                   (t
+                    (error "invalid operands for ~A: ~S, ~S" ',name dst src))))
+
+                ;; printers:
+                ;; K <- K and K <- memory share the same opcode
+                ;; and are both decoded by kreg-kreg/mem.
+                ,@(kmov-printer-list 'kreg-kreg/mem kk-prefix op-k-k w)
+
+                ;; K <- GPR
+                ,@(kmov-printer-list 'kreg-reg/mem gr-prefix op-k-r w)
+
+                ;; GPR <- K
+                ,@(kmov-printer-list 'reg-kreg/mem gr-prefix op-r-k w)
+
+                ;; memory <- K
+                ;; ModRM.reg = K, ModRM.r/m = memory.
+                ;; kreg-kreg/mem can decode r/m as memory.
+                ,@(kmov-printer-list 'kreg-kreg/mem store-mem-prefix op-m-k w
+                                     :printer '(:name :tab reg/mem ", " reg)))))
+
+  ;;         kk       gr    store load  k<-k k<-r r<-k m<-k k<-m  w
+  (def kmovw nil      nil   nil   nil   #x90 #x92 #x93 #x91 #x90  0)
+  (def kmovb #x66     #x66  #x66  #x66  #x90 #x92 #x93 #x91 #x90  0)
+  (def kmovd #x66     #x66  #x66  #x66  #x90 #x92 #x93 #x91 #x90  1)
+  (def kmovq nil      #xf2  nil   nil   #x90 #x92 #x93 #x91 #x90  1))
 
 ;;; KAND, KOR, KXOR, etc. - Opmask logical operations (VEX.L1)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun klogical-printer-list (prefix opcode w)
+    (let ((pp (vex-encode-pp prefix))
+          (m-mmmm (vex-encode-m-mmmm #x0F)))
+      (flet ((make-printer (inst-format fields)
+               `(:printer ,inst-format ,fields)))
+        (if (eql w 1)
+            (list
+             (make-printer
+              (symbolicate "VEX3-" 'kreg-kreg/mem-k)
+              `((pp ,pp)
+                (m-mmmm ,m-mmmm)
+                (w ,w)
+                (l 1)
+                (op ,opcode))))
+            (list
+             (make-printer
+              (symbolicate "VEX2-" 'kreg-kreg/mem-k)
+              `((pp ,pp)
+                (l 1)
+                (op ,opcode)))
+             (make-printer
+              (symbolicate "VEX3-" 'kreg-kreg/mem-k)
+              `((pp ,pp)
+                (m-mmmm ,m-mmmm)
+                (w ,w)
+                (l 1)
+                (op ,opcode)))))))))
+
 (macrolet ((def (name prefix opcode w)
              `(define-instruction ,name (segment dst src1 src2)
                 (:emitter
                  (emit-vex segment src1 src2 dst ,prefix #x0F 1 ,w)
                  (emit-bytes segment ,opcode)
-                 (emit-ea segment src2 dst)))))
+                 (emit-ea segment src2 dst))
+
+                ,@(klogical-printer-list prefix opcode w))))
+
   (def kandw  nil  #x41 0)
   (def kandb  #x66 #x41 0)
   (def kandd  #x66 #x41 1)
@@ -346,12 +449,16 @@
   (def kxnorq #xf2 #x46 1))
 
 ;;; KNOT, KTEST - single-source opmask operations
+;;; Encoding: ModRM.reg = dst, VEX.vvvv = src1, ModRM.r/m = src2
 (macrolet ((def (name prefix opcode w)
              `(define-instruction ,name (segment dst src)
                 (:emitter
-                 (emit-vex segment nil src dst ,prefix #x0F nil ,w)
+                 (emit-vex segment nil src dst ,prefix #x0F 0 ,w)
                  (emit-bytes segment ,opcode)
-                 (emit-ea segment src dst)))))
+                 (emit-ea segment src dst))
+
+                ,@(kmov-printer-list 'kreg-kreg/mem prefix opcode w))))
+
   (def knotw  nil  #x44 0)
   (def knotb  #x66 #x44 0)
   (def knotd  #x66 #x44 1)
@@ -369,9 +476,12 @@
 (macrolet ((def (name prefix w)
              `(define-instruction ,name (segment dst src1 src2)
                 (:emitter
-                 (emit-vex segment src1 src2 dst ,prefix #x0F 1 ,w)
+                 (emit-vex segment src1 src2 dst ,prefix #x0F nil ,w)
                  (emit-bytes segment #x4b)
-                 (emit-ea segment src2 dst)))))
+                 (emit-ea segment src2 dst))
+
+                ,@(klogical-printer-list prefix #x4b w))))
+
   (def kunpckbw #x66 0)
   (def kunpckwd nil  0)
   (def kunpckdq nil  1))
@@ -533,22 +643,16 @@
   (def vprord    #x72 0 0)
   (def vprorq    #x72 0 1))
 
-;;; vpsraq - dual form (register + immediate)
-(define-instruction vpsraq (segment dst src src2/imm)
+;;; VPSRAQ immediate form.
+;;; The variable-shift form VPSRAVQ is defined separately.
+(define-instruction vpsraq (segment dst src imm)
   (:emitter
-   (if (integerp src2/imm)
-       (emit-avx512-inst-imm segment dst src src2/imm
-                             #x66 #x72 4
-                             :w 1)
-       (emit-avx512-inst segment src2/imm dst #x66 #xe2
-                         :opcode-prefix #x0f38
-                         :vvvv src
-                         :w 1)))
-  . #.(append (avx512-inst-printer-list 'ymm-ymm-imm #x66 #x72
-                                        :w 1
-                                        :more-fields '((/i 4)))
-              (avx512-inst-printer-list 'ymm-ymm/mem #x66 #xe2
-                                        :opcode-prefix #x0f38 :w 1 :nds t)))
+   (emit-avx512-inst-imm segment dst src imm
+                         #x66 #x72 4
+                         :w 1))
+  . #.(avx512-inst-printer-list 'ymm-ymm-imm #x66 #x72
+                                :w 1
+                                :more-fields '((/i 4))))
 
 ;;; Unsigned conversions (2-operand)
 (macrolet ((def (name prefix opcode w &optional (opcode-prefix #x0f))
@@ -667,17 +771,34 @@
   (def vpbroadcastq-gpr #x7c 1))
 
 ;;; VEX-encoded kshift (dst, src, imm8)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun kshift-printer-list (prefix opcode w)
+    (let ((fields
+            `((pp ,(vex-encode-pp prefix))
+              (m-mmmm ,(vex-encode-m-mmmm #x0F3A))
+              (w ,w)
+              (l 0)
+              (op ,opcode)
+              (imm nil :type 'imm-byte))))
+      (list
+       `(:printer ,(symbolicate "VEX3-" 'kreg-kreg/mem-imm)
+                  ,fields)))))
+
 (macrolet ((def (name prefix opcode w)
              `(define-instruction ,name (segment dst src imm)
                 (:emitter
                  (emit-vex segment nil src dst ,prefix #x0F3A 0 ,w)
                  (emit-bytes segment ,opcode)
                  (emit-ea segment src dst :remaining-bytes 1)
-                 (emit-byte segment imm)))))
+                 (emit-byte segment imm))
+
+                ,@(kshift-printer-list prefix opcode w))))
+
   (def kshiftlb #x66 #x32 0)
   (def kshiftlw #x66 #x32 1)
   (def kshiftld #x66 #x33 0)
   (def kshiftlq #x66 #x33 1)
+
   (def kshiftrb #x66 #x30 0)
   (def kshiftrw #x66 #x30 1)
   (def kshiftrd #x66 #x31 0)
@@ -689,11 +810,14 @@
                 (:emitter
                  (emit-vex segment src1 src2 dst ,prefix #x0F 1 ,w)
                  (emit-bytes segment ,opcode)
-                 (emit-ea segment src2 dst)))))
-  (def kaddb  #x66 #x4a 0)
-  (def kaddw  nil  #x4a 0)
-  (def kaddd  #x66 #x4a 1)
-  (def kaddq  #xf2 #x4a 1))
+                 (emit-ea segment src2 dst))
+
+                ,@(klogical-printer-list prefix opcode w))))
+
+  (def kaddb #x66 #x4a 0)
+  (def kaddw nil  #x4a 0)
+  (def kaddd #x66 #x4a 1)
+  (def kaddq #xf2 #x4a 1))
 
 ;;; Compare-to-k (kdst, src1, src2, imm8) - k-reg in ModR/M reg
 (macrolet ((def (name prefix opcode w)
@@ -1093,8 +1217,8 @@
                                    :aaa mask
                                    :vm t)))))
   ;; Dword destinations (8 lanes, YMM dst; index is ZMM qword)
-  (def vpgatherqd-z #x91 0)
-  (def vgatherqps-z #x93 0)
+  (def vpgatherqd-z #x91 1)
+  (def vgatherqps-z #x93 1)
   ;; Qword destinations (8 lanes, ZMM dst; index is ZMM qword)
   (def vpgatherqq-z #x91 1)
   (def vgatherqpd-z #x93 1)
@@ -1115,8 +1239,8 @@
                                    :w ,w
                                    :aaa mask
                                    :vm t)))))
-  (def vpscatterqd-z #xa1 0)
-  (def vscatterqps-z #xa3 0)
+  (def vpscatterqd-z #xa1 1)
+  (def vscatterqps-z #xa3 1)
   (def vpscatterqq-z #xa1 1)
   (def vscatterqpd-z #xa3 1)
   (def vpscatterdd-z #xa0 0)

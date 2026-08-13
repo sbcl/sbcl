@@ -909,6 +909,11 @@
              (%make-simd-pack tag
                               (fast-read-u-integer 8)
                               (fast-read-u-integer 8)))))))
+
+#+sb-simd-pack-512
+(define-fop 90 :not-host (fop-simd-pack-512-mask)
+  (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
+    (%make-simd-pack-512-mask (fast-read-u-integer 8))))
 
 ;;;; loading lists
 

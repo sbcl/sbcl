@@ -653,14 +653,43 @@ Floats are passed in integer registers."
                       '#:r8 '#:r9 '#:r10 '#:r11))
           (vars))
       (append
+       ;; Caller-saved GPRs.
        (loop for gpr in gprs
-             for offset = (symbol-value (intern (concatenate 'string (symbol-name gpr) "-OFFSET") "SB-VM"))
-             collect `(:temporary (:sc any-reg :offset ,offset :from :eval :to :result)
-                                  ,(car (push gpr vars))))
-       (loop for float to 15
+             for offset = (symbol-value
+                           (intern (concatenate 'string
+                                                (symbol-name gpr)
+                                                "-OFFSET")
+                                   "SB-VM"))
+             collect `(:temporary
+                       (:sc any-reg :offset ,offset :from :eval :to :result)
+                       ,(car (push gpr vars))))
+
+       ;; Low 16 vector registers, XMM0-15.
+       ;; These also cover the low halves of YMM0-15 and ZMM0-15.
+       (loop for float below 16
              for varname = (format nil "FLOAT~D" float)
-             collect `(:temporary (:sc single-reg :offset ,float :from :eval :to :result)
-                                  ,(car (push (make-symbol varname) vars))))
+             collect `(:temporary
+                       (:sc single-reg :offset ,float :from :eval :to :result)
+                       ,(car (push (make-symbol varname) vars))))
+
+       ;; AVX-512 high ZMM registers, ZMM16-31.
+       #+sb-simd-pack-512
+       (loop for zmm from 16 below 32
+             for varname = (format nil "ZMM~D" zmm)
+             collect `(:temporary
+                       (:sc single-avx512-reg :offset ,zmm
+                             :from :eval :to :result)
+                       ,(car (push (make-symbol varname) vars))))
+
+       ;; AVX-512 opmask registers K1-K7.
+       ;; K0 is not allocatable so not listed here
+       #+sb-simd-pack-512
+       (loop for mask from 1 to 7
+             for varname = (format nil "MASK~D" mask)
+             collect `(:temporary
+                       (:sc mask-reg :offset ,mask :from :eval :to :result)
+                       ,(car (push (make-symbol varname) vars))))
+
        `((:ignore ,@vars))))))
 
 (define-vop (call-out)

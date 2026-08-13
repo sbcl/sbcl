@@ -182,6 +182,39 @@
   (def %numerator)
   (def %denominator))
 
+#+sb-simd-pack-512
+(progn
+  (defun %make-simd-pack-512-mask (mask)
+    (declare (type (unsigned-byte 64) mask))
+    (let ((obj
+            (sb-c::%primitive
+             sb-vm::fixed-alloc
+             '%make-simd-pack-512-mask
+             sb-vm:simd-pack-512-mask-size
+             sb-vm:simd-pack-512-mask-widetag
+             sb-vm:other-pointer-lowtag
+             nil)))
+      (with-pinned-objects (obj)
+        (let ((sap (int-sap
+                    (logandc2 (get-lisp-obj-address obj)
+                              sb-vm:lowtag-mask))))
+          (setf (sap-ref-word
+                 sap
+                 (* sb-vm::simd-pack-512-mask-value-slot
+                    sb-vm:n-word-bytes))
+                mask)))
+      obj))
+
+  (defun %simd-pack-512-mask-value (mask)
+    (declare (type sb-ext:simd-pack-512-mask mask))
+    (with-pinned-objects (mask)
+      (sap-ref-word
+       (int-sap
+        (logandc2 (get-lisp-obj-address mask)
+                  sb-vm:lowtag-mask))
+       (* sb-vm::simd-pack-512-mask-value-slot
+          sb-vm:n-word-bytes)))))
+
 ;;; Document only those that SB-MANUAL:@UNTYPED-MEMORY singles out as
 ;;; examples.
 (setf (documentation 'int-sap 'function)

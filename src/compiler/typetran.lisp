@@ -100,7 +100,8 @@
   '(or array
     (and number (not (or fixnum #+64-bit single-float)))
     fdefn (and symbol (not null))
-    weak-pointer system-area-pointer code-component))
+    weak-pointer system-area-pointer code-component
+    #+sb-simd-pack-512 simd-pack-512-mask))
 
 (defun type-other-pointer-p (type)
   (csubtypep type (specifier-type 'other-pointer)))

@@ -196,6 +196,8 @@
          simd-pack-256-sb64)))
 #+sb-simd-pack-512
 (progn
+  (!def-primitive-type simd-pack-512-mask-type (descriptor-reg mask-reg)
+    :type simd-pack-512-mask)
   (!def-primitive-type simd-pack-512-single (single-avx512-reg descriptor-reg)
     :type (simd-pack-512 single-float))
   (!def-primitive-type simd-pack-512-double (double-avx512-reg descriptor-reg)
@@ -549,6 +551,9 @@
             (values (primitive-type-or-lose (classoid-name type)) t))
            ((pathname logical-pathname)
             (part-of instance))
+           #+sb-simd-pack-512
+           (simd-pack-512-mask
+            (values (primitive-type-or-lose 'simd-pack-512-mask-type) t))
            (t
             (any))))
         (fun-designator-type

@@ -22,7 +22,7 @@
 
 (defun int-avx512-p (tn)
   (sc-is tn int-avx512-reg int-avx512-stack fp-immediate))
-
+
 #+sb-xc-host
 (progn ; the host compiler will complain about absence of these
   (defun %simd-pack-512-0 (x) (error "Called %SIMD-PACK-512-0 ~S" x))
@@ -32,7 +32,164 @@
   (defun %simd-pack-512-4 (x) (error "Called %SIMD-PACK-512-4 ~S" x))
   (defun %simd-pack-512-5 (x) (error "Called %SIMD-PACK-512-5 ~S" x))
   (defun %simd-pack-512-6 (x) (error "Called %SIMD-PACK-512-6 ~S" x))
-  (defun %simd-pack-512-7 (x) (error "Called %SIMD-PACK-512-7 ~S" x)))
+  (defun %simd-pack-512-7 (x) (error "Called %SIMD-PACK-512-7 ~S" x))
+  (defun %simd-pack-512-mask-value (x) (error "Called %SIMD-PACK-512-MASK-VALUE ~S" x)))
+
+;; mask registers
+
+;; Mask registers are 64-bit registers so we can reuse ea from scalar regs for
+;; stack spilling, but the system has to use the specialized kmovq instruction
+;; since they live in their own hardware registers, not shared with either
+;; scalar nor zmm regs.
+
+(define-move-fun (load-mask 2) (vop x y)
+  ((kmask-stack) (mask-reg))
+  (inst kmovq y x))
+
+(define-move-fun (store-mask 2) (vop x y)
+  ((mask-reg) (kmask-stack))
+  (inst kmovq y x))
+
+(define-move-fun (load-mask-immediate 1) (vop x y)
+  ((fp-immediate) (mask-reg))
+  (let ((val (%simd-pack-512-mask-value (tn-value x))))
+    (cond ((= val 0) (inst kxorq y y y))
+          ((= val (ldb (byte 64 0) -1)) (inst kxnorq y y y))
+          (t (inst kmovq y (register-inline-constant :qword val))))))
+
+(define-vop (mask-move)
+  (:args (x :scs (mask-reg) :target y :load-if (not (location= x y))))
+  (:arg-types simd-pack-512-mask-type)
+  (:results (y :scs (mask-reg) :load-if (not (location= x y))))
+  (:result-types simd-pack-512-mask-type)
+  (:note "avx512 mask move")
+  (:generator 3
+    (unless (location= y x)
+      (inst kmovq y x))))
+
+(define-vop (move-mask-arg)
+  (:args (x :scs (mask-reg) :target y)
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y mask-reg))))
+  (:results (y))
+  (:note "avx512 mask argument move")
+  (:generator 4
+    (sc-case y
+      (mask-reg
+       (unless (location= x y)
+         (inst kmovq y x)))
+      (kmask-stack
+       (inst kmovq (ea (frame-byte-offset (tn-offset y)) fp) x)))))
+
+(define-vop (move-to-mask)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types simd-pack-512-mask-type)
+  (:results (y :scs (mask-reg)))
+  (:result-types simd-pack-512-mask-type)
+  (:note "pointer to mask coercion")
+  (:generator 2
+    (let ((ea (object-slot-ea x simd-pack-512-mask-value-slot other-pointer-lowtag)))
+      (inst kmovq y ea))))
+
+(define-allocator (move-from-mask)
+  (:args (x :scs (mask-reg)))
+  (:arg-types simd-pack-512-mask-type)
+  (:results (y :scs (descriptor-reg)))
+  (:result-types simd-pack-512-mask-type)
+  (:note "mask to pointer coercion")
+  (:generator 10
+    (alloc-other simd-pack-512-mask-widetag simd-pack-512-mask-size y)
+    (let ((ea (object-slot-ea y simd-pack-512-mask-value-slot other-pointer-lowtag)))
+      (inst kmovq ea x))))
+
+(define-vop (move-from-mask-to-unsigned)
+  (:args (x :scs (mask-reg)))
+  (:arg-types simd-pack-512-mask-type)
+  (:results (y :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:note "mask to unsigned move")
+  (:generator 1
+    (inst kmovq y x)))
+
+(define-vop (move-from-unsigned-to-mask)
+  (:args (x :scs (unsigned-reg)))
+  (:arg-types unsigned-num)
+  (:results (y :scs (mask-reg)))
+  (:result-types simd-pack-512-mask-type)
+  (:note "unsigned to mask move")
+  (:generator 1
+    (inst kmovq y x)))
+
+(define-vop (move-from-mask-to-signed)
+  (:args (x :scs (mask-reg)))
+  (:arg-types simd-pack-512-mask-type)
+  (:results (y :scs (signed-reg)))
+  (:result-types signed-num)
+  (:note "mask to signed move")
+  (:generator 1
+    (inst kmovq y x)))
+
+(define-vop (move-from-signed-to-mask)
+  (:args (x :scs (signed-reg)))
+  (:arg-types signed-num)
+  (:results (y :scs (mask-reg)))
+  (:result-types simd-pack-512-mask-type)
+  (:note "signed to mask move")
+  (:generator 1
+    (inst kmovq y x)))
+
+(define-vop (move-from-mask-to-any)
+  (:args (x :scs (mask-reg)))
+  (:arg-types simd-pack-512-mask-type)
+  (:results (y :scs (any-reg)))
+  (:result-types *)
+  (:note "mask to any move")
+  (:generator 1
+    (inst kmovq y x)))
+
+(define-vop (move-from-any-to-mask)
+  (:args (x :scs (any-reg)))
+  (:arg-types *)
+  (:results (y :scs (mask-reg)))
+  (:result-types simd-pack-512-mask-type)
+  (:note "any to mask move")
+  (:generator 1
+    (inst kmovq y x)))
+
+(define-move-vop move-from-mask-to-any :move (mask-reg) (any-reg))
+(define-move-vop move-from-any-to-mask :move (any-reg) (mask-reg))
+(define-move-vop move-from-mask-to-signed :move (mask-reg) (signed-reg))
+(define-move-vop move-from-signed-to-mask :move (signed-reg) (mask-reg))
+(define-move-vop move-from-mask-to-unsigned :move (mask-reg) (unsigned-reg))
+(define-move-vop move-from-unsigned-to-mask :move (unsigned-reg) (mask-reg))
+(define-move-vop move-to-mask :move (descriptor-reg) (mask-reg))
+(define-move-vop move-from-mask :move (mask-reg) (descriptor-reg))
+(define-move-vop mask-move :move (mask-reg) (mask-reg))
+(define-move-vop move-mask-arg :move-arg (mask-reg) (mask-reg))
+(define-move-vop move-arg :move-arg (mask-reg) (descriptor-reg))
+
+(define-vop (%make-simd-pack-512-mask)
+  (:translate sb-ext:%make-simd-pack-512-mask)
+  (:policy :fast-safe)
+  (:args (val :scs (unsigned-reg) :target dst))
+  (:arg-types unsigned-num)
+  (:results (dst :scs (mask-reg)))
+  (:result-types simd-pack-512-mask-type)
+  (:generator 1
+    (inst kmovq dst val)))
+
+(define-vop (%simd-pack-512-mask-value)
+  (:translate sb-kernel:%simd-pack-512-mask-value)
+  (:policy :fast-safe)
+  (:args (val :scs (descriptor-reg)))
+  (:arg-types simd-pack-512-mask-type)
+  (:results (dst :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:note "extract simd-pack-512 mask")
+  (:generator 3
+    (loadw dst val simd-pack-512-mask-value-slot other-pointer-lowtag)))
+
+;; simd-pack-512 related
 
 (define-move-fun (load-int-avx512-immediate 1) (vop x y)
                  ((fp-immediate) (int-avx512-reg))
@@ -69,7 +226,7 @@
            ;; in 512 it works on zmm regs; we good
            (inst vxorps y y y))
           ((= p0 p1 p2 p3 p4 p5 p6 p7 (ldb (byte 64 0) -1))
-           (inst vpcmpeqd 0 y y)) ;; fixme512 ???
+           (inst vpcmpeqd y y y))
           (t
            (inst vmovdqu64 y (register-inline-constant x))))))
 
@@ -111,7 +268,6 @@
                     (:results (y :scs (descriptor-reg)))
                     (:arg-types ,type)
                     (:note "AVX512 to pointer coercion")
-                    ;; fixme512 below is definitely wrong for avx512
                     (:generator 13
                       (alloc-other simd-pack-512-widetag simd-pack-512-size y)
                       (storew (fixnumize ,tag)
@@ -120,7 +276,7 @@
                                  y simd-pack-512-p0-slot other-pointer-lowtag)))
                         (if (float-avx512-p x)
                             (inst vmovups ea x)
-                            (inst vmovdqu ea x)))))
+                            (inst vmovdqu64 ea x)))))
                   (define-move-vop ,name :move
                     ,scs (descriptor-reg))))))
   ;; see +simd-pack-element-types+

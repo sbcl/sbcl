@@ -1178,6 +1178,8 @@
                    (get-fpr :ymm (tn-offset operand)))
                   ((eq (sb-name (sc-sb (tn-sc operand))) 'float-registers)
                    (get-fpr :xmm (tn-offset operand)))
+                  ((eq (sb-name (sc-sb (tn-sc operand))) 'sb-vm::mask-registers)
+                   (get-fpr :kreg (tn-offset operand)))
                   (t ; a stack SC or constant
                    operand)))
           operands))

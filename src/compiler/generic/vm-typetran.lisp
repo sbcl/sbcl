@@ -118,6 +118,8 @@
 (define-type-predicate simd-pack-256-p simd-pack-256)
 #+sb-simd-pack-512
 (define-type-predicate simd-pack-512-p simd-pack-512)
+#+sb-simd-pack-512
+(define-type-predicate simd-pack-512-mask-p simd-pack-512-mask)
 (define-type-predicate weak-pointer-p weak-pointer)
 (define-type-predicate code-component-p code-component)
 (define-type-predicate fdefn-p fdefn)

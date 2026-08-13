@@ -5473,6 +5473,7 @@ expansion happened."
 
 #+sb-simd-pack-512
 (progn
+  ;; simd-pack related
   (define-type-class simd-pack-512 :enumerable nil :might-contain-other-types nil)
 
   ;; Though this involves a recursive call to parser, parsing context need not

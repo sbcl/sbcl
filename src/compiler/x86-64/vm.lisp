@@ -201,11 +201,28 @@
   (defreg float31 31 :float)
   (defregset *float-regs* float0 float1 float2 float3 float4 float5 float6 float7
              float8 float9 float10 float11 float12 float13 float14 float15)
-  ;; ZMM16-31 are only accessible via EVEX encoding
-  (defregset *zmm-regs* float0 float1 float2 float3 float4 float5 float6 float7
-             float8 float9 float10 float11 float12 float13 float14 float15
-             float16 float17 float18 float19 float20 float21 float22 float23
-             float24 float25 float26 float27 float28 float29 float30 float31)
+  #+sb-simd-pack-512
+  (progn
+    ;; ZMM16-31 are only accessible via EVEX encoding
+    (defregset *zmm-regs* float0 float1 float2 float3 float4 float5 float6 float7
+      float8 float9 float10 float11 float12 float13 float14 float15
+      float16 float17 float18 float19 float20 float21 float22 float23
+      float24 float25 float26 float27 float28 float29 float30 float31)
+    ;; mask registers for use with avx512
+    (defreg k0 0 :qword)
+    (defreg k1 1 :qword)
+    (defreg k2 2 :qword)
+    (defreg k3 3 :qword)
+    (defreg k4 4 :qword)
+    (defreg k5 5 :qword)
+    (defreg k6 6 :qword)
+    (defreg k7 7 :qword)
+    ;; k0 is special meaning "no masking", so we can't schedule those regs for
+    ;; normal ops. I am not sure how to best model it, this is the simplest try
+    (defregset *mask-regs* k1 k2 k3 k4 k5 k6 k7)
+    (defconstant-eqx +mask-register-names+
+        #("K0" "K1" "K2" "K3" "K4" "K5" "K6" "K7")
+      #'equalp))
 
   ;; registers used to pass arguments
   ;;
@@ -226,7 +243,7 @@
 (define-storage-base registers :finite :size 16)
 
 (define-storage-base float-registers :finite :size 32)
-
+(define-storage-base mask-registers :finite :size 8)
 ;;; Start from 2, for the old RBP (aka OCFP) and return address
 (define-storage-base stack :unbounded :size 2 :size-increment 1)
 (define-storage-base constant :non-packed)
@@ -276,6 +293,8 @@
   (double-avx512-stack stack :element-size 8)
   #+sb-simd-pack-512
   (single-avx512-stack stack :element-size 8)
+  #+sb-simd-pack-512
+  (kmask-stack stack)
 
   ;;
   ;; things that can go in the integer registers
@@ -413,14 +432,22 @@
                      :constant-scs (fp-immediate)
                      :save-p t
                      :alternate-scs (single-avx512-stack))
+  #+sb-simd-pack-512
+  (mask-reg          mask-registers
+                     :locations #.*mask-regs*
+                     :constant-scs (fp-immediate)
+                     :save-p t
+                     :alternate-scs (kmask-stack))
 
-  (catch-block stack :element-size catch-block-size)
-  (unwind-block stack :element-size unwind-block-size)))
+ (catch-block stack :element-size catch-block-size)
+ (unwind-block stack :element-size unwind-block-size)))
 
 (defparameter *qword-sc-names*
   '(any-reg descriptor-reg sap-reg signed-reg unsigned-reg control-stack
     signed-stack unsigned-stack sap-stack single-stack
-    character-reg character-stack constant))
+    character-reg character-stack constant
+    #+sb-simd-pack-512 mask-reg
+    #+sb-simd-pack-512 kmask-stack))
 ;;; added by jrd. I guess the right thing to do is to treat floats
 ;;; as a separate size...
 ;;;
@@ -437,12 +464,12 @@
                                    int-avx2-stack single-avx2-stack
                                  double-avx2-stack))
 #+sb-simd-pack-512
-(defparameter *zword-sc-names* '(#+sb-simd-pack-512 int-avx512-reg
-                                 #+sb-simd-pack-512 single-avx512-reg
-                                 #+sb-simd-pack-512 double-avx512-reg
-                                 #+sb-simd-pack-512 int-avx512-stack
-                                 #+sb-simd-pack-512 single-avx512-stack
-                                 #+sb-simd-pack-512 double-avx512-stack))
+(defparameter *zword-sc-names* '(int-avx512-reg
+                                 single-avx512-reg
+                                 double-avx512-reg
+                                 int-avx512-stack
+                                 single-avx512-stack
+                                 double-avx512-stack))
 ) ; EVAL-WHEN
 (!define-storage-classes
   . #.(mapcar (lambda (class-spec)
@@ -488,8 +515,8 @@
       (make-random-tn (sc-or-lose 'unsigned-reg) nil)
     #'constantly-t)
   (def-fpr-tns single-reg
-      float0 float1 float2 float3 float4 float5 float6 float7
-      float8 float9 float10 float11 float12 float13 float14 float15))
+    float0 float1 float2 float3 float4 float5 float6 float7
+    float8 float9 float10 float11 float12 float13 float14 float15))
 
 ;;; Return true if THING is a general-purpose register TN.
 (defun gpr-tn-p (thing)
@@ -499,6 +526,7 @@
 (defun xmm-tn-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'float-registers)))
+
 (defun zmm-tn-p (tn)
   (member (tn-sc tn) (list (sc-or-lose 'single-avx512-reg)
                            (sc-or-lose 'double-avx512-reg)
@@ -544,7 +572,8 @@
     ((or float (complex float)
          #+(and sb-simd-pack (not sb-xc-host)) simd-pack
          #+(and sb-simd-pack-256 (not sb-xc-host)) simd-pack-256
-         #+(and sb-simd-pack-512 (not sb-xc-host)) simd-pack-512)
+         #+(and sb-simd-pack-512 (not sb-xc-host)) simd-pack-512
+         #+(and sb-simd-pack-512 (not sb-xc-host)) simd-pack-512-mask)
      fp-immediate-sc-number)
     ;; This case has to follow the numeric cases because proxy floating-point numbers
     ;; are host structs. Or we could implement and use something like SB-XC:TYPECASE
@@ -669,6 +698,7 @@
       (stack (format nil "S~D" offset))
       (constant (format nil "Const~D" offset))
       (immediate-constant "Immed")
+      (mask-registers (format nil "K~D" offset))
       (noise (symbol-name (sc-name sc))))))
 
 (defconstant nargs-offset rcx-offset)

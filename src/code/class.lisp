@@ -951,7 +951,8 @@ between the ~A definition and the ~A definition"
 ;;; hierarchy).  See NAMED :COMPLEX-SUBTYPEP-ARG2
 (declaim (type cons **non-instance-classoid-types**))
 (defglobal **non-instance-classoid-types**
-  '(symbol system-area-pointer weak-pointer code-component fdefn random-class))
+  '(symbol system-area-pointer weak-pointer code-component fdefn random-class
+    #+sb-simd-pack-512 simd-pack-512-mask))
 
 (defun classoid-non-instance-p (classoid)
   (declare (type classoid classoid))
@@ -1109,6 +1110,11 @@ between the ~A definition and the ~A definition"
       ;; KLUDGE: doesn't work without AVX512 support from the CPU
       ;; (%make-simd-pack-512-ub64 42 42 42 42 42 42 42 42)
       sb-pcl:+slot-unbound+)
+     #+sb-simd-pack-512
+     (simd-pack-512-mask
+      :codes (,#.sb-vm:simd-pack-512-mask-widetag)
+      :predicate simd-pack-512-mask-p
+      :prototype-form sb-pcl:+slot-unbound+)
      (real :translation real :inherits (number) :prototype-form 0)
      (float :translation float :inherits (real number) :prototype-form 0f0)
      (single-float

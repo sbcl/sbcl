@@ -518,6 +518,13 @@
               (unless (similar-check-table x file)
                 (dump-simd-pack-512 x file)
                 (similar-save-object x file)))
+             #+(and (not sb-xc-host) sb-simd-pack-512)
+             (simd-pack-512-mask
+              (unless (similar-check-table x file)
+                (dump-fop 'fop-simd-pack-512-mask file)
+                (dump-integer-as-n-bytes
+                 (%simd-pack-512-mask-value x) 8 file)
+                (similar-save-object x file)))
              (t
               ;; This probably never happens, since bad things tend to
               ;; be detected during IR1 conversion.

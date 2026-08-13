@@ -213,16 +213,21 @@
 (define-vop (sb-c::end-pseudo-atomic)
   (:generator 1 (emit-end-pseudo-atomic)))
 
-(defun zmm-registers-used-p ()
+(defun avx512-state-tn-p (tn)
+  (sc-is tn
+         int-avx512-reg
+         double-avx512-reg
+         single-avx512-reg
+         mask-reg))
+
+(defun avx512-state-used-p ()
   (when (and #+sb-xc-host (boundp '*component-being-compiled*))
     (let ((comp (component-info *component-being-compiled*)))
       (flet ((used-p (tn)
                (do ((tn tn (sb-c::tn-next tn)))
                    ((null tn))
-                 (when (sc-is tn int-avx512-reg
-                              double-avx512-reg
-                              single-avx512-reg)
-                   (return-from zmm-registers-used-p t)))))
+                 (when (avx512-state-tn-p tn)
+                   (return-from avx512-state-used-p t)))))
         (used-p (sb-c::ir2-component-normal-tns comp))
         (used-p (sb-c::ir2-component-wired-tns comp))))))
 
@@ -241,7 +246,7 @@
                              (avx512 :default))
   (declare (ignorable thread-temp))
   (when (eq avx512 :default)
-    (setf avx512 (zmm-registers-used-p)))
+    (setf avx512 (avx512-state-used-p)))
   (flet ((fallback (size)
            ;; Call an allocator trampoline and get the result in the proper register.
            ;; There are 2 choices of trampoline to invoke alloc() or alloc_list()
