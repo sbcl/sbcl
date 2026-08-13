@@ -1601,16 +1601,13 @@
        (type (make-symbol "TYPE")))
     (declare (ignorable layout))
 
+    (acond
     ;; Easiest case first: single bit test.
-    (cond ((member name '(condition pathname structure-object))
-           (let ((flag (case name
-                         (condition +condition-layout-flag+)
-                         (pathname  +pathname-layout-flag+)
-                         (t         +structure-layout-flag+))))
+          ((sb-vm::struct-typep-bit-test-p name)
             (if (vop-existsp :translate structure-typep)
                 `(structure-typep object ,layout)
                 `(and (%instancep object)
-                      (logtest (,get-flags (%instance-layout object)) ,flag)))))
+                      (logtest (,get-flags (%instance-layout object)) ,it))))
 
           ;; Next easiest: Sealed and no subtypes. Typically for DEFSTRUCT only.
           ;; Even if you don't seal a DEFCLASS, we're allowed to assume that things

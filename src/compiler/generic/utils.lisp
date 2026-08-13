@@ -545,6 +545,16 @@
   (let ((slot (get-dsd-index layout sb-kernel::id-word0)))
     (ash (+ sb-vm:instance-slots-offset slot) sb-vm:word-shift)))
 
+;; It is both an optimization and a necessity that we use a single-bit test
+;; for these three layouts in particular, because no layout-id is stored
+;; for depthoid=1 in the ID array within a layout.
+(defun struct-typep-bit-test-p (layout)
+  (let ((name (if (symbolp layout) layout (layout-classoid-name layout))))
+    (case name
+      (condition +condition-layout-flag+)
+      (pathname  +pathname-layout-flag+)
+      (structure-object +structure-layout-flag+))))
+
 ;;; I'd like the division-by-constant-integer optimization to work
 ;;; during cross-compilation, but the algorithm to compute the magic
 ;;; parameters is expressed in C, not Lisp. I need to translate it.

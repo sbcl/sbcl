@@ -810,11 +810,7 @@
     (loadw r object instance-slots-offset instance-pointer-lowtag)))
 
 (defun structure-is-a (layout temp this-id test-layout &optional desc-temp target not-p done)
-  (let ((test-layout (case (layout-classoid-name test-layout)
-                       (condition +condition-layout-flag+)
-                       (pathname  +pathname-layout-flag+)
-                       (structure-object +structure-layout-flag+)
-                       (t test-layout))))
+  (let ((test-layout (or (struct-typep-bit-test-p test-layout) test-layout)))
    (cond ((integerp test-layout)
           (inst ldrsw temp
                 (@ layout
@@ -888,16 +884,13 @@
   (:temporary (:sc unsigned-reg
                :unused-if
                (and (instance-tn-ref-p args)
-                    #1=(and (not (memq (layout-classoid-name test-layout)
-                                       '(condition pathname structure-object)))
+                    #1=(and (not (struct-typep-bit-test-p test-layout))
                             (let ((classoid (layout-classoid test-layout)))
                               (and (eq (classoid-state classoid) :sealed)
                                    (not (classoid-subclasses classoid)))))))
               temp)
   (:temporary (:sc unsigned-reg
-               :unused-if (or (memq (layout-classoid-name test-layout)
-                                    '(condition pathname structure-object))
-                              #1#))
+               :unused-if (or (struct-typep-bit-test-p test-layout) #1#))
               this-id)
   (:temporary (:sc descriptor-reg
                :unused-if (not #1#))
@@ -922,16 +915,13 @@
   (:info target not-p test-layout)
   (:temporary (:sc unsigned-reg
                :unused-if
-               #1=(and (not (memq (layout-classoid-name test-layout)
-                                  '(condition pathname structure-object)))
+               #1=(and (not (struct-typep-bit-test-p test-layout))
                        (let ((classoid (layout-classoid test-layout)))
                          (and (eq (classoid-state classoid) :sealed)
                               (not (classoid-subclasses classoid))))))
               temp)
   (:temporary (:sc unsigned-reg
-               :unused-if (or (memq (layout-classoid-name test-layout)
-                                    '(condition pathname structure-object))
-                              #1#))
+               :unused-if (or (struct-typep-bit-test-p test-layout) #1#))
               this-id)
   (:temporary (:sc descriptor-reg
                :unused-if (not #1#))

@@ -1237,12 +1237,7 @@
       (inst cmp :dword (read-depthoid) (fixnumize k))))
 
   (defun structure-is-a (layout test-layout &optional target not-p done)
-    (let ((test-layout
-            (case (layout-classoid-name test-layout)
-                       (condition +condition-layout-flag+)
-                       (pathname  +pathname-layout-flag+)
-                       (structure-object +structure-layout-flag+)
-                       (t test-layout))))
+    (let ((test-layout (or (struct-typep-bit-test-p test-layout) test-layout)))
      (cond ((integerp test-layout)
             (inst test
                   (if (typep test-layout '(unsigned-byte 8))
@@ -1310,8 +1305,7 @@
     (unless (instance-tn-ref-p args)
       (%test-lowtag object layout (if not-p target done) t instance-pointer-lowtag))
 
-    (cond ((and (not (memq (layout-classoid-name test-layout)
-                           '(condition pathname structure-object)))
+    (cond ((and (not (struct-typep-bit-test-p test-layout))
                 (let ((classoid (layout-classoid test-layout)))
                   (and (eq (classoid-state classoid) :sealed)
                        (not (classoid-subclasses classoid)))))
@@ -1330,10 +1324,9 @@
            #-compact-instance-header
            (loadw layout object instance-slots-offset instance-pointer-lowtag)
            (structure-is-a layout test-layout target not-p done)))
-    (inst jmp (if (if  (memq (layout-classoid-name test-layout)
-                             '(condition pathname structure-object))
-                      (not not-p)
-                      not-p)
+    ;; Flag sense: in layout tests that use the CMP instruction (most of them),
+    ;; the :E flag means "yes" though for 1-bit tests the :NE flag means "yes"
+    (inst jmp (if (if (struct-typep-bit-test-p test-layout) (not not-p) not-p)
                   :ne :e) target)
     done))
 
@@ -1344,10 +1337,7 @@
   (:info target not-p test-layout)
   (:generator 4
     (structure-is-a layout test-layout target not-p done)
-    (inst jmp (if (if  (memq (layout-classoid-name test-layout)
-                             '(condition pathname structure-object))
-                      (not not-p)
-                      not-p)
+    (inst jmp (if (if (struct-typep-bit-test-p test-layout) (not not-p) not-p)
                   :ne :e) target)
     done))
 
