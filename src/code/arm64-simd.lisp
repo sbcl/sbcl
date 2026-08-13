@@ -537,15 +537,13 @@
            (tail (sb-impl::buffer-tail ibuf))
            (string-end (- end (/ 64 4)))
            (byte-end (- tail 16)))
-      (multiple-value-bind (copied written)
-          (inline-vop (((byte-start any-reg) head)
-                       ((string-start any-reg) start)
-                       ((byte-end any-reg) byte-end)
+      (multiple-value-bind (read written)
+          (inline-vop (((string-start any-reg) start)
+                       ((byte-start any-reg) head)
+                       ((byte-end any-reg t) byte-end)
                        ((string-end any-reg) string-end)
-                       ((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
-                       ((byte-array sap-reg t))
-                       ((string* sap-reg t) (vector-sap string))
-                       ((string sap-reg t))
+                       ((byte-array* sap-reg) (sb-impl::buffer-sap ibuf))
+                       ((string* sap-reg) (vector-sap string))
 
                        ((index unsigned-reg t :from (:argument 1)))
                        ((suffix unsigned-reg t :from (:argument 1)))
@@ -578,14 +576,15 @@
                        ((tag-clear complex-double-reg))
                        ((s1 complex-double-reg t :offset 8))
                        ((s2 complex-double-reg t :offset 9)))
-              ((copied unsigned-reg positive-fixnum)
-               (written unsigned-reg positive-fixnum))
+              ((byte-array unsigned-reg positive-fixnum :from :load)
+               (string any-reg positive-fixnum :from (:argument 0)))
 
-            (inst add byte-end byte-array* (asr byte-end 1))
+            (inst add string string* (lsl string-start (- 2 n-fixnum-tag-bits)))
             (inst add byte-array byte-array* (lsr byte-start 1))
 
             (inst add string-end string* (lsl string-end (- 2 n-fixnum-tag-bits)))
-            (inst add string string* (lsl string-start (- 2 n-fixnum-tag-bits)))
+            (inst add byte-end byte-array* (asr byte-end 1))
+
 
             (inst b start)
 
@@ -771,10 +770,10 @@
             FULL-DONE
             (inst add byte-array byte-array suffix) ;; strip any consumed continuations bytes
             DONE
-            (inst sub copied byte-array byte-array*)
-            (inst sub written string string*)
-            (inst lsr written written 2))
-        (setf (sb-impl::buffer-head ibuf) copied)
+            (inst sub byte-array byte-array byte-array*)
+            (inst sub string string string*)
+            (inst lsr string string (- 2 n-fixnum-tag-bits)))
+        (setf (sb-impl::buffer-head ibuf) read)
         (truly-the index written)))))
 
 #+sb-unicode
@@ -1056,15 +1055,13 @@
            (tail (sb-impl::buffer-tail ibuf))
            (string-end (- end (/ 64 4)))
            (byte-end (- tail 32)))
-      (multiple-value-bind (copied written)
-          (inline-vop (((byte-start any-reg) head)
-                       ((string-start any-reg) start)
+      (multiple-value-bind (read written)
+          (inline-vop (((string-start any-reg t :target string) start)
+                       ((byte-start any-reg) head)
                        ((byte-end any-reg) byte-end)
                        ((string-end any-reg) string-end)
                        ((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
-                       ((byte-array sap-reg t))
                        ((string* sap-reg t) (vector-sap string))
-                       ((string sap-reg t))
 
                        ((index unsigned-reg t :from (:argument 1)))
                        ((suffix unsigned-reg t :from (:argument 1)))
@@ -1100,14 +1097,13 @@
                        ((tag-clear complex-double-reg))
                        ((s1 complex-double-reg t :offset 8))
                        ((s2 complex-double-reg t :offset 9)))
-              ((copied unsigned-reg positive-fixnum)
-               (written unsigned-reg positive-fixnum))
+              ((byte-array unsigned-reg positive-fixnum :from :load)
+               (string any-reg positive-fixnum :from (:argument 0)))
 
-            (inst add byte-end byte-array* (asr byte-end 1))
-            (inst add byte-array byte-array* (lsr byte-start 1))
-
-            (inst add string-end string* (lsl string-end (- 2 n-fixnum-tag-bits)))
             (inst add string string* (lsl string-start (- 2 n-fixnum-tag-bits)))
+            (inst add byte-array byte-array* (lsr byte-start 1))
+            (inst add string-end string* (lsl string-end (- 2 n-fixnum-tag-bits)))
+            (inst add byte-end byte-array* (asr byte-end 1))
 
             (inst cmp byte-array byte-end)
             (inst b :hi DONE)
@@ -1388,10 +1384,10 @@
 
             (inst add byte-array byte-array suffix) ;; strip any consumed continuations bytes
             DONE
-            (inst sub copied byte-array byte-array*)
-            (inst sub written string string*)
-            (inst lsr written written 2))
-        (setf (sb-impl::buffer-head ibuf) copied)
+            (inst sub byte-array byte-array byte-array*)
+            (inst sub string string string*)
+            (inst lsr string string (- 2 n-fixnum-tag-bits)))
+        (setf (sb-impl::buffer-head ibuf) read)
         (truly-the index written)))))
 
 (defun character-string-to-utf8 (start end string obuf)
@@ -1408,9 +1404,7 @@
                         ((byte-end any-reg) byte-end)
                         ((string-end any-reg) string-end)
                         ((byte-array* sap-reg t) (sb-impl::buffer-sap obuf))
-                        ((byte-array sap-reg t))
                         ((string* sap-reg t) (vector-sap string))
-                        ((string sap-reg t))
 
                         ((newlines complex-double-reg))
                         ((f1 complex-double-reg t :offset 1))
@@ -1440,8 +1434,8 @@
                         ((orr-mask complex-double-reg t :offset 12))
                         ((zeros complex-double-reg))
                         ((:label error)))
-               ((read unsigned-reg positive-fixnum :from :load)
-                (written unsigned-reg positive-fixnum)
+               ((string any-reg positive-fixnum :from (:argument 0))
+                (byte-array unsigned-reg positive-fixnum :from :load)
                 (last-newline signed-reg signed-num :from :load))
              (flet ((make-full-table ()
                       (let* ((table-size 256)
@@ -1484,6 +1478,11 @@
                                                    (incf dest-index))))
                         table)))
                (assemble ()
+                 (inst add byte-end byte-array* (asr byte-end 1))
+                 (inst add byte-array byte-array* (lsr byte-start 1))
+
+                 (inst add string-end string* (lsl string-end (- 2 n-fixnum-tag-bits)))
+                 (inst add string string* (lsl string-start (- 2 n-fixnum-tag-bits)))
 
                  (inst movi newlines 10 :16b)
                  (inst movi increment 4 :4s)
@@ -1491,11 +1490,6 @@
                  (inst movi zeros 0 :4s)
                  (load-inline-constant indexes :oword (concat-ub 32 '(3 2 1 0)))
 
-                 (inst add byte-end byte-array* (asr byte-end 1))
-                 (inst add byte-array byte-array* (lsr byte-start 1))
-
-                 (inst add string-end string* (lsl string-end (- 2 n-fixnum-tag-bits)))
-                 (inst add string string* (lsl string-start (- 2 n-fixnum-tag-bits)))
                  (inst b start)
 
                  ASCII-LOOP
@@ -1604,8 +1598,8 @@
                  (inst b :le ERROR)
 
                  DONE
-                 (inst sub read string string*)
-                 (inst lsr read read 2)
+                 (inst sub string string string*)
+                 (inst lsr string string (- 2 n-fixnum-tag-bits))
 
                  (inst smaxv temp last-newlines :4s)
                  (inst smov last-newline temp 0 :s)
@@ -1627,7 +1621,7 @@
                  (inst add last-newline last-newline (lsr string-start n-fixnum-tag-bits))
                  NO-NL
 
-                 (inst sub written byte-array byte-array*)))))
+                 (inst sub byte-array byte-array byte-array*)))))
        (setf (sb-impl::buffer-tail obuf) written)
        (return (values read
                        (truly-the fixnum last-newline))))

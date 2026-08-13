@@ -733,14 +733,12 @@
   (declare (type index start end)
            (optimize speed (safety 0)))
   (let* ((head (sb-impl::buffer-head ibuf))
-         (tail (sb-impl::buffer-tail ibuf))
-         (string-end (- end (/ 64 4)))
-         (byte-end (- tail 16)))
+         (tail (sb-impl::buffer-tail ibuf)))
     (multiple-value-bind (copied written)
         (inline-vop (((byte-start unsigned-reg t :target byte-array) head)
                      ((string-start any-reg) start)
-                     ((byte-end unsigned-reg) byte-end)
-                     ((string-end any-reg) string-end)
+                     ((byte-end unsigned-reg) tail)
+                     ((string-end any-reg) end)
                      ((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
                      ((string* sap-reg t) (vector-sap string))
 
@@ -770,13 +768,14 @@
 
                      ((tag-clear complex-double-reg t)))
             ((byte-array unsigned-reg positive-fixnum :from (:argument 0))
-             (string unsigned-reg positive-fixnum :from :load))
+             (string any-reg positive-fixnum :from :load))
           (assemble ()
             (inst lea byte-array (ea byte-array* byte-start))
-            (inst add byte-end byte-array*)
+            (inst lea byte-end (ea -16 byte-end byte-array*))
 
-            (inst lea string-end (ea string* string-end (ash 1 (- 2 n-fixnum-tag-bits))))
-            (inst lea string  (ea string* string-start (ash 1 (- 2 n-fixnum-tag-bits))))
+            (inst lea string-end (ea -64
+                                     string* string-end (ash 1 (- 2 n-fixnum-tag-bits))))
+            (inst lea string (ea string* string-start (ash 1 (- 2 n-fixnum-tag-bits))))
 
             (inst jmp start)
 
@@ -959,7 +958,7 @@
             (inst vzeroupper)
             DONE
             (inst sub string string*)
-            (inst shr string 2)
+            (inst shr string (- 2 n-fixnum-tag-bits))
             (inst sub byte-array byte-array*)))
       (setf (sb-impl::buffer-head ibuf) copied)
       (truly-the index written))))
@@ -1510,15 +1509,13 @@
   (declare (type index start end)
            (optimize speed (safety 0)))
   (prog* ((length (sb-impl::buffer-length obuf))
-          (tail (sb-impl::buffer-tail obuf))
-          (string-end (- end (/ 64 4)))
-          (byte-end (- length 16)))
+          (tail (sb-impl::buffer-tail obuf)))
      (multiple-value-bind (read written last-newline)
          (with-pinned-objects (string)
            (inline-vop (((byte-start unsigned-reg t :target byte-array) tail)
                         ((string-start any-reg) start)
-                        ((byte-end unsigned-reg) byte-end)
-                        ((string-end any-reg) string-end)
+                        ((byte-end unsigned-reg) length)
+                        ((string-end any-reg) end)
                         ((byte-array* sap-reg t) (sb-impl::buffer-sap obuf))
                         ((string* sap-reg t) (vector-sap string))
                         ((full-table sap-reg t))
@@ -1543,7 +1540,7 @@
                         ((t3 complex-double-reg))
                         ((errors))
                         ((:label error)))
-               ((string unsigned-reg positive-fixnum :from :load)
+               ((string any-reg positive-fixnum :from :load)
                 (byte-array unsigned-reg positive-fixnum :from (:argument 0))
                 (last-newline signed-reg signed-num))
              (flet ((make-full-table ()
@@ -1597,8 +1594,8 @@
                    (inst vpcmpeqb last-newlines last-newlines last-newlines) ;; FF..FF
 
                    (inst lea byte-array (ea byte-array* byte-start))
-                   (inst add byte-end byte-array*)
-                   (inst lea string-end (ea string* string-end (ash 1 (- 2 n-fixnum-tag-bits))))
+                   (inst lea byte-end (ea -16 byte-end byte-array*))
+                   (inst lea string-end (ea -64 string* string-end (ash 1 (- 2 n-fixnum-tag-bits))))
                    (inst lea string  (ea string* string-start (ash 1 (- 2 n-fixnum-tag-bits))))
 
                    (inst jmp start)
@@ -1734,7 +1731,7 @@
 
                    DONE
                    (inst sub string string*)
-                   (inst shr string 2)
+                   (inst shr string (- 2 n-fixnum-tag-bits))
                    (inst sub byte-array byte-array*)
 
                    (let ((xlast-newlines (reg-in-sc last-newlines 'int-sse-reg))
