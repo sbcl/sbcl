@@ -193,7 +193,7 @@
                  ,defclass-form)))))))
 
 (defun canonize-defclass-options (expansion-state class-name options)
-  (declare ((simple-vector 4) expansion-state))
+  (declare (type (simple-vector 4) expansion-state))
   (maplist (lambda (sublist)
              (let ((option-name (first (pop sublist))))
                (when (member option-name sublist :key #'first :test #'eq)
@@ -239,7 +239,7 @@
       (values (or metaclass 'standard-class) (nreverse canonized-options))))
 
 (defun canonize-defclass-slot (expansion-state class-name metaclass spec env)
-  (declare ((simple-vector 4) expansion-state))
+  (declare (type (simple-vector 4) expansion-state))
   (let ((location (sb-c::make-definition-source-location))
         (spec (sb-int:ensure-list spec)))
     (when (and (cdr spec) (null (cddr spec)))
@@ -335,7 +335,7 @@
                            name class-name)))))
 
 (defun make-initfunction (expansion-state initform &optional (type t) source-form)
-  (declare ((simple-vector 4) expansion-state))
+  (declare (type (simple-vector 4) expansion-state))
   (cond ((and (or (eq initform t)
                   (equal initform ''t))
               (eq type t))
