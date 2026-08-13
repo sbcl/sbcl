@@ -884,3 +884,38 @@
                                     (f p)
                                     (f p))))))
              0)))
+
+(defun check-no-list-consing (lexpr)
+  (let* ((calls (ir-calls lexpr))
+         (count (+ (count 'list calls
+                          :key (lambda (x) (combination-fun-source-name x nil)))
+                   (count 'list* calls
+                          :key (lambda (x) (combination-fun-source-name x nil))))))
+    (assert (zerop count))))
+
+(defglobal *thing* 0)
+(with-test (:name :member-as-boolean-quasiquoted-list)
+  (check-no-list-consing
+   '(lambda (x)
+     (not (null (member x (list* 1 2 3 (list 'foo 'bar)))))))
+  (check-no-list-consing
+   '(lambda (e w x y z)
+     (declare (symbol e))
+     (cond ((member e `(,w ,x)) 'this) ((member e `(,y ,z)) 'that))))
+  (check-no-list-consing
+   '(lambda (x a)
+     (if (member (the symbol x) `(,a ,*thing* :all :default :other)) 'yes 'no)))
+  (check-no-list-consing
+   '(lambda (x a)
+     (if (member x `(,a ,*thing* :other) :test 'eq) 'yes 'no)))
+  (check-no-list-consing
+   '(lambda (x a)
+     (if (member x `(,a ,*thing* -1) :test #'=) 'yes 'no)))
+  ;; try one of those to see that it works
+  (let ((f (compile nil
+                    '(lambda (x a)
+                      (if (member x `(,a ,*thing* :other) :test 'eq) 'yes 'no)))))
+    (assert (eq (funcall f 'foo 'foo) 'yes))
+    (assert (eq (funcall f  0 'whatever) 'yes))
+    (assert (eq (funcall f :other 'ignore) 'yes))
+    (assert (eq (funcall f 3 4) 'no))))

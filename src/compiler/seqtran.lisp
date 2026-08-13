@@ -776,8 +776,9 @@
                    (test (symbolicate "%" name "-TEST"))
                    (key-test (symbolicate "%" name "-KEY-TEST")))
                `(progn
-                  (deftransform ,name ((item list &key key test test-not) * * :node node)
-                    (transform-list-item-seek ',name item list key test test-not node))
+                  ,@(unless (eq name 'member) ; tries its own thing first
+                      `((deftransform ,name ((item list &key key test test-not) * * :node node)
+                          (transform-list-item-seek ',name item list key test test-not node))))
                   (deftransform ,basic ((item list) * * :important nil :node node)
                     (transform-list-item-seek ',name item list nil nil nil node 'eql))
                   (deftransform ,basic ((item list) (eq-comparable-type t) * :important nil)
@@ -824,6 +825,83 @@
   (def assoc  t)
   (def member t)
   (def rassoc t))
+
+;; In situations where MEMBER is used only as a boolean, if we see (MEMBER x `(...))
+;; where it did not simplify to QUOTE, the instead of constructing a list  we can
+;; forward all args of LIST or LIST* to a new lambda that performs the membership
+;; test without consing. There are (at most) three collections of elements:
+;; (1) a bounded set of constants: These can use a hash-based, or range-based,
+;;     or bit-test-based comparison, or at worse an IF/ELSE chain.
+;;     It'll produce whatever the MEMBER optimizer would ordinarily do.
+;; (2) a bounded set of non-constants: this becomes an IF/ELSE chain.
+;; (3) a variable tail if present becomes another MEMBER call.
+;; If the list elements are all constants, it should have been folded to a constant
+;; list by the #\` optimizer, however the user might have hand-written an expression
+;; such as (MEMBER X (LIST 'a 'b 'c)) but more likely that came from a macro,
+;; in which case LIST would not have been folded.
+;;
+;; TODOs:
+;; - For non-constant lists, in general FIND gets more aggressive open-coding so
+;;   we should prefer to transform MEMBER to FIND,  taking care to avoid the semantic
+;;   difference where NIL is found, which for MEMBER is "true" since it returns a cons.
+;; - Consider similar ways that FIND-IF, MEMBER-IF can avoid constructing the list
+(defun try-member-predicate-transform (list-lvar key test test-not)
+  (let ((list-ctor (lvar-uses list-lvar)))
+    ;; I see no reason to attempt this transform with KEY or TEST-NOT.
+    (unless (and (and (null key) (null test-not))
+                 (combination-p list-ctor)
+                 (lvar-fun-is (combination-fun list-ctor)
+                              '(sb-impl::|List| sb-impl::|List*| list list*)))
+      (return-from try-member-predicate-transform))
+    (binding*
+        ((parameters (make-gensym-list (length (combination-args list-ctor))))
+         ((literals non-literals dotted-tail)
+          (let* ((star (lvar-fun-is (combination-fun list-ctor)
+                                    '(sb-impl::|List*| list*)))
+                 (args (combination-args list-ctor))
+                 (last (car (last args)))
+                 (formals parameters))
+            (collect ((literals) (non-literals))
+              (dolist (lvar (if star (butlast args) args))
+                (if (constant-lvar-p lvar)
+                    (literals (lvar-value lvar))
+                    (non-literals (car formals)))
+                (pop formals))
+              (cond ((not star)
+                     (values (literals) (non-literals) nil))
+                    ((constant-lvar-p last) ; `(a b ,x y z) has a dotted tail of (y z)
+                     (unless (proper-list-p (lvar-value last))
+                       (return-from try-member-predicate-transform))
+                     (values (nconc (literals) (lvar-value last)) (non-literals) nil))
+                    (t
+                     (values (literals) (non-literals) (car formals)))))))
+         ;; SET-DIFFERENCE does not promise to be order-preserving, but
+         ;; it doesn't matter.
+         (ignore (set-difference parameters (cons dotted-tail non-literals))))
+      (splice-fun-args list-lvar :any nil)
+      (when ignore (setq ignore `((declare (ignore ,@ignore)))))
+      (if (not test)
+          `(lambda (item ,@parameters)
+             ,@ignore
+             (or ,@(if literals `((member item ',literals)))
+                 (when (or ,@(mapcar (lambda (varname) `(eql item ,varname))
+                                     non-literals))
+                   '(t)) ; return a non-nil list as MEMBER requires
+                 ,@(if dotted-tail `((member item ,dotted-tail)))))
+          `(lambda (item ,@parameters &key test)
+             ,@ignore
+             (or ,@(if literals `((member item ',literals :test test)))
+                 (when (or ,@(mapcar (lambda (varname) `(funcall test item ,varname))
+                                     non-literals))
+                   '(t))
+                 ,@(if dotted-tail `((member item ,dotted-tail :test test)))))))))
+
+(deftransform member ((item list &key key test test-not) * * :node node)
+  ;; If the list argument is a runtime-constructed list, and the result of MEMBER
+  ;; is used only for its truth value, try to avoid constructing the list.
+  (or (and (if-p (node-dest node))
+           (try-member-predicate-transform list key test test-not))
+      (transform-list-item-seek 'member item list key test test-not node)))
 
 ;;; A similar transform used to apply to MEMBER and ASSOC, but since
 ;;; TRANSFORM-LIST-ITEM-SEEK now takes care of them those transform
