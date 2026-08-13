@@ -1546,42 +1546,42 @@
                ((string unsigned-reg positive-fixnum :from :load)
                 (byte-array unsigned-reg positive-fixnum :from (:argument 0))
                 (last-newline signed-reg signed-num))
-             (macrolet ((track-newline (bytes)
-                          `(progn
-                             (inst vpcmpeqd temp ,bytes newlines)
-                             (inst vpblendvb last-newlines last-newlines indexes temp)
-                             (inst vpaddd indexes indexes increment))))
-               (flet ((make-full-table ()
-                        (let* ((table-size 256)
-                               (row-size 64)
-                               (table (make-array (* table-size row-size) :element-type '(unsigned-byte 8)
-                                                                          :initial-element 0)))
-                          (loop for row below table-size
-                                for dest-index = 0
-                                do (loop
-                                     for lane below 4
-                                     for bytes = (1+ (ldb (byte 2 (* lane 2)) row))
-                                     do (loop for b below bytes
-                                              for src-index = (+ (* lane 4) (- bytes 1 b))
-                                              for lead-p = (= b 0)
-                                              for and-mask = (if lead-p
-                                                                 (case bytes
-                                                                   (1 #x7F) (2 #x1F) (3 #x0F) (4 #x07))
-                                                                 #x3F)
-                                              for orr-mask = (if lead-p
-                                                                 (case bytes
-                                                                   (1 #x00) (2 #xC0) (3 #xE0) (4 #xF0))
-                                                                 #x80)
-                                              do (setf (aref table (+ (* row row-size) dest-index)) src-index)
-                                                 (setf (aref table (+ (* row row-size) 16 dest-index)) and-mask)
-                                                 (setf (aref table (+ (* row row-size) 32 dest-index)) orr-mask)
-                                                 (incf dest-index)))
-                                   (loop for i from dest-index below 16
-                                         do (setf (aref table (+ (* row row-size) i)) #xFF)
-                                            (setf (aref table (+ (* row row-size) 16 i)) 0)
-                                            (setf (aref table (+ (* row row-size) 32 i)) 0))
-                                   (setf (aref table (+ (* row row-size) 48)) dest-index))
-                          table)))
+             (flet ((make-full-table ()
+                      (let* ((table-size 256)
+                             (row-size 64)
+                             (table (make-array (* table-size row-size) :element-type '(unsigned-byte 8)
+                                                                        :initial-element 0)))
+                        (loop for row below table-size
+                              for dest-index = 0
+                              do (loop
+                                   for lane below 4
+                                   for bytes = (1+ (ldb (byte 2 (* lane 2)) row))
+                                   do (loop for b below bytes
+                                            for src-index = (+ (* lane 4) (- bytes 1 b))
+                                            for lead-p = (= b 0)
+                                            for and-mask = (if lead-p
+                                                               (case bytes
+                                                                 (1 #x7F) (2 #x1F) (3 #x0F) (4 #x07))
+                                                               #x3F)
+                                            for orr-mask = (if lead-p
+                                                               (case bytes
+                                                                 (1 #x00) (2 #xC0) (3 #xE0) (4 #xF0))
+                                                               #x80)
+                                            do (setf (aref table (+ (* row row-size) dest-index)) src-index)
+                                               (setf (aref table (+ (* row row-size) 16 dest-index)) and-mask)
+                                               (setf (aref table (+ (* row row-size) 32 dest-index)) orr-mask)
+                                               (incf dest-index)))
+                                 (loop for i from dest-index below 16
+                                       do (setf (aref table (+ (* row row-size) i)) #xFF)
+                                          (setf (aref table (+ (* row row-size) 16 i)) 0)
+                                          (setf (aref table (+ (* row row-size) 32 i)) 0))
+                                 (setf (aref table (+ (* row row-size) 48)) dest-index))
+                        table)))
+               (macrolet ((track-newline (bytes)
+                            `(progn
+                               (inst vpcmpeqd temp ,bytes newlines)
+                               (inst vpblendvb last-newlines last-newlines indexes temp)
+                               (inst vpaddd indexes indexes increment))))
                  (assemble ()
                    (inst vmovdqu ascii-mask (register-inline-constant :avx2
                                                                       (concat-ub 32 (loop repeat 8
@@ -1594,7 +1594,7 @@
                                                                                          collect 8))))
                    (inst vmovdqu indexes (register-inline-constant :avx2
                                                                    (concat-ub 32 '(7 6 5 4 3 2 1 0))))
-                   (inst vpcmpeqb last-newlines last-newlines last-newlines) ;; #xFF....
+                   (inst vpcmpeqb last-newlines last-newlines last-newlines) ;; FF..FF
 
                    (inst lea byte-array (ea byte-array* byte-start))
                    (inst add byte-end byte-array*)
@@ -1649,11 +1649,9 @@
                    (inst vpbroadcastd c-7ff temp)
 
                    (inst mov multiplier #x0100040010004000)
+                   (inst vpsrld increment increment 1) ;; go from 8 to 4
 
-                   (inst vmovdqu increment (register-inline-constant :avx2
-                                                                     (concat-ub 32 (loop repeat 4 collect 4))))
-
-                   (inst vpcmpeqd errors errors errors)
+                   (inst vpcmpeqd errors errors errors) ;; FF..FF
                    (inst vmovdqa c-d800 (register-inline-constant
                                          :sse (concat-ub 32 (loop repeat 4 collect #xd800))))
 
@@ -1747,8 +1745,8 @@
                      (inst vpmaxsd xlast-newlines xlast-newlines temp)
                      (inst vpsrldq temp xlast-newlines 4)
                      (inst vpmaxsd xlast-newlines xlast-newlines temp)
-                     (inst vmovd  last-newline xlast-newlines))
-                   (inst movsx '(:dword :qword) last-newline last-newline)
+                     (inst vmovd  last-newline xlast-newlines)
+                     (inst movsx '(:dword :qword) last-newline last-newline))
 
                    (inst vzeroupper))))))
        (setf (sb-impl::buffer-tail obuf) written)
