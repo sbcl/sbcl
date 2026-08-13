@@ -89,10 +89,12 @@
 ;;;; DEFCLASS macro and close personal friends
 
 ;;; state for the current DEFCLASS expansion
-(sb-impl:define-thread-local *initfunctions-for-this-defclass*)
-(sb-impl:define-thread-local *readers-for-this-defclass*)
-(sb-impl:define-thread-local *writers-for-this-defclass*)
-(sb-impl:define-thread-local *slot-names-for-this-defclass*)
+;;; These macros are unhygienic but there are no references outside of this file,
+;;; so it's fine. They behave just like the specials they formerly were.
+(define-symbol-macro *initfunctions-for-this-defclass* (svref expansion-state 0))
+(define-symbol-macro *readers-for-this-defclass* (svref expansion-state 1))
+(define-symbol-macro *writers-for-this-defclass* (svref expansion-state 2))
+(define-symbol-macro *slot-names-for-this-defclass* (svref expansion-state 3))
 
 ;; forward declarations so the host doesn't warn these to be undefined functions.
 (declaim (ftype (function (t t) (values t t &optional)) *subtypep))
@@ -110,19 +112,17 @@
 ;;; installed by the file std-class.lisp
 (sb-xc:defmacro defclass (&environment env name direct-superclasses direct-slots &rest options)
   (check-class-name name nil)
-  (let (*initfunctions-for-this-defclass*
-        *readers-for-this-defclass* ;Truly a crock, but we got
-        *writers-for-this-defclass* ;to have it to live nicely.
-        *slot-names-for-this-defclass*)
+  (let ((expansion-state (make-array 4 :initial-element nil)))
     ;; FIXME: It would be nice to collect all errors from the
     ;; expansion of a defclass and signal them in a single go.
     (multiple-value-bind (metaclass canonical-options)
-        (canonize-defclass-options name options)
+        (canonize-defclass-options expansion-state name options)
       ;; Check deprecation status of direct superclasses and
       ;; metaclass.
       (mapc #'sb-int:check-deprecated-type direct-superclasses)
       (sb-int:check-deprecated-type metaclass)
-      (let ((canonical-slots (canonize-defclass-slots name metaclass direct-slots env))
+      (let ((canonical-slots
+             (canonize-defclass-slots expansion-state name metaclass direct-slots env))
             ;; DEFSTRUCT-P should be true if the class is defined
             ;; with a metaclass STRUCTURE-CLASS, so that a DEFSTRUCT
             ;; is compiled for the class.
@@ -192,7 +192,8 @@
                     ',*slot-names-for-this-defclass*))
                  ,defclass-form)))))))
 
-(defun canonize-defclass-options (class-name options)
+(defun canonize-defclass-options (expansion-state class-name options)
+  (declare ((simple-vector 4) expansion-state))
   (maplist (lambda (sublist)
              (let ((option-name (first (pop sublist))))
                (when (member option-name sublist :key #'first :test #'eq)
@@ -223,7 +224,7 @@
                                   DEFCLASS ~S.~:>"
                                  key class-name))
                (push key arg-names)
-               (push ``(,',key ,',val ,,(make-initfunction val)) initargs))
+               (push ``(,',key ,',val ,,(make-initfunction expansion-state val)) initargs))
              (setf default-initargs t)
              (push `(:direct-default-initargs (list ,@(nreverse initargs)))
                    canonized-options)))
@@ -237,7 +238,8 @@
         (push '(:direct-default-initargs nil) canonized-options))
       (values (or metaclass 'standard-class) (nreverse canonized-options))))
 
-(defun canonize-defclass-slot (class-name metaclass spec env)
+(defun canonize-defclass-slot (expansion-state class-name metaclass spec env)
+  (declare ((simple-vector 4) expansion-state))
   (let ((location (sb-c::make-definition-source-location))
         (spec (sb-int:ensure-list spec)))
     (when (and (cdr spec) (null (cddr spec)))
@@ -254,7 +256,7 @@
            (unsupplied (list nil))
            (type t)
            (initform unsupplied))
-      (check-slot-name-for-defclass name class-name env)
+      (check-slot-name-for-defclass expansion-state name class-name env)
       (push name *slot-names-for-this-defclass*)
       (flet ((note-reader (x)
                (unless (symbolp x)
@@ -308,16 +310,16 @@
                      :initargs ',initargs  'source ,location ',others)))
         (if (eq initform unsupplied)
             `(list* ,@canon)
-            `(list* :initfunction ,(make-initfunction initform type spec)
+            `(list* :initfunction ,(make-initfunction expansion-state initform type spec)
                     ,@canon))))))
 
-(defun canonize-defclass-slots (class-name metaclass slots env)
+(defun canonize-defclass-slots (expansion-state class-name metaclass slots env)
   (map 'list (lambda (spec)
                (with-current-source-form (spec)
-                 (canonize-defclass-slot class-name metaclass spec env)))
+                 (canonize-defclass-slot expansion-state class-name metaclass spec env)))
        slots))
 
-(defun check-slot-name-for-defclass (name class-name env)
+(defun check-slot-name-for-defclass (expansion-state name class-name env)
   (flet ((slot-name-illegal (reason)
            (%program-error "~@<In DEFCLASS ~S, the slot name ~S is ~
                             ~A.~@:>"
@@ -332,8 +334,8 @@
            (%program-error "Multiple slots named ~S in DEFCLASS ~S."
                            name class-name)))))
 
-(defun make-initfunction (initform &optional (type t)
-                                             source-form)
+(defun make-initfunction (expansion-state initform &optional (type t) source-form)
+  (declare ((simple-vector 4) expansion-state))
   (cond ((and (or (eq initform t)
                   (equal initform ''t))
               (eq type t))
