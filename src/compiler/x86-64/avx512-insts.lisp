@@ -302,7 +302,7 @@
 (macrolet ((def (name prefix opcode-from opcode-to w)
              `(define-instruction ,name (segment dst src)
                 (:emitter
-                 (cond ((xmm-register-p dst)
+                 (cond ((k-register-p dst)
                         ;; k <- k/m or k <- gpr
                         (emit-vex segment nil src dst ,prefix #x0F nil ,w)
                         (emit-bytes segment ,opcode-from)

@@ -1038,6 +1038,10 @@
 (defun zmm-register-p (thing)
   (and (register-p thing) (is-zmm-id-p (reg-id thing))))
 
+;;; Return true if THING is a K register (mask reg k0 - k7).
+(defun k-register-p (thing)
+  (and (register-p thing) (is-kreg-id-p (reg-id thing))))
+
 ;;; Return true if THING is AL, AX, EAX, or RAX
 (defun accumulator-p (thing)
   (and (gpr-p thing) (= 0 (reg-id-num (reg-id thing)))))
