@@ -1742,7 +1742,6 @@
                    (let ((xlast-newlines (reg-in-sc last-newlines 'int-sse-reg))
                          (temp (reg-in-sc temp 'int-sse-reg)))
                      (inst vextracti128 temp last-newlines 1)
-                     (inst vzeroupper)
                      (inst vpmaxsd xlast-newlines temp xlast-newlines)
                      (inst vpsrldq temp xlast-newlines 8)
                      (inst vpmaxsd xlast-newlines xlast-newlines temp)
