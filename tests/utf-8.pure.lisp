@@ -477,7 +477,7 @@
                (multiple-value-bind (length byte-length ascii-p)
                    (sb-vm::utf8-strlen (sb-sys:sap+ (sb-sys:vector-sap bytes) offset))
                  (unless (and (eql expected-length length)
-                              (eql expected-ascii-p ascii-p)
+                              (eql expected-ascii-p (and ascii-p t))
                               (or (not expected-length)
                                   (eql expected-byte-length byte-length)))
                    (error "(sb-vm::utf8-strlen (sb-sys:sap+ (sb-sys:vector-sap ~s) ~s)) => ~a, ~a, ~a; but ~a, ~a, ~a expected"
@@ -519,7 +519,7 @@
              (multiple-value-bind (length ascii-p)
                  (sb-impl::character-string-utf8-length string)
                (unless (and (eql expected-length length)
-                            (eql expected-ascii-p ascii-p))
+                            (eql expected-ascii-p (and ascii-p t)))
                  (error "(sb-impl::character-string-utf8-length ~a) => ~a, ~a; but ~a, ~a expected"
                         string length ascii-p
                         expected-length expected-ascii-p))))))

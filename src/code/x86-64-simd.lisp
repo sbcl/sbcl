@@ -1681,7 +1681,7 @@
 
                      ;; Multiplying by 1 + 2^6 + 2^12 + 2^18
                      ;; shifts two bits per byte into the upper byte
-                     (inst imul tmp multiplier)
+                     (inst imul tmp multiplier) ; #x0100040010004000
                      (inst shr tmp (- 56 6)) ;; shift left 6 for the table entry size
 
                      ;; Spread the character to all 4 bytes
@@ -1724,7 +1724,7 @@
                          (register-inline-constant :sse (concat-ub 32 (loop repeat 4 collect #x800007FF))))
 
                    (inst vmovmskps tmp t2)
-                   (inst cmp tmp #xF)
+                   (inst cmp :dword tmp #xF)
                    (inst jmp :e DONE)
                    (inst vzeroupper)
                    (inst jmp error)
@@ -2488,7 +2488,7 @@
         (inst mov byte-length ptr)
         (inst mov char-length byte-length)
         (inst shl char-length 1)
-        (load-symbol all-ascii t)
+        (zeroize all-ascii) ;; generalized boolean non-nil
         (inst jmp DONE)
 
         NON-ASCII
@@ -2575,6 +2575,7 @@
         (inst vzeroupper)))))
 
 (def-variant sb-impl::character-string-utf8-length :avx2 (string)
+  (declare (optimize speed (safety 0)))
   (with-pinned-objects (string)
     (inline-vop
         (((ptr sap-reg t) (vector-sap string))
@@ -2601,7 +2602,7 @@
          (all-ascii descriptor-reg t :from :load))
 
       (inst mov res length)
-      (load-symbol all-ascii t)
+      (zeroize all-ascii) ;; generalized boolean non-nil
 
       (inst test length length)
       (inst jmp :z DONE)
@@ -2636,7 +2637,7 @@
       (inst vmovdqa c-ffff (register-inline-constant
                             :sse (concat-ub 32 (loop repeat 4 collect #xFFFF))))
       (inst vmovdqa c-d800 (register-inline-constant
-                          :sse (concat-ub 32 (loop repeat 4 collect #xd800))))
+                            :sse (concat-ub 32 (loop repeat 4 collect #xd800))))
 
       (inst jmp START)
 
@@ -2676,7 +2677,7 @@
             (register-inline-constant :sse (concat-ub 32 (loop repeat 4 collect #x800007FF))))
 
       (inst vmovmskps tmp tmp1)
-      (inst cmp tmp #xF)
+      (inst cmp :dword tmp #xF)
       (inst jmp :ne DONE-FULL)
 
       (inst vextracti128 tmp1 extra-len 1)
