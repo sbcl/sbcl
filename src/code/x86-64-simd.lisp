@@ -1169,7 +1169,8 @@
                            ((byte-array sap-reg t))
                            ((char-array* sap-reg t) (vector-sap string))
                            ((char-array sap-reg t))
-                           ((crlf-mask complex-double-reg))
+                           ((lf-mask complex-double-reg))
+                           ((cr-mask complex-double-reg))
                            ((bytes complex-double-reg))
                            ((next-bytes complex-double-reg))
                            ((shifted complex-double-reg))
@@ -1182,9 +1183,8 @@
                            ((shuffle-mask2 complex-double-reg)))
                   ((new-head unsigned-reg positive-fixnum :from :load)
                    (copied unsigned-reg positive-fixnum :from :load))
-                (inst movdqa crlf-mask (register-inline-constant :sse (concat-ub 8 (loop for i below 8
-                                                                                        collect #x0A
-                                                                                        collect #x0D))))
+                (inst movdqa cr-mask (register-inline-constant :sse (concat-ub 8 (loop repeat 16 collect #x0D))))
+                (inst movdqa lf-mask (register-inline-constant :sse (concat-ub 8 (loop repeat 16 collect #x0A))))
                 (inst lea byte-array (ea head byte-array*))
                 (inst add end byte-array)
 
@@ -1203,16 +1203,11 @@
                 (inst test :dword head head)
                 (inst jmp :nz done)
 
-
-                ;; Compare both variants
                 (move temp bytes)
-                (inst pcmpeqw temp crlf-mask)
-                (inst pcmpeqw shifted crlf-mask)
-                ;; pcmpeqw will have FFFF, shifting in different directions and then combining
-                ;; will have FF in the right places for CR in the original chunk.
-                (inst psrlw temp 8)
-                (inst psllw shifted 8)
-                (inst por temp shifted)
+                ;; If a CR aligns with an LF in the shifted register then it's a CRLF
+                (inst pcmpeqb temp cr-mask)
+                (inst pcmpeqb shifted lf-mask)
+                (inst pand temp shifted)
 
                 ;; Get a 16-bit mask
                 (inst pmovmskb copied temp)
@@ -1280,7 +1275,8 @@
                            ((byte-array sap-reg t))
                            ((char-array* sap-reg t) (vector-sap string))
                            ((char-array sap-reg t))
-                           ((crlf-mask complex-double-reg))
+                           ((lf-mask complex-double-reg))
+                           ((cr-mask complex-double-reg))
                            ((bytes complex-double-reg))
                            ((next-bytes complex-double-reg))
                            ((shifted complex-double-reg))
@@ -1295,17 +1291,15 @@
                            ((zero int-sse-reg)))
                   ((new-head unsigned-reg positive-fixnum :from :load)
                    (copied unsigned-reg positive-fixnum :from :load))
-                (inst movdqa crlf-mask (register-inline-constant :sse
-                                                                 (concat-ub 8 (loop for i below 8
-                                                                                    collect #x0A
-                                                                                    collect #x0D))))
+                (inst movdqa cr-mask (register-inline-constant :sse (concat-ub 8 (loop repeat 16 collect #x0D))))
+                (inst movdqa lf-mask (register-inline-constant :sse (concat-ub 8 (loop repeat 16 collect #x0A))))
+
                 (inst pxor zero zero)
                 (inst lea byte-array (ea head byte-array*))
                 (inst add end byte-array)
 
                 (inst add char-array* string-start)
                 (inst mov char-array char-array*)
-
 
                 LOOP
                 (inst movdqu bytes (ea byte-array))
@@ -1318,16 +1312,11 @@
                 (inst test :dword head head)
                 (inst jmp :nz done)
 
-
-                ;; Compare both variants
                 (move temp bytes)
-                (inst pcmpeqw temp crlf-mask)
-                (inst pcmpeqw shifted crlf-mask)
-                ;; pcmpeqw will have FFFF, shifting in different directions and then combining
-                ;; will have FF in the right places for CR in the original chunk.
-                (inst psrlw temp 8)
-                (inst psllw shifted 8)
-                (inst por temp shifted)
+                ;; If a CR aligns with an LF in the shifted register then it's a CRLF
+                (inst pcmpeqb temp cr-mask)
+                (inst pcmpeqb shifted lf-mask)
+                (inst pand temp shifted)
 
                 ;; Get a 16-bit mask
                 (inst pmovmskb copied temp)
