@@ -1545,9 +1545,10 @@
                 (last-newline signed-reg signed-num))
              (flet ((make-full-table ()
                       (let* ((table-size 256)
-                             (row-size 64)
-                             (table (make-array (* table-size row-size) :element-type '(unsigned-byte 8)
-                                                                        :initial-element 0)))
+                             (row-size 32)
+                             (total-size (+ (* table-size row-size) table-size))
+                             (table (make-array total-size :element-type '(unsigned-byte 8)
+                                                           :initial-element 0)))
                         (loop for row below table-size
                               for dest-index = 0
                               do (loop
@@ -1556,23 +1557,18 @@
                                    do (loop for b below bytes
                                             for src-index = (+ (* lane 4) (- bytes 1 b))
                                             for lead-p = (= b 0)
-                                            for and-mask = (if lead-p
-                                                               (case bytes
-                                                                 (1 #x7F) (2 #x1F) (3 #x0F) (4 #x07))
-                                                               #x3F)
                                             for orr-mask = (if lead-p
                                                                (case bytes
                                                                  (1 #x00) (2 #xC0) (3 #xE0) (4 #xF0))
                                                                #x80)
                                             do (setf (aref table (+ (* row row-size) dest-index)) src-index)
-                                               (setf (aref table (+ (* row row-size) 16 dest-index)) and-mask)
-                                               (setf (aref table (+ (* row row-size) 32 dest-index)) orr-mask)
+                                               (setf (aref table (+ (* row row-size) 16 dest-index)) orr-mask)
                                                (incf dest-index)))
+                                 ;; for vpshufb to produce zeros
                                  (loop for i from dest-index below 16
-                                       do (setf (aref table (+ (* row row-size) i)) #xFF)
-                                          (setf (aref table (+ (* row row-size) 16 i)) 0)
-                                          (setf (aref table (+ (* row row-size) 32 i)) 0))
-                                 (setf (aref table (+ (* row row-size) 48)) dest-index))
+                                       do (setf (aref table (+ (* row row-size) i)) #xFF))
+                                 ;; produced bytes
+                                 (setf (aref table (+ (* table-size row-size) row)) dest-index))
                         table)))
                (macrolet ((track-newline (bytes)
                             `(progn
@@ -1682,27 +1678,34 @@
                      ;; Multiplying by 1 + 2^6 + 2^12 + 2^18
                      ;; shifts two bits per byte into the upper byte
                      (inst imul tmp multiplier) ; #x0100040010004000
-                     (inst shr tmp (- 56 6)) ;; shift left 6 for the table entry size
+                     (inst shr tmp (- 56 5)) ;; shift left 5 for the table entry size
 
                      ;; Spread the character to all 4 bytes
+                     ;; For the first byte, the mask depends on if it's a single byte or a continuation byte
+                     ;; t1 has a mask for bytes > 127, choose between #x7f and #x3f based on that.
+                     ;; An ascii character doesn't need to clear anything,
+                     ;; so this either clears nothing or clears ~3f bits.
+                     (inst vpand t1 t1 (register-inline-constant :oword #xFFFFFFC0FFFFFFC0FFFFFFC0FFFFFFC0))
+                     (inst vpandn temp t1 bytes)
+
                      (inst vpslld t1 bytes 6)
                      (inst vpslld t2 bytes 4)
                      (inst vpslld t3 bytes 2)
 
-                     (inst vpand t1 t1 (register-inline-constant :oword #xFF000000FF000000FF000000FF000000))
-                     (inst vpand t2 t2 (register-inline-constant :oword #x00FF000000FF000000FF000000FF0000))
-                     (inst vpand t3 t3 (register-inline-constant :oword #x0000FF000000FF000000FF000000FF00))
-                     (inst vpand bytes bytes (register-inline-constant :oword #x000000FF000000FF000000FF000000FF))
+                     (inst vpand t1 t1 (register-inline-constant :oword #x07000000070000000700000007000000))
+                     (inst vpand t2 t2 (register-inline-constant :oword #x003F0000003F0000003F0000003F0000))
+                     (inst vpand t3 t3 (register-inline-constant :oword #x00003F0000003F0000003F0000003F00))
 
                      (inst vpor t2 t2 t3)
-                     (inst vpor bytes bytes t1)
+                     (inst vpor bytes temp t1)
                      (inst vpor bytes bytes t2)
 
                      ;; Shuffle the bytes into place
                      (inst vpshufb bytes bytes (ea 0 full-table tmp))
-                     (inst vpand bytes bytes (ea 16 full-table tmp))
-                     (inst vpor bytes bytes (ea 32 full-table tmp))
-                     (inst movzx '(:byte :dword) tmp (ea 48 full-table tmp)) ;; number of produced bytes
+
+                     (inst vpor bytes bytes (ea 16 full-table tmp))
+                     (inst shr :dword tmp 5)
+                     (inst mov :byte tmp (ea 8192 full-table tmp)) ;; number of produced bytes
 
                      (inst vmovdqu (ea byte-array) bytes)
 
