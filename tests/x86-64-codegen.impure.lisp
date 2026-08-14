@@ -1498,3 +1498,45 @@
      (some (lambda (line)
              (and (search "MOV" line) (search "+R" line) (search "*2]" line)))
            lines))))
+
+(defstruct test-struct-alpha)
+(defstruct test-struct-beta)
+(defstruct test-struct-gamma)
+
+(with-test (:name :hoist-typecase-layout-id)
+  (let* ((f (compile nil '(lambda (x)
+                           (declare (optimize speed))
+                           (typecase x
+                             (test-struct-alpha 1)
+                             (test-struct-beta 2)
+                             (test-struct-gamma 3)))))
+         (lines (disassembly-lines f))
+         (mem-cmps (loop for line in lines
+                         count (and (search "CMP" line)
+                                    (search "[" line))))
+         (reg-cmps (loop for line in lines
+                         count (and (search "CMP" line)
+                                    (not (search "[" line))))))
+    (assert (eql (funcall f (make-test-struct-alpha)) 1))
+    (assert (eql (funcall f (make-test-struct-beta)) 2))
+    (assert (eql (funcall f (make-test-struct-gamma)) 3))
+    (assert (eql (funcall f "other") nil))
+    (assert (>= reg-cmps 3))
+    (assert (<= mem-cmps 1))))
+
+(with-test (:name :single-struct-typep-fused-cmp)
+  (let* ((f (compile nil '(lambda (x)
+                           (declare (optimize speed))
+                           (if (typep x 'test-struct-alpha) 1 2))))
+         (lines (disassembly-lines f))
+         (mem-cmps (loop for line in lines
+                         count (and (search "CMP" line)
+                                    (search "[" line))))
+         (reg-cmps (loop for line in lines
+                         count (and (search "CMP" line)
+                                    (not (search "[" line))))))
+    (assert (eql (funcall f (make-test-struct-alpha)) 1))
+    (assert (eql (funcall f "other") 2))
+    ;; Must keep the single fused memory CMP and avoid separate register CMPs
+    (assert (= mem-cmps 1))
+    (assert (= reg-cmps 0))))

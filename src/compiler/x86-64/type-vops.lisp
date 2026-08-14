@@ -1354,3 +1354,27 @@
     (inst mov :dword r (ea (- 4 instance-pointer-lowtag) object))
     #-compact-instance-header
     (loadw r object instance-slots-offset instance-pointer-lowtag)))
+
+(define-vop (get-layout-id)
+  (:args (layout :scs (descriptor-reg)))
+  (:info offset)
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:generator 1
+    ;; Layout IDs are 32-bit (signed-byte 30) values. As long as GET-LAYOUT-ID and
+    ;; TEST-LAYOUT-ID both use :DWORD operand size, no sign-extension is needed.
+    (inst mov :dword r (ea (- offset instance-pointer-lowtag) layout))))
+
+(define-vop (test-layout-id)
+  (:args (id :scs (signed-reg)))
+  (:arg-types signed-num (:constant t))
+  (:policy :fast-safe)
+  (:info target not-p test-layout)
+  (:generator 1
+    (inst cmp :dword id
+          (cond ((or (typep (layout-id test-layout) '(and (signed-byte 8) (not (eql 0))))
+                     (not (sb-c::producing-fasl-file)))
+                 (layout-id test-layout))
+                (t
+                 (make-fixup test-layout :layout-id))))
+    (inst jmp (if not-p :ne :e) target)))

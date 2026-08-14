@@ -933,6 +933,36 @@
                 :ne :eq) target)
     done))
 
+(define-vop (get-layout-id)
+  (:args (layout :scs (descriptor-reg)))
+  (:info offset)
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:generator 1
+    ;; Layout IDs are 32-bit (signed-byte 30) values. As long as GET-LAYOUT-ID and
+    ;; TEST-LAYOUT-ID both use 32-bit-reg, no sign-extension is needed.
+    (inst ldr (32-bit-reg r) (@ layout (- offset instance-pointer-lowtag)))))
+
+(define-vop (test-layout-id)
+  (:args (id :scs (signed-reg)))
+  (:arg-types signed-num (:constant t))
+  (:policy :fast-safe)
+  (:info target not-p test-layout)
+  (:temporary (:sc non-descriptor-reg) temp)
+  (:generator 1
+    (let ((test-id (layout-id test-layout)))
+      (cond ((typep test-id '(and (signed-byte 8) (not (eql 0))))
+             (if (minusp test-id)
+                 (inst cmn (32-bit-reg id) (- test-id))
+                 (inst cmp (32-bit-reg id) test-id)))
+            (t
+             (destructuring-bind (size . label)
+                 (register-inline-constant :dword `(:layout-id ,test-layout))
+               (declare (ignore size))
+               (inst load-from-label (32-bit-reg temp) label))
+             (inst cmp (32-bit-reg id) (32-bit-reg temp)))))
+    (inst b (if not-p :ne :eq) target)))
+
 (define-vop (keywordp type-predicate)
   (:translate keywordp)
   (:generator 3

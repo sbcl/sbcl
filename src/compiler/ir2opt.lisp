@@ -1036,6 +1036,7 @@
         (when (> (length vops) 1)
           (let ((layout (make-representation-tn *backend-t-primitive-type*
                                                 sb-vm:descriptor-reg-sc-number))
+                (test-layouts (mapcar (lambda (v) (third (vop-codegen-info v))) vops))
                 (block (vop-block vop)))
             (setf (tn-type value)
                   (tn-ref-type (vop-args vop)))
@@ -1049,14 +1050,32 @@
             (update-block-succ block
                                (cons stop
                                      (ir2block-successors block)))
-            (let ((test-vop (template-or-lose 'sb-vm::structure-typep*)))
+            (let ((test-vop (template-or-lose 'sb-vm::structure-typep*))
+                  (test-arg layout)
+                  ;; not to be confused with "load-layout-id" in some */insts.lisp files
+                  (depthoid (and (vop-existsp :named sb-vm::get-layout-id)
+                                 (notany 'sb-vm::struct-typep-bit-test-p test-layouts)
+                                 (layout-depthoid (car test-layouts)))))
+              (when (and depthoid
+                         (<= 2 depthoid sb-kernel::layout-id-vector-fixed-capacity)
+                         (every (lambda (l) (eql (layout-depthoid l) depthoid)) test-layouts))
+                (let ((id-tn (make-representation-tn
+                              (primitive-type-or-lose 'sb-vm::signed-byte-64)
+                              sb-vm:signed-reg-sc-number))
+                      (offset (+ (sb-vm::id-bits-offset) (ash (- depthoid 2) 2))))
+                  (emit-and-insert-vop (vop-node vop) block
+                                       (template-or-lose 'sb-vm::get-layout-id)
+                                       (reference-tn layout nil) (reference-tn id-tn t)
+                                       vop (list offset))
+                  (setq test-vop (template-or-lose 'sb-vm::test-layout-id)
+                        test-arg id-tn)))
               (loop for vop in vops
                     for info = (vop-codegen-info vop)
                     do
                     (emit-and-insert-vop (vop-node vop)
                                          (vop-block vop)
                                          test-vop
-                                         (reference-tn layout nil)
+                                         (reference-tn test-arg nil)
                                          nil
                                          vop
                                          info)
