@@ -1423,10 +1423,10 @@
 
                         ((tmp unsigned-reg))
                         ((full-table any-reg t))
+                        ((size-table any-reg t))
                         ((shift-mask complex-double-reg))
                         ((c-d800 complex-double-reg))
 
-                        ((r4 complex-double-reg t))
                         ((length1 complex-double-reg t :offset 8))
                         ((length2 complex-double-reg t :offset 9))
                         ((shuf-mask complex-double-reg t :offset 10))
@@ -1533,6 +1533,12 @@
 
                  (load-inline-constant shift-mask :oword #x6000000040000000200000000)
                  (load-inline-constant full-table (make-full-table))
+                 (load-inline-constant size-table (let ((table (make-array 256 :element-type '(unsigned-byte 8))))
+                                                    (loop for row below 256
+                                                          for total-bytes = (loop for lane below 4
+                                                                                  sum (1+ (ldb (byte 2 (* lane 2)) row)))
+                                                          do (setf (aref table row) total-bytes))
+                                                    table))
                  (inst movi c-d800  #xd800 :4s)
                  (inst movi length1 3 :16b)
                  (load-inline-constant length2 :oword #x00000000000000010101010202020202)
@@ -1557,7 +1563,6 @@
                    (inst clz temp bytes :4s)
                    ;; Map leading zeros to utf8 lengths
                    (inst tbl temp (list length1 length2) temp :16b)
-                   (inst addv r4 temp :4s) ;; total length in utf-8 bytes - 4
 
                    ;; Shift by 0 2 4 6
                    (inst ushl temp temp shift-mask :4s)
@@ -1565,27 +1570,26 @@
                    (inst addv temp temp :4s)
                    (inst umov tmp temp 0 :b)
 
+                   (inst ldrb tmp-tn (@ size-table tmp))
+
                    ;; Multiply by 48 (3 * 16)
                    (inst add tmp tmp (lsl tmp 1))
                    (inst add tmp full-table (lsl tmp 4))
 
                    (inst ld1 (list shuf-mask and-mask orr-mask) (@ tmp) :16b)
 
-                   (inst umov tmp-tn r4 0 :b)
-
                    (inst tbl bytes (list f1 f2 f3 bytes) shuf-mask :16b)
 
                    (inst and bytes bytes and-mask :16b)
                    (inst orr bytes bytes orr-mask :16b)
 
-                   (inst str bytes (@ byte-array 4 :post-index))
+                   (inst str bytes (@ byte-array))
 
                    (inst add byte-array byte-array tmp-tn)
                    (inst add string string 16))
 
                  (inst cmp byte-array byte-end)
-                 (inst b :hi DONE-FULL)
-                 (inst cmp string string-end)
+                 (inst ccmp string string-end :ls 2)
                  (inst b :hi DONE-FULL)
 
                  (inst ldr bytes (@ string))
