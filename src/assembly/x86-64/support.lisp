@@ -245,7 +245,7 @@
              collect
              (if (typep arg '(cons (eql addressof)))
                  `(inst lea ,c-arg ,(cadr arg))
-                 `(inst mov ,c-arg ,arg)))
+                 `(if (eql ,arg 0) (zeroize ,c-arg) (inst mov ,c-arg ,arg))))
      (inst call ,fun)
      #+win32 (inst add rsp-tn 32)))
 
