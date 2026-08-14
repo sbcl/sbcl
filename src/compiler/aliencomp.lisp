@@ -605,7 +605,7 @@
     ;; diffs affecting DEREF and I want to keep them separate for reasons.
     ;; (Maybe not good reasons. We'll see after they're both done.)
     (cond #+(or arm64 x86-64)
-          ((and (combination-p (lvar-use object))
+          ((and (combination-p (lvar-uses object))
                 (constant-lvar-p type)
                 (let ((type (lvar-value type)))
                   (and (alien-integer-type-p type)
