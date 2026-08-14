@@ -310,10 +310,8 @@
                        ((load-immediate-word tmp-tn y))))))
         (inst and r x imm)))))
 
-(define-vop (fast-logand-c/unsigned=>unsigned fast-signed-binop-c)
-  (:translate logand)
+(define-vop (fast-logand-c/unsigned=>unsigned fast-logand-c/signed=>signed)
   (:args (x :scs (unsigned-reg)))
-  (:info y)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:arg-types unsigned-num (:constant (satisfies encode-logical-immediate))))
