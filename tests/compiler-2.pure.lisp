@@ -5146,3 +5146,12 @@
                                                                 (declare (ignore d))
                                                                 (values a b c)) -1 t (floor x y))))
                  '(sb-kernel::floor1))))
+
+(with-test (:name :reusing-inlined-function)
+  (checked-compile-and-assert
+      (:optimize '(:safety 1 :debug 3 :space 0))
+      `(lambda (b)
+         (values (elt '(1 2) b)
+                 (elt '(3 4) b)))
+    ((0) (values 1 3))
+    ((1) (values 2 4))))

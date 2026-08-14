@@ -1643,6 +1643,11 @@
        (with-ir1-environment-from-node call
          (let ((fun (defined-fun-functional leaf)))
            (cond ((or (not fun)
+                      ;; Type propagation might have already made
+                      ;; changes to the previously inlined function.
+                      ;; Don't try to detect whether something has
+                      ;; changed and inline again.
+                      (boundp '*component-being-compiled*)
                       ;; It has already been processed by locall,
                       ;; inline again.
                       (not (functional-kind-eq fun nil)))
@@ -2973,26 +2978,7 @@
                     ;; type to its refs yet.
                     ((lambda-var-optimistic-type var))
                     (t
-                     (propagate-to-refs var type)))))
-
-      ;; It's possible to discover new inline calls which may have
-      ;; incompatible argument types, so don't allow reuse of this
-      ;; functional during future inline expansion to prevent
-      ;; spurious type conflicts.
-      (let ((defined-fun (and (functional-inline-expanded fun)
-                              (gethash (leaf-%source-name fun)
-                                       (free-funs *ir1-namespace*)))))
-        (when (defined-fun-p defined-fun)
-          (do ((args (basic-combination-args call) (cdr args))
-               (vars vars (cdr vars)))
-              ((null args))
-            (let ((arg (car args))
-                  (var (car vars)))
-              (unless (and arg
-                           (eq (leaf-type var) *universal-type*))
-                (setf (defined-fun-functional defined-fun) nil)
-                (return))))))))
-
+                     (propagate-to-refs var type)))))))
   (values))
 
 ;;;; multiple values optimization
