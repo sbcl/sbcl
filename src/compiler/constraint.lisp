@@ -1438,11 +1438,11 @@
           (let ((fun (combination-lambda node))
                 (call-in (combination-constraints-in node)))
             (when (functional-kind-eq fun nil assignment optional cleanup)
-              ;; Add type constraints from local call arguments. We
-              ;; clear the existing variable constraints first for
-              ;; local calls which participate in recursive
-              ;; dataflow. (e.g. an iterative loop written
-              ;; functionally instead of with SETQ)
+              ;; Add type constraints and any equality constraints
+              ;; from local call arguments. We clear the existing
+              ;; variable constraints first for local calls which
+              ;; participate in recursive dataflow. (e.g. an iterative
+              ;; loop written functionally instead of with SETQ)
               (let ((new (copy-conset gen))
                     (vars (lambda-vars fun))
                     (args (combination-args node)))
@@ -1453,9 +1453,19 @@
                 (loop for var in vars
                       for val in args
                       when (and val (lambda-var-constraints var))
-                        do (let ((type (lvar-type val)))
+                        do (let* ((arg-var (ok-lvar-lambda-var val gen))
+                                  (type (if arg-var
+                                            ;; Not strictly necessary
+                                            ;; to grab the type from
+                                            ;; constraints here
+                                            ;; straight away, but
+                                            ;; speeds up convergence.
+                                            (type-from-constraints arg-var gen (lvar-type val))
+                                            (lvar-type val))))
                              (when (type-for-constraints-p type)
-                               (conset-add-constraint new 'typep var type nil))))
+                               (conset-add-constraint new 'typep var type nil))
+                             (when arg-var
+                               (inherit-constraints (list var) arg-var gen new))))
                 (unless (and call-in (conset= call-in new))
                   (setf (combination-constraints-in node) new)
                   (when *constraint-blocks-p*
