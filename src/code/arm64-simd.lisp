@@ -1423,7 +1423,7 @@
 
                         ((tmp unsigned-reg))
                         ((full-table any-reg t))
-                        ((size-table any-reg t))
+                        ((tmp2 any-reg t))
                         ((shift-mask complex-double-reg))
                         ((c-d800 complex-double-reg))
 
@@ -1533,12 +1533,6 @@
 
                  (load-inline-constant shift-mask :oword #x6000000040000000200000000)
                  (load-inline-constant full-table (make-full-table))
-                 (load-inline-constant size-table (let ((table (make-array 256 :element-type '(unsigned-byte 8))))
-                                                    (loop for row below 256
-                                                          for total-bytes = (loop for lane below 4
-                                                                                  sum (1+ (ldb (byte 2 (* lane 2)) row)))
-                                                          do (setf (aref table row) total-bytes))
-                                                    table))
                  (inst movi c-d800  #xd800 :4s)
                  (inst movi length1 3 :16b)
                  (load-inline-constant length2 :oword #x00000000000000010101010202020202)
@@ -1570,7 +1564,16 @@
                    (inst addv temp temp :4s)
                    (inst umov tmp temp 0 :b)
 
-                   (inst ldrb tmp-tn (@ size-table tmp))
+                   ;; Do a sum of lengths in gprs,
+                   ;; since addv+umov uses already saturated vector execution ports.
+                   ;; Using a lookup table might be slightly faster
+                   ;; but relies on it always being in L1.
+                   (progn
+                     (inst and (32-bit-reg tmp-tn) tmp #x33333333)
+                     (inst and (32-bit-reg tmp2) tmp #xCCCCCCCC)
+                     (inst add tmp-tn tmp-tn (lsr tmp2 2))
+                     (inst add tmp-tn tmp-tn (lsr tmp-tn 4))
+                     (inst and tmp-tn tmp-tn #x0F))
 
                    ;; Multiply by 48 (3 * 16)
                    (inst add tmp tmp (lsl tmp 1))
@@ -1583,7 +1586,7 @@
                    (inst and bytes bytes and-mask :16b)
                    (inst orr bytes bytes orr-mask :16b)
 
-                   (inst str bytes (@ byte-array))
+                   (inst str bytes (@ byte-array 4 :post-index))
 
                    (inst add byte-array byte-array tmp-tn)
                    (inst add string string 16))
