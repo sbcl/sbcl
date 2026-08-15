@@ -1560,10 +1560,10 @@
                                             do (setf (aref table (+ (* row row-size) dest-index)) src-index)
                                                (incf dest-index))))
                         table)))
-               (macrolet ((track-newline (bytes)
+               (macrolet ((track-newline (bytes temp)
                             `(progn
-                               (inst vpcmpeqd temp ,bytes newlines)
-                               (inst vpblendvb last-newlines last-newlines indexes temp)
+                               (inst vpcmpeqd ,temp ,bytes newlines)
+                               (inst vpblendvb last-newlines last-newlines indexes ,temp)
                                (inst vpaddd indexes indexes increment))))
                  (assemble ()
                    (inst vmovdqu ascii-mask (register-inline-constant :avx2
@@ -1594,8 +1594,8 @@
                    (inst vptest temp ascii-mask)
                    (inst jmp :nz FULL-START)
 
-                   (track-newline bytes)
-                   (track-newline bytes2)
+                   (track-newline bytes temp)
+                   (track-newline bytes2 temp)
 
                    (inst vpackusdw bytes bytes bytes2)
                    (inst vpermq bytes bytes 216)
@@ -1646,8 +1646,6 @@
                      (inst vpsubd t1 bytes c-d800)
                      (inst vpminud errors errors t1)
 
-                     (track-newline bytes)
-
                      ;; Compute utf8 lengths -1
                      (inst vpcmpgtd t1 bytes c-7f)
                      (inst vpcmpgtd t2 bytes c-7ff)
@@ -1659,8 +1657,6 @@
                      ;; Negate
                      (inst vpabsd temp temp)
 
-                     ;; Create a tag mask from lengths
-
                      ;; Build an 8-bit index mask
                      ;; Narrow to 16 bits, making a 64-bit mask
                      (inst vpackusdw temp2 temp temp)
@@ -1669,16 +1665,16 @@
                      ;; Create a tag mask from lengths
                      (inst vpermd temp2 temp (register-inline-constant :oword #xF0808080F0E08080F080C080F0808000))
 
-                     ;; Sum utf8 lengths, step 1
-                     ;; step 2 is computed later, when tmp becomes free.
-                     (inst mov tmp2 tmp)
-                     (inst shr tmp2 32)
-                     (inst add :dword tmp2 tmp)
-
                      ;; Multiplying by 1 + 2^6 + 2^12 + 2^18
-                     ;; shifts two bits per byte into the upper byte
-                     (inst imul tmp (constantize #x0100040010004000))
+                     ;; shifts two bits per byte into the upper byte.
+                     ;; By adding 1 to each multiplier the lower 8
+                     ;; bits produce a sum of the lengths.
+                     (inst imul tmp (constantize (+ #x0100040010004000
+                                                    #x0001000100010001)))
+                     (inst mov tmp2 tmp)
                      (inst shr tmp (- 56 4)) ;; shift left 4 for the table entry size
+
+                     (track-newline bytes temp)
 
                      ;; Spread the character to all 4 bytes
                      ;; For the first byte, the mask depends on if it's a single byte or a continuation byte
@@ -1700,16 +1696,13 @@
                      (inst vpor bytes temp t1)
                      (inst vpor bytes bytes t2)
 
-                     (inst vpor bytes bytes temp2)
+                     (inst vpor bytes bytes temp2) ;; add tags
 
                      ;; Shuffle the bytes into place
                      (inst vpshufb bytes bytes (ea full-table tmp))
 
-                     ;; Sum the remaining part of the utf8 lengths
-                     (inst mov :dword tmp tmp2)
-                     (inst shr :dword tmp 16)
-                     (inst add :dword tmp2 tmp)
-                     (inst and :dword tmp2 #xF)
+                     (inst shr tmp2 48)
+                     (inst and :dword tmp2 #xF) ;; the sum of utf8 lengths - 4
 
                      (inst vmovdqu (ea byte-array) bytes)
 
