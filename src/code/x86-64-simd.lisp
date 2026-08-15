@@ -1526,7 +1526,7 @@
                         ((c-ffff complex-double-reg))
                         ((c-d800 complex-double-reg))
 
-                        ((multiplier unsigned-reg))
+                        ((tmp2 unsigned-reg))
 
                         ((ascii-mask int-avx2-reg))
                         ((newlines int-avx2-reg))
@@ -1547,9 +1547,9 @@
              (flet ((make-full-table ()
                       (let* ((table-size 256)
                              (row-size 16)
-                             (total-size (+ (* table-size row-size) table-size))
+                             (total-size (* table-size row-size))
                              (table (make-array total-size :element-type '(unsigned-byte 8)
-                                                           :initial-element 0)))
+                                                           :initial-element #xFF)))
                         (loop for row below table-size
                               for dest-index = 0
                               do (loop
@@ -1558,12 +1558,7 @@
                                    do (loop for b below bytes
                                             for src-index = (+ (* lane 4) (- bytes 1 b))
                                             do (setf (aref table (+ (* row row-size) dest-index)) src-index)
-                                               (incf dest-index)))
-                                 ;; for vpshufb to produce zeros
-                                 (loop for i from dest-index below 16
-                                       do (setf (aref table (+ (* row row-size) i)) #xFF))
-                                 ;; produced bytes
-                                 (setf (aref table (+ (* table-size row-size) row)) dest-index))
+                                               (incf dest-index))))
                         table)))
                (macrolet ((track-newline (bytes)
                             `(progn
@@ -1636,7 +1631,6 @@
                    (inst vmovd temp tmp)
                    (inst vpbroadcastd c-7ff temp)
 
-                   (inst mov multiplier #x0100040010004000)
                    (inst vpsrld increment increment 1) ;; go from 8 to 4
 
                    (inst vpcmpeqd errors errors errors) ;; FF..FF
@@ -1666,17 +1660,25 @@
                      (inst vpabsd temp temp)
 
                      ;; Create a tag mask from lengths
-                     (inst vpermd temp2 temp (register-inline-constant :oword #xF0808080F0E08080F080C080F0808000))
 
                      ;; Build an 8-bit index mask
                      ;; Narrow to 16 bits, making a 64-bit mask
-                     (inst vpackusdw temp temp temp)
-                     (inst vmovq tmp temp)
+                     (inst vpackusdw temp2 temp temp)
+                     (inst vmovq tmp temp2)
+
+                     ;; Create a tag mask from lengths
+                     (inst vpermd temp2 temp (register-inline-constant :oword #xF0808080F0E08080F080C080F0808000))
+
+                     ;; Sum utf8 lengths, step 1
+                     ;; step 2 is computed later, when tmp becomes free.
+                     (inst mov tmp2 tmp)
+                     (inst shr tmp2 32)
+                     (inst add :dword tmp2 tmp)
 
                      ;; Multiplying by 1 + 2^6 + 2^12 + 2^18
                      ;; shifts two bits per byte into the upper byte
-                     (inst imul tmp multiplier) ; #x0100040010004000
-                     (inst shr tmp (- 56 4)) ;; shift left 5 for the table entry size
+                     (inst imul tmp (constantize #x0100040010004000))
+                     (inst shr tmp (- 56 4)) ;; shift left 4 for the table entry size
 
                      ;; Spread the character to all 4 bytes
                      ;; For the first byte, the mask depends on if it's a single byte or a continuation byte
@@ -1703,12 +1705,15 @@
                      ;; Shuffle the bytes into place
                      (inst vpshufb bytes bytes (ea full-table tmp))
 
-                     (inst shr :dword tmp 4)
-                     (inst mov :byte tmp (ea 4096 full-table tmp)) ;; number of produced bytes
+                     ;; Sum the remaining part of the utf8 lengths
+                     (inst mov :dword tmp tmp2)
+                     (inst shr :dword tmp 16)
+                     (inst add :dword tmp2 tmp)
+                     (inst and :dword tmp2 #xF)
 
                      (inst vmovdqu (ea byte-array) bytes)
 
-                     (inst add byte-array tmp)
+                     (inst lea byte-array (ea 4 byte-array tmp2))
                      (inst add string 16)
 
                      (inst cmp byte-array byte-end)
