@@ -775,9 +775,9 @@ call the function (as though it was declared with a prototype). The
 type need not be known at compile time, but only known-type calls
 are efficiently compiled.
 
-On x86-64 and ARM64 systems, structures may be passed and returned by
-value. The implementation follows the System V AMD64/Microsoft x64 and
-AAPCS64 specifications respectively.
+On x86-64 and ARM64 systems, structures may be passed and returned
+by value. The implementation follows the System V AMD64 / Microsoft
+x64 and AAPCS64 specifications, respectively.
 
 Here is an example which allocates a @code{(struct foo)}, calls a foreign
 function to initialize it, then returns a Lisp vector of all
