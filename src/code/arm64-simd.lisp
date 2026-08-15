@@ -1423,7 +1423,6 @@
 
                         ((tmp unsigned-reg))
                         ((full-table any-reg t))
-                        ((tmp2 any-reg t))
                         ((shift-mask complex-double-reg))
                         ((c-d800 complex-double-reg))
 
@@ -1523,10 +1522,11 @@
                  (inst movi increment 1 :4s)
                  (inst mvni errors 0 :4s)
 
-                 (load-inline-constant shift-mask :oword #x6000000040000000200000000)
+                 (load-inline-constant shift-mask :oword #x00000401000001010000004100000011)
                  (load-inline-constant full-table (make-full-table))
                  (inst movi c-d800  #xd800 :4s)
-                 (inst movi length1 3 :16b)
+
+                 (load-inline-constant length1 :oword #x03030303030000000000000000000000)
                  (load-inline-constant length2 :oword #x00000000000000010101010202020202)
 
                  FULL-LOOP
@@ -1550,28 +1550,27 @@
                    ;; Map leading zeros to utf8 lengths
                    (inst tbl temp (list length1 length2) temp :16b)
 
-                   ;; Shift by 0 2 4 6
-                   (inst ushl temp temp shift-mask :4s)
-                   ;; combine into an 8-bit mask, 2 bits per lane
-                   (inst addv temp temp :4s)
-                   (inst umov tmp temp 0 :b)
+                   ;; Multiply by 1025 257 65 17, now each length will
+                   ;; be shifted left into non-overlapping positions,
+                   ;; and duplicated as is in the low bits (hence the power-of-two + 1).
+                   (inst mul temp temp shift-mask :4s)
 
-                   ;; Do a sum of lengths in gprs,
-                   ;; since addv+umov uses already saturated vector execution ports.
-                   ;; Using a lookup table might be slightly faster
-                   ;; but relies on it always being in L1.
-                   (progn
-                     (inst and (32-bit-reg tmp-tn) tmp #x33333333)
-                     (inst and (32-bit-reg tmp2) tmp #xCCCCCCCC)
-                     (inst add tmp-tn tmp-tn (lsr tmp2 2))
-                     (inst add tmp-tn tmp-tn (lsr tmp-tn 4))
-                     (inst and tmp-tn tmp-tn #x0F))
+                   ;; Now adding non-overlapping high bits will combine
+                   ;; into a bit mask index, and the low bits will sum
+                   ;; into a 4 bit total sum (to add 4 later)
+                   (inst addv temp temp :4s)
+                   (inst umov tmp temp 0 :h)
+
+                   (inst and tmp-tn tmp #xF) ;; length
+                   (inst lsr tmp tmp 4) ;; index
 
                    (inst add tmp full-table (lsl tmp 5))
 
                    (inst ld1 (list shuf-mask orr-mask) (@ tmp) :16b)
                    (inst tbl bytes (list f1 f2 f3 bytes) shuf-mask :16b)
 
+                   ;; Tags are in the form #b1.10, a signed right
+                   ;; shift by 1 will create a clear mask.
                    (inst sshr temp orr-mask 1 :16b)
                    (inst bic bytes bytes temp :16b)
                    (inst orr bytes bytes orr-mask :16b)
