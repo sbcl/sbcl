@@ -1430,8 +1430,8 @@
                         ((length1 complex-double-reg t :offset 8))
                         ((length2 complex-double-reg t :offset 9))
                         ((shuf-mask complex-double-reg t :offset 10))
-                        ((and-mask complex-double-reg t :offset 11))
-                        ((orr-mask complex-double-reg t :offset 12))
+                        ((orr-mask complex-double-reg t :offset 11))
+
                         ((zeros complex-double-reg))
                         ((:label error)))
                ((string any-reg positive-fixnum :from (:argument 0))
@@ -1439,7 +1439,7 @@
                 (last-newline signed-reg signed-num :from :load))
              (flet ((make-full-table ()
                       (let* ((table-size 256)
-                             (row-size (* 16 3))
+                             (row-size (* 16 2))
                              (table (make-array (* table-size row-size) :element-type '(unsigned-byte 8)
                                                                         :initial-element 0)))
 
@@ -1458,13 +1458,6 @@
                                                 for reg-index = (+ zeros b)
                                                 for src-index = (+ (* reg-index 16) (* lane 4))
                                                 for lead-p = (= b 0)
-                                                for and-mask = (if lead-p
-                                                                   (case bytes
-                                                                     (1 #x7F)
-                                                                     (2 #x1F)
-                                                                     (3 #x0F)
-                                                                     (4 #x07))
-                                                                   #x3F)
                                                 for orr-mask = (if lead-p
                                                                    (case bytes
                                                                      (1 #x00)
@@ -1473,8 +1466,7 @@
                                                                      (4 #xF0))
                                                                    #x80)
                                                 do (setf (aref table (+ (* row row-size) dest-index)) src-index) ;; tbl
-                                                   (setf (aref table (+ (* row row-size) 16 dest-index)) and-mask) ;; and
-                                                   (setf (aref table (+ (* row row-size) 32 dest-index)) orr-mask) ;; orr
+                                                   (setf (aref table (+ (* row row-size) 16 dest-index)) orr-mask) ;; orr
                                                    (incf dest-index))))
                         table)))
                (assemble ()
@@ -1575,15 +1567,13 @@
                      (inst add tmp-tn tmp-tn (lsr tmp-tn 4))
                      (inst and tmp-tn tmp-tn #x0F))
 
-                   ;; Multiply by 48 (3 * 16)
-                   (inst add tmp tmp (lsl tmp 1))
-                   (inst add tmp full-table (lsl tmp 4))
+                   (inst add tmp full-table (lsl tmp 5))
 
-                   (inst ld1 (list shuf-mask and-mask orr-mask) (@ tmp) :16b)
-
+                   (inst ld1 (list shuf-mask orr-mask) (@ tmp) :16b)
                    (inst tbl bytes (list f1 f2 f3 bytes) shuf-mask :16b)
 
-                   (inst and bytes bytes and-mask :16b)
+                   (inst sshr temp orr-mask 1 :16b)
+                   (inst bic bytes bytes temp :16b)
                    (inst orr bytes bytes orr-mask :16b)
 
                    (inst str bytes (@ byte-array 4 :post-index))
