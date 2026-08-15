@@ -1538,6 +1538,7 @@
                         ((last-newlines))
                         ((t2 complex-double-reg))
                         ((t3 complex-double-reg))
+                        ((temp2))
                         ((errors))
                         ((:label error)))
                ((string any-reg positive-fixnum :from :load)
@@ -1545,7 +1546,7 @@
                 (last-newline signed-reg signed-num))
              (flet ((make-full-table ()
                       (let* ((table-size 256)
-                             (row-size 32)
+                             (row-size 16)
                              (total-size (+ (* table-size row-size) table-size))
                              (table (make-array total-size :element-type '(unsigned-byte 8)
                                                            :initial-element 0)))
@@ -1556,13 +1557,7 @@
                                    for bytes = (1+ (ldb (byte 2 (* lane 2)) row))
                                    do (loop for b below bytes
                                             for src-index = (+ (* lane 4) (- bytes 1 b))
-                                            for lead-p = (= b 0)
-                                            for orr-mask = (if lead-p
-                                                               (case bytes
-                                                                 (1 #x00) (2 #xC0) (3 #xE0) (4 #xF0))
-                                                               #x80)
                                             do (setf (aref table (+ (* row row-size) dest-index)) src-index)
-                                               (setf (aref table (+ (* row row-size) 16 dest-index)) orr-mask)
                                                (incf dest-index)))
                                  ;; for vpshufb to produce zeros
                                  (loop for i from dest-index below 16
@@ -1670,6 +1665,9 @@
                      ;; Negate
                      (inst vpabsd temp temp)
 
+                     ;; Create a tag mask from lengths
+                     (inst vpermd temp2 temp (register-inline-constant :oword #xF0808080F0E08080F080C080F0808000))
+
                      ;; Build an 8-bit index mask
                      ;; Narrow to 16 bits, making a 64-bit mask
                      (inst vpackusdw temp temp temp)
@@ -1678,7 +1676,7 @@
                      ;; Multiplying by 1 + 2^6 + 2^12 + 2^18
                      ;; shifts two bits per byte into the upper byte
                      (inst imul tmp multiplier) ; #x0100040010004000
-                     (inst shr tmp (- 56 5)) ;; shift left 5 for the table entry size
+                     (inst shr tmp (- 56 4)) ;; shift left 5 for the table entry size
 
                      ;; Spread the character to all 4 bytes
                      ;; For the first byte, the mask depends on if it's a single byte or a continuation byte
@@ -1700,12 +1698,13 @@
                      (inst vpor bytes temp t1)
                      (inst vpor bytes bytes t2)
 
-                     ;; Shuffle the bytes into place
-                     (inst vpshufb bytes bytes (ea 0 full-table tmp))
+                     (inst vpor bytes bytes temp2)
 
-                     (inst vpor bytes bytes (ea 16 full-table tmp))
-                     (inst shr :dword tmp 5)
-                     (inst mov :byte tmp (ea 8192 full-table tmp)) ;; number of produced bytes
+                     ;; Shuffle the bytes into place
+                     (inst vpshufb bytes bytes (ea full-table tmp))
+
+                     (inst shr :dword tmp 4)
+                     (inst mov :byte tmp (ea 4096 full-table tmp)) ;; number of produced bytes
 
                      (inst vmovdqu (ea byte-array) bytes)
 
