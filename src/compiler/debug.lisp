@@ -27,6 +27,11 @@
 (defvar *seen-blocks*)
 (defvar *seen-funs*)
 
+(defvar *debug-print-types* nil)
+(defvar *debug-print-vop-temps* nil)
+#+sb-devel
+(defvar *debug-print-lvar-annotations* nil)
+
 ;;; Barf if NODE is in a block which wasn't reached during the graph
 ;;; walk.
 (defun check-node-reached (node)
@@ -980,6 +985,10 @@
                :unknown))
       (format t "uv~D " (cont-num cont))
       (format t "v~D " (cont-num cont)))
+  #+sb-devel
+  (when (and *debug-print-lvar-annotations*
+             (lvar-annotations cont))
+    (format t "~a " (lvar-annotations cont)))
   (values))
 
 (defun print-lvar-stack (stack &optional (stream *standard-output*))
@@ -988,9 +997,6 @@
                    (eq (ir2-lvar-kind (lvar-info lvar)) :stack)
                    (cont-num lvar)
                    rest)))
-
-(defvar *debug-print-types* nil)
-(defvar *debug-print-vop-temps* nil)
 
 ;;; Print out the nodes in BLOCK in a format oriented toward
 ;;; representing what the code does.

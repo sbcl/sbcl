@@ -2884,9 +2884,16 @@
                                          ;; (NODE-DERIVED-TYPE USE) would
                                          ;; be better -- APD, 2003-05-15
                                          (leaf-type var)))
-                     (propagate-lvar-annotations-to-refs arg var)
+
                      (propagate-to-refs var type)
-                     (unless (preserve-single-use-debug-var-p call var)
+                     ;; Don't substitute lvars with type annotations,
+                     ;; which might cause type conflicts in new refs.
+                     ;; This might make some things opaque, but type-annotations
+                     ;; are used only in very specific cases, and preserving
+                     ;; control flow with casts or combinations will be just as opaque.
+                     (unless (or (preserve-single-use-debug-var-p call var)
+                                 (find-if #'lvar-type-annotation-p (lvar-annotations arg)))
+                       (propagate-lvar-annotations-to-refs arg var)
                        (update-lvar-dependencies leaf arg)
                        (propagate-ref-dx use arg var)
                        (let ((use-component (node-component use)))
@@ -2902,7 +2909,7 @@
              (not (preserve-single-use-debug-var-p call var))
              (substitute-single-use-lvar arg var)))
        (t
-         (propagate-to-refs var type))))
+        (propagate-to-refs var type))))
    call
    :reoptimize t)
 

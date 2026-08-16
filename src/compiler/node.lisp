@@ -241,6 +241,7 @@
   lexenv
   fired)
 
+#+sb-devel
 (defprinter (lvar-annotation)
   fired)
 
@@ -286,6 +287,11 @@
             (:copier nil))
   type
   context)
+
+#+sb-devel
+(defprinter (lvar-type-annotation)
+  fired
+  (type :princ (type-specifier type)))
 
 (defstruct (lvar-function-annotation
             (:include lvar-type-annotation)

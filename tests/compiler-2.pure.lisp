@@ -5155,3 +5155,10 @@
                  (elt '(3 4) b)))
     ((0) (values 1 3))
     ((1) (values 2 4))))
+
+(with-test (:name :annotations-traveling-type-conflicts)
+  (checked-compile
+   `(lambda (x)
+      (let ((g (sb-kernel:the* (symbol :use-annotations t) x)))
+        (unless (typep g 'symbol)
+          g)))))
