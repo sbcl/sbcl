@@ -739,13 +739,6 @@ static __attribute__((unused)) uword_t corespace_checksum(uword_t* base, int nwo
     return result;
 }
 
-/* TODO: If static + readonly were mapped as desired without disabling ASLR
- * but one of the large spaces couldn't be mapped as desired, start over from
- * the top, disabling ASLR. This should help to avoid relocating the heap
- * if at all possible. It might make sense to parse the core header sooner in
- * startup to avoid wasting time on all actions performed prior to re-exec.
- */
-
 lispobj* linkage_space;
 int linkage_table_count;
 
