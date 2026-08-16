@@ -2860,7 +2860,7 @@
   (checked-compile-and-assert (:optimize nil :allow-notes nil)
       '(lambda (x)
         (or x
-         (destructuring-bind (a (b c) d) '(1 "foo" 4)
+         (destructuring-bind (a (b c) d) '(1 (2 3) 4)
            (+ a b c d))))
     ((:feh) :feh)))
 
