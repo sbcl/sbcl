@@ -116,50 +116,38 @@
                        sb-vm:word-shift)
                   sb-vm:instance-pointer-lowtag)))
 
-;;;; Ensure ID uniqueness and that layout ID words match the ID's in the INHERITS vector.
-(defparameter *all-wrappers*
-  (delete-if
-   ;; temporary layouts (created for parsing DEFSTRUCT)
-   ;; must be be culled out.
-   (lambda (x)
-     (and (typep (sb-kernel:layout-classoid x)
-                 'sb-kernel:structure-classoid)
-          (eq (sb-kernel:layout-equalp-impl x)
-              #'sb-kernel::equalp-err)))
-   (sb-vm::list-allocated-objects :all
-                                  :type sb-vm:instance-widetag
-                                  :test #'sb-kernel::layout-p)))
-
 ;;; Assert no overlaps on ID
 (with-test (:name :id-uniqueness)
-  (let ((hash (make-hash-table)))
-    (dolist (wrapper *all-wrappers*)
+  (let ((hash (make-hash-table))
+        (all-layouts
+         (sb-vm::list-allocated-objects :all
+                                        :type sb-vm:instance-widetag
+                                        :test #'sb-kernel::layout-p)))
+    (dolist (wrapper all-layouts)
       (let ((id (sb-kernel:layout-id wrapper)))
-        (sb-int:awhen (gethash id hash)
-          (error "ID ~D is ~A and ~A" id sb-int:it wrapper))
-        (setf (gethash id hash) wrapper)))))
+        (when id ; not all layouts have IDs
+          (sb-int:awhen (gethash id hash)
+            (error "ID ~D is ~A and ~A" id sb-int:it wrapper))
+          (setf (gethash id hash) wrapper))))))
 
 ;;; Assert that IDs are right
 (with-test (:name :id-versus-inherits)
-  (let ((structure-object (sb-kernel:find-layout 'structure-object)))
-    (dolist (wrapper *all-wrappers*)
-      (when (find structure-object (sb-kernel:layout-inherits wrapper))
-        (let* ((layout wrapper)
-               (ids
+  (let ((structure-layouts
+         (loop for v being each hash-value
+               of (sb-kernel:classoid-subclasses (sb-kernel:find-classoid 'structure-object))
+               collect v)))
+    (dolist (layout structure-layouts)
+        (let* ((ids
                 (sb-sys:with-pinned-objects (layout)
                   (let ((sap (layout-id-vector-sap layout)))
-                    (loop for depthoid from 2 to (sb-kernel:layout-depthoid wrapper)
+                    (loop for depthoid from 2 below (sb-kernel:layout-depthoid layout)
                        collect (sb-sys:signed-sap-ref-32 sap (ash (- depthoid 2) 2))))))
                (expected
-                (map 'list 'sb-kernel:layout-id (sb-kernel:layout-inherits wrapper))))
-          (unless (equal (list* (sb-kernel:layout-id (sb-kernel:find-layout 't))
-                                (sb-kernel:layout-id (sb-kernel:find-layout 'structure-object))
-                                ids)
-                         (append expected (list (sb-kernel:layout-id wrapper))))
+                (map 'list 'sb-kernel:layout-id (subseq (sb-kernel:layout-inherits layout) 2))))
+          (unless (equal ids expected)
+            (setq *print-pretty* nil)
             (error "Wrong IDs for ~A: expect ~D actual ~D~%"
-                   wrapper expected ids)))))))
-
-(makunbound '*all-wrappers*)
+                   layout expected ids))))))
 
 (defun random-bitmap (nwords random-state sign-bit)
   (let ((integer 0)

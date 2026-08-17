@@ -1842,7 +1842,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "LAYOUT-EQUALP-IMPL"
            "BITMAP-NWORDS"
            "LAYOUT-DEPTHOID"
-           "LAYOUT-ID"
+           "LAYOUT-ID" "ENSURE-LAYOUT-ID"
            "LAYOUT-FOR-PCL-OBJ-P"
            #+(or x86-64 x86) "%LEA"
            "LEXENV" "LEXENV-DESIGNATOR" "LINE-LENGTH"

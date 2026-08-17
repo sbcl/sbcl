@@ -271,7 +271,7 @@ SB-C::DXABLE-ARGS
 #-sb-xc
 (defun choose-layout-id (name conditionp)
   (case name
-    ((t) 0)
+    ((t) nil)
     (structure-object 1)
     (sb-impl::buffer 2)
     (layout 3)

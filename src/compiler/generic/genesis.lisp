@@ -850,7 +850,10 @@
 ;;; in the core for a cold layout, so that we don't have to extract
 ;;; them out of the core to compare cold layouts for validity.
 (defstruct (cold-layout (:constructor %make-cold-layout))
-  id name depthoid length bitmap flags inherits descriptor)
+  ;; ID is NIL for non-structures, and NIL is stored as 0. We want to enforce
+  ;; the constraint that that no layout has an actual ID is 0.
+  (id nil :type (or (and fixnum (not (eql 0))) null))
+  name depthoid length bitmap flags inherits descriptor)
 
 ;;; a map from name as a host symbol to the descriptor of its target layout
 (defvar *cold-layouts*)
@@ -1451,13 +1454,15 @@ core and return a descriptor to it."
                                             (host-constant-to-core '#(1 nil))))))
 
       (let ((byte-offset (+ (descriptor-byte-offset result) (sb-vm::id-bits-offset))))
+        (when this-id
+          (let ((disp (+ byte-offset (ash (max 0 (- depthoid 2)) 2))))
+            (setf (bvref-s32 (descriptor-mem result) disp) this-id)))
         (when (logtest flags +structure-layout-flag+)
           (loop for i from 2 below (cold-vector-len inherits)
                 do (setf (bvref-s32 (descriptor-mem result) byte-offset)
                          (cold-layout-id (gethash (descriptor-bits (cold-svref inherits i))
                                                   *cold-layout-by-addr*)))
-                   (incf byte-offset 4)))
-        (setf (bvref-s32 (descriptor-mem result) byte-offset) this-id)))
+                   (incf byte-offset 4)))))
 
     (integer-bits-to-core bitmap result (1+ fixed-words) bitmap-words)
 
@@ -3046,8 +3051,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
              (:symbol-tls-index (ensure-symbol-tls-index name))
              (:layout (cold-layout-descriptor-bits name))
              (:layout-id ; SYM is a #<LAYOUT>
-              (cold-layout-id (gethash (descriptor-bits name)
-                                       *cold-layout-by-addr*)))
+              (the (and fixnum (not (eql 0)))
+                   (cold-layout-id (gethash (descriptor-bits name) *cold-layout-by-addr*))))
              ;; The machine-dependent code decides how to patch in 'nbits'
              (:card-table-index-mask sb-vm::gencgc-card-table-index-nbits)
              (:immobile-symbol

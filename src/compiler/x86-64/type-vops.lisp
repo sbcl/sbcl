@@ -1267,17 +1267,8 @@
                 (inst jmp :l (if not-p target done)))
               (inst cmp :dword
                     (ea (layout-id-offset test-layout) layout)
-                    ;; Small layout-ids can only occur for layouts made in genesis.
-                    ;; Therefore if the compile-time value of the ID is small,
-                    ;; it is permanently assigned to that type.
-                    ;; Otherwise, we allow for the possibility that the compile-time ID
-                    ;; is not the same as the load-time ID.
-                    ;; I don't think layout-id 0 can get here, but be sure to exclude it.
-                    (cond ((or (typep (layout-id test-layout) '(and (signed-byte 8) (not (eql 0))))
-                               (not (sb-c::producing-fasl-file)))
-                           (layout-id test-layout))
-                          (t
-                           (make-fixup test-layout :layout-id))))))))))
+                    (ensure-layout-id-fixup-or-imm test-layout)))))))
+) ; end MACROLET
 
 (define-vop ()
   (:translate sb-c::%structure-is-a)
@@ -1368,10 +1359,5 @@
   (:policy :fast-safe)
   (:info target not-p test-layout)
   (:generator 1
-    (inst cmp :dword id
-          (cond ((or (typep (layout-id test-layout) '(and (signed-byte 8) (not (eql 0))))
-                     (not (sb-c::producing-fasl-file)))
-                 (layout-id test-layout))
-                (t
-                 (make-fixup test-layout :layout-id))))
+    (inst cmp :dword id (ensure-layout-id-fixup-or-imm test-layout))
     (inst jmp (if not-p :ne :e) target)))

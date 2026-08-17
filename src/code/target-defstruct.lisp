@@ -100,7 +100,7 @@
     ;; - only subtypes of STRUCTURE-OBJECT need an ID for TYPEP, and structures
     ;;   are not redefinable, so you'd have to define 2^32 different structure
     ;;   types to exhaust the space of IDS.
-    (set-layout-inherits layout inherits (logtest flags +structure-layout-flag+) 0)
+    (set-layout-inherits layout inherits (logtest flags +structure-layout-flag+) nil)
     (let ((bitmap-base (+ fixed-words extra-id-words)))
       (dotimes (i bitmap-words)
         (%raw-instance-set/word layout (+ bitmap-base i)
@@ -197,32 +197,30 @@
                         layout (+ (get-dsd-index layout id-word0) index))
              ;; use SAP-ref, for lack of half-sized slots
              #+64-bit `(signed-sap-ref-32 (id-bits-sap) (ash index 2))))
-(defun layout-id (layout &optional (assign t))
+(defun layout-id (layout)
   ;; If a structure type at depthoid >= 2, then fetch the INDEXth id
   ;; where INDEX is depthoid - 2. Otherwise fetch the 0th id.
   ;; There are a few non-structure types at positive depthoid; those do not store
   ;; their ancestors in the vector; they only store self-id at index 0.
   ;; This isn't performance-critical. If it were, then we should store self-ID
-  ;; at a fixed index. Using it for type-based dispatch remains a possibility.
-  (let* ((depth (- (sb-vm::layout-depthoid layout) 2))
-         (index (if (or (< depth 0) (not (logtest (layout-flags layout)
-                                                  +structure-layout-flag+)))
-                    0 depth))
-         (id (with-pinned-objects (layout)
-               (access-it))))
-    (truly-the
-     (or null layout-id)
-     (cond ((not (zerop id)) id)
-           (assign
-            (aver (logior +structure-layout-flag+ (layout-flags layout)))
-            (with-system-mutex (*layout-id-mutex*)
-              (let ((id (truly-the layout-id (access-it)))) ; double-check
-                (if (zerop id)
-                    (with-pinned-objects (layout)
-                      (setf (access-it)
-                            ;; doesn't really need ATOMIC- any moren
-                            (atomic-incf (car *layout-id-generator*))))
-                    id))))))))
+  ;; at a fixed index.
+  (let* ((index (max 0 (- (sb-vm::layout-depthoid layout) 2)))
+         (id (with-pinned-objects (layout) (access-it))))
+    (unless (zerop id) id)))
+
+(defun ensure-layout-id (layout)
+  (or (layout-id layout)
+      (progn
+        (aver (logtest (layout-flags layout) +structure-layout-flag+))
+        (with-system-mutex (*layout-id-mutex*)
+          (let* ((index (max 0 (- (sb-vm::layout-depthoid layout) 2)))
+                 (id (access-it))) ; double-check
+            (if (zerop id)
+                (with-pinned-objects (layout)
+                  (setf (access-it)
+                        ;; doesn't really need ATOMIC- any more
+                        (atomic-incf (car *layout-id-generator*))))
+                id))))))
 
 (defun set-layout-inherits (layout inherits structurep this-id)
   (setf (layout-inherits layout) inherits)
@@ -243,9 +241,11 @@
       (cond (structurep
              (loop for i from 0 by 4
                    for j from 2 below (length inherits) ; skip T and STRUCTURE-OBJECT
-                   do (setf (signed-sap-ref-32 sap i) (layout-id (svref inherits j)))
-                   finally (setf (signed-sap-ref-32 sap i) this-id)))
-            ((not (eql this-id 0))
+                   do (setf (signed-sap-ref-32 sap i) (ensure-layout-id (svref inherits j)))
+                   finally (setf (signed-sap-ref-32 sap i) (or this-id 0))))
+            (this-id ; it shold only be nonzero for a very restricted number
+             ;; of non-structures. Maybe should assert that we're not assigning
+             ;; numbers to every standard-object.
              (setf (signed-sap-ref-32 sap 0) this-id))))))
 ) ; end MACROLET
 

@@ -140,7 +140,7 @@
   (print-unreadable-object (layout stream :type t :identity t)
     (format stream
             "~@[(ID=~d) ~]for ~S~@[, INVALID=~S~]"
-            (layout-id layout #-sb-xc-host nil)
+            (layout-id layout)
             (layout-proper-name layout)
             (layout-invalid layout))))
 

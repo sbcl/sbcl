@@ -77,10 +77,7 @@
   (:generator 1
     (inst cmp
           (make-ea :dword :disp (layout-id-offset test) :base x)
-          (if (or (typep (layout-id test) '(and (signed-byte 8) (not (eql 0))))
-                  (not (sb-c::producing-fasl-file)))
-              (layout-id test)
-              (make-fixup test :layout-id)))))
+          (ensure-layout-id-fixup-or-imm test))))
 
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)

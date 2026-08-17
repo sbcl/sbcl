@@ -81,7 +81,7 @@
     (inst ldr this-id (@ x (layout-id-offset test-layout)))
     (let ((test-id (layout-id test-layout)))
       ;; 8-bit IDs are permanently assigned, so no fixup ever needed for those.
-      (cond ((typep test-id '(and (unsigned-byte 8) (not (eql 0))))
+      (cond ((typep test-id '(unsigned-byte 8))
              (inst cmp this-id test-id))
             (t
              (inst .layout-id test-layout)

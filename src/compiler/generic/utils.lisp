@@ -544,6 +544,16 @@
 (defmacro id-bits-offset () ; FIXME: could this be a constant ?
   (let ((slot (get-dsd-index layout sb-kernel::id-word0)))
     (ash (+ sb-vm:instance-slots-offset slot) sb-vm:word-shift)))
+
+(defmacro ensure-layout-id-fixup-or-imm (l)
+  ;; If not compiling to a file, then ensure we have an ID, and use it as an immediate
+  ;; operand. (If the backend can't do that due to encoding limitations, it can choose to
+  ;; use a fixup). Otherwise, if the ID is a small integer for a builtin layout - so it won't
+  ;; change - then wire it in even if compiling to a file. Otherwise, returnd a fixup.
+  `(cond ((not (sb-c::producing-fasl-file)) (ensure-layout-id ,l)) ; assign it now
+         ((typep (layout-id ,l) '(signed-byte 8)) (layout-id ,l)) ; a known small id
+         (t (make-fixup ,l :layout-id))))
+
 (defmacro layout-id-offset (layout)
   ;; Compute offset at which you can read a layout-id from an unknown layout to see
   ;; if it matches the ID at the depthoid of LAYOUT.

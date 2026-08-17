@@ -842,7 +842,7 @@
               (inst b :lt (if not-p target done)))
             (inst ldr (32-bit-reg this-id) (@ layout (layout-id-offset test-layout)))
             ;; 8-bit IDs are permanently assigned, so no fixup ever needed for those.
-            (cond ((typep test-id '(and (signed-byte 8) (not (eql 0))))
+            (cond ((typep test-id '(signed-byte 8))
                    (if (minusp test-id)
                        (inst cmn (32-bit-reg this-id) (- test-id))
                        (inst cmp (32-bit-reg this-id) test-id)))
@@ -948,7 +948,7 @@
   (:temporary (:sc non-descriptor-reg) temp)
   (:generator 1
     (let ((test-id (layout-id test-layout)))
-      (cond ((typep test-id '(and (signed-byte 8) (not (eql 0))))
+      (cond ((typep test-id '(signed-byte 8))
              (if (minusp test-id)
                  (inst cmn (32-bit-reg id) (- test-id))
                  (inst cmp (32-bit-reg id) test-id)))

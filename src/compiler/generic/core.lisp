@@ -95,7 +95,7 @@
                    #+sb-thread (:symbol-tls-index (ensure-symbol-tls-index name))
                    (:layout (get-lisp-obj-address
                              (if (symbolp name) (find-layout name) name)))
-                   (:layout-id (layout-id name))
+                   (:layout-id (ensure-layout-id name))
                    (:card-table-index-mask (extern-alien "gc_card_table_nbits" int))
                    (:immobile-symbol (get-lisp-obj-address name))
                    (t (bug "bad fixup flavor ~s" flavor)))

@@ -68,12 +68,9 @@
   (:temporary (:scs (non-descriptor-reg)) this-id that-id)
   (:generator 4
     (inst lwz this-id x (layout-id-offset test-layout))
-    (let ((test-id (layout-id test-layout)))
-      ;; Always prefer 'cmpwi' if compiling to memory.
-      ;; 8-bit IDs are permanently assigned, so no fixup ever needed for those.
-      (cond ((or (typep test-id '(and (signed-byte 8) (not (eql 0))))
-                 (and (not (sb-c::producing-fasl-file))
-                      (typep test-id '(signed-byte 16))))
+    (let ((test-id (ensure-layout-id-fixup-or-imm test-layout)))
+      ;; When compiling to memory prefer to use the 'cmpwi' instruction if TEST-ID is encodable
+      (cond ((typep test-id '(signed-byte 16))
              (inst cmpwi this-id test-id))
             (t
              (inst lwz that-id code-tn

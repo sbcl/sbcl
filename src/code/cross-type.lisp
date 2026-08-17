@@ -382,3 +382,5 @@
 
 (defun sb-bignum:%bignum-length (x)
   (values (ceiling (1+ (integer-length x)) sb-vm:n-word-bits)))
+
+(defun ensure-layout-id (layout) (declare (ignore layout)) (error "Should not get here"))
