@@ -1520,30 +1520,25 @@
                         ((string* sap-reg t) (vector-sap string))
                         ((full-table sap-reg t))
                         ((tmp unsigned-reg t))
+                        ((tmp2 unsigned-reg))
 
                         ((c-7ff complex-double-reg))
                         ((c-7f complex-double-reg))
                         ((c-ffff complex-double-reg))
                         ((c-d800 complex-double-reg))
 
-                        ((tmp2 unsigned-reg))
-
-                        ((ascii-mask int-avx2-reg))
                         ((newlines int-avx2-reg))
                         ((bytes int-avx2-reg))
                         ((bytes2 int-avx2-reg))
                         ((temp int-avx2-reg))
-                        ((indexes))
-                        ((increment))
-                        ((last-newlines))
                         ((t2 complex-double-reg))
                         ((t3 complex-double-reg))
-                        ((temp2))
-                        ((errors))
+                        ((temp2 complex-double-reg))
+                        ((errors complex-double-reg))
                         ((:label error)))
                ((string any-reg positive-fixnum :from :load)
                 (byte-array unsigned-reg positive-fixnum :from (:argument 0))
-                (last-newline signed-reg signed-num))
+                (last-newline any-reg tagged-num :from :load))
              (flet ((make-full-table ()
                       (let* ((table-size 256)
                              (row-size 16)
@@ -1560,29 +1555,31 @@
                                             do (setf (aref table (+ (* row row-size) dest-index)) src-index)
                                                (incf dest-index))))
                         table)))
-               (macrolet ((track-newline (bytes temp)
-                            `(progn
-                               (inst vpcmpeqd ,temp ,bytes newlines)
-                               (inst vpblendvb last-newlines last-newlines indexes ,temp)
-                               (inst vpaddd indexes indexes increment))))
+               (flet ((track-newline (bytes temp tmp &optional (size 1))
+                        (assemble ()
+                          (ecase size
+                            (1
+                             (inst vpcmpeqb (reg-in-sc temp 'int-sse-reg) bytes newlines)
+                             (inst vpmovmskb tmp temp))
+                            (4
+                             (inst vpcmpeqd temp bytes newlines)
+                             (inst vmovmskps tmp temp)))
+                          (inst test :dword tmp tmp)
+                          (inst jmp :z no-nl)
+                          (inst bsr :dword tmp tmp)
+                          (inst lea last-newline (ea string tmp 4))
+                          no-nl)))
                  (assemble ()
-                   (inst vmovdqu ascii-mask (register-inline-constant :avx2
-                                                                      (concat-ub 32 (loop repeat 8
-                                                                                          collect (ldb (byte 32 0) (lognot 127))))))
-                   (inst vmovdqu newlines (register-inline-constant :avx2
-                                                                    (concat-ub 32 (loop repeat 8
-                                                                                        collect 10))))
-                   (inst vmovdqu increment (register-inline-constant :avx2
-                                                                     (concat-ub 32 (loop repeat 8
-                                                                                         collect 8))))
-                   (inst vmovdqu indexes (register-inline-constant :avx2
-                                                                   (concat-ub 32 '(7 6 5 4 3 2 1 0))))
-                   (inst vpcmpeqb last-newlines last-newlines last-newlines) ;; FF..FF
-
+                   (inst vmovdqu newlines (register-inline-constant :sse
+                                                                    (concat-ub 8 (loop repeat 16
+                                                                                       collect 10))))
+                   (inst mov last-newline (fixnumize -1))
                    (inst lea byte-array (ea byte-array* byte-start))
+
                    (inst lea byte-end (ea -16 byte-end byte-array*))
                    (inst lea string-end (ea -64 string* string-end (ash 1 (- 2 n-fixnum-tag-bits))))
-                   (inst lea string  (ea string* string-start (ash 1 (- 2 n-fixnum-tag-bits))))
+                   (inst lea string (ea string* string-start (ash 1 (- 2 n-fixnum-tag-bits))))
+
 
                    (inst jmp start)
 
@@ -1590,21 +1587,22 @@
                    (inst vmovdqu bytes (ea string))
                    (inst vmovdqu bytes2 (ea 32 string))
 
-                   (inst vpor temp bytes bytes2)
-                   (inst vptest temp ascii-mask)
-                   (inst jmp :nz FULL-START)
 
-                   (track-newline bytes temp)
-                   (track-newline bytes2 temp)
+                   (inst vpackssdw temp bytes bytes2)
+                   (inst vpermq temp temp 216)
+                   (inst vpackuswb temp temp temp)
+                   (inst vpermq temp temp 216)
 
-                   (inst vpackusdw bytes bytes bytes2)
-                   (inst vpermq bytes bytes 216)
-                   (inst vpackuswb bytes bytes bytes)
-                   (inst vpermq bytes bytes 216)
+
+                   (inst vpmovmskb tmp temp)
+                   (inst test :dword tmp tmp)
+                   (inst jmp :nz full-start)
+
+                   (track-newline temp temp2 tmp)
 
                    (inst add string 64)
 
-                   (inst vmovdqu (ea byte-array) (reg-in-sc bytes 'int-sse-reg))
+                   (inst vmovdqu (ea byte-array) (reg-in-sc temp 'int-sse-reg))
                    (inst add byte-array 16)
 
                    start
@@ -1631,7 +1629,9 @@
                    (inst vmovd temp tmp)
                    (inst vpbroadcastd c-7ff temp)
 
-                   (inst vpsrld increment increment 1) ;; go from 8 to 4
+                   (inst vmovdqu newlines (register-inline-constant :sse
+                                                                    (concat-ub 32 (loop repeat 4
+                                                                                        collect 10))))
 
                    (inst vpcmpeqd errors errors errors) ;; FF..FF
                    (inst vmovdqa c-d800 (register-inline-constant
@@ -1657,6 +1657,8 @@
                      ;; Negate
                      (inst vpabsd temp temp)
 
+                     (track-newline bytes temp2 tmp 4)
+
                      ;; Build an 8-bit index mask
                      ;; Narrow to 16 bits, making a 64-bit mask
                      (inst vpackusdw temp2 temp temp)
@@ -1673,8 +1675,6 @@
                                                     #x0001000100010001)))
                      (inst mov tmp2 tmp)
                      (inst shr tmp (- 56 4)) ;; shift left 4 for the table entry size
-
-                     (track-newline bytes temp)
 
                      ;; Spread the character to all 4 bytes
                      ;; For the first byte, the mask depends on if it's a single byte or a continuation byte
@@ -1730,27 +1730,20 @@
                    (inst jmp error)
 
                    DONE
+                   (inst test last-newline last-newline)
+                   (inst jmp :s no-nl)
+                   (inst sub last-newline string*)
+                   (inst shr last-newline (- 2 n-fixnum-tag-bits))
+                   no-nl
                    (inst sub string string*)
                    (inst shr string (- 2 n-fixnum-tag-bits))
                    (inst sub byte-array byte-array*)
 
-                   (let ((xlast-newlines (reg-in-sc last-newlines 'int-sse-reg))
-                         (temp (reg-in-sc temp 'int-sse-reg)))
-                     (inst vextracti128 temp last-newlines 1)
-                     (inst vpmaxsd xlast-newlines temp xlast-newlines)
-                     (inst vpsrldq temp xlast-newlines 8)
-                     (inst vpmaxsd xlast-newlines xlast-newlines temp)
-                     (inst vpsrldq temp xlast-newlines 4)
-                     (inst vpmaxsd xlast-newlines xlast-newlines temp)
-                     (inst vmovd  last-newline xlast-newlines)
-                     (inst movsx '(:dword :qword) last-newline last-newline))
 
                    (inst vzeroupper))))))
        (setf (sb-impl::buffer-tail obuf) written)
        (return (values read
-                       (if (>= last-newline 0)
-                           (truly-the index (+ start last-newline))
-                           (truly-the fixnum last-newline)))))
+                       (truly-the fixnum last-newline))))
    error
      ;; Surrogates should rarely happen, return as if no work was done
      ;; and let the scalar loop handle it.
