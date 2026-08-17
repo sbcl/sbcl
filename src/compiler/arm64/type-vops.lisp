@@ -828,10 +828,7 @@
           nil)
          (t
           (let* ((test-id (layout-id test-layout))
-                 (depthoid (layout-depthoid test-layout))
-                 (offset (+ (id-bits-offset)
-                            (ash (- depthoid 2) 2)
-                            (- instance-pointer-lowtag))))
+                 (depthoid (layout-depthoid test-layout)))
             (when (and target
                        (> depthoid sb-kernel::layout-id-vector-fixed-capacity))
               (inst ldrsw temp
@@ -843,7 +840,7 @@
                           instance-pointer-lowtag)))
               (inst cmp temp (add-sub-immediate (fixnumize depthoid)))
               (inst b :lt (if not-p target done)))
-            (inst ldr (32-bit-reg this-id) (@ layout offset))
+            (inst ldr (32-bit-reg this-id) (@ layout (layout-id-offset test-layout)))
             ;; 8-bit IDs are permanently assigned, so no fixup ever needed for those.
             (cond ((typep test-id '(and (signed-byte 8) (not (eql 0))))
                    (if (minusp test-id)

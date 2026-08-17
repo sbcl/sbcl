@@ -77,14 +77,10 @@
   (:info target not-p test-layout)
   (:temporary (:sc unsigned-reg) this-id test-id)
   (:generator 4
-    (let ((label (register-inline-constant :layout-id test-layout))
-          (offset (+ (id-bits-offset)
-                     (ash (- (layout-depthoid test-layout) 2) 2)
-                     (- instance-pointer-lowtag))))
-      (inst lw test-id sb-vm::code-tn label)
-      (inst lw this-id x offset)
-      (inst* (if not-p 'bne 'beq) this-id test-id target)
-      (inst nop))))
+    (inst lw test-id sb-vm::code-tn (register-inline-constant :layout-id test-layout))
+    (inst lw this-id x (layout-id test-layout))
+    (inst* (if not-p 'bne 'beq) this-id test-id target)
+    (inst nop)))
 
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)

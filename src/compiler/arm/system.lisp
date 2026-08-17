@@ -78,11 +78,8 @@
   (:info test-layout)
   (:temporary (:sc unsigned-reg) this-id)
   (:generator 4
-    (let ((test-id (layout-id test-layout))
-          (offset (+ (id-bits-offset)
-                     (ash (- (layout-depthoid test-layout) 2) 2)
-                     (- instance-pointer-lowtag))))
-      (inst ldr this-id (@ x offset))
+    (inst ldr this-id (@ x (layout-id-offset test-layout)))
+    (let ((test-id (layout-id test-layout)))
       ;; 8-bit IDs are permanently assigned, so no fixup ever needed for those.
       (cond ((typep test-id '(and (unsigned-byte 8) (not (eql 0))))
              (inst cmp this-id test-id))

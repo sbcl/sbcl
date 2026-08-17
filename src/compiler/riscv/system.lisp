@@ -78,15 +78,12 @@
   (:info target not-p test-layout)
   (:temporary (:sc unsigned-reg) this-id temp)
   (:generator 4
-    (let ((offset (+ (id-bits-offset)
-                     (ash (- (layout-depthoid test-layout) 2) 2)
-                     (- instance-pointer-lowtag))))
-      (inst lw this-id x offset)
+      (inst lw this-id x (layout-id-offset test-layout))
       (if (or (typep (layout-id test-layout) '(and (signed-byte 8) (not (eql 0))))
               (not (sb-c::producing-fasl-file)))
           (inst li temp (layout-id test-layout))
           (inst load-layout-id temp test-layout))
-      (inst* (if not-p 'bne 'beq) this-id temp target))))
+      (inst* (if not-p 'bne 'beq) this-id temp target)))
 
 #+64-bit
 (define-vop (layout-depthoid)

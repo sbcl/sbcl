@@ -544,6 +544,12 @@
 (defmacro id-bits-offset () ; FIXME: could this be a constant ?
   (let ((slot (get-dsd-index layout sb-kernel::id-word0)))
     (ash (+ sb-vm:instance-slots-offset slot) sb-vm:word-shift)))
+(defmacro layout-id-offset (layout)
+  ;; Compute offset at which you can read a layout-id from an unknown layout to see
+  ;; if it matches the ID at the depthoid of LAYOUT.
+  `(+ (id-bits-offset)
+      (ash (- (layout-depthoid ,layout) 2) 2)
+      (- instance-pointer-lowtag))) ; Answer is in bytes relative to tagged ptr
 
 ;; It is both an optimization and a necessity that we use a single-bit test
 ;; for these three layouts in particular, because no layout-id is stored

@@ -1260,16 +1260,13 @@
             (inst cmp (emit-constant test-layout) layout))
 
            (t
-            (let* ((depthoid (layout-depthoid test-layout))
-                   (offset (+ (id-bits-offset)
-                              (ash (- depthoid 2) 2)
-                              (- instance-pointer-lowtag))))
+            (let ((depthoid (layout-depthoid test-layout)))
               (when (and target
                          (> depthoid sb-kernel::layout-id-vector-fixed-capacity))
                 (inst cmp :dword (read-depthoid) (fixnumize depthoid))
                 (inst jmp :l (if not-p target done)))
               (inst cmp :dword
-                    (ea offset layout)
+                    (ea (layout-id-offset test-layout) layout)
                     ;; Small layout-ids can only occur for layouts made in genesis.
                     ;; Therefore if the compile-time value of the ID is small,
                     ;; it is permanently assigned to that type.

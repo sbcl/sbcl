@@ -67,11 +67,8 @@
   (:info target not-p test-layout)
   (:temporary (:scs (non-descriptor-reg)) this-id that-id)
   (:generator 4
-    (let ((test-id (layout-id test-layout))
-          (offset (+ (id-bits-offset)
-                     (ash (- (layout-depthoid test-layout) 2) 2)
-                     (- instance-pointer-lowtag))))
-      (inst lwz this-id x offset)
+    (inst lwz this-id x (layout-id-offset test-layout))
+    (let ((test-id (layout-id test-layout)))
       ;; Always prefer 'cmpwi' if compiling to memory.
       ;; 8-bit IDs are permanently assigned, so no fixup ever needed for those.
       (cond ((or (typep test-id '(and (signed-byte 8) (not (eql 0))))

@@ -76,11 +76,7 @@
   (:conditional :e)
   (:generator 1
     (inst cmp
-          (make-ea :dword
-                   :disp (+ (id-bits-offset)
-                            (ash (- (layout-depthoid test) 2) 2)
-                            (- instance-pointer-lowtag))
-                   :base x)
+          (make-ea :dword :disp (layout-id-offset test) :base x)
           (if (or (typep (layout-id test) '(and (signed-byte 8) (not (eql 0))))
                   (not (sb-c::producing-fasl-file)))
               (layout-id test)
