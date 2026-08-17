@@ -78,7 +78,7 @@
   (:temporary (:sc unsigned-reg) this-id test-id)
   (:generator 4
     (inst lw test-id sb-vm::code-tn (register-inline-constant :layout-id test-layout))
-    (inst lw this-id x (layout-id test-layout))
+    (inst lw this-id x (layout-id-offset test-layout))
     (inst* (if not-p 'bne 'beq) this-id test-id target)
     (inst nop)))
 
