@@ -15,8 +15,7 @@
 ;;;; Move functions:
 (define-move-fun (load-single 1) (vop x y)
   ((single-stack) (single-reg))
-  (inst lwc1 y (current-nfp-tn vop) (tn-byte-offset x))
-  (inst nop))
+  (inst lwc1 y (current-nfp-tn vop) (tn-byte-offset x)))
 
 (define-move-fun (store-single 1) (vop x y)
   ((single-reg) (single-stack))
@@ -35,8 +34,7 @@
   ((double-stack) (double-reg))
   (let ((nfp (current-nfp-tn vop))
         (offset (tn-byte-offset x)))
-    (ld-double y nfp offset))
-  (inst nop))
+    (ld-double y nfp offset)))
 
 (defun str-double (x base offset)
   (ecase *backend-byte-order*
@@ -119,8 +117,7 @@
                            ,@(when double-p
                                `((inst lwc1-odd y x
                                        (- (* (1+ ,value) n-word-bytes)
-                                          other-pointer-lowtag)))))))
-                    (inst nop)))
+                                          other-pointer-lowtag)))))))))
                 (define-move-vop ,name :move (descriptor-reg) (,sc)))))
   (frob move-to-single single-reg nil single-float-value-slot)
   (frob move-to-double double-reg t double-float-value-slot))
@@ -177,8 +174,7 @@
     (let ((real-tn (complex-single-reg-real-tn y)))
       (inst lwc1 real-tn nfp offset))
     (let ((imag-tn (complex-single-reg-imag-tn y)))
-      (inst lwc1 imag-tn nfp (+ offset n-word-bytes))))
-  (inst nop))
+      (inst lwc1 imag-tn nfp (+ offset n-word-bytes)))))
 
 (define-move-fun (store-complex-single 2) (vop x y)
   ((complex-single-reg) (complex-single-stack))
@@ -196,8 +192,7 @@
     (let ((real-tn (complex-double-reg-real-tn y)))
       (ld-double real-tn nfp offset))
     (let ((imag-tn (complex-double-reg-imag-tn y)))
-      (ld-double imag-tn nfp (+ offset (* 2 n-word-bytes))))
-    (inst nop)))
+      (ld-double imag-tn nfp (+ offset (* 2 n-word-bytes))))))
 
 (define-move-fun (store-complex-double 4) (vop x y)
   ((complex-double-reg) (complex-double-stack))
@@ -298,8 +293,7 @@
                               other-pointer-lowtag)))
     (let ((imag-tn (complex-single-reg-imag-tn y)))
       (inst lwc1 imag-tn x (- (* complex-single-float-imag-slot n-word-bytes)
-                              other-pointer-lowtag)))
-    (inst nop)))
+                              other-pointer-lowtag)))))
 (define-move-vop move-to-complex-single :move
   (descriptor-reg) (complex-single-reg))
 
@@ -313,8 +307,7 @@
                               other-pointer-lowtag)))
     (let ((imag-tn (complex-double-reg-imag-tn y)))
       (ld-double imag-tn x (- (* complex-double-float-imag-slot n-word-bytes)
-                              other-pointer-lowtag)))
-    (inst nop)))
+                              other-pointer-lowtag)))))
 (define-move-vop move-to-complex-double :move
   (descriptor-reg) (complex-double-reg))
 
@@ -383,8 +376,7 @@
        (inst mfc1 y x))
       (descriptor-reg
        (inst lw y x (- (* single-float-value-slot n-word-bytes)
-                       other-pointer-lowtag))))
-    (inst nop)))                        ;nop needed here?
+                       other-pointer-lowtag))))))
 (define-move-vop move-to-single-int-reg
     :move (single-reg descriptor-reg) (single-int-carg-reg))
 
@@ -417,8 +409,7 @@
        (inst lw y x (- (* double-float-value-slot n-word-bytes)
                        other-pointer-lowtag))
        (inst lw-odd y x (- (* (1+ double-float-value-slot) n-word-bytes)
-                           other-pointer-lowtag))))
-    (inst nop)))                        ;nop needed here?
+                           other-pointer-lowtag))))))
 (define-move-vop move-to-double-int-reg
     :move (double-reg descriptor-reg) (double-int-carg-reg))
 
@@ -507,7 +498,7 @@
   (:generator 3
     (note-this-location vop :internal-error)
     (inst fcmp operation format x y)
-    (inst nop)
+    (inst nop) ; FPU condition code hazard was not eliminated until MIPS IV
     (if (if complement (not not-p) not-p)
         (inst bc1f target)
         (inst bc1t target))
@@ -555,7 +546,6 @@
                   (:generator ,(if word-p 3 2)
                     ,@(if word-p
                           `((inst mtc1 y x)
-                            (inst nop)
                             (note-this-location vop :internal-error)
                             (inst fcvt ,to-format :word y y))
                           `((note-this-location vop :internal-error)
@@ -589,8 +579,7 @@
                 (:generator 3
                   (note-this-location vop :internal-error)
                   (inst fcvt :word ,from-format temp x)
-                  (inst mfc1 y temp)
-                  (inst nop)))))
+                  (inst mfc1 y temp)))))
   (frob %unary-round/single-float single-reg single-float :single)
   (frob %unary-round/double-float double-reg double-float :double))
 
@@ -629,7 +618,6 @@
                     (note-this-location vop :internal-error)
                     (inst fcvt :word ,from-format temp x)
                     (inst mfc1 y temp)
-                    (inst nop)
                     (inst ctc1 status-save 31))))))
   (frob %unary-truncate/single-float single-reg single-float :single)
   (frob %unary-truncate/double-float double-reg double-float :double))
@@ -643,8 +631,7 @@
   (:translate make-single-float)
   (:policy :fast-safe)
   (:generator 2
-    (inst mtc1 res bits)
-    (inst nop)))
+    (inst mtc1 res bits)))
 
 (define-vop (make-double-float)
   (:args (hi-bits :scs (signed-reg))
@@ -656,8 +643,7 @@
   (:policy :fast-safe)
   (:generator 2
     (inst mtc1 res lo-bits)
-    (inst mtc1-odd res hi-bits)
-    (inst nop)))
+    (inst mtc1-odd res hi-bits)))
 
 (define-vop (single-float-bits)
   (:args (float :scs (single-reg)))
@@ -667,8 +653,7 @@
   (:translate single-float-bits)
   (:policy :fast-safe)
   (:generator 2
-    (inst mfc1 bits float)
-    (inst nop)))
+    (inst mfc1 bits float)))
 
 (define-vop (double-float-high-bits)
   (:args (float :scs (double-reg)))
@@ -678,8 +663,7 @@
   (:translate double-float-high-bits)
   (:policy :fast-safe)
   (:generator 2
-    (inst mfc1-odd hi-bits float)
-    (inst nop)))
+    (inst mfc1-odd hi-bits float)))
 
 (define-vop (double-float-low-bits)
   (:args (float :scs (double-reg)))
@@ -768,8 +752,7 @@
       (complex-single-stack
        (inst lwc1 r (current-nfp-tn vop) (* (+ (ecase slot (:real 0) (:imag 1))
                                                (tn-offset x))
-                                            n-word-bytes))
-       (inst nop)))))
+                                            n-word-bytes))))))
 
 (define-vop (realpart/complex-single-float complex-single-float-value)
   (:translate realpart)
@@ -801,8 +784,7 @@
       (complex-double-stack
        (ld-double r (current-nfp-tn vop) (* (+ (ecase slot (:real 0) (:imag 2))
                                                (tn-offset x))
-                                            n-word-bytes))
-       (inst nop)))))
+                                            n-word-bytes))))))
 
 (define-vop (realpart/complex-double-float complex-double-float-value)
   (:translate realpart)

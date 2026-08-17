@@ -178,8 +178,7 @@
                        (inst lwc1-odd result sap 0)))
                     (:little-endian
                      '((inst lwc1 result sap 0)
-                       (inst lwc1-odd result sap n-word-bytes))))))
-           (inst nop)))
+                       (inst lwc1-odd result sap n-word-bytes))))))))
        (define-vop (,(symbolicate ref-name "-C"))
          (:translate ,ref-name)
          (:policy :fast-safe)
@@ -214,8 +213,7 @@
                      (inst lwc1-odd result object offset)))
                   (:little-endian
                    '((inst lwc1 result object offset)
-                     (inst lwc1-odd result object (+ offset n-word-bytes)))))))
-           (inst nop)))
+                     (inst lwc1-odd result object (+ offset n-word-bytes)))))))))
        (define-vop (,set-name)
          (:translate ,set-name)
          (:policy :fast-safe)

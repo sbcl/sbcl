@@ -83,7 +83,6 @@
                      (- instance-pointer-lowtag))))
       (inst lw test-id sb-vm::code-tn label)
       (inst lw this-id x offset)
-      (inst nop)
       (inst* (if not-p 'bne 'beq) this-id test-id target)
       (inst nop))))
 
@@ -198,8 +197,7 @@
     (inst add res offset res)
     (inst subu res other-pointer-lowtag)
     (inst add lip code res)
-    (inst lw res lip 0)
-    (inst nop)))
+    (inst lw res lip 0)))
 
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg))
@@ -240,7 +238,6 @@
     (let ((offset
            (- (* (+ index vector-data-offset) n-word-bytes) other-pointer-lowtag)))
       (inst lw count count-vector offset)
-      (inst nop)
       (inst addu count 1)
       (inst sw count count-vector offset))))
 

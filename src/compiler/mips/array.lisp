@@ -58,7 +58,6 @@
     ;; ASSUMPTION: n-widetag-bits = 8 and rank is adjacent to widetag
     (inst lbu res x #+little-endian (- 1 other-pointer-lowtag)
                     #+big-endian    (- 2 other-pointer-lowtag))
-    (inst nop)
     (inst addu res 1)
     (inst and res array-rank-mask)))
 
@@ -336,8 +335,7 @@
     (inst addu lip object index)
     (inst lwc1 value lip
           (- (* vector-data-offset n-word-bytes)
-             other-pointer-lowtag))
-    (inst nop)))
+             other-pointer-lowtag))))
 
 (define-vop (data-vector-set/simple-array-single-float)
   (:note "inline array store")
@@ -383,8 +381,7 @@
        (inst lwc1-odd value lip
              (+ (- (* vector-data-offset n-word-bytes)
                    other-pointer-lowtag)
-                n-word-bytes))))
-    (inst nop)))
+                n-word-bytes))))))
 
 (define-vop (data-vector-set/simple-array-double-float)
   (:note "inline array store")
@@ -435,8 +432,7 @@
                                 other-pointer-lowtag)))
     (let ((imag-tn (complex-single-reg-imag-tn value)))
       (inst lwc1 imag-tn lip (- (* (1+ vector-data-offset) n-word-bytes)
-                                other-pointer-lowtag)))
-    (inst nop)))
+                                other-pointer-lowtag)))))
 
 (define-vop (data-vector-set/simple-array-complex-single-float)
   (:note "inline array store")
@@ -477,8 +473,7 @@
                                 other-pointer-lowtag)))
     (let ((imag-tn (complex-double-reg-imag-tn value)))
       (ld-double imag-tn lip (- (* (+ vector-data-offset 2) n-word-bytes)
-                                other-pointer-lowtag)))
-    (inst nop)))
+                                other-pointer-lowtag)))))
 
 (define-vop (data-vector-set/simple-array-complex-double-float)
   (:note "inline array store")
