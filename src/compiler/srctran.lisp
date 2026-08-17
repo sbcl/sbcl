@@ -3621,7 +3621,7 @@
     (cond ((and (<= mask most-positive-word)
                 (or (combination-matches '= '(* 0) (node-dest node))
                     (combination-matches '> '(* 0) (node-dest node))))
-           (erase-node-type node (specifier-type 'word))
+           (erase-node-type node (values-specifier-type '(values word &optional)))
            `(logand integer ,mask))
           (t
            (give-up-ir1-transform)))))
@@ -3630,7 +3630,7 @@
 (deftransform %mask-field ((size posn int) * * :node node)
   (cond ((or (combination-matches '= '(* 0) (node-dest node))
              (combination-matches '> '(* 0) (node-dest node)))
-         (erase-node-type node (specifier-type 'unsigned-byte))
+         (erase-node-type node (values-specifier-type '(values unsigned-byte &optional)))
          `(%ldb size posn int))
         (t
          (give-up-ir1-transform))))

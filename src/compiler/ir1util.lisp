@@ -652,17 +652,20 @@
 
 (defun erase-node-type (node type &optional nth-value erase-calls)
   (setf (node-derived-type node)
-        (if (eq type t)
-            (let ((derived (node-derived-type node)))
-              (make-values-type
-               (loop for i from 0
-                     for r in (values-type-required derived)
-                     collect (if (= i nth-value)
-                                 *universal-type*
-                                 r))
-               (values-type-optional derived)
-               (values-type-rest derived)))
-            type))
+        (cond ((eq type t)
+               (let ((derived (node-derived-type node)))
+                 (make-values-type
+                  (loop for i from 0
+                        for r in (values-type-required derived)
+                        collect (if (= i nth-value)
+                                    *universal-type*
+                                    r))
+                  (values-type-optional derived)
+                  (values-type-rest derived))))
+              (t
+               (aver (or (eq type *wild-type*)
+                         (values-type-p type)))
+               type)))
   (erase-lvar-type (node-lvar node) nth-value erase-calls))
 
 ;;; The uses need to have the correct type before calling this.
