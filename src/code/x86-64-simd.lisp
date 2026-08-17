@@ -1527,7 +1527,7 @@
                         ((c-ffff complex-double-reg))
                         ((c-d800 complex-double-reg))
 
-                        ((newlines int-avx2-reg))
+                        ((newlines complex-double-reg))
                         ((bytes int-avx2-reg))
                         ((bytes2 int-avx2-reg))
                         ((temp int-avx2-reg))
@@ -1629,9 +1629,7 @@
                    (inst vmovd temp tmp)
                    (inst vpbroadcastd c-7ff temp)
 
-                   (inst vmovdqu newlines (register-inline-constant :sse
-                                                                    (concat-ub 32 (loop repeat 4
-                                                                                        collect 10))))
+                   (inst vpmovzxbd newlines newlines)
 
                    (inst vpcmpeqd errors errors errors) ;; FF..FF
                    (inst vmovdqa c-d800 (register-inline-constant
