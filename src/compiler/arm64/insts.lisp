@@ -564,13 +564,11 @@
      (:printer simd-three-same-scalar-d ((u ,simd-u) (op ,simd-op)))
      (:emitter
       (if vector-size
-          (multiple-value-bind (q size) (encode-vector-size/scalar vector-size)
+          (multiple-value-bind (q size scalar) (encode-vector-size/scalar vector-size)
             (emit-simd-three-same segment
                                   q
                                   ,simd-u
-                                  (case vector-size
-                                    (:d 1)
-                                    (t 0))
+                                  scalar
                                   size
                                   (fpr-offset rm)
                                   ,simd-op
@@ -643,13 +641,11 @@
   (:printer simd-two-misc-scalar-d ((u 1) (op #b01011)))
   (:emitter
    (if vector-size
-       (multiple-value-bind (q size) (encode-vector-size/scalar vector-size)
+       (multiple-value-bind (q size scalar) (encode-vector-size/scalar vector-size)
          (emit-simd-two-misc segment
                                q
                                1
-                               (case vector-size
-                                 (:d 1)
-                                 (t 0))
+                               scalar
                                size
                                #b01011
                                (fpr-offset rm)
@@ -3499,6 +3495,7 @@
 (define-instruction-format (simd-three-same-scalar-d 32
                             :include simd-three-same
                             :default-printer '(:name :tab rd ", " rn ", " rm))
+  (q :field (byte 1 30) :value #b1)
   (op4 :field (byte 5 24) :value #b11110)
   (rm :field (byte 5 16) :type 'simd-reg-d)
   (rn :field (byte 5 5) :type 'simd-reg-d)
@@ -3545,15 +3542,15 @@
 
 (defun encode-vector-size/scalar (size)
   (ecase size
-    (:8b (values 0 0))
-    (:16b (values 1 0))
-    (:4h (values 0 #b01))
-    (:8h (values 1 #b01))
-    (:2s (values 0 #b10))
-    (:4s (values 1 #b10))
-    (:1d (values 0 #b11))
-    (:2d (values 1 #b11))
-    (:d (values 1 #b11))))
+    (:8b (values 0 0 0))
+    (:16b (values 1 0 0))
+    (:4h (values 0 #b01 0))
+    (:8h (values 1 #b01 0))
+    (:2s (values 0 #b10 0))
+    (:4s (values 1 #b10 0))
+    (:1d (values 0 #b11 0))
+    (:2d (values 1 #b11 0))
+    (:d (values 1 #b11 1))))
 
 (defun encode-vector-float-size (size)
   (ecase size
@@ -4114,6 +4111,7 @@
 
 (define-instruction-format (simd-two-misc-scalar-d 32
                             :include simd-two-misc)
+  (q :field (byte 1 30) :value 1)
   (op2 :field (byte 5 24) :value #b11110)
   (rn :field (byte 5 5) :type 'simd-reg-d)
   (rd :field (byte 5 0) :type 'simd-reg-d))
@@ -4201,7 +4199,8 @@
   (#b0 1 31)
   (q 1 30)
   (u 1 29)
-  (#b011110 6 23)
+  (scalar 1 28)
+  (#b11110 5 23)
   (immh 4 19)
   (immb 3 16)
   (op 5 11)
@@ -4220,6 +4219,13 @@
   (op3 :field (byte 1 10) :value #b1)
   (rn :fields (list (byte 1 30) (byte 4 19) (byte 5 5)) :type 'simd-immh-reg)
   (rd :fields (list (byte 4 19) (byte 5 0)) :type 'simd-immh-reg))
+
+(define-instruction-format (simd-shift-by-imm-scalar-d 32
+                            :include simd-shift-by-imm)
+  (q :field (byte 1 30) :value 1)
+  (op2 :field (byte 6 23) :value #b111110)
+  (rn :field (byte 5 5) :type 'simd-reg-d)
+  (rd :field (byte 5 0) :type 'simd-reg-d))
 
 (macrolet
     ((def (name q u op)
@@ -4261,6 +4267,7 @@
              (emit-simd-shift-by-imm segment
                                      ,q
                                      ,u
+                                     0
                                      immh
                                      immb
                                      ,op
@@ -4279,26 +4286,34 @@
                                       (3 20)
                                       (2 21)
                                       (1 22))
-                  collect
-                  `(:printer simd-shift-by-imm ((u ,u) (op ,op)
-                                                       ,@(and q `((q ,q)))
-                                                (immh #b1 :field (byte ,size ,pos))
-                                                ,@(if right
-                                                      `((shift nil :type 'simd-immh-shift-right)))
-                                                (rd nil :fields (list (byte 1 30) (byte 4 19) (byte 5 0))
-                                                        :type 'simd-immh-reg))))
+                  append
+                  `((:printer simd-shift-by-imm
+                              ((u ,u) (op ,op)
+                                      ,@(and q `((q ,q)))
+                                      (immh #b1 :field (byte ,size ,pos))
+                                      ,@(if right
+                                            `((shift nil :type 'simd-immh-shift-right)))
+                                      (rd nil :fields (list (byte 1 30) (byte 4 19) (byte 5 0))
+                                              :type 'simd-immh-reg)))
+                    ,@(unless q
+                        `((:printer simd-shift-by-imm-scalar-d
+                                    ((u ,u) (op ,op)
+                                            (immh #b1 :field (byte ,size ,pos))
+                                            ,@(if right
+                                                  `((shift nil :type 'simd-immh-shift-right)))))))))
           (:emitter
            (let ((immh 0)
                  (immb 0)
                  (q 0)
                  (shift ,(if right
                              `(ldb (byte 6 0) (- shift))
-                             `shift)))
+                             `shift))
+                 (scalar 0))
              (ecase size
                ,@(remove-if (lambda (x)
                               (member (car x)
                                       (case q
-                                        (1 '(:8b :4h :2s))
+                                        (1 '(:8b :4h :2s :d))
                                         (0 '(:16b :8h :4s :2d)))))
                   `((:8b
                      (setf immh #b1
@@ -4318,6 +4333,10 @@
                     (:4s
                      (setf immh #b100
                            q 1))
+                    (:d
+                     (setf immh #b1000
+                           q 1
+                           scalar 1))
                     ,@(when 2d
                         `((:2d
                            (setf immh #b1000
@@ -4327,6 +4346,7 @@
              (emit-simd-shift-by-imm segment
                                      q
                                      ,u
+                                     scalar
                                      immh
                                      immb
                                      ,op

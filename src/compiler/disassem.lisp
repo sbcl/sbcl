@@ -339,8 +339,9 @@
 
 (defun %def-inst-format (name inherit length printer &rest arg-specs)
   (declare (inline make-inst-format))
-  (let ((args (if inherit (copy-list (format-args (format-or-lose inherit)))))
-        (seen))
+  (let* ((inherit (and inherit (format-or-lose inherit)))
+         (args (and inherit (copy-list (format-args inherit))))
+         (seen))
     (dolist (arg-spec arg-specs)
       (let* ((arg-name (car arg-spec))
              (properties (cdr arg-spec)))
@@ -358,7 +359,11 @@
                  (rplaca cell (apply #'modify-arg (copy-structure (car cell))
                                      length properties)))))))
     (setf (get name 'inst-format)
-          (make-inst-format name (bits-to-bytes length) printer args))))
+          (make-inst-format name (bits-to-bytes length)
+                            (or printer
+                                (and inherit
+                                     (sb-disassem::format-default-printer inherit)))
+                            args))))
 
 (defun modify-arg (arg format-length
                    &key   (value nil value-p)

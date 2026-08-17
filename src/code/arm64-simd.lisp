@@ -2449,8 +2449,8 @@
             TAIL-16
             (inst cmp tmp-tn 8)
             (inst b :lt DONE)
-            (inst movi temp #xFFFFFFFF)
-            (inst and continuations continuations temp :8b)
+            ;; Clear the upper bits
+            (inst shl continuations continuations 32 :d)
             (inst addv count continuations :8b)
             (inst smov tmp-tn count 0 :b)
             (inst str s1 (@ ptr))
