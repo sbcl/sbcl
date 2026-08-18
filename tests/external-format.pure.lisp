@@ -679,51 +679,51 @@
 ;;; External format support in SB-ALIEN
 
 (with-test (:name (:sb-alien :vanilla))
-  (define-alien-routine (#-win32 "strdup" #+win32 "_strdup" strdup)
+  (define-alien-routine (#-win32 "strdup" #+win32 "_strdup" strdup1)
       c-string
     (str c-string))
-  (assert (equal "foo" (strdup "foo"))))
+  (assert (equal "foo" (strdup1 "foo"))))
 
 (with-test (:name (:sb-alien :utf-8 :utf-8))
-  (define-alien-routine (#-win32 "strdup" #+win32 "_strdup" strdup)
+  (define-alien-routine (#-win32 "strdup" #+win32 "_strdup" strdup2)
       (c-string :external-format :utf-8)
     (str (c-string :external-format :utf-8)))
-  (assert (equal "foo" (strdup "foo"))))
+  (assert (equal "foo" (strdup2 "foo"))))
 
 (with-test (:name (:sb-alien :latin-1 :utf-8))
-  (define-alien-routine (#-win32 "strdup" #+win32 "_strdup" strdup)
+  (define-alien-routine (#-win32 "strdup" #+win32 "_strdup" strdup3)
       (c-string :external-format :latin-1)
     (str (c-string :external-format :utf-8)))
-  (assert (= (length (strdup (string (code-char 246))))
+  (assert (= (length (strdup3 (string (code-char 246))))
              2)))
 
 (with-test (:name (:sb-alien :utf-8 :latin-1))
-  (define-alien-routine (#-win32 "strdup" #+win32 "_strdup" strdup)
+  (define-alien-routine (#-win32 "strdup" #+win32 "_strdup" strdup4)
       (c-string :external-format :utf-8)
     (str (c-string :external-format :latin-1)))
   (assert (equal (string (code-char 228))
-                 (strdup (concatenate 'string
-                                      (list (code-char 195))
-                                      (list (code-char 164)))))))
+                 (strdup4 (concatenate 'string
+                                       (list (code-char 195))
+                                       (list (code-char 164)))))))
 
 (with-ef-test (:name (:sb-alien :ebcdic :ebcdic-us))
-  (define-alien-routine (#-win32 "strdup" #+win32 "_strdup" strdup)
+  (define-alien-routine (#-win32 "strdup" #+win32 "_strdup" strdup5)
       (c-string :external-format :ebcdic-us)
     (str (c-string :external-format :ebcdic-us)))
-  (assert (equal "foo" (strdup "foo"))))
+  (assert (equal "foo" (strdup5 "foo"))))
 
 (with-ef-test (:name (:sb-alien :latin-1 :ebcdic-us))
-  (define-alien-routine (#-win32 "strdup" #+win32 "_strdup" strdup)
+  (define-alien-routine (#-win32 "strdup" #+win32 "_strdup" strdup6)
       (c-string :external-format :latin-1)
     (str (c-string :external-format :ebcdic-us)))
-  (assert (not (equal "foo" (strdup "foo")))))
+  (assert (not (equal "foo" (strdup6 "foo")))))
 
 (with-ef-test (:name (:sb-alien :simple-base-string :ebcdic-us))
-  (define-alien-routine (#-win32 "strdup" #+win32 "_strdup" strdup)
+  (define-alien-routine (#-win32 "strdup" #+win32 "_strdup" strdup7)
       (c-string :external-format :ebcdic-us
                 :element-type base-char)
     (str (c-string :external-format :ebcdic-us)))
-  (assert (typep (strdup "foo") 'simple-base-string)))
+  (assert (typep (strdup7 "foo") 'simple-base-string)))
 
 (with-test (:name (:input-replacement :at-end-of-file))
   (dotimes (i 256)

@@ -1092,6 +1092,9 @@
 
 (define-instruction-macro sxtw (rd rn)
   `(inst sbfm ,rd ,rn 0 31))
+
+(define-instruction-macro sxtb (rd rn)
+  `(inst sbfm ,rd ,rn 0 7))
 ;;;
 
 (def-emitter extract

@@ -548,7 +548,7 @@
                        ((index unsigned-reg t :from (:argument 1)))
                        ((suffix unsigned-reg t :from (:argument 1)))
                        ((char-count unsigned-reg t))
-                       ((full-table any-reg t))
+                       ((table any-reg t))
 
                        ((bytes complex-double-reg))
                        ((tbl1         complex-double-reg))
@@ -614,6 +614,139 @@
             (inst b ASCII-LOOP)
 
             NOT-ASCII
+            (load-inline-constant powers :qword #x8040201008040201)
+            (inst movi c-c0 #xC0 :16b)
+            (inst add string-end string-end 32) ;; now writing 32 bytes, not 64
+            ;; 1/2 bytes
+            (let ((c-bf nibble-mask)
+                  (next temp2)
+                  (continuations prev-len)
+                  (bytes16 tbl1)
+                  (combined tbl2)
+                  (is-lead16 tbl3)
+                  (shuf tbl4)
+                  (count prev)
+                  (c-c1 c-ff))
+              (inst movi c-bf #xBF :8h)
+              (inst movi c-c1 #xc1 :16b)
+              (load-inline-constant table
+                                    (let ((table (make-array (* #b10101011 16) :element-type '(unsigned-byte 8)
+                                                                               :initial-element #xFF)))
+                                      (loop for row to #b10101010 ;; highest possible inverted index for compressing 1/2 bytes
+                                            do (loop with indexes = (loop for i below 8
+                                                                          unless (logbitp i row)
+                                                                          collect (* i 2)
+                                                                          and
+                                                                          collect (1+ (* i 2)))
+                                                     for column below 16
+                                                     for index = (pop indexes)
+                                                     when index
+                                                     do
+                                                     (setf (aref table (+ (* row 16) column)) index)))
+                                      table))
+              (assemble ()
+                ;; Stop if the first byte is a continuation
+                (inst ldrsb tmp-tn (@ byte-array))
+                (inst cmn tmp-tn 64)
+                (inst b :lt DONE)
+
+                1-2-LOOP
+                (inst ldr bytes (@ byte-array))
+
+                ;; Check for 3-4 byte characters using SWAR in GPR,
+                ;; saving on vector execution ports
+                (progn
+                  (inst ldr index (@ byte-array))
+                  ;; and 3 high bits of a byte together, non-zero
+                  ;; result means some of them were all set.
+                  (inst and tmp-tn index (lsl index 1))
+                  (inst and tmp-tn tmp-tn (lsl index 2))
+                  (inst tst tmp-tn #x8080808080808080)
+
+                  (inst b :eq NOT-FULL)
+
+                  ;; Advance by 1 if the first byte is a continuation
+                  (inst sxtb tmp-tn index)
+                  (inst cmn tmp-tn 64)
+                  (inst csinc byte-array byte-array byte-array :ge)
+                  (inst cmp byte-array byte-end)
+                  (inst b :hi DONE)
+                  (inst b FULL))
+
+                NOT-FULL
+
+                (inst ext next bytes bytes 1 :16b)
+                (progn ;; Validation
+                  (inst cmgt continuations c-c0 next :8b)
+                  ;; Identify leading non-ascii bytes
+                  (inst cmhi temp3 bytes c-c1 :8b)
+
+                  ;; Continuations must follow leading bytes,
+                  ;; they must align with the shifted input
+                  (inst eor temp1 temp3 continuations :8b) ;; errors 1
+
+                  ;; Find #xC0 or #xC1, which are overlong
+                  (inst cmhs temp4 bytes c-c0 :8b) ;; >= c0
+                  (inst bic temp4 temp4 temp3 :8b) ;; temp3 has a mask for > c1
+
+                  (inst orr temp1 temp1 temp4 :8b) ;; combine errors
+                  (inst umov index temp1 0 :d)
+                  (inst cbnz index ERROR-1-2))
+
+                ;; Build a bit pattern of non-continuation bytes
+                ;; suitable for the lookup table
+                (inst cmge continuations c-c0 bytes :8b)
+                (inst and temp3 powers continuations :8b)
+                (inst addv temp3 temp3 :8b)
+                (inst umov tmp-tn temp3 0 :b)
+
+                (inst ushll bytes16 :8h bytes :8b 0)
+                (inst ushll combined :8h next :8b 0)
+
+                ;; next is shifted by one,
+                ;; construct a codepoint from two overlapping bytes,
+                ;; i.e. (dpb b0 (byte 5 6) b1)
+                (inst sli combined bytes16 6 :8h)
+                (inst bic combined #xF800 :8h)
+
+                ;; Select either the combined two bytes or one ascii byte
+                (inst cmhi is-lead16 bytes16 c-bf :8h)
+                (inst bsl is-lead16 combined bytes16 :16b)
+
+                ;; Remove the gaps left over from using two bytes as one codepoint
+                (inst ldr shuf (@ table (lsl tmp-tn 4)))
+                (inst tbl temp4 (list is-lead16) shuf :16b)
+
+                ;; Widen
+                (inst ushll s1 :4s temp4 :4h 0)
+                (inst ushll2 s2 :4s temp4 :8h 0)
+
+                (inst addv count continuations :8b)
+                (inst stp s1 s2 (@ string))
+                (inst smov char-count count 0 :b)
+
+                (inst add byte-array byte-array 8)
+                (inst add string string (* 8 4))
+                (inst add string string (lsl char-count 2)) ;; subtract continuations
+
+                (inst cmp byte-array byte-end)
+                (inst ccmp string string-end :ls 2)
+                (inst b :hi DONE-1-2)
+                (inst b 1-2-LOOP)
+
+                ERROR-1-2
+                (inst smov tmp-tn bytes 0 :b)
+                (inst b ADJUST-TAIL)
+                DONE-1-2
+                (inst smov tmp-tn bytes 8 :b)
+                ADJUST-TAIL
+                ;; Ignore any consumed continuations
+                (inst cmn tmp-tn 64)
+                (inst csinc byte-array byte-array byte-array :ge)
+
+                (inst b DONE)))
+
+            FULL
             (inst movi nibble-mask #x0f :16b)
 
             (load-inline-constant tbl1 :oword #x38060001000000000000000000000000)
@@ -623,15 +756,13 @@
 
             (inst movi prev     0 :16b)
             (inst movi prev-len 0 :16b)
-            (inst movi c-c0 #xc0 :16b)
             (inst movi c-ff #xFF :8h)
             (inst movi c-4 4 :4s)
             (inst mov suffix 0)
 
-            (load-inline-constant powers :qword #x8040201008040201)
 
             (load-inline-constant tag-clear :oword #x070F1F1F3F3F3F3F7F7F7F7F7F7F7F7F)
-            (load-inline-constant full-table (coerce (loop for index below (ash 1 10)
+            (load-inline-constant table (coerce (loop for index below (ash 1 10)
                                                            for low-index = (ldb (byte 8 0) index)
                                                            for suffix = (ldb (byte 2 8) index)
                                                            append (let ((starts (loop for i to 7
@@ -714,7 +845,7 @@
                      ;; Add the size of the last character, ensuring that only 2 bits are added
                      (inst bfm index suffix 56 1)
 
-                     (inst add tmp-tn full-table (lsl index 5))
+                     (inst add tmp-tn table (lsl index 5))
                      (inst ld1 (list shuf-low shuf-high) (@ tmp-tn) :16b)
 
                      (inst addv temp2 temp1 :8b)
