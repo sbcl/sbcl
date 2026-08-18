@@ -731,14 +731,13 @@
 
                 (inst cmp byte-array byte-end)
                 (inst ccmp string string-end :ls 2)
-                (inst b :hi DONE-1-2)
-                (inst b 1-2-LOOP)
+                (inst b :ls 1-2-LOOP)
 
+                (inst smov tmp-tn bytes 8 :b)
+                (inst b ADJUST-TAIL)
                 ERROR-1-2
                 (inst smov tmp-tn bytes 0 :b)
-                (inst b ADJUST-TAIL)
-                DONE-1-2
-                (inst smov tmp-tn bytes 8 :b)
+
                 ADJUST-TAIL
                 ;; Ignore any consumed continuations
                 (inst cmn tmp-tn 64)
