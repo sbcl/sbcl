@@ -419,10 +419,9 @@
       (:optimize :safe)
       `(lambda (x) (elt x 3))
     (("foo") (condition 'type-error))
+    (('(1 2)) (condition 'type-error))
     (("foob") #\b))
-  (locally
-      (declare (optimize (safety 3)))
-    (assert-error (elt (list 1 2 3) 3) type-error)))
+  (assert-error (elt (list 1 2 3) 3) type-error))
 
 ;;; confusion in the refactoring led to this signalling an unbound
 ;;; variable, not a type error.

@@ -8336,7 +8336,7 @@
                       ;; isn't good anywhere else either.
                       (lvar-fun-is (combination-fun dest)
                                    '(%rest-values %rest-ref %rest-length
-                                     %rest-null %rest-true %rest-listify))
+                                     %rest-null %rest-true %rest-listify %rest-elt))
                       ;; If the home lambda is different and isn't DX, it might
                       ;; escape -- in which case using the more context isn't safe.
                       (dx-node-p dest))))
@@ -8390,12 +8390,10 @@
         (bug "no &REST context for FAST-REST-NTH"))))
 
 (define-source-transform elt (seq n)
-  (if (policy *lexenv* (= safety 3))
-      (values nil t)
-      (multiple-value-bind (context count) (possible-rest-arg-context seq)
-        (if context
-            `(%rest-ref ,n ,seq ,context ,count)
-            (values nil t)))))
+  (multiple-value-bind (context count) (possible-rest-arg-context seq)
+    (if context
+        `(%rest-elt ,n ,seq ,context ,count)
+        (values nil t))))
 
 ;;; CAxR -> %REST-REF
 (defun source-transform-car (list nth)
@@ -8521,6 +8519,18 @@
          `(%more-arg context n))
         (t
          `(and (< (the index n) count) (%more-arg context n)))))
+
+(deftransform %rest-elt ((n list context count &optional length-checked-p))
+  (cond ((not (rest-var-more-context-ok list))
+         `(elt-list list n))
+        ((and length-checked-p
+              (constant-lvar-p length-checked-p)
+              (lvar-value length-checked-p))
+         `(%more-arg context n))
+        (t
+         `(if (< (the index n) count)
+              (%more-arg context n)
+              (sb-impl::signal-index-too-large-error nil n count)))))
 
 (deftransform %rest-length ((list context count))
   (if (rest-var-more-context-ok list)

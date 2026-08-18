@@ -620,9 +620,15 @@
 ;;;; from the "Sequences" chapter:
 
 (defknown elt ((read-only proper-sequence) index) t (foldable unsafely-flushable))
+(defknown elt-list ((read-only proper-list) index) t (foldable unsafely-flushable))
+
+(defknown %setelt ((modifying sequence) index t) t ()
+  :derive-type #'result-type-last-arg)
+(defknown %setelt-list ((modifying sequence) index t) t ()
+  :derive-type #'result-type-last-arg)
 
 (defknown subseq ((read-only proper-sequence) index &optional sequence-end) consed-sequence
-  (flushable foldable-read-only))
+    (flushable foldable-read-only))
 
 (defknown vector-subseq ((read-only vector) index sequence-end) (simple-array * (*))
   (flushable foldable-read-only no-verify-arg-count))
@@ -2176,6 +2182,7 @@
 
 (defknown %rest-values (t t t t) * (always-translatable))
 (defknown %rest-ref (t t t t &optional boolean) * (always-translatable))
+(defknown %rest-elt (t t t t &optional boolean) * (always-translatable))
 (defknown %rest-length (t t t) * (always-translatable))
 (defknown %rest-null (t t t t) * (always-translatable))
 (defknown %rest-true (t t t) * (always-translatable))
@@ -2297,10 +2304,11 @@
     function (flushable no-verify-arg-count))
 (defknown array-bounding-indices-bad-error (t t t) nil (no-verify-arg-count))
 (defknown sequence-bounding-indices-bad-error (t t t) nil (no-verify-arg-count))
+(defknown sb-impl::signal-index-too-large-error (sequence index &optional t) nil)
 (defknown %find-position
     (t sequence t index sequence-end (function (t)) (function (t t)))
-  (values t (or index null))
-  (flushable foldable call no-verify-arg-count))
+    (values t (or index null))
+    (flushable foldable call no-verify-arg-count))
 (defknown (%find-position-if %find-position-if-not)
   ((function ((nth-arg 1 :sequence t :key (nth-arg 5))))
    sequence t index sequence-end (function ((nth-arg 1 :sequence t))))
@@ -2391,8 +2399,6 @@
 (defknown (%rplaca %rplacd) ((modifying cons) t) t ()
   :derive-type #'result-type-last-arg)
 (defknown %put (symbol t t) t (no-verify-arg-count))
-(defknown %setelt ((modifying sequence) index t) t ()
-  :derive-type #'result-type-last-arg)
 (defknown %svset ((modifying simple-vector) index t) t ())
 (defknown (setf bit) (bit (modifying (array bit)) &rest index) bit ())
 (defknown (setf sbit) (bit (modifying (simple-array bit)) &rest index) bit ())

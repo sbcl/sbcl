@@ -1470,21 +1470,25 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
    (lambda (condition stream)
      (let ((sequence (slot-value condition 'sequence))
            (index (type-error-datum condition)))
-       (if (vectorp sequence)
-           (format stream "Invalid index ~D for ~S~@[ with fill-pointer ~D~]~
+       (cond ((integerp sequence)
+              (format stream "Invalid index ~d for a &rest list of length ~d."
+                      index sequence))
+             ((vectorp sequence)
+              (format stream "Invalid index ~D for ~S~@[ with fill-pointer ~D~]~
 ~@[, ~:@_should be a non-negative integer below ~D~]."
-                   index
-                   (type-of sequence)
-                   (and (array-has-fill-pointer-p sequence)
-                        (fill-pointer sequence))
-                   (let ((l (length sequence))) (if (> l 0) l)))
-           (format stream
-                   "The index ~D is too large for a ~a of length ~D."
-                   index
-                   (if (listp sequence)
-                       "list"
-                       "sequence")
-                   (length sequence)))))))
+                      index
+                      (type-of sequence)
+                      (and (array-has-fill-pointer-p sequence)
+                           (fill-pointer sequence))
+                      (let ((l (length sequence))) (if (> l 0) l))))
+             (t
+              (format stream
+                      "The index ~D is too large for a ~a of length ~D."
+                      index
+                      (if (listp sequence)
+                          "list"
+                          "sequence")
+                      (length sequence))))))))
 
 (define-condition bounding-indices-bad-error (reference-condition type-error)
   ((object :reader bounding-indices-bad-object :initarg :object))

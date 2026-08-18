@@ -416,8 +416,7 @@
 
 (with-test (:name :&more-elt-index-too-large)
   (checked-compile-and-assert
-      (:optimize `(:filter ,(lambda (&key safety &allow-other-keys)
-                              (= safety 3))))
+      (:optimize :safe)
       `(lambda (&rest args)
          (elt args 0))
     (() (condition 'sb-kernel:index-too-large-error))))

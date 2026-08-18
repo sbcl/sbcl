@@ -403,16 +403,14 @@
 (deftransform elt ((s i) (simple-array t) *)
   '(aref s i))
 
-(deftransform elt ((s i) (list t) * :policy (< safety 3))
-  (when (eql (lvar-type s) (specifier-type 'null))
-    (give-up-ir1-transform))
-  '(nth i s))
+(deftransform elt ((s i) (list t))
+  '(elt-list s i))
 
 (deftransform %setelt ((s i v) ((simple-array * (*)) t t) *)
   '(setf (aref s i) v))
 
-(deftransform %setelt ((s i v) (list t t) * :policy (< safety 3))
-  '(setf (car (nthcdr i s)) v))
+(deftransform %setelt ((s i v) (list t t))
+  '(%setelt-list s i v))
 
 (deftransform %check-vector-sequence-bounds ((vector start end)
                                              (vector t t) *
