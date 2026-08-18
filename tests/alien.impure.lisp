@@ -52,6 +52,51 @@
     (declare (ignore function failure-p))
     (assert (= (length warnings) 1))))
 
+;;; An FTYPE can retain an unresolved named record from an earlier compilation
+;;; while the alien type registry now holds its completed definition. They are
+;;; the same C record type and proclaiming the completed form must not warn.
+(proclaim '(ftype (function ()
+                   (values (sb-alien:alien
+                            (sb-alien:struct ftype-forward-record))
+                           &optional))
+                  ftype-forward-record-return))
+(sb-alien:define-alien-type nil
+  (sb-alien:struct ftype-forward-record
+    (x (sb-alien:signed 64))
+    (y (sb-alien:signed 64))))
+
+(with-test (:name (define-alien-routine ftype :completed-forward-record))
+  (let ((mismatch nil))
+    (handler-bind ((sb-kernel:ftype-proclamation-mismatch-warning
+                     (lambda (condition)
+                       (declare (ignore condition))
+                       (setf mismatch t))))
+      (proclaim '(ftype (function ()
+                         (values (sb-alien:alien
+                                  (sb-alien:struct ftype-forward-record))
+                                 &optional))
+                        ftype-forward-record-return)))
+    (assert (not mismatch))))
+
+(with-test (:name (alien-record-type= :forward-record-scope))
+  (let* ((int-type (sb-alien::parse-alien-type 'sb-alien:int nil))
+         (wide-type
+           (sb-alien::parse-alien-type '(sb-alien:signed 64) nil))
+         (complete-a
+           (sb-alien::load-alien-record-type
+            :struct 'complete-record 32 32 '(x) '(0) int-type))
+         (complete-b
+           (sb-alien::load-alien-record-type
+            :struct 'complete-record 64 64 '(x) '(0) wide-type))
+         (anonymous-incomplete
+           (sb-alien::parse-alien-type '(sb-alien:struct nil) nil))
+         (anonymous-complete
+           (sb-alien::load-alien-record-type
+            :struct nil 32 32 '(x) '(0) int-type)))
+    (assert (not (sb-alien::alien-type-= complete-a complete-b)))
+    (assert (not (sb-alien::alien-type-=
+                  anonymous-incomplete anonymous-complete)))))
+
 ;;; This used to break due to too eager auxiliary type twiddling in
 ;;; parse-alien-record-type.
 (defparameter *maybe* nil)
