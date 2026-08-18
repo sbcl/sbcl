@@ -1113,3 +1113,11 @@
                       `(lambda (m)
                          (concatenate 'string '(1 #\a) m))
                       :allow-warnings t))))
+
+(with-test (:name :dont-stop-on-bad-type-declarations)
+  (multiple-value-bind (fun fail warn)
+      (checked-compile
+       `(lambda () (declare (list 1)) 2)
+       :allow-warnings t)
+    (assert (and fail warn))
+    (assert (eql (funcall fun) 2))))

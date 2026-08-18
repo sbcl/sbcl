@@ -4917,13 +4917,6 @@
            (min a -1f0)))
     ((0f0 1) -1f0)))
 
-(with-test (:name :malformed-declare)
-  (assert (nth-value
-           1 (checked-compile `(lambda (x)
-                                 (declare (unsigned-byte (x)))
-                                 x)
-                              :allow-failure t))))
-
 (with-test (:name :no-dubious-asterisk-warning)
   (checked-compile
    `(lambda (foo)
