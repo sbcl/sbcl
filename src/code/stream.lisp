@@ -368,20 +368,27 @@
                      (replace res chunk :start1 start1)))))
         (declare (inline refill-buffer))
         (if (or (< %frc-index% +ansi-stream-in-buffer-length+) (refill-buffer))
-            (loop
-             (let ((pos (position #\Newline %frc-buffer%
-                                  :test #'char= :start %frc-index%)))
-               (when pos
-                 (return (values (build-result pos (- pos %frc-index%)) nil)))
-               (let ((chunk (subseq %frc-buffer% %frc-index%)))
-                 (incf chunks-total-length (length chunk))
-                 (push chunk chunks))
-               (unless (refill-buffer)
-                 (return (values (build-result -1 0) t)))))
-          ;; EOF had been reached before we read anything
-          ;; at all. Return the EOF value or signal the error.
-            (progn (done-with-fast-read-char)
-                   (eof-or-lose stream eof-error-p (values eof-value t))))))))
+            (let ((pos (position #\Newline %frc-buffer%
+                                 :test #'char= :start %frc-index%)))
+              (if pos
+                  (let ((result (subseq %frc-buffer% %frc-index% pos)))
+                    (setf %frc-index% (1+ pos))
+                    (done-with-fast-read-char)
+                    (values result nil))
+                  (loop
+                   (let ((chunk (subseq %frc-buffer% %frc-index%)))
+                     (incf chunks-total-length (length chunk))
+                     (push chunk chunks))
+                   (unless (refill-buffer)
+                     (return (values (build-result -1 0) t)))
+                   (let ((pos (position #\Newline %frc-buffer%
+                                        :test #'char= :start %frc-index%)))
+                     (when pos
+                       (return (values (build-result pos (- pos %frc-index%)) nil)))))))
+            ;; EOF had been reached before we read anything
+            ;; at all. Return the EOF value or signal the error.
+          (progn (done-with-fast-read-char)
+                 (eof-or-lose stream eof-error-p (values eof-value t))))))))
 
 ;; to potentially avoid consing a buffer on successive calls to read-line
 ;; (just consing the result string)
