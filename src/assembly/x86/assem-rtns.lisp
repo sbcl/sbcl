@@ -221,7 +221,7 @@
 (define-assembly-routine (throw
                            (:return-style :full-call-no-return)
                            (:save-p :compute-only))
-                         ((:arg target (descriptor-reg any-reg) edx-offset)
+                         ((:arg target (descriptor-reg any-reg) (:lisp-reg 0))
                           (:arg start any-reg ebx-offset)
                           (:arg count any-reg ecx-offset)
                           (:temp catch any-reg eax-offset))

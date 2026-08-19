@@ -105,7 +105,11 @@
       (car (reg-spec-scs spec))))
 
 (defun parse-reg-spec (kind name sc offset)
-  (let ((reg (make-reg-spec :kind kind :name name :scs sc :offset offset)))
+  (let* ((actual-offset
+          (cond ((and (consp offset) (eq (car offset) :lisp-reg))
+                 (nth (cadr offset) sb-vm::*register-arg-offsets*))
+                (t offset)))
+         (reg (make-reg-spec :kind kind :name name :scs sc :offset actual-offset)))
     (ecase kind
       (:temp)
       ((:arg :res)

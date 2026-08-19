@@ -45,10 +45,10 @@
                                         (:translate ,fun)
                                         (:policy :safe)
                                         (:save-p t))
-                ((:arg x (descriptor-reg any-reg) rdx-offset)
-                 (:arg y (descriptor-reg any-reg) rdi-offset)
+                ((:arg x (descriptor-reg any-reg) (:lisp-reg 0))
+                 (:arg y (descriptor-reg any-reg) (:lisp-reg 1))
 
-                 (:res res (descriptor-reg any-reg) rdx-offset)
+                 (:res res (descriptor-reg any-reg) (:lisp-reg 0))
 
                  ;; + and - can make do with only 1 temp.
                  ;; RCX is always needed for lisp call.
@@ -126,8 +126,8 @@
                           (:policy :safe)
                           (:translate %negate)
                           (:save-p t))
-                         ((:arg x (descriptor-reg any-reg) rdx-offset)
-                          (:res res (descriptor-reg any-reg) rdx-offset))
+                         ((:arg x (descriptor-reg any-reg) (:lisp-reg 0))
+                          (:res res (descriptor-reg any-reg) (:lisp-reg 0)))
   (inst test :byte x fixnum-tag-mask)
   (inst jmp :nz GENERIC)
   (move res x)
@@ -154,8 +154,8 @@
                                         (:save-p t)
                                         (:conditional ,test)
                                         (:cost 10))
-                  ((:arg x (descriptor-reg any-reg) rdx-offset)
-                   (:arg y (descriptor-reg any-reg) rdi-offset)
+                  ((:arg x (descriptor-reg any-reg) (:lisp-reg 0))
+                   (:arg y (descriptor-reg any-reg) (:lisp-reg 1))
 
                    (:temp rcx unsigned-reg rcx-offset))
 
@@ -182,8 +182,8 @@
                           (:save-p t)
                           (:conditional :e)
                           (:cost 10))
-                         ((:arg x (descriptor-reg any-reg) rdx-offset)
-                          (:arg y (descriptor-reg any-reg) rdi-offset)
+                         ((:arg x (descriptor-reg any-reg) (:lisp-reg 0))
+                          (:arg y (descriptor-reg any-reg) (:lisp-reg 1))
 
                           (:temp rcx unsigned-reg rcx-offset))
   (both-fixnum-p rcx x y)
@@ -200,7 +200,7 @@
 
 #+sb-assembling
 (define-assembly-routine (logcount)
-                         ((:arg arg (descriptor-reg any-reg) rdx-offset)
+                         ((:arg arg (descriptor-reg any-reg) (:lisp-reg 0))
                           (:temp mask unsigned-reg rcx-offset)
                           (:temp temp unsigned-reg rax-offset))
   (inst push temp)
@@ -503,8 +503,8 @@
                           (:conditional :e)
                           (:cost 10)
                           (:arg-types (:or integer bignum) *))
-                         ((:arg x (descriptor-reg) rdx-offset)
-                          (:arg y (descriptor-reg any-reg) rdi-offset)
+                         ((:arg x (descriptor-reg) (:lisp-reg 0))
+                          (:arg y (descriptor-reg any-reg) (:lisp-reg 1))
                           (:temp rcx unsigned-reg rcx-offset)
                           (:temp rax unsigned-reg rax-offset))
   (inst cmp x y)

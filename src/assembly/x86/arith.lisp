@@ -20,10 +20,10 @@
                                         (:translate ,fun)
                                         (:policy :safe)
                                         (:save-p t))
-                ((:arg x (descriptor-reg any-reg) edx-offset)
-                 (:arg y (descriptor-reg any-reg) edi-offset)
+                ((:arg x (descriptor-reg any-reg) (:lisp-reg 0))
+                 (:arg y (descriptor-reg any-reg) (:lisp-reg 1))
 
-                 (:res res (descriptor-reg any-reg) edx-offset)
+                 (:res res (descriptor-reg any-reg) (:lisp-reg 0))
 
                  ,@(if (eq fun '*)
                        '((:temp eax unsigned-reg eax-offset)))
@@ -123,8 +123,8 @@
                           (:policy :safe)
                           (:translate %negate)
                           (:save-p t))
-                         ((:arg x (descriptor-reg any-reg) edx-offset)
-                          (:res res (descriptor-reg any-reg) edx-offset)
+                         ((:arg x (descriptor-reg any-reg) (:lisp-reg 0))
+                          (:res res (descriptor-reg any-reg) (:lisp-reg 0))
                           (:temp ecx unsigned-reg ecx-offset))
   (inst test x fixnum-tag-mask)
   (inst jmp :z FIXNUM)
@@ -159,8 +159,8 @@
                                         (:save-p t)
                                         (:conditional ,test)
                                         (:cost 10))
-                ((:arg x (descriptor-reg any-reg) edx-offset)
-                 (:arg y (descriptor-reg any-reg) edi-offset)
+                ((:arg x (descriptor-reg any-reg) (:lisp-reg 0))
+                 (:arg y (descriptor-reg any-reg) (:lisp-reg 1))
 
                  (:temp ecx unsigned-reg ecx-offset))
 
@@ -207,8 +207,8 @@
                           (:save-p t)
                           (:conditional :e)
                           (:cost 10))
-                         ((:arg x (descriptor-reg any-reg) edx-offset)
-                          (:arg y (descriptor-reg any-reg) edi-offset)
+                         ((:arg x (descriptor-reg any-reg) (:lisp-reg 0))
+                          (:arg y (descriptor-reg any-reg) (:lisp-reg 1))
 
                           (:temp ecx unsigned-reg ecx-offset))
   (inst mov ecx x)
@@ -254,8 +254,8 @@
                           (:save-p t)
                           (:conditional :e)
                           (:cost 10))
-                         ((:arg x (descriptor-reg any-reg) edx-offset)
-                          (:arg y (descriptor-reg any-reg) edi-offset)
+                         ((:arg x (descriptor-reg any-reg) (:lisp-reg 0))
+                          (:arg y (descriptor-reg any-reg) (:lisp-reg 1))
 
                           (:temp ecx unsigned-reg ecx-offset))
   (inst mov ecx x)
