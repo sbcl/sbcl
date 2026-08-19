@@ -306,23 +306,6 @@
     (move tmp value)
     (inst shr tmp n-positive-fixnum-bits)))
 
-#-#.(cl:if (cl:= sb-vm:n-fixnum-tag-bits 1) '(:and) '(:or))
-(define-vop (fixnump/signed-byte-64 simple-type-predicate)
-  (:args (value :scs (signed-reg)))
-  (:conditional :z)
-  (:temporary (:sc unsigned-reg) temp)
-  (:arg-types signed-num)
-  (:translate fixnump)
-  (:generator 3
-    ;; Hackers Delight, p. 53: signed
-    ;;    a <= x <= a + 2^n - 1
-    ;; is equivalent to unsigned
-    ;;    ((x-a) >> n) = 0
-    (inst mov temp #.(- most-negative-fixnum))
-    (inst add temp value)
-    (inst shr temp n-fixnum-bits)))
-
-#+#.(cl:if (cl:= sb-vm:n-fixnum-tag-bits 1) '(:and) '(:or))
 (define-vop (fixnump/signed-byte-64 simple-type-predicate)
   (:args (value :scs (signed-reg) :target temp))
   (:conditional :no)

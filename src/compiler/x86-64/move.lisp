@@ -203,28 +203,6 @@
 
 
 ;;; Arg is a fixnum or bignum, figure out which and load if necessary.
-#-#.(cl:if (cl:= sb-vm:n-fixnum-tag-bits 1) '(:and) '(:or))
-(define-vop (move-to-word/integer)
-  (:args (x :scs (descriptor-reg) :target rax))
-  (:results (y :scs (signed-reg unsigned-reg)))
-  (:note "integer to untagged word coercion")
-  ;; I'm not convinced that increasing the demand for rAX is
-  ;; better than adding 1 byte to some instruction encodings.
-  ;; I'll leave it alone though.
-  (:temporary (:sc unsigned-reg :offset rax-offset
-               :from (:argument 0) :to (:result 0) :target y) rax)
-  (:generator 4
-    (move rax x)
-    (inst test :byte rax fixnum-tag-mask)
-    (inst jmp :z FIXNUM)
-    (loadw y rax bignum-digits-offset other-pointer-lowtag)
-    (inst jmp DONE)
-    FIXNUM
-    (inst sar rax n-fixnum-tag-bits)
-    (move y rax)
-    DONE))
-
-#+#.(cl:if (cl:= sb-vm:n-fixnum-tag-bits 1) '(:and) '(:or))
 (define-vop (move-to-word/integer)
   (:args (x :scs (descriptor-reg) :target y))
   (:results (y :scs (signed-reg unsigned-reg)))
