@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(when (assertoid:legacy-eval-p) (invoke-restart 'run-tests::skip-file))
-
 (load "compiler-test-util.lisp")
 (defpackage "CLOS-IMPURE"
   (:use "CL" "SB-EXT" "ASSERTOID" "TEST-UTIL" "COMPILER-TEST-UTIL"))
