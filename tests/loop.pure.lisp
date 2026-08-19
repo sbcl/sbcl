@@ -38,8 +38,7 @@
 ;;; The type declarations should apply, hence under Python's
 ;;; declarations-are-assertions rule, the code should signal a type
 ;;; error. (Except when running interpreted code)
-#+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
-(with-test (:name :loop-type-decl)
+(with-test (:name :loop-type-decl :skipped-on :interpreter)
   (declare (muffle-conditions style-warning))
   (assert (typep (nth-value 1
                             (ignore-errors
@@ -193,7 +192,7 @@
   (setf (gethash 7 ht) 15)
   (assert (= (loop for v fixnum being each hash-key in ht sum v) 8))
   (assert (= (loop for v fixnum being each hash-value in ht sum v) 18))
-  #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
+  #-interpreter
   (assert-error (loop for v float being each hash-value in ht sum v)
                 type-error))
 

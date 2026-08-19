@@ -132,12 +132,11 @@
   (assert (eq *base-string-1* *base-string-2*))
   (assert (typep *base-string-1* '(simple-base-string 5))))
 
-#-#.(cl:if (cl:subtypep 'cl:character 'cl:base-char) '(and) '(or))
-(progn
-  (defvar *base-string*
-    #.(make-string 5 :element-type 'base-char :initial-element #\x))
-  (defvar *character-string*
-    #.(make-string 5 :initial-element #\x))
+(defvar *base-string*
+  #.(make-string 5 :element-type 'base-char :initial-element #\x))
+(defvar *character-string*
+  #.(make-string 5 :initial-element #\x))
+(unless (subtypep 'character 'base-char)
   (assert (not (eq *base-string* *character-string*)))
   (assert (typep *base-string* 'base-string))
   (assert (typep *character-string* '(vector character))))

@@ -272,8 +272,8 @@
 ;;;
 ;;; (In fact, this is such a fearsome loop that executing it with the
 ;;; evaluator would take ages... Disable it under those circumstances.)
-#+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
-(with-test (:name (:type-derivation :logical-operations :correctness) :slow t)
+(with-test (:name (:type-derivation :logical-operations :correctness) :slow t
+                  :skipped-on :interpreter)
   (let* ((n-bits 5)
          (size (ash 1 n-bits)))
     (labels ((brute-force (a b c d op)
