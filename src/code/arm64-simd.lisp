@@ -548,7 +548,8 @@
                        ((index unsigned-reg t :from (:argument 1)))
                        ((suffix unsigned-reg t :from (:argument 1)))
                        ((char-count unsigned-reg t))
-                       ((table any-reg t))
+                       ((full-table any-reg t))
+                       ((1-2-table any-reg t))
 
                        ((bytes complex-double-reg))
                        ((tbl1         complex-double-reg))
@@ -557,9 +558,13 @@
                        ((tbl4         complex-double-reg))
 
                        ((nibble-mask  complex-double-reg))
-                       ((c-c0         complex-double-reg))
+                       ((c-c0 complex-double-reg))
+                       ((c-c1 complex-double-reg))
                        ((c-ff complex-double-reg))
                        ((c-4 complex-double-reg))
+                       ((c-bf complex-double-reg))
+
+
                        ((powers double-reg))
                        ((prev         complex-double-reg))
                        ((prev-len     complex-double-reg))
@@ -608,47 +613,47 @@
 
             start
             (inst cmp byte-array byte-end)
-            (inst b :hi DONE)
-            (inst cmp string string-end)
+            (inst ccmp string string-end :ls 2)
             (inst b :hi DONE)
             (inst b ASCII-LOOP)
 
             NOT-ASCII
+            ;; Stop if the first byte is a continuation
+            (inst ldrsb tmp-tn (@ byte-array))
+            (inst cmn tmp-tn 64)
+            (inst b :lt DONE)
             (load-inline-constant powers :qword #x8040201008040201)
             (inst movi c-c0 #xC0 :16b)
-            (inst add string-end string-end 32) ;; now writing 32 bytes, not 64
+            (inst movi c-bf #xBF :8h)
+            (inst movi c-c1 #xc1 :16b)
+            (load-inline-constant 1-2-table
+                                  (let ((table (make-array (* #b10101011 16) :element-type '(unsigned-byte 8)
+                                                                             :initial-element #xFF)))
+                                    (loop for row to #b10101010 ;; highest possible inverted index for compressing 1/2 bytes
+                                          do (loop with indexes = (loop for i below 8
+                                                                        unless (logbitp i row)
+                                                                        collect (* i 2)
+                                                                        and
+                                                                        collect (1+ (* i 2)))
+                                                   for column below 16
+                                                   for index = (pop indexes)
+                                                   when index
+                                                   do
+                                                   (setf (aref table (+ (* row 16) column)) index)))
+                                    table))
+
+            START-1-2
             ;; 1/2 bytes
-            (let ((c-bf nibble-mask)
-                  (next temp2)
+            (let ((next temp2)
                   (continuations prev-len)
                   (bytes16 tbl1)
                   (combined tbl2)
                   (is-lead16 tbl3)
                   (shuf tbl4)
-                  (count prev)
-                  (c-c1 c-ff))
-              (inst movi c-bf #xBF :8h)
-              (inst movi c-c1 #xc1 :16b)
-              (load-inline-constant table
-                                    (let ((table (make-array (* #b10101011 16) :element-type '(unsigned-byte 8)
-                                                                               :initial-element #xFF)))
-                                      (loop for row to #b10101010 ;; highest possible inverted index for compressing 1/2 bytes
-                                            do (loop with indexes = (loop for i below 8
-                                                                          unless (logbitp i row)
-                                                                          collect (* i 2)
-                                                                          and
-                                                                          collect (1+ (* i 2)))
-                                                     for column below 16
-                                                     for index = (pop indexes)
-                                                     when index
-                                                     do
-                                                     (setf (aref table (+ (* row 16) column)) index)))
-                                      table))
+                  (count prev))
+
               (assemble ()
-                ;; Stop if the first byte is a continuation
-                (inst ldrsb tmp-tn (@ byte-array))
-                (inst cmn tmp-tn 64)
-                (inst b :lt DONE)
+
 
                 1-2-LOOP
                 (inst ldr bytes (@ byte-array))
@@ -714,7 +719,7 @@
                 (inst bsl is-lead16 combined bytes16 :16b)
 
                 ;; Remove the gaps left over from using two bytes as one codepoint
-                (inst ldr shuf (@ table (lsl tmp-tn 4)))
+                (inst ldr shuf (@ 1-2-table (lsl tmp-tn 4)))
                 (inst tbl temp4 (list is-lead16) shuf :16b)
 
                 ;; Widen
@@ -731,8 +736,15 @@
 
                 (inst cmp byte-array byte-end)
                 (inst ccmp string string-end :ls 2)
-                (inst b :ls 1-2-LOOP)
+                (inst b :hi DONE-1-2)
 
+                (progn
+                  (inst ldp index tmp-tn (@ byte-array)) ;; ASCII-LOOP reads 16 bytes
+                  (inst orr tmp-tn index tmp-tn)
+                  (inst tst tmp-tn #x8080808080808080)
+                  (inst b :eq ASCII-LOOP))
+                (inst b 1-2-LOOP)
+                DONE-1-2
                 (inst smov tmp-tn bytes 8 :b)
                 (inst b ADJUST-TAIL)
                 ERROR-1-2
@@ -761,23 +773,24 @@
 
 
             (load-inline-constant tag-clear :oword #x070F1F1F3F3F3F3F7F7F7F7F7F7F7F7F)
-            (load-inline-constant table (coerce (loop for index below (ash 1 10)
-                                                           for low-index = (ldb (byte 8 0) index)
-                                                           for suffix = (ldb (byte 2 8) index)
-                                                           append (let ((starts (loop for i to 7
-                                                                                      when (logbitp i low-index)
-                                                                                      collect i)))
-                                                                    (loop for lane below 8
-                                                                          for start = (pop starts)
-                                                                          for next = (car starts)
+            (load-inline-constant full-table
+                                  (coerce (loop for index below (ash 1 10)
+                                                for low-index = (ldb (byte 8 0) index)
+                                                for suffix = (ldb (byte 2 8) index)
+                                                append (let ((starts (loop for i to 7
+                                                                           when (logbitp i low-index)
+                                                                           collect i)))
+                                                         (loop for lane below 8
+                                                               for start = (pop starts)
+                                                               for next = (car starts)
 
-                                                                          for sources = (when start
-                                                                                          (loop for i from (1- (or next
-                                                                                                                   (+ suffix 8))) downto start
-                                                                                                collect i))
-                                                                          append (loop for byte below 4
-                                                                                       collect (or (pop sources) #xFF)))))
-                                                     '(vector (unsigned-byte 8))))
+                                                               for sources = (when start
+                                                                               (loop for i from (1- (or next
+                                                                                                        (+ suffix 8))) downto start
+                                                                                     collect i))
+                                                               append (loop for byte below 4
+                                                                            collect (or (pop sources) #xFF)))))
+                                          '(vector (unsigned-byte 8))))
 
             (flet ((validate ()
                      (assemble ()
@@ -844,7 +857,7 @@
                      ;; Add the size of the last character, ensuring that only 2 bits are added
                      (inst bfm index suffix 56 1)
 
-                     (inst add tmp-tn table (lsl index 5))
+                     (inst add tmp-tn full-table (lsl index 5))
                      (inst ld1 (list shuf-low shuf-high) (@ tmp-tn) :16b)
 
                      (inst addv temp2 temp1 :8b)
@@ -890,11 +903,41 @@
                 (inst ldr bytes (@ byte-array))
                 (validate)
                 (convert-full)
+
                 (inst cmp byte-array byte-end)
+                (inst ccmp string string-end :ls 2)
                 (inst b :hi FULL-DONE)
-                (inst cmp string string-end)
-                (inst b :hi FULL-DONE)
-                (inst b FULL-LOOP)))
+
+                ;; A SWAR check to go back to the fast path, not
+                ;; utilizing any vector units
+                (let ((ptr char-count))
+                  (assemble ()
+                    ;; Don't modify byte-array directly for the benefit
+                    ;; of out order execution
+                    (inst add ptr byte-array suffix)
+                    (inst cmp ptr byte-end)
+                    (inst b :hi FULL-LOOP)
+
+                    (inst ldp index tmp-tn (@ ptr))
+                    (inst orr tmp-tn index tmp-tn)
+                    (inst tst tmp-tn #x8080808080808080)
+                    (inst b :ne SKIP)
+                    (move byte-array ptr)
+                    (inst b ASCII-LOOP)
+
+                    skip
+                    ;; and 3 high bits of a byte together, non-zero
+                    ;; result means some of them were all set.
+                    ;; Do this part on 8 bytes only, avoiding spurious
+                    ;; bit overlaps, but don't forget to change it if
+                    ;; the 1-2-loop ever starts processing more than 8
+                    ;; bytes at a time.
+                    (inst and tmp-tn index (lsl index 1))
+                    (inst and tmp-tn tmp-tn (lsl index 2))
+                    (inst tst tmp-tn #x8080808080808080)
+                    (inst b :ne FULL-LOOP)
+                    (move byte-array ptr)
+                    (inst b START-1-2)))))
 
             ERROR
             FULL-DONE
@@ -1640,8 +1683,7 @@
 
                  start
                  (inst cmp byte-array byte-end)
-                 (inst b :hi DONE)
-                 (inst cmp string string-end)
+                 (inst ccmp string string-end :ls 2)
                  (inst b :hi DONE)
                  (inst b ASCII-LOOP)
 
