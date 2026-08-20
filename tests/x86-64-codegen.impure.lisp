@@ -240,12 +240,11 @@
              (split-string
               (with-output-to-string (s)
                (let ((sb-disassem:*disassem-location-column-width* 0))
-                 (disassemble '(lambda (x) (logtest (the fixnum x) #x80))
+                 (disassemble '(lambda (x)
+                                (let ((q (the fixnum (truncate (the fixnum x) 3)))) (logtest q #x80)))
                               :stream s)))
               #\newline))
-      (when (search (format nil "TEST DH, ~D"
-                            (ash (ash #x80 sb-vm:n-fixnum-tag-bits) -8))
-                    line)
+      (when (search "TEST AH, 1" line)
         (setq success t)))
     (assert success)))
 
