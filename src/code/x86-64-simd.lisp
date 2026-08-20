@@ -149,7 +149,29 @@
                                     (ldb (byte size 0) ub))))
       result))
   (defun reg-in-sc (tn sc)
-    (make-random-tn (sc-or-lose sc) (tn-offset tn))))
+    (make-random-tn (sc-or-lose sc) (tn-offset tn)))
+
+  (defun broadcast (dst value size tmp)
+    (inst mov tmp value)
+    (inst vmovd dst tmp)
+    (ecase size
+      (8
+       (inst vpbroadcastb dst dst))
+      (16
+       (inst vpbroadcastw dst dst))
+      (32
+       (inst vpbroadcastd dst dst))))
+
+  (defun mov-const (dst value &optional (size :sse))
+    (let ((c (register-inline-constant size value)))
+      (ecase size
+        (:sse
+         (inst vmovdqa dst c))
+        (:avx2
+         (inst vmovdqu dst c)))))
+
+  (defun lea-const (dst value)
+    (inst lea dst (register-inline-constant value))))
 
 (def-variant simd-nreverse8 :avx2 (result vector start end)
   (declare (optimize speed (safety 0)))
@@ -755,7 +777,7 @@
                      ((index unsigned-reg))
                      ((produced unsigned-reg))
 
-                     ((full-table unsigned-reg t))
+                     ((table unsigned-reg t))
 
                      ((c-c0 complex-double-reg t))
                      ((c-0f complex-double-reg t))
@@ -784,7 +806,7 @@
 
             (inst vpmovmskb tmp bytes) ;; any high bit set? not ascii
             (inst test :dword tmp tmp)
-            (inst jmp :nz FULL-START)
+            (inst jmp :nz START-1-2)
 
             (inst add byte-array 16)
 
@@ -806,51 +828,169 @@
             (inst jmp :a DONE)
             (inst jmp LOOP)
 
+            START-1-2
+            (broadcast c-c0 #xC0 8 tmp)
+            (lea-const table
+                       (let ((table (make-array (* #b10101011 16) :element-type '(unsigned-byte 8) :initial-element #xFF)))
+                         (loop for row to #b10101010 ;; highest possible inverted index for compressing 1/2 bytes
+                               do (loop with indexes = (loop for i below 8
+                                                             unless (logbitp i row)
+                                                             collect (* i 2) and collect (1+ (* i 2)))
+                                        for column below 16
+                                        for index = (pop indexes)
+                                        when index
+                                        do (setf (aref table (+ (* row 16) column)) index)))
+                         table))
+
+            ;; 1/2 bytes
+            (let ((c-df c-0f)
+                  (next tbl1)
+                  (c-bf tbl2)
+                  (c-3080 tbl3)
+                  (c-41 high-nibbles))
+              ;; Stop if the first byte is a continuation
+              (inst cmp :byte (ea byte-array) -64)
+              (inst jmp :l DONE)
+
+              (broadcast c-3080 #x3080 16 tmp)
+              (broadcast c-bf #xBF 16 tmp)
+              (broadcast c-df #XDF 8 tmp)
+              (broadcast c-41 #x41 8 tmp)
+
+              (assemble ()
+                1-2-LOOP
+
+                (inst vmovq bytes (ea byte-array))
+                ;; Check for 3 or 4 bytes
+                (progn
+                  ;; Use SWAR in GPR to free up the SIMD pipeline
+                  (inst mov produced (ea byte-array))
+
+                  ;; Find any byte with all high 3 bits set
+                  (inst mov tmp produced)
+                  (inst shl tmp 1)
+                  (inst and tmp produced)
+
+                  (inst shl tmp 1)
+                  (inst and tmp produced)
+                  (inst test tmp (constantize #x8080808080808080)))
+                (inst jmp :z not-full)
+                GO-TO-FULL
+                ;; Advance by 1 if the first byte is a continuation
+                (inst cmp :byte (ea byte-array) -64)
+                (inst jmp :ge full-start)
+                (inst inc byte-array)
+                (inst cmp byte-array byte-end)
+                (inst jmp :a done)
+                (inst jmp full-start)
+                not-full
+
+                (inst vmovq next (ea 1 byte-array))
+                ;; Validate
+                (progn
+                  (inst vpcmpgtb temp4 c-c0 next) ;; continuations
+
+                  ;; Flip the high bit for unsigned comparisons
+                  (inst vpxor temp2 bytes (register-inline-constant :sse #x80808080808080808080808080808080))
+
+                  ;; 2 byte leads (41 is C1 without the high bit)
+                  (inst vpcmpgtb temp3 temp2 c-41)
+
+                  ;; Continuations must follow leading bytes,
+                  ;; they must align with the shifted input
+                  (inst vpxor temp4 temp4 temp3) ;; error 1
+
+                  ;; Find #xC0 or #xC1, which are overlong
+                  (inst vpcmpgtb temp2 temp2 (register-inline-constant :sse #x3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F))
+                  (inst vpandn temp2 temp3 temp2)
+
+                  (inst vpor temp4 temp4 temp2) ;; Combine errors
+
+                  (inst vptest temp4 temp4)
+                  ;; Due to the need to adjust for the consumed continuations,
+                  ;; redo validation in the full loop
+                  (inst jmp :nz go-to-full))
+
+                ;; Build a bit pattern of non-continuation bytes
+                ;; suitable for the lookup table
+                (inst vpcmpgtb temp3 c-c0 bytes)
+                (inst vpmovmskb produced temp3)
+                (inst shl :dword produced 4)
+
+                ;; Widen to 16-bits
+                (inst vpmovzxbw temp3 bytes)
+                ;; construct a codepoint from two bytes,
+                ;; i.e. (dpb b0 (byte 5 6) b1)
+                (progn
+                  ;; Interleave next and bytes into 16-bit words
+                  (inst vpunpcklbw temp4 next bytes)
+                  ;; Shift the high byte left by 6 and add it to the low byte
+                  (inst vpmaddubsw temp4 temp4 (register-inline-constant :sse #x40014001400140014001400140014001))
+                  ;; Remove tags
+                  (inst vpsubw temp4 temp4 c-3080))
+
+                ;; Select either the temp4 two bytes or one ascii byte
+                (inst vpcmpgtw next temp3 c-bf)
+                (inst vpblendvb temp3 temp3 temp4 next)
+
+                ;; Remove the gaps left over from using two bytes as one codepoint
+                (inst vpshufb temp3 temp3 (ea table produced))
+                (inst xor :dword produced #xFF0) ;; Count non-continuation bytes
+
+                (inst popcnt :dword produced produced)
+
+                ;; Widen
+                (let ((ymm-temp4 (reg-in-sc temp4 'int-avx2-reg)))
+                  (inst vpmovzxwd ymm-temp4 temp3)
+                  (inst vmovdqu (ea string) ymm-temp4))
+
+                (inst add byte-array 8)
+                (inst lea string (ea string produced 4))
+
+                (inst cmp byte-array byte-end)
+                (inst jmp :a DONE-1-2)
+                (inst cmp string string-end)
+                (inst jmp :a DONE-1-2)
+                (inst jmp 1-2-LOOP)
+                DONE-1-2
+
+                ;; Remove consumed continuations
+                (inst cmp :byte (ea byte-array) -64)
+                (inst jmp :ge done)
+                (inst inc byte-array)
+                (inst jmp done)))
             FULL-START
 
             (inst add string-end 32) ;; now it writes 32 bytes instead of 64
 
-            (inst mov tmp #x0F)
-            (inst vmovd c-0f tmp)
-            (inst vpbroadcastb c-0f c-0f)
+            (broadcast c-0f #x0F 8 tmp)
 
-            (inst mov tmp #xC0)
-            (inst vmovd temp tmp)
-            (inst vpbroadcastb c-c0 temp)
-            (inst vmovdqu tbl1 (register-inline-constant
-                                :sse
-                                #x38060001000000000000000000000000))
-            (inst vmovdqu tbl2 (register-inline-constant
-                                :sse
-                                #x2020242020202020202020100000010B))
-            (inst vmovdqu tbl3 (register-inline-constant
-                                :sse
-                                #x202020203535332B2020202020202020))
-            (inst vmovdqu tbl4 (register-inline-constant
-                                :sse
-                                #x03020101000000000000000000000000))
+            (mov-const tbl1 #x38060001000000000000000000000000)
+            (mov-const tbl2 #x2020242020202020202020100000010B)
+            (mov-const tbl3 #x202020203535332B2020202020202020)
+            (mov-const tbl4 #x03020101000000000000000000000000)
+            (mov-const tag-clear #x070F1F1F3F3F3F3F7F7F7F7F7F7F7F7F)
+
             (inst vpxor prev prev prev)
             (inst vpxor prev-len prev-len prev-len)
 
-            (inst lea full-table
-                  (register-inline-constant
-                   (coerce (loop for index below (ash 1 10)
-                                 for low-index = (ldb (byte 8 0) index)
-                                 for tmp = (ldb (byte 2 8) index)
-                                 append (let ((starts (loop for i to 7
-                                                            when (logbitp i low-index)
-                                                            collect i)))
-                                          (loop for lane below 8
-                                                for start = (pop starts)
-                                                for next = (car starts)
-                                                for sources = (when start
-                                                                (loop for i from (1- (or next (+ tmp 8))) downto start
-                                                                      collect i))
-                                                append (loop for byte below 4
-                                                             collect (or (pop sources) #xFF)))))
-                           '(vector (unsigned-byte 8)))))
-            (inst vmovdqa tag-clear (register-inline-constant
-                                     :sse #x070F1F1F3F3F3F3F7F7F7F7F7F7F7F7F))
+            (lea-const table
+                       (coerce (loop for index below (ash 1 10)
+                                     for low-index = (ldb (byte 8 0) index)
+                                     for tmp = (ldb (byte 2 8) index)
+                                     append (let ((starts (loop for i to 7
+                                                                when (logbitp i low-index)
+                                                                collect i)))
+                                              (loop for lane below 8
+                                                    for start = (pop starts)
+                                                    for next = (car starts)
+                                                    for sources = (when start
+                                                                    (loop for i from (1- (or next (+ tmp 8))) downto start
+                                                                          collect i))
+                                                    append (loop for byte below 4
+                                                                 collect (or (pop sources) #xFF)))))
+                               '(vector (unsigned-byte 8))))
+
             (zeroize tmp)
             FULL-LOOP
             (flet ((validate ()
@@ -900,6 +1040,7 @@
                        (inst vpalignr prev bytes prev 8)
                        (inst vpalignr prev-len len prev-len 8)
                        VALIDATED)))
+              (inst vmovdqu bytes (ea byte-array))
               (validate)
               (progn
                 ;; Process the leading bytes in the first 8 bytes, loading 16 bytes
@@ -932,7 +1073,7 @@
                   (inst vinserti128 bytes bytes bytes 1)
 
                   ;; Shuffle the bytes into 4-byte lanes
-                  (inst vpshufb bytes bytes (ea full-table index))
+                  (inst vpshufb bytes bytes (ea table index))
 
                   ;; Perform
                   ;; A + B<<6 + C<<12 + D<<18
@@ -945,18 +1086,16 @@
                 (inst lea string (ea string produced 4))))
             (inst cmp byte-array byte-end)
             (inst jmp :a DONE-FULL)
-
             (inst cmp string string-end)
             (inst jmp :a DONE-FULL)
-            (inst vmovdqu bytes (ea byte-array))
 
             (inst jmp FULL-LOOP)
             DONE-FULL
             (inst shr :dword tmp 8)
 
             (inst add byte-array tmp) ;; strip any consumed continuation bytes
-            (inst vzeroupper)
             DONE
+            (inst vzeroupper)
             (inst sub string string*)
             (inst shr string (- 2 n-fixnum-tag-bits))
             (inst sub byte-array byte-array*)))
