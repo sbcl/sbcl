@@ -26,12 +26,14 @@
 ;;;; +BIGNUM-TO-Rxx : choose a 1, 2, or 3-digit bignum given [high:low] on stack,
 ;;;;      ensuring that if the sign bit of the high word is on, the third digit
 ;;;;      is zeroized to ensure that the result is a positive bignum.
-;#+sb-assembling
+#+sb-assembling
 (make-defs ((($avx512 $suffix)
              (t -avx512)
              (nil ||)))
   (macrolet
-      ((alloc-other (&rest rest)
+      ((float0-tn ()
+         (make-random-tn (sc-or-lose 'single-reg) 0))
+       (alloc-other (&rest rest)
          `(emit-alloc-other nil thread-tn ,@rest :avx512 $avx512))
        (signed (reg)
          `(define-assembly-routine (,(symbolicate "ALLOC-SIGNED-BIGNUM-IN-" reg '$suffix))
@@ -63,13 +65,13 @@
             (inst test :byte result result) ; is-two-digit flag
             (inst jmp :z one-word-bignum)
             (alloc-other bignum-widetag (+ bignum-digits-offset 2) result)
-            (inst movdqu float0-tn (ea 8 rsp-tn))
-            (inst movdqu (object-slot-ea result 1 other-pointer-lowtag) float0-tn)
+            (inst movdqu (float0-tn) (ea 8 rsp-tn))
+            (inst movdqu (object-slot-ea result 1 other-pointer-lowtag) (float0-tn))
             (inst ret 16)               ; pop args
             ONE-WORD-BIGNUM
             (alloc-other bignum-widetag (+ bignum-digits-offset 1) result)
-            (inst movq float0-tn (ea 8 rsp-tn))
-            (inst movq (object-slot-ea result 1 other-pointer-lowtag) float0-tn)
+            (inst movq (float0-tn) (ea 8 rsp-tn))
+            (inst movq (object-slot-ea result 1 other-pointer-lowtag) (float0-tn))
             (inst ret 16)))
        ;; "from unsigned" might need to allocate 3 digits, but it receives only high:low
        ;; because the highest digit if needed must be all 0.
@@ -85,8 +87,8 @@
             ;; Since 2 digits and 3 digits consume the same number of bytes
             ;; due to padding, they can share the allocation request.
             (alloc-other bignum-widetag (+ bignum-digits-offset 3) result)
-            (inst movdqu float0-tn (ea 8 rsp-tn))
-            (inst movdqu (object-slot-ea result 1 other-pointer-lowtag) float0-tn)
+            (inst movdqu (float0-tn) (ea 8 rsp-tn))
+            (inst movdqu (object-slot-ea result 1 other-pointer-lowtag) (float0-tn))
             ;; don't assume prezeroed unboxed pages. (zeroize word even if 2-digit result)
             (inst mov :qword (object-slot-ea result 3 other-pointer-lowtag) 0)
             ;; Test sign bit of digit index 1
@@ -99,8 +101,8 @@
             (inst ret 16)               ; pop args
             ONE-WORD-BIGNUM
             (alloc-other bignum-widetag (+ bignum-digits-offset 1) result)
-            (inst movq float0-tn (ea 8 rsp-tn))
-            (inst movq (object-slot-ea result 1 other-pointer-lowtag) float0-tn)
+            (inst movq (float0-tn) (ea 8 rsp-tn))
+            (inst movq (object-slot-ea result 1 other-pointer-lowtag) (float0-tn))
             (inst ret 16)))
        ;; The high bit is in the carry flag.
        (two-word-bignum (reg)

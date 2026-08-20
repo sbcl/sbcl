@@ -77,7 +77,6 @@
   (defreg fr5 5 :float)
   (defreg fr6 6 :float)
   (defreg fr7 7 :float)
-  (defregset *float-regs* fr0 fr1 fr2 fr3 fr4 fr5 fr6 fr7)
 
   ;; registers used to pass arguments
   ;;

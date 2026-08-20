@@ -88,6 +88,5 @@
 #+sb-simd-pack-512
 (defun print-opmask-register (value stream dstate)
   (declare (ignore dstate))
-  (let ((name (svref +mask-register-names+ (logand value 7))))
-    (if stream
-        (write-string name stream))))
+  (if stream
+      (format stream "K~d" (logand value 7))))

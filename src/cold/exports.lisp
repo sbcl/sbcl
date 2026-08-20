@@ -3270,7 +3270,6 @@ structure representations")
    "SIMD-PACK-256-WIDETAG")
   #+sb-simd-pack-512
   (:export
-   "+MASK-REGISTER-NAMES+"
    "SIMD-PACK-512-TAG-SLOT"
    "SIMD-PACK-512-P0-SLOT"
    "SIMD-PACK-512-P1-SLOT"

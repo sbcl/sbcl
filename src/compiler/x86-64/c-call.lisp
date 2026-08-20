@@ -56,8 +56,7 @@
                         #+win32 (arg-state-register-args state))))
     (cond ((< xmm-args max-xmm-args)
            (setf (arg-state-xmm-args state) (1+ xmm-args))
-           (make-wired-tn* prim-type reg-sc
-                             (nth xmm-args *float-regs*)))
+           (make-wired-tn* prim-type reg-sc xmm-args))
           (t
            (let ((frame-size (arg-state-stack-frame-size state)))
              (setf (arg-state-stack-frame-size state) (1+ frame-size))
@@ -893,9 +892,8 @@ Floats are passed in integer registers."
   ;;   2. Struct arguments <=8 bytes: passed in integer register as value
   ;;   3. Struct returns >8 bytes: hidden pointer in RCX (first arg register)
   ;;   4. Struct returns <=8 bytes: returned in RAX
-  (labels ((make-tn-maker (sc-name)
-             (lambda (offset)
-               (make-random-tn (sc-or-lose sc-name) offset)))
+  (labels ((make-tn (sc-name offset)
+             (make-random-tn (sc-or-lose sc-name) offset))
            (argument-byte-size (type)
              "Return the number of bytes this argument occupies in the callback vector."
              (ceiling (sb-alien::alien-type-bits type) n-byte-bits))
@@ -918,9 +916,9 @@ Floats are passed in integer registers."
            (rsp rsp-tn)
            #+(and win32 sb-thread) (r8 r8-tn)
            #+win32 (r11 r11-tn)  ; scratch register for struct copy (not an arg register)
-           (xmm0 float0-tn)
+           (xmm0 (make-tn 'double-reg 0))
            #-win32
-           (xmm1 float1-tn)
+           (xmm1 (make-tn 'double-reg 1))
            ([rsp] (ea rsp))
            ;; Calculate total argument vector size in bytes
            (total-arg-bytes
@@ -935,14 +933,16 @@ Floats are passed in integer registers."
            ;; For large struct returns, the hidden pointer is in the first arg register
            ;; (RCX on Windows, RDI on SysV). Skip it in the GPR list.
            ;; On Windows, this also consumes argument slot 0, so skip XMM0 too.
-           (gprs (let ((all-gprs (mapcar (make-tn-maker 'any-reg) *c-call-register-arg-offsets*)))
+           (gprs (let ((all-gprs (mapcar (lambda (offset)
+                                           (make-tn 'any-reg offset))
+                                         *c-call-register-arg-offsets*)))
                    (if large-struct-return-p
                        (rest all-gprs)  ; Skip RCX (win32) or RDI (SysV)
                        all-gprs)))
-           (fprs (let ((all-fprs (mapcar (make-tn-maker 'double-reg)
-                                         ;; Only 8 first XMM registers are used for
-                                         ;; passing arguments
-                                         (subseq *float-regs* 0 #-win32 8 #+win32 4))))
+           (fprs (let ((all-fprs ;; Only 8 first XMM registers are used for
+                         ;; passing arguments
+                         (loop for i to (+ 7 #+win32 -4)
+                               collect (make-tn 'double-reg i))))
                    ;; On Windows, when there's a hidden return pointer in RCX (slot 0),
                    ;; the float arguments shift: XMM0 is "consumed" by slot 0, so
                    ;; actual float args start at XMM1.

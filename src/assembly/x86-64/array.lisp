@@ -28,7 +28,7 @@
                           (:temp end-card-index unsigned-reg rbx-offset)
                           ;; storage class doesn't matter since all float regs
                           ;; and sse regs map to the same storage base.
-                          (:temp wordpair double-reg float0-offset))
+                          (:temp wordpair double-reg 0))
   (progn end-card-index)
   (move res vector) ; to "use" res
 

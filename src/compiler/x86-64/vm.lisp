@@ -166,64 +166,6 @@
       "R8B" "R9B" "R10B" "R11B" "R12B" "R13B" "R14B" "R15B"
       "AH" "CH" "DH" "BH"))
 
-  ;; floating point registers
-  (defreg float0 0 :float)
-  (defreg float1 1 :float)
-  (defreg float2 2 :float)
-  (defreg float3 3 :float)
-  (defreg float4 4 :float)
-  (defreg float5 5 :float)
-  (defreg float6 6 :float)
-  (defreg float7 7 :float)
-  (defreg float8 8 :float)
-  (defreg float9 9 :float)
-  (defreg float10 10 :float)
-  (defreg float11 11 :float)
-  (defreg float12 12 :float)
-  (defreg float13 13 :float)
-  (defreg float14 14 :float)
-  (defreg float15 15 :float)
-  (defreg float16 16 :float)
-  (defreg float17 17 :float)
-  (defreg float18 18 :float)
-  (defreg float19 19 :float)
-  (defreg float20 20 :float)
-  (defreg float21 21 :float)
-  (defreg float22 22 :float)
-  (defreg float23 23 :float)
-  (defreg float24 24 :float)
-  (defreg float25 25 :float)
-  (defreg float26 26 :float)
-  (defreg float27 27 :float)
-  (defreg float28 28 :float)
-  (defreg float29 29 :float)
-  (defreg float30 30 :float)
-  (defreg float31 31 :float)
-  (defregset *float-regs* float0 float1 float2 float3 float4 float5 float6 float7
-             float8 float9 float10 float11 float12 float13 float14 float15)
-  #+sb-simd-pack-512
-  (progn
-    ;; ZMM16-31 are only accessible via EVEX encoding
-    (defregset *zmm-regs* float0 float1 float2 float3 float4 float5 float6 float7
-      float8 float9 float10 float11 float12 float13 float14 float15
-      float16 float17 float18 float19 float20 float21 float22 float23
-      float24 float25 float26 float27 float28 float29 float30 float31)
-    ;; mask registers for use with avx512
-    (defreg k0 0 :qword)
-    (defreg k1 1 :qword)
-    (defreg k2 2 :qword)
-    (defreg k3 3 :qword)
-    (defreg k4 4 :qword)
-    (defreg k5 5 :qword)
-    (defreg k6 6 :qword)
-    (defreg k7 7 :qword)
-    ;; k0 is special meaning "no masking", so we can't schedule those regs for
-    ;; normal ops. I am not sure how to best model it, this is the simplest try
-    (defregset *mask-regs* k1 k2 k3 k4 k5 k6 k7)
-    (defconstant-eqx +mask-register-names+
-        #("K0" "K1" "K2" "K3" "K4" "K5" "K6" "K7")
-      #'equalp))
-
   ;; registers used to pass arguments
   ;;
   ;; the number of arguments/return values passed in registers
@@ -235,7 +177,8 @@
   (defregset    *c-call-register-arg-offsets* rdi rsi rdx rcx r8 r9)
   #+win32
   (defregset    *c-call-register-arg-offsets* rcx rdx r8 r9)
-  (defregset *descriptor-args* rdx rdi rsi rbx rcx r8 r9 r10 r14))
+  (defregset *descriptor-args* rdx rdi rsi rbx rcx r8 r9 r10 r14)
+  (defconstant float-reg-count 16))
 
 ;;;; SB definitions
 
@@ -348,26 +291,26 @@
 
   ;; non-descriptor SINGLE-FLOATs
   (single-reg float-registers
-              :locations #.*float-regs*
+              :locations #.(loop for i to 15 collect i)
               :constant-scs (fp-immediate)
               :save-p t
               :alternate-scs (single-stack))
 
   ;; non-descriptor DOUBLE-FLOATs
   (double-reg float-registers
-              :locations #.*float-regs*
+              :locations #.(loop for i to 15 collect i)
               :constant-scs (fp-immediate)
               :save-p t
               :alternate-scs (double-stack))
 
   (complex-single-reg float-registers
-                      :locations #.*float-regs*
+                      :locations #.(loop for i to 15 collect i)
                       :constant-scs (fp-immediate)
                       :save-p t
                       :alternate-scs (complex-single-stack))
 
   (complex-double-reg float-registers
-                      :locations #.*float-regs*
+                      :locations #.(loop for i to 15 collect i)
                       :constant-scs (fp-immediate)
                       :save-p t
                       :alternate-scs (complex-double-stack))
@@ -375,66 +318,66 @@
   ;; temporary only
   #+sb-simd-pack
   (sse-reg float-registers
-           :locations #.*float-regs*)
+           :locations #.(loop for i to 15 collect i))
   ;; regular values
   #+sb-simd-pack
   (int-sse-reg float-registers
-               :locations #.*float-regs*
+               :locations #.(loop for i to 15 collect i)
                :constant-scs (fp-immediate)
                :save-p t
                :alternate-scs (int-sse-stack))
   #+sb-simd-pack
   (double-sse-reg float-registers
-                  :locations #.*float-regs*
+                  :locations #.(loop for i to 15 collect i)
                   :constant-scs (fp-immediate)
                   :save-p t
                   :alternate-scs (double-sse-stack))
   #+sb-simd-pack
   (single-sse-reg float-registers
-                  :locations #.*float-regs*
+                  :locations #.(loop for i to 15 collect i)
                   :constant-scs (fp-immediate)
                   :save-p t
                   :alternate-scs (single-sse-stack))
   #+sb-simd-pack-256
   (int-avx2-reg float-registers
-               :locations #.*float-regs*
+               :locations #.(loop for i to 15 collect i)
                :constant-scs (fp-immediate)
                :save-p t
                :alternate-scs (int-avx2-stack))
   #+sb-simd-pack-256
   (double-avx2-reg float-registers
-                  :locations #.*float-regs*
+                  :locations #.(loop for i to 15 collect i)
                   :constant-scs (fp-immediate)
                   :save-p t
                   :alternate-scs (double-avx2-stack))
   #+sb-simd-pack-256
   (single-avx2-reg float-registers
-                  :locations #.*float-regs*
+                  :locations #.(loop for i to 15 collect i)
                   :constant-scs (fp-immediate)
                   :save-p t
                   :alternate-scs (single-avx2-stack))
   ;; ZMM SCs use all 32 registers (16-31 require EVEX encoding)
   #+sb-simd-pack-512
   (int-avx512-reg float-registers
-                  :locations #.*zmm-regs*
+                  :locations #.(loop for i to 31 collect i)
                   :constant-scs (fp-immediate)
                   :save-p t
                   :alternate-scs (int-avx512-stack))
   #+sb-simd-pack-512
   (double-avx512-reg float-registers
-                     :locations #.*zmm-regs*
+                     :locations #.(loop for i to 31 collect i)
                      :constant-scs (fp-immediate)
                      :save-p t
                      :alternate-scs (double-avx512-stack))
   #+sb-simd-pack-512
   (single-avx512-reg float-registers
-                     :locations #.*zmm-regs*
+                     :locations #.(loop for i to 31 collect i)
                      :constant-scs (fp-immediate)
                      :save-p t
                      :alternate-scs (single-avx512-stack))
   #+sb-simd-pack-512
   (mask-reg          mask-registers
-                     :locations #.*mask-regs*
+                     :locations #.(loop for i to 7 collect i)
                      :constant-scs (fp-immediate)
                      :save-p t
                      :alternate-scs (kmask-stack))
@@ -513,10 +456,7 @@
   ;; Because there is no :OFFSET, unanticipated use will be caught.
   (defconstant-eqx rip-tn
       (make-random-tn (sc-or-lose 'unsigned-reg) nil)
-    #'constantly-t)
-  (def-fpr-tns single-reg
-    float0 float1 float2 float3 float4 float5 float6 float7
-    float8 float9 float10 float11 float12 float13 float14 float15))
+    #'constantly-t))
 
 ;;; Return true if THING is a general-purpose register TN.
 (defun gpr-tn-p (thing)

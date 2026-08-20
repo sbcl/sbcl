@@ -166,7 +166,6 @@
 
 #-(or arm64 x86-64) (defvar *descriptor-args*)
 #-(or arm64 c-stack-is-control-stack) (defvar *non-descriptor-args*)
-#-(or x86 arm64 x86-64) (defvar *float-regs*)
 
 (defun fixed-call-arg-location (type state)
   (let* ((primtype (if (typep type 'primitive-type)
@@ -182,12 +181,11 @@
                                   (elt *descriptor-args* index))
                    (make-wired-tn primtype control-stack-sc-number (+ register-arg-count (- index max-regs)))))))
       (case (primitive-type-name primtype)
+        #+(or arm64 x86-64)
         ((double-float single-float)
          (let ((n (incf (fixed-call-args-state-float state))))
-           (if (< n (length *float-regs*))
-               (make-wired-tn primtype
-                              sc
-                              (elt *float-regs* n))
+           (if (< n float-reg-count)
+               (make-wired-tn primtype sc n)
                (descriptor))))
         ((system-area-pointer unsigned-byte-64 signed-byte-64)
          (let ((n (incf (#-c-stack-is-control-stack fixed-call-args-state-non-descriptors
@@ -196,9 +194,7 @@
                (regs #-c-stack-is-control-stack *non-descriptor-args*
                      #+c-stack-is-control-stack *descriptor-args*))
            (if (< n (length regs))
-               (make-wired-tn primtype
-                              sc
-                              (elt regs n))
+               (make-wired-tn primtype sc (elt regs n))
                (descriptor))))
         (t
          (descriptor))))))

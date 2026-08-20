@@ -88,7 +88,8 @@
   (defconstant-eqx register-arg-names '(r0 r1 r2 r3) #'equal)
   (defregset *descriptor-args* r0 r1 r2 r3 r4 r5 r6 r7 #-(or darwin win32) r8 r9 r10)
   (defregset *non-descriptor-args* nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nl8)
-  (defglobal *float-regs* (loop for i below 32 collect i)))
+
+  (defconstant float-reg-count 32))
 
 
 ;;;; SB and SC definition:
@@ -215,23 +216,23 @@
   ;; temporary only
   #+sb-simd-pack
   (neon-reg float-registers
-           :locations #.*float-regs*)
+           :locations #.(loop for i to 31 collect i))
   ;; regular values
   #+sb-simd-pack
   (int-neon-reg float-registers
-                :locations #.*float-regs*
+                :locations #.(loop for i to 31 collect i)
                 :constant-scs (fp-immediate)
                 :save-p t
                 :alternate-scs (int-neon-stack))
   #+sb-simd-pack
   (double-neon-reg float-registers
-                   :locations #.*float-regs*
+                   :locations #.(loop for i to 31 collect i)
                    :constant-scs (fp-immediate)
                    :save-p t
                    :alternate-scs (double-neon-stack))
   #+sb-simd-pack
   (single-neon-reg float-registers
-                   :locations #.*float-regs*
+                   :locations #.(loop for i to 31 collect i)
                    :constant-scs (fp-immediate)
                    :save-p t
                    :alternate-scs (single-neon-stack))
