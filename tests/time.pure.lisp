@@ -14,7 +14,6 @@
 (with-test (:name (get-internal-run-time :monotonic))
   (checked-compile-and-assert (:optimize nil)
       '(lambda (n-seconds)
-         (declare (type fixnum n-seconds))
          (let* ((n-internal-time-units
                  (* n-seconds
                     internal-time-units-per-second))
@@ -23,7 +22,7 @@
            (loop for time = (get-internal-run-time)
                  while (< time time1)
                  always (>= time time0))))
-    ((1) t)))
+    ((0.5) t)))
 
 (with-test (:name (time :lambdas-converted))
   (let ((output (with-output-to-string (*trace-output*)
@@ -32,3 +31,20 @@
     ;; converted. The exact number depends on the inner workings of
     ;; the compiler.
     (assert (search "converted" output))))
+
+(with-test (:name :encode-decode-time)
+  (let ((*random-state* (make-random-state t)))
+    (loop repeat 200
+          for time = (random (expt 2 (random 80)))
+          for tz = (* 1/3600
+                      (if (zerop (random 2))
+                          -1
+                          1)
+                      (random (/ 24 1/3600)))
+          do (multiple-value-bind (second minute hour date month year day daylight-p zone)
+                 (decode-universal-time time tz)
+               (assert (= day (mod (floor (- time (* tz 3600)) 86400) 7)))
+               (assert (= zone tz))
+               (assert (not daylight-p))
+               (assert (= time
+                          (encode-universal-time second minute hour date month year tz)))))))
