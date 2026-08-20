@@ -466,8 +466,8 @@
        (eq (sb-name (sc-sb (tn-sc thing))) 'registers)))
 
 ;;; Return true if THING is a TN in the FLOAT-REGISTERS storage base.  This
-;;; includes XMM, YMM, ZMM SIMD registers, but also scalar float, double and
-;;; complex float/double, but does not include mask registers.
+;;; includes XMM, YMM, ZMM SIMD registers, scalar float/double, and complex
+;;; float/double, but does not include mask registers.
 (defun float-tn-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'float-registers)))
