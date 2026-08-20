@@ -377,7 +377,9 @@
                      :alternate-scs (single-avx512-stack))
   #+sb-simd-pack-512
   (mask-reg          mask-registers
-                     :locations #.(loop for i to 7 collect i)
+                     ;; k0 is special meaning "no masking", so we can't schedule those regs for
+                     ;; normal ops. I am not sure how to best model it, this is the simplest try
+                     :locations #.(loop for i from 1 to 7 collect i)
                      :constant-scs (fp-immediate)
                      :save-p t
                      :alternate-scs (kmask-stack))
