@@ -464,15 +464,14 @@
 (defun gpr-tn-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'registers)))
-;;; Return true if THING is an XMM register TN.
-(defun xmm-tn-p (thing)
+
+;;; Return true if THING is a TN in the FLOAT-REGISTERS storage base.  This
+;;; includes XMM, YMM, ZMM SIMD registers, but also scalar float, double and
+;;; complex float/double, but does not include mask registers.
+(defun float-tn-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'float-registers)))
 
-(defun zmm-tn-p (tn)
-  (member (tn-sc tn) (list (sc-or-lose 'single-avx512-reg)
-                           (sc-or-lose 'double-avx512-reg)
-                           (sc-or-lose 'int-avx512-reg))))
 ;;; Return true if THING is on the stack (in whatever storage class).
 (defun stack-tn-p (thing)
   (and (tn-p thing)

@@ -22,34 +22,34 @@
   (unless (location= dst src)
     (sc-case dst
       ((single-reg complex-single-reg)
-       (aver (xmm-tn-p src))
+       (aver (float-tn-p src))
        (inst movaps dst src))
       ((double-reg complex-double-reg)
-       (aver (xmm-tn-p src))
+       (aver (float-tn-p src))
        (inst movapd dst src))
       #+sb-simd-pack
       ((int-sse-reg sse-reg)
-       (aver (xmm-tn-p src))
+       (aver (float-tn-p src))
        (inst movdqa dst src))
       #+sb-simd-pack
       ((single-sse-reg double-sse-reg)
-       (aver (xmm-tn-p src))
+       (aver (float-tn-p src))
        (inst movaps dst src))
       #+sb-simd-pack-256
       (int-avx2-reg
-       (aver (xmm-tn-p src))
+       (aver (float-tn-p src))
        (inst vmovdqa dst src))
       #+sb-simd-pack-256
       ((single-avx2-reg double-avx2-reg)
-       (aver (xmm-tn-p src))
+       (aver (float-tn-p src))
        (inst vmovaps dst src))
       #+sb-simd-pack-512
       (int-avx512-reg
-       (aver (xmm-tn-p src))
+       (aver (float-tn-p src))
        (inst vmovdqu64 dst src))
       #+sb-simd-pack-512
       ((single-avx512-reg double-avx512-reg)
-       (aver (xmm-tn-p src))
+       (aver (float-tn-p src))
        (inst vmovups dst src))
       (t
        (if size

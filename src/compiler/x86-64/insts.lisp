@@ -1021,7 +1021,7 @@
   (ldb (byte 5 3) reg-id))
 
 ;;; Note that SB-VM has its own variation on these predicates
-;;; operating on TNs: GPR-TN-P, XMM-TN-P
+;;; operating on TNs: GPR-TN-P, FLOAT-TN-P
 
 ;;; Return true if THING is a general-purpose register.
 (defun gpr-p (thing)
