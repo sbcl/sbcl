@@ -365,7 +365,11 @@
       (cond ((= mod #b11) ; register direct mode
              (case regclass
               (gpr (get-gpr :qword full-reg)) ; size is not really known here
-              (fpr (get-fpr :xmm full-reg))))
+              (fpr (get-fpr :xmm
+              (if (and (dstate-getprop dstate +evex+)
+                       (dstate-getprop dstate +rex-x+))
+                  (+ full-reg 16)
+                  full-reg)))))
             ((= r/m #b100) ; SIB byte - rex.b is "don't care"
              (let* ((sib (the (unsigned-byte 8) (read-suffix 8 dstate)))
                     (index-reg (extend +rex-x+ (ldb (byte 3 3) sib)))

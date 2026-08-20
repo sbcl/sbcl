@@ -284,3 +284,41 @@
                    1d0 0f0 0f0 0f0 0f0 0f0 0f0 0f0
                    0f0 0f0 0f0 0f0 0f0 0f0 0f0 0f0)
                   type-error)))
+
+;; evex patch
+(cl:in-package "SB-VM")
+
+(sb-c::defknown %test-evex-high-regs ()
+    (unsigned-byte 64)
+  (sb-c::flushable sb-c::movable))
+
+(defun %test-evex-high-regs ()
+  (error "%test-evex-high-regs stub"))
+
+(define-vop (%test-evex-high-regs)
+  (:translate %test-evex-high-regs)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 16) z16)
+  (:temporary (:sc single-avx512-reg :offset 17) z17)
+  (:temporary (:sc single-avx512-reg :offset 18) z18)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vaddps z16 z17 z18)
+    (inst xor :dword res res)))
+
+(cl:in-package :test-util)
+
+(with-test (:name :evex-high-register-disassembly)
+  (let* ((fun (compile nil
+                       '(lambda ()
+                          (sb-vm::%test-evex-high-regs))))
+         (text (with-output-to-string (s)
+                 (disassemble fun :stream s))))
+    ;; These names can only appear if the disassembler correctly
+    ;; handles EVEX R', V', and X-as-B'.
+    (assert (search "ZMM16" text))
+    (assert (search "ZMM17" text))
+    (assert (search "ZMM18" text))
+    ;; Ideally we see a decoded instruction, not raw EVEX bytes.
+    (assert (search "VADDPS" text))))

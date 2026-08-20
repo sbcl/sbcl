@@ -47,6 +47,12 @@
   :prefilter #'prefilter-xmmreg/mem
   :printer #'print-sized-xmmreg/mem-default-qword)
 
+;;; General indicator that we are decoding an EVEX instruction.
+;;; EVEX has 128-, 256-, and 512-bit forms; L'L=00 is 128-bit and sets
+;;; neither +vex-l+ nor +evex-l1+, so this separate bit is required for
+;;; code that needs to know "EVEX vs VEX/legacy".
+;;; (Bit 14 is currently unused by other dstate properties.)
+(defconstant +evex+ #b100000000000000)
 (defconstant +vex-l+ #b10000000000)
 ;; EVEX L'L=10 (512-bit) sets bit 11; L'L=01 (256-bit) sets bit 10 (=+vex-l+)
 (defconstant +evex-l1+ #b100000000000)
@@ -54,6 +60,10 @@
 (defconstant +evex-r-prime+ #b1000000000000)
 ;; EVEX X bit as B' (r/m bit 4, for registers 16-31 in ModR/M.r/m, reg-direct only)
 (defconstant +evex-b-prime+ #b10000000000000)
+;;; EVEX V' bit (vvvv bit 4, for registers 16-31 in the vvvv field).
+;;; The 4-bit vvvv field in the EVEX prefix is extended with this bit.
+;;; (Bit 15 is currently unused by other dstate properties.)
+(defconstant +evex-v-prime+ #b1000000000000000)
 
 (define-arg-type vex-l
   :prefilter  (lambda (dstate value)
@@ -95,13 +105,21 @@
   :prefilter (lambda (dstate value)
                (dstate-setprop dstate (if (zerop value) +evex-r-prime+ 0))))
 
+;;; Marks that the instruction being decoded uses an EVEX prefix.
+;;; This is set by the EVEX fixed-bit field and is independent of L'L.
+(define-arg-type evex-fixed
+  :prefilter (lambda (dstate value)
+               (declare (ignore value))
+               (dstate-setprop dstate +evex+)))
+
 ;; EVEX V' extends vvvv bit 4 (inverted in prefix)
 ;; V'=0 means bit4=1 (register 16-31 in vvvv)
 ;; Note: the printer for vvvv (print-ymmreg via ymm-vvvv-reg) gets
 ;; a 4-bit value from the invert-4 prefilter. V' provides the 5th bit.
 (define-arg-type evex-v-prime
   :prefilter (lambda (dstate value)
-               (declare (ignore dstate value))))
+               (dstate-setprop dstate
+                               (if (zerop value) +evex-v-prime+ 0))))
 
 ;; EVEX L'L: 2-bit vector length (00=128, 01=256, 10=512)
 ;; Stores into dstate bits 10-11: L'L=01 sets bit 10 (+vex-l+),
@@ -114,6 +132,12 @@
 (define-arg-type evex-w
   :prefilter (lambda (dstate value)
                (dstate-setprop dstate (if (plusp value) +rex-w+ 0))))
+
+;;; EVEX vvvv register operand.
+;;; The 4-bit value is inverted and extended with V' by the printer.
+(define-arg-type evex-ymm-vvvv-reg
+  :prefilter #'invert-4
+  :printer #'print-ymmreg-vvvv)
 
 ;; Opmask register k0-k7
 (define-arg-type opmask-reg
@@ -293,8 +317,8 @@
   (mm       :field (byte 2 8))
   ;; Byte 2
   (w          :field (byte 1 23) :type 'evex-w)
-  (vvvv       :field (byte 4 19) :type 'ymm-vvvv-reg)
-  (evex-fixed :field (byte 1 18) :value 1) ; must be 1 for EVEX
+  (vvvv       :field (byte 4 19) :type 'evex-ymm-vvvv-reg)
+  (evex-fixed :field (byte 1 18) :value 1 :type 'evex-fixed) ; must be 1 for EVEX
   (pp         :field (byte 2 16))
   ;; Byte 3
   (z-bit   :field (byte 1 31))

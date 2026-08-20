@@ -1171,15 +1171,25 @@
 ;;; mask-reg-number is 1-7 (k1-k7; k0 means no masking).
 ;;; Merge-masking: destination elements not selected by mask are preserved.
 (macrolet ((def (name prefix opcode w &optional (opcode-prefix #x0f))
-             `(define-instruction ,name (segment dst src1 src2 mask)
-                ,@(avx512-inst-printer-list 'ymm-ymm/mem prefix opcode
-                                            :opcode-prefix opcode-prefix :w w :nds t)
-                (:emitter
-                 (emit-avx512-inst segment src2 dst ,prefix ,opcode
-                                   :opcode-prefix ,opcode-prefix
-                                   :vvvv src1
-                                   :w ,w
-                                   :aaa mask)))))
+             (let ((mask-printer
+                    '(:name :tab reg ", " vvvv ", " reg/mem
+                      " {" aaa "}")))
+               `(define-instruction ,name (segment dst src1 src2 mask)
+                  ,@(loop for k from 1 to 7
+                          append
+                          (avx512-inst-printer-list
+                           'ymm-ymm/mem prefix opcode
+                           :opcode-prefix opcode-prefix
+                           :w w
+                           :nds t
+                           :more-fields `((aaa ,k))
+                           :printer mask-printer))
+                  (:emitter
+                   (emit-avx512-inst segment src2 dst ,prefix ,opcode
+                                     :opcode-prefix ,opcode-prefix
+                                     :vvvv src1
+                                     :w ,w
+                                     :aaa mask))))))
   ;; Integer arithmetic (qword)
   (def vpaddq-masked  #x66 #xd4 1)
   (def vpsubq-masked  #x66 #xfb 1)

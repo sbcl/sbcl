@@ -11,6 +11,38 @@
 
 (in-package "SB-X86-64-ASM")
 
+;;; Printer for EVEX/VEX ModRM.r/m register operands.
+;;; Does NOT use EVEX R' — R' belongs only to the ModRM.reg field.
+(defun print-ymmreg-rm (value stream dstate)
+  (let* ((offset (etypecase value
+                   ((unsigned-byte 4) value)
+                   (reg (reg-num value))))
+         (reg (get-fpr (cond ((dstate-getprop dstate +evex-l1+) :zmm)
+                             ((dstate-getprop dstate +vex-l+) :ymm)
+                             (t :xmm))
+                       offset))
+         (name (reg-name reg)))
+    (if stream
+        (write-string name stream)
+        (operand name dstate))))
+
+;;; Uses EVEX V' to form a 5-bit register number.
+(defun print-ymmreg-vvvv (value stream dstate)
+  (let* ((offset (etypecase value
+                   ((unsigned-byte 4) value)
+                   (reg (reg-num value))))
+         (offset (if (dstate-getprop dstate +evex-v-prime+)
+                     (+ offset 16)
+                     offset))
+         (reg (get-fpr (cond ((dstate-getprop dstate +evex-l1+) :zmm)
+                             ((dstate-getprop dstate +vex-l+) :ymm)
+                             (t :xmm))
+                       offset))
+         (name (reg-name reg)))
+    (if stream
+        (write-string name stream)
+        (operand name dstate))))
+
 (defun print-ymmreg (value stream dstate)
   (let* ((offset (etypecase value
                    ((unsigned-byte 4) value)
@@ -47,7 +79,7 @@
 (defun print-ymmreg/mem (value stream dstate)
   (if (machine-ea-p value)
       (print-mem-ref :ref value nil stream dstate)
-      (print-ymmreg value stream dstate)))
+      (print-ymmreg-rm value stream dstate)))
 
 (defun invert-4 (dstate value)
   (declare (ignore dstate))
