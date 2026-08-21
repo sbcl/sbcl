@@ -464,8 +464,8 @@
                  ((t-i))
                  ((g))
                  ((v int-avx2-reg))
-                 ((reverse-mask))
-                 ((v-xmm)))
+                 ((reverse-mask int-avx2-reg))
+                 ((v-xmm int-sse-reg)))
         ()
       (let ((reverse-mask-c (inline-const (concat-ub 8 (loop for i below 32 collect i)))))
         (assemble ()
@@ -2563,7 +2563,7 @@
         (inst sub byte-length ptr)
 
 
-        (inst vmovq tmp1 byte-length)
+        (inst vmovd tmp1 byte-length)
         (inst vpbroadcastb tmp1 tmp1)
         (inst vpcmpgtb tmp1 tmp1 (inline-const #x1F1E1D1C1B1A191817161514131211100F0E0D0C0B0A09080706050403020100))
 
@@ -2637,7 +2637,7 @@
         TAIL
         (inst bsf :dword tmp tmp)
 
-        (inst vmovq tmp2 tmp)
+        (inst vmovd tmp2 tmp)
         (inst vpbroadcastb tmp2 tmp2)
 
         (inst vpcmpgtb tmp1 tmp2 (inline-const #x1F1E1D1C1B1A191817161514131211100F0E0D0C0B0A09080706050403020100))
