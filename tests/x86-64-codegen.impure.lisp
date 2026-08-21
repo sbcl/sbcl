@@ -1539,3 +1539,19 @@
     ;; Must keep the single fused memory CMP and avoid separate register CMPs
     (assert (= mem-cmps 1))
     (assert (= reg-cmps 0))))
+
+(with-test (:name :specifically-sized-ea-disp)
+  (let* ((lines
+          (disassembly-lines
+           (compile
+            nil
+            '(lambda ()
+              sb-vm::(inline-vop (((x int-sse-reg))) ()
+               (inst movdqa (ea 0 rdx-tn) x)
+               (inst movdqa (ea :disp8 0 rdx-tn) x)
+               (inst movdqa (ea :disp32 0 rdx-tn) x))))))
+         (found (member "MOVDQA [RDX], XMM0" lines :test #'search))
+         (disp8 (cadr found))
+         (disp32 (caddr found)))
+    (assert (search "660F7F4200       MOVDQA [RDX], XMM0" disp8))
+    (assert (search "660F7F8200000000 MOVDQA [RDX], XMM0" disp32))))

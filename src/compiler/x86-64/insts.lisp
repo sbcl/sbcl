@@ -884,12 +884,13 @@
 (declaim (freeze-type label+addend))
 
 ;;;; the effective-address (ea) structure
-(defstruct (ea (:constructor %ea (segment disp base index scale))
+(defstruct (ea (:constructor %ea (segment disp-bits disp base index scale))
                (:copier nil))
   (segment nil :type (member :cs :fs :gs) :read-only t)
   (base nil :type (or tn null) :read-only t)
   (index nil :type (or tn null) :read-only t)
   (scale 1 :type (member 1 2 4 8) :read-only t)
+  (disp-bits nil :type (member 8 32 nil) :read-only t)
   (disp 0 :type (or (unsigned-byte 32) (signed-byte 32) fixup
                     label label+addend)
           :read-only t))
@@ -941,11 +942,17 @@
 ;;;
 (defun ea (&rest args) ; seg displacement base index scale
   (declare (dynamic-extent args))
-  (let ((seg :cs) disp)
-    (let ((first (car args)))
-      (case first
-        ((:fs :gs) (setq seg first) (pop args))
-        (:cs (pop args))))
+  (let ((seg :cs) disp-bits disp)
+    (loop
+      (let ((is-prefix
+             (case (car args)
+               ((:fs :gs) (setq seg (car args)))
+               (:cs t)
+               ;; Syntax motivated by ".disp{8,32}" in GNU asm
+               (:disp8 (setq disp-bits 8))
+               (:disp32 (setq disp-bits 32))
+               (t nil))))
+        (if is-prefix (pop args) (return))))
     (let ((first (car args)))
       ;; Rather than checking explicitly for all the things that are legal to be
       ;; a displacement (i.e. LABEL, FIXUP, INTEGER), look for (NOT (OR TN NULL).)
@@ -957,14 +964,18 @@
     ;; The minimal EA is either an absolute address or an unindexed base register.
     ;; So gotta have at least one of disp or base. Enforce by doing either of two
     ;; destructuring-binds depending on whether DISP was present.
-    (if disp
-        (destructuring-bind (&optional base index (scale 1)) args
-          (%ea seg disp base index scale))
-        (destructuring-bind (base &optional index (scale 1)) args
-          (%ea seg 0 base index scale)))))
+    (multiple-value-bind (disp base index scale)
+        (if disp
+            (destructuring-bind (&optional base index (scale 1)) args
+              (values disp base index scale))
+            (destructuring-bind (base &optional index (scale 1)) args
+              (values 0 base index scale)))
+      (%ea seg disp-bits disp base index scale))))
 
 (defun rip-relative-ea (label &optional addend)
-  (%ea :cs (if addend (make-label+addend label addend) label) rip-tn nil 1))
+  ;; disp-bits is 32 but using NIL for "automatic" will infer it just like
+  ;; it always did before adding the ability to choose.
+  (%ea :cs nil (if addend (make-label+addend label addend) label) rip-tn nil 1))
 
 (defun emit-byte-displacement-backpatch (segment target)
   (emit-back-patch segment 1
@@ -1241,7 +1252,9 @@
                                   (zerop (mod disp disp-n))
                                   (let ((q (/ disp disp-n)))
                                     (and (<= -128 q 127) q))))
-            (mod (cond ((or (null base) (and (eql disp 0) (/= base-encoding #b101)))
+            (mod (cond ((ea-disp-bits thing) ; explicit .disp8 or .disp32
+                        (case (ea-disp-bits thing) (8 #b01) (t #b10)))
+                       ((or (null base) (and (eql disp 0) (/= base-encoding #b101)))
                         #b00)
                        (compressed-disp
                         #b01)
