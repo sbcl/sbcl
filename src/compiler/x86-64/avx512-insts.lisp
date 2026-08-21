@@ -23,22 +23,41 @@
 
 ;;;; AVX-512 (EVEX-only) instruction definitions
 
+;;; Return the compressed-displacement scale N for a full-vector
+;;; load/store instruction.  The vector width determines N:
+;;;   128-bit -> 16
+;;;   256-bit -> 32
+;;;   512-bit -> 64
+(defun full-vector-disp-n (reg)
+  (cond ((zmm-register-p reg) 64)
+        ((ymm-register-p reg) 32)
+        ((xmm-register-p reg) 16)
+        (t 0)))
+
 ;;; EVEX-only aligned/unaligned moves
 (macrolet ((def (name prefix opcode-from opcode-to w)
              `(define-instruction ,name (segment dst src)
-                ,@(avx512-inst-printer-list 'ymm-ymm/mem prefix opcode-from
-                                            :w w)
-                ,@(avx512-inst-printer-list 'ymm-ymm/mem prefix opcode-to
-                                            :printer '(:name :tab reg/mem ", " reg)
-                                            :w w)
+                ,@(loop for (ll n) in '((#b00 16) (#b01 32) (#b10 64))
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem prefix opcode-from
+                         :w w :ll ll :disp-n n))
+                ,@(loop for (ll n) in '((#b00 16) (#b01 32) (#b10 64))
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem prefix opcode-to
+                         :w w :ll ll :disp-n n
+                         :printer '(:name :tab reg/mem ", " reg)))
                 (:emitter
                  (cond ((xmm-register-p dst)
                         (emit-avx512-inst segment src dst ,prefix ,opcode-from
-                                         :opcode-prefix #x0F :w ,w))
+                                         :opcode-prefix #x0F :w ,w
+                                         :disp-n (full-vector-disp-n dst)))
                        (t
                         (aver (xmm-register-p src))
                         (emit-avx512-inst segment dst src ,prefix ,opcode-to
-                                         :opcode-prefix #x0F :w ,w)))))))
+                                         :opcode-prefix #x0F :w ,w
+                                         :disp-n (full-vector-disp-n src))))))))
   (def vmovdqa32 #x66 #x6f #x7f 0)
   (def vmovdqa64 #x66 #x6f #x7f 1)
   (def vmovdqu8  #xf2 #x6f #x7f 0)

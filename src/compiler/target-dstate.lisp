@@ -118,7 +118,12 @@
   (notes nil) ; a single note or a list of notes
 
   ;; currently active source variables
-  (current-valid-locations nil :type (or null (vector bit))))
+  (current-valid-locations nil :type (or null (vector bit)))
+
+  ;; used for evex compressed-displacement scale
+  ;; N is the tuple size; a mod=01 disp8 means disp8*N, 0 if unknown/disabled.
+  #+x86-64
+  (disp-n 0 :type (unsigned-byte 7)))
 
 (declaim (freeze-type disassem-state))
 (defmethod print-object ((dstate disassem-state) stream)

@@ -27,6 +27,20 @@
   :prefilter #'prefilter-xmmreg/mem
   :printer #'print-ymmreg/mem)
 
+(macrolet ((define-disp-arg-type (name n)
+             `(define-arg-type ,name
+                :prefilter (lambda (dstate mod r/m)
+                             (setf (dstate-disp-n dstate) ,n)
+                             (decode-mod-r/m dstate mod r/m 'fpr))
+                :printer #'print-ymmreg/mem)))
+  (define-disp-arg-type evex-ymmreg/mem-disp1  1)
+  (define-disp-arg-type evex-ymmreg/mem-disp2  2)
+  (define-disp-arg-type evex-ymmreg/mem-disp4  4)
+  (define-disp-arg-type evex-ymmreg/mem-disp8  8)
+  (define-disp-arg-type evex-ymmreg/mem-disp16 16)
+  (define-disp-arg-type evex-ymmreg/mem-disp32 32)
+  (define-disp-arg-type evex-ymmreg/mem-disp64 64))
+
 (define-arg-type vm
   :prefilter #'prefilter-xmmreg/mem
   :printer #'print-ymmreg/mem)
@@ -697,42 +711,60 @@ REG is the source (encoded in ModR/M.r/m).
 
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+  ;; if both disp-n and a *-mem-size are supplied, this version uses the disp-n
+  ;; arg type and loses the explicit size indicator. For the common full-vector
+  ;; load/store cases that is fine, but needs more work to fully support sized +
+  ;; compressed displacement
   (defun avx512-inst-printer-list (inst-format-stem prefix opcode
-                                   &key more-fields printer
-                                        (opcode-prefix #x0F)
-                                        reg-mem-size
-                                        xmmreg-mem-size
-                                        w
-                                        ll
-                                        nds)
-    (let ((fields `((pp ,(vex-encode-pp prefix))
-                    (mm ,(evex-encode-mm opcode-prefix))
-                    (op ,opcode)
-                    ,@(and w `((w ,w)))
-                    ,@(and ll `((ll ,ll)))
-                    ,@(cond (xmmreg-mem-size
-                             `((reg/mem nil :type ',(case xmmreg-mem-size
-                                                      (:qword 'sized-xmmreg/mem-default-qword)
-                                                      (:dword 'sized-dword-xmmreg/mem)
-                                                      (:word 'sized-word-xmmreg/mem)
-                                                      (:byte 'sized-byte-xmmreg/mem)
-                                                      (:sized 'sized-xmmreg/mem)))))
-                            (reg-mem-size
-                             `((reg/mem nil :type ',(case reg-mem-size
-                                                      (:qword 'sized-reg/mem-default-qword)
-                                                      (:dword 'sized-dword-reg/mem)
-                                                      (:word 'sized-word-reg/mem)
-                                                      (:byte 'sized-byte-reg/mem)
-                                                      (:sized 'sized-reg/mem))))))
-                    ,@more-fields))
-          (inst-format (symbolicate "EVEX-" inst-format-stem)))
-      (list `(:printer ,inst-format ,fields
-                       ,@(cond (printer
-                                `(',printer))
-                               ((eq nds 'to-mem)
-                                `('(:name :tab reg/mem ", " vvvv ", " reg)))
-                               (nds
-                                `('(:name :tab reg ", " vvvv ", " reg/mem))))))))
+                                 &key more-fields printer
+                                      (opcode-prefix #x0F)
+                                      reg-mem-size
+                                      xmmreg-mem-size
+                                      w
+                                      ll
+                                      nds
+                                      disp-n)
+  (let ((fields `((pp ,(vex-encode-pp prefix))
+                  (mm ,(evex-encode-mm opcode-prefix))
+                  (op ,opcode)
+                  ,@(and w `((w ,w)))
+                  ,@(and ll `((ll ,ll)))
+                  ,@(cond
+                      (disp-n
+                       `((reg/mem nil :type
+                          ',(ecase disp-n
+                              (1  'evex-ymmreg/mem-disp1)
+                              (2  'evex-ymmreg/mem-disp2)
+                              (4  'evex-ymmreg/mem-disp4)
+                              (8  'evex-ymmreg/mem-disp8)
+                              (16 'evex-ymmreg/mem-disp16)
+                              (32 'evex-ymmreg/mem-disp32)
+                              (64 'evex-ymmreg/mem-disp64)))))
+                      (xmmreg-mem-size
+                       `((reg/mem nil :type
+                          ',(case xmmreg-mem-size
+                              (:qword 'sized-xmmreg/mem-default-qword)
+                              (:dword 'sized-dword-xmmreg/mem)
+                              (:word  'sized-word-xmmreg/mem)
+                              (:byte  'sized-byte-xmmreg/mem)
+                              (:sized 'sized-xmmreg/mem)))))
+                      (reg-mem-size
+                       `((reg/mem nil :type
+                          ',(case reg-mem-size
+                              (:qword 'sized-reg/mem-default-qword)
+                              (:dword 'sized-dword-reg/mem)
+                              (:word  'sized-word-reg/mem)
+                              (:byte  'sized-byte-reg/mem)
+                              (:sized 'sized-reg/mem))))))
+                  ,@more-fields))
+        (inst-format (symbolicate "EVEX-" inst-format-stem)))
+    (list `(:printer ,inst-format ,fields
+                     ,@(cond (printer
+                              `(',printer))
+                             ((eq nds 'to-mem)
+                              `('(:name :tab reg/mem ", " vvvv ", " reg)))
+                             (nds
+                              `('(:name :tab reg ", " vvvv ", " reg/mem))))))))
 
   (defun avx2-inst-printer-list (inst-format-stem prefix opcode
                                  &key more-fields printer

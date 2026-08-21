@@ -288,12 +288,19 @@
 ;; evex patch
 (cl:in-package "SB-VM")
 
-(sb-c::defknown %test-evex-high-regs ()
-    (unsigned-byte 64)
-  (sb-c::flushable sb-c::movable))
-
-(defun %test-evex-high-regs ()
-  (error "%test-evex-high-regs stub"))
+(macrolet ((def (name)
+             `(progn
+                (sb-c::defknown ,name ()
+                    (unsigned-byte 64)
+                  (sb-c::flushable sb-c::movable))
+                (defun ,name ()
+                  (error ,(format nil "~A stub" name))))))
+  (def %test-evex-high-regs)
+  (def %test-evex-disp8)
+  (def %test-evex-disp-vector-lengths)
+  (def %test-evex-disp-negative)
+  (def %test-evex-disp-nonmultiple)
+  (def %test-evex-disp-large))
 
 (define-vop (%test-evex-high-regs)
   (:translate %test-evex-high-regs)
@@ -307,12 +314,71 @@
     (inst vaddps z16 z17 z18)
     (inst xor :dword res res)))
 
+(define-vop (%test-evex-disp8)
+  (:translate %test-evex-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst xor :dword res res)
+    (inst vmovdqu64 zmm (ea 64 rsp))))
+
+(define-vop (%test-evex-disp-vector-lengths)
+  (:translate %test-evex-disp-vector-lengths)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm)
+  (:temporary (:sc single-avx2-reg :offset 1) ymm)
+  (:temporary (:sc single-avx512-reg :offset 2) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst xor :dword res res)
+    (inst vmovdqu64 xmm (ea 16 rsp))
+    (inst vmovdqu64 ymm (ea 32 rsp))
+    (inst vmovdqu64 zmm (ea 64 rsp))))
+
+(define-vop (%test-evex-disp-negative)
+  (:translate %test-evex-disp-negative)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst xor :dword res res)
+    (inst vmovdqu64 zmm (ea -64 rsp))))
+
+(define-vop (%test-evex-disp-nonmultiple)
+  (:translate %test-evex-disp-nonmultiple)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst xor :dword res res)
+    (inst vmovdqu64 zmm (ea 65 rsp))))
+
+(define-vop (%test-evex-disp-large)
+  (:translate %test-evex-disp-large)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst xor :dword res res)
+    (inst vmovdqu64 zmm (ea 8192 rsp))))
+
 (cl:in-package :test-util)
 
 (with-test (:name :evex-high-register-disassembly)
   (let* ((fun (compile nil
                        '(lambda ()
-                          (sb-vm::%test-evex-high-regs))))
+                         (sb-vm::%test-evex-high-regs))))
          (text (with-output-to-string (s)
                  (disassemble fun :stream s))))
     ;; These names can only appear if the disassembler correctly
@@ -321,4 +387,59 @@
     (assert (search "ZMM17" text))
     (assert (search "ZMM18" text))
     ;; Ideally we see a decoded instruction, not raw EVEX bytes.
-    (assert (search "VADDPS" text))))
+    (assert (search "VADDPS" text))
+    ;; While development, the decoder was a bit too broad
+    (assert (not (search "VADDPS-MASKED" text)))))
+
+#| tests for evex compressed displacement patch:
+
+   EVEX vector lengths
+   signed negative compressed displacement
+   non-compressible displacement fallback to disp32
+   compressible displacement too large for disp8
+|#
+
+(with-test (:name :evex-compressed-displacement-vector-lengths)
+  (let* ((fun (compile nil
+                       '(lambda ()
+                         (sb-vm::%test-evex-disp-vector-lengths))))
+         (text (with-output-to-string (s)
+                 (disassemble fun :stream s))))
+    (assert (search "VMOVDQU64 XMM0, [RSP+16]" text))
+    (assert (search "VMOVDQU64 YMM1, [RSP+32]" text))
+    (assert (search "VMOVDQU64 ZMM2, [RSP+64]" text))))
+
+(with-test (:name :evex-compressed-displacement)
+  (let* ((fun (compile nil
+                       '(lambda ()
+                         (sb-vm::%test-evex-disp8))))
+         (text (with-output-to-string (s)
+                 (disassemble fun :stream s))))
+    ;; The disassembler must scale EVEX disp8 by 64.
+    (assert (search "VMOVDQU64 ZMM0, [RSP+64]" text))
+    ;; A failure mode is showing the unscaled compressed byte instead:
+    (assert (not (search "[RSP+1]" text)))))
+
+(with-test (:name :evex-compressed-displacement-negative)
+  (let* ((fun (compile nil
+                       '(lambda ()
+                         (sb-vm::%test-evex-disp-negative))))
+         (text (with-output-to-string (s)
+                 (disassemble fun :stream s))))
+    (assert (search "VMOVDQU64 ZMM0, [RSP-64]" text))))
+
+(with-test (:name :evex-compressed-displacement-nonmultiple)
+  (let* ((fun (compile nil
+                       '(lambda ()
+                         (sb-vm::%test-evex-disp-nonmultiple))))
+         (text (with-output-to-string (s)
+                 (disassemble fun :stream s))))
+    (assert (search "VMOVDQU64 ZMM0, [RSP+65]" text))))
+
+(with-test (:name :evex-compressed-displacement-large)
+  (let* ((fun (compile nil
+                       '(lambda ()
+                         (sb-vm::%test-evex-disp-large))))
+         (text (with-output-to-string (s)
+                 (disassemble fun :stream s))))
+    (assert (search "VMOVDQU64 ZMM0, [RSP+8192]" text))))

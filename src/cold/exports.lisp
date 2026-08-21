@@ -3302,6 +3302,7 @@ structure representations")
            "DSTATE-SETPROP"
            "DSTATE-SEGMENT-SAP"
            "DSTATE-OPERANDS"
+           "DSTATE-DISP-N"
            "FIND-INST"
            "GET-CODE-SEGMENTS" "GET-FUN-SEGMENTS"
            "GET-INST-SPACE" "HANDLE-BREAK-ARGS"
