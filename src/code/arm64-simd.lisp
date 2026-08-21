@@ -1595,25 +1595,47 @@
                         ((errors))
 
                         ((tmp unsigned-reg))
+                        ((tmp2 unsigned-reg))
                         ((full-table any-reg t))
+                        ((table any-reg t))
                         ((shift-mask complex-double-reg))
                         ((c-d800 complex-double-reg))
+                        ((c-80 complex-double-reg))
+                        ((c-c0 complex-double-reg))
+                        ((c-80C0 complex-double-reg))
+                        ((powers double-reg))
 
                         ((length1 complex-double-reg t :offset 8))
                         ((length2 complex-double-reg t :offset 9))
                         ((shuf-mask complex-double-reg t :offset 10))
                         ((orr-mask complex-double-reg t :offset 11))
-
-                        ((zeros complex-double-reg))
+                        ((ascii complex-double-reg))
+                        ((powers complex-double-reg))
+                        ((shuf complex-double-reg))
                         ((:label error)))
                ((string any-reg positive-fixnum :from (:argument 0))
                 (byte-array unsigned-reg positive-fixnum :from :load)
                 (last-newline signed-reg signed-num :from :load))
-             (flet ((make-full-table ()
+             (flet ((make-table ()
+                      (let* ((table-size 256)
+                             (table (make-array (* table-size 16) :element-type '(unsigned-byte 8) :initial-element #xFF)))
+                        ;; A table for selecting 1 or 2 byte utf8
+                        ;; indexed by an 8 bit mask each bit with a set bit representing 1-byte characters
+                        (loop for row below table-size
+                              do (loop with dest-index = 0
+                                       for lane below 8
+                                       do
+                                       (cond ((logbitp lane row)
+                                              (setf (aref table (+ (* row 16) dest-index)) (* lane 2))
+                                              (incf dest-index))
+                                             ((setf (aref table (+ (* row 16) dest-index)) (+ 16 (* lane 2)))
+                                              (setf (aref table (+ (* row 16) (1+ dest-index))) (+ 16 1 (* lane 2)))
+                                              (incf dest-index 2)))))
+                        table))
+                    (make-full-table ()
                       (let* ((table-size 256)
                              (row-size (* 16 2))
-                             (table (make-array (* table-size row-size) :element-type '(unsigned-byte 8)
-                                                                        :initial-element 0)))
+                             (table (make-array (* table-size row-size) :element-type '(unsigned-byte 8) :initial-element 0)))
 
                         ;; A table with three masks per entry
                         ;; indexed by 4x2 bits representing the number of utf8 bytes for character - 1
@@ -1651,7 +1673,6 @@
                  (inst movi newlines 10 :16b)
                  (inst movi increment 4 :4s)
                  (inst mvni last-newlines 0 :4s)
-                 (inst movi zeros 0 :4s)
                  (load-inline-constant indexes :oword (concat-ub 32 '(3 2 1 0)))
 
                  (inst b start)
@@ -1663,7 +1684,7 @@
                  (inst orr temp bytes bytes2 :16b)
                  (inst orr temp2 bytes3 bytes4 :16b)
                  (inst orr temp temp temp2 :16b)
-                 (check-ascii temp temp FULL-START :4s)
+                 (check-ascii temp temp 1-2-START :4s)
 
                  (inst uzp1 bytes2 bytes bytes2 :8h)
                  (inst uzp1 bytes4 bytes3 bytes4 :8h)
@@ -1673,12 +1694,10 @@
                  ;; Save the base index of newlines
                  (inst cmeq temp bytes4 newlines :16b)
                  ;; Extend matches to 4s
-                 (inst cmhi f1 temp zeros :4s)
+                 (inst cmeq f1 temp 0 :4s)
                  ;; Save the index of newlines
-                 (inst bit last-newlines indexes f1 :16b)
-
+                 (inst bif last-newlines indexes f1 :16b)
                  (inst add indexes indexes increment :4s)
-
                  (inst add string string 64)
 
                  start
@@ -1687,6 +1706,68 @@
                  (inst b :hi DONE)
                  (inst b ASCII-LOOP)
 
+                 1-2-START
+                 (load-inline-constant table (make-table))
+                 (load-inline-constant powers :oword #x01800140012001100108010401020101)
+                 (inst movi c-c0 #xC0 :16b)
+                 (inst movi c-80 #x80 :8h)
+                 (inst mov c-80C0 c-c0 :16b)
+                 (inst sli c-80C0 c-80 8 :8h)
+                 (inst movi newlines 10 :8h)
+                 (inst movi increment 2 :4s)
+                 (inst zip1 indexes indexes indexes :4s) ;; take the two low words
+                 (assemble ()
+                   1-2-LOOP
+                   (inst ld1 (list bytes bytes2) (@ string) :4s)
+                   ;; Stop if anything is 3-4 bytes in utf8
+                   (inst orr temp bytes bytes2 :4s)
+                   (inst umaxv temp temp :4s)
+                   (inst umov tmp temp 0 :s)
+                   (inst cmp tmp #x800)
+                   (inst b :ge FULL-START)
+
+                   ;; Narrow to 16 bits
+                   (inst uzp1 bytes bytes bytes2 :8h)
+
+                   ;; Track newlines
+                   (inst cmeq temp bytes newlines :8h)
+                   (inst cmeq f1 temp 0 :4s)
+                   (inst bif last-newlines indexes f1 :16b)
+                   (inst add indexes indexes increment :4s)
+
+                   ;; Construct
+                   ;; (logior
+                   ;;  #x80C0
+                   ;;  (dpb (ldb (byte 6 0) bits)
+                   ;;       (byte 8 8)
+                   ;;       (ldb (byte 5 6) bits)))
+                   (inst ushr bytes2 bytes 6 :8h)
+                   (inst sli bytes2 bytes 8 :8h)
+                   (inst bit bytes2 c-80C0 c-c0 :16b)
+
+                   (inst cmhi ascii c-80 bytes :8h)
+
+                   ;; powers has two parts, powers in the low byte, 1 in the high byte.
+                   ;; Adding them up will produce a bit mask in the
+                   ;; low byte and a sum in the high byte.
+                   (inst and ascii powers ascii :8h)
+                   (inst addv ascii ascii :8h)
+                   (inst umov tmp ascii 0 :h)
+
+                   (inst ubfiz tmp2 tmp 4 8) ;; shift the low 8 bits left
+                   (inst ldr shuf (@ table tmp2))
+                   (inst tbl bytes (list bytes bytes2) shuf :16b)
+
+                   (inst str bytes (@ byte-array))
+
+                   (inst add string string 32)
+                   (inst add byte-array byte-array 16)
+                   (inst sub byte-array byte-array (lsr tmp 8))
+
+                   (inst cmp byte-array byte-end)
+                   (inst ccmp string string-end :ls 2)
+                   (inst b :ls 1-2-LOOP)
+                   (inst b DONE))
                  FULL-START
                  (inst add string-end string-end 48) ;; now it reads 16 bytes instead of 64
                  (inst dup indexes indexes :4s 0)
@@ -1744,8 +1825,7 @@
                    ;; Tags are in the form #b1.10, a signed right
                    ;; shift by 1 will create a clear mask.
                    (inst sshr temp orr-mask 1 :16b)
-                   (inst bic bytes bytes temp :16b)
-                   (inst orr bytes bytes orr-mask :16b)
+                   (inst bit bytes orr-mask temp :16b)
 
                    (inst str bytes (@ byte-array 4 :post-index))
 
@@ -2683,7 +2763,7 @@
                        ((ptr unsigned-reg))
                        ((temp complex-double-reg))
                        ((c-80 complex-double-reg))
-                       ((2byte-mask-8h complex-double-reg))
+                       ((2byte-mask complex-double-reg))
                        ((shuf complex-double-reg))
                        ((ascii complex-double-reg))
                        ((powers double-reg))
@@ -2704,7 +2784,7 @@
                (char-index unsigned-reg positive-fixnum :from :load))
             (inst movi c-80 #x80 :8h)
             (move string string*)
-            (load-inline-constant 2byte-mask-8h :oword #x80C080C080C080C080C080C080C080C0)
+            (load-inline-constant 2byte-mask :oword #x80C080C080C080C080C080C080C080C0)
             (load-inline-constant powers :qword (concat-ub 8 '(128 64 32 16 8 4 2 1)))
             (flet ((make-table ()
                      (let* ((table-size 256)
@@ -2801,7 +2881,7 @@
                          (inst ushr bytes2 bytes 6 h-size)
                          (inst sli bytes2 bytes 8 h-size)
                          (inst bic bytes2 #xC000 h-size)
-                         (inst orr bytes2 bytes2 2byte-mask-8h h-size)
+                         (inst orr bytes2 bytes2 2byte-mask h-size)
 
                          (inst cmhi ascii c-80 bytes h-size)
 

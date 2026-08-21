@@ -1095,6 +1095,16 @@
 
 (define-instruction-macro sxtb (rd rn)
   `(inst sbfm ,rd ,rn 0 7))
+
+(define-instruction-macro ubfiz (rd rn lsb width)
+  `(let ((rd ,rd))
+     (inst ubfm rd ,rn (let ((lsb (- ,lsb)))
+                         (sc-case rd
+                           (32-bit-reg
+                            (mod lsb 32))
+                           (t
+                            (mod lsb 64))))
+           (1- ,width))))
 ;;;
 
 (def-emitter extract
