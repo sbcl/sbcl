@@ -156,13 +156,23 @@
     (inst vmovd dst tmp)
     (ecase size
       (8
+       (check-type value (unsigned-byte 8))
        (inst vpbroadcastb dst dst))
       (16
+       (check-type value (unsigned-byte 16))
        (inst vpbroadcastw dst dst))
       (32
+       (check-type value (unsigned-byte 32))
        (inst vpbroadcastd dst dst))))
 
+  (defun inline-const (value &optional (size :sse))
+    (when (>= value (expt 2 128))
+      (setf size :avx2))
+    (register-inline-constant size value))
+
   (defun mov-const (dst value &optional (size :sse))
+    (when (>= value (expt 2 128))
+      (setf size :avx2))
     (let ((c (register-inline-constant size value)))
       (ecase size
         (:sse
@@ -171,7 +181,7 @@
          (inst vmovdqu dst c)))))
 
   (defun lea-const (dst value)
-    (inst lea dst (register-inline-constant value))))
+    (inst lea dst (register-inline-constant (coerce value '(vector (unsigned-byte 8)))))))
 
 (def-variant simd-nreverse8 :avx2 (result vector start end)
   (declare (optimize speed (safety 0)))
@@ -189,7 +199,7 @@
                  ((vl-xmm))
                  ((vr-xmm)))
         ()
-      (let ((reverse-mask-c (register-inline-constant :avx2 (concat-ub 8 (loop for i below 32 collect i)))))
+      (let ((reverse-mask-c (inline-const (concat-ub 8 (loop for i below 32 collect i)))))
         (assemble ()
           (inst shr end 1)
           (inst shr start 1)
@@ -228,12 +238,11 @@
           (inst vmovdqu reverse-mask-xmm reverse-mask-c)
           (inst vmovdqu vl-xmm (ea left))
           (inst vmovdqu vr-xmm (ea right))
-          (inst vpshufb vl-xmm vl-xmm reverse-mask-c)
-          (inst vpshufb vr-xmm vr-xmm reverse-mask-c)
+          (inst vpshufb vl-xmm vl-xmm reverse-mask-xmm)
+          (inst vpshufb vr-xmm vr-xmm reverse-mask-xmm)
           (inst vmovdqu (ea left) vr-xmm)
           (inst vmovdqu (ea right) vl-xmm)
           (inst add left 16)
-
 
           (inst mov l right)
           (inst sub l left)
@@ -341,8 +350,7 @@
       (inst jmp :b XMM)
       (inst sub right 32)
 
-      (inst vmovdqu reverse-mask (register-inline-constant :avx2
-                                                           (concat-ub 32 (loop for i to 7 collect i))))
+      (mov-const reverse-mask (concat-ub 32 (loop for i to 7 collect i)))
       LOOP
       (inst vmovdqu vl (ea left))
       (inst vmovdqu vr (ea right))
@@ -457,10 +465,9 @@
                  ((g))
                  ((v int-avx2-reg))
                  ((reverse-mask))
-                 ((reverse-mask-xmm int-sse-reg))
                  ((v-xmm)))
         ()
-      (let ((reverse-mask-c (register-inline-constant :avx2 (concat-ub 8 (loop for i below 32 collect i)))))
+      (let ((reverse-mask-c (inline-const (concat-ub 8 (loop for i below 32 collect i)))))
         (assemble ()
           (inst shr start 1)
           (inst add source start)
@@ -488,7 +495,6 @@
           (inst jmp :b WORD)
 
           (inst sub s-i 16)
-          (inst vmovdqu reverse-mask-xmm reverse-mask-c)
           (inst vmovdqu v-xmm (ea source s-i))
           (inst vpshufb v-xmm v-xmm reverse-mask-c)
           (inst vmovdqu (ea target t-i) v-xmm)
@@ -580,8 +586,7 @@
       (inst jmp :b XMM)
       (inst sub s-i 32)
 
-      (inst vmovdqu reverse-mask (register-inline-constant :avx2
-                                                           (concat-ub 32 (loop for i to 7 collect i))))
+      (mov-const reverse-mask (concat-ub 32 (loop for i to 7 collect i)))
       LOOP
       (inst vmovdqu v (ea source s-i))
       (inst vpermd v reverse-mask v)
@@ -830,18 +835,16 @@
 
             START-1-2
             (broadcast c-c0 #xC0 8 tmp)
-            (lea-const table
-                       (let ((table (make-array (* #b10101011 16) :element-type '(unsigned-byte 8) :initial-element #xFF)))
-                         (loop for row to #b10101010 ;; highest possible inverted index for compressing 1/2 bytes
-                               do (loop with indexes = (loop for i below 8
-                                                             unless (logbitp i row)
-                                                             collect (* i 2) and collect (1+ (* i 2)))
-                                        for column below 16
-                                        for index = (pop indexes)
-                                        when index
-                                        do (setf (aref table (+ (* row 16) column)) index)))
-                         table))
-
+            (lea-const table (let ((table (make-array (* #b10101011 16) :initial-element #xFF)))
+                               (loop for row to #b10101010 ;; highest possible inverted index for compressing 1/2 bytes
+                                     do (loop with indexes = (loop for i below 8
+                                                                   unless (logbitp i row)
+                                                                   collect (* i 2) and collect (1+ (* i 2)))
+                                              for column below 16
+                                              for index = (pop indexes)
+                                              when index
+                                              do (setf (aref table (+ (* row 16) column)) index)))
+                               table))
             ;; 1/2 bytes
             (let ((c-df c-0f)
                   (next tbl1)
@@ -856,16 +859,13 @@
               (broadcast c-bf #xBF 16 tmp)
               (broadcast c-df #XDF 8 tmp)
               (broadcast c-41 #x41 8 tmp)
-
               (assemble ()
                 1-2-LOOP
-
                 (inst vmovq bytes (ea byte-array))
                 ;; Check for 3 or 4 bytes
                 (progn
                   ;; Use SWAR in GPR to free up the SIMD pipeline
                   (inst mov produced (ea byte-array))
-
                   ;; Find any byte with all high 3 bits set
                   (inst mov tmp produced)
                   (inst shl tmp 1)
@@ -891,7 +891,7 @@
                   (inst vpcmpgtb temp4 c-c0 next) ;; continuations
 
                   ;; Flip the high bit for unsigned comparisons
-                  (inst vpxor temp2 bytes (register-inline-constant :sse #x80808080808080808080808080808080))
+                  (inst vpxor temp2 bytes (inline-const #x80808080808080808080808080808080))
 
                   ;; 2 byte leads (41 is C1 without the high bit)
                   (inst vpcmpgtb temp3 temp2 c-41)
@@ -901,7 +901,7 @@
                   (inst vpxor temp4 temp4 temp3) ;; error 1
 
                   ;; Find #xC0 or #xC1, which are overlong
-                  (inst vpcmpgtb temp2 temp2 (register-inline-constant :sse #x3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F))
+                  (inst vpcmpgtb temp2 temp2 (inline-const #x3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F3F))
                   (inst vpandn temp2 temp3 temp2)
 
                   (inst vpor temp4 temp4 temp2) ;; Combine errors
@@ -925,7 +925,7 @@
                   ;; Interleave next and bytes into 16-bit words
                   (inst vpunpcklbw temp4 next bytes)
                   ;; Shift the high byte left by 6 and add it to the low byte
-                  (inst vpmaddubsw temp4 temp4 (register-inline-constant :sse #x40014001400140014001400140014001))
+                  (inst vpmaddubsw temp4 temp4 (inline-const #x40014001400140014001400140014001))
                   ;; Remove tags
                   (inst vpsubw temp4 temp4 c-3080))
 
@@ -964,34 +964,28 @@
             (inst add string-end 32) ;; now it writes 32 bytes instead of 64
 
             (broadcast c-0f #x0F 8 tmp)
-
             (mov-const tbl1 #x38060001000000000000000000000000)
             (mov-const tbl2 #x2020242020202020202020100000010B)
             (mov-const tbl3 #x202020203535332B2020202020202020)
             (mov-const tbl4 #x03020101000000000000000000000000)
             (mov-const tag-clear #x070F1F1F3F3F3F3F7F7F7F7F7F7F7F7F)
-
             (inst vpxor prev prev prev)
             (inst vpxor prev-len prev-len prev-len)
-
-            (lea-const table
-                       (coerce (loop for index below (ash 1 10)
-                                     for low-index = (ldb (byte 8 0) index)
-                                     for tmp = (ldb (byte 2 8) index)
-                                     append (let ((starts (loop for i to 7
-                                                                when (logbitp i low-index)
-                                                                collect i)))
-                                              (loop for lane below 8
-                                                    for start = (pop starts)
-                                                    for next = (car starts)
-                                                    for sources = (when start
-                                                                    (loop for i from (1- (or next (+ tmp 8))) downto start
-                                                                          collect i))
-                                                    append (loop for byte below 4
-                                                                 collect (or (pop sources) #xFF)))))
-                               '(vector (unsigned-byte 8))))
-
             (zeroize tmp)
+            (lea-const table (loop for index below (ash 1 10)
+                                   for low-index = (ldb (byte 8 0) index)
+                                   for tmp = (ldb (byte 2 8) index)
+                                   append (let ((starts (loop for i to 7
+                                                              when (logbitp i low-index)
+                                                              collect i)))
+                                            (loop for lane below 8
+                                                  for start = (pop starts)
+                                                  for next = (car starts)
+                                                  for sources = (when start
+                                                                  (loop for i from (1- (or next (+ tmp 8))) downto start
+                                                                        collect i))
+                                                  append (loop for byte below 4
+                                                               collect (or (pop sources) #xFF))))))
             FULL-LOOP
             (flet ((validate ()
                      (assemble ()
@@ -1019,9 +1013,9 @@
                        (inst vpalignr temp3 len prev-len 14)
                        (inst vpalignr temp len prev-len 15)
 
-                       (inst vpcmpgtb temp temp (register-inline-constant :sse 0))
-                       (inst vpcmpgtb temp3 temp3 (register-inline-constant :sse #x01010101010101010101010101010101))
-                       (inst vpcmpgtb temp4 temp4 (register-inline-constant :sse #x02020202020202020202020202020202))
+                       (inst vpcmpgtb temp temp (inline-const 0))
+                       (inst vpcmpgtb temp3 temp3 (inline-const #x01010101010101010101010101010101))
+                       (inst vpcmpgtb temp4 temp4 (inline-const #x02020202020202020202020202020202))
 
                        (inst vpor temp temp temp3)
                        (inst vpor temp temp temp4)
@@ -1077,8 +1071,8 @@
 
                   ;; Perform
                   ;; A + B<<6 + C<<12 + D<<18
-                  (inst vpmaddubsw temp2 bytes (register-inline-constant :avx2 (concat-ub 32 (loop repeat 8 collect #x40014001))))
-                  (inst vpmaddwd bytes temp2 (register-inline-constant :avx2 (concat-ub 32 (loop repeat 8 collect #x10000001))))
+                  (inst vpmaddubsw temp2 bytes (inline-const (concat-ub 32 (loop repeat 8 collect #x40014001))))
+                  (inst vpmaddwd bytes temp2 (inline-const (concat-ub 32 (loop repeat 8 collect #x10000001))))
 
                   (inst vmovdqu (ea string) bytes))
 
@@ -1088,7 +1082,17 @@
             (inst jmp :a DONE-FULL)
             (inst cmp string string-end)
             (inst jmp :a DONE-FULL)
+            #+nil
+            (progn
+              (inst mov produced (ea byte-array))
+              (inst mov tmp produced)
+              (inst shl tmp 1)
+              (inst and tmp produced)
 
+              (inst shl tmp 1)
+              (inst and tmp produced)
+              (inst test tmp (constantize #x8080808080808080))
+              (inst jmp :z START-1-2))
             (inst jmp FULL-LOOP)
             DONE-FULL
             (inst shr :dword tmp 8)
@@ -1321,8 +1325,8 @@
                            ((shuffle-mask2 complex-double-reg)))
                   ((new-head unsigned-reg positive-fixnum :from :load)
                    (copied unsigned-reg positive-fixnum :from :load))
-                (inst movdqa cr-mask (register-inline-constant :sse (concat-ub 8 (loop repeat 16 collect #x0D))))
-                (inst movdqa lf-mask (register-inline-constant :sse (concat-ub 8 (loop repeat 16 collect #x0A))))
+                (inst movdqa cr-mask (inline-const (concat-ub 8 (loop repeat 16 collect #x0D))))
+                (inst movdqa lf-mask (inline-const (concat-ub 8 (loop repeat 16 collect #x0A))))
                 (inst lea byte-array (ea head byte-array*))
                 (inst add end byte-array)
 
@@ -1429,8 +1433,8 @@
                            ((zero int-sse-reg)))
                   ((new-head unsigned-reg positive-fixnum :from :load)
                    (copied unsigned-reg positive-fixnum :from :load))
-                (inst movdqa cr-mask (register-inline-constant :sse (concat-ub 8 (loop repeat 16 collect #x0D))))
-                (inst movdqa lf-mask (register-inline-constant :sse (concat-ub 8 (loop repeat 16 collect #x0A))))
+                (inst movdqa cr-mask (inline-const (concat-ub 8 (loop repeat 16 collect #x0D))))
+                (inst movdqa lf-mask (inline-const (concat-ub 8 (loop repeat 16 collect #x0A))))
 
                 (inst pxor zero zero)
                 (inst lea byte-array (ea head byte-array*))
@@ -1545,17 +1549,10 @@
               ((byte-array unsigned-reg unsigned-num :from :load)
                (last-newline signed-reg signed-num))
 
-            (inst movdqa ascii-mask (register-inline-constant :sse
-                                                              (concat-ub 32 (loop repeat 4
-                                                                                  collect 127))))
-            (inst movdqa newlines (register-inline-constant :sse
-                                                            (concat-ub 32 (loop repeat 4
-                                                                                collect 10))))
-            (inst movdqa increment (register-inline-constant :sse
-                                                             (concat-ub 32 (loop repeat 4
-                                                                                 collect 4))))
-            (inst movdqa indexes (register-inline-constant :sse
-                                                           (concat-ub 32 '(3 2 1 0))))
+            (inst movdqa ascii-mask (inline-const (concat-ub 32 (loop repeat 4 collect 127))))
+            (inst movdqa newlines (inline-const (concat-ub 32 (loop repeat 4 collect 10))))
+            (inst movdqa increment (inline-const (concat-ub 32 (loop repeat 4 collect 4))))
+            (inst movdqa indexes (inline-const (concat-ub 32 '(3 2 1 0))))
             (inst pcmpeqb last-newlines last-newlines) ;; #xFF....
 
             (inst add byte-array* tail)
@@ -1709,7 +1706,7 @@
                           (inst lea last-newline (ea string tmp 4))
                           no-nl)))
                  (assemble ()
-                   (inst vmovdqu newlines (register-inline-constant :sse
+                   (inst vmovdqu newlines (inline-const
                                                                     (concat-ub 8 (loop repeat 16
                                                                                        collect 10))))
                    (inst mov last-newline (fixnumize -1))
@@ -1754,25 +1751,14 @@
 
                    FULL-START
                    (inst add string-end 48) ;; now it reads 16 bytes instead of 64
-                   (inst lea full-table (register-inline-constant (make-full-table)))
 
-                   (inst mov tmp #xFFFF)
-                   (inst vmovd temp tmp)
-                   (inst vpbroadcastd c-ffff temp)
-
-                   (inst mov tmp #x7f)
-                   (inst vmovd temp tmp)
-                   (inst vpbroadcastd c-7f temp)
-
-                   (inst mov tmp #x7ff)
-                   (inst vmovd temp tmp)
-                   (inst vpbroadcastd c-7ff temp)
-
+                   (lea-const full-table (make-full-table))
+                   (broadcast c-ffff #xFFFF 32 tmp)
+                   (broadcast c-7ff #x7ff 32 tmp)
+                   (broadcast c-7f #x7f 32 tmp)
                    (inst vpmovzxbd newlines newlines)
-
                    (inst vpcmpeqd errors errors errors) ;; FF..FF
-                   (inst vmovdqa c-d800 (register-inline-constant
-                                         :sse (concat-ub 32 (loop repeat 4 collect #xd800))))
+                   (mov-const c-d800 (concat-ub 32 (loop repeat 4 collect #xd800)))
 
                    FULL-LOOP
                    (let ((t1 (reg-in-sc bytes2 'complex-double-reg))
@@ -1802,7 +1788,7 @@
                      (inst vmovq tmp temp2)
 
                      ;; Create a tag mask from lengths
-                     (inst vpermd temp2 temp (register-inline-constant :oword #xF0808080F0E08080F080C080F0808000))
+                     (inst vpermd temp2 temp (inline-const #xF0808080F0E08080F080C080F0808000))
 
                      ;; Multiplying by 1 + 2^6 + 2^12 + 2^18
                      ;; shifts two bits per byte into the upper byte.
@@ -1818,16 +1804,16 @@
                      ;; t1 has a mask for bytes > 127, choose between #x7f and #x3f based on that.
                      ;; An ascii character doesn't need to clear anything,
                      ;; so this either clears nothing or clears ~3f bits.
-                     (inst vpand t1 t1 (register-inline-constant :oword #xFFFFFFC0FFFFFFC0FFFFFFC0FFFFFFC0))
+                     (inst vpand t1 t1 (inline-const #xFFFFFFC0FFFFFFC0FFFFFFC0FFFFFFC0))
                      (inst vpandn temp t1 bytes)
 
                      (inst vpslld t1 bytes 6)
                      (inst vpslld t2 bytes 4)
                      (inst vpslld t3 bytes 2)
 
-                     (inst vpand t1 t1 (register-inline-constant :oword #x07000000070000000700000007000000))
-                     (inst vpand t2 t2 (register-inline-constant :oword #x003F0000003F0000003F0000003F0000))
-                     (inst vpand t3 t3 (register-inline-constant :oword #x00003F0000003F0000003F0000003F00))
+                     (inst vpand t1 t1 (inline-const #x07000000070000000700000007000000))
+                     (inst vpand t2 t2 (inline-const #x003F0000003F0000003F0000003F0000))
+                     (inst vpand t3 t3 (inline-const #x00003F0000003F0000003F0000003F00))
 
                      (inst vpor t2 t2 t3)
                      (inst vpor bytes temp t1)
@@ -1856,9 +1842,9 @@
                    DONE-FULL
                    ;; Do an unsigned comparison with #x7FF
                    (inst vpxor t2 errors
-                         (register-inline-constant :sse (concat-ub 32 (loop repeat 4 collect #x80000000)))) ;; flip the sign bit
+                         (inline-const (concat-ub 32 (loop repeat 4 collect #x80000000)))) ;; flip the sign bit
                    (inst vpcmpgtd t2 t2
-                         (register-inline-constant :sse (concat-ub 32 (loop repeat 4 collect #x800007FF))))
+                         (inline-const (concat-ub 32 (loop repeat 4 collect #x800007FF))))
 
                    (inst vmovmskps tmp t2)
                    (inst cmp :dword tmp #xF)
@@ -2481,9 +2467,7 @@
                (inst test :dword tmp tmp)
                (inst jmp :z VALIDATED)
 
-               (inst vpsubusb tmp2 tmp2 (register-inline-constant
-                                         :avx2
-                                         #xDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDF))
+               (inst vpsubusb tmp2 tmp2 (inline-const #xDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDF))
                (inst vptest tmp2 tmp2)
                (inst jmp :nz full)
 
@@ -2492,9 +2476,7 @@
 
                (inst vpcmpgtb tmp3 mask-c0 current) ;; continuations
                ;; 2-byte leading bytes
-               (inst vpcmpgtb tmp4 current (register-inline-constant
-                                            :avx2
-                                            #xC1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1))
+               (inst vpcmpgtb tmp4 current (inline-const #xC1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1))
                (inst vpand tmp4 tmp4 tmp2) ;; it's a signed comparison, remove ascii
 
                ;; Find #xC0 or #xC1, which are overlong
@@ -2580,11 +2562,10 @@
         (inst mov byte-length bytes)
         (inst sub byte-length ptr)
 
-        (inst vmovdqu tmp2 (register-inline-constant :avx2 #x1F1E1D1C1B1A191817161514131211100F0E0D0C0B0A09080706050403020100))
 
         (inst vmovq tmp1 byte-length)
         (inst vpbroadcastb tmp1 tmp1)
-        (inst vpcmpgtb tmp1 tmp1 tmp2)
+        (inst vpcmpgtb tmp1 tmp1 (inline-const #x1F1E1D1C1B1A191817161514131211100F0E0D0C0B0A09080706050403020100))
 
         ;; Replace the aligned bits with ones, avoiding null termination
         (inst vmovdqa current (ea ptr))
@@ -2626,26 +2607,12 @@
         (zeroize total-conts)
         (inst vpxor total-conts-vec total-conts-vec total-conts-vec)
 
-        (inst vmovdqu tbl1 (register-inline-constant
-                            :avx2
-                            #x3806000100000000000000000000000038060001000000000000000000000000))
-        (inst vmovdqu tbl2 (register-inline-constant
-                            :avx2
-                            #x2020242020202020202020100000010B2020242020202020202020100000010B))
-        (inst vmovdqu tbl3 (register-inline-constant
-                            :avx2
-                            #x202020203535332B2020202020202020202020203535332B2020202020202020))
-        (inst vmovdqu tbl4 (register-inline-constant
-                            :avx2
-                            #x0302010100000000000000000000000003020101000000000000000000000000))
-
-        (inst vmovdqu mask-0f (register-inline-constant
-                               :avx2
-                               #x0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F0F))
-        (inst vmovdqu mask-c0 (register-inline-constant
-                               :avx2
-                               #xC0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0))
-
+        (mov-const tbl1 #x3806000100000000000000000000000038060001000000000000000000000000)
+        (mov-const tbl2 #x2020242020202020202020100000010B2020242020202020202020100000010B)
+        (mov-const tbl3 #x202020203535332B2020202020202020202020203535332B2020202020202020)
+        (mov-const tbl4 #x0302010100000000000000000000000003020101000000000000000000000000)
+        (broadcast mask-0f #x0F 8 tmp)
+        (broadcast mask-c0 #xC0 8 tmp)
         (inst vpxor errors errors errors)
         (inst vpxor prev prev prev)
         (inst vpxor prev-len prev-len prev-len)
@@ -2670,13 +2637,10 @@
         TAIL
         (inst bsf :dword tmp tmp)
 
-        (inst vmovdqu tmp3 (register-inline-constant
-                            :avx2
-                            #x1F1E1D1C1B1A191817161514131211100F0E0D0C0B0A09080706050403020100))
         (inst vmovq tmp2 tmp)
         (inst vpbroadcastb tmp2 tmp2)
 
-        (inst vpcmpgtb tmp1 tmp2 tmp3)
+        (inst vpcmpgtb tmp1 tmp2 (inline-const #x1F1E1D1C1B1A191817161514131211100F0E0D0C0B0A09080706050403020100))
         (inst vpand current current tmp1)
 
         (inst add ptr tmp)
@@ -2740,8 +2704,7 @@
       (inst mov chars-left length)
       (inst shr chars-left n-fixnum-tag-bits)
 
-      (inst vmovdqa c-7f (register-inline-constant
-                          :sse (concat-ub 32 (loop repeat 4 collect #x7F))))
+      (mov-const c-7f (concat-ub 32 (loop repeat 4 collect #x7F)))
 
       ASCII-LOOP
       (inst vmovdqa current (ea ptr))
@@ -2758,16 +2721,11 @@
       NON-ASCII
       (inst mov res null-tn)
       (inst mov all-ascii null-tn)
-
       (inst vpxor extra-len extra-len extra-len)
       (inst vpcmpeqd errors errors errors)
-
-      (inst vmovdqa c-7ff (register-inline-constant
-                           :sse (concat-ub 32 (loop repeat 4 collect #x7FF))))
-      (inst vmovdqa c-ffff (register-inline-constant
-                            :sse (concat-ub 32 (loop repeat 4 collect #xFFFF))))
-      (inst vmovdqa c-d800 (register-inline-constant
-                            :sse (concat-ub 32 (loop repeat 4 collect #xd800))))
+      (mov-const c-7ff (concat-ub 32 (loop repeat 4 collect #x7FF)))
+      (mov-const c-ffff (concat-ub 32 (loop repeat 4 collect #xFFFF)))
+      (mov-const c-d800 (concat-ub 32 (loop repeat 4 collect #xd800)))
 
       (inst jmp START)
 
@@ -2801,10 +2759,8 @@
 
       EXIT
       ;; Do an unsigned comparison with #x7FF
-      (inst vpxor tmp1 errors
-            (register-inline-constant :sse (concat-ub 32 (loop repeat 4 collect #x80000000)))) ;; flip the sign bit
-      (inst vpcmpgtd tmp1 tmp1
-            (register-inline-constant :sse (concat-ub 32 (loop repeat 4 collect #x800007FF))))
+      (inst vpxor tmp1 errors (inline-const (concat-ub 32 (loop repeat 4 collect #x80000000)))) ;; flip the sign bit
+      (inst vpcmpgtd tmp1 tmp1 (inline-const (concat-ub 32 (loop repeat 4 collect #x800007FF))))
 
       (inst vmovmskps tmp tmp1)
       (inst cmp :dword tmp #xF)
@@ -2858,43 +2814,28 @@
                      ((tag-clear complex-double-reg t)))
             ((byte-index unsigned-reg positive-fixnum :from :load)
              (char-index unsigned-reg positive-fixnum :from :load))
-
           (assemble ()
             (move byte-array byte-array*)
-            (inst lea table
-                  (register-inline-constant
-                   (let ((table (make-array (* #b10101011 16) :element-type '(unsigned-byte 8)
-                                                              :initial-element #xFF)))
-                     (loop for row to #b10101010 ;; highest possible inverted index for compressing 1/2 bytes
-                           do (loop with indexes = (loop for i below 8
-                                                         unless (logbitp i row)
-                                                         collect (* i 2)
-                                                         and
-                                                         collect (1+ (* i 2)))
-                                    for column below 16
-                                    for index = (pop indexes)
-                                    when index
-                                    do
-                                    (setf (aref table (+ (* row 16) column)) index)))
-                     table)))
-            (inst mov tmp #xC0)
-            (inst vmovd x2 tmp)
-            (inst vpbroadcastb c-c0 x2)
-
-            (inst mov tmp #xDF)
-            (inst vmovd x2 tmp)
-            (inst vpbroadcastb c-df x2)
-
-            (inst mov tmp #x3080)
-            (inst vmovd x2 tmp)
-            (inst vpbroadcastw c-3080 x2)
-
-            (inst mov tmp #xBF)
-            (inst vmovd x2 tmp)
-            (inst vpbroadcastw c-bf x2)
+            (lea-const table
+                       (let ((table (make-array (* #b10101011 16) :initial-element #xFF)))
+                         (loop for row to #b10101010 ;; highest possible inverted index for compressing 1/2 bytes
+                               do (loop with indexes = (loop for i below 8
+                                                             unless (logbitp i row)
+                                                             collect (* i 2)
+                                                             and
+                                                             collect (1+ (* i 2)))
+                                        for column below 16
+                                        for index = (pop indexes)
+                                        when index
+                                        do
+                                        (setf (aref table (+ (* row 16) column)) index)))
+                         table))
+            (broadcast c-c0 #xC0 8 tmp)
+            (broadcast c-df #xDF 8 tmp)
+            (broadcast c-3080 #x3080 16 tmp)
+            (broadcast c-bf #xBF 16 tmp)
             (zeroize byte-index)
             (zeroize char-index)
-
             (flet ((convert-1-2 (full)
                      (assemble ()
                        LOOP
@@ -2953,40 +2894,26 @@
                        (inst jmp LOOP))))
               (assemble ()
                 (convert-1-2 START-FULL)
-
                 START-FULL
-
-                (inst mov tmp2 #x4001)
-                (inst vmovd c-4001 tmp2)
-                (inst vpbroadcastw c-4001 c-4001)
-
-                (inst mov tmp2 #x0F)
-                (inst vmovd c-0f tmp2)
-                (inst vpbroadcastb c-0f c-0f)
-
-                (inst mov tmp2 #x10000001)
-                (inst vmovd c-10000001 tmp2)
-                (inst vpbroadcastd c-10000001 c-10000001)
-
-                (inst lea full-table
-                      (register-inline-constant
-                       (coerce (loop for index below (ash 1 10)
-                                     for low-index = (ldb (byte 8 0) index)
-                                     for tmp2 = (ldb (byte 2 8) index)
-                                     append (let ((starts (loop for i to 7
-                                                                when (logbitp i low-index)
-                                                                collect i)))
-                                              (loop for lane below 8
-                                                    for start = (pop starts)
-                                                    for next = (car starts)
-                                                    for sources = (when start
-                                                                    (loop for i from (1- (or next (+ tmp2 8))) downto start
-                                                                          collect i))
-                                                    append (loop for byte below 4
-                                                                 collect (or (pop sources) #xFF)))))
-                               '(vector (unsigned-byte 8)))))
-                (inst vmovdqa tag-clear (register-inline-constant
-                                         :sse #x070F1F1F3F3F3F3F7F7F7F7F7F7F7F7F))
+                (broadcast c-4001 #x4001 16 tmp)
+                (broadcast c-0f #x0F 8 tmp)
+                (broadcast c-10000001 #x10000001 32 tmp)
+                (mov-const tag-clear #x070F1F1F3F3F3F3F7F7F7F7F7F7F7F7F)
+                (lea-const full-table
+                           (loop for index below (ash 1 10)
+                                 for low-index = (ldb (byte 8 0) index)
+                                 for tmp2 = (ldb (byte 2 8) index)
+                                 append (let ((starts (loop for i to 7
+                                                            when (logbitp i low-index)
+                                                            collect i)))
+                                          (loop for lane below 8
+                                                for start = (pop starts)
+                                                for next = (car starts)
+                                                for sources = (when start
+                                                                (loop for i from (1- (or next (+ tmp2 8))) downto start
+                                                                      collect i))
+                                                append (loop for byte below 4
+                                                             collect (or (pop sources) #xFF))))))
 
                 FULL-LOOP
                 (move tmp byte-array-length)
@@ -3136,9 +3063,7 @@
               ((byte-index unsigned-reg positive-fixnum :from :load)
                (char-index unsigned-reg positive-fixnum :from :load))
 
-            (inst lea table (register-inline-constant
-                             (let ((table (make-array (* 256 16) :element-type '(unsigned-byte 8)
-                                                                 :initial-element #xFF)))
+            (lea-const table (let ((table (make-array (* 256 16) :initial-element #xFF)))
                                (loop for row below 256
                                      do (loop with indexes = (loop for i below 8
                                                                    collect (* i 2)
@@ -3149,30 +3074,16 @@
                                               when index
                                               do
                                               (setf (aref table (+ (* row 16) column)) index)))
-                               table)))
-            (inst mov tmp #x3F)
-            (inst vmovd temp tmp)
-            (inst vpbroadcastw c-3f temp)
-
-            (inst mov tmp #b1000000011000000)
-            (inst vmovd temp tmp)
-            (inst vpbroadcastw utf8-mask temp)
-
-            (inst mov tmp #x80)
-            (inst vmovd temp tmp)
-            (inst vpbroadcastw c-80 temp)
-
-            (inst mov tmp #x7ff)
-            (inst vmovd temp tmp)
-            (inst vpbroadcastd c-7ff temp)
-
+                               table))
+            (broadcast c-3f #x3F 16 tmp)
+            (broadcast c-80 #x80 16 tmp)
+            (broadcast c-7ff #x7ff 32 tmp)
+            (broadcast utf8-mask #b1000000011000000 16 tmp)
             (inst vpxor zero zero zero)
-
             (flet ((make-full-table ()
                      (let* ((table-size 256)
                             (row-size 64)
-                            (table (make-array (* table-size row-size) :element-type '(unsigned-byte 8)
-                                                                       :initial-element 0)))
+                            (table (make-array (* table-size row-size) :initial-element 0)))
                        (loop for row below table-size
                              for dest-index = 0
                              do (loop
@@ -3199,7 +3110,6 @@
                                          (setf (aref table (+ (* row row-size) 32 i)) 0))
                                 (setf (aref table (+ (* row row-size) 48)) dest-index))
                        table))
-
                    (convert (size full)
                      (inst cmp byte-array-length (/ size 2))
                      (inst jmp :l DONE)
@@ -3288,10 +3198,10 @@
                        (inst vpslld t2 bytes 4)
                        (inst vpslld t3 bytes 2)
 
-                       (inst vpand t1 t1 (register-inline-constant :oword #xFF000000FF000000FF000000FF000000))
-                       (inst vpand t2 t2 (register-inline-constant :oword #x00FF000000FF000000FF000000FF0000))
-                       (inst vpand t3 t3 (register-inline-constant :oword #x0000FF000000FF000000FF000000FF00))
-                       (inst vpand bytes bytes (register-inline-constant :oword #x000000FF000000FF000000FF000000FF))
+                       (inst vpand t1 t1 (inline-const #xFF000000FF000000FF000000FF000000))
+                       (inst vpand t2 t2 (inline-const #x00FF000000FF000000FF000000FF0000))
+                       (inst vpand t3 t3 (inline-const #x0000FF000000FF000000FF000000FF00))
+                       (inst vpand bytes bytes (inline-const #x000000FF000000FF000000FF000000FF))
 
                        (inst vpor t2 t2 t3)
                        (inst vpor bytes bytes t1)
@@ -3329,18 +3239,10 @@
                 (inst jmp DONE)
 
                 START-FULL-LENGTH
-                (inst lea full-table (register-inline-constant (make-full-table)))
-
-                (inst mov tmp #xFFFF)
-                (inst vmovd temp tmp)
-                (inst vpbroadcastd c-ffff temp)
-
-                (inst mov tmp #x7f)
-                (inst vmovd temp tmp)
-                (inst vpbroadcastd c-7f temp)
+                (lea-const full-table (make-full-table))
+                (broadcast c-ffff #xFFFF 32 tmp)
+                (broadcast c-7f #x7f 32 tmp)
                 (inst mov multiplier #x0100040010004000)
-
-
                 FULL-LENGTH
                 (convert-full)
 
