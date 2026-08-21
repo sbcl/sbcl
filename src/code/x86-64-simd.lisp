@@ -800,8 +800,7 @@
             (inst lea byte-array (ea byte-array* byte-start))
             (inst lea byte-end (ea -16 byte-end byte-array*))
 
-            (inst lea string-end (ea -64
-                                     string* string-end (ash 1 (- 2 n-fixnum-tag-bits))))
+            (inst lea string-end (ea -64 string* string-end (ash 1 (- 2 n-fixnum-tag-bits))))
             (inst lea string (ea string* string-start (ash 1 (- 2 n-fixnum-tag-bits))))
 
             (inst jmp start)
@@ -834,6 +833,7 @@
             (inst jmp LOOP)
 
             START-1-2
+            (inst add string-end 32) ;; now it writes 32 bytes instead of 64
             (broadcast c-c0 #xC0 8 tmp)
             (lea-const table (let ((table (make-array (* #b10101011 16) :initial-element #xFF)))
                                (loop for row to #b10101010 ;; highest possible inverted index for compressing 1/2 bytes
@@ -960,8 +960,6 @@
                 (inst inc byte-array)
                 (inst jmp done)))
             FULL-START
-
-            (inst add string-end 32) ;; now it writes 32 bytes instead of 64
 
             (broadcast c-0f #x0F 8 tmp)
             (mov-const tbl1 #x38060001000000000000000000000000)
