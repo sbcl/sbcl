@@ -2645,3 +2645,16 @@
       (sb-int:dx-let ((a (list a b)))
         (stack-allocated-p (reverse a))))
    ((1 2) nil)))
+
+(with-test (:name :dynamic-extent-assignment-lambda)
+  (checked-compile-and-assert
+   ()
+   '(lambda (x y z)
+     (let ((f (lambda (values)
+                (declare (dynamic-extent values))
+                (declare (ignore values)))))
+       (if z
+           (funcall f (cons x y))
+           (funcall f (cons y x)))))
+   ((1 2 t) nil)
+   ((3 2 nil) nil)))

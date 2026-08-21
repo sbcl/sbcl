@@ -1650,7 +1650,10 @@
                  (:constructor make-bind ()))
   ;; the lambda we are binding variables for. Null when we are
   ;; creating the LAMBDA during IR1 translation.
-  (lambda nil :type (or clambda null)))
+  (lambda nil :type (or clambda null))
+  ;; The dynamic extent for this bind if any of its variables are
+  ;; declared dynamic extent.
+  (dynamic-extent nil :type (or null cdynamic-extent)))
 (defprinter (bind)
   lambda)
 

@@ -459,10 +459,19 @@
       (setf (lvar-dynamic-extent lvar) dynamic-extent)
       t)))
 
-;;; Find all stack allocatable values in COMPONENT, setting
-;;; appropriate dynamic extents for any lvar which may take on a stack
-;;; allocatable value. If a dynamic extent is in fact associated with
-;;; a stack allocatable value, note that fact by setting its info.
+;;; Determine which values and closures in COMPONENT may be stack
+;;; allocated. We do so by starting a recursive walk from the values
+;;; and closures declared dynamic extent explicitly and transitively
+;;; marking the otherwise-inaccessible parts of these values as
+;;; potentially stack allocatable. If a dynamic extent is in fact
+;;; associated with a stack allocatable thing, note that fact by
+;;; setting the dynamic extent's info.
+;;;
+;;; We do this during environment analysis once all major changes to
+;;; the dataflow in IR1 have been done and it becomes whether a
+;;; combination can actually stack allocate its value. In particular,
+;;; a value must share the same environment as its dynamic extent in
+;;; order for stack allocation to make sense.
 (defun find-lvar-dynamic-extents (component)
   (declare (type component component))
   (do-blocks (block component)
@@ -471,56 +480,17 @@
                  (memq (basic-combination-kind node)
                        '(:full :unknown-keys :known)))
         (dxify-downward-funargs node))))
-  ;; For each dynamic extent declared variable, each value that the
-  ;; variable can take on is also dynamic extent.
-  (dolist (lambda (component-lambdas component))
-    (let* ((bind (lambda-bind lambda))
-           (lexenv (node-lexenv bind))
-           dynamic-extent)
-      (dolist (var (lambda-vars lambda))
-        (when (leaf-dynamic-extent var)
-          (let ((values (mapcar #'set-value (basic-var-sets var))))
-            (when values
-              ;; This dynamic extent is over the whole environment.
-              (unless dynamic-extent
-                (setf (node-lexenv bind) (make-lexenv :default lexenv))
-                (setq dynamic-extent
-                      (with-ir1-environment-from-node bind
-                        (make-dynamic-extent)))
-                (insert-node-after bind dynamic-extent)
-                (let ((cleanup (make-cleanup :dynamic-extent dynamic-extent)))
-                  (setf (dynamic-extent-cleanup dynamic-extent) cleanup)
-                  (aver (null (lexenv-cleanup lexenv)))
-                  (setf (lexenv-cleanup lexenv) cleanup))
-                (push dynamic-extent (lambda-dynamic-extents lambda)))
-              (dolist (value values)
-                (push value (dynamic-extent-values dynamic-extent))
-                (setf (lvar-dynamic-extent value) dynamic-extent)))))))
-    (dolist (let (lambda-lets lambda))
-      (dolist (var (lambda-vars let))
-        (when (leaf-dynamic-extent var)
-          (let ((initial-value (let-var-initial-value var)))
-            ;; FIXME: This is overly pessimistic; a flushed initial
-            ;; value should not inhibit stack allocation.
-            (when initial-value
-              (let ((dynamic-extent (lvar-dynamic-extent initial-value)))
-                (dolist (set (basic-var-sets var))
-                  ;; The environments of the SET and the dynamic
-                  ;; extent must be the same to ensure the set value
-                  ;; lives on the stack long enough.
-                  (when (eq (node-environment set)
-                            (node-environment dynamic-extent))
-                    (let ((set-value (set-value set)))
-                      (unless (lvar-dynamic-extent set-value)
-                        (setf (lvar-dynamic-extent set-value) dynamic-extent)
-                        (push set-value (dynamic-extent-values dynamic-extent)))))))))))))
   (dolist (lambda (component-lambdas component))
     (dolist (dynamic-extent (lambda-dynamic-extents lambda))
-      (dolist (lvar (dynamic-extent-values dynamic-extent))
-        (aver (eq dynamic-extent (lvar-dynamic-extent lvar)))
-        (setf (lvar-dynamic-extent lvar) nil)
-        (when (find-stack-allocatable-parts lvar dynamic-extent)
-          (setf (dynamic-extent-info dynamic-extent) (make-lvar))))))
+      (let ((environment (node-environment dynamic-extent)))
+        (dolist (lvar (dynamic-extent-values dynamic-extent))
+          (aver (eq dynamic-extent (lvar-dynamic-extent lvar)))
+          (setf (lvar-dynamic-extent lvar) nil)
+          (when (and (do-uses (use lvar t)
+                       (unless (eq environment (node-environment use))
+                         (return nil)))
+                     (find-stack-allocatable-parts lvar dynamic-extent))
+            (setf (dynamic-extent-info dynamic-extent) (make-lvar)))))))
   (dolist (xep (component-lambdas component))
     (when (and (functional-kind-eq xep external)
                (leaf-dynamic-extent (functional-entry-fun xep))

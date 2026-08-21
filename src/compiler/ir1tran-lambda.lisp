@@ -218,7 +218,8 @@
                                           (make-lexenv :policy local-policy)
                                           *lexenv*)))
          (result-ctran (make-ctran))
-         (result-lvar (make-lvar)))
+         (result-lvar (make-lvar))
+         dynamic-extent)
     ;; just to check: This function should fail internal assertions if
     ;; we didn't set up a valid debug name above.
     ;;
@@ -236,6 +237,13 @@
         ;; been set before. Let's make sure. -- WHN 2001-09-29
         (aver (not (lambda-var-home var)))
         (setf (lambda-var-home var) lambda)
+        (when (leaf-dynamic-extent var)
+          (unless dynamic-extent
+            (setq dynamic-extent (make-dynamic-extent))
+            (setf (bind-dynamic-extent bind) dynamic-extent)
+            (setf (dynamic-extent-cleanup dynamic-extent)
+                  (make-cleanup :dynamic-extent dynamic-extent))
+            (push dynamic-extent (lambda-dynamic-extents lambda))))
         (let ((specvar (lambda-var-specvar var)))
           (cond (specvar
                  (svars var)
@@ -250,6 +258,8 @@
                                    :cleanup nil)))
         (setf (bind-lambda bind) lambda)
         (setf (node-lexenv bind) *lexenv*)
+        (when dynamic-extent
+          (setf (node-lexenv dynamic-extent) *lexenv*))
 
         (let ((block (ctran-starts-block result-ctran)))
           (declare (inline make-return))
@@ -265,11 +275,24 @@
         (with-component-last-block (*current-component*
                                     (ctran-block result-ctran))
           (let ((prebind-ctran (make-ctran))
-                (postbind-ctran (make-ctran)))
+                (postbind-ctran (make-ctran))
+                (start-ctran (if dynamic-extent
+                                 (make-ctran)
+                                 nil))
+                (*lexenv* (if dynamic-extent
+                              (make-lexenv
+                               :default *lexenv*
+                               :cleanup
+                               (dynamic-extent-cleanup dynamic-extent))
+                              *lexenv*)))
             (ctran-starts-block prebind-ctran)
             (link-node-to-previous-ctran bind prebind-ctran)
             (use-ctran bind postbind-ctran)
-            (ir1-convert-special-bindings postbind-ctran result-ctran
+            (when dynamic-extent
+              (link-node-to-previous-ctran dynamic-extent postbind-ctran)
+              (use-ctran dynamic-extent start-ctran))
+            (ir1-convert-special-bindings (or start-ctran postbind-ctran)
+                                          result-ctran
                                           result-lvar body
                                           aux-vars aux-vals (svars)
                                           post-binding-lexenv

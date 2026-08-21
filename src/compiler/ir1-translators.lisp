@@ -1320,7 +1320,9 @@ care."
                               (explode-setq source 'compiler-error))))
 
 ;;; This is kind of like REFERENCE-LEAF, but we generate a SET node.
-;;; This should only need to be called in SETQ.
+;;; This should only need to be called in SETQ. If VAR is a lambda var
+;;; and declared dynamic extent, we set the dynamic extent of VALUE to
+;;; a dynamic extent corresponding to the contour of the VAR's lambda.
 (defun setq-var (start next result var value)
   (declare (type ctran start next) (type (or lvar null) result)
            (type basic-var var)
@@ -1329,6 +1331,12 @@ care."
         (dest-lvar (make-lvar))
         (type (or (lexenv-find var type-restrictions)
                   (leaf-type var))))
+    (when (and (lambda-var-p var)
+               (leaf-dynamic-extent var))
+      (let ((dynamic-extent (bind-dynamic-extent
+                             (lambda-bind (lambda-var-home var)))))
+        (setf (lvar-dynamic-extent dest-lvar) dynamic-extent)
+        (push dest-lvar (dynamic-extent-values dynamic-extent))))
     (ir1-convert start dest-ctran dest-lvar (wrap-if (neq type *universal-type*)
                                                      `(the ,(type-specifier type))
                                                      value))
