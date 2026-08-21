@@ -12,7 +12,7 @@
 (in-package "SB-X86-64-ASM")
 
 ;;; Printer for EVEX/VEX ModRM.r/m register operands.
-;;; Does NOT use EVEX R' — R' belongs only to the ModRM.reg field.
+;;; Does NOT use EVEX R' - R' belongs only to the ModRM.reg field.
 (defun print-ymmreg-rm (value stream dstate)
   (let* ((offset (etypecase value
                    ((unsigned-byte 4) value)
