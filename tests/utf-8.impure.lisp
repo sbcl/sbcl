@@ -71,7 +71,8 @@
                         0
                         (random 4))
         while (< i (length string))
-        do (loop repeat (1+ (random (- (length string) i)))
+        do (loop repeat (1+ (random (min (- (length string) i)
+                                         80)))
                  for char = (case width
                               (0 (random 128))
                               (1 (+ 128 (random (- 2048 128))))

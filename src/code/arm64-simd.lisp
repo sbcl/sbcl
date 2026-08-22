@@ -1721,9 +1721,11 @@
                    (inst ld1 (list bytes bytes2) (@ string) :4s)
                    ;; Stop if anything is 3-4 bytes in utf8
                    (inst orr temp bytes bytes2 :4s)
-                   1-2-LOOP-START
                    (inst umaxv temp temp :4s)
                    (inst umov tmp temp 0 :s)
+                   (inst cmp tmp 127)
+                   (inst b :ls 32-ASCII-START)
+                   1-2-LOOP-START
                    (inst cmp tmp #x800)
                    (inst b :ge FULL-START)
 
@@ -1746,8 +1748,6 @@
                    (inst umov tmp ascii 0 :h)
 
                    (inst ubfiz tmp2 tmp 4 8) ;; shift the low 8 bits left
-                   (inst cmp tmp2 #xFF0)
-                   (inst b :eq 32-ASCII-START)
 
                    ;; Construct
                    ;; (logior
@@ -1780,7 +1780,9 @@
                    32-ASCII-LOOP
                    (inst ld1 (list bytes bytes2) (@ string) :4s)
                    (inst orr temp bytes bytes2 :4s)
-                   (check-ascii temp temp2 1-2-LOOP-START :4s)
+                   (check-ascii temp temp2 1-2-LOOP-START :4s :gpr tmp)
+
+                   32-ASCII-START
 
                    ;; Narrow to 16 bits
                    (inst uzp1 bytes bytes bytes2 :8h)
@@ -1791,7 +1793,6 @@
                    (inst bif last-newlines indexes f1 :16b)
                    (inst add indexes indexes increment :4s)
 
-                   32-ASCII-START
                    ;; Narrow to 8 bytes
                    (inst xtn bytes bytes :8b)
                    (inst str bytes (@ byte-array 8 :post-index) :d)
