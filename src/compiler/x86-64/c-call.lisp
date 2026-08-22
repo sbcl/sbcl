@@ -1111,13 +1111,13 @@ Floats are passed in integer registers."
             #-sb-thread
             (progn
               ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
-              (inst mov rdx (fixnumize index))
+              (inst mov rdi (fixnumize index))
               ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
-              (inst mov rdi rsp)
+              (inst mov rsi rsp)
               ;; add room on stack for return value
               (inst sub rsp (* return-slot-count-aligned n-word-bytes))
               ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
-              (inst mov rsi rsp)
+              (inst mov rdx rsp)
 
               ;; Make new frame
               (inst push rbp)

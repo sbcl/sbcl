@@ -171,8 +171,8 @@
   ;; the number of arguments/return values passed in registers
   (defconstant  register-arg-count 3)
   ;; names and offsets for registers used to pass arguments
-  (defconstant-eqx register-arg-names '(rdx rdi rsi) #'equal)
-  (defregset    *register-arg-offsets* rdx rdi rsi)
+  (defconstant-eqx register-arg-names '(rdi rsi rdx) #'equal)
+  (defregset    *register-arg-offsets* rdi rsi rdx)
   #-win32
   (defregset    *c-call-register-arg-offsets* rdi rsi rdx rcx r8 r9)
   #+win32

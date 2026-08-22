@@ -27,8 +27,9 @@
      ;; These we need as temporaries.
      (:temp rax unsigned-reg rax-offset)
      (:temp rbx unsigned-reg rbx-offset)
-     (:temp rdx unsigned-reg rdx-offset)
-     (:temp rdi unsigned-reg rdi-offset)
+     (:temp a0 unsigned-reg (:lisp-reg 0))
+     (:temp a1 unsigned-reg (:lisp-reg 1))
+     (:temp a2 unsigned-reg (:lisp-reg 2))
      (:temp temp unsigned-reg r8-offset)
      (:temp loop-index unsigned-reg r9-offset))
 
@@ -46,7 +47,7 @@
 
   ;; Save the count, the return address and restore the frame pointer,
   ;; because the loop is going to destroy them.
-  (inst mov rdx rcx)
+  (inst mov a2 rcx)
   (inst mov rax (ea (frame-byte-offset return-pc-save-offset) rbp-tn))
   (inst mov rbp-tn (ea (frame-byte-offset ocfp-save-offset) rbp-tn))
   ;; Blit the values down the stack. Note: there might be overlap, so
@@ -60,16 +61,16 @@
   (inst mov temp (ea rsi loop-index))
   (inst mov (ea rbx loop-index) temp)
 
-  (inst sub rdx (fixnumize 1))
+  (inst sub a2 (fixnumize 1))
   (inst jmp :nz LOOP)
 
   ;; Set the stack top to the last result.
   (inst lea rsp-tn (ea rbx loop-index))
 
   ;; Load the register args.
-  (loadw rdx rbx -1)
-  (loadw rdi rbx -2)
-  (loadw rsi rbx -3)
+  (loadw a0 rbx -1)
+  (loadw a1 rbx -2)
+  (loadw a2 rbx -3)
 
   ;; And back we go.
   (emit-mv-return rax t)
@@ -77,9 +78,9 @@
   ;; Handle the register arg cases.
   ZERO-VALUES
   (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
-  (inst mov rdx null-tn)
-  (inst mov rdi null-tn)
-  (inst mov rsi null-tn)
+  (inst mov a0 null-tn)
+  (inst mov a1 null-tn)
+  (inst mov a2 null-tn)
   (inst stc)
   (inst leave)
   (inst ret)
@@ -87,25 +88,25 @@
   ;; Note: we can get this, because the return-multiple vop doesn't
   ;; check for this case when size > speed.
   ONE-VALUE
-  (loadw rdx rsi -1)
+  (loadw a0 rsi -1)
   (inst clc)
   (inst leave)
   (inst ret)
 
   TWO-VALUES
   (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
-  (loadw rdx rsi -1)
-  (loadw rdi rsi -2)
-  (inst mov rsi null-tn)
+  (loadw a0 rsi -1)
+  (inst mov a2 null-tn)
+  (loadw a1 rsi -2)
   (inst stc)
   (inst leave)
   (inst ret)
 
   THREE-VALUES
   (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
-  (loadw rdx rsi -1)
-  (loadw rdi rsi -2)
-  (loadw rsi rsi -3)
+  (loadw a0 rsi -1)
+  (loadw a2 rsi -3)
+  (loadw a1 rsi -2)
   (inst stc)
   (inst leave)
   (inst ret))
@@ -123,12 +124,12 @@
 ;;; we actually called. We also have to compute RCX from the difference
 ;;; between RSI and the stack top.
 #-sb-assembling ; avoid "Redefinition" warning (this file is processed twice)
-(defun prepare-for-tail-call-variable (fun temp nargs rdx rdi rsi
+(defun prepare-for-tail-call-variable (fun temp nargs a0 a1 a2
                                         r8 r9 r10
                                         &optional jump-to-the-end)
   (assemble ()
     ;; Calculate NARGS (as a fixnum)
-    (move nargs rsi)
+    (move nargs rsi-tn)
     (inst sub nargs rsp-tn)
     (inst shr nargs (- word-shift n-fixnum-tag-bits))
 
@@ -136,12 +137,12 @@
     (inst cmp nargs (fixnumize register-arg-count))
     (inst jmp :le REGISTER-ARGS)
 
-    (inst mov r8 rsi)
+    (inst mov r8 rsi-tn)
 
     ;; Register args
-    (loadw rdx rsi -1)
-    (loadw rdi rsi -2)
-    (loadw rsi rsi -3)
+    (loadw a0 r8 -1)
+    (loadw a1 r8 -2)
+    (loadw a2 r8 -3)
 
     ;; Do the blit. Because we are coping from smaller addresses to
     ;; larger addresses, we have to start at the largest pair and work
@@ -169,9 +170,9 @@
 
     ;; All the arguments fit in registers, so load them.
     REGISTER-ARGS
-    (loadw rdx rsi -1)
-    (loadw rdi rsi -2)
-    (loadw rsi rsi -3)
+    (loadw a0 rsi-tn -1)
+    (loadw a2 rsi-tn -3)
+    (loadw a1 rsi-tn -2)
 
     ;; Clear most of the stack.
     (inst lea rsp-tn (ea (* (- sp->fp-offset 3) n-word-bytes) rbp-tn))
@@ -187,13 +188,13 @@
     ((:temp fun unsigned-reg rax-offset)
      (:temp temp unsigned-reg rbx-offset)
      (:temp nargs unsigned-reg rcx-offset)
-     (:temp rdx unsigned-reg rdx-offset)
-     (:temp rdi unsigned-reg rdi-offset)
-     (:temp rsi unsigned-reg rsi-offset)
+     (:temp a0 unsigned-reg (:lisp-reg 0))
+     (:temp a1 unsigned-reg (:lisp-reg 1))
+     (:temp a2 unsigned-reg (:lisp-reg 2))
      (:temp r8 unsigned-reg r8-offset)
      (:temp r9 unsigned-reg r9-offset)
      (:temp r10 unsigned-reg r10-offset))
-  (prepare-for-tail-call-variable fun temp nargs rdx rdi rsi r8 r9 r10)
+  (prepare-for-tail-call-variable fun temp nargs a0 a1 a2 r8 r9 r10)
 
   (inst jmp (object-slot-ea fun closure-fun-slot fun-pointer-lowtag)))
 
@@ -204,13 +205,13 @@
     ((:temp fun unsigned-reg rax-offset)
      (:temp temp unsigned-reg rbx-offset)
      (:temp nargs unsigned-reg rcx-offset)
-     (:temp rdx unsigned-reg rdx-offset)
-     (:temp rdi unsigned-reg rdi-offset)
-     (:temp rsi unsigned-reg rsi-offset)
+     (:temp a0 unsigned-reg (:lisp-reg 0))
+     (:temp a1 unsigned-reg (:lisp-reg 1))
+     (:temp a2 unsigned-reg (:lisp-reg 2))
      (:temp r8 unsigned-reg r8-offset)
      (:temp r9 unsigned-reg r9-offset)
      (:temp r10 unsigned-reg r10-offset))
-  (prepare-for-tail-call-variable fun temp nargs rdx rdi rsi r8 r9 r10 t)
+  (prepare-for-tail-call-variable fun temp nargs a0 a1 a2 r8 r9 r10 t)
 
   (%lea-for-lowtag-test rbx-tn fun fun-pointer-lowtag)
   (inst test :byte rbx-tn lowtag-mask)
@@ -368,7 +369,7 @@
     ((:arg x (descriptor-reg) (:lisp-reg 0))
      (:res r (descriptor-reg) (:lisp-reg 0)))
   (progn x r)
-  (with-registers-preserved (lisp :except rdx)
+  (with-registers-preserved (lisp :except #.(first register-arg-names))
     (call-lisp-fun 'update-object-layout 1 nil)))
 
 (define-assembly-routine (sb-impl:install-hash-table-lock
@@ -378,7 +379,7 @@
     ((:arg x (descriptor-reg) (:lisp-reg 0))
      (:res r (descriptor-reg) (:lisp-reg 0)))
   (progn x r)
-  (with-registers-preserved (lisp :except rdx)
+  (with-registers-preserved (lisp :except #.(first register-arg-names))
     (call-lisp-fun 'sb-impl:install-hash-table-lock 1)))
 
 (define-assembly-routine
@@ -386,9 +387,9 @@
     ((:arg list descriptor-reg rax-offset)
 
      (:temp rbx unsigned-reg rbx-offset)
-     (:temp rdx unsigned-reg rdx-offset)
-     (:temp rdi unsigned-reg rdi-offset)
-     (:temp rsi unsigned-reg rsi-offset)
+     (:temp a0 unsigned-reg (:lisp-reg 0))
+     (:temp a1 unsigned-reg (:lisp-reg 1))
+     (:temp a2 unsigned-reg (:lisp-reg 2))
      (:temp count unsigned-reg rcx-offset)
      (:temp temp unsigned-reg r9-offset)
      (:temp return unsigned-reg r10-offset))
@@ -404,7 +405,7 @@
       (inst cmp list null)
       (inst jmp :e ZERO-VALUES)
 
-      (loadw rdx list cons-car-slot list-pointer-lowtag)
+      (loadw a0 list cons-car-slot list-pointer-lowtag)
       (loadw list list cons-cdr-slot list-pointer-lowtag)
       (inst cmp list null)
       (inst jmp :ne CONTINUE)
@@ -417,14 +418,14 @@
       (check ONE-VALUE)
 
       (inst mov count (fixnumize 2))
-      (loadw rdi list cons-car-slot list-pointer-lowtag)
+      (loadw a1 list cons-car-slot list-pointer-lowtag)
       (loadw list list cons-cdr-slot list-pointer-lowtag)
       (inst cmp list null)
       (inst jmp :e TWO-VALUES)
       (check TWO-VALUES)
 
       (inst mov count (fixnumize 3))
-      (loadw rsi list cons-car-slot list-pointer-lowtag)
+      (loadw a2 list cons-car-slot list-pointer-lowtag)
       (loadw list list cons-cdr-slot list-pointer-lowtag)
       (inst cmp list null)
       (inst jmp :e THREE-VALUES)
@@ -453,11 +454,11 @@
       (cerror-call nil 'bogus-arg-to-values-list-error list)
       ZERO-VALUES
       (zeroize count)
-      (inst mov rdx null)
-      (inst mov rdi null)
+      (inst mov a0 null)
+      (inst mov a1 null)
 
       TWO-VALUES
-      (inst mov rsi null)
+      (inst mov a2 null)
 
       THREE-VALUES
       (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))

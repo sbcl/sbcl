@@ -143,7 +143,7 @@
                  (inst cmp count (fixnumize i))
                  (inst jmp :le default-lab)
                  (when first-stack-arg-p
-                   (storew rdx-tn rbx-tn -1))
+                   (storew (first *register-arg-tns*) rbx-tn -1))
                  (sc-case tn
                    ((descriptor-reg any-reg)
                     (loadw tn start (frame-word-offset (+ sp->fp-offset i))))
@@ -157,7 +157,7 @@
                  (dolist (default (defaults))
                    (emit-label (car default))
                    (when (cddr default)
-                     (inst push rdx-tn))
+                     (inst push (first *register-arg-tns*)))
                    (inst mov (second default) null-tn))
                  (inst jmp defaulting-done))))))
     (inst mov rsp-tn sp)))

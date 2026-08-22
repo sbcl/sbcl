@@ -589,7 +589,7 @@
 
 (with-test (:name :char-code-is-single-shr)
   (assert-thereis-line '(lambda (x) (char-code (truly-the character x)))
-                       "SHR EDX, 7"))
+                       "SHR EDI, 7"))
 
 (import '(sb-x86-64-asm::get-gpr sb-x86-64-asm::machine-ea))
 ;; to make this pass on different configurations we'd have to add

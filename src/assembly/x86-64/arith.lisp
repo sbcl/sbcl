@@ -102,12 +102,12 @@
     (inst clc) (inst ret)
 
     BIGNUM
-    (inst shrd rax x n-fixnum-tag-bits) ; high bits from edx
-    (inst sar x n-fixnum-tag-bits)      ; now shift edx too
+    (inst shrd rax rdx-tn n-fixnum-tag-bits) ; high bits from edx
+    (inst sar rdx-tn n-fixnum-tag-bits)      ; now shift edx too
 
-    (move rcx x)                   ; save high bits from cqo
+    (move rcx rdx-tn)              ; save high bits from cqo
     (inst cqo)                     ; edx:eax <- sign-extend of eax
-    (inst cmp x rcx)
+    (inst cmp rdx-tn rcx)
     (inst jmp :e SINGLE-WORD-BIGNUM)
 
     (emit-alloc-other nil thread-tn bignum-widetag (+ bignum-digits-offset 2) res)

@@ -30,7 +30,7 @@
                           (:arg  start  (any-reg descriptor-reg) (:lisp-reg 1))
                           (:arg  end    (any-reg descriptor-reg) rcx-offset)
                           (:res  res    (descriptor-reg) (:lisp-reg 0))
-                          (:temp scratch unsigned-reg rsi-offset)
+                          (:temp scratch unsigned-reg rbx-offset)
                           ;; storage class doesn't matter since all float regs
                           ;; and sse regs map to the same storage base.
                           (:temp wordpair double-reg 0))
@@ -100,8 +100,11 @@
   (inst jmp unroll)
 
   (inst shr count n-fixnum-tag-bits)
+  (move scratch vector) ; save it for the return value
+  (move rdi-tn start) ; implicit operand to STOS
   (inst rep)
   (inst stos :qword)
+  (move rdi-tn scratch) ; restore the return value
   DONE
   (inst ret)
   UNROLL

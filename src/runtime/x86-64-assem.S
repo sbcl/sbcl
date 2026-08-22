@@ -188,9 +188,9 @@ Lstack:
 	cmp	$1,%rcx
 	je	Lone
 	jl	Lzero
-	mov	16(%rbx),%rsi	# arg2
-Ltwo:	mov	8(%rbx),%rdi	# arg1
-Lone:	mov	0(%rbx),%rdx	# arg0
+	mov	16(%rbx),%rdx	# arg2
+Ltwo:	mov	8(%rbx),%rsi	# arg1
+Lone:	mov	0(%rbx),%rdi	# arg0
 Lzero:
 	shl	$(N_FIXNUM_TAG_BITS),%rcx	# (fixnumize num-args)
 	
@@ -230,7 +230,7 @@ LsingleValue:
 
 /* FIXME Restore the NPX state. */
 
-	mov	%rdx,%rax	# c-val
+	mov	%rdi,%rax	# c-val
 #ifdef SUPPORT_FOMIT_FRAME_POINTER
 	mov	%r15,%rbp	# orig rbp
 	pop	%r15		# orig r15
@@ -247,9 +247,9 @@ LsingleValue:
 	.align	align_16byte,0x90
 GNAME(funcall_alien_callback):
 /* Specialized call_into_lisp for callbacks
-   rdi arg1
-   rsi arg2
-   rdx arg0
+   rdi arg0
+   rsi arg1
+   rdx arg2
    rcx thread #+sb-thread
 */
 
@@ -308,8 +308,8 @@ GNAME(fun_end_breakpoint_guts):
 	mov	%rsp,%rbx	# Setup ebx - the ofp.
 	sub	$8,%rsp		# Allocate one stack slot for the return value
 	mov	$(1 << N_FIXNUM_TAG_BITS),%rcx		# Setup ecx for one return value.
-	mov	reg_NULL,%rdi	# default second value
-	mov	reg_NULL,%rsi	# default third value
+	mov	reg_NULL,%rsi	# default second value
+	mov	reg_NULL,%rdx	# default third value
 multiple_value_return:
 
 	.globl  GNAME(fun_end_breakpoint_trap)

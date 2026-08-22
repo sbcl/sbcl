@@ -79,10 +79,9 @@
     (do-fprs push :xmm)
     (inst ret)
     HAVE-YMM
-    ;; Although most of the time RDX can be clobbered, some of the time it can't.
-    ;; If WITH-REGISTERS-PRESERVED wraps a lisp function to make it appear to preserve
-    ;; all registers, we obviously need to return its primary value in RDX.
-    ;; RAX need not be saved though.
+    ;; This routine preserves RDX because when calling from Lisp into C on #+win32
+    ;; where the 2nd ABI-specified arg-passing register is RDX, it might be an outgoing
+    ;; argument that we have not stashed away safely yet.
     (inst push rdx-tn)
     (zeroize rdx-tn)
     ;; After PUSH the save area is at RSP+16 with the return-PC at [RSP+8]
@@ -99,19 +98,16 @@
     (do-fprs pop :xmm)
     (inst ret)
     HAVE-YMM
-    (inst push rdx-tn)
-    (inst mov rax-tn 7) ; OK to clobber RAX
+    ;; We can freely clobber RDX and RAX because the surrounding code - namely that
+    ;; which invoked FPR-RESTORE - will restore all GPRs upon return from this.
+    (inst mov rax-tn 7)
     (zeroize rdx-tn)
-    (inst xrstor (ea 16 rsp-tn))
-    (inst pop rdx-tn)))
+    (inst xrstor (ea 8 rsp-tn))))
 
 ;; Caller will have allocated xsave-avx512-area-size bytes above the stack-pointer
 ;; prior to the CALL. Use that as the save area.
+;; Similar considerations pertain to the use of RAX and RDX as in FPR-SAVE.
 (define-assembly-routine (fpr-save-avx512) ()
-  ;; Although most of the time RDX can be clobbered, some of the time it can't.
-  ;; If WITH-REGISTERS-PRESERVED wraps a lisp function to make it appear to preserve
-  ;; all registers, we obviously need to return its primary value in RDX.
-  ;; RAX need not be saved though.
   (inst push rdx-tn)
   (zeroize rdx-tn)
   ;; After PUSH the save area is at RSP+16 with the return-PC at [RSP+8]
@@ -126,11 +122,9 @@
   (inst pop rdx-tn))
 
 (define-assembly-routine (fpr-restore-avx512) ()
-  (inst push rdx-tn)
-  (inst mov rax-tn #xE7)                   ; OK to clobber RAX
+  (inst mov rax-tn #xE7)                   ; OK to clobber RAX and RDX
   (zeroize rdx-tn)
-  (inst xrstor (ea 16 rsp-tn))
-  (inst pop rdx-tn))
+  (inst xrstor (ea 8 rsp-tn)))
 
 (define-assembly-routine (switch-to-arena (:return-style :raw)) ()
   ;; RSI and RDI are vop temps, so don't bother preserving them
@@ -149,9 +143,9 @@
   (let ((save (list rbx-tn r12-tn r13-tn r14-tn r15-tn)))
     (dolist (reg save) (inst push reg))
     ;; count of bytes or elements (always at RBP+16) into 2nd arg
-    (inst mov rdi-tn (ea 16 rbp-tn))
+    (inst mov (second *register-arg-tns*) (ea 16 rbp-tn))
     (call-lisp-fun 'handle-arena-request 2)
-    (inst mov rax-tn rdx-tn) ; Lisp result reg into C result reg
+    (inst mov rax-tn (first *register-arg-tns*)) ; Lisp result reg into C result reg
     (dolist (reg (reverse save)) (inst pop reg)))
   (emit-begin-pseudo-atomic))
 
@@ -174,9 +168,9 @@
              `(progn (inst test rax-tn rax-tn)
                      (inst jmp :nz SUCCESS)
                      ,(ecase units
-                        (:list-elts '(zeroize rdx-tn))
-                        (:bytes-non-list '(inst mov rdx-tn (fixnumize 1)))
-                        (:bytes-list '(inst mov rdx-tn (fixnumize 2))))
+                        (:list-elts `(zeroize ,(first *register-arg-tns*)))
+                        (:bytes-non-list `(inst mov ,(first *register-arg-tns*) (fixnumize 1)))
+                        (:bytes-list `(inst mov ,(first *register-arg-tns*) (fixnumize 2))))
                      (inst call (make-fixup 'handle-arena-request :assembly-routine))
                      ;; if an oversized object which the predicate determined should be allocated
                      ;; then it was in fact already allocated, and its address is in rax.

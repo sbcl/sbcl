@@ -73,11 +73,11 @@ static void xgetbv(unsigned *eax, unsigned *edx)
 }
 
 #define VECTOR_FILL_T "VECTOR-FILL/T"
-static const int vector_fill_offset_to_check = 0x59;
-static const int vector_fill_offset_to_poke  = 0x60;
+static const int vector_fill_offset_to_check = 0x58;
+static const int vector_fill_offset_to_poke  = 0x5F;
 static const unsigned char vector_fill_expect_bytes[] = {
   0x48, 0x81, 0xF9, 0xBC, 0x02, 0x00, 0x00,
-  0xEB, 0x07
+  0xEB, 0x10
 };
 
 // Poke in a byte that changes an opcode to enable faster vector fill.
