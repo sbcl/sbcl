@@ -1603,14 +1603,14 @@
                         ((c-80 complex-double-reg))
                         ((c-c0 complex-double-reg))
                         ((c-80C0 complex-double-reg))
-                        ((powers double-reg))
+                        ((powers complex-double-reg))
 
                         ((length1 complex-double-reg t :offset 8))
                         ((length2 complex-double-reg t :offset 9))
                         ((shuf-mask complex-double-reg t :offset 10))
                         ((orr-mask complex-double-reg t :offset 11))
                         ((ascii complex-double-reg))
-                        ((powers complex-double-reg))
+
                         ((shuf complex-double-reg))
                         ((:label error)))
                ((string any-reg positive-fixnum :from (:argument 0))
@@ -1683,8 +1683,8 @@
 
                  (inst orr temp bytes bytes2 :16b)
                  (inst orr temp2 bytes3 bytes4 :16b)
-                 (inst orr temp temp temp2 :16b)
-                 (check-ascii temp temp 1-2-START :4s)
+                 (inst orr temp2 temp temp2 :16b)
+                 (check-ascii temp2 temp2 1-2-START :4s)
 
                  (inst uzp1 bytes2 bytes bytes2 :8h)
                  (inst uzp1 bytes4 bytes3 bytes4 :8h)
@@ -1721,6 +1721,7 @@
                    (inst ld1 (list bytes bytes2) (@ string) :4s)
                    ;; Stop if anything is 3-4 bytes in utf8
                    (inst orr temp bytes bytes2 :4s)
+                   1-2-LOOP-START
                    (inst umaxv temp temp :4s)
                    (inst umov tmp temp 0 :s)
                    (inst cmp tmp #x800)
@@ -1735,16 +1736,6 @@
                    (inst bif last-newlines indexes f1 :16b)
                    (inst add indexes indexes increment :4s)
 
-                   ;; Construct
-                   ;; (logior
-                   ;;  #x80C0
-                   ;;  (dpb (ldb (byte 6 0) bits)
-                   ;;       (byte 8 8)
-                   ;;       (ldb (byte 5 6) bits)))
-                   (inst ushr bytes2 bytes 6 :8h)
-                   (inst sli bytes2 bytes 8 :8h)
-                   (inst bit bytes2 c-80C0 c-c0 :16b)
-
                    (inst cmhi ascii c-80 bytes :8h)
 
                    ;; powers has two parts, powers in the low byte, 1 in the high byte.
@@ -1755,6 +1746,19 @@
                    (inst umov tmp ascii 0 :h)
 
                    (inst ubfiz tmp2 tmp 4 8) ;; shift the low 8 bits left
+                   (inst cmp tmp2 #xFF0)
+                   (inst b :eq 32-ASCII-START)
+
+                   ;; Construct
+                   ;; (logior
+                   ;;  #x80C0
+                   ;;  (dpb (ldb (byte 6 0) bits)
+                   ;;       (byte 8 8)
+                   ;;       (ldb (byte 5 6) bits)))
+                   (inst ushr bytes2 bytes 6 :8h)
+                   (inst sli bytes2 bytes 8 :8h)
+                   (inst bit bytes2 c-80C0 c-c0 :16b)
+
                    (inst ldr shuf (@ table tmp2))
                    (inst tbl bytes (list bytes bytes2) shuf :16b)
 
@@ -1767,6 +1771,35 @@
                    (inst cmp byte-array byte-end)
                    (inst ccmp string string-end :ls 2)
                    (inst b :ls 1-2-LOOP)
+                   (inst b DONE)
+
+                   ;; An escape from 1-2-LOOP, it's slower than the full
+                   ;; ASCII loop but it reads the same amount of
+                   ;; characters and doesn't need any state transitions
+                   ;; if it's going to bounce back quickly.
+                   32-ASCII-LOOP
+                   (inst ld1 (list bytes bytes2) (@ string) :4s)
+                   (inst orr temp bytes bytes2 :4s)
+                   (check-ascii temp temp2 1-2-LOOP-START :4s)
+
+                   ;; Narrow to 16 bits
+                   (inst uzp1 bytes bytes bytes2 :8h)
+
+                   ;; Track newlines
+                   (inst cmeq temp bytes newlines :8h)
+                   (inst cmeq f1 temp 0 :4s)
+                   (inst bif last-newlines indexes f1 :16b)
+                   (inst add indexes indexes increment :4s)
+
+                   32-ASCII-START
+                   ;; Narrow to 8 bytes
+                   (inst xtn bytes bytes :8b)
+                   (inst str bytes (@ byte-array 8 :post-index) :d)
+                   (inst add string string 32)
+
+                   (inst cmp byte-array byte-end)
+                   (inst ccmp string string-end :ls 2)
+                   (inst b :ls 32-ASCII-LOOP)
                    (inst b DONE))
                  FULL-START
                  (inst add string-end string-end 48) ;; now it reads 16 bytes instead of 64
