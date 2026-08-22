@@ -16,55 +16,73 @@
 ;;; to deal with pre- and post-loop pieces for proper alignment.
 ;;; Alternatively, if the CPU has the enhanced MOVSB feature, use REP STOS
 ;;; depending on the number of elements to be written.
+(symbol-macrolet
+    ((disp (- (ash vector-data-offset word-shift) other-pointer-lowtag))
+     (scale (ash 1 (- word-shift n-fixnum-tag-bits)))
+     (card-index scratch) ; alias for RSI
+     (end-card-index item) ; alias for RAX
+     (count end)) ; alias for RCX
 (define-assembly-routine (vector-fill/t ; <-- this could work on raw bits too
                           (:translate vector-fill/t)
                           (:policy :fast-safe))
                          ((:arg  vector (descriptor-reg) (:lisp-reg 0))
                           (:arg  item   (any-reg descriptor-reg) rax-offset)
                           (:arg  start  (any-reg descriptor-reg) (:lisp-reg 1))
-                          (:arg  end    (any-reg descriptor-reg) (:lisp-reg 2))
+                          (:arg  end    (any-reg descriptor-reg) rcx-offset)
                           (:res  res    (descriptor-reg) (:lisp-reg 0))
-                          (:temp count unsigned-reg rcx-offset)
-                          (:temp end-card-index unsigned-reg rbx-offset)
+                          (:temp scratch unsigned-reg rsi-offset)
                           ;; storage class doesn't matter since all float regs
                           ;; and sse regs map to the same storage base.
                           (:temp wordpair double-reg 0))
-  (progn end-card-index)
   (move res vector) ; to "use" res
 
-  ;; Mark each GC card of the vector unless ITEM is not a pointer
-  ;; (NIL is non-pointer) or the COUNT is 0.
-  #+soft-card-marks
-  (progn
   (inst cmp start end)
   (inst jmp :ge DONE)
-  (inst lea :dword count (ea -3 item)) ; same as POINTERP (see type-vops)
-  (inst test :byte count #b11)
-  (inst jmp :nz DONE-CARD-MARKING)
-  (inst cmp item null-tn)
-  (inst jmp :e DONE-CARD-MARKING)
-
-  (let ((disp (- (ash vector-data-offset word-shift) other-pointer-lowtag))
-        (card-index count)
-        (loop (gen-label)))
-    ;; Compute EA of starting and ending (inclusive) indices
-    (inst lea card-index (ea disp vector start (ash 1 (- word-shift n-fixnum-tag-bits))))
-    (inst lea end-card-index (ea (- disp n-word-bytes)
-                                 vector end (ash 1 (- word-shift n-fixnum-tag-bits))))
-    (inst shr card-index gencgc-card-shift)
-    (inst shr end-card-index gencgc-card-shift)
-    (inst and :dword card-index card-index-mask)
-    (inst and :dword end-card-index card-index-mask)
-    (emit-label LOOP)
-    (mark-gc-card card-index nil) ; NIL = already shifted + masked
-    (inst cmp card-index end-card-index)
+  ;; stash ITEM safely away, exactly where we usually need it
+  (inst movq wordpair item)
+  ;; Mark each GC card of the vector unless ITEM is not a pointer
+  ;; (NIL is non-pointer) or the COUNT is 0.
+  ;; TODO: Skipping marking whenever VECTOR is younger than ITEM would yield a nice
+  ;; savings especially for things like (fill x :EMPTY) because keywords are nearly
+  ;; always immortal, at least for any image that was saved to disk. That being so,
+  ;; could we hoist marking into the IR1 representation so that transforms can
+  ;; decide whether to mark at all, and separate out the actual fill routine?
+  #+soft-card-marks
+  (assemble ()
+    (inst lea :dword card-index (ea -3 item)) ; same as POINTERP (see type-vops)
+    (inst test :byte card-index #b11)
+    (inst jmp :nz DONE-CARD-MARKING)
+    (inst cmp item null-tn)
     (inst jmp :e DONE-CARD-MARKING)
+
+    ;; Compute EA of starting and ending (inclusive) indices
+    (inst lea card-index (ea disp vector start scale))
+    (inst shr card-index gencgc-card-shift)
+    (inst and :dword card-index card-index-mask)
+    ;; Compute the modularly post-incremented end-card-mask so that our backward branch
+    ;; in the loop can use a not-equal test. (We can't use any branch on inequality
+    ;; because modular math screws it up)
+    (inst lea end-card-index (ea (- disp n-word-bytes) vector end scale))
+    (inst shr end-card-index gencgc-card-shift)
+    (inst inc :dword end-card-index)
+    (inst and :dword end-card-index card-index-mask)
+    LOOP
+    ;; Were we to use MARK-GC-CARD which is technically the right abstraction,
+    ;; it emits different encodings of the 'disp 'field for #+/-sb-safepoint
+    ;; because in one case the disp is imm8 and the other imm32.
+    ;; Then we would have an annoyance in the C runtime of having to #ifdef
+    ;; the hot-patching of the "JMP UNROLL" below - its address would change.
+    (inst mov :byte (ea :disp32 nil-cardtable-disp null-tn card-index) CARD-MARKED)
     (inst inc :dword card-index)
     (inst and :dword card-index card-index-mask)
-    (inst jmp LOOP)))
+    (inst cmp :dword card-index end-card-index)
+    (inst jmp :ne LOOP))
 
   DONE-CARD-MARKING
-  (move count end)
+  ;; restore ITEM from its saved location. Needed for the STOS instruction
+  ;; and for the final elements after loop unrolling.
+  (inst movq item wordpair)
+  ;; compute number of elements as a fixnum
   (inst sub count start)
   ;; 'start' is an interior pointer to 'vector',
   ;; but 'vector' is pinned because it's in a register, so this is ok.
@@ -87,8 +105,7 @@
   DONE
   (inst ret)
   UNROLL
-  (inst test count count)
-  (inst jmp :z DONE)
+  (inst lea scratch (ea start count scale)) ; compute end pointer
   ;; if address ends in 8, we must write 1 word before using MOVDQA
   (inst test :byte start #b1000)
   (inst jmp :z SETUP)
@@ -96,17 +113,17 @@
   (inst add start n-word-bytes)
   (inst sub count (fixnumize 1))
   SETUP
-  ;; Compute (FLOOR COUNT 8) to compute the number of fast iterations.
+  ;; Compute (FLOOR COUNT 8) to get the number of fast iterations.
+  ;; We can untagify and divide by 8 in the same operation
   (inst shr count (+ 3 n-fixnum-tag-bits)) ; It's a native integer now.
   ;; For a very small number of elements, the unrolled loop won't execute.
   (inst jmp :z FINISH)
-  ;; Load the xmm register.
-  (inst movq wordpair item)
+  ;; WORDPAIR already holds ITEM in its low 64 bits
   (inst pshufd wordpair wordpair #b01000100)
   ;; Multiply count by 64 (= 8 lisp objects) and add to 'start'
   ;; to get the upper limit of the loop.
   (inst shl count 6)
-  (inst add count start)
+  (inst add count start) ; remember: COUNT and END are the same register!
   ;; MOVNTDQ is supposedly faster, but would require a trailing SFENCE
   ;; which measurably harms performance on a small number of iterations.
   UNROLL-LOOP ; Write 4 double-quads = 8 lisp objects
@@ -115,20 +132,30 @@
   (inst movdqa (ea 32 start) wordpair)
   (inst movdqa (ea 48 start) wordpair)
   (inst add start (* 8 n-word-bytes))
-  (inst cmp start count)
+  (inst cmp start end)
   (inst jmp :b UNROLL-LOOP)
   FINISH
-  ;; Now recompute 'count' as the ending address
-  (inst lea count (ea (- (ash vector-data-offset word-shift) other-pointer-lowtag)
-                      vector
-                      end (ash 1 (- word-shift n-fixnum-tag-bits))))
-  (inst cmp start count)
-  (inst jmp :ae DONE)
-  FINAL-LOOP
-  (inst mov (ea start) item)
-  (inst add start n-word-bytes)
-  (inst cmp start count)
-  (inst jmp :b FINAL-LOOP))
+  ;; Now we're going to complete the fill with no looping by jumping
+  ;; to the middle of a sequence of stores.
+  ;; SCRATCH is the ending byte address. Bytes remaining is (SCRATCH - START)
+  ;; There are at most 7 more stores to do. Each takes 4 bytes to encode
+  ;; including the last one whose EA displacement is 0.
+  ;; Therefore divide scratch by 2 to get the number of bytes to execute.
+  (inst sub scratch start)
+  (inst shr :dword scratch 1)
+  ;; Subtract from TAIL to get the entry point without using a lookup table
+  (inst lea end (rip-relative-ea TAIL))
+  (inst sub end scratch)
+  (inst jmp end)
+  ;; entry points
+  (inst mov (ea 48 start) item)
+  (inst mov (ea 40 start) item)
+  (inst mov (ea 32 start) item)
+  (inst mov (ea 24 start) item)
+  (inst mov (ea 16 start) item)
+  (inst mov (ea  8 start) item)
+  (inst mov (ea :disp8 0 start) item)
+  TAIL))
 
 (define-assembly-routine (%data-vector-and-index
                           (:translate %data-vector-and-index)
