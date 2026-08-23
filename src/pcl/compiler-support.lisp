@@ -175,8 +175,10 @@
   (deftransform sb-pcl::set-slot-value ((object slot-name new-value)
                                         (t (constant-arg symbol) t)
                                         * :node node)
-    (acond ((always-bound-struct-accessor-p object slot-name)
-            ;; Note that the SETF is undefined for :READ-ONLY slots.
+    (acond ((let ((dsd (always-bound-struct-accessor-p object slot-name)))
+              (and dsd
+                   (not (dsd-read-only dsd))
+                   dsd))
             `(setf (,(dsd-accessor-name it) object) new-value))
            ((policy node (= safety 3))
             ;; Safe code wants to check the type, and the global

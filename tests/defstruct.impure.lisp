@@ -1495,3 +1495,13 @@ redefinition."
     (setf (oolbc-x struct) 2)
     (assert (eql (oolbc-x struct) 2))
     (assert (eql (oolbc-z struct) 104))))
+
+(defstruct read-only-slot-value
+  (slot 0 :read-only t))
+
+(with-test (:name :read-only-slot-value)
+  (let ((i (make-read-only-slot-value)))
+    (setf (slot-value i 'slot) 6)
+    (assert (= (slot-value i 'slot)
+               (read-only-slot-value-slot i)
+               6))))
