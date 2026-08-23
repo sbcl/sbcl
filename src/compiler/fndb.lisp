@@ -131,7 +131,11 @@
 ;;; represented by a call to VALUES.
 (defknown values (&rest t) * (movable flushable))
 (defknown values-list (list) * (movable foldable unsafely-flushable))
-(defknown reverse-values-list (list index) * (movable foldable unsafely-flushable))
+(defknown reverse-values-list ((read-only list) index) *
+    (movable foldable unsafely-flushable)
+  :folder (lambda (list length)
+            (aver (= (length list) length))
+            (values-list (reverse list))))
 
 ;;;; from the "Macros" chapter:
 
