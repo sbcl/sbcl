@@ -22,8 +22,15 @@
 
 (defconstant +page-size+ (extern-alien "os_reported_page_size" int))
 (setf *random-state* (make-random-state t))
+
 (defun free-protected-array (vector)
   (let* ((addr (sb-sys:sap-int (sb-sys:vector-sap vector)))
+         (rw (logand addr (- +page-size+))))
+    (sb-posix:munmap (sb-sys:int-sap (- rw +page-size+))
+                     (* +page-size+ 3))))
+
+(defun free-protected-sap (sap)
+  (let* ((addr (sb-sys:sap-int sap))
          (rw (logand addr (- +page-size+))))
     (sb-posix:munmap (sb-sys:int-sap (- rw +page-size+))
                      (* +page-size+ 3))))
@@ -50,6 +57,20 @@
       (setf (sb-sys:sap-ref-word addr 0) widetag)
       (setf (sb-kernel:%array-fill-pointer vector) length)
       vector)))
+
+(defun make-protected-sap (bytes align-to-start)
+  (let* ((whole (sb-posix:mmap nil (* +page-size+ 3)
+                               (logior sb-posix:prot-read
+                                       sb-posix:prot-write)
+                               (logior sb-posix:map-private sb-posix:map-anon) -1 0))
+         (rw (sb-sys:sap+ whole +page-size+))
+         (sap (sb-sys:sap+ rw (if align-to-start
+                                   0
+                                   (- +page-size+ bytes)))))
+    (sb-posix:mprotect whole +page-size+ sb-posix:prot-none)
+    (sb-posix:mprotect (sb-sys:sap+ whole (* +page-size+ 2))
+                       +page-size+ sb-posix:prot-none)
+    sap))
 
 (defun decode-test (vector string-length)
   (sb-sys:with-pinned-objects (vector)
@@ -121,7 +142,8 @@
                             (unless (= utf-length octet-length)
                               (error "(sb-impl::character-string-utf8-length ~s) => ~a /= ~a"
                                      string utf-length octet-length))))
-                     (free-protected-array bytes))))))
+                     (free-protected-array bytes))))
+        (free-protected-array string)))
 
 (defun encode-test (string byte-length)
   (let ((byte-array (make-protected-array byte-length '(unsigned-byte 8) nil)))
@@ -252,88 +274,70 @@
                  (incf index 4))
                 (t (return index))))))))
 
-#+(or arm64 x86-64)
-(with-test (:name :utf8-to-character-string)
-  (let ((vector (make-array sb-impl::+bytes-per-buffer+ :element-type '(unsigned-byte 8)))
-        (ibuf (sb-impl::alloc-buffer))
-        (string (make-protected-array 512 'character nil)))
-    (setf (sb-impl::buffer-tail ibuf) sb-impl::+bytes-per-buffer+)
-    (loop repeat (* 256 #+slow 10)
-          do
-          (map-into vector (lambda () (random 256)))
-          (setf (sb-impl::buffer-head ibuf) 0
-                (sb-impl::buffer-tail ibuf) sb-impl::+bytes-per-buffer+)
-          (sb-kernel:copy-ub8-to-system-area vector 0 (sb-impl::buffer-sap ibuf) 0 (length vector))
-          (let* ((bad (validate-utf8 vector))
-                 (chars (sb-vm::utf8-to-character-string 0 (length string) string ibuf))
-                 (bytes (sb-impl::buffer-head ibuf))
-                 (decoded (octets-to-string vector :end bad)))
-            (when bad
-              (assert (>= bad bytes)))
-            (assert (string= string decoded :end1 chars :end2 chars))))
-    (let ((random-string (make-string sb-impl::+bytes-per-buffer+)))
-      (loop repeat (* 256 #+slow 10)
-            do
-            (fill-random-string random-string)
-            (replace vector (string-to-octets random-string))
-            (setf (sb-impl::buffer-head ibuf) 0
-                  (sb-impl::buffer-tail ibuf) sb-impl::+bytes-per-buffer+)
-            (sb-kernel:copy-ub8-to-system-area vector 0 (sb-impl::buffer-sap ibuf) 0 (length vector))
-            (let* ((bad (validate-utf8 vector))
-                   (chars (sb-vm::utf8-to-character-string 0 (length string) string ibuf))
-                   (bytes (sb-impl::buffer-head ibuf))
-                   (decoded (octets-to-string vector :end bad)))
-              (when bad
-                (assert (>= bad bytes)))
-              (assert (string= string decoded :end1 chars :end2 chars)))))))
+(defun random-element (seq)
+  (elt seq (random (length seq))))
 
 #+(or arm64 x86-64)
-(with-test (:name :utf8-crlf-to-character-string)
-  (let ((vector (make-array 1024 :element-type '(unsigned-byte 8)))
-        (ibuf (sb-impl::alloc-buffer))
-        (string (make-protected-array 512 'character nil)))
+(defun test-utf8-to-string (crlf)
+  (let* ((buffer-length 1024)
+         (vector (make-array buffer-length :element-type '(unsigned-byte 8)))
+         (sap (make-protected-sap buffer-length nil))
+         (ibuf (sb-impl::alloc-buffer buffer-length))
+         (string (make-protected-array 512 'character nil)))
+    (setf (slot-value ibuf (opaque-identity 'sb-impl::sap)) sap)
     (unwind-protect
          (progn
-       (setf (sb-impl::buffer-tail ibuf) sb-impl::+bytes-per-buffer+)
-       (loop repeat (* 256 #+slow 10)
-             do
-             (map-into vector (lambda () (random 256)))
-             (let ((crlf (random (1- (length vector)))))
-               (setf (aref vector crlf) #xd)
-               (setf (aref vector (1+ crlf)) #xa))
+           (setf (sb-impl::buffer-tail ibuf) buffer-length)
+           (let ((random-string (make-string buffer-length)))
+             (loop repeat (* 512 #+slow 10)
+                   do
+                   (fill-random-string random-string)
+                   (replace vector (string-to-octets random-string))
+                   (let ((crlf (when crlf
+                                 (random (1- (length vector)))))
+                         (error (random (- (length vector) 4))))
+                     (when crlf
+                       (setf (aref vector crlf) #xd)
+                       (setf (aref vector (1+ crlf)) #xa))
+                     (when (zerop (random 2))
+                       (replace vector
+                                (if (zerop (random 2))
+                                    (loop repeat (1+ (random 4))
+                                          collect (+ 128 (random 128)))
+                                    (random-element '((#xc0 #xaf)
+                                                      (#xc1 #xaf)
+                                                      (#xe0 #x80 #x80)
+                                                      (#xf0 #x80 #x80 #x80)
+                                                      (#xed #xa0 #x80)
+                                                      (#xf4 #x90 #x80 #x80)
+                                                      (#x41 #xff #x42)
+                                                      (#x80 #x80 #x80)
+                                                      (#xe2 #x82 #x41)
+                                                      (#xf0 #x9f #x92 #x41))))
+                                :start1 error)))
 
-             (setf (sb-impl::buffer-head ibuf) 0
-                   (sb-impl::buffer-tail ibuf) 1024)
-             (sb-kernel:copy-ub8-to-system-area vector 0 (sb-impl::buffer-sap ibuf) 0 (length vector))
-             (let* ((bad (validate-utf8 vector))
-                    (chars (sb-vm::utf8-crlf-to-character-string 0 (length string) string ibuf))
-                    (bytes (sb-impl::buffer-head ibuf))
-                    (decoded (octets-to-string vector :end bad :external-format '(:utf8 :newline :crlf))))
-               (when bad
-                 (assert (>= bad bytes)))
-               (assert (string= string decoded :end1 chars :end2 chars))))
-       (let ((random-string (make-string sb-impl::+bytes-per-buffer+)))
-         (loop repeat (* 256 #+slow 10)
-               do
-               (fill-random-string random-string)
-               (replace vector (string-to-octets random-string))
-               (let ((crlf (random (1- (length vector)))))
-                 (setf (aref vector crlf) #xd)
-                 (setf (aref vector (1+ crlf)) #xa))
-
-               (setf (sb-impl::buffer-head ibuf) 0
-                     (sb-impl::buffer-tail ibuf) 1024)
-               (sb-kernel:copy-ub8-to-system-area vector 0 (sb-impl::buffer-sap ibuf) 0 (length vector))
-               (let* ((bad (validate-utf8 vector))
-                      (chars (sb-vm::utf8-crlf-to-character-string 0 (length string) string ibuf))
-                      (bytes (sb-impl::buffer-head ibuf))
-                      (decoded (octets-to-string vector :end bad
-                                                        :external-format '(:utf8 :newline :crlf))))
-                 (when bad
-                   (assert (>= bad bytes)))
-                 (unless (string= string decoded :end1 chars :end2 chars)
-                   (error "~s" vector))))))
+                   (setf (sb-impl::buffer-head ibuf) 0
+                         (sb-impl::buffer-tail ibuf) buffer-length)
+                   (sb-kernel:copy-ub8-to-system-area vector 0 sap 0 (length vector))
+                   (let* ((bad (validate-utf8 vector))
+                          (chars (sb-vm::utf8-crlf-to-character-string 0 (length string) string ibuf))
+                          (bytes (sb-impl::buffer-head ibuf))
+                          (decoded (octets-to-string vector :end bad
+                                                            :external-format '(:utf8 :newline :crlf))))
+                     (when bad
+                       (assert (>= bad bytes)))
+                     (unless (string= string decoded :end1 chars :end2 chars)
+                       (error "~s" vector))))))
+      (free-protected-sap sap)
       (free-protected-array string))))
+
+(with-test (:name :utf8-to-character-string
+            :implemented-on (or :arm64 :x86-64))
+  (test-utf8-to-string nil))
+
+(with-test (:name :utf8-crlf-to-character-string
+            :implemented-on (or :arm64 :x86-64))
+  (test-utf8-to-string t))
 
 #+(or arm64 x86-64)
 (with-test (:name :character-string-to-utf8)
@@ -386,3 +390,68 @@
           (obuf (sb-impl::alloc-buffer))
           (random-string (make-string sb-impl::+bytes-per-buffer+ :element-type 'character)))
       (run-test random-string obuf vector))))
+
+(with-test (:name :utf8-strlen
+            :skipped-on :interpreter)
+  (flet ((test (bytes &optional (offset 0))
+           (loop for prefix from 0 to (if (> offset 0)
+                                          0
+                                          128)
+                 for string = (fill-random-string (make-string prefix))
+                 do
+                 (loop with bytes = (concatenate '(vector (mod 256))
+                                                 (string-to-octets string)
+                                                 bytes)
+                       for align-to-start in '(t nil)
+                       do
+                       (let* ((nul (position 0 bytes :start offset))
+                              (sub (subseq bytes offset nul))
+                              (bad (validate-utf8 sub))
+                              (expected-byte-length (length sub))
+                              (expected-length (unless bad
+                                                 (length (octets-to-string sub))))
+                              (expected-ascii-p (every (lambda (c)
+                                                         (< c 128)) sub))
+                              (sap (make-protected-sap (length bytes) align-to-start)))
+                         (when align-to-start
+                           (setf sap (sb-sys:sap+ sap (random 128))))
+                         (sb-kernel:copy-ub8-to-system-area bytes 0 sap 0 (length bytes))
+                         (unwind-protect
+                              (multiple-value-bind (length byte-length ascii-p)
+                                  (sb-vm::utf8-strlen (sb-sys:sap+ sap offset))
+                                (unless (and (eql expected-length length)
+                                             (eql expected-ascii-p (and ascii-p t))
+                                             (or (not expected-length)
+                                                 (eql expected-byte-length byte-length)))
+                                  (error "(sb-vm::utf8-strlen (sb-sys:sap+ (sb-sys:vector-sap ~s) ~s)) => ~a, ~a, ~a; but ~a, ~a, ~a expected"
+                                         bytes offset length byte-length ascii-p
+                                         expected-length expected-byte-length expected-ascii-p)))
+                           (free-protected-sap sap)))))))
+    (test '(1 2 0 255 255))
+    (test (append (loop for i from 1 to 64 collect i) '(0 1 255)))
+    (test '(1 2 0 1 1 1))
+    (test '(0 0 1 2 0) 2)
+    (test '(1 1 1 2 0) 2)
+    (test '(255 255 1 127 0) 2)
+    (test '(255 255 1 2 0))
+    (test '(255 255 1 2 0))
+    (test '(240 159 152 130 0))
+    (test '(1 240 159 152 130 0))
+    (test '(1 240 159 152 130 2 0))
+    (test '(65 195 132 226 130 172 240 159 152 130 0))
+    (test '(#xf4 #x8f #xbf #xbf 0))
+    (test '(#xe0 #xa0 #x80 0))
+    (test (append (loop for i from 1 to 61 collect i) '(240 159 152 130 0 255)))
+    (test (append (loop for i from 1 to 62 collect i) '(240 159 152 130 0 240)))
+    (test (append (loop for i from 1 to 63 collect i) '(240 159 152 130 0 250)))
+    (test (append (loop for i from 1 to 63 collect i) '(195 169 0 128)))
+
+    (test '(#xc0 #xaf 0))
+    (test '(#xe0 #x80 #x80 0))
+    (test '(#xf0 #x80 #x80 #x80 0))
+    (test '(#xed #xa0 #x80 0))
+    (test '(#xf4 #x90 #x80 #x80 0))
+    (test '(#x41 #xff #x42 0))
+    (test '(#x80 #x80 #x80 0))
+    (test '(#xe2 #x82 #x41 0))
+    (test '(#xf0 #x9f #x92 0))))
