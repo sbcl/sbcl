@@ -61,7 +61,7 @@
            signed-byte-32-p
            #+64-bit unsigned-byte-64-p
            #+64-bit signed-byte-64-p
-           weak-pointer-p code-component-p lra-p
+           weak-pointer-p code-component-p
            sb-int:unbound-marker-p
            pointerp
            simple-fun-p
@@ -918,7 +918,7 @@
 (defknown double-float-low-bits (double-float) (unsigned-byte 32)
   (movable foldable flushable))
 
-(defknown (%tan %sinh %asinh %atanh %log %logb %log10 %log1p %log2 %tan-quick)
+(defknown (%tan %sinh %asinh %atanh %log %log10 %log1p %log2 %tan-quick)
           (double-float) double-float
   (movable foldable flushable))
 
@@ -926,7 +926,7 @@
           (single-float) single-float
   (movable foldable flushable))
 
-(defknown (%sin %cos %tanh %sin-quick %cos-quick)
+(defknown (%sin %cos %tanh)
   (double-float) (double-float -1.0d0 1.0d0)
   (movable foldable flushable))
 
@@ -1001,14 +1001,6 @@
     (single-float #.(coerce (sb-xc:- pi) 'single-float)
                   #.(coerce pi 'single-float))
     (movable foldable flushable))
-
-(defknown (%scalb)
-  (double-float double-float) double-float
-  (movable foldable flushable))
-
-(defknown (%scalbn)
-  (double-float (signed-byte 32)) double-float
-  (movable foldable flushable))
 
 (defknown (%unary-truncate %unary-round) (real) integer
   (movable foldable flushable no-verify-arg-count))
