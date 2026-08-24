@@ -1268,7 +1268,8 @@ REG is the source (encoded in ModR/M.r/m).
                       l
                       (opcode-prefix #x0F)
                       (evex-w 0)
-                      nds)
+                      nds
+                      disp-n)
              `(progn
                 ,(when reg-reg-name
                    `(define-instruction ,reg-reg-name (segment dst src ,@(if nds '(src2)))
@@ -1296,7 +1297,8 @@ REG is the source (encoded in ModR/M.r/m).
                        'ymm-ymm/mem prefix opcode-to
                        :printer '(:name :tab reg/mem ", " reg)
                        :opcode-prefix opcode-prefix
-                       :w evex-w))
+                       :w evex-w
+                       :disp-n disp-n))
                   (:emitter
                    ,@(when nds
                        `((aver (register-p src))))
@@ -1329,18 +1331,18 @@ REG is the source (encoded in ModR/M.r/m).
                                           :w ,evex-w
                                           :l ,l))))))))
   ;; direction bit?
-  (def vmovapd #x66 #x28 #x29 :evex-w 1)
-  (def vmovaps nil  #x28 #x29)
+  (def vmovapd #x66 #x28 #x29 :evex-w 1 :disp-n 64)
+  (def vmovaps nil  #x28 #x29 :disp-n 64)
   (def vmovdqa #x66 #x6f #x7f)
   (def vmovdqu #xf3 #x6f #x7f)
-  (def vmovupd #x66 #x10 #x11 :evex-w 1)
-  (def vmovups nil  #x10 #x11)
+  (def vmovupd #x66 #x10 #x11 :evex-w 1 :disp-n 64)
+  (def vmovups nil  #x10 #x11 :disp-n 64)
 
   ;; streaming
-  (def vmovntdq #x66 nil #xe7  :force-to-mem t)
-  (def vmovntdqa #x66 #x2a nil :force-to-mem t :opcode-prefix #x0F38)
-  (def vmovntpd #x66 nil #x2b  :force-to-mem t :evex-w 1)
-  (def vmovntps nil  nil #x2b  :force-to-mem t)
+  (def vmovntdq #x66 nil #xe7  :force-to-mem t :disp-n 64)
+  (def vmovntdqa #x66 #x2a nil :force-to-mem t :opcode-prefix #x0F38 :disp-n 64)
+  (def vmovntpd #x66 nil #x2b  :force-to-mem t :evex-w 1 :disp-n 64)
+  (def vmovntps nil  nil #x2b  :force-to-mem t :disp-n 64)
 
   ;; use vmovhps for vmovlhps and vmovlps for vmovhlps
   (def vmovhpd #x66 #x16 #x17 :force-to-mem t :l 0 :nds t)

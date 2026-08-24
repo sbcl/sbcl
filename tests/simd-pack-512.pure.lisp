@@ -785,3 +785,28 @@
     (assert (search "VMOVAPS" text))
     (assert (search "ZMM0" text))
     (assert (search "[RSP+64]" text))))
+
+(with-test (:name :auto-promoted-vmovaps-disp8-printer)
+  (let* ((asm-pkg (find-package "SB-X86-64-ASM"))
+         (printer-fun (find-symbol "AVX2-INST-PRINTER-LIST" asm-pkg))
+         (inst-format (find-symbol "YMM-YMM/MEM" asm-pkg))
+         (disp64 (find-symbol "EVEX-YMMREG/MEM-DISP64" asm-pkg)))
+    (when (and printer-fun inst-format disp64)
+      (let* ((printer-forms
+               (funcall printer-fun
+                        inst-format
+                        nil        ; prefix for vmovaps
+                        #x28       ; opcode-from
+                        :opcode-prefix #x0f
+                        :w 0
+                        :disp-n 64))
+             (evex-form
+               (find-if (lambda (form)
+                          (and (eq (first form) :printer)
+                               (let ((name (second form)))
+                                 (and (symbolp name)
+                                      (search "EVEX-" (symbol-name name))))))
+                        printer-forms)))
+        (assert evex-form)
+        (let ((fields (third evex-form)))
+          (assert (eq (third (assoc 'reg/mem fields)) disp64)))))))
