@@ -314,8 +314,9 @@
                    1d0 0f0 0f0 0f0 0f0 0f0 0f0 0f0
                    0f0 0f0 0f0 0f0 0f0 0f0 0f0 0f0)
                   type-error)))
+
+;; evex patch - stubs
 
-;; evex patch
 (cl:in-package "SB-VM")
 
 (macrolet ((def (name)
@@ -355,10 +356,68 @@
   (def %test-vpcmpd-disp8)
   (def %test-vpcmpd-disp32)
   (def %test-vptestmd-disp8)
-  (def %test-vptestmd-disp32))
+  (def %test-vptestmd-disp32)
+  (def %test-vpmovqd-xmm-disp8)
+  (def %test-vpmovqd-ymm-disp8)
+  (def %test-vpmovqd-zmm-disp8)
+  (def %test-vpmovqd-zmm-disp32)
+  (def %test-vpmovsqb-xmm-disp8)
+  (def %test-vpmovsqb-ymm-disp8)
+  (def %test-vpmovsqb-zmm-disp8)
+  (def %test-vpmovsqb-zmm-disp32)
+  (def %test-vrcp14ps-xmm-disp8)
+  (def %test-vrcp14ps-ymm-disp8)
+  (def %test-vrcp14ps-zmm-disp8)
+  (def %test-vrcp14ps-zmm-disp32)
+  (def %test-vpabsq-zmm-disp8)
+  (def %test-valignd-xmm-disp8)
+  (def %test-valignd-ymm-disp8)
+  (def %test-valignd-zmm-disp8)
+  (def %test-valignd-zmm-disp32)
+  (def %test-vrangess-disp8)
+  (def %test-vrangess-disp32)
+  (def %test-vrangesd-disp8)
+  (def %test-vrndscaleps-xmm-disp8)
+  (def %test-vrndscaleps-zmm-disp8)
+  (def %test-vrndscaleps-zmm-disp32)
+  (def %test-vrndscaless-disp8)
+  (def %test-vrndscaless-disp32)
+  (def %test-vrndscalesd-disp8)
+  (def %test-vfixupimmps-xmm-disp8)
+  (def %test-vfixupimmps-zmm-disp8)
+  (def %test-vfixupimmps-zmm-disp32)
+  (def %test-vfixupimmss-disp8)
+  (def %test-vfixupimmss-disp32)
+  (def %test-vfixupimmsd-disp8)
+  (def %test-vreducess-disp8)
+  (def %test-vreducess-disp32)
+  (def %test-vreducesd-disp8)
+  (def %test-vgetmantss-disp8)
+  (def %test-vgetmantss-disp32)
+  (def %test-vgetmantsd-disp8)
+  (def %test-vgetexpss-disp8)
+  (def %test-vgetexpss-disp32)
+  (def %test-vgetexpsd-disp8)
+  (def %test-vscalefps-xmm-disp8)
+  (def %test-vscalefps-zmm-disp8)
+  (def %test-vscalefps-zmm-disp32)
+  (def %test-vscalefss-disp8)
+  (def %test-vscalefss-disp32)
+  (def %test-vscalefsd-disp8)
+  (def %test-vcvtss2usi-disp8)
+  (def %test-vcvtss2usi-disp32)
+  (def %test-vcvtsd2usi-disp8)
+  (def %test-vcvttss2usi-disp8)
+  (def %test-vcvttsd2usi-disp8)
+  (def %test-vcvtusi2sd-disp8)
+  (def %test-vcvtusi2sd-disp32)
+  (def %test-vcvtusi2ss-disp8))
+
+
+;; instruction vops
 
 (define-vop (%test-evex-high-regs)
-  (:translate %test-evex-high-regs)
+    (:translate %test-evex-high-regs)
   (:policy :fast-safe)
   (:temporary (:sc single-avx512-reg :offset 16) z16)
   (:temporary (:sc single-avx512-reg :offset 17) z17)
@@ -742,6 +801,637 @@
     (inst vptestmd k1 zmm (ea 65 rsp))
     (inst xor :dword res res)))
 
+(define-vop (%test-vpmovqd-xmm-disp8)
+  (:translate %test-vpmovqd-xmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vpmovqd (ea 8 rsp) xmm)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vpmovqd-ymm-disp8)
+  (:translate %test-vpmovqd-ymm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx2-reg :offset 1) ymm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vpmovqd (ea 16 rsp) ymm)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vpmovqd-zmm-disp8)
+  (:translate %test-vpmovqd-zmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 2) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vpmovqd (ea 32 rsp) zmm)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vpmovqd-zmm-disp32)
+  (:translate %test-vpmovqd-zmm-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 2) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vpmovqd (ea 33 rsp) zmm)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vpmovsqb-xmm-disp8)
+  (:translate %test-vpmovsqb-xmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vpmovsqb (ea 2 rsp) xmm)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vpmovsqb-ymm-disp8)
+  (:translate %test-vpmovsqb-ymm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx2-reg :offset 1) ymm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vpmovsqb (ea 4 rsp) ymm)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vpmovsqb-zmm-disp8)
+  (:translate %test-vpmovsqb-zmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 2) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vpmovsqb (ea 8 rsp) zmm)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vpmovsqb-zmm-disp32)
+  (:translate %test-vpmovsqb-zmm-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 2) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vpmovsqb (ea 9 rsp) zmm)
+    (inst xor :dword res res)))
+
+;; Full-vector 2-operand group: vrcp14ps (W=0)
+(define-vop (%test-vrcp14ps-xmm-disp8)
+  (:translate %test-vrcp14ps-xmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vrcp14ps xmm (ea 16 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vrcp14ps-ymm-disp8)
+  (:translate %test-vrcp14ps-ymm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx2-reg :offset 1) ymm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vrcp14ps ymm (ea 32 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vrcp14ps-zmm-disp8)
+  (:translate %test-vrcp14ps-zmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 2) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vrcp14ps zmm (ea 64 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vrcp14ps-zmm-disp32)
+  (:translate %test-vrcp14ps-zmm-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 2) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vrcp14ps zmm (ea 65 rsp))
+    (inst xor :dword res res)))
+
+;; Ensure integer W=1 full-vector group also uses compressed disp
+(define-vop (%test-vpabsq-zmm-disp8)
+  (:translate %test-vpabsq-zmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 3) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vpabsq zmm (ea 64 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-valignd-xmm-disp8)
+  (:translate %test-valignd-xmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm0)
+  (:temporary (:sc single-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst valignd xmm0 xmm1 (ea 16 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-valignd-ymm-disp8)
+  (:translate %test-valignd-ymm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx2-reg :offset 1) ymm1)
+  (:temporary (:sc int-avx2-reg :offset 2) ymm2)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst valignd ymm1 ymm2 (ea 32 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-valignd-zmm-disp8)
+  (:translate %test-valignd-zmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 1) zmm1)
+  (:temporary (:sc int-avx512-reg :offset 2) zmm2)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst valignd zmm1 zmm2 (ea 64 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-valignd-zmm-disp32)
+  (:translate %test-valignd-zmm-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 1) zmm1)
+  (:temporary (:sc int-avx512-reg :offset 2) zmm2)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst valignd zmm1 zmm2 (ea 65 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vrangess-disp8)
+  (:translate %test-vrangess-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm0)
+  (:temporary (:sc single-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vrangess xmm0 xmm1 (ea 4 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vrangess-disp32)
+  (:translate %test-vrangess-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm0)
+  (:temporary (:sc single-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vrangess xmm0 xmm1 (ea 5 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vrangesd-disp8)
+  (:translate %test-vrangesd-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc double-sse-reg :offset 0) xmm0)
+  (:temporary (:sc double-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vrangesd xmm0 xmm1 (ea 8 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vrndscaleps-xmm-disp8)
+  (:translate %test-vrndscaleps-xmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vrndscaleps xmm (ea 16 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vrndscaleps-zmm-disp8)
+  (:translate %test-vrndscaleps-zmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 2) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vrndscaleps zmm (ea 64 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vrndscaleps-zmm-disp32)
+  (:translate %test-vrndscaleps-zmm-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 2) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vrndscaleps zmm (ea 65 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vrndscaless-disp8)
+  (:translate %test-vrndscaless-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vrndscaless xmm (ea 4 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vrndscaless-disp32)
+  (:translate %test-vrndscaless-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vrndscaless xmm (ea 5 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vrndscalesd-disp8)
+  (:translate %test-vrndscalesd-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc double-sse-reg :offset 0) xmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vrndscalesd xmm (ea 8 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vfixupimmps-xmm-disp8)
+  (:translate %test-vfixupimmps-xmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm0)
+  (:temporary (:sc single-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vfixupimmps xmm0 xmm1 (ea 16 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vfixupimmps-zmm-disp8)
+  (:translate %test-vfixupimmps-zmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 1) zmm1)
+  (:temporary (:sc single-avx512-reg :offset 2) zmm2)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vfixupimmps zmm1 zmm2 (ea 64 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vfixupimmps-zmm-disp32)
+  (:translate %test-vfixupimmps-zmm-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 1) zmm1)
+  (:temporary (:sc single-avx512-reg :offset 2) zmm2)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vfixupimmps zmm1 zmm2 (ea 65 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vfixupimmss-disp8)
+  (:translate %test-vfixupimmss-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm0)
+  (:temporary (:sc single-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vfixupimmss xmm0 xmm1 (ea 4 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vfixupimmss-disp32)
+  (:translate %test-vfixupimmss-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm0)
+  (:temporary (:sc single-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vfixupimmss xmm0 xmm1 (ea 5 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vfixupimmsd-disp8)
+  (:translate %test-vfixupimmsd-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc double-sse-reg :offset 0) xmm0)
+  (:temporary (:sc double-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vfixupimmsd xmm0 xmm1 (ea 8 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vreducess-disp8)
+  (:translate %test-vreducess-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm0)
+  (:temporary (:sc single-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vreducess xmm0 xmm1 (ea 4 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vreducess-disp32)
+  (:translate %test-vreducess-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm0)
+  (:temporary (:sc single-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vreducess xmm0 xmm1 (ea 5 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vreducesd-disp8)
+  (:translate %test-vreducesd-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc double-sse-reg :offset 0) xmm0)
+  (:temporary (:sc double-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vreducesd xmm0 xmm1 (ea 8 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vgetmantss-disp8)
+  (:translate %test-vgetmantss-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm0)
+  (:temporary (:sc single-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vgetmantss xmm0 xmm1 (ea 4 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vgetmantss-disp32)
+  (:translate %test-vgetmantss-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm0)
+  (:temporary (:sc single-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vgetmantss xmm0 xmm1 (ea 5 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vgetmantsd-disp8)
+  (:translate %test-vgetmantsd-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc double-sse-reg :offset 0) xmm0)
+  (:temporary (:sc double-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vgetmantsd xmm0 xmm1 (ea 8 rsp) 0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vgetexpss-disp8)
+  (:translate %test-vgetexpss-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm0)
+  (:temporary (:sc single-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vgetexpss xmm0 xmm1 (ea 4 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vgetexpss-disp32)
+  (:translate %test-vgetexpss-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm0)
+  (:temporary (:sc single-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vgetexpss xmm0 xmm1 (ea 5 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vgetexpsd-disp8)
+  (:translate %test-vgetexpsd-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc double-sse-reg :offset 0) xmm0)
+  (:temporary (:sc double-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vgetexpsd xmm0 xmm1 (ea 8 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vscalefps-xmm-disp8)
+  (:translate %test-vscalefps-xmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm0)
+  (:temporary (:sc single-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vscalefps xmm0 xmm1 (ea 16 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vscalefps-zmm-disp8)
+  (:translate %test-vscalefps-zmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 1) zmm1)
+  (:temporary (:sc single-avx512-reg :offset 2) zmm2)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vscalefps zmm1 zmm2 (ea 64 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vscalefps-zmm-disp32)
+  (:translate %test-vscalefps-zmm-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 1) zmm1)
+  (:temporary (:sc single-avx512-reg :offset 2) zmm2)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vscalefps zmm1 zmm2 (ea 65 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vscalefss-disp8)
+  (:translate %test-vscalefss-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm0)
+  (:temporary (:sc single-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vscalefss xmm0 xmm1 (ea 4 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vscalefss-disp32)
+  (:translate %test-vscalefss-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm0)
+  (:temporary (:sc single-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vscalefss xmm0 xmm1 (ea 5 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vscalefsd-disp8)
+  (:translate %test-vscalefsd-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc double-sse-reg :offset 0) xmm0)
+  (:temporary (:sc double-sse-reg :offset 1) xmm1)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vscalefsd xmm0 xmm1 (ea 8 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vcvtss2usi-disp8)
+  (:translate %test-vcvtss2usi-disp8)
+  (:policy :fast-safe)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:generator 1
+    (inst vcvtss2usi res (ea 4 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vcvtss2usi-disp32)
+  (:translate %test-vcvtss2usi-disp32)
+  (:policy :fast-safe)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:generator 1
+    (inst vcvtss2usi res (ea 5 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vcvtsd2usi-disp8)
+  (:translate %test-vcvtsd2usi-disp8)
+  (:policy :fast-safe)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:generator 1
+    (inst vcvtsd2usi res (ea 8 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vcvttss2usi-disp8)
+  (:translate %test-vcvttss2usi-disp8)
+  (:policy :fast-safe)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:generator 1
+    (inst vcvttss2usi res (ea 4 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vcvttsd2usi-disp8)
+  (:translate %test-vcvttsd2usi-disp8)
+  (:policy :fast-safe)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:generator 1
+    (inst vcvttsd2usi res (ea 8 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vcvtusi2sd-disp8)
+  (:translate %test-vcvtusi2sd-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc double-sse-reg :offset 0) xmm)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:generator 1
+    (inst vcvtusi2sd xmm xmm (ea 8 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vcvtusi2sd-disp32)
+  (:translate %test-vcvtusi2sd-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc double-sse-reg :offset 0) xmm)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:generator 1
+    (inst vcvtusi2sd xmm xmm (ea 9 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vcvtusi2ss-disp8)
+  (:translate %test-vcvtusi2ss-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-sse-reg :offset 0) xmm)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:generator 1
+    (inst vcvtusi2ss xmm xmm (ea 8 rsp))
+    (inst xor :dword res res)))
+
+;; evex tests
 (cl:in-package :test-util)
 
 (defmacro define-evex-disasm-test (name function expects &key unexpected)
@@ -1023,3 +1713,401 @@
     :evex-vptestmd-disp32-fallback
     sb-vm::%test-vptestmd-disp32
   ("VPTESTMD" "K1" "ZMM0" "[RSP+65]"))
+
+;; Down-convert store: XMM source has disp-n=8
+(define-evex-disasm-test
+    :evex-vpmovqd-xmm-compressed-disp8
+    sb-vm::%test-vpmovqd-xmm-disp8
+  ("VPMOVQD" "XMM0" "[RSP+8]")
+  :unexpected ("[RSP+1]"))
+
+;; Down-convert store: YMM source has disp-n=16
+(define-evex-disasm-test
+    :evex-vpmovqd-ymm-compressed-disp8
+    sb-vm::%test-vpmovqd-ymm-disp8
+  ("VPMOVQD" "YMM1" "[RSP+16]")
+  :unexpected ("[RSP+1]"))
+
+;; Down-convert store: ZMM source has disp-n=32
+(define-evex-disasm-test
+    :evex-vpmovqd-zmm-compressed-disp8
+    sb-vm::%test-vpmovqd-zmm-disp8
+  ("VPMOVQD" "ZMM2" "[RSP+32]")
+  :unexpected ("[RSP+1]"))
+
+;; Down-convert store: ZMM falls back to disp32 for non-multiple
+(define-evex-disasm-test
+    :evex-vpmovqd-zmm-disp32-fallback
+    sb-vm::%test-vpmovqd-zmm-disp32
+  ("VPMOVQD" "ZMM2" "[RSP+33]"))
+
+;; Saturating truncation: XMM source, byte result -> disp-n=2
+(define-evex-disasm-test
+    :evex-vpmovsqb-xmm-compressed-disp8
+    sb-vm::%test-vpmovsqb-xmm-disp8
+  ("VPMOVSQB" "XMM0" "[RSP+2]")
+  :unexpected ("[RSP+1]"))
+
+;; Saturating truncation: YMM source, byte result -> disp-n=4
+(define-evex-disasm-test
+    :evex-vpmovsqb-ymm-compressed-disp8
+    sb-vm::%test-vpmovsqb-ymm-disp8
+  ("VPMOVSQB" "YMM1" "[RSP+4]")
+  :unexpected ("[RSP+1]"))
+
+;; Saturating truncation: ZMM source, byte result -> disp-n=8
+(define-evex-disasm-test
+    :evex-vpmovsqb-zmm-compressed-disp8
+    sb-vm::%test-vpmovsqb-zmm-disp8
+  ("VPMOVSQB" "ZMM2" "[RSP+8]")
+  :unexpected ("[RSP+1]"))
+
+;; Saturating truncation: non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vpmovsqb-zmm-disp32-fallback
+    sb-vm::%test-vpmovsqb-zmm-disp32
+  ("VPMOVSQB" "ZMM2" "[RSP+9]"))
+
+;; Full-vector reciprocal approximation: XMM -> disp-n=16
+(define-evex-disasm-test
+    :evex-vrcp14ps-xmm-compressed-disp8
+    sb-vm::%test-vrcp14ps-xmm-disp8
+  ("VRCP14PS" "XMM0" "[RSP+16]")
+  :unexpected ("[RSP+1]"))
+
+;; Full-vector reciprocal approximation: YMM -> disp-n=32
+(define-evex-disasm-test
+    :evex-vrcp14ps-ymm-compressed-disp8
+    sb-vm::%test-vrcp14ps-ymm-disp8
+  ("VRCP14PS" "YMM1" "[RSP+32]")
+  :unexpected ("[RSP+1]"))
+
+;; Full-vector reciprocal approximation: ZMM -> disp-n=64
+(define-evex-disasm-test
+    :evex-vrcp14ps-zmm-compressed-disp8
+    sb-vm::%test-vrcp14ps-zmm-disp8
+  ("VRCP14PS" "ZMM2" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Full-vector reciprocal approximation: non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vrcp14ps-zmm-disp32-fallback
+    sb-vm::%test-vrcp14ps-zmm-disp32
+  ("VRCP14PS" "ZMM2" "[RSP+65]"))
+
+;; Integer full-vector group with W=1: vpabsq
+(define-evex-disasm-test
+    :evex-vpabsq-zmm-compressed-disp8
+    sb-vm::%test-vpabsq-zmm-disp8
+  ("VPABSQ" "ZMM3" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Packed 3-operand immediate: valignd XMM -> disp-n=16
+(define-evex-disasm-test
+    :evex-valignd-xmm-compressed-disp8
+    sb-vm::%test-valignd-xmm-disp8
+  ("VALIGND" "XMM0" "XMM1" "[RSP+16]")
+  :unexpected ("[RSP+1]"))
+
+;; Packed 3-operand immediate: valignd YMM -> disp-n=32
+(define-evex-disasm-test
+    :evex-valignd-ymm-compressed-disp8
+    sb-vm::%test-valignd-ymm-disp8
+  ("VALIGND" "YMM1" "YMM2" "[RSP+32]")
+  :unexpected ("[RSP+1]"))
+
+;; Packed 3-operand immediate: valignd ZMM -> disp-n=64
+(define-evex-disasm-test
+    :evex-valignd-zmm-compressed-disp8
+    sb-vm::%test-valignd-zmm-disp8
+  ("VALIGND" "ZMM1" "ZMM2" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Packed 3-operand immediate: non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-valignd-zmm-disp32-fallback
+    sb-vm::%test-valignd-zmm-disp32
+  ("VALIGND" "ZMM1" "ZMM2" "[RSP+65]"))
+
+;; Scalar range: single precision uses disp-n=4
+(define-evex-disasm-test
+    :evex-vrangess-compressed-disp8
+    sb-vm::%test-vrangess-disp8
+  ("VRANGESS" "XMM0" "XMM1" "[RSP+4]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar range: single precision non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vrangess-disp32-fallback
+    sb-vm::%test-vrangess-disp32
+  ("VRANGESS" "XMM0" "XMM1" "[RSP+5]"))
+
+;; Scalar range: double precision uses disp-n=8
+(define-evex-disasm-test
+    :evex-vrangesd-compressed-disp8
+    sb-vm::%test-vrangesd-disp8
+  ("VRANGESD" "XMM0" "XMM1" "[RSP+8]")
+  :unexpected ("[RSP+1]"))
+
+;; Packed round: XMM full-vector -> disp-n=16
+(define-evex-disasm-test
+    :evex-vrndscaleps-xmm-compressed-disp8
+    sb-vm::%test-vrndscaleps-xmm-disp8
+  ("VRNDSCALEPS" "XMM0" "[RSP+16]")
+  :unexpected ("[RSP+1]"))
+
+;; Packed round: ZMM full-vector -> disp-n=64
+(define-evex-disasm-test
+    :evex-vrndscaleps-zmm-compressed-disp8
+    sb-vm::%test-vrndscaleps-zmm-disp8
+  ("VRNDSCALEPS" "ZMM2" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Packed round: non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vrndscaleps-zmm-disp32-fallback
+    sb-vm::%test-vrndscaleps-zmm-disp32
+  ("VRNDSCALEPS" "ZMM2" "[RSP+65]"))
+
+;; Scalar round: single precision uses disp-n=4
+(define-evex-disasm-test
+    :evex-vrndscaless-compressed-disp8
+    sb-vm::%test-vrndscaless-disp8
+  ("VRNDSCALESS" "XMM0" "[RSP+4]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar round: single precision non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vrndscaless-disp32-fallback
+    sb-vm::%test-vrndscaless-disp32
+  ("VRNDSCALESS" "XMM0" "[RSP+5]"))
+
+;; Scalar round: double precision uses disp-n=8
+(define-evex-disasm-test
+    :evex-vrndscalesd-compressed-disp8
+    sb-vm::%test-vrndscalesd-disp8
+  ("VRNDSCALESD" "XMM0" "[RSP+8]")
+  :unexpected ("[RSP+1]"))
+
+;; Packed fixup: XMM full-vector -> disp-n=16
+(define-evex-disasm-test
+    :evex-vfixupimmps-xmm-compressed-disp8
+    sb-vm::%test-vfixupimmps-xmm-disp8
+  ("VFIXUPIMMPS" "XMM0" "XMM1" "[RSP+16]")
+  :unexpected ("[RSP+1]"))
+
+;; Packed fixup: ZMM full-vector -> disp-n=64
+(define-evex-disasm-test
+    :evex-vfixupimmps-zmm-compressed-disp8
+    sb-vm::%test-vfixupimmps-zmm-disp8
+  ("VFIXUPIMMPS" "ZMM1" "ZMM2" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Packed fixup: non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vfixupimmps-zmm-disp32-fallback
+    sb-vm::%test-vfixupimmps-zmm-disp32
+  ("VFIXUPIMMPS" "ZMM1" "ZMM2" "[RSP+65]"))
+
+;; Scalar fixup: single precision uses disp-n=4
+(define-evex-disasm-test
+    :evex-vfixupimmss-compressed-disp8
+    sb-vm::%test-vfixupimmss-disp8
+  ("VFIXUPIMMSS" "XMM0" "XMM1" "[RSP+4]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar fixup: single precision non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vfixupimmss-disp32-fallback
+    sb-vm::%test-vfixupimmss-disp32
+  ("VFIXUPIMMSS" "XMM0" "XMM1" "[RSP+5]"))
+
+;; Scalar fixup: double precision uses disp-n=8
+(define-evex-disasm-test
+    :evex-vfixupimmsd-compressed-disp8
+    sb-vm::%test-vfixupimmsd-disp8
+  ("VFIXUPIMMSD" "XMM0" "XMM1" "[RSP+8]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar reduce: single precision uses disp-n=4
+(define-evex-disasm-test
+    :evex-vreducess-compressed-disp8
+    sb-vm::%test-vreducess-disp8
+  ("VREDUCESS" "XMM0" "XMM1" "[RSP+4]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar reduce: single precision non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vreducess-disp32-fallback
+    sb-vm::%test-vreducess-disp32
+  ("VREDUCESS" "XMM0" "XMM1" "[RSP+5]"))
+
+;; Scalar reduce: double precision uses disp-n=8
+(define-evex-disasm-test
+    :evex-vreducesd-compressed-disp8
+    sb-vm::%test-vreducesd-disp8
+  ("VREDUCESD" "XMM0" "XMM1" "[RSP+8]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar getmant: single precision uses disp-n=4
+(define-evex-disasm-test
+    :evex-vgetmantss-compressed-disp8
+    sb-vm::%test-vgetmantss-disp8
+  ("VGETMANTSS" "XMM0" "XMM1" "[RSP+4]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar getmant: single precision non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vgetmantss-disp32-fallback
+    sb-vm::%test-vgetmantss-disp32
+  ("VGETMANTSS" "XMM0" "XMM1" "[RSP+5]"))
+
+;; Scalar getmant: double precision uses disp-n=8
+(define-evex-disasm-test
+    :evex-vgetmantsd-compressed-disp8
+    sb-vm::%test-vgetmantsd-disp8
+  ("VGETMANTSD" "XMM0" "XMM1" "[RSP+8]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar getexp: single precision uses disp-n=4
+(define-evex-disasm-test
+    :evex-vgetexpss-compressed-disp8
+    sb-vm::%test-vgetexpss-disp8
+  ("VGETEXPSS" "XMM0" "XMM1" "[RSP+4]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar getexp: single precision non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vgetexpss-disp32-fallback
+    sb-vm::%test-vgetexpss-disp32
+  ("VGETEXPSS" "XMM0" "XMM1" "[RSP+5]"))
+
+;; Scalar getexp: double precision uses disp-n=8
+(define-evex-disasm-test
+    :evex-vgetexpsd-compressed-disp8
+    sb-vm::%test-vgetexpsd-disp8
+  ("VGETEXPSD" "XMM0" "XMM1" "[RSP+8]")
+  :unexpected ("[RSP+1]"))
+
+;; Packed scale: XMM full-vector -> disp-n=16
+(define-evex-disasm-test
+    :evex-vscalefps-xmm-compressed-disp8
+    sb-vm::%test-vscalefps-xmm-disp8
+  ("VSCALEFPS" "XMM0" "XMM1" "[RSP+16]")
+  :unexpected ("[RSP+1]"))
+
+;; Packed scale: ZMM full-vector -> disp-n=64
+(define-evex-disasm-test
+    :evex-vscalefps-zmm-compressed-disp8
+    sb-vm::%test-vscalefps-zmm-disp8
+  ("VSCALEFPS" "ZMM1" "ZMM2" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Packed scale: non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vscalefps-zmm-disp32-fallback
+    sb-vm::%test-vscalefps-zmm-disp32
+  ("VSCALEFPS" "ZMM1" "ZMM2" "[RSP+65]"))
+
+;; Scalar scale: single precision uses disp-n=4
+(define-evex-disasm-test
+    :evex-vscalefss-compressed-disp8
+    sb-vm::%test-vscalefss-disp8
+  ("VSCALEFSS" "XMM0" "XMM1" "[RSP+4]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar scale: single precision non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vscalefss-disp32-fallback
+    sb-vm::%test-vscalefss-disp32
+  ("VSCALEFSS" "XMM0" "XMM1" "[RSP+5]"))
+
+;; Scalar scale: double precision uses disp-n=8
+(define-evex-disasm-test
+    :evex-vscalefsd-compressed-disp8
+    sb-vm::%test-vscalefsd-disp8
+  ("VSCALEFSD" "XMM0" "XMM1" "[RSP+8]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar unsigned conversion: single precision uses disp-n=4
+(define-evex-disasm-test
+    :evex-vcvtss2usi-compressed-disp8
+    sb-vm::%test-vcvtss2usi-disp8
+  ("VCVTSS2USI" "[RSP+4]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar unsigned conversion: single precision non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vcvtss2usi-disp32-fallback
+    sb-vm::%test-vcvtss2usi-disp32
+  ("VCVTSS2USI" "[RSP+5]"))
+
+;; Scalar unsigned conversion: double precision uses disp-n=8
+(define-evex-disasm-test
+    :evex-vcvtsd2usi-compressed-disp8
+    sb-vm::%test-vcvtsd2usi-disp8
+  ("VCVTSD2USI" "[RSP+8]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar truncating unsigned conversion: single precision uses disp-n=4
+(define-evex-disasm-test
+    :evex-vcvttss2usi-compressed-disp8
+    sb-vm::%test-vcvttss2usi-disp8
+  ("VCVTTSS2USI" "[RSP+4]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar truncating unsigned conversion: double precision uses disp-n=8
+(define-evex-disasm-test
+    :evex-vcvttsd2usi-compressed-disp8
+    sb-vm::%test-vcvttsd2usi-disp8
+  ("VCVTTSD2USI" "[RSP+8]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar unsigned convert to double, default W=1 -> disp-n=8
+(define-evex-disasm-test
+    :evex-vcvtusi2sd-compressed-disp8
+    sb-vm::%test-vcvtusi2sd-disp8
+  ("VCVTUSI2SD" "XMM0" "XMM0" "[RSP+8]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar unsigned convert to double, non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vcvtusi2sd-disp32-fallback
+    sb-vm::%test-vcvtusi2sd-disp32
+  ("VCVTUSI2SD" "XMM0" "XMM0" "[RSP+9]"))
+
+;; Scalar unsigned convert to single, default W=1 -> disp-n=8
+(define-evex-disasm-test
+    :evex-vcvtusi2ss-compressed-disp8
+    sb-vm::%test-vcvtusi2ss-disp8
+  ("VCVTUSI2SS" "XMM0" "XMM0" "[RSP+8]")
+  :unexpected ("[RSP+1]"))
+
+;; Printer metadata: W=0 and W=1 entries have correct disp-n
+(with-test (:name :scalar-unsigned-convert-printer-disp-n)
+  (let* ((asm-pkg (find-package "SB-X86-64-ASM"))
+         (printer-fun (find-symbol "AVX512-INST-PRINTER-LIST" asm-pkg))
+         (inst-format (find-symbol "YMM-YMM/MEM" asm-pkg)))
+    (when (and printer-fun inst-format)
+      (flet ((find-disp-n (forms w)
+               (find-if (lambda (form)
+                          (and (eq (first form) :printer)
+                               (let ((fields (third form)))
+                                 (and (eql (second (assoc 'w fields)) w)
+                                      (assoc 'reg/mem fields)))))
+                        forms)))
+        (let ((w0-forms (funcall printer-fun inst-format #xf3 #x7b
+                                 :nds t :w 0 :disp-n 4))
+              (w1-forms (funcall printer-fun inst-format #xf3 #x7b
+                                 :nds t :w 1 :disp-n 8)))
+          (let ((w0-form (find-disp-n w0-forms 0))
+                (w1-form (find-disp-n w1-forms 1)))
+            (assert w0-form)
+            (assert w1-form)
+            (let ((w0-reg/mem (assoc 'reg/mem (third w0-form)))
+                  (w1-reg/mem (assoc 'reg/mem (third w1-form))))
+              ;; The third element of the reg/mem field is the arg type.
+              (assert (eq (third w0-reg/mem)
+                          (find-symbol "EVEX-YMMREG/MEM-DISP4" asm-pkg)))
+              (assert (eq (third w1-reg/mem)
+                          (find-symbol "EVEX-YMMREG/MEM-DISP8" asm-pkg))))))))))

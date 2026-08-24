@@ -214,21 +214,30 @@
   (def vpexpandq  #x66 #x89 1))
 
 ;;; Down-convert (pack and store)
-(macrolet ((def (name prefix opcode w)
+(macrolet ((def (name prefix opcode w disp-ns)
              `(define-instruction ,name (segment dst src)
-                ,@(avx512-inst-printer-list 'ymm-ymm/mem prefix opcode
-                                            :opcode-prefix #x0f38 :w w
-                                            :printer '(:name :tab reg/mem ", " reg))
+                ,@(loop for ll in '(#b00 #b01 #b10)
+                        for n in disp-ns
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem prefix opcode
+                         :opcode-prefix #x0f38 :w w
+                         :ll ll :disp-n n
+                         :printer '(:name :tab reg/mem ", " reg)))
                 (:emitter
                  (emit-avx512-inst segment dst src ,prefix ,opcode
                                    :opcode-prefix #x0f38
-                                   :w ,w)))))
-  (def vpmovqd  #xf3 #x35 0)
-  (def vpmovqw  #xf3 #x34 0)
-  (def vpmovqb  #xf3 #x32 0)
-  (def vpmovdw  #xf3 #x33 0)
-  (def vpmovdb  #xf3 #x31 0)
-  (def vpmovwb  #xf3 #x30 0))
+                                   :w ,w
+                                   :disp-n (cond ((zmm-register-p src) (third ',disp-ns))
+                                                 ((ymm-register-p src) (second ',disp-ns))
+                                                 ((xmm-register-p src) (first ',disp-ns))
+                                                 (t 0)))))))
+  (def vpmovqd #xf3 #x35 0 (8 16 32))
+  (def vpmovqw #xf3 #x34 0 (4 8 16))
+  (def vpmovqb #xf3 #x32 0 (2 4 8))
+  (def vpmovdw #xf3 #x33 0 (8 16 32))
+  (def vpmovdb #xf3 #x31 0 (4 8 16))
+  (def vpmovwb #xf3 #x30 0 (8 16 32)))
 
 ;;; Get exponent / mantissa
 (macrolet ((def (name opcode w &key (opcode-prefix #x0f38))
@@ -256,38 +265,73 @@
   (def-imm vgetmantpd  #x26 1))
 
 ;;; Round to scale
-(macrolet ((def (name opcode w)
+(macrolet ((def (name opcode w &key scalar-disp-n)
              `(define-instruction ,name (segment dst src imm)
-                ,@(avx512-inst-printer-list 'ymm-ymm/mem-imm #x66 opcode
-                                            :opcode-prefix #x0f3a :w w
-                                            :printer '(:name :tab reg ", " reg/mem ", " imm))
+                ,@(if scalar-disp-n
+                      (avx512-inst-printer-list
+                       'ymm-ymm/mem-imm #x66 opcode
+                       :opcode-prefix #x0f3a :w w
+                       :disp-n scalar-disp-n
+                       :printer '(:name :tab reg ", " reg/mem ", " imm))
+                      (loop for (ll n) in '((#b00 16) (#b01 32) (#b10 64))
+                            append
+                            (avx512-inst-printer-list
+                             'ymm-ymm/mem-imm #x66 opcode
+                             :opcode-prefix #x0f3a :w w
+                             :ll ll :disp-n n
+                             :printer '(:name :tab reg ", " reg/mem ", " imm))))
                 (:emitter
                  (emit-avx512-inst segment src dst #x66 ,opcode
                                    :opcode-prefix #x0f3a
                                    :w ,w
+                                   :disp-n ,(if scalar-disp-n
+                                                scalar-disp-n
+                                                '(cond ((zmm-register-p dst) 64)
+                                                       ((ymm-register-p dst) 32)
+                                                       ((xmm-register-p dst) 16)
+                                                       (t 0)))
                                    :remaining-bytes 1)
                  (emit-byte segment imm)))))
+  ;; packed full-vector
   (def vrndscaleps #x08 0)
   (def vrndscalepd #x09 1)
-  (def vrndscaless #x0a 0)
-  (def vrndscalesd #x0b 1))
+  ;; scalar fixed-width
+  (def vrndscaless #x0a 0 :scalar-disp-n 4)
+  (def vrndscalesd #x0b 1 :scalar-disp-n 8))
 
 ;;; Fixup
-(macrolet ((def (name opcode w)
+(macrolet ((def (name opcode w &key scalar-disp-n)
              `(define-instruction ,name (segment dst src1 src2 imm)
-                ,@(avx512-inst-printer-list 'ymm-ymm/mem-imm #x66 opcode
-                                            :opcode-prefix #x0f3a :w w)
+                ,@(if scalar-disp-n
+                      (avx512-inst-printer-list
+                       'ymm-ymm/mem-imm #x66 opcode
+                       :opcode-prefix #x0f3a :w w
+                       :disp-n scalar-disp-n)
+                      (loop for (ll n) in '((#b00 16) (#b01 32) (#b10 64))
+                            append
+                            (avx512-inst-printer-list
+                             'ymm-ymm/mem-imm #x66 opcode
+                             :opcode-prefix #x0f3a :w w
+                             :ll ll :disp-n n)))
                 (:emitter
                  (emit-avx512-inst segment src2 dst #x66 ,opcode
                                    :opcode-prefix #x0f3a
                                    :vvvv src1
                                    :w ,w
+                                   :disp-n ,(if scalar-disp-n
+                                                scalar-disp-n
+                                                '(cond ((zmm-register-p dst) 64)
+                                                       ((ymm-register-p dst) 32)
+                                                       ((xmm-register-p dst) 16)
+                                                       (t 0)))
                                    :remaining-bytes 1)
                  (emit-byte segment imm)))))
+  ;; packed full-vector
   (def vfixupimmps #x54 0)
   (def vfixupimmpd #x54 1)
-  (def vfixupimmss #x55 0)
-  (def vfixupimmsd #x55 1))
+  ;; scalar fixed-width
+  (def vfixupimmss #x55 0 :scalar-disp-n 4)
+  (def vfixupimmsd #x55 1 :scalar-disp-n 8))
 
 ;;; Range
 (macrolet ((def (name opcode w)
@@ -320,23 +364,39 @@
   (def vreducepd #x56 1))
 
 ;;; Scale
-(macrolet ((def (name opcode w)
+(macrolet ((def (name opcode w &key scalar-disp-n)
              `(define-instruction ,name (segment dst src1 src2)
-                ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 opcode
-                                            :opcode-prefix #x0f38 :w w :nds t)
+                ,@(if scalar-disp-n
+                      (avx512-inst-printer-list
+                       'ymm-ymm/mem #x66 opcode
+                       :opcode-prefix #x0f38 :w w :nds t
+                       :disp-n scalar-disp-n)
+                      (loop for (ll n) in '((#b00 16) (#b01 32) (#b10 64))
+                            append
+                            (avx512-inst-printer-list
+                             'ymm-ymm/mem #x66 opcode
+                             :opcode-prefix #x0f38 :w w :nds t
+                             :ll ll :disp-n n)))
                 (:emitter
                  (emit-avx512-inst segment src2 dst #x66 ,opcode
                                    :opcode-prefix #x0f38
                                    :vvvv src1
-                                   :w ,w)))))
+                                   :w ,w
+                                   :disp-n ,(if scalar-disp-n
+                                                scalar-disp-n
+                                                '(cond ((zmm-register-p dst) 64)
+                                                       ((ymm-register-p dst) 32)
+                                                       ((xmm-register-p dst) 16)
+                                                       (t 0))))))))
+  ;; packed full-vector
   (def vscalefps #x2c 0)
   (def vscalefpd #x2c 1)
-  (def vscalefss #x2d 0)
-  (def vscalefsd #x2d 1))
+  ;; scalar fixed-width
+  (def vscalefss #x2d 0 :scalar-disp-n 4)
+  (def vscalefsd #x2d 1 :scalar-disp-n 8))
 
 ;;; Opmask instructions
 ;;; KMOV - Move to/from opmask registers
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun kmov-printer-list (format-stem prefix opcode w &key printer)
     (let ((pp (vex-encode-pp prefix))
@@ -606,11 +666,19 @@
 ;;; 2-operand (dst, src)
 (macrolet ((def (name prefix opcode w &optional (opcode-prefix #x0f38))
              `(define-instruction ,name (segment dst src)
-                ,@(avx512-inst-printer-list 'ymm-ymm/mem prefix opcode
-                                            :opcode-prefix opcode-prefix :w w)
+                ,@(loop for (ll n) in '((#b00 16) (#b01 32) (#b10 64))
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem prefix opcode
+                         :opcode-prefix opcode-prefix :w w
+                         :ll ll :disp-n n))
                 (:emitter
                  (emit-avx512-inst segment src dst ,prefix ,opcode
-                                   :opcode-prefix ,opcode-prefix :w ,w)))))
+                                   :opcode-prefix ,opcode-prefix :w ,w
+                                   :disp-n (cond ((zmm-register-p dst) 64)
+                                                 ((ymm-register-p dst) 32)
+                                                 ((xmm-register-p dst) 16)
+                                                 (t 0)))))))
   (def vpabsq     #x66 #x1f 1)
   (def vrcp14ps   #x66 #x4c 0)
   (def vrcp14pd   #x66 #x4c 1)
@@ -633,38 +701,57 @@
   (def vrsqrt14sd #x4f 1))
 
 ;;; 3-operand NDS + imm8
-(macrolet ((def (name opcode w)
+(macrolet ((def (name opcode w &key scalar-disp-n)
              `(define-instruction ,name (segment dst src1 src2 imm)
-                ,@(avx512-inst-printer-list 'ymm-ymm/mem-imm #x66 opcode
-                                            :opcode-prefix #x0f3a :w w)
+                ,@(if scalar-disp-n
+                      (avx512-inst-printer-list
+                       'ymm-ymm/mem-imm #x66 opcode
+                       :opcode-prefix #x0f3a :w w
+                       :disp-n scalar-disp-n)
+                      (loop for (ll n) in '((#b00 16) (#b01 32) (#b10 64))
+                            append
+                            (avx512-inst-printer-list
+                             'ymm-ymm/mem-imm #x66 opcode
+                             :opcode-prefix #x0f3a :w w
+                             :ll ll :disp-n n)))
                 (:emitter
                  (emit-avx512-inst segment src2 dst #x66 ,opcode
                                    :opcode-prefix #x0f3a
                                    :vvvv src1
                                    :w ,w
+                                   :disp-n ,(if scalar-disp-n
+                                                scalar-disp-n
+                                                '(cond ((zmm-register-p dst) 64)
+                                                       ((ymm-register-p dst) 32)
+                                                       ((xmm-register-p dst) 16)
+                                                       (t 0)))
                                    :remaining-bytes 1)
                  (emit-byte segment imm)))))
+  ;; packed full-vector
   (def valignd    #x03 0)
   (def valignq    #x03 1)
-  (def vrangess   #x51 0)
-  (def vrangesd   #x51 1)
-  (def vreducess  #x57 0)
-  (def vreducesd  #x57 1)
-  (def vgetmantss #x27 0)
-  (def vgetmantsd #x27 1))
+  ;; scalar fixed-width
+  (def vrangess   #x51 0 :scalar-disp-n 4)
+  (def vrangesd   #x51 1 :scalar-disp-n 8)
+  (def vreducess  #x57 0 :scalar-disp-n 4)
+  (def vreducesd  #x57 1 :scalar-disp-n 8)
+  (def vgetmantss #x27 0 :scalar-disp-n 4)
+  (def vgetmantsd #x27 1 :scalar-disp-n 8))
 
 ;;; Scalar getexp (3-operand NDS)
-(macrolet ((def (name opcode w)
+(macrolet ((def (name opcode w scalar-disp-n)
              `(define-instruction ,name (segment dst src1 src2)
                 ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 opcode
-                                            :opcode-prefix #x0f38 :w w :nds t)
+                                            :opcode-prefix #x0f38 :w w :nds t
+                                            :disp-n scalar-disp-n)
                 (:emitter
                  (emit-avx512-inst segment src2 dst #x66 ,opcode
                                    :opcode-prefix #x0f38
                                    :vvvv src1
-                                   :w ,w)))))
-  (def vgetexpss  #x43 0)
-  (def vgetexpsd  #x43 1))
+                                   :w ,w
+                                   :disp-n ,scalar-disp-n)))))
+  (def vgetexpss #x43 0 4)
+  (def vgetexpsd #x43 1 8))
 
 ;;; Immediate rotate via /i field
 (macrolet ((def (name opcode /i w)
@@ -708,10 +795,12 @@
   (def vcvtudq2pd  #xf3 #x7a 0))
 
 ;;; Scalar unsigned conversions (2-operand, dst=gpr)
-(macrolet ((def (name prefix opcode)
+(macrolet ((def (name prefix opcode disp-n)
              `(define-instruction ,name (segment dst src)
-                ,@(avx512-inst-printer-list 'reg-ymm/mem prefix opcode :w 0)
-                ,@(avx512-inst-printer-list 'reg-ymm/mem prefix opcode :w 1)
+                ,@(avx512-inst-printer-list 'reg-ymm/mem prefix opcode
+                                            :w 0 :disp-n disp-n)
+                ,@(avx512-inst-printer-list 'reg-ymm/mem prefix opcode
+                                            :w 1 :disp-n disp-n)
                 (:emitter
                  (aver (gpr-p dst))
                  (let ((dst-size (operand-size dst)))
@@ -719,17 +808,20 @@
                    (emit-avx512-inst segment src dst ,prefix ,opcode
                                      :w (ecase dst-size
                                           (:qword 1)
-                                          (:dword 0))))))))
-  (def vcvtss2usi  #xf3 #x79)
-  (def vcvtsd2usi  #xf2 #x79)
-  (def vcvttss2usi #xf3 #x78)
-  (def vcvttsd2usi #xf2 #x78))
+                                          (:dword 0))
+                                     :disp-n ,disp-n))))))
+  (def vcvtss2usi  #xf3 #x79 4)
+  (def vcvtsd2usi  #xf2 #x79 8)
+  (def vcvttss2usi #xf3 #x78 4)
+  (def vcvttsd2usi #xf2 #x78 8))
 
 ;;; Scalar unsigned convert to FP (3-operand NDS)
 (macrolet ((def (name prefix opcode)
              `(define-instruction ,name (segment dst src src2)
                 ,@(avx512-inst-printer-list 'ymm-ymm/mem prefix opcode
-                                            :nds t)
+                                            :nds t :w 0 :disp-n 4)
+                ,@(avx512-inst-printer-list 'ymm-ymm/mem prefix opcode
+                                            :nds t :w 1 :disp-n 8)
                 (:emitter
                  (aver (xmm-register-p dst))
                  (let ((src-size (operand-size src2)))
@@ -738,32 +830,45 @@
                                      :w (case src-size
                                           (:qword 1)
                                           (:dword 0)
-                                          (t 1))))))))
+                                          (t 1))
+                                     :disp-n (case src-size
+                                               (:qword 8)
+                                               (:dword 4)
+                                               (t 8))))))))
   (def vcvtusi2ss #xf3 #x7b)
   (def vcvtusi2sd #xf2 #x7b))
 
 ;;; Saturating truncations (reversed encoding: src in reg, dst in r/m)
-(macrolet ((def (name prefix opcode w)
+(macrolet ((def (name prefix opcode w disp-ns)
              `(define-instruction ,name (segment dst src)
-                ,@(avx512-inst-printer-list 'ymm-ymm/mem prefix opcode
-                                            :opcode-prefix #x0f38 :w w
-                                            :printer '(:name :tab reg/mem ", " reg))
+                ,@(loop for ll in '(#b00 #b01 #b10)
+                        for n in disp-ns
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem prefix opcode
+                         :opcode-prefix #x0f38 :w w
+                         :ll ll :disp-n n
+                         :printer '(:name :tab reg/mem ", " reg)))
                 (:emitter
                  (emit-avx512-inst segment dst src ,prefix ,opcode
                                    :opcode-prefix #x0f38
-                                   :w ,w)))))
-  (def vpmovsqd  #xf3 #x25 0)
-  (def vpmovsqw  #xf3 #x24 0)
-  (def vpmovsqb  #xf3 #x22 0)
-  (def vpmovusqd #xf3 #x15 0)
-  (def vpmovusqw #xf3 #x14 0)
-  (def vpmovusqb #xf3 #x12 0)
-  (def vpmovsdw  #xf3 #x23 0)
-  (def vpmovsdb  #xf3 #x21 0)
-  (def vpmovusdw #xf3 #x13 0)
-  (def vpmovusdb #xf3 #x11 0)
-  (def vpmovswb  #xf3 #x20 0)
-  (def vpmovuswb #xf3 #x10 0))
+                                   :w ,w
+                                   :disp-n (cond ((zmm-register-p src) (third ',disp-ns))
+                                                 ((ymm-register-p src) (second ',disp-ns))
+                                                 ((xmm-register-p src) (first ',disp-ns))
+                                                 (t 0)))))))
+  (def vpmovsqd  #xf3 #x25 0 (8 16 32))
+  (def vpmovsqw  #xf3 #x24 0 (4 8 16))
+  (def vpmovsqb  #xf3 #x22 0 (2 4 8))
+  (def vpmovusqd #xf3 #x15 0 (8 16 32))
+  (def vpmovusqw #xf3 #x14 0 (4 8 16))
+  (def vpmovusqb #xf3 #x12 0 (2 4 8))
+  (def vpmovsdw  #xf3 #x23 0 (8 16 32))
+  (def vpmovsdb  #xf3 #x21 0 (2 4 8))
+  (def vpmovusdw #xf3 #x13 0 (8 16 32))
+  (def vpmovusdb #xf3 #x11 0 (2 4 8))
+  (def vpmovswb  #xf3 #x20 0 (4 8 16))
+  (def vpmovuswb #xf3 #x10 0 (4 8 16)))
 
 ;;; Broadcast-memory
 (macrolet ((def (name opcode w disp-n)
