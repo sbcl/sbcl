@@ -332,7 +332,17 @@
   (def %test-evex-disp-nonmultiple)
   (def %test-evex-disp-large)
   (def %test-evex-vpmovzx-vpslldq-disassem)
-  (def %test-evex-high-registers-poke))
+  (def %test-evex-high-registers-poke)
+  (def %test-auto-promoted-vaddps)
+  (def %test-auto-promoted-vaddpd)
+  (def %test-auto-promoted-vpbroadcastq)
+  (def %test-auto-promoted-vmovdqu)
+  (def %test-evex-vpternlogd)
+  (def %test-evex-vpermt2d)
+  (def %test-evex-vblendmps)
+  (def %test-evex-vpcmpd)
+  (def %test-evex-vpmovqd)
+  (def %test-auto-promoted-vmovaps-disp8))
 
 (define-vop (%test-evex-high-regs)
   (:translate %test-evex-high-regs)
@@ -454,6 +464,124 @@
     (inst vpmovzxwd zmm18 ymm28)
     (inst vpmovzxwq zmm29 xmm16)))
 
+(define-vop (%test-auto-promoted-vaddps)
+  (:translate %test-auto-promoted-vaddps)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 16) z16)
+  (:temporary (:sc single-avx512-reg :offset 17) z17)
+  (:temporary (:sc single-avx512-reg :offset 18) z18)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vaddps z16 z17 z18)
+    (inst xor :dword res res)))
+
+;; needed for testing w-bit with auto-promoted instructions
+(define-vop (%test-auto-promoted-vaddpd)
+  (:translate %test-auto-promoted-vaddpd)
+  (:policy :fast-safe)
+  (:temporary (:sc double-avx512-reg :offset 16) z16)
+  (:temporary (:sc double-avx512-reg :offset 17) z17)
+  (:temporary (:sc double-avx512-reg :offset 18) z18)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vaddpd z16 z17 z18)
+    (inst xor :dword res res)))
+
+(define-vop (%test-auto-promoted-vpbroadcastq)
+  (:translate %test-auto-promoted-vpbroadcastq)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst xor :dword res res)
+    (inst vpbroadcastq zmm (ea 64 rsp))))
+
+(define-vop (%test-auto-promoted-vmovdqu)
+  (:translate %test-auto-promoted-vmovdqu)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst xor :dword res res)
+    (inst vmovdqu zmm (ea 64 rsp))))
+
+(define-vop (%test-evex-vpternlogd)
+  (:translate %test-evex-vpternlogd)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 0) z0)
+  (:temporary (:sc int-avx512-reg :offset 1) z1)
+  (:temporary (:sc int-avx512-reg :offset 2) z2)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vpternlogd z0 z1 z2 #xFF)
+    (inst xor :dword res res)))
+
+;; needed for evex emitters and printers
+(define-vop (%test-evex-vpermt2d)
+  (:translate %test-evex-vpermt2d)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 0) z0)
+  (:temporary (:sc int-avx512-reg :offset 1) z1)
+  (:temporary (:sc int-avx512-reg :offset 2) z2)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vpermt2d z0 z1 z2)
+    (inst xor :dword res res)))
+
+(define-vop (%test-evex-vblendmps)
+  (:translate %test-evex-vblendmps)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 16) z16)
+  (:temporary (:sc single-avx512-reg :offset 17) z17)
+  (:temporary (:sc single-avx512-reg :offset 18) z18)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vblendmps z16 z17 z18)
+    (inst xor :dword res res)))
+
+(define-vop (%test-evex-vpcmpd)
+  (:translate %test-evex-vpcmpd)
+  (:policy :fast-safe)
+  (:temporary (:sc mask-reg :offset 1) k1)
+  (:temporary (:sc int-avx512-reg :offset 0) z0)
+  (:temporary (:sc int-avx512-reg :offset 1) z1)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vpcmpd k1 z0 z1 #x1)
+    (inst xor :dword res res)))
+
+(define-vop (%test-evex-vpmovqd)
+  (:translate %test-evex-vpmovqd)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 0) z0)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vpmovqd (ea 32 rsp) z0)
+    (inst xor :dword res res)))
+
+(define-vop (%test-auto-promoted-vmovaps-disp8)
+  (:translate %test-auto-promoted-vmovaps-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vmovaps zmm (ea 64 rsp))
+    (inst xor :dword res res)))
+
 (cl:in-package :test-util)
 
 (with-test (:name :evex-high-register-disassembly)
@@ -481,48 +609,33 @@
 |#
 
 (with-test (:name :evex-compressed-displacement-vector-lengths)
-  (let* ((fun (compile nil
-                       '(lambda ()
-                         (sb-vm::%test-evex-disp-vector-lengths))))
-         (text (with-output-to-string (s)
-                 (disassemble fun :stream s))))
+  (let* ((func (compile nil '(lambda () (sb-vm::%test-evex-disp-vector-lengths))))
+         (text (with-output-to-string (s) (disassemble func :stream s))))
     (assert (search "VMOVDQU64 XMM0, [RSP+16]" text))
     (assert (search "VMOVDQU64 YMM1, [RSP+32]" text))
     (assert (search "VMOVDQU64 ZMM2, [RSP+64]" text))))
 
 (with-test (:name :evex-compressed-displacement)
-  (let* ((fun (compile nil
-                       '(lambda ()
-                         (sb-vm::%test-evex-disp8))))
-         (text (with-output-to-string (s)
-                 (disassemble fun :stream s))))
+  (let* ((func (compile nil '(lambda () (sb-vm::%test-evex-disp8))))
+         (text (with-output-to-string (s) (disassemble func :stream s))))
     ;; The disassembler must scale EVEX disp8 by 64.
     (assert (search "VMOVDQU64 ZMM0, [RSP+64]" text))
     ;; A failure mode is showing the unscaled compressed byte instead:
     (assert (not (search "[RSP+1]" text)))))
 
 (with-test (:name :evex-compressed-displacement-negative)
-  (let* ((fun (compile nil
-                       '(lambda ()
-                         (sb-vm::%test-evex-disp-negative))))
-         (text (with-output-to-string (s)
-                 (disassemble fun :stream s))))
+  (let* ((func (compile nil '(lambda () (sb-vm::%test-evex-disp-negative))))
+         (text (with-output-to-string (s) (disassemble func :stream s))))
     (assert (search "VMOVDQU64 ZMM0, [RSP-64]" text))))
 
 (with-test (:name :evex-compressed-displacement-nonmultiple)
-  (let* ((fun (compile nil
-                       '(lambda ()
-                         (sb-vm::%test-evex-disp-nonmultiple))))
-         (text (with-output-to-string (s)
-                 (disassemble fun :stream s))))
+  (let* ((func (compile nil '(lambda () (sb-vm::%test-evex-disp-nonmultiple))))
+         (text (with-output-to-string (s) (disassemble func :stream s))))
     (assert (search "VMOVDQU64 ZMM0, [RSP+65]" text))))
 
 (with-test (:name :evex-compressed-displacement-large)
-  (let* ((fun (compile nil
-                       '(lambda ()
-                         (sb-vm::%test-evex-disp-large))))
-         (text (with-output-to-string (s)
-                 (disassemble fun :stream s))))
+  (let* ((func (compile nil '(lambda () (sb-vm::%test-evex-disp-large))))
+         (text (with-output-to-string (s) (disassemble func :stream s))))
     (assert (search "VMOVDQU64 ZMM0, [RSP+8192]" text))))
 
 (with-test (:name :evex-disassembler-vpmov-and-high-reg-shifts)
@@ -556,3 +669,119 @@
     (assert (search "VPMOVSXDQ ZMM29, YMM17" text))
     (assert (search "VPMOVZXWD ZMM18, YMM28" text))
     (assert (search "VPMOVZXWQ ZMM29, XMM16" text))))
+;; call avx2-inst-printer-list for vmovdqu and assert it is restricted to
+;; L'L = 512 (ll = 2), uses disp-n = 64 => selects evex-ymmreg/mem-disp64.
+(with-test (:name :auto-promoted-evex-disp8-printer)
+  (let* ((asm-pkg (find-package "SB-X86-64-ASM"))
+         (printer-fun (find-symbol "AVX2-INST-PRINTER-LIST" asm-pkg))
+         (inst-format (find-symbol "YMM-YMM/MEM" asm-pkg))
+         (disp64 (find-symbol "EVEX-YMMREG/MEM-DISP64" asm-pkg)))
+    (when (and printer-fun inst-format disp64)
+      (let* ((printer-forms
+               (funcall printer-fun
+                        inst-format
+                        #xf3       ; prefix
+                        #x6f       ; opcode
+                        :opcode-prefix #x0f
+                        :w 0))
+             (evex-form
+               (find-if (lambda (form)
+                          (and (eq (first form) :printer)
+                               (let ((name (second form)))
+                                 (and (symbolp name)
+                                      (search "EVEX-" (symbol-name name))))))
+                        printer-forms)))
+        (assert evex-form)
+        (let ((fields (third evex-form)))
+          ;; Auto-promoted EVEX forms are ZMM-only, so L'L = #b10.
+          (assert (equal (second (assoc 'll fields)) 2))
+          ;; The full-vector ZMM memory form uses compressed displacement N=64.
+          (assert (eq (third (assoc 'reg/mem fields)) disp64)))))))
+
+(with-test (:name :auto-promoted-evex-vaddps-disasm)
+  (let* ((func (compile nil '(lambda () (sb-vm::%test-auto-promoted-vaddps))))
+         (text (with-output-to-string (s) (disassemble func :stream s))))
+    (assert (search "VADDPS" text))
+    (assert (search "ZMM16" text))
+    (assert (search "ZMM17" text))
+    (assert (search "ZMM18" text))
+    ;; Must not be confused with the W=1 double-precision form
+    (assert (not (search "VADDPD" text)))))
+
+(with-test (:name :auto-promoted-evex-vaddpd-disasm)
+  (let* ((func (compile nil '(lambda () (sb-vm::%test-auto-promoted-vaddpd))))
+         (text (with-output-to-string (s) (disassemble func :stream s))))
+    (assert (search "VADDPD" text))
+    (assert (search "ZMM16" text))
+    (assert (search "ZMM17" text))
+    (assert (search "ZMM18" text))
+    ;; Must not be confused with the W=0 single-precision form
+    (assert (not (search "VADDPS" text)))))
+
+(with-test (:name :auto-promoted-evex-vpbroadcastq-disasm)
+  (let* ((func (compile nil '(lambda () (sb-vm::%test-auto-promoted-vpbroadcastq))))
+         (text (with-output-to-string (s) (disassemble func :stream s))))
+    (assert (search "VPBROADCASTQ" text))
+    (assert (search "ZMM0" text))
+    ;; The EVEX form should use W=1 (qword broadcast)
+    ;; This is indirectly checked by correct mnemonic.
+    (assert (search "[RSP+64]" text))))
+
+(with-test (:name :auto-promoted-vmovdqu-skip-conflict-disasm)
+  ;; VMOVDQU (VEX, prefix #xF3) auto-promotes to EVEX ZMM.
+  ;; Because the explicit VMOVDQU32 is skipped, the disassembler
+  ;; should still choose a valid printer, not signal a conflict.
+  (let* ((func (compile nil '(lambda () (sb-vm::%test-auto-promoted-vmovdqu))))
+         (text (with-output-to-string (s) (disassemble func :stream s))))
+    ;; The actual mnemonic is VMOVDQU32 because that is the official
+    ;; AVX512 name, and the printer for the explicit EVEX instruction wins.
+    (assert (search "VMOVDQU32" text))
+    (assert (search "ZMM0" text))
+    (assert (search "[RSP+64]" text))))
+
+(with-test (:name :evex-explicit-vpternlogd-disasm)
+  (let* ((func (compile nil '(lambda () (sb-vm::%test-evex-vpternlogd))))
+         (text (with-output-to-string (s) (disassemble func :stream s))))
+    (assert (search "VPTERNLOGD" text))
+    (assert (search "ZMM0" text))
+    (assert (search "ZMM1" text))
+    (assert (search "ZMM2" text))
+    (assert (search "255"  text))))
+
+(with-test (:name :evex-explicit-vpermt2d-disasm)
+  (let* ((func (compile nil '(lambda () (sb-vm::%test-evex-vpermt2d))))
+         (text (with-output-to-string (s) (disassemble func :stream s))))
+    (assert (search "VPERMT2D" text))
+    (assert (search "ZMM0" text))
+    (assert (search "ZMM1" text))
+    (assert (search "ZMM2" text))))
+
+(with-test (:name :evex-explicit-vblendmps-disasm)
+  (let* ((func (compile nil '(lambda () (sb-vm::%test-evex-vblendmps))))
+         (text (with-output-to-string (s) (disassemble func :stream s))))
+    (assert (search "VBLENDMPS" text))
+    (assert (search "ZMM16" text))
+    (assert (search "ZMM17" text))
+    (assert (search "ZMM18" text))))
+
+(with-test (:name :evex-explicit-vpcmpd-disasm)
+  (let* ((func (compile nil '(lambda () (sb-vm::%test-evex-vpcmpd))))
+         (text (with-output-to-string (s) (disassemble func :stream s))))
+    (assert (search "VPCMPD" text))
+    (assert (search "K1" text))
+    (assert (search "ZMM0" text))
+    (assert (search "ZMM1" text))))
+
+(with-test (:name :evex-explicit-vpmovqd-disasm)
+  (let* ((func (compile nil '(lambda () (sb-vm::%test-evex-vpmovqd))))
+         (text (with-output-to-string (s) (disassemble func :stream s))))
+    (assert (search "VPMOVQD" text))
+    (assert (search "[RSP+32]" text))
+    (assert (search "ZMM0" text))))
+
+(with-test (:name :auto-promoted-evex-vmovaps-disp8-disasm)
+  (let* ((fun (compile nil '(lambda () (sb-vm::%test-auto-promoted-vmovaps-disp8))))
+         (text (with-output-to-string (s) (disassemble fun :stream s))))
+    (assert (search "VMOVAPS" text))
+    (assert (search "ZMM0" text))
+    (assert (search "[RSP+64]" text))))
