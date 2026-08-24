@@ -2465,8 +2465,12 @@
                (inst test :dword tmp tmp)
                (inst jmp :z VALIDATED)
 
+               (inst vperm2i128 tmp1 prev current #x21)
+               (inst vpalignr tmp1 current tmp1 15)
+
                (inst vpsubusb tmp2 tmp2 (inline-const #xDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDFDF))
                (inst vptest tmp2 tmp2)
+
                (inst jmp :nz full)
 
                ;; 1/2 bytes
@@ -2478,19 +2482,17 @@
                (inst vpand tmp4 tmp4 tmp2) ;; it's a signed comparison, remove ascii
 
                ;; Find #xC0 or #xC1, which are overlong
-               (inst vpandn tmp1 tmp3 tmp2) ;; neither ascii or continuations
-               (inst vpxor tmp1 tmp1 tmp4) ;; nor a valid leading byte
+               (inst vpandn tmp2 tmp3 tmp2) ;; neither ascii or continuations
+               (inst vpxor tmp2 tmp2 tmp4) ;; nor a valid leading byte
 
                ;; Continuations must follow leading bytes,
                ;; they must align with the shifted input
 
-               (inst vpcmpgtb tmp2 prev-len zeros)
-
                ;; Identify leading non-ascii bytes, shifted left by
                ;; one byte, with the previous byte shifted in
-               (inst vperm2i128 tmp2 tmp2 tmp4 #x21)
-               (inst vpalignr tmp2 tmp4 tmp2 15)
-               (inst vpxor tmp2 tmp2 tmp3)
+               (inst vpsubusb tmp1 tmp1 (inline-const #xC1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1))
+               (inst vpcmpgtb tmp1 tmp1 zeros)
+               (inst vpxor tmp1 tmp1 tmp3)
 
                (inst vpor tmp1 tmp1 tmp2)
                (inst vpor errors errors tmp1)
@@ -2503,9 +2505,6 @@
                (inst jmp VALIDATED)
                FULL
                ;; The Keiser, Lemire algorithm
-               (inst vperm2i128 tmp1 prev current #x21)
-               (inst vpalignr tmp1 current tmp1 15)
-
                (inst vpsrlw tmp2 tmp1 4)
                (inst vpand tmp2 tmp2 mask-0f)
 
