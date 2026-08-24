@@ -384,7 +384,7 @@
                                                   ,(if (eql newline :lf)
                                                        :utf-8
                                                        `'(:utf-8 :newline ,newline))
-                                                  replacement string index)))
+                                                  replacement string error-position)))
                                 (flet ((add-byte (b) (vector-push-extend b new-array)))
                                   (dotimes (i (length replacement))
                                     (add-byte (aref replacement i)))

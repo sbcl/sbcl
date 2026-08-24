@@ -506,3 +506,11 @@
     (test '(97 128077 98 9989 65039 65039 65039 65039 65039 65039 65039)
           #(97 240 159 145 141 98 226 156 133 239 184 143 239 184 143 239 184 143 239 184 143 239 184 143 239 184 143 239 184 143 0))
     (test '(0 #xd800 1) nil t)))
+
+#+sb-unicode
+(with-test (:name :string-to-octets-encoding-error)
+  (assert
+   (equalp
+    (handler-bind ((sb-int:character-encoding-error (lambda (c) (use-value #\a c))))
+      (string-to-octets (map 'string #'code-char '(233 233 55955 99))))
+    #(195 169 195 169 97 99))))
