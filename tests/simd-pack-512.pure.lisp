@@ -342,7 +342,8 @@
   (def %test-evex-vblendmps)
   (def %test-evex-vpcmpd)
   (def %test-evex-vpmovqd)
-  (def %test-auto-promoted-vmovaps-disp8))
+  (def %test-auto-promoted-vmovaps-disp8)
+  (def %test-auto-promoted-vmovaps-disp-nonmultiple))
 
 (define-vop (%test-evex-high-regs)
   (:translate %test-evex-high-regs)
@@ -582,6 +583,17 @@
     (inst vmovaps zmm (ea 64 rsp))
     (inst xor :dword res res)))
 
+(define-vop (%test-auto-promoted-vmovaps-disp-nonmultiple)
+  (:translate %test-auto-promoted-vmovaps-disp-nonmultiple)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vmovaps zmm (ea 65 rsp))
+    (inst xor :dword res res)))
+
 (cl:in-package :test-util)
 
 (with-test (:name :evex-high-register-disassembly)
@@ -810,3 +822,27 @@
         (assert evex-form)
         (let ((fields (third evex-form)))
           (assert (eq (third (assoc 'reg/mem fields)) disp64)))))))
+
+(with-test (:name :auto-promoted-vmovaps-disp8-disasm)
+  (let* ((fun (compile nil
+                       '(lambda ()
+                         (sb-vm::%test-auto-promoted-vmovaps-disp8))))
+         (text (with-output-to-string (s)
+                 (disassemble fun :stream s))))
+    ;; Auto-promoted VMOVAPS should use compressed disp8*64 and print +64.
+    (assert (search "VMOVAPS" text))
+    (assert (search "ZMM0" text))
+    (assert (search "[RSP+64]" text))
+    ;; The compressed byte itself must not leak through as +1.
+    (assert (not (search "[RSP+1]" text)))))
+
+(with-test (:name :auto-promoted-vmovaps-disp-nonmultiple-disasm)
+  (let* ((fun (compile nil
+                       '(lambda ()
+                         (sb-vm::%test-auto-promoted-vmovaps-disp-nonmultiple))))
+         (text (with-output-to-string (s)
+                 (disassemble fun :stream s))))
+    ;; Non-multiple displacement must fall back to disp32.
+    (assert (search "VMOVAPS" text))
+    (assert (search "ZMM0" text))
+    (assert (search "[RSP+65]" text))))

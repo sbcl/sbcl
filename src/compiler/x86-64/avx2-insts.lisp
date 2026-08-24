@@ -656,7 +656,8 @@ produces silently wrong addresses."
                             evex-w
                             vvvv
                             is4
-                            vm)
+                            vm
+                            (disp-n 0))
   ;; Auto-detect ZMM operands and delegate to EVEX encoding
   (flet ((evex-reg-p (r)
            (and (register-p r)
@@ -1291,7 +1292,8 @@ REG is the source (encoded in ModR/M.r/m).
                       (avx2-inst-printer-list 'ymm-ymm/mem prefix opcode-from
                                               :opcode-prefix opcode-prefix
                                               :nds nds
-                                              :w evex-w))
+                                              :w evex-w
+                                              :disp-n disp-n))
                   ,@(when opcode-to
                       (avx2-inst-printer-list
                        'ymm-ymm/mem prefix opcode-to
@@ -1316,6 +1318,10 @@ REG is the source (encoded in ModR/M.r/m).
                                                 :opcode-prefix ,opcode-prefix
                                                 :evex-w ,evex-w
                                                 :w ,evex-w
+                                                :disp-n (cond ((zmm-register-p dst) 64)
+                                                              ((ymm-register-p dst) 32)
+                                                              ((xmm-register-p dst) 16)
+                                                              (t 0))
                                                 ,@(and nds
                                                        `(:vvvv src))
                                                 :l ,l))))
@@ -1329,6 +1335,10 @@ REG is the source (encoded in ModR/M.r/m).
                                           :opcode-prefix ,opcode-prefix
                                           :evex-w ,evex-w
                                           :w ,evex-w
+                                          :disp-n (cond ((zmm-register-p src) 64)
+                                                        ((ymm-register-p src) 32)
+                                                        ((xmm-register-p src) 16)
+                                                        (t 0))
                                           :l ,l))))))))
   ;; direction bit?
   (def vmovapd #x66 #x28 #x29 :evex-w 1 :disp-n 64)
