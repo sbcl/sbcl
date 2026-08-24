@@ -1847,95 +1847,161 @@ REG is the source (encoded in ModR/M.r/m).
   (def vgatherqpd #x93 1 xmm/ymm-vmx/y))
 
 ;;; FMA
-
-(macrolet ((def-insert (name prefix op &key w l)
+(macrolet ((def-insert (name prefix op &key w l disp-ns scalar-disp-n)
              `(define-instruction ,name (segment dst src src2)
-                ,@(avx2-inst-printer-list 'ymm-ymm/mem prefix op
-                                          :w w :l l
-                                          :nds t
-                                          :opcode-prefix #x0f38)
+                ;; VEX printers once
+                ,@(avx2-inst-printer-list
+                   'ymm-ymm/mem prefix op
+                   :w w
+                   :l l
+                   :nds t
+                   :opcode-prefix #x0f38
+                   :auto-evex nil)
+                ;; EVEX printers
+                ,@(cond
+                    (disp-ns
+                     (loop for ll in '(#b00 #b01 #b10)
+                           for n in disp-ns
+                           append
+                           (avx512-inst-printer-list
+                            'ymm-ymm/mem prefix op
+                            :w w
+                            :nds t
+                            :opcode-prefix #x0f38
+                            :ll ll
+                            :disp-n n)))
+                    (scalar-disp-n
+                     (avx512-inst-printer-list
+                      'ymm-ymm/mem prefix op
+                      :w w
+                      :nds t
+                      :opcode-prefix #x0f38
+                      :ll #b00
+                      :disp-n scalar-disp-n)))
                 (:emitter
                  (emit-avx2-inst segment src2 dst ,prefix ,op
                                  :opcode-prefix #x0f38
                                  :vvvv src
-                                 :w ,w :l ,l)))))
-  (def-insert vfmadd132ps #x66 #x98 :w 0)
-  (def-insert vfmadd213ps #x66 #xa8 :w 0)
-  (def-insert vfmadd231ps #x66 #xb8 :w 0)
-  (def-insert vfmadd132pd #x66 #x98 :w 1)
-  (def-insert vfmadd213pd #x66 #xa8 :w 1)
-  (def-insert vfmadd231pd #x66 #xb8 :w 1)
+                                 :w ,w
+                                 :l ,l
+                                 :disp-n
+                                 ,(cond
+                                    (disp-ns
+                                     `(cond ((zmm-register-p dst) (third ',disp-ns))
+                                            ((ymm-register-p dst) (second ',disp-ns))
+                                            ((xmm-register-p dst) (first ',disp-ns))
+                                            (t 0)))
+                                    (scalar-disp-n scalar-disp-n)
+                                    (t 0)))))))
+  ;; packed forms
+  (def-insert vfmadd132ps #x66 #x98 :w 0 :disp-ns (16 32 64))
+  (def-insert vfmadd213ps #x66 #xa8 :w 0 :disp-ns (16 32 64))
+  (def-insert vfmadd231ps #x66 #xb8 :w 0 :disp-ns (16 32 64))
+  (def-insert vfmadd132pd #x66 #x98 :w 1 :disp-ns (16 32 64))
+  (def-insert vfmadd213pd #x66 #xa8 :w 1 :disp-ns (16 32 64))
+  (def-insert vfmadd231pd #x66 #xb8 :w 1 :disp-ns (16 32 64))
 
-  (def-insert vfmadd132ss #x66 #x99 :w 0 :l 0)
-  (def-insert vfmadd213ss #x66 #xa9 :w 0 :l 0)
-  (def-insert vfmadd231ss #x66 #xb9 :w 0 :l 0)
-  (def-insert vfmadd132sd #x66 #x99 :w 1 :l 0)
-  (def-insert vfmadd213sd #x66 #xa9 :w 1 :l 0)
-  (def-insert vfmadd231sd #x66 #xb9 :w 1 :l 0)
+  (def-insert vfnmadd132ps #x66 #x9c :w 0 :disp-ns (16 32 64))
+  (def-insert vfnmadd213ps #x66 #xac :w 0 :disp-ns (16 32 64))
+  (def-insert vfnmadd231ps #x66 #xbc :w 0 :disp-ns (16 32 64))
+  (def-insert vfnmadd132pd #x66 #x9c :w 1 :disp-ns (16 32 64))
+  (def-insert vfnmadd213pd #x66 #xac :w 1 :disp-ns (16 32 64))
+  (def-insert vfnmadd231pd #x66 #xbc :w 1 :disp-ns (16 32 64))
 
-  (def-insert vfnmadd132ps #x66 #x9c :w 0)
-  (def-insert vfnmadd213ps #x66 #xac :w 0)
-  (def-insert vfnmadd231ps #x66 #xbc :w 0)
-  (def-insert vfnmadd132pd #x66 #x9c :w 1)
-  (def-insert vfnmadd213pd #x66 #xac :w 1)
-  (def-insert vfnmadd231pd #x66 #xbc :w 1)
+  (def-insert vfmaddsub132ps #x66 #x96 :w 0 :disp-ns (16 32 64))
+  (def-insert vfmaddsub213ps #x66 #xa6 :w 0 :disp-ns (16 32 64))
+  (def-insert vfmaddsub231ps #x66 #xb6 :w 0 :disp-ns (16 32 64))
+  (def-insert vfmaddsub132pd #x66 #x96 :w 1 :disp-ns (16 32 64))
+  (def-insert vfmaddsub213pd #x66 #xa6 :w 1 :disp-ns (16 32 64))
+  (def-insert vfmaddsub231pd #x66 #xb6 :w 1 :disp-ns (16 32 64))
 
-  (def-insert vfnmadd132ss #x66 #x9d :w 0 :l 0)
-  (def-insert vfnmadd213ss #x66 #xad :w 0 :l 0)
-  (def-insert vfnmadd231ss #x66 #xbd :w 0 :l 0)
-  (def-insert vfnmadd132sd #x66 #x9d :w 1 :l 0)
-  (def-insert vfnmadd213sd #x66 #xad :w 1 :l 0)
-  (def-insert vfnmadd231sd #x66 #xbd :w 1 :l 0)
+  (def-insert vfmsubadd132ps #x66 #x97 :w 0 :disp-ns (16 32 64))
+  (def-insert vfmsubadd213ps #x66 #xa7 :w 0 :disp-ns (16 32 64))
+  (def-insert vfmsubadd231ps #x66 #xb7 :w 0 :disp-ns (16 32 64))
+  (def-insert vfmsubadd132pd #x66 #x97 :w 1 :disp-ns (16 32 64))
+  (def-insert vfmsubadd213pd #x66 #xa7 :w 1 :disp-ns (16 32 64))
+  (def-insert vfmsubadd231pd #x66 #xb7 :w 1 :disp-ns (16 32 64))
 
-  (def-insert vfmaddsub132ps #x66 #x96 :w 0)
-  (def-insert vfmaddsub213ps #x66 #xa6 :w 0)
-  (def-insert vfmaddsub231ps #x66 #xb6 :w 0)
-  (def-insert vfmaddsub132pd #x66 #x96 :w 1)
-  (def-insert vfmaddsub213pd #x66 #xa6 :w 1)
-  (def-insert vfmaddsub231pd #x66 #xb6 :w 1)
+  (def-insert vfmsub132ps #x66 #x9a :w 0 :disp-ns (16 32 64))
+  (def-insert vfmsub213ps #x66 #xaa :w 0 :disp-ns (16 32 64))
+  (def-insert vfmsub231ps #x66 #xba :w 0 :disp-ns (16 32 64))
+  (def-insert vfmsub132pd #x66 #x9a :w 1 :disp-ns (16 32 64))
+  (def-insert vfmsub213pd #x66 #xaa :w 1 :disp-ns (16 32 64))
+  (def-insert vfmsub231pd #x66 #xba :w 1 :disp-ns (16 32 64))
 
-  (def-insert vfmsubadd132ps #x66 #x97 :w 0)
-  (def-insert vfmsubadd213ps #x66 #xa7 :w 0)
-  (def-insert vfmsubadd231ps #x66 #xb7 :w 0)
-  (def-insert vfmsubadd132pd #x66 #x97 :w 1)
-  (def-insert vfmsubadd213pd #x66 #xa7 :w 1)
-  (def-insert vfmsubadd231pd #x66 #xb7 :w 1)
+  ;; scalar forms
+  (def-insert vfmadd132ss #x66 #x99 :w 0 :l 0 :scalar-disp-n 4)
+  (def-insert vfmadd213ss #x66 #xa9 :w 0 :l 0 :scalar-disp-n 4)
+  (def-insert vfmadd231ss #x66 #xb9 :w 0 :l 0 :scalar-disp-n 4)
+  (def-insert vfmadd132sd #x66 #x99 :w 1 :l 0 :scalar-disp-n 8)
+  (def-insert vfmadd213sd #x66 #xa9 :w 1 :l 0 :scalar-disp-n 8)
+  (def-insert vfmadd231sd #x66 #xb9 :w 1 :l 0 :scalar-disp-n 8)
 
-  (def-insert vfmsub132ps #x66 #x9a :w 0)
-  (def-insert vfmsub213ps #x66 #xaa :w 0)
-  (def-insert vfmsub231ps #x66 #xba :w 0)
-  (def-insert vfmsub132pd #x66 #x9a :w 1)
-  (def-insert vfmsub213pd #x66 #xaa :w 1)
-  (def-insert vfmsub231pd #x66 #xba :w 1)
 
-  (def-insert vfmsub132ss #x66 #x9b :w 0 :l 0)
-  (def-insert vfmsub213ss #x66 #xab :w 0 :l 0)
-  (def-insert vfmsub231ss #x66 #xbb :w 0 :l 0)
-  (def-insert vfmsub132sd #x66 #x9b :w 1 :l 0)
-  (def-insert vfmsub213sd #x66 #xab :w 1 :l 0)
-  (def-insert vfmsub231sd #x66 #xbb :w 1 :l 0))
+  (def-insert vfnmadd132ss #x66 #x9d :w 0 :l 0 :scalar-disp-n 4)
+  (def-insert vfnmadd213ss #x66 #xad :w 0 :l 0 :scalar-disp-n 4)
+  (def-insert vfnmadd231ss #x66 #xbd :w 0 :l 0 :scalar-disp-n 4)
+  (def-insert vfnmadd132sd #x66 #x9d :w 1 :l 0 :scalar-disp-n 8)
+  (def-insert vfnmadd213sd #x66 #xad :w 1 :l 0 :scalar-disp-n 8)
+  (def-insert vfnmadd231sd #x66 #xbd :w 1 :l 0 :scalar-disp-n 8)
+
+  (def-insert vfmsub132ss #x66 #x9b :w 0 :l 0 :scalar-disp-n 4)
+  (def-insert vfmsub213ss #x66 #xab :w 0 :l 0 :scalar-disp-n 4)
+  (def-insert vfmsub231ss #x66 #xbb :w 0 :l 0 :scalar-disp-n 4)
+  (def-insert vfmsub132sd #x66 #x9b :w 1 :l 0 :scalar-disp-n 8)
+  (def-insert vfmsub213sd #x66 #xab :w 1 :l 0 :scalar-disp-n 8)
+  (def-insert vfmsub231sd #x66 #xbb :w 1 :l 0 :scalar-disp-n 8))
+
 ;;; F16C
-
+;;; load, widening
 (define-instruction vcvtph2ps (segment dst src)
   (:emitter
    (emit-avx2-inst segment src dst #x66 #x13
                    :opcode-prefix #x0f38
-                   :w 0))
-  . #.(avx2-inst-printer-list 'ymm-ymm/mem #x66 #x13
-                              :w 0
-                              :opcode-prefix #x0f38))
+                   :w 0
+                   :disp-n (cond ((zmm-register-p dst) 32)
+                                 ((ymm-register-p dst) 16)
+                                 ((xmm-register-p dst) 8)
+                                 (t 0))))
+  . #.(append
+       (avx2-inst-printer-list 'ymm-ymm/mem #x66 #x13
+                               :w 0
+                               :opcode-prefix #x0f38
+                               :auto-evex nil)
+       (loop for (ll n) in '((#b00 8) (#b01 16) (#b10 32))
+             append
+             (avx512-inst-printer-list 'ymm-ymm/mem #x66 #x13
+                                       :w 0
+                                       :opcode-prefix #x0f38
+                                       :ll ll
+                                       :disp-n n))))
 
+;;; store, narrow
 (define-instruction vcvtps2ph (segment dst src imm)
   (:emitter
    (emit-avx2-inst segment dst src #x66 #x1d
                    :opcode-prefix #x0f3a
                    :w 0
+                   :disp-n (cond ((zmm-register-p src) 32)
+                                 ((ymm-register-p src) 16)
+                                 ((xmm-register-p src) 8)
+                                 (t 0))
                    :remaining-bytes 1)
    (emit-byte segment imm))
-  . #.(avx2-inst-printer-list 'ymm-ymm/mem #x66 #x1d
-                              :w 0
-                              :opcode-prefix #x0f3a
-                              :printer '(:name :tab reg/mem ", " reg ", " imm)))
+  . #.(append
+       (avx2-inst-printer-list 'ymm-ymm/mem #x66 #x1d
+                               :w 0
+                               :opcode-prefix #x0f3a
+                               :auto-evex nil
+                               :printer '(:name :tab reg/mem ", " reg ", " imm))
+       (loop for (ll n) in '((#b00 8) (#b01 16) (#b10 32))
+             append
+             (avx512-inst-printer-list 'ymm-ymm/mem #x66 #x1d
+                                       :w 0
+                                       :opcode-prefix #x0f3a
+                                       :ll ll
+                                       :disp-n n
+                                       :printer '(:name :tab reg/mem ", " reg ", " imm)))))
 
 ;;;; GFNI (Galois Field instructions)
 ;;;; VEX-encoded; auto-promotes to EVEX for ZMM operands.
@@ -1946,20 +2012,43 @@ REG is the source (encoded in ModR/M.r/m).
    (emit-avx2-inst segment src2 dst #x66 #xcf
                    :opcode-prefix #x0f38
                    :vvvv src1
-                   :w 0))
-  . #.(avx2-inst-printer-list 'ymm-ymm/mem #x66 #xcf
-                              :opcode-prefix #x0f38 :w 0 :nds t))
+                   :w 0
+                   :disp-n (cond ((zmm-register-p dst) 64)
+                                 ((ymm-register-p dst) 32)
+                                 ((xmm-register-p dst) 16)
+                                 (t 0))))
+  . #.(append
+       (avx2-inst-printer-list 'ymm-ymm/mem #x66 #xcf
+                               :opcode-prefix #x0f38 :w 0 :nds t
+                               :auto-evex nil)
+       (loop for (ll n) in '((#b00 16) (#b01 32) (#b10 64))
+             append
+             (avx512-inst-printer-list 'ymm-ymm/mem #x66 #xcf
+                                       :opcode-prefix #x0f38 :w 0 :nds t
+                                       :ll ll :disp-n n))))
 
 ;;; GF(2^8) affine transformation and inverse (with immediate)
 (macrolet ((def (name opcode)
              `(define-instruction ,name (segment dst src1 src2 imm)
-                ,@(avx2-inst-printer-list 'ymm-ymm/mem-imm #x66 opcode
-                                          :opcode-prefix #x0f3a :w 1)
+                ,@(avx2-inst-printer-list
+                   'ymm-ymm/mem-imm #x66 opcode
+                   :opcode-prefix #x0f3a :w 1
+                   :auto-evex nil)
+                ,@(loop for (ll n) in '((#b00 16) (#b01 32) (#b10 64))
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem-imm #x66 opcode
+                         :opcode-prefix #x0f3a :w 1
+                         :ll ll :disp-n n))
                 (:emitter
                  (emit-avx2-inst segment src2 dst #x66 ,opcode
                                  :opcode-prefix #x0f3a
                                  :vvvv src1
                                  :w 1
+                                 :disp-n (cond ((zmm-register-p dst) 64)
+                                               ((ymm-register-p dst) 32)
+                                               ((xmm-register-p dst) 16)
+                                               (t 0))
                                  :remaining-bytes 1)
                  (emit-byte segment imm)))))
   (def vgf2p8affineqb    #xce)

@@ -429,8 +429,57 @@
   (def %test-auto-promoted-vpmovsxbw-disp8)
   (def %test-vpand-zmm-disasm)
   (def %test-vmovdqa-zmm-disasm)
-  (def %test-vbroadcastf128-zmm-disasm))
-
+  (def %test-vbroadcastf128-zmm-disasm)
+  (def %test-vpermt2d-zmm-disp8)
+  (def %test-vpermt2d-zmm-disp32)
+  (def %test-vpmaxsq-zmm-disp8)
+  (def %test-vprolvd-xmm-disp8)
+  (def %test-vpermt2q-zmm-disp8)
+  (def %test-vpermt2q-zmm-disp32)
+  (def %test-vshuff32x4-zmm-disp8)
+  (def %test-vshuff32x4-zmm-disp32)
+  (def %test-vshufi32x4-xmm-disp8)
+  (def %test-vblendmps-zmm-disp8)
+  (def %test-vblendmps-zmm-disp32)
+  (def %test-vpblendmq-zmm-disp8)
+  (def %test-vrangepd-zmm-disp8)
+  (def %test-vreduceps-xmm-disp8)
+  (def %test-vreduceps-zmm-disp8)
+  (def %test-vreduceps-zmm-disp32)
+  (def %test-vrcp14ss-disp8)
+  (def %test-vrcp14ss-disp32)
+  (def %test-vrcp14sd-disp8)
+  (def %test-vrsqrt14ss-disp8)
+  (def %test-vrsqrt14sd-disp8)
+  (def %test-vpblendmb-zmm-disp8)
+  (def %test-vpcmpb-zmm-disp8)
+  (def %test-vptestmw-zmm-disp8)
+  (def %test-vpermw-zmm-disp8)
+  (def %test-vpsllvw-zmm-disp8)
+  (def %test-vdbpsadbw-zmm-disp8)
+  (def %test-vpmadd52luq-zmm-disp8)
+  (def %test-vpermb-zmm-disp8)
+  (def %test-vpcompressb-zmm-disp8)
+  (def %test-vpshldw-zmm-disp8)
+  (def %test-vpopcntd-zmm-disp8)
+  (def %test-vpshufbitqmb-zmm-disp8)
+  (def %test-vaddps-masked-zmm-disp8)
+  (def %test-vaddps-masked-zmm-disp32)
+  (def %test-vpaddq-masked-zmm-disp8)
+  (def %test-vaddpd-masked-zmm-disp8)
+  (def %test-vinsertf32x4-zmm-disp8)
+  (def %test-vinsertf32x8-zmm-disp8)
+  (def %test-vextractf32x4-zmm-disp8)
+  (def %test-vextractf32x8-zmm-disp8)
+  (def %test-vfmadd132ps-zmm-disp8)
+  (def %test-vfmadd132ss-disp8)
+  (def %test-vcvtph2ps-zmm-disp8)
+  (def %test-vcvtps2ph-zmm-disp8)
+  (def %test-vgf2p8mulb-zmm-disp8)
+  (def %test-vgf2p8affineqb-zmm-disp8)
+  (def %test-vfpclassps-zmm-disp8)
+  (def %test-vfpclassss-disp8)
+  (def %test-vpmullq-zmm-disp8))
 
 ;; instruction vops
 
@@ -1745,7 +1794,6 @@
         (let ((fields (third evex-form)))
           (assert (eq (third (assoc 'reg/mem fields)) disp64)))))))
 
-
 ;; Printer metadata: W=0 and W=1 entries have correct disp-n
 (with-test (:name :scalar-unsigned-convert-printer-disp-n)
   (let* ((asm-pkg (find-package "SB-X86-64-ASM"))
@@ -2451,3 +2499,346 @@
     sb-vm::%test-vbroadcastf128-zmm-disasm
   ("VBROADCASTF32X4" "ZMM0" "[RSP+16]")
   :unexpected ("VBROADCASTF128"))
+
+;; Full-vector 3-operand NDS: vpermt2d ZMM -> disp-n=64
+(define-evex-disasm-test
+    :evex-vpermt2d-zmm-compressed-disp8
+    sb-vm::%test-vpermt2d-zmm-disp8
+  ("VPERMT2D" "ZMM0" "ZMM1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Full-vector 3-operand NDS: vpermt2d disp32 fallback
+(define-evex-disasm-test
+    :evex-vpermt2d-zmm-disp32-fallback
+    sb-vm::%test-vpermt2d-zmm-disp32
+  ("VPERMT2D" "ZMM0" "ZMM1" "[RSP+65]"))
+
+;; Full-vector 3-operand NDS: vpmaxsq ZMM -> disp-n=64
+(define-evex-disasm-test
+    :evex-vpmaxsq-zmm-compressed-disp8
+    sb-vm::%test-vpmaxsq-zmm-disp8
+  ("VPMAXSQ" "ZMM0" "ZMM1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Full-vector 3-operand NDS: vprolvd XMM -> disp-n=16
+(define-evex-disasm-test
+    :evex-vprolvd-xmm-compressed-disp8
+    sb-vm::%test-vprolvd-xmm-disp8
+  ("VPROLVD" "XMM0" "XMM1" "[RSP+16]")
+  :unexpected ("[RSP+1]"))
+
+;; Full-vector 3-operand NDS: vpermt2q ZMM, W=1 -> disp-n=64
+(define-evex-disasm-test
+    :evex-vpermt2q-zmm-compressed-disp8
+    sb-vm::%test-vpermt2q-zmm-disp8
+  ("VPERMT2Q" "ZMM0" "ZMM1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; vpermt2q disp32 fallback
+(define-evex-disasm-test
+    :evex-vpermt2q-zmm-disp32-fallback
+    sb-vm::%test-vpermt2q-zmm-disp32
+  ("VPERMT2Q" "ZMM0" "ZMM1" "[RSP+65]"))
+
+;; Cross-lane shuffle: vshuff32x4 ZMM -> disp-n=64
+(define-evex-disasm-test
+    :evex-vshuff32x4-zmm-compressed-disp8
+    sb-vm::%test-vshuff32x4-zmm-disp8
+  ("VSHUFF32X4" "ZMM2" "ZMM3" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; vshuff32x4 disp32 fallback
+(define-evex-disasm-test
+    :evex-vshuff32x4-zmm-disp32-fallback
+    sb-vm::%test-vshuff32x4-zmm-disp32
+  ("VSHUFF32X4" "ZMM2" "ZMM3" "[RSP+65]"))
+
+;; Cross-lane shuffle: vshufi32x4 XMM -> disp-n=16
+(define-evex-disasm-test
+    :evex-vshufi32x4-xmm-compressed-disp8
+    sb-vm::%test-vshufi32x4-xmm-disp8
+  ("VSHUFI32X4" "XMM0" "XMM1" "[RSP+16]")
+  :unexpected ("[RSP+1]"))
+
+;; Blend with mask: vblendmps ZMM -> disp-n=64
+(define-evex-disasm-test
+    :evex-vblendmps-zmm-compressed-disp8
+    sb-vm::%test-vblendmps-zmm-disp8
+  ("VBLENDMPS" "ZMM0" "ZMM1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Blend with mask: vblendmps disp32 fallback
+(define-evex-disasm-test
+    :evex-vblendmps-zmm-disp32-fallback
+    sb-vm::%test-vblendmps-zmm-disp32
+  ("VBLENDMPS" "ZMM0" "ZMM1" "[RSP+65]"))
+
+;; Blend with mask (integer): vpblendmq ZMM, W=1 -> disp-n=64
+(define-evex-disasm-test
+    :evex-vpblendmq-zmm-compressed-disp8
+    sb-vm::%test-vpblendmq-zmm-disp8
+  ("VPBLENDMQ" "ZMM0" "ZMM1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Range: vrangepd ZMM, W=1 -> disp-n=64
+(define-evex-disasm-test
+    :evex-vrangepd-zmm-compressed-disp8
+    sb-vm::%test-vrangepd-zmm-disp8
+  ("VRANGEPD" "ZMM0" "ZMM1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Reduce: vreduceps XMM -> disp-n=16
+(define-evex-disasm-test
+    :evex-vreduceps-xmm-compressed-disp8
+    sb-vm::%test-vreduceps-xmm-disp8
+  ("VREDUCEPS" "XMM0" "[RSP+16]")
+  :unexpected ("[RSP+1]"))
+
+;; Reduce: vreduceps ZMM -> disp-n=64
+(define-evex-disasm-test
+    :evex-vreduceps-zmm-compressed-disp8
+    sb-vm::%test-vreduceps-zmm-disp8
+  ("VREDUCEPS" "ZMM0" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Reduce: vreduceps disp32 fallback
+(define-evex-disasm-test
+    :evex-vreduceps-zmm-disp32-fallback
+    sb-vm::%test-vreduceps-zmm-disp32
+  ("VREDUCEPS" "ZMM0" "[RSP+65]"))
+
+;; Scalar reciprocal: single precision uses disp-n=4
+(define-evex-disasm-test
+    :evex-vrcp14ss-compressed-disp8
+    sb-vm::%test-vrcp14ss-disp8
+  ("VRCP14SS" "XMM0" "XMM1" "[RSP+4]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar reciprocal: single precision non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vrcp14ss-disp32-fallback
+    sb-vm::%test-vrcp14ss-disp32
+  ("VRCP14SS" "XMM0" "XMM1" "[RSP+5]"))
+
+;; Scalar reciprocal: double precision uses disp-n=8
+(define-evex-disasm-test
+    :evex-vrcp14sd-compressed-disp8
+    sb-vm::%test-vrcp14sd-disp8
+  ("VRCP14SD" "XMM0" "XMM1" "[RSP+8]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar rsqrt: single precision uses disp-n=4
+(define-evex-disasm-test
+    :evex-vrsqrt14ss-compressed-disp8
+    sb-vm::%test-vrsqrt14ss-disp8
+  ("VRSQRT14SS" "XMM0" "XMM1" "[RSP+4]")
+  :unexpected ("[RSP+1]"))
+
+;; Scalar rsqrt: double precision uses disp-n=8
+(define-evex-disasm-test
+    :evex-vrsqrt14sd-compressed-disp8
+    sb-vm::%test-vrsqrt14sd-disp8
+  ("VRSQRT14SD" "XMM0" "XMM1" "[RSP+8]")
+  :unexpected ("[RSP+1]"))
+
+;; Blend byte: ZMM full-vector -> disp-n=64
+(define-evex-disasm-test
+    :evex-vpblendmb-zmm-compressed-disp8
+    sb-vm::%test-vpblendmb-zmm-disp8
+  ("VPBLENDMB" "ZMM0" "ZMM1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Compare byte to k: ZMM full-vector -> disp-n=64
+(define-evex-disasm-test
+    :evex-vpcmpb-zmm-compressed-disp8
+    sb-vm::%test-vpcmpb-zmm-disp8
+  ("VPCMPB" "K1" "ZMM0" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Test word to k: ZMM full-vector -> disp-n=64
+(define-evex-disasm-test
+    :evex-vptestmw-zmm-compressed-disp8
+    sb-vm::%test-vptestmw-zmm-disp8
+  ("VPTESTMW" "K1" "ZMM0" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Permute word: ZMM full-vector -> disp-n=64
+(define-evex-disasm-test
+    :evex-vpermw-zmm-compressed-disp8
+    sb-vm::%test-vpermw-zmm-disp8
+  ("VPERMW" "ZMM0" "ZMM1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Variable shift word: ZMM full-vector -> disp-n=64
+(define-evex-disasm-test
+    :evex-vpsllvw-zmm-compressed-disp8
+    sb-vm::%test-vpsllvw-zmm-disp8
+  ("VPSLLVW" "ZMM0" "ZMM1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Double-block SAD: ZMM full-vector -> disp-n=64
+(define-evex-disasm-test
+    :evex-vdbpsadbw-zmm-compressed-disp8
+    sb-vm::%test-vdbpsadbw-zmm-disp8
+  ("VDBPSADBW" "ZMM0" "ZMM1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; IFMA: vpmadd52luq ZMM -> disp-n=64
+(define-evex-disasm-test
+    :evex-vpmadd52luq-zmm-compressed-disp8
+    sb-vm::%test-vpmadd52luq-zmm-disp8
+  ("VPMADD52LUQ" "ZMM0" "ZMM1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; VBMI permute: vpermb ZMM -> disp-n=64
+(define-evex-disasm-test
+    :evex-vpermb-zmm-compressed-disp8
+    sb-vm::%test-vpermb-zmm-disp8
+  ("VPERMB" "ZMM0" "ZMM1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; VBMI2 compress: vpcompressb ZMM -> disp-n=64
+(define-evex-disasm-test
+    :evex-vpcompressb-zmm-compressed-disp8
+    sb-vm::%test-vpcompressb-zmm-disp8
+  ("VPCOMPRESSB" "ZMM0" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; VBMI2 shift immediate: vpshldw ZMM -> disp-n=64
+(define-evex-disasm-test
+    :evex-vpshldw-zmm-compressed-disp8
+    sb-vm::%test-vpshldw-zmm-disp8
+  ("VPSHLDW" "ZMM0" "ZMM1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; VPOPCNTDQ: vpopcntd ZMM -> disp-n=64
+(define-evex-disasm-test
+    :evex-vpopcntd-zmm-compressed-disp8
+    sb-vm::%test-vpopcntd-zmm-disp8
+  ("VPOPCNTD" "ZMM0" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; BITALG: vpshufbitqmb ZMM -> disp-n=64
+(define-evex-disasm-test
+    :evex-vpshufbitqmb-zmm-compressed-disp8
+    sb-vm::%test-vpshufbitqmb-zmm-disp8
+  ("VPSHUFBITQMB" "K1" "ZMM0" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Masked arithmetic: vaddps-masked ZMM, W=0 -> disp-n=64
+(define-evex-disasm-test
+    :evex-vaddps-masked-zmm-compressed-disp8
+    sb-vm::%test-vaddps-masked-zmm-disp8
+  ("VADDPS" "ZMM0" "ZMM1" "[RSP+64]" "{K1}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked arithmetic: vaddps-masked ZMM disp32 fallback
+(define-evex-disasm-test
+    :evex-vaddps-masked-zmm-disp32-fallback
+    sb-vm::%test-vaddps-masked-zmm-disp32
+  ("VADDPS" "ZMM0" "ZMM1" "[RSP+65]" "{K1}"))
+
+;; Masked integer arithmetic: vpaddq-masked ZMM, W=1 -> disp-n=64
+(define-evex-disasm-test
+    :evex-vpaddq-masked-zmm-compressed-disp8
+    sb-vm::%test-vpaddq-masked-zmm-disp8
+  ("VPADDQ" "ZMM0" "ZMM1" "[RSP+64]" "{K1}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked double arithmetic: vaddpd-masked ZMM, W=1 -> disp-n=64
+(define-evex-disasm-test
+    :evex-vaddpd-masked-zmm-compressed-disp8
+    sb-vm::%test-vaddpd-masked-zmm-disp8
+  ("VADDPD" "ZMM0" "ZMM1" "[RSP+64]" "{K1}")
+  :unexpected ("[RSP+1]"))
+
+;; Insert 128-bit lane: disp-n=16
+(define-evex-disasm-test
+    :evex-vinsertf32x4-zmm-compressed-disp8
+    sb-vm::%test-vinsertf32x4-zmm-disp8
+  ("VINSERTF32X4" "ZMM0" "ZMM1" "[RSP+16]")
+  :unexpected ("[RSP+1]"))
+
+;; Insert 256-bit lane: disp-n=32
+(define-evex-disasm-test
+    :evex-vinsertf32x8-zmm-compressed-disp8
+    sb-vm::%test-vinsertf32x8-zmm-disp8
+  ("VINSERTF32X8" "ZMM0" "ZMM1" "[RSP+32]")
+  :unexpected ("[RSP+1]"))
+
+;; Extract 128-bit lane: disp-n=16
+(define-evex-disasm-test
+    :evex-vextractf32x4-zmm-compressed-disp8
+    sb-vm::%test-vextractf32x4-zmm-disp8
+  ("VEXTRACTF32X4" "[RSP+16]" "ZMM0")
+  :unexpected ("[RSP+1]"))
+
+;; Extract 256-bit lane: disp-n=32
+(define-evex-disasm-test
+    :evex-vextractf32x8-zmm-compressed-disp8
+    sb-vm::%test-vextractf32x8-zmm-disp8
+  ("VEXTRACTF32X8" "[RSP+32]" "ZMM0")
+  :unexpected ("[RSP+1]"))
+
+;; FMA packed: full-vector, disp-n=64
+(define-evex-disasm-test
+    :evex-vfmadd132ps-zmm-compressed-disp8
+    sb-vm::%test-vfmadd132ps-zmm-disp8
+  ("VFMADD132PS" "ZMM0" "ZMM1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; FMA scalar: fixed disp-n=4
+(define-evex-disasm-test
+    :evex-vfmadd132ss-compressed-disp8
+    sb-vm::%test-vfmadd132ss-disp8
+  ("VFMADD132SS" "XMM0" "XMM1" "[RSP+4]")
+  :unexpected ("[RSP+1]"))
+
+;; F16C load: widening, disp-n=32 for ZMM
+(define-evex-disasm-test
+    :evex-vcvtph2ps-zmm-compressed-disp8
+    sb-vm::%test-vcvtph2ps-zmm-disp8
+  ("VCVTPH2PS" "ZMM0" "[RSP+32]")
+  :unexpected ("[RSP+1]"))
+
+;; F16C store: narrowing, disp-n=32 for ZMM
+(define-evex-disasm-test
+    :evex-vcvtps2ph-zmm-compressed-disp8
+    sb-vm::%test-vcvtps2ph-zmm-disp8
+  ("VCVTPS2PH" "[RSP+32]" "ZMM0")
+  :unexpected ("[RSP+1]"))
+
+;; GFNI mulb: full-vector, disp-n=64
+(define-evex-disasm-test
+    :evex-vgf2p8mulb-zmm-compressed-disp8
+    sb-vm::%test-vgf2p8mulb-zmm-disp8
+  ("VGF2P8MULB" "ZMM0" "ZMM1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; GFNI affine: full-vector, disp-n=64
+(define-evex-disasm-test
+    :evex-vgf2p8affineqb-zmm-compressed-disp8
+    sb-vm::%test-vgf2p8affineqb-zmm-disp8
+  ("VGF2P8AFFINEQB" "ZMM0" "ZMM1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; vfpclassps packed: full-vector source, disp-n=64
+(define-evex-disasm-test
+    :evex-vfpclassps-zmm-compressed-disp8
+  sb-vm::%test-vfpclassps-zmm-disp8
+  ("VFPCLASSPS" "K1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; vfpclassss scalar: fixed disp-n=4
+(define-evex-disasm-test
+    :evex-vfpclassss-compressed-disp8
+    sb-vm::%test-vfpclassss-disp8
+  ("VFPCLASSSS" "K1" "[RSP+4]")
+  :unexpected ("[RSP+1]"))
+
+;; vpmullq full-vector: disp-n=64
+(define-evex-disasm-test
+    :evex-vpmullq-zmm-compressed-disp8
+    sb-vm::%test-vpmullq-zmm-disp8
+  ("VPMULLQ" "ZMM0" "ZMM1" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
