@@ -2658,3 +2658,36 @@
            (funcall f (cons y x)))))
    ((1 2 t) nil)
    ((3 2 nil) nil)))
+
+(with-test (:name :dynamic-extent-lp2156347)
+  (checked-compile-and-assert
+   ()
+   '(lambda (n j)
+     (let ((elt
+             (let ((cr (make-array (the integer n))))
+               (declare (dynamic-extent cr))
+               (if j
+                   (list (list 1)
+                         (let ((n (make-array (length cr))))
+                           (declare (dynamic-extent n))
+                           n))))))
+       (declare (dynamic-extent elt))
+       (assert (sb-ext:stack-allocated-p elt))))
+   ((0 t) nil)))
+
+(with-test (:name :dynamic-extent-lp2156347.reduced)
+  (checked-compile-and-assert
+   ()
+   '(lambda (n j)
+     (let ((elt
+             (let ((cr (cons n 2)))
+               (declare (dynamic-extent cr))
+               (if j
+                   (list (list 1)
+                         (let ((z (cons cr 2)))
+                           (declare (dynamic-extent z))
+                           z))))))
+       (declare (dynamic-extent elt))
+       (assert (sb-ext:stack-allocated-p elt))
+       2))
+   ((0 t) 2)))

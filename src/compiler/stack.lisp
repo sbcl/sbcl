@@ -147,7 +147,18 @@
                 ;; the stack lvar (and hence the lifetime). We must do
                 ;; this because stack allocated objects can't move;
                 ;; object identity must be preserved and we can't in
-                ;; general track all references.
+                ;; general track all references. Because values can be
+                ;; stack allocated before their corresponding dynamic
+                ;; extent cleanup is in scope in the flow graph, and
+                ;; this function does not simulate stack popping, we
+                ;; need to look at both the lexical nesting and the
+                ;; state of the stack in this graph walk to determine
+                ;; if we should merge the stack lifetime here. In
+                ;; particular, we check the state of the stack to make
+                ;; sure that dynamic extents always end up taking on
+                ;; the stack lvars of dynamic extents that happen
+                ;; before them in the flow graph when merging their
+                ;; lifetimes.
                 ((memq info stack)
                  (when (or (enclose-p node) (combination-p node))
                    (do-nested-cleanups (cleanup node)
@@ -156,7 +167,9 @@
                          (when (eq dynamic-extent mess-up)
                            (return))
                          (let ((old (dynamic-extent-info mess-up)))
-                           (when (and old (not (eq info old)))
+                           (when (and old
+                                      (not (eq info old))
+                                      (memq info (memq old stack)))
                              (setf (ir2-lvar-kind (lvar-info old)) :unused)
                              (setf (dynamic-extent-info mess-up) info))))))))
                 (t
