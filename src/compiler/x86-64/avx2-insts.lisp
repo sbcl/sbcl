@@ -658,7 +658,7 @@ produces silently wrong addresses."
                             is4
                             vm
                             (disp-n 0))
-  ;; Auto-detect ZMM operands and delegate to EVEX encoding
+  ;; Auto-detect ZMM/YMM16+/XMM16+ operands and delegate to EVEX encoding
   (flet ((evex-reg-p (r)
            (and (register-p r)
                 (or (is-zmm-id-p (reg-id r))
@@ -678,16 +678,11 @@ produces silently wrong addresses."
                           :w (or evex-w w)
                           :vvvv vvvv
                           :vm vm
-                          ;; Force disp32 for auto-promoted VEX instructions:
-                          ;; the correct N depends on tuple type which varies
-                          ;; per instruction. disp-n=0 disables disp8 entirely.
                           :disp-n 0))))
   (emit-vex segment vvvv thing reg prefix opcode-prefix l w)
   (emit-bytes segment opcode)
   (when is4
     (incf remaining-bytes))
-  ;; FIXME: :xmm-index should be removed and we should alter the EA
-  ;; to have the proper FPR as the index reg when appropriate.
   (emit-ea segment thing reg :remaining-bytes remaining-bytes :xmm-index vm)
   (when is4
     (emit-byte segment (ash (reg-id-num (reg-id is4)) 4))))
@@ -863,8 +858,9 @@ REG is the source (encoded in ModR/M.r/m).
                                    :reg-mem-size reg-mem-size
                                    :xmmreg-mem-size xmmreg-mem-size
                                    :w w
-                                   :nds nds)))))
-(macrolet
+                                   :nds nds))))))
+
+  (macrolet
     ((def (name opcode /i)
        `(define-instruction ,name (segment dst src imm)
           ,@(avx2-inst-printer-list 'ymm-ymm-imm #x66 opcode

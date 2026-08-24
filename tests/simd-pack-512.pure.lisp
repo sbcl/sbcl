@@ -411,7 +411,25 @@
   (def %test-vcvttsd2usi-disp8)
   (def %test-vcvtusi2sd-disp8)
   (def %test-vcvtusi2sd-disp32)
-  (def %test-vcvtusi2ss-disp8))
+  (def %test-vcvtusi2ss-disp8)
+  (def %test-vcvtps2udq-zmm-disp8)
+  (def %test-vcvtps2udq-zmm-disp32)
+  (def %test-vcvtudq2pd-zmm-disp8)
+  (def %test-vcvtudq2pd-xmm-disp8)
+  (def %test-vcvtps2qq-zmm-disp8)
+  (def %test-vcvtps2qq-zmm-disp32)
+  (def %test-vcvtpd2qq-zmm-disp8)
+  (def %test-vcvtqq2ps-zmm-disp8)
+  (def %test-vcvtqq2ps-zmm-disp32)
+  (def %test-auto-promoted-vcvtdq2pd-disp8)
+  (def %test-auto-promoted-vcvtdq2pd-disp32)
+  (def %test-auto-promoted-vcvtps2dq-disp8)
+  (def %test-auto-promoted-vcvtps2dq-disp32)
+  (def %test-auto-promoted-vrcpps-disp8)
+  (def %test-auto-promoted-vpmovsxbw-disp8)
+  (def %test-vpand-zmm-disasm)
+  (def %test-vmovdqa-zmm-disasm)
+  (def %test-vbroadcastf128-zmm-disasm))
 
 
 ;; instruction vops
@@ -1430,6 +1448,205 @@
   (:generator 1
     (inst vcvtusi2ss xmm xmm (ea 8 rsp))
     (inst xor :dword res res)))
+
+(define-vop (%test-vcvtps2udq-zmm-disp8)
+  (:translate %test-vcvtps2udq-zmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vcvtps2udq zmm (ea 64 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vcvtps2udq-zmm-disp32)
+  (:translate %test-vcvtps2udq-zmm-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vcvtps2udq zmm (ea 65 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vcvtudq2pd-zmm-disp8)
+  (:translate %test-vcvtudq2pd-zmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc double-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vcvtudq2pd zmm (ea 32 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vcvtudq2pd-xmm-disp8)
+  (:translate %test-vcvtudq2pd-xmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc double-sse-reg :offset 0) xmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vcvtudq2pd xmm (ea 8 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vcvtps2qq-zmm-disp8)
+  (:translate %test-vcvtps2qq-zmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vcvtps2qq zmm (ea 32 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vcvtps2qq-zmm-disp32)
+  (:translate %test-vcvtps2qq-zmm-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vcvtps2qq zmm (ea 33 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vcvtpd2qq-zmm-disp8)
+  (:translate %test-vcvtpd2qq-zmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vcvtpd2qq zmm (ea 64 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vcvtqq2ps-zmm-disp8)
+  (:translate %test-vcvtqq2ps-zmm-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vcvtqq2ps zmm (ea 64 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vcvtqq2ps-zmm-disp32)
+  (:translate %test-vcvtqq2ps-zmm-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vcvtqq2ps zmm (ea 65 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-auto-promoted-vcvtdq2pd-disp8)
+  (:translate %test-auto-promoted-vcvtdq2pd-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc double-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vcvtdq2pd zmm (ea 32 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-auto-promoted-vcvtdq2pd-disp32)
+  (:translate %test-auto-promoted-vcvtdq2pd-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc double-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vcvtdq2pd zmm (ea 33 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-auto-promoted-vcvtps2dq-disp8)
+  (:translate %test-auto-promoted-vcvtps2dq-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vcvtps2dq zmm (ea 64 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-auto-promoted-vcvtps2dq-disp32)
+  (:translate %test-auto-promoted-vcvtps2dq-disp32)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vcvtps2dq zmm (ea 65 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-auto-promoted-vrcpps-disp8)
+  (:translate %test-auto-promoted-vrcpps-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vrcpps zmm (ea 64 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-auto-promoted-vpmovsxbw-disp8)
+  (:translate %test-auto-promoted-vpmovsxbw-disp8)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vpmovsxbw zmm (ea 32 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vpand-zmm-disasm)
+  (:translate %test-vpand-zmm-disasm)
+  (:policy :fast-safe)
+  (:temporary (:sc int-avx512-reg :offset 0) zmm0)
+  (:temporary (:sc int-avx512-reg :offset 1) zmm1)
+  (:temporary (:sc int-avx512-reg :offset 2) zmm2)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vpand zmm0 zmm1 zmm2)
+    (inst xor :dword res res)))
+
+(define-vop (%test-vmovdqa-zmm-disasm)
+  (:translate %test-vmovdqa-zmm-disasm)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vmovdqa zmm (ea 64 rsp))
+    (inst xor :dword res res)))
+
+(define-vop (%test-vbroadcastf128-zmm-disasm)
+  (:translate %test-vbroadcastf128-zmm-disasm)
+  (:policy :fast-safe)
+  (:temporary (:sc single-avx512-reg :offset 0) zmm)
+  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst vbroadcastf128 zmm (ea 16 rsp))
+    (inst xor :dword res res)))
 
 ;; evex tests
 (cl:in-package :test-util)
@@ -1527,6 +1744,37 @@
         (assert evex-form)
         (let ((fields (third evex-form)))
           (assert (eq (third (assoc 'reg/mem fields)) disp64)))))))
+
+
+;; Printer metadata: W=0 and W=1 entries have correct disp-n
+(with-test (:name :scalar-unsigned-convert-printer-disp-n)
+  (let* ((asm-pkg (find-package "SB-X86-64-ASM"))
+         (printer-fun (find-symbol "AVX512-INST-PRINTER-LIST" asm-pkg))
+         (inst-format (find-symbol "YMM-YMM/MEM" asm-pkg)))
+    (when (and printer-fun inst-format)
+      (flet ((find-disp-n (forms w)
+               (find-if (lambda (form)
+                          (and (eq (first form) :printer)
+                               (let ((fields (third form)))
+                                 (and (eql (second (assoc 'w fields)) w)
+                                      (assoc 'reg/mem fields)))))
+                        forms)))
+        (let ((w0-forms (funcall printer-fun inst-format #xf3 #x7b
+                                 :nds t :w 0 :disp-n 4))
+              (w1-forms (funcall printer-fun inst-format #xf3 #x7b
+                                 :nds t :w 1 :disp-n 8)))
+          (let ((w0-form (find-disp-n w0-forms 0))
+                (w1-form (find-disp-n w1-forms 1)))
+            (assert w0-form)
+            (assert w1-form)
+            (let ((w0-reg/mem (assoc 'reg/mem (third w0-form)))
+                  (w1-reg/mem (assoc 'reg/mem (third w1-form))))
+              ;; The third element of the reg/mem field is the arg type.
+              (assert (eq (third w0-reg/mem)
+                          (find-symbol "EVEX-YMMREG/MEM-DISP4" asm-pkg)))
+              (assert (eq (third w1-reg/mem)
+                          (find-symbol "EVEX-YMMREG/MEM-DISP8" asm-pkg))))))))))
+
 ;; EVEX high registers: R', V', X-as-B'
 (define-evex-disasm-test
     :evex-high-register-disassembly
@@ -2083,31 +2331,123 @@
   ("VCVTUSI2SS" "XMM0" "XMM0" "[RSP+8]")
   :unexpected ("[RSP+1]"))
 
-;; Printer metadata: W=0 and W=1 entries have correct disp-n
-(with-test (:name :scalar-unsigned-convert-printer-disp-n)
-  (let* ((asm-pkg (find-package "SB-X86-64-ASM"))
-         (printer-fun (find-symbol "AVX512-INST-PRINTER-LIST" asm-pkg))
-         (inst-format (find-symbol "YMM-YMM/MEM" asm-pkg)))
-    (when (and printer-fun inst-format)
-      (flet ((find-disp-n (forms w)
-               (find-if (lambda (form)
-                          (and (eq (first form) :printer)
-                               (let ((fields (third form)))
-                                 (and (eql (second (assoc 'w fields)) w)
-                                      (assoc 'reg/mem fields)))))
-                        forms)))
-        (let ((w0-forms (funcall printer-fun inst-format #xf3 #x7b
-                                 :nds t :w 0 :disp-n 4))
-              (w1-forms (funcall printer-fun inst-format #xf3 #x7b
-                                 :nds t :w 1 :disp-n 8)))
-          (let ((w0-form (find-disp-n w0-forms 0))
-                (w1-form (find-disp-n w1-forms 1)))
-            (assert w0-form)
-            (assert w1-form)
-            (let ((w0-reg/mem (assoc 'reg/mem (third w0-form)))
-                  (w1-reg/mem (assoc 'reg/mem (third w1-form))))
-              ;; The third element of the reg/mem field is the arg type.
-              (assert (eq (third w0-reg/mem)
-                          (find-symbol "EVEX-YMMREG/MEM-DISP4" asm-pkg)))
-              (assert (eq (third w1-reg/mem)
-                          (find-symbol "EVEX-YMMREG/MEM-DISP8" asm-pkg))))))))))
+;; Full-vector unsigned conversion: vcvtps2udq ZMM -> disp-n=64
+(define-evex-disasm-test
+    :evex-vcvtps2udq-zmm-compressed-disp8
+    sb-vm::%test-vcvtps2udq-zmm-disp8
+  ("VCVTPS2UDQ" "ZMM0" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Full-vector unsigned conversion: non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vcvtps2udq-zmm-disp32-fallback
+    sb-vm::%test-vcvtps2udq-zmm-disp32
+  ("VCVTPS2UDQ" "ZMM0" "[RSP+65]"))
+
+;; Widening unsigned conversion: vcvtudq2pd ZMM source -> disp-n=32
+(define-evex-disasm-test
+    :evex-vcvtudq2pd-zmm-compressed-disp8
+    sb-vm::%test-vcvtudq2pd-zmm-disp8
+  ("VCVTUDQ2PD" "ZMM0" "[RSP+32]")
+  :unexpected ("[RSP+1]"))
+
+;; Widening unsigned conversion: XMM source -> disp-n=8
+(define-evex-disasm-test
+    :evex-vcvtudq2pd-xmm-compressed-disp8
+    sb-vm::%test-vcvtudq2pd-xmm-disp8
+  ("VCVTUDQ2PD" "XMM0" "[RSP+8]")
+  :unexpected ("[RSP+1]"))
+
+;; Narrowing conversion: single -> qword, ZMM memory = 32 bytes, disp-n=32
+(define-evex-disasm-test
+    :evex-vcvtps2qq-zmm-compressed-disp8
+    sb-vm::%test-vcvtps2qq-zmm-disp8
+  ("VCVTPS2QQ" "ZMM0" "[RSP+32]")
+  :unexpected ("[RSP+1]"))
+
+;; Narrowing conversion non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vcvtps2qq-zmm-disp32-fallback
+    sb-vm::%test-vcvtps2qq-zmm-disp32
+  ("VCVTPS2QQ" "ZMM0" "[RSP+33]"))
+
+;; Full-width conversion: double -> qword, ZMM memory = 64 bytes, disp-n=64
+(define-evex-disasm-test
+    :evex-vcvtpd2qq-zmm-compressed-disp8
+    sb-vm::%test-vcvtpd2qq-zmm-disp8
+  ("VCVTPD2QQ" "ZMM0" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Full-width conversion: qword -> single, ZMM memory = 64 bytes, disp-n=64
+(define-evex-disasm-test
+    :evex-vcvtqq2ps-zmm-compressed-disp8
+    sb-vm::%test-vcvtqq2ps-zmm-disp8
+  ("VCVTQQ2PS" "ZMM0" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Full-width conversion non-multiple falls back to disp32
+(define-evex-disasm-test
+    :evex-vcvtqq2ps-zmm-disp32-fallback
+    sb-vm::%test-vcvtqq2ps-zmm-disp32
+  ("VCVTQQ2PS" "ZMM0" "[RSP+65]"))
+
+;; Auto-promoted widening conversion: vcvtdq2pd ZMM -> disp-n=32
+(define-evex-disasm-test
+    :auto-promoted-vcvtdq2pd-compressed-disp8
+    sb-vm::%test-auto-promoted-vcvtdq2pd-disp8
+  ("VCVTDQ2PD" "ZMM0" "[RSP+32]")
+  :unexpected ("[RSP+1]"))
+
+;; Auto-promoted widening conversion non-multiple falls back to disp32
+(define-evex-disasm-test
+    :auto-promoted-vcvtdq2pd-disp32-fallback
+    sb-vm::%test-auto-promoted-vcvtdq2pd-disp32
+  ("VCVTDQ2PD" "ZMM0" "[RSP+33]"))
+
+;; Auto-promoted same-width conversion: vcvtps2dq ZMM -> disp-n=64
+(define-evex-disasm-test
+    :auto-promoted-vcvtps2dq-compressed-disp8
+    sb-vm::%test-auto-promoted-vcvtps2dq-disp8
+  ("VCVTPS2DQ" "ZMM0" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Auto-promoted same-width conversion non-multiple falls back to disp32
+(define-evex-disasm-test
+    :auto-promoted-vcvtps2dq-disp32-fallback
+    sb-vm::%test-auto-promoted-vcvtps2dq-disp32
+  ("VCVTPS2DQ" "ZMM0" "[RSP+65]"))
+
+;; Auto-promoted full-vector same width: vrcpps ZMM -> disp-n=64
+(define-evex-disasm-test
+    :auto-promoted-vrcpps-compressed-disp8
+    sb-vm::%test-auto-promoted-vrcpps-disp8
+  ("VRCPPS" "ZMM0" "[RSP+64]")
+  :unexpected ("[RSP+1]"))
+
+;; Auto-promoted widening conversion: vpmovsxbw ZMM -> disp-n=32
+(define-evex-disasm-test
+    :auto-promoted-vpmovsxbw-compressed-disp8
+    sb-vm::%test-auto-promoted-vpmovsxbw-disp8
+  ("VPMOVSXBW" "ZMM0" "[RSP+32]")
+  :unexpected ("[RSP+1]"))
+
+;; vpand skip: explicit VPANDD should be used, not auto-promoted VPAND
+(define-evex-disasm-test
+    :auto-evex-skip-vpand
+    sb-vm::%test-vpand-zmm-disasm
+  ("VPANDD" "ZMM0" "ZMM1" "ZMM2")
+  :unexpected ("VPAND "))
+
+;; vmovdqa skip: explicit VMOVDQA32 should be used
+(define-evex-disasm-test
+    :auto-evex-skip-vmovdqa
+    sb-vm::%test-vmovdqa-zmm-disasm
+  ("VMOVDQA32" "ZMM0" "[RSP+64]")
+  :unexpected ("VMOVDQA "))
+
+;; vbroadcastf128 skip: explicit VBROADCASTF32X4 should be used
+(define-evex-disasm-test
+    :auto-evex-skip-vbroadcastf128
+    sb-vm::%test-vbroadcastf128-zmm-disasm
+  ("VBROADCASTF32X4" "ZMM0" "[RSP+16]")
+  :unexpected ("VBROADCASTF128"))

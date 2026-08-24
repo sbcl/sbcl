@@ -780,19 +780,28 @@
                                 :more-fields '((/i 4))))
 
 ;;; Unsigned conversions (2-operand)
-(macrolet ((def (name prefix opcode w &optional (opcode-prefix #x0f))
+(macrolet ((def (name prefix opcode w disp-ns &optional (opcode-prefix #x0f))
              `(define-instruction ,name (segment dst src)
-                ,@(avx512-inst-printer-list 'ymm-ymm/mem prefix opcode
-                                            :opcode-prefix opcode-prefix :w w)
+                ,@(loop for ll in '(#b00 #b01 #b10)
+                        for n in disp-ns
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem prefix opcode
+                         :opcode-prefix opcode-prefix :w w
+                         :ll ll :disp-n n))
                 (:emitter
                  (emit-avx512-inst segment src dst ,prefix ,opcode
-                                   :opcode-prefix ,opcode-prefix :w ,w)))))
-  (def vcvtps2udq  nil  #x79 0)
-  (def vcvtpd2udq  nil  #x79 1)
-  (def vcvttps2udq nil  #x78 0)
-  (def vcvttpd2udq nil  #x78 1)
-  (def vcvtudq2ps  #xf2 #x7a 0)
-  (def vcvtudq2pd  #xf3 #x7a 0))
+                                   :opcode-prefix ,opcode-prefix :w ,w
+                                   :disp-n (cond ((zmm-register-p dst) (third ',disp-ns))
+                                                 ((ymm-register-p dst) (second ',disp-ns))
+                                                 ((xmm-register-p dst) (first ',disp-ns))
+                                                 (t 0)))))))
+  (def vcvtps2udq  nil  #x79 0 (16 32 64))
+  (def vcvtpd2udq  nil  #x79 1 (16 32 64))
+  (def vcvttps2udq nil  #x78 0 (16 32 64))
+  (def vcvttpd2udq nil  #x78 1 (16 32 64))
+  (def vcvtudq2ps  #xf2 #x7a 0 (16 32 64))
+  (def vcvtudq2pd  #xf3 #x7a 0 (8 16 32)))
 
 ;;; Scalar unsigned conversions (2-operand, dst=gpr)
 (macrolet ((def (name prefix opcode disp-n)
@@ -1135,25 +1144,37 @@
                                 :opcode-prefix #x0f38 :w 1 :nds t))
 
 ;;; Convert packed integers to/from FP (DQ extensions)
-(macrolet ((def (name prefix opcode w &optional (opcode-prefix #x0f))
+(macrolet ((def (name prefix opcode w disp-ns &optional (opcode-prefix #x0f))
              `(define-instruction ,name (segment dst src)
-                ,@(avx512-inst-printer-list 'ymm-ymm/mem prefix opcode
-                                            :opcode-prefix opcode-prefix :w w)
+                ,@(loop for ll in '(#b00 #b01 #b10)
+                        for n in disp-ns
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem prefix opcode
+                         :opcode-prefix opcode-prefix :w w
+                         :ll ll :disp-n n))
                 (:emitter
                  (emit-avx512-inst segment src dst ,prefix ,opcode
-                                   :opcode-prefix ,opcode-prefix :w ,w)))))
-  (def vcvtps2qq   #x66 #x7b 0)
-  (def vcvtpd2qq   #x66 #x7b 1)
-  (def vcvtps2uqq  #x66 #x79 0)
-  (def vcvtpd2uqq  #x66 #x79 1)
-  (def vcvttps2qq  #x66 #x7a 0)
-  (def vcvttpd2qq  #x66 #x7a 1)
-  (def vcvttps2uqq #x66 #x78 0)
-  (def vcvttpd2uqq #x66 #x78 1)
-  (def vcvtqq2ps   nil  #x5b 1)
-  (def vcvtqq2pd   #xf3 #xe6 1)
-  (def vcvtuqq2ps  #xf2 #x7a 1)
-  (def vcvtuqq2pd  #xf3 #x7a 1))
+                                   :opcode-prefix ,opcode-prefix :w ,w
+                                   :disp-n (cond ((zmm-register-p dst) (third ',disp-ns))
+                                                 ((ymm-register-p dst) (second ',disp-ns))
+                                                 ((xmm-register-p dst) (first ',disp-ns))
+                                                 (t 0)))))))
+  ;; single -> qword (memory operand is half width)
+  (def vcvtps2qq   #x66 #x7b 0 (8 16 32))
+  (def vcvtps2uqq  #x66 #x79 0 (8 16 32))
+  (def vcvttps2qq  #x66 #x7a 0 (8 16 32))
+  (def vcvttps2uqq #x66 #x78 0 (8 16 32))
+  ;; double -> qword (full width)
+  (def vcvtpd2qq   #x66 #x7b 1 (16 32 64))
+  (def vcvtpd2uqq  #x66 #x79 1 (16 32 64))
+  (def vcvttpd2qq  #x66 #x7a 1 (16 32 64))
+  (def vcvttpd2uqq #x66 #x78 1 (16 32 64))
+  ;; qword -> single/double (full width)
+  (def vcvtqq2ps   nil  #x5b 1 (16 32 64))
+  (def vcvtqq2pd   #xf3 #xe6 1 (16 32 64))
+  (def vcvtuqq2ps  #xf2 #x7a 1 (16 32 64))
+  (def vcvtuqq2pd  #xf3 #x7a 1 (16 32 64)))
 
 ;;; Move mask (dword/qword to/from k)
 (macrolet ((def (name prefix opcode w)
