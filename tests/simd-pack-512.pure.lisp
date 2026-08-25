@@ -580,7 +580,41 @@
   (def %test-vpmadd52luq-masked-zmm-disp8)
   (def %test-vpshldvw-masked-z-zmm-disp8)
   (def %test-vpopcntd-masked-zmm-disp8)
-  (def %test-vpopcntq-masked-z-zmm-disp8))
+  (def %test-vpopcntq-masked-z-zmm-disp8)
+  (def %test-vrcp14ps-masked-zmm-disp8)
+  (def %test-vrcp14pd-masked-z-zmm-disp8)
+  (def %test-vrsqrt14ps-masked-zmm-disp8)
+  (def %test-vrcp14ps-bcast-xmm-disp8)
+  (def %test-vrsqrt14pd-bcast-zmm-disp8)
+  (def %test-vreduceps-masked-zmm-disp8)
+  (def %test-vreducepd-masked-z-zmm-disp8)
+  (def %test-vreduceps-bcast-xmm-disp8)
+  (def %test-vscalefps-masked-zmm-disp8)
+  (def %test-vscalefpd-masked-z-zmm-disp8)
+  (def %test-vscalefps-bcast-ymm-disp8)
+  (def %test-vfixupimmps-masked-zmm-disp8)
+  (def %test-vfixupimmpd-masked-z-zmm-disp8)
+  (def %test-vfixupimmps-bcast-xmm-disp8)
+  (def %test-vrndscaleps-masked-zmm-disp8)
+  (def %test-vrndscalepd-masked-z-zmm-disp8)
+  (def %test-vrndscaleps-bcast-ymm-disp8)
+  (def %test-vrcp14ss-masked-disp8)
+  (def %test-vrsqrt14sd-masked-z-disp8)
+  (def %test-vgetexpss-masked-disp8)
+  (def %test-vscalefsd-masked-z-disp8)
+  (def %test-vgetmantss-masked-disp8)
+  (def %test-vrangesd-masked-z-disp8)
+  (def %test-vfixupimmss-masked-disp8)
+  (def %test-vrndscaless-masked-disp8)
+  (def %test-vrndscalesd-masked-z-disp8)
+  (def %test-vgetexpps-masked-zmm-disp8)
+  (def %test-vgetexppd-masked-z-zmm-disp8)
+  (def %test-vgetmantps-masked-zmm-disp8)
+  (def %test-vgetmantpd-masked-z-zmm-disp8)
+  (def %test-vpabsq-masked-zmm-disp8)
+  (def %test-vgf2p8mulb-masked-zmm-disp8)
+  (def %test-vgf2p8affineqb-masked-z-zmm-disp8)
+  (def %test-vgf2p8affineinvqb-masked-zmm-disp8))
 
 ;; instruction vops
 
@@ -1819,6 +1853,44 @@
               `(inst ,inst data (ea ,disp ,base-sym index ,scale) ,mask))
          (inst xor :dword res res)))))
 
+(defmacro define-test-vop-masked-reg-mem-imm
+    (name inst reg-sc reg-off disp mask imm)
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (:sc ,reg-sc :offset ,reg-off) vec)
+     (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       (inst ,inst vec (ea ,disp rsp) ,mask ,imm)
+       (inst xor :dword res res))))
+
+(defmacro define-test-vop-masked-reg-mem (name inst reg-sc reg-off disp mask)
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (:sc ,reg-sc :offset ,reg-off) vec)
+     (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       (inst ,inst vec (ea ,disp rsp) ,mask)
+       (inst xor :dword res res))))
+
+(defmacro define-test-vop-masked-reg-mem-imm
+    (name inst reg-sc reg-off disp mask imm)
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (:sc ,reg-sc :offset ,reg-off) vec)
+     (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       (inst ,inst vec (ea ,disp rsp) ,mask ,imm)
+       (inst xor :dword res res))))
+
 (define-vop (%test-vp2intersectd)
   (:translate %test-vp2intersectd)
   (:policy :fast-safe)
@@ -1847,18 +1919,6 @@
   (:generator 1
     (inst vp2intersectq k3 k4 zmm2 (ea 64 rsp))
     (inst xor :dword res res)))
-
-(defmacro define-test-vop-masked-reg-mem (name inst reg-sc reg-off disp mask &optional imm)
-  `(define-vop (,name)
-     (:translate ,name)
-     (:policy :fast-safe)
-     (:temporary (:sc ,reg-sc :offset ,reg-off) vec)
-     (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
-     (:results (res :scs (unsigned-reg)))
-     (:result-types unsigned-num)
-     (:generator 1
-       (inst ,inst vec (ea ,disp rsp) ,mask)
-       (inst xor :dword res res))))
 
 (define-test-vop-three-reg %test-evex-high-regs vaddps single-avx512-reg 16 single-avx512-reg 17 single-avx512-reg 18)
 (define-test-vop-load %test-evex-disp8 vmovdqu64 single-avx512-reg 0 64)
@@ -2148,6 +2208,69 @@
 (define-test-vop-masked-reg-reg-mem %test-vpshldvw-masked-z-zmm-disp8 vpshldvw-masked-z int-avx512-reg 0 int-avx512-reg 1 64 3)
 (define-test-vop-masked-reg-mem %test-vpopcntd-masked-zmm-disp8 vpopcntd-masked int-avx512-reg 0 64 4)
 (define-test-vop-masked-reg-mem %test-vpopcntq-masked-z-zmm-disp8 vpopcntq-masked-z int-avx512-reg 0 64 5)
+(define-test-vop-masked-reg-mem %test-vrcp14ps-masked-zmm-disp8 vrcp14ps-masked single-avx512-reg 0 64 2)
+(define-test-vop-masked-reg-mem %test-vrcp14pd-masked-z-zmm-disp8 vrcp14pd-masked-z double-avx512-reg 0 64 3)
+(define-test-vop-masked-reg-mem %test-vrsqrt14ps-masked-zmm-disp8 vrsqrt14ps-masked single-avx512-reg 0 64 4)
+(define-test-vop-load %test-vrcp14ps-bcast-xmm-disp8 vrcp14ps-bcast single-sse-reg 0 4)
+(define-test-vop-load %test-vrsqrt14pd-bcast-zmm-disp8 vrsqrt14pd-bcast double-avx512-reg 0 8)
+(define-test-vop-masked-reg-mem-imm %test-vreduceps-masked-zmm-disp8
+  vreduceps-masked single-avx512-reg 0 64 2 0)
+(define-test-vop-masked-reg-mem-imm %test-vreducepd-masked-z-zmm-disp8
+  vreducepd-masked-z double-avx512-reg 0 64 3 0)
+(define-test-vop-load %test-vreduceps-bcast-xmm-disp8
+  vreduceps-bcast single-sse-reg 0 4 0)
+(define-test-vop-masked-reg-reg-mem %test-vscalefps-masked-zmm-disp8
+  vscalefps-masked single-avx512-reg 0 single-avx512-reg 1 64 4)
+(define-test-vop-masked-reg-reg-mem %test-vscalefpd-masked-z-zmm-disp8
+  vscalefpd-masked-z double-avx512-reg 0 double-avx512-reg 1 64 5)
+(define-test-vop-reg-reg-mem %test-vscalefps-bcast-ymm-disp8
+  vscalefps-bcast single-avx2-reg 0 single-avx2-reg 1 4)
+(define-test-vop-masked-reg-reg-mem %test-vfixupimmps-masked-zmm-disp8
+  vfixupimmps-masked single-avx512-reg 0 single-avx512-reg 1 64 6 0)
+(define-test-vop-masked-reg-reg-mem %test-vfixupimmpd-masked-z-zmm-disp8
+  vfixupimmpd-masked-z double-avx512-reg 0 double-avx512-reg 1 64 7 0)
+(define-test-vop-reg-reg-mem %test-vfixupimmps-bcast-xmm-disp8
+  vfixupimmps-bcast single-sse-reg 0 single-sse-reg 1 4 0)
+(define-test-vop-masked-reg-mem-imm %test-vrndscaleps-masked-zmm-disp8
+  vrndscaleps-masked single-avx512-reg 0 64 2 0)
+(define-test-vop-masked-reg-mem-imm %test-vrndscalepd-masked-z-zmm-disp8
+  vrndscalepd-masked-z double-avx512-reg 0 64 3 0)
+(define-test-vop-load %test-vrndscaleps-bcast-ymm-disp8
+  vrndscaleps-bcast single-avx2-reg 0 4 0)
+(define-test-vop-masked-reg-reg-mem %test-vrcp14ss-masked-disp8
+  vrcp14ss-masked single-sse-reg 0 single-sse-reg 1 4 2)
+(define-test-vop-masked-reg-reg-mem %test-vrsqrt14sd-masked-z-disp8
+  vrsqrt14sd-masked-z double-sse-reg 0 double-sse-reg 1 8 3)
+(define-test-vop-masked-reg-reg-mem %test-vgetexpss-masked-disp8
+  vgetexpss-masked single-sse-reg 0 single-sse-reg 1 4 2)
+(define-test-vop-masked-reg-reg-mem %test-vscalefsd-masked-z-disp8
+  vscalefsd-masked-z double-sse-reg 0 double-sse-reg 1 8 3)
+(define-test-vop-masked-reg-reg-mem %test-vgetmantss-masked-disp8
+  vgetmantss-masked single-sse-reg 0 single-sse-reg 1 4 2 0)
+(define-test-vop-masked-reg-reg-mem %test-vrangesd-masked-z-disp8
+  vrangesd-masked-z double-sse-reg 0 double-sse-reg 1 8 3 0)
+(define-test-vop-masked-reg-reg-mem %test-vfixupimmss-masked-disp8
+  vfixupimmss-masked single-sse-reg 0 single-sse-reg 1 4 4 0)
+(define-test-vop-masked-reg-mem-imm %test-vrndscaless-masked-disp8
+  vrndscaless-masked single-sse-reg 0 4 2 0)
+(define-test-vop-masked-reg-mem-imm %test-vrndscalesd-masked-z-disp8
+  vrndscalesd-masked-z double-sse-reg 0 8 3 0)
+(define-test-vop-masked-reg-mem %test-vgetexpps-masked-zmm-disp8
+  vgetexpps-masked single-avx512-reg 0 64 2)
+(define-test-vop-masked-reg-mem %test-vgetexppd-masked-z-zmm-disp8
+  vgetexppd-masked-z double-avx512-reg 0 64 3)
+(define-test-vop-masked-reg-mem-imm %test-vgetmantps-masked-zmm-disp8
+  vgetmantps-masked single-avx512-reg 0 64 4 0)
+(define-test-vop-masked-reg-mem-imm %test-vgetmantpd-masked-z-zmm-disp8
+  vgetmantpd-masked-z double-avx512-reg 0 64 5 0)
+(define-test-vop-masked-reg-mem %test-vpabsq-masked-zmm-disp8
+  vpabsq-masked int-avx512-reg 0 64 6)
+(define-test-vop-masked-reg-reg-mem %test-vgf2p8mulb-masked-zmm-disp8
+  vgf2p8mulb-masked int-avx512-reg 0 int-avx512-reg 1 64 2)
+(define-test-vop-masked-reg-reg-mem %test-vgf2p8affineqb-masked-z-zmm-disp8
+  vgf2p8affineqb-masked-z int-avx512-reg 0 int-avx512-reg 1 64 3 0)
+(define-test-vop-masked-reg-reg-mem %test-vgf2p8affineinvqb-masked-zmm-disp8
+  vgf2p8affineinvqb-masked int-avx512-reg 0 int-avx512-reg 1 64 4 0)
 
 ;; evex tests
 (cl:in-package :test-util)
@@ -3966,4 +4089,221 @@
     :evex-vpopcntq-masked-z-zmm-disp8
     sb-vm::%test-vpopcntq-masked-z-zmm-disp8
   ("VPOPCNTQ" "ZMM0" "[RSP+64]" "{K5}{z}")
+  :unexpected ("[RSP+1]"))
+
+(define-evex-disasm-test
+    :evex-vrcp14ps-masked-zmm-disp8
+    sb-vm::%test-vrcp14ps-masked-zmm-disp8
+  ("VRCP14PS" "ZMM0" "[RSP+64]" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+(define-evex-disasm-test
+    :evex-vrcp14pd-masked-z-zmm-disp8
+    sb-vm::%test-vrcp14pd-masked-z-zmm-disp8
+  ("VRCP14PD" "ZMM0" "[RSP+64]" "{K3}{z}")
+  :unexpected ("[RSP+1]"))
+
+(define-evex-disasm-test
+    :evex-vrsqrt14ps-masked-zmm-disp8
+    sb-vm::%test-vrsqrt14ps-masked-zmm-disp8
+  ("VRSQRT14PS" "ZMM0" "[RSP+64]" "{K4}")
+  :unexpected ("[RSP+1]"))
+
+(define-evex-disasm-test
+    :evex-vrcp14ps-bcast-xmm-disp8
+    sb-vm::%test-vrcp14ps-bcast-xmm-disp8
+  ("VRCP14PS-BCAST" "XMM0" "[RSP+4]" "{1to4}")
+  :unexpected ("[RSP+1]"))
+
+(define-evex-disasm-test
+    :evex-vrsqrt14pd-bcast-zmm-disp8
+    sb-vm::%test-vrsqrt14pd-bcast-zmm-disp8
+  ("VRSQRT14PD-BCAST" "ZMM0" "[RSP+8]" "{1to8}")
+  :unexpected ("[RSP+1]"))
+
+;; Reduce
+(define-evex-disasm-test
+    :evex-vreduceps-masked-zmm-disp8
+    sb-vm::%test-vreduceps-masked-zmm-disp8
+  ("VREDUCEPS" "ZMM0" "[RSP+64]" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+(define-evex-disasm-test
+    :evex-vreducepd-masked-z-zmm-disp8
+    sb-vm::%test-vreducepd-masked-z-zmm-disp8
+  ("VREDUCEPD" "ZMM0" "[RSP+64]" "{K3}{z}")
+  :unexpected ("[RSP+1]"))
+
+(define-evex-disasm-test
+    :evex-vreduceps-bcast-xmm-disp8
+    sb-vm::%test-vreduceps-bcast-xmm-disp8
+  ("VREDUCEPS-BCAST" "XMM0" "[RSP+4]" "{1to4}")
+  :unexpected ("[RSP+1]"))
+
+;; Scale
+(define-evex-disasm-test
+    :evex-vscalefps-masked-zmm-disp8
+    sb-vm::%test-vscalefps-masked-zmm-disp8
+  ("VSCALEFPS" "ZMM0" "ZMM1" "[RSP+64]" "{K4}")
+  :unexpected ("[RSP+1]"))
+
+(define-evex-disasm-test
+    :evex-vscalefpd-masked-z-zmm-disp8
+    sb-vm::%test-vscalefpd-masked-z-zmm-disp8
+  ("VSCALEFPD" "ZMM0" "ZMM1" "[RSP+64]" "{K5}{z}")
+  :unexpected ("[RSP+1]"))
+
+(define-evex-disasm-test
+    :evex-vscalefps-bcast-ymm-disp8
+    sb-vm::%test-vscalefps-bcast-ymm-disp8
+  ("VSCALEFPS-BCAST" "YMM0" "YMM1" "[RSP+4]" "{1to8}")
+  :unexpected ("[RSP+1]"))
+
+;; Fixup
+(define-evex-disasm-test
+    :evex-vfixupimmps-masked-zmm-disp8
+    sb-vm::%test-vfixupimmps-masked-zmm-disp8
+  ("VFIXUPIMMPS" "ZMM0" "ZMM1" "[RSP+64]" "{K6}")
+  :unexpected ("[RSP+1]"))
+
+(define-evex-disasm-test
+    :evex-vfixupimmpd-masked-z-zmm-disp8
+    sb-vm::%test-vfixupimmpd-masked-z-zmm-disp8
+  ("VFIXUPIMMPD" "ZMM0" "ZMM1" "[RSP+64]" "{K7}{z}")
+  :unexpected ("[RSP+1]"))
+
+(define-evex-disasm-test
+    :evex-vfixupimmps-bcast-xmm-disp8
+    sb-vm::%test-vfixupimmps-bcast-xmm-disp8
+  ("VFIXUPIMMPS-BCAST" "XMM0" "XMM1" "[RSP+4]" "{1to4}")
+  :unexpected ("[RSP+1]"))
+
+;; Round
+(define-evex-disasm-test
+    :evex-vrndscaleps-masked-zmm-disp8
+    sb-vm::%test-vrndscaleps-masked-zmm-disp8
+  ("VRNDSCALEPS" "ZMM0" "[RSP+64]" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+(define-evex-disasm-test
+    :evex-vrndscalepd-masked-z-zmm-disp8
+    sb-vm::%test-vrndscalepd-masked-z-zmm-disp8
+  ("VRNDSCALEPD" "ZMM0" "[RSP+64]" "{K3}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; masked scalar reciprocal
+(define-evex-disasm-test
+    :evex-vrcp14ss-masked-disp8
+    sb-vm::%test-vrcp14ss-masked-disp8
+  ("VRCP14SS" "XMM0" "XMM1" "[RSP+4]" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+;; zeroing scalar sqrt
+(define-evex-disasm-test
+    :evex-vrsqrt14sd-masked-z-disp8
+    sb-vm::%test-vrsqrt14sd-masked-z-disp8
+  ("VRSQRT14SD" "XMM0" "XMM1" "[RSP+8]" "{K3}{z}")
+  :unexpected ("[RSP+1]"))
+
+(define-evex-disasm-test
+    :evex-vgetexpss-masked-disp8
+    sb-vm::%test-vgetexpss-masked-disp8
+  ("VGETEXPSS" "XMM0" "XMM1" "[RSP+4]" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+(define-evex-disasm-test
+    :evex-vscalefsd-masked-z-disp8
+    sb-vm::%test-vscalefsd-masked-z-disp8
+  ("VSCALEFSD" "XMM0" "XMM1" "[RSP+8]" "{K3}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked scalar getmant
+(define-evex-disasm-test
+    :evex-vgetmantss-masked-disp8
+    sb-vm::%test-vgetmantss-masked-disp8
+  ("VGETMANTSS" "XMM0" "XMM1" "[RSP+4]" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing scalar range
+(define-evex-disasm-test
+    :evex-vrangesd-masked-z-disp8
+    sb-vm::%test-vrangesd-masked-z-disp8
+  ("VRANGESD" "XMM0" "XMM1" "[RSP+8]" "{K3}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked scalar fixup
+(define-evex-disasm-test
+    :evex-vfixupimmss-masked-disp8
+    sb-vm::%test-vfixupimmss-masked-disp8
+  ("VFIXUPIMMSS" "XMM0" "XMM1" "[RSP+4]" "{K4}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked 2-operand round
+(define-evex-disasm-test
+    :evex-vrndscaless-masked-disp8
+    sb-vm::%test-vrndscaless-masked-disp8
+  ("VRNDSCALESS" "XMM0" "[RSP+4]" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing 2-operand round
+(define-evex-disasm-test
+    :evex-vrndscalesd-masked-z-disp8
+    sb-vm::%test-vrndscalesd-masked-z-disp8
+  ("VRNDSCALESD" "XMM0" "[RSP+8]" "{K3}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked get exponent
+(define-evex-disasm-test
+    :evex-vgetexpps-masked-zmm-disp8
+    sb-vm::%test-vgetexpps-masked-zmm-disp8
+  ("VGETEXPPS" "ZMM0" "[RSP+64]" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing get exponent double
+(define-evex-disasm-test
+    :evex-vgetexppd-masked-z-zmm-disp8
+    sb-vm::%test-vgetexppd-masked-z-zmm-disp8
+  ("VGETEXPPD" "ZMM0" "[RSP+64]" "{K3}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked get mantissa
+(define-evex-disasm-test
+    :evex-vgetmantps-masked-zmm-disp8
+    sb-vm::%test-vgetmantps-masked-zmm-disp8
+  ("VGETMANTPS" "ZMM0" "[RSP+64]" "{K4}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing get mantissa double
+(define-evex-disasm-test
+    :evex-vgetmantpd-masked-z-zmm-disp8
+    sb-vm::%test-vgetmantpd-masked-z-zmm-disp8
+  ("VGETMANTPD" "ZMM0" "[RSP+64]" "{K5}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked absolute value qword
+(define-evex-disasm-test
+    :evex-vpabsq-masked-zmm-disp8
+    sb-vm::%test-vpabsq-masked-zmm-disp8
+  ("VPABSQ" "ZMM0" "[RSP+64]" "{K6}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked GFNI multiply
+(define-evex-disasm-test
+    :evex-vgf2p8mulb-masked-zmm-disp8
+    sb-vm::%test-vgf2p8mulb-masked-zmm-disp8
+  ("VGF2P8MULB" "ZMM0" "ZMM1" "[RSP+64]" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing GFNI affine QB
+(define-evex-disasm-test
+    :evex-vgf2p8affineqb-masked-z-zmm-disp8
+    sb-vm::%test-vgf2p8affineqb-masked-z-zmm-disp8
+  ("VGF2P8AFFINEQB" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked GFNI affine INVQB
+(define-evex-disasm-test
+    :evex-vgf2p8affineinvqb-masked-zmm-disp8
+    sb-vm::%test-vgf2p8affineinvqb-masked-zmm-disp8
+  ("VGF2P8AFFINEINVQB" "ZMM0" "ZMM1" "[RSP+64]" "{K4}")
   :unexpected ("[RSP+1]"))

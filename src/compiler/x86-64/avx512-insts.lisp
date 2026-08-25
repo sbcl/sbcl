@@ -1706,7 +1706,12 @@
   (def vpshldvq-masked #x66 #x71 1 #x0f38)
   (def vpshrdvw-masked #x66 #x72 1 #x0f38)
   (def vpshrdvd-masked #x66 #x73 0 #x0f38)
-  (def vpshrdvq-masked #x66 #x73 1 #x0f38))
+  (def vpshrdvq-masked #x66 #x73 1 #x0f38)
+  ;; Scale masked
+  (def vscalefps-masked #x66 #x2c 0 #x0f38)
+  (def vscalefpd-masked #x66 #x2c 1 #x0f38)
+  ;; GFNI multiply masked
+  (def vgf2p8mulb-masked #x66 #xcf 0 #x0f38))
 
 ;;; 2-operand with opmask (vsqrtps/vsqrtpd)
 (macrolet ((def (name prefix opcode w &optional (opcode-prefix #x0f))
@@ -1878,7 +1883,12 @@
   (def-z vpshldvq-masked #x66 #x71 1 #x0f38)
   (def-z vpshrdvw-masked #x66 #x72 1 #x0f38)
   (def-z vpshrdvd-masked #x66 #x73 0 #x0f38)
-  (def-z vpshrdvq-masked #x66 #x73 1 #x0f38))
+  (def-z vpshrdvq-masked #x66 #x73 1 #x0f38)
+  ;; Scale zeroing masked
+  (def-z vscalefps-masked #x66 #x2c 0 #x0f38)
+  (def-z vscalefpd-masked #x66 #x2c 1 #x0f38)
+  ;; GFNI multiply zeroing masked
+  (def-z vgf2p8mulb-masked #x66 #xcf 0 #x0f38))
 
 ;;;; ---- Embedded broadcast forms ----
 
@@ -2041,7 +2051,69 @@
   (def-ibcast-38 vpdpbusd-bcast  #x50 0)
   (def-ibcast-38 vpdpbusds-bcast #x51 0)
   (def-ibcast-38 vpdpwssd-bcast  #x52 0)
-  (def-ibcast-38 vpdpwssds-bcast #x53 0))
+  (def-ibcast-38 vpdpwssds-bcast #x53 0)
+  ;; Scale broadcast
+  (def-ibcast-38 vscalefps-bcast #x2c 0)
+  (def-ibcast-38 vscalefpd-bcast #x2c 1))
+
+;;;; ---- Immediate broadcast (2- and 3-operand) ----
+(macrolet
+    ((def-bcast-3a (name prefix opcode w &key (nds nil))
+       (let* ((disp-n (if (= w 0) 4 8))
+              (bcast-list
+                (if (= w 0)
+                    '((#b00 "{1to4}") (#b01 "{1to8}") (#b10 "{1to16}"))
+                    '((#b00 "{1to2}") (#b01 "{1to4}") (#b10 "{1to8}"))))
+              (printer-forms
+                (loop for (ll bcast) in bcast-list
+                      append
+                      (avx512-inst-printer-list
+                       'ymm-ymm/mem-imm prefix opcode
+                       :opcode-prefix #x0f3a
+                       :w w
+                       :nds nds
+                       :ll ll
+                       :disp-n disp-n
+                       :evex-b 1
+                       :printer
+                       (if nds
+                           (list :name :tab 'reg ", " 'vvvv ", "
+                                 'reg/mem " " bcast)
+                           (list :name :tab 'reg ", " 'reg/mem " " bcast))))))
+         `(define-instruction ,name
+              ,(if nds
+                   `(segment dst src1 src2 imm)
+                   `(segment dst src imm))
+            ,@printer-forms
+            (:emitter
+              ,(if nds
+                   `(progn
+                      (aver (not (register-p src2)))
+                      (emit-avx512-inst segment src2 dst ,prefix ,opcode
+                                        :opcode-prefix #x0f3a
+                                        :vvvv src1
+                                        :w ,w
+                                        :evex-b 1
+                                        :disp-n ,disp-n
+                                        :remaining-bytes 1)
+                      (emit-byte segment imm))
+                   `(progn
+                      (aver (not (register-p src)))
+                      (emit-avx512-inst segment src dst ,prefix ,opcode
+                                        :opcode-prefix #x0f3a
+                                        :w ,w
+                                        :evex-b 1
+                                        :disp-n ,disp-n
+                                        :remaining-bytes 1)
+                      (emit-byte segment imm))))))))
+  ;; 2-operand immediate broadcast forms
+  (def-bcast-3a vreduceps-bcast #x66 #x56 0)
+  (def-bcast-3a vreducepd-bcast #x66 #x56 1)
+  (def-bcast-3a vrndscaleps-bcast #x66 #x08 0)
+  (def-bcast-3a vrndscalepd-bcast #x66 #x09 1)
+  ;; 3-operand immediate broadcast forms
+  (def-bcast-3a vfixupimmps-bcast #x66 #x54 0 :nds t)
+  (def-bcast-3a vfixupimmpd-bcast #x66 #x54 1 :nds t))
 
 ;;;; ---- EVEX gather/scatter (ZMM width) ----
 
@@ -3055,7 +3127,29 @@
   (def-scalar-fma-masked vfnmadd213ss #x66 #xad 0 :z t)
   (def-scalar-fma-masked vfnmadd213sd #x66 #xad 1 :z t)
   (def-scalar-fma-masked vfnmadd231ss #x66 #xbd 0 :z t)
-  (def-scalar-fma-masked vfnmadd231sd #x66 #xbd 1 :z t))
+  (def-scalar-fma-masked vfnmadd231sd #x66 #xbd 1 :z t)
+  ;; Scalar reciprocal/rsqrt masked
+  (def-scalar-fma-masked vrcp14ss #x66 #x4d 0)
+  (def-scalar-fma-masked vrcp14sd #x66 #x4d 1)
+  (def-scalar-fma-masked vrsqrt14ss #x66 #x4f 0)
+  (def-scalar-fma-masked vrsqrt14sd #x66 #x4f 1)
+  ;; Scalar reciprocal/rsqrt zeroing
+  (def-scalar-fma-masked vrcp14ss #x66 #x4d 0 :z t)
+  (def-scalar-fma-masked vrcp14sd #x66 #x4d 1 :z t)
+  (def-scalar-fma-masked vrsqrt14ss #x66 #x4f 0 :z t)
+  (def-scalar-fma-masked vrsqrt14sd #x66 #x4f 1 :z t)
+  ;; Scalar getexp masked
+  (def-scalar-fma-masked vgetexpss #x66 #x43 0)
+  (def-scalar-fma-masked vgetexpsd #x66 #x43 1)
+  ;; Scalar scale masked
+  (def-scalar-fma-masked vscalefss #x66 #x2d 0)
+  (def-scalar-fma-masked vscalefsd #x66 #x2d 1)
+  ;; Scalar getexp zeroing
+  (def-scalar-fma-masked vgetexpss #x66 #x43 0 :z t)
+  (def-scalar-fma-masked vgetexpsd #x66 #x43 1 :z t)
+  ;; Scalar scale zeroing
+  (def-scalar-fma-masked vscalefss #x66 #x2d 0 :z t)
+  (def-scalar-fma-masked vscalefsd #x66 #x2d 1 :z t))
 
 ;;;; ---- BF16 masked/zeroing ----
 
@@ -3105,7 +3199,6 @@
   ;; Masked and zeroing BF16 forms
   (def-bf16-masked vcvtne2ps2bf16 #xf2 #x72 0)
   (def-bf16-masked vdpbf16ps     #xf2 #x52 0)
-
   (def-bf16-masked vcvtne2ps2bf16 #xf2 #x72 0 :z t)
   (def-bf16-masked vdpbf16ps     #xf2 #x52 0 :z t))
 
@@ -3149,7 +3242,6 @@
                                               ((ymm-register-p dst) 32)
                                               ((xmm-register-p dst) 16)
                                               (t 0))))))))
-
   ;; Masked and zeroing forms
   (def-bf16-2op-masked vcvtneps2bf16 #xf2 #x73 0)
   (def-bf16-2op-masked vcvtneps2bf16 #xf2 #x73 0 :z t))
@@ -3229,17 +3321,26 @@
                                :disp-n ,disp-n
                                :remaining-bytes 1)
              (emit-byte segment imm))))))
-
   ;; Masked and zeroing forms
   (def-range-masked vrangeps #x66 #x50 0)
   (def-range-masked vrangepd #x66 #x50 1)
-
   (def-range-masked vrangeps #x66 #x50 0 :z t)
   (def-range-masked vrangepd #x66 #x50 1 :z t)
-
   ;; Broadcast forms
   (def-range-bcast vrangeps-bcast #x66 #x50 0)
-  (def-range-bcast vrangepd-bcast #x66 #x50 1))
+  (def-range-bcast vrangepd-bcast #x66 #x50 1)
+  ;; Fixup masked
+  (def-range-masked vfixupimmps #x66 #x54 0)
+  (def-range-masked vfixupimmpd #x66 #x54 1)
+  ;; Fixup zeroing masked
+  (def-range-masked vfixupimmps #x66 #x54 0 :z t)
+  (def-range-masked vfixupimmpd #x66 #x54 1 :z t)
+  ;; GFNI affine masked
+  (def-range-masked vgf2p8affineqb    #x66 #xce 1)
+  (def-range-masked vgf2p8affineinvqb #x66 #xcf 1)
+  ;; GFNI affine zeroing masked
+  (def-range-masked vgf2p8affineqb    #x66 #xce 1 :z t)
+  (def-range-masked vgf2p8affineinvqb #x66 #xcf 1 :z t))
 
 ;;;; ---- Popcount masked/zeroing ----
 
@@ -3288,8 +3389,238 @@
   (def-2op-masked vpopcntq #x66 #x55 1)
   (def-2op-masked vpopcntb #x66 #x54 0)
   (def-2op-masked vpopcntw #x66 #x54 1)
-
   (def-2op-masked vpopcntd #x66 #x55 0 :z t)
   (def-2op-masked vpopcntq #x66 #x55 1 :z t)
   (def-2op-masked vpopcntb #x66 #x54 0 :z t)
-  (def-2op-masked vpopcntw #x66 #x54 1 :z t))
+  (def-2op-masked vpopcntw #x66 #x54 1 :z t)
+  ;; Get exponent masked/zeroing
+  (def-2op-masked vgetexpps #x66 #x42 0)
+  (def-2op-masked vgetexppd #x66 #x42 1)
+  (def-2op-masked vgetexpps #x66 #x42 0 :z t)
+  (def-2op-masked vgetexppd #x66 #x42 1 :z t)
+  ;; Absolute value qword masked/zeroing
+  (def-2op-masked vpabsq #x66 #x1f 1)
+  (def-2op-masked vpabsq #x66 #x1f 1 :z t))
+
+;;;; ---- Reciprocal/rsqrt masked/zeroing/broadcast ----
+
+(macrolet
+    ((def-2op-masked (name prefix opcode w &key z)
+       (let* ((z-bit (if z 1 0))
+              (ins-name (symbolicate name (if z "-MASKED-Z" "-MASKED")))
+              (mask-printer
+                (if z
+                    '(:name :tab reg ", " reg/mem " {" aaa "}{z}")
+                    '(:name :tab reg ", " reg/mem " {" aaa "}")))
+              (printer-forms
+                (loop for k from 1 to 7
+                      append
+                      (loop for ll in '(#b00 #b01 #b10)
+                            append
+                            (avx512-inst-printer-list
+                             'ymm-ymm/mem prefix opcode
+                             :opcode-prefix #x0f38
+                             :w w
+                             :ll ll
+                             :disp-n (case ll
+                                       (#b00 16)
+                                       (#b01 32)
+                                       (#b10 64))
+                             :evex-b 0
+                             :more-fields (list (list 'aaa k)
+                                                (list 'z-bit z-bit))
+                             :printer mask-printer)))))
+         `(define-instruction ,ins-name (segment dst src mask)
+            ,@printer-forms
+            (:emitter
+             (aver (and (integerp mask) (<= 1 mask 7)))
+             (emit-avx512-inst segment src dst ,prefix ,opcode
+                               :opcode-prefix #x0f38
+                               :w ,w
+                               :aaa mask
+                               :z ,z-bit
+                               :disp-n
+                               (cond ((zmm-register-p dst) 64)
+                                     ((ymm-register-p dst) 32)
+                                     ((xmm-register-p dst) 16)
+                                     (t 0)))))))
+
+     (def-2op-bcast (name prefix opcode w)
+       (let* ((disp-n (if (= w 0) 4 8))
+              (bcast-list
+                (if (= w 0)
+                    '((#b00 "{1to4}") (#b01 "{1to8}") (#b10 "{1to16}"))
+                    '((#b00 "{1to2}") (#b01 "{1to4}") (#b10 "{1to8}"))))
+              (printer-forms
+                (loop for (ll bcast) in bcast-list
+                      append
+                      (avx512-inst-printer-list
+                       'ymm-ymm/mem prefix opcode
+                       :opcode-prefix #x0f38
+                       :w w
+                       :ll ll
+                       :disp-n disp-n
+                       :evex-b 1
+                       :printer (list :name :tab 'reg ", " 'reg/mem " " bcast)))))
+         `(define-instruction ,name (segment dst src)
+            ,@printer-forms
+            (:emitter
+             (aver (not (register-p src)))
+             (emit-avx512-inst segment src dst ,prefix ,opcode
+                               :opcode-prefix #x0f38
+                               :w ,w
+                               :evex-b 1
+                               :disp-n ,disp-n))))))
+  ;; Masked and zeroing forms
+  (def-2op-masked vrcp14ps #x66 #x4c 0)
+  (def-2op-masked vrcp14pd #x66 #x4c 1)
+  (def-2op-masked vrsqrt14ps #x66 #x4e 0)
+  (def-2op-masked vrsqrt14pd #x66 #x4e 1)
+  (def-2op-masked vrcp14ps #x66 #x4c 0 :z t)
+  (def-2op-masked vrcp14pd #x66 #x4c 1 :z t)
+  (def-2op-masked vrsqrt14ps #x66 #x4e 0 :z t)
+  (def-2op-masked vrsqrt14pd #x66 #x4e 1 :z t)
+  ;; Broadcast forms
+  (def-2op-bcast vrcp14ps-bcast #x66 #x4c 0)
+  (def-2op-bcast vrcp14pd-bcast #x66 #x4c 1)
+  (def-2op-bcast vrsqrt14ps-bcast #x66 #x4e 0)
+  (def-2op-bcast vrsqrt14pd-bcast #x66 #x4e 1))
+
+;;;; ---- Reduce/round 2-operand masked/zeroing ----
+
+(macrolet
+    ((def-2op-imm-masked (name prefix opcode w &key z)
+       (let* ((z-bit (if z 1 0))
+              (ins-name (symbolicate name (if z "-MASKED-Z" "-MASKED")))
+              (mask-printer
+                (if z
+                    '(:name :tab reg ", " reg/mem " {" aaa "}{z}")
+                    '(:name :tab reg ", " reg/mem " {" aaa "}")))
+              (printer-forms
+                (loop for k from 1 to 7
+                      append
+                      (loop for ll in '(#b00 #b01 #b10)
+                            append
+                            (avx512-inst-printer-list
+                             'ymm-ymm/mem-imm prefix opcode
+                             :opcode-prefix #x0f3a
+                             :w w
+                             :ll ll
+                             :disp-n 64
+                             :evex-b 0
+                             :more-fields (list (list 'aaa k)
+                                                (list 'z-bit z-bit))
+                             :printer mask-printer)))))
+         `(define-instruction ,ins-name (segment dst src mask imm)
+            ,@printer-forms
+            (:emitter
+              (aver (and (integerp mask) (<= 1 mask 7)))
+              (emit-avx512-inst segment src dst ,prefix ,opcode
+                                :opcode-prefix #x0f3a
+                                :w ,w
+                                :aaa mask
+                                :z ,z-bit
+                                :disp-n
+                                (cond ((zmm-register-p dst) 64)
+                                      ((ymm-register-p dst) 32)
+                                      ((xmm-register-p dst) 16)
+                                      (t 0))
+                                :remaining-bytes 1)
+              (emit-byte segment imm))))))
+  ;; Reduce masked and zeroing
+  (def-2op-imm-masked vreduceps #x66 #x56 0)
+  (def-2op-imm-masked vreducepd #x66 #x56 1)
+  (def-2op-imm-masked vreduceps #x66 #x56 0 :z t)
+  (def-2op-imm-masked vreducepd #x66 #x56 1 :z t)
+  ;; Round masked and zeroing
+  (def-2op-imm-masked vrndscaleps #x66 #x08 0)
+  (def-2op-imm-masked vrndscalepd #x66 #x09 1)
+  (def-2op-imm-masked vrndscaleps #x66 #x08 0 :z t)
+  (def-2op-imm-masked vrndscalepd #x66 #x09 1 :z t)
+  ;; Get mantissa masked/zeroing
+  (def-2op-imm-masked vgetmantps #x66 #x26 0)
+  (def-2op-imm-masked vgetmantpd #x66 #x26 1)
+  (def-2op-imm-masked vgetmantps #x66 #x26 0 :z t)
+  (def-2op-imm-masked vgetmantpd #x66 #x26 1 :z t))
+
+;;;; ---- Scalar immediate masked/zeroing ----
+
+(macrolet
+    ((def-scalar-imm-masked (name prefix opcode w &key z (nds nil))
+       (let* ((z-bit (if z 1 0))
+              (ins-name (symbolicate name (if z "-MASKED-Z" "-MASKED")))
+              (mask-printer
+                (if z
+                    (if nds
+                        '(:name :tab reg ", " vvvv ", " reg/mem " {" aaa "}{z}")
+                        '(:name :tab reg ", " reg/mem " {" aaa "}{z}"))
+                    (if nds
+                        '(:name :tab reg ", " vvvv ", " reg/mem " {" aaa "}")
+                        '(:name :tab reg ", " reg/mem " {" aaa "}"))))
+              (disp-n (if (= w 0) 4 8))
+              (printer-forms
+                (loop for k from 1 to 7
+                      append
+                      (avx512-inst-printer-list
+                       'ymm-ymm/mem-imm prefix opcode
+                       :opcode-prefix #x0f3a
+                       :w w
+                       :nds nds
+                       :ll #b00
+                       :disp-n disp-n
+                       :evex-b 0
+                       :more-fields (list (list 'aaa k)
+                                          (list 'z-bit z-bit))
+                       :printer mask-printer))))
+         `(define-instruction ,ins-name
+              ,(if nds
+                   `(segment dst src1 src2 mask imm)
+                   `(segment dst src mask imm))
+            ,@printer-forms
+            (:emitter
+              (aver (and (integerp mask) (<= 1 mask 7)))
+              ,(if nds
+                   `(progn
+                      (emit-avx512-inst segment src2 dst ,prefix ,opcode
+                                        :opcode-prefix #x0f3a
+                                        :vvvv src1
+                                        :w ,w
+                                        :aaa mask
+                                        :z ,z-bit
+                                        :disp-n ,disp-n
+                                        :remaining-bytes 1)
+                      (emit-byte segment imm))
+                   `(progn
+                      (emit-avx512-inst segment src dst ,prefix ,opcode
+                                        :opcode-prefix #x0f3a
+                                        :w ,w
+                                        :aaa mask
+                                        :z ,z-bit
+                                        :disp-n ,disp-n
+                                        :remaining-bytes 1)
+                      (emit-byte segment imm))))))))
+
+  ;; 3-operand immediate scalar masked/zeroing
+  (def-scalar-imm-masked vgetmantss #x66 #x27 0 :nds t)
+  (def-scalar-imm-masked vgetmantsd #x66 #x27 1 :nds t)
+  (def-scalar-imm-masked vrangess #x66 #x51 0 :nds t)
+  (def-scalar-imm-masked vrangesd #x66 #x51 1 :nds t)
+  (def-scalar-imm-masked vreducess #x66 #x57 0 :nds t)
+  (def-scalar-imm-masked vreducesd #x66 #x57 1 :nds t)
+  (def-scalar-imm-masked vfixupimmss #x66 #x55 0 :nds t)
+  (def-scalar-imm-masked vfixupimmsd #x66 #x55 1 :nds t)
+
+  (def-scalar-imm-masked vgetmantss #x66 #x27 0 :nds t :z t)
+  (def-scalar-imm-masked vgetmantsd #x66 #x27 1 :nds t :z t)
+  (def-scalar-imm-masked vrangess #x66 #x51 0 :nds t :z t)
+  (def-scalar-imm-masked vrangesd #x66 #x51 1 :nds t :z t)
+  (def-scalar-imm-masked vreducess #x66 #x57 0 :nds t :z t)
+  (def-scalar-imm-masked vreducesd #x66 #x57 1 :nds t :z t)
+  (def-scalar-imm-masked vfixupimmss #x66 #x55 0 :nds t :z t)
+  (def-scalar-imm-masked vfixupimmsd #x66 #x55 1 :nds t :z t)
+
+  ;; 2-operand immediate scalar masked/zeroing
+  (def-scalar-imm-masked vrndscaless #x66 #x0a 0)
+  (def-scalar-imm-masked vrndscalesd #x66 #x0b 1)
+  (def-scalar-imm-masked vrndscaless #x66 #x0a 0 :z t)
+  (def-scalar-imm-masked vrndscalesd #x66 #x0b 1 :z t))
