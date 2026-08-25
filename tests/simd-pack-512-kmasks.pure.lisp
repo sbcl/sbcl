@@ -264,20 +264,6 @@
     (assert (not (search "ALLOC" text)))
     (assert (not (search "KMOVQ" text)))))
 
-(with-test (:name :avx512-state-tn-p)
-  (let* ((vm (find-package "SB-VM"))
-         (c (find-package "SB-C"))
-         (pred (and vm (find-symbol "AVX512-STATE-TN-P" vm)))
-         (mask-reg (and vm (find-symbol "MASK-REG" vm)))
-         (sc-or-lose (and c (find-symbol "SC-OR-LOSE" c)))
-         (make-random-tn (and c (find-symbol "MAKE-RANDOM-TN" c)))
-         (sc (and sc-or-lose mask-reg
-                  (funcall sc-or-lose mask-reg)))
-         (tn (and make-random-tn sc
-                  (funcall make-random-tn sc 0))))
-    (when (and pred tn)
-      (assert (funcall pred tn)))))
-
 (with-test (:name :kandq-disassembly)
   (let* ((fun (compile nil
     '(lambda (x y)

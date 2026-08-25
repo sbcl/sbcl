@@ -216,17 +216,6 @@
 (defun avx512-tn-p (tn)
   (sc-is tn int-avx512-reg double-avx512-reg single-avx512-reg mask-reg))
 
-(defun avx512-state-used-p ()
-  (when (and #+sb-xc-host (boundp '*component-being-compiled*))
-    (let ((comp (component-info *component-being-compiled*)))
-      (flet ((used-p (tn)
-               (do ((tn tn (sb-c::tn-next tn)))
-                   ((null tn))
-                 (when (avx512-tn-p tn)
-                   (return-from avx512-state-used-p t)))))
-        (used-p (sb-c::ir2-component-normal-tns comp))
-        (used-p (sb-c::ir2-component-wired-tns comp))))))
-
 ;;; Emit code to allocate an object with a size in bytes given by
 ;;; SIZE into ALLOC-TN. The size may be an integer of a TN.
 ;;; NODE may be used to make policy-based decisions.
@@ -238,11 +227,8 @@
 ;;; 2. where to put the result
 ;;; 3. node (for determining immobile-space-p) and a scratch register or two
 (defun emit-allocation (node thread-temp type size lowtag alloc-tn temp
-                        &key scale overflow (systemp (system-tlab-p type node))
-                             (avx512 :default))
+                        &key scale overflow (systemp (system-tlab-p type node)))
   (declare (ignorable thread-temp))
-  (when (eq avx512 :default)
-    (setf avx512 (avx512-state-used-p)))
   (flet ((fallback (size)
            ;; Call an allocator trampoline and get the result in the proper register.
            ;; There are 2 choices of trampoline to invoke alloc() or alloc_list()
@@ -255,13 +241,9 @@
                   (inst push size)))
            (invoke-asm-routine
             'call
-            (if avx512
-                (if systemp
-                    (if (eql type +cons-primtype+) 'sys-list-alloc-tramp-avx512 'sys-alloc-tramp-avx512)
-                    (if (eql type +cons-primtype+) 'list-alloc-tramp-avx512 'alloc-tramp-avx512))
-                (if systemp
-                    (if (eql type +cons-primtype+) 'sys-list-alloc-tramp 'sys-alloc-tramp)
-                    (if (eql type +cons-primtype+) 'list-alloc-tramp 'alloc-tramp)))
+            (if systemp
+                (if (eql type +cons-primtype+) 'sys-list-alloc-tramp 'sys-alloc-tramp)
+                (if (eql type +cons-primtype+) 'list-alloc-tramp 'alloc-tramp))
             node)
            (inst pop alloc-tn)))
     (let* ((NOT-INLINE (gen-label))
@@ -347,7 +329,7 @@
 ;;; below the region's free pointer. Right now we can do the inits either inside or outside
 ;;; of pseudo-atomic because all pages except CONS are prezeroed.
 (defun emit-alloc-other (node thread-temp widetag nwords result-tn
-                         &key alloc-temps init (avx512 :default)
+                         &key alloc-temps init
                          &aux (bytes (pad-data-block nwords)))
   (declare (dynamic-extent init))
   #+bignum-assertions
@@ -358,13 +340,11 @@
         (alloc-temp (if (listp alloc-temps) (car alloc-temps) alloc-temps)))
     (allocating ()
       (cond (alloc-temp
-             (emit-allocation node thread-temp widetag bytes 0 result-tn alloc-temp
-                              :avx512 avx512)
+             (emit-allocation node thread-temp widetag bytes 0 result-tn alloc-temp)
              (storew* header result-tn 0 0 t)
              (inst or :byte result-tn other-pointer-lowtag))
             (t
-             (emit-allocation node thread-temp widetag bytes other-pointer-lowtag result-tn nil
-                              :avx512 avx512)
+             (emit-allocation node thread-temp widetag bytes other-pointer-lowtag result-tn nil)
              (storew* header result-tn 0 other-pointer-lowtag t)))
       (when init
         (funcall init)))))
@@ -1247,6 +1227,7 @@
   (:temporary (:sc unsigned-reg :offset rbx-offset) rbx)
   (:temporary (:sc unsigned-reg :offset rcx-offset) rcx)
   (:temporary (:sc unsigned-reg) header)
+  (:save-p :avx512)
   (:generator 1
     ;; fixedobj_pages alien linkage entry: 1 PTE per page, 12-byte struct
     (inst mov rbx (rip-relative-ea (make-fixup "fixedobj_pages" :foreign-dataref)))
@@ -1262,36 +1243,36 @@
     ;; There is no way to inform GC that we are currently looking at a page
     ;; in anticipation of allocating to it.
     (allocating ()
-       (inst mov :dword rax (ea 4 rax)) ; rax := fixedobj_page_hint[1] (sizeclass=SYMBOL)
-       (inst test :dword rax rax)
-       (inst jmp :z FAIL) ; fail if hint page is 0
-       (inst lea rbx (ea rbx rax 8))  ; rbx := &fixedobj_pages[hint].free_index
-       ;; compute fixedobj_page_address(hint) into RAX
-       (inst mov rcx (rip-relative-ea (make-fixup "FIXEDOBJ_SPACE_START" :foreign-dataref)))
-       (inst shl rax (integer-length (1- immobile-card-bytes)))
-       (inst add rax (ea rcx))
-       ;; load the page's free pointer
-       (inst mov :dword rcx (ea rbx)) ; rcx := fixedobj_pages[hint].free_index
-       ;; fail if allocation would overrun the page
-       (inst cmp :dword rcx (- immobile-card-bytes (* symbol-size n-word-bytes)))
-       (inst jmp :a FAIL)
-       ;; compute address of the allegedly free memory block into RESULT
-       (inst lea result (ea rcx rax)) ; free_index + page_base
-       ;; read the potential symbol header
-       (inst mov rax (ea result))
-       (inst test :dword rax 1)
-       (inst jmp :nz FAIL) ; not a fixnum implies already taken
-       ;; try to claim this word of memory
-       (inst mov header (compute-object-header (1- symbol-size) symbol-widetag))
-       (inst cmpxchg :lock (ea result) header)
-       (inst jmp :ne FAIL) ; already taken
-       ;; compute new free_index = spacing + old header + free_index
-       (inst lea :dword rax (ea (* symbol-size n-word-bytes) rax rcx))
-       (inst mov :dword (ea rbx) rax) ; store new free_index
-       ;; set the low bit of the 'gens' field
-       (inst or :lock :byte (ea 7 rbx) 1) ; 7+rbx = &fixedobj_pages[i].attr.parts.gens_
-       (inst or :byte result other-pointer-lowtag) ; make_lispobj()
-       (inst jmp OUT)
-       FAIL
-       (inst mov result null-tn)
-       OUT)))
+      (inst mov :dword rax (ea 4 rax)) ; rax := fixedobj_page_hint[1] (sizeclass=SYMBOL)
+      (inst test :dword rax rax)
+      (inst jmp :z FAIL)             ; fail if hint page is 0
+      (inst lea rbx (ea rbx rax 8)) ; rbx := &fixedobj_pages[hint].free_index
+      ;; compute fixedobj_page_address(hint) into RAX
+      (inst mov rcx (rip-relative-ea (make-fixup "FIXEDOBJ_SPACE_START" :foreign-dataref)))
+      (inst shl rax (integer-length (1- immobile-card-bytes)))
+      (inst add rax (ea rcx))
+      ;; load the page's free pointer
+      (inst mov :dword rcx (ea rbx)) ; rcx := fixedobj_pages[hint].free_index
+      ;; fail if allocation would overrun the page
+      (inst cmp :dword rcx (- immobile-card-bytes (* symbol-size n-word-bytes)))
+      (inst jmp :a FAIL)
+      ;; compute address of the allegedly free memory block into RESULT
+      (inst lea result (ea rcx rax))    ; free_index + page_base
+      ;; read the potential symbol header
+      (inst mov rax (ea result))
+      (inst test :dword rax 1)
+      (inst jmp :nz FAIL)         ; not a fixnum implies already taken
+      ;; try to claim this word of memory
+      (inst mov header (compute-object-header (1- symbol-size) symbol-widetag))
+      (inst cmpxchg :lock (ea result) header)
+      (inst jmp :ne FAIL)               ; already taken
+      ;; compute new free_index = spacing + old header + free_index
+      (inst lea :dword rax (ea (* symbol-size n-word-bytes) rax rcx))
+      (inst mov :dword (ea rbx) rax)    ; store new free_index
+      ;; set the low bit of the 'gens' field
+      (inst or :lock :byte (ea 7 rbx) 1) ; 7+rbx = &fixedobj_pages[i].attr.parts.gens_
+      (inst or :byte result other-pointer-lowtag) ; make_lispobj()
+      (inst jmp OUT)
+      FAIL
+      (inst mov result null-tn)
+      OUT)))

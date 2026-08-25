@@ -406,7 +406,7 @@
                                  int-sse-stack single-sse-stack double-sse-stack))
 #+sb-simd-pack-256
 (defparameter *hword-sc-names* '(ymm-reg int-avx2-reg single-avx2-reg double-avx2-reg
-                                   int-avx2-stack single-avx2-stack
+                                 int-avx2-stack single-avx2-stack
                                  double-avx2-stack))
 #+sb-simd-pack-512
 (defparameter *zword-sc-names* '(int-avx512-reg

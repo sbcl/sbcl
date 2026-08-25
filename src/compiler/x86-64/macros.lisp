@@ -231,6 +231,8 @@
      #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
      ,@(remove :generator body :key 'car)
      (:node-var node)
+     #+sb-simd-pack-512
+     (:save-p :avx512)
      (:generator ,(car g) ; cost
        (macrolet
            ((instrument-alloc (&rest args) `(emit-instrument-alloc node thread-tn ,@args))

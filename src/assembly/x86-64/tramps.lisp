@@ -104,28 +104,6 @@
     (zeroize rdx-tn)
     (inst xrstor (ea 8 rsp-tn))))
 
-;; Caller will have allocated xsave-avx512-area-size bytes above the stack-pointer
-;; prior to the CALL. Use that as the save area.
-;; Similar considerations pertain to the use of RAX and RDX as in FPR-SAVE.
-(define-assembly-routine (fpr-save-avx512) ()
-  (inst push rdx-tn)
-  (zeroize rdx-tn)
-  ;; After PUSH the save area is at RSP+16 with the return-PC at [RSP+8]
-  ;; Zero the header
-  (inst lea rax-tn (ea (+ 512 16) rsp-tn))
-  (dotimes (i 8)
-    (inst mov (ea (ash i word-shift) rax-tn) rdx-tn))
-  ;; AVX-512 state mask for EAX:
-  ;; x87(0) | SSE(1) | AVX(2) | KMM(5) | ZMM 0-15(6) | ZMM 16-31(7) = 0xE7
-  (inst mov rax-tn #xE7)
-  (inst xsave (ea 16 rsp-tn))
-  (inst pop rdx-tn))
-
-(define-assembly-routine (fpr-restore-avx512) ()
-  (inst mov rax-tn #xE7)                   ; OK to clobber RAX and RDX
-  (zeroize rdx-tn)
-  (inst xrstor (ea 8 rsp-tn)))
-
 (define-assembly-routine (switch-to-arena (:return-style :raw)) ()
   ;; RSI and RDI are vop temps, so don't bother preserving them
   (with-registers-preserved (c :except (rsi rdi))
@@ -177,27 +155,24 @@
                      (inst test rax-tn rax-tn)
                      (inst jmp :z RESTART))))
 
-(make-defs ((($avx512 $suffix)
-             (t -avx512)
-             (nil ||)))
-  (def-routine-pair (alloc-tramp$suffix) ()
-    (with-registers-preserved (c :avx512 $avx512)
+  (def-routine-pair (alloc-tramp) ()
+    (with-registers-preserved (c)
       RESTART
       (call-c "alloc" (ea 16 rbp-tn) system-tlab-p)
       (test-arena-exhausted :bytes-non-list)
       SUCCESS
       (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
-  (def-routine-pair (list-alloc-tramp$suffix) () ; CONS, ACONS, LIST, LIST*
-    (with-registers-preserved (c :avx512 $avx512)
+  (def-routine-pair (list-alloc-tramp) () ; CONS, ACONS, LIST, LIST*
+    (with-registers-preserved (c)
       RESTART
       (call-c "alloc_list" (ea 16 rbp-tn) system-tlab-p)
       (test-arena-exhausted :bytes-list)
       SUCCESS
       (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
-  (def-routine-pair (listify-&rest$suffix (:return-style :none)) ()
-    (with-registers-preserved (c :avx512 $avx512)
+  (def-routine-pair (listify-&rest (:return-style :none)) ()
+    (with-registers-preserved (c)
       RESTART
       (call-c "listify_rest_arg" (ea 16 rbp-tn) (ea 24 rbp-tn) system-tlab-p)
       (test-arena-exhausted :list-elts)
@@ -205,15 +180,15 @@
       (inst mov (ea 24 rbp-tn) rax-tn)) ; result
     (inst ret 8)) ; pop one argument; the unpopped word now holds the result
 
-  (def-routine-pair (make-list$suffix (:return-style :none)) ()
-    (with-registers-preserved (c :avx512 $avx512)
+  (def-routine-pair (make-list (:return-style :none)) ()
+    (with-registers-preserved (c)
       RESTART
       (call-c "make_list" (ea 16 rbp-tn) (ea 24 rbp-tn) system-tlab-p)
       (test-arena-exhausted :list-elts)
       SUCCESS
       (inst mov (ea 24 rbp-tn) rax-tn)) ; result
-    (inst ret 8))) ; pop one argument; the unpopped word now holds the result
-)
+    (inst ret 8)) ; pop one argument; the unpopped word now holds the result
+  )
 
 (define-assembly-routine (alloc-funinstance) ()
   (with-registers-preserved (c)
