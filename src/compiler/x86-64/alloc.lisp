@@ -213,12 +213,8 @@
 (define-vop (sb-c::end-pseudo-atomic)
   (:generator 1 (emit-end-pseudo-atomic)))
 
-(defun avx512-state-tn-p (tn)
-  (sc-is tn
-         int-avx512-reg
-         double-avx512-reg
-         single-avx512-reg
-         mask-reg))
+(defun avx512-tn-p (tn)
+  (sc-is tn int-avx512-reg double-avx512-reg single-avx512-reg mask-reg))
 
 (defun avx512-state-used-p ()
   (when (and #+sb-xc-host (boundp '*component-being-compiled*))
@@ -226,7 +222,7 @@
       (flet ((used-p (tn)
                (do ((tn tn (sb-c::tn-next tn)))
                    ((null tn))
-                 (when (avx512-state-tn-p tn)
+                 (when (avx512-tn-p tn)
                    (return-from avx512-state-used-p t)))))
         (used-p (sb-c::ir2-component-normal-tns comp))
         (used-p (sb-c::ir2-component-wired-tns comp))))))

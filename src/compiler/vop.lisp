@@ -675,7 +675,7 @@
   ;;    used by NLX entry vops.
   ;; -- If :COMPUTE-ONLY, just compute the save set, don't do any saving.
   ;;    This is used to get the live variables for debug info.
-  (save-p nil :type (member t nil :force-to-stack :compute-only))
+  (save-p nil :type (member t nil :force-to-stack :compute-only #+sb-simd-pack-512 :avx512))
   ;; info for automatic emission of move-arg VOPs by representation
   ;; selection. If NIL, then do nothing special. If non-null, then
   ;; there must be a more arg. Each more arg is moved to its passing

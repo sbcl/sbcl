@@ -333,7 +333,7 @@
   (translate () :type list)
   (ltn-policy :fast :type ltn-policy)
   ;; stuff used by life analysis
-  (save-p nil :type (member t nil :compute-only :force-to-stack))
+  (save-p nil :type (member t nil :compute-only :force-to-stack #+sb-simd-pack-512 :avx512))
   ;; info about how to emit MOVE-ARG VOPs for the &MORE operand in
   ;; call/return VOPs
   (move-args nil :type (member nil :local-call :full-call :known-return :fixed))
@@ -1108,7 +1108,7 @@
         (:save-p
          (setf (vop-parse-save-p parse)
                (vop-spec-arg spec
-                             '(member t nil :compute-only :force-to-stack))))
+                             '(member t nil :compute-only :force-to-stack #+sb-simd-pack-512 :avx512))))
         (:optional-results
          (setf (vop-parse-optional-results parse)
                (append (vop-parse-optional-results parse)
@@ -1733,7 +1733,7 @@
 ;;;     In the generator, bind the specified variable to the VOP or
 ;;;     the Node that generated this VOP.
 ;;;
-;;; :SAVE-P {NIL | T | :COMPUTE-ONLY | :FORCE-TO-STACK}
+;;; :SAVE-P {NIL | T | :COMPUTE-ONLY | :FORCE-TO-STACK | :AVX-512 }
 ;;;     Indicates how a VOP wants live registers saved.
 ;;;
 ;;; :MOVE-ARGS {NIL | :FULL-CALL | :LOCAL-CALL | :KNOWN-RETURN}

@@ -670,25 +670,8 @@ Floats are passed in integer registers."
              collect `(:temporary
                        (:sc single-reg :offset ,float :from :eval :to :result)
                        ,(car (push (make-symbol varname) vars))))
-
-       ;; AVX-512 high ZMM registers, ZMM16-31.
-       #+(and sb-simd-pack-512 nil)
-       (append
-        (loop for zmm from 16 below 32
-              for varname = (format nil "ZMM~D" zmm)
-              collect `(:temporary
-                        (:sc single-avx512-reg :offset ,zmm
-                         :from :eval :to :result)
-                        ,(car (push (make-symbol varname) vars))))
-
-        ;; AVX-512 opmask registers K1-K7.
-        ;; K0 is not allocatable so not listed here
-        (loop for mask from 1 to 7
-              for varname = (format nil "MASK~D" mask)
-              collect `(:temporary
-                        (:sc mask-reg :offset ,mask :from :eval :to :result)
-                        ,(car (push (make-symbol varname) vars)))))
-
+       #+sb-simd-pack-512
+       '((:save-p :avx512))
        `((:ignore ,@vars))))))
 
 (define-vop (call-out)

@@ -651,14 +651,25 @@
   (declare (type ir2-block block))
   (do ((vop (ir2-block-start-vop block) (vop-next vop)))
       ((null vop))
-    (when (eq (vop-info-save-p (vop-info vop)) t)
-      (do-live-tns (tn (vop-save-set vop) block)
-        (when (and (sc-save-p (tn-sc tn))
-                   (not (eq (tn-kind tn) :component))
-                   ;; Ignore closed over but not read values (due to
-                   ;; type propagation)
-                   (tn-offset tn))
-          (basic-save-tn tn vop)))))
+    (case (vop-info-save-p (vop-info vop))
+      ((t)
+       (do-live-tns (tn (vop-save-set vop) block)
+         (when (and (sc-save-p (tn-sc tn))
+                    (not (eq (tn-kind tn) :component))
+                    ;; Ignore closed over but not read values (due to
+                    ;; type propagation)
+                    (tn-offset tn))
+           (basic-save-tn tn vop))))
+      #+sb-simd-pack-512
+      (:avx512
+       (do-live-tns (tn (vop-save-set vop) block)
+         (when (and (sc-save-p (tn-sc tn))
+                    (not (eq (tn-kind tn) :component))
+                    ;; Ignore closed over but not read values (due to
+                    ;; type propagation)
+                    (tn-offset tn)
+                    (sb-vm::avx512-tn-p tn))
+           (basic-save-tn tn vop))))))
 
   (values))
 

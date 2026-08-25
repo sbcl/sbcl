@@ -634,7 +634,14 @@
 (defun saved-after-read (tn block)
   (do ((vop (ir2-block-last-vop block) (vop-prev vop)))
       ((null vop) t)
-    (when (vop-info-save-p (vop-info vop)) (return t))
+    (case (vop-info-save-p (vop-info vop))
+      ((nil))
+      #+sb-simd-pack-512
+      (:avx512
+       (when (sb-vm::avx512-tn-p tn)
+         (return t)))
+      (t
+       (return t)))
     (when (find-in #'tn-ref-across tn (vop-args vop) :key #'tn-ref-tn)
       (return nil))))
 
