@@ -479,7 +479,25 @@
   (def %test-vgf2p8affineqb-zmm-disp8)
   (def %test-vfpclassps-zmm-disp8)
   (def %test-vfpclassss-disp8)
-  (def %test-vpmullq-zmm-disp8))
+  (def %test-vpmullq-zmm-disp8)
+  (def %test-vsib-high-index)
+  (def %test-vsib-no-base-low-index)
+  (def %test-vsib-high-base-high-index)
+  (def %test-vsib-scatter-low-index)
+  (def %test-vsib-scale-2)
+  (def %test-vsib-scale-8)
+  (def %test-vsib-disp8)
+  (def %test-vsib-disp8-compressed)
+  (def %test-vsib-scatter-disp8-compressed)
+  (def %test-vsib-qword-disp8-compressed)
+  (def %test-vsib-nonmultiple-disp32)
+  (def %test-vsib-high-index-disp8-compressed)
+  (def %test-vaddps-masked-z-disp8)
+  (def %test-vaddps-masked-z-disp32)
+  (def %test-vpaddq-masked-z-disp8)
+  (def %test-vaddpd-masked-z-disp8)
+  (def %test-vgatherdps-z-zero)
+  (def %test-vsib-no-disp))
 
 ;; instruction vops
 
@@ -1696,6 +1714,245 @@
   (:generator 1
     (inst vbroadcastf128 zmm (ea 16 rsp))
     (inst xor :dword res res)))
+(defmacro define-test-vop-vsib
+    (name inst data-sc data-off index-sc index-off disp scale mask
+     &key (base-sc nil) (base-off nil) (reverse-p nil))
+  (let ((base-sym (if base-sc 'base nil)))
+    `(define-vop (,name)
+       (:translate ,name)
+       (:policy :fast-safe)
+       (:temporary (:sc ,data-sc :offset ,data-off) data)
+       (:temporary (:sc ,index-sc :offset ,index-off) index)
+       ,@(when base-sc
+           `((:temporary (:sc ,base-sc :offset ,base-off) base)
+             (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)))
+       (:results (res :scs (unsigned-reg)))
+       (:result-types unsigned-num)
+       (:generator 1
+         ,@(when base-sc
+             `((inst mov :qword base rsp)))
+         ,(if reverse-p
+              `(inst ,inst (ea ,disp ,base-sym index ,scale) data ,mask)
+              `(inst ,inst data (ea ,disp ,base-sym index ,scale) ,mask))
+         (inst xor :dword res res)))))
+
+(define-test-vop-three-reg %test-evex-high-regs vaddps single-avx512-reg 16 single-avx512-reg 17 single-avx512-reg 18)
+(define-test-vop-load %test-evex-disp8 vmovdqu64 single-avx512-reg 0 64)
+(define-test-vop-multi-load %test-evex-disp-vector-lengths
+  (vmovdqu64 single-sse-reg 0 16)
+  (vmovdqu64 single-avx2-reg 1 32)
+  (vmovdqu64 single-avx512-reg 2 64))
+(define-test-vop-load %test-evex-disp-negative vmovdqu64 single-avx512-reg 0 -64)
+(define-test-vop-load %test-evex-disp-nonmultiple vmovdqu64 single-avx512-reg 0 65)
+(define-test-vop-load %test-evex-disp-large vmovdqu64 single-avx512-reg 0 8192)
+(define-test-vop-three-reg %test-auto-promoted-vaddps vaddps single-avx512-reg 16 single-avx512-reg 17 single-avx512-reg 18)
+(define-test-vop-three-reg %test-auto-promoted-vaddpd vaddpd double-avx512-reg 16 double-avx512-reg 17 double-avx512-reg 18)
+(define-test-vop-load %test-auto-promoted-vpbroadcastq vpbroadcastq int-avx512-reg 0 64)
+(define-test-vop-load %test-auto-promoted-vmovdqu vmovdqu single-avx512-reg 0 64)
+(define-test-vop-three-reg %test-evex-vpternlogd vpternlogd int-avx512-reg 0 int-avx512-reg 1 int-avx512-reg 2 #xFF)
+(define-test-vop-three-reg %test-evex-vpermt2d vpermt2d int-avx512-reg 0 int-avx512-reg 1 int-avx512-reg 2)
+(define-test-vop-three-reg %test-evex-vblendmps vblendmps single-avx512-reg 16 single-avx512-reg 17 single-avx512-reg 18)
+(define-test-vop-mask-reg-reg %test-evex-vpcmpd vpcmpd mask-reg 1 int-avx512-reg 0 int-avx512-reg 1 #x1)
+(define-test-vop-store %test-evex-vpmovqd vpmovqd int-avx512-reg 0 32)
+(define-test-vop-load %test-auto-promoted-vmovaps-disp8 vmovaps single-avx512-reg 0 64)
+(define-test-vop-load %test-auto-promoted-vmovaps-disp-nonmultiple vmovaps single-avx512-reg 0 65)
+(define-test-vop-load %test-broadcast-f32x4-disp8 vbroadcastf32x4 single-avx512-reg 0 16)
+(define-test-vop-load %test-broadcast-f32x4-disp32 vbroadcastf32x4 single-avx512-reg 0 17)
+(define-test-vop-load %test-broadcast-f64x4-disp8 vbroadcastf64x4 double-avx512-reg 0 32)
+(define-test-vop-load %test-broadcast-f64x4-disp32 vbroadcastf64x4 double-avx512-reg 0 33)
+(define-test-vop-store %test-compress-disp8 vcompressps single-avx512-reg 0 64)
+(define-test-vop-store %test-compress-disp32 vcompressps single-avx512-reg 0 65)
+(define-test-vop-load %test-expand-disp8 vpexpandq int-avx512-reg 0 64)
+(define-test-vop-load %test-expand-disp32 vpexpandq int-avx512-reg 0 65)
+(define-test-vop-mask-mem %test-vpcmpd-disp8 vpcmpd mask-reg 1 int-avx512-reg 0 64 #x1)
+(define-test-vop-mask-mem %test-vpcmpd-disp32 vpcmpd mask-reg 1 int-avx512-reg 0 65 #x1)
+(define-test-vop-mask-mem %test-vptestmd-disp8 vptestmd mask-reg 1 int-avx512-reg 0 64)
+(define-test-vop-mask-mem %test-vptestmd-disp32 vptestmd mask-reg 1 int-avx512-reg 0 65)
+(define-test-vop-store %test-vpmovqd-xmm-disp8 vpmovqd single-sse-reg 0 8)
+(define-test-vop-store %test-vpmovqd-ymm-disp8 vpmovqd single-avx2-reg 1 16)
+(define-test-vop-store %test-vpmovqd-zmm-disp8 vpmovqd int-avx512-reg 2 32)
+(define-test-vop-store %test-vpmovqd-zmm-disp32 vpmovqd int-avx512-reg 2 33)
+(define-test-vop-store %test-vpmovsqb-xmm-disp8 vpmovsqb single-sse-reg 0 2)
+(define-test-vop-store %test-vpmovsqb-ymm-disp8 vpmovsqb int-avx2-reg 1 4)
+(define-test-vop-store %test-vpmovsqb-zmm-disp8 vpmovsqb int-avx512-reg 2 8)
+(define-test-vop-store %test-vpmovsqb-zmm-disp32 vpmovsqb int-avx512-reg 2 9)
+(define-test-vop-load %test-vrcp14ps-xmm-disp8 vrcp14ps single-sse-reg 0 16)
+(define-test-vop-load %test-vrcp14ps-ymm-disp8 vrcp14ps single-avx2-reg 1 32)
+(define-test-vop-load %test-vrcp14ps-zmm-disp8 vrcp14ps single-avx512-reg 2 64)
+(define-test-vop-load %test-vrcp14ps-zmm-disp32 vrcp14ps single-avx512-reg 2 65)
+(define-test-vop-load %test-vpabsq-zmm-disp8 vpabsq int-avx512-reg 3 64)
+(define-test-vop-reg-reg-mem %test-valignd-xmm-disp8 valignd single-sse-reg 0 single-sse-reg 1 16 0)
+(define-test-vop-reg-reg-mem %test-valignd-ymm-disp8 valignd int-avx2-reg 1 int-avx2-reg 2 32 0)
+(define-test-vop-reg-reg-mem %test-valignd-zmm-disp8 valignd int-avx512-reg 1 int-avx512-reg 2 64 0)
+(define-test-vop-reg-reg-mem %test-valignd-zmm-disp32 valignd int-avx512-reg 1 int-avx512-reg 2 65 0)
+(define-test-vop-reg-reg-mem %test-vrangess-disp8 vrangess single-sse-reg 0 single-sse-reg 1 4 0)
+(define-test-vop-reg-reg-mem %test-vrangess-disp32 vrangess single-sse-reg 0 single-sse-reg 1 5 0)
+(define-test-vop-reg-reg-mem %test-vrangesd-disp8 vrangesd double-sse-reg 0 double-sse-reg 1 8 0)
+(define-test-vop-load %test-vrndscaleps-xmm-disp8 vrndscaleps single-sse-reg 0 16 0)
+(define-test-vop-load %test-vrndscaleps-zmm-disp8 vrndscaleps single-avx512-reg 2 64 0)
+(define-test-vop-load %test-vrndscaleps-zmm-disp32 vrndscaleps single-avx512-reg 2 65 0)
+(define-test-vop-load %test-vrndscaless-disp8 vrndscaless single-sse-reg 0 4 0)
+(define-test-vop-load %test-vrndscaless-disp32 vrndscaless single-sse-reg 0 5 0)
+(define-test-vop-load %test-vrndscalesd-disp8 vrndscalesd double-sse-reg 0 8 0)
+(define-test-vop-reg-reg-mem %test-vfixupimmps-xmm-disp8 vfixupimmps single-sse-reg 0 single-sse-reg 1 16 0)
+(define-test-vop-reg-reg-mem %test-vfixupimmps-zmm-disp8 vfixupimmps single-avx512-reg 1 single-avx512-reg 2 64 0)
+(define-test-vop-reg-reg-mem %test-vfixupimmps-zmm-disp32 vfixupimmps single-avx512-reg 1 single-avx512-reg 2 65 0)
+(define-test-vop-reg-reg-mem %test-vfixupimmss-disp8 vfixupimmss single-sse-reg 0 single-sse-reg 1 4 0)
+(define-test-vop-reg-reg-mem %test-vfixupimmss-disp32 vfixupimmss single-sse-reg 0 single-sse-reg 1 5 0)
+(define-test-vop-reg-reg-mem %test-vfixupimmsd-disp8 vfixupimmsd double-sse-reg 0 double-sse-reg 1 8 0)
+(define-test-vop-reg-reg-mem %test-vreducess-disp8 vreducess single-sse-reg 0 single-sse-reg 1 4 0)
+(define-test-vop-reg-reg-mem %test-vreducess-disp32 vreducess single-sse-reg 0 single-sse-reg 1 5 0)
+(define-test-vop-reg-reg-mem %test-vreducesd-disp8 vreducesd double-sse-reg 0 double-sse-reg 1 8 0)
+(define-test-vop-reg-reg-mem %test-vgetmantss-disp8 vgetmantss single-sse-reg 0 single-sse-reg 1 4 0)
+(define-test-vop-reg-reg-mem %test-vgetmantss-disp32 vgetmantss single-sse-reg 0 single-sse-reg 1 5 0)
+(define-test-vop-reg-reg-mem %test-vgetmantsd-disp8 vgetmantsd double-sse-reg 0 double-sse-reg 1 8 0)
+(define-test-vop-reg-reg-mem %test-vgetexpss-disp8 vgetexpss single-sse-reg 0 single-sse-reg 1 4)
+(define-test-vop-reg-reg-mem %test-vgetexpss-disp32 vgetexpss single-sse-reg 0 single-sse-reg 1 5)
+(define-test-vop-reg-reg-mem %test-vgetexpsd-disp8 vgetexpsd double-sse-reg 0 double-sse-reg 1 8)
+(define-test-vop-reg-reg-mem %test-vscalefps-xmm-disp8 vscalefps single-sse-reg 0 single-sse-reg 1 16)
+(define-test-vop-reg-reg-mem %test-vscalefps-zmm-disp8 vscalefps single-avx512-reg 1 single-avx512-reg 2 64)
+(define-test-vop-reg-reg-mem %test-vscalefps-zmm-disp32 vscalefps single-avx512-reg 1 single-avx512-reg 2 65)
+(define-test-vop-reg-reg-mem %test-vscalefss-disp8 vscalefss single-sse-reg 0 single-sse-reg 1 4)
+(define-test-vop-reg-reg-mem %test-vscalefss-disp32 vscalefss single-sse-reg 0 single-sse-reg 1 5)
+(define-test-vop-reg-reg-mem %test-vscalefsd-disp8 vscalefsd double-sse-reg 0 double-sse-reg 1 8)
+(define-test-vop-scalar-to-gp %test-vcvtss2usi-disp8 vcvtss2usi 4)
+(define-test-vop-scalar-to-gp %test-vcvtss2usi-disp32 vcvtss2usi 5)
+(define-test-vop-scalar-to-gp %test-vcvtsd2usi-disp8 vcvtsd2usi 8)
+(define-test-vop-scalar-to-gp %test-vcvttss2usi-disp8 vcvttss2usi 4)
+(define-test-vop-scalar-to-gp %test-vcvttsd2usi-disp8 vcvttsd2usi 8)
+(define-test-vop-same-reg-mem %test-vcvtusi2sd-disp8 vcvtusi2sd double-sse-reg 0 8)
+(define-test-vop-same-reg-mem %test-vcvtusi2sd-disp32 vcvtusi2sd double-sse-reg 0 9)
+(define-test-vop-same-reg-mem %test-vcvtusi2ss-disp8 vcvtusi2ss single-sse-reg 0 8)
+(define-test-vop-load %test-vcvtps2udq-zmm-disp8 vcvtps2udq int-avx512-reg 0 64)
+(define-test-vop-load %test-vcvtps2udq-zmm-disp32 vcvtps2udq int-avx512-reg 0 65)
+(define-test-vop-load %test-vcvtudq2pd-zmm-disp8 vcvtudq2pd double-avx512-reg 0 32)
+(define-test-vop-load %test-vcvtudq2pd-xmm-disp8 vcvtudq2pd double-sse-reg 0 8)
+(define-test-vop-load %test-vcvtps2qq-zmm-disp8 vcvtps2qq int-avx512-reg 0 32)
+(define-test-vop-load %test-vcvtps2qq-zmm-disp32 vcvtps2qq int-avx512-reg 0 33)
+(define-test-vop-load %test-vcvtpd2qq-zmm-disp8 vcvtpd2qq int-avx512-reg 0 64)
+(define-test-vop-load %test-vcvtqq2ps-zmm-disp8 vcvtqq2ps single-avx512-reg 0 64)
+(define-test-vop-load %test-vcvtqq2ps-zmm-disp32 vcvtqq2ps single-avx512-reg 0 65)
+(define-test-vop-load %test-auto-promoted-vcvtdq2pd-disp8 vcvtdq2pd double-avx512-reg 0 32)
+(define-test-vop-load %test-auto-promoted-vcvtdq2pd-disp32 vcvtdq2pd double-avx512-reg 0 33)
+(define-test-vop-load %test-auto-promoted-vcvtps2dq-disp8 vcvtps2dq int-avx512-reg 0 64)
+(define-test-vop-load %test-auto-promoted-vcvtps2dq-disp32 vcvtps2dq int-avx512-reg 0 65)
+(define-test-vop-load %test-auto-promoted-vrcpps-disp8 vrcpps single-avx512-reg 0 64)
+(define-test-vop-load %test-auto-promoted-vpmovsxbw-disp8 vpmovsxbw int-avx512-reg 0 32)
+(define-test-vop-three-reg %test-vpand-zmm-disasm vpand int-avx512-reg 0 int-avx512-reg 1 int-avx512-reg 2)
+(define-test-vop-load %test-vmovdqa-zmm-disasm vmovdqa single-avx512-reg 0 64)
+(define-test-vop-load %test-vbroadcastf128-zmm-disasm vbroadcastf128 single-avx512-reg 0 16)
+(define-test-vop-reg-reg-mem %test-vpermt2d-zmm-disp8 vpermt2d single-avx512-reg 0 single-avx512-reg 1 64)
+(define-test-vop-reg-reg-mem %test-vpermt2d-zmm-disp32 vpermt2d single-avx512-reg 0 single-avx512-reg 1 65)
+(define-test-vop-reg-reg-mem %test-vpmaxsq-zmm-disp8 vpmaxsq int-avx512-reg 0 int-avx512-reg 1 64)
+(define-test-vop-reg-reg-mem %test-vprolvd-xmm-disp8 vprolvd int-sse-reg 0 int-sse-reg 1 16)
+(define-test-vop-reg-reg-mem %test-vpermt2q-zmm-disp8 vpermt2q int-avx512-reg 0 int-avx512-reg 1 64)
+(define-test-vop-reg-reg-mem %test-vpermt2q-zmm-disp32 vpermt2q int-avx512-reg 0 int-avx512-reg 1 65)
+(define-test-vop-reg-reg-mem %test-vshuff32x4-zmm-disp8 vshuff32x4 int-avx512-reg 2 int-avx512-reg 3 64 0)
+(define-test-vop-reg-reg-mem %test-vshuff32x4-zmm-disp32 vshuff32x4 int-avx512-reg 2 int-avx512-reg 3 65 0)
+(define-test-vop-reg-reg-mem %test-vshufi32x4-xmm-disp8 vshufi32x4 int-sse-reg 0 int-sse-reg 1 16 0)
+(define-test-vop-reg-reg-mem %test-vblendmps-zmm-disp8 vblendmps single-avx512-reg 0 single-avx512-reg 1 64)
+(define-test-vop-reg-reg-mem %test-vblendmps-zmm-disp32 vblendmps single-avx512-reg 0 single-avx512-reg 1 65)
+(define-test-vop-reg-reg-mem %test-vpblendmq-zmm-disp8 vpblendmq int-avx512-reg 0 int-avx512-reg 1 64)
+(define-test-vop-reg-reg-mem %test-vrangepd-zmm-disp8 vrangepd double-avx512-reg 0 double-avx512-reg 1 64 0)
+(define-test-vop-load %test-vreduceps-xmm-disp8 vreduceps single-sse-reg 0 16 0)
+(define-test-vop-load %test-vreduceps-zmm-disp8 vreduceps single-avx512-reg 0 64 0)
+(define-test-vop-load %test-vreduceps-zmm-disp32 vreduceps single-avx512-reg 0 65 0)
+(define-test-vop-reg-reg-mem %test-vrcp14ss-disp8 vrcp14ss single-sse-reg 0 single-sse-reg 1 4)
+(define-test-vop-reg-reg-mem %test-vrcp14ss-disp32 vrcp14ss single-sse-reg 0 single-sse-reg 1 5)
+(define-test-vop-reg-reg-mem %test-vrcp14sd-disp8 vrcp14sd double-sse-reg 0 double-sse-reg 1 8)
+(define-test-vop-reg-reg-mem %test-vrsqrt14ss-disp8 vrsqrt14ss single-sse-reg 0 single-sse-reg 1 4)
+(define-test-vop-reg-reg-mem %test-vrsqrt14sd-disp8 vrsqrt14sd double-sse-reg 0 double-sse-reg 1 8)
+(define-test-vop-reg-reg-mem %test-vpblendmb-zmm-disp8 vpblendmb int-avx512-reg 0 int-avx512-reg 1 64)
+(define-test-vop-mask-mem %test-vpcmpb-zmm-disp8 vpcmpb mask-reg 1 int-avx512-reg 0 64 #x1)
+(define-test-vop-mask-mem %test-vptestmw-zmm-disp8 vptestmw mask-reg 1 int-avx512-reg 0 64)
+(define-test-vop-reg-reg-mem %test-vpermw-zmm-disp8 vpermw int-avx512-reg 0 int-avx512-reg 1 64)
+(define-test-vop-reg-reg-mem %test-vpsllvw-zmm-disp8 vpsllvw int-avx512-reg 0 int-avx512-reg 1 64)
+(define-test-vop-reg-reg-mem %test-vdbpsadbw-zmm-disp8 vdbpsadbw int-avx512-reg 0 int-avx512-reg 1 64 0)
+(define-test-vop-reg-reg-mem %test-vpmadd52luq-zmm-disp8 vpmadd52luq int-avx512-reg 0 int-avx512-reg 1 64)
+(define-test-vop-reg-reg-mem %test-vpermb-zmm-disp8 vpermb int-avx512-reg 0 int-avx512-reg 1 64)
+(define-test-vop-store %test-vpcompressb-zmm-disp8 vpcompressb int-avx512-reg 0 64)
+(define-test-vop-reg-reg-mem %test-vpshldw-zmm-disp8 vpshldw int-avx512-reg 0 int-avx512-reg 1 64 0)
+(define-test-vop-load %test-vpopcntd-zmm-disp8 vpopcntd int-avx512-reg 0 64)
+(define-test-vop-mask-mem %test-vpshufbitqmb-zmm-disp8 vpshufbitqmb mask-reg 1 int-avx512-reg 0 64)
+(define-test-vop-masked-reg-reg-mem %test-vaddps-masked-zmm-disp8 vaddps-masked single-avx512-reg 0 single-avx512-reg 1 64 1)
+(define-test-vop-masked-reg-reg-mem %test-vaddps-masked-zmm-disp32 vaddps-masked single-avx512-reg 0 single-avx512-reg 1 65 1)
+(define-test-vop-masked-reg-reg-mem %test-vpaddq-masked-zmm-disp8 vpaddq-masked int-avx512-reg 0 int-avx512-reg 1 64 1)
+(define-test-vop-masked-reg-reg-mem %test-vaddpd-masked-zmm-disp8 vaddpd-masked double-avx512-reg 0 double-avx512-reg 1 64 1)
+(define-test-vop-reg-reg-mem %test-vinsertf32x4-zmm-disp8 vinsertf32x4 single-avx512-reg 0 single-avx512-reg 1 16 0)
+(define-test-vop-reg-reg-mem %test-vinsertf32x8-zmm-disp8 vinsertf32x8 single-avx512-reg 0 single-avx512-reg 1 32 0)
+(define-test-vop-store-imm %test-vextractf32x4-zmm-disp8 vextractf32x4 single-avx512-reg 0 16 0)
+(define-test-vop-store-imm %test-vextractf32x8-zmm-disp8 vextractf32x8 single-avx512-reg 0 32 0)
+(define-test-vop-reg-reg-mem %test-vfmadd132ps-zmm-disp8 vfmadd132ps single-avx512-reg 0 single-avx512-reg 1 64)
+(define-test-vop-reg-reg-mem %test-vfmadd132ss-disp8 vfmadd132ss single-sse-reg 0 single-sse-reg 1 4)
+(define-test-vop-load %test-vcvtph2ps-zmm-disp8 vcvtph2ps single-avx512-reg 0 32)
+(define-test-vop-store-imm %test-vcvtps2ph-zmm-disp8 vcvtps2ph single-avx512-reg 0 32 0)
+(define-test-vop-reg-reg-mem %test-vgf2p8mulb-zmm-disp8 vgf2p8mulb int-avx512-reg 0 int-avx512-reg 1 64)
+(define-test-vop-reg-reg-mem %test-vgf2p8affineqb-zmm-disp8 vgf2p8affineqb int-avx512-reg 0 int-avx512-reg 1 64 0)
+(define-test-vop-reg-reg-mem %test-vpmullq-zmm-disp8 vpmullq int-avx512-reg 0 int-avx512-reg 1 64)
+(define-test-vop-mask-single-mem %test-vfpclassps-zmm-disp8 vfpclassps mask-reg 1 64 #x1)
+(define-test-vop-mask-single-mem %test-vfpclassss-disp8 vfpclassss mask-reg 1 4 #x1)
+
+(define-test-vop-vsib %test-vsib-no-base-low-index vgatherdps-z
+  single-avx512-reg 0 single-avx512-reg 1 64 4 1)
+
+(define-test-vop-vsib %test-vsib-high-index vgatherdps-z single-avx512-reg 0
+  single-avx512-reg 16 0 4 1 :base-sc unsigned-reg :base-off rax-offset)
+
+(define-test-vop-vsib %test-vsib-high-base-high-index vgatherdps-z
+  single-avx512-reg 0 single-avx512-reg 16 0 8 2 :base-sc unsigned-reg :base-off
+  r8-offset)
+
+(define-test-vop-vsib %test-vsib-scatter-low-index vscatterdps-z
+  single-avx512-reg 0 single-avx512-reg 3 0 4 3 :base-sc unsigned-reg :base-off
+  rax-offset :reverse-p t)
+
+(define-test-vop-vsib %test-vsib-scale-2 vgatherdps-z single-avx512-reg 0
+  single-avx512-reg 5 0 2 4 :base-sc unsigned-reg :base-off rbx-offset)
+
+(define-test-vop-vsib %test-vsib-scale-8 vgatherdps-z single-avx512-reg 0
+  single-avx512-reg 7 0 8 5 :base-sc unsigned-reg :base-off rdx-offset)
+
+(define-test-vop-vsib %test-vsib-disp8 vgatherdps-z single-avx512-reg 0
+  single-avx512-reg 2 8 4 6 :base-sc unsigned-reg :base-off rax-offset)
+
+(define-test-vop-vsib %test-vsib-disp8-compressed vgatherdps-z single-avx512-reg
+  0 single-avx512-reg 1 4 4 1 :base-sc unsigned-reg :base-off rax-offset)
+
+(define-test-vop-vsib %test-vsib-scatter-disp8-compressed vscatterdps-z
+  single-avx512-reg 0 single-avx512-reg 1 4 4 1 :base-sc unsigned-reg :base-off
+  rax-offset :reverse-p t)
+
+(define-test-vop-vsib %test-vsib-qword-disp8-compressed vpgatherqq-z
+  int-avx512-reg 0 int-avx512-reg 2 8 8 2 :base-sc unsigned-reg :base-off
+  rbx-offset)
+
+(define-test-vop-vsib %test-vsib-nonmultiple-disp32 vgatherdps-z
+  single-avx512-reg 0 single-avx512-reg 3 5 4 3 :base-sc unsigned-reg :base-off
+  rcx-offset)
+
+(define-test-vop-vsib %test-vsib-high-index-disp8-compressed vgatherdps-z
+  single-avx512-reg 0 single-avx512-reg 16 4 4 4 :base-sc unsigned-reg :base-off
+  rdx-offset)
+
+(define-test-vop-masked-reg-reg-mem %test-vaddps-masked-z-disp8
+  vaddps-masked-z single-avx512-reg 0 single-avx512-reg 1 64 1)
+
+(define-test-vop-masked-reg-reg-mem %test-vaddps-masked-z-disp32
+  vaddps-masked-z single-avx512-reg 0 single-avx512-reg 1 65 1)
+
+(define-test-vop-masked-reg-reg-mem %test-vpaddq-masked-z-disp8
+  vpaddq-masked-z int-avx512-reg 0 int-avx512-reg 1 64 1)
+
+(define-test-vop-masked-reg-reg-mem %test-vaddpd-masked-z-disp8
+  vaddpd-masked-z double-avx512-reg 0 double-avx512-reg 1 64 1)
+
+(define-test-vop-vsib %test-vgatherdps-z-zero
+  vgatherdps-z-zero single-avx512-reg 0 single-avx512-reg 1 0 4 1
+  :base-sc unsigned-reg :base-off rax-offset)
+
+(define-test-vop-vsib %test-vsib-no-disp
+  vgatherdps-z single-avx512-reg 0 single-avx512-reg 1 0 4 1
+  :base-sc unsigned-reg :base-off rax-offset)
 
 ;; evex tests
 (cl:in-package :test-util)
@@ -2842,3 +3099,143 @@
     sb-vm::%test-vpmullq-zmm-disp8
   ("VPMULLQ" "ZMM0" "ZMM1" "[RSP+64]")
   :unexpected ("[RSP+1]"))
+
+(with-test (:name :evex-vsib-high-index-disasm)
+  (let* ((fun (compile nil '(lambda () (sb-vm::%test-vsib-high-index))))
+         (text (with-output-to-string (s) (disassemble fun :stream s))))
+    (assert (search "VGATHERDPS" text))
+    (assert (search "ZMM0" text))     ; destination register
+    (assert (search "ZMM16" text))    ; high vector index
+    (assert (search "{K1}" text))))   ; mask
+
+;; VSIB No base, low index, displacement
+(define-evex-disasm-test
+    :evex-vsib-no-base-low-index
+    sb-vm::%test-vsib-no-base-low-index
+  ("VGATHERDPS" "ZMM0" "[ZMM1*4+64]" "K1"))
+
+;; VSIB High base and high vector index
+(define-evex-disasm-test
+    :evex-vsib-high-base-high-index
+    sb-vm::%test-vsib-high-base-high-index
+  ("VGATHERDPS" "ZMM0" "ZMM16*8" "K2"))
+
+;; VSIB Scatter, low index
+(define-evex-disasm-test
+    :evex-vsib-scatter-low-index
+    sb-vm::%test-vsib-scatter-low-index
+  ("VSCATTERDPS" "ZMM0" "ZMM3" "K3"))
+
+;; VSIB Scale 2
+(define-evex-disasm-test
+    :evex-vsib-scale-2
+    sb-vm::%test-vsib-scale-2
+  ("VGATHERDPS" "ZMM0" "ZMM5*2" "K4"))
+
+;; VSIB Scale 8
+(define-evex-disasm-test
+    :evex-vsib-scale-8
+    sb-vm::%test-vsib-scale-8
+  ("VGATHERDPS" "ZMM0" "ZMM7*8" "K5"))
+
+;; VSIB Compressed displacement (disp8)
+(define-evex-disasm-test
+    :evex-vsib-disp8
+    sb-vm::%test-vsib-disp8
+  ("VGATHERDPS" "ZMM0" "ZMM2*4+8" "K6"))
+
+(define-evex-disasm-test
+    :evex-vsib-disp8-compressed
+    sb-vm::%test-vsib-disp8-compressed
+  ("VGATHERDPS" "ZMM0" "ZMM1*4+4" "K1"))
+
+;; Scatter with compressed displacement
+(define-evex-disasm-test
+    :evex-vsib-scatter-disp8-compressed
+    sb-vm::%test-vsib-scatter-disp8-compressed
+  ("VSCATTERDPS" "ZMM0" "ZMM1*4+4" "K1"))
+
+;; Qword gather uses disp-n=8
+(define-evex-disasm-test
+    :evex-vsib-qword-disp8-compressed
+    sb-vm::%test-vsib-qword-disp8-compressed
+  ("VPGATHERQQ" "ZMM0" "ZMM2*8+8" "K2"))
+
+;; Non-multiple displacement falls back to disp32
+(define-evex-disasm-test
+    :evex-vsib-nonmultiple-disp32
+    sb-vm::%test-vsib-nonmultiple-disp32
+  ("VGATHERDPS" "ZMM0" "ZMM3*4+5" "K3"))
+
+;; High vector index with compressed displacement
+(define-evex-disasm-test
+    :evex-vsib-high-index-disp8-compressed
+    sb-vm::%test-vsib-high-index-disp8-compressed
+  ("VGATHERDPS" "ZMM0" "ZMM16*4+4" "K4"))
+
+(define-evex-disasm-test
+    :evex-vaddps-masked-z-disp32-fallback
+    sb-vm::%test-vaddps-masked-z-disp32
+  ("VADDPS" "ZMM0" "ZMM1" "[RSP+65]" "{K1}{z}"))
+
+;; Zeroing masked arithmetic: single precision
+(define-evex-disasm-test
+    :evex-vaddps-masked-z-compressed-disp8
+    sb-vm::%test-vaddps-masked-z-disp8
+  ("VADDPS" "ZMM0" "ZMM1" "[RSP+64]" "{K1}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing masked arithmetic: single precision, disp32 fallback
+(define-evex-disasm-test
+    :evex-vaddps-masked-z-disp32-fallback
+    sb-vm::%test-vaddps-masked-z-disp32
+  ("VADDPS" "ZMM0" "ZMM1" "[RSP+65]" "{K1}{z}"))
+
+;; Zeroing masked integer arithmetic: qword
+(define-evex-disasm-test
+    :evex-vpaddq-masked-z-compressed-disp8
+    sb-vm::%test-vpaddq-masked-z-disp8
+  ("VPADDQ" "ZMM0" "ZMM1" "[RSP+64]" "{K1}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing masked double precision
+(define-evex-disasm-test
+    :evex-vaddpd-masked-z-compressed-disp8
+    sb-vm::%test-vaddpd-masked-z-disp8
+  ("VADDPD" "ZMM0" "ZMM1" "[RSP+64]" "{K1}{z}")
+  :unexpected ("[RSP+1]"))
+
+
+;; Zeroing masked arithmetic: single precision
+(define-evex-disasm-test
+    :evex-vaddps-masked-z-compressed-disp8
+    sb-vm::%test-vaddps-masked-z-disp8
+  ("VADDPS" "ZMM0" "ZMM1" "[RSP+64]" "{K1}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing masked integer arithmetic: qword
+(define-evex-disasm-test
+    :evex-vpaddq-masked-z-compressed-disp8
+    sb-vm::%test-vpaddq-masked-z-disp8
+  ("VPADDQ" "ZMM0" "ZMM1" "[RSP+64]" "{K1}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing masked double precision
+(define-evex-disasm-test
+    :evex-vaddpd-masked-z-compressed-disp8
+    sb-vm::%test-vaddpd-masked-z-disp8
+  ("VADDPD" "ZMM0" "ZMM1" "[RSP+64]" "{K1}{z}")
+  :unexpected ("[RSP+1]"))
+
+(define-evex-disasm-test
+    :evex-vgatherdps-z-zero
+    sb-vm::%test-vgatherdps-z-zero
+  ("VGATHERDPS" "ZMM0" "ZMM1*4" "{K1}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Ensure zero displacement with base+index does not print "+0"
+(define-evex-disasm-test
+    :evex-vsib-no-disp
+    sb-vm::%test-vsib-no-disp
+  ("VGATHERDPS" "ZMM0" "ZMM1*4" "K1")
+  :unexpected ("+0"))

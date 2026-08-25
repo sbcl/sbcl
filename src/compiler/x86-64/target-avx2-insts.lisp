@@ -143,3 +143,40 @@
         (write-string name stream)
         (operand name dstate))))
 
+(defun print-vsib/mem (value stream dstate)
+  (if (not (machine-ea-p value))
+      (print-ymmreg/mem value stream dstate)
+      (let ((base (machine-ea-base value))
+            (disp (machine-ea-disp value))
+            (index (machine-ea-index value))
+            (scale (machine-ea-scale value)))
+        (flet ((write-vector-index (reg)
+                 (let ((id (reg-id reg)))
+                   (format stream "~a~d"
+                           (cond ((dstate-getprop dstate +evex-l1+) "ZMM")
+                                 ((dstate-getprop dstate +vex-l+) "YMM")
+                                 (t "XMM"))
+                           (reg-id-num id))))
+               (write-disp (disp)
+                 (cond
+                   ((integerp disp)
+                    (unless (zerop disp)
+                      (format stream "~@d" disp)))
+                   ((label-p disp)
+                    (print-label disp stream dstate))
+                   (t
+                    (princ disp stream)))))
+          (when stream
+            (write-char #\[ stream)
+            (when base
+              (print-reg base stream dstate))
+            (when index
+              (when base (write-char #\+ stream))
+              (write-vector-index index)
+              (unless (= scale 1)
+                (format stream "*~d" scale)))
+            (when (or base index)
+              (write-disp disp))
+            (unless (or base index)
+              (write-disp disp))
+            (write-char #\] stream))))))

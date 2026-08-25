@@ -64,23 +64,49 @@
   :prefilter #'prefilter-xmmreg/mem
   :printer #'print-sized-xmmreg/mem-default-qword)
 
+;; flags below were expressed in binary format. Looking at long
+;; stream of 0's does not tell me much, so they are in hex now
+
 ;;; General indicator that we are decoding an EVEX instruction.
 ;;; EVEX has 128-, 256-, and 512-bit forms; L'L=00 is 128-bit and sets
 ;;; neither +vex-l+ nor +evex-l1+, so this separate bit is required for
 ;;; code that needs to know "EVEX vs VEX/legacy".
 ;;; (Bit 14 is currently unused by other dstate properties.)
-(defconstant +evex+ #b100000000000000)
-(defconstant +vex-l+ #b10000000000)
+(defconstant +evex+  #x4000)
+(defconstant +vex-l+ #x400)
 ;; EVEX L'L=10 (512-bit) sets bit 11; L'L=01 (256-bit) sets bit 10 (=+vex-l+)
-(defconstant +evex-l1+ #b100000000000)
+(defconstant +evex-l1+ #x800)
 ;; EVEX R' bit (reg bit 4, for registers 16-31 in ModR/M.reg)
-(defconstant +evex-r-prime+ #b1000000000000)
+(defconstant +evex-r-prime+ #x1000)
 ;; EVEX X bit as B' (r/m bit 4, for registers 16-31 in ModR/M.r/m, reg-direct only)
-(defconstant +evex-b-prime+ #b10000000000000)
+(defconstant +evex-b-prime+ #x2000)
 ;;; EVEX V' bit (vvvv bit 4, for registers 16-31 in the vvvv field).
 ;;; The 4-bit vvvv field in the EVEX prefix is extended with this bit.
-;;; (Bit 15 is currently unused by other dstate properties.)
-(defconstant +evex-v-prime+ #b1000000000000000)
+;;; (Bit 15 is used by EVEX V'.)
+(defconstant +evex-v-prime+ #x8000)
+;;; VSIB flag: this instruction uses vector-index SIB addressing.
+;;; Bit 16 is unused by other dstate properties.
+(defconstant +vsib+ #x10000)
+
+(define-arg-type evex-vsib/mem
+  :prefilter (lambda (dstate mod r/m)
+               (dstate-setprop dstate +vsib+)
+               (decode-mod-r/m dstate mod r/m 'fpr))
+  :printer #'print-vsib/mem)
+
+(define-arg-type evex-vsib-disp4
+  :prefilter (lambda (dstate mod r/m)
+               (dstate-setprop dstate +vsib+)
+               (setf (dstate-disp-n dstate) 4)
+               (decode-mod-r/m dstate mod r/m 'fpr))
+  :printer #'print-vsib/mem)
+
+(define-arg-type evex-vsib-disp8
+  :prefilter (lambda (dstate mod r/m)
+               (dstate-setprop dstate +vsib+)
+               (setf (dstate-disp-n dstate) 8)
+               (decode-mod-r/m dstate mod r/m 'fpr))
+  :printer #'print-vsib/mem)
 
 (define-arg-type vex-l
   :prefilter  (lambda (dstate value)
@@ -561,7 +587,7 @@
                       (ash (logxor 1 v-prime) 3)
                       aaa)))
 
-(defun determine-evex-flags (thing reg ll vvvv)
+(defun determine-evex-flags (thing reg ll vvvv &optional vsib)
   "Extract EVEX prefix flags from operands.
 Returns: ll, r, x, b, r-prime, v-prime.
 EVEX uses independent bit3 (R/B) and bit4 (R'/X) for 32-register encoding."
@@ -594,17 +620,21 @@ EVEX uses independent bit3 (R/B) and bit4 (R'/X) for 32-register encoding."
           (r-prime (if (or (null reg) (k-register-p reg)) 0 (reg-bit4 (reg-id reg))))
           ;; X from EA index, or bit 4 of r/m reg for register-direct
           ;; In EVEX, X doubles as B' (bit 4 of r/m) when mod=11 (reg-direct)
-          (x (cond ((and (ea-p thing)
-                         (ea-index thing))
-                    (let ((index (ea-index thing)))
-                      (cond ((gpr-p index)
-                             (reg-bit3 (reg-id (tn-reg index))))
-                            ((<= (tn-offset index) 7)
-                             0)
-                            (t 1))))
-                   ((register-p thing)
-                    (reg-bit4 (reg-id thing)))
-                   (t 0)))
+          ;; For VSIB, X is not used; the index high bit is V'.
+          (x (cond
+               (vsib
+                0)
+               ((and (ea-p thing)
+                     (ea-index thing))
+                (let ((index (ea-index thing)))
+                  (cond ((gpr-p index)
+                         (reg-bit3 (reg-id (tn-reg index))))
+                        ((<= (tn-offset index) 7)
+                         0)
+                        (t 1))))
+               ((register-p thing)
+                (reg-bit4 (reg-id thing)))
+               (t 0)))
           ;; B from thing (ModR/M r/m field) - bit 3
           (b (reg-bit3
               (cond ((ea-p thing)
@@ -615,8 +645,16 @@ EVEX uses independent bit3 (R/B) and bit4 (R'/X) for 32-register encoding."
                     ((register-p thing)
                      (reg-id thing))
                     (t 0))))
-          ;; V' from vvvv - bit 4 of vvvv register number
-          (v-prime (if vvvv (reg-bit4 (reg-id vvvv)) 0)))
+          ;; V' from vvvv normally; for VSIB, from the vector index high bit.
+          (v-prime (cond
+                     (vsib
+                      (let ((index (and (ea-p thing) (ea-index thing))))
+                        (if index
+                            (if (logbitp 4 (tn-offset index)) 1 0)
+                            0)))
+                     (vvvv
+                      (reg-bit4 (reg-id vvvv)))
+                     (t 0))))
       (values ll r x b r-prime v-prime))))
 
 (defun emit-avx512-inst (segment thing reg prefix opcode
@@ -638,7 +676,7 @@ Default is 0 (force disp32, never use disp8) for safety -- the CPU
 always applies compression to EVEX disp8, so using the wrong N
 produces silently wrong addresses."
   (multiple-value-bind (ll r x b r-prime v-prime)
-      (determine-evex-flags thing reg ll vvvv)
+      (determine-evex-flags thing reg ll vvvv vm)
     (let ((vvvv-num (if vvvv (reg-id-num (reg-id vvvv)) 0)))
       (emit-evex segment r x b r-prime opcode-prefix w
                  vvvv-num prefix z ll evex-b v-prime aaa))
