@@ -402,6 +402,25 @@
                   (incf ,bias 8))
          ,result))))
 
+
+(defmacro do-sc-locations-back ((location locations &optional result)
+                                &body body)
+  (let ((bitmap '#:bits)
+        (bias '#:bias))
+    `(let ((,bitmap ,locations)
+           (,bias (- sb-vm:finite-sc-offset-limit 8)))
+       (declare (type sb-vm:finite-sc-offset-map ,bitmap))
+       (declare (type (integer -8 ,sb-vm:finite-sc-offset-limit) ,bias))
+       (block nil
+         (loop named #:outer repeat (/ sb-vm:finite-sc-offset-limit 8)
+               do (when (ldb-test (byte 8 ,bias) ,bitmap)
+                    ;; scan 8 bits starting at BIAS from highest to lowest
+                    (loop named #:inner
+                          for ,location downfrom (+ ,bias 7) to ,bias
+                          when (logbitp ,location ,bitmap) do (progn ,@body)))
+                  (decf ,bias 8))
+         ,result))))
+
 ;;; If load TN packing fails, try to give a helpful error message. We
 ;;; find a TN in each location that conflicts, and print it.
 (defun failed-to-pack-load-tn-error (scs op)
@@ -1486,6 +1505,10 @@
                      (return-from select-location start-offset))))
              (try (locations)
                (do-sc-locations (location locations nil element-size)
+                 (attempt-location location)))
+             (try-backward (locations)
+               (do-sc-locations-back (location locations)
+                 (print location)
                  (attempt-location location))))
       (if (eq (sb-kind sb) :unbounded)
           (let ((size (finite-sb-current-size sb)))
@@ -1495,13 +1518,24 @@
           (let* ((locations (sc-locations sc))
                  (reserved (sc-reserve-locations sc))
                  (wired (logandc2 (finite-sb-wired-map sb) reserved)))
-            ;; Try non wired locatiions first
-            (try (logandc2 locations wired))
-            ;; Then the wired locations that are present in this SC.
-            (try (logand locations wired))
-            ;; And only then when requested try the reserved locations.
-            (when use-reserved-locs
-              (try reserved)))))))
+            (cond #+sb-simd-pack-512
+                  ((sc-is tn sb-vm::int-avx512-reg sb-vm::double-avx512-reg sb-vm::single-avx512-reg)
+                   ;; ZMM registers are registers from 0 to 31,
+                   ;; XMM/YMM are from 0 to 15, if ZMMs are packed
+                   ;; first into 0-15, then XMM/YMM won't have
+                   ;; anywhere to go, pack ZMMs from 31 and down.
+                   (try-backward (logandc2 locations wired))
+                   (try-backward (logand locations wired))
+                   (when use-reserved-locs
+                     (try-backward reserved)))
+                  (t
+                   ;; Try non wired locatiions first
+                   (try (logandc2 locations wired))
+                   ;; Then the wired locations that are present in this SC.
+                     (try (logand locations wired))
+                     ;; And only then when requested try the reserved locations.
+                     (when use-reserved-locs
+                       (try reserved)))))))))
 
 ;;; If a save TN, return the saved TN, otherwise return TN. This is
 ;;; useful for getting the conflicts of a TN that might be a save TN.
