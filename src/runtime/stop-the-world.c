@@ -123,8 +123,11 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
 #ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
     /* The stop signal was already processed by
        handle_foreign_call_trigger */
-    if (!atomic_load(&stopping_the_world))
+    if (!atomic_load(&stopping_the_world)) {
+        gc_assert(read_TLS(STOP_FOR_GC_PENDING, get_sb_vm_thread()) == NIL);
+        gc_assert(read_TLS(GC_PENDING, get_sb_vm_thread()) == NIL);
         return;
+    }
 #endif
 
     struct thread *thread = get_sb_vm_thread();
