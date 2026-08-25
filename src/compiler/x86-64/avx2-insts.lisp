@@ -643,23 +643,27 @@ produces silently wrong addresses."
                             is4
                             vm)
   ;; Auto-detect ZMM operands and delegate to EVEX encoding
-  (when (or (and (register-p reg) (is-zmm-id-p (reg-id reg)))
-            (and (register-p thing) (is-zmm-id-p (reg-id thing)))
-            (and vvvv (register-p vvvv) (is-zmm-id-p (reg-id vvvv))))
-    (return-from emit-avx2-inst
-      (emit-avx512-inst segment thing reg prefix opcode
-                        :remaining-bytes remaining-bytes
-                        ;; Don't pass VEX L as EVEX L'L; let determine-evex-flags
-                        ;; auto-detect the vector length from register types.
-                        :ll nil
-                        :opcode-prefix opcode-prefix
-                        :w (or evex-w w)
-                        :vvvv vvvv
-                        :vm vm
-                        ;; Force disp32 for auto-promoted VEX instructions:
-                        ;; the correct N depends on tuple type which varies
-                        ;; per instruction. disp-n=0 disables disp8 entirely.
-                        :disp-n 0)))
+  (flet ((evex-reg-p (r)
+           (and (register-p r)
+                (or (is-zmm-id-p (reg-id r))
+                    (>= (reg-id-num (reg-id r)) 16)))))
+    (when (or (evex-reg-p reg)
+              (evex-reg-p thing)
+              (evex-reg-p vvvv))
+      (return-from emit-avx2-inst
+        (emit-avx512-inst segment thing reg prefix opcode
+                          :remaining-bytes remaining-bytes
+                          ;; Don't pass VEX L as EVEX L'L; let determine-evex-flags
+                          ;; auto-detect the vector length from register types.
+                          :ll nil
+                          :opcode-prefix opcode-prefix
+                          :w (or evex-w w)
+                          :vvvv vvvv
+                          :vm vm
+                          ;; Force disp32 for auto-promoted VEX instructions:
+                          ;; the correct N depends on tuple type which varies
+                          ;; per instruction. disp-n=0 disables disp8 entirely.
+                          :disp-n 0))))
   (emit-vex segment vvvv thing reg prefix opcode-prefix l w)
   (emit-bytes segment opcode)
   (when is4
