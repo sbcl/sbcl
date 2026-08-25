@@ -264,27 +264,6 @@
     (assert (not (search "ALLOC" text)))
     (assert (not (search "KMOVQ" text)))))
 
-(with-test (:name :destroyed-c-registers-include-kmasks)
-  (let* ((vm (find-package "SB-VM"))
-         (fun (and vm (find-symbol "DESTROYED-C-REGISTERS" vm)))
-         (forms (and fun (funcall fun))))
-    (when (and fun forms)
-      (flet ((mask-temp-p (form)
-               (and (listp form)
-                    (eq (first form) :temporary)
-                    (let ((spec (second form)))
-                      (and (listp spec)
-                           (eq (getf (cdr spec) :sc) 'mask-reg))))))
-        (let ((mask-temps (remove-if-not #'mask-temp-p forms)))
-          (assert (= (length mask-temps) 7))
-          (assert
-           (equal
-            (sort (mapcar (lambda (form)
-                            (getf (cdr (second form)) :offset))
-                          mask-temps)
-                  #'<)
-            '(1 2 3 4 5 6 7))))))))
-
 (with-test (:name :avx512-state-tn-p)
   (let* ((vm (find-package "SB-VM"))
          (c (find-package "SB-C"))

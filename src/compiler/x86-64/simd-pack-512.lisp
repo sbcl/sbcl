@@ -631,16 +631,10 @@
               single-float single-float single-float single-float
               single-float single-float single-float single-float
               single-float single-float single-float single-float)
-  (:results (dst :scs (single-avx512-reg)))
   (:result-types simd-pack-512-single)
-  ;; (:temporary (:sc single-avx512-reg) t0 t1 t2 t3)
-  ;; temporaries explicitly in float16, float17, float18, and float19 regs
-  ;; avoids allocator putting temps in the lower zmm 16-regs, so we don't
-  ;; need a new sc class, which is a scarce resource in SBCL (only 60)
-  (:temporary (:sc single-avx512-reg :offset 16) t0)
-  (:temporary (:sc single-avx512-reg :offset 17) t1)
-  (:temporary (:sc single-avx512-reg :offset 18) t2)
-  (:temporary (:sc single-avx512-reg :offset 19) t3)
+  (:results (dst :scs (single-avx512-reg) :from (:argument 4)))
+  (:result-types simd-pack-512-single)
+  (:temporary (:sc single-avx512-reg) t0 t1 t2 t3)
   (:generator 5
      (inst vunpcklps t0 p0 p1)
      (inst vunpcklps t1 p2 p3)
