@@ -1201,7 +1201,6 @@
   (def vpsravw   #x11 1)
   (def vpsrlvw   #x10 1))
 
-
 ;;; Double-block packed SAD
 (define-instruction vdbpsadbw (segment dst src1 src2 imm)
   (:emitter
@@ -1629,7 +1628,42 @@
   (def vpmaxsq-masked #x66 #x3d 1 #x0f38)
   ;; Unsigned qword min/max
   (def vpminuq-masked #x66 #x3b 1 #x0f38)
-  (def vpmaxuq-masked #x66 #x3f 1 #x0f38))
+  (def vpmaxuq-masked #x66 #x3f 1 #x0f38)
+  ;; FMA masked
+  (def vfmadd132ps-masked #x66 #x98 0 #x0f38)
+  (def vfmadd132pd-masked #x66 #x98 1 #x0f38)
+  (def vfmadd213ps-masked #x66 #xa8 0 #x0f38)
+  (def vfmadd213pd-masked #x66 #xa8 1 #x0f38)
+  (def vfmadd231ps-masked #x66 #xb8 0 #x0f38)
+  (def vfmadd231pd-masked #x66 #xb8 1 #x0f38)
+    ;; FMA subtract masked
+  (def vfmsub132ps-masked #x66 #x9a 0 #x0f38)
+  (def vfmsub132pd-masked #x66 #x9a 1 #x0f38)
+  (def vfmsub213ps-masked #x66 #xaa 0 #x0f38)
+  (def vfmsub213pd-masked #x66 #xaa 1 #x0f38)
+  (def vfmsub231ps-masked #x66 #xba 0 #x0f38)
+  (def vfmsub231pd-masked #x66 #xba 1 #x0f38)
+  ;; FMA negative-add masked
+  (def vfnmadd132ps-masked #x66 #x9c 0 #x0f38)
+  (def vfnmadd132pd-masked #x66 #x9c 1 #x0f38)
+  (def vfnmadd213ps-masked #x66 #xac 0 #x0f38)
+  (def vfnmadd213pd-masked #x66 #xac 1 #x0f38)
+  (def vfnmadd231ps-masked #x66 #xbc 0 #x0f38)
+  (def vfnmadd231pd-masked #x66 #xbc 1 #x0f38)
+  ;; FMA add/subtract masked
+  (def vfmaddsub132ps-masked #x66 #x96 0 #x0f38)
+  (def vfmaddsub132pd-masked #x66 #x96 1 #x0f38)
+  (def vfmaddsub213ps-masked #x66 #xa6 0 #x0f38)
+  (def vfmaddsub213pd-masked #x66 #xa6 1 #x0f38)
+  (def vfmaddsub231ps-masked #x66 #xb6 0 #x0f38)
+  (def vfmaddsub231pd-masked #x66 #xb6 1 #x0f38)
+  ;; FMA subtract/add masked
+  (def vfmsubadd132ps-masked #x66 #x97 0 #x0f38)
+  (def vfmsubadd132pd-masked #x66 #x97 1 #x0f38)
+  (def vfmsubadd213ps-masked #x66 #xa7 0 #x0f38)
+  (def vfmsubadd213pd-masked #x66 #xa7 1 #x0f38)
+  (def vfmsubadd231ps-masked #x66 #xb7 0 #x0f38)
+  (def vfmsubadd231pd-masked #x66 #xb7 1 #x0f38))
 
 ;;; 2-operand with opmask (vsqrtps/vsqrtpd)
 (macrolet ((def (name prefix opcode w &optional (opcode-prefix #x0f))
@@ -1712,7 +1746,14 @@
   (def-z vmaxps-masked  nil  #x5f 0)
   (def-z vminpd-masked  #x66 #x5d 1)
   (def-z vmaxpd-masked  #x66 #x5f 1)
-    ;; Signed dword min/max
+  ;; FMA zeroing masked
+  (def-z vfmadd132ps-masked #x66 #x98 0 #x0f38)
+  (def-z vfmadd132pd-masked #x66 #x98 1 #x0f38)
+  (def-z vfmadd213ps-masked #x66 #xa8 0 #x0f38)
+  (def-z vfmadd213pd-masked #x66 #xa8 1 #x0f38)
+  (def-z vfmadd231ps-masked #x66 #xb8 0 #x0f38)
+  (def-z vfmadd231pd-masked #x66 #xb8 1 #x0f38)
+  ;; Signed dword min/max
   (def-z vpminsd-masked #x66 #x39 0 #x0f38)
   (def-z vpmaxsd-masked #x66 #x3d 0 #x0f38)
   ;; Unsigned dword min/max
@@ -1723,7 +1764,35 @@
   (def-z vpmaxsq-masked #x66 #x3d 1 #x0f38)
   ;; Unsigned qword min/max
   (def-z vpminuq-masked #x66 #x3b 1 #x0f38)
-  (def-z vpmaxuq-masked #x66 #x3f 1 #x0f38))
+  (def-z vpmaxuq-masked #x66 #x3f 1 #x0f38)
+  ;; FMA subtract zeroing masked
+  (def-z vfmsub132ps-masked #x66 #x9a 0 #x0f38)
+  (def-z vfmsub132pd-masked #x66 #x9a 1 #x0f38)
+  (def-z vfmsub213ps-masked #x66 #xaa 0 #x0f38)
+  (def-z vfmsub213pd-masked #x66 #xaa 1 #x0f38)
+  (def-z vfmsub231ps-masked #x66 #xba 0 #x0f38)
+  (def-z vfmsub231pd-masked #x66 #xba 1 #x0f38)
+  ;; FMA negative-add zeroing masked
+  (def-z vfnmadd132ps-masked #x66 #x9c 0 #x0f38)
+  (def-z vfnmadd132pd-masked #x66 #x9c 1 #x0f38)
+  (def-z vfnmadd213ps-masked #x66 #xac 0 #x0f38)
+  (def-z vfnmadd213pd-masked #x66 #xac 1 #x0f38)
+  (def-z vfnmadd231ps-masked #x66 #xbc 0 #x0f38)
+  (def-z vfnmadd231pd-masked #x66 #xbc 1 #x0f38)
+  ;; FMA add/subtract zeroing masked
+  (def-z vfmaddsub132ps-masked #x66 #x96 0 #x0f38)
+  (def-z vfmaddsub132pd-masked #x66 #x96 1 #x0f38)
+  (def-z vfmaddsub213ps-masked #x66 #xa6 0 #x0f38)
+  (def-z vfmaddsub213pd-masked #x66 #xa6 1 #x0f38)
+  (def-z vfmaddsub231ps-masked #x66 #xb6 0 #x0f38)
+  (def-z vfmaddsub231pd-masked #x66 #xb6 1 #x0f38)
+  ;; FMA subtract/add zeroing masked
+  (def-z vfmsubadd132ps-masked #x66 #x97 0 #x0f38)
+  (def-z vfmsubadd132pd-masked #x66 #x97 1 #x0f38)
+  (def-z vfmsubadd213ps-masked #x66 #xa7 0 #x0f38)
+  (def-z vfmsubadd213pd-masked #x66 #xa7 1 #x0f38)
+  (def-z vfmsubadd231ps-masked #x66 #xb7 0 #x0f38)
+  (def-z vfmsubadd231pd-masked #x66 #xb7 1 #x0f38))
 
 ;;;; ---- Embedded broadcast forms ----
 
@@ -1838,18 +1907,50 @@
   ;; Signed dword min/max
   (def-ibcast-38 vpminsd-bcast #x39 0)
   (def-ibcast-38 vpmaxsd-bcast #x3d 0)
-
   ;; Unsigned dword min/max
   (def-ibcast-38 vpminud-bcast #x3b 0)
   (def-ibcast-38 vpmaxud-bcast #x3f 0)
-
   ;; Signed qword min/max
   (def-ibcast-38 vpminsq-bcast #x39 1)
   (def-ibcast-38 vpmaxsq-bcast #x3d 1)
-
   ;; Unsigned qword min/max
   (def-ibcast-38 vpminuq-bcast #x3b 1)
-  (def-ibcast-38 vpmaxuq-bcast #x3f 1))
+  (def-ibcast-38 vpmaxuq-bcast #x3f 1)
+  ;; FMA broadcast
+  (def-ibcast-38 vfmadd132ps-bcast #x98 0)
+  (def-ibcast-38 vfmadd132pd-bcast #x98 1)
+  (def-ibcast-38 vfmadd213ps-bcast #xa8 0)
+  (def-ibcast-38 vfmadd213pd-bcast #xa8 1)
+  (def-ibcast-38 vfmadd231ps-bcast #xb8 0)
+  (def-ibcast-38 vfmadd231pd-bcast #xb8 1)
+  ;; FMA subtract broadcast
+  (def-ibcast-38 vfmsub132ps-bcast #x9a 0)
+  (def-ibcast-38 vfmsub132pd-bcast #x9a 1)
+  (def-ibcast-38 vfmsub213ps-bcast #xaa 0)
+  (def-ibcast-38 vfmsub213pd-bcast #xaa 1)
+  (def-ibcast-38 vfmsub231ps-bcast #xba 0)
+  (def-ibcast-38 vfmsub231pd-bcast #xba 1)
+  ;; FMA negative-add broadcast
+  (def-ibcast-38 vfnmadd132ps-bcast #x9c 0)
+  (def-ibcast-38 vfnmadd132pd-bcast #x9c 1)
+  (def-ibcast-38 vfnmadd213ps-bcast #xac 0)
+  (def-ibcast-38 vfnmadd213pd-bcast #xac 1)
+  (def-ibcast-38 vfnmadd231ps-bcast #xbc 0)
+  (def-ibcast-38 vfnmadd231pd-bcast #xbc 1)
+  ;; FMA add/subtract broadcast
+  (def-ibcast-38 vfmaddsub132ps-bcast #x96 0)
+  (def-ibcast-38 vfmaddsub132pd-bcast #x96 1)
+  (def-ibcast-38 vfmaddsub213ps-bcast #xa6 0)
+  (def-ibcast-38 vfmaddsub213pd-bcast #xa6 1)
+  (def-ibcast-38 vfmaddsub231ps-bcast #xb6 0)
+  (def-ibcast-38 vfmaddsub231pd-bcast #xb6 1)
+    ;; FMA subtract/add broadcast
+  (def-ibcast-38 vfmsubadd132ps-bcast #x97 0)
+  (def-ibcast-38 vfmsubadd132pd-bcast #x97 1)
+  (def-ibcast-38 vfmsubadd213ps-bcast #xa7 0)
+  (def-ibcast-38 vfmsubadd213pd-bcast #xa7 1)
+  (def-ibcast-38 vfmsubadd231ps-bcast #xb7 0)
+  (def-ibcast-38 vfmsubadd231pd-bcast #xb7 1))
 
 ;;;; ---- EVEX gather/scatter (ZMM width) ----
 
@@ -2783,3 +2884,84 @@
                                    :disp-n 64)))))
   (def vp2intersectd #x68 #xf2 0)
   (def vp2intersectq #x68 #xf2 1))
+
+;;;; ---- Scalar FMA masked/zeroing ----
+
+(macrolet
+    ((def-scalar-fma-masked (name prefix opcode w &key z)
+       (let* ((z-bit (if z 1 0))
+              (ins-name (symbolicate name (if z "-MASKED-Z" "-MASKED")))
+              (mask-printer
+                (if z
+                    '(:name :tab reg ", " vvvv ", " reg/mem " {" aaa "}{z}")
+                    '(:name :tab reg ", " vvvv ", " reg/mem " {" aaa "}")))
+              (disp-n (if (= w 0) 4 8))
+              (printer-forms
+                (loop for k from 1 to 7
+                      append
+                      (avx512-inst-printer-list
+                       'ymm-ymm/mem prefix opcode
+                       :opcode-prefix #x0f38
+                       :w w
+                       :nds t
+                       :ll #b00
+                       :disp-n disp-n
+                       :evex-b 0
+                       :more-fields (list (list 'aaa k)
+                                          (list 'z-bit z-bit))
+                       :printer mask-printer))))
+         `(define-instruction ,ins-name (segment dst src1 src2 mask)
+            ,@printer-forms
+            (:emitter
+              (aver (and (integerp mask) (<= 1 mask 7)))
+              (emit-avx512-inst segment src2 dst ,prefix ,opcode
+                                :opcode-prefix #x0f38
+                                :vvvv src1
+                                :w ,w
+                                :aaa mask
+                                :z ,z-bit
+                                :disp-n ,disp-n))))))
+
+  ;; Masked scalar FMA forms
+  (def-scalar-fma-masked vfmadd132ss #x66 #x99 0)
+  (def-scalar-fma-masked vfmadd132sd #x66 #x99 1)
+  (def-scalar-fma-masked vfmadd213ss #x66 #xa9 0)
+  (def-scalar-fma-masked vfmadd213sd #x66 #xa9 1)
+  (def-scalar-fma-masked vfmadd231ss #x66 #xb9 0)
+  (def-scalar-fma-masked vfmadd231sd #x66 #xb9 1)
+
+  (def-scalar-fma-masked vfmsub132ss #x66 #x9b 0)
+  (def-scalar-fma-masked vfmsub132sd #x66 #x9b 1)
+  (def-scalar-fma-masked vfmsub213ss #x66 #xab 0)
+  (def-scalar-fma-masked vfmsub213sd #x66 #xab 1)
+  (def-scalar-fma-masked vfmsub231ss #x66 #xbb 0)
+  (def-scalar-fma-masked vfmsub231sd #x66 #xbb 1)
+
+  (def-scalar-fma-masked vfnmadd132ss #x66 #x9d 0)
+  (def-scalar-fma-masked vfnmadd132sd #x66 #x9d 1)
+  (def-scalar-fma-masked vfnmadd213ss #x66 #xad 0)
+  (def-scalar-fma-masked vfnmadd213sd #x66 #xad 1)
+  (def-scalar-fma-masked vfnmadd231ss #x66 #xbd 0)
+  (def-scalar-fma-masked vfnmadd231sd #x66 #xbd 1)
+
+  ;; Zeroing scalar FMA forms
+  (def-scalar-fma-masked vfmadd132ss #x66 #x99 0 :z t)
+  (def-scalar-fma-masked vfmadd132sd #x66 #x99 1 :z t)
+  (def-scalar-fma-masked vfmadd213ss #x66 #xa9 0 :z t)
+  (def-scalar-fma-masked vfmadd213sd #x66 #xa9 1 :z t)
+  (def-scalar-fma-masked vfmadd231ss #x66 #xb9 0 :z t)
+  (def-scalar-fma-masked vfmadd231sd #x66 #xb9 1 :z t)
+
+  (def-scalar-fma-masked vfmsub132ss #x66 #x9b 0 :z t)
+  (def-scalar-fma-masked vfmsub132sd #x66 #x9b 1 :z t)
+  (def-scalar-fma-masked vfmsub213ss #x66 #xab 0 :z t)
+  (def-scalar-fma-masked vfmsub213sd #x66 #xab 1 :z t)
+  (def-scalar-fma-masked vfmsub231ss #x66 #xbb 0 :z t)
+  (def-scalar-fma-masked vfmsub231sd #x66 #xbb 1 :z t)
+
+  (def-scalar-fma-masked vfnmadd132ss #x66 #x9d 0 :z t)
+  (def-scalar-fma-masked vfnmadd132sd #x66 #x9d 1 :z t)
+  (def-scalar-fma-masked vfnmadd213ss #x66 #xad 0 :z t)
+  (def-scalar-fma-masked vfnmadd213sd #x66 #xad 1 :z t)
+  (def-scalar-fma-masked vfnmadd231ss #x66 #xbd 0 :z t)
+  (def-scalar-fma-masked vfnmadd231sd #x66 #xbd 1 :z t))
