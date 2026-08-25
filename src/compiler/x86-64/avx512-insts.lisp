@@ -1,5 +1,5 @@
 (in-package "SB-X86-64-ASM")
-
+
 ;;;; AVX-512 Instruction Support
 ;;;;
 ;;;; Implemented subsets:
@@ -434,7 +434,7 @@
   ;; scalar fixed-width
   (def vscalefss #x2d 0 :scalar-disp-n 4)
   (def vscalefsd #x2d 1 :scalar-disp-n 8))
-
+
 ;;; Opmask instructions
 ;;; KMOV - Move to/from opmask registers
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -670,7 +670,7 @@
   (def-extract vextracti64x2 #x66 #x39 1 16)
   (def-extract vextracti32x8 #x66 #x3b 0 32)
   (def-extract vextracti64x4 #x66 #x3b 1 32))
-
+
 ;;;; ---- AVX-512F additional instructions ----
 
 ;;; 3-operand NDS (dst, src1, src2)
@@ -1069,7 +1069,7 @@
   (def vptestmq  #x66 #x27 1)
   (def vptestnmd #xf3 #x27 0)
   (def vptestnmq #xf3 #x27 1))
-
+
 ;;;; ---- AVX-512BW instructions ----
 
 ;;; Blend with mask (byte/word)
@@ -1220,7 +1220,7 @@
             (avx512-inst-printer-list 'ymm-ymm/mem-imm #x66 #x42
                                       :opcode-prefix #x0f3a :w 0
                                       :ll ll :disp-n n)))
-
+
 ;;;; ---- AVX-512DQ instructions ----
 
 ;;; FP classify
@@ -1345,7 +1345,7 @@
   (def vbroadcasti64x2 #x5a 1 16)
   (def vbroadcastf32x8 #x1b 0 32)
   (def vbroadcasti32x8 #x5b 0 32))
-
+
 ;;;; ---- AVX-512IFMA instructions ----
 
 (macrolet ((def (name opcode w)
@@ -1367,7 +1367,7 @@
                                                  (t 0)))))))
   (def vpmadd52luq #xb4 1)
   (def vpmadd52huq #xb5 1))
-
+
 ;;;; ---- AVX-512VBMI instructions ----
 
 ;;; Permute and multishift
@@ -1392,7 +1392,7 @@
   (def vpermi2b     #x75 0)
   (def vpermt2b     #x7d 0)
   (def vpmultishiftqb #x83 1))
-
+
 ;;;; ---- AVX-512VBMI2 instructions ----
 
 ;;; Compress byte/word (reversed encoding)
@@ -1487,7 +1487,7 @@
   (def vpshrdvw  #x72 1)
   (def vpshrdvd  #x73 0)
   (def vpshrdvq  #x73 1))
-
+
 ;;;; ---- AVX-512VPOPCNTDQ instructions ----
 
 ;;; VPOPCNTDQ
@@ -1509,7 +1509,7 @@
                                                  (t 0)))))))
   (def vpopcntd  #x55 0)
   (def vpopcntq  #x55 1))
-
+
 ;;;; ---- AVX-512BITALG instructions ----
 
 ;;; BITALG popcount
@@ -1549,7 +1549,7 @@
                                       :opcode-prefix #x0f38 :w 0 :nds t
                                       :ll ll :disp-n n
                                       :more-fields '((reg nil :type 'opmask-reg)))))
-
+
 ;;;; ---- Masked arithmetic (EVEX with opmask {k}) ----
 
 ;;; 3-operand NDS with opmask: (inst name dst src1 src2 mask &optional zeroing)
@@ -1693,7 +1693,7 @@
   (def-z vaddps-masked  nil  #x58 0)
   (def-z vsubps-masked  nil  #x5c 0)
   (def-z vmulps-masked  nil  #x59 0))
-
+
 ;;;; ---- EVEX gather/scatter (ZMM width) ----
 
 ;;; EVEX gather: dst {k1}, vm (index in vector register, mask in k1-k7)
