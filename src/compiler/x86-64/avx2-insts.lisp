@@ -448,6 +448,16 @@
   (reg4    :field (byte 4 (+ start 16 4))
            :type 'ymm-reg-is4))
 
+;; EVEX format needed for vp2intersect
+(define-evex-instruction-format
+  (2mask-nds 16
+           :default-printer '(:name :tab reg ", " aaa ", " vvvv ", " reg/mem))
+  (op      :field (byte 8 (+ start 0)))
+  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
+           :type 'ymmreg/mem)
+  (reg     :field (byte 3 (+ start 11))
+           :type 'kreg))
+
 (define-instruction-format (evex-vex-gpr (+ 32 16)
                                          :include evex
                                          :default-printer '(:name :tab reg ", " vvvv ", " reg/mem))
@@ -783,7 +793,8 @@ REG is the source (encoded in ModR/M.r/m).
                                      w
                                      ll
                                      nds
-                                     disp-n)
+                                     disp-n
+                                     (evex-b 0))
     (let* ((aa (assoc 'aaa more-fields))
            (aa (if aa (second aa) 0))
            ;; Remove the custom aaa from more-fields so we don't splice it twice.
@@ -794,6 +805,7 @@ REG is the source (encoded in ModR/M.r/m).
                      (aaa ,aa)
                      ,@(and w `((w ,w)))
                      ,@(and ll `((ll ,ll)))
+                     (evex-b ,evex-b)
                      ,@(cond
                          (disp-n
                           `((reg/mem nil :type

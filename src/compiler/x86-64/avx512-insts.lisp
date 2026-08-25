@@ -12,14 +12,14 @@
 ;;;;   EVEX Masked Arithmetic & Logic (vadd*, vsub*, vmul*, vdiv*, vsqrt*, vpadd*, vpsub*, vpand*, vpor*, vpxor* with {k} and {z}),
 ;;;;   EVEX Broadcasts (vbroadcasts*, vpbroadcast* from memory, XMM, and GPRs),
 ;;;;   EVEX Opmask Transfers & Manipulation (kmov*, kand*, kor*, kxor*, knot*, etc.),
-;;;;   EVEX Gather & Scatter (vpgather*, vgather*, vpscatter*, vscatter*).
+;;;;   EVEX Gather & Scatter (vpgather*, vgather*, vpscatter*, vscatter*),
+;;;;   VP2INTERSECT (vp2intersectd/q).
 ;;;;
 ;;;; Not yet implemented / Future extensions:
 ;;;;   AVX-512VL  - Explicit EVEX 128/256-bit forms with masking/broadcast
 ;;;;                (auto-promotion handles basic ZMM; full VL needs
 ;;;;                explicit EVEX for XMM/YMM with masking)
 ;;;;   VAES-256/512 - Wide forms of vaesenc/vaesdec
-;;;;   VP2INTERSECT - vp2intersectd/q
 ;;;;   AVX-512ER/PF - vexp2ps/pd, prefetch (Knights Landing Xeon Phi, deprecated)
 
 ;;;; AVX-512 (EVEX-only) instruction definitions
@@ -1617,7 +1617,19 @@
   (def vmulps-masked   nil  #x59 0)
   (def vdivps-masked   nil  #x5e 0)
   (def vminps-masked   nil  #x5d 0)
-  (def vmaxps-masked   nil  #x5f 0))
+  (def vmaxps-masked   nil  #x5f 0)
+  ;; Signed dword min/max
+  (def vpminsd-masked #x66 #x39 0 #x0f38)
+  (def vpmaxsd-masked #x66 #x3d 0 #x0f38)
+  ;; Unsigned dword min/max
+  (def vpminud-masked #x66 #x3b 0 #x0f38)
+  (def vpmaxud-masked #x66 #x3f 0 #x0f38)
+  ;; Signed qword min/max
+  (def vpminsq-masked #x66 #x39 1 #x0f38)
+  (def vpmaxsq-masked #x66 #x3d 1 #x0f38)
+  ;; Unsigned qword min/max
+  (def vpminuq-masked #x66 #x3b 1 #x0f38)
+  (def vpmaxuq-masked #x66 #x3f 1 #x0f38))
 
 ;;; 2-operand with opmask (vsqrtps/vsqrtpd)
 (macrolet ((def (name prefix opcode w &optional (opcode-prefix #x0f))
@@ -1650,7 +1662,6 @@
                                      :disp-n (full-vector-disp-n dst)))))))
   (def vsqrtps-masked nil  #x51 0)
   (def vsqrtpd-masked #x66 #x51 1))
-
 ;;; Zeroing masked arithmetic variants
 (macrolet ((def-z (name prefix opcode w &optional (opcode-prefix #x0f))
              (let ((zero-name (symbolicate name "-Z"))
@@ -1692,7 +1703,153 @@
   ;; FP arithmetic (single)
   (def-z vaddps-masked  nil  #x58 0)
   (def-z vsubps-masked  nil  #x5c 0)
-  (def-z vmulps-masked  nil  #x59 0))
+  (def-z vmulps-masked  nil  #x59 0)
+  ;; FP division (single/double)
+  (def-z vdivps-masked nil  #x5e 0)
+  (def-z vdivpd-masked #x66 #x5e 1)
+  ;; FP min/max
+  (def-z vminps-masked  nil  #x5d 0)
+  (def-z vmaxps-masked  nil  #x5f 0)
+  (def-z vminpd-masked  #x66 #x5d 1)
+  (def-z vmaxpd-masked  #x66 #x5f 1)
+    ;; Signed dword min/max
+  (def-z vpminsd-masked #x66 #x39 0 #x0f38)
+  (def-z vpmaxsd-masked #x66 #x3d 0 #x0f38)
+  ;; Unsigned dword min/max
+  (def-z vpminud-masked #x66 #x3b 0 #x0f38)
+  (def-z vpmaxud-masked #x66 #x3f 0 #x0f38)
+  ;; Signed qword min/max
+  (def-z vpminsq-masked #x66 #x39 1 #x0f38)
+  (def-z vpmaxsq-masked #x66 #x3d 1 #x0f38)
+  ;; Unsigned qword min/max
+  (def-z vpminuq-masked #x66 #x3b 1 #x0f38)
+  (def-z vpmaxuq-masked #x66 #x3f 1 #x0f38))
+
+;;;; ---- Embedded broadcast forms ----
+
+(macrolet ((def-bcast (name prefix opcode w)
+             (let ((disp-n (if (= w 0) 4 8))
+                   (bcast-list
+                    (if (= w 0)
+                        '((#b00 "{1to4}") (#b01 "{1to8}") (#b10 "{1to16}"))
+                        '((#b00 "{1to2}") (#b01 "{1to4}") (#b10 "{1to8}")))))
+               `(define-instruction ,name (segment dst src1 src2)
+                  ,@(loop for (ll bcast) in bcast-list
+                          append
+                          (avx512-inst-printer-list
+                           'ymm-ymm/mem prefix opcode
+                           :opcode-prefix #x0f
+                           :w w
+                           :nds t
+                           :ll ll
+                           :disp-n disp-n
+                           :evex-b 1
+                           :printer (list :name :tab 'reg ", " 'vvvv ", "
+                                          'reg/mem " " bcast)))
+                  (:emitter
+                   (aver (not (register-p src2))) ; must be memory
+                   (emit-avx512-inst segment src2 dst ,prefix ,opcode
+                                     :opcode-prefix #x0f
+                                     :vvvv src1
+                                     :w ,w
+                                     :evex-b 1
+                                     :disp-n ,disp-n))))))
+  (def-bcast vaddps-bcast nil  #x58 0)
+  (def-bcast vmulps-bcast nil  #x59 0)
+  (def-bcast vaddpd-bcast #x66 #x58 1)
+  (def-bcast vmulpd-bcast #x66 #x59 1)
+  (def-bcast vsubps-bcast nil  #x5c 0)
+  (def-bcast vsubpd-bcast #x66 #x5c 1)
+  (def-bcast vdivps-bcast nil  #x5e 0)
+  (def-bcast vdivpd-bcast #x66 #x5e 1)
+  (def-bcast vminps-bcast nil  #x5d 0)
+  (def-bcast vmaxps-bcast nil  #x5f 0)
+  (def-bcast vminpd-bcast #x66 #x5d 1)
+  (def-bcast vmaxpd-bcast #x66 #x5f 1))
+
+(macrolet ((def-ibcast (name opcode w)
+             (let ((disp-n (if (= w 0) 4 8))
+                   (bcast-list
+                     (if (= w 0)
+                         '((#b00 "{1to4}") (#b01 "{1to8}") (#b10 "{1to16}"))
+                         '((#b00 "{1to2}") (#b01 "{1to4}") (#b10 "{1to8}")))))
+               `(define-instruction ,name (segment dst src1 src2)
+                  ,@(loop for (ll bcast) in bcast-list
+                          append
+                          (avx512-inst-printer-list
+                           'ymm-ymm/mem #x66 opcode
+                           :opcode-prefix #x0f
+                           :w w
+                           :nds t
+                           :ll ll
+                           :disp-n disp-n
+                           :evex-b 1
+                           :printer (list :name :tab 'reg ", " 'vvvv ", "
+                                          'reg/mem " " bcast)))
+                  (:emitter
+                   (aver (not (register-p src2))) ; must be memory
+                   (emit-avx512-inst segment src2 dst #x66 ,opcode
+                                     :opcode-prefix #x0f
+                                     :vvvv src1
+                                     :w ,w
+                                     :evex-b 1
+                                     :disp-n ,disp-n))))))
+  ;; Integer arithmetic broadcast
+  (def-ibcast vpaddd-bcast #xfe 0)
+  (def-ibcast vpaddq-bcast #xd4 1)
+  (def-ibcast vpsubd-bcast #xfa 0)
+  (def-ibcast vpsubq-bcast #xfb 1)
+  (def-ibcast vpandd-bcast #xdb 0)
+  (def-ibcast vpandq-bcast #xdb 1)
+  (def-ibcast vpandnd-bcast #xdf 0)
+  (def-ibcast vpandnq-bcast #xdf 1)
+  (def-ibcast vpord-bcast #xeb 0)
+  (def-ibcast vporq-bcast #xeb 1)
+  (def-ibcast vpxord-bcast #xef 0)
+  (def-ibcast vpxorq-bcast #xef 1))
+
+(macrolet ((def-ibcast-38 (name opcode w)
+             (let ((disp-n (if (= w 0) 4 8))
+                   (bcast-list
+                     (if (= w 0)
+                         '((#b00 "{1to4}") (#b01 "{1to8}") (#b10 "{1to16}"))
+                         '((#b00 "{1to2}") (#b01 "{1to4}") (#b10 "{1to8}")))))
+               `(define-instruction ,name (segment dst src1 src2)
+                  ,@(loop for (ll bcast) in bcast-list
+                          append
+                          (avx512-inst-printer-list
+                           'ymm-ymm/mem #x66 opcode
+                           :opcode-prefix #x0f38
+                           :w w
+                           :nds t
+                           :ll ll
+                           :disp-n disp-n
+                           :evex-b 1
+                           :printer (list :name :tab 'reg ", " 'vvvv ", "
+                                          'reg/mem " " bcast)))
+                  (:emitter
+                   (aver (not (register-p src2))) ; must be memory
+                   (emit-avx512-inst segment src2 dst #x66 ,opcode
+                                     :opcode-prefix #x0f38
+                                     :vvvv src1
+                                     :w ,w
+                                     :evex-b 1
+                                     :disp-n ,disp-n))))))
+  ;; Signed dword min/max
+  (def-ibcast-38 vpminsd-bcast #x39 0)
+  (def-ibcast-38 vpmaxsd-bcast #x3d 0)
+
+  ;; Unsigned dword min/max
+  (def-ibcast-38 vpminud-bcast #x3b 0)
+  (def-ibcast-38 vpmaxud-bcast #x3f 0)
+
+  ;; Signed qword min/max
+  (def-ibcast-38 vpminsq-bcast #x39 1)
+  (def-ibcast-38 vpmaxsq-bcast #x3d 1)
+
+  ;; Unsigned qword min/max
+  (def-ibcast-38 vpminuq-bcast #x3b 1)
+  (def-ibcast-38 vpmaxuq-bcast #x3f 1))
 
 ;;;; ---- EVEX gather/scatter (ZMM width) ----
 
@@ -2595,3 +2752,34 @@
                          (t
                           (error "Unsupported operands for VMOVW: ~S, ~S" dst src))))))))
   (def))
+;;;; ---- VP2INTERSECT ----
+
+(macrolet ((def (name opcode prefix w)
+             `(define-instruction ,name (segment k1 k2 src1 src2)
+                ,@(loop for k1num from 1 to 7
+                        append
+                        (loop for k2num from 1 to 7
+                              append
+                              (avx512-inst-printer-list
+                               '2mask-nds prefix opcode
+                               :opcode-prefix #x0f38
+                               :w w
+                               :ll #b10
+                               :disp-n 64
+                               :more-fields `((aaa ,k2num)
+                                              (reg ,k1num :type 'kreg))
+                               :printer '(:name :tab reg ", " aaa ", " vvvv ", " reg/mem))))
+                (:emitter
+                 (aver (k-register-p k1))
+                 (aver (k-register-p k2))
+                 (aver (not (zerop (reg-id-num (reg-id k1)))))
+                 (aver (not (zerop (reg-id-num (reg-id k2)))))
+                 (emit-avx512-inst segment src2 k1 ,prefix ,opcode
+                                   :opcode-prefix #x0f38
+                                   :w ,w
+                                   :ll #b10
+                                   :vvvv src1
+                                   :aaa (reg-id-num (reg-id k2))
+                                   :disp-n 64)))))
+  (def vp2intersectd #x68 #xf2 0)
+  (def vp2intersectq #x68 #xf2 1))
