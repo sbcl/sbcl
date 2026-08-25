@@ -1519,7 +1519,6 @@
                  (attempt-location location)))
              (try-backward (locations)
                (do-sc-locations-back (location locations)
-                 (print location)
                  (attempt-location location))))
       (if (eq (sb-kind sb) :unbounded)
           (let ((size (finite-sb-current-size sb)))
