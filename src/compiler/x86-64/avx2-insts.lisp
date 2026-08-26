@@ -702,11 +702,16 @@ REG is the source (encoded in ModR/M.r/m).
                                 evex-w
                                 (opcode-prefix #x0F))
   (aver (<= 0 /i 7))
-  ;; Auto-detect ZMM operands and delegate to EVEX encoding
-  (when (and (register-p reg) (is-zmm-id-p (reg-id reg)))
-    (return-from emit-avx2-inst-imm
-      (emit-avx512-inst-imm segment thing reg imm prefix opcode /i
-                            :ll l :w (or evex-w w) :opcode-prefix opcode-prefix)))
+  (flet ((evex-reg-p (r)
+           (and (register-p r)
+                (or (is-zmm-id-p (reg-id r))
+                    (>= (reg-id-num (reg-id r)) 16)))))
+    ;; Auto-detect ZMM operands and delegate to EVEX encoding
+    (when (or (evex-reg-p reg)
+              (evex-reg-p thing))
+      (return-from emit-avx2-inst-imm
+        (emit-avx512-inst-imm segment thing reg imm prefix opcode /i
+                              :ll l :w (or evex-w w) :opcode-prefix opcode-prefix))))
   (emit-vex segment thing reg nil prefix opcode-prefix l w)
   (emit-bytes segment opcode)
   (emit-byte segment (logior (ash (logior #b11000 /i) 3)
