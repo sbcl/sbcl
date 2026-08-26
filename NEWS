@@ -12,8 +12,6 @@ changes relative to sbcl-2.6.7:
     Harrington and Arthur Miller)
   * bug fix: FILE-POSITION on a stream after reading input into a list or
     generic sequence returns the correct result.
-  * bug fix: compiler crash while deleting SET nodes in constraint
-    propagation.  (lp#2161789)
   * bug fix: allow the manual to build on more platforms.  (lp#2162021)
   * bug fix: infinite loop in the compiler while attempting to remove data
     moves.  (lp#2162597)
