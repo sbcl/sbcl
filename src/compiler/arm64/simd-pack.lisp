@@ -35,13 +35,13 @@
                 (zerop (dpb 0 (byte 8 8) (ldb (byte 32 0) value)))
                 (zerop (dpb 0 (byte 8 16) (ldb (byte 32 0) value)))
                 (zerop (dpb 0 (byte 8 24) (ldb (byte 32 0) value)))))
-       (inst movi dst value :4s))
+       (inst movi dst (ldb (byte 32 0) value) :4s))
       ((and wordp
             (or (zerop (dpb 0 (byte 8 0) (ldb (byte 16 0) value)))
                 (zerop (dpb 0 (byte 8 8) (ldb (byte 16 0) value)))))
-       (inst movi dst value :8h))
+       (inst movi dst (ldb (byte 16 0) value) :8h))
       (bytep
-       (inst movi dst value :16b))
+       (inst movi dst (ldb (byte 8 0) value) :16b))
       ((and (member (ldb (byte 8 0) value) '(0 #xFF))
             (member (ldb (byte 8 8) value) '(0 #xFF))
             (member (ldb (byte 8 16) value) '(0 #xFF))
@@ -50,7 +50,7 @@
             (member (ldb (byte 8 40) value) '(0 #xFF))
             (member (ldb (byte 8 48) value) '(0 #xFF))
             (member (ldb (byte 8 56) value) '(0 #xFF)))
-       (inst movi value :2d))
+       (inst movi dst value :2d))
       ;; Can't do movi, try via the scalar regs.
       (wordp
        (inst movz tmp-tn (ldb (byte 16 0) value))

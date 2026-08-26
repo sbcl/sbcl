@@ -109,6 +109,12 @@
 (define-fake-vop u64.2-horizontal+ (a)
   (sb-simd::%two-arg-u64+ (%u64.2-lane-extract a 0) (%u64.2-lane-extract a 1)))
 
+(define-fake-vop two-arg-u64.2-min (a b)
+  (%u64.2-bit-select (%two-arg-u64.2> b a) a b))
+
+(define-fake-vop two-arg-u64.2-max (a b)
+  (%u64.2-bit-select (%two-arg-u64.2> a b) a b))
+
 (define-fake-vop s64.2-pair-min (a b)
   (%make-s64.2 (sb-simd::%two-arg-s64-min (%s64.2-lane-extract a 0) (%s64.2-lane-extract a 1))
                (sb-simd::%two-arg-s64-min (%s64.2-lane-extract b 0) (%s64.2-lane-extract b 1))))
@@ -129,3 +135,9 @@
 
 (define-fake-vop s64.2-horizontal+ (a)
   (sb-simd::%two-arg-s64+ (%s64.2-lane-extract a 0) (%s64.2-lane-extract a 1)))
+
+(define-fake-vop two-arg-s64.2-min (a b)
+  (%s64.2-bit-select (%two-arg-s64.2> b a) a b))
+
+(define-fake-vop two-arg-s64.2-max (a b)
+  (%s64.2-bit-select (%two-arg-s64.2> a b) a b))

@@ -148,11 +148,11 @@
   (complex-single-stack non-descriptor-stack)
   (complex-double-stack non-descriptor-stack :element-size 2 :alignment 2)
   #+sb-simd-pack
-  (int-neon-stack non-descriptor-stack :element-size 2)
+  (int-neon-stack non-descriptor-stack :element-size 2 :alignment 2)
   #+sb-simd-pack
-  (double-neon-stack non-descriptor-stack :element-size 2)
+  (double-neon-stack non-descriptor-stack :element-size 2 :alignment 2)
   #+sb-simd-pack
-  (single-neon-stack non-descriptor-stack :element-size 2)
+  (single-neon-stack non-descriptor-stack :element-size 2 :alignment 2)
 
   ;; **** Things that can go in the integer registers.
 

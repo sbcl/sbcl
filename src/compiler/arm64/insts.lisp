@@ -2810,38 +2810,42 @@
                                  (fpr-offset rd)))))
 
 (defmacro def-fp-data-processing-1+simd (name op
-                                         simd-u simd-neg simd-op)
+                                         simd-u simd-neg simd-op6 simd-op)
   `(define-instruction ,name (segment rd rn &optional vector-size)
      (:printer fp-data-processing-1 ((op ,op)))
-     (:printer simd-two-same-float ((u ,simd-u) (neg ,simd-neg) (op ,simd-op)))
+     (:printer simd-two-same-float ((u ,simd-u) (neg ,simd-neg) (op6 ,simd-op6)
+                                    (op ,simd-op)))
      (:emitter
       (assert (and (eq (tn-sc rd)
                        (tn-sc rn)))
               (rd rn)
               "Arguments should have the same FP storage class: ~s ~s." rd rn)
-      (if vector-size
-          (multiple-value-bind (q size) (encode-vector-size vector-size)
-            (emit-simd-two-same-float
-             segment
-             q
-             ,simd-u
-             ,simd-neg
-             (logand 1 size)
-             ,simd-op
-             (fpr-offset rn)
-             (fpr-offset rd)))
-          (emit-fp-data-processing-1 segment
-                                     (fp-reg-type rn)
-                                     ,op
-                                     (fpr-offset rn)
-                                     (fpr-offset rd))))))
+      (cond (vector-size
+             (aver (member vector-size '(:2s :4s :2d)))
+             (multiple-value-bind (q size) (encode-vector-size vector-size)
+               (emit-simd-two-same-float
+                segment
+                q
+                ,simd-u
+                ,simd-neg
+                (logand 1 size)
+                ,simd-op6
+                ,simd-op
+                (fpr-offset rn)
+                (fpr-offset rd))))
+            (t
+             (emit-fp-data-processing-1 segment
+                                        (fp-reg-type rn)
+                                        ,op
+                                        (fpr-offset rn)
+                                        (fpr-offset rd)))))))
 
 (def-fp-data-processing-1+simd fabs #b0001
-  #b0 #b1 #b11111)
+  #b0 #b1 #b00000 #b11111)
 (def-fp-data-processing-1+simd fneg #b0010
-  #b1 #b1 #b11111)
+  #b1 #b1 #b00000 #b11111)
 (def-fp-data-processing-1+simd fsqrt #b0011
-  #b1 #b0 #b11111)
+  #b1 #b1 #b00001 #b11111)
 (def-fp-data-processing-1 frintn #b1000)
 (def-fp-data-processing-1 frintp #b1001)
 (def-fp-data-processing-1 frintm #b1010)
@@ -2888,24 +2892,26 @@
      (:printer fp-data-processing-2 ((op ,op)))
      (:printer simd-three-same-float ((u ,simd-u) (neg ,simd-neg) (op ,simd-op)))
      (:emitter
-      (if vector-size
-          (multiple-value-bind (q size) (encode-vector-size vector-size)
-            (emit-simd-three-same-float
-             segment
-             q
-             ,simd-u
-             ,simd-neg
-             (logand 1 size)
-             (fpr-offset rm)
-             ,simd-op
-             (fpr-offset rn)
-             (fpr-offset rd)))
-          (emit-fp-data-processing-2 segment
-                                     (fp-reg-type rn)
-                                     (fpr-offset rm)
-                                     ,op
-                                     (fpr-offset rn)
-                                     (fpr-offset rd))))))
+      (cond (vector-size
+             (aver (member vector-size '(:2s :4s :2d)))
+             (multiple-value-bind (q size) (encode-vector-size vector-size)
+               (emit-simd-three-same-float
+                segment
+                q
+                ,simd-u
+                ,simd-neg
+                (logand 1 size)
+                (fpr-offset rm)
+                ,simd-op
+                (fpr-offset rn)
+                (fpr-offset rd))))
+            (t
+             (emit-fp-data-processing-2 segment
+                                        (fp-reg-type rn)
+                                        (fpr-offset rm)
+                                        ,op
+                                        (fpr-offset rn)
+                                        (fpr-offset rd)))))))
 
 (def-fp-data-processing-2+simd fmul #b0000
   #b1 #b0 #b11011)
@@ -3479,8 +3485,8 @@
   (neg 1 23)
   (size 1 22)
   (#b1 1 21)
-  (#b00000 5 16)
-  (opc 5 11)
+  (op6 5 16)
+  (op 5 11)
   (#b0 1 10)
   (rn 5 5)
   (rd 5 0))
@@ -3533,10 +3539,10 @@
   (op3 :field (byte 1 31) :value #b0)
   (u :field (byte 1 29))
   (op4 :field (byte 5 24) :value #b01110)
-  (neg :field (byte 1 23))
+  (neg :field (byte 1 23) :value #b1)
   (size :field (byte 1 22))
   (op5 :field (byte 1 21) :value #b1)
-  (op6 :field (byte 5 16) :value #b00000)
+  (op6 :field (byte 5 16))
   (op :field (byte 5 11))
   (op7 :field (byte 1 10) :value #b0)
   (rn :fields (list (byte 1 30) (byte 1 22) (byte 5 5)) :type 'simd-float-reg)
@@ -3612,7 +3618,9 @@
   (def bit #b1 #b10 #b00011)
   (def bif #b1 #b11 #b00011))
 
-(macrolet ((def (name u op &optional zero-u zero)
+(macrolet ((def (name u op &optional
+                              (2d t)
+                              zero-u zero)
              `(define-instruction ,name (segment rd rn rm size)
                 ,@(when op
                     `((:printer simd-three-same-sized ((u ,u) (op ,op)))))
@@ -3620,6 +3628,9 @@
                     `((:printer simd-two-misc ((u ,zero-u) (op ,zero))
                                 '(:name :tab rd ", " rn ", " "#0"))))
                 (:emitter
+                 (aver (member size ',(if 2d
+                                          '(:8b :16b :4h :8h :2s :4s :2d)
+                                          '(:8b :16b :4h :8h :2s :4s))))
                  (multiple-value-bind (q size) (encode-vector-size size)
                    (cond ,@(when zero
                              `(((eql rm 0)
@@ -3644,32 +3655,32 @@
                                                       (fpr-offset rd))
                                `(error "Can be compared only with zero, not ~s" rm)))))))))
   (def cmtst #b0 #b10001)
-  (def cmeq #b1 #b10001 0 #b01001)
-  (def cmgt #b0 #b00110 0 #b01000)
-  (def cmge #b0 #b00111 1 #b01000)
-  (def cmlt nil nil 0 #b01010)
-  (def cmle nil nil 1 #b01001)
+  (def cmeq #b1 #b10001 t 0 #b01001)
+  (def cmgt #b0 #b00110 t 0 #b01000)
+  (def cmge #b0 #b00111 t 1 #b01000)
+  (def cmlt nil nil t 0 #b01010)
+  (def cmle nil nil t 1 #b01001)
   (def cmhi #b1 #b00110)
   (def cmhs #b1 #b00111)
-  (def umin #b1 #b01101)
-  (def umax #b1 #b01100)
-  (def smin #b0 #b01101)
-  (def smax #b0 #b01100)
-  (def uhadd #b1 #b00000)
+  (def umin #b1 #b01101 nil)
+  (def umax #b1 #b01100 nil)
+  (def smin #b0 #b01101 nil)
+  (def smax #b0 #b01100 nil)
+  (def uhadd #b1 #b00000 nil)
   (def uqadd #b1 #b00001)
-  (def urhadd #b1 #b00010)
-  (def uhsub #b1 #b00100)
+  (def urhadd #b1 #b00010 nil)
+  (def uhsub #b1 #b00100 nil)
   (def uqsub #b1 #b00101)
   (def addp #b0 #b10111)
-  (def shadd #b0 #b00000)
+  (def shadd #b0 #b00000 nil)
   (def sqadd #b0 #b00001)
-  (def srhadd #b0 #b00010)
-  (def shsub #b0 #b00100)
+  (def srhadd #b0 #b00010 nil)
+  (def shsub #b0 #b00100 nil)
   (def sqsub #b0 #b00101)
-  (def uminp #b1 #b10101)
-  (def umaxp #b1 #b10100)
-  (def sminp #b0 #b10101)
-  (def smaxp #b0 #b10100)
+  (def uminp #b1 #b10101 nil)
+  (def umaxp #b1 #b10100 nil)
+  (def sminp #b0 #b10101 nil)
+  (def smaxp #b0 #b10100 nil)
   (def sshl #b0 #b01001)
   (def ushl #b1 #b01001))
 
@@ -3677,6 +3688,7 @@
              `(define-instruction ,name (segment rd rn rm size)
                 (:printer simd-three-same-float ((u ,u) (neg ,neg) (op ,op)))
                 (:emitter
+                 (aver (member size '(:2s :4s :2d)))
                  (multiple-value-bind (q size) (encode-vector-size size)
                    (emit-simd-three-same-float
                     segment
@@ -3759,6 +3771,7 @@
                                                          (fpr-offset rn)
                                                          (fpr-offset rd)))
                        (t
+                        (aver (member vector-size '(:2s :4s :2d)))
                         (multiple-value-bind (q size) (encode-vector-size vector-size)
                           (emit-simd-three-same-float
                            segment
@@ -4082,6 +4095,7 @@
                 (:printer simd-across-lanes  ((u ,u) (op ,op)
                                               (rd nil :type 'vbhs)))
                 (:emitter
+                 (aver (member size '(:8b :16b :4h :8h :2s :4s)))
                  (multiple-value-bind (q size) (encode-vector-size size)
                    (emit-simd-across-lanes
                     segment
@@ -4171,6 +4185,7 @@
        `(define-instruction ,name (segment rd rn size)
           (:printer simd-two-misc ((u ,u) (op ,op) (rd nil :type 'simd-reg-2x)))
           (:emitter
+           (aver (member size '(:8b :16b :4h :8h :2s :4s)))
            (multiple-value-bind (q size) (encode-vector-size size)
              (emit-simd-two-misc segment
                                  q
@@ -4366,8 +4381,8 @@
                                      (fpr-offset rn)
                                      (fpr-offset rd)))))))
   (def shl #b0 #b01010 nil t)
-  (def sli #b1 #b01010)
-  (def sri #b1 #b01000 t)
+  (def sli #b1 #b01010 nil t)
+  (def sri #b1 #b01000 t t)
   (def sshr #b0 #b00000 t t)
   (def shrn #b0 #b10000 t)
   (def ssra #b0 #b00010 t t)

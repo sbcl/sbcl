@@ -313,7 +313,10 @@
                    (:info lane)
                    (:results (dst :scs (,scalar-reg)))
                    (:generator
-                    (inst umov dst src lane ,element)))
+                    (inst ,(if (and (eql sign :s) (not (eql width 64)))
+                               'smov
+                               'umov)
+                          dst src lane ,element)))
                  (define-custom-vop ,(name "~a~d.~d-LANE-INSERT" sign width count)
                      (:args (src1 :scs (int-neon-reg) :target dst)
                             (src2 :scs (,scalar-reg) :to :save))
