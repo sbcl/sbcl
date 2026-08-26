@@ -1,5 +1,38 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.6.7:
+  * minor incompatible change: FILE-POSITION on composite streams returns a
+    more accurate result for CONCATENATED-STREAM, and NULL on TWO-WAY-STREAM
+    and ECHO-STREAM.
+  * platform support:
+    ** improvements to code generation for the ARM64 backend.
+    ** improved support for AVX512 instruction encoding and decoding.  (thanks
+       to Arthur Miller)
+  * various enhancements to the SB-SIMD contributed module.  (thanks to Sylvia
+    Harrington and Arthur Miller)
+  * bug fix: FILE-POSITION on a stream after reading input into a list or
+    generic sequence returns the correct result.
+  * bug fix: compiler crash while deleting SET nodes in constraint
+    propagation.  (lp#2161789)
+  * bug fix: allow the manual to build on more platforms.  (lp#2162021)
+  * bug fix: infinite loop in the compiler while attempting to remove data
+    moves.  (lp#2162597)
+  * bug fix: debugger failed to handle (COMPLEX DOUBLE-FLOAT) entities on the
+    stack.  (reported by Clint Seinen)
+  * bug fix: error reporting from STRING-TO-OCTETS reported using the wrong
+    string indices.  (lp#2164924)
+  * optimization: the compiler will "contify", or transform code written as
+    mutually-calling local functions, along the lines of Fluet and Weeks'
+    "Contification using Dominators" of 2001.
+  * optimization: local call argument types are propagated more
+    optimistically.  (lp#486416, reported by Tobias Rittweiler)
+  * optimization: special-case DPB with newbyte of 0 or -1.
+  * optimization: more improvements to UTF8 encoding and decoding.
+  * optimization: multiple structure TYPEP tests in sequence can elide
+    redundant memory loads of layouts.
+  * optimization: transform ZEROP of (LDB ...) to an equivalent zero test with
+    a mask.  (lp#2162824, thanks to Vasily Postnicov)
+
 changes in sbcl-2.6.7 relative to sbcl-2.6.6:
   * new contrib module: SB-MANUAL contains the SBCL manual in docstrings of
     section definitions, which tie together the docstrings of normal Lisp
