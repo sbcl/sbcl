@@ -1355,7 +1355,13 @@ the first."
 (sb-c::when-vop-existsp (:translate check-range<=)
   (defun check-range<= (low x high)
     (when (typep x 'fixnum)
-      (range<= low x high))))
+      (range<= low x high)))
+  (defun check-range<<= (low x high)
+    (when (typep x 'fixnum)
+      (range<<= low x high)))
+  (defun check-range<=< (low x high)
+    (when (typep x 'fixnum)
+      (range<=< low x high))))
 
 
 ;;;; logicals

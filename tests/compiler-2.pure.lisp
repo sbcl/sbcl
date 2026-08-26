@@ -5162,3 +5162,21 @@
       (let ((g (sb-kernel:the* (symbol :use-annotations t) x)))
         (unless (typep g 'symbol)
           g)))))
+
+(with-test (:name :unfoldable-functions
+            :skipped-on (not :sb-devel)) ;; no sb-c::ir1-attributep
+  (let (no-folders)
+    (do-all-symbols (symbol)
+      (unless (or (equal (package-name (symbol-package symbol))
+                         "SB-BIGNUM")
+                  (eq symbol 'sb-kernel:complex-vector-p))
+        (loop for name in (list symbol `(setf ,symbol))
+              do
+              (let ((info (sb-int:info :function :info name)))
+                (when (and info
+                           (sb-c::ir1-attributep (sb-c::fun-info-attributes info) sb-c::foldable)
+                           (not (sb-c::fun-info-folder info))
+                           (sb-c::fun-info-templates info))
+                  (unless (fboundp name)
+                    (push name no-folders)))))))
+    (assert (not no-folders))))
