@@ -400,6 +400,8 @@
            (type segment segment))
   (setf (dstate-segment dstate) segment)
   (setf (dstate-inst-properties dstate) 0)
+  #+x86-64
+  (setf (dstate-disp-n dstate) 0)
   (setf (dstate-known-register-contents dstate) nil)
   (setf (dstate-cur-offs-hooks dstate)
         (stable-sort (nreverse (copy-list (seg-hooks segment)))
@@ -523,6 +525,8 @@
 (defun disassemble-instruction (dstate)
   (declare (type disassem-state dstate))
   (setf (dstate-inst-properties dstate) 0)
+  #+x86-64
+  (setf (dstate-disp-n dstate) 0)
   (setf (dstate-filtered-arg-pool-in-use dstate) nil)
   (loop
    ;; There is no point to using GET-DCHUNK. How many bytes remain is unknown.
@@ -671,7 +675,9 @@
               (nconc (dstate-filtered-arg-pool-free dstate)
                      (dstate-filtered-arg-pool-in-use dstate)))
         (setf (dstate-filtered-arg-pool-in-use dstate) nil)
-        (setf (dstate-inst-properties dstate) 0))))))
+        (setf (dstate-inst-properties dstate) 0)
+        #+x86-64
+        (setf (dstate-disp-n dstate) 0))))))
 
 
 (defun collect-labelish-operands (args cache)
