@@ -5163,8 +5163,8 @@
         (unless (typep g 'symbol)
           g)))))
 
-(with-test (:name :unfoldable-functions
-            :skipped-on (not :sb-devel)) ;; no sb-c::ir1-attributep
+#+sb-devel ;; no sb-c::ir1-attributep
+(with-test (:name :unfoldable-functions)
   (let (no-folders)
     (do-all-symbols (symbol)
       (unless (or (equal (package-name (symbol-package symbol))
