@@ -614,7 +614,21 @@
   (def %test-vpabsq-masked-zmm-disp8)
   (def %test-vgf2p8mulb-masked-zmm-disp8)
   (def %test-vgf2p8affineqb-masked-z-zmm-disp8)
-  (def %test-vgf2p8affineinvqb-masked-zmm-disp8))
+  (def %test-vgf2p8affineinvqb-masked-zmm-disp8)
+  (def %test-vcvtne2ps2bf16-bcast-zmm-disp8)
+  (def %test-vdpbf16ps-bcast-xmm-disp8)
+  (def %test-vpconflictd-masked-zmm-disp8)
+  (def %test-vpconflictq-masked-z-zmm-disp8)
+  (def %test-vplzcntd-masked-xmm-disp8)
+  (def %test-vplzcntq-masked-z-zmm-disp8)
+  (def %test-vaesenc-masked-zmm-disp8)
+  (def %test-vaesenclast-masked-z-zmm-disp8)
+  (def %test-vaesdec-masked-xmm-disp8)
+  (def %test-vaesdeclast-masked-z-ymm-disp8)
+  (def %test-vaesenc-evex-zmm)
+  (def %test-vaesenclast-evex-zmm)
+  (def %test-vaesdec-evex-zmm)
+  (def %test-vaesdeclast-evex-zmm))
 
 ;; instruction vops
 
@@ -2271,6 +2285,34 @@
   vgf2p8affineqb-masked-z int-avx512-reg 0 int-avx512-reg 1 64 3 0)
 (define-test-vop-masked-reg-reg-mem %test-vgf2p8affineinvqb-masked-zmm-disp8
   vgf2p8affineinvqb-masked int-avx512-reg 0 int-avx512-reg 1 64 4 0)
+(define-test-vop-reg-reg-mem %test-vcvtne2ps2bf16-bcast-zmm-disp8
+  vcvtne2ps2bf16-bcast int-avx512-reg 0 int-avx512-reg 1 4)
+(define-test-vop-reg-reg-mem %test-vdpbf16ps-bcast-xmm-disp8
+  vdpbf16ps-bcast int-sse-reg 0 int-sse-reg 1 4)
+(define-test-vop-masked-reg-mem %test-vpconflictd-masked-zmm-disp8
+  vpconflictd-masked int-avx512-reg 0 64 2)
+(define-test-vop-masked-reg-mem %test-vpconflictq-masked-z-zmm-disp8
+  vpconflictq-masked-z int-avx512-reg 0 64 3)
+(define-test-vop-masked-reg-mem %test-vplzcntd-masked-xmm-disp8
+  vplzcntd-masked int-sse-reg 0 16 4)
+(define-test-vop-masked-reg-mem %test-vplzcntq-masked-z-zmm-disp8
+  vplzcntq-masked-z int-avx512-reg 0 64 5)
+(define-test-vop-masked-reg-reg-mem %test-vaesenc-masked-zmm-disp8
+  vaesenc-masked int-avx512-reg 0 int-avx512-reg 1 64 2)
+(define-test-vop-masked-reg-reg-mem %test-vaesenclast-masked-z-zmm-disp8
+  vaesenclast-masked-z int-avx512-reg 0 int-avx512-reg 1 64 3)
+(define-test-vop-masked-reg-reg-mem %test-vaesdec-masked-xmm-disp8
+  vaesdec-masked int-sse-reg 0 int-sse-reg 1 16 4)
+(define-test-vop-masked-reg-reg-mem %test-vaesdeclast-masked-z-ymm-disp8
+  vaesdeclast-masked-z int-avx2-reg 1 int-avx2-reg 2 32 5)
+(define-test-vop-three-reg %test-vaesenc-evex-zmm
+  vaesenc int-avx512-reg 0 int-avx512-reg 1 int-avx512-reg 2)
+(define-test-vop-three-reg %test-vaesenclast-evex-zmm
+  vaesenclast int-avx512-reg 0 int-avx512-reg 1 int-avx512-reg 2)
+(define-test-vop-three-reg %test-vaesdec-evex-zmm
+  vaesdec int-avx512-reg 0 int-avx512-reg 1 int-avx512-reg 2)
+(define-test-vop-three-reg %test-vaesdeclast-evex-zmm
+  vaesdeclast int-avx512-reg 0 int-avx512-reg 1 int-avx512-reg 2)
 
 ;; evex tests
 (cl:in-package :test-util)
@@ -4307,3 +4349,97 @@
     sb-vm::%test-vgf2p8affineinvqb-masked-zmm-disp8
   ("VGF2P8AFFINEINVQB" "ZMM0" "ZMM1" "[RSP+64]" "{K4}")
   :unexpected ("[RSP+1]"))
+
+;; Broadcast BF16 conversion
+(define-evex-disasm-test
+    :evex-vcvtne2ps2bf16-bcast-zmm-disp8
+    sb-vm::%test-vcvtne2ps2bf16-bcast-zmm-disp8
+  ("VCVTNE2PS2BF16-BCAST" "ZMM0" "ZMM1" "[RSP+4]" "{1to16}")
+  :unexpected ("[RSP+1]"))
+
+;; Broadcast BF16 dot product
+(define-evex-disasm-test
+    :evex-vdpbf16ps-bcast-xmm-disp8
+    sb-vm::%test-vdpbf16ps-bcast-xmm-disp8
+  ("VDPBF16PS-BCAST" "XMM0" "XMM1" "[RSP+4]" "{1to4}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked conflict detection dword
+(define-evex-disasm-test
+    :evex-vpconflictd-masked-zmm-disp8
+    sb-vm::%test-vpconflictd-masked-zmm-disp8
+  ("VPCONFLICTD" "ZMM0" "[RSP+64]" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing conflict detection qword
+(define-evex-disasm-test
+    :evex-vpconflictq-masked-z-zmm-disp8
+    sb-vm::%test-vpconflictq-masked-z-zmm-disp8
+  ("VPCONFLICTQ" "ZMM0" "[RSP+64]" "{K3}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked leading zero count dword
+(define-evex-disasm-test
+    :evex-vplzcntd-masked-xmm-disp8
+    sb-vm::%test-vplzcntd-masked-xmm-disp8
+  ("VPLZCNTD" "XMM0" "[RSP+16]" "{K4}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing leading zero count qword
+(define-evex-disasm-test
+    :evex-vplzcntq-masked-z-zmm-disp8
+    sb-vm::%test-vplzcntq-masked-z-zmm-disp8
+  ("VPLZCNTQ" "ZMM0" "[RSP+64]" "{K5}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked VAESENC
+(define-evex-disasm-test
+    :evex-vaesenc-masked-zmm-disp8
+    sb-vm::%test-vaesenc-masked-zmm-disp8
+  ("VAESENC" "ZMM0" "ZMM1" "[RSP+64]" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing VAESENCLAST
+(define-evex-disasm-test
+    :evex-vaesenclast-masked-z-zmm-disp8
+    sb-vm::%test-vaesenclast-masked-z-zmm-disp8
+  ("VAESENCLAST" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked VAESDEC
+(define-evex-disasm-test
+    :evex-vaesdec-masked-xmm-disp8
+    sb-vm::%test-vaesdec-masked-xmm-disp8
+  ("VAESDEC" "XMM0" "XMM1" "[RSP+16]" "{K4}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing VAESDECLAST
+(define-evex-disasm-test
+    :evex-vaesdeclast-masked-z-ymm-disp8
+    sb-vm::%test-vaesdeclast-masked-z-ymm-disp8
+  ("VAESDECLAST" "YMM1" "YMM2" "[RSP+32]" "{K5}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Unmasked EVEX VAESENC ZMM
+(define-evex-disasm-test
+    :evex-vaesenc-unmasked-zmm
+    sb-vm::%test-vaesenc-evex-zmm
+  ("VAESENC" "ZMM0" "ZMM1" "ZMM2"))
+
+;; Unmasked EVEX VAESENCLAST ZMM
+(define-evex-disasm-test
+    :evex-vaesenclast-unmasked-zmm
+    sb-vm::%test-vaesenclast-evex-zmm
+  ("VAESENCLAST" "ZMM0" "ZMM1" "ZMM2"))
+
+;; Unmasked EVEX VAESDEC ZMM
+(define-evex-disasm-test
+    :evex-vaesdec-unmasked-zmm
+    sb-vm::%test-vaesdec-evex-zmm
+  ("VAESDEC" "ZMM0" "ZMM1" "ZMM2"))
+
+;; Unmasked EVEX VAESDECLAST ZMM
+(define-evex-disasm-test
+    :evex-vaesdeclast-unmasked-zmm
+    sb-vm::%test-vaesdeclast-evex-zmm
+  ("VAESDECLAST" "ZMM0" "ZMM1" "ZMM2"))

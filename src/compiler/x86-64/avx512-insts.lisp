@@ -1,5 +1,5 @@
 (in-package "SB-X86-64-ASM")
-
+
 ;;;; AVX-512 Instruction Support
 ;;;;
 ;;;; Implemented subsets:
@@ -8,6 +8,7 @@
 ;;;;   AVX-512VNNI, AVX-512BF16, AVX-512FP16,
 ;;;;   GFNI (in avx2-insts.lisp),
 ;;;;   VPCLMULQDQ-256/512 (via VEX auto-promotion to EVEX),
+;;;;   VAES-256/512 (wide forms of vaesenc/vaesdec),
 ;;;;   EVEX Compare-to-Opmask (vcmpps, vcmppd, vcmpss, vcmpsd),
 ;;;;   EVEX Masked Arithmetic & Logic (vadd*, vsub*, vmul*, vdiv*, vsqrt*, vpadd*, vpsub*, vpand*, vpor*, vpxor* with {k} and {z}),
 ;;;;   EVEX Broadcasts (vbroadcasts*, vpbroadcast* from memory, XMM, and GPRs),
@@ -19,7 +20,6 @@
 ;;;;   AVX-512VL  - Explicit EVEX 128/256-bit forms with masking/broadcast
 ;;;;                (auto-promotion handles basic ZMM; full VL needs
 ;;;;                explicit EVEX for XMM/YMM with masking)
-;;;;   VAES-256/512 - Wide forms of vaesenc/vaesdec
 ;;;;   AVX-512ER/PF - vexp2ps/pd, prefetch (Knights Landing Xeon Phi, deprecated)
 
 ;;;; AVX-512 (EVEX-only) instruction definitions
@@ -717,7 +717,12 @@
   (def vpord      #x66 #xeb 0 #x0f)
   (def vporq      #x66 #xeb 1 #x0f)
   (def vpxord     #x66 #xef 0 #x0f)
-  (def vpxorq     #x66 #xef 1 #x0f))
+  (def vpxorq     #x66 #xef 1 #x0f)
+  ;; VAES full-vector EVEX forms
+  (def vaesenc     #x66 #xdc 0 #x0f38)
+  (def vaesenclast #x66 #xdd 0 #x0f38)
+  (def vaesdec     #x66 #xde 0 #x0f38)
+  (def vaesdeclast #x66 #xdf 0 #x0f38))
 
 ;;; 2-operand (dst, src)
 (macrolet ((def (name prefix opcode w &optional (opcode-prefix #x0f38))
@@ -1711,7 +1716,12 @@
   (def vscalefps-masked #x66 #x2c 0 #x0f38)
   (def vscalefpd-masked #x66 #x2c 1 #x0f38)
   ;; GFNI multiply masked
-  (def vgf2p8mulb-masked #x66 #xcf 0 #x0f38))
+  (def vgf2p8mulb-masked #x66 #xcf 0 #x0f38)
+  ;; VAES masked
+  (def vaesenc-masked      #x66 #xdc 0 #x0f38)
+  (def vaesenclast-masked  #x66 #xdd 0 #x0f38)
+  (def vaesdec-masked      #x66 #xde 0 #x0f38)
+  (def vaesdeclast-masked  #x66 #xdf 0 #x0f38))
 
 ;;; 2-operand with opmask (vsqrtps/vsqrtpd)
 (macrolet ((def (name prefix opcode w &optional (opcode-prefix #x0f))
@@ -1888,7 +1898,12 @@
   (def-z vscalefps-masked #x66 #x2c 0 #x0f38)
   (def-z vscalefpd-masked #x66 #x2c 1 #x0f38)
   ;; GFNI multiply zeroing masked
-  (def-z vgf2p8mulb-masked #x66 #xcf 0 #x0f38))
+  (def-z vgf2p8mulb-masked #x66 #xcf 0 #x0f38)
+  ;; VAES zeroing masked
+  (def-z vaesenc-masked      #x66 #xdc 0 #x0f38)
+  (def-z vaesenclast-masked  #x66 #xdd 0 #x0f38)
+  (def-z vaesdec-masked      #x66 #xde 0 #x0f38)
+  (def-z vaesdeclast-masked  #x66 #xdf 0 #x0f38))
 
 ;;;; ---- Embedded broadcast forms ----
 
@@ -3400,7 +3415,17 @@
   (def-2op-masked vgetexppd #x66 #x42 1 :z t)
   ;; Absolute value qword masked/zeroing
   (def-2op-masked vpabsq #x66 #x1f 1)
-  (def-2op-masked vpabsq #x66 #x1f 1 :z t))
+  (def-2op-masked vpabsq #x66 #x1f 1 :z t)
+  ;; AVX-512CD masked/zeroing
+  (def-2op-masked vpconflictd #x66 #xc4 0)
+  (def-2op-masked vpconflictq #x66 #xc4 1)
+  (def-2op-masked vplzcntd #x66 #x44 0)
+  (def-2op-masked vplzcntq #x66 #x44 1)
+
+  (def-2op-masked vpconflictd #x66 #xc4 0 :z t)
+  (def-2op-masked vpconflictq #x66 #xc4 1 :z t)
+  (def-2op-masked vplzcntd #x66 #x44 0 :z t)
+  (def-2op-masked vplzcntq #x66 #x44 1 :z t))
 
 ;;;; ---- Reciprocal/rsqrt masked/zeroing/broadcast ----
 
@@ -3624,3 +3649,39 @@
   (def-scalar-imm-masked vrndscalesd #x66 #x0b 1)
   (def-scalar-imm-masked vrndscaless #x66 #x0a 0 :z t)
   (def-scalar-imm-masked vrndscalesd #x66 #x0b 1 :z t))
+
+;;;; ---- BF16 embedded broadcast ----
+
+(macrolet
+    ((def-bf16-bcast (name prefix opcode w)
+       (let* ((disp-n (if (= w 0) 4 8))
+              (bcast-list
+                (if (= w 0)
+                    '((#b00 "{1to4}") (#b01 "{1to8}") (#b10 "{1to16}"))
+                    '((#b00 "{1to2}") (#b01 "{1to4}") (#b10 "{1to8}"))))
+              (printer-forms
+                (loop for (ll bcast) in bcast-list
+                      append
+                      (avx512-inst-printer-list
+                       'ymm-ymm/mem prefix opcode
+                       :opcode-prefix #x0f38
+                       :w w
+                       :nds t
+                       :ll ll
+                       :disp-n disp-n
+                       :evex-b 1
+                       :printer (list :name :tab 'reg ", " 'vvvv ", "
+                                      'reg/mem " " bcast)))))
+         `(define-instruction ,name (segment dst src1 src2)
+            ,@printer-forms
+            (:emitter
+             (aver (not (register-p src2)))
+             (emit-avx512-inst segment src2 dst ,prefix ,opcode
+                               :opcode-prefix #x0f38
+                               :vvvv src1
+                               :w ,w
+                               :evex-b 1
+                               :disp-n ,disp-n))))))
+  ;; BF16 3-operand broadcast forms
+  (def-bf16-bcast vcvtne2ps2bf16-bcast #xf2 #x72 0)
+  (def-bf16-bcast vdpbf16ps-bcast      #xf2 #x52 0))
