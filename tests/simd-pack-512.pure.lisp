@@ -644,7 +644,33 @@
   (def %test-vpcompressd-masked-xmm-disp8)
   (def %test-vexpandps-masked-zmm-disp8)
   (def %test-vexpandpd-masked-z-zmm-disp8)
-  (def %test-vpexpandd-masked-xmm-disp8))
+  (def %test-vpexpandd-masked-xmm-disp8)
+  (def %test-vpmovqd-masked-zmm-disp8)
+  (def %test-vpmovqd-masked-z-zmm-disp8)
+  (def %test-vpmovsqb-masked-xmm-disp8)
+  (def %test-vpmovsqb-masked-z-ymm-disp8)
+  (def %test-vdbpsadbw-masked-zmm-disp8)
+  (def %test-vdbpsadbw-masked-z-zmm-disp8)
+  (def %test-vpternlogd-masked-zmm-disp8)
+  (def %test-vpternlogd-masked-z-zmm-disp8)
+  (def %test-vpternlogq-masked-xmm-disp8)
+  (def %test-vpternlogq-masked-z-ymm-disp8)
+  (def %test-vshuff32x4-masked-zmm-disp8)
+  (def %test-vshuff32x4-masked-z-zmm-disp8)
+  (def %test-vshuff64x2-masked-xmm-disp8)
+  (def %test-vshuff64x2-masked-z-ymm-disp8)
+  (def %test-vshufi32x4-masked-zmm-disp8)
+  (def %test-vshufi32x4-masked-z-zmm-disp8)
+  (def %test-vshufi64x2-masked-xmm-disp8)
+  (def %test-vshufi64x2-masked-z-ymm-disp8)
+  (def %test-vinsertf32x4-masked-zmm-disp8)
+  (def %test-vinsertf32x4-masked-z-zmm-disp8)
+  (def %test-vinsertf64x2-masked-xmm-disp8)
+  (def %test-vinsertf64x2-masked-z-ymm-disp8)
+  (def %test-vinserti32x4-masked-zmm-disp8)
+  (def %test-vinserti32x4-masked-z-zmm-disp8)
+  (def %test-vinserti32x8-masked-ymm-disp8)
+  (def %test-vinserti32x8-masked-z-ymm-disp8))
 
 ;; instruction vops
 
@@ -2387,6 +2413,58 @@
   vexpandpd-masked-z double-avx512-reg 0 64 3)
 (define-test-vop-masked-reg-mem %test-vpexpandd-masked-xmm-disp8
   vpexpandd-masked int-sse-reg 0 16 4)
+(define-test-vop-masked-mem-reg %test-vpmovqd-masked-zmm-disp8
+  vpmovqd-masked int-avx512-reg 0 32 2)
+(define-test-vop-masked-mem-reg %test-vpmovqd-masked-z-zmm-disp8
+  vpmovqd-masked-z int-avx512-reg 0 32 3)
+(define-test-vop-masked-mem-reg %test-vpmovsqb-masked-xmm-disp8
+  vpmovsqb-masked single-sse-reg 0 2 4)
+(define-test-vop-masked-mem-reg %test-vpmovsqb-masked-z-ymm-disp8
+  vpmovsqb-masked-z int-avx2-reg 1 4 5)
+(define-test-vop-masked-reg-reg-mem %test-vdbpsadbw-masked-zmm-disp8
+  vdbpsadbw-masked int-avx512-reg 0 int-avx512-reg 1 64 2 0)
+(define-test-vop-masked-reg-reg-mem %test-vdbpsadbw-masked-z-zmm-disp8
+  vdbpsadbw-masked-z int-avx512-reg 0 int-avx512-reg 1 64 3 0)
+(define-test-vop-masked-reg-reg-mem %test-vpternlogd-masked-zmm-disp8
+  vpternlogd-masked int-avx512-reg 0 int-avx512-reg 1 64 2 0)
+(define-test-vop-masked-reg-reg-mem %test-vpternlogd-masked-z-zmm-disp8
+  vpternlogd-masked-z int-avx512-reg 0 int-avx512-reg 1 64 3 0)
+(define-test-vop-masked-reg-reg-mem %test-vpternlogq-masked-xmm-disp8
+  vpternlogq-masked int-sse-reg 0 int-sse-reg 1 16 4 0)
+(define-test-vop-masked-reg-reg-mem %test-vpternlogq-masked-z-ymm-disp8
+  vpternlogq-masked-z int-avx2-reg 1 int-avx2-reg 2 32 5 0)
+(define-test-vop-masked-reg-reg-mem %test-vshuff32x4-masked-zmm-disp8
+  vshuff32x4-masked int-avx512-reg 0 int-avx512-reg 1 64 2 0)
+(define-test-vop-masked-reg-reg-mem %test-vshuff32x4-masked-z-zmm-disp8
+  vshuff32x4-masked-z int-avx512-reg 0 int-avx512-reg 1 64 3 0)
+(define-test-vop-masked-reg-reg-mem %test-vshuff64x2-masked-xmm-disp8
+  vshuff64x2-masked int-sse-reg 0 int-sse-reg 1 16 4 0)
+(define-test-vop-masked-reg-reg-mem %test-vshuff64x2-masked-z-ymm-disp8
+  vshuff64x2-masked-z int-avx2-reg 1 int-avx2-reg 2 32 5 0)
+(define-test-vop-masked-reg-reg-mem %test-vshufi32x4-masked-zmm-disp8
+  vshufi32x4-masked int-avx512-reg 0 int-avx512-reg 1 64 6 0)
+(define-test-vop-masked-reg-reg-mem %test-vshufi32x4-masked-z-zmm-disp8
+  vshufi32x4-masked-z int-avx512-reg 0 int-avx512-reg 1 64 7 0)
+(define-test-vop-masked-reg-reg-mem %test-vshufi64x2-masked-xmm-disp8
+  vshufi64x2-masked int-sse-reg 0 int-sse-reg 1 16 2 0)
+(define-test-vop-masked-reg-reg-mem %test-vshufi64x2-masked-z-ymm-disp8
+  vshufi64x2-masked-z int-avx2-reg 1 int-avx2-reg 2 32 3 0)
+(define-test-vop-masked-reg-reg-mem %test-vinsertf32x4-masked-zmm-disp8
+  vinsertf32x4-masked single-avx512-reg 0 single-avx512-reg 1 16 2 0)
+(define-test-vop-masked-reg-reg-mem %test-vinsertf32x4-masked-z-zmm-disp8
+  vinsertf32x4-masked-z single-avx512-reg 0 single-avx512-reg 1 16 3 0)
+(define-test-vop-masked-reg-reg-mem %test-vinsertf64x2-masked-xmm-disp8
+  vinsertf64x2-masked double-sse-reg 0 double-sse-reg 1 16 4 0)
+(define-test-vop-masked-reg-reg-mem %test-vinsertf64x2-masked-z-ymm-disp8
+  vinsertf64x2-masked-z double-avx2-reg 1 double-avx2-reg 2 16 5 0)
+(define-test-vop-masked-reg-reg-mem %test-vinserti32x4-masked-zmm-disp8
+  vinserti32x4-masked int-avx512-reg 0 int-avx512-reg 1 16 6 0)
+(define-test-vop-masked-reg-reg-mem %test-vinserti32x4-masked-z-zmm-disp8
+  vinserti32x4-masked-z int-avx512-reg 0 int-avx512-reg 1 16 7 0)
+(define-test-vop-masked-reg-reg-mem %test-vinserti32x8-masked-ymm-disp8
+  vinserti32x8-masked int-avx2-reg 1 int-avx2-reg 2 32 2 0)
+(define-test-vop-masked-reg-reg-mem %test-vinserti32x8-masked-z-ymm-disp8
+  vinserti32x8-masked-z int-avx2-reg 1 int-avx2-reg 2 32 3 0)
 
 ;; evex tests
 (cl:in-package :test-util)
@@ -4628,4 +4706,186 @@
     :evex-vpexpandd-masked-xmm-disp8
     sb-vm::%test-vpexpandd-masked-xmm-disp8
   ("VPEXPANDD" "XMM0" "[RSP+16]" "{K4}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked down-convert store: vpmovqd ZMM
+(define-evex-disasm-test
+    :evex-vpmovqd-masked-zmm-disp8
+    sb-vm::%test-vpmovqd-masked-zmm-disp8
+  ("VPMOVQD" "[RSP+32]" "ZMM0" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing down-convert store: vpmovqd ZMM
+(define-evex-disasm-test
+    :evex-vpmovqd-masked-z-zmm-disp8
+    sb-vm::%test-vpmovqd-masked-z-zmm-disp8
+  ("VPMOVQD" "[RSP+32]" "ZMM0" "{K3}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked saturating truncation: vpmovsqb XMM
+(define-evex-disasm-test
+    :evex-vpmovsqb-masked-xmm-disp8
+    sb-vm::%test-vpmovsqb-masked-xmm-disp8
+  ("VPMOVSQB" "[RSP+2]" "XMM0" "{K4}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing saturating truncation: vpmovsqb YMM
+(define-evex-disasm-test
+    :evex-vpmovsqb-masked-z-ymm-disp8
+    sb-vm::%test-vpmovsqb-masked-z-ymm-disp8
+  ("VPMOVSQB" "[RSP+4]" "YMM1" "{K5}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked vdbpsadbw
+(define-evex-disasm-test
+    :evex-vdbpsadbw-masked-zmm-disp8
+    sb-vm::%test-vdbpsadbw-masked-zmm-disp8
+  ("VDBPSADBW" "ZMM0" "ZMM1" "[RSP+64]" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing vdbpsadbw
+(define-evex-disasm-test
+    :evex-vdbpsadbw-masked-z-zmm-disp8
+    sb-vm::%test-vdbpsadbw-masked-z-zmm-disp8
+  ("VDBPSADBW" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked ternary logic dword ZMM
+(define-evex-disasm-test
+    :evex-vpternlogd-masked-zmm-disp8
+    sb-vm::%test-vpternlogd-masked-zmm-disp8
+  ("VPTERNLOGD" "ZMM0" "ZMM1" "[RSP+64]" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing ternary logic dword ZMM
+(define-evex-disasm-test
+    :evex-vpternlogd-masked-z-zmm-disp8
+    sb-vm::%test-vpternlogd-masked-z-zmm-disp8
+  ("VPTERNLOGD" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked ternary logic qword XMM
+(define-evex-disasm-test
+    :evex-vpternlogq-masked-xmm-disp8
+    sb-vm::%test-vpternlogq-masked-xmm-disp8
+  ("VPTERNLOGQ" "XMM0" "XMM1" "[RSP+16]" "{K4}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing ternary logic qword YMM
+(define-evex-disasm-test
+    :evex-vpternlogq-masked-z-ymm-disp8
+    sb-vm::%test-vpternlogq-masked-z-ymm-disp8
+  ("VPTERNLOGQ" "YMM1" "YMM2" "[RSP+32]" "{K5}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked cross-lane shuffle: vshuff32x4 ZMM
+(define-evex-disasm-test
+    :evex-vshuff32x4-masked-zmm-disp8
+    sb-vm::%test-vshuff32x4-masked-zmm-disp8
+  ("VSHUFF32X4" "ZMM0" "ZMM1" "[RSP+64]" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing cross-lane shuffle: vshuff32x4 ZMM
+(define-evex-disasm-test
+    :evex-vshuff32x4-masked-z-zmm-disp8
+    sb-vm::%test-vshuff32x4-masked-z-zmm-disp8
+  ("VSHUFF32X4" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked cross-lane shuffle: vshuff64x2 XMM
+(define-evex-disasm-test
+    :evex-vshuff64x2-masked-xmm-disp8
+    sb-vm::%test-vshuff64x2-masked-xmm-disp8
+  ("VSHUFF64X2" "XMM0" "XMM1" "[RSP+16]" "{K4}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing cross-lane shuffle: vshuff64x2 YMM
+(define-evex-disasm-test
+    :evex-vshuff64x2-masked-z-ymm-disp8
+    sb-vm::%test-vshuff64x2-masked-z-ymm-disp8
+  ("VSHUFF64X2" "YMM1" "YMM2" "[RSP+32]" "{K5}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked cross-lane shuffle: vshufi32x4 ZMM
+(define-evex-disasm-test
+    :evex-vshufi32x4-masked-zmm-disp8
+    sb-vm::%test-vshufi32x4-masked-zmm-disp8
+  ("VSHUFI32X4" "ZMM0" "ZMM1" "[RSP+64]" "{K6}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing cross-lane shuffle: vshufi32x4 ZMM
+(define-evex-disasm-test
+    :evex-vshufi32x4-masked-z-zmm-disp8
+    sb-vm::%test-vshufi32x4-masked-z-zmm-disp8
+  ("VSHUFI32X4" "ZMM0" "ZMM1" "[RSP+64]" "{K7}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked cross-lane shuffle: vshufi64x2 XMM
+(define-evex-disasm-test
+    :evex-vshufi64x2-masked-xmm-disp8
+    sb-vm::%test-vshufi64x2-masked-xmm-disp8
+  ("VSHUFI64X2" "XMM0" "XMM1" "[RSP+16]" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing cross-lane shuffle: vshufi64x2 YMM
+(define-evex-disasm-test
+    :evex-vshufi64x2-masked-z-ymm-disp8
+    sb-vm::%test-vshufi64x2-masked-z-ymm-disp8
+  ("VSHUFI64X2" "YMM1" "YMM2" "[RSP+32]" "{K3}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked insert 128-bit lane single
+(define-evex-disasm-test
+    :evex-vinsertf32x4-masked-zmm-disp8
+    sb-vm::%test-vinsertf32x4-masked-zmm-disp8
+  ("VINSERTF32X4" "ZMM0" "ZMM1" "[RSP+16]" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing insert 128-bit lane single
+(define-evex-disasm-test
+    :evex-vinsertf32x4-masked-z-zmm-disp8
+    sb-vm::%test-vinsertf32x4-masked-z-zmm-disp8
+  ("VINSERTF32X4" "ZMM0" "ZMM1" "[RSP+16]" "{K3}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked insert 128-bit lane double
+(define-evex-disasm-test
+    :evex-vinsertf64x2-masked-xmm-disp8
+    sb-vm::%test-vinsertf64x2-masked-xmm-disp8
+  ("VINSERTF64X2" "XMM0" "XMM1" "[RSP+16]" "{K4}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing insert 128-bit lane double YMM
+(define-evex-disasm-test
+    :evex-vinsertf64x2-masked-z-ymm-disp8
+    sb-vm::%test-vinsertf64x2-masked-z-ymm-disp8
+  ("VINSERTF64X2" "YMM1" "YMM2" "[RSP+16]" "{K5}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked integer insert 128-bit lane
+(define-evex-disasm-test
+    :evex-vinserti32x4-masked-zmm-disp8
+    sb-vm::%test-vinserti32x4-masked-zmm-disp8
+  ("VINSERTI32X4" "ZMM0" "ZMM1" "[RSP+16]" "{K6}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing integer insert 128-bit lane
+(define-evex-disasm-test
+    :evex-vinserti32x4-masked-z-zmm-disp8
+    sb-vm::%test-vinserti32x4-masked-z-zmm-disp8
+  ("VINSERTI32X4" "ZMM0" "ZMM1" "[RSP+16]" "{K7}{z}")
+  :unexpected ("[RSP+1]"))
+
+;; Masked integer insert 256-bit lane
+(define-evex-disasm-test
+    :evex-vinserti32x8-masked-ymm-disp8
+    sb-vm::%test-vinserti32x8-masked-ymm-disp8
+  ("VINSERTI32X8" "YMM1" "YMM2" "[RSP+32]" "{K2}")
+  :unexpected ("[RSP+1]"))
+
+;; Zeroing integer insert 256-bit lane
+(define-evex-disasm-test
+    :evex-vinserti32x8-masked-z-ymm-disp8
+    sb-vm::%test-vinserti32x8-masked-z-ymm-disp8
+  ("VINSERTI32X8" "YMM1" "YMM2" "[RSP+32]" "{K3}{z}")
   :unexpected ("[RSP+1]"))

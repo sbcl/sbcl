@@ -3278,7 +3278,7 @@
               (printer-forms
                 (loop for k from 1 to 7
                       append
-                      (loop for ll in '(#b00 #b01 #b10)
+                      (loop for (ll n) in '((#b00 16) (#b01 32) (#b10 64))
                             append
                             (avx512-inst-printer-list
                              'ymm-ymm/mem-imm prefix opcode
@@ -3286,7 +3286,7 @@
                              :w w
                              :nds t
                              :ll ll
-                             :disp-n 64
+                             :disp-n n
                              :evex-b 0
                              :more-fields (list (list 'aaa k)
                                                 (list 'z-bit z-bit))
@@ -3373,7 +3373,81 @@
   (def-range-masked vpshldq #x66 #x71 1 :z t)
   (def-range-masked vpshrdw #x66 #x72 1 :z t)
   (def-range-masked vpshrdd #x66 #x73 0 :z t)
-  (def-range-masked vpshrdq #x66 #x73 1 :z t))
+  (def-range-masked vpshrdq #x66 #x73 1 :z t)
+  ;; Ternary logic masked
+  (def-range-masked vpternlogd #x66 #x25 0)
+  (def-range-masked vpternlogq #x66 #x25 1)
+  ;; Ternary logic zeroing masked
+  (def-range-masked vpternlogd #x66 #x25 0 :z t)
+  (def-range-masked vpternlogq #x66 #x25 1 :z t)
+  ;; Cross-lane shuffle masked
+  (def-range-masked vshuff32x4 #x66 #x23 0)
+  (def-range-masked vshuff64x2 #x66 #x23 1)
+  (def-range-masked vshufi32x4 #x66 #x43 0)
+  (def-range-masked vshufi64x2 #x66 #x43 1)
+  ;; Cross-lane shuffle zeroing masked
+  (def-range-masked vshuff32x4 #x66 #x23 0 :z t)
+  (def-range-masked vshuff64x2 #x66 #x23 1 :z t)
+  (def-range-masked vshufi32x4 #x66 #x43 0 :z t)
+  (def-range-masked vshufi64x2 #x66 #x43 1 :z t))
+
+;;;; ---- Insert lane masked/zeroing ----
+(macrolet
+    ((def-insert-masked (name prefix opcode w disp-n &key z)
+       (let* ((z-bit (if z 1 0))
+              (ins-name (symbolicate name (if z "-MASKED-Z" "-MASKED")))
+              (mask-printer
+                (if z
+                    '(:name :tab reg ", " vvvv ", " reg/mem " {" aaa "}{z}")
+                    '(:name :tab reg ", " vvvv ", " reg/mem " {" aaa "}")))
+              (printer-forms
+                (loop for k from 1 to 7
+                      append
+                      (loop for ll in '(#b00 #b01 #b10)
+                            append
+                            (avx512-inst-printer-list
+                             'ymm-ymm/mem-imm prefix opcode
+                             :opcode-prefix #x0f3a
+                             :w w
+                             :nds t
+                             :ll ll
+                             :disp-n disp-n
+                             :evex-b 0
+                             :more-fields (list (list 'aaa k)
+                                                (list 'z-bit z-bit))
+                             :printer mask-printer)))))
+         `(define-instruction ,ins-name (segment dst src1 src2 mask imm)
+            ,@printer-forms
+            (:emitter
+             (aver (and (integerp mask) (<= 1 mask 7)))
+             (emit-avx512-inst segment src2 dst ,prefix ,opcode
+                               :opcode-prefix #x0f3a
+                               :vvvv src1
+                               :w ,w
+                               :aaa mask
+                               :z ,z-bit
+                               :disp-n ,disp-n
+                               :remaining-bytes 1)
+             (emit-byte segment imm))))))
+
+  ;; Masked and zeroing forms
+  (def-insert-masked vinsertf32x4 #x66 #x18 0 16)
+  (def-insert-masked vinsertf64x2 #x66 #x18 1 16)
+  (def-insert-masked vinsertf32x8 #x66 #x1a 0 32)
+  (def-insert-masked vinsertf64x4 #x66 #x1a 1 32)
+  (def-insert-masked vinserti32x4 #x66 #x38 0 16)
+  (def-insert-masked vinserti64x2 #x66 #x38 1 16)
+  (def-insert-masked vinserti32x8 #x66 #x3a 0 32)
+  (def-insert-masked vinserti64x4 #x66 #x3a 1 32)
+
+  (def-insert-masked vinsertf32x4 #x66 #x18 0 16 :z t)
+  (def-insert-masked vinsertf64x2 #x66 #x18 1 16 :z t)
+  (def-insert-masked vinsertf32x8 #x66 #x1a 0 32 :z t)
+  (def-insert-masked vinsertf64x4 #x66 #x1a 1 32 :z t)
+  (def-insert-masked vinserti32x4 #x66 #x38 0 16 :z t)
+  (def-insert-masked vinserti64x2 #x66 #x38 1 16 :z t)
+  (def-insert-masked vinserti32x8 #x66 #x3a 0 32 :z t)
+  (def-insert-masked vinserti64x4 #x66 #x3a 1 32 :z t))
 
 ;;;; ---- Popcount masked/zeroing ----
 (macrolet
@@ -3835,3 +3909,137 @@
   ;; Masked and zeroing forms
   (def-f16c-store-masked vcvtps2ph #x66 #x1d)
   (def-f16c-store-masked vcvtps2ph #x66 #x1d :z t))
+
+;;;; ---- Narrowing store masked/zeroing ----
+
+(macrolet
+    ((def-narrow-store-masked (name prefix opcode w disp-ns &key z)
+       (let* ((z-bit (if z 1 0))
+              (ins-name (symbolicate name (if z "-MASKED-Z" "-MASKED")))
+              (mask-printer
+                (if z
+                    '(:name :tab reg/mem ", " reg " {" aaa "}{z}")
+                    '(:name :tab reg/mem ", " reg " {" aaa "}")))
+              (printer-forms
+                (loop for k from 1 to 7
+                      append
+                      (loop for (ll n) in (list (list #b00 (first disp-ns))
+                                                (list #b01 (second disp-ns))
+                                                (list #b10 (third disp-ns)))
+                            append
+                            (avx512-inst-printer-list
+                             'ymm-ymm/mem prefix opcode
+                             :opcode-prefix #x0f38
+                             :w w
+                             :ll ll
+                             :disp-n n
+                             :evex-b 0
+                             :more-fields (list (list 'aaa k)
+                                                (list 'z-bit z-bit))
+                             :printer mask-printer)))))
+         `(define-instruction ,ins-name (segment dst src mask)
+            ,@printer-forms
+            (:emitter
+              (aver (and (integerp mask) (<= 1 mask 7)))
+              (emit-avx512-inst segment dst src ,prefix ,opcode
+                                :opcode-prefix #x0f38
+                                :w ,w
+                                :aaa mask
+                                :z ,z-bit
+                                :disp-n
+                                (cond ((zmm-register-p src) ,(third disp-ns))
+                                      ((ymm-register-p src) ,(second disp-ns))
+                                      ((xmm-register-p src) ,(first disp-ns))
+                                      (t 0))))))))
+
+  ;; Down-convert masked
+  (def-narrow-store-masked vpmovqd #xf3 #x35 0 (8 16 32))
+  (def-narrow-store-masked vpmovqw #xf3 #x34 0 (4 8 16))
+  (def-narrow-store-masked vpmovqb #xf3 #x32 0 (2 4 8))
+  (def-narrow-store-masked vpmovdw #xf3 #x33 0 (8 16 32))
+  (def-narrow-store-masked vpmovdb #xf3 #x31 0 (4 8 16))
+  (def-narrow-store-masked vpmovwb #xf3 #x30 0 (8 16 32))
+
+  ;; Down-convert zeroing masked
+  (def-narrow-store-masked vpmovqd #xf3 #x35 0 (8 16 32) :z t)
+  (def-narrow-store-masked vpmovqw #xf3 #x34 0 (4 8 16) :z t)
+  (def-narrow-store-masked vpmovqb #xf3 #x32 0 (2 4 8) :z t)
+  (def-narrow-store-masked vpmovdw #xf3 #x33 0 (8 16 32) :z t)
+  (def-narrow-store-masked vpmovdb #xf3 #x31 0 (4 8 16) :z t)
+  (def-narrow-store-masked vpmovwb #xf3 #x30 0 (8 16 32) :z t)
+
+  ;; Saturating truncation masked
+  (def-narrow-store-masked vpmovsqd  #xf3 #x25 0 (8 16 32))
+  (def-narrow-store-masked vpmovsqw  #xf3 #x24 0 (4 8 16))
+  (def-narrow-store-masked vpmovsqb  #xf3 #x22 0 (2 4 8))
+  (def-narrow-store-masked vpmovusqd #xf3 #x15 0 (8 16 32))
+  (def-narrow-store-masked vpmovusqw #xf3 #x14 0 (4 8 16))
+  (def-narrow-store-masked vpmovusqb #xf3 #x12 0 (2 4 8))
+  (def-narrow-store-masked vpmovsdw  #xf3 #x23 0 (8 16 32))
+  (def-narrow-store-masked vpmovsdb  #xf3 #x21 0 (2 4 8))
+  (def-narrow-store-masked vpmovusdw #xf3 #x13 0 (8 16 32))
+  (def-narrow-store-masked vpmovusdb #xf3 #x11 0 (2 4 8))
+  (def-narrow-store-masked vpmovswb  #xf3 #x20 0 (4 8 16))
+  (def-narrow-store-masked vpmovuswb #xf3 #x10 0 (4 8 16))
+
+  ;; Saturating truncation zeroing masked
+  (def-narrow-store-masked vpmovsqd  #xf3 #x25 0 (8 16 32) :z t)
+  (def-narrow-store-masked vpmovsqw  #xf3 #x24 0 (4 8 16) :z t)
+  (def-narrow-store-masked vpmovsqb  #xf3 #x22 0 (2 4 8) :z t)
+  (def-narrow-store-masked vpmovusqd #xf3 #x15 0 (8 16 32) :z t)
+  (def-narrow-store-masked vpmovusqw #xf3 #x14 0 (4 8 16) :z t)
+  (def-narrow-store-masked vpmovusqb #xf3 #x12 0 (2 4 8) :z t)
+  (def-narrow-store-masked vpmovsdw  #xf3 #x23 0 (8 16 32) :z t)
+  (def-narrow-store-masked vpmovsdb  #xf3 #x21 0 (2 4 8) :z t)
+  (def-narrow-store-masked vpmovusdw #xf3 #x13 0 (8 16 32) :z t)
+  (def-narrow-store-masked vpmovusdb #xf3 #x11 0 (2 4 8) :z t)
+  (def-narrow-store-masked vpmovswb  #xf3 #x20 0 (4 8 16) :z t)
+  (def-narrow-store-masked vpmovuswb #xf3 #x10 0 (4 8 16) :z t))
+
+;;;; ---- VDBPSADBW masked/zeroing ----
+
+(macrolet
+    ((def-vdbpsadbw-masked (name prefix opcode w &key z)
+       (let* ((z-bit (if z 1 0))
+              (ins-name (symbolicate name (if z "-MASKED-Z" "-MASKED")))
+              (mask-printer
+                (if z
+                    '(:name :tab reg ", " vvvv ", " reg/mem " {" aaa "}{z}")
+                    '(:name :tab reg ", " vvvv ", " reg/mem " {" aaa "}")))
+              (printer-forms
+                (loop for k from 1 to 7
+                      append
+                      (loop for (ll n) in '((#b00 16) (#b01 32) (#b10 64))
+                            append
+                            (avx512-inst-printer-list
+                             'ymm-ymm/mem-imm prefix opcode
+                             :opcode-prefix #x0f3a
+                             :w w
+                             :nds t
+                             :ll ll
+                             :disp-n n
+                             :evex-b 0
+                             :more-fields (list (list 'aaa k)
+                                                (list 'z-bit z-bit))
+                             :printer mask-printer)))))
+         `(define-instruction ,ins-name (segment dst src1 src2 mask imm)
+            ,@printer-forms
+            (:emitter
+              (aver (and (integerp mask) (<= 1 mask 7)))
+              (emit-avx512-inst segment src2 dst ,prefix ,opcode
+                                :opcode-prefix #x0f3a
+                                :vvvv src1
+                                :w ,w
+                                :aaa mask
+                                :z ,z-bit
+                                :disp-n
+                                (cond ((zmm-register-p dst) 64)
+                                      ((ymm-register-p dst) 32)
+                                      ((xmm-register-p dst) 16)
+                                      (t 0))
+                                :remaining-bytes 1)
+              (emit-byte segment imm))))))
+
+  ;; Masked and zeroing forms
+  (def-vdbpsadbw-masked vdbpsadbw #x66 #x42 0)
+  (def-vdbpsadbw-masked vdbpsadbw #x66 #x42 0 :z t))
