@@ -30,8 +30,7 @@
 (macrolet ((define-disp-arg-type (name n)
              `(define-arg-type ,name
                 :prefilter (lambda (dstate mod r/m)
-                             (setf (dstate-disp-n dstate) ,n)
-                             (decode-mod-r/m dstate mod r/m 'fpr))
+                             (decode-mod-r/m dstate mod r/m 'fpr :disp-n ,n))
                 :printer #'print-ymmreg/mem)))
   (define-disp-arg-type evex-ymmreg/mem-disp1  1)
   (define-disp-arg-type evex-ymmreg/mem-disp2  2)
