@@ -777,7 +777,8 @@ REG is the source (encoded in ModR/M.r/m).
                                       xmmreg-mem-size
                                       w
                                       l
-                                      nds)
+                                      nds
+                                      evex)
     (let ((fields `((pp ,(vex-encode-pp prefix))
                     (m-mmmm ,(vex-encode-m-mmmm opcode-prefix))
                     (op ,opcode)
@@ -818,7 +819,8 @@ REG is the source (encoded in ModR/M.r/m).
        ;; instructions reuse those opcodes). Map 0F38 has many conflicts
        ;; (broadcasts, vmaskmov vs vscalef, etc.), so we only include the
        ;; FMA range (#x96-#xBF) which is safe. Map 0F3A is skipped entirely.
-       (when (or (= opcode-prefix #x0F)
+       (when (or evex
+                 (= opcode-prefix #x0F)
                  (and (= opcode-prefix #x0F38)
                       (<= #x96 opcode #xbf)))
          (avx512-inst-printer-list inst-format-stem prefix opcode
@@ -1325,7 +1327,8 @@ REG is the source (encoded in ModR/M.r/m).
                                           :opcode-prefix op-prefix
                                           :reg-mem-size size ;; FIXME: it has r32/m8, but we print as r8/m8
                                           :more-fields `((imm nil :type 'imm-byte))
-                                          :printer `(:name :tab reg ", " vvvv ", " reg/mem ", " imm))
+                                          :printer `(:name :tab reg ", " vvvv ", " reg/mem ", " imm)
+                                          :evex t)
                 (:emitter
                  (emit-avx2-inst segment src2 dst ,prefix ,op
                                  :opcode-prefix ,op-prefix
@@ -1341,7 +1344,8 @@ REG is the source (encoded in ModR/M.r/m).
                                            :opcode-prefix #x0f3a
                                            :reg-mem-size size ;; FIXME: it has r32/m8, but we print as r8/m8
                                            :more-fields `((imm nil :type 'imm-byte))
-                                           :printer `(:name :tab reg/mem ", " reg ", "imm))
+                                           :printer `(:name :tab reg/mem ", " reg ", "imm)
+                                           :evex t)
                 (:emitter
                  (aver (and (xmm-register-p src) (not (xmm-register-p dst))))
                  (emit-avx2-inst segment dst src ,prefix ,op
