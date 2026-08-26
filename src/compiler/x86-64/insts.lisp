@@ -1078,10 +1078,10 @@
                   #.(coerce (loop for i below 32 collect (format nil "ZMM~D" i))
                             'vector))
                  ((is-ymm-id-p id)
-                  #.(coerce (loop for i below 16 collect (format nil "YMM~D" i))
+                  #.(coerce (loop for i below 32 collect (format nil "YMM~D" i))
                             'vector))
                  (t
-                  #.(coerce (loop for i below 16 collect (format nil "XMM~D" i))
+                  #.(coerce (loop for i below 32 collect (format nil "XMM~D" i))
                             'vector)))
            (reg-id-num id))))
 
