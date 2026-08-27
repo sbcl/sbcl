@@ -19,11 +19,14 @@ changes relative to sbcl-2.6.7:
     stack.  (reported by Clint Seinen)
   * bug fix: error reporting from STRING-TO-OCTETS reported using the wrong
     string indices.  (lp#2164924)
-  * optimization: the compiler will "contify", or transform code written as
-    mutually-calling local functions, along the lines of Fluet and Weeks'
-    "Contification using Dominators" of 2001.
-  * optimization: local call argument types are propagated more
-    optimistically.  (lp#486416, reported by Tobias Rittweiler)
+  * optimization: the compiler performs assignment conversion in nearly all
+    possible cases now, along the lines of Fluet and Weeks' "Contification
+    using Dominators" of 2001., which transforms state-machine-like code
+    written in terms of local functions into the equivalent tagbody/go control
+    structures.
+  * optimization: type inference of parameters is now possible for local
+    functions which recursively call themselves.  (lp#486416, reported by
+    Tobias Rittweiler)
   * optimization: special-case DPB with newbyte of 0 or -1.
   * optimization: more improvements to UTF8 encoding and decoding.
   * optimization: multiple structure TYPEP tests in sequence can elide
