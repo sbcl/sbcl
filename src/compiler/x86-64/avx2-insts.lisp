@@ -905,24 +905,44 @@ REG is the source (encoded in ModR/M.r/m).
        ;; Map 0F38 also allows the sign/zero extension ranges
        ;; (#x20-#x25, #x30-#x35) so vpmovsx*/vpmovzx* auto-promoted to
        ;; EVEX can be disassembled.
-       (when (or evex
-                 (and auto-evex
-                      (not (member (list prefix opcode) skip-list :test #'equal))
-                      (not (assoc 'reg/mem more-fields))
-                      (or (= opcode-prefix #x0F)
-                          (and (= opcode-prefix #x0F38)
-                               (or (<= #x20 opcode #x25)
-                                   (<= #x30 opcode #x35)
-                                   (<= #x96 opcode #xbf)
-                                   (find opcode #(#x18 #x19 #x1A #x58 #x59 #x5A #x78 #x79)))))))
-         (avx512-inst-printer-list inst-format-stem prefix opcode
-                                   :more-fields more-fields
-                                   :printer printer
-                                   :opcode-prefix opcode-prefix
-                                   :w w
-                                   :ll #b10
-                                   :disp-n disp-n
-                                   :nds nds)))))))
+       (let ((broadcast-opcodes #(#x18 #x19 #x1A #x58 #x59 #x5A #x78 #x79)))
+         (let ((broadcast (and (= opcode-prefix #x0F38)
+                               (find opcode broadcast-opcodes))))
+           (when (or evex
+                     (and auto-evex
+                          (not (member (list prefix opcode) skip-list :test #'equal))
+                          (not (assoc 'reg/mem more-fields))
+                          (or (= opcode-prefix #x0F)
+                              (and (= opcode-prefix #x0F38)
+                                   (or (<= #x20 opcode #x25)
+                                       (<= #x30 opcode #x35)
+                                       (<= #x96 opcode #xbf)
+                                       broadcast)))))
+             (if broadcast
+                 ;; Broadcast: use caller-supplied disp-n.
+                 ;; Keep ZMM-only printer for now because broadcasts
+                 ;; have element-size displacement, not full-vector.
+                 (avx512-inst-printer-list
+                  inst-format-stem prefix opcode
+                  :more-fields more-fields
+                  :printer printer
+                  :opcode-prefix opcode-prefix
+                  :w w
+                  :ll #b10
+                  :disp-n disp-n
+                  :nds nds)
+                 ;; Full-vector: generate XMM/YMM/ZMM with correct disp-n.
+                 (loop for (ll n) in '((#b00 16) (#b01 32) (#b10 64))
+                       append
+                       (avx512-inst-printer-list
+                        inst-format-stem prefix opcode
+                        :more-fields more-fields
+                        :printer printer
+                        :opcode-prefix opcode-prefix
+                        :w w
+                        :ll ll
+                        :disp-n n
+                        :nds nds)))))))))))
 
   (macrolet
     ((def (name opcode /i)
@@ -1407,8 +1427,7 @@ REG is the source (encoded in ModR/M.r/m).
                       l
                       (opcode-prefix #x0F)
                       (evex-w 0)
-                      nds
-                      disp-n)
+                      nds)
              `(progn
                 ,(when reg-reg-name
                    `(define-instruction ,reg-reg-name (segment dst src ,@(if nds '(src2)))
@@ -1430,15 +1449,13 @@ REG is the source (encoded in ModR/M.r/m).
                       (avx2-inst-printer-list 'ymm-ymm/mem prefix opcode-from
                                               :opcode-prefix opcode-prefix
                                               :nds nds
-                                              :w evex-w
-                                              :disp-n disp-n))
+                                              :w evex-w))
                   ,@(when opcode-to
                       (avx2-inst-printer-list
                        'ymm-ymm/mem prefix opcode-to
                        :printer '(:name :tab reg/mem ", " reg)
                        :opcode-prefix opcode-prefix
-                       :w evex-w
-                       :disp-n disp-n))
+                       :w evex-w))
                   (:emitter
                    ,@(when nds
                        `((aver (register-p src))))
@@ -1479,18 +1496,18 @@ REG is the source (encoded in ModR/M.r/m).
                                                         (t 0))
                                           :l ,l))))))))
   ;; direction bit?
-  (def vmovapd #x66 #x28 #x29 :evex-w 1 :disp-n 64)
-  (def vmovaps nil  #x28 #x29 :disp-n 64)
+  (def vmovapd #x66 #x28 #x29 :evex-w 1)
+  (def vmovaps nil  #x28 #x29)
   (def vmovdqa #x66 #x6f #x7f)
   (def vmovdqu #xf3 #x6f #x7f)
-  (def vmovupd #x66 #x10 #x11 :evex-w 1 :disp-n 64)
-  (def vmovups nil  #x10 #x11 :disp-n 64)
+  (def vmovupd #x66 #x10 #x11 :evex-w 1)
+  (def vmovups nil  #x10 #x11)
 
   ;; streaming
-  (def vmovntdq #x66 nil #xe7  :force-to-mem t :disp-n 64)
-  (def vmovntdqa #x66 #x2a nil :force-to-mem t :opcode-prefix #x0F38 :disp-n 64)
-  (def vmovntpd #x66 nil #x2b  :force-to-mem t :evex-w 1 :disp-n 64)
-  (def vmovntps nil  nil #x2b  :force-to-mem t :disp-n 64)
+  (def vmovntdq #x66 nil #xe7  :force-to-mem t)
+  (def vmovntdqa #x66 #x2a nil :force-to-mem t :opcode-prefix #x0F38)
+  (def vmovntpd #x66 nil #x2b  :force-to-mem t :evex-w 1)
+  (def vmovntps nil  nil #x2b  :force-to-mem t)
 
   ;; use vmovhps for vmovlhps and vmovlps for vmovhlps
   (def vmovhpd #x66 #x16 #x17 :force-to-mem t :l 0 :nds t)
@@ -1779,20 +1796,21 @@ REG is the source (encoded in ModR/M.r/m).
                                       :evex-w 1 :w 0 :l nil))))))))
   (def-vbroadcast))
 
-(macrolet ((def (name opcode &optional l (mem-size :qword) (evex-w 0))
+(macrolet ((def (name opcode
+                 &key l (mem-size :qword) (evex-w 0) (disp-n 0))
              `(define-instruction ,name (segment dst src)
                 ,@(avx2-inst-printer-list 'ymm-ymm/mem #x66 opcode
                                           :opcode-prefix #x0f38
                                           :xmmreg-mem-size mem-size
-                                          :w evex-w :l l)
+                                          :w evex-w :l l :disp-n disp-n)
                 (:emitter
                  (emit-avx2-inst segment src dst #x66 ,opcode
                                  :opcode-prefix #x0f38
                                  :evex-w ,evex-w :l ,l)))))
-  (def vbroadcastf128 #x1a 1)
-  (def vbroadcasti128 #x5a 1)
-  (def vpbroadcastb #x78 nil :byte)
-  (def vpbroadcastw #x79 nil :word))
+  (def vbroadcastf128 #x1a :l 1   :mem-size :qword :disp-n 16)
+  (def vbroadcasti128 #x5a :l 1   :mem-size :qword :disp-n 16)
+  (def vpbroadcastb   #x78 :l nil :mem-size :byte  :disp-n 1)
+  (def vpbroadcastw   #x79 :l nil :mem-size :word  :disp-n 2))
 
 (macrolet ((def-insert (name prefix op)
              `(define-instruction ,name (segment dst src src2 imm)
