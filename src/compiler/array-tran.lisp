@@ -2009,7 +2009,6 @@
                         (t
                          (list (length dims))))))
                (t '()))))
-      (declare (dynamic-extent #'over #'under))
       (multiple-value-bind (not-p ranks)
           (list-abstract-type-function ctype #'over :under #'under)
         (cond ((eql ranks '*)

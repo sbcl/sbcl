@@ -716,6 +716,10 @@
   ;; a list of NLX-INFO structures describing all the non-local exits
   ;; into this environment
   (nlx-info nil :type list)
+  ;; whether this environment has a closure and the function that
+  ;; allocates this environment escapes through any other escaping
+  ;; environments.
+  (escapes-elsewhere-p nil :type boolean)
   ;; some kind of info used by the back end
   (info nil :type (or ir2-environment null)))
 (defprinter (environment :identity t)
@@ -1251,7 +1255,7 @@
   ;; the TAIL-SET that this LAMBDA is in. This is null during creation
   ;; and in let lambdas.
   (tail-set nil :type (or tail-set null))
-  ;; the structure which represents the phsical environment that this
+  ;; the structure which represents the environment that this
   ;; function's variables are allocated in. This is filled in by
   ;; environment analysis. In a LET, this is EQ to our home's
   ;; environment.

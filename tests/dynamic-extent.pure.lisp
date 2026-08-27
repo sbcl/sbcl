@@ -2517,8 +2517,7 @@
 (with-test (:name :auto-dx-recursive-ref.correct)
   (assert (equal (auto-dx-recursive-ref '(1 2 3 4)) nil)))
 
-(with-test (:name :auto-dx-recursive-ref.stack-allocates
-            :fails-on :sbcl)
+(with-test (:name :auto-dx-recursive-ref.stack-allocates)
   (assert-no-consing (auto-dx-recursive-ref '(1 2 3 4))))
 
 (defun auto-dx-recursive-ref-2 (seq)
@@ -2532,8 +2531,7 @@
 (with-test (:name :auto-dx-recursive-ref-2.correct)
   (assert (equal (auto-dx-recursive-ref-2 '(1 2 3 4)) nil)))
 
-(with-test (:name :auto-dx-recursive-ref-2.stack-allocates
-            :fails-on :sbcl)
+(with-test (:name :auto-dx-recursive-ref-2.stack-allocates)
   (assert-no-consing (auto-dx-recursive-ref-2 '(1 2 3 4))))
 
 ;;; Even though #'f's direct references do not escape, it is closed
@@ -2691,3 +2689,123 @@
        (assert (sb-ext:stack-allocated-p elt))
        2))
    ((0 t) 2)))
+
+(defun auto-dx-mutually-recursive-map (seq1 seq2)
+  (let ((count 0))
+    (labels ((ping (x)
+               (incf count)
+               (when (listp x)
+                 (map nil #'pong x)))
+             (pong (x)
+               (incf count)
+               (when (listp x)
+                 (map nil #'ping x))))
+      (map nil #'ping seq1)
+      (map nil #'pong seq2)
+      count)))
+
+(with-test (:name :auto-dx-mutually-recursive.correct)
+  (assert (= (auto-dx-mutually-recursive-map '((1) (2 3)) '((4 5) (6)))
+             10)))
+
+(with-test (:name :auto-dx-mutually-recursive.stack-allocates)
+  (assert-no-consing
+   (auto-dx-mutually-recursive-map '((1) (2 3)) '((4 5) (6)))))
+
+(defun auto-dx-transitive-carriers (seq)
+  (let ((count 0))
+    (labels ((f (x)
+               (incf count x))
+             (g (x)
+               (map nil #'f x))
+             (h (x)
+               (g x)
+               (g x)))
+      (h seq)
+      (h seq)
+      count)))
+
+(with-test (:name :auto-dx-transitive-carriers.correct)
+  (assert (= (auto-dx-transitive-carriers '(-1 2 -3 4)) 8)))
+
+(with-test (:name :auto-dx-transitive-carriers.stack-allocates)
+  (assert-no-consing (auto-dx-transitive-carriers '(-1 2 -3 4))))
+
+(defun auto-dx-disjoint-sequential (seq)
+  (let ((z 0))
+    (labels ((y (a)
+               (incf z a))
+             (g ()
+               (map nil #'y seq)))
+      (map nil #'y seq)
+      (g)
+      (let ((x (cons 1 2)))
+        (declare (dynamic-extent x))
+        (opaque-identity x))
+      (g)
+      z)))
+
+(with-test (:name :auto-dx-disjoint-sequential.correct)
+  (assert (= (auto-dx-disjoint-sequential '(1 2 3)) 18)))
+
+(with-test (:name :auto-dx-disjoint-sequential.stack-allocates)
+  (assert-no-consing (auto-dx-disjoint-sequential '(1 2 3))))
+
+(defun auto-dx-directed-escape-precision (seq)
+  (let ((state 0))
+    (labels ((f (x)
+               (incf state)
+               (when (listp x)
+                 (map nil #'g x)))
+             (g (x)
+               (incf state)
+               (when (listp x)
+                 (map nil #'f x)))
+             (h ()
+               state))
+      (map nil #'f seq)
+      #'h)))
+
+;;; FIXME: We need to find a way to check that #'g and #'f do get
+;;; stack-allocated.
+(with-test (:name :auto-dx-directed-escape-precision.correct)
+  (let ((h-fun (auto-dx-directed-escape-precision '((1) (2)))))
+    (assert (functionp h-fun))
+    (assert (= (funcall h-fun) 4))))
+
+(defun auto-dx-escaping-carrier (seq)
+  (let ((z (car seq)))
+    (labels ((f (x)
+               (when (member x seq)
+                 (return-from f z))
+               (map nil #'f (cdr seq)))
+             (g ()
+               (map nil #'f (cdr seq))))
+      (values (f seq) #'g))))
+
+(with-test (:name :auto-dx-escaping-carrier.correct)
+  (multiple-value-bind (val g-fun)
+      (auto-dx-escaping-carrier '(1 2 3 4))
+    (assert (eq val nil))
+    (assert (eq (funcall g-fun) nil))))
+
+(with-test (:name :auto-dx-local-call-in-lambda.correct)
+  (checked-compile-and-assert
+   ()
+   '(lambda (flag forms)
+     (let ((count 0))
+       (labels ((z (c)
+                  (declare (ignore c))
+                  (incf count)
+                  nil)
+                (trap (form)
+                  (handler-bind ((condition #'z))
+                    (when (eq form :boom)
+                      (warn "boo")))))
+         (if flag
+             (map nil (lambda (form)
+                        (trap form))
+                  forms)
+             (trap '(print)))
+         count)))
+   ((t '(:boom :boom)) 2 :allow-conditions 'warning)))

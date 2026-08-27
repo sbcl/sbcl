@@ -5770,6 +5770,7 @@ expansion happened."
 
 ;;; Standard list representation of sets. Use CL:* for the universe.
 (defun list-abstract-type-function (type over &key under (overapproximate t))
+  (declare (dynamic-extent over under))
   #-sb-xc-host (declare (inline generic-abstract-type-function))
   (generic-abstract-type-function
    type overapproximate

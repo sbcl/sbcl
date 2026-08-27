@@ -343,19 +343,27 @@
               (when (and (not (lvar-dynamic-extent arg))
                          (ref-p use)
                          (lambda-p (ref-leaf use))
-                         (not (leaf-dynamic-extent (functional-entry-fun (ref-leaf use))))
-                         ;; TODO: we need to do this because we don't
-                         ;; have enough smarts yet.
-                         (eq (node-home-lambda (xep-enclose (ref-leaf use)))
-                             (node-home-lambda node)))
+                         (not (leaf-dynamic-extent (functional-entry-fun (ref-leaf use)))))
                 (unless dynamic-extent
                   (setq dynamic-extent (insert-dynamic-extent node)))
                 (setf (lvar-dynamic-extent arg) dynamic-extent)
                 (push arg (dynamic-extent-values dynamic-extent))))))))))
 
+;;; Check if all references to LEAF (other than USE) are bounded by
+;;; dynamic extents or safely discarded and therefore do not escape.
+(defun leaf-refs-not-escape-elsewhere-p (leaf use &optional visited)
+  (dolist (ref (leaf-refs leaf) t)
+    (unless (eq use ref)
+      (multiple-value-bind (dest p-lvar)
+          (principal-lvar-end (node-lvar ref))
+        (declare (ignore dest))
+        (unless (or (lvar-dynamic-extent p-lvar)
+                    (ref-good-for-dx-p ref visited))
+          (return nil))))))
+
 ;;; Check that REF delivers a value to a combination which is DX safe
 ;;; or whose result is that value and ends up being discarded.
-(defun ref-good-for-dx-p (ref)
+(defun ref-good-for-dx-p (ref &optional visited)
   (let* ((lvar (ref-lvar ref))
          (dest (when lvar (lvar-dest lvar))))
     (and (combination-p dest)
@@ -367,14 +375,36 @@
                        (awhen (fun-info-result-arg it)
                          (eql lvar (nth it (combination-args dest))))))))
            (:local
-            (loop for arg in (combination-args dest)
-                  for var in (lambda-vars (combination-lambda dest))
-                  do (when (eq arg lvar)
-                       (return
-                         (dolist (ref (lambda-var-refs var) t)
-                           (unless (ref-good-for-dx-p ref)
-                             (return nil)))))
-                  finally (sb-impl::unreachable)))))))
+            (or (memq ref visited)
+                (progn
+                  (push ref visited)
+                  (loop for arg in (combination-args dest)
+                        for var in (lambda-vars (combination-lambda dest))
+                        do (when (eq arg lvar)
+                             (return (leaf-refs-not-escape-elsewhere-p var nil visited)))
+                        finally (sb-impl::unreachable)))))))))
+
+;;; Find which environments escape because they are closed over by
+;;; other external entry points which themselves escape. An entry
+;;; point is considered to escape if it is closed over by a non
+;;; dynamic extent lambda whose references escape. If an environment's
+;;; lambda closes over itself, we do not take that into account here,
+;;; to make it easier for others to check whether the lambda escapes
+;;; even when excluding one of its references.
+(defun analyze-escaping-closure-environments (component)
+  (declare (type component component))
+  (dolist (xep (component-lambdas component))
+    (let ((closure (environment-closure (lambda-environment xep))))
+      (when (and (functional-kind-eq xep external)
+                 (not (leaf-dynamic-extent (functional-entry-fun xep)))
+                 closure
+                 (not (leaf-refs-not-escape-elsewhere-p xep nil)))
+        (dolist (thing closure)
+          (when (and (lambda-p thing)
+                     (neq thing xep))
+            (setf (environment-escapes-elsewhere-p (lambda-environment thing))
+                  t))))))
+  (values))
 
 ;;; Recursively look for otherwise inaccessible potentially
 ;;; stack-allocatable parts in the uses of LVAR. If there is one,
@@ -410,7 +440,6 @@
                    (find-stack-allocatable-parts arg dynamic-extent t)))))))
         (ref
          (let ((leaf (ref-leaf use)))
-
            (typecase leaf
              (lambda-var
               ;; LET lambda var with no SETS.
@@ -418,38 +447,25 @@
                          (not (lambda-var-sets leaf))
                          (lexenv-contains-lambda (lambda-var-home leaf)
                                                  (node-lexenv dynamic-extent))
-                         ;; Check the other refs are good.
-                         (dolist (ref (leaf-refs leaf) t)
-                           (unless (eq use ref)
-                             (when (not (ref-good-for-dx-p ref))
-                               (return nil)))))
+                         (leaf-refs-not-escape-elsewhere-p leaf use))
                 (when (find-stack-allocatable-parts (let-var-initial-value leaf)
                                                     dynamic-extent)
                   (setq found-subpart-p t))))
              (clambda
               (when (functional-kind-eq leaf external)
                 (let* ((fun (functional-entry-fun leaf))
-                       (enclose (functional-enclose fun)))
+                       (enclose (functional-enclose fun))
+                       (environment (get-lambda-environment leaf)))
                   (when (and (or (not check-nesting)
                                  ;; Allow (let ((x (lambda () v))) (let ((d x)) (dynamic-extent d)))
                                  ;; but not (let ((x (lambda () v))) (let ((d (list x))) (dynamic-extent d)))
                                  (lexenv-contains-lambda leaf (node-lexenv dynamic-extent)))
-                             (environment-closure (get-lambda-environment leaf))
-                             ;; To make sure the allocation is in the same
-                             ;; stack frame as the dynamic extent.
-                             (eq (node-home-lambda enclose)
-                                 (node-home-lambda dynamic-extent))
-                             ;; Check the other refs are good. At this
-                             ;; point, DXIFY-DOWNWARD-FUNARGS and
-                             ;; PROPAGATE-REF-DX should have marked
-                             ;; the p-lvar-ends of all good refs.
-                             (dolist (ref (leaf-refs leaf) t)
-                               (unless (eq use ref)
-                                 (multiple-value-bind (dest lvar)
-                                     (principal-lvar-end (node-lvar ref))
-                                   (declare (ignore dest))
-                                   (unless (lvar-dynamic-extent lvar)
-                                     (return nil))))))
+                             (environment-closure environment)
+                             ;; At this point, DXIFY-DOWNWARD-FUNARGS
+                             ;; and PROPAGATE-REF-DX should have
+                             ;; marked the p-lvar-ends of FUN's refs.
+                             (leaf-refs-not-escape-elsewhere-p leaf use)
+                             (not (environment-escapes-elsewhere-p environment)))
                     (unless (enclose-dynamic-extent enclose)
                       (pushnew dynamic-extent
                                (enclose-derived-dynamic-extents enclose)))
@@ -459,9 +475,104 @@
       (setf (lvar-dynamic-extent lvar) dynamic-extent)
       t)))
 
+;;; Return the return node of FUN, creating it if it no longer exists.
+(defun ensure-lambda-return (fun)
+  (declare (type clambda fun))
+  (or (lambda-return fun)
+      (with-ir1-environment-from-node (lambda-bind fun)
+        (let* ((result-ctran (make-ctran))
+               (result-lvar (make-lvar))
+               (return (make-return result-lvar fun))
+               (block (ctran-starts-block result-ctran)))
+          (link-node-to-previous-ctran return result-ctran)
+          (setf (block-last block) return)
+          (setf (lvar-dest result-lvar) return)
+          (setf (lambda-return fun) return)
+          (link-blocks block (component-tail (lambda-component fun)))
+          return))))
+
+;;; Revoke the tail-call status of CALL to FUN. This unlinks the call
+;;; from FUN's bind node and routes it to a proper return node,
+;;; creating it if necessary.
+(defun revoke-tail-call (call fun)
+  (declare (type combination call)
+           (type clambda fun))
+  (aver (node-tail-p call))
+  (setf (node-tail-p call) nil)
+  (unlink-blocks (node-block call)
+                 (node-block (lambda-bind fun)))
+  (let ((return (ensure-lambda-return (node-home-lambda call))))
+    (link-blocks (node-block call) (node-block return))
+    (add-lvar-use call (return-result return))))
+
+;;; For each local call to FUN which shares a home lambda with
+;;; ENCLOSE, insert a DYNAMIC-EXTENT node to bound the lifetime of
+;;; ENCLOSE.
+;;;
+;;; If the call is a tail call, we have to revoke its tail-call
+;;; status, since the dynamic extent cleanup action makes the call
+;;; non-tail.
+(defun insert-local-call-dynamic-extents (fun enclose)
+  (let ((enclose-home (node-home-lambda enclose)))
+    (dolist (ref (leaf-refs fun))
+      (let* ((lvar (node-lvar ref))
+             (dest (and lvar (lvar-dest lvar))))
+        (when (and (eq (node-home-lambda ref) enclose-home)
+                   (combination-p dest)
+                   (eq (combination-kind dest) :local)
+                   (eq lvar (combination-fun dest)))
+          (pushnew (insert-dynamic-extent dest)
+                   (enclose-derived-dynamic-extents enclose))
+          (when (node-tail-p dest)
+            (revoke-tail-call dest fun)))))))
+
+;;; For each lambda in COMPONENT which has been determined to be
+;;; eligible for stack allocation and does not have an explicit
+;;; dynamic extent lifetime, annotate its derived lifetime. This is
+;;; done by inserting appropriate dynamic extents around local calls
+;;; in lambda's allocation environment and inheriting any lifetime
+;;; annotations in the same environment from functions with XEPs which
+;;; close over the lambda. Because a function might be invoked
+;;; transitively by another local function that closes over it, we
+;;; scan the component's lambdas and check if the lambda's local calls
+;;; are in the same allocation environment of itself or any of the
+;;; functions it closes over when annotating derived lifetimes around
+;;; local calls.
+(defun annotate-lambda-derived-extents (component)
+  (dolist (fun (component-lambdas component))
+    (let ((enclose (functional-enclose fun)))
+      (when enclose
+        (when (leaf-dynamic-extent fun)
+          (unless (enclose-dynamic-extent enclose)
+            (insert-local-call-dynamic-extents fun enclose)))
+        (dolist (thing (environment-closure (lambda-environment fun)))
+          (when (and (lambda-p thing)
+                     (leaf-dynamic-extent (functional-entry-fun thing)))
+            (let ((captured-enclose (xep-enclose thing)))
+              (unless (enclose-dynamic-extent captured-enclose)
+                (insert-local-call-dynamic-extents fun captured-enclose))))))))
+  (dolist (xep (component-lambdas component))
+    (when (and (functional-kind-eq xep external)
+               (leaf-dynamic-extent (functional-entry-fun xep)))
+      (let* ((enclose (xep-enclose xep))
+             (dynamic-extent (enclose-dynamic-extent enclose))
+             (enclose-home (node-home-lambda enclose)))
+        (dolist (thing (environment-closure (lambda-environment xep)))
+          (when (and (lambda-p thing)
+                     (leaf-dynamic-extent (functional-entry-fun thing)))
+            (let ((captured-enclose (xep-enclose thing)))
+              (when (and (not (enclose-dynamic-extent captured-enclose))
+                         (eq (node-home-lambda captured-enclose) enclose-home))
+                (cond (dynamic-extent
+                       (pushnew dynamic-extent (enclose-derived-dynamic-extents captured-enclose)))
+                      (t
+                       (setf (enclose-derived-dynamic-extents captured-enclose)
+                             (union (enclose-derived-dynamic-extents enclose)
+                                    (enclose-derived-dynamic-extents captured-enclose)))))))))))))
+
 ;;; Determine which values and closures in COMPONENT may be stack
 ;;; allocated. We do so by starting a recursive walk from the values
-;;; and closures declared dynamic extent explicitly and transitively
+;;; and closures explicitly declared dynamic extent and transitively
 ;;; marking the otherwise-inaccessible parts of these values as
 ;;; potentially stack allocatable. If a dynamic extent is in fact
 ;;; associated with a stack allocatable thing, note that fact by
@@ -480,6 +591,9 @@
                  (memq (basic-combination-kind node)
                        '(:full :unknown-keys :known)))
         (dxify-downward-funargs node))))
+
+  (analyze-escaping-closure-environments component)
+
   (dolist (lambda (component-lambdas component))
     (dolist (dynamic-extent (lambda-dynamic-extents lambda))
       (let ((environment (node-environment dynamic-extent)))
@@ -491,6 +605,9 @@
                          (return nil)))
                      (find-stack-allocatable-parts lvar dynamic-extent))
             (setf (dynamic-extent-info dynamic-extent) (make-lvar)))))))
+
+  (annotate-lambda-derived-extents component)
+
   (dolist (xep (component-lambdas component))
     (when (and (functional-kind-eq xep external)
                (leaf-dynamic-extent (functional-entry-fun xep))

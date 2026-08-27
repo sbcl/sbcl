@@ -132,6 +132,7 @@
              (invalid-fasl-fhsss condition)))))
 
 (defun call-with-load-bindings (function stream arg pathname-designator)
+  (declare (dynamic-extent function))
   (let* (;; FIXME: we should probably document the circumstances
          ;; where *LOAD-PATHNAME* and *LOAD-TRUENAME* aren't
          ;; pathnames during LOAD.  ANSI makes no exceptions here.
@@ -260,7 +261,6 @@
                    ;; of using the compiler to perform interpretation.
                    (sb-c:with-compiler-error-resignalling
                        (load-as-source stream :verbose verbose :print print))))))
-    (declare (dynamic-extent #'load-stream-1))
 
     ;; Case 1: stream.
     (when (streamp filespec)

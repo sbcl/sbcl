@@ -1243,7 +1243,6 @@ have dynamic extent."
                      (if (funcall predicate key2 key1)
                          (prog1 elt2 (step2) (pop/key2))
                          (prog1 elt1 (step1) (pop/key1)))))
-            (declare (dynamic-extent #'pop-one/no-key #'pop-one/key))
             ;; Populate ENDP{1,2}, ELT{1,2} and maybe KEY{1,2}.
             (cond (key-function (pop/key1) (pop/key2))
                   (t (pop/no-key1) (pop/no-key2)))

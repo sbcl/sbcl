@@ -2756,14 +2756,15 @@
          ,@(and key
                 `((key (%coerce-callable-to-fun key)))))
      (declare (index count))
-     (flet ((counter (x) (when (funcall ,(if test 'test ''eql)
-                                        item
-                                        ,(if key
-                                             `(funcall key x)
-                                             `x))
-                           (incf count))))
-       (declare (dynamic-extent #'counter))
-       (map nil #'counter sequence))
+     (map nil
+          (lambda (x)
+            (when (funcall ,(if test 'test ''eql)
+                           item
+                           ,(if key
+                                `(funcall key x)
+                                `x))
+              (incf count)))
+          sequence)
      count))
 
 (defoptimizer (sb-impl::length-remove-duplicates derive-type) ((sequence &key &allow-other-keys))
