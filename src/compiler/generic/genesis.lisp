@@ -3426,8 +3426,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (write-tags "" "-WIDETAG" (ash (1+ sb-vm:widetag-mask) -2) -2))
   (dolist (name '(symbol ratio complex sb-vm::code simple-fun
                   closure funcallable-instance
-                  weak-pointer fdefn sb-vm::value-cell
-                  #+sb-simd-pack-512 sb-vm::simd-pack-512-mask))
+                  weak-pointer fdefn sb-vm::value-cell))
     (format out "static char *~A_slots[] = {~%~{ \"~A: \",~} NULL~%};~%"
             (c-name (string-downcase name))
             (map 'list (lambda (x) (c-name (string-downcase (sb-vm:slot-name x))))
