@@ -369,18 +369,19 @@
     (inst mov (thread-tls-ea tls-index) val)))
 
 (defun bind (bsp symbol tmp)
-  (inst mov bsp (* binding-size n-word-bytes))
-  (inst xadd (thread-slot-ea thread-binding-stack-pointer-slot) bsp)
+  (load-binding-stack-pointer bsp)
+  (inst add bsp (* binding-size n-word-bytes))
+  (store-binding-stack-pointer bsp)
   (let* ((tls-index (load-time-tls-offset symbol))
          (tls-cell (thread-tls-ea tls-index)))
     ;; Too bad we can't use "XCHG [thread + disp], val" to write new value
     ;; and read the old value in one step. It will violate the constraints
     ;; prescribed in the internal documentation on special binding.
     (inst mov tmp tls-cell)
-    (storew tmp bsp binding-value-slot)
+    (storew tmp bsp (- binding-value-slot binding-size))
     ;; Indices are small enough to be written as :DWORDs which avoids
     ;; a REX prefix if 'bsp' happens to be any of the low 8 registers.
-    (inst mov :dword (ea (ash binding-symbol-slot word-shift) bsp) tls-index)
+    (inst mov :dword (object-slot-ea bsp (- binding-symbol-slot binding-size) 0) tls-index)
     (values tls-cell tmp)))
 
 (define-vop (bind) ; bind a known symbol
@@ -419,10 +420,11 @@
                            &optional (newval nil newvalp)
                            &aux (value-ea (ea 1 index-temp)))
   (inst mov val-temp (ea index-temp thread-tn))
-  (inst mov bsp (* binding-size n-word-bytes))
-  (inst xadd (thread-slot-ea thread-binding-stack-pointer-slot) bsp)
-  (inst mov (ea (ash binding-value-slot word-shift) bsp) val-temp)
-  (inst mov :dword (ea (ash binding-symbol-slot word-shift) bsp) index-temp)
+  (load-binding-stack-pointer bsp)
+  (inst add bsp (* binding-size n-word-bytes))
+  (store-binding-stack-pointer bsp)
+  (storew val-temp bsp (- binding-value-slot binding-size))
+  (inst mov :dword (object-slot-ea bsp (- binding-symbol-slot binding-size) 0) index-temp)
   ;; (usually) update the indirect pointer
   (cond ((not symbol) ; compile-time-unknown if indirection word exists
          (assemble ()
