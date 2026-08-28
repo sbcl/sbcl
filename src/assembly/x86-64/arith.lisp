@@ -60,7 +60,6 @@
                 (inst jmp :nz DO-STATIC-FUN)    ; no - do generic
 
                 ,@body
-                (inst clc) ; single-value return
                 (inst ret)
 
                 DO-STATIC-FUN
@@ -70,7 +69,7 @@
     (move res x)
     (inst add res y)
     (inst jmp :o BIGNUM)
-    (inst clc) (inst ret)
+    (inst ret)
     BIGNUM
     ;; Unbox the overflowed result, recovering the correct sign from
     ;; the carry flag, then re-box as a bignum.
@@ -83,7 +82,7 @@
     (move res x)
     (inst sub res y)
     (inst jmp :o BIGNUM)
-    (inst clc) (inst ret)
+    (inst ret)
     BIGNUM
     ;; Unbox the overflowed result, recovering the correct sign from
     ;; the carry flag, then re-box as a bignum.
@@ -99,7 +98,7 @@
     (inst imul y)                    ; result in edx:eax
     (inst jmp :o BIGNUM)
     (move res rax)
-    (inst clc) (inst ret)
+    (inst ret)
 
     BIGNUM
     (inst shrd rax rdx-tn n-fixnum-tag-bits) ; high bits from edx
@@ -113,7 +112,7 @@
     (emit-alloc-other nil thread-tn bignum-widetag (+ bignum-digits-offset 2) res)
     (storew rax res bignum-digits-offset other-pointer-lowtag)
     (storew rcx res (1+ bignum-digits-offset) other-pointer-lowtag)
-    (inst clc) (inst ret)
+    (inst ret)
 
     SINGLE-WORD-BIGNUM
     (return-single-word-bignum res res rax)))
@@ -138,7 +137,7 @@
                                     (+ (ash code-constants-offset word-shift)
                                        (- other-pointer-lowtag)))
                         rip-tn))
-  (inst clc) (inst ret)
+  (inst ret)
   GENERIC
   (tail-call-lisp-fun '%negate 1))
 
