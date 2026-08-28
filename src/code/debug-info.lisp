@@ -438,3 +438,13 @@
   ;; The compiler really needs to be made more aware of
   ;; some issues involving recursive structures.
   (parent nil :type (or null source-info) :read-only t))
+
+(defun make-sc+offset (sc-number offset)
+  ;; Both any-reg and descriptor-reg are tagged and are accessed in
+  ;; the same way, combine them to reduce debug info size.
+  (when (eq sc-number sb-vm:any-reg-sc-number)
+    (setf sc-number sb-vm:descriptor-reg-sc-number))
+  (dpb (ash sc-number (- (byte-size (car +sc+offset-scn-bytes+))))
+       (cadr +sc+offset-scn-bytes+)
+       (logior (ash offset (byte-position (car +sc+offset-offset-bytes+)))
+               (logand sc-number (ldb (car +sc+offset-scn-bytes+) -1)))))

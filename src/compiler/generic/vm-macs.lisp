@@ -197,9 +197,10 @@
 ;;; determined) and assign the rest sequentially.
 (defmacro !define-storage-classes (&rest classes)
   (let* ((fixed-numbers '((descriptor-reg . 0)
-                          (any-reg        . 1)
+                          (control-stack  . 1)
                           (signed-reg     . 2)
-                          (constant       . 3)))
+                          (constant       . 3)
+                          (any-reg        . 4))) ;; any-reg will be merged with descriptor-reg by make-sc+offset
          (index (length fixed-numbers)))
     (flet ((process-class (class-spec)
              (destructuring-bind (sc-name sb-name &rest args) class-spec

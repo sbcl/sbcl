@@ -41,11 +41,6 @@
 (assert (and (= (length +sc+offset-offset-bytes+) 1)
              (= (length +sc+offset-scn-bytes+) 2)
              (= (byte-position (car +sc+offset-scn-bytes+)) 0)))
-(defun make-sc+offset (sc-number offset)
-  (dpb (ash sc-number (- (byte-size (car +sc+offset-scn-bytes+))))
-       (cadr +sc+offset-scn-bytes+)
-       (logior (ash offset (byte-position (car +sc+offset-offset-bytes+)))
-               (logand sc-number (ldb (car +sc+offset-scn-bytes+) -1)))))
 
 (declaim (ftype (sfunction (sc+offset) sc-number)
                 sc+offset-scn)
