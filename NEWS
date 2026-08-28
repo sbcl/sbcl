@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.6.7:
+changes in sbcl-2.6.8 relative to sbcl-2.6.7:
   * minor incompatible change: FILE-POSITION on composite streams returns a
     more accurate result for CONCATENATED-STREAM, and NULL on TWO-WAY-STREAM
     and ECHO-STREAM.
