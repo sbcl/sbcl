@@ -95,9 +95,6 @@
   (ecase style
     (:raw
      `((inst ret)))
-    (:full-call
-     `((inst clc)
-       (inst ret)))
     ((:none :full-call-no-return))))
 
 (defconstant xsave-area-alignment 64)
