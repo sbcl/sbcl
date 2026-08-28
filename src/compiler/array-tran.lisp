@@ -1396,11 +1396,7 @@
             ;; Case (5) - :INITIAL-CONTENTS and indeterminate length
             (t
              (let* ((listp (csubtypep (lvar-type initial-contents) (specifier-type 'list)))
-                    (inline-fill (cond ((and (lvar-matches initial-contents :fun-names '(reverse nreverse
-                                                                                         sb-impl::list-reverse
-                                                                                         sb-impl::vector-reverse
-                                                                                         sb-impl::list-nreverse
-                                                                                         sb-impl::vector-nreverse))
+                    (inline-fill (cond ((and (lvar-matches initial-contents :fun-names '(reverse nreverse))
                                              ;; Nothing should be modifying the original sequence
                                              (almost-immediately-used-p initial-contents (lvar-use initial-contents)
                                                                         :flushable t))

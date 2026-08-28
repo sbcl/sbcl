@@ -2044,11 +2044,7 @@
                (if ,already-type-p
                    x
                    ,(cond ((eq dimension '*)
-                           (cond ((and (lvar-matches x :fun-names '(reverse nreverse
-                                                                    sb-impl::list-reverse
-                                                                    sb-impl::vector-reverse
-                                                                    sb-impl::list-nreverse
-                                                                    sb-impl::vector-nreverse))
+                           (cond ((and (lvar-matches x :fun-names '(reverse nreverse))
                                        (almost-immediately-used-p x (lvar-use x) :flushable t))
                                   (splice-fun-args x :any 1)
                                   ;; The make-array transform can handle this

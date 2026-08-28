@@ -651,23 +651,31 @@
 (defknown length ((read-only proper-sequence)) index (foldable flushable dx-safe))
 
 (defknown reverse ((read-only proper-sequence)) consed-sequence (flushable foldable-read-only)
-  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t)
+  :result-arg 0)
 
 (defknown nreverse ((modifying sequence)) sequence (important-result)
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t
-                                          :preserve-vector-type t))
+                                          :preserve-vector-type t)
+  :result-arg 0)
 
 (defknown (list-reverse-into-vector list-reverse-into-vector-cddr)
     (proper-list) simple-vector
   (flushable no-verify-arg-count))
 (defknown sb-impl::vector-nreverse (vector) vector (important-result no-verify-arg-count)
   :result-arg 0)
+(defknown sb-impl::list-nreverse (list) list (important-result no-verify-arg-count)
+  :result-arg 0)
+(defknown sb-impl::vector-reverse (vector) vector (no-verify-arg-count)
+  :result-arg 0)
+(defknown sb-impl::list-reverse (list) list (no-verify-arg-count)
+  :result-arg 0)
 
 (defknown make-sequence (type-specifier index
                                         &key
                                         (:initial-element t))
-  consed-sequence
-  (movable foldable-read-only)
+    consed-sequence
+    (movable foldable-read-only)
   :derive-type (creation-result-type-specifier-nth-arg 0))
 
 (defknown concatenate (type-specifier &rest (read-only proper-sequence)) consed-sequence

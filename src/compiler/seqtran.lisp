@@ -2695,7 +2695,7 @@
     (give-up-ir1-transform))
   (if (and (or (not start) (lvar-value-is start 0))
            (eq end nil)
-           (lvar-csubtypep sequence simple-bit-vector))
+           (lvar-subtypep sequence simple-bit-vector))
       `(let* ((length (vector-length sequence))
               (count 0)
               (words (floor length sb-vm:n-word-bits)))
@@ -4192,17 +4192,43 @@
          (declare (ignore ,@ignored))
          (append ,@arguments)))))
 
-(deftransform reverse ((sequence) (vector) * :important nil)
-  `(sb-impl::vector-reverse sequence))
 
-(deftransform reverse ((sequence) (list) * :important nil)
-  `(sb-impl::list-reverse sequence))
+(defoptimizer (reverse rewrite-full-call) ((list) node)
+  (cond ((lvar-subtypep list list)
+         'sb-impl::list-reverse)
+        ((lvar-subtypep list vector)
+         'sb-impl::vector-reverse)))
 
-(deftransform nreverse ((sequence) (vector) * :important nil)
-  `(sb-impl::vector-nreverse sequence))
+(defoptimizer (nreverse rewrite-full-call) ((list) node)
+  (cond ((lvar-subtypep list list)
+         'sb-impl::list-nreverse)
+        ((lvar-subtypep list vector)
+         'sb-impl::vector-nreverse)))
 
-(deftransform nreverse ((sequence) (list) * :important nil)
-  `(sb-impl::list-nreverse sequence))
+(deftransforms (reverse nreverse) ((sequence) ((or vector list)) * :node node :important nil)
+  (or (combination-case sequence
+        (list *
+         (setf (combination-args combination) (reverse args))
+         'sequence)
+        (list* *
+         (let ((last (last args)))
+           (cond ((lvar-subtypep (car last) null)
+                  (setf (combination-args combination)
+                        (append (cdr (reverse args)) last))
+                  'sequence)
+                 (t
+                  (splice-fun-args sequence 'list* nil)
+                  (let ((vars (make-gensym-list (length args))))
+                    `(lambda ,vars
+                       (,(case (combination-name node)
+                           (reverse 'revappend)
+                           (nreverse 'nreconc))
+                        ,(car (last vars))
+                        (list ,@(reverse (butlast vars))))))))))
+        (initialize-vector *
+         (setf (combination-args combination) (reverse args))
+         'sequence))
+      (give-up-ir1-transform)))
 
 (deftransforms (intersection nintersection)
     ((list1 list2 &key key test test-not))

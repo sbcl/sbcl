@@ -680,7 +680,7 @@
                       (setf cut t))))
           (splice-fun-args x 'logand 2)
           (if cut
-              (if (lvar-csubtypep x word)
+              (if (lvar-subtypep x word)
                   `(lambda (x y z)
                      (declare (ignore z))
                      (not (logtest x (logand most-positive-word y))))
@@ -5946,12 +5946,12 @@
 ;; Don't allow mixing integer 0 and float zero, which have different negations
 (defun float-contagion-for-negate (a b &optional no-rational)
   (cond ((and (not no-rational)
-              (lvar-csubtypep a (or rational (complex rational)))
-              (lvar-csubtypep b (or rational (complex rational)))))
-        ((lvar-csubtypep a (and number (not (or (eql 0) (complex rational)))))
-         (or (lvar-csubtypep b (and number (not (or (eql 0) (complex rational)))))
+              (lvar-subtypep a (or rational (complex rational)))
+              (lvar-subtypep b (or rational (complex rational)))))
+        ((lvar-subtypep a (and number (not (or (eql 0) (complex rational)))))
+         (or (lvar-subtypep b (and number (not (or (eql 0) (complex rational)))))
              a))
-        ((lvar-csubtypep b (and number (not (or (eql 0) (complex rational)))))
+        ((lvar-subtypep b (and number (not (or (eql 0) (complex rational)))))
          b)))
 
 (defun negate-lvar (x outer-node &key test minus-zero-ignored
@@ -6050,7 +6050,7 @@
                               (cond ((or (float-safe-p)
                                          (loop for arg in args
                                                do
-                                               (if (lvar-csubtypep arg (and number (not (or (eql 0) (complex rational)))))
+                                               (if (lvar-subtypep arg (and number (not (or (eql 0) (complex rational)))))
                                                    (setf good arg)
                                                    (setf all-good nil))
                                                finally (return all-good)))
@@ -6173,7 +6173,7 @@
                             (negate-truncation combination args 'ffloor t))
                            (sin (*)
                             (when (or (float-safe-p)
-                                      (lvar-csubtypep (first args)
+                                      (lvar-subtypep (first args)
                                                       (and number (not (or (eql 0) (complex rational))))))
                               (negate-lvar (first args) test any-branch)))))))))
         (negate-lvar x test any-branch)))))
@@ -9251,7 +9251,7 @@
                     ((or null vector) t &rest t) *
                     :policy (= space 0))
   (cond ((eq (array-type-upgraded-element-type (lvar-type vector) :ignore-null t) *wild-type*)
-         (unless (lvar-csubtypep vector null)
+         (unless (lvar-subtypep vector null)
            (give-up-ir1-transform)))
         (t
          (wrap-if

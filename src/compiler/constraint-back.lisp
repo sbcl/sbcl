@@ -319,8 +319,8 @@
     (cond
       ((and var
             (eql nth-value 1)
-            (lvar-csubtypep x integer)
-            (lvar-csubtypep d integer))
+            (lvar-subtypep x integer)
+            (lvar-subtypep d integer))
        (flet ((derive-quot (target &optional sign)
                 ;; If the remainder is non-zero then the divisor is at least 2
                 (let* ((q (first (mv-bind-vars (node-lvar node))))
@@ -382,13 +382,13 @@
               (when divisor-var
                 (conset-add-constraint-to-eql gen 'typep divisor-var (specifier-type '(and integer (not (integer -1 1)))) nil alternative))))
            (>
-            (when (lvar-csubtypep constraint (integer 0))
+            (when (lvar-subtypep constraint (integer 0))
               (conset-add-constraint-to-eql gen 'typep var (specifier-type '(integer 1)) nil consequent)
               (derive-quot consequent (specifier-type '(integer 1)))
               (when divisor-var
                 (conset-add-constraint-to-eql gen 'typep divisor-var (specifier-type '(and integer (not (integer -1 1)))) nil consequent))))
            (<
-            (when (lvar-csubtypep constraint (integer * 0))
+            (when (lvar-subtypep constraint (integer * 0))
               (conset-add-constraint-to-eql gen 'typep var (specifier-type '(integer * -1)) nil consequent)
               (derive-quot consequent (specifier-type '(integer * -1)))
               (when divisor-var

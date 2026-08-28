@@ -4235,8 +4235,11 @@ is :ANY, the function name is not checked."
 
 (defmacro lvar-intersectp (lvar type)
   `(types-equal-or-intersect (lvar-type ,lvar) (specifier-type ',type)))
-(defmacro lvar-csubtypep  (lvar type)
+(defmacro lvar-subtypep  (lvar type)
   `(csubtypep (lvar-type ,lvar) (specifier-type ',type)))
+
+(defun combination-name (combination)
+  (lvar-fun-name (combination-fun combination) t))
 
 (defun replace-node-type (node type)
   (setf (node-derived-type node) type
