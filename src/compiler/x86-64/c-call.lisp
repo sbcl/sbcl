@@ -829,10 +829,10 @@ Floats are passed in integer registers."
     (:result-types system-area-pointer)
     (:generator 0
       (aver (not (location= result rsp-tn)))
+      (inst mov result (alien-stack-ptr))
       (unless (zerop amount)
-        (let ((delta (align-up amount 8)))
-          (inst sub :qword (alien-stack-ptr) delta)))
-      (inst mov result (alien-stack-ptr)))))
+        (inst sub result (align-up amount 8))
+        (inst mov (alien-stack-ptr) result)))))
 
 ;;; Callbacks
 
