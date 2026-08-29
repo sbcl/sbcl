@@ -127,6 +127,7 @@
   "../contrib/sb-simd/test-suite/test-horizontal-functions-arm64.lisp"
   "../contrib/sb-simd/test-suite/test-horizontal-functions-x86-64.lisp"
   "../contrib/sb-simd/test-suite/test-hairy-simd-functions.lisp"
+  "../contrib/sb-simd/test-suite/test-arm64-regressions.lisp"
   "../contrib/sb-simd/test-suite/test-packages.lisp")
  ("sb-simple-streams.impure.lisp" "contrib/sb-simple-streams.fasl" "contrib/sb-bsd-sockets.fasl"
   "../contrib/sb-simple-streams/simple-stream-tests.lisp")

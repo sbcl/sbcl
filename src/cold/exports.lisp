@@ -958,7 +958,6 @@ possibly temporarily, because it might be used internally.")
    "FAST-READ-CHAR-REFILL"
    "FAST-READ-S-INTEGER"
    "FAST-READ-U-INTEGER"
-   "FAST-READ-VAR-U-INTEGER"
    "FILE-NAME"
    "FORM-TRACKING-STREAM"
    "FORM-TRACKING-STREAM-OBSERVER"

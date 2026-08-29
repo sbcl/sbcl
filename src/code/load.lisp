@@ -183,19 +183,6 @@
                                         `(ash (fast-read-byte) ,(* i 8))))))
        (logior ,@bytes))))
 
-;;; like FAST-READ-U-INTEGER, but the size may be determined at run time
-(defmacro fast-read-var-u-integer (n)
-  (let ((n-pos (gensym))
-        (n-res (gensym))
-        (n-cnt (gensym)))
-    `(do ((,n-pos 8 (+ ,n-pos 8))
-          (,n-cnt (1- ,n) (1- ,n-cnt))
-          (,n-res
-           (fast-read-byte)
-           (dpb (fast-read-byte) (byte 8 ,n-pos) ,n-res)))
-         ((zerop ,n-cnt) ,n-res)
-       (declare (type index ,n-pos ,n-cnt)))))
-
 ;;; FIXME: why do all of these reading functions and macros declare
 ;;; (SPEED 0)?  was there some bug in the compiler which has since
 ;;; been fixed?  --njf, 2004-09-08

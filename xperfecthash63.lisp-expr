@@ -1835,5 +1835,42 @@
 (#(A49305EF D0241AE7 E55E7F8C EE9A5410)
  "(SB-PCL::%CLASS SB-PCL::%PARAMETER SB-PCL::%VARIABLE-REBINDING SPECIAL)"
  "((& (>> val 8) 3))")
+(#(5256235A 87C835DD E0AD3E74 ED8563BC F7158E95)
+ "((SB-VM::DESCRIPTOR-REG . 0) (SB-VM::CONTROL-STACK . 1) (SB-VM::SIGNED-REG . 2) (CONSTANT . 3) (SB-VM::ANY-REG . 4))"
+ "((& (+ val (>> val 2)) 7))")
+(#(2 6 A 16 2C)
+ "(1 5 3 11 22)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 6 2 0)))
+  (+= val #xe705d0f4)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 2) #x3)))
+   (let ((a (>> (u32+ val (<< val 21)) 30)))
+    (^ a (aref tab b))))))")
+(#(2 6 A 18 2C)
+ "(1 5 3 12 22)"
+ "((let ((tab #a((4) (unsigned-byte 8) 3 1 0 4)))
+  (let ((b (& (>> val 2) #x3)))
+   (let ((a (>> (<< val 30) 30)))
+    (^ a (aref tab b))))))")
+(#(A E 10 16 2C)
+ "(11 22 7 8 5)"
+ "((let ((tab #a((4) (unsigned-byte 8) 2 2 6 0)))
+  (let ((b (& (>> val 1) #x3)))
+   (let ((a (>> (<< val 26) 30)))
+    (^ a (aref tab b))))))")
+(#(0 4 8 24 26 28 2E 30)
+ "(18 19 23 24 2 20 4 0)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 7 2 4 2 5 5 0)))
+  (+= val #xa4e87235)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 1) #x7)))
+   (let ((a (>> (u32+ val (<< val 24)) 30)))
+    (^ a (aref tab b))))))")
+(#(2 A E 10 12 16 18 1A 1C 2C)
+ "(14 13 12 11 22 9 8 7 1 5)"
+ "((let ((tab #a((8) (unsigned-byte 8) 5 0 0 11 11 5 0 0)))
+  (let ((b (& (>> val 1) #x7)))
+   (let ((a (>> (<< val 26) 29)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF
