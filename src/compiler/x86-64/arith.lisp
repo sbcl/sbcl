@@ -3469,6 +3469,9 @@
                                           (fixnum-width (+ width ,(if fixnump
                                                                       1
                                                                       0)))
+                                          (fixnum-bit (+ bit ,(if fixnump
+                                                                  1
+                                                                  0)))
                                           (size (if (<= fixnum-width 32)
                                                     :dword
                                                     :qword)))
@@ -3477,23 +3480,21 @@
                                           (<
                                            `(when (= y (ash 1 bit))
                                               (cond (,test-form
-                                                     (change-vop-flags vop '(:ns)))
-                                                    (t
-                                                     (inst bt size x (+ bit ,(if fixnump
-                                                                                 1
-                                                                                 0)))
-                                                     (change-vop-flags vop '(:nc))))
-                                              (return-from ,name)))
+                                                     (change-vop-flags vop '(:ns))
+                                                     (return-from ,name))
+                                                    ((> fixnum-bit 31)
+                                                     (inst bt size x fixnum-bit)
+                                                     (change-vop-flags vop '(:nc))
+                                                     (return-from ,name)))))
                                           (>
                                            `(when (= y (1- (ash 1 bit)))
                                               (cond (,test-form
-                                                     (change-vop-flags vop '(:s)))
-                                                    (t
-                                                     (inst bt size x (+ bit ,(if fixnump
-                                                                                 1
-                                                                                 0)))
-                                                     (change-vop-flags vop '(:c))))
-                                              (return-from ,name))))))))))
+                                                     (change-vop-flags vop '(:s))
+                                                     (return-from ,name))
+                                                    ((> fixnum-bit 31)
+                                                     (inst bt size x fixnum-bit)
+                                                     (change-vop-flags vop '(:c))
+                                                     (return-from ,name))))))))))))
                          ,(when constant
                             `(cond
                                ((zerop (+ y ,addend))
