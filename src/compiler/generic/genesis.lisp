@@ -1631,19 +1631,21 @@ core and return a descriptor to it."
 (declaim (type hash-table *cold-package-symbols*))
 (defvar *package-graph*)
 
+(defun package-name-id (name)
+  (position name sb-impl::*preassigned-package-ids* :test #'string=))
+
 ;; These fixed IDs have no use in lisp code, but we need known values
 ;; for C to find packages easily
-(defconstant +package-id-user+   3)
-(defconstant +package-id-kernel+ 4)
-(defconstant +package-id-sys+    5)
-(defvar *package-id-count* 5) ; pre-incremented on use
+(defvar +package-id-user+   (package-name-id "COMMON-LISP-USER"))
+(defvar +package-id-kernel+ (package-name-id "SB-KERNEL"))
+(defvar +package-id-sys+    (package-name-id "SB-SYS"))
+(defvar *package-id-count* sb-impl::+last-stable-package-id+) ; pre-incremented on use
+
 (defun package-id-generator (name)
-  (cond ((string= name "SB-KERNEL") +package-id-kernel+)
-        ((string= name "SB-SYS") +package-id-sys+)
-        ;; These were for C, but they seem unused
-        ;;((string= name "SB-INT") +package-id-int+)
-        ;;((string= name "SB-EXT") +package-id-ext+)
+  (cond ((package-name-id name))
         (t (incf *package-id-count*))))
+(assert (= +package-id-lisp+ (package-name-id "COMMON-LISP")))
+(assert (= sb-impl::+package-id-keyword+ (package-name-id "KEYWORD")))
 
 ;;; Initialize the cold package named by NAME. The information is
 ;;; usually derived from the host package of the same name, except

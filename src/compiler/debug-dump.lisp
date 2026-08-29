@@ -549,6 +549,8 @@
 ;;; environment live and is an argument. If a :DEBUG-ENVIRONMENT TN,
 ;;; then we also exclude set variables, since the variable is not
 ;;; guaranteed to be live everywhere in that case.
+;;;
+;;; This is read by sb-di::parse-compiled-debug-vars
 (defun dump-1-var (fun var tn minimal buffer &optional name same-name-p)
   (declare (type lambda-var var) (type (or tn null) tn)
            (type clambda fun))
@@ -578,9 +580,15 @@
            (setq flags (logior flags compiled-debug-var-uninterned)))
           (package-p
            (setq flags (logior flags compiled-debug-var-packaged))
-           (when (eq package *previous-package*)
-             (setf flags (logior flags compiled-debug-var-same-name-p)) ;; overloaded
-             (setf package-p nil))))
+           (cond ((eq package *previous-package*)
+                  (setf flags (logior flags compiled-debug-var-same-name-p)) ;; overloaded
+                  (setf package-p nil))
+                 ;; Write a packe-id integer
+                 ((or (eq package *cl-package*)
+                      (system-package-p package))
+                  (let ((id (sb-impl::package-id package)))
+                    (when (< id sb-impl::+last-stable-package-id+) ;; exclude contribs
+                      (setf package-p id)))))))
     (when (and (or (eq kind :environment)
                    (and (eq kind :debug-environment)
                         (null (basic-var-sets var))))
@@ -594,11 +602,15 @@
       (setq flags (logior flags compiled-debug-var-save-loc-p)))
     (when indirect
       (setq flags (logior flags compiled-debug-var-indirect-p)))
+    (when (integerp package-p)
+      (setf flags (logior flags compiled-debug-var-uninterned)))
     (vector-push-extend flags buffer)
     (unless (or minimal same-name-p)
       (write-var-string (symbol-name name) buffer)
       (when package-p
-        (write-var-string (sb-xc:package-name package) buffer)
+        (if (integerp package-p)
+            (vector-push-extend package-p buffer)
+            (write-var-string (sb-xc:package-name package) buffer))
         (setf *previous-package* package)))
 
     (cond (indirect

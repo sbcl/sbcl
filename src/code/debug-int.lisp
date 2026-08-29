@@ -1724,6 +1724,8 @@
 ;;; Parse the packed representation of DEBUG-VARs from
 ;;; DEBUG-FUN's SB-C::COMPILED-DEBUG-FUN, returning a vector
 ;;; of DEBUG-VARs, or NIL if there was no information to parse.
+;;;
+;;; This is written by SB-C::DUMP-1-VAR
 (defun parse-compiled-debug-vars (debug-fun)
   (let* ((cdebug-fun (compiled-debug-fun-compiler-debug-fun
                       debug-fun))
@@ -1745,58 +1747,64 @@
           previously-read-package
           previous-package)
       (loop
-        ;; The routines in the "SB-C" package are macros that advance the
-        ;; index.
-        (let* ((flags (prog1 (aref packed-vars i) (incf i)))
-               (minimal (logtest sb-c::compiled-debug-var-minimal-p flags))
-               (deleted (logtest sb-c::compiled-debug-var-deleted-p flags))
-               (packaged (logtest sb-c::compiled-debug-var-packaged flags))
-               (same-name-p (logtest sb-c::compiled-debug-var-same-name-p flags))
-               (name (cond (minimal "")
-                           ;; If packaged is 1 then same-name-p means same-package-p
-                           ((and (not packaged)
-                                 same-name-p)
-                            prev-name)
-                           (t (sb-c::read-var-string packed-vars i))))
-               (package (cond
-                          (minimal default-package)
-                          (packaged
-                           (cond (same-name-p   ; now same-package-p
-                                  previously-read-package)
-                                 (t
-                                  (setf previously-read-package
-                                        (find-package (sb-c::read-var-string packed-vars i))))))
-                          ((logtest sb-c::compiled-debug-var-uninterned flags)
-                           nil)
-                          (same-name-p
-                           previous-package)
-                          (t
-                           default-package)))
-               (sc+offset
-                 (if deleted 0 (sb-c::read-var-integerf packed-vars i)))
-               (save-sc+offset
-                 (if (logtest sb-c::compiled-debug-var-save-loc-p flags)
-                     (sb-c::read-var-integerf packed-vars i)
-                     nil))
-               (indirect-sc+offset
-                 (if (logtest sb-c::compiled-debug-var-indirect-p flags)
-                     (sb-c::read-var-integerf packed-vars i)
-                     nil)))
-          (aver (not (and args-minimal (not minimal))))
-          (cond ((and prev-name (string= prev-name name))
-                 (incf id))
-                (t
-                 (setf id 0
-                       prev-name name)))
-          (setf previous-package package)
-          (vector-push-extend
-           (make-compiled-debug-var
-            name package id
-            (logtest sb-c::compiled-debug-var-environment-live flags)
-            sc+offset save-sc+offset
-            indirect-sc+offset)
-           buffer))
-        (when (>= i len) (return)))
+       ;; The routines in the "SB-C" package are macros that advance the
+       ;; index.
+       (let* ((flags (prog1 (aref packed-vars i) (incf i)))
+              (minimal (logtest sb-c::compiled-debug-var-minimal-p flags))
+              (deleted (logtest sb-c::compiled-debug-var-deleted-p flags))
+              (packaged (logtest sb-c::compiled-debug-var-packaged flags))
+              (same-name-p (logtest sb-c::compiled-debug-var-same-name-p flags))
+              (uninterned (logtest sb-c::compiled-debug-var-uninterned flags))
+              (name (cond (minimal "")
+                          ;; If packaged is 1 then same-name-p means same-package-p
+                          ((and (not packaged)
+                                same-name-p)
+                           prev-name)
+                          (t (sb-c::read-var-string packed-vars i))))
+              (package (cond
+                         (minimal default-package)
+                         (packaged
+                          (cond (same-name-p ; now same-package-p
+                                 previously-read-package)
+                                ;; packaged & uninterned means it's
+                                ;; writen as an integer package-id
+                                (uninterned
+                                 (aref sb-impl::*id->package*
+                                       (prog1 (aref packed-vars i) (incf i))))
+                                (t
+                                 (setf previously-read-package
+                                       (find-package (sb-c::read-var-string packed-vars i))))))
+                         (uninterned
+                          nil)
+                         (same-name-p
+                          previous-package)
+                         (t
+                          default-package)))
+              (sc+offset
+                (if deleted 0 (sb-c::read-var-integerf packed-vars i)))
+              (save-sc+offset
+                (if (logtest sb-c::compiled-debug-var-save-loc-p flags)
+                    (sb-c::read-var-integerf packed-vars i)
+                    nil))
+              (indirect-sc+offset
+                (if (logtest sb-c::compiled-debug-var-indirect-p flags)
+                    (sb-c::read-var-integerf packed-vars i)
+                    nil)))
+         (aver (not (and args-minimal (not minimal))))
+         (cond ((and prev-name (string= prev-name name))
+                (incf id))
+               (t
+                (setf id 0
+                      prev-name name)))
+         (setf previous-package package)
+         (vector-push-extend
+          (make-compiled-debug-var
+           name package id
+           (logtest sb-c::compiled-debug-var-environment-live flags)
+           sc+offset save-sc+offset
+           indirect-sc+offset)
+          buffer))
+       (when (>= i len) (return)))
       (let ((result (coerce buffer 'simple-vector)))
         (when args-minimal
           (assign-minimal-var-names result))

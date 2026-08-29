@@ -31,11 +31,11 @@
 ;;;    SC-Offset of primary location (as var-length integer)
 ;;;    [If has save SC, SC-OFFSET of save location (as var-length integer)]
 
-(defconstant compiled-debug-var-uninterned             #b00000001)
+(defconstant compiled-debug-var-uninterned             #b00000001) ;; if -packaged then package-id is stored
 (defconstant compiled-debug-var-packaged               #b00000010)
 (defconstant compiled-debug-var-environment-live       #b00000100)
 (defconstant compiled-debug-var-save-loc-p             #b00001000)
-(defconstant compiled-debug-var-same-name-p            #b00010000) ;; if -packaged is 1 then this becomes same-package-p
+(defconstant compiled-debug-var-same-name-p            #b00010000) ;; if -packaged => -same-package-p
 (defconstant compiled-debug-var-minimal-p              #b00100000)
 (defconstant compiled-debug-var-deleted-p              #b01000000)
 (defconstant compiled-debug-var-indirect-p             #b10000000)

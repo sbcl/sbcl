@@ -175,3 +175,28 @@ body. Body can begin with declarations."
 ;; only ppc64 needs this constant at compile-time. The others don't.
 ;; The package of this constant is sb-fasl for convenience in genesis.
 (defconstant sb-fasl::+package-id-lisp+ 2)
+
+;;; Stable IDs for the debugger
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; Before which system-package-p can be used, otherwise it'll include contribs
+  (defconstant +last-stable-package-id+
+    (1- (length
+         #1=(remove-if
+             (lambda (n)
+               (and n
+                    (not (find-package n))))
+             #(nil "KEYWORD" "COMMON-LISP" "COMMON-LISP-USER" "SB-KERNEL" "SB-SYS"
+               "SB-VM" "SB-IMPL" "SB-THREAD" "SB-APROF" "SB-UNIX"
+               "SB-DEBUG" "SB-C" "SB-ALIEN-INTERNALS" "SB-PCL" "SB-DI" "SB-INT" "SB-LOOP"
+               "SB-ALIEN" "SB-EXT" "SB-PRETTY" "SB-FASL" "SB-ASSEM" "SB-BIGNUM" "SB-FORMAT"
+               "SB-DISASSEM" "SB-REGALLOC"  "SB-EVAL" "SB-SEQUENCE" "SB-MOP"
+               "SB-BROTHERTREE" "SB-UNICODE" "SB-GRAY" "SB-WALKER" "SB-PROFILE"
+               "SB-WIN32" "SB-INTERPRETER" "SB-LOCKLESS"
+               #.(sb-cold::backend-asm-package-name))))))
+
+  #+sb-xc-host
+  (defvar *preassigned-package-ids* #1#))
+
+#+sb-xc-host
+(defun package-id (name)
+  (position (sb-xc:package-name name) *preassigned-package-ids* :test #'string=))
