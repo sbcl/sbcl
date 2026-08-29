@@ -2885,7 +2885,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                      ;; It ends at the next function
                      (- (descriptor-bits (%code-entry-point des (1+ fun-index)))
                         sb-vm:fun-pointer-lowtag)
-                     ;; It goes the end of the blob. The trailer bytes are not executable
+                     ;; It goes to the end of the blob. The trailer bytes are not executable
                      ;; but this is a good approximation.
                      (+ (descriptor-bits des) (- sb-vm:other-pointer-lowtag) codeblob-size))))
             (push (cons fn end) *funaddr-range-table*))
@@ -3562,10 +3562,13 @@ do {                                                                \\
                "length_"
                (c-name (string-downcase slot-name)))))
     (dovector (slot slots)
-      (format t "    ~A ~A~@[[1]~];~%"
-              (getf (cddr slot) :c-type "lispobj")
-              (mangle-c-slot-name (sb-vm:slot-name slot))
-              (eq slot rest-slot))))
+      (let* ((c-type (getf (cddr slot) :c-type "lispobj"))
+             (len (getf (cddr slot) :length)))
+        (format t "    ~A ~A~@[[~D]~];~%"
+                c-type
+                (mangle-c-slot-name (sb-vm:slot-name slot))
+                (cond ((and (typep len '(integer 2 *)) (string= c-type "lispobj")) len)
+                      ((eq slot rest-slot) 1))))))
   (format t "};~%"))
 
 (defun sub-write-primitive-object (obj lang)
@@ -4019,7 +4022,7 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
             (spans (make-hash-table)))
         (dolist (span *funaddr-range-table*)
           (setf (gethash (descriptor-bits (car span)) spans) (cdr span)))
-        ;; Firat output as s-expressions
+        ;; First output as s-expressions
         (ignore-errors (delete-file "output/cold-funtable.lisp-expr"))
         (with-open-file (f "output/cold-funtable.lisp-expr" :direction :output)
           (format f ";;; Cold function listing (start-addr end-addr \"NAME\")~%(~%")
