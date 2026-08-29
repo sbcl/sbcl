@@ -393,7 +393,6 @@
      (:temp count unsigned-reg rcx-offset)
      (:temp temp unsigned-reg r9-offset)
      (:temp return unsigned-reg r10-offset))
-  (symbol-macrolet ((null null-tn))
   (flet ((check (label)
            (assemble ()
              (%test-lowtag list temp skip nil list-pointer-lowtag)
@@ -402,12 +401,12 @@
              skip)))
     (assemble ()
       (%test-lowtag list temp ZERO-VALUES-ERROR t list-pointer-lowtag)
-      (inst cmp list null)
+      (inst cmp list null-tn)
       (inst jmp :e ZERO-VALUES)
 
       (loadw a0 list cons-car-slot list-pointer-lowtag)
       (loadw list list cons-cdr-slot list-pointer-lowtag)
-      (inst cmp list null)
+      (inst cmp list null-tn)
       (inst jmp :ne CONTINUE)
       ONE-VALUE
       (inst clc)
@@ -420,14 +419,14 @@
       (inst mov count (fixnumize 2))
       (loadw a1 list cons-car-slot list-pointer-lowtag)
       (loadw list list cons-cdr-slot list-pointer-lowtag)
-      (inst cmp list null)
+      (inst cmp list null-tn)
       (inst jmp :e TWO-VALUES)
       (check TWO-VALUES)
 
       (inst mov count (fixnumize 3))
       (loadw a2 list cons-car-slot list-pointer-lowtag)
       (loadw list list cons-cdr-slot list-pointer-lowtag)
-      (inst cmp list null)
+      (inst cmp list null-tn)
       (inst jmp :e THREE-VALUES)
       (check THREE-VALUES)
 
@@ -454,17 +453,17 @@
       (cerror-call nil 'bogus-arg-to-values-list-error list)
       ZERO-VALUES
       (zeroize count)
-      (inst mov a0 null)
-      (inst mov a1 null)
+      (inst mov a0 null-tn)
+      (inst mov a1 null-tn)
 
       TWO-VALUES
-      (inst mov a2 null)
+      (inst mov a2 null-tn)
 
       THREE-VALUES
       (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
       (inst stc)
       (inst leave)
-      (inst ret)))))
+      (inst ret))))
 
 #+(and immobile-space sb-assembling)
 (define-assembly-routine (mark-symbol-card
