@@ -1060,12 +1060,18 @@
 
   (values))
 
+(defun remove-lvar-dx (lvar)
+  (when lvar
+    (let ((dynamic-extent (lvar-dynamic-extent lvar)))
+      (when dynamic-extent
+        (setf (lvar-dynamic-extent lvar) nil)
+        (setf (dynamic-extent-values dynamic-extent)
+              (delq1 lvar (dynamic-extent-values dynamic-extent)))
+        dynamic-extent))))
+
 (defun propagate-lvar-dx (new old)
-  (let ((dynamic-extent (lvar-dynamic-extent old)))
+  (let ((dynamic-extent (remove-lvar-dx old)))
     (when dynamic-extent
-      (setf (lvar-dynamic-extent old) nil)
-      (setf (dynamic-extent-values dynamic-extent)
-            (delq1 old (dynamic-extent-values dynamic-extent)))
       (unless (lvar-dynamic-extent new)
         (setf (lvar-dynamic-extent new) dynamic-extent)
         (push new (dynamic-extent-values dynamic-extent))))))

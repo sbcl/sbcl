@@ -4209,15 +4209,18 @@
   (or (combination-case sequence
         (list *
          (setf (combination-args combination) (reverse args))
+         (remove-lvar-dx sequence)
          'sequence)
         (list* *
          (let ((last (last args)))
            (cond ((lvar-subtypep (car last) null)
                   (setf (combination-args combination)
                         (append (cdr (reverse args)) last))
+                  (remove-lvar-dx sequence)
                   'sequence)
                  (t
                   (splice-fun-args sequence 'list* nil)
+                  (remove-lvar-dx sequence)
                   (let ((vars (make-gensym-list (length args))))
                     `(lambda ,vars
                        (,(case (combination-name node)
@@ -4227,6 +4230,7 @@
                         (list ,@(reverse (butlast vars))))))))))
         (initialize-vector *
          (setf (combination-args combination) (reverse args))
+         (remove-lvar-dx sequence)
          'sequence))
       (give-up-ir1-transform)))
 

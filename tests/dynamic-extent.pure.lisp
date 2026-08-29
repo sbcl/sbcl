@@ -2636,3 +2636,12 @@
                                          (declare (notinline f))
                                          (f (lambda () x)))))
                    1)))
+
+(with-test (:name :reverse-remove-dx)
+  (declare (optimize (debug 1)))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b)
+      (sb-int:dx-let ((a (list a b)))
+        (stack-allocated-p (reverse a))))
+   ((1 2) nil)))
