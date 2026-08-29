@@ -712,7 +712,7 @@
           (t
            (aver (or (null (leaf-refs var))
                      (not (tn-offset (leaf-info var)))))
-           'deleted))))
+           '%deleted))))
 
 ;;;; arguments/returns
 
@@ -745,16 +745,16 @@
                                             (return-from one-arg))
                                            (more
                                             (setf (arg-info-default info) t)))
-                                     (res 'rest-arg)))
+                                     (res '%rest)))
                                   (:more-context
-                                   (res 'more-arg))
+                                   (res '%more))
                                   (:optional
                                    (unless saw-optional
-                                     (res 'optional-args)
+                                     (res '%optional)
                                      (setq saw-optional t))))
                                 (res (debug-location-for actual var-locs))
                                 (when (arg-info-supplied-p info)
-                                  (res 'supplied-p)
+                                  (res '%supplied-p)
                                   (res (debug-location-for (pop actual-vars) var-locs))))
                                 (t
                                  (res (debug-location-for actual var-locs)))))))
@@ -946,19 +946,19 @@
           (dotimes (i len)
             (let ((argument (aref arguments i)))
               (case argument
-                (deleted
+                (%deleted
                  (write-var-integer packed-debug-fun-arg-deleted
                                     *byte-buffer*))
-                (supplied-p
+                (%supplied-p
                  (write-var-integer packed-debug-fun-arg-supplied-p
                                     *byte-buffer*))
-                (optional
+                (%optional
                  (write-var-integer packed-debug-fun-arg-optional
                                     *byte-buffer*))
-                (rest
+                (%rest
                  (write-var-integer packed-debug-fun-arg-rest
                                     *byte-buffer*))
-                (more
+                (%more
                  (write-var-integer packed-debug-fun-arg-more
                                     *byte-buffer*))
                 (otherwise

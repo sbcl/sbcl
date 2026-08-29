@@ -97,10 +97,14 @@
 ;;; Write STRING into VEC (adjustable, with fill-pointer) represented
 ;;; as the length (in a var-length integer) followed by the codes of
 ;;; the characters.
+(defvar *int* (make-hash-table))
 (defun write-var-string (string vec)
   (declare (simple-string string))
   (let ((len (length string)))
     (write-var-integer len vec)
+    (when (equalp string "SB-C")
+      (break))
+    (incf (gethash string *int* 0))
     (dotimes (i len)
       (write-var-integer (char-code (schar string i)) vec)))
   (values))
