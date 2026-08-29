@@ -247,7 +247,7 @@
        (when ,type-code
          (load-immediate-word ,flag-tn (compute-object-header ,size ,type-code))
          ,@(and store-type-code
-                `((storew ,flag-tn ,result-tn 0 ,lowtag))))
+                `((storew ,flag-tn tmp-tn))))
        ,@body)))
 
 ;;;; Error Code

@@ -166,7 +166,7 @@
     ;; Allocate the object and set its header
     (pseudo-atomic (lr)
       (allocation nil bytes lowtag result :flag-tn lr)
-      (storew header result 0 lowtag))))
+      (storew header tmp-tn))))
 
 #+(and sb-xc-host immobile-space)
 (define-vop (alloc-immobile-fixedobj)

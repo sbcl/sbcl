@@ -40,7 +40,7 @@
       (inst orr ndescr type (lsl ndescr array-rank-position))
       (inst lsr ndescr ndescr n-fixnum-tag-bits)
       ;; And store the header value.
-      (storew ndescr header 0 other-pointer-lowtag))
+      (storew ndescr tmp-tn))
     (move result header)))
 
 ;;;; Additional accessors and setters for the array header.
