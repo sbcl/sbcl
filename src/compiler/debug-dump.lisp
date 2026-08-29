@@ -147,7 +147,7 @@
            (type hash-table var-locs) (type node node)
            (type (or vop null) vop)
            #-sb-xc-host (values simple-bit-vector))
-  (let ((res (make-array (logandc2 (+ (hash-table-count var-locs) 7) 7)
+  (let ((res (make-array (align-up (hash-table-count var-locs) 8)
                          :element-type 'bit
                          :initial-element 0))
         (spilled (gethash vop

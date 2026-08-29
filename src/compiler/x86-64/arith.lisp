@@ -3077,30 +3077,46 @@
          ;; in an 8-bit-aligned field. For now I'm only dealing with
          ;; the restricted case of 8 bits at (BYTE 8 8).
          (reducible-to-byte-p
-          (and (eq size :word) (not (logtest #xFF y)))))
-    (cond  ((and (integerp y)
-                 (not (plausible-signed-imm32-operand-p y))
-                 (= (logcount (ldb (byte n-word-bits 0) y)) 1))
-            (change-vop-flags sb-assem::*current-vop* '(:c))
-            (inst bt x (1- (integer-length (ldb (byte n-word-bits 0) y)))))
-           ((not size)
-            ;; Ensure that both operands are acceptable
-            ;; by possibly loading one into TEMP
+           (and (eq size :word) (not (logtest #xFF y))))
+         (memory-p (sc-is x control-stack unsigned-stack signed-stack)))
+    (cond ((and (not memory-p)
+                (case y
+                  (#.(ash 1 63)
+                   (inst test x x)
+                   t)
+                  (#.(ash 1 31)
+                   (inst test :dword x x)
+                   t)
+                  (#.(ash 1 15)
+                   (inst test :word x x)
+                   t)
+                  (#.(ash 1 7)
+                   (inst test :byte x x)
+                   t)))
+           (change-vop-flags sb-assem::*current-vop* '(:s)))
+          ((and (integerp y)
+                (not (plausible-signed-imm32-operand-p y))
+                (= (logcount (ldb (byte n-word-bits 0) y)) 1))
+           (change-vop-flags sb-assem::*current-vop* '(:c))
+           (inst bt x (1- (integer-length (ldb (byte n-word-bits 0) y)))))
+          ((not size)
+           ;; Ensure that both operands are acceptable
+           ;; by possibly loading one into TEMP
             (multiple-value-setq (x y) (ensure-not-mem+mem x y temp))
             (inst test :qword x y))
-          ((sc-is x control-stack unsigned-stack signed-stack)
+          (memory-p
            ;; Otherwise, when using an immediate operand smaller
            ;; than 64 bits, narrow the reg/mem operand to match.
-           (let ((disp (frame-byte-offset (tn-offset x))))
-             (when reducible-to-byte-p
-               (setq size :byte disp (1+ disp) y (ash y -8)))
-             (inst test size (ea disp rbp-tn) y)))
+            (let ((disp (frame-byte-offset (tn-offset x))))
+              (when reducible-to-byte-p
+                (setq size :byte disp (1+ disp) y (ash y -8)))
+              (inst test size (ea disp rbp-tn) y)))
           (t
            (aver (gpr-tn-p x))
            (if (and reducible-to-byte-p (<= (tn-offset x) rbx-offset))
                ;; Use upper byte of word reg {A,C,D,B}X -> {A,C,D,B}H
-               (inst test :byte `(,x . :high-byte) (ash y -8))
-               (inst test size x y))))))
+                (inst test :byte `(,x . :high-byte) (ash y -8))
+                (inst test size x y))))))
 
 (deftransform logtest ((x y) (:or ((signed-word signed-word) *)
                                   ((word word) *))
@@ -3276,21 +3292,24 @@
            (binding* ((frame-disp  (frame-byte-offset (tn-offset int)))
                       ((extra-disp bit-shift) (floor bit 8)))
              (inst test :byte (ea (+ frame-disp extra-disp) rbp-tn) (ash 1 bit-shift)))
-           (change-vop-flags vop '(:ne))
-           (return-from logbitp/c))
-          ((= bit 31)       ; test the sign bit of the 32-bit register
+           (change-vop-flags vop '(:ne)))
+          ((= bit 7) ; test the sign bit
+           (inst test :byte int int)
+           (change-vop-flags vop '(:s)))
+          ((= bit 15)
+           (inst test :word int int)
+           (change-vop-flags vop '(:s)))
+          ((= bit 31)
            (inst test :dword int int)
-           (change-vop-flags vop '(:s))
-           (return-from logbitp/c))
+           (change-vop-flags vop '(:s)))
           ((= bit 63)
            (inst test int int)
-           (change-vop-flags vop '(:s))
-           (return-from logbitp/c))
+           (change-vop-flags vop '(:s)))
           ((< bit 32)
            (inst test (if (< bit 8) :byte :dword) int (ash 1 bit))
-           (change-vop-flags vop '(:ne))
-           (return-from logbitp/c)))
-    (inst bt (if (<= bit 31) :dword :qword) int bit)))
+           (change-vop-flags vop '(:ne)))
+          (t
+           (inst bt (if (<= bit 31) :dword :qword) int bit)))))
 
 (define-vop (logbitp-memref fast-conditional)
   (:args (x :scs (descriptor-reg)))
