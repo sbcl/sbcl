@@ -3484,8 +3484,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
 struct thread_state_word {
   // - control_stack_guard_page_protected is referenced from
   //   hand-written assembly code. (grep 'THREAD_STATE_WORD_OFFSET')
-  // - sprof_enable is referenced with SAPs.
-  //   (grep 'sb-vm:thread-state-word-slot')
   char control_stack_guard_page_protected;
   char unused;
   char state;
