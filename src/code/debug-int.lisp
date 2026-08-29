@@ -1530,7 +1530,7 @@
                        tag-and-info)
                    result))
            (var-or-deleted (index-or-deleted)
-             (if (eq index-or-deleted 'sb-c::deleted)
+             (if (eq index-or-deleted 'sb-c::%deleted)
                  :deleted
                  (svref vars index-or-deleted))))
       (loop
@@ -1538,24 +1538,24 @@
         do
            (let ((ele (aref args i)))
              (cond
-               ((eq ele 'sb-c::optional-args)
+               ((eq ele 'sb-c::%optional)
                 (setf optionalp t))
-               ((eq ele 'sb-c::rest-arg)
+               ((eq ele 'sb-c::%rest)
                 (push-var '(:rest) 1))
                ;; The next two args are the &MORE arg context and
                ;; count.
-               ((eq ele 'sb-c::more-arg)
+               ((eq ele 'sb-c::%more)
                 (push-var '(:more) 2))
                ;; SUPPLIED-P var immediately following keyword or
                ;; optional. Stick the extra var in the result element
                ;; representing the keyword or optional, which is the
                ;; previous one.
-               ((eq ele 'sb-c::supplied-p)
+               ((eq ele 'sb-c::%supplied-p)
                 (push-var (pop result) 1))
                ;; The keyword of a keyword parameter. Store it so the next
                ;; element can be used to form a (:keyword KEYWORD VALUE)
                ;; entry.
-               ((typep ele '(and symbol (not (eql sb-c::deleted))))
+               ((typep ele '(and symbol (not (eql sb-c::%deleted))))
                 (setf keyword ele))
                ;; The previous element was the keyword of a keyword
                ;; parameter and is stored in KEYWORD. The current element
@@ -1569,7 +1569,7 @@
                (optionalp
                 (push-var (list :optional (var-or-deleted ele))))
                ;; Deleted required, optional or keyword argument.
-               ((eq ele 'sb-c::deleted)
+               ((eq ele 'sb-c::%deleted)
                 (push-var :deleted))
                ;; Required arg at beginning of args array.
                (t
@@ -1583,7 +1583,7 @@
            (simple-vector vars))
   (let ((ele (aref args i)))
     (cond ((typep ele 'index) (svref vars ele))
-          ((eq ele 'sb-c::deleted) :deleted)
+          ((eq ele 'sb-c::%deleted) :deleted)
           (t (error "malformed arguments description")))))
 
 (defun compiled-debug-fun-debug-info (debug-fun)
@@ -1885,15 +1885,15 @@
               (let ((arg (sb-c::read-var-integerf map i)))
                 (case arg
                   (#.sb-c::packed-debug-fun-arg-deleted
-                   (vector-push-extend 'sb-c::deleted buffer))
+                   (vector-push-extend 'sb-c::%deleted buffer))
                   (#.sb-c::packed-debug-fun-arg-supplied-p
-                   (vector-push-extend 'sb-c::supplied-p buffer))
+                   (vector-push-extend 'sb-c::%supplied-p buffer))
                   (#.sb-c::packed-debug-fun-arg-optional
-                   (vector-push-extend 'sb-c::optional buffer))
+                   (vector-push-extend 'sb-c::%optional buffer))
                   (#.sb-c::packed-debug-fun-arg-rest
-                   (vector-push-extend 'sb-c::rest buffer))
+                   (vector-push-extend 'sb-c::%rest buffer))
                   (#.sb-c::packed-debug-fun-arg-more
-                   (vector-push-extend 'sb-c::more buffer))
+                   (vector-push-extend 'sb-c::%more buffer))
                   (#.sb-c::packed-debug-fun-key-arg-keyword
                    (vector-push-extend (intern (sb-c::read-var-string map i)
                                                *keyword-package*)
