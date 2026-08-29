@@ -117,12 +117,12 @@
                     (:note "NEON to pointer coercion")
                     (:generator 13
                       (with-fixed-allocation (y lr
-                                                simd-pack-widetag
-                                                simd-pack-size)
+                                              simd-pack-widetag
+                                              simd-pack-size
+                                              :store-type-code nil)
                         (inst mov header (fixnumize ,tag))
-                        (storew header
-                                y simd-pack-tag-slot other-pointer-lowtag)
-                        (storew x y simd-pack-lo-value-slot other-pointer-lowtag))))
+                        (storew-pair lr 0 header simd-pack-tag-slot tmp-tn)
+                        (storew x tmp-tn simd-pack-lo-value-slot))))
                   (define-move-vop ,name :move
                     ,scs (descriptor-reg))))))
   ;; see +simd-pack-element-types+
@@ -201,12 +201,11 @@
   (:result-types t)
   (:generator 13
     (with-fixed-allocation (dst lr
-                                simd-pack-widetag
-                                simd-pack-size)
+                            simd-pack-widetag
+                            simd-pack-size :store-type-code nil)
       ;; see +simd-pack-element-types+
-      (storew tag dst simd-pack-tag-slot other-pointer-lowtag)
-      (storew lo dst simd-pack-lo-value-slot other-pointer-lowtag)
-      (storew hi dst simd-pack-hi-value-slot other-pointer-lowtag))))
+      (storew-pair lr 0 tag simd-pack-tag-slot tmp-tn)
+      (storew-pair lo simd-pack-lo-value-slot hi simd-pack-hi-value-slot tmp-tn))))
 
 (define-vop (%make-simd-pack-ub64)
   (:translate %make-simd-pack-ub64)
