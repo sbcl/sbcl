@@ -2825,6 +2825,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
 ;;; fixups (or function headers) are applied.
 (defvar *show-pre-fixup-code-p* nil)
 
+(defvar *funaddr-range-table* nil)
 (define-cold-fop (fop-load-code (header n-code-bytes n-fixup-elts))
   (let* ((n-simple-funs (read-unsigned-byte-32-arg (fasl-input-stream)))
          (n-boxed-words (ash header -1))
@@ -2836,10 +2837,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
          (aligned-n-boxed-words (align-up n-boxed-words sb-c::code-boxed-words-align))
          (stack (%fasl-input-stack (fasl-input)))
          (stack-index (fop-stack-pop-n stack stack-elts-consumed))
+         (codeblob-size (+ (ash aligned-n-boxed-words sb-vm:word-shift) n-code-bytes))
          (des (allocate-cold-descriptor
                   (or #+immobile-code (and immobile *immobile-text*)
                       *dynamic*)
-                  (+ (ash aligned-n-boxed-words sb-vm:word-shift) n-code-bytes)
+                  codeblob-size
                   sb-vm:other-pointer-lowtag :code)))
     (declare (ignorable immobile))
     (write-code-header-words des aligned-n-boxed-words n-code-bytes)
@@ -2875,6 +2877,16 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (declare (type index header-index stack-index))
       (dotimes (fun-index (code-n-entries des))
         (let ((fn (%code-entry-point des fun-index)))
+          ;; append FN to *funaddr-range-table*
+          (let ((end
+                 (if (< fun-index (1- (code-n-entries des)))
+                     ;; It ends at the next function
+                     (- (descriptor-bits (%code-entry-point des (1+ fun-index)))
+                        sb-vm:fun-pointer-lowtag)
+                     ;; It goes the end of the blob. The trailer bytes are not executable
+                     ;; but this is a good approximation.
+                     (+ (descriptor-bits des) (- sb-vm:other-pointer-lowtag) codeblob-size))))
+            (push (cons fn end) *funaddr-range-table*))
           (set-simple-fun-layout fn)
           (write-wordindexed/raw fn sb-vm:simple-fun-self-slot
            (if (or #+(or arm64 ppc64 x86 x86-64) t) ; Store a raw pointer to the function entry
@@ -4001,7 +4013,23 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
                     :key (lambda (x) (fun-name-block-name (fifth x)))))
       ;; Sort by address
       (format t "~|~%II.B. defined functions (numerically):")
-      (output (sort (copy-list lines) #'< :key (lambda (x) (fourth x)))))))
+      (let ((sorted (sort (copy-list lines) #'< :key (lambda (x) (fourth x))))
+            (spans (make-hash-table)))
+        (dolist (span *funaddr-range-table*)
+          (setf (gethash (descriptor-bits (car span)) spans) (cdr span)))
+        ;; Firat output as s-expressions
+        (ignore-errors (delete-file "output/cold-funtable.lisp-expr"))
+        (with-open-file (f "output/cold-funtable.lisp-expr" :direction :output)
+          (format f ";;; Cold function listing (start-addr end-addr \"NAME\")~%(~%")
+          (dolist (x sorted)
+            (destructuring-bind (index linkage-cell fname-ptr entrypoint name) x
+              (declare (ignore index linkage-cell fname-ptr))
+              (when (plusp entrypoint)
+                (format f " (#x~X #x~X ~S)~%"
+                        entrypoint (gethash entrypoint spans) (write-to-string name)))))
+          (format f ")~%"))
+        ;; And then as plain text
+        (output sorted)))))
 
 ;;;; writing core file
 
