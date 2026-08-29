@@ -1741,25 +1741,35 @@
           (id 0)
           (len (length packed-vars))
           (buffer (make-array 0 :fill-pointer 0 :adjustable t))
-          prev-name)
+          prev-name
+          previously-read-package
+          previous-package)
       (loop
         ;; The routines in the "SB-C" package are macros that advance the
         ;; index.
         (let* ((flags (prog1 (aref packed-vars i) (incf i)))
                (minimal (logtest sb-c::compiled-debug-var-minimal-p flags))
                (deleted (logtest sb-c::compiled-debug-var-deleted-p flags))
+               (packaged (logtest sb-c::compiled-debug-var-packaged flags))
+               (same-name-p (logtest sb-c::compiled-debug-var-same-name-p flags))
                (name (cond (minimal "")
-                           ((logtest sb-c::compiled-debug-var-same-name-p flags)
+                           ;; If packaged is 1 then same-name-p means same-package-p
+                           ((and (not packaged)
+                                 same-name-p)
                             prev-name)
                            (t (sb-c::read-var-string packed-vars i))))
                (package (cond
                           (minimal default-package)
-                          ((logtest sb-c::compiled-debug-var-packaged
-                                    flags)
-                           (find-package (sb-c::read-var-string packed-vars i)))
-                          ((logtest sb-c::compiled-debug-var-uninterned
-                                    flags)
+                          (packaged
+                           (cond (same-name-p   ; now same-package-p
+                                  previously-read-package)
+                                 (t
+                                  (setf previously-read-package
+                                        (find-package (sb-c::read-var-string packed-vars i))))))
+                          ((logtest sb-c::compiled-debug-var-uninterned flags)
                            nil)
+                          (same-name-p
+                           previous-package)
                           (t
                            default-package)))
                (sc+offset
@@ -1778,6 +1788,7 @@
                 (t
                  (setf id 0
                        prev-name name)))
+          (setf previous-package package)
           (vector-push-extend
            (make-compiled-debug-var
             name package id

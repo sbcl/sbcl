@@ -538,6 +538,8 @@
   (make-sc+offset (sc-number (tn-sc tn))
                   (tn-offset tn)))
 
+(defvar *previous-package*)
+
 ;;; Dump info to represent VAR's location being TN. ID is an integer
 ;;; that makes VAR's name unique in the function. BUFFER is the vector
 ;;; we stick the result in. If MINIMAL, we suppress name dumping, and
@@ -570,11 +572,15 @@
            (setq flags (logior flags compiled-debug-var-minimal-p))
            (unless (and tn (tn-offset tn))
              (setq flags (logior flags compiled-debug-var-deleted-p))))
-          (t
-           (unless package
-             (setq flags (logior flags compiled-debug-var-uninterned)))
-           (when package-p
-             (setq flags (logior flags compiled-debug-var-packaged)))))
+          (same-name-p
+           (setq flags (logior flags compiled-debug-var-same-name-p)))
+          ((not package)
+           (setq flags (logior flags compiled-debug-var-uninterned)))
+          (package-p
+           (setq flags (logior flags compiled-debug-var-packaged))
+           (when (eq package *previous-package*)
+             (setf flags (logior flags compiled-debug-var-same-name-p)) ;; overloaded
+             (setf package-p nil))))
     (when (and (or (eq kind :environment)
                    (and (eq kind :debug-environment)
                         (null (basic-var-sets var))))
@@ -588,14 +594,12 @@
       (setq flags (logior flags compiled-debug-var-save-loc-p)))
     (when indirect
       (setq flags (logior flags compiled-debug-var-indirect-p)))
-    (when (and same-name-p (not minimal))
-      (setq flags (logior flags compiled-debug-var-same-name-p)))
     (vector-push-extend flags buffer)
-    (unless minimal
-      (unless same-name-p
-        (write-var-string (symbol-name name) buffer))
+    (unless (or minimal same-name-p)
+      (write-var-string (symbol-name name) buffer)
       (when package-p
-        (write-var-string (sb-xc:package-name package) buffer)))
+        (write-var-string (sb-xc:package-name package) buffer)
+        (setf *previous-package* package)))
 
     (cond (indirect
            ;; Indirect variables live in the parent frame, and are
@@ -653,13 +657,20 @@
           (frob-lambda let (>= level 2)))))
 
     (setf (fill-pointer *byte-buffer*) 0)
-    (let ((sorted (sort (vars) #'string<
-                        :key (lambda (x)
-                               (symbol-name (car x)))))
+    (let ((sorted (stable-sort
+                   (sort (vars) #'string<
+                         :key (lambda (x)
+                                (symbol-name (car x))))
+                   #'string<
+                   :key (lambda (x)
+                          (let ((package (sb-xc:symbol-package (car x))))
+                            (when package
+                              (sb-xc:package-name package))))))
           (prev-name nil)
           (i 0)
           ;; XEPs don't have any useful variables
-          (minimal (functional-kind-eq fun external)))
+          (minimal (functional-kind-eq fun external))
+          *previous-package*)
       (declare (type index i))
       (loop for (name var . tn) in sorted
             do
