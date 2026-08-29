@@ -651,8 +651,7 @@
 (defknown length ((read-only proper-sequence)) index (foldable flushable dx-safe))
 
 (defknown reverse ((read-only proper-sequence)) consed-sequence (flushable foldable-read-only)
-  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t)
-  :result-arg 0)
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
 (defknown nreverse ((modifying sequence)) sequence (important-result)
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t
@@ -666,10 +665,8 @@
   :result-arg 0)
 (defknown sb-impl::list-nreverse (list) list (important-result no-verify-arg-count)
   :result-arg 0)
-(defknown sb-impl::vector-reverse (vector) vector (no-verify-arg-count)
-  :result-arg 0)
-(defknown sb-impl::list-reverse (list) list (no-verify-arg-count)
-  :result-arg 0)
+(defknown sb-impl::vector-reverse (vector) vector (no-verify-arg-count))
+(defknown sb-impl::list-reverse (list) list (no-verify-arg-count))
 
 (defknown make-sequence (type-specifier index
                                         &key
