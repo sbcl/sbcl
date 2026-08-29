@@ -2473,9 +2473,7 @@
          (int-sap val)))
       (#.signed-reg-sc-number
        (with-escaped-value (val)
-         (if (logbitp (1- n-word-bits) val)
-             (logior val (ash -1 n-word-bits))
-             val)))
+         (sb-c::mask-signed-field n-word-bits val)))
       ((#.unsigned-reg-sc-number #-c-stack-is-control-stack #.non-descriptor-reg-sc-number)
        (with-escaped-value (val)
          val))
