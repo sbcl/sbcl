@@ -1298,8 +1298,7 @@
          (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
   (:note "inline (unsigned-byte 64) comparison"))
-
-(defmacro define-conditional-vop (tran fixnum signed unsigned &optional addend addend-signed addend-unsigned)
+(defmacro define-cmp-vop (tran fixnum signed unsigned &optional addend addend-signed addend-unsigned)
   `(progn
      ,@(loop for (suffix cost signed-p) in
              (append
@@ -1320,49 +1319,74 @@
        (:args (x :scs (any-reg signed-reg unsigned-reg)))
        (:arg-types (:or tagged-num signed-num unsigned-num)
                    (:constant (or signed-word word)))
+       (:arg-refs x-ref)
        (:info y)
        (:vop-var vop)
        (:policy :fast-safe)
        (:conditional ,signed)
        (:generator 2
-         ,(unless (eq signed unsigned)
-            `(flet ((try (y)
-                      (let ((y (if (sc-is x any-reg)
-                                   (fixnumize y)
-                                   y)))
-                        (flet ((try (constant)
-                                 (add-sub-immediate-p constant)))
-                          (or (try y)
-                              (try (ldb (byte 64 0) (- y))))))))
-               (change-vop-flags
-                vop
-                (cond ((or (zerop (+ y ,addend))
-                           (and (not (try y))
-                                (try (+ y ,addend))))
-                       (setf y (+ y ,addend))
-                       (if (sc-is x unsigned-reg)
-                           '(,addend-unsigned)
-                           '(,addend-signed)))
-                      (t
-                       (if (sc-is x unsigned-reg)
-                           '(,unsigned)
-                           '(,signed)))))))
-         (let ((y (if (sc-is x any-reg)
-                      (fixnumize y)
-                      y)))
-           (flet ((try (constant negate)
-                    (when (add-sub-immediate-p constant)
-                      (if negate
-                          (inst cmn x constant)
-                          (inst cmp x constant))
-                      t)))
-             (or (try y nil)
-                 (try (ldb (byte 64 0) (- y)) t)
-                 (inst cmp x (load-immediate-word tmp-tn y)))))))))
+         (cond
+           ,@(when (member tran '(< >))
+               `(((let ((tagged-y (if (sc-is x any-reg)
+                                      (fixnumize y)
+                                      y)))
+                    (and (plusp tagged-y)
+                         (or (sc-is x unsigned-reg)
+                             (csubtypep (tn-ref-type x-ref)
+                                        (specifier-type 'unsigned-byte)))
+                         (not (add-sub-immediate-p tagged-y))
+                         ,(ecase tran
+                            ;; Check if the high bits are clear
+                            (<
+                             `(when (= (logcount y) 1)
+                                (inst tst x (logandc1 (1- tagged-y) most-positive-word))
+                                (change-vop-flags vop '(:eq))
+                                t))
+                            (>
+                             `(when (= (logcount (1+ y)) 1)
+                                (inst tst x (logandc1 tagged-y most-positive-word))
+                                (change-vop-flags vop '(:ne))
+                                t))))))))
+           (t
+            ,(unless (eq tran 'eql)
+               `(flet ((try (y)
+                         (let ((y (if (sc-is x any-reg)
+                                      (fixnumize y)
+                                      y)))
+                           (flet ((try (constant)
+                                    (add-sub-immediate-p constant)))
+                             (or (try y)
+                                 (try (ldb (byte 64 0) (- y))))))))
+                  (change-vop-flags
+                   vop
+                   (cond ((or (zerop (+ y ,addend))
+                              (and (not (try y))
+                                   (try (+ y ,addend))))
+                          (setf y (+ y ,addend))
+                          (if (sc-is x unsigned-reg)
+                              '(,addend-unsigned)
+                              '(,addend-signed)))
+                         (t
+                          (if (sc-is x unsigned-reg)
+                              '(,unsigned)
+                              '(,signed)))))))
 
-(define-conditional-vop < t :lt :lo -1 :le :ls)
-(define-conditional-vop > t :gt :hi 1 :ge :hs)
-(define-conditional-vop eql nil :eq :eq)
+            (let ((y (if (sc-is x any-reg)
+                         (fixnumize y)
+                         y)))
+              (flet ((try (constant negate)
+                       (when (add-sub-immediate-p constant)
+                         (if negate
+                             (inst cmn x constant)
+                             (inst cmp x constant))
+                         t)))
+                (or (try y nil)
+                    (try (ldb (byte 64 0) (- y)) t)
+                    (inst cmp x (load-immediate-word tmp-tn y)))))))))))
+
+(define-cmp-vop < t :lt :lo -1 :le :ls)
+(define-cmp-vop > t :gt :hi 1 :ge :hs)
+(define-cmp-vop eql nil :eq :eq)
 
 (define-vop (<-unsigned-signed)
   (:translate <)

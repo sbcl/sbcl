@@ -3420,58 +3420,107 @@
                (inst cmp operand-size x y)))))
 
 
-(macrolet ((define-conditional-vop (tran cond unsigned
-                                    addend addend-signed addend-unsigned
-                                    &optional zero)
-             `(progn
-                ,@(loop for (suffix cost signed constant)
-                        in '((/fixnum 4 t)
-                             (-c/fixnum 3 t t)
-                             (/signed 6 t)
-                             (-c/signed 5 t t)
-                             (/unsigned 6)
-                              (-c/unsigned 5 nil t))
-                        collect
-                        (flet ((fix (n)
-                                 (if (eq suffix '-c/fixnum)
-                                     `(fixnumize ,n)
-                                     n)))
-                          `(define-vop (,(symbolicate "FAST-IF-" tran suffix)
-                                        ,(symbolicate "FAST-CONDITIONAL"  suffix))
-                             (:translate ,tran)
-                             (:vop-var vop)
-                             (:conditional)
-                             (:conditional ,(if signed cond unsigned))
-                             (:arg-refs x-tn-ref)
-                             (:generator ,cost
-                               ,(when constant
-                                  `(cond ((zerop (+ y ,addend))
-                                          (setf y 0)
-                                          (change-vop-flags
-                                           vop
-                                           ',(if signed
-                                                 (list addend-signed)
-                                                 (list addend-unsigned))))
-                                         ,@(when (and zero
-                                                      signed)
-                                             ;; (< x 0) can be tested using only the sign flag,
-                                             ;; which allows sub x, y; test x, x to be optimized
-                                             `(((zerop y)
-                                                (change-vop-flags vop '(,zero)))))
-                                         ((and
-                                           (not (plausible-signed-imm32-operand-p ,(fix 'y)))
-                                           (plausible-signed-imm32-operand-p ,(fix `(+ y ,addend))))
-                                          (incf y ,addend)
-                                          (change-vop-flags
-                                           vop
-                                           ',(if signed
-                                                 (list addend-signed)
-                                                 (list addend-unsigned))))))
-                               (emit-optimized-cmp
-                                 x ,(fix 'y)
-                                 temp (tn-ref-type x-tn-ref)))))))))
-  (define-conditional-vop < :l :b -1 :le :be :s)
-  (define-conditional-vop > :g :a 1 :ge :ae))
+(macrolet
+    ((define-cmp-vop (tran cond unsigned
+                      addend addend-signed addend-unsigned
+                      &optional zero)
+       `(progn
+          ,@(loop for (suffix cost signed constant)
+                  in '((/fixnum 4 t)
+                       (-c/fixnum 3 t t)
+                       (/signed 6 t)
+                       (-c/signed 5 t t)
+                       (/unsigned 6)
+                       (-c/unsigned 5 nil t))
+                  for fixnump = (eq suffix '-c/fixnum)
+                  for name = (symbolicate "FAST-IF-" tran suffix)
+                  collect
+                  (flet ((fix (n)
+                           (if fixnump
+                               `(fixnumize ,n)
+                               n)))
+                    `(define-vop (,name ,(symbolicate "FAST-CONDITIONAL"  suffix))
+                       (:translate ,tran)
+                       (:vop-var vop)
+                       (:conditional)
+                       (:conditional ,(if signed cond unsigned))
+                       (:arg-refs x-ref)
+                       (:generator ,cost
+                         ,(when constant
+                            (let ((test-form
+                                    `(and (gpr-tn-p x)
+                                          (case fixnum-width
+                                            (64
+                                             (inst test x x)
+                                             t)
+                                            (32
+                                             (inst test :dword x x)
+                                             t)
+                                            (16
+                                             (inst test :word x x)
+                                             t)
+                                            (8
+                                             (inst test :byte x x)
+                                             t)))))
+                              ;; Check only one bit if possible
+                              `(let ((width (sb-c::unsigned-type-width (tn-ref-type x-ref))))
+                                 (when width
+                                   (let* ((bit (1- width))
+                                          (fixnum-width (+ width ,(if fixnump
+                                                                      1
+                                                                      0)))
+                                          (size (if (<= fixnum-width 32)
+                                                    :dword
+                                                    :qword)))
+                                     (when (>= fixnum-width 8)
+                                       ,(ecase tran
+                                          (<
+                                           `(when (= y (ash 1 bit))
+                                              (cond (,test-form
+                                                     (change-vop-flags vop '(:ns)))
+                                                    (t
+                                                     (inst bt size x (+ bit ,(if fixnump
+                                                                                 1
+                                                                                 0)))
+                                                     (change-vop-flags vop '(:nc))))
+                                              (return-from ,name)))
+                                          (>
+                                           `(when (= y (1- (ash 1 bit)))
+                                              (cond (,test-form
+                                                     (change-vop-flags vop '(:s)))
+                                                    (t
+                                                     (inst bt size x (+ bit ,(if fixnump
+                                                                                 1
+                                                                                 0)))
+                                                     (change-vop-flags vop '(:c))))
+                                              (return-from ,name))))))))))
+                         ,(when constant
+                            `(cond
+                               ((zerop (+ y ,addend))
+                                (setf y 0)
+                                (change-vop-flags
+                                 vop
+                                 ',(if signed
+                                       (list addend-signed)
+                                       (list addend-unsigned))))
+                               ,@(when (and zero
+                                            signed)
+                                   ;; (< x 0) can be tested using only the sign flag,
+                                   ;; which allows sub x, y; test x, x to be optimized
+                                   `(((zerop y)
+                                      (change-vop-flags vop '(,zero)))))
+                               ((and
+                                 (not (plausible-signed-imm32-operand-p ,(fix 'y)))
+                                 (plausible-signed-imm32-operand-p ,(fix `(+ y ,addend))))
+                                (incf y ,addend)
+                                (change-vop-flags
+                                 vop
+                                 ',(if signed
+                                       (list addend-signed)
+                                       (list addend-unsigned))))))
+                         (emit-optimized-cmp x ,(fix 'y) temp (tn-ref-type x-ref)))))))))
+  (define-cmp-vop < :l :b -1 :le :be :s)
+  (define-cmp-vop > :g :a 1 :ge :ae))
 
 (define-vop (<-unsigned-signed)
   (:translate <)

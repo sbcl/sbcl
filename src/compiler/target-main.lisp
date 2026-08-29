@@ -38,6 +38,9 @@
                    fun old)))
       name)))
 
+#+sb-devel
+(defvar *debug-trace-toplevel-components* t)
+
 ;;; If ERORRP is true signals an error immediately -- otherwise
 ;;; returns a function that will signal the error.
 (defun %compile-in-lexenv (form *lexenv* name source-info tlf ephemeral errorp for-eval)
@@ -154,7 +157,12 @@
                             (multiple-value-bind (components top-components)
                                 (find-initial-dfo (list lambda))
                               (dolist (component (append components top-components))
-                                (compile-component component)))
+                                (let (#+sb-devel
+                                      (*compiler-trace-output*
+                                        (unless (and (not *debug-trace-toplevel-components*)
+                                                     (eq (component-kind component) :toplevel))
+                                          *compiler-trace-output*)))
+                                  (compile-component component))))
 
                             (fix-core-source-info *source-info* *compile-object*
                                                   (policy (lambda-bind lambda)
