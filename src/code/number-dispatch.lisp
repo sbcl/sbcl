@@ -249,13 +249,16 @@
        ((bignum bignum)
         (,big-op x y))))))
 
-(defmacro dispatch-ratio ((ratio numerator denominator) &body body)
+(defmacro dispatch-ratio ((ratio numerator denominator &optional integer-type) &body body)
   `(let ((,numerator (numerator ,ratio))
          (,denominator (denominator ,ratio)))
-     (if (and (fixnump ,numerator)
-              (fixnump ,denominator))
-         (progn ,@body)
-         (progn ,@body))))
+     ,(if (eq integer-type 'bignum)
+          `(progn
+             ,@body)
+          `(if (and (fixnump ,numerator)
+                    (fixnump ,denominator))
+               (progn ,@body)
+               (progn ,@body)))))
 
 (defmacro dispatch-two-ratios ((numerator1-var numerator1)
                                (denominator1-var denominator1)

@@ -544,7 +544,7 @@
 #+(and (not sb-xc-host) sb-simd-pack-512)
 (defun dump-simd-pack-512 (x file)
   (dump-fop 'fop-simd-pack file)
-  (dump-byte (logior (%simd-pack-512-tag x) (ash 1 6)) file)
+  (dump-byte (logior (%simd-pack-512-tag x) (ash 1 7)) file)
   (dump-integer-as-n-bytes (%simd-pack-512-0 x) 8 file)
   (dump-integer-as-n-bytes (%simd-pack-512-1 x) 8 file)
   (dump-integer-as-n-bytes (%simd-pack-512-2 x) 8 file)
