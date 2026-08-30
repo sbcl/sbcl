@@ -104,6 +104,7 @@
    ("invalid argument count" invalid-arg-count 1)
    ("invalid argument count" local-invalid-arg-count 2)
    ("bogus argument to VALUES-LIST" bogus-arg-to-values-list 1)
+   ("attempt to return too many values" too-many-return-values 1)
    ("An attempt was made to use an undefined SYMBOL-VALUE." unbound-symbol 1)
    ("attempt to RETURN-FROM a block that no longer exists" invalid-unwind 0)
    ("attempt to THROW to a non-existent tag" unseen-throw-tag 1)

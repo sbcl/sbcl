@@ -136,6 +136,14 @@ void *handle_fun_end_breakpoint(os_context_t *context)
     lispobj code, lra;
     struct code *codeptr;
     DX_ALLOC_SAP(context_sap, context);
+#ifdef LISP_FEATURE_TLS_BASED_MV_RETURN
+    struct thread *th = get_sb_vm_thread();
+    __typeof__(th->mv_return_values) saved_mv_return_values;
+    memcpy(saved_mv_return_values, th->mv_return_values, sizeof saved_mv_return_values);
+    unsigned char saved_mv_count = th->state_word.mv_count;
+    void *old_misc = th->breakpoint_misc;
+    th->breakpoint_misc = saved_mv_return_values;
+#endif
 
     fake_foreign_function_call(context);
 
@@ -177,6 +185,11 @@ void *handle_fun_end_breakpoint(os_context_t *context)
 
     undo_fake_foreign_function_call(context);
 
+#ifdef LISP_FEATURE_TLS_BASED_MV_RETURN
+    memcpy(th->mv_return_values, saved_mv_return_values, sizeof saved_mv_return_values);
+    th->state_word.mv_count = saved_mv_count;
+    th->breakpoint_misc = old_misc;
+#endif
 #ifdef reg_LRA
     return (void *)(lra-OTHER_POINTER_LOWTAG+sizeof(lispobj));
 #else

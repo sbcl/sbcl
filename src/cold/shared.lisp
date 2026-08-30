@@ -319,6 +319,8 @@
           (push :os-thread-stack sb-xc:*features*))
         (when (target-featurep '(:and :sb-thread :x86-64))
           (push :tls-load-indirect sb-xc:*features*))
+        #+nil (when (target-featurep ':x86-64) ; not yet
+                (push :tls-based-mv-return sb-xc:*features*))
         (when (target-featurep '(:and :x86 :int4-breakpoints))
           ;; 0xCE is a perfectly good 32-bit instruction,
           ;; unlike on x86-64 where it is illegal. It's therefore

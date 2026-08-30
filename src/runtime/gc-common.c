@@ -3309,3 +3309,19 @@ char* vm_thread_name(struct thread* th)
     if (simple_base_string_p(name)) return vector_sap(name);
     return "?";
 }
+
+#ifdef LISP_FEATURE_TLS_BASED_MV_RETURN
+int thread_multiple_value_hwm(struct thread* th)
+{
+    int limit = (int)(sizeof th->mv_return_values / sizeof (lispobj));
+    // ASSUMPTION: 3 of the multiple-values can go in registers so the thread-local
+    // area is only used if at least 4 values were returned from some function.
+    int count = fixnum_value(th->state_word.mv_count) - 3;
+    if (count > limit) count = limit;
+    if (count < 0) count = 0;
+    // scrub unused cells
+    memset(&th->mv_return_values[count], 0, (limit-count)<<WORD_SHIFT);
+    // Return the inclusive bound of the last cell used. -1 is acceptable
+    return count - 1;
+}
+#endif

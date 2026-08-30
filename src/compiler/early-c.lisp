@@ -31,7 +31,12 @@
   "The exclusive upper bound on the number of parameters which may be specified
   in a given lambda list. This is actually the limit on required and &OPTIONAL
   parameters. With &KEY and &AUX you can get more.")
-(defconstant multiple-values-limit call-arguments-limit
+(defconstant multiple-values-limit
+  #-tls-based-mv-return call-arguments-limit
+  ;; Careful: currently 1 byte of the thread state word stores the multiple-value count
+  ;; as a tagged fixnum. There is a small bit of headroom to raise this limit to 128
+  ;; (max count of 127) but any more needs a new thread slot.
+  #+tls-based-mv-return 65
   "The exclusive upper bound on the number of multiple VALUES that you can
   return.")
 

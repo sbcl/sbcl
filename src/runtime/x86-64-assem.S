@@ -212,11 +212,13 @@ Lcall:
 	sub	NIL_CARDTABLE_DISP, reg_NULL
 	call	*CLOSURE_FUN_OFFSET(%rax)
 
+#ifndef LISP_FEATURE_TLS_BASED_MV_RETURN
 	/* If the function returned multiple values, the carry flag will be set.
            Lose them */
 	jnc	LsingleValue
 	mov	%rbx, %rsp
 LsingleValue:
+#endif
 
 #ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
         pop    %r8

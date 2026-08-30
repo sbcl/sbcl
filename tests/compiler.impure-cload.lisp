@@ -350,6 +350,7 @@
 
 ;;; failed on Alpha prior to sbcl-0.8.10.30
 (defun lotso-values ()
+  #.(let ((form ' ; tries to return 100 values
   (values 0 1 2 3 4 5 6 7 8 9
           0 1 2 3 4 5 6 7 8 9
           0 1 2 3 4 5 6 7 8 9
@@ -360,6 +361,10 @@
           0 1 2 3 4 5 6 7 8 9
           0 1 2 3 4 5 6 7 8 9
           0 1 2 3 4 5 6 7 8 9))
+          )
+      (if (>= multiple-values-limit 101) ; required M-V-LIMIT for the test to pass
+          form                           ;  as it was originally written
+          (subseq form 0 multiple-values-limit))))
 
 ;;; bug 313: source transforms were "lisp-1"
 (defun srctran-lisp1-1 (cadr) (if (functionp cadr) (funcall cadr 1) nil))

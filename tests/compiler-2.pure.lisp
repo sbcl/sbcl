@@ -118,9 +118,10 @@
 
 (with-test (:name (nth-value :huge-n :works))
   (flet ((return-a-ton-of-values ()
-           (values-list (loop for i below 5000 collect i))))
+           (values-list (loop for i below (min 5000 (1- multiple-values-limit)) collect i))))
     (assert (= (nth-value 1 (return-a-ton-of-values)) 1))
-    (assert (= (nth-value 4000 (return-a-ton-of-values)) 4000))))
+    (let ((n (min 4000 (- multiple-values-limit 2))))
+      (assert (= (nth-value n (return-a-ton-of-values)) n)))))
 
 (with-test (:name :internal-name-p :skipped-on :sb-xref-for-internals)
   (assert (sb-c::internal-name-p 'sb-int:neq)))
@@ -824,7 +825,8 @@
       `(lambda (n x)
          (declare (sb-vm:word n))
          (log (float n))
-         (nth-value 33 (funcall x . #.(loop for i to 350 collect i))))
+         (nth-value 33 (funcall x . #.(loop for i to (min 350 (- multiple-values-limit 2))
+                                            collect i))))
     ((10 (lambda (&rest args) (values-list args))) 33)))
 
 (with-test (:name (dynamic-extent :recursive-local-functions))

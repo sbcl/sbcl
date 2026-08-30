@@ -279,7 +279,8 @@
 ;;;     returned, regardless of the number of values desired.
 (defun default-unknown-values (vop values nvals node rbx move-temp)
   (declare (type (or tn-ref null) values)
-           (type unsigned-byte nvals))
+           (type unsigned-byte nvals)
+           #+tls-based-mv-return (ignore rbx))
   (multiple-value-bind (type name leaf) (sb-c::lvar-fun-type (sb-c::basic-combination-fun node))
    (let* ((verify (and leaf
                         (policy node (and (>= safety 1)
@@ -333,9 +334,9 @@
                       register-arg-count)))
             ((and trust
                   (not (sb-kernel:values-type-may-be-single-value-p type)))
-             (inst mov rsp-tn rbx))
+             #-tls-based-mv-return (inst mov rsp-tn rbx))
             (t
-             (inst cmov :c rsp-tn rbx)
+             #-tls-based-mv-return (inst cmov :c rsp-tn rbx)
              (unless trust
                (inst mov move-temp (fixnumize 1))
                (inst cmov :nc rcx-tn move-temp)
@@ -363,9 +364,10 @@
                     do
                     (inst mov (tn-ref-tn tn-ref)
                           (if 2nd-tn-live 2nd-tn null-tn)))))
-              (inst mov rbx rsp-tn)
+              #-tls-based-mv-return (inst mov rbx rsp-tn)
               regs-defaulted))
 
+          #-tls-based-mv-return
           (when (or (not trust)
                     (< register-arg-count
                        (sb-kernel:values-type-max-value-count type)))
@@ -417,6 +419,13 @@
                           ;; is assumed to fit in a :dword register.
                           (inst cmp :dword rcx-tn (fixnumize i))
                           (inst jmp :be default-lab)))
+                      #+tls-based-mv-return
+                      (let ((src (thread-slot-ea (+ thread-mv-return-values-slot
+                                                    (- i register-arg-count)))))
+                        (inst mov tn (sc-case tn
+                                      (control-stack (inst mov move-temp src) move-temp)
+                                      (t src))))
+                      #-tls-based-mv-return
                       (sc-case tn
                         (control-stack
                          (loadw move-temp rbx (frame-word-offset (+ sp->fp-offset i)))
@@ -424,7 +433,7 @@
                         (t
                          (loadw tn rbx (frame-word-offset (+ sp->fp-offset i))))))))
                 DEFAULTING-DONE
-                (move rsp-tn rbx)
+                #-tls-based-mv-return (move rsp-tn rbx)
                 (unless trust
                   (check-nargs))
                 DONE
@@ -436,7 +445,7 @@
                         (emit-label default-stack-slots)
                         (loop for reg in used-registers
                               do (inst mov reg null-tn))
-                        (move rbx rsp-tn))
+                        #-tls-based-mv-return (move rbx rsp-tn))
                       (dolist (default defaults)
                         (emit-label (car default))
                         (inst mov (cdr default) null-tn))
@@ -463,6 +472,7 @@
 ;;; them.)
 (defun receive-unknown-values (args nargs start count node)
   (declare (type tn args nargs start count))
+  #-tls-based-mv-return ;; Old way
   (let ((type (sb-c::basic-combination-derived-type node))
         (variable-values (gen-label))
         (stack-values (gen-label))
@@ -506,6 +516,66 @@
     (unless unused-count-p
       (move count nargs))
 
+    (emit-label done))
+
+  #+tls-based-mv-return ;; New way
+  (let ((type (sb-c::basic-combination-derived-type node))
+        (variable-values (gen-label))
+        (done (gen-label))
+        (unused-count-p (eq (tn-kind count) :unused)))
+    (when (sb-kernel:values-type-may-be-single-value-p type)
+      (inst jmp :c variable-values)
+      (cond ((eq (tn-kind start) :unused)
+             (inst push (first *register-arg-tns*)))
+            ((location= start (first *register-arg-tns*))
+             (inst push (first *register-arg-tns*))
+             (inst lea start (ea n-word-bytes rsp-tn)))
+            (t (inst mov start rsp-tn)
+               (inst push (first *register-arg-tns*))))
+      (unless unused-count-p
+        (inst mov count (fixnumize 1)))
+      (inst jmp done)
+      (emit-label variable-values))
+    ;; Save current rsp into args (values-start) before allocating stack space
+    (inst mov args rsp-tn)
+    ;; Allocate stack space for nargs values
+    (let ((delta rax-tn))
+      (inst mov :dword delta nargs)
+      (inst shl :dword delta (- word-shift n-fixnum-tag-bits))
+      (inst sub rsp-tn delta))
+    ;; Store register args onto stack
+    (loop
+      for arg in *register-arg-tns*
+      for i downfrom -1
+      for j below (sb-kernel:values-type-max-value-count type)
+      do (storew arg args i))
+    ;; If > 3 values, copy thread-mv-return-values onto stack
+    (when (> (sb-kernel:values-type-max-value-count type) register-arg-count)
+      (let ((countdown rsi-tn)
+            (index rax-tn)
+            (stack-ptr rdi-tn)
+            (scratch rdx-tn))
+        (assemble ()
+          (inst cmp :dword nargs (fixnumize register-arg-count))
+          (inst jmp :le copy-done)
+          (inst lea :dword countdown (ea (fixnumize (- register-arg-count)) nargs))
+          (inst lea stack-ptr (ea (- (* (1+ register-arg-count) n-word-bytes)) args))
+          (zeroize index)
+          COPY-LOOP
+          (inst mov scratch
+                (ea (+ (ash thread-mv-return-values-slot word-shift)) thread-tn index 8))
+          (inst mov (ea stack-ptr) scratch)
+          (inst sub stack-ptr n-word-bytes)
+          (inst inc :dword index)
+          (inst sub :dword countdown (fixnumize 1))
+          (inst jmp :nz copy-loop)
+          ;; Restore a0 (rdi) from [args - 8]
+          (loadw (first *register-arg-tns*) args -1)
+          COPY-DONE)))
+    (unless (eq (tn-kind start) :unused)
+      (move start args))
+    (unless unused-count-p
+      (move count nargs))
     (emit-label done))
   (values))
 
@@ -1012,12 +1082,13 @@
   (:args (old-fp)
          (return-pc :to (:eval 1))
          (values :more t))
-  (:ignore values)
+  #-tls-based-mv-return (:ignore values)
+  (:vop-var vop)
   (:info nvals)
   ;; In the case of other than one value, we need these registers to
   ;; tell the caller where they are and how many there are.
   (:temporary (:sc unsigned-reg :offset rbx-offset) rbx)
-  (:temporary (:sc unsigned-reg :offset rcx-offset) rcx)
+  (:temporary (:sc any-reg :offset rcx-offset) rcx)
   ;; We need to stretch the lifetime of return-pc past the argument
   ;; registers so that we can default the argument registers without
   ;; trashing return-pc.
@@ -1034,7 +1105,7 @@
       ;; This is handled in RETURN-SINGLE.
       (error "nvalues is 1"))
     ;; Establish the values pointer and values count.
-    (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
+    #-tls-based-mv-return (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
     (if (zerop nvals)
         (zeroize rcx) ; smaller
         (inst mov rcx (fixnumize nvals)))
@@ -1042,6 +1113,8 @@
     (when (< nvals register-arg-count)
       (dolist (tn (nthcdr nvals (list a0 a1 a2)))
         (move tn null-tn)))
+    #-tls-based-mv-return
+    (progn
     ;; Set the multiple value return flag.
     (inst stc)
     ;; And away we go. Except that return-pc is still on the
@@ -1061,7 +1134,33 @@
                  (ea (frame-byte-offset (1- nvals)) rbp-tn))
            (move rbp-tn old-fp)
            (emit-mv-return
-            (ea (frame-byte-offset (+ sp->fp-offset (tn-offset return-pc))) rbx))))))
+            (ea (frame-byte-offset (+ sp->fp-offset (tn-offset return-pc))) rbx)))))
+    #+tls-based-mv-return
+    (cond
+      ((>= nvals multiple-values-limit)
+       (error-call vop 'too-many-return-values-error rcx))
+      (t
+       ;; If nvals > register-arg-count, copy the extras to thread->mv_return_values.
+       ;; Compared to #-tls-based-mv-return this looks like it's doing more, but that's
+       ;; only because ir2-convert-return did not move results to the receiving frame.
+       (when (> nvals register-arg-count)
+         (do ((tn-ref (do ((i register-arg-count (1- i)) ; skip over this many
+                           (ref values (tn-ref-across ref)))
+                          ((zerop i) ref))
+                      (tn-ref-across tn-ref))
+              (slot 0 (1+ slot)))
+             ((null tn-ref))
+           (inst mov (thread-slot-ea (+ thread-mv-return-values-slot slot))
+                 (let ((tn (tn-ref-tn tn-ref)))
+                   (cond ((sc-is tn immediate) (immediate-tn-repr tn))
+                         ((sc-is tn any-reg descriptor-reg) tn)
+                         (t (inst mov rbx tn) rbx))))) ; use RBX as a scratch reg
+         ;; Inform GC of the high water mark so it can clear below. If a function returns a huge
+         ;; object as its 39th value, the next function to store a smaller number of values
+         ;; grants permission to smash the huge object. Maybe always do this store?
+         (inst mov :byte (thread-mv-count) (fixnumize nvals)))
+       (inst stc) ; multiple value return flag
+       (inst leave) (inst ret)))))
 
 ;;; Do unknown-values return of an arbitrary number of values (passed
 ;;; on the stack.) We check for the common case of a single return

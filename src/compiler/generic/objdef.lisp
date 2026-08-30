@@ -602,6 +602,12 @@ during backtrace.
   (slow-path-allocs)
   (et-find-freeish-page)
   (et-bzeroing)
+  #+tls-based-mv-return ; An array of lispobj for multiple values
+  ;; HACK - SB-VM::REGISTER-ARG-COUNT is not defined yet (it's in the "vm" file
+  ;; but it could maybe be moved to the "parms" file). So our choices are to
+  ;; hardcode a 3 here or oversize the array and let confusion reign.
+  ;; Also remember, limit is an exclusive upper bound so "size" is 1 less.
+  (mv-return-values :length #.(- (1- sb-xc:multiple-values-limit) 3))
   ;; The *current-thread* MUST be the last slot in the C thread structure.
   ;; It it the only slot that needs to be noticed by the garbage collector.
   (lisp-thread :pointer t :special sb-thread:*current-thread*))

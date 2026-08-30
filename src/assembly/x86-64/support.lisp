@@ -234,6 +234,7 @@
 ;; that 4-valued return is suboptimal because it didn't use 2 instructions to do the job of 1.
 ;; But if a microbenchmark can show that to be true, it suffices to change it only here
 ;; instead of in a few places.
+#-tls-based-mv-return
 (defmacro emit-mv-return (reg/mem &optional emit-stc)
   ;; All mv returns (incl. 0) need CF set, but it could occur outside (before) the macro
   `(progn ,@(if emit-stc '((inst stc)))

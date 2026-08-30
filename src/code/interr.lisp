@@ -230,6 +230,9 @@
   (with-simple-restart (continue "Ignore the last CDR")
     (error 'values-list-argument-error :datum list :expected-type 'list)))
 
+(deferr too-many-return-values-error (count)
+  (%program-error "Can not return ~D values (MULTIPLE-VALUES-LIMIT exceeded)" count))
+
 (defun restart-unbound (symbol condition context)
   (multiple-value-bind (tn-offset pc-offset)
       (sb-c::decode-restart-location context)

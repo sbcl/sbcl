@@ -3634,10 +3634,25 @@
                   (compiled-debug-fun-compiler-debug-fun
                    (breakpoint-what bpt))))
         (results nil))
+    #+tls-based-mv-return (declare (ignorable ocfp))
     (case returns
       (:standard
        (let ((nargs (boxed-context-register scp sb-vm::nargs-offset))
              (reg-arg-offsets '#.sb-vm::*register-arg-offsets*))
+         #+tls-based-mv-return
+         (let* ((misc (sb-vm::current-thread-offset-sap sb-vm::thread-breakpoint-misc-slot))
+                (mv-sap (if (zerop (sap-int misc))
+                            (sap+ (sb-thread::current-thread-sap)
+                                  (ash sb-vm::thread-mv-return-values-slot sb-vm:word-shift))
+                            misc)))
+           (dotimes (arg-num nargs)
+             (push (if reg-arg-offsets
+                       (boxed-context-register scp (pop reg-arg-offsets))
+                       (sap-ref-lispobj mv-sap
+                                        (ash (- arg-num sb-vm::register-arg-count)
+                                             sb-vm:word-shift)))
+                   results)))
+         #-tls-based-mv-return
          (dotimes (arg-num nargs)
            (push (if reg-arg-offsets
                      (boxed-context-register scp (pop reg-arg-offsets))

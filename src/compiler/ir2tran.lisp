@@ -1691,6 +1691,35 @@
                (nil)
                (return-info-locations returns))))
       ((eq lvar-kind :fixed)
+       #+tls-based-mv-return
+       (let* ((types (loop for tn in (ir2-lvar-locs 2lvar)
+                           for i from 0
+                           collect
+                           ;; TLS MV area requires boxed values.
+                           ;; Only call tn-primitive-type for the register results.
+                           (if (< i sb-vm::register-arg-count)
+                               (tn-primitive-type tn)
+                               *backend-t-primitive-type*)))
+              (lvar-locs (lvar-tns node block lvar types))
+              (nvals (length lvar-locs))
+              (nregs (min nvals sb-vm::register-arg-count))
+              (reg-locs (make-standard-value-tns nregs)))
+         (when (>= nvals multiple-values-limit)
+           (compiler-warn "Can not return ~D values" nvals))
+         ;; Calling MAKE-STANDARD-VALUE-TNS for more than the number of result-passing regs
+         ;; would go wrong because the standard location of the excess results is the stack.
+         ;; We also can't call EMIT-MOVE. RETURN vop will deal with some LVAR-LOCS as-is
+         (mapc (lambda (val loc) (emit-move node block val loc)) lvar-locs reg-locs)
+         ;; +/-tls-based are the nearly the same from here down
+         ;; but I don't see how to easily share the code.
+         (if (= nvals 1)
+             (vop return-single node block old-fp return-pc (car reg-locs))
+             (let ((locs (append reg-locs (nthcdr nregs lvar-locs))))
+               (vop* return node block
+                     (old-fp return-pc (reference-tn-list locs nil))
+                     (nil)
+                     nvals))))
+       #-tls-based-mv-return
        (let* ((types (mapcar #'tn-primitive-type (ir2-lvar-locs 2lvar)))
               (lvar-locs (lvar-tns node block lvar types))
               (nvals (length lvar-locs))

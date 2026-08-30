@@ -108,6 +108,11 @@
       (let (#+gs-seg (thread-tn nil))
         (ea thread-segment-reg (ash slot-index word-shift) thread-tn))))
 
+#+tls-based-mv-return
+(defmacro thread-mv-count ()
+  ;; This is byte index 1 of thread_state_word
+  '(ea (1+ (ash thread-state-word-slot word-shift)) thread-tn))
+
 ;;; Similar to thread-slot-ea, but INDEX in this case does not signify the Nth slot {0,1,2,..}
 ;;; but rather the displacement into the thread's storage, added to the thread base address.
 (defun thread-tls-ea (index)

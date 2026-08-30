@@ -366,4 +366,7 @@ extern int handle_tls_deref_trap(os_context_t*, os_vm_address_t);
 # define bytes_per_tls_symbol N_WORD_BYTES
 #endif
 
+// Return the high-water-mark of the multiple-value return area
+extern int thread_multiple_value_hwm(struct thread*);
+
 #endif /* _INCLUDE_THREAD_H_ */

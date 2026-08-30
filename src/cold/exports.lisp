@@ -2022,6 +2022,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%INSTANCE-SET"
            "TESTABLE-TYPE-P"
            "TLS-EXHAUSTED-ERROR"
+           "TOO-MANY-RETURN-VALUES-ERROR"
            "*TOP-LEVEL-FORM-P*"
            "TWO-ARG-*" "TWO-ARG-+" "TWO-ARG--" "TWO-ARG-/"
            "TWO-ARG-/=" "TWO-ARG-<" "TWO-ARG-<=" "TWO-ARG-="
