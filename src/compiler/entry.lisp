@@ -137,7 +137,7 @@ missing MAKE-LOAD-FORM methods?")
                 (closure (and
                           ;; It may have been deleted due to none of
                           ;; the optional entries reaching it.
-                          (neq (functional-kind main-entry) :deleted)
+                          (not (functional-kind-eq main-entry deleted))
                           (environment-closure (lambda-environment main-entry)))))
            (dolist (ref (leaf-refs lambda))
              (let ((ref-component (node-component ref)))
