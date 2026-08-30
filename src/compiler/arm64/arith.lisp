@@ -162,9 +162,13 @@
   `(progn
      (define-vop (,(symbolicate 'fast- translate '/fixnum=>fixnum)
                   fast-fixnum-binop)
+       (:args (x :scs (any-reg))
+              (y :scs (any-reg signed-reg unsigned-reg)))
        (:translate ,translate)
        (:generator 2
-         (inst ,op r x y)))
+         (inst ,op r x (if (sc-is y any-reg)
+                           y
+                           (lsl y n-fixnum-tag-bits)))))
      (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
                   fast-fixnum-binop-c)
        (:arg-types tagged-num
@@ -989,33 +993,41 @@
   (define shift-towards-start lsr)
   (define shift-towards-end   lsl))
 
-(define-vop (signed-byte-64-len)
-  (:translate integer-length)
-  (:note "inline (signed-byte 64) integer-length")
-  (:policy :fast-safe)
-  (:args (arg :scs (signed-reg) :target temp))
-  (:arg-types signed-num)
-  (:results (res :scs (any-reg)))
-  (:result-types positive-fixnum)
-  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) temp)
-  (:generator 5
-    (inst cls temp arg)
-    (inst mov res (fixnumize 63))
-    (inst sub res res (lsl temp n-fixnum-tag-bits))))
+(defknown (cls clz) (integer)
+    (integer 0 #.sb-vm:n-word-bits)
+    (movable foldable flushable))
 
-(define-vop (unsigned-byte-64-len)
-  (:translate integer-length)
-  (:note "inline (unsigned-byte 64) integer-length")
+(defun clz (integer) (- 64 (integer-length integer)))
+(defun cls (integer) (- 63 (integer-length integer)))
+
+;;; Implement via transforms and cls/clz, so that the addition has a
+;;; chance to get associated with some surrounding arithmetic.
+(deftransform integer-length ((integer) (signed-word) * :node node :priority :last)
+  (sb-c::delay-ir1-transform node :ir1-phases)
+  `(- 63 (cls integer)))
+(deftransform integer-length ((integer) (word) fixnum :node node :priority :last)
+  (sb-c::delay-ir1-transform node :ir1-phases)
+  `(- 64 (clz integer)))
+
+(define-vop ()
+  (:translate cls)
   (:policy :fast-safe)
-  (:args (arg :scs (unsigned-reg) :target temp))
-  (:arg-types unsigned-num)
-  (:results (res :scs (any-reg)))
+  (:args (arg :scs (unsigned-reg signed-reg)))
+  (:arg-types (:or signed-num unsigned-num))
+  (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
-  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) temp)
-  (:generator 5
-    (inst clz temp arg)
-    (inst mov res (fixnumize 64))
-    (inst sub res res (lsl temp n-fixnum-tag-bits))))
+  (:generator 1
+    (inst cls res arg)))
+
+(define-vop ()
+  (:translate clz)
+  (:policy :fast-safe)
+  (:args (arg :scs (unsigned-reg signed-reg)))
+  (:arg-types (:or signed-num unsigned-num))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:generator 1
+    (inst clz res arg)))
 
 (define-vop ()
   (:translate count-trailing-zeros)
