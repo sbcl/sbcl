@@ -1040,11 +1040,8 @@
         (inst mov rcx (fixnumize nvals)))
     ;; Pre-default any argument register that need it.
     (when (< nvals register-arg-count)
-      (let* ((arg-tns (nthcdr nvals (list a0 a1 a2)))
-             (first (first arg-tns)))
-        (inst mov first null-tn)
-        (dolist (tn (cdr arg-tns))
-          (inst mov tn first))))
+      (dolist (tn (nthcdr nvals (list a0 a1 a2)))
+        (move tn null-tn)))
     ;; Set the multiple value return flag.
     (inst stc)
     ;; And away we go. Except that return-pc is still on the
