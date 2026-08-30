@@ -62,13 +62,5 @@
 ;;; pseudo-atomic would benefit from a way to advise the allocator
 ;;; to fill with a non-default value.
 #-x86-64
-(define-vop ()
-  (:policy :fast-safe)
-  (:translate sb-vm::splat)
-  (:args (vector :scs (sb-vm::descriptor-reg))
-         (words :scs (sb-vm::unsigned-reg sb-vm::immediate)))
-  (:info value)
-  (:arg-types * sb-vm::positive-fixnum (:constant t))
-  (:results (result :scs (sb-vm::descriptor-reg)))
-  (:ignore words value)
-  (:generator 1 (move result vector)))
+(define-source-transform sb-vm::splat (vector n value)
+  `(prog1 ,vector ,n ,value))
