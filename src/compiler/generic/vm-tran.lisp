@@ -328,6 +328,19 @@
                                      (%array-data array))
                           index)))))
 
+(deftransform #-(or x86 x86-64) data-vector-ref
+              #+(or x86 x86-64) data-vector-ref-with-offset
+  ((array index #+(or x86 x86-64) offset) (vector (constant-arg t) #+(or x86 x86-64) (constant-arg t)))
+  (let ((index (+ (lvar-value index)
+                  #+(or x86 x86-64) (lvar-value offset))))
+    (or (combination-case array
+          (initialize-vector *
+           (when (< index (length (cdr args)))
+             (splice-fun-args array :any (lambda (args)
+                                           (elt (cdr args) index)))
+             'array)))
+        (give-up-ir1-transform))))
+
 ;;; Transform data vector access to a form that opens up optimization
 ;;; opportunities. On platforms that support DATA-VECTOR-REF-WITH-OFFSET
 ;;; DATA-VECTOR-REF is not supported at all.

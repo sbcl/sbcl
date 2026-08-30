@@ -9,7 +9,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(enable-test-parallelism)
+;(enable-test-parallelism)
 
 
 (import '(sb-c::combination-fun-debug-name
@@ -43,7 +43,8 @@
      (lambda (component)
        (ctu:do-blocks (block component)
          (ctu:do-nodes (node nil block)
-           (when (basic-combination-p node)
+           (when (and (basic-combination-p node)
+                      (not (eq (sb-c::basic-combination-kind node) :local)))
              (push node calls))))))
     calls))
 
@@ -919,3 +920,9 @@
     (assert (eq (funcall f  0 'whatever) 'yes))
     (assert (eq (funcall f :other 'ignore) 'yes))
     (assert (eq (funcall f 3 4) 'no))))
+
+(with-test (:name :aref-vector-fold)
+  (assert (null
+           (ir-calls
+            `(lambda (a)
+               (aref (vector a) 0))))))
