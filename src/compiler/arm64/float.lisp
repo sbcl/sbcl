@@ -606,35 +606,63 @@
              `(progn
                 (define-vop (,complex-complex-name)
                   (:translate =)
-                  (:args (x :scs (,complex-sc)) (y :scs (,complex-sc)))
+                  (:args (x :scs (,complex-sc))
+                         (y :scs (,complex-sc (fp-immediate
+                                               (zerop (tn-value tn))))))
                   (:arg-types ,complex-type ,complex-type)
                   (:temporary (:sc ,complex-sc) mask)
-                  (:temporary (:sc unsigned-reg) min)
                   (:conditional :ne)
+                  (:vop-var vop)
                   (:policy :fast-safe)
                   (:generator 3
-                     (inst fcmeq mask x y ,float-size)
-                     (inst uminv mask mask ,byte-size)
-                     (inst umov min mask 0 :b)
-                     (inst cmp min 0)))
+                    (when (sc-is y fp-immediate)
+                      (setf y (tn-value y)))
+                    (inst fcmeq mask x y ,float-size)
+                    ,@(if (eq real-type 'double-float)
+                          `((inst uminv mask mask ,byte-size)
+                            (inst umov tmp-tn mask 0 :b)
+                            (inst cmp tmp-tn 0))
+                          `((inst umov tmp-tn mask 0 :d)
+                            (inst cmn tmp-tn 1)
+                            (change-vop-flags vop '(:eq))))))
                 (define-vop (,eql-complex-complex-name)
                   (:translate eql)
-                  (:args (x :scs (,complex-sc)) (y :scs (,complex-sc)))
+                  (:args (x :scs (,complex-sc))
+                         (y :scs (,complex-sc (fp-immediate
+                                               (member (tn-value tn) '(#c(0d0 0d0) #c(0f0 0f0)))))))
                   (:arg-types ,complex-type ,complex-type)
-                  (:temporary (:sc ,complex-sc) mask)
-                  (:temporary (:sc unsigned-reg) min)
+                  (:temporary (:sc ,complex-sc
+                                   ,@(when (eq real-type 'single-float)
+                                       `(:unused-if (and (sc-is y fp-immediate)
+                                                         (eql (tn-value y) #c(0f0 0f0))))))
+                              mask)
                   (:conditional :ne)
+                  (:vop-var vop)
                   (:policy :fast-safe)
                   (:generator 3
-                     (inst cmeq mask x y ,byte-size)
-                     (inst uminv mask mask ,byte-size)
-                     (inst umov min mask 0 :b)
-                     (inst cmp min 0)))
+                    (when (sc-is y fp-immediate)
+                      (setf y 0))
+
+                    ,@(if (eq real-type 'double-float)
+                          `((inst cmeq mask x y ,byte-size)
+                            (inst uminv mask mask ,byte-size)
+                            (inst umov tmp-tn mask 0 :b)
+                            (inst cmp tmp-tn 0))
+                          `((cond ((eq y 0)
+                                   (inst umov tmp-tn x 0 :d)
+                                   (inst cmn tmp-tn 0)
+                                   (change-vop-flags vop '(:eq)))
+                                  (t
+                                   (inst cmeq mask x y ,byte-size)
+                                   (inst umov tmp-tn mask 0 :d)
+                                   (inst cmn tmp-tn 1)
+                                   (change-vop-flags vop '(:eq))))))))
                 (define-vop (,real-complex-name ,complex-complex-name)
                   (:args (x :scs (,real-sc)) (y :scs (,complex-sc)))
                   (:arg-types ,real-type ,complex-type))
                 (define-vop (,complex-real-name ,complex-complex-name)
-                  (:args (x :scs (,complex-sc)) (y :scs (,real-sc)))
+                  (:args (x :scs (,complex-sc)) (y :scs (,real-sc (fp-immediate
+                                                                   (zerop (tn-value tn))))))
                   (:arg-types ,complex-type ,real-type)))))
   (define-complex-float-=
       =/complex-single-float =/complex-real-single-float
@@ -1005,10 +1033,11 @@
   (:generator 3
     (sc-case x
       (complex-single-reg
-       (inst ins r 0 x (ecase slot
-                           (:real 0)
-                           (:imag 1))
-             :s))
+       (ecase slot
+         (:real
+          (move-float r x))
+         (:imag
+          (inst ins r 0 x 1 :s))))
       (complex-single-stack
        (inst ldr r
              (@ (current-nfp-tn vop)
@@ -1040,10 +1069,11 @@
   (:generator 3
     (sc-case x
       (complex-double-reg
-       (inst ins r 0 x (ecase slot
-                           (:real 0)
-                           (:imag 1))
-             :d))
+       (ecase slot
+         (:real
+          (move-float r x))
+         (:imag
+          (inst ins r 0 x 1 :d))))
       (complex-double-stack
        (loadw r (current-nfp-tn vop) (+ (ecase slot (:real 0) (:imag 1))
                                         (tn-offset x)))))))

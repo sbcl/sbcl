@@ -3170,10 +3170,7 @@
                                 (fpr-offset rd)))))
          ((and (fp-register-p rd)
                (fp-register-p rn))
-          (assert (and (eq (tn-sc rd) (tn-sc rn))) (rd rn)
-                  "Arguments should have the same fp storage class: ~s ~s."
-                  rd rn)
-          (emit-fp-data-processing-1 segment (fp-reg-type rn) 0
+          (emit-fp-data-processing-1 segment (fp-reg-type rd) 0
                                      (fpr-offset rn) (fpr-offset rd)))
          ((and (register-p rd)
                (fp-register-p rn))
@@ -3684,25 +3681,45 @@
   (def sshl #b0 #b01001)
   (def ushl #b1 #b01001))
 
-(macrolet ((def (name u neg op)
+(macrolet ((def (name u neg op &optional zero-u zero)
              `(define-instruction ,name (segment rd rn rm size)
-                (:printer simd-three-same-float ((u ,u) (neg ,neg) (op ,op)))
+                ,@(when op
+                    `((:printer simd-three-same-float ((u ,u) (neg ,neg) (op ,op)))))
+                ,@(when zero
+                    `((:printer simd-two-misc ((u ,zero-u) (op ,zero))
+                                '(:name :tab rd ", " rn ", " "#0.0"))))
                 (:emitter
                  (aver (member size '(:2s :4s :2d)))
                  (multiple-value-bind (q size) (encode-vector-size size)
-                   (emit-simd-three-same-float
-                    segment
-                    q
-                    ,u
-                    ,neg
-                    (logand 1 size)
-                    (fpr-offset rm)
-                    ,op
-                    (fpr-offset rn)
-                    (fpr-offset rd)))))))
-  (def fcmeq #b0 #b0 #b11100)
-  (def fcmge #b1 #b0 #b11100)
-  (def fcmgt #b1 #b1 #b11100))
+                   (cond ,@(when zero
+                             `(((and (numberp rm) (zerop rm))
+                                (emit-simd-two-misc segment
+                                                    q
+                                                    ,zero-u
+                                                    0
+                                                    size
+                                                    ,zero
+                                                    (fpr-offset rn)
+                                                    (fpr-offset rd)))))
+                         (t
+                          ,(if op
+                               `(emit-simd-three-same-float segment
+                                                            q
+                                                            ,u
+                                                            ,neg
+                                                            (logand 1 size)
+                                                            (fpr-offset rm)
+                                                            ,op
+                                                            (fpr-offset rn)
+                                                            (fpr-offset rd))
+                               `(error "Can be compared only with 0.0")))))))))
+  (def fcmeq #b0 #b0 #b11100 0 #b01101)
+  (def fcmge #b1 #b0 #b11100 1 #b01100)
+  (def fcmgt #b1 #b1 #b11100 0 #b01100)
+  (def fcmle nil nil nil     1 #b01101)
+  (def fcmlt nil nil nil     0 #b01110)
+  (def facge #b1 #b0 #b11101)
+  (def facgt #b1 #b1 #b11101))
 
 (def-emitter simd-scalar-three-same
     (#b01 2 30)
