@@ -454,7 +454,7 @@ The second returned value is the remainder."
            (bignum-truncate-single-digit (make-small-bignum number) divisor)
            (bignum-truncate (make-small-bignum number) divisor)))
       ((ratio (foreach (eql 1) fixnum bignum))
-       (dispatch-ratio (number numerator denominator)
+       (dispatch-ratio (number numerator denominator (dispatch-type divisor))
          (multiple-value-bind (q rem) (truncate numerator
                                                 (* denominator divisor))
            (values q (%make-ratio rem denominator)))))
@@ -527,7 +527,7 @@ The second returned value is the remainder."
             (bignum-truncate-single-digit (make-small-bignum number) divisor)
             (bignum-truncate (make-small-bignum number) divisor))))
       ((ratio (foreach (eql 1) fixnum bignum))
-       (dispatch-ratio (number numerator denominator)
+       (dispatch-ratio (number numerator denominator (dispatch-type divisor))
          (let* ((q-num numerator)
                 (q-den (* denominator divisor))
                 (rem-den denominator))
@@ -608,7 +608,7 @@ The second returned value is the remainder."
             (bignum-truncate-single-digit (make-small-bignum number) divisor)
             (bignum-truncate (make-small-bignum number) divisor))))
       ((ratio (foreach (eql 1) fixnum bignum))
-       (dispatch-ratio (number numerator denominator)
+       (dispatch-ratio (number numerator denominator (dispatch-type divisor))
          (let* ((q-num numerator)
                 (q-den (* denominator divisor))
                 (rem-den denominator))
@@ -1216,7 +1216,7 @@ the first."
                    :infinite-y-finite-x
                    (,op (coerce 0 '(dispatch-type y)) y))
                   (((foreach fixnum bignum) ratio)
-                   (dispatch-ratio (y numerator denominator)
+                   (dispatch-ratio (y numerator denominator (dispatch-type x))
                        (,(case op
                            (<= '<)
                            (>= '>)
@@ -1224,7 +1224,7 @@ the first."
                         x (,ratio-arg2 numerator
                                        denominator))))
                   ((ratio (foreach fixnum bignum))
-                   (dispatch-ratio (x numerator denominator)
+                   (dispatch-ratio (x numerator denominator (dispatch-type x))
                      (,(case op
                          (<= '<)
                          (>= '>)
