@@ -43,16 +43,6 @@
 ;;; something not EQ to anything we might legitimately READ
 (define-load-time-global *eof-object* (make-symbol "EOF-OBJECT"))
 
-(macrolet ((make-file-stream-source-info (s)
-             `(sb-c::make-source-info
-               :file-info (sb-c::make-file-info
-                           :%truename :defer
-                           ;; This T-L-P has been around since at least 2011.
-                           ;; It's unclear why an LPN isn't good enough.
-                           :pathname (translate-logical-pathname ,s)
-                           :external-format (stream-external-format ,s)
-                           :write-date (file-write-date ,s)))))
-
 ;;; Load a text stream.  (Note that load-as-fasl is in another file.)
 ;; We'd like, when entering the debugger as a result of an EVAL error,
 ;; that the condition be annotated with the stream position.
@@ -101,13 +91,20 @@
          (locally (declare (optimize (sb-c::type-check 0)))
            (setf sb-c::*current-path* (make-unbound-marker)))
          (if pathname
-             (let* ((info (make-file-stream-source-info stream))
-                    (sb-c::*source-info* info))
+             (let* ((info (sb-c::make-source-info
+                           :file-info (sb-c::make-file-info
+                                       :%truename :defer
+                                        ;; This T-L-P has been around since at least 2011.
+                                        ;; It's unclear why an LPN isn't good enough.
+                                        :pathname (translate-logical-pathname stream)
+                                        :external-format (stream-external-format stream)
+                                        :write-date (file-write-date stream))))
+                     (sb-c::*source-info* info))
                (locally (declare (optimize (sb-c::type-check 0)))
                  (setf sb-c::*current-path* (make-unbound-marker)))
                (setf (sb-c::source-info-stream info) stream)
                (sb-c:do-forms-from-info ((form current-index) info
-                                          'sb-c::input-error-in-load)
+                                         'sb-c::input-error-in-load)
                  (sb-c::with-source-paths
                    (sb-c::find-source-paths form current-index)
                    (eval-form form current-index))))
@@ -121,7 +118,6 @@
                      do (sb-c::with-source-paths
                           (eval-form form nil)))))))))
   t)
-) ; end MACROLET
 
 ;;;; LOAD itself
 
