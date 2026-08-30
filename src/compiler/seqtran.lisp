@@ -4511,23 +4511,25 @@
     (make-numeric-type 'integer min max)))
 
 (defoptimizers constants
-    (hairy-data-vector-ref hairy-data-vector-ref/check-bounds
+    (nth nthcdr sb-impl::append2 nreconc revappend
+     %adjoin %adjoin-eq %adjoin-key %adjoin-test %adjoin-key-eq %adjoin-key-test %adjoin-key-test-not
+     %assoc %assoc-eq %assoc-key %assoc-test %assoc-key-eq %assoc-key-test %assoc-key-test-not
+     %rassoc %rassoc-eq %rassoc-key %rassoc-test %rassoc-key-eq %rassoc-key-test %rassoc-key-test-not
+     %member %member-eq %member-key %member-test %member-key-eq %member-key-test %member-key-test-not
+     %find-position %find-position-if %find-position-if-not
+     remove remove-if remove-if-not)
+    ((a b &rest args))
+  b)
+
+(defoptimizers constants
+    (car cdr last elt-list
+     hairy-data-vector-ref hairy-data-vector-ref/check-bounds
      data-vector-ref data-vector-ref-with-offset)
-    ((array index &optional offset))
-  array)
+    ((a &rest args))
+  a)
 
-(defoptimizers constants (nth nthcdr) ((index list))
-  list)
-(defoptimizers constants (car cdr) ((cons))
-  cons)
-
-(defoptimizers constants (%find-position %find-position-if %find-position-if-not)
-    ((x sequence from-end start end key))
-  sequence)
-
-(defoptimizers constants (remove remove-if remove-if-not)
-    ((x sequence &rest rest))
-  sequence)
+(defoptimizers constants (append nconc list*) ((&rest args))
+  (car (last args)))
 
 (defoptimizer (vector-to-list derive-type) ((vector))
   (when (typep (nth-value 1 (sequence-lvar-dimensions vector)) '(integer 1))
