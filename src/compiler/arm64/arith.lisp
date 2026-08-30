@@ -1741,11 +1741,9 @@
   (:policy :fast-safe)
   (:args (digit :scs (unsigned-reg)))
   (:arg-types unsigned-num)
-  (:conditional)
-  (:info target not-p)
+  (:conditional :ge)
   (:generator 2
-    (inst cmp digit 0)
-    (inst b (if not-p :lt :ge) target)))
+    (inst cmp digit 0)))
 
 (define-vop (add-w/carry)
   (:translate sb-bignum:%add-with-carry)
