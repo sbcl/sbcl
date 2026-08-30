@@ -17,6 +17,22 @@
   (format t "~&INFO: simd-pack-256 not supported")
   (invoke-restart 'run-tests::skip-file))
 
+(defun %simd-pack-256-doubles (pack)
+  (values (sb-vm::%simd-pack-ref-double pack 0)
+          (sb-vm::%simd-pack-ref-double pack 1)
+          (sb-vm::%simd-pack-ref-double pack 2)
+          (sb-vm::%simd-pack-ref-double pack 3)))
+
+(defun %simd-pack-256-singles (pack)
+  (values (sb-vm::%simd-pack-ref-single pack 0)
+          (sb-vm::%simd-pack-ref-single pack 1)
+          (sb-vm::%simd-pack-ref-single pack 2)
+          (sb-vm::%simd-pack-ref-single pack 3)
+          (sb-vm::%simd-pack-ref-single pack 4)
+          (sb-vm::%simd-pack-ref-single pack 5)
+          (sb-vm::%simd-pack-ref-single pack 6)
+          (sb-vm::%simd-pack-ref-single pack 7)))
+
 (defun make-constant-packs ()
   (values (sb-ext:%make-simd-pack-256-ub64 1 2 3 4)
           (sb-ext:%make-simd-pack-256-ub32 0 0 0 0 0 0 0 0)
@@ -69,7 +85,7 @@
                                  8 :initial-element (sb-kernel:make-single-float -1)))
           for pack in (list f f0 f-1)
           do (assert (every #'eql expected
-                            (multiple-value-list (sb-ext:%simd-pack-256-singles pack)))))
+                            (multiple-value-list (%simd-pack-256-singles pack)))))
     (loop for expected in (list '(1d0 2d0 3d0 4d0)
                                 '(0d0 0d0 0d0 0d0)
                                 (make-list
@@ -77,7 +93,7 @@
                                                      -1 (ldb (byte 32 0) -1))))
           for pack in (list d d0 d-1)
           do (assert (every #'eql expected
-                            (multiple-value-list (sb-ext:%simd-pack-256-doubles pack)))))))
+                            (multiple-value-list (%simd-pack-256-doubles pack)))))))
 
 (with-test (:name (simd-pack-256 print :smoke))
   (let ((packs (multiple-value-list (make-constant-packs))))
@@ -138,7 +154,7 @@
            (let ((*pack* nil))
              (load tmp-fasl)
              (assert (typep *pack* '(sb-ext:simd-pack-256 single-float)))
-             (assert (equal (multiple-value-list (sb-ext:%simd-pack-256-singles *pack*))
+             (assert (equal (multiple-value-list (%simd-pack-256-singles *pack*))
                             '(1f0 2f0 3f0 4f0 5f0 6f0 7f0 8f0)))))
       (when tmp-fasl (delete-file tmp-fasl))
       (delete-file *tmp-filename*))))
@@ -156,7 +172,7 @@
            (let ((*pack* nil))
              (load tmp-fasl)
              (assert (typep *pack* '(sb-ext:simd-pack-256 double-float)))
-             (assert (equal (multiple-value-list (sb-ext:%simd-pack-256-doubles *pack*))
+             (assert (equal (multiple-value-list (%simd-pack-256-doubles *pack*))
                             '(1d0 2d0 3d0 4d0)))))
       (when tmp-fasl (delete-file tmp-fasl))
       (delete-file *tmp-filename*))))

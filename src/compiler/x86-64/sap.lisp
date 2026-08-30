@@ -158,7 +158,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
     (ea disp sap index)))
 
 (defun emit-sap-ref (size insn modifier result sap offset node vop temp)
-  (declare (ignorable node size vop temp))
+  (declare (ignorable node size vop))
   (cond
    ;; MSAN as implemented can't correctly interact with the C sanitizer because
    ;; C msan shadow memory indicates bit-for-bit whether the user-visible memory

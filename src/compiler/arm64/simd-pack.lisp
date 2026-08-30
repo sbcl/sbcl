@@ -228,71 +228,27 @@
           +simd-pack-element-types+))))
 
 #-sb-xc-host
-(macrolet ((unpack-unsigned (pack bits)
-             `(simd-pack-dispatch ,pack
-                (let ((lo (%simd-pack-low ,pack))
-                      (hi (%simd-pack-high ,pack)))
-                  (values
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-unsigned-1 ,bits ,pos lo))
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-unsigned-1 ,bits ,pos hi))))))
-           (unpack-unsigned-1 (bits position ub64)
-             `(ldb (byte ,bits ,position) ,ub64)))
-  (declaim (inline %simd-pack-ub8s))
-  (defun %simd-pack-ub8s (pack)
-    (declare (type simd-pack pack))
-    (unpack-unsigned pack 8))
-
-  (declaim (inline %simd-pack-ub16s))
-  (defun %simd-pack-ub16s (pack)
-    (declare (type simd-pack pack))
-    (unpack-unsigned pack 16))
-
-  (declaim (inline %simd-pack-ub32s))
-  (defun %simd-pack-ub32s (pack)
-    (declare (type simd-pack pack))
-    (unpack-unsigned pack 32))
-
-  (declaim (inline %simd-pack-ub64s))
-  (defun %simd-pack-ub64s (pack)
-    (declare (type simd-pack pack))
-    (unpack-unsigned pack 64)))
-
-#-sb-xc-host
-(macrolet ((unpack-signed (pack bits)
-             `(simd-pack-dispatch ,pack
-                (let ((lo (%simd-pack-low ,pack))
-                      (hi (%simd-pack-high ,pack)))
-                  (values
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-signed-1 ,bits ,pos lo))
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-signed-1 ,bits ,pos hi))))))
-           (unpack-signed-1 (bits position ub64)
-             `(- (mod (+ (ldb (byte ,bits ,position) ,ub64)
-                         ,(expt 2 (1- bits)))
-                      ,(expt 2 bits))
-                 ,(expt 2 (1- bits)))))
-  (declaim (inline %simd-pack-sb8s))
-  (defun %simd-pack-sb8s (pack)
-    (declare (type simd-pack pack))
-    (unpack-signed pack 8))
-
-  (declaim (inline %simd-pack-sb16s))
-  (defun %simd-pack-sb16s (pack)
-    (declare (type simd-pack pack))
-    (unpack-signed pack 16))
-
-  (declaim (inline %simd-pack-sb32s))
-  (defun %simd-pack-sb32s (pack)
-    (declare (type simd-pack pack))
-    (unpack-signed pack 32))
-
-  (declaim (inline %simd-pack-sb64s))
-  (defun %simd-pack-sb64s (pack)
-    (declare (type simd-pack pack))
-    (unpack-signed pack 64)))
+(macrolet ((def ()
+             `(progn
+                ,@(loop for width in '(8 16 32 64 double single)
+                        for step = (case width
+                                     (double 8)
+                                     (single 4)
+                                     (t (/ width 8)))
+                        append (loop for signed in (if (numberp width)
+                                                       '(t nil)
+                                                       '(nil))
+                                     for name = (symbolicate '%simd-pack- (if signed 'signed- "")
+                                                             'ref- width)
+                                     for ref = (symbolicate (if signed 'signed- "") 'sap-ref- width)
+                                     collect
+                                     `(defun ,name (pack n)
+                                        (declare (fixnum n))
+                                        (with-pinned-objects (pack)
+                                          (let ((sap (truly-the word (+ (- (get-lisp-obj-address pack) other-pointer-lowtag)
+                                                                        (* simd-pack-lo-value-slot n-word-bytes)))))
+                                            (,ref (int-sap sap) (truly-the fixnum (* n ,step)))))))))))
+  (def))
 
 #-sb-xc-host
 (progn
@@ -345,17 +301,6 @@
   (:generator 1
     (inst ins dst 0 x index :s)))
 
-#-sb-xc-host
-(progn
-(declaim (inline %simd-pack-singles))
-(defun %simd-pack-singles (pack)
-  (declare (type simd-pack pack))
-  (simd-pack-dispatch pack
-    (values (%simd-pack-single-item pack 0)
-            (%simd-pack-single-item pack 1)
-            (%simd-pack-single-item pack 2)
-            (%simd-pack-single-item pack 3)))))
-
 (defknown %simd-pack-double-item
   (simd-pack (integer 0 1)) double-float (flushable))
 
@@ -370,11 +315,48 @@
   (:generator 3
     (inst ins dst 0 x index :d)))
 
-#-sb-xc-host
-(progn
-(declaim (inline %simd-pack-doubles))
-(defun %simd-pack-doubles (pack)
-  (declare (type simd-pack pack))
-  (simd-pack-dispatch pack
-    (values (%simd-pack-double-item pack 0)
-            (%simd-pack-double-item pack 1)))))
+(define-vop ()
+   (:translate sap-ref-128)
+   (:policy :fast-safe)
+   (:args (sap :scs (sap-reg))
+          (offset :scs (signed-reg)))
+   (:arg-types system-area-pointer signed-num)
+   (:results (result :scs (int-neon-reg)))
+   (:result-types simd-pack-ub64)
+   (:generator 5
+     (inst ldr result (@ sap offset))))
+
+(define-vop (%set-sap-ref-128)
+   (:translate (setf sap-ref-128))
+   (:policy :fast-safe)
+   (:args (value :scs (int-neon-reg))
+          (sap :scs (sap-reg))
+          (offset :scs (signed-reg)))
+   (:arg-types simd-pack-ub64 system-area-pointer signed-num)
+   (:generator 5
+     (inst str value (@ sap offset))))
+
+(defknown %simd-pack-int-to-double
+    ((simd-pack (unsigned-byte 64))) (simd-pack double-float) (flushable))
+(defknown %simd-pack-int-to-single
+    ((simd-pack (unsigned-byte 64))) (simd-pack single-float) (flushable))
+
+(define-vop ()
+  (:translate %simd-pack-int-to-double)
+  (:args (x :scs (int-neon-reg)))
+  (:arg-types simd-pack-ub64)
+  (:results (y :scs (double-neon-reg)))
+  (:result-types simd-pack-double)
+  (:policy :fast-safe)
+  (:generator 2
+    (move x y :16b)))
+
+(define-vop ()
+  (:translate %simd-pack-int-to-single)
+  (:args (x :scs (int-neon-reg)))
+  (:arg-types simd-pack-ub64)
+  (:results (y :scs (single-neon-reg)))
+  (:result-types simd-pack-single)
+  (:policy :fast-safe)
+  (:generator 2
+    (move x y :16b)))

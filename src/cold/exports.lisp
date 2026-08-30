@@ -420,17 +420,7 @@
    "%MAKE-SIMD-PACK-UB32"
    "%MAKE-SIMD-PACK-UB64"
    "%MAKE-SIMD-PACK-DOUBLE"
-   "%MAKE-SIMD-PACK-SINGLE"
-   "%SIMD-PACK-UB8S"
-   "%SIMD-PACK-UB16S"
-   "%SIMD-PACK-UB32S"
-   "%SIMD-PACK-UB64S"
-   "%SIMD-PACK-SB8S"
-   "%SIMD-PACK-SB16S"
-   "%SIMD-PACK-SB32S"
-   "%SIMD-PACK-SB64S"
-   "%SIMD-PACK-DOUBLES"
-   "%SIMD-PACK-SINGLES")
+   "%MAKE-SIMD-PACK-SINGLE")
   #+sb-simd-pack-256
   (:export
    "SIMD-PACK-256"
@@ -438,17 +428,7 @@
    "%MAKE-SIMD-PACK-256-UB32"
    "%MAKE-SIMD-PACK-256-UB64"
    "%MAKE-SIMD-PACK-256-DOUBLE"
-   "%MAKE-SIMD-PACK-256-SINGLE"
-   "%SIMD-PACK-256-UB8S"
-   "%SIMD-PACK-256-UB16S"
-   "%SIMD-PACK-256-UB32S"
-   "%SIMD-PACK-256-UB64S"
-   "%SIMD-PACK-256-SB8S"
-   "%SIMD-PACK-256-SB16S"
-   "%SIMD-PACK-256-SB32S"
-   "%SIMD-PACK-256-SB64S"
-   "%SIMD-PACK-256-DOUBLES"
-   "%SIMD-PACK-256-SINGLES")
+   "%MAKE-SIMD-PACK-256-SINGLE")
   #+sb-simd-pack-512
   (:export
    "SIMD-PACK-512"
@@ -459,17 +439,7 @@
    "%MAKE-SIMD-PACK-512-UB32"
    "%MAKE-SIMD-PACK-512-UB64"
    "%MAKE-SIMD-PACK-512-DOUBLE"
-   "%MAKE-SIMD-PACK-512-SINGLE"
-   "%SIMD-PACK-512-UB8S"
-   "%SIMD-PACK-512-UB16S"
-   "%SIMD-PACK-512-UB32S"
-   "%SIMD-PACK-512-UB64S"
-   "%SIMD-PACK-512-SB8S"
-   "%SIMD-PACK-512-SB16S"
-   "%SIMD-PACK-512-SB32S"
-   "%SIMD-PACK-512-SB64S"
-   "%SIMD-PACK-512-DOUBLES"
-   "%SIMD-PACK-512-SINGLES"))
+   "%MAKE-SIMD-PACK-512-SINGLE"))
 
 (defpackage "SB-INT"
   (:documentation
@@ -1494,11 +1464,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
                 "%MAKE-SIMD-PACK-UB32"
                 "%MAKE-SIMD-PACK-UB64"
                 "%MAKE-SIMD-PACK-DOUBLE"
-                "%MAKE-SIMD-PACK-SINGLE"
-                "%SIMD-PACK-UB32S"
-                "%SIMD-PACK-UB64S"
-                "%SIMD-PACK-DOUBLES"
-                "%SIMD-PACK-SINGLES")
+                "%MAKE-SIMD-PACK-SINGLE")
   (:export "%%DATA-VECTOR-REFFERS%%"
            "%%DATA-VECTOR-SETTERS%%"
            "%ACOS" "%ACOSH"
@@ -2407,11 +2373,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%MAKE-SIMD-PACK-UB32"
            "%MAKE-SIMD-PACK-UB64"
            "%MAKE-SIMD-PACK-DOUBLE"
-           "%MAKE-SIMD-PACK-SINGLE"
-           "%SIMD-PACK-UB32S"
-           "%SIMD-PACK-UB64S"
-           "%SIMD-PACK-DOUBLES"
-           "%SIMD-PACK-SINGLES")
+           "%MAKE-SIMD-PACK-SINGLE")
   #+sb-simd-pack
   (:export "%SIMD-PACK-TAG"
            "%SIMD-PACK-LOW"

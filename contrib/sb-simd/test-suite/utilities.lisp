@@ -33,18 +33,28 @@
                       (symbol-package name))
          (error "No unpacker found for ~S." name)))))
 
+(defun %simd-pack-ub64s (pack)
+  (values (sb-vm::%simd-pack-ref-64 pack 0)
+          (sb-vm::%simd-pack-ref-64 pack 1)))
+
+(defun %simd-pack-256-ub64s (pack)
+  (values (sb-vm::%simd-pack-ref-64 pack 0)
+          (sb-vm::%simd-pack-ref-64 pack 1)
+          (sb-vm::%simd-pack-ref-64 pack 2)
+          (sb-vm::%simd-pack-ref-64 pack 3)))
+
 (defun simd= (a b)
   (typecase a
     (sb-ext:simd-pack
      (when (sb-ext:simd-pack-p b)
-       (multiple-value-bind (a0 a1) (sb-ext:%simd-pack-ub64s a)
-         (multiple-value-bind (b0 b1) (sb-ext:%simd-pack-ub64s b)
+       (multiple-value-bind (a0 a1) (%simd-pack-ub64s a)
+         (multiple-value-bind (b0 b1) (%simd-pack-ub64s b)
            (and (= a0 b0) (= a1 b1))))))
     #+sb-simd-pack-256
     (sb-ext:simd-pack-256
      (when (sb-ext:simd-pack-256-p b)
-       (multiple-value-bind (a0 a1 a2 a3) (sb-ext:%simd-pack-256-ub64s a)
-         (multiple-value-bind (b0 b1 b2 b3) (sb-ext:%simd-pack-256-ub64s b)
+       (multiple-value-bind (a0 a1 a2 a3) (%simd-pack-256-ub64s a)
+         (multiple-value-bind (b0 b1 b2 b3) (%simd-pack-256-ub64s b)
            (and (= a0 b0) (= a1 b1) (= a2 b2) (= a3 b3))))))
     (otherwise nil)))
 

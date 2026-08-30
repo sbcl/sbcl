@@ -2419,6 +2419,7 @@
                          nil)))))))
 
 (defun sub-access-debug-var-slot (fp sc+offset &optional escaped integer-float)
+  (declare ((or null system-area-pointer) fp))
   ;; NOTE: The long-float support in here is obviously decayed.  When
   ;; the x86oid and non-x86oid versions of this function were unified,
   ;; the behavior of long-floats was preserved, which only served to
@@ -2426,7 +2427,7 @@
   (macrolet ((with-escaped-value ((var) &body forms)
                `(if escaped
                     (let ((,var (context-register escaped
-                                 (sb-c:sc+offset-offset sc+offset))))
+                                                  (sb-c:sc+offset-offset sc+offset))))
                       ,@forms)
                     :invalid-value-for-unescaped-register-storage))
              (escaped-boxed-value ()
@@ -2438,7 +2439,7 @@
              (escaped-float-value (format)
                `(if escaped
                     (context-float-register escaped
-                     (sb-c:sc+offset-offset sc+offset) ',format integer-float)
+                                            (sb-c:sc+offset-offset sc+offset) ',format integer-float)
                     :invalid-value-for-unescaped-register-storage))
              (with-nfp ((var) &body body)
                ;; x86oids have no separate number stack, so dummy it
@@ -2458,9 +2459,6 @@
                    #-c-stack-is-control-stack
                    (* (sb-c:sc+offset-offset sc+offset) n-word-bytes)
                    ,offset)))
-    ;; Don't make the whole thing use avx512 registers
-    #+sb-simd-pack-512
-    (declare (notinline %make-simd-pack-512-ub64 %make-simd-pack-512-single %make-simd-pack-512-double))
     (ecase (sb-c:sc+offset-scn sc+offset)
       ((#.any-reg-sc-number
         #.descriptor-reg-sc-number)
@@ -2480,128 +2478,72 @@
       #+sb-simd-pack
       ((#+x86-64 #.sb-vm::sse-reg-sc-number #+x86-64 #.sb-vm::int-sse-reg-sc-number
         #+arm64 #.sb-vm::neon-reg-sc-number #+arm64 #.sb-vm::int-neon-reg-sc-number)
-       (escaped-float-value simd-pack-int))
+       (escaped-float-value simd-pack))
       #+sb-simd-pack
       ((#+x86-64 #.sb-vm::single-sse-reg-sc-number
         #+arm64 #.sb-vm::single-neon-reg-sc-number)
-       (escaped-float-value simd-pack-single))
+       (escaped-float-value simd-pack))
       #+sb-simd-pack
       ((#+x86-64 #.sb-vm::double-sse-reg-sc-number
         #+arm64 #.sb-vm::double-neon-reg-sc-number)
-       (escaped-float-value simd-pack-double))
+       (escaped-float-value simd-pack))
       #+sb-simd-pack
       ((#+x86-64 #.sb-vm::int-sse-stack-sc-number
         #+arm64 #.sb-vm::int-neon-stack-sc-number)
        (with-nfp (nfp)
-         (%make-simd-pack-ub64
-          (sap-ref-64 nfp (number-stack-offset 0))
-          (sap-ref-64 nfp (number-stack-offset 8)))))
+         (sb-vm::sap-ref-128 nfp (number-stack-offset 0))))
       #+sb-simd-pack
       ((#+x86-64 #.sb-vm::single-sse-stack-sc-number
         #+arm64 #.sb-vm::single-neon-stack-sc-number)
        (with-nfp (nfp)
-         (%make-simd-pack-single
-          (sap-ref-single nfp (number-stack-offset 0))
-          (sap-ref-single nfp (number-stack-offset 4))
-          (sap-ref-single nfp (number-stack-offset 8))
-          (sap-ref-single nfp (number-stack-offset 12)))))
+         (sb-vm::%simd-pack-int-to-single (sb-vm::sap-ref-128 nfp (number-stack-offset 0)))))
       #+sb-simd-pack
       ((#+x86-64 #.sb-vm::double-sse-stack-sc-number
         #+arm64 #.sb-vm::double-neon-stack-sc-number)
        (with-nfp (nfp)
-         (%make-simd-pack-double
-          (sap-ref-double nfp (number-stack-offset 0))
-          (sap-ref-double nfp (number-stack-offset 8)))))
+         (sb-vm::%simd-pack-int-to-double (sb-vm::sap-ref-128 nfp (number-stack-offset 0)))))
       #+sb-simd-pack-256
       (#.sb-vm::int-avx2-reg-sc-number
-       (escaped-float-value simd-pack-256-int))
+       (escaped-float-value simd-pack-256))
       #+sb-simd-pack-256
       ((#.sb-vm::single-avx2-reg-sc-number)
-       (escaped-float-value simd-pack-256-single))
+       (escaped-float-value simd-pack-256))
       #+sb-simd-pack-256
       ((#.sb-vm::double-avx2-reg-sc-number)
-       (escaped-float-value simd-pack-256-double))
+       (escaped-float-value simd-pack-256))
       #+sb-simd-pack-256
       ((#.sb-vm::int-avx2-stack-sc-number)
        (with-nfp (nfp)
-         (%make-simd-pack-256-ub64
-          (sap-ref-64 nfp (number-stack-offset 0))
-          (sap-ref-64 nfp (number-stack-offset 8))
-          (sap-ref-64 nfp (number-stack-offset 16))
-          (sap-ref-64 nfp (number-stack-offset 24)))))
+         (sb-vm::sap-ref-256 nfp (number-stack-offset 0))))
       #+sb-simd-pack-256
       ((#.sb-vm::single-avx2-stack-sc-number)
        (with-nfp (nfp)
-         (%make-simd-pack-256-single
-          (sap-ref-single nfp (number-stack-offset 0))
-          (sap-ref-single nfp (number-stack-offset 4))
-          (sap-ref-single nfp (number-stack-offset 8))
-          (sap-ref-single nfp (number-stack-offset 12))
-          (sap-ref-single nfp (number-stack-offset 16))
-          (sap-ref-single nfp (number-stack-offset 20))
-          (sap-ref-single nfp (number-stack-offset 24))
-          (sap-ref-single nfp (number-stack-offset 28)))))
+         (sb-vm::%simd-pack-256-int-to-single (sb-vm::sap-ref-256 nfp (number-stack-offset 0)))))
       #+sb-simd-pack-256
       ((#.sb-vm::double-avx2-stack-sc-number)
        (with-nfp (nfp)
-         (%make-simd-pack-256-double
-          (sap-ref-double nfp (number-stack-offset 0))
-          (sap-ref-double nfp (number-stack-offset 8))
-          (sap-ref-double nfp (number-stack-offset 16))
-          (sap-ref-double nfp (number-stack-offset 24)))))
+         (sb-vm::%simd-pack-256-int-to-double (sb-vm::sap-ref-256 nfp (number-stack-offset 0)))))
       #+sb-simd-pack-512
       (#.sb-vm::int-avx512-reg-sc-number
-       (escaped-float-value simd-pack-512-int))
+       (escaped-float-value simd-pack-512))
       #+sb-simd-pack-512
       ((#.sb-vm::single-avx512-reg-sc-number)
-       (escaped-float-value simd-pack-512-single))
+       (escaped-float-value simd-pack-512))
       #+sb-simd-pack-512
       ((#.sb-vm::double-avx512-reg-sc-number)
-       (escaped-float-value simd-pack-512-double))
+       (escaped-float-value simd-pack-512))
       #+sb-simd-pack-512
       ((#.sb-vm::int-avx512-stack-sc-number)
        (with-nfp (nfp)
-         (%make-simd-pack-512-ub64
-          (sap-ref-64 nfp (number-stack-offset 0))
-          (sap-ref-64 nfp (number-stack-offset 8))
-          (sap-ref-64 nfp (number-stack-offset 16))
-          (sap-ref-64 nfp (number-stack-offset 24))
-          (sap-ref-64 nfp (number-stack-offset 32))
-          (sap-ref-64 nfp (number-stack-offset 40))
-          (sap-ref-64 nfp (number-stack-offset 48))
-          (sap-ref-64 nfp (number-stack-offset 56)))))
+         (sb-vm::sap-ref-512 nfp (number-stack-offset 0))))
       #+sb-simd-pack-512
       ((#.sb-vm::single-avx512-stack-sc-number)
        (with-nfp (nfp)
-         (%make-simd-pack-512-single
-          (sap-ref-single nfp (number-stack-offset 0))
-          (sap-ref-single nfp (number-stack-offset 4))
-          (sap-ref-single nfp (number-stack-offset 8))
-          (sap-ref-single nfp (number-stack-offset 12))
-          (sap-ref-single nfp (number-stack-offset 16))
-          (sap-ref-single nfp (number-stack-offset 20))
-          (sap-ref-single nfp (number-stack-offset 24))
-          (sap-ref-single nfp (number-stack-offset 28))
-          (sap-ref-single nfp (number-stack-offset 32))
-          (sap-ref-single nfp (number-stack-offset 36))
-          (sap-ref-single nfp (number-stack-offset 40))
-          (sap-ref-single nfp (number-stack-offset 44))
-          (sap-ref-single nfp (number-stack-offset 48))
-          (sap-ref-single nfp (number-stack-offset 52))
-          (sap-ref-single nfp (number-stack-offset 54))
-          (sap-ref-single nfp (number-stack-offset 60)))))
+         (sb-vm::%simd-pack-512-int-to-single (sb-vm::sap-ref-512 nfp (number-stack-offset 0)))))
       #+sb-simd-pack-512
       ((#.sb-vm::double-avx512-stack-sc-number)
        (with-nfp (nfp)
-         (%make-simd-pack-512-double
-          (sap-ref-double nfp (number-stack-offset 0))
-          (sap-ref-double nfp (number-stack-offset 8))
-          (sap-ref-double nfp (number-stack-offset 16))
-          (sap-ref-double nfp (number-stack-offset 24))
-          (sap-ref-double nfp (number-stack-offset 32))
-          (sap-ref-double nfp (number-stack-offset 40))
-          (sap-ref-double nfp (number-stack-offset 48))
-          (sap-ref-double nfp (number-stack-offset 56)))))
+         (sb-vm::%simd-pack-512-int-to-double (sb-vm::sap-ref-512 nfp (number-stack-offset 0)))))
       (#.single-reg-sc-number
        (escaped-float-value single-float))
       (#.double-reg-sc-number
@@ -2701,6 +2643,7 @@
          value))))
 
 (defun sub-set-debug-var-slot (fp sc+offset value &optional escaped)
+  (declare ((or null system-area-pointer) fp))
   ;; Like sub-access-debug-var-slot, this is the unification of two
   ;; divergent copy-pasted functions.  The astute reviewer will notice
   ;; that long-floats are messed up here as well, that x86oids
@@ -2753,9 +2696,6 @@
                    #-c-stack-is-control-stack
                    (* (sb-c:sc+offset-offset sc+offset) n-word-bytes)
                    ,offset)))
-    ;; Don't make the whole thing use avx512 registers
-    #+sb-simd-pack-512
-    (declare (notinline %make-simd-pack-512-ub64 %make-simd-pack-512-single %make-simd-pack-512-double))
     (ecase (sb-c:sc+offset-scn sc+offset)
       ((#.any-reg-sc-number
         #.descriptor-reg-sc-number)
@@ -2784,28 +2724,14 @@
         #+arm64 #.sb-vm::double-neon-reg-sc-number)
        (set-escaped-float-value simd-pack-double value))
       #+sb-simd-pack
-      ((#+x86-64 #.sb-vm::int-sse-stack-sc-number
-        #+arm64 #.sb-vm::int-neon-stack-sc-number)
-       (multiple-value-bind (a b) (%simd-pack-ub64s value)
-         (with-nfp (nfp)
-           (setf (sap-ref-64 nfp (number-stack-offset 0)) a
-                 (sap-ref-64 nfp (number-stack-offset 8)) b))))
-      #+sb-simd-pack
       ((#+x86-64 #.sb-vm::single-sse-stack-sc-number
-        #+arm64 #.sb-vm::single-neon-stack-sc-number)
-       (multiple-value-bind (a b c d) (%simd-pack-singles value)
-         (with-nfp (nfp)
-           (setf (sap-ref-single nfp (number-stack-offset 0)) a
-                 (sap-ref-single nfp (number-stack-offset 4)) b
-                 (sap-ref-single nfp (number-stack-offset 8)) c
-                 (sap-ref-single nfp (number-stack-offset 12)) d))))
-      #+sb-simd-pack
-      ((#+x86-64 #.sb-vm::double-sse-stack-sc-number
-        #+arm64 #.sb-vm::double-neon-stack-sc-number)
-       (multiple-value-bind (a b) (%simd-pack-doubles value)
-         (with-nfp (nfp)
-           (setf (sap-ref-double nfp (number-stack-offset 0)) a
-                 (sap-ref-double nfp (number-stack-offset 8)) b))))
+        #+x86-64 #.sb-vm::int-sse-stack-sc-number
+        #+x86-64 #.sb-vm::double-sse-stack-sc-number
+        #+arm64 #.sb-vm::double-neon-stack-sc-number
+        #+arm64 #.sb-vm::single-neon-stack-sc-number
+        #+arm64 #.sb-vm::int-neon-stack-sc-number)
+       (with-nfp (nfp)
+         (setf (sb-vm::sap-ref-128 nfp (number-stack-offset 0)) (sb-vm::sap-ref-128 value 0))))
       #+sb-simd-pack-256
       (#.sb-vm::int-avx2-reg-sc-number
        (set-escaped-float-value simd-pack-256-int value))
@@ -2816,65 +2742,13 @@
       ((#.sb-vm::double-avx2-reg-sc-number)
        (set-escaped-float-value simd-pack-256-double value))
       #+sb-simd-pack-256
-      ((#.sb-vm::int-avx2-stack-sc-number)
+      ((#.sb-vm::int-avx2-stack-sc-number #.sb-vm::single-avx2-stack-sc-number #.sb-vm::double-avx2-stack-sc-number)
        (with-nfp (nfp)
-         (multiple-value-bind (a b c d) (%simd-pack-256-ub64s value)
-           (setf (sap-ref-64 nfp (number-stack-offset 0)) a
-                 (sap-ref-64 nfp (number-stack-offset 8)) b
-                 (sap-ref-64 nfp (number-stack-offset 16)) c
-                 (sap-ref-64 nfp (number-stack-offset 24)) d))))
-      #+sb-simd-pack-256
-      ((#.sb-vm::single-avx2-stack-sc-number)
-       (multiple-value-bind (a b c d e f g h) (%simd-pack-256-singles value)
-         (with-nfp (nfp)
-           (setf (sap-ref-single nfp (number-stack-offset 0)) a
-                 (sap-ref-single nfp (number-stack-offset 4)) b
-                 (sap-ref-single nfp (number-stack-offset 8)) c
-                 (sap-ref-single nfp (number-stack-offset 12)) d
-                 (sap-ref-single nfp (number-stack-offset 16)) e
-                 (sap-ref-single nfp (number-stack-offset 20)) f
-                 (sap-ref-single nfp (number-stack-offset 24)) g
-                 (sap-ref-single nfp (number-stack-offset 28)) h))))
-      #+sb-simd-pack-256
-      ((#.sb-vm::double-avx2-stack-sc-number)
-       (multiple-value-bind (a b c d) (%simd-pack-256-doubles value)
-         (with-nfp (nfp)
-           (setf (sap-ref-double nfp (number-stack-offset 0)) a
-                 (sap-ref-double nfp (number-stack-offset 8)) b
-                 (sap-ref-double nfp (number-stack-offset 16)) c
-                 (sap-ref-double nfp (number-stack-offset 24)) d))))
+         (setf (sb-vm::sap-ref-256 nfp (number-stack-offset 0)) (sb-vm::sap-ref-256 value 0))))
       #+sb-simd-pack-512
-      ((#.sb-vm::single-avx512-stack-sc-number)
+      ((#.sb-vm::int-avx512-stack-sc-number #.sb-vm::single-avx512-stack-sc-number #.sb-vm::double-avx512-stack-sc-number)
        (with-nfp (nfp)
-         (%make-simd-pack-512-single
-          (sap-ref-single nfp (number-stack-offset 0))
-          (sap-ref-single nfp (number-stack-offset 4))
-          (sap-ref-single nfp (number-stack-offset 8))
-          (sap-ref-single nfp (number-stack-offset 12))
-          (sap-ref-single nfp (number-stack-offset 16))
-          (sap-ref-single nfp (number-stack-offset 20))
-          (sap-ref-single nfp (number-stack-offset 24))
-          (sap-ref-single nfp (number-stack-offset 28))
-          (sap-ref-single nfp (number-stack-offset 32))
-          (sap-ref-single nfp (number-stack-offset 36))
-          (sap-ref-single nfp (number-stack-offset 40))
-          (sap-ref-single nfp (number-stack-offset 44))
-          (sap-ref-single nfp (number-stack-offset 48))
-          (sap-ref-single nfp (number-stack-offset 52))
-          (sap-ref-single nfp (number-stack-offset 54))
-          (sap-ref-single nfp (number-stack-offset 60)))))
-      #+sb-simd-pack-512
-      ((#.sb-vm::double-avx512-stack-sc-number)
-       (with-nfp (nfp)
-         (%make-simd-pack-512-double
-          (sap-ref-double nfp (number-stack-offset 0))
-          (sap-ref-double nfp (number-stack-offset 8))
-          (sap-ref-double nfp (number-stack-offset 16))
-          (sap-ref-double nfp (number-stack-offset 24))
-          (sap-ref-double nfp (number-stack-offset 32))
-          (sap-ref-double nfp (number-stack-offset 40))
-          (sap-ref-double nfp (number-stack-offset 48))
-          (sap-ref-double nfp (number-stack-offset 56)))))
+         (setf (sb-vm::sap-ref-512 nfp (number-stack-offset 0)) (sb-vm::sap-ref-512 value 0))))
       (#.single-reg-sc-number
        #-(or x86 x86-64) ;; don't have escaped floats.
        (set-escaped-float-value single-float value))
@@ -2940,7 +2814,7 @@
                (the long-float (realpart value)))
          (setf (sap-ref-long
                 nfp (number-stack-offset #+sparc 4
-                                        #+(or x86 x86-64) 3))
+                                         #+(or x86 x86-64) 3))
                #+(or x86 x86-64)
                (imagpart (the (complex long-float) value))
                #-(or x86 x86-64)

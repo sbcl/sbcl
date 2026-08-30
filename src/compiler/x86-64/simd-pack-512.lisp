@@ -459,109 +459,6 @@
           +simd-pack-element-types+))))
 
 #-sb-xc-host
-(macrolet ((unpack-unsigned (pack bits)
-             `(simd-pack-512-dispatch ,pack
-                (let ((a (%simd-pack-512-0 ,pack))
-                      (b (%simd-pack-512-1 ,pack))
-                      (c (%simd-pack-512-2 ,pack))
-                      (d (%simd-pack-512-3 ,pack))
-                      (e (%simd-pack-512-4 ,pack))
-                      (f (%simd-pack-512-5 ,pack))
-                      (g (%simd-pack-512-6 ,pack))
-                      (h (%simd-pack-512-7 ,pack)))
-                  (values
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-unsigned-1 ,bits ,pos a))
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-unsigned-1 ,bits ,pos b))
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-unsigned-1 ,bits ,pos c))
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-unsigned-1 ,bits ,pos d))
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-unsigned-1 ,bits ,pos e))
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-unsigned-1 ,bits ,pos f))
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-unsigned-1 ,bits ,pos g))
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-unsigned-1 ,bits ,pos h))))))
-           (unpack-unsigned-1 (bits position ub64)
-             `(ldb (byte ,bits ,position) ,ub64)))
-  (declaim (inline %simd-pack-512-ub8s))
-  (defun %simd-pack-512-ub8s (pack)
-    (declare (type simd-pack-512 pack))
-    (unpack-unsigned pack 8))
-
-  (declaim (inline %simd-pack-512-ub16s))
-  (defun %simd-pack-512-ub16s (pack)
-    (declare (type simd-pack-512 pack))
-    (unpack-unsigned pack 16))
-
-  (declaim (inline %simd-pack-512-ub32s))
-  (defun %simd-pack-512-ub32s (pack)
-    (declare (type simd-pack-512 pack))
-    (unpack-unsigned pack 32))
-
-  (declaim (inline %simd-pack-512-ub64s))
-  (defun %simd-pack-512-ub64s (pack)
-    (declare (type simd-pack-512 pack))
-    (unpack-unsigned pack 64)))
-
-#-sb-xc-host
-(macrolet ((unpack-signed (pack bits)
-             `(simd-pack-512-dispatch ,pack
-                (let ((a (%simd-pack-512-0 ,pack))
-                      (b (%simd-pack-512-1 ,pack))
-                      (c (%simd-pack-512-2 ,pack))
-                      (d (%simd-pack-512-3 ,pack))
-                      (e (%simd-pack-512-4 ,pack))
-                      (f (%simd-pack-512-5 ,pack))
-                      (g (%simd-pack-512-6 ,pack))
-                      (h (%simd-pack-512-7 ,pack)))
-                  (values
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-signed-1 ,bits ,pos a))
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-signed-1 ,bits ,pos b))
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-signed-1 ,bits ,pos c))
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-signed-1 ,bits ,pos d))
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-signed-1 ,bits ,pos e))
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-signed-1 ,bits ,pos f))
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-signed-1 ,bits ,pos g))
-                   ,@(loop for pos by bits below 64 collect
-                           `(unpack-signed-1 ,bits ,pos h))))))
-           (unpack-signed-1 (bits position ub64)
-             `(- (mod (+ (ldb (byte ,bits ,position) ,ub64)
-                         ,(expt 2 (1- bits)))
-                      ,(expt 2 bits))
-                 ,(expt 2 (1- bits)))))
-  (declaim (inline %simd-pack-512-sb8s))
-  (defun %simd-pack-512-sb8s (pack)
-    (declare (type simd-pack-512 pack))
-    (unpack-signed pack 8))
-
-  (declaim (inline %simd-pack-512-sb16s))
-  (defun %simd-pack-512-sb16s (pack)
-    (declare (type simd-pack-512 pack))
-    (unpack-signed pack 16))
-
-  (declaim (inline %simd-pack-512-sb32s))
-  (defun %simd-pack-512-sb32s (pack)
-    (declare (type simd-pack-512 pack))
-    (unpack-signed pack 32))
-
-  (declaim (inline %simd-pack-512-sb64s))
-  (defun %simd-pack-512-sb64s (pack)
-    (declare (type simd-pack-512 pack))
-    (unpack-signed pack 64)))
-
-#-sb-xc-host
 (progn
   (defun %make-simd-pack-512-ub32 (p0 p1 p2 p3 p4 p5 p6 p7 p8
                                    p9 p10 p11 p12 p13 p14 p15)
@@ -698,43 +595,6 @@
           (inst vpsrldq dst tmp 8)))))
 
 #-sb-xc-host
-(progn
-(declaim (inline %simd-pack-512-singles))
-(defun %simd-pack-512-singles (pack)
-  (declare (type simd-pack-512 pack))
-  (simd-pack-512-dispatch pack
-    (values (%simd-pack-512-single-item pack 0)
-            (%simd-pack-512-single-item pack 1)
-            (%simd-pack-512-single-item pack 2)
-            (%simd-pack-512-single-item pack 3)
-            (%simd-pack-512-single-item pack 4)
-            (%simd-pack-512-single-item pack 5)
-            (%simd-pack-512-single-item pack 6)
-            (%simd-pack-512-single-item pack 7)
-            (%simd-pack-512-single-item pack 8)
-            (%simd-pack-512-single-item pack 9)
-            (%simd-pack-512-single-item pack 10)
-            (%simd-pack-512-single-item pack 11)
-            (%simd-pack-512-single-item pack 12)
-            (%simd-pack-512-single-item pack 13)
-            (%simd-pack-512-single-item pack 14)
-            (%simd-pack-512-single-item pack 15)))))
-
-#-sb-xc-host
-(progn
-(declaim (inline %simd-pack-512-doubles))
-(defun %simd-pack-512-doubles (pack)
-  (declare (type simd-pack-512 pack))
-  (simd-pack-512-dispatch pack
-    (values (%simd-pack-512-double-item pack 0)
-            (%simd-pack-512-double-item pack 1)
-            (%simd-pack-512-double-item pack 2)
-            (%simd-pack-512-double-item pack 3)
-            (%simd-pack-512-double-item pack 4)
-            (%simd-pack-512-double-item pack 5)
-            (%simd-pack-512-double-item pack 6)
-            (%simd-pack-512-double-item pack 7))))
-
 (defun %simd-pack-512-inline-constant (pack)
   (list :avx512 (logior (%simd-pack-512-0 pack)
                         (ash (%simd-pack-512-1 pack) 64)
@@ -743,4 +603,54 @@
                         (ash (%simd-pack-512-4 pack) 256)
                         (ash (%simd-pack-512-5 pack) 320)
                         (ash (%simd-pack-512-6 pack) 384)
-                        (ash (%simd-pack-512-7 pack) 448)))))
+                        (ash (%simd-pack-512-7 pack) 448))))
+
+(define-vop ()
+  (:translate sap-ref-512)
+  (:policy :fast-safe)
+  (:args (sap :scs (sap-reg))
+         (offset :scs (signed-reg immediate)))
+  (:arg-types system-area-pointer signed-num)
+  (:results (result :scs (int-avx512-reg)))
+  (:result-types simd-pack-512-ub64)
+  (:temporary
+   (:sc unsigned-reg :unused-if (not (offset-needs-temp offset)))
+   temp)
+  (:generator 3
+    (inst vmovdqu64 result (sap+offset-to-ea sap offset temp))))
+
+(define-vop (set-sap-ref-512)
+  (:translate (setf sap-ref-512))
+  (:policy :fast-safe)
+  (:args (value :scs (int-avx512-reg))
+         (sap :scs (sap-reg))
+         (offset :scs (signed-reg immediate)))
+  (:arg-types simd-pack-512-ub64 system-area-pointer signed-num)
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 5
+    (inst vmovdqu64 (sap+offset-to-ea sap offset temp) value)))
+
+(defknown %simd-pack-512-int-to-double
+    ((simd-pack-512 (unsigned-byte 64))) (simd-pack-512 double-float) (flushable))
+(defknown %simd-pack-512-int-to-single
+    ((simd-pack-512 (unsigned-byte 64))) (simd-pack-512 single-float) (flushable))
+
+(define-vop ()
+  (:translate %simd-pack-512-int-to-double)
+  (:args (x :scs (int-avx512-reg)))
+  (:arg-types simd-pack-512-ub64)
+  (:results (y :scs (double-avx512-reg)))
+  (:result-types simd-pack-512-double)
+  (:policy :fast-safe)
+  (:generator 2
+    (move x y)))
+
+(define-vop ()
+  (:translate %simd-pack-512-int-to-single)
+  (:args (x :scs (int-avx512-reg)))
+  (:arg-types simd-pack-512-ub64)
+  (:results (y :scs (single-avx512-reg)))
+  (:result-types simd-pack-512-single)
+  (:policy :fast-safe)
+  (:generator 2
+    (move x y)))

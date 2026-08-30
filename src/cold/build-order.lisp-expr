@@ -403,10 +403,10 @@
 
  ("src/compiler/{arch}/move")
  ("src/compiler/{arch}/float")
+ ("src/compiler/{arch}/sap")
  #+sb-simd-pack ("src/compiler/{arch}/simd-pack")
  #+sb-simd-pack-256 ("src/compiler/{arch}/simd-pack-256")
  #+sb-simd-pack-512 ("src/compiler/{arch}/simd-pack-512")
- ("src/compiler/{arch}/sap")
  ("src/compiler/{arch}/char")
  ("src/compiler/{arch}/system")
  ("src/compiler/{arch}/memory")
