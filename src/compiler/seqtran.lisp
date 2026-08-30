@@ -4511,7 +4511,7 @@
     (make-numeric-type 'integer min max)))
 
 (defoptimizers constants
-    (nth nthcdr sb-impl::append2 nreconc revappend
+    (nth nthcdr
      %adjoin %adjoin-eq %adjoin-key %adjoin-test %adjoin-key-eq %adjoin-key-test %adjoin-key-test-not
      %assoc %assoc-eq %assoc-key %assoc-test %assoc-key-eq %assoc-key-test %assoc-key-test-not
      %rassoc %rassoc-eq %rassoc-key %rassoc-test %rassoc-key-eq %rassoc-key-test %rassoc-key-test-not
@@ -4528,8 +4528,14 @@
     ((a &rest args))
   a)
 
+(defoptimizers constants
+    (sb-impl::append2 nreconc revappend
+     %adjoin %adjoin-eq %adjoin-key %adjoin-test %adjoin-key-eq %adjoin-key-test %adjoin-key-test-not)
+    ((a b &rest args))
+  (values b t)) ;; partial result
+
 (defoptimizers constants (append nconc list*) ((&rest args))
-  (car (last args)))
+  (values (car (last args)) t))
 
 (defoptimizer (vector-to-list derive-type) ((vector))
   (when (typep (nth-value 1 (sequence-lvar-dimensions vector)) '(integer 1))

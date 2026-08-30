@@ -3838,7 +3838,7 @@ is :ANY, the function name is not checked."
                     collect annotation)))))))
 
 (defun lvar-constants (lvar &optional walk-functions)
-  (named-let recurse ((lvar lvar) (seen nil))
+  (named-let recurse ((lvar lvar) (seen nil) (toplevel t))
     (let ((uses (lvar-uses lvar)))
       (flet ((handle-ref (ref)
                (let* ((ref (principal-ref ref))
@@ -3852,7 +3852,7 @@ is :ANY, the function name is not checked."
                            (lambda (call lvar)
                              (unless (xset-member-p lvar seen)
                                (add-to-xset lvar seen)
-                               (multiple-value-bind (type values) (recurse lvar seen)
+                               (multiple-value-bind (type values) (recurse lvar seen toplevel)
                                  (case type
                                    (:values
                                     (push (cons call values) constants))
@@ -3868,10 +3868,12 @@ is :ANY, the function name is not checked."
                     (eq (combination-kind node) :known)
                     (let ((fun-info (fun-info-constants (combination-fun-info node))))
                       (when fun-info
-                        (let ((constants (funcall fun-info node)))
-                          (when constants
+                        (multiple-value-bind (constants partial) (funcall fun-info node)
+                          (when (and constants
+                                     (or toplevel
+                                         (not partial))) ;; (car (append x constant)) is ok
                             (multiple-value-bind (kind constants)
-                                (recurse constants seen)
+                                (recurse constants seen nil)
                               (when constants
                                 (values kind constants))))))))))
         (cond ((constant-lvar-p lvar)

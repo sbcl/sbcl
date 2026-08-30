@@ -1130,3 +1130,8 @@
                                      (delete 2 (list* '- a))))
                           (a (* 2 3))))
                       :allow-warnings 'sb-kernel::macro-arg-modified))))
+
+(with-test (:name :constant-modification-partial-result)
+  (checked-compile
+   '(lambda (b n)
+     (delete 10 (nth n (list* b '(a b a)))))))
