@@ -934,9 +934,9 @@
   (:translate complex)
   (:args (real :scs (single-reg) :target r
                :load-if (not (location= real r)))
-         (imag :scs (single-reg) :to :save))
+         (imag :scs (single-reg)))
   (:arg-types single-float single-float)
-  (:results (r :scs (complex-single-reg) :from (:argument 0)
+  (:results (r :scs (complex-single-reg)
                :load-if (not (sc-is r complex-single-stack))))
   (:result-types complex-single-float)
   (:note "inline complex single-float creation")
@@ -945,8 +945,10 @@
   (:generator 5
     (sc-case r
       (complex-single-reg
-       (move r real :8b)
-       (inst ins r 1 imag 0 :s))
+       (cond ((location= r real)
+              (inst ins r 1 imag 0 :s))
+             (t
+              (inst zip1 r real imag :2s))))
       (complex-single-stack
        (let ((nfp (current-nfp-tn vop))
              (offset (tn-offset r)))
@@ -975,8 +977,10 @@
   (:generator 5
     (sc-case r
       (complex-double-reg
-       (move r real :16b)
-       (inst ins r 1 imag 0 :d))
+       (cond ((location= r real)
+              (inst ins r 1 imag 0 :d))
+             (t
+              (inst zip1 r real imag :2d))))
       (complex-double-stack
        (let ((nfp (current-nfp-tn vop))
              (offset (tn-offset r)))

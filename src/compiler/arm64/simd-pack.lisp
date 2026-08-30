@@ -307,56 +307,29 @@
 (define-vop (%make-simd-pack-double)
   (:translate %make-simd-pack-double)
   (:policy :fast-safe)
-  (:args (lo :scs (double-reg) :target dst)
+  (:args (lo :scs (double-reg))
          (hi :scs (double-reg)))
   (:arg-types double-float double-float)
   (:results (dst :scs (double-neon-reg)))
   (:result-types simd-pack-double)
   (:generator 5
-    (cond ((location= dst lo)
-           (inst ins dst 1 hi 0 :d))
-          ((location= dst hi)
-           (inst ins dst 1 hi 0 :d)
-           (inst ins dst 0 lo 0 :d))
-          (t
-           (inst ins dst 0 lo 0 :d)
-           (inst ins dst 1 hi 0 :d)))))
+    (inst zip1 dst lo hi :2d)))
 
 (define-vop (%make-simd-pack-single)
   (:translate %make-simd-pack-single)
   (:policy :fast-safe)
-  (:args (x :scs (single-reg) :target dst)
+  (:args (x :scs (single-reg) :target tmp)
          (y :scs (single-reg))
          (z :scs (single-reg))
          (w :scs (single-reg)))
   (:arg-types single-float single-float single-float single-float)
+  (:temporary (:sc single-neon-reg :from (:argument 2)) tmp)
   (:results (dst :scs (single-neon-reg)))
   (:result-types simd-pack-single)
-  (:generator 5
-    (cond ((location= dst x)
-           (inst ins dst 1 y 0 :s)
-           (inst ins dst 2 z 0 :s)
-           (inst ins dst 3 w 0 :s))
-          ((location= dst y)
-           (inst ins dst 1 y 0 :s)
-           (inst ins dst 0 x 0 :s)
-           (inst ins dst 2 z 0 :s)
-           (inst ins dst 3 w 0 :s))
-          ((location= dst z)
-           (inst ins dst 2 z 0 :s)
-           (inst ins dst 0 x 0 :s)
-           (inst ins dst 1 y 0 :s)
-           (inst ins dst 3 w 0 :s))
-          ((location= dst w)
-           (inst ins dst 3 w 0 :s)
-           (inst ins dst 0 x 0 :s)
-           (inst ins dst 1 y 0 :s)
-           (inst ins dst 2 z 0 :s))
-          (t
-           (inst ins dst 0 x 0 :s)
-           (inst ins dst 1 y 0 :s)
-           (inst ins dst 2 z 0 :s)
-           (inst ins dst 3 w 0 :s)))))
+  (:generator 3
+    (inst zip1 tmp x y :2s)
+    (inst zip1 dst z w :2s)
+    (inst zip1 dst tmp dst :2d)))
 
 (defknown %simd-pack-single-item
   (simd-pack (integer 0 3)) single-float (flushable))
@@ -368,13 +341,9 @@
   (:info index)
   (:results (dst :scs (single-reg)))
   (:result-types single-float)
-  (:temporary (:sc double-neon-reg :from (:argument 0)) tmp)
   (:policy :fast-safe)
-  (:generator 3
-    (unless (location= x tmp)
-      (inst mov tmp x :16b))
-    (inst movi dst 0 :4s)
-    (inst ins dst 0 tmp index :s)))
+  (:generator 1
+    (inst ins dst 0 x index :s)))
 
 #-sb-xc-host
 (progn
@@ -392,19 +361,14 @@
 
 (define-vop (%simd-pack-double-item)
   (:translate %simd-pack-double-item)
-  (:args (x :scs (int-neon-reg double-neon-reg single-neon-reg)
-            :target tmp))
+  (:args (x :scs (int-neon-reg double-neon-reg single-neon-reg)))
   (:info index)
   (:arg-types simd-pack (:constant t))
   (:results (dst :scs (double-reg)))
   (:result-types double-float)
-  (:temporary (:sc double-neon-reg :from (:argument 0)) tmp)
   (:policy :fast-safe)
   (:generator 3
-    (unless (location= x tmp)
-      (inst mov tmp x :16b))
-    (inst movi dst 0 :2d)
-    (inst ins dst 0 tmp index :d)))
+    (inst ins dst 0 x index :d)))
 
 #-sb-xc-host
 (progn
