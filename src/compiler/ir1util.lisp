@@ -3839,15 +3839,7 @@ is :ANY, the function name is not checked."
 
 (defun lvar-constants (lvar &optional walk-functions)
   (named-let recurse ((lvar lvar) (seen nil))
-    (let* ((uses (lvar-uses lvar))
-           (lvar (or (and (ref-p uses)
-                          (let ((ref (principal-lvar-ref lvar)))
-                            (and ref
-                                 (or
-                                  (lambda-var-ref-lvar ref)
-                                  (node-lvar ref)))))
-                     lvar))
-           (uses (lvar-uses lvar)))
+    (let ((uses (lvar-uses lvar)))
       (flet ((handle-ref (ref)
                (let* ((ref (principal-ref ref))
                       (leaf (and ref
@@ -3886,6 +3878,14 @@ is :ANY, the function name is not checked."
                (values :values (list (lvar-value lvar))))
               ((constant-lvar-uses-p lvar)
                (values :values (lvar-uses-values lvar)))
+              ((loop for annot in (lvar-annotations lvar)
+                     when (lvar-lambda-var-annotation-p annot)
+                     do (let ((lambda-var (lvar-lambda-var-annotation-lambda-var annot)))
+                          (when (and (lambda-var-constant lambda-var)
+                                     (not (lambda-var-sets lambda-var)))
+                            (return-from
+                             lvar-constants
+                              (values :macro lambda-var))))))
               ((ref-p uses)
                (handle-ref uses))
               (walk-functions
@@ -3921,15 +3921,6 @@ is :ANY, the function name is not checked."
         (leaf-debug-name leaf))))
 
 (defun process-lvar-modified-annotation (lvar annotation)
-  (loop for annot in (lvar-annotations lvar)
-        when (lvar-lambda-var-annotation-p annot)
-        do (let ((lambda-var (lvar-lambda-var-annotation-lambda-var annot)))
-             (when (and (lambda-var-constant lambda-var)
-                        (not (lambda-var-sets lambda-var)))
-               (warn 'sb-kernel::macro-arg-modified
-                     :fun-name (lvar-modified-annotation-caller annotation)
-                     :variable (lambda-var-original-name lambda-var))
-               (return-from process-lvar-modified-annotation))))
   (multiple-value-bind (type values) (lvar-constants lvar t)
     (labels ((modifiable-p (value)
                (or (consp value)
@@ -3944,6 +3935,14 @@ is :ANY, the function name is not checked."
                         :fun-name (lvar-modified-annotation-caller annotation)
                         :values sans-nil)))))
      (case type
+       (:macro
+        (let ((lambda-var values))
+          (when (and (lambda-var-constant lambda-var)
+                     (not (lambda-var-sets lambda-var)))
+            (warn 'sb-kernel::macro-arg-modified
+                  :fun-name (lvar-modified-annotation-caller annotation)
+                  :variable (lambda-var-original-name lambda-var))
+            (return-from process-lvar-modified-annotation))))
        (:values
         (report values)
         t)

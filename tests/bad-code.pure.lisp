@@ -1121,3 +1121,12 @@
        :allow-warnings t)
     (assert (and fail warn))
     (assert (eql (funcall fun) 2))))
+
+(with-test (:name :macro-argument-modification)
+  (assert (nth-value 2
+                     (checked-compile
+                      '(lambda ()
+                        (macrolet ((a (a)
+                                     (delete 2 (list* '- a))))
+                          (a (* 2 3))))
+                      :allow-warnings 'sb-kernel::macro-arg-modified))))
