@@ -1692,15 +1692,7 @@
                (return-info-locations returns))))
       ((eq lvar-kind :fixed)
        #+tls-based-mv-return
-       (let* ((types (loop for tn in (ir2-lvar-locs 2lvar)
-                           for i from 0
-                           collect
-                           ;; TLS MV area requires boxed values.
-                           ;; Only call tn-primitive-type for the register results.
-                           (if (< i sb-vm::register-arg-count)
-                               (tn-primitive-type tn)
-                               *backend-t-primitive-type*)))
-              (lvar-locs (lvar-tns node block lvar types))
+       (let* ((lvar-locs (ir2-lvar-locs (lvar-info lvar)))
               (nvals (length lvar-locs))
               (nregs (min nvals sb-vm::register-arg-count))
               (reg-locs (make-standard-value-tns nregs)))
@@ -1883,9 +1875,20 @@
 (defoptimizer (values ir2-convert) ((&rest values) node block)
   (let ((tns (mapcar (lambda (x)
                        (lvar-tn node block x))
-                     values)))
-
-    (move-lvar-result node block tns (node-lvar node))))
+                     values))
+        (lvar (node-lvar node)))
+    (when lvar
+      (let ((2lvar (lvar-info lvar)))
+        (if (and (eq (ir2-lvar-kind 2lvar) :fixed)
+                 (return-p (lvar-dest lvar))
+                 (atom (lvar-uses lvar)))
+            ;; If this is the only thing going to a return
+            ;; make the return do its own moves.
+            ;; Allowing the return on #+tls-based-mv-return to perform
+            ;; its own coercions withot preloading values into
+            ;; stack/register.
+            (setf (ir2-lvar-locs 2lvar) tns)
+            (move-lvar-result node block tns lvar))))))
 
 ;;; In the normal case where unknown values are desired, we use the
 ;;; VALUES-LIST VOP. In the relatively unimportant case of VALUES-LIST

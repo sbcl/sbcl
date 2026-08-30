@@ -1081,7 +1081,9 @@
 (define-vop (return)
   (:args (old-fp)
          (return-pc :to (:eval 1))
-         (values :more t))
+         (values :more t
+                 #+tls-based-mv-return :scs
+                 #+tls-based-mv-return (descriptor-reg any-reg immediate control-stack constant)))
   #-tls-based-mv-return (:ignore values)
   (:vop-var vop)
   (:info nvals)
@@ -1150,15 +1152,21 @@
                       (tn-ref-across tn-ref))
               (slot 0 (1+ slot)))
              ((null tn-ref))
-           (inst mov (thread-slot-ea (+ thread-mv-return-values-slot slot))
-                 (let ((tn (tn-ref-tn tn-ref)))
-                   (cond ((sc-is tn immediate) (immediate-tn-repr tn))
-                         ((sc-is tn any-reg descriptor-reg) tn)
-                         (t (inst mov rbx tn) rbx))))) ; use RBX as a scratch reg
+           (let ((target (thread-slot-ea (+ thread-mv-return-values-slot slot))))
+             (let* ((tn (tn-ref-tn tn-ref))
+                    (value
+                      (cond ((sc-is tn immediate) (immediate-tn-repr tn))
+                            ((sc-is tn any-reg descriptor-reg) tn)
+                            (t (inst mov rbx tn) ; use RBX as a scratch reg
+                               rbx))))
+               (cond ((tn-p value)
+                      (inst mov target value))
+                     (t
+                      (move-immediate  target value rbx))))))
          ;; Inform GC of the high water mark so it can clear below. If a function returns a huge
          ;; object as its 39th value, the next function to store a smaller number of values
          ;; grants permission to smash the huge object. Maybe always do this store?
-         (inst mov :byte (thread-mv-count) (fixnumize nvals)))
+         (inst mov :byte (thread-mv-count) rcx))
        (inst stc) ; multiple value return flag
        (inst leave) (inst ret)))))
 
