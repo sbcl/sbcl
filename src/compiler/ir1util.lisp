@@ -3837,8 +3837,8 @@ is :ANY, the function name is not checked."
                                                           source-path)))))
                     collect annotation)))))))
 
-(defun lvar-constants (lvar &optional walk-functions)
-  (named-let recurse ((lvar lvar) (seen nil) (toplevel t))
+(defun lvar-constants (lvar &optional walk-functions partial-modifier)
+  (named-let recurse ((lvar lvar) (seen nil) (toplevel (not partial-modifier)))
     (let ((uses (lvar-uses lvar)))
       (flet ((handle-ref (ref)
                (let* ((ref (principal-ref ref))
@@ -3923,36 +3923,45 @@ is :ANY, the function name is not checked."
         (leaf-debug-name leaf))))
 
 (defun process-lvar-modified-annotation (lvar annotation)
-  (multiple-value-bind (type values) (lvar-constants lvar t)
-    (labels ((modifiable-p (value)
-               (or (consp value)
-                   (and (arrayp value)
-                        (not (typep value '(vector * 0))))
-                   (hash-table-p value)))
-             (report (values)
-               (let ((sans-nil (remove nil values)))
-                (when (and sans-nil
-                           (every #'modifiable-p sans-nil))
-                  (warn 'constant-modified
-                        :fun-name (lvar-modified-annotation-caller annotation)
-                        :values sans-nil)))))
-     (case type
-       (:macro
-        (let ((lambda-var values))
-          (when (and (lambda-var-constant lambda-var)
-                     (not (lambda-var-sets lambda-var)))
-            (warn 'sb-kernel::macro-arg-modified
-                  :fun-name (lvar-modified-annotation-caller annotation)
-                  :variable (lambda-var-original-name lambda-var))
-            (return-from process-lvar-modified-annotation))))
-       (:values
-        (report values)
-        t)
-       (:calls
-        (loop for (call . values) in values
-              do (let ((*compiler-error-context* call))
-                   (report values)))
-        t)))))
+  (let ((partial-modifier-p
+          (not (member (lvar-modified-annotation-caller annotation)
+                       '(replace nreverse map-into nconc nreconc
+                         fill delq delq1
+                         delete delete-if delete-if-not
+                         delete-duplicates nunion nintersection
+                         nsubstitute nsubstitute-if nsubstitute-if-not
+                         nsubst nsubst-if nsubst-if-not
+                         sort stable-sort merge read-sequence)))))
+    (multiple-value-bind (type values) (lvar-constants lvar t partial-modifier-p)
+      (labels ((modifiable-p (value)
+                 (or (consp value)
+                     (and (arrayp value)
+                          (not (typep value '(vector * 0))))
+                     (hash-table-p value)))
+               (report (values)
+                 (let ((sans-nil (remove nil values)))
+                   (when (and sans-nil
+                              (every #'modifiable-p sans-nil))
+                     (warn 'constant-modified
+                           :fun-name (lvar-modified-annotation-caller annotation)
+                           :values sans-nil)))))
+        (case type
+          (:macro
+           (let ((lambda-var values))
+             (when (and (lambda-var-constant lambda-var)
+                        (not (lambda-var-sets lambda-var)))
+               (warn 'sb-kernel::macro-arg-modified
+                     :fun-name (lvar-modified-annotation-caller annotation)
+                     :variable (lambda-var-original-name lambda-var))
+               (return-from process-lvar-modified-annotation))))
+          (:values
+           (report values)
+           t)
+          (:calls
+           (loop for (call . values) in values
+                 do (let ((*compiler-error-context* call))
+                      (report values)))
+           t))))))
 
 (defun improper-sequence-p (annotation value)
   (case annotation

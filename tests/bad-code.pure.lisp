@@ -1134,4 +1134,9 @@
 (with-test (:name :constant-modification-partial-result)
   (checked-compile
    '(lambda (b n)
-     (delete 10 (nth n (list* b '(a b a)))))))
+     (delete 10 (nth n (list* b '(a b a))))))
+  (checked-compile
+   '(lambda (v)
+     (let ((x (cons v "b")))
+       (setf (car x) 10)
+       x))))
