@@ -18,17 +18,63 @@
 (sb-impl:define-thread-local sb-pcl::*cache-miss-values-stack* nil)
 (sb-impl:define-thread-local sb-pcl::*dfun-miss-gfs-on-stack* nil)
 
-(defmacro with-interrupt-bindings (&body body)
-  `(let*
+;;; TODO: this macro should probably disappear from the pristine image, right?
+;;; (well it doesn't)
+(defmacro with-interrupt-bindings ((style) &body body)
+  (declare (type (member :synchronous :asynchronous) style)
+           (ignorable style))
        ;; KLUDGE: Whatever is on the PCL stacks before the interrupt
        ;; handler runs doesn't really matter, since we're not on the
        ;; same call stack, really -- and if we don't bind these (esp.
        ;; the cache one) we can get a bogus metacircle if an interrupt
        ;; handler calls a GF that was being computed when the interrupt
        ;; hit.
+  #-tls-based-mv-return
+  `(let*
        ((sb-pcl::*cache-miss-values-stack* nil)
         (sb-pcl::*dfun-miss-gfs-on-stack* nil))
-     ,@body))
+     ,@body)
+  #+tls-based-mv-return
+  ;; The multi-value return area needs to be preserved around async interrupts
+  ;; and each slot has the nature of a distinct special binding.
+  ;; In theory these could go on the binding stack since they are accessible
+  ;; at TLS indices - from C as well - however I prefer to use only 1 cleanup for
+  ;; them all. We have at least 5 layers of cleanup now (WITHOUT-ARENA,
+  ;; WITHOUT-THREAD-WAITING-FOR, NLX-PROTECT, plus bindings in WITHOUT-INTERRUPTS
+  ;; and here) and so I think that because INTERRUPT-THREAD is questionable to use
+  ;; in production code in the first place, performance is not a consideration.
+  ;; What's one more cleanup? Let's use UWP to simulate an array of bindings.
+  ;; Also note that as we're inside WITHOUT-INTERRUPTS, scanning the MV area
+  ;; from Lisp is immune to further destruction at this point.
+  (ecase style
+    (:synchronous
+     ;; Moving values between TLS <-> control stack won't incur synchronous traps,
+     ;; so use the simpler #-tls-based-mv-return code. Sorry for the repetition
+     `(let* ((sb-pcl::*cache-miss-values-stack* nil)
+             (sb-pcl::*dfun-miss-gfs-on-stack* nil))
+        ,@body))
+    (:asynchronous
+     (flet ((mv-count-byte ()
+              `(sap-ref-8 (sb-thread:current-thread-sap)
+                          ,(1+ (ash sb-vm:thread-state-word-slot
+                                    sb-vm:word-shift))))
+            (spill/restore (form)
+              `(loop for i from ,(ash sb-vm::thread-mv-return-values-slot
+                                      sb-vm:word-shift) by ,sb-vm:n-word-bytes
+                     for j below (length mv-spill)
+                     do ,form))
+            (mv-slot-at (n)
+              `(sap-ref-lispobj (sb-thread:current-thread-sap) ,n)))
+       `(let* ((mv-count ,(mv-count-byte))
+               (mv-spill (make-array
+                          (truly-the (mod #.sb-xc:multiple-values-limit)
+                                     (max 0 (- mv-count ,sb-vm::register-arg-count)))))
+               (sb-pcl::*cache-miss-values-stack* nil) ; and again
+               (sb-pcl::*dfun-miss-gfs-on-stack* nil))
+          ,(spill/restore `(setf (aref mv-spill j) ,(mv-slot-at 'i)))
+          (unwind-protect (progn ,@body)
+            (setf ,(mv-count-byte) mv-count)
+            ,(spill/restore `(setf ,(mv-slot-at 'i) (aref mv-spill j)))))))))
 
 (defun unblock-deferrable-signals ()
   (with-alien ((%unblock-deferrable-signals
@@ -117,7 +163,7 @@
     (let ((*unblock-deferrables-on-enabling-interrupts-p* t)
           (sb-debug:*stack-top-hint* (or sb-debug:*stack-top-hint* 'invoke-interruption)))
       (sb-vm:without-arena
-        (with-interrupt-bindings
+        (with-interrupt-bindings (:asynchronous)
           (sb-thread::without-thread-waiting-for (:already-without-interrupts t)
             (allow-with-interrupts
               (nlx-protect (funcall function)

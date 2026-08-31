@@ -676,7 +676,7 @@
                              *current-internal-trap-number*)
            (sb-vm::with-pinned-context-code-object (alien-context)
              (sb-vm:internal-error-args alien-context))
-         (with-interrupt-bindings
+         (with-interrupt-bindings (:synchronous)
            (let ((sb-debug:*stack-top-hint* (find-interrupted-frame))
                  (sb-di::*current-internal-error* error-number)
                  (*current-internal-error-args* arguments)
