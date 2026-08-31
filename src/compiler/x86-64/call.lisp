@@ -1090,16 +1090,16 @@
   ;; In the case of other than one value, we need these registers to
   ;; tell the caller where they are and how many there are.
   (:temporary (:sc unsigned-reg :offset rbx-offset) rbx)
-  (:temporary (:sc any-reg :offset rcx-offset) rcx)
+  (:temporary (:sc any-reg :offset rcx-offset :from (:result 0)) rcx)
   ;; We need to stretch the lifetime of return-pc past the argument
   ;; registers so that we can default the argument registers without
   ;; trashing return-pc.
   (:temporary (:sc unsigned-reg :offset (first *register-arg-offsets*)
-                   :from :eval) a0)
+               :from :eval) a0)
   (:temporary (:sc unsigned-reg :offset (second *register-arg-offsets*)
-                   :from :eval) a1)
+               :from :eval) a1)
   (:temporary (:sc unsigned-reg :offset (third *register-arg-offsets*)
-                   :from :eval) a2)
+               :from :eval) a2)
 
   (:generator 6
     (check-ocfp-and-return-pc old-fp return-pc)
@@ -1108,67 +1108,73 @@
       (error "nvalues is 1"))
     ;; Establish the values pointer and values count.
     #-tls-based-mv-return (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
-    (if (zerop nvals)
-        (zeroize rcx) ; smaller
-        (inst mov rcx (fixnumize nvals)))
     ;; Pre-default any argument register that need it.
     (when (< nvals register-arg-count)
       (dolist (tn (nthcdr nvals (list a0 a1 a2)))
         (move tn null-tn)))
-    #-tls-based-mv-return
-    (progn
-    ;; Set the multiple value return flag.
-    (inst stc)
-    ;; And away we go. Except that return-pc is still on the
-    ;; stack and we've changed the stack pointer. So we might have to
-    ;; tell it to index off of RBX instead of RBP, depending on nvals.
-    (cond ((<= nvals register-arg-count)
-           (inst leave)
-           (inst ret))
-          (t
-           ;; Some values are on the stack after RETURN-PC and OLD-FP,
-           ;; can't return normally and some slots of the frame will
-           ;; be used as temporaries by the receiver.
-           ;;
-           ;; Clear as much of the stack as possible, but not past the
-           ;; old frame address.
-           (inst lea rsp-tn
-                 (ea (frame-byte-offset (1- nvals)) rbp-tn))
-           (move rbp-tn old-fp)
-           (emit-mv-return
-            (ea (frame-byte-offset (+ sp->fp-offset (tn-offset return-pc))) rbx)))))
-    #+tls-based-mv-return
-    (cond
-      ((>= nvals multiple-values-limit)
-       (error-call vop 'too-many-return-values-error rcx))
-      (t
-       ;; If nvals > register-arg-count, copy the extras to thread->mv_return_values.
-       ;; Compared to #-tls-based-mv-return this looks like it's doing more, but that's
-       ;; only because ir2-convert-return did not move results to the receiving frame.
-       (when (> nvals register-arg-count)
-         (do ((tn-ref (do ((i register-arg-count (1- i)) ; skip over this many
-                           (ref values (tn-ref-across ref)))
-                          ((zerop i) ref))
-                      (tn-ref-across tn-ref))
-              (slot 0 (1+ slot)))
-             ((null tn-ref))
-           (let ((target (thread-slot-ea (+ thread-mv-return-values-slot slot))))
-             (let* ((tn (tn-ref-tn tn-ref))
-                    (value
-                      (cond ((sc-is tn immediate) (immediate-tn-repr tn))
-                            ((sc-is tn any-reg descriptor-reg) tn)
-                            (t (inst mov rbx tn) ; use RBX as a scratch reg
-                               rbx))))
-               (cond ((tn-p value)
-                      (inst mov target value))
-                     (t
-                      (move-immediate  target value rbx))))))
-         ;; Inform GC of the high water mark so it can clear below. If a function returns a huge
-         ;; object as its 39th value, the next function to store a smaller number of values
-         ;; grants permission to smash the huge object. Maybe always do this store?
-         (inst mov :byte (thread-mv-count) rcx))
-       (inst stc) ; multiple value return flag
-       (inst leave) (inst ret)))))
+    (flet ((set-rcx ()
+             (if (zerop nvals)
+                 (zeroize rcx)          ; smaller
+                 (inst mov rcx (fixnumize nvals)))))
+      #-tls-based-mv-return
+      (progn
+        (set-rcx)
+        ;; Set the multiple value return flag.
+        (inst stc)
+        ;; And away we go. Except that return-pc is still on the
+        ;; stack and we've changed the stack pointer. So we might have to
+        ;; tell it to index off of RBX instead of RBP, depending on nvals.
+        (cond ((<= nvals register-arg-count)
+               (inst leave)
+               (inst ret))
+              (t
+               ;; Some values are on the stack after RETURN-PC and OLD-FP,
+               ;; can't return normally and some slots of the frame will
+               ;; be used as temporaries by the receiver.
+               ;;
+               ;; Clear as much of the stack as possible, but not past the
+               ;; old frame address.
+              (inst lea rsp-tn
+                    (ea (frame-byte-offset (1- nvals)) rbp-tn))
+              (move rbp-tn old-fp)
+              (emit-mv-return
+               (ea (frame-byte-offset (+ sp->fp-offset (tn-offset return-pc))) rbx)))))
+      #+tls-based-mv-return
+      (cond
+        ((>= nvals multiple-values-limit)
+         (set-rcx)
+         (error-call vop 'too-many-return-values-error rcx))
+        (t
+         ;; If nvals > register-arg-count, copy the extras to thread->mv_return_values.
+         ;; Compared to #-tls-based-mv-return this looks like it's doing more, but that's
+         ;; only because ir2-convert-return did not move results to the receiving frame.
+        (cond ((> nvals register-arg-count)
+               (do ((tn-ref (do ((i register-arg-count (1- i)) ; skip over this many
+                                 (ref values (tn-ref-across ref)))
+                                ((zerop i) ref))
+                            (tn-ref-across tn-ref))
+                    (slot 0 (1+ slot)))
+                   ((null tn-ref))
+                 (let ((target (thread-slot-ea (+ thread-mv-return-values-slot slot))))
+                   (let* ((tn (tn-ref-tn tn-ref))
+                          (value
+                            (cond ((sc-is tn immediate) (immediate-tn-repr tn))
+                                  ((sc-is tn any-reg descriptor-reg) tn)
+                                  (t (inst mov rbx tn) ; use RBX as a scratch reg
+                                     rbx))))
+                     (cond ((tn-p value)
+                            (inst mov target value))
+                           (t
+                            (move-immediate  target value rbx))))))
+               (set-rcx)
+               ;; Inform GC of the high water mark so it can clear below. If a function returns a huge
+               ;; object as its 39th value, the next function to store a smaller number of values
+               ;; grants permission to smash the huge object. Maybe always do this store?
+               (inst mov :byte (thread-mv-count) rcx))
+              (t
+               (set-rcx)))
+        (inst stc)                      ; multiple value return flag
+        (inst leave) (inst ret))))))
 
 ;;; Do unknown-values return of an arbitrary number of values (passed
 ;;; on the stack.) We check for the common case of a single return
