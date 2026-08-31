@@ -71,6 +71,7 @@
                                      (max 0 (- mv-count ,sb-vm::register-arg-count)))))
                (sb-pcl::*cache-miss-values-stack* nil) ; and again
                (sb-pcl::*dfun-miss-gfs-on-stack* nil))
+          (declare (dynamic-extent mv-spill))
           ,(spill/restore `(setf (aref mv-spill j) ,(mv-slot-at 'i)))
           (unwind-protect (progn ,@body)
             (setf ,(mv-count-byte) mv-count)
