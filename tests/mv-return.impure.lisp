@@ -20,5 +20,5 @@
                                  :test #'equal))))))
 
 (test-util:with-test (:name :async-mv-area-preservation)
-  (schedule-timer (make-timer #'rest2) 0.1 :repeat-interval 0.005)
+  (schedule-timer (make-timer #'ret2) 0.1 :repeat-interval 0.005)
   (j))

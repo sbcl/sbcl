@@ -65,7 +65,8 @@
                      do ,form))
             (mv-slot-at (n)
               `(sap-ref-lispobj (sb-thread:current-thread-sap) ,n)))
-       `(let* ((mv-count ,(mv-count-byte))
+       `(let* ((raw-mv-count ,(mv-count-byte))
+               (mv-count (ash raw-mv-count (- sb-vm:n-fixnum-tag-bits)))
                (mv-spill (make-array
                           (truly-the (mod #.sb-xc:multiple-values-limit)
                                      (max 0 (- mv-count ,sb-vm::register-arg-count)))))
@@ -74,7 +75,7 @@
           (declare (dynamic-extent mv-spill))
           ,(spill/restore `(setf (aref mv-spill j) ,(mv-slot-at 'i)))
           (unwind-protect (progn ,@body)
-            (setf ,(mv-count-byte) mv-count)
+            (setf ,(mv-count-byte) raw-mv-count)
             ,(spill/restore `(setf ,(mv-slot-at 'i) (aref mv-spill j)))))))))
 
 (defun unblock-deferrable-signals ()
