@@ -62,6 +62,7 @@
   (setf (sb-int:system-package-p *package*) t))
 
 (defvar *gmp-disabled* nil)
+(declaim (sb-ext:always-bound *gmp-disabled*))
 
 (defconstant +bignum-raw-area-offset+
   (- (* sb-vm:bignum-digits-offset sb-vm:n-word-bytes)
@@ -960,24 +961,26 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
   (declare (inline mpz-mul-2exp mpz-pow)
            (optimize (sb-c:verify-arg-count 0)))
   (cond
-    ((or (and (integerp base)
-              (< (abs power) 1000)
-              (< (blength base) 4))
-         ;; EXPT dispatches to INTEXP for a (COMPLEX RATIONAL) base as well,
-         ;; and MPZ-POW below only takes an integer.
-         (not (rationalp base))
-         (member base '(0 1 -1))
+    ((or (not (typep power '(integer #.(1+ most-negative-fixnum) #.most-positive-fixnum)))
+         (if (integerp base)
+             (and
+              (< (blength base) 4)
+              (typep power '(signed-byte 10)))
+             ;; EXPT dispatches to INTEXP for a (COMPLEX RATIONAL) base as well,
+             ;; and MPZ-POW below only takes an integer.
+             (not (typep base 'ratio)))
          *gmp-disabled*)
      (orig-intexp base power))
     (t
-     (check-type power (integer #.(1+ most-negative-fixnum) #.most-positive-fixnum))
      (cond ((minusp power)
-            (/ (gmp-intexp base (- power))))
+            (let ((abs-power (- power)))
+              (sb-kernel:build-ratio (sb-ext:truly-the integer (gmp-intexp (denominator base) abs-power))
+                                     (sb-ext:truly-the integer (gmp-intexp (numerator base) abs-power)))))
            ((eql base 2)
             (mpz-mul-2exp 1 power))
            ((typep base 'ratio)
-            (sb-kernel::%make-ratio (gmp-intexp (numerator base) power)
-                                    (gmp-intexp (denominator base) power)))
+            (sb-kernel::%make-ratio (sb-ext:truly-the integer (gmp-intexp (numerator base) power))
+                                    (sb-ext:truly-the integer (gmp-intexp (denominator base) power))))
            (t
             (mpz-pow base power))))))
 
