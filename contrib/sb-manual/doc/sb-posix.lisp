@@ -1,1 +1,0 @@
-../../sb-posix/manual.lisp

@@ -1,1 +1,0 @@
-../../sb-introspect/manual.lisp

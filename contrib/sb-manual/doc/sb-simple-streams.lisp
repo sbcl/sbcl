@@ -1,1 +1,0 @@
-../../sb-simple-streams/manual.lisp

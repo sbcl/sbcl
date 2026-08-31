@@ -1,1 +1,0 @@
-../../sb-aclrepl/manual.lisp

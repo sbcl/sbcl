@@ -16,5 +16,5 @@
   (@sb-posix section)
   (@sb-queue section)
   (@sb-rotate-byte section)
+  #+(or :x86-64 :arm64)
   (@sb-simd section))
-

@@ -1,1 +1,0 @@
-../../sb-simd/manual.lisp

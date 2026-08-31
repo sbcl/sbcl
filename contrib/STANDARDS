@@ -74,10 +74,7 @@ good place to test that they still exist, etc.
 Each package should provide documentation in SB-MANUAL format.  For the
 documentation to be included in the SBCL manual, you must
 
-- symlink contrib/sb-manual/doc/<some-contrib>/manual.lisp to
-  contrib/<some-contrib>/manual.lisp,
-
-- add the symlink to contrib/sb-manual/sb-manual.asd,
+- add the relevant file to contrib/sb-manual/sb-manual.asd,
 
 - modify SB-MANUAL::*PAGES*.
 

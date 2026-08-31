@@ -1,1 +1,0 @@
-../../sb-grovel/manual.lisp

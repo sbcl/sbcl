@@ -2,8 +2,7 @@
 
     Currently, `sb-manual` loads *all* contribs to be able to query
     the definition docstrings. Each contrib directory has a
-    `manual.lisp` file, which is part of the `sb-manual` contrib (the
-    files are symlinked).
+    `manual.lisp` file, which is part of the `sb-manual` contrib.
 
     On the positive side, this does not load extra stuff until the
     user `require`s `sb-manual`. However, then it loads all contribs.

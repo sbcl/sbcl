@@ -1,1 +1,0 @@
-../../sb-rotate-byte/manual.lisp

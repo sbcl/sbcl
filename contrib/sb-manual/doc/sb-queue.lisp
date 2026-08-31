@@ -1,1 +1,0 @@
-../../sb-queue/manual.lisp

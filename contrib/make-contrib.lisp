@@ -46,6 +46,15 @@
           (unless (= result 0) (error "C execution failed")))))))
 
 (defparameter +genfile+ "generated-constants")
+
+(defun resolve-up-directory-components (pathname-directory)
+  (let ((result ()))
+    (dolist (c pathname-directory)
+      (if (eq c :up)
+          (pop result)
+          (push c result)))
+    (nreverse result)))
+
 (defun logicalize (path generated)
   (make-pathname :host "SYS"
                  :directory
@@ -53,8 +62,9 @@
                          (if generated
                              (list "OBJ" "FROM-SELF" "CONTRIB" *system*)
                              (list* "CONTRIB"
-                                    (append (last (pathname-directory *default-pathname-defaults*))
-                                            (cdr (pathname-directory path))))))
+                                    (resolve-up-directory-components
+                                     (append (last (pathname-directory *default-pathname-defaults*))
+                                             (cdr (pathname-directory path)))))))
                  :name (pathname-name path)
                  :type (pathname-type path)))
 
