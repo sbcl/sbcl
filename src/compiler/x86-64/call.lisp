@@ -1149,6 +1149,11 @@
          ;; Compared to #-tls-based-mv-return this looks like it's doing more, but that's
          ;; only because ir2-convert-return did not move results to the receiving frame.
         (cond ((> nvals register-arg-count)
+               ;; Inform GC of the high water mark so it can clear below. If a function returns a huge
+               ;; object as its 39th value, the next function to store a smaller number of values
+               ;; grants permission to smash the huge object. Maybe always do this store?
+               ;; Do this before storing anything.
+               (inst mov :byte (thread-mv-count) (fixnumize nvals))
                (do ((tn-ref (do ((i register-arg-count (1- i)) ; skip over this many
                                  (ref values (tn-ref-across ref)))
                                 ((zerop i) ref))
@@ -1166,11 +1171,7 @@
                             (inst mov target value))
                            (t
                             (move-immediate  target value rbx))))))
-               (set-rcx)
-               ;; Inform GC of the high water mark so it can clear below. If a function returns a huge
-               ;; object as its 39th value, the next function to store a smaller number of values
-               ;; grants permission to smash the huge object. Maybe always do this store?
-               (inst mov :byte (thread-mv-count) rcx))
+               (set-rcx))
               (t
                (set-rcx)))
         (inst stc)                      ; multiple value return flag
