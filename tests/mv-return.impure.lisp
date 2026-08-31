@@ -9,20 +9,16 @@
 (defun ret2 ()
   (values 1 2 3 4))
 
-(sb-ext:schedule-timer (make-timer (lambda () (ret2))) 0.1
-:repeat-interval 0.005)
-
-(defglobal *stop* nil)
 (defun j ()
-  (loop
-   (when *stop* (return))
-   (ret2)
-   (assert (not (mismatch  (multiple-value-list (ret))
-                           '#.(loop for i below mvl  collect (list i))
-                           :test #'equal)))))
+  (let ((end (+ (get-internal-real-time)
+                (* internal-time-units-per-second #-slow 1/2))))
+    (loop until (>= (get-internal-real-time) end)
+          do
+          (ret2)
+          (assert (not (mismatch (multiple-value-list (ret))
+                                 '#.(loop for i below mvl collect (list i))
+                                 :test #'equal))))))
 
 (test-util:with-test (:name :async-mv-area-preservation)
-  (let ((thr (sb-thread:make-thread #'j)))
-    (sleep .75)
-    (setq *stop* t)
-    (sb-thread:join-thread thr)))
+  (schedule-timer (make-timer (lambda () (ret2))) 0.1 :repeat-interval 0.005)
+  (j))
