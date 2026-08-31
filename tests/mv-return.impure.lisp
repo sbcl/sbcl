@@ -7,7 +7,7 @@
   (values . #.(loop for i below mvl collect `(list ,i))))
 
 (defun ret2 ()
-  (values 1 2 3 4))
+  (values 1 2 3 4 5 6 7 8 9 10))
 
 (defun j ()
   (let ((end (+ (get-internal-real-time)
@@ -20,5 +20,5 @@
                                  :test #'equal))))))
 
 (test-util:with-test (:name :async-mv-area-preservation)
-  (schedule-timer (make-timer (lambda () (ret2))) 0.1 :repeat-interval 0.005)
+  (schedule-timer (make-timer #'rest2) 0.1 :repeat-interval 0.005)
   (j))
