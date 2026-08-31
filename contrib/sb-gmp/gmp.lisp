@@ -963,6 +963,9 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
     ((or (and (integerp base)
               (< (abs power) 1000)
               (< (blength base) 4))
+         ;; EXPT dispatches to INTEXP for a (COMPLEX RATIONAL) base as well,
+         ;; and MPZ-POW below only takes an integer.
+         (not (rationalp base))
          (member base '(0 1 -1))
          *gmp-disabled*)
      (orig-intexp base power))

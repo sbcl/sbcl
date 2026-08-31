@@ -207,6 +207,14 @@
     (sb-gmp::gmp-intexp 113/355 -1)
   355/113)
 
+;; EXPT dispatches to INTEXP for a (COMPLEX RATIONAL) base as well.
+(deftest intexp-complex-rational
+    (list (sb-gmp::gmp-intexp #c(1/5 1) 1)
+          (sb-gmp::gmp-intexp #c(1/5 1) 2)
+          (sb-gmp::gmp-intexp #c(2 3) 5)
+          (sb-gmp::gmp-intexp #c(1/5 1) -1))
+  (#c(1/5 1) #c(-24/25 2/5) #c(122 -597) #c(5/26 -25/26)))
+
 (deftest remove-1
     (multiple-value-list (mpz-remove 28 2))
   (7 2))
