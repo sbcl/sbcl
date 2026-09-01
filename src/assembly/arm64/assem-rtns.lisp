@@ -2,7 +2,7 @@
 
 ;;;; Return-multiple with other than one value
 
-#+sb-assembling ;; we don't want a vop for this one.
+#+(and (not tls-based-mv-return) sb-assembling) ;; we don't want a vop for this one.
 (define-assembly-routine
     (return-multiple
      (:return-style :none))
@@ -68,6 +68,7 @@
   ;; Return.
   (lisp-return lra :multiple-values t))
 
+#-tls-based-mv-return
 (define-assembly-routine
     (return-values-list
      (:return-style :none)
@@ -165,6 +166,221 @@
       FOUR-VALUES
       (inst add csp-tn ocfp-tn (lsl count (- word-shift n-fixnum-tag-bits)))
       (lisp-return lr :multiple-values))))
+
+#+tls-based-mv-return
+(progn
+(defmacro check-and-save-mv-count (count)
+  `(progn
+     (inst cmp ,count (fixnumize multiple-values-limit))
+     (inst b :hs (assemble (:elsewhere)
+                   TOO-MANY-VALUES ; could make this continuable (for no good reason)
+                   (error-call nil 'too-many-return-values-error
+                    (make-random-tn (sc-or-lose 'any-reg) (tn-offset ,count)))
+                   (progn TOO-MANY-VALUES)))
+     (inst strb ,count (thread-mv-count))))
+
+#+sb-assembling ;; We don't want a vop for this one.
+(define-assembly-routine
+    (return-multiple
+     (:return-style :none))
+
+    ;; These are really arguments.
+    ((:temp nvals any-reg nargs-offset)
+     (:temp vals any-reg nl1-offset)
+     (:temp lra non-descriptor-reg lr-offset)
+
+     ;; These are just needed to facilitate the transfer
+     (:temp count any-reg nl3-offset)
+     (:temp src any-reg nl4-offset)
+     (:temp dst descriptor-reg r4-offset)
+     (:temp temp descriptor-reg r5-offset)
+
+     ;; These are needed so we can get at the register args.
+     (:temp r0 descriptor-reg r0-offset)
+     (:temp r1 descriptor-reg r1-offset)
+     (:temp r2 descriptor-reg r2-offset)
+     (:temp r3 descriptor-reg r3-offset))
+
+  ;; Pick off the cases where everything fits in register args.
+  (inst cmp nvals (fixnumize 1))
+  (inst b :eq ONE-VALUE)
+  (inst b :lt ZERO-VALUES)
+  (inst cmp nvals (fixnumize 2))
+  (inst b :eq TWO-VALUES)
+  (inst cmp nvals (fixnumize 3))
+  (inst b :eq THREE-VALUES)
+  (inst cmp nvals (fixnumize 4))
+  (inst b :eq FOUR-VALUES)
+
+  ;; Values > 4:
+  (check-and-save-mv-count nvals)
+  ;; Load register values r0, r1, r2, r3
+  (inst ldp r0 r1 (@ vals))
+  (loadw r2 vals 2)
+  (loadw r3 vals 3)
+
+  ;; Copy remaining values to thread-mv-return-values
+  (inst add src vals (* 4 n-word-bytes))
+  (inst add dst thread-tn (add-sub-immediate (* thread-mv-return-values-slot n-word-bytes)))
+  (inst sub count nvals (fixnumize 4))
+
+  LOOP
+  (inst subs count count (fixnumize 1))
+  (inst ldr temp (@ src n-word-bytes :post-index))
+  (inst str temp (@ dst n-word-bytes :post-index))
+  (inst b :gt LOOP)
+
+  (move csp-tn cfp-tn)
+  (lisp-return lra :multiple-values t)
+
+  ;; Handle the register arg cases.
+  ZERO-VALUES
+  (move r0 null-tn)
+  (move r1 null-tn)
+  (move r2 null-tn)
+  (move r3 null-tn)
+  (move csp-tn cfp-tn)
+  (lisp-return lra :multiple-values t)
+
+  ONE-VALUE
+  (loadw r0 vals 0)
+  (move csp-tn cfp-tn)
+  (lisp-return lra :single-value t)
+
+  TWO-VALUES
+  (inst ldp r0 r1 (@ vals))
+  (move r2 null-tn)
+  (move r3 null-tn)
+  (move csp-tn cfp-tn)
+  (lisp-return lra :multiple-values t)
+
+  THREE-VALUES
+  (inst ldp r0 r1 (@ vals))
+  (loadw r2 vals 2)
+  (move r3 null-tn)
+  (move csp-tn cfp-tn)
+  (lisp-return lra :multiple-values t)
+
+  FOUR-VALUES
+  (inst ldp r0 r1 (@ vals))
+  (loadw r2 vals 2)
+  (loadw r3 vals 3)
+  (move csp-tn cfp-tn)
+  (lisp-return lra :multiple-values t))
+
+(define-assembly-routine
+    (return-values-list
+     (:return-style :none)
+     (:vop-var vop)
+     (:vop-prefix
+      (let ((cur-nfp (current-nfp-tn vop)))
+        (when cur-nfp
+          (inst add nsp-tn cur-nfp (add-sub-immediate
+                                    (bytes-needed-for-non-descriptor-stack-frame)))))))
+
+    ;; These four are really arguments.
+    ((:arg list descriptor-reg r5-offset)
+     (:temp count any-reg nargs-offset)
+     (:temp temp descriptor-reg r6-offset)
+     (:temp ndescr non-descriptor-reg nl0-offset)
+     (:temp src non-descriptor-reg nl1-offset)
+
+     (:temp lr non-descriptor-reg lr-offset)
+     (:temp r0 descriptor-reg r0-offset)
+     (:temp r1 descriptor-reg r1-offset)
+     (:temp r2 descriptor-reg r2-offset)
+     (:temp r3 descriptor-reg r3-offset))
+  (flet ((check (label)
+           (assemble ()
+             (%test-lowtag list temp skip nil list-pointer-lowtag)
+             (cerror-call nil 'bogus-arg-to-values-list-error list)
+             (inst b label)
+             skip)))
+    (assemble ()
+      (move ocfp-tn cfp-tn)
+      (loadw-pair cfp-tn ocfp-save-offset lr lra-save-offset cfp-tn)
+      (%test-lowtag list ndescr ZERO-VALUES-ERROR t list-pointer-lowtag)
+      (inst cmp list null-tn)
+      (inst b :eq ZERO-VALUES)
+
+      (loadw r0 list cons-car-slot list-pointer-lowtag)
+      (loadw list list cons-cdr-slot list-pointer-lowtag)
+      (inst cmp list null-tn)
+      (inst b :ne CONTINUE)
+
+      ONE-VALUE
+      (move csp-tn ocfp-tn)
+      (lisp-return lr :single-value)
+      CONTINUE
+      (check ONE-VALUE)
+
+      (inst mov count (fixnumize 2))
+      (loadw r1 list cons-car-slot list-pointer-lowtag)
+      (loadw list list cons-cdr-slot list-pointer-lowtag)
+      (inst cmp list null-tn)
+      (inst b :eq TWO-VALUES)
+      (check TWO-VALUES)
+
+      (inst mov count (fixnumize 3))
+      (loadw r2 list cons-car-slot list-pointer-lowtag)
+      (loadw list list cons-cdr-slot list-pointer-lowtag)
+      (inst cmp list null-tn)
+      (inst b :eq THREE-VALUES)
+      (check THREE-VALUES)
+
+      (inst mov count (fixnumize 4))
+      (loadw r3 list cons-car-slot list-pointer-lowtag)
+      (loadw list list cons-cdr-slot list-pointer-lowtag)
+      (inst cmp list null-tn)
+      (inst b :eq FOUR-VALUES)
+      (check FOUR-VALUES)
+
+      ;; Values > 4:
+      ;; Store values 5, 6, ... onto the stack starting at ocfp-tn.
+      (move csp-tn ocfp-tn)
+      LOOP
+      (inst add count count (fixnumize 1))
+      (loadw temp list cons-car-slot list-pointer-lowtag)
+      (loadw list list cons-cdr-slot list-pointer-lowtag)
+      (inst str temp (@ csp-tn n-word-bytes :post-index))
+      (check DONE)
+      (inst cmp list null-tn)
+      (inst b :ne LOOP)
+
+      DONE
+      (check-and-save-mv-count count)
+
+      ;; Copy remaining values from stack into thread-mv-return-values
+      (inst add list thread-tn (add-sub-immediate (* thread-mv-return-values-slot n-word-bytes)))
+      (inst sub ndescr count (fixnumize 4)) ; number of extra values in TLS
+      (move src ocfp-tn)
+      COPY
+      (inst subs ndescr ndescr (fixnumize 1))
+      (inst ldr temp (@ src n-word-bytes :post-index))
+      (inst str temp (@ list n-word-bytes :post-index))
+      (inst b :gt COPY)
+
+      (move csp-tn ocfp-tn)
+      (lisp-return lr :multiple-values)
+
+      ZERO-VALUES-ERROR
+      (cerror-call nil 'bogus-arg-to-values-list-error list)
+      ZERO-VALUES
+      (inst mov count 0)
+      (inst mov r0 null-tn)
+      (inst mov r1 null-tn)
+
+      TWO-VALUES
+      (inst mov r2 null-tn)
+      (inst mov r3 null-tn)
+
+      THREE-VALUES
+      (inst mov r3 null-tn)
+
+      FOUR-VALUES
+      (move csp-tn ocfp-tn)
+      (lisp-return lr :multiple-values))))
+) ; end #+tls-based-mv-return
 
 ;;;; tail-call-variable.
 (defun prepare-for-tail-call-variable (nargs args count dest temp r0 r1 r2 r3)

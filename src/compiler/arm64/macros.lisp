@@ -582,6 +582,11 @@
   #-sb-thread
   `(store-symbol-value ,reg ,symbol))
 
+#+tls-based-mv-return
+(defmacro thread-mv-count ()
+  ;; This is byte index 1 of thread_state_word
+  '(@ thread-tn (1+ (ash thread-state-word-slot word-shift))))
+
 ;;; Load constants, stack-values, reusing when possible
 (defmacro maybe-load (tn &optional (temp 'temp))
   (once-only ((tn tn))

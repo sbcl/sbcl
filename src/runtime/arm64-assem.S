@@ -269,8 +269,10 @@ Lno_args:
         ldr     reg_LR, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
         blr     reg_LR
 
+#ifndef LISP_FEATURE_TLS_BASED_MV_RETURN
 	// Correct stack pointer for return processing.
         csel reg_CSP, reg_OCFP, reg_CSP, eq
+#endif
 
         // Return value
         mov     x0, reg_R0

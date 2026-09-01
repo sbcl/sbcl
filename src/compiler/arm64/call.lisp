@@ -255,13 +255,14 @@
                            (type-single-value-p type)))
             (cond ((or (not trust)
                        (values-type-may-be-single-value-p type))
-                   (inst csel csp-tn ocfp-tn csp-tn :eq)
+                   #-tls-based-mv-return (inst csel csp-tn ocfp-tn csp-tn :eq)
                    (unless trust
                      (inst mov tmp-tn (fixnumize 1))
                      (inst csel nargs-tn tmp-tn nargs-tn :ne)
                      (check-nargs)))
                   ((eq type *empty-type*))
                   (t
+                   #-tls-based-mv-return
                    (inst mov csp-tn ocfp-tn))))
           (macrolet ((map-stack-values (&body body)
                        `(do ((i register-arg-count (1+ i))
@@ -294,7 +295,7 @@
                             (> min-values 1)))
                       ((or (not trust)
                            stack-targets-p)
-                       (inst csel ocfp-tn csp-tn ocfp-tn :ne)
+                       #-tls-based-mv-return (inst csel ocfp-tn csp-tn ocfp-tn :ne)
                        (inst mov tmp-tn (fixnumize 1))
                        (inst csel nargs-tn tmp-tn nargs-tn :ne)
                        (unless trust
@@ -306,6 +307,15 @@
                         (incf decrement (fixnumize 1)))
                        ((< i min-values)
                         (incf decrement (fixnumize 1))
+                        #+tls-based-mv-return
+                        (let ((slot (+ thread-mv-return-values-slot (- i register-arg-count))))
+                          (sc-case tn
+                            (control-stack
+                             (loadw move-temp thread-tn slot)
+                             (store-stack-tn tn move-temp))
+                            (t
+                             (loadw tn thread-tn slot))))
+                        #-tls-based-mv-return
                         (sc-case tn
                           (control-stack
                            (let* ((next (and (< (1+ i) min-values)
@@ -357,12 +367,16 @@
                             (when stack-targets-p
                               (move dst null-tn))
                             (inst b :lt NONE)
+                            #+tls-based-mv-return
+                            (loadw dst thread-tn (+ thread-mv-return-values-slot
+                                                    (- i register-arg-count)))
+                            #-tls-based-mv-return
                             (loadw dst ocfp-tn i)
                             NONE
                             (when (sc-is tn control-stack)
                               (store-stack-tn tn dst))))))))
               ;; Deallocate the callee stack frame.
-              (move csp-tn ocfp-tn)))
+              #-tls-based-mv-return (move csp-tn ocfp-tn)))
           DONE))))
   (values))
 
@@ -386,6 +400,7 @@
 ;;; results Start and Count (also, it's nice to be able to target them).
 (defun receive-unknown-values (node args nargs start count)
   (declare (type tn args nargs start count))
+  #-tls-based-mv-return
   (let ((unused-count-p (eq (tn-kind count) :unused))
         (unused-start-p (eq (tn-kind start) :unused))
         (type (sb-c::node-derived-type node)))
@@ -415,7 +430,59 @@
             (move start args))
           (unless unused-count-p
             (move count nargs))
-          DONE))))
+          DONE)))
+  #+tls-based-mv-return
+  (let ((unused-count-p (eq (tn-kind count) :unused))
+        (unused-start-p (eq (tn-kind start) :unused))
+        (type (sb-c::node-derived-type node))
+        (variable-values (gen-label))
+        (done (gen-label)))
+    (assemble ()
+      (when (values-type-may-be-single-value-p type)
+        (inst b :eq variable-values)
+        (unless unused-start-p
+          (move start csp-tn))
+        (inst str (first *register-arg-tns*) (@ csp-tn n-word-bytes :post-index))
+        (unless unused-count-p
+          (inst mov count (fixnumize 1)))
+        (inst b done)
+        (emit-label variable-values))
+
+      ;; Multiple values case:
+      ;; Save current csp-tn into args (values-start) before allocating stack space
+      (move args csp-tn)
+      ;; Allocate stack space for nargs values
+      (inst add csp-tn csp-tn (lsl nargs (- word-shift n-fixnum-tag-bits)))
+      ;; Store register args onto stack at args
+      (inst stp (first *register-arg-tns*) (second *register-arg-tns*) (@ args))
+      (inst stp (third *register-arg-tns*) (fourth *register-arg-tns*) (@ args (* 2 n-word-bytes)))
+
+      ;; If > 4 values, copy thread-mv-return-values onto stack
+      (when (> (sb-kernel:values-type-max-value-count type) register-arg-count)
+        (let ((countdown tmp-tn)
+              (src (first *register-arg-tns*))
+              (dst (second *register-arg-tns*))
+              (scratch (third *register-arg-tns*))
+              (copy-done (gen-label))
+              (copy-loop (gen-label)))
+          (inst cmp nargs (fixnumize register-arg-count))
+          (inst b :le copy-done)
+          (inst sub countdown nargs (fixnumize register-arg-count))
+          (inst add src thread-tn (add-sub-immediate (* thread-mv-return-values-slot n-word-bytes)))
+          (inst add dst args (* register-arg-count n-word-bytes))
+          (emit-label copy-loop)
+          (inst subs countdown countdown (fixnumize 1))
+          (inst ldr scratch (@ src n-word-bytes :post-index))
+          (inst str scratch (@ dst n-word-bytes :post-index))
+          (inst b :gt copy-loop)
+          (emit-label copy-done)))
+
+      (unless unused-start-p
+        (move start args))
+      (unless unused-count-p
+        (move count nargs))
+      (emit-label done)))
+  (values))
 
 ;;; VOP that can be inherited by unknown values receivers.  The main
 ;;; thing this handles is allocation of the result temporaries.
@@ -1262,8 +1329,11 @@
   (:args
    (old-fp)
    (return-pc)
-   (values :more t))
-  (:ignore values old-fp return-pc)
+   (values :more t
+           #+tls-based-mv-return :scs
+           #+tls-based-mv-return (descriptor-reg any-reg control-stack constant immediate)))
+  #-tls-based-mv-return (:ignore values old-fp return-pc)
+  #+tls-based-mv-return (:ignore old-fp return-pc)
   (:info nvals)
   (:temporary (:sc descriptor-reg :offset r0-offset :from (:eval 0)) r0)
   (:temporary (:sc descriptor-reg :offset r1-offset :from (:eval 0)) r1)
@@ -1271,6 +1341,7 @@
   (:temporary (:sc descriptor-reg :offset r3-offset :from (:eval 0)) r3)
   (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
   (:temporary (:sc any-reg :offset nargs-offset) nargs)
+  #-tls-based-mv-return
   (:temporary (:sc any-reg :offset ocfp-offset) val-ptr)
   (:vop-var vop)
   (:generator 6
@@ -1279,6 +1350,7 @@
       (when cur-nfp
         (inst add nsp-tn cur-nfp (add-sub-immediate
                                   (bytes-needed-for-non-descriptor-stack-frame)))))
+    #-tls-based-mv-return
     (cond ((= nvals 1)
            ;; Clear the control stack, and restore the frame pointer.
            (move csp-tn cfp-tn)
@@ -1295,7 +1367,46 @@
              (dolist (reg (subseq (list r0 r1 r2 r3) nvals))
                (move reg null-tn)))
            ;; And away we go.
-           (lisp-return lr :multiple-values t)))))
+           (lisp-return lr :multiple-values t)))
+    #+tls-based-mv-return
+    (cond
+      ((= nvals 1)
+       (move csp-tn cfp-tn)
+       (lisp-return lr :single-value t))
+      ((>= nvals multiple-values-limit)
+       (load-immediate-word nargs (fixnumize nvals))
+       (error-call vop 'too-many-return-values-error nargs))
+      (t
+       (load-immediate-word nargs (fixnumize nvals))
+       (when (< nvals register-arg-count)
+         (dolist (reg (subseq (list r0 r1 r2 r3) nvals))
+           (move reg null-tn)))
+       (when (> nvals register-arg-count)
+         (do ((tn-ref (do ((i register-arg-count (1- i)) ; skip over this many
+                           (ref values (tn-ref-across ref)))
+                          ((zerop i) ref))
+                      (tn-ref-across tn-ref))
+              (slot 0 (1+ slot)))
+             ((null tn-ref))
+           (let ((tn (tn-ref-tn tn-ref))
+                 (ea (@ thread-tn
+                        (load-store-offset
+                         (ash (+ thread-mv-return-values-slot slot) word-shift)))))
+             (sc-case tn
+               ((descriptor-reg any-reg)
+                (inst str tn ea))
+               ((control-stack)
+                (load-stack-tn tmp-tn tn)
+                (inst str tmp-tn ea))
+               ((constant)
+                (inst load-constant tmp-tn (tn-byte-offset tn))
+                (inst str tmp-tn ea))
+               ((immediate)
+                (load-immediate vop tn tmp-tn)
+                (inst str tmp-tn ea)))))
+         (inst strb nargs (thread-mv-count)))
+       (move csp-tn cfp-tn)
+       (lisp-return lr :multiple-values t)))))
 
 ;;; Do unknown-values return of an arbitrary number of values (passed
 ;;; on the stack.)  We check for the common case of a single return
