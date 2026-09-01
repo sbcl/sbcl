@@ -302,7 +302,8 @@
                    return var)))
     (when (and var
                (not (lambda-var-refs var))
-               (eql (lambda-var-type var) *universal-type*))
+               (eq (leaf-defined-type var) *universal-type*) ;; ftype
+               (eq (lambda-var-type var) *universal-type*))
       (let* ((info (lambda-var-arg-info var))
              (kind (arg-info-kind info)))
         (or (and (eq kind :optional)
