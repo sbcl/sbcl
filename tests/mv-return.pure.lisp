@@ -62,6 +62,9 @@
 (defun hairy-result ()
   (loop for i from 0 repeat 32 collect (list 'massive-structure i)))
 
+;; the symbol sb-vm::register-arg-count might have dropped out
+(defparameter mv-return-register-count (length sb-vm::*register-arg-offsets*))
+
 (with-test (:name :mv-area-gc-scrubbing :fails-on :interpreter)
   (let ((f1 (checked-compile `(lambda () (values-list (hairy-result)))))
         (f2 (checked-compile `(lambda () (values-list (list 'a 'b 'c 'd 'e))))))
@@ -70,7 +73,8 @@
     (gc :full t)
     (let ((mv-count (get-mv-return-count)))
       (assert (= mv-count 5))
-      (loop for i from (+ sb-vm::thread-mv-return-values-slot 2)
+      (loop for i from (+ sb-vm::thread-mv-return-values-slot
+                          (- 5 mv-return-register-count))
             for word = (sb-sys:sap-int (sb-vm::current-thread-offset-sap i))
             repeat 30 ; arb
             do (assert (zerop word))))))

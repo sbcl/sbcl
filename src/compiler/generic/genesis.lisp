@@ -3366,6 +3366,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 (defun write-regnames-h (stream)
   (declare (ignorable stream))
+  (format stream "#define REGISTER_ARG_COUNT ~d~%" sb-vm::register-arg-count)
   #-x86 ;; too weird - "UESP" (user-mode register ESP) is only
   ;; visible in a ucontext, so not a lisp register.
   (flet ((prettify (macro list &optional trailing-slash)

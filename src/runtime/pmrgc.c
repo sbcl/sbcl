@@ -727,14 +727,6 @@ conservative_stack_scan(struct thread* th,
           preserve_pointer(word, 0);
         }
     }
-#ifdef LISP_FEATURE_TLS_BASED_MV_RETURN
-    for (int i = thread_multiple_value_hwm(th); i >= 0 ; --i) {
-        lispobj word = th->mv_return_values[i];
-        if (word >= BACKEND_PAGE_BYTES && potential_heap_pointer(word)) {
-            preserve_pointer(word, 0);
-        }
-    }
-#endif
 }
 #endif
 
@@ -997,6 +989,9 @@ garbage_collect_generation(generation_index_t generation, int raise,
              * objects which would otherwise not be pinned.
              * Could this be an incompatible use of the term "preserve"? */
             mr_preserve_range(from, nwords);
+#ifdef LISP_FEATURE_TLS_BASED_MV_RETURN
+            mr_preserve_range(th->mv_return_values, thread_mv_cell_count(th));
+#endif
         }
     }
 

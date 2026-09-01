@@ -3266,17 +3266,6 @@ conservative_stack_scan(struct thread* th,
             preserve_pointer(word, 0);
         }
     }
-#ifdef LISP_FEATURE_TLS_BASED_MV_RETURN
-    // Scavenging would be better than pinning, however we can not move objects
-    // yet at this point because not all threads have completed their stack scan,
-    // so we don't know what to actually pin. It would demand two passes.
-    for (int i = thread_multiple_value_hwm(th); i >= 0 ; --i) {
-        lispobj word = th->mv_return_values[i];
-        if (word >= BACKEND_PAGE_BYTES && potential_heap_pointer(word)) {
-            preserve_pointer(word, 0);
-        }
-    }
-#endif
 }
 #endif
 
@@ -3543,6 +3532,14 @@ garbage_collect_generation(generation_index_t generation, int raise,
                 scavenge(from, nwords);
             else
                 gc_mark_range(from, nwords);
+#ifdef LISP_FEATURE_TLS_BASED_MV_RETURN
+            from = th->mv_return_values;
+            nwords = thread_mv_cell_count(th);
+            if (compacting_p())
+                scavenge(from,nwords);
+            else
+                gc_mark_range(from, nwords);
+#endif
         }
     }
 
