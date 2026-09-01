@@ -1103,7 +1103,7 @@
          ;; complex.
          (float-or-complex-float-type (numeric-contagion x y)))))
 
-(defoptimizer (expt derive-type) ((x y))
+(defoptimizers derive-type (expt sb-kernel::intexp) ((x y))
   (two-arg-derive-type x y #'expt-derive-type-aux))
 
 (defun coerce-float-type (type format)
