@@ -408,54 +408,62 @@ GNAME(arch_scrub_control_stack):
 	 * [RSP] is our return address, [RSP-8] is the first
 	 * stack slot to scrub. */
 
-	/* We start by setting up our scrub pointer in RAX, our
-	 * guard page upper bound in R8, and our hard guard
-	 * page upper bound in R9. */
-	lea	-8(%rsp), %rax
+	/* Select guard boundary based on page protection status */
+	cmpb	$0, THREAD_STATE_WORD_OFFSET(%rdi) // see genesis/thread.h
+	cmovne	%rsi, %rdx              // if protected, stop at soft guard
+	lea	(%rdx, %rcx), %r9       // R9 = guard page upper bound
+	lea	64(%r9), %r9            // 64 byte safety margin
 
-	lea	(%rsi,%rcx), %r8
-	Lea	(%rdx,%rcx), %r9
+	/* tentative_bottom = rsp but cache-line aligned. RSP is 16-byte-aligned coming in,
+	 * but want to ensure that all 4 loads (the movdqa and por) are in one L1 cache line. */
+	mov	%rsp, %rdi
+	and	$-64, %rdi
+	cmp	%r9, %rdi
+	jbe	.Lhit_bottom
 
-	/* Now we begin our main scrub loop. */
-ascs_outer_loop:
+	/* Check 8 quadwords (64 bytes) below RDI */
+.Lprobe:
+	movdqa	-64(%rdi), %xmm0
+	por	-48(%rdi), %xmm0
+	por	-32(%rdi), %xmm0
+	por	-16(%rdi), %xmm0
+	ptest	%xmm0, %xmm0            // Sets ZF=1 if all 64 bytes are zero
+	jz	.Lfound_clear
 
-	/* If we're about to scrub the hard guard page, exit. */
-	cmp	%r9, %rax
-	jae	ascs_check_guard_page
-	cmp	%rax, %rdx
-	jbe	ascs_finished
+	/* This loop differs from its previous incarnation in several ways:
+	 * 1. We're no longer interleaving the looking-for-stopping-point and zeroing.
+	 *    Instead we look first, then blast zeros over the whole dirty range.
+	 *    The only possible downside is that there is a tiny chance the OS could
+	 *    evict a certain page between looking at it and clearing it. Not our problem!
+	 * 2. We were wasting bus cycles looking at every byte just to write over it.
+	 *    Sampling is good enough and it saves some memory bandwidth
+	 *    which is generally better citizenship in a shared compute environment.
+	 * 3. There's no reason to operate on 4k at a time. That granularity
+	 *    has nothing to do with anything about how the stack is used. */
 
-ascs_check_guard_page:
-	/* If we're about to scrub the guard page, and the guard
-	 * page is protected, exit. */
-	cmp	%r8, %rax
-	jae	ascs_clear_loop
-	cmp	%rax, %rsi
-	ja	ascs_clear_loop
-	/* test state_word.control_stack_guard_page_protected */
-	cmpb	$0, THREAD_STATE_WORD_OFFSET(%rdi)
-	jne	ascs_finished
+	sub	$1024, %rdi             // Step arbitrarily -128 words (1KiB)
+	cmp	%r9, %rdi
+	ja	.Lprobe
 
-	/* Clear memory backwards to the start of the (4KiB) page */
-ascs_clear_loop:
-	movq	$0, (%rax)
-	test	$0xfff, %rax
-	lea	-8(%rax), %rax
-	jnz	ascs_clear_loop
+.Lhit_bottom:
+	/* %rdi landed somewhere at or below the cutoff, so restore it to the exact
+	 * address of the top of the chosen guard page. We initially added 64 to %r9
+	 * as a buffer so that the movdqa could safely look 64 bytes below without
+	 * stepping into the guard page */
+	lea	-64(%r9), %rdi
 
-	/* If we're about to hit the hard guard page, exit. */
-	cmp	%r9, %rax
-	jae	ascs_finished
-
-	/* If the next (previous?) 4KiB page contains a non-zero
-	 * word, continue scrubbing. */
-ascs_check_loop:
-	testq	$-1, (%rax)
-	jnz	ascs_outer_loop
-	test	$0xfff, %rax
-	lea	-8(%rax), %rax
-	jnz	ascs_check_loop
-
-ascs_finished:
+.Lfound_clear: // Below RDI is fully clear (we assume) so clear from it up through RSP
+	mov	%rsp, %rcx
+	sub	%rdi, %rcx              // RCX = (RSP - RDI)
+	jbe	.Ldone
+	shrq	$3, %rcx                // RCX = word count
+	xor	%eax, %eax
+	/* Two factors support unconditional use of stosq versus a memset call:
+	 * 1. Lisp codegen uses it in the SPLAT vops so we've already decided it's fine.
+	 * 2. Whether or not the CPU has EMRS, stosq runs as fast as or faster than individual
+	 *    stores. If present, ERMS has the added benefit of effectively doing stores
+	 *    that are equal in bit width to the widest FPR (YMM or ZMM). */
+	rep stosq
+.Ldone:
 	ret
 	SIZE(GNAME(arch_scrub_control_stack))
