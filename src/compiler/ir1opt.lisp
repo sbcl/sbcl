@@ -205,10 +205,10 @@
 ;;; does the same -- so there is no way to use the derived information in
 ;;; general.
 ;;;
-;;; So, the conservative option is to use the derived type if the leaf has
-;;; only a single ref -- in which case there cannot be a prior call that
-;;; mutates it. Otherwise we use the declared type or punt to the most general
-;;; type we know to be correct for sure.
+;;; So, the conservative option is to use the derived type if the leaf
+;;; has only a single ref -- in which case there cannot be a prior
+;;; call that mutates it. Otherwise we punt to the most general type
+;;; we know to be correct for sure.
 (defun lvar-conservative-type (lvar)
   (let ((derived-type (lvar-type lvar))
         (t-type *universal-type*))
@@ -243,18 +243,7 @@
         (let ((leaf (ref-leaf node)))
           (if (and (basic-var-p leaf)
                    (cdr (leaf-refs leaf)))
-              (coerce-to-values
-               (if (eq :declared (leaf-where-from leaf))
-                   (let ((leaf-type (leaf-type leaf))
-                         (cons-type (specifier-type 'cons)))
-                     ;; If LEAF-TYPE is (or null some-cons-type) and
-                     ;; DERIVED-TYPE is known to be non-null, use
-                     ;; SOME-CONS-TYPE in that case, because a cons
-                     ;; can't become null.
-                     (if (csubtypep derived-type cons-type)
-                         (type-intersection leaf-type cons-type)
-                         leaf-type))
-                   (conservative-type derived-type)))
+              (coerce-to-values (conservative-type derived-type))
               derived-values-type))
         derived-values-type)))
 

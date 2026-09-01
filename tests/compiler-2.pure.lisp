@@ -2345,7 +2345,8 @@
         t)
     ((1 2) t)))
 
-(with-test (:name :car-type-on-or-null)
+(with-test (:name :car-type-on-or-null
+            :fails-on :sbcl)
   (assert
    (equal (sb-kernel:%simple-fun-type
            (checked-compile
