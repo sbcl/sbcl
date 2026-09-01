@@ -9,6 +9,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+#+x86-64 (setf (extern-alien "aggressive_scrub_control_stack" int) 1)
+
 (defstruct foo)
 (defstruct bar x y)
 
@@ -562,3 +564,5 @@
              (test (1- (expt 2 i)))
              (test (- (expt 2 i) (random (expt 2 i))))
              (test (+ (expt 2 i) (random (expt 2 i)))))))
+
+#+x86-64 (setf (extern-alien "aggressive_scrub_control_stack" int) 0)

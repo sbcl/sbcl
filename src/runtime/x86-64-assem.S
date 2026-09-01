@@ -416,8 +416,17 @@ GNAME(arch_scrub_control_stack):
 	lea	(%rdx, %rcx), %r9       // R9 = guard page upper bound
 	lea	64(%r9), %r9            // 64 byte safety margin
 
+	LOAD_PIC_UINT(aggressive_scrub_control_stack, ax)
+	test	%eax, %eax
+	/* if this branch gets taken, then rdi becomes exactly r9
+	 * which is exactly where to start clearing the entire stack */
+	jnz	.Lhit_bottom
+
 	/* tentative_bottom = rsp but cache-line aligned. RSP is 16-byte-aligned coming in,
 	 * but want to ensure that all 4 loads (the movdqa and por) are in one L1 cache line. */
+	/* We may want to start one 4k page down from RSP, ensuring that at least that
+	 * much is scrubbed. Doing so would replicate the older behavior of the quasi-broken
+	 * scrub routine that scrubbed that much and then stopped */
 	mov	%rsp, %rdi
 	and	$-64, %rdi
 	cmp	%r9, %rdi

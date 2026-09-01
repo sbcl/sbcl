@@ -81,6 +81,7 @@ static const unsigned char vector_fill_expect_bytes[] = {
 };
 
 unsigned int cpuid_fn1_ecx = 0;
+unsigned int aggressive_scrub_control_stack = 0;
 
 // Poke in a byte that changes an opcode to enable faster vector fill.
 // Using fixed offsets and bytes is no worse than what we do elsewhere.
