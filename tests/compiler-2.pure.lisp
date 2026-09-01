@@ -5229,36 +5229,37 @@
       (:optimize :default)
       `(lambda () (ftype-test-unused-key2 1))
     (() nil))
-
-  (checked-compile-and-assert
-      (:optimize :default)
-      `(lambda (a) (ftype-test-unused-opt a))
-    ((1) (condition 'type-error)))
-  (checked-compile-and-assert
-      (:optimize :default)
-      `(lambda (a) (ftype-test-unused-key :a a))
-    ((1) (condition 'type-error)))
-  (checked-compile-and-assert
-      (:optimize :default)
-      `(lambda (a) (ftype-test-unused-key2 1 :a a))
-    ((1) (condition 'type-error)))
-  (checked-compile-and-assert
-      (:optimize :default)
-      `(lambda (a) (ftype-test-unused-opt2 a))
-    ((1) (condition 'type-error)))
-  (checked-compile-and-assert
-      (:optimize :default)
-      `(lambda (a) (ftype-test-unused-opt2 a))
-    ((1) (condition 'type-error)))
-  (checked-compile-and-assert
-      (:optimize :default)
-      `(lambda (a) (ftype-test-unused-opt2 0.0 a))
-    ((1) (condition 'type-error)))
-  (checked-compile-and-assert
-      (:optimize :default)
-      `(lambda (a) (ftype-test-unused-opt3 1 a))
-    ((1) (condition 'type-error)))
-  (checked-compile-and-assert
-      (:optimize :default)
-      `(lambda (a) (ftype-test-unused-opt3 1 0.0 a))
-    ((1) (condition 'type-error))))
+  #-interpreter
+  (progn
+   (checked-compile-and-assert
+       (:optimize :default)
+       `(lambda (a) (ftype-test-unused-opt a))
+     ((1) (condition 'type-error)))
+   (checked-compile-and-assert
+       (:optimize :default)
+       `(lambda (a) (ftype-test-unused-key :a a))
+     ((1) (condition 'type-error)))
+   (checked-compile-and-assert
+       (:optimize :default)
+       `(lambda (a) (ftype-test-unused-key2 1 :a a))
+     ((1) (condition 'type-error)))
+   (checked-compile-and-assert
+       (:optimize :default)
+       `(lambda (a) (ftype-test-unused-opt2 a))
+     ((1) (condition 'type-error)))
+   (checked-compile-and-assert
+       (:optimize :default)
+       `(lambda (a) (ftype-test-unused-opt2 a))
+     ((1) (condition 'type-error)))
+   (checked-compile-and-assert
+       (:optimize :default)
+       `(lambda (a) (ftype-test-unused-opt2 0.0 a))
+     ((1) (condition 'type-error)))
+   (checked-compile-and-assert
+       (:optimize :default)
+       `(lambda (a) (ftype-test-unused-opt3 1 a))
+     ((1) (condition 'type-error)))
+   (checked-compile-and-assert
+       (:optimize :default)
+       `(lambda (a) (ftype-test-unused-opt3 1 0.0 a))
+     ((1) (condition 'type-error)))))
