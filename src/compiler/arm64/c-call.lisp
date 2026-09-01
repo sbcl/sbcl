@@ -274,7 +274,7 @@
         ;; Small non-HFA: return in x0 (and x1 if 9-16 bytes)
         ((<= byte-size 16)
          (sb-alien::make-struct-classification
-          :register-slots (make-list (max 1 (ceiling byte-size 8)) :initial-element :integer)
+          :register-slots (make-list (ceiling byte-size 8) :initial-element :integer)
           :size byte-size
           :alignment alignment
           :memory-p nil))
