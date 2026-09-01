@@ -1158,10 +1158,10 @@
           (ecase kind
             (:union
              (load-time-value
-              (!make-alien-record-type :kind :union)))
+              (!make-alien-record-type :kind :union :bits 0 :alignment 1)))
             (:struct
              (load-time-value
-              (!make-alien-record-type :kind :struct))))))))
+              (!make-alien-record-type :kind :struct :bits 0 :alignment 1))))))))
   (define-alien-type-translator union (name &rest fields &environment env)
     (parse-alien-record-type :union name fields env))
   (define-alien-type-translator struct (name &rest fields &environment env)

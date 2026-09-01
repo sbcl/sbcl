@@ -158,9 +158,9 @@
 
    Walks fields recursively, descending into nested records and arrays
    so each leaf scalar contributes to the eightbyte it lands in."
-  (let* ((bits (sb-alien::alien-type-bits record-type))
+  (let* ((bits (alien-type-bits record-type))
          (byte-size (ceiling bits 8))
-         (alignment (sb-alien::alien-type-alignment record-type)))
+         (alignment (alien-type-alignment record-type)))
     ;; Rule: Structs > 16 bytes always use memory (hidden pointer)
     (when (> byte-size 16)
       (return-from classify-struct
@@ -170,72 +170,73 @@
          :alignment alignment
          :memory-p t)))
 
-    (let* ((num-eightbytes (max 1 (ceiling byte-size 8)))
+    (let* ((num-eightbytes (ceiling byte-size 8))
            (eightbytes (make-list num-eightbytes :initial-element :no-class)))
-      (labels ((merge-leaf (offset-bytes size-bytes class)
-                 (loop for byte-offset from offset-bytes
-                       below (+ offset-bytes size-bytes)
-                       by 8
-                       for eb = (floor byte-offset 8)
-                       when (< eb num-eightbytes)
-                       do (setf (nth eb eightbytes)
-                                (merge-classes (nth eb eightbytes) class))))
+      (labels ((merge-leaf (offset-bytes size-bytes class align-bytes)
+                 (if (and (> align-bytes 0)
+                          (plusp (mod offset-bytes align-bytes)))
+                     ;; Unaligned fields go to memory
+                     (setf (first eightbytes) :memory)
+                     (loop for byte-offset from offset-bytes
+                           below (+ offset-bytes size-bytes)
+                           by 8
+                           for eb = (floor byte-offset 8)
+                           when (< eb num-eightbytes)
+                           do (setf (nth eb eightbytes)
+                                    (merge-classes (nth eb eightbytes) class)))))
                (walk (type offset-bytes)
                  (cond
-                   ((sb-alien::alien-record-type-p type)
-                    (dolist (field (sb-alien::alien-record-type-fields type))
-                      (walk (sb-alien::alien-record-field-type field)
+                   ((alien-record-type-p type)
+                    (dolist (field (alien-record-type-fields type))
+                      (walk (alien-record-field-type field)
                             (+ offset-bytes
-                               (floor (sb-alien::alien-record-field-offset field) 8)))))
-                   ((sb-alien::alien-array-type-p type)
-                    (let* ((elt (sb-alien::alien-array-type-element-type type))
-                           (elt-bytes (ceiling (sb-alien::alien-type-bits elt) 8))
-                           (n (or (first (sb-alien::alien-array-type-dimensions type)) 0)))
+                               (floor (alien-record-field-offset field) 8)))))
+                   ((alien-array-type-p type)
+                    (let* ((elt (alien-array-type-element-type type))
+                           (elt-bytes (ceiling (alien-type-bits elt) 8))
+                           (n (or (first (alien-array-type-dimensions type)) 0)))
                       (dotimes (i n)
                         (walk elt (+ offset-bytes (* i elt-bytes))))))
                    ;; Leaf scalar
                    (t
                     (merge-leaf offset-bytes
-                                (ceiling (sb-alien::alien-type-bits type) 8)
-                                (classify-field-sysv-amd64 type))))))
+                                (ceiling (alien-type-bits type) 8)
+                                (classify-field-sysv-amd64 type)
+                                (floor (alien-type-alignment type) 8))))))
         (walk record-type 0))
-
-      ;; Post-merge cleanup per ABI: if second eightbyte is MEMORY, first must be too
-      (when (and (> num-eightbytes 1)
-                 (eq (second eightbytes) :memory))
-        (setf (first eightbytes) :memory))
-
-      ;; Convert remaining :no-class to :integer (padding bytes are treated as integer)
-      (setf eightbytes
-            (mapcar (lambda (c) (if (eq c :no-class) :integer c)) eightbytes))
-
+      (if (member :memory eightbytes)
+          ;; If anything goes to memory then everything goes too
+          (setf eightbytes '(:memory))
+          ;; Convert remaining :no-class to :integer (padding bytes are treated as integer)
+          (setf eightbytes
+                (mapcar (lambda (c) (if (eq c :no-class) :integer c)) eightbytes)))
       (sb-alien::make-struct-classification
        :register-slots eightbytes
        :size byte-size
        :alignment alignment
-       :memory-p (member :memory eightbytes)))))
+       :memory-p (and (member :memory eightbytes) t)))))
 
 #+win32
 (defun classify-struct (record-type)
   "Classify struct for Windows AMD64 ABI.
 Size-based only: <=8 bytes in single integer register, >8 bytes via pointer.
 Floats are passed in integer registers."
-  (let* ((bits (sb-alien::alien-type-bits record-type))
+  (let* ((bits (alien-type-bits record-type))
          (byte-size (ceiling bits 8))
-         (alignment (sb-alien::alien-type-alignment record-type)))
-    (if (> byte-size 8)
+         (alignment (alien-type-alignment record-type)))
+    (if (member byte-size '(1 2 4 8))
+        ;; Small aligned struct: single integer
+        (sb-alien::make-struct-classification
+         :register-slots '(:integer)
+         :size byte-size
+         :alignment alignment
+         :memory-p nil)
         ;; Large struct: hidden pointer
         (sb-alien::make-struct-classification
          :register-slots '(:memory)
          :size byte-size
          :alignment alignment
-         :memory-p t)
-        ;; Small struct: single integer
-        (sb-alien::make-struct-classification
-         :register-slots '(:integer)
-         :size byte-size
-         :alignment alignment
-         :memory-p nil))))
+         :memory-p t))))
 
 ;;; Result TN generation for record types
 ;;; Called from src/code/c-call.lisp

@@ -442,3 +442,51 @@ struct three_u64 three_u64_from_u128(__uint128_t x) {
   s.c = s.a ^ s.b;
   return s;
 }
+
+#include <stdint.h>
+
+typedef struct __attribute__((packed)) {
+    uint8_t  a;
+    uint16_t b;
+} Struct3B;
+
+uint32_t sum_struct_3b(Struct3B s) {
+    return (uint32_t)s.a + (uint32_t)s.b;
+}
+
+typedef struct __attribute__((packed)) {
+    uint64_t first;
+    uint8_t  tag;
+    uint16_t unaligned;
+} StructUnalignedSecond;
+
+uint64_t sum_unaligned_second(StructUnalignedSecond s) {
+    return s.first + s.tag + s.unaligned;
+}
+
+typedef struct {} StructEmpty;
+
+int32_t check_empty_struct(StructEmpty s, int32_t val) {
+    (void)s;
+    return val * 2;
+}
+
+typedef struct __attribute__((packed)) {
+    uint8_t  pad;
+    uint16_t unaligned;
+    uint64_t b;
+} StructMemFirst;
+
+uint64_t sum_mem_first(StructMemFirst s) {
+    return (uint64_t)s.pad + (uint64_t)s.unaligned + s.b;
+}
+
+typedef struct {
+    unsigned __int128 val;
+} StructInt128;
+
+StructInt128 make_int128(uint64_t low, uint64_t high) {
+    StructInt128 s;
+    s.val = ((unsigned __int128)high << 64) | low;
+    return s;
+}

@@ -806,3 +806,79 @@
     (assert (= (slot s 'a) low))
     (assert (= (slot s 'b) high))
     (assert (= (slot s 'c) (logxor low high)))))
+
+
+(sb-alien:define-alien-type struct-3b
+  (sb-alien:struct nil
+    (a (sb-alien:unsigned 8))
+    (b (sb-alien:unsigned 16) :offset 8 :alignment 8)))
+
+(sb-alien:define-alien-routine ("sum_struct_3b" sum-struct-3b) (sb-alien:unsigned 32)
+  (s struct-3b))
+
+(with-test (:name :unaligned-3byte-struct)
+  (sb-alien:with-alien ((s3 struct-3b))
+    (setf (sb-alien:slot s3 'a) 5
+          (sb-alien:slot s3 'b) 300)
+    (assert (= (sum-struct-3b s3) 305))))
+
+(sb-alien:define-alien-type struct-unaligned-second
+  (sb-alien:struct nil
+    (first (sb-alien:unsigned 64) :offset 0)
+    (tag (sb-alien:unsigned 8) :offset 64)
+    (unaligned (sb-alien:unsigned 16) :offset 72)))
+
+(sb-alien:define-alien-routine ("sum_unaligned_second" sum-unaligned-second)
+    (sb-alien:unsigned 64)
+  (s struct-unaligned-second))
+
+(with-test (:name :unaligned-second-eightbyte-in-memory)
+  (sb-alien:with-alien ((s struct-unaligned-second))
+    (setf (sb-alien:slot s 'first) 1000
+          (sb-alien:slot s 'tag) 5
+          (sb-alien:slot s 'unaligned) 400)
+    (assert (= (sum-unaligned-second s) 1405))))
+
+(sb-alien:define-alien-type struct-empty
+  (sb-alien:struct nil))
+
+(sb-alien:define-alien-routine ("check_empty_struct" check-empty-struct)
+    (sb-alien:signed 32)
+  (s struct-empty)
+  (val (sb-alien:signed 32)))
+
+(with-test (:name :empty-struct-consumes-no-registers)
+  (sb-alien:with-alien ((s struct-empty))
+    (assert (= (check-empty-struct s 21) 42))))
+
+(sb-alien:define-alien-type struct-mem-first
+  (sb-alien:struct nil
+    (pad (sb-alien:unsigned 8) :offset 0)
+    (unaligned (sb-alien:unsigned 16) :offset 8)
+    (b (sb-alien:unsigned 64) :offset 24)))
+
+(sb-alien:define-alien-routine ("sum_mem_first" sum-mem-first)
+    (sb-alien:unsigned 64)
+  (s struct-mem-first))
+
+(with-test (:name :memory-first-eightbyte-propagation)
+  (sb-alien:with-alien ((s struct-mem-first))
+    (setf (sb-alien:slot s 'pad) 7
+          (sb-alien:slot s 'unaligned) 300
+          (sb-alien:slot s 'b) 5000)
+    (assert (= (sum-mem-first s) 5307))))
+
+;; (sb-alien:define-alien-type struct-int128
+;;   (sb-alien:struct nil
+;;     (val (sb-alien:unsigned 128))))
+
+;; (sb-alien:define-alien-routine ("make_int128" make-int128)
+;;     struct-int128
+;;   (low (sb-alien:unsigned 64))
+;;   (high (sb-alien:unsigned 64)))
+
+;; (with-test (:name :leaf-spanning-two-eightbytes)
+;;   (let* ((res (make-int128 #x1122334455667788 #xAABBCCDDEEFF0011))
+;;          (val (sb-alien:slot res 'val))
+;;          (expected (+ (ash #xAABBCCDDEEFF0011 64) #x1122334455667788)))
+;;     (assert (= val expected))))
