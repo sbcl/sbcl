@@ -9,7 +9,10 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#+x86-64 (setf (extern-alien "aggressive_scrub_control_stack" int) 1)
+;;; This test passes without aggressive scrubbing on #+win32 so let's not mess with it.
+;;; It appears that you can't touch the lowest address on your stack without first consuming
+;;; some stack pages from higher addresses. The OS enforces this as a precaution, I think.
+#+(and (not win32) x86-64) (setf (extern-alien "aggressive_scrub_control_stack" int) 1)
 
 (defstruct foo)
 (defstruct bar x y)
