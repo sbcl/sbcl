@@ -80,6 +80,8 @@ static const unsigned char vector_fill_expect_bytes[] = {
   0xEB, 0x10
 };
 
+unsigned int cpuid_fn1_ecx = 0;
+
 // Poke in a byte that changes an opcode to enable faster vector fill.
 // Using fixed offsets and bytes is no worse than what we do elsewhere.
 void tune_asm_routines_for_microarch(void)
@@ -109,7 +111,6 @@ void tune_asm_routines_for_microarch(void)
 #endif
 
     unsigned int eax, ebx, ecx, edx, xcr0;
-    unsigned int cpuid_fn1_ecx = 0;
 
     cpuid(0, 0, &eax, &ebx, &ecx, &edx);
     if (eax >= 1) { // see if we can execute basic id function 1

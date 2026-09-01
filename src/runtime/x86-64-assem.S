@@ -36,8 +36,10 @@
 // macOS does not like the general way we do this, so do something different.
 #if defined(LISP_FEATURE_DARWIN) || defined(LISP_FEATURE_WIN32)
 #define LOAD_PIC_VAR(x,dest) mov GNAME(x)(%rip), dest
+#define LOAD_PIC_UINT(x,reg) mov GNAME(x)(%rip), %e##reg
 #else
 #define LOAD_PIC_VAR(x,dest) mov GNAME(x)@GOTPCREL(%rip), dest ; mov (dest), dest
+#define LOAD_PIC_UINT(x,reg) mov GNAME(x)@GOTPCREL(%rip), %r##reg ; mov (%r##reg), %e##reg
 #endif
 
 /* Get the right type of alignment. Linux, FreeBSD and OpenBSD
@@ -421,14 +423,9 @@ GNAME(arch_scrub_control_stack):
 	cmp	%r9, %rdi
 	jbe	.Lhit_bottom
 
-	/* Check 8 quadwords (64 bytes) below RDI */
-.Lprobe:
-	movdqa	-64(%rdi), %xmm0
-	por	-48(%rdi), %xmm0
-	por	-32(%rdi), %xmm0
-	por	-16(%rdi), %xmm0
-	ptest	%xmm0, %xmm0            // Sets ZF=1 if all 64 bytes are zero
-	jz	.Lfound_clear
+	LOAD_PIC_UINT(cpuid_fn1_ecx, ax)
+	test	$(1 << 19), %eax
+	jnz	.Lprobe_sse
 
 	/* This loop differs from its previous incarnation in several ways:
 	 * 1. We're no longer interleaving the looking-for-stopping-point and zeroing.
@@ -441,9 +438,32 @@ GNAME(arch_scrub_control_stack):
 	 * 3. There's no reason to operate on 4k at a time. That granularity
 	 *    has nothing to do with anything about how the stack is used. */
 
+.Lprobe: // slower way
+	/* Check 8 quadwords (64 bytes) below RDI */
+	movq	-64(%rdi), %rax
+	orq	-56(%rdi), %rax
+	orq	-48(%rdi), %rax
+	orq	-40(%rdi), %rax
+	orq	-32(%rdi), %rax
+	orq	-24(%rdi), %rax
+	orq	-16(%rdi), %rax
+	orq	-8(%rdi), %rax
+	jz	.Lfound_clear
 	sub	$1024, %rdi             // Step arbitrarily -128 words (1KiB)
 	cmp	%r9, %rdi
 	ja	.Lprobe
+	jmp	.Lhit_bottom
+
+.Lprobe_sse: // faster way
+	movdqa	-64(%rdi), %xmm0
+	por	-48(%rdi), %xmm0
+	por	-32(%rdi), %xmm0
+	por	-16(%rdi), %xmm0
+	ptest	%xmm0, %xmm0            // Sets ZF=1 if all 64 bytes are zero
+	jz	.Lfound_clear
+	sub	$1024, %rdi             // Step arbitrarily -128 words (1KiB)
+	cmp	%r9, %rdi
+	ja	.Lprobe_sse
 
 .Lhit_bottom:
 	/* %rdi landed somewhere at or below the cutoff, so restore it to the exact
