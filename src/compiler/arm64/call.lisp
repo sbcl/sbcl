@@ -360,8 +360,16 @@
                           (assemble ()
                             ;; ... Load it if there is a stack value available, or
                             ;; default it if there isn't.
-                            (inst subs nargs-tn nargs-tn decrement)
-                            (setf decrement (fixnumize 1))
+                            #+tls-based-mv-return
+                            (progn
+                              (inst cmp nargs-tn decrement)
+                              (incf decrement (fixnumize 1)))
+                            #-tls-based-mv-return
+                            (progn
+                             (if (tn-ref-across val) ;; more to come
+                                 (inst subs nargs-tn nargs-tn decrement)
+                                 (inst cmp nargs-tn decrement))
+                             (setf decrement (fixnumize 1)))
                             (unless (sc-is tn control-stack)
                               (setf dst tn))
                             (when stack-targets-p
