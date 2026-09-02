@@ -283,10 +283,10 @@
 
 ;;; Instructions are streamed into a section before (optionally combining
 ;;; sections and) assembling into a SEGMENT.
-(defstruct (stmt (:constructor make-stmt (labels vop mnemonic operands)))
+(defstruct (stmt (:constructor make-stmt (labels vop op operands)))
   (labels)
   (vop)
-  (mnemonic)
+  (op) ; symbol denoting an INST, or possibly a pseudo-op like .align
   (operands)
   (plist nil) ; put anything you want here for later passes such as instcombine
   (prev nil)
@@ -295,7 +295,7 @@
 (defmethod print-object ((stmt stmt) stream)
   (print-unreadable-object (stmt stream :type t :identity t)
     (format stream "~@[~A ~]~A ~:S"
-            (stmt-labels stmt) (stmt-mnemonic stmt) (stmt-operands stmt))))
+            (stmt-labels stmt) (stmt-op stmt) (stmt-operands stmt))))
 
 ;;; A section is just a doubly-linked list of statements with a head and
 ;;; tail pointer to allow insertion anywhere,
@@ -380,22 +380,22 @@
 (defun emit (section &rest things)
   ;; each element of THINGS can be:
   ;; - a label
-  ;; - a list (mnemonic . operands) for a machine instruction or assembler directive
+  ;; - a list (op . operands) for a machine instruction or assembler directive
   ;; - a function to emit a postit
   (let ((last (section-tail section))
         (vop (if (boundp '*current-vop*) *current-vop*)))
     (dolist (thing things (setf (section-tail section) last))
       (if (label-p thing) ; Accumulate multiple labels until the next instruction
-          (if (stmt-mnemonic last)
+          (if (stmt-op last)
               (setq last (insert-stmt (make-stmt thing vop nil nil) last))
               (let ((old (stmt-labels last)) (new (list thing)))
                 (setf (stmt-labels last)
                       (if (label-p old) (cons old new) (nconc old new)))))
-          (multiple-value-bind (mnemonic operands)
+          (multiple-value-bind (op operands)
               (if (consp thing) (values (car thing) (cdr thing)) thing)
-            (unless (member mnemonic '(.align .byte .skip))
+            (unless (member op '(.align .byte .skip))
               ;; This automatically gets the .QWORD pseudo-op which we use on x86-64
-              ;; to create jump tables, but it's sort of unfortunate that the mnemonic
+              ;; to create jump tables, but it's sort of unfortunate that the pseudo-op
               ;; is specific to that backend. It should probably be .LISPWORD instead.
               ;; Anyway, the good news is that jump tables flag all the labels as used.
               (dolist (operand operands)
@@ -403,10 +403,10 @@
                     (setf (label-usedp operand) t)
                     ;; backend decides what labels are used
                     (%mark-used-labels operand))))
-            (if (stmt-mnemonic last)
-                (setq last (insert-stmt (make-stmt nil vop mnemonic operands) last))
+            (if (stmt-op last)
+                (setq last (insert-stmt (make-stmt nil vop op operands) last))
                 (setf (stmt-vop last) (or (stmt-vop last) vop)
-                      (stmt-mnemonic last) mnemonic
+                      (stmt-op last) op
                       (stmt-operands last) operands)))))))
 
 #-(or x86-64 x86)
@@ -1403,7 +1403,7 @@
 
 (defun dump-symbolic-asm (start stream &aux last-vop all-labels (n 0))
   (format stream "~2&Assembler input:~%")
-  (when (eq (stmt-mnemonic start) :ignore)
+  (when (eq (stmt-op start) :ignore)
     (setq start (stmt-next start))) ; Skip dummy head of statement list
   (do ((statement start (stmt-next statement))
        (*print-pretty* nil))
@@ -1413,7 +1413,7 @@
       (unless (eq vop last-vop)
         (format stream "## ~A~%" (sb-c::vop-name vop)))
       (setq last-vop vop))
-    (let ((op (stmt-mnemonic statement))
+    (let ((op (stmt-op statement))
           (eol-comment ""))
       (awhen (stmt-labels statement)
         (let ((list (ensure-list it))
@@ -1446,7 +1446,7 @@
 (defun append-sections (first second)
   (let ((last-stmt (section-tail first)))
     (let ((head (section-start second)))
-      (aver (eq (stmt-mnemonic head) :ignore))
+      (aver (eq (stmt-op head) :ignore))
       (when (stmt-next head)
         (setf (stmt-next last-stmt) (stmt-next head)
               (stmt-prev (stmt-next head)) last-stmt)
@@ -1486,11 +1486,11 @@
       (awhen (stmt-vop statement) (setq *current-vop* it))
       (dolist (label (ensure-list (stmt-labels statement)))
         (%emit-label segment *current-vop* label))
-      (let ((mnemonic (stmt-mnemonic statement))
+      (let ((op (stmt-op statement))
             (operands (stmt-operands statement)))
-        (if (functionp mnemonic)
-            (%emit-postit segment mnemonic)
-            (case mnemonic
+        (if (functionp op)
+            (%emit-postit segment op)
+            (case op
               (.begin-without-scheduling
                (aver (not in-without-scheduling))
                (setq in-without-scheduling t
@@ -1505,14 +1505,14 @@
                      was-scheduling nil))
                ((nil)) ; ignore
                (t
-                (let ((encoder (gethash mnemonic *inst-encoder*)))
+                (let ((encoder (gethash op *inst-encoder*)))
                   (cond (encoder
                          (instruction-hooks segment)
                          (apply (the function (if (listp encoder) (car encoder) encoder))
                                 segment
                                 (perform-operand-lowering operands)))
                         (t
-                         (bug "No encoder for ~S" mnemonic))))))))))
+                         (bug "No encoder for ~S" op))))))))))
   (finalize-segment segment))
 
 ;;; The interface to %ASSEMBLE
@@ -1585,34 +1585,34 @@
 #-x86-64
 (defun perform-operand-lowering (operands) operands)
 
-(defun trace-inst (section mnemonic operands)
+(defun trace-inst (section op operands)
   (when sb-c::*compiler-trace-output*
     (let* ((asmstream *asmstream*)
            (section-name
             (if (eq section (asmstream-code-section asmstream))
                 :regular
                 :elsewhere)))
-      (sb-c::trace-instruction section-name *current-vop* mnemonic operands
+      (sb-c::trace-instruction section-name *current-vop* op operands
                                (asmstream-tracing-state asmstream)))))
 
-(defmacro inst (&whole whole mnemonic &rest args)
+(defmacro inst (&whole whole op &rest args)
   "Emit the specified instruction to the current segment."
-  (let* ((sym (find-symbol (string mnemonic) *backend-instruction-set-package*))
+  (let* ((sym (find-symbol (string op) *backend-instruction-set-package*))
          (definedp (nth-value 1 (gethash sym *inst-encoder*))))
     (cond ((not definedp)
-           ;; INST* can not execute random forms, so MNEMONIC must be a literal to be
+           ;; INST* can not execute random forms, so OP must be a literal to be
            ;; recognized as a macro instruction. It's basically a lisp macro that can
            ;; coexist with other identically-named lisp macros or functions.
            ;; For example, arm64 has {ASR, LSR} as DEFUNs and macro instructions.
            ;; By using an unusual convention of a symbol with #\: in its name,
            ;; FIND-SYMBOL reliably tests whether a macro is defined without further
            ;; using FBOUNDP or MACRO-FUNCTION.
-           (let ((macro (find-symbol (format nil "M:~A" mnemonic)
+           (let ((macro (find-symbol (format nil "M:~A" op)
                                      *backend-instruction-set-package*)))
              (when macro
                (return-from inst `(,macro ,@args))))
-           (warn "Undefined instruction: ~s in~% ~s" mnemonic whole)
-           `(error "Undefined instruction: ~s in~% ~s" ',mnemonic ',whole))
+           (warn "Undefined instruction: ~s in~% ~s" op whole)
+           `(error "Undefined instruction: ~s in~% ~s" ',op ',whole))
           (t
            `(inst* ',sym ,@args)))))
 
@@ -1627,11 +1627,12 @@
 ;;;     but not its front-end. This could be changed, but it's not wrong.
 ;;; As such, we must detect that we are emitting directly to machine code.
 ;;;
-(defun inst* (mnemonic &rest operands)
+(defun inst* (op &rest operands)
   (let ((dest
-         (etypecase mnemonic
+         (etypecase op
            (symbol
-            ;; If called by a vop, the first argument is a mnemonic.
+            ;; If called by a vop, the first argument is a machine instruction mnemonic,
+            ;; or a pseudo-op.
             *current-destination*)
            (segment
             ;; If called by an instruction encoder to encode other instructions,
@@ -1640,18 +1641,17 @@
             ;; instructions to emit. Similar results could be achievedy by factoring
             ;; out other emitters into callable functions, though the INST macro
             ;; tends to be a more convenient interface.
-            (prog1 mnemonic (setq mnemonic (the symbol (pop operands)))))))
-        (action (gethash mnemonic *inst-encoder*)))
+            (prog1 op (setq op (the symbol (pop operands)))))))
+        (action (gethash op *inst-encoder*)))
     (unless action ; try canonicalizing again
-      (setq mnemonic (find-symbol (string mnemonic)
-                                  *backend-instruction-set-package*)
-            action (gethash mnemonic *inst-encoder*))
+      (setq op (find-symbol (string op) *backend-instruction-set-package*)
+            action (gethash op *inst-encoder*))
       (aver action))
     (when (listp action) (setq operands (extract-prefix-keywords operands)))
     (typecase dest
       (cons ; streaming in to the assembler
-       (trace-inst dest mnemonic operands)
-       (emit dest (cons mnemonic operands)))
+       (trace-inst dest op operands)
+       (emit dest (cons op operands)))
       (segment ; streaming out of the assembler
        (instruction-hooks dest)
        (apply (the function (if (listp action) (car action) action))
@@ -2044,8 +2044,8 @@
         ;; (e.g. "MOV reg, ea" + ? + "CMP reg, val") provided that the "?"
         ;; does not interact with instructions around it.
         (unless (labeled-statement-p next)
-          (let ((op (stmt-mnemonic stmt))
-                (next-op (stmt-mnemonic next)))
+          (let ((op (stmt-op stmt))
+                (next-op (stmt-op next)))
             ;; Look for a rule that can be applied
             (dolist (rule *asm-pattern-matchers*)
               (destructuring-bind (opcodes1 opcodes2 . action) rule

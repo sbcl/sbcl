@@ -140,7 +140,7 @@
     ;; We also output some raw words using fixups; I'm not sure if they should be
     ;; changed to labels. For now, restrict to control transfers.
     (binding* ((patch
-                (when (member (stmt-mnemonic statement)
+                (when (member (stmt-op statement)
                               '("B" "BEQ" "JMP" "CALL" "CBZ" "CBNZ" "TBZ" "TBNZ") ; KLUDGE
                               :test 'string=)
                   (member-if (lambda (x)

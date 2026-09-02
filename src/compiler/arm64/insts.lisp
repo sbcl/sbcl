@@ -4985,7 +4985,7 @@
        (inst* segment 'strb sb-vm::null-tn addr)))))
 
 (defun conditional-branch-p (stmt)
-  (and (eq (stmt-mnemonic stmt) 'b)
+  (and (eq (stmt-op stmt) 'b)
        (= (length (stmt-operands stmt)) 2)))
 
 (defpattern "cmp 0 + branch" ((subs) (b)) (stmt next)
@@ -5000,19 +5000,19 @@
             (unless (eq (sb-assem::label-comment label) :merged-ifs)
               (when (case flag
                       (:eq
-                       (setf (stmt-mnemonic stmt) 'cbz
+                       (setf (stmt-op stmt) 'cbz
                              (stmt-operands stmt)
                              (list value label)))
                       (:ne
-                       (setf (stmt-mnemonic stmt) 'cbnz
+                       (setf (stmt-op stmt) 'cbnz
                              (stmt-operands stmt)
                              (list value label)))
                       (:ge
-                       (setf (stmt-mnemonic stmt) 'tbz*
+                       (setf (stmt-op stmt) 'tbz*
                              (stmt-operands stmt)
                              (list value (1- n-word-bits) label)))
                       (:lt
-                       (setf (stmt-mnemonic stmt) 'tbnz*
+                       (setf (stmt-op stmt) 'tbnz*
                              (stmt-operands stmt)
                              (list value (1- n-word-bits) label))))
                 (delete-stmt next)
@@ -5030,11 +5030,11 @@
           (destructuring-bind (flag label) (stmt-operands next)
             (when (case flag
                     (:eq
-                     (setf (stmt-mnemonic stmt) 'tbz*
+                     (setf (stmt-op stmt) 'tbz*
                            (stmt-operands stmt)
                            (list value (1- (integer-length mask)) label)))
                     (:ne
-                     (setf (stmt-mnemonic stmt) 'tbnz*
+                     (setf (stmt-op stmt) 'tbnz*
                            (stmt-operands stmt)
                            (list value (1- (integer-length mask)) label))))
               (delete-stmt next)
@@ -5084,7 +5084,7 @@
                      (= immr 63)
                      (= imms 62)
                      (stmt-delete-safe-p dst1 dst2 '(logand)))
-            (setf (stmt-mnemonic next) 'ubfm
+            (setf (stmt-op next) 'ubfm
                   (stmt-operands next) (list dst2 src1 63 (+ (logcount mask)
                                                              (if tagged
                                                                  -1
@@ -5103,7 +5103,7 @@
                   (= immr 63)
                   (= imms 62)
                   (stmt-delete-safe-p dst1 dst2 nil '(sb-vm::move-from-word/fixnum)))
-         (setf (stmt-mnemonic next) 'ubfm
+         (setf (stmt-op next) 'ubfm
                (stmt-operands next) (list dst2 src1 63 (1- (logcount mask))))
          (add-stmt-labels next (stmt-labels stmt))
          (delete-stmt stmt)
@@ -5120,7 +5120,7 @@
                    (= immr 1)
                    (= imms 63)
                    (stmt-delete-safe-p dst1 dst2 '(logand)))
-          (setf (stmt-mnemonic next) 'ubfm
+          (setf (stmt-op next) 'ubfm
                 (stmt-operands next) (list dst2 src1 immr imms))
           (add-stmt-labels next (stmt-labels stmt))
           (delete-stmt stmt)
@@ -5140,7 +5140,7 @@
           ;; but the AND is not needed.
           (if (= (integer-length mask) 64)
               (setf (stmt-operands next) (list dst2 src1 immr imms))
-              (setf (stmt-mnemonic next) 'ubfm
+              (setf (stmt-op next) 'ubfm
                     (stmt-operands next) (list dst2 src1 1 (logcount mask))))
           (add-stmt-labels next (stmt-labels stmt))
           (delete-stmt stmt)
@@ -5160,7 +5160,7 @@
             (when (or (zerop mask)
                       (encode-logical-immediate mask))
               (if (zerop mask)
-                  (setf (stmt-mnemonic next) 'orr
+                  (setf (stmt-op next) 'orr
                         (stmt-operands next) (list dst2 zr-tn zr-tn))
                   (setf (stmt-operands next) (list dst2 src1 mask)))
               (add-stmt-labels next (stmt-labels stmt))
@@ -5289,7 +5289,7 @@
                                         sb-vm::ash-left-mod64
                                         sb-vm::ash-left-modfx)
                                       '(sb-vm::move-from-word/fixnum)))
-             (setf (stmt-mnemonic next) 'sbfm
+             (setf (stmt-op next) 'sbfm
                    (stmt-operands next)
                    (list dst2 src1 immr2 imms1))
              (add-stmt-labels next (stmt-labels stmt))
@@ -5302,7 +5302,7 @@
                                       '(ash
                                         sb-vm::ash-left-mod64
                                         sb-vm::ash-left-modfx)))
-             (setf (stmt-mnemonic next) 'sbfm
+             (setf (stmt-op next) 'sbfm
                    (stmt-operands next)
                    (list dst2 src1 (mod (+ immr1 immr2) 64) imms1))
              (add-stmt-labels next (stmt-labels stmt))
@@ -5322,7 +5322,7 @@
                  (location= srcn zr-tn)
                  (location= dst1 src2)
                  (stmt-delete-safe-p dst1 dst2 nil '(sb-vm::move-to-word/fixnum)))
-        (setf (stmt-mnemonic next) 'sub
+        (setf (stmt-op next) 'sub
               (stmt-operands next) (list dst2 srcn (asr srcm 1)))
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
@@ -5339,7 +5339,7 @@
                  (stmt-delete-safe-p dst1 dst2
                                      '(- sb-vm::--mod64 sb-vm::--modfx
                                        %negate sb-vm::%negate-mod64 sb-vm::%negate-modfx)))
-        (setf (stmt-mnemonic next) 'msub
+        (setf (stmt-op next) 'msub
               (stmt-operands next) (list dst2 srcn1 srcm1 srcn2))
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
@@ -5356,7 +5356,7 @@
                      (location= dst1 srcn2))
                  (stmt-delete-safe-p dst1 dst2
                                      '(+ sb-vm::+-mod64 sb-vm::+-modfx)))
-        (setf (stmt-mnemonic next) 'madd
+        (setf (stmt-op next) 'madd
               (stmt-operands next) (list dst2
                                          srcn1 srcm1
                                          (if (location= dst1 srcm2)
@@ -5375,7 +5375,7 @@
                  (or (location= dst1 srcn2)
                      (location= dst1 srcm2))
                  (stmt-delete-safe-p dst1 dst2 '(* sb-vm::*-mod64 sb-vm::*-modfx)))
-        (setf (stmt-mnemonic next) 'msub
+        (setf (stmt-op next) 'msub
               (stmt-operands next) (list dst2
                                          srcm1
                                          (if (location= dst1 srcm2)
@@ -5398,7 +5398,7 @@
             (when (and (location= dst1 srcm2)
                        (not (location= srcn2 srcm2))
                        (stmt-delete-safe-p dst1 dst2 '(-)))
-              (setf (stmt-mnemonic next) 'fmsub
+              (setf (stmt-op next) 'fmsub
                     (stmt-operands next) (list dst2 srcn1 srcm1 srcn2))
               (add-stmt-labels next (stmt-labels stmt))
               (delete-stmt stmt)
@@ -5415,7 +5415,7 @@
                            (location= dst1 srcn2))
                        (not (location= srcn2 srcm2))
                        (stmt-delete-safe-p dst1 dst2 '(+)))
-              (setf (stmt-mnemonic next) 'fmadd
+              (setf (stmt-op next) 'fmadd
                     (stmt-operands next) (list dst2 srcn1 srcm1 (if (location= dst1 srcm2)
                                                                     srcn2
                                                                     srcm2)))
@@ -5430,7 +5430,7 @@
         (unless vector-size2
           (when (and (location= dst1 srcn2)
                      (stmt-delete-safe-p dst1 dst2 '(%negate)))
-            (setf (stmt-mnemonic next) 'fnmul
+            (setf (stmt-op next) 'fnmul
                   (stmt-operands next) (list dst2 srcn1 srcm1))
             (add-stmt-labels next (stmt-labels stmt))
             (delete-stmt stmt)
@@ -5444,7 +5444,7 @@
           (when (and (or (location= dst1 srcn2)
                          (location= dst1 srcm2))
                      (stmt-delete-safe-p dst1 dst2 '(*)))
-            (setf (stmt-mnemonic next) 'fnmul
+            (setf (stmt-op next) 'fnmul
                   (stmt-operands next) (list dst2
                                              (if (location= dst1 srcm2)
                                                  srcn2

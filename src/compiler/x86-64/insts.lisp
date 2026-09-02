@@ -3655,7 +3655,7 @@
   (let* ((operands (stmt-operands stmt))
          (first (pop operands))
          (second (pop operands)))
-    (if (atom (gethash (stmt-mnemonic stmt) sb-assem::*inst-encoder*)) ; no prefixes
+    (if (atom (gethash (stmt-op stmt) sb-assem::*inst-encoder*)) ; no prefixes
         (values :qword first second)
         (let ((prefix first)
               (first second)
@@ -3727,21 +3727,21 @@
                (eq dst2 src2)
                next-next
                ;; Zero shifts do not affect the flags
-               (not (and (memq (stmt-mnemonic stmt) '(sar shl shr))
+               (not (and (memq (stmt-op stmt) '(sar shl shr))
                          (memq (car (last (stmt-operands stmt)))
                                '(:cl 0))))
-               (let ((flag (cond ((memq (stmt-mnemonic next-next) '(jmp set))
+               (let ((flag (cond ((memq (stmt-op next-next) '(jmp set))
                                   (car (stmt-operands next-next)))
                                  (t
                                   (loop for next = next-next then (stmt-next next)
                                         while next
-                                        do (case (stmt-mnemonic next)
+                                        do (case (stmt-op next)
                                              ((mov lea))
                                              (cmov
                                               (return (second (stmt-operands next))))
                                              (t
                                               (return))))))))
-                 (or (and (memq (stmt-mnemonic stmt) '(and xor or)) ;; the same flags are set
+                 (or (and (memq (stmt-op stmt) '(and xor or)) ;; the same flags are set
                           (or (eq size2 size1)
                               (and (memq flag '(:ne :e :nz :z))
                                    (eq size1 :dword)
@@ -3811,7 +3811,7 @@
         ;; It makes me nervous to think about correctness in that case,
         ;; so I'm constraining this to 31 bits, not 32.
         (when (<= max-dst1-bit-index 30)
-          (setf (stmt-mnemonic stmt) 'shr
+          (setf (stmt-op stmt) 'shr
                 (stmt-operands stmt) `(,+dword-size-prefix+ ,dst1 ,src1))
           next)))))
 
@@ -3886,11 +3886,11 @@
              (and (label-p maybe-label) maybe-label))))
     (do ((stmt starting-stmt (stmt-next stmt)))
         ((null stmt))
-      (when (eq (stmt-mnemonic stmt) 'jmp)
+      (when (eq (stmt-op stmt) 'jmp)
         (let* ((to-label (jmp-target stmt))
                (to-stmt (gethash to-label label->stmt-map)))
           (case (and to-stmt
-                     (eq (stmt-mnemonic to-stmt) 'jmp)
+                     (eq (stmt-op to-stmt) 'jmp)
                      (jmp-target to-stmt)
                      (branch-branch-implication (jmp-cond stmt) (jmp-cond to-stmt)))
             (:taken

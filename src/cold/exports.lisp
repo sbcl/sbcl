@@ -1197,7 +1197,7 @@ of `SB-KERNEL`) have been undone, but probably more remain.")
            "VARIABLE-LENGTH"
            "SEGMENT-COLLECT-DYNAMIC-STATISTICS"
            "SECTION-START"
-           "STMT-LABELS" "STMT-MNEMONIC" "STMT-OPERANDS"
+           "STMT-LABELS" "STMT-OP" "STMT-OPERANDS"
            "STMT-PLIST"
            "STMT-PREV" "STMT-NEXT"
            "ADD-STMT-LABELS" "DELETE-STMT"
