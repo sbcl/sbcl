@@ -1797,7 +1797,7 @@
   (rt :fields (list (byte 2 30) (byte 5 0)))
   (ldr-str-annotation :fields (list (byte 5 5) (byte 7 15)) :type 'ldr-str-pair-annotation))
 
-(defun ldp-stp-offset-p (offset size)
+(defun ldp-stp-offset-p (offset &optional (size 64))
   (multiple-value-bind (quot rem) (truncate offset (ecase size
                                                      (32 4)
                                                      (64 8)

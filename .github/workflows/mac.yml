@@ -10,7 +10,7 @@ jobs:
     strategy: 
       matrix:
         arch: [arm64, x86-64]
-        options: [--with-sb-thread --with-nonstop-foreign-call, --with-mark-region-gc --with-nonstop-foreign-call]
+        options: [--with-sb-thread --with-nonstop-foreign-call --with-tls-based-mv-return, --with-mark-region-gc --with-nonstop-foreign-call --with-tls-based-mv-return]
       fail-fast: false
 
     steps:

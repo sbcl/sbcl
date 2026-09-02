@@ -1343,14 +1343,12 @@
   #-tls-based-mv-return (:ignore values old-fp return-pc)
   #+tls-based-mv-return (:ignore old-fp return-pc)
   (:info nvals)
-  (:temporary (:sc descriptor-reg :offset r0-offset :from (:eval 0)) r0)
-  (:temporary (:sc descriptor-reg :offset r1-offset :from (:eval 0)) r1)
-  (:temporary (:sc descriptor-reg :offset r2-offset :from (:eval 0)) r2)
-  (:temporary (:sc descriptor-reg :offset r3-offset :from (:eval 0)) r3)
+  (:temporary (:sc descriptor-reg :offset r0-offset :from (:eval 0)))
+  (:temporary (:sc descriptor-reg :offset r1-offset :from (:eval 0)))
+  (:temporary (:sc descriptor-reg :offset r2-offset :from (:eval 0)))
+  (:temporary (:sc descriptor-reg :offset r3-offset :from (:eval 0)))
   (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
   (:temporary (:sc any-reg :offset nargs-offset) nargs)
-  #+tls-based-mv-return
-  (:temporary (:sc descriptor-reg) desc-temp)
   #-tls-based-mv-return
   (:temporary (:sc any-reg :offset ocfp-offset) val-ptr)
   (:vop-var vop)
@@ -1374,8 +1372,8 @@
            (load-immediate-word nargs (fixnumize nvals))
            ;; pre-default any argument register that need it.
            (when (< nvals register-arg-count)
-             (dolist (reg (subseq (list r0 r1 r2 r3) nvals))
-               (move reg null-tn)))
+             (loop for r in (nthcdr nvals *register-arg-tns*)
+                   do (move r null-tn)))
            ;; And away we go.
            (lisp-return lr :multiple-values t)))
     #+tls-based-mv-return
@@ -1389,31 +1387,219 @@
       (t
        (load-immediate-word nargs (fixnumize nvals))
        (when (< nvals register-arg-count)
-         (dolist (reg (subseq (list r0 r1 r2 r3) nvals))
-           (move reg null-tn)))
+         (loop for r in (nthcdr nvals *register-arg-tns*)
+               do (move r null-tn)))
        (when (> nvals register-arg-count)
          (inst strb nargs (thread-mv-count)) ;; reserve space before storing anything
-         (do ((tn-ref (do ((i register-arg-count (1- i)) ; skip over this many
-                           (ref values (tn-ref-across ref)))
-                          ((zerop i) ref))
-                      (tn-ref-across tn-ref))
-              (slot 0 (1+ slot)))
-             ((null tn-ref))
-           (let ((tn (tn-ref-tn tn-ref))
-                 (ea (@ thread-tn
-                        (ash (+ thread-mv-return-values-slot slot) word-shift))))
-             (sc-case tn
-               ((descriptor-reg any-reg)
-                (inst str tn ea))
-               ((control-stack)
-                (load-stack-tn desc-temp tn)
-                (inst str desc-temp ea))
-               ((constant)
-                (inst load-constant desc-temp (tn-byte-offset tn))
-                (inst str desc-temp ea))
-               ((immediate)
-                (load-immediate vop tn tmp-tn)
-                (inst str tmp-tn ea))))))
+         (collect ((remaining)
+                   (constants)
+                   (immediates))
+           (let ((stack 0)
+                 wired-constants
+                 wired-immediates
+                 (registers-used (make-array 32 :initial-element nil))
+                 (registers #.(sb-c::make-sc-locations (list* lr-offset
+                                                              nargs-offset
+                                                              *register-arg-offsets*))))
+             (do ((i register-arg-count (1- i)))
+                 ((zerop i))
+               (let* ((tn (tn-ref-tn values))
+                      (original-tn (remove-moves tn)))
+                 (sc-case original-tn
+                   (constant
+                    (push (cons tn (tn-offset original-tn)) wired-constants))
+                   (immediate
+                    (push (cons tn (tn-value original-tn)) wired-immediates))
+                   (t))
+                 (setf values (tn-ref-across values))))
+             ;; Store as many register pairs using STP as possible
+             ;; That might free up some registers and allow more STP do be done
+             (do* ((tn-ref values (tn-ref-across next-ref))
+                   (next-ref (and tn-ref (tn-ref-across tn-ref))
+                             (and tn-ref (tn-ref-across tn-ref)))
+                   (slot 0 (+ slot 2)))
+                  ((null tn-ref))
+               (let ((tn (tn-ref-tn tn-ref))
+                     (offset (ash (+ thread-mv-return-values-slot slot) word-shift)))
+                 (when (and (constant-tn-p tn)
+                            (eql (tn-value tn) 0))
+                   (setf tn zr-tn))
+                 (flet ((save (tn &optional (add 0))
+                          (incf offset add)
+                          (sc-case tn
+                            (control-stack (incf stack))
+                            (constant (constants (tn-offset tn)))
+                            (immediate (immediates (tn-value tn)))
+                            ((descriptor-reg any-reg)
+                             (setf (ldb (byte 1 (tn-offset tn)) registers) 1)
+                             (push tn (aref registers-used (tn-offset tn)))))
+                          (remaining (cons tn offset))))
+                   (let ((next (if next-ref
+                                   (tn-ref-tn next-ref)
+                                   (return (save tn)))))
+                     (when (and (constant-tn-p next)
+                                (eql (tn-value next) 0))
+                       (setf next zr-tn))
+                     (cond ((and (sc-is tn descriptor-reg any-reg)
+                                 (sc-is next descriptor-reg any-reg))
+                            (cond ((ldp-stp-offset-p offset)
+                                   (inst stp tn next (@ thread-tn offset)))
+                                  (t
+                                   (inst str tn (@ thread-tn offset))
+                                   (inst str next (@ thread-tn (+ offset 8))))))
+                           (t
+                            (save tn)
+                            (save next 8)))))))
+             (let* ((remaining (remaining))
+                    (constants (constants))
+                    (immediates (immediates))
+                    (free-desc (logandc2 #.(sb-c::sc-locations (sc-or-lose 'descriptor-reg))
+                                         registers))
+                    (free-any (logandc2 #.(+ (sb-c::sc-locations (sc-or-lose 'any-reg)) (ash 1 tmp-offset))
+                                        registers))
+                    freeable-constants
+                    freeable-immediates
+                    want)
+               (labels ((claim (offset)
+                          (setf (ldb (byte 1 offset) free-any) 0
+                                (ldb (byte 1 offset) free-desc) 0))
+                        (get-desc ()
+                          (when (or (plusp free-desc)
+                                    (free (car (pop freeable-constants))))
+                            (let ((first (count-trailing-zeros free-desc)))
+                              (claim first)
+                              (make-random-tn (sc-or-lose 'descriptor-reg) first))))
+                        (get-any ()
+                          (when (or (plusp free-any)
+                                    (free (car (pop freeable-immediates)))
+                                    (free (car (pop freeable-constants))))
+                            (let ((first (count-trailing-zeros free-any)))
+                              (claim first)
+                              (make-random-tn (sc-or-lose 'any-reg) first))))
+                        (free (tn)
+                          (when tn
+                            (let ((offset (tn-offset tn)))
+                              (unless (or (eql offset zr-offset)
+                                          (eql offset null-offset))
+                                (when (logbitp offset #.(sb-c::sc-locations (sc-or-lose 'descriptor-reg)))
+                                  (setf (ldb (byte 1 offset) free-desc) 1))
+                                (setf (ldb (byte 1 offset) free-any) 1))))))
+                 (when (or (and (or constants
+                                    (plusp stack))
+                                (<= (logcount free-desc) 1)
+                                (setf want #.(sb-c::sc-locations (sc-or-lose 'descriptor-reg))))
+                           (and immediates
+                                (<= (logcount free-any) 1)
+                                (setf want #.(sb-c::sc-locations (sc-or-lose 'any-reg)))))
+                   (let* ((freeable-registers (sort (loop for i below (length registers-used)
+                                                          for r = (aref registers-used i)
+                                                          when (and r
+                                                                    (logbitp i want))
+                                                          collect r)
+                                                    #'< :key #'length))
+                          (reg1 (elt freeable-registers 0))
+                          (reg2 (elt freeable-registers 1))
+                          (regs (append reg1 reg2))
+                          (tn1 (car reg1))
+                          (tn2 (car reg2)))
+                     (loop for pair in remaining
+                           for (tn . offset) = pair
+                           when (member tn regs)
+                           do
+                           (inst str tn (@ thread-tn offset))
+                           (setf (car pair) nil))
+                     (free tn1)
+                     (free tn2)))
+                 (loop for (pair . rest) on remaining by #'cddr
+                       for (tn . offset) = pair
+                       for (next-pair) = rest
+                       for free = nil
+                       for constants-to-add = nil
+                       for immediates-to-add = nil
+                       do
+                       (flet ((process (tn rest)
+                                (cond ((listp tn)
+                                       (when tn
+                                         (push (car tn) free)
+                                         (decf stack)
+                                         (car tn)))
+                                      (t
+                                       (sc-case tn
+                                         ((descriptor-reg any-reg)
+                                          (let* ((offset (tn-offset tn))
+                                                 (used-tns (aref registers-used offset)))
+                                            (aver used-tns)
+                                            (unless (setf (aref registers-used offset) (cdr used-tns))
+                                              (push tn free)))
+                                          tn)
+                                         (control-stack
+                                          (decf stack)
+                                          (let* ((stack-offset (tn-offset tn))
+                                                 (byte-stack-offset (ash stack-offset word-shift))
+                                                 (pair (and (ldp-stp-offset-p byte-stack-offset)
+                                                            (loop for p in rest
+                                                                  for (tn) = p
+                                                                  when (and (not (listp tn))
+                                                                            (sc-is tn control-stack)
+                                                                            (= (abs (- stack-offset (tn-offset tn))) 1))
+                                                                  return p)))
+                                                 (reg1 (get-desc))
+                                                 reg2)
+                                            (aver reg1)
+                                            (push reg1 free)
+                                            (cond ((and pair
+                                                        (or (and (= stack 1)
+                                                                 (not constants)
+                                                                 (not immediates))
+                                                            (> (logcount free-desc) 1))
+                                                        (setf reg2 (get-desc)))
+                                                   (let ((stack-offset2 (tn-offset (car pair))))
+                                                     (setf (car pair) (list reg2)) ;; use & free later
+                                                     (if (> stack-offset stack-offset2)
+                                                         (inst ldp reg2 reg1 (@ cfp-tn (- byte-stack-offset 8)))
+                                                         (inst ldp reg1 reg2 (@ cfp-tn byte-stack-offset)))))
+                                                  (t
+                                                   (inst ldr reg1 (@ cfp-tn byte-stack-offset))))
+                                            reg1))
+                                         (constant
+                                          (pop constants)
+                                          (let ((offset (tn-offset tn)))
+                                            (or (car (find offset wired-constants :key #'cdr))
+                                                (car (find offset freeable-constants :key #'cdr))
+                                                (car (find offset constants-to-add :key #'cdr))
+                                                (let ((reg (get-desc)))
+                                                  (inst load-constant reg (ash offset word-shift))
+                                                  (if (find offset constants)
+                                                      (push (cons reg offset) constants-to-add)
+                                                      (push reg free))
+                                                  reg))))
+                                         (immediate
+                                          (pop immediates)
+                                          (let ((value (tn-value tn)))
+                                            (or (car (find value wired-immediates :key #'cdr))
+                                                (car (find value freeable-immediates :key #'cdr))
+                                                (car (find value immediates-to-add :key #'cdr))
+                                                (let ((reg (get-any)))
+                                                  (load-immediate vop tn reg)
+                                                  (if (find value immediates)
+                                                      (push (cons reg value) immediates-to-add)
+                                                      (push reg free))
+                                                  reg)))))))))
+                         (let ((tn (process tn rest))
+                               (next-tn (and next-pair
+                                             (process (car next-pair) (cdr rest)))))
+                           (cond ((and tn
+                                       next-tn
+                                       (ldp-stp-offset-p offset))
+                                  (inst stp tn next-tn (@ thread-tn offset)))
+                                 (t
+                                  (when tn
+                                    (inst str tn (@ thread-tn offset)))
+                                  (when next-tn
+                                    (inst str next-tn (@ thread-tn (+ offset 8)))))))
+                         (setf freeable-immediates (nconc immediates-to-add freeable-immediates)
+                               freeable-constants  (nconc constants-to-add freeable-constants))
+                         (mapc #'free free))))))))
        (move csp-tn cfp-tn)
        (lisp-return lr :multiple-values t)))))
 
