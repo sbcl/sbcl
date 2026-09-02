@@ -13,7 +13,7 @@ obj/xbuild/arm.core: obj/xbuild/arm/xc.core
 	$(SBCL) $(ARGS) arm < $(SCRIPT2)
 
 obj/xbuild/arm64/xc.core: $(DEPS1)
-	$(SBCL) $(ARGS) arm64 arm64 "(:UNIX :LINUX :ELF :OS-PROVIDES-CLOCK-GETTIME :LITTLE-ENDIAN :SB-THREAD)" < $(SCRIPT1)
+	$(SBCL) $(ARGS) arm64 arm64 "(:UNIX :LINUX :ELF :OS-PROVIDES-CLOCK-GETTIME :LITTLE-ENDIAN :SB-THREAD :TLS-BASED-MV-RETURN)" < $(SCRIPT1)
 obj/xbuild/arm64.core: obj/xbuild/arm64/xc.core
 	$(SBCL) $(ARGS) arm64 < $(SCRIPT2)
 
