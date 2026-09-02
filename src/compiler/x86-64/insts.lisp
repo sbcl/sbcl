@@ -3684,9 +3684,8 @@
                (location= dst2 dst1)
                (eq size1 :qword)
                (eq size2 :dword))
-      (setf (stmt-operands stmt) `(,+dword-size-prefix+ ,dst1 ,(if (integerp src1)
-                                                                   (ldb (byte 32 0) src1)
-                                                                   src1)))
+      (replace-operands stmt +dword-size-prefix+ dst1
+                        (if (integerp src1) (ldb (byte 32 0) src1) src1))
       next)))
 
 ;;; "AND r, imm1" + "AND r, imm2" -> "AND r, (imm1 & imm2)"
@@ -3699,8 +3698,8 @@
                (typep src1 '(signed-byte 32))
                (member size2 '(:dword :qword))
                (typep src2 '(signed-byte 32)))
-      (setf (stmt-operands next)
-            `(,(encode-size-prefix (smaller-of size1 size2)) ,dst2 ,(logand src1 src2)))
+      (replace-operands next (encode-size-prefix (smaller-of size1 size2))
+                        dst2 (logand src1 src2))
       (add-stmt-labels next (stmt-labels stmt))
       (delete-stmt stmt)
       next)))
@@ -3811,8 +3810,7 @@
         ;; It makes me nervous to think about correctness in that case,
         ;; so I'm constraining this to 31 bits, not 32.
         (when (<= max-dst1-bit-index 30)
-          (setf (stmt-op stmt) 'shr
-                (stmt-operands stmt) `(,+dword-size-prefix+ ,dst1 ,src1))
+          (replace-stmt stmt 'shr +dword-size-prefix+ dst1 src1)
           next)))))
 
 (defun reg= (a b) ; Return T if A and B are the same register

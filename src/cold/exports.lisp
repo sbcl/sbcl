@@ -1201,6 +1201,7 @@ of `SB-KERNEL`) have been undone, but probably more remain.")
            "STMT-PLIST"
            "STMT-PREV" "STMT-NEXT"
            "ADD-STMT-LABELS" "DELETE-STMT"
+           "REPLACE-STMT" "REPLACE-OPERANDS"
            "LABELED-STATEMENT-P"
            "DEFPATTERN"))
 

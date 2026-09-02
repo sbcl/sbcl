@@ -287,10 +287,19 @@
   (labels)
   (vop)
   (op) ; symbol denoting an INST, or possibly a pseudo-op like .align
-  (operands)
   (plist nil) ; put anything you want here for later passes such as instcombine
   (prev nil)
-  (next nil))
+  (next nil)
+  ;; In the target compiler, a STMT could be a variable-length structure with OPERANDS
+  ;; as the trailing payload. The peephole optimizer wouldn't be able to modify
+  ;; instances as it currently does, but that was not necessarily a desirable aspect
+  ;; of the design. The main reason STMT was made mutable in the first place
+  ;; was to capture the usage pattern of emit-a-label / emit-an-instruction as one
+  ;; STMT without having to add an stateful accumulator within EMIT.
+  ;; Unfortunately as things stand, there is an awful lot of DESTRUCTURING-BIND
+  ;; of STMT-OPERANDS which precludes changing the representation.
+  (operands nil :type list))
+
 (declaim (freeze-type stmt))
 (defmethod print-object ((stmt stmt) stream)
   (print-unreadable-object (stmt stream :type t :identity t)
@@ -408,6 +417,19 @@
                 (setf (stmt-vop last) (or (stmt-vop last) vop)
                       (stmt-op last) op
                       (stmt-operands last) operands)))))))
+
+;;; Change the instruction and/or operands of a stmt.
+;;; If STMT were immutable, this would allocate and link a new
+;;; STMT into the chain, and delete the old. For now it's just SETF
+(declaim (ftype (sfunction (stmt symbol &rest t) stmt) replace-stmt)
+         (ftype (sfunction (stmt &rest t) stmt) replace-operands))
+(defun replace-stmt (stmt op &rest operands)
+  (setf (stmt-op stmt) op
+        (stmt-operands stmt) operands)
+  stmt)
+(defun replace-operands (stmt &rest operands)
+  (setf (stmt-operands stmt) operands)
+  stmt)
 
 #-(or x86-64 x86)
 (defun %mark-used-labels (operand) ; default implementation
