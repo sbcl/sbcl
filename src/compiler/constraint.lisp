@@ -1350,27 +1350,13 @@
     (typecase node
       (bind
        (let ((fun (bind-lambda node)))
-         (functional-kind-case fun
-           (let
-               (loop with call = (lvar-dest (node-lvar (first (lambda-refs fun))))
-                     for var in (lambda-vars fun)
-                     and val in (combination-args call)
-                     when (and val (lambda-var-constraints var))
-                     do (let ((type (lvar-type val)))
-                          (when (type-for-constraints-p type)
-                            (conset-add-constraint gen 'typep var type nil)))
-                        (maybe-add-eql-var-var-constraint var val gen)
-                        (add-var-result-constraints var val gen)))
-           ((nil optional)
-            (loop for var in (lambda-vars fun)
-                  for type = (leaf-defined-type var)
-                  do
-                  (when (and (lambda-var-constraints var)
-                             (type-for-constraints-p type)
-                             (not (lambda-var-arg-info var)))
-                    (conset-add-constraint gen 'typep var type nil))))
-           (mv-let
-            (add-mv-let-result-constraints (lvar-dest (node-lvar (first (lambda-refs fun)))) fun gen)))))
+         (when (functional-kind-eq fun nil optional)
+           (dolist (var (lambda-vars fun))
+             (let ((type (leaf-defined-type var)))
+               (when (and (lambda-var-constraints var)
+                          (type-for-constraints-p type)
+                          (not (lambda-var-arg-info var)))
+                 (conset-add-constraint gen 'typep var type nil)))))))
       (ref
        (when (ok-ref-lambda-var node)
          (maybe-add-eql-var-lvar-constraint node gen)
@@ -1413,8 +1399,8 @@
            (conset-add-constraint gen 'set var var nil)
            (when (node-lvar node)
              (conset-add-lvar-lambda-var-eql gen (node-lvar node) var)))))
-      (combination
-       (case (combination-kind node)
+      (basic-combination
+       (case (basic-combination-kind node)
          (:known
           (unless (and preprocess-refs-p
                        (try-equality-constraint node gen))
@@ -1437,41 +1423,52 @@
                                       not-p))))
                    constraints))))
          (:local
-          (let ((fun (combination-lambda node))
-                (call-in (combination-constraints-in node)))
-            (when (functional-kind-eq fun nil assignment optional cleanup)
-              ;; Add type constraints and any equality constraints
-              ;; from local call arguments. We clear the existing
-              ;; variable constraints first for local calls which
-              ;; participate in recursive dataflow. (e.g. an iterative
-              ;; loop written functionally instead of with SETQ)
-              (let ((new (copy-conset gen))
-                    (vars (lambda-vars fun))
-                    (args (combination-args node)))
-                (loop for var in vars
-                      for val in args
-                      when (and val (lambda-var-constraints var))
-                        do (conset-clear-lambda-var new var))
-                (loop for var in vars
-                      for val in args
-                      when (and val (lambda-var-constraints var))
-                        do (let* ((arg-var (ok-lvar-lambda-var val gen))
-                                  (type (if arg-var
-                                            ;; Not strictly necessary
-                                            ;; to grab the type from
-                                            ;; constraints here
-                                            ;; straight away, but
-                                            ;; speeds up convergence.
-                                            (type-from-constraints arg-var gen (lvar-type val))
-                                            (lvar-type val))))
-                             (when (type-for-constraints-p type)
-                               (conset-add-constraint new 'typep var type nil))
-                             (when arg-var
-                               (inherit-constraints (list var) arg-var gen new))))
-                (unless (and call-in (conset= call-in new))
-                  (setf (combination-constraints-in node) new)
-                  (when *constraint-blocks-p*
-                    (enqueue-block-for-constraints (lambda-block fun))))))))))))
+          (let* ((fun (combination-lambda node))
+                 (vars (lambda-vars fun))
+                 (args (basic-combination-args node)))
+            (functional-kind-case fun
+              ((let)
+               (loop for var in vars
+                     for val in args
+                     when (and val (lambda-var-constraints var))
+                       do (let ((type (lvar-type val)))
+                            (when (type-for-constraints-p type)
+                              (conset-add-constraint gen 'typep var type nil)))
+                          (maybe-add-eql-var-var-constraint var val gen)
+                          (add-var-result-constraints var val gen)))
+              ((nil assignment optional cleanup)
+               ;; TODO: mv-combinations are too hairy.
+               (when (combination-p node)
+                 ;; Add type constraints and any equality constraints
+                 ;; from local call arguments. We clear the existing
+                 ;; variable constraints first for local calls which
+                 ;; participate in recursive dataflow. (e.g. an iterative
+                 ;; loop written functionally instead of with SETQ)
+                 (let ((new (copy-conset gen))
+                       (call-in (combination-constraints-in node)))
+                   (loop for var in vars
+                         for val in args
+                         when (and val (lambda-var-constraints var))
+                           do (conset-clear-lambda-var new var)
+                              (let* ((arg-var (ok-lvar-lambda-var val gen))
+                                     (type (if arg-var
+                                               ;; Not strictly necessary
+                                               ;; to grab the type from
+                                               ;; constraints here
+                                               ;; straight away, but
+                                               ;; speeds up convergence.
+                                               (type-from-constraints arg-var gen (lvar-type val))
+                                               (lvar-type val))))
+                                (when (type-for-constraints-p type)
+                                  (conset-add-constraint new 'typep var type nil))
+                                (when arg-var
+                                  (inherit-constraints (list var) arg-var gen new))))
+                   (unless (and call-in (conset= call-in new))
+                     (setf (combination-constraints-in node) new)
+                     (when *constraint-blocks-p*
+                       (enqueue-block-for-constraints (lambda-block fun)))))))
+              ((mv-let)
+               (add-mv-let-result-constraints vars args gen)))))))))
   gen)
 
 (defun constraint-propagate-if (block gen)

@@ -799,13 +799,10 @@
       (when vector-length
         (add-equality-constraint 'eq var vector-length constraints target nil)))))
 
-(defun add-mv-let-result-constraints (call fun constraints &optional (target constraints))
-  (let ((vars (lambda-vars fun))
-        (lvars (basic-combination-args call)))
-    (when (= (length lvars) 1)
-      (loop for (nth-value operator second min-amount max-amount) in (nth-value 1 (lvar-result-constraints (car lvars) constraints))
-            do
-            (add-equality-constraint operator (elt vars nth-value) second constraints target nil min-amount max-amount)))))
+(defun add-mv-let-result-constraints (vars lvars constraints &optional (target constraints))
+  (when (= (length lvars) 1)
+    (loop for (nth-value operator second min-amount max-amount) in (nth-value 1 (lvar-result-constraints (car lvars) constraints))
+          do (add-equality-constraint operator (elt vars nth-value) second constraints target nil min-amount max-amount))))
 
 ;;; Need a separate function because a set clears the constraints of the var
 (defun add-set-constraints (var lvar constraints)
