@@ -514,16 +514,12 @@
 (defun insert-local-call-dynamic-extents (fun enclose)
   (let ((enclose-home (node-home-lambda enclose)))
     (dolist (ref (leaf-refs fun))
-      (let* ((lvar (node-lvar ref))
-             (dest (and lvar (lvar-dest lvar))))
-        (when (and (eq (node-home-lambda ref) enclose-home)
-                   (combination-p dest)
-                   (eq (combination-kind dest) :local)
-                   (eq lvar (combination-fun dest)))
-          (pushnew (insert-dynamic-extent dest)
+      (when (eq (node-home-lambda ref) enclose-home)
+        (let ((call (node-dest ref)))
+          (pushnew (insert-dynamic-extent call)
                    (enclose-derived-dynamic-extents enclose))
-          (when (node-tail-p dest)
-            (revoke-tail-call dest fun)))))))
+          (when (node-tail-p call)
+            (revoke-tail-call call fun)))))))
 
 ;;; For each lambda in COMPONENT which has been determined to be
 ;;; eligible for stack allocation and does not have an explicit

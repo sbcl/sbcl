@@ -1905,6 +1905,7 @@
 ;;; Insert code to establish a dynamic extent around CALL, returning
 ;;; the dynamic extent.
 (defun insert-dynamic-extent (call)
+  (declare (type combination call))
   (let* ((dynamic-extent (with-ir1-environment-from-node call
                            (make-dynamic-extent)))
          (cleanup (make-cleanup :dynamic-extent dynamic-extent)))
