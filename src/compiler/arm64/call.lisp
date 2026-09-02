@@ -1401,8 +1401,7 @@
              ((null tn-ref))
            (let ((tn (tn-ref-tn tn-ref))
                  (ea (@ thread-tn
-                        (load-store-offset
-                         (ash (+ thread-mv-return-values-slot slot) word-shift)))))
+                        (ash (+ thread-mv-return-values-slot slot) word-shift))))
              (sc-case tn
                ((descriptor-reg any-reg)
                 (inst str tn ea))
