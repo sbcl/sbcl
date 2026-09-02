@@ -152,19 +152,21 @@
                             (push c wcu-warnings)))))
           (with-compilation-unit ()
             (loop for (generated-p stem) in (flattened-sources)
-             do (let* ((output (let ((name (format nil "~A~A.fasl" objdir stem)))
-                                 (ensure-directories-exist name)
-                                 name))
-                       (fasl
-                        (if (string= (pathname-type stem) "fasl")
-                            stem
-                            (multiple-value-bind (output warnings errors)
-                                (compile-file (logicalize stem generated-p)
-                                              :output-file output)
-                              (when (or warnings errors) (sb-sys:os-exit 1))
-                              output))))
-                  (fasls fasl)
-                  (load fasl)))))
+                  do (let* ((output (let ((name (if (pathnamep stem)
+                                                    stem
+                                                    (merge-pathnames objdir stem))))
+                                      (ensure-directories-exist name)
+                                      name))
+                            (fasl
+                              (if (string= (pathname-type stem) "fasl")
+                                  stem
+                                  (multiple-value-bind (output warnings errors)
+                                      (compile-file (logicalize stem generated-p)
+                                                    :output-file output)
+                                    (when (or warnings errors) (sb-sys:os-exit 1))
+                                    output))))
+                       (fasls fasl)
+                       (load fasl)))))
         ;; Deferred warnings occur *after* exiting the W-C-U body.
         ;; See also lp#1078460 - "unknown variable" is not really ever resolved.
         (when wcu-warnings (sb-sys:os-exit 1)))
