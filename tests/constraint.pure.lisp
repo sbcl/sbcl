@@ -943,6 +943,43 @@
                      nil))
              0)))
 
+(with-test (:name :bounds-check-make-array.ssa)
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (length)
+                        (declare (integer length))
+                        (let ((array (make-array length)))
+                          (labels ((loop-fn (i)
+                                     (when (< i length)
+                                       (setf (aref array i) i)
+                                       (loop-fn (1+ i)))))
+                            (loop-fn 0))))
+                     nil))
+             0))
+  #-sbcl
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (length)
+                        (let ((array (make-array length)))
+                          (labels ((loop-fn (i)
+                                     (when (< i length)
+                                       (setf (aref array i) i)
+                                       (loop-fn (1+ i)))))
+                            (loop-fn 0))))
+                     nil))
+             0))
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (type length)
+                        (let ((array (make-sequence type length)))
+                          (labels ((loop-fn (i)
+                                     (when (< i length)
+                                       (setf (aref array i) i)
+                                       (loop-fn (1+ i)))))
+                            (loop-fn 0))))
+                     nil))
+             0)))
+
 (with-test (:name :bounds-check-down)
   (assert (= (count 'sb-kernel:%check-bound
                     (ctu:ir1-named-calls

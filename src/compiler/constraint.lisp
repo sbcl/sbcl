@@ -15,7 +15,7 @@
 ;;;
 ;;; -- documentation
 ;;;
-;;; -- MV-BIND, :ASSIGNMENT
+;;; -- MV-BIND
 ;;;
 ;;; Note: The functions in this file that accept constraint sets are
 ;;; actually receiving the constraint sets associated with nodes,
@@ -1337,6 +1337,27 @@
     (when lambda-var
       (add-eql-var-var-constraint var lambda-var constraints target))))
 
+;;; This function adds appropriate constraints on VARS from a local
+;;; call with arguments ARGS into the conset TARGET. Since local calls
+;;; can participate in recursive dataflow, we clear any variable
+;;; constraints before adding new ones.
+(defun constraint-propagate-from-args (args vars constraints target)
+  (loop for var in vars
+        for val in args
+        when (and val (lambda-var-constraints var))
+          do (conset-clear-lambda-var target var)
+             (let* ((arg-var (ok-lvar-lambda-var val constraints))
+                    (type (if arg-var
+                              ;; Not strictly necessary to grab the
+                              ;; type from constraints here straight
+                              ;; away, but speeds up convergence.
+                              (type-from-constraints arg-var constraints (lvar-type val))
+                              (lvar-type val))))
+               (when (type-for-constraints-p type)
+                 (conset-add-constraint target 'typep var type nil))
+               (when arg-var
+                 (inherit-constraints (list var) arg-var constraints target)))))
+
 ;;; Local propagation
 ;;; -- [TODO: For any LAMBDA-VAR ref with a type check, add that
 ;;;    constraint.]
@@ -1436,33 +1457,16 @@
                               (conset-add-constraint gen 'typep var type nil)))
                           (maybe-add-eql-var-var-constraint var val gen)
                           (add-var-result-constraints var val gen)))
-              ((nil assignment optional cleanup)
+              ((assignment)
                ;; TODO: mv-combinations are too hairy.
                (when (combination-p node)
-                 ;; Add type constraints and any equality constraints
-                 ;; from local call arguments. We clear the existing
-                 ;; variable constraints first for local calls which
-                 ;; participate in recursive dataflow. (e.g. an iterative
-                 ;; loop written functionally instead of with SETQ)
+                 (constraint-propagate-from-args args vars (copy-conset gen) gen)))
+              ((nil optional cleanup)
+               ;; TODO: mv-combinations are too hairy.
+               (when (combination-p node)
                  (let ((new (copy-conset gen))
                        (call-in (combination-constraints-in node)))
-                   (loop for var in vars
-                         for val in args
-                         when (and val (lambda-var-constraints var))
-                           do (conset-clear-lambda-var new var)
-                              (let* ((arg-var (ok-lvar-lambda-var val gen))
-                                     (type (if arg-var
-                                               ;; Not strictly necessary
-                                               ;; to grab the type from
-                                               ;; constraints here
-                                               ;; straight away, but
-                                               ;; speeds up convergence.
-                                               (type-from-constraints arg-var gen (lvar-type val))
-                                               (lvar-type val))))
-                                (when (type-for-constraints-p type)
-                                  (conset-add-constraint new 'typep var type nil))
-                                (when arg-var
-                                  (inherit-constraints (list var) arg-var gen new))))
+                   (constraint-propagate-from-args args vars gen new)
                    (unless (and call-in (conset= call-in new))
                      (setf (combination-constraints-in node) new)
                      (when *constraint-blocks-p*
@@ -1626,7 +1630,10 @@
     (cond
       ;; Use constraints from the local calls to this function
       ((and (bind-p bind)
-            (functional-kind-eq (bind-lambda bind) nil assignment optional cleanup))
+            ;; LETs and ASSIGNMENTs have first order control flow
+            ;; (their function heads are no longer linked to the
+            ;; component head) so don't need special treatment here.
+            (functional-kind-eq (bind-lambda bind) nil optional cleanup))
        (let ((fun (bind-lambda bind)))
          (loop for ref in (lambda-refs fun)
                for call = (node-dest ref)
@@ -1677,7 +1684,7 @@
             (bind (block-start-node block))
             fun)
         (if (and (bind-p bind)
-                 (functional-kind-eq (setf fun (bind-lambda bind)) nil assignment optional cleanup))
+                 (functional-kind-eq (setf fun (bind-lambda bind)) nil optional cleanup))
             (loop for ref in (lambda-refs fun)
                   for call = (node-dest ref)
                   for call-block = (and call
