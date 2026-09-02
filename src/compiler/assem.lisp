@@ -1607,7 +1607,7 @@
            ;; By using an unusual convention of a symbol with #\: in its name,
            ;; FIND-SYMBOL reliably tests whether a macro is defined without further
            ;; using FBOUNDP or MACRO-FUNCTION.
-           (let ((macro (find-symbol (format nil "M:~A" mnemonic)
+           (let ((macro (find-symbol (format nil "M:~A" (string mnemonic))
                                      *backend-instruction-set-package*)))
              (when macro
                (return-from inst `(,macro ,@args))))
