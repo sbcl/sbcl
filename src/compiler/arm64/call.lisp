@@ -1390,6 +1390,7 @@
          (dolist (reg (subseq (list r0 r1 r2 r3) nvals))
            (move reg null-tn)))
        (when (> nvals register-arg-count)
+         (inst strb nargs (thread-mv-count)) ;; reserve space before storing anything
          (do ((tn-ref (do ((i register-arg-count (1- i)) ; skip over this many
                            (ref values (tn-ref-across ref)))
                           ((zerop i) ref))
@@ -1411,8 +1412,7 @@
                 (inst str tmp-tn ea))
                ((immediate)
                 (load-immediate vop tn tmp-tn)
-                (inst str tmp-tn ea)))))
-         (inst strb nargs (thread-mv-count)))
+                (inst str tmp-tn ea))))))
        (move csp-tn cfp-tn)
        (lisp-return lr :multiple-values t)))))
 
