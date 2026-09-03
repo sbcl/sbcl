@@ -412,6 +412,18 @@
                  (primitive-types) (lvar-types))))))))
   (values))
 
+#+tls-based-mv-return
+(defun annotate-unknown-direct-call-values-lvar (lvar)
+  (declare (type lvar lvar))
+  (aver (not (lvar-dynamic-extent lvar)))
+  (let ((2lvar (make-ir2-lvar nil)))
+    (setf (ir2-lvar-kind 2lvar) :unknown
+          (ir2-lvar-locs 2lvar)
+          (list* (make-normal-tn sb-vm::*fixnum-primitive-type*) ;; arg-count
+                 (loop repeat sb-vm::register-arg-count
+                       collect (make-normal-tn *backend-t-primitive-type*))))
+    (setf (lvar-info lvar) 2lvar)))
+
 ;;; We force all the argument lvars to use the unknown values
 ;;; convention. The lvars are annotated in reverse order, since the
 ;;; last argument is on top, thus must be popped first. We disallow
@@ -437,10 +449,30 @@
           (t
            (setf (basic-combination-info call) :full)
            (annotate-fun-lvar (basic-combination-fun call) nil)
-           (loop for (arg . prev) on (reverse args)
-                 do
-                 ;; Only the first argument's CSP is used
-                 (annotate-unknown-values-lvar arg t prev)))))
+           (let* ((reversed-args (reverse args))
+                  #+tls-based-mv-return
+                  (last-arg (car reversed-args)))
+             ;; If only one the last argument is a full call its
+             ;; return values from thread-mv-return-values can be used directly
+             (cond #+tls-based-mv-return
+                   ((and (not (node-tail-p call))
+                         (let ((node (lvar-uses last-arg)))
+                           (and (combination-p node)
+                                (eq (basic-combination-info node) :full)
+                                (almost-immediately-used-p last-arg node)))
+                         (loop for arg in (cdr reversed-args)
+                               always (type-single-value-p (lvar-derived-type arg)))
+                         (lvar-single-value-p (node-lvar call)))
+                    (setf (mv-combination-direct-call call) t)
+                    (annotate-unknown-direct-call-values-lvar last-arg)
+                    (loop for arg in (cdr reversed-args)
+                          do
+                          (annotate-ordinary-lvar  arg)))
+                   (t
+                    (loop for (arg . prev) on reversed-args
+                          do
+                          ;; Only the first argument's CSP is used
+                          (annotate-unknown-values-lvar arg t prev))))))))
 
   (values))
 

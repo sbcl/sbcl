@@ -2148,7 +2148,8 @@
         (let* ((base (- (get-lisp-obj-address object) sb-vm:other-pointer-lowtag))
                (insts (code-instructions object)))
         (format stream "~&; Base: ~x Data: ~x~%" base (sap-int insts))))
-      (disassemble-code-component thing :stream stream)))))
+      (disassemble-code-component thing :stream stream))))
+  object)
 
 ;;;; code to disassemble assembler segments
 

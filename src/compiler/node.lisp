@@ -1642,7 +1642,10 @@
 ;;; receiving forms.
 (defstruct (mv-combination (:include basic-combination)
                            (:constructor make-mv-combination (fun))
-                           (:copier nil)))
+                           (:copier nil))
+  ;; A call consuming multiple values directly from another call
+  #+tls-based-mv-return
+  (direct-call nil))
 (defprinter (mv-combination)
   (fun :prin1 (lvar-uses fun))
   (args :prin1 (mapcar #'lvar-uses args)))

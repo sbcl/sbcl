@@ -152,6 +152,19 @@
                  (inst add csp-tn csp-tn size)
                  (storew cfp-tn res ocfp-save-offset)))))))
 
+#+tls-based-mv-return
+(define-vop (allocate-direct-mv-call-frame)
+  (:info nargs)
+  (:results (res :scs (any-reg)))
+  (:generator 2
+    (let ((size (add-sub-immediate (* nargs n-word-bytes))))
+      (move res csp-tn)
+      (cond ((typep size '(signed-byte 9))
+             (inst str cfp-tn (@ csp-tn size :post-index)))
+            (t
+             (inst add csp-tn csp-tn size)
+             (storew cfp-tn res ocfp-save-offset))))))
+
 ;;; Emit code needed at the return-point from an unknown-values call
 ;;; for a fixed number of values.  VALUES is the head of the TN-REF
 ;;; list for the locations that the values are to be received into.
@@ -1007,7 +1020,7 @@
 ;;; In tail call with fixed arguments, the passing locations are passed as a
 ;;; more arg, but there is no new-FP, since the arguments have been set up in
 ;;; the current frame.
-(defmacro define-full-call (name named return variable &optional args)
+(defmacro define-full-call (name named return variable &optional args direct)
   (aver (not (and variable (eq return :tail))))
   `(define-vop (,name
                 ,@(when (eq return :unknown)
@@ -1026,7 +1039,8 @@
       ,@(when (eq return :tail)
           '((old-fp)
             (return-pc)))
-
+      ,@(when (eq direct :call)
+          '((direct-arg-count :scs (any-reg) :target nargs-pass)))
       ,@(unless variable `((args :more t ,@(unless (eq args :fixed)
                                              '(:scs (descriptor-reg control-stack)))))))
      (:arg-refs
@@ -1051,19 +1065,27 @@
      (:vop-var vop)
      (:node-var node)
      (:info ,@(unless (or variable (eq return :tail)) '(arg-locs))
-            ,@(unless variable '(nargs))
+            ,@(unless (or variable (eq direct :call)) '(nargs))
             ,@(when (eq named :direct) '(fun))
-            ,@(when (eq return :fixed) '(nvals))
-            step-instrumenting)
+            ,@(when (and (eq return :fixed)
+                         (neq direct :return)) '(nvals))
+            step-instrumenting
+            ,@(when (eq direct :call)
+                '(n-fixed)))
 
      (:ignore
       ,@(unless (or variable (eq return :tail)) '(arg-locs))
       ,@(unless variable '(args))
-      ,@(ecase return
-          (:fixed '(ocfp-temp))
-          (:unboxed '(ocfp-temp node values))
-          (:tail '(old-fp return-pc node))
-          (:unknown '(r0-temp))))
+      ,@(when (eq direct :return) '(values))
+      ,@(ecase direct
+          (:call )
+          (:return '(node))
+          ((nil)
+           (ecase return
+             (:fixed '(ocfp-temp))
+             (:unboxed '(ocfp-temp node values))
+             (:tail '(old-fp return-pc node))
+             (:unknown '(r0-temp))))))
 
      ,@(unless (eq named :direct)
          `((:temporary (:sc descriptor-reg :offset lexenv-offset
@@ -1071,10 +1093,16 @@
                         :to :eval)
                        ,(if named 'name-pass 'lexenv))))
 
-     (:temporary (:sc any-reg :offset nargs-offset :to
-                      ,(if (eq return :fixed)
-                           :save
-                           :eval))
+     (:temporary (:sc any-reg :offset nargs-offset
+                      ,@ (when (eq direct :call)
+                           `(:from (:argument 1)))
+                      :to
+                      ,(cond (direct
+                              :eval)
+                             ((eq return :fixed)
+                              :save)
+                             (t
+                              :eval)))
                  nargs-pass)
 
      ,@(when variable
@@ -1084,7 +1112,10 @@
                                    :to :result)
                                   ,name))
                  register-arg-names *register-arg-offsets*))
-     ,@(when (eq return :fixed)
+     ,@(when (eq direct :call)
+         `((:temporary (:scs (descriptor-reg) :from :eval) move-temp mv-slot)))
+     ,@(when (and (not direct)
+                  (eq return :fixed))
          '((:temporary (:scs (descriptor-reg) :from :eval) move-temp)
            (:temporary (:sc any-reg :from :eval :offset ocfp-offset) ocfp-temp)))
      ,@(when (eq return :unboxed)
@@ -1102,12 +1133,15 @@
        (let* ((cur-nfp (current-nfp-tn vop))
               (filler
                 (remove nil
-                        (list ,@'(:load-nargs
+                        (list ,@`(
+                                  ,@(unless (eq direct :call)
+                                      '(:load-nargs))
                                   (when cur-nfp
                                     :frob-nfp)))))
               ,@(unless (eq return :tail)
                   `((new-fp-tn (cond ,@(and
                                         (not variable)
+                                        (not (eq direct :call))
                                         '(((<= (if (consp nargs)
                                                    (car nargs)
                                                    nargs) register-arg-count)
@@ -1118,21 +1152,22 @@
                   (let* ((next (pop filler))
                          (what (if (consp next) (car next) next)))
                     (ecase what
-                      (:load-nargs
-                       ,@(if variable
-                             `((inst sub nargs-pass csp-tn new-fp)
-                               (inst asr nargs-pass nargs-pass (- word-shift n-fixnum-tag-bits))
-                               ,@(do ((arg register-arg-names (cddr arg))
-                                      (i 0 (+ i 2))
-                                      (insts))
-                                     ((null arg) (nreverse insts))
-                                   #.(assert (evenp register-arg-count))
-                                   (push `(inst ldp ,(first arg) ,(second arg)
-                                                (@ new-fp ,(* i n-word-bytes)))
-                                         insts))
-                               (storew cfp-tn new-fp ocfp-save-offset))
-                             '((unless (consp nargs)
-                                 (load-immediate-word nargs-pass (fixnumize nargs))))))
+                      ,@(unless (eq direct :call)
+                          `((:load-nargs
+                             ,@(if variable
+                                   `((inst sub nargs-pass csp-tn new-fp)
+                                     (inst asr nargs-pass nargs-pass (- word-shift n-fixnum-tag-bits))
+                                     ,@(do ((arg register-arg-names (cddr arg))
+                                            (i 0 (+ i 2))
+                                            (insts))
+                                           ((null arg) (nreverse insts))
+                                         #.(assert (evenp register-arg-count))
+                                         (push `(inst ldp ,(first arg) ,(second arg)
+                                                      (@ new-fp ,(* i n-word-bytes)))
+                                               insts))
+                                     (storew cfp-tn new-fp ocfp-save-offset))
+                                   '((unless (consp nargs)
+                                       (load-immediate-word nargs-pass (fixnumize nargs))))))))
                       (:frob-nfp
                        ,(if (eq return :tail)
                             `(inst add nsp-tn cur-nfp (add-sub-immediate
@@ -1187,6 +1222,20 @@
                 `((inst ldr lr (@ null-tn (load-store-offset (static-fun-offset fun))))
                   ,(if (eq return :tail)
                        `(inst add lr lr 4)))))
+           ,@(when (eq direct :call)
+               `((assemble ()
+                   (move nargs-pass direct-arg-count)
+                   (inst subs tmp-tn nargs-pass (fixnumize register-arg-count))
+                   (inst b :le DONE-COPY)
+                   (inst add mv-slot thread-tn (* thread-mv-return-values-slot n-word-bytes))
+                   LOOP
+                   (inst ldr move-temp (@ mv-slot 8 :post-index))
+                   (inst str move-temp (@ csp-tn 8 :post-index))
+                   (inst subs tmp-tn tmp-tn (fixnumize 1))
+                   (inst b :gt LOOP)
+                   DONE-COPY
+                   (unless (zerop n-fixed)
+                     (inst add nargs-pass nargs-pass (fixnumize n-fixed))))))
            (loop
             (if filler
                 (do-next-filler)
@@ -1206,20 +1255,24 @@
                     `(tail-call-unnamed lexenv fun-ref lr)
                     `(call-unnamed lexenv fun-ref lr new-fp-tn))))
 
-         ,@(ecase return
-             (:fixed
-              '((default-unknown-values vop values nvals move-temp node)
-                (when cur-nfp
-                  (load-stack-tn cur-nfp nfp-save))))
-             (:unknown
-              '((note-this-location vop :unknown-return)
-                (receive-unknown-values node values-start nvals start count)
-                (when cur-nfp
-                  (load-stack-tn cur-nfp nfp-save))))
-             ((:unboxed)
-              '((when cur-nfp
-                  (load-stack-tn cur-nfp nfp-save))))
-             ((:tail)))))))
+         ,@(if (eq direct :return)
+               `((assemble ()
+                   (inst mov tmp-tn (fixnumize 1))
+                   (inst csel nargs-tn tmp-tn nargs-tn :ne)))
+               (ecase return
+                 (:fixed
+                  '((default-unknown-values vop values nvals move-temp node)
+                    (when cur-nfp
+                      (load-stack-tn cur-nfp nfp-save))))
+                 (:unknown
+                  '((note-this-location vop :unknown-return)
+                    (receive-unknown-values node values-start nvals start count)
+                    (when cur-nfp
+                      (load-stack-tn cur-nfp nfp-save))))
+                 ((:unboxed)
+                  '((when cur-nfp
+                      (load-stack-tn cur-nfp nfp-save))))
+                 ((:tail))))))))
 
 (define-full-call call nil :fixed nil)
 (define-full-call call-named t :fixed nil)
@@ -1240,6 +1293,15 @@
 (define-full-call unboxed-call-named t :unboxed nil)
 (define-full-call fixed-unboxed-call-named t :unboxed nil :fixed)
 (define-full-call fixed-multiple-call-named t :unknown nil :fixed)
+
+#+tls-based-mv-return
+(progn
+  ;; (multiple-call-call x (y)) => (mv-call-direct x (call-direct))
+  ;; without copying the return values through the stack
+  (define-full-call call-direct nil :fixed nil nil :return)
+  (define-full-call call-direct-named t :fixed nil nil :return)
+  (define-full-call mv-call-direct nil :fixed nil nil :call)
+  (define-full-call mv-call-direct-named t :fixed nil nil :call))
 
 ;;; Defined separately, since needs special code that BLT's the
 ;;; arguments down.

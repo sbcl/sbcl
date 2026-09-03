@@ -258,6 +258,16 @@
             (t
              (inst lea res (ea (- fp-offset) rsp-tn))
              (inst sub rsp-tn stack-size))))))
+
+#+tls-based-mv-return
+(define-vop (allocate-direct-mv-call-frame)
+  (:info nargs)
+  (:results (res :scs (any-reg)))
+  (:generator 2
+    (let ((fp-offset (* sp->fp-offset n-word-bytes))
+          (stack-size (* nargs n-word-bytes)))
+      (inst lea res (ea (- fp-offset) rsp-tn))
+      (inst sub rsp-tn stack-size))))
 
 ;;; Emit code needed at the return-point from an unknown-values call
 ;;; for a fixed number of values. Values is the head of the TN-REF
@@ -760,30 +770,32 @@
 ;;; In tail call with fixed arguments, the passing locations are
 ;;; passed as a more arg, but there is no new-FP, since the arguments
 ;;; have been set up in the current frame.
-(defmacro define-full-call (vop-name named return variable &optional args)
+(defmacro define-full-call (vop-name named return variable &optional args direct)
   (aver (not (and variable (eq return :tail))))
   `(define-vop (,vop-name ,@(when (eq return :unknown) '(unknown-values-receiver)))
-     (:args ,@(unless (eq return :tail)
-                '((new-fp :scs (any-reg) :to (:argument 1))))
+     (:args
+      ,@(unless (eq return :tail)
+          '((new-fp :scs (any-reg) :to (:argument 1))))
 
-            ,@(unless named   ; FUN is an info argument for named call
-                '((fun :scs (descriptor-reg control-stack)
-                       :target rax :to (:argument 0))))
-
-            ,@(when (eq return :tail)
-                '((old-fp)
-                  (return-pc)))
-
-            ,@(unless variable
-                `((args :more t ,@(unless (eq args :fixed)
-                                    '(:scs (descriptor-reg control-stack)))))))
+      ,@(unless named         ; FUN is an info argument for named call
+          '((fun :scs (descriptor-reg control-stack)
+                 :target rax :to (:argument 0))))
+      ,@(when (eq return :tail)
+          '((old-fp)
+            (return-pc)))
+      ,@(when (eq direct :call)
+          '((direct-arg-count :scs (any-reg) :target rcx)))
+      ,@(unless variable
+          `((args :more t ,@(unless (eq args :fixed)
+                              '(:scs (descriptor-reg control-stack)))))))
      (:arg-refs
       ,@(unless (eq return :tail)
           '(nil))
       ,@(unless named
           '(fun-ref)))
 
-     ,@(when (memq return '(:fixed :unboxed)) '((:results (values :more t))))
+     ,@(when (memq return '(:fixed :unboxed))
+         '((:results  (values :more t))))
 
      (:save-p ,(if (eq return :tail) :compute-only t))
 
@@ -793,17 +805,22 @@
      (:vop-var vop)
      (:node-var node)
      (:info    ,@(unless (or variable (eq return :tail)) '(arg-locs))
-               ,@(unless variable '(nargs))
+               ,@(unless (or variable (eq direct :call)) '(nargs))
                ;; Intuitively you might want FUN to be the first codegen arg,
                ;; but that won't work, because EMIT-ARG-MOVES wants the
                ;; passing locs in (FIRST (vop-codegen-info vop)).
                ,@(when named '(fun))
-               ,@(when (eq return :fixed) '(nvals))
-               step-instrumenting)
+               ,@(when (and (eq return :fixed)
+                            (neq direct :return))
+                   '(nvals))
+               step-instrumenting
+               ,@(when (eq direct :call)
+                   '(n-fixed)))
 
      (:ignore   ,@(unless (or variable (eq return :tail)) '(arg-locs))
                 ,@(unless variable '(args))
-                ,@(when (eq return :unboxed) '(values))
+                ,@(when (or (eq direct :return)
+                            (eq return :unboxed)) '(values))
                 ,@(when (eq args :fixed) '(nargs)))
 
      ;; For anonymous call, RAX is the function. For named call, RAX will be the linkage
@@ -815,19 +832,23 @@
      ;; We pass the number of arguments in RCX.
      ,@(unless (eq args :fixed)
          `((:temporary
-            (:sc unsigned-reg :offset rcx-offset
-             :to ,(if (eq return :fixed) :save :eval))
+            (:sc any-reg :offset rcx-offset
+                 ,@ (when (eq direct :call)
+                      `(:from (:argument 1)))
+                 :to :eval)
             rcx)))
-
-     ,@(when (eq return :fixed)
-                   ;; Save it for DEFAULT-UNKNOWN-VALUES to work
+     ,@(when (eq direct :call)
+         '((:temporary (:sc any-reg) counter)))
+     ,@(when (and (eq return :fixed)
+                  (neq direct :return))
+         ;; Save it for DEFAULT-UNKNOWN-VALUES to work
          `((:temporary (:sc unsigned-reg :offset rbx-offset :from :result) rbx)
            (:temporary (:sc any-reg) move-temp)))
 
-               ;; With variable call, we have to load the
-               ;; register-args out of the (new) stack frame before
-               ;; doing the call. Therefore, we have to tell the
-               ;; lifetime stuff that we need to use them.
+     ;; With variable call, we have to load the
+     ;; register-args out of the (new) stack frame before
+     ;; doing the call. Therefore, we have to tell the
+     ;; lifetime stuff that we need to use them.
      ,@(when variable
          (mapcar (lambda (name offset)
                    `(:temporary (:sc descriptor-reg
@@ -843,93 +864,111 @@
      ,@(unless (eq return :tail) '((:node-var node)))
 
      (:generator ,(+ (if named 5 0)
-                     (if variable 19 1)
-                     (if (eq return :tail) 0 10)
-                     15
-                     (if (eq return :unknown) 25 0))
+                    (if variable 19 1)
+                    (if (eq return :tail) 0 10)
+                    15
+                    (if (eq return :unknown) 25 0))
 
-       (progn node) ; always "use" it
+       (progn node)                     ; always "use" it
 
-               ;; This has to be done before the frame pointer is
-               ;; changed! RAX stores the 'lexical environment' needed
-               ;; for closures.
+       ;; This has to be done before the frame pointer is
+       ;; changed! RAX stores the 'lexical environment' needed
+       ;; for closures.
        ,@(unless named '((move rax fun)))
        ,@(unless (eq args :fixed)
-           (if variable
-               ;; For variable call, compute the number of
-               ;; arguments and move some of the arguments to
-               ;; registers.
-               `((inst mov rcx new-fp)
-                 (inst sub rcx rsp-tn)
-                 (inst shr rcx ,(- word-shift n-fixnum-tag-bits))
-                 ;; Move the necessary args to registers,
-                 ;; this moves them all even if they are
-                 ;; not all needed.
-                 ,@(loop for name in register-arg-names
-                         for index downfrom -1
-                         collect `(loadw ,name new-fp ,index)))
-               '((cond ((listp nargs)) ;; no-verify-arg-count
-                       ((zerop nargs)
-                        (zeroize rcx))
-                       (t
-                        (inst mov rcx (fixnumize nargs)))))))
+           (cond (variable
+                  ;; For variable call, compute the number of
+                  ;; arguments and move some of the arguments to
+                  ;; registers.
+                    `((inst mov rcx new-fp)
+                      (inst sub rcx rsp-tn)
+                      (inst shr rcx ,(- word-shift n-fixnum-tag-bits))
+                      ;; Move the necessary args to registers,
+                      ;; this moves them all even if they are
+                      ;; not all needed.
+                      ,@(loop for name in register-arg-names
+                              for index downfrom -1
+                              collect `(loadw ,name new-fp ,index))))
+                 ((eq direct :call)
+                  nil)
+                 (t
+                  '((cond ((listp nargs)) ;; no-verify-arg-count
+                          ((zerop nargs)
+                           (zeroize rcx))
+                          (t
+                           (inst mov rcx (fixnumize nargs))))))))
        ,@(cond ((eq return :tail)
-                '(        ;; Python has figured out what frame we should
-                          ;; return to so might as well use that clue.
-                          ;; This seems really important to the
-                          ;; implementation of things like
-                          ;; (without-interrupts ...)
-                          ;;
-                          ;; dtc; Could be doing a tail call from a
-                          ;; known-call-local etc in which the old-fp
-                          ;; or ret-pc are in regs or in non-standard
-                          ;; places. If the passing location were
-                          ;; wired to the stack in standard locations
-                          ;; then these moves will be un-necessary;
-                          ;; this is probably best for the x86.
+                '(;; Python has figured out what frame we should
+                  ;; return to so might as well use that clue.
+                  ;; This seems really important to the
+                  ;; implementation of things like
+                  ;; (without-interrupts ...)
+                  ;;
+                  ;; dtc; Could be doing a tail call from a
+                  ;; known-call-local etc in which the old-fp
+                  ;; or ret-pc are in regs or in non-standard
+                  ;; places. If the passing location were
+                  ;; wired to the stack in standard locations
+                  ;; then these moves will be un-necessary;
+                  ;; this is probably best for the x86.
                   (sc-case old-fp
-                   ((control-stack)
-                    (unless (= ocfp-save-offset (tn-offset old-fp))
-                                      ;; FIXME: FORMAT T for stale
-                                      ;; diagnostic output (several of
-                                      ;; them around here), ick
-                      (error "** tail-call old-fp not S0~%")
-                      (move old-fp-tmp old-fp)
-                      (storew old-fp-tmp rbp-tn (frame-word-offset ocfp-save-offset))))
-                   ((any-reg descriptor-reg)
-                    (error "** tail-call old-fp in reg not S0~%")
-                    (storew old-fp rbp-tn (frame-word-offset ocfp-save-offset))))
+                    ((control-stack)
+                     (unless (= ocfp-save-offset (tn-offset old-fp))
+                       ;; FIXME: FORMAT T for stale
+                       ;; diagnostic output (several of
+                       ;; them around here), ick
+                       (error "** tail-call old-fp not S0~%")
+                       (move old-fp-tmp old-fp)
+                       (storew old-fp-tmp rbp-tn (frame-word-offset ocfp-save-offset))))
+                    ((any-reg descriptor-reg)
+                     (error "** tail-call old-fp in reg not S0~%")
+                     (storew old-fp rbp-tn (frame-word-offset ocfp-save-offset))))
 
-                          ;; For tail call, we have to push the
-                          ;; return-pc so that it looks like we CALLed
-                          ;; despite the fact that we are going to JMP.
+                  ;; For tail call, we have to push the
+                  ;; return-pc so that it looks like we CALLed
+                  ;; despite the fact that we are going to JMP.
                   (inst push return-pc)))
                (t
-                        ;; For non-tail call, we have to save our
-                        ;; frame pointer and install the new frame
-                        ;; pointer. We can't load stack tns after this
-                        ;; point.
-                `(        ;; Python doesn't seem to allocate a frame
-                          ;; here which doesn't leave room for the
-                          ;; ofp/ret stuff.
+                ;; For non-tail call, we have to save our
+                ;; frame pointer and install the new frame
+                ;; pointer. We can't load stack tns after this
+                ;; point.
+                  `(;; Python doesn't seem to allocate a frame
+                    ;; here which doesn't leave room for the
+                    ;; ofp/ret stuff.
 
-                          ;; The variable args are on the stack and
-                          ;; become the frame, but there may be <3
-                          ;; args and 3 stack slots are assumed
-                          ;; allocate on the call. So need to ensure
-                          ;; there are at least 3 slots. This hack
-                          ;; just adds 3 more.
-                  ,(if variable
-                       '(inst sub rsp-tn (* 3 n-word-bytes)))
+                    ;; The variable args are on the stack and
+                    ;; become the frame, but there may be <3
+                    ;; args and 3 stack slots are assumed
+                    ;; allocate on the call. So need to ensure
+                    ;; there are at least 3 slots. This hack
+                    ;; just adds 3 more.
+                    ,(if variable
+                         '(inst sub rsp-tn (* 3 n-word-bytes)))
 
-                          ;; Bias the new-fp for use as an fp
-                   ,(if variable
-                        '(inst sub new-fp (* sp->fp-offset n-word-bytes)))
+                    ;; Bias the new-fp for use as an fp
+                    ,(if variable
+                         '(inst sub new-fp (* sp->fp-offset n-word-bytes)))
 
-                          ;; Save the fp
-                   (storew rbp-tn new-fp (frame-word-offset ocfp-save-offset))
-                   (move rbp-tn new-fp))))  ; NB - now on new stack frame.
-
+                    ;; Save the fp
+                    (storew rbp-tn new-fp (frame-word-offset ocfp-save-offset))
+                    (move rbp-tn new-fp)))) ; NB - now on new stack frame.
+       ,@(when (eq direct :call)
+           `((assemble ()
+               (move rcx direct-arg-count :dword)
+               (inst mov counter (fixnumize register-arg-count))
+               (inst jmp TEST)
+               LOOP
+               (inst push
+                     (ea (+ (ash thread-mv-return-values-slot word-shift)
+                            (* register-arg-count (- n-word-bytes)))
+                         thread-tn counter 4))
+               (inst add :dword counter 2)
+               TEST
+               (inst cmp :dword counter rcx)
+               (inst jmp :l LOOP)
+               (unless (zerop n-fixed)
+                 (inst add :dword rcx (fixnumize n-fixed))))))
        (when step-instrumenting
          ,@(when named '((compute-linkage-cell node fun rax)))
          (emit-single-step-test)
@@ -944,12 +983,17 @@
                `(tail-call-unnamed rax fun-ref vop))
               (t
                `(call-unnamed rax fun-ref vop)))
-       ,@(ecase return
-           (:fixed '((default-unknown-values vop values nvals node rbx move-temp)))
-           (:unknown
-            '((note-this-location vop :unknown-return)
-              (receive-unknown-values values-start nvals start count node)))
-           ((:tail :unboxed))))))
+       ,@(if (eq direct :return)
+             `((assemble ()
+                 (inst jmp :c multiple)
+                 (inst mov rcx-tn (fixnumize 1))
+                 multiple))
+             (ecase return
+               (:fixed `((default-unknown-values vop values nvals node rbx move-temp)))
+               (:unknown
+                '((note-this-location vop :unknown-return)
+                  (receive-unknown-values values-start nvals start count node)))
+               ((:tail :unboxed)))))))
 
 (define-full-call call nil :fixed nil)
 (define-full-call call-named t :fixed nil)
@@ -966,6 +1010,15 @@
 (define-full-call unboxed-call-named t :unboxed nil)
 (define-full-call fixed-unboxed-call-named t :unboxed nil :fixed)
 (define-full-call fixed-multiple-call-named t :unknown nil :fixed)
+
+#+tls-based-mv-return
+(progn
+  ;; (multiple-call-call x (y)) => (mv-call-direct x (call-direct))
+  ;; without copying the return values through the stack
+  (define-full-call call-direct nil :fixed nil nil :return)
+  (define-full-call call-direct-named t :fixed nil nil :return)
+  (define-full-call mv-call-direct nil :fixed nil nil :call)
+  (define-full-call mv-call-direct-named t :fixed nil nil :call))
 
 ;;; Call NAME "directly" meaning in a single JMP or CALL instruction,
 ;;; if possible (without loading RAX)

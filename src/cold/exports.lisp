@@ -2637,6 +2637,16 @@ be submitted as a \\CDR")
            "ALLOC-ALIEN-STACK-SPACE" "ALLOC-NUMBER-STACK-SPACE"
            "ALLOCATE-CODE-OBJECT" "ALLOCATE-FRAME"
            "ALLOCATE-FULL-CALL-FRAME"
+           #+tls-based-mv-return
+           "ALLOCATE-DIRECT-MV-CALL-FRAME"
+           #+tls-based-mv-return
+           "CALL-DIRECT"
+           #+tls-based-mv-return
+           "CALL-DIRECT-NAMED"
+           #+tls-based-mv-return
+           "MV-CALL-DIRECT"
+           #+tls-based-mv-return
+           "MV-CALL-DIRECT-NAMED"
            "ALWAYS-TRANSLATABLE"
            "ANCESTOR-FRAME-REF" "ANCESTOR-FRAME-SET"
            "ANY"
