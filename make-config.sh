@@ -292,9 +292,17 @@ if [ -n "$SBCL_TARGET_LOCATION" ]; then
     echo "SBCL_TARGET_LOCATION=\"$SBCL_TARGET_LOCATION\"; export SBCL_TARGET_LOCATION" >> output/build-config
 fi
 echo "android=$android; export android" >> output/build-config
+echo "SBCL_RUNNER=\"$SBCL_RUNNER\"; export SBCL_RUNNER" >> output/build-config
 
 # And now, sorting out the per-target dependencies...
 
+# The target OS is normally detected with `uname`.  Set SBCL_OS to
+# override the detection, for cross-OS builds whose target binaries
+# are run by an emulator on the build host (e.g. SBCL_OS=win32 with
+# SBCL_RUNNER set to a script that runs them with Wine).
+if [ -n "$SBCL_OS" ]; then
+    sbcl_os="$SBCL_OS"
+else
 case `uname` in
     Linux)
         sbcl_os="linux"
@@ -339,6 +347,7 @@ case `uname` in
         exit 1
         ;;
 esac
+fi
 
 link_or_copy() {
    if [ "$sbcl_os" = "win32" ] ; then
@@ -743,7 +752,7 @@ case "$sbcl_arch" in
             SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST sb-simd"
         fi
     else
-        if ! $GNUMAKE -C tools-for-build avx2 2> /dev/null || tools-for-build/avx2 ; then
+        if ! $GNUMAKE -C tools-for-build avx2 2> /dev/null || $SBCL_RUNNER tools-for-build/avx2 ; then
             SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST sb-simd"
         fi
     fi
@@ -811,9 +820,9 @@ else
         android_run tools-for-build/determine-endianness >> $ltf
     else
         $GNUMAKE -C tools-for-build determine-endianness -I ../src/runtime
-        tools-for-build/determine-endianness >> $ltf
+        $SBCL_RUNNER tools-for-build/determine-endianness >> $ltf
     fi
-    export sbcl_os sbcl_arch android
+    export sbcl_os sbcl_arch android SBCL_RUNNER
     sh tools-for-build/grovel-features.sh >> $ltf
 fi
 
