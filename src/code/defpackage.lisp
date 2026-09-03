@@ -219,7 +219,11 @@ implementation it is ~S." *!default-package-use-list*)
      "Defines a new package called PACKAGE. Each of OPTIONS should be one of the
 following:~% ~{~%~4T(~S ~A)~}~%
 All options except ~{~S, ~}and :DOCUMENTATION can be used multiple
-times."
+times.
+
+For the non-standard options LOCK and IMPLEMENT, see
+SB-MANUAL:@PACKAGE-LOCKS. For LOCAL-NICKNAMES, see
+SB-MANUAL:@PACKAGE-LOCAL-NICKNAMES."
      '(:use "{package-name}*"
        :export "{symbol-name}*"
        :import-from "<package-name> {symbol-name}*"
