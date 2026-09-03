@@ -290,7 +290,7 @@ most appropriate version based on the instruction set extensions that
 are actually available.
 
 This kind of run time instruction set dispatch is explicitly
-supported by means of the SB-SIMD-INTERNALS:INSTRUCTION-SET-CASE
+supported by means of the @code{sb-simd-internals:instruction-set-case}
 macro. The code resulting from an invocation of this macro compiles
 to an efficient jump table whose index is recomputed on each startup
 of the Lisp image.

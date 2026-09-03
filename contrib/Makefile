@@ -20,10 +20,13 @@ sb-mpfr.fasl: sb-gmp.fasl
 sb-queue.fasl: sb-concurrency.fasl
 sb-simple-streams.fasl: sb-posix.fasl sb-bsd-sockets.fasl
 sb-grovel.fasl: asdf.fasl # for building the module, not for our build
-sb-manual.fasl: sb-aclrepl.fasl sb-bsd-sockets.fasl sb-cltl2.fasl \
-	sb-concurrency.fasl sb-cover.fasl sb-grovel.fasl sb-introspect.fasl \
-	sb-md5.fasl sb-posix.fasl sb-rotate-byte.fasl sb-queue.fasl \
-	sb-sprof.fasl
+
+sb_manual_module_deps = sb-aclrepl sb-bsd-sockets sb-cltl2 sb-concurrency \
+    sb-cover sb-grovel sb-introspect sb-md5 sb-posix sb-rotate-byte \
+    sb-queue sb-sprof sb-simd sb-simple-streams
+sb_manual_unblocked_module_deps = \
+    $(filter-out $(SBCL_CONTRIB_BLOCKLIST), $(sb_manual_module_deps))
+sb-manual.fasl: $(sb_manual_unblocked_module_deps:=.fasl)
 
 # Notes:
 # 1. Invoking $(MAKE) for nested make eliminates a warning about jobserver mode.

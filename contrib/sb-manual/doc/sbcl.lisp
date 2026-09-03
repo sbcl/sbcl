@@ -7,7 +7,9 @@
       (if long
           (format nil "~D-~2,'0D-~2,'0D ~2,'0D:~2,'0D:~2,'0D"
                   year month day hour minute second)
-          (format nil "~D-~2,'0D" year month)))))
+          (format nil "~D-~2,'0D" year month))))
+  (defun package-exists-p/reader (name)
+    (if (find-package name) '(and) '(or))))
 
 (defsection @sbcl-manual (:title "SBCL Manual")
   ;; This docstring is not used in the Texinfo version (see
@@ -44,6 +46,7 @@
   (@package-locks section)
   (@threading section)
   (@timers section)
+  #+#.(sb-manual::package-exists-p/reader '#:sb-bsd-sockets)
   (@networking section)
   (@profiling section)
   (@contributed-modules section)

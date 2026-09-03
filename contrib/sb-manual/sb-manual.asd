@@ -38,8 +38,7 @@
                              (:file "../../sb-posix/manual")
                              (:file "../../sb-queue/manual")
                              (:file "../../sb-rotate-byte/manual")
-                             (:file "../../sb-simd/manual"
-                              :if-feature (:or :x86-64 :arm64))
+                             (:file "../../sb-simd/manual")
                              (:file "../../sb-simple-streams/manual")
                              (:file "deprecation")))
                (:file "late")))

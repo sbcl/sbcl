@@ -58,6 +58,8 @@ jobs:
       with:
         name: sbcl-windows-installer-${{ matrix.sys }}
         path: sbcl-windows-installer
+    - name: build documentation
+      run: cd ./doc/manual && sh generate-texinfo.sh
     - name: tests
       working-directory: tests
       run: ./run-tests.sh

@@ -7,13 +7,8 @@
     On the positive side, this does not load extra stuff until the
     user `require`s `sb-manual`. However, then it loads all contribs.
 
-    A finer grained approach may be preferable. For example, we could
-    make the `manual.lisp` file part of the contrib itself. Then
-    people might complain about the overhead of loading/having the
-    docstrings in the image.
-
-    Alternatively, we could have `sb-bsd-sockets/manual.lisp` as a new
-    `sb-bsd-sockets-manual` module. Eh.
+    It shouldn't be difficult to show documtation only for actually
+    loaded contribs.
 
 - How to deal with repetitive package names?
 

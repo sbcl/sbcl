@@ -37,6 +37,8 @@ jobs:
       with:
         name: sbcl-mac-binary-${{ matrix.arch }}${{ matrix.options }}
         path: sbcl-mac-binary-${{ matrix.arch }}${{ matrix.options }}
+    - name: build documentation
+      run: cd ./doc/manual && sh generate-texinfo.sh
     - name: test
       run: cd tests; ./run-tests.sh --slow
     - name: ansi-test

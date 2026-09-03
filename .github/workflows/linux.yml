@@ -50,6 +50,8 @@ jobs:
     - name: test-fasteval
       if: matrix.subfeatures == 'fasteval'
       run: cd tests; ./run-tests.sh --evaluator-mode interpret
+    - name: build documentation
+      run: cd ./doc/manual && sh generate-texinfo.sh
     - name: test
       run: cd tests; ./run-tests.sh --slow
     - name: ansi-test

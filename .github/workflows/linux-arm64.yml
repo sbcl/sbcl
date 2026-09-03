@@ -47,6 +47,8 @@ jobs:
         name: sbcl-linux-binary-arm64${{ matrix.options }}
         path: sbcl-linux-binary-arm64${{ matrix.options }}
 
+    - name: build documentation
+      run: cd ./doc/manual && sh generate-texinfo.sh
     - name: test
       run: cd tests; ./run-tests.sh --slow
     - name: ansi-test

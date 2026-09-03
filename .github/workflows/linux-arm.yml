@@ -29,6 +29,8 @@ jobs:
         CC: arm-linux-gnueabihf-gcc
       run: ./make.sh --xc-host='sbcl --dynamic-space-size 700MB --lose-on-corruption --disable-ldb --disable-debugger' --arch=arm
 
+    - name: build documentation
+      run: cd ./doc/manual && sh generate-texinfo.sh
     - name: test
       env:
         CC: arm-linux-gnueabihf-gcc
