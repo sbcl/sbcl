@@ -78,3 +78,48 @@
             for word = (sb-sys:sap-int (sb-vm::current-thread-offset-sap i))
             repeat 30 ; arb
             do (assert (zerop word))))))
+
+;;; Test pass-through returns
+
+(declaim (ftype function g h))
+
+(defun test-passthru-return (form)
+  (let ((vops
+         (ctu:ir2-vops `(lambda (x) ,form))))
+    (assert (not (find 'sb-c:return-multiple vops))))
+  ;; negative test
+  (let ((vops
+         (ctu:ir2-vops
+          `(lambda (x) (multiple-value-prog1 ,form (h x))))))
+    (assert (find 'sb-c:return-multiple vops))))
+
+(with-test (:name :pass-through-dx-return)
+  (test-passthru-return '(sb-int:dx-let ((y (cons x x))) (g y))))
+
+(with-test (:name :pass-through-special-unbind)
+  (test-passthru-return '(let ((*print-base* 10)) (g x))))
+
+(defun passthru-callee-normal (n)
+  (values-list (loop for i from 1 to n collect i)))
+(defun passthru-callee-throw (tag n)
+  (throw tag (values-list (loop for i from 1 to n collect i))))
+
+;;; It's not as easy to assert that return-multiple doesn't occur on the
+;;; normal path of CATCH - which it doesn't - because the vop is present
+;;; for the nonlocal path. When thrown through, the value are on the stack.
+;;; So this tests the functionality, but doesn't verify the passthru logic.
+(with-test (:name :pass-through-catch-return)
+  (let ((fun-normal (checked-compile
+                     `(lambda (n)
+                        (catch 'pt-tag
+                          (passthru-callee-normal n)))))
+        (fun-throw (checked-compile
+                    `(lambda (n)
+                       (catch 'pt-tag
+                         (passthru-callee-throw 'pt-tag n))))))
+    (dotimes (n cl:multiple-values-limit)
+      (let ((expected (loop for i from 1 to n collect i))
+            (actual-norm (multiple-value-list (funcall fun-normal n)))
+            (actual-throw (multiple-value-list (funcall fun-throw n))))
+        (assert (equal actual-norm expected))
+        (assert (equal actual-throw expected))))))

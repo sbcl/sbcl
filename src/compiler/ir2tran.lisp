@@ -1424,6 +1424,30 @@
                                                  (emit-step-p node)))))))))))
   (values))
 
+(defun ir2-convert-pass-through-full-call (node block)
+  (declare (type combination node) (type ir2-block block))
+  (multiple-value-bind (fp args arg-locs nargs fixed-args-p)
+      (ir2-convert-full-call-args node block)
+    (let ((fun-lvar (basic-combination-fun node)))
+      (multiple-value-bind (fun-tn named)
+          (fun-lvar-tn node block fun-lvar)
+        (cond ((not named)
+               (vop* sb-vm::pass-through-call node block (fp fun-tn args) (nil)
+                     arg-locs nargs (emit-step-p node)))
+              (fixed-args-p
+               (when-vop-existsp (:named sb-vm::fixed-pass-through-call-named)
+                 (vop* sb-vm::fixed-pass-through-call-named node block
+                       (fp #-linkage-space fun-tn args)
+                       (nil)
+                       arg-locs nargs #+linkage-space named
+                       (emit-step-p node))))
+              (t
+               (vop* sb-vm::pass-through-call-named node block
+                     (fp #-linkage-space fun-tn args)
+                     (nil)
+                     arg-locs nargs #+linkage-space named
+                     (emit-step-p node))))))))
+
 ;;; stuff to check in PONDER-FULL-CALL
 ;;;
 ;;; These came in handy when troubleshooting cold boot after making
@@ -1524,6 +1548,10 @@
   (ponder-full-call node)
   (cond ((node-tail-p node)
          (ir2-convert-tail-full-call node block))
+        ((let ((lvar (node-lvar node)))
+           (and lvar
+                (eq (ir2-lvar-kind (lvar-info lvar)) :pass-through)))
+         (ir2-convert-pass-through-full-call node block))
         ((let ((lvar (node-lvar node)))
            (and lvar
                 (eq (ir2-lvar-kind (lvar-info lvar)) :unknown)))
@@ -1793,6 +1821,8 @@
                    (old-fp return-pc (reference-tn-list locs nil))
                    (nil)
                    nvals))))
+      ((eq lvar-kind :pass-through)
+       (vop sb-vm::return-pass-through node block old-fp return-pc))
       (t
        (aver (eq lvar-kind :unknown))
        (vop* return-multiple node block
@@ -1899,6 +1929,11 @@
                     (vop tail-call-variable node block start fun
                          (ir2-environment-old-fp env)
                          (ir2-environment-return-pc env))))
+                 ((and 2lvar
+                       (eq (ir2-lvar-kind 2lvar) :pass-through))
+                  (vop* sb-vm::pass-through-call-variable node block (start fun nil)
+                        (nil)
+                        (emit-step-p node)))
                  ((and 2lvar
                        (eq (ir2-lvar-kind 2lvar) :unknown))
                   (vop* multiple-call-variable node block (start fun nil)
@@ -2287,12 +2322,18 @@
              (start-loc (make-nlx-entry-arg-start-location))
              (count-loc (make-arg-count-location))
              (2lvar (and lvar (lvar-info lvar))))
-         (if (and 2lvar (eq (ir2-lvar-kind 2lvar) :unknown))
-             (vop* nlx-entry-multiple node block
-                   (top-loc start-loc count-loc nil)
-                   ((reference-tn-list (ir2-lvar-locs 2lvar) t))
-                   target)
-             (let ((locs (standard-result-tns lvar)))
+         (cond ((and 2lvar (eq (ir2-lvar-kind 2lvar) :pass-through))
+                (vop* sb-vm::nlx-entry-pass-through node block
+                      (start-loc count-loc nil)
+                      (nil)
+                      target))
+               ((and 2lvar (eq (ir2-lvar-kind 2lvar) :unknown))
+                (vop* nlx-entry-multiple node block
+                      (top-loc start-loc count-loc nil)
+                      ((reference-tn-list (ir2-lvar-locs 2lvar) t))
+                      target))
+               (t
+                (let ((locs (standard-result-tns lvar)))
                (if (and (= (length locs) 1)
                         (memq kind '(:block :tagbody))
                         lvar
@@ -2306,7 +2347,7 @@
                          ((reference-tn-list locs t))
                          target
                          (length locs)))
-               (move-lvar-result node block locs lvar)))))
+               (move-lvar-result node block locs lvar))))))
       #-no-continue-unwind
       ((:unwind-protect)
        (let ((start-loc (make-nlx-entry-arg-start-location))

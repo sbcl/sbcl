@@ -92,7 +92,8 @@
 
 (define-vop (%catch-breakup)
   (:args (current-block))
-  (:temporary (:sc unsigned-reg) block)
+  ;; picking RAX avoids touching result registers if this is a pass-through cleanup
+  (:temporary (:sc unsigned-reg :offset rax-offset) block)
   (:policy :fast-safe)
   (:generator 17
     (inst mov block (catch-block-ea current-block catch-block-previous-catch-slot))
@@ -100,7 +101,7 @@
 
 (define-vop (%unwind-protect-breakup)
   (:args (current-block))
-  (:temporary (:sc unsigned-reg) block)
+  (:temporary (:sc unsigned-reg :offset rax-offset) block)
   (:policy :fast-safe)
   (:generator 17
      (inst mov block (unwind-block-ea current-block unwind-block-uwp-slot))
@@ -216,6 +217,20 @@
     ;; Reset the CSP at last moved arg.
     (inst lea rsp-tn (ea result loop-index))))
 
+(define-vop (nlx-entry-pass-through)
+  (:args (source :to :save)
+         (count :to :save))
+  (:ignore count)
+  (:info label)
+  (:before-load
+    (emit-label label)
+    (note-this-location vop :non-local-entry))
+  (:temporary (:sc unsigned-reg :offset rsi-offset) rsi)
+  (:save-p :compute-only)
+  (:vop-var vop)
+  (:generator 30
+    (move rsi source)
+    (invoke-asm-routine 'jmp 'return-multiple vop)))
 
 ;;; This VOP is just to force the TNs used in the cleanup onto the stack.
 (define-vop (uwp-entry)

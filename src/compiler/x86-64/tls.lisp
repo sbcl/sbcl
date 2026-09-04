@@ -506,11 +506,19 @@
 ) ; end #+tls-load-indirect
 
 (define-vop (unbind-n)
-  (:temporary (:sc unsigned-reg) temp bsp)
+  ;; The reason for explicitly picking registers is that this needs to avoid
+  ;; affecting the argument/return registers for pass-through cleanups.
+  (:temporary (:sc unsigned-reg :offset rax-offset) bsp)
+  (:temporary (:sc unsigned-reg :offset rbx-offset) temp)
+  (:temporary (:sc unsigned-reg :offset r11-offset) flags-temp)
   (:temporary (:sc complex-double-reg) zero)
   (:info symbols)
   (:vop-var vop)
   (:generator 0
+    ;; The CMP instruction touches the carry flag, which must remain intact
+    ;; for pass-through cleanups. For now, always preserve CF whether or not it's
+    ;; needed (even if #-tls-based-mv-return)
+    (inst set :c flags-temp)
     (load-binding-stack-pointer bsp)
     (inst xorps zero zero)
     (dolist (symbol symbols)
@@ -548,6 +556,7 @@
 
         ;; Zero out the stack.
         (inst movaps (ea bsp) zero)))
+    (inst shr :dword flags-temp 1) ; restore carry flag from low bit
     (store-binding-stack-pointer bsp)))
 
 (define-vop (atomic-inc-symbol-global-value cell-xadd)

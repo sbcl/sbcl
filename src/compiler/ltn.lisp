@@ -299,6 +299,73 @@
 
   (values))
 
+(defun annotate-pass-through-values-lvar (lvar)
+  (declare (type lvar lvar))
+  (aver (not (lvar-dynamic-extent lvar)))
+  (let ((2lvar (make-ir2-lvar nil)))
+    (setf (ir2-lvar-kind 2lvar) :pass-through)
+    (setf (ir2-lvar-locs 2lvar) nil)
+    (setf (lvar-info lvar) 2lvar))
+  (ltn-annotate-casts lvar)
+  (values))
+
+(defun pass-through-path-p (start-block end-block)
+  (declare (type cblock start-block end-block))
+  (let ((visited nil))
+    (labels ((benign-block-p (block)
+               (do-nodes (node lvar block)
+                 (typecase node
+                   ((or ref cast bind entry)
+                    t)
+                   (combination
+                    (let ((name (combination-fun-source-name node nil)))
+                      (unless (member name '(%cleanup-point %special-unbind
+                                             %catch-breakup
+                                             ;; not useful in practice, because the user-written cleaup
+                                             ;; code needs to be analyzed for non-mv-clobbering
+                                             #|%unwind-protect-breakup|#))
+                        (return-from benign-block-p nil))))
+                   (t
+                    (return-from benign-block-p nil))))
+               t)
+             (walk (block)
+               (cond ((eq block end-block) t)
+                     ((member block visited) nil)
+                     ((null (block-succ block)) nil)
+                     ((cdr (block-succ block)) nil)
+                     (t
+                      (push block visited)
+                      (let ((succ (first (block-succ block))))
+                        (if (eq succ end-block)
+                            t
+                            (and (benign-block-p succ)
+                                 (walk succ))))))))
+      (walk start-block))))
+
+(defun return-pass-through-p (return-node lvar)
+  (declare (type creturn return-node) (type lvar lvar))
+  (when (vop-existsp :named sb-vm::return-pass-through)
+    (let ((use (lvar-uses lvar)))
+      (cond ((node-p use)
+             (and (basic-combination-p use)
+                  (eq (basic-combination-kind use) :full)
+                  (not (node-tail-p use))
+                  (eq use (block-last (node-block use)))
+                  (pass-through-path-p (node-block use) (node-block return-node))))
+            ((and (consp use) (= (length use) 2))
+             (let ((call-node (find-if (lambda (u)
+                                         (and (basic-combination-p u)
+                                              (eq (basic-combination-kind u) :full)))
+                                       use))
+                   (nlx-node (find-if (lambda (u)
+                                        (and (combination-p u)
+                                             (eq (combination-fun-source-name u nil) '%nlx-entry)))
+                                      use)))
+               (and call-node nlx-node
+                    (not (node-tail-p call-node))
+                    (eq call-node (block-last (node-block call-node)))
+                    (pass-through-path-p (node-block call-node) (node-block return-node)))))))))
+
 ;;; Annotate LVAR for a fixed, but arbitrary number of values, of the
 ;;; specified primitive TYPES.
 (defun annotate-fixed-values-lvar (lvar types &optional lvar-types)
@@ -358,7 +425,9 @@
                     (values nil :unknown)
                     (values-types int))
               (if (eq kind :unknown)
-                  (annotate-unknown-values-lvar lvar)
+                  (if (return-pass-through-p node lvar)
+                      (annotate-pass-through-values-lvar lvar)
+                      (annotate-unknown-values-lvar lvar))
                   (annotate-fixed-values-lvar
                    lvar (mapcar #'primitive-type types)
                    types)))))
@@ -1065,6 +1134,8 @@
     (ecase (ir2-lvar-kind 2lvar)
       (:unknown
        (annotate-unknown-values-lvar value))
+      (:pass-through
+       (annotate-pass-through-values-lvar value))
       (:fixed
        (let* ((count (length (ir2-lvar-locs 2lvar)))
               (ctype (lvar-derived-type value)))

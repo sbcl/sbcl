@@ -28,6 +28,7 @@
            #:inspect-ir
            #:ir1-named-calls
            #:ir1-funargs
+           #:ir2-vops
            #:disassembly-lines
            #:do-blocks
            #:do-nodes
@@ -110,6 +111,18 @@
                     (sb-c::ir2-block-next ,block-var)))
        ((null ,block-var) ,result)
      ,@forms))
+
+(defun ir2-vops (form)
+  (let (vops)
+    (inspect-ir
+     form
+     (lambda (component)
+       (ctu:do-ir2-blocks (block component)
+         (do ((vop (sb-c::ir2-block-start-vop block)
+                   (sb-c:vop-next vop)))
+             ((null vop))
+           (push (sb-c:vop-name vop) vops)))))
+    vops))
 
 (defun ir1-named-calls (lambda-expression &optional (full t))
   (declare (ignorable lambda-expression full))

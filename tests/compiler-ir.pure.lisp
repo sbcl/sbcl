@@ -22,7 +22,7 @@
           sb-c::%check-bound
           sb-kernel:%bit-pos-fwd/1))
 
-(import 'ctu:inspect-ir)
+(import '(ctu:inspect-ir ctu:ir2-vops))
 
 (defun ir-full-calls (form)
   (let (calls)
@@ -47,18 +47,6 @@
                       (not (eq (sb-c::basic-combination-kind node) :local)))
              (push node calls))))))
     calls))
-
-(defun ir2-vops (form)
-  (let (vops)
-    (inspect-ir
-     form
-     (lambda (component)
-       (ctu:do-ir2-blocks (block component)
-         (do ((vop (sb-c::ir2-block-start-vop block)
-                   (sb-c:vop-next vop)))
-             ((null vop))
-           (push (sb-c:vop-name vop) vops)))))
-    vops))
 
 (with-test (:name :%bit-pos-fwd/1-tail-called)
   (destructuring-bind (combination)

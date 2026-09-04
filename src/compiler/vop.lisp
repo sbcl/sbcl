@@ -244,7 +244,7 @@
   ;;
   ;; If this is :STACK, then this LVAR represents the stack pointer
   ;; used to undo stack allocation of dynamic extent objects.
-  (kind :fixed :type (member :delayed :fixed :unknown :unused :stack))
+  (kind :fixed :type (member :delayed :fixed :unknown :unused :stack :pass-through))
   ;; The primitive-type of the first value of this LVAR. This is
   ;; primarily for internal use during LTN, but it also records the
   ;; type restriction on delayed references. In multiple-value

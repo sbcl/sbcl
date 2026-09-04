@@ -797,7 +797,7 @@
      ,@(when (memq return '(:fixed :unboxed))
          '((:results  (values :more t))))
 
-     (:save-p ,(if (eq return :tail) :compute-only t))
+     (:save-p ,(if (member return '(:tail :pass-through)) :compute-only t))
 
      ,@(unless (or (eq return :tail) variable)
          `((:move-args ,(if (eq args :fixed) :fixed :full-call))))
@@ -993,6 +993,8 @@
                (:unknown
                 '((note-this-location vop :unknown-return)
                   (receive-unknown-values values-start nvals start count node)))
+               (:pass-through
+                '((note-this-location vop :unknown-return)))
                ((:tail :unboxed)))))))
 
 (define-full-call call nil :fixed nil)
@@ -1001,6 +1003,11 @@
 (define-full-call multiple-call-named t :unknown nil)
 (define-full-call tail-call nil :tail nil)
 (define-full-call tail-call-named t :tail nil)
+
+(define-full-call pass-through-call nil :pass-through nil)
+(define-full-call pass-through-call-named t :pass-through nil)
+(define-full-call fixed-pass-through-call-named t :pass-through nil :fixed)
+(define-full-call pass-through-call-variable nil :pass-through t)
 
 (define-full-call call-variable nil :fixed t)
 (define-full-call multiple-call-variable nil :unknown t)
@@ -1122,6 +1129,14 @@
     ;; Clear the multiple-value return flag
     (inst clc)
     ;; And return.
+    (inst ret)))
+
+(define-vop (return-pass-through)
+  (:args (old-fp)
+         (return-pc))
+  (:generator 6
+    (check-ocfp-and-return-pc old-fp return-pc)
+    (inst leave)
     (inst ret)))
 
 ;;; Do unknown-values return of a fixed (other than 1) number of
