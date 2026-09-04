@@ -73,3 +73,30 @@
 
 (define-inline f64.4-truncate (x)
   (f64.4-%round x #b11))
+
+(in-package #:sb-simd-avx512f)
+
+(define-inline f32.16-round (x)
+  (f32.16-%round x #x00))
+
+(define-inline f32.16-floor (x)
+  (f32.16-%round x #x01))
+
+(define-inline f32.16-ceiling (x)
+  (f32.16-%round x #x02))
+
+(define-inline f32.16-truncate (x)
+  (f32.16-%round x #x03))
+
+(define-inline f64.8-round (x)
+  (f64.8-%round x #x00))
+
+(define-inline f64.8-floor (x)
+  (f64.8-%round x #x01))
+
+(define-inline f64.8-ceiling (x)
+  (f64.8-%round x #x02))
+
+(define-inline f64.8-truncate (x)
+  (f64.8-%round x #x03))
+
