@@ -62,14 +62,14 @@
         (operand name dstate))))
 
 (defun print-kreg (value stream dstate)
-  (declare (ignore dstate))
   (let* ((offset (etypecase value
                    ((unsigned-byte 4) value)
                    (reg (reg-num value))))
          (reg (get-fpr :kreg offset))
          (name (reg-name reg)))
-    (when stream
-      (write-string name stream))))
+    (if stream
+        (write-string name stream)
+        (operand name dstate))))
 
 (defun print-kreg/mem (value stream dstate)
   (if (machine-ea-p value)
@@ -117,8 +117,9 @@
   (print-xmmreg/mem-with-width
    value (inst-operand-size-default-qword dstate) t stream dstate))
 
-#+sb-simd-pack-512
 (defun print-opmask-register (value stream dstate)
-  (declare (ignore dstate))
-  (if stream
-      (format stream "K~d" (logand value 7))))
+  (let ((name (format nil "K~d" (logand value 7))))
+    (if stream
+        (write-string name stream)
+        (operand name dstate))))
+
