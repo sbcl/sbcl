@@ -1165,7 +1165,8 @@
              (and (member ignore inherited-ignore)
                   (not (or
                         (member ignore (vop-parse-info-args parse))
-                        (member ignore (vop-parse-operands parse) :key #'operand-parse-name)))))
+                        (member ignore (vop-parse-operands parse) :key #'operand-parse-name)
+                        (member ignore (vop-parse-variant-vars parse))))))
            (vop-parse-ignores parse)))
     (values)))
 
