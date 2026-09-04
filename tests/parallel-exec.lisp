@@ -51,6 +51,11 @@
               (find :gs-seg sb-impl:+internal-features+))
     (push :test-aprof *features*))
 (in-package run-tests)
+
+(let ((ev (member "--interpret" *posix-argv* :test #'equal)))
+  (setf *test-evaluator-mode* :interpret)
+  (setf *posix-argv* (remove "--interpret" *posix-argv* :test #'equal)))
+
 (import '(sb-alien:alien-funcall sb-alien:extern-alien
           sb-alien:int sb-alien:c-string sb-alien:unsigned))
 (setq *summarize-test-times* (not (sb-ext:posix-getenv "SBCL_TEST_NO_SUMMARIZE")))
