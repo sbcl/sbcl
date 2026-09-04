@@ -448,7 +448,6 @@
            (setf (node-tail-p call) nil))
           (t
            (setf (basic-combination-info call) :full)
-           (annotate-fun-lvar (basic-combination-fun call) nil)
            (let* ((reversed-args (reverse args))
                   #+tls-based-mv-return
                   (last-arg (car reversed-args)))
@@ -463,6 +462,7 @@
                          (loop for arg in (cdr reversed-args)
                                never (eq (nth-value 1 (values-types (lvar-derived-type arg))) :unknown))
                          (lvar-single-value-p (node-lvar call)))
+                    (annotate-fun-lvar (basic-combination-fun call)) ;; can delay, there's mv-call-direct-named
                     (setf (mv-combination-direct-call call) t)
                     (annotate-unknown-direct-call-values-lvar last-arg)
                     (loop for arg in (cdr reversed-args)
@@ -470,6 +470,8 @@
                           (annotate-fixed-values-lvar arg
                                                       (mapcar #'primitive-type (values-types (lvar-derived-type arg))))))
                    (t
+                    (annotate-fun-lvar (basic-combination-fun call) nil)
+
                     (loop for (arg . prev) on reversed-args
                           do
                           ;; Only the first argument's CSP is used

@@ -1882,7 +1882,7 @@
                        (vop* mv-call-direct-named node block
                              (fp #-linkage-space fun (car extra-args) args)
                              ((reference-tn-list locs t))
-                             arg-locs (length locs) #+linkage-space fun (emit-step-p node) fixed-args)
+                             arg-locs #+linkage-space fun (length locs) (emit-step-p node) fixed-args)
                        (vop* mv-call-direct node block
                              (fp fun (car extra-args) args)
                              ((reference-tn-list locs t))
