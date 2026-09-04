@@ -3,8 +3,9 @@
 ;;;; AVX-512 Instruction Support
 ;;;;
 ;;;; Implemented subsets:
-;;;;   AVX-512F, AVX-512BW, AVX-512DQ, AVX-512IFMA,
+;;;;   AVX-512F, AVX-512BW, AVX-512DQ, AVX-512CD, AVX-512IFMA,
 ;;;;   AVX-512VBMI, AVX-512VBMI2, AVX-512VPOPCNTDQ, AVX-512BITALG,
+;;;;   AVX-512VNNI, AVX-512BF16,
 ;;;;   GFNI (in avx2-insts.lisp),
 ;;;;   VPCLMULQDQ-256/512 (via VEX auto-promotion to EVEX),
 ;;;;   EVEX Compare-to-Opmask (vcmpps, vcmppd, vcmpss, vcmpsd),
@@ -14,12 +15,9 @@
 ;;;;   EVEX Gather & Scatter (vpgather*, vgather*, vpscatter*, vscatter*).
 ;;;;
 ;;;; Not yet implemented / Future extensions:
-;;;;   AVX-512CD  - vpconflictd/q, vplzcntd/q
 ;;;;   AVX-512VL  - Explicit EVEX 128/256-bit forms with masking/broadcast
 ;;;;                (auto-promotion handles basic ZMM; full VL needs
 ;;;;                explicit EVEX for XMM/YMM with masking)
-;;;;   AVX-512VNNI - vpdpbusd/s, vpdpwssd/s (Neural network integer dot products)
-;;;;   AVX-512BF16 - vcvtne2ps2bf16, vcvtneps2bf16, vdpbf16ps (Bfloat16)
 ;;;;   AVX-512FP16 - Half-precision FP16 arithmetic (~100 instructions)
 ;;;;   VAES-256/512 - Wide forms of vaesenc/vaesdec
 ;;;;   VP2INTERSECT - vp2intersectd/q
@@ -1325,3 +1323,224 @@
   (def vscatterdps-z #xa2 0)
   (def vpscatterdq-z #xa0 1)
   (def vscatterdpd-z #xa2 1))
+
+;;;; ---- AVX-512CD instructions ----
+
+;;; Conflict detection (2-operand)
+(macrolet ((def (name opcode w)
+             `(define-instruction ,name (segment dst src)
+                ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 opcode
+                                            :opcode-prefix #x0f38 :w w)
+                (:emitter
+                 (emit-avx512-inst segment src dst #x66 ,opcode
+                                   :opcode-prefix #x0f38
+                                   :w ,w
+                                   :disp-n (full-vector-disp-n dst))))))
+  (def vpconflictd #xc4 0)
+  (def vpconflictq #xc4 1)
+  (def vplzcntd    #x44 0)
+  (def vplzcntq    #x44 1))
+
+;;; Conflict detection with opmask
+(macrolet ((def (name opcode w)
+             `(define-instruction ,name (segment dst src mask &optional (zeroing 0))
+                ,@(loop for k from 1 to 7
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem #x66 opcode
+                         :opcode-prefix #x0f38
+                         :w w
+                         :more-fields `((aaa ,k) (z-bit 0))
+                         :printer '(:name :tab reg ", " reg/mem " {" aaa "}"))
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem #x66 opcode
+                         :opcode-prefix #x0f38
+                         :w w
+                         :more-fields `((aaa ,k) (z-bit 1))
+                         :printer '(:name :tab reg ", " reg/mem " {" aaa "} {z}")))
+                (:emitter
+                 (let ((mask-num (cond ((integerp mask) mask)
+                                       ((k-register-p mask) (reg-id-num (reg-id mask)))
+                                       (t (error "Invalid mask ~S" mask))))
+                       (z-num (if (or (eq zeroing :z) (eql zeroing 1)) 1 0)))
+                   (emit-avx512-inst segment src dst #x66 ,opcode
+                                     :opcode-prefix #x0f38
+                                     :w ,w
+                                     :aaa mask-num
+                                     :z z-num
+                                     :disp-n (full-vector-disp-n dst)))))))
+  (def vpconflictd-masked #xc4 0)
+  (def vpconflictq-masked #xc4 1)
+  (def vplzcntd-masked    #x44 0)
+  (def vplzcntq-masked    #x44 1))
+
+;;; Broadcast mask bit to vector register
+(macrolet ((def (name opcode w)
+             `(define-instruction ,name (segment dst src)
+                ,@(avx512-inst-printer-list 'ymm-ymm/mem #xf3 opcode
+                                            :opcode-prefix #x0f38 :w w)
+                (:emitter
+                 (emit-avx512-inst segment src dst #xf3 ,opcode
+                                   :opcode-prefix #x0f38
+                                   :w ,w)))))
+  (def vpbroadcastmb2q #x2a 1)
+  (def vpbroadcastmw2d #x3a 0))
+
+;;;; ---- AVX-512VNNI instructions ----
+
+;;; Vector Neural Network Instructions (3-operand NDS)
+(macrolet ((def (name opcode)
+             `(define-instruction ,name (segment dst src1 src2)
+                ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 opcode
+                                            :opcode-prefix #x0f38 :w 0 :nds t)
+                (:emitter
+                 (emit-avx512-inst segment src2 dst #x66 ,opcode
+                                   :opcode-prefix #x0f38
+                                   :vvvv src1
+                                   :w 0
+                                   :disp-n (full-vector-disp-n dst))))))
+  (def vpdpbusd   #x50)
+  (def vpdpbusds  #x51)
+  (def vpdpwssd   #x52)
+  (def vpdpwssds  #x53))
+
+;;; Vector Neural Network Instructions with opmask
+(macrolet ((def (name opcode)
+             `(define-instruction ,name (segment dst src1 src2 mask &optional (zeroing 0))
+                ,@(loop for k from 1 to 7
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem #x66 opcode
+                         :opcode-prefix #x0f38
+                         :w 0
+                         :nds t
+                         :more-fields `((aaa ,k) (z-bit 0))
+                         :printer '(:name :tab reg ", " vvvv ", " reg/mem " {" aaa "}"))
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem #x66 opcode
+                         :opcode-prefix #x0f38
+                         :w 0
+                         :nds t
+                         :more-fields `((aaa ,k) (z-bit 1))
+                         :printer '(:name :tab reg ", " vvvv ", " reg/mem " {" aaa "} {z}")))
+                (:emitter
+                 (let ((mask-num (cond ((integerp mask) mask)
+                                       ((k-register-p mask) (reg-id-num (reg-id mask)))
+                                       (t (error "Invalid mask ~S" mask))))
+                       (z-num (if (or (eq zeroing :z) (eql zeroing 1)) 1 0)))
+                   (emit-avx512-inst segment src2 dst #x66 ,opcode
+                                     :opcode-prefix #x0f38
+                                     :vvvv src1
+                                     :w 0
+                                     :aaa mask-num
+                                     :z z-num
+                                     :disp-n (full-vector-disp-n dst)))))))
+  (def vpdpbusd-masked   #x50)
+  (def vpdpbusds-masked  #x51)
+  (def vpdpwssd-masked   #x52)
+  (def vpdpwssds-masked  #x53))
+
+;;;; ---- AVX-512BF16 instructions ----
+
+;;; Convert two single-precision vectors to bfloat16 (3-operand NDS)
+(macrolet ((def (name opcode prefix)
+             `(define-instruction ,name (segment dst src1 src2)
+                ,@(avx512-inst-printer-list 'ymm-ymm/mem prefix opcode
+                                            :opcode-prefix #x0f38 :w 0 :nds t)
+                (:emitter
+                 (emit-avx512-inst segment src2 dst ,prefix ,opcode
+                                   :opcode-prefix #x0f38
+                                   :vvvv src1
+                                   :w 0
+                                   :disp-n (full-vector-disp-n dst))))))
+  (def vcvtne2ps2bf16 #x72 #xf2)
+  (def vdpbf16ps      #x52 #xf3))
+
+;;; 3-operand BF16 with opmask
+(macrolet ((def (name opcode prefix)
+             `(define-instruction ,name (segment dst src1 src2 mask &optional (zeroing 0))
+                ,@(loop for k from 1 to 7
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem prefix opcode
+                         :opcode-prefix #x0f38
+                         :w 0
+                         :nds t
+                         :more-fields `((aaa ,k) (z-bit 0))
+                         :printer '(:name :tab reg ", " vvvv ", " reg/mem " {" aaa "}"))
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem prefix opcode
+                         :opcode-prefix #x0f38
+                         :w 0
+                         :nds t
+                         :more-fields `((aaa ,k) (z-bit 1))
+                         :printer '(:name :tab reg ", " vvvv ", " reg/mem " {" aaa "} {z}")))
+                (:emitter
+                 (let ((mask-num (cond ((integerp mask) mask)
+                                       ((k-register-p mask) (reg-id-num (reg-id mask)))
+                                       (t (error "Invalid mask ~S" mask))))
+                       (z-num (if (or (eq zeroing :z) (eql zeroing 1)) 1 0)))
+                   (emit-avx512-inst segment src2 dst ,prefix ,opcode
+                                     :opcode-prefix #x0f38
+                                     :vvvv src1
+                                     :w 0
+                                     :aaa mask-num
+                                     :z z-num
+                                     :disp-n (full-vector-disp-n dst)))))))
+  (def vcvtne2ps2bf16-masked #x72 #xf2)
+  (def vdpbf16ps-masked      #x52 #xf3))
+
+;;; Convert single-precision vector to bfloat16 (2-operand)
+(macrolet ((def ()
+             `(define-instruction vcvtneps2bf16 (segment dst src)
+                ,@(avx512-inst-printer-list 'ymm-ymm/mem #xf3 #x72
+                                            :opcode-prefix #x0f38 :w 0)
+                (:emitter
+                 (let ((ll (cond ((or (zmm-register-p src) (ymm-register-p dst)) #b10)
+                                 ((ymm-register-p src) #b01)
+                                 (t #b00)))
+                       (disp-n (if (or (zmm-register-p src) (ymm-register-p dst)) 64 (full-vector-disp-n dst))))
+                   (emit-avx512-inst segment src dst #xf3 #x72
+                                     :opcode-prefix #x0f38
+                                     :w 0
+                                     :ll ll
+                                     :disp-n disp-n))))))
+  (def))
+
+(macrolet ((def ()
+             `(define-instruction vcvtneps2bf16-masked (segment dst src mask &optional (zeroing 0))
+                ,@(loop for k from 1 to 7
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem #xf3 #x72
+                         :opcode-prefix #x0f38
+                         :w 0
+                         :more-fields `((aaa ,k) (z-bit 0))
+                         :printer '(:name :tab reg ", " reg/mem " {" aaa "}"))
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem #xf3 #x72
+                         :opcode-prefix #x0f38
+                         :w 0
+                         :more-fields `((aaa ,k) (z-bit 1))
+                         :printer '(:name :tab reg ", " reg/mem " {" aaa "} {z}")))
+                (:emitter
+                 (let ((mask-num (cond ((integerp mask) mask)
+                                       ((k-register-p mask) (reg-id-num (reg-id mask)))
+                                       (t (error "Invalid mask ~S" mask))))
+                       (z-num (if (or (eq zeroing :z) (eql zeroing 1)) 1 0))
+                       (ll (cond ((or (zmm-register-p src) (ymm-register-p dst)) #b10)
+                                 ((ymm-register-p src) #b01)
+                                 (t #b00)))
+                       (disp-n (if (or (zmm-register-p src) (ymm-register-p dst)) 64 (full-vector-disp-n dst))))
+                   (emit-avx512-inst segment src dst #xf3 #x72
+                                     :opcode-prefix #x0f38
+                                     :w 0
+                                     :ll ll
+                                     :aaa mask-num
+                                     :z z-num
+                                     :disp-n disp-n))))))
+  (def))
