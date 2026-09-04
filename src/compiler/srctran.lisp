@@ -4820,7 +4820,7 @@
 
 ;;; (the fixnum (truncate integer 2)) can work with a signed-word X.
 (make-defs (($fun truncate floor ceiling))
-  (deftransform $fun ((x y) (integer fixnum) * :node node)
+  (deftransform $fun ((x y) (integer fixnum) * :node node :important nil)
     (or (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
                     (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word))
                     (eq (lvar-type y) (specifier-type '(eql 0))))
