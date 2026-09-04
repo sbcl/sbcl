@@ -188,6 +188,13 @@
     (declare (ignore element-type))
     'phony-simd-pack-256))
 
+#-sb-simd-pack-512
+(progn
+  (defstruct phony-simd-pack-512)
+  (deftype simd-pack-512 (&optional element-type)
+    (declare (ignore element-type))
+    'phony-simd-pack-512))
+
 (defmethod decode-record-definition ((_ (eql 'simd-record)) expr)
   (destructuring-bind (name scalar-record-name bits primitive-type scs) expr
     (let ((simd-pack-type
@@ -196,7 +203,10 @@
                       (128 (find-symbol "SIMD-PACK" "SB-EXT"))
                       (256 (or (find-symbol "SIMD-PACK-256" "SB-EXT")
                                #-sb-simd-pack-256
-                               'simd-pack-256)))))
+                               'simd-pack-256))
+                      (512 (or (find-symbol "SIMD-PACK-512" "SB-EXT")
+                               #-sb-simd-pack-512
+                               'simd-pack-512)))))
               (cond ((not base-type) 't)
                     ((not scalar-record-name) base-type)
                     (t `(,base-type ,scalar-record-name))))))
