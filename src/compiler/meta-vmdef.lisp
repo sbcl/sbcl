@@ -1037,7 +1037,8 @@
         arg-refs
         arg-refs-p
         result-refs
-        result-refs-p)
+        result-refs-p
+        (inherited-ignore (vop-parse-ignores parse)))
     (dolist (spec specs)
       (unless (consp spec)
         (error "malformed option specification: ~S" spec))
@@ -1144,9 +1145,9 @@
     (cond (result-refs-p
            (loop with refs = result-refs
                  for result in (if results-p
-                                (vop-parse-results parse)
-                                (setf (vop-parse-results parse)
-                                      (mapcar #'copy-structure (vop-parse-results parse))))
+                                   (vop-parse-results parse)
+                                   (setf (vop-parse-results parse)
+                                         (mapcar #'copy-structure (vop-parse-results parse))))
                  for ref = (pop refs)
                  when ref
                  do (setf (operand-parse-temp result) ref)))
@@ -1156,6 +1157,16 @@
                  for result in (vop-parse-results parse)
                  do (setf (operand-parse-temp result)
                           (operand-parse-temp inherited-result)))))
+    (set-vop-parse-operands parse)
+    (setf (vop-parse-ignores parse)
+          ;; remove inherited ignores for not inherited operands
+          (remove-if
+           (lambda (ignore)
+             (and (member ignore inherited-ignore)
+                  (not (or
+                        (member ignore (vop-parse-info-args parse))
+                        (member ignore (vop-parse-operands parse) :key #'operand-parse-name)))))
+           (vop-parse-ignores parse)))
     (values)))
 
 ;;;; making costs and restrictions
@@ -1774,7 +1785,6 @@
     (setf (vop-parse-inherits parse) inherits)
 
     (parse-define-vop parse specs inherited-parse)
-    (set-vop-parse-operands parse)
     (check-operand-types parse
                          (vop-parse-args parse)
                          (vop-parse-more-args parse)

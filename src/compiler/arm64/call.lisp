@@ -1053,7 +1053,7 @@
      ,@(when (memq return '(:fixed :unboxed))
          '((:results (values :more t))))
 
-     (:save-p ,(if (eq return :tail) :compute-only t))
+     (:save-p ,(if (member return '(:tail :pass-through)) :compute-only t))
 
      ,@(unless (or (eq return :tail)
                    variable)
@@ -1085,7 +1085,8 @@
              (:fixed '(ocfp-temp))
              (:unboxed '(ocfp-temp node values))
              (:tail '(old-fp return-pc node))
-             (:unknown '(r0-temp))))))
+             (:unknown '(r0-temp))
+             (:pass-through '(node))))))
 
      ,@(unless (eq named :direct)
          `((:temporary (:sc descriptor-reg :offset lexenv-offset
@@ -1272,7 +1273,9 @@
                  ((:unboxed)
                   '((when cur-nfp
                       (load-stack-tn cur-nfp nfp-save))))
-                 ((:tail))))))))
+                 (:pass-through
+                  '((note-this-location vop :unknown-return)))
+                 (:tail)))))))
 
 (define-full-call call nil :fixed nil)
 (define-full-call call-named t :fixed nil)
@@ -1289,6 +1292,14 @@
 
 (define-full-call fixed-call-named t :fixed nil :fixed)
 (define-full-call fixed-tail-call-named t :tail nil :fixed)
+
+#+tls-based-mv-return
+(progn
+  (define-full-call pass-through-call nil :pass-through nil)
+  (define-full-call pass-through-call-named t :pass-through nil)
+  (define-full-call fixed-pass-through-call-named t :pass-through nil :fixed)
+  (define-full-call pass-through-call-variable nil :pass-through t))
+
 
 (define-full-call unboxed-call-named t :unboxed nil)
 (define-full-call fixed-unboxed-call-named t :unboxed nil :fixed)
@@ -1382,6 +1393,10 @@
     ;; to deallocate the frame before accessing OCFP/LR.
     (move csp-tn cfp-tn)
     (lisp-return lr :single-value t)))
+
+(define-vop (return-pass-through return-single)
+  (:args (old-fp)
+         (return-pc)))
 
 ;;; Do unknown-values return of a fixed number of values.  The Values are
 ;;; required to be set up in the standard passing locations.  Nvals is the

@@ -425,9 +425,11 @@
                     (values nil :unknown)
                     (values-types int))
               (if (eq kind :unknown)
-                  (if (return-pass-through-p node lvar)
-                      (annotate-pass-through-values-lvar lvar)
-                      (annotate-unknown-values-lvar lvar))
+                  (cond #+(and x86-64 tls-based-mv-return)
+                        ((return-pass-through-p node lvar)
+                         (annotate-pass-through-values-lvar lvar))
+                        (t
+                         (annotate-unknown-values-lvar lvar)))
                   (annotate-fixed-values-lvar
                    lvar (mapcar #'primitive-type types)
                    types)))))

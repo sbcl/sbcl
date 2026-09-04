@@ -1424,6 +1424,7 @@
                                                  (emit-step-p node)))))))))))
   (values))
 
+#+(and x86-64 tls-based-mv-return)
 (defun ir2-convert-pass-through-full-call (node block)
   (declare (type combination node) (type ir2-block block))
   (multiple-value-bind (fp args arg-locs nargs fixed-args-p)
@@ -1548,6 +1549,7 @@
   (ponder-full-call node)
   (cond ((node-tail-p node)
          (ir2-convert-tail-full-call node block))
+        #+(and x86-64 tls-based-mv-return)
         ((let ((lvar (node-lvar node)))
            (and lvar
                 (eq (ir2-lvar-kind (lvar-info lvar)) :pass-through)))
@@ -1821,6 +1823,7 @@
                    (old-fp return-pc (reference-tn-list locs nil))
                    (nil)
                    nvals))))
+      #+(and x86-64 tls-based-mv-return)
       ((eq lvar-kind :pass-through)
        (vop sb-vm::return-pass-through node block old-fp return-pc))
       (t
@@ -1929,6 +1932,7 @@
                     (vop tail-call-variable node block start fun
                          (ir2-environment-old-fp env)
                          (ir2-environment-return-pc env))))
+                 #+(and x86-64 tls-based-mv-return)
                  ((and 2lvar
                        (eq (ir2-lvar-kind 2lvar) :pass-through))
                   (vop* sb-vm::pass-through-call-variable node block (start fun nil)
@@ -2322,7 +2326,8 @@
              (start-loc (make-nlx-entry-arg-start-location))
              (count-loc (make-arg-count-location))
              (2lvar (and lvar (lvar-info lvar))))
-         (cond ((and 2lvar (eq (ir2-lvar-kind 2lvar) :pass-through))
+         (cond #+(and x86-64 tls-based-mv-return)
+               ((and 2lvar (eq (ir2-lvar-kind 2lvar) :pass-through))
                 (vop* sb-vm::nlx-entry-pass-through node block
                       (start-loc count-loc nil)
                       (nil)
