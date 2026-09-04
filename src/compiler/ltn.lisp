@@ -319,8 +319,9 @@
                     t)
                    (combination
                     (let ((name (combination-fun-source-name node nil)))
-                      (unless (member name '(%cleanup-point %special-unbind
-                                             %catch-breakup
+                      (unless (member name '(%special-unbind
+                                             #+nil %cleanup-point
+                                             #+nil %catch-breakup
                                              ;; not useful in practice, because the user-written cleaup
                                              ;; code needs to be analyzed for non-mv-clobbering
                                              #|%unwind-protect-breakup|#))

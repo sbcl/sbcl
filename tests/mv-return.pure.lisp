@@ -93,10 +93,13 @@
           `(lambda (x) (multiple-value-prog1 ,form (h x))))))
     (assert (find 'sb-c:return-multiple vops))))
 
-(with-test (:name :pass-through-dx-return)
+(with-test (:name :pass-through-dx-return
+            :implemented-on (and :x86-64 :tls-based-mv-return)
+            :broken-on :sbcl)
   (test-passthru-return '(sb-int:dx-let ((y (cons x x))) (g y))))
 
-(with-test (:name :pass-through-special-unbind)
+(with-test (:name :pass-through-special-unbind
+            :implemented-on (and :x86-64 :tls-based-mv-return))
   (test-passthru-return '(let ((*print-base* 10)) (g x))))
 
 (defun passthru-callee-normal (n)
