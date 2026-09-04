@@ -6,20 +6,24 @@
 ;;;;   AVX-512F, AVX-512BW, AVX-512DQ, AVX-512IFMA,
 ;;;;   AVX-512VBMI, AVX-512VBMI2, AVX-512VPOPCNTDQ, AVX-512BITALG,
 ;;;;   GFNI (in avx2-insts.lisp),
-;;;;   VPCLMULQDQ-256/512 (via VEX auto-promotion to EVEX)
+;;;;   VPCLMULQDQ-256/512 (via VEX auto-promotion to EVEX),
+;;;;   EVEX Compare-to-Opmask (vcmpps, vcmppd, vcmpss, vcmpsd),
+;;;;   EVEX Masked Arithmetic & Logic (vadd*, vsub*, vmul*, vdiv*, vsqrt*, vpadd*, vpsub*, vpand*, vpor*, vpxor* with {k} and {z}),
+;;;;   EVEX Broadcasts (vbroadcasts*, vpbroadcast* from memory, XMM, and GPRs),
+;;;;   EVEX Opmask Transfers & Manipulation (kmov*, kand*, kor*, kxor*, knot*, etc.),
+;;;;   EVEX Gather & Scatter (vpgather*, vgather*, vpscatter*, vscatter*).
 ;;;;
-;;;; Not yet implemented:
+;;;; Not yet implemented / Future extensions:
 ;;;;   AVX-512CD  - vpconflictd/q, vplzcntd/q
-;;;;   AVX-512VL  - EVEX 128/256-bit forms with masking/broadcast
+;;;;   AVX-512VL  - Explicit EVEX 128/256-bit forms with masking/broadcast
 ;;;;                (auto-promotion handles basic ZMM; full VL needs
 ;;;;                explicit EVEX for XMM/YMM with masking)
-;;;;   AVX-512ER  - vexp2ps/pd, vrcp28*, vrsqrt28* (Xeon Phi, deprecated)
-;;;;   AVX-512PF  - gather/scatter prefetch (Xeon Phi, deprecated)
-;;;;   AVX-512VNNI - vpdpbusd/s, vpdpwssd/s
-;;;;   AVX-512BF16 - vcvtne2ps2bf16, vcvtneps2bf16, vdpbf16ps
-;;;;   AVX-512FP16 - full FP16 arithmetic (~100 instructions)
-;;;;   VAES-256/512 - wide forms of vaesenc/vaesdec
+;;;;   AVX-512VNNI - vpdpbusd/s, vpdpwssd/s (Neural network integer dot products)
+;;;;   AVX-512BF16 - vcvtne2ps2bf16, vcvtneps2bf16, vdpbf16ps (Bfloat16)
+;;;;   AVX-512FP16 - Half-precision FP16 arithmetic (~100 instructions)
+;;;;   VAES-256/512 - Wide forms of vaesenc/vaesdec
 ;;;;   VP2INTERSECT - vp2intersectd/q
+;;;;   AVX-512ER/PF - vexp2ps/pd, prefetch (Knights Landing Xeon Phi, deprecated)
 
 ;;;; AVX-512 (EVEX-only) instruction definitions
 
