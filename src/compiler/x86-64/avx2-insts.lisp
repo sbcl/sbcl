@@ -1001,11 +1001,11 @@ REG is the source (encoded in ModR/M.r/m).
   (def vpsignd #x66 #x0a #x0f38)
   (def vpmulhrsw #x66 #x0b #x0f38)
 
-  (def vpmuldq #x66 #x28 #x0f38)
-  (def vpcmpeqq #x66 #x29 #x0f38)
+  (def vpmuldq #x66 #x28 #x0f38 1)
+  (def vpcmpeqq #x66 #x29 #x0f38 1)
   (def vpackusdw #x66 #x2b #x0f38)
 
-  (def vpcmpgtq #x66 #x37 #x0f38)
+  (def vpcmpgtq #x66 #x37 #x0f38 1)
   (def vpminsb #x66 #x38 #x0f38)
   (def vpminsd #x66 #x39 #x0f38)
   (def vpminuw #x66 #x3a #x0f38)
