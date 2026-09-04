@@ -3487,7 +3487,7 @@
   ;; Such slop would not work for big-endian machines.
   (let ((size (align-of constant)))
     (emit section
-          `(.align ,(integer-length (1- size)))
+          `(.align ,(min sb-assem::max-alignment (integer-length (1- size))))
           label
           (cond ((eq (car constant) :jump-table)
                  `(.lispwords ,(cdr constant)))
