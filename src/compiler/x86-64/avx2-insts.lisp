@@ -655,7 +655,8 @@ produces silently wrong addresses."
                           :remaining-bytes remaining-bytes
                           ;; Don't pass VEX L as EVEX L'L; let determine-evex-flags
                           ;; auto-detect the vector length from register types.
-                          :ll nil
+                          ;; However, if an operand is a GPR (vmovd/vmovq), EVEX L'L must be 0 (128-bit).
+                          :ll (if (or (gpr-p reg) (gpr-p thing)) 0 nil)
                           :opcode-prefix opcode-prefix
                           :w (or evex-w w)
                           :vvvv vvvv
