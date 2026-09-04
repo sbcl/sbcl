@@ -1882,11 +1882,11 @@
                        (vop* mv-call-direct-named node block
                              (fp #-linkage-space fun (car extra-args) args)
                              ((reference-tn-list locs t))
-                             arg-locs (length locs) #+linkage-space fun (emit-step-p node) fixed-args))
-                   (vop* mv-call-direct node block
-                         (fp fun (car extra-args) args)
-                         ((reference-tn-list locs t))
-                         arg-locs (length locs) (emit-step-p node) fixed-args)
+                             arg-locs (length locs) #+linkage-space fun (emit-step-p node) fixed-args)
+                       (vop* mv-call-direct node block
+                             (fp fun (car extra-args) args)
+                             ((reference-tn-list locs t))
+                             arg-locs (length locs) (emit-step-p node) fixed-args))
                    (move-lvar-result node block locs lvar)))))
             (t
              (let* ((start-lvar (lvar-info (first (basic-combination-args node))))
