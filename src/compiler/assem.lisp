@@ -418,7 +418,7 @@
                       (if (label-p old) (cons old new) (nconc old new)))))
           (multiple-value-bind (op operands)
               (if (consp thing) (values (car thing) (cdr thing)) thing)
-            (unless (member op '(.align .byte .skip))
+            (unless (member op '(.align .byte .skip .lispwords))
               ;; This automatically gets the .QWORD pseudo-op which we use on x86-64
               ;; to create jump tables, but it's sort of unfortunate that the pseudo-op
               ;; is specific to that backend. It should probably be .LISPWORDS instead.
