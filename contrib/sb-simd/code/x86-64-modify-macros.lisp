@@ -107,3 +107,38 @@
 
 (define-modify-macro s64.4-incf (&optional (num 1)) two-arg-s64.4+)
 (define-modify-macro s64.4-decf (&optional (num 1)) two-arg-s64.4-)
+
+(in-package #:sb-simd-avx512f)
+
+(define-modify-macro f32.16-incf (&optional (num 1f0)) two-arg-f32.16+)
+(define-modify-macro f32.16-decf (&optional (num 1f0)) two-arg-f32.16-)
+
+(define-modify-macro f64.8-incf (&optional (num 1d0)) two-arg-f64.8+)
+(define-modify-macro f64.8-decf (&optional (num 1d0)) two-arg-f64.8-)
+
+(define-modify-macro u32.16-incf (&optional (num 1)) two-arg-u32.16+)
+(define-modify-macro u32.16-decf (&optional (num 1)) two-arg-u32.16-)
+
+(define-modify-macro u64.8-incf (&optional (num 1)) two-arg-u64.8+)
+(define-modify-macro u64.8-decf (&optional (num 1)) two-arg-u64.8-)
+
+(define-modify-macro s32.16-incf (&optional (num 1)) two-arg-s32.16+)
+(define-modify-macro s32.16-decf (&optional (num 1)) two-arg-s32.16-)
+
+(define-modify-macro s64.8-incf (&optional (num 1)) two-arg-s64.8+)
+(define-modify-macro s64.8-decf (&optional (num 1)) two-arg-s64.8-)
+
+(in-package #:sb-simd-avx512bw)
+
+(define-modify-macro u8.64-incf (&optional (num 1)) two-arg-u8.64+)
+(define-modify-macro u8.64-decf (&optional (num 1)) two-arg-u8.64-)
+
+(define-modify-macro u16.32-incf (&optional (num 1)) two-arg-u16.32+)
+(define-modify-macro u16.32-decf (&optional (num 1)) two-arg-u16.32-)
+
+(define-modify-macro s8.64-incf (&optional (num 1)) two-arg-s8.64+)
+(define-modify-macro s8.64-decf (&optional (num 1)) two-arg-s8.64-)
+
+(define-modify-macro s16.32-incf (&optional (num 1)) two-arg-s16.32+)
+(define-modify-macro s16.32-decf (&optional (num 1)) two-arg-s16.32-)
+

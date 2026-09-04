@@ -1364,3 +1364,184 @@
 
 (define-fake-vop f64.4-reverse (a)
   (%f64.4-permute4x64 a #b00011011))
+
+(in-package #:sb-simd-avx512f)
+
+(define-fake-vop u32!-from-p512 (x)
+  (logand #xffffffff (%u64!-from-p512 x)))
+
+(define-fake-vop make-f32.16 (a b c d e f g h i j k l m n o p)
+  (let ((lo (sb-simd-avx::%make-f32.8 a b c d e f g h))
+        (hi (sb-simd-avx::%make-f32.8 i j k l m n o p)))
+    (%f32.16-insert-f32.8 (%f32.16!-from-p256 lo) hi 1)))
+
+(define-fake-vop f32.16-values (x)
+  (multiple-value-call #'values
+    (sb-simd-avx::%f32.8-values (%f32.8!-from-p512 x))
+    (sb-simd-avx::%f32.8-values (%f32.8-from-f32.16 x 1))))
+
+(define-fake-vop make-f64.8 (a b c d e f g h)
+  (let ((lo (sb-simd-avx::%make-f64.4 a b c d))
+        (hi (sb-simd-avx::%make-f64.4 e f g h)))
+    (%f64.8-insert-f64.4 (%f64.8!-from-p256 lo) hi 1)))
+
+(define-fake-vop f64.8-values (x)
+  (multiple-value-call #'values
+    (sb-simd-avx::%f64.4-values (%f64.4!-from-p512 x))
+    (sb-simd-avx::%f64.4-values (%f64.4-from-f64.8 x 1))))
+
+(define-fake-vop make-u64.8 (a b c d e f g h)
+  (let ((lo (sb-simd-avx2::%make-u64.4 a b c d))
+        (hi (sb-simd-avx2::%make-u64.4 e f g h)))
+    (%u64.8-insert-u64.4 (%u64.8!-from-p256 lo) hi 1)))
+
+(define-fake-vop u64.8-values (x)
+  (multiple-value-call #'values
+    (sb-simd-avx2::%u64.4-values (%u64.4!-from-p512 x))
+    (sb-simd-avx2::%u64.4-values (%u64.4-from-u64.8 x 1))))
+
+(define-fake-vop make-s64.8 (a b c d e f g h)
+  (let ((lo (sb-simd-avx2::%make-s64.4 a b c d))
+        (hi (sb-simd-avx2::%make-s64.4 e f g h)))
+    (%s64.8-insert-s64.4 (%s64.8!-from-p256 lo) hi 1)))
+
+(define-fake-vop s64.8-values (x)
+  (multiple-value-call #'values
+    (sb-simd-avx2::%s64.4-values (%s64.4!-from-p512 x))
+    (sb-simd-avx2::%s64.4-values (%s64.4-from-s64.8 x 1))))
+
+(define-fake-vop make-u32.16 (a b c d e f g h i j k l m n o p)
+  (let ((lo (sb-simd-avx2::%make-u32.8 a b c d e f g h))
+        (hi (sb-simd-avx2::%make-u32.8 i j k l m n o p)))
+    (%u32.16-insert-u32.8 (%u32.16!-from-p256 lo) hi 1)))
+
+(define-fake-vop u32.16-values (x)
+  (multiple-value-call #'values
+    (sb-simd-avx2::%u32.8-values (%u32.8!-from-p512 x))
+    (sb-simd-avx2::%u32.8-values (%u32.8-from-u32.16 x 1))))
+
+(define-fake-vop make-s32.16 (a b c d e f g h i j k l m n o p)
+  (let ((lo (sb-simd-avx2::%make-s32.8 a b c d e f g h))
+        (hi (sb-simd-avx2::%make-s32.8 i j k l m n o p)))
+    (%s32.16-insert-s32.8 (%s32.16!-from-p256 lo) hi 1)))
+
+(define-fake-vop s32.16-values (x)
+  (multiple-value-call #'values
+    (sb-simd-avx2::%s32.8-values (%s32.8!-from-p512 x))
+    (sb-simd-avx2::%s32.8-values (%s32.8-from-s32.16 x 1))))
+
+
+(macrolet ((def-f32 (name hop sop)
+             `(define-fake-vop ,name (x)
+                (let ((lo (%f32.8!-from-p512 x))
+                      (hi (%f32.8-from-f32.16 x 1)))
+                  (,sop (,hop lo) (,hop hi)))))
+           (def-f64 (name hop sop)
+             `(define-fake-vop ,name (x)
+                (let ((lo (%f64.4!-from-p512 x))
+                      (hi (%f64.4-from-f64.8 x 1)))
+                  (,sop (,hop lo) (,hop hi))))))
+  (def-f32 f32.16-horizontal-and sb-simd-avx::%f32.8-horizontal-and sb-simd-avx::%two-arg-f32-and)
+  (def-f32 f32.16-horizontal-or  sb-simd-avx::%f32.8-horizontal-or  sb-simd-avx::%two-arg-f32-or)
+  (def-f32 f32.16-horizontal-xor sb-simd-avx::%f32.8-horizontal-xor sb-simd-avx::%two-arg-f32-xor)
+  (def-f32 f32.16-horizontal-max sb-simd-avx::%f32.8-horizontal-max sb-simd-avx::%two-arg-f32-max)
+  (def-f32 f32.16-horizontal-min sb-simd-avx::%f32.8-horizontal-min sb-simd-avx::%two-arg-f32-min)
+  (def-f32 f32.16-horizontal+    sb-simd-avx::%f32.8-horizontal+    sb-simd-avx::%two-arg-f32+)
+  (def-f32 f32.16-horizontal*    sb-simd-avx::%f32.8-horizontal*    sb-simd-avx::%two-arg-f32*)
+
+  (def-f64 f64.8-horizontal-and  sb-simd-avx::%f64.4-horizontal-and sb-simd-avx::%two-arg-f64-and)
+  (def-f64 f64.8-horizontal-or   sb-simd-avx::%f64.4-horizontal-or  sb-simd-avx::%two-arg-f64-or)
+  (def-f64 f64.8-horizontal-xor  sb-simd-avx::%f64.4-horizontal-xor sb-simd-avx::%two-arg-f64-xor)
+  (def-f64 f64.8-horizontal-max  sb-simd-avx::%f64.4-horizontal-max sb-simd-avx::%two-arg-f64-max)
+  (def-f64 f64.8-horizontal-min  sb-simd-avx::%f64.4-horizontal-min sb-simd-avx::%two-arg-f64-min)
+  (def-f64 f64.8-horizontal+     sb-simd-avx::%f64.4-horizontal+     sb-simd-avx::%two-arg-f64+)
+  (def-f64 f64.8-horizontal*     sb-simd-avx::%f64.4-horizontal*     sb-simd-avx::%two-arg-f64*))
+
+(in-package #:sb-simd-avx512bw)
+
+(define-fake-vop u8!-from-p512 (x)
+  (logand #xff (sb-simd-avx512f::%u64!-from-p512 x)))
+
+(define-fake-vop u16!-from-p512 (x)
+  (logand #xffff (sb-simd-avx512f::%u64!-from-p512 x)))
+
+(define-fake-vop make-u16.32 (u01 u02 u03 u04 u05 u06 u07 u08 u09 u10 u11 u12 u13 u14 u15 u16 u17 u18 u19 u20 u21 u22 u23 u24 u25 u26 u27 u28 u29 u30 u31 u32)
+  (let ((lo (sb-simd-avx2::%make-u16.16 u01 u02 u03 u04 u05 u06 u07 u08 u09 u10 u11 u12 u13 u14 u15 u16))
+        (hi (sb-simd-avx2::%make-u16.16 u17 u18 u19 u20 u21 u22 u23 u24 u25 u26 u27 u28 u29 u30 u31 u32)))
+    (%u16.32-insert-u16.16 (%u16.32!-from-p256 lo) hi 1)))
+
+(define-fake-vop u16.32-values (x)
+  (multiple-value-call #'values
+    (sb-simd-avx2::%u16.16-values (%u16.16!-from-p512 x))
+    (sb-simd-avx2::%u16.16-values (%u16.16-from-u16.32 x 1))))
+
+(define-fake-vop make-s16.32 (u01 u02 u03 u04 u05 u06 u07 u08 u09 u10 u11 u12 u13 u14 u15 u16 u17 u18 u19 u20 u21 u22 u23 u24 u25 u26 u27 u28 u29 u30 u31 u32)
+  (let ((lo (sb-simd-avx2::%make-s16.16 u01 u02 u03 u04 u05 u06 u07 u08 u09 u10 u11 u12 u13 u14 u15 u16))
+        (hi (sb-simd-avx2::%make-s16.16 u17 u18 u19 u20 u21 u22 u23 u24 u25 u26 u27 u28 u29 u30 u31 u32)))
+    (%s16.32-insert-s16.16 (%s16.32!-from-p256 lo) hi 1)))
+
+(define-fake-vop s16.32-values (x)
+  (multiple-value-call #'values
+    (sb-simd-avx2::%s16.16-values (%s16.16!-from-p512 x))
+    (sb-simd-avx2::%s16.16-values (%s16.16-from-s16.32 x 1))))
+
+(define-fake-vop make-u8.64
+    (u01 u02 u03 u04 u05 u06 u07 u08 u09 u10 u11 u12 u13 u14 u15 u16
+     u17 u18 u19 u20 u21 u22 u23 u24 u25 u26 u27 u28 u29 u30 u31 u32
+     u33 u34 u35 u36 u37 u38 u39 u40 u41 u42 u43 u44 u45 u46 u47 u48
+     u49 u50 u51 u52 u53 u54 u55 u56 u57 u58 u59 u60 u61 u62 u63 u64)
+  (let ((lo (sb-simd-avx2::%make-u8.32
+             u01 u02 u03 u04 u05 u06 u07 u08 u09 u10 u11 u12 u13 u14 u15 u16
+             u17 u18 u19 u20 u21 u22 u23 u24 u25 u26 u27 u28 u29 u30 u31 u32))
+        (hi (sb-simd-avx2::%make-u8.32
+             u33 u34 u35 u36 u37 u38 u39 u40 u41 u42 u43 u44 u45 u46 u47 u48
+             u49 u50 u51 u52 u53 u54 u55 u56 u57 u58 u59 u60 u61 u62 u63 u64)))
+    (%u8.64-insert-u8.32 (%u8.64!-from-p256 lo) hi 1)))
+
+(define-fake-vop u8.64-values (x)
+  (multiple-value-call #'values
+    (sb-simd-avx2::%u8.32-values (%u8.32!-from-p512 x))
+    (sb-simd-avx2::%u8.32-values (%u8.32-from-u8.64 x 1))))
+
+(define-fake-vop make-s8.64
+    (u01 u02 u03 u04 u05 u06 u07 u08 u09 u10 u11 u12 u13 u14 u15 u16
+     u17 u18 u19 u20 u21 u22 u23 u24 u25 u26 u27 u28 u29 u30 u31 u32
+     u33 u34 u35 u36 u37 u38 u39 u40 u41 u42 u43 u44 u45 u46 u47 u48
+     u49 u50 u51 u52 u53 u54 u55 u56 u57 u58 u59 u60 u61 u62 u63 u64)
+  (let ((lo (sb-simd-avx2::%make-s8.32
+             u01 u02 u03 u04 u05 u06 u07 u08 u09 u10 u11 u12 u13 u14 u15 u16
+             u17 u18 u19 u20 u21 u22 u23 u24 u25 u26 u27 u28 u29 u30 u31 u32))
+        (hi (sb-simd-avx2::%make-s8.32
+             u33 u34 u35 u36 u37 u38 u39 u40 u41 u42 u43 u44 u45 u46 u47 u48
+             u49 u50 u51 u52 u53 u54 u55 u56 u57 u58 u59 u60 u61 u62 u63 u64)))
+    (%s8.64-insert-s8.32 (%s8.64!-from-p256 lo) hi 1)))
+
+(define-fake-vop s8.64-values (x)
+  (multiple-value-call #'values
+    (sb-simd-avx2::%s8.32-values (%s8.32!-from-p512 x))
+    (sb-simd-avx2::%s8.32-values (%s8.32-from-s8.64 x 1))))
+
+(define-fake-vop u8.64-broadcast (x)
+  (%u8.64-broadcastvec (%u8.64!-from-p256 (sb-simd-avx::%u8.32!-from-u8 x))))
+
+(define-fake-vop s8.64-broadcast (x)
+  (%s8.64-broadcastvec (%s8.64!-from-p256 (sb-simd-avx::%s8.32!-from-s8 x))))
+
+(define-fake-vop u16.32-broadcast (x)
+  (%u16.32-broadcastvec (%u16.32!-from-p256 (sb-simd-avx::%u16.16!-from-u16 x))))
+
+(define-fake-vop s16.32-broadcast (x)
+  (%s16.32-broadcastvec (%s16.32!-from-p256 (sb-simd-avx::%s16.16!-from-s16 x))))
+
+(define-fake-vop u8.64!-from-u8 (x)
+  (%u8.64-broadcast x))
+
+(define-fake-vop s8.64!-from-s8 (x)
+  (%s8.64-broadcast x))
+
+(define-fake-vop u16.32!-from-u16 (x)
+  (%u16.32-broadcast x))
+
+(define-fake-vop s16.32!-from-s16 (x)
+  (%s16.32-broadcast x))
+

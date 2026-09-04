@@ -49,3 +49,19 @@
 (sb-simd-test-suite:define-aref-test s16.16-aref (signed-byte 16) 16 s16.16-values)
 (sb-simd-test-suite:define-aref-test s32.8-aref (signed-byte 32) 8 s32.8-values)
 (sb-simd-test-suite:define-aref-test s64.4-aref (signed-byte 64) 4 s64.4-values)
+
+(in-package #:sb-simd-avx512f)
+
+(sb-simd-test-suite:define-aref-test f32.16-aref single-float       16 f32.16-values)
+(sb-simd-test-suite:define-aref-test f64.8-aref  double-float       8  f64.8-values)
+(sb-simd-test-suite:define-aref-test u32.16-aref (unsigned-byte 32) 16 u32.16-values)
+(sb-simd-test-suite:define-aref-test u64.8-aref  (unsigned-byte 64) 8  u64.8-values)
+(sb-simd-test-suite:define-aref-test s32.16-aref (signed-byte 32)   16 s32.16-values)
+(sb-simd-test-suite:define-aref-test s64.8-aref  (signed-byte 64)   8  s64.8-values)
+
+(in-package #:sb-simd-avx512bw)
+
+(sb-simd-test-suite:define-aref-test u8.64-aref  (unsigned-byte 8)  64 u8.64-values)
+(sb-simd-test-suite:define-aref-test u16.32-aref (unsigned-byte 16) 32 u16.32-values)
+(sb-simd-test-suite:define-aref-test s8.64-aref  (signed-byte 8)    64 s8.64-values)
+(sb-simd-test-suite:define-aref-test s16.32-aref (signed-byte 16)   32 s16.32-values)
