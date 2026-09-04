@@ -218,7 +218,7 @@
       ;; depending on the number of boxed constants. We could reduce space
       ;; by storing one bit in the header indicating whether or not there
       ;; is a jump table. I don't think that's worth the trouble.
-      (emit section `(.lispword ,(1+ nwords)))
+      (emit section `(.lispwords (,(1+ nwords))))
       (when (plusp nwords)
         (setf (ir2-component-n-jump-table-entries ir2-component) nwords)
         (dolist (constant (jump-tables))

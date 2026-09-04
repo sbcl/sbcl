@@ -2383,7 +2383,7 @@
           `(.align ,(integer-length (1- size)))
           label
           (cond ((eq (car constant) :jump-table)
-                 `(.lispword ,@(coerce (cdr constant) 'list)))
+                 `(.lispwords ,(cdr constant)))
                 ((typep (cdr constant) '(cons (eql :layout-id)))
                  `(.layout-id ,(cddr constant)))
                 (t

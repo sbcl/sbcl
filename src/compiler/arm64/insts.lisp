@@ -4885,9 +4885,9 @@
                  ;; Use the DWORD emitter which knows how to emit fixups
                  `(dword ,(apply #'make-fixup val)))
                 ((eq type :jump-table)
-                 `(.lispword ,@(coerce val 'list)))
+                 `(.lispwords ,val))
                 ((eq type :byte-array)
-                 `(.byte ,@(coerce val 'list)))
+                 `(.bytes ,val))
                 (t
                  ;; Could add pseudo-ops for .WORD, .INT, .QUAD, .OCTA just like gcc has.
                  ;; But it works fine to emit as a sequence of bytes

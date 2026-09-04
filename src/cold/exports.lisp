@@ -1176,7 +1176,7 @@ of `SB-KERNEL`) have been undone, but probably more remain.")
            "ASMSTREAM-CONSTANT-TABLE"
            "ASMSTREAM-CONSTANT-VECTOR"
            "APPEND-SECTIONS" "ASSEMBLE-SECTIONS"
-           "EMIT" ".ALIGN" ".BYTE" ".LISPWORD" ".SKIP"
+           "EMIT" ".ALIGN" ".BYTE" ".BYTES" ".LISPWORDS" ".SKIP"
            ".COMMENT"
            "EMIT-ALIGNMENT" "EMIT-BYTE" "EMIT-BACK-PATCH"
            "EMIT-CHOOSER" "DEFINE-BITFIELD-EMITTER"

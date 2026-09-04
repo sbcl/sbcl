@@ -3489,16 +3489,17 @@
     (emit section
           `(.align ,(integer-length (1- size)))
           label
-          (if (eq (car constant) :jump-table)
-              `(.lispword ,@(coerce (cdr constant) 'list))
-              ;; Could add pseudo-ops for .WORD, .INT, .OCTA just like gcc has.
-              ;; But it works fine to emit as a sequence of bytes
-              `(.byte ,@(let ((val (cdr constant)))
-                          (if (eq (car constant) :byte-array)
-                              (coerce val 'list)
-                              (loop repeat size
-                                    collect (prog1 (ldb (byte 8 0) val)
-                                              (setf val (ash val -8)))))))))))
+          (cond ((eq (car constant) :jump-table)
+                 `(.lispwords ,(cdr constant)))
+                ((eq (car constant) :byte-array)
+                 `(.bytes ,(cdr constant)))
+                (t
+                 ;; Could add pseudo-ops for .WORD, .INT, .OCTA just like gcc has.
+                 ;; But it works fine to emit as a sequence of bytes
+                 `(.byte ,@(let ((val (cdr constant)))
+                             (loop repeat size
+                                   collect (prog1 (ldb (byte 8 0) val)
+                                             (setf val (ash val -8)))))))))))
 
 #+sb-xc-host (declaim (ftype function sb-fasl::asm-routine-vector-elt-addr))
 ;;; Return an address which when added to NULL-TN and dereferenced will yield ADDR

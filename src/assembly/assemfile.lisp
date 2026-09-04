@@ -55,7 +55,7 @@
                        do (progn #+host-quirks-ccl label) ; shut up the host
                        when (eq category :jump-table) sum (length data))))
             (emit (asmstream-data-section asmstream)
-                  `(.lispword ,(+ n-extra-words n-data-words 1))
+                  `(.lispwords (,(+ n-extra-words n-data-words 1)))
                   `(.skip ,(* n-extra-words sb-vm:n-word-bytes))))
           (emit-inline-constants)
           ;; Ensure alignment to double-Lispword in case a raw constant
