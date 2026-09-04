@@ -338,3 +338,41 @@
   ;; This just assserts that we can assemble
   (try `(ldmxcsr ,(ea rax-tn)))
   (try `(stmxcsr ,(ea rax-tn))))
+
+#+x86-64
+(test-util:with-test (:name :avx512-evex-instructions)
+  (let ((k1 (sb-x86-64-asm::get-fpr :kreg 1))
+        (k2 (sb-x86-64-asm::get-fpr :kreg 2))
+        (zmm0 (sb-x86-64-asm::get-fpr :zmm 0))
+        (zmm1 (sb-x86-64-asm::get-fpr :zmm 1))
+        (zmm2 (sb-x86-64-asm::get-fpr :zmm 2))
+        (ymm0 (sb-x86-64-asm::get-fpr :ymm 0))
+        (xmm1 (sb-x86-64-asm::get-fpr :xmm 1)))
+    ;; Compare to mask (both forms)
+    (try `(vcmpps :eq ,k1 ,zmm1 ,zmm2))
+    (try `(vcmpps :eq ,k1 ,zmm1 ,zmm2 ,k2))
+    (try `(vcmpps ,k1 ,zmm1 ,zmm2 :eq))
+    (try `(vcmppd :eq ,k1 ,zmm1 ,zmm2))
+    (try `(vcmpss :eq ,k1 ,xmm1 ,xmm1))
+    (try `(vcmpsd :eq ,k1 ,xmm1 ,xmm1))
+    ;; Broadcast
+    (try `(vbroadcastss ,ymm0 ,xmm1))
+    (try `(vbroadcastss ,zmm0 ,xmm1))
+    (try `(vbroadcastsd ,zmm0 ,xmm1))
+    (try `(vpbroadcastd ,zmm0 ,rax-tn))
+    (try `(vpbroadcastq ,zmm0 ,rax-tn))
+    ;; Mask transfers
+    (test-assemble `(kmovd ,k1 ,rax-tn)
+                   "C5FB92C8         KMOVD K1, EAX")
+    (test-assemble `(kmovd ,rax-tn ,k1)
+                   "C5FB93C1         KMOVD EAX, K1")
+    (test-assemble `(kmovq ,k1 ,rax-tn)
+                   "C4E1FB92C8       KMOVQ K1, RAX")
+    (test-assemble `(kmovq ,rax-tn ,k1)
+                   "C4E1FB93C1       KMOVQ RAX, K1")
+    ;; Masked arithmetic
+    (test-assemble `(vaddps-masked ,zmm0 ,zmm1 ,zmm2 ,k1 :z)
+                   "62F174C958C2     VADDPS-MASKED ZMM0, ZMM1, ZMM2 {K1} {z}")
+    (try `(vdivps-masked ,zmm0 ,zmm1 ,zmm2 ,k1))
+    (try `(vsqrtps-masked ,zmm0 ,zmm1 ,k1))))
+
