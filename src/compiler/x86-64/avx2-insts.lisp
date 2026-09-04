@@ -645,6 +645,7 @@ produces silently wrong addresses."
   (flet ((evex-reg-p (r)
            (and (register-p r)
                 (or (is-zmm-id-p (reg-id r))
+                    (is-kreg-id-p (reg-id r))
                     (>= (reg-id-num (reg-id r)) 16)))))
     (when (or (evex-reg-p reg)
               (evex-reg-p thing)
@@ -1000,11 +1001,11 @@ REG is the source (encoded in ModR/M.r/m).
   (def vpsignd #x66 #x0a #x0f38)
   (def vpmulhrsw #x66 #x0b #x0f38)
 
-  (def vpmuldq #x66 #x28 #x0f38)
-  (def vpcmpeqq #x66 #x29 #x0f38)
+  (def vpmuldq #x66 #x28 #x0f38 1)
+  (def vpcmpeqq #x66 #x29 #x0f38 1)
   (def vpackusdw #x66 #x2b #x0f38)
 
-  (def vpcmpgtq #x66 #x37 #x0f38)
+  (def vpcmpgtq #x66 #x37 #x0f38 1)
   (def vpminsb #x66 #x38 #x0f38)
   (def vpminsd #x66 #x39 #x0f38)
   (def vpminuw #x66 #x3a #x0f38)
@@ -1145,25 +1146,71 @@ REG is the source (encoded in ModR/M.r/m).
   (def-two vaeskeygenassist #x66 #xdf))
 
 (macrolet ((def (name prefix opcode
-                 name-suffix &key (evex-w 0))
-             `(define-instruction ,name (segment condition dst src src2)
+                 name-suffix &key (evex-w 0) scalar)
+             `(define-instruction ,name (segment condition dst src src2 &optional mask)
                 ,@(avx2-inst-printer-list 'ymm-ymm/mem-imm prefix opcode
                                           :more-fields `((imm nil :type 'avx-condition-code))
                                           :printer `("VCMP" imm ,name-suffix
                                                             :tab reg ", " vvvv ", " reg/mem))
+                ,@(loop for k from 0 to 7
+                        append
+                        (avx512-inst-printer-list
+                         'ymm-ymm/mem-imm prefix opcode
+                         :opcode-prefix #x0F
+                         :w evex-w
+                         :more-fields `((reg nil :type 'opmask-reg)
+                                        (imm nil :type 'avx-condition-code)
+                                        ,@(when (plusp k) `((aaa ,k))))
+                         :printer (if (plusp k)
+                                      `("VCMP" imm ,name-suffix
+                                               :tab reg " {" aaa "}, " vvvv ", " reg/mem)
+                                      `("VCMP" imm ,name-suffix
+                                               :tab reg ", " vvvv ", " reg/mem))))
                 (:emitter
-                 (emit-avx2-inst segment src2 dst ,prefix ,opcode
-                                 :evex-w ,evex-w
-                                 :vvvv src
-                                 :remaining-bytes 1)
-                 (emit-byte segment (or (position condition +avx-conditions+)
-                                        (error "~s not one of ~s"
-                                               condition
-                                               +avx-conditions+)))))))
+                 (multiple-value-bind (cond-arg dst-reg src1 src2-arg mask-val)
+                     (if (register-p condition)
+                         ;; (inst vcmp dst src1 src2 condition &optional mask)
+                         (values src2 condition dst src (or mask 0))
+                         ;; (inst vcmp condition dst src1 src2 &optional mask)
+                         (values condition dst src src2 (or mask 0)))
+                   (let ((imm (or (position cond-arg +avx-conditions+)
+                                  (and (integerp cond-arg) (<= 0 cond-arg 31) cond-arg)
+                                  (error "~s not one of ~s or 0..31"
+                                         cond-arg
+                                         +avx-conditions+)))
+                         (mask-num (cond ((null mask-val) 0)
+                                         ((integerp mask-val) mask-val)
+                                         ((k-register-p mask-val) (reg-id-num (reg-id mask-val)))
+                                         (t 0))))
+                     (cond
+                       ((or (k-register-p dst-reg)
+                            (zmm-register-p src1)
+                            (and (register-p src2-arg) (zmm-register-p src2-arg))
+                            (plusp mask-num))
+                        (aver (k-register-p dst-reg))
+                        (let ((disp-n ,(if scalar
+                                           `(if (zerop ,evex-w) 4 8)
+                                           `(cond ((zmm-register-p src1) 64)
+                                                  ((ymm-register-p src1) 32)
+                                                  (t 16)))))
+                          (emit-avx512-inst segment src2-arg dst-reg ,prefix ,opcode
+                                            :opcode-prefix #x0F
+                                            :vvvv src1
+                                            :w ,evex-w
+                                            :aaa mask-num
+                                            :disp-n disp-n
+                                            :remaining-bytes 1)
+                          (emit-byte segment imm)))
+                       (t
+                        (emit-avx2-inst segment src2-arg dst-reg ,prefix ,opcode
+                                        :evex-w ,evex-w
+                                        :vvvv src1
+                                        :remaining-bytes 1)
+                        (emit-byte segment imm)))))))))
   (def vcmppd #x66 #xc2 "PD" :evex-w 1)
-  (def vcmpps nil  #xc2 "PS")
-  (def vcmpsd #xf2 #xc2 "SD" :evex-w 1)
-  (def vcmpss #xf3 #xc2 "SS"))
+  (def vcmpps nil  #xc2 "PS" :evex-w 0)
+  (def vcmpsd #xf2 #xc2 "SD" :evex-w 1 :scalar t)
+  (def vcmpss #xf3 #xc2 "SS" :evex-w 0 :scalar t))
 
 (macrolet ((def (name prefix op)
              `(define-instruction ,name (segment dst src src2 mask)
@@ -1443,6 +1490,109 @@ REG is the source (encoded in ModR/M.r/m).
    (emit-two-byte-vex segment 0 0 1 nil)
    (emit-byte segment #x77)))
 
+(macrolet ((def-vbroadcast ()
+             `(progn
+                (define-instruction vbroadcastss (segment dst src)
+                  ,@(avx2-inst-printer-list 'ymm-ymm/mem #x66 #x18
+                                            :opcode-prefix #x0f38
+                                            :xmmreg-mem-size :dword
+                                            :w 0 :l nil)
+                  ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 #x18
+                                              :opcode-prefix #x0f38
+                                              :w 0 :disp-n 4)
+                  (:emitter
+                   (cond
+                     ((or (xmm-register-p src) (zmm-register-p dst))
+                      (emit-avx512-inst segment src dst #x66 #x18
+                                        :opcode-prefix #x0f38
+                                        :w 0
+                                        :disp-n 4))
+                     (t
+                      (emit-avx2-inst segment src dst #x66 #x18
+                                      :opcode-prefix #x0f38
+                                      :evex-w 0 :w 0 :l nil)))))
+
+                (define-instruction vbroadcastsd (segment dst src)
+                  ,@(avx2-inst-printer-list 'ymm-ymm/mem #x66 #x19
+                                            :opcode-prefix #x0f38
+                                            :xmmreg-mem-size :qword
+                                            :w 0 :l 1)
+                  ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 #x19
+                                              :opcode-prefix #x0f38
+                                              :w 1 :disp-n 8)
+                  (:emitter
+                   (cond
+                     ((or (xmm-register-p src) (zmm-register-p dst))
+                      (emit-avx512-inst segment src dst #x66 #x19
+                                        :opcode-prefix #x0f38
+                                        :w 1
+                                        :disp-n 8))
+                     (t
+                      (emit-avx2-inst segment src dst #x66 #x19
+                                      :opcode-prefix #x0f38
+                                      :evex-w 1 :w 0 :l 1)))))
+
+                (define-instruction vpbroadcastd (segment dst src)
+                  ,@(avx2-inst-printer-list 'ymm-ymm/mem #x66 #x58
+                                            :opcode-prefix #x0f38
+                                            :xmmreg-mem-size :dword
+                                            :w 0 :l nil)
+                  ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 #x58
+                                              :opcode-prefix #x0f38
+                                              :w 0 :disp-n 4)
+                  ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 #x7c
+                                              :opcode-prefix #x0f38
+                                              :w 0
+                                              :reg-mem-size :dword
+                                              :printer '(:name :tab reg ", " reg/mem))
+                  (:emitter
+                   (cond
+                     ((gpr-p src)
+                      (emit-avx512-inst segment src dst #x66 #x7c
+                                        :opcode-prefix #x0f38
+                                        :w 0))
+                     ((or (zmm-register-p dst)
+                          (and (register-p src) (zmm-register-p src)))
+                      (emit-avx512-inst segment src dst #x66 #x58
+                                        :opcode-prefix #x0f38
+                                        :w 0
+                                        :disp-n 4))
+                     (t
+                      (emit-avx2-inst segment src dst #x66 #x58
+                                      :opcode-prefix #x0f38
+                                      :evex-w 0 :w 0 :l nil)))))
+
+                (define-instruction vpbroadcastq (segment dst src)
+                  ,@(avx2-inst-printer-list 'ymm-ymm/mem #x66 #x59
+                                            :opcode-prefix #x0f38
+                                            :xmmreg-mem-size :qword
+                                            :w 0 :l nil)
+                  ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 #x59
+                                              :opcode-prefix #x0f38
+                                              :w 1 :disp-n 8)
+                  ,@(avx512-inst-printer-list 'ymm-ymm/mem #x66 #x7c
+                                              :opcode-prefix #x0f38
+                                              :w 1
+                                              :reg-mem-size :qword
+                                              :printer '(:name :tab reg ", " reg/mem))
+                  (:emitter
+                   (cond
+                     ((gpr-p src)
+                      (emit-avx512-inst segment src dst #x66 #x7c
+                                        :opcode-prefix #x0f38
+                                        :w 1))
+                     ((or (zmm-register-p dst)
+                          (and (register-p src) (zmm-register-p src)))
+                      (emit-avx512-inst segment src dst #x66 #x59
+                                        :opcode-prefix #x0f38
+                                        :w 1
+                                        :disp-n 8))
+                     (t
+                      (emit-avx2-inst segment src dst #x66 #x59
+                                      :opcode-prefix #x0f38
+                                      :evex-w 1 :w 0 :l nil))))))))
+  (def-vbroadcast))
+
 (macrolet ((def (name opcode &optional l (mem-size :qword) (evex-w 0))
              `(define-instruction ,name (segment dst src)
                 ,@(avx2-inst-printer-list 'ymm-ymm/mem #x66 opcode
@@ -1453,14 +1603,10 @@ REG is the source (encoded in ModR/M.r/m).
                  (emit-avx2-inst segment src dst #x66 ,opcode
                                  :opcode-prefix #x0f38
                                  :evex-w ,evex-w :l ,l)))))
-  (def vbroadcastss #x18 nil :dword)
-  (def vbroadcastsd #x19 1)
   (def vbroadcastf128 #x1a 1)
   (def vbroadcasti128 #x5a 1)
   (def vpbroadcastb #x78 nil :byte)
-  (def vpbroadcastw #x79 nil :word)
-  (def vpbroadcastd #x58 nil :dword)
-  (def vpbroadcastq #x59 nil :qword 1)) ; evex-w=1 for EVEX qword
+  (def vpbroadcastw #x79 nil :word))
 
 (macrolet ((def-insert (name prefix op)
              `(define-instruction ,name (segment dst src src2 imm)
