@@ -3269,9 +3269,10 @@
       (mapc #'propagate (lambda-lets fun))))
   (values))
 
-(defun count-values (call &optional min)
-  (loop for arg in (basic-combination-args call)
+(defun count-values (call &optional min butlast)
+  (loop for (arg . next) on (basic-combination-args call)
         for nvals = (nth-value 1 (values-types (lvar-derived-type arg)))
+        until (and butlast (not next))
         if (eq nvals :unknown)
         do (unless min
              (return))

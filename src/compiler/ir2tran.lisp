@@ -414,20 +414,29 @@
 ;;; move the extra values with no check.
 (defun lvar-tns (node block lvar ptypes)
   (declare (type node node) (type ir2-block block)
-           (type lvar lvar) (list ptypes))
+           (type lvar lvar))
   (let* ((locs (ir2-lvar-locs (lvar-info lvar)))
          (nlocs (length locs)))
-    (aver (= nlocs (length ptypes)))
-
-    (mapcar (lambda (from to-type)
-              (if (or (eq (tn-kind from) :unused)
-                      (eq (tn-primitive-type from) to-type))
-                  from
-                  (let ((temp (make-normal-tn to-type)))
-                    (emit-move node block from temp)
-                    temp)))
-            locs
-            ptypes)))
+    (cond ((atom ptypes)
+           (mapcar (lambda (from)
+                     (if (or (eq (tn-kind from) :unused)
+                             (eq (tn-primitive-type from) ptypes))
+                         from
+                         (let ((temp (make-normal-tn ptypes)))
+                           (emit-move node block from temp)
+                           temp)))
+                   locs))
+          (t
+           (aver (= nlocs (length ptypes)))
+           (mapcar (lambda (from to-type)
+                     (if (or (eq (tn-kind from) :unused)
+                             (eq (tn-primitive-type from) to-type))
+                         from
+                         (let ((temp (make-normal-tn to-type)))
+                           (emit-move node block from temp)
+                           temp)))
+                   locs
+                   ptypes)))))
 
 ;;;; utilities for delivering values to lvars
 
@@ -1252,25 +1261,28 @@
 (defun ir2-convert-direct-call-args (node block extra-tns)
   (declare (type mv-combination node) (type ir2-block block))
   (let* ((args (basic-combination-args node))
-         (nargs (1- (length args)))
+         (nargs (count-values node nil t))
          (all-nargs (+ nargs sb-vm::register-arg-count))
          (fp (make-stack-pointer-tn)))
     (vop sb-vm::allocate-direct-mv-call-frame node block all-nargs fp)
     (collect ((locs))
       (let ((last nil)
-            (first nil))
-        (loop for num below nargs
-              for arg in args
+            (first nil)
+            (num 0))
+        (loop for arg in args
+              while (< num nargs)
               do
-              (let* ((ref (reference-tn (lvar-tn node block arg)
-                                        nil)))
-                (locs
-                 (sb-vm::standard-call-arg-location num))
 
-                (if last
-                    (setf (tn-ref-across last) ref)
-                    (setf first ref))
-                (setq last ref)))
+              (loop for tn in (lvar-tns node block arg *backend-t-primitive-type*)
+                    do
+                    (let ((ref (reference-tn tn nil)))
+                      (locs (sb-vm::standard-call-arg-location num))
+
+                      (if last
+                          (setf (tn-ref-across last) ref)
+                          (setf first ref))
+                      (setq last ref)
+                      (incf num))))
         (loop for i from nargs
               for extra-tn in extra-tns
               do
@@ -1862,9 +1874,8 @@
         (fun-lvar-tn node block fun-lvar)
       (cond #+tls-based-mv-return
             ((mv-combination-direct-call node)
-             (let ((fixed-args (1- (length (basic-combination-args node))))
-                   (extra-args (ir2-lvar-locs (lvar-info (car (last (basic-combination-args node)))))))
-               (multiple-value-bind (fp args arg-locs)
+             (let ((extra-args (ir2-lvar-locs (lvar-info (car (last (basic-combination-args node)))))))
+               (multiple-value-bind (fp args arg-locs fixed-args)
                    (ir2-convert-direct-call-args node block (cdr extra-args))
                  (let ((locs (standard-result-tns lvar)))
                    (if named

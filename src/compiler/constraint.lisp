@@ -112,6 +112,8 @@
 ;;; A bound is open if it is a list containing a number, just like
 ;;; Lisp says. NIL means unbounded.
 (defstruct (interval (:constructor %make-interval (low high))
+                     #+sb-devel
+                     (:constructor default-make-interval)
                      (:copier nil))
   low high)
 (declaim (freeze-type interval))

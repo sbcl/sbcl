@@ -461,13 +461,14 @@
                                 (eq (basic-combination-info node) :full)
                                 (almost-immediately-used-p last-arg node)))
                          (loop for arg in (cdr reversed-args)
-                               always (type-single-value-p (lvar-derived-type arg)))
+                               never (eq (nth-value 1 (values-types (lvar-derived-type arg))) :unknown))
                          (lvar-single-value-p (node-lvar call)))
                     (setf (mv-combination-direct-call call) t)
                     (annotate-unknown-direct-call-values-lvar last-arg)
                     (loop for arg in (cdr reversed-args)
                           do
-                          (annotate-ordinary-lvar  arg)))
+                          (annotate-fixed-values-lvar arg
+                                                      (mapcar #'primitive-type (values-types (lvar-derived-type arg))))))
                    (t
                     (loop for (arg . prev) on reversed-args
                           do
@@ -1185,4 +1186,3 @@
   (ltn-analyze-block block)
   (aver (not (ir2-block-popped (block-info block))))
   (values))
-
