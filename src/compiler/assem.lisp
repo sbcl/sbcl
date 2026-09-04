@@ -283,9 +283,16 @@
 
 ;;; Instructions are streamed into a section before (optionally combining
 ;;; sections and) assembling into a SEGMENT.
-(defstruct (stmt (:constructor make-stmt (labels vop op operands)))
+(defstruct (stmt (:constructor make-stmt (labels vop prefix op operands)))
   (labels)
   (vop)
+  ;; Currently the prefix is used only by the x86-64 assembler but nearly all the
+  ;; other supported CPUs have the concept of modifiers on an instructions that could
+  ;; reasonably be split out from the OP field if doing so simplifies analysis
+  ;; of instructions in the peephole optimization pass.
+  ;; e.g. on risc-v we could record memory ordering flags (acq/rel) as distinct
+  ;; from the OP. (And we may want to rename this slot to MODIFIERS)
+  (prefix 0 :type fixnum)
   (op) ; symbol denoting an INST, or possibly a pseudo-op like .align
   (plist nil) ; put anything you want here for later passes such as instcombine
   (prev nil)
@@ -310,7 +317,7 @@
 ;;; tail pointer to allow insertion anywhere,
 ;;; and a dummy head node to avoid special-casing an empty section.
 (defun make-section ()
-  (let ((first (make-stmt nil nil :ignore nil)))
+  (let ((first (make-stmt nil nil 0 :ignore nil)))
     (cons first first)))
 (defun section-start (section) (car section))
 (defmacro section-tail (section) `(cdr ,section))
@@ -385,6 +392,15 @@
 ;;; This is used only to keep track of which vops emit which insts.
 (defvar *current-vop*)
 
+;;; Map of opcode symbol to function that emits it into the byte stream
+;;; (or with the schedulding assembler, into the queue)
+;;; Key is a symbol. Value is either #<function> or (#<function>),
+;;; the latter if function wants to receive prefix arguments.
+(defglobal *inst-encoder* (make-hash-table)) ; keys are symbols
+(declaim (inline accept-prefixes-p))
+(defun accept-prefixes-p (op)
+  (listp (gethash op *inst-encoder* 0))) ; if not found -> any non-list
+
 ;;; Return the final statement emitted.
 (defun emit (section &rest things)
   ;; each element of THINGS can be:
@@ -396,7 +412,7 @@
     (dolist (thing things (setf (section-tail section) last))
       (if (label-p thing) ; Accumulate multiple labels until the next instruction
           (if (stmt-op last)
-              (setq last (insert-stmt (make-stmt thing vop nil nil) last))
+              (setq last (insert-stmt (make-stmt thing vop 0 nil nil) last))
               (let ((old (stmt-labels last)) (new (list thing)))
                 (setf (stmt-labels last)
                       (if (label-p old) (cons old new) (nconc old new)))))
@@ -412,19 +428,29 @@
                     (setf (label-usedp operand) t)
                     ;; backend decides what labels are used
                     (%mark-used-labels operand))))
-            (if (stmt-op last)
-                (setq last (insert-stmt (make-stmt nil vop op operands) last))
-                (setf (stmt-vop last) (or (stmt-vop last) vop)
-                      (stmt-op last) op
-                      (stmt-operands last) operands)))))))
+            (multiple-value-bind (prefix operands)
+                (if (accept-prefixes-p op) (extract-prefix-keywords operands) (values 0 operands))
+              (if (stmt-op last)
+                  (setq last (insert-stmt (make-stmt nil vop prefix op operands) last))
+                  (setf (stmt-vop last) (or (stmt-vop last) vop)
+                        (stmt-prefix last) prefix
+                        (stmt-op last) op
+                        (stmt-operands last) operands))))))))
 
 ;;; Change the instruction and/or operands of a stmt.
 ;;; If STMT were immutable, this would allocate and link a new
 ;;; STMT into the chain, and delete the old. For now it's just SETF
 (declaim (ftype (sfunction (stmt symbol &rest t) stmt) replace-stmt)
+         (ftype (sfunction (stmt fixnum symbol &rest t) stmt) replace-prefixed)
          (ftype (sfunction (stmt &rest t) stmt) replace-operands))
 (defun replace-stmt (stmt op &rest operands)
-  (setf (stmt-op stmt) op
+  (setf (stmt-prefix stmt) 0 ; clear it. (Use REPLACE-PREFIXED instead to set a new prefix)
+        (stmt-op stmt) op
+        (stmt-operands stmt) operands)
+  stmt)
+(defun replace-prefixed (stmt prefix op &rest operands)
+  (setf (stmt-prefix stmt) prefix
+        (stmt-op stmt) op
         (stmt-operands stmt) operands)
   stmt)
 (defun replace-operands (stmt &rest operands)
@@ -1407,12 +1433,6 @@
 
 ;;;; interface to the rest of the compiler
 
-;;; Map of opcode symbol to function that emits it into the byte stream
-;;; (or with the schedulding assembler, into the queue)
-;;; Key is a symbol. Value is either #<function> or (#<function>),
-;;; the latter if function wants to receive prefix arguments.
-(defglobal *inst-encoder* (make-hash-table)) ; keys are symbols
-
 ;;; Return T only if STATEMENT has a label which is potentially a branch
 ;;; target, and not merely labeled to store a location of interest.
 (defun labeled-statement-p (statement &aux (labels (stmt-labels statement)))
@@ -1420,8 +1440,8 @@
 
 #-x86-64
 (progn
-  (defun extract-prefix-keywords (x) x)
-  (defun decode-prefix (args) args))
+  (defun extract-prefix-keywords (x) (values 0 x))
+  (defun decode-prefix (prefix) (declare (ignore prefix)) nil))
 
 (defun dump-symbolic-asm (start stream &aux last-vop all-labels (n 0))
   (format stream "~2&Assembler input:~%")
@@ -1451,9 +1471,8 @@
           (format stream "# postit ~S~A~%" op eol-comment)
           (format stream "    ~:@(~A~) ~{~A~^, ~}~A~%"
                   op
-                  (if (consp (gethash op *inst-encoder*))
-                      (decode-prefix (stmt-operands statement))
-                      (stmt-operands statement))
+                  (append (decode-prefix (stmt-prefix statement))
+                          (stmt-operands statement))
                   eol-comment))))
   (let ((*print-length* nil)
         (*print-pretty* t)
@@ -1508,8 +1527,8 @@
       (awhen (stmt-vop statement) (setq *current-vop* it))
       (dolist (label (ensure-list (stmt-labels statement)))
         (%emit-label segment *current-vop* label))
-      (let ((op (stmt-op statement))
-            (operands (stmt-operands statement)))
+      (let* ((op (stmt-op statement))
+             (encoder (gethash op *inst-encoder*)))
         (if (functionp op)
             (%emit-postit segment op)
             (case op
@@ -1527,14 +1546,19 @@
                      was-scheduling nil))
                ((nil)) ; ignore
                (t
-                (let ((encoder (gethash op *inst-encoder*)))
-                  (cond (encoder
-                         (instruction-hooks segment)
-                         (apply (the function (if (listp encoder) (car encoder) encoder))
-                                segment
-                                (perform-operand-lowering operands)))
-                        (t
-                         (bug "No encoder for ~S" op))))))))))
+                (unless encoder (bug "No encoder for ~/sb-ext:print-symbol-with-prefix/" op))
+                (instruction-hooks segment)
+                (multiple-value-bind (prefix f)
+                    (if (atom encoder) ; does not want prefix
+                        ;; If NIL were to be a valid prefix, this could easily be changed
+                        ;; to :none or :no-prefix for disambiguation.
+                        (values nil encoder)
+                        (values (stmt-prefix statement) (car encoder)))
+                  (multiple-value-call
+                      (the function f) segment
+                      (if (eq prefix nil) (values) prefix)
+                      (values-list (perform-operand-lowering
+                                    (stmt-operands statement)))))))))))
   (finalize-segment segment))
 
 ;;; The interface to %ASSEMBLE
@@ -1664,20 +1688,30 @@
             ;; out other emitters into callable functions, though the INST macro
             ;; tends to be a more convenient interface.
             (prog1 op (setq op (the symbol (pop operands)))))))
-        (action (gethash op *inst-encoder*)))
-    (unless action ; try canonicalizing again
+        (encoder (gethash op *inst-encoder*)))
+    (unless encoder ; try canonicalizing again
       (setq op (find-symbol (string op) *backend-instruction-set-package*)
-            action (gethash op *inst-encoder*))
-      (aver action))
-    (when (listp action) (setq operands (extract-prefix-keywords operands)))
+            encoder (gethash op *inst-encoder*))
+      (aver encoder))
     (typecase dest
       (cons ; streaming in to the assembler
+       ;; If the instruction accepts prefixes, we used to convert them (zero or more
+       ;; symbols) into a bitmask here, before sending the list of operands into EMIT.
+       ;; Now we leave it up to EMIT to do that, and it will separate any prefixes
+       ;; into the STMT-PREFIX slot.
        (trace-inst dest op operands)
        (emit dest (cons op operands)))
       (segment ; streaming out of the assembler
        (instruction-hooks dest)
-       (apply (the function (if (listp action) (car action) action))
-              dest (perform-operand-lowering operands))))))
+       (multiple-value-bind (prefix operands f)
+           (if (atom encoder) ; does not want prefix
+               (values nil operands encoder)
+               ;; Encoders require the bit representation of prefixes, not symbols.
+               (multiple-value-bind (prefix operands) (extract-prefix-keywords operands)
+                 (values prefix operands (car encoder))))
+         (multiple-value-call (the function f) dest
+                              (if (eq prefix nil) (values) prefix)
+                              (values-list (perform-operand-lowering operands))))))))
 
 (defun emit-label (label)
   "Emit LABEL at this location in the current section."

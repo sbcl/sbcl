@@ -63,15 +63,11 @@
 (defun sb-assem::extract-prefix-keywords (args &aux (lockp 0) (size 0))
   (loop (acond ((eq (car args) :lock) (setq lockp +lock-prefix-present+))
                ((encode-size-prefix (car args)) (setq size it))
-               (t (return (cons (logior lockp size) args))))
+               (t (return (values (logior lockp size) args))))
         (pop args)))
-(defun sb-assem::decode-prefix (args) ; for trace file only
-  (let ((b (car args)))
-    (if (zerop b)
-        (cdr args)
-        (cons (append (if (logtest +lock-prefix-present+ b) '(:lock))
-                      (if (opsize-prefix-present b) (list (opsize-prefix-keyword b))))
-              (cdr args)))))
+(defun sb-assem::decode-prefix (prefix) ; for trace file only
+  (append (if (logtest +lock-prefix-present+ prefix) '(:lock))
+          (if (opsize-prefix-present prefix) (list (opsize-prefix-keyword prefix)))))
 
 ;;; a REG object discards all information about a TN except its storage base
 ;;; (a/k/a register class), size class (for GPRs), and encoding.
@@ -3653,14 +3649,9 @@
 
 (defun parse-2-operands (stmt)
   (let* ((operands (stmt-operands stmt))
-         (first (pop operands))
-         (second (pop operands)))
-    (if (atom (gethash (stmt-op stmt) sb-assem::*inst-encoder*)) ; no prefixes
-        (values :qword first second)
-        (let ((prefix first)
-              (first second)
-              (second (pop operands)))
-          (values (pick-operand-size prefix first second) first second)))))
+         (first (first operands))
+         (second (second operands)))
+    (values (pick-operand-size (stmt-prefix stmt) first second) first second)))
 
 (defun smaller-of (size1 size2)
   (if (or (eq size1 :dword) (eq size2 :dword)) :dword :qword))
@@ -3684,8 +3675,8 @@
                (location= dst2 dst1)
                (eq size1 :qword)
                (eq size2 :dword))
-      (replace-operands stmt +dword-size-prefix+ dst1
-                        (if (integerp src1) (ldb (byte 32 0) src1) src1))
+      (replace-prefixed stmt +dword-size-prefix+ 'mov
+                        dst1 (if (integerp src1) (ldb (byte 32 0) src1) src1))
       next)))
 
 ;;; "AND r, imm1" + "AND r, imm2" -> "AND r, (imm1 & imm2)"
@@ -3698,8 +3689,8 @@
                (typep src1 '(signed-byte 32))
                (member size2 '(:dword :qword))
                (typep src2 '(signed-byte 32)))
-      (replace-operands next (encode-size-prefix (smaller-of size1 size2))
-                        dst2 (logand src1 src2))
+      (replace-prefixed next (encode-size-prefix (smaller-of size1 size2))
+                        'and dst2 (logand src1 src2))
       (add-stmt-labels next (stmt-labels stmt))
       (delete-stmt stmt)
       next)))
@@ -3810,7 +3801,7 @@
         ;; It makes me nervous to think about correctness in that case,
         ;; so I'm constraining this to 31 bits, not 32.
         (when (<= max-dst1-bit-index 30)
-          (replace-stmt stmt 'shr +dword-size-prefix+ dst1 src1)
+          (replace-prefixed stmt +dword-size-prefix+ 'shr dst1 src1)
           next)))))
 
 (defun reg= (a b) ; Return T if A and B are the same register

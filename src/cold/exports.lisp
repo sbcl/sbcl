@@ -1197,11 +1197,11 @@ of `SB-KERNEL`) have been undone, but probably more remain.")
            "VARIABLE-LENGTH"
            "SEGMENT-COLLECT-DYNAMIC-STATISTICS"
            "SECTION-START"
-           "STMT-LABELS" "STMT-OP" "STMT-OPERANDS"
+           "STMT-LABELS" "STMT-PREFIX" "STMT-OP" "STMT-OPERANDS"
            "STMT-PLIST"
            "STMT-PREV" "STMT-NEXT"
            "ADD-STMT-LABELS" "DELETE-STMT"
-           "REPLACE-STMT" "REPLACE-OPERANDS"
+           "REPLACE-PREFIXED" "REPLACE-STMT" "REPLACE-OPERANDS"
            "LABELED-STATEMENT-P"
            "DEFPATTERN"))
 
