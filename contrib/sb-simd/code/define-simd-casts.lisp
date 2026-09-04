@@ -17,7 +17,8 @@
 (progn
  (define-inline sb-simd-sse:p128 (x) (the sb-simd-sse:p128 x))
  (define-inline sb-simd-avx:p128 (x) (the sb-simd-avx:p128 x))
- (define-inline sb-simd-avx:p256 (x) (the sb-simd-avx:p256 x)))
+ (define-inline sb-simd-avx:p256 (x) (the sb-simd-avx:p256 x))
+ (define-inline sb-simd-avx512f:p512 (x) (the sb-simd-avx512f:p512 x)))
 #+arm64
 (define-inline sb-simd-neon:p128 (x) (the sb-simd-neon:p128 x))
 

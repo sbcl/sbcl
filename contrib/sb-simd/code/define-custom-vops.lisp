@@ -169,7 +169,203 @@
     (:generator
      (inst vxorpd dst dst dst)
      (inst movsd dst src)))
-  )
+  (define-custom-vop sb-simd-avx512f::f32!-from-p512
+      (:args (src :to :save))
+    (:results (dst))
+    (:generator
+     (inst vxorps dst dst dst)
+     (inst vmovss dst dst src)))
+  (define-custom-vop sb-simd-avx512f::f64!-from-p512
+      (:args (src :to :save))
+    (:results (dst))
+    (:generator
+     (inst vxorpd dst dst dst)
+     (inst vmovsd dst dst src)))
+  ;; AVX-512F
+  (macrolet ((def-f32 (name cmp)
+               `(define-custom-vop ,name
+                    (:args (a) (b))
+                  (:temporary (:sc mask-reg) k)
+                  (:results (dst))
+                  (:generator
+                   (inst vcmpps ,cmp k a b)
+                   (inst vpmovm2d dst k))))
+             (def-f64 (name cmp)
+               `(define-custom-vop ,name
+                    (:args (a) (b))
+                  (:temporary (:sc mask-reg) k)
+                  (:results (dst))
+                  (:generator
+                   (inst vcmppd ,cmp k a b)
+                   (inst vpmovm2q dst k))))
+             (def-i32 (name inst imm)
+               `(define-custom-vop ,name
+                    (:args (a) (b))
+                  (:temporary (:sc mask-reg) k)
+                  (:results (dst))
+                  (:generator
+                   (inst ,inst k a b ,imm)
+                   (inst vpmovm2d dst k))))
+             (def-i64 (name inst imm)
+               `(define-custom-vop ,name
+                    (:args (a) (b))
+                  (:temporary (:sc mask-reg) k)
+                  (:results (dst))
+                  (:generator
+                   (inst ,inst k a b ,imm)
+                   (inst vpmovm2q dst k))))
+             (def-i8 (name inst imm)
+               `(define-custom-vop ,name
+                    (:args (a) (b))
+                  (:temporary (:sc mask-reg) k)
+                  (:results (dst))
+                  (:generator
+                   (inst ,inst k a b ,imm)
+                   (inst vpmovm2b dst k))))
+             (def-i16 (name inst imm)
+               `(define-custom-vop ,name
+                    (:args (a) (b))
+                  (:temporary (:sc mask-reg) k)
+                  (:results (dst))
+                  (:generator
+                   (inst ,inst k a b ,imm)
+                   (inst vpmovm2w dst k)))))
+    (def-f32 sb-simd-avx512f::two-arg-f32.16=  :eq)
+    (def-f32 sb-simd-avx512f::two-arg-f32.16/= :neq)
+    (def-f32 sb-simd-avx512f::two-arg-f32.16<  :lt)
+    (def-f32 sb-simd-avx512f::two-arg-f32.16<= :le)
+    (def-f32 sb-simd-avx512f::two-arg-f32.16>  :gt)
+    (def-f32 sb-simd-avx512f::two-arg-f32.16>= :ge)
+
+    (def-f64 sb-simd-avx512f::two-arg-f64.8=  :eq)
+    (def-f64 sb-simd-avx512f::two-arg-f64.8/= :neq)
+    (def-f64 sb-simd-avx512f::two-arg-f64.8<  :lt)
+    (def-f64 sb-simd-avx512f::two-arg-f64.8<= :le)
+    (def-f64 sb-simd-avx512f::two-arg-f64.8>  :gt)
+    (def-f64 sb-simd-avx512f::two-arg-f64.8>= :ge)
+
+    (def-i32 sb-simd-avx512f::two-arg-s32.16=  vpcmpd  0)
+    (def-i32 sb-simd-avx512f::two-arg-s32.16/= vpcmpd  4)
+    (def-i32 sb-simd-avx512f::two-arg-s32.16<  vpcmpd  1)
+    (def-i32 sb-simd-avx512f::two-arg-s32.16<= vpcmpd  2)
+    (def-i32 sb-simd-avx512f::two-arg-s32.16>  vpcmpd  6)
+    (def-i32 sb-simd-avx512f::two-arg-s32.16>= vpcmpd  5)
+
+    (def-i32 sb-simd-avx512f::two-arg-u32.16=  vpcmpud 0)
+    (def-i32 sb-simd-avx512f::two-arg-u32.16/= vpcmpud 4)
+    (def-i32 sb-simd-avx512f::two-arg-u32.16<  vpcmpud 1)
+    (def-i32 sb-simd-avx512f::two-arg-u32.16<= vpcmpud 2)
+    (def-i32 sb-simd-avx512f::two-arg-u32.16>  vpcmpud 6)
+    (def-i32 sb-simd-avx512f::two-arg-u32.16>= vpcmpud 5)
+
+    (def-i64 sb-simd-avx512f::two-arg-s64.8=  vpcmpq  0)
+    (def-i64 sb-simd-avx512f::two-arg-s64.8/= vpcmpq  4)
+    (def-i64 sb-simd-avx512f::two-arg-s64.8<  vpcmpq  1)
+    (def-i64 sb-simd-avx512f::two-arg-s64.8<= vpcmpq  2)
+    (def-i64 sb-simd-avx512f::two-arg-s64.8>  vpcmpq  6)
+    (def-i64 sb-simd-avx512f::two-arg-s64.8>= vpcmpq  5)
+
+    (def-i64 sb-simd-avx512f::two-arg-u64.8=  vpcmpuq 0)
+    (def-i64 sb-simd-avx512f::two-arg-u64.8/= vpcmpuq 4)
+    (def-i64 sb-simd-avx512f::two-arg-u64.8<  vpcmpuq 1)
+    (def-i64 sb-simd-avx512f::two-arg-u64.8<= vpcmpuq 2)
+    (def-i64 sb-simd-avx512f::two-arg-u64.8>  vpcmpuq 6)
+    (def-i64 sb-simd-avx512f::two-arg-u64.8>= vpcmpuq 5)
+
+    (def-i8 sb-simd-avx512bw::two-arg-s8.64=  vpcmpb  0)
+    (def-i8 sb-simd-avx512bw::two-arg-s8.64/= vpcmpb  4)
+    (def-i8 sb-simd-avx512bw::two-arg-s8.64<  vpcmpb  1)
+    (def-i8 sb-simd-avx512bw::two-arg-s8.64<= vpcmpb  2)
+    (def-i8 sb-simd-avx512bw::two-arg-s8.64>  vpcmpb  6)
+    (def-i8 sb-simd-avx512bw::two-arg-s8.64>= vpcmpb  5)
+
+    (def-i8 sb-simd-avx512bw::two-arg-u8.64=  vpcmpub 0)
+    (def-i8 sb-simd-avx512bw::two-arg-u8.64/= vpcmpub 4)
+    (def-i8 sb-simd-avx512bw::two-arg-u8.64<  vpcmpub 1)
+    (def-i8 sb-simd-avx512bw::two-arg-u8.64<= vpcmpub 2)
+    (def-i8 sb-simd-avx512bw::two-arg-u8.64>  vpcmpub 6)
+    (def-i8 sb-simd-avx512bw::two-arg-u8.64>= vpcmpub 5)
+
+    (def-i16 sb-simd-avx512bw::two-arg-s16.32=  vpcmpw  0)
+    (def-i16 sb-simd-avx512bw::two-arg-s16.32/= vpcmpw  4)
+    (def-i16 sb-simd-avx512bw::two-arg-s16.32<  vpcmpw  1)
+    (def-i16 sb-simd-avx512bw::two-arg-s16.32<= vpcmpw  2)
+    (def-i16 sb-simd-avx512bw::two-arg-s16.32>  vpcmpw  6)
+    (def-i16 sb-simd-avx512bw::two-arg-s16.32>= vpcmpw  5)
+
+    (def-i16 sb-simd-avx512bw::two-arg-u16.32=  vpcmpuw 0)
+    (def-i16 sb-simd-avx512bw::two-arg-u16.32/= vpcmpuw 4)
+    (def-i16 sb-simd-avx512bw::two-arg-u16.32<  vpcmpuw 1)
+    (def-i16 sb-simd-avx512bw::two-arg-u16.32<= vpcmpuw 2)
+    (def-i16 sb-simd-avx512bw::two-arg-u16.32>  vpcmpuw 6)
+    (def-i16 sb-simd-avx512bw::two-arg-u16.32>= vpcmpuw 5))
+
+  (define-custom-vop sb-simd-avx512f::f32.16-blend
+      (:args (a) (b) (mask))
+    (:temporary (:sc mask-reg) k)
+    (:temporary (:sc single-avx512-reg) mask-reg tmp)
+    (:temporary (:sc int-avx512-reg) zero)
+    (:results (dst))
+    (:generator
+     (inst vpxorq zero zero zero)
+     (inst vpcmpd k mask zero 1)
+     (inst vpmovm2d mask-reg k)
+     (inst vandps tmp b mask-reg)
+     (inst vandnps dst mask-reg a)
+     (inst vorps dst dst tmp)))
+
+  (define-custom-vop sb-simd-avx512f::f64.8-blend
+      (:args (a) (b) (mask))
+    (:temporary (:sc mask-reg) k)
+    (:temporary (:sc double-avx512-reg) mask-reg tmp)
+    (:temporary (:sc int-avx512-reg) zero)
+    (:results (dst))
+    (:generator
+     (inst vpxorq zero zero zero)
+     (inst vpcmpq k mask zero 1)
+     (inst vpmovm2q mask-reg k)
+     (inst vandpd tmp b mask-reg)
+     (inst vandnpd dst mask-reg a)
+     (inst vorpd dst dst tmp)))
+
+  (macrolet ((def-blend (name)
+               `(define-custom-vop ,name
+                    (:args (a) (b) (mask))
+                  (:temporary (:sc mask-reg) k)
+                  (:temporary (:sc int-avx512-reg) zero tmp mask-reg)
+                  (:results (dst))
+                  (:generator
+                   (inst vpxorq zero zero zero)
+                   (inst vpcmpb k mask zero 1)
+                   (inst vpmovm2b mask-reg k)
+                   (inst vpandd tmp b mask-reg)
+                   (inst vpandnd dst mask-reg a)
+                   (inst vpord dst dst tmp)))))
+    (def-blend sb-simd-avx512f::u32.16-blend)
+    (def-blend sb-simd-avx512f::s32.16-blend)
+    (def-blend sb-simd-avx512f::u64.8-blend)
+    (def-blend sb-simd-avx512f::s64.8-blend)
+    (def-blend sb-simd-avx512bw::u8.64-blend)
+    (def-blend sb-simd-avx512bw::s8.64-blend)
+    (def-blend sb-simd-avx512bw::u16.32-blend)
+    (def-blend sb-simd-avx512bw::s16.32-blend))
+
+  (macrolet ((def-not (name)
+               `(define-custom-vop ,name
+                    (:args (a))
+                  (:results (dst))
+                  (:generator
+                   (inst vpternlogd dst a a #x55)))))
+    (def-not sb-simd-avx512f::f32.16-not)
+    (def-not sb-simd-avx512f::f64.8-not)
+    (def-not sb-simd-avx512f::u32.16-not)
+    (def-not sb-simd-avx512f::u64.8-not)
+    (def-not sb-simd-avx512f::s32.16-not)
+    (def-not sb-simd-avx512f::s64.8-not)
+    (def-not sb-simd-avx512bw::u8.64-not)
+    (def-not sb-simd-avx512bw::u16.32-not)
+    (def-not sb-simd-avx512bw::s8.64-not)
+    (def-not sb-simd-avx512bw::s16.32-not)))
 ;; Neon
 #+arm64
 (progn
