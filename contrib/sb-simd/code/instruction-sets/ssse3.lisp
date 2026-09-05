@@ -4,6 +4,8 @@
   (:include :sse3)
   (:test (ssse3-supported-p))
   (:instructions
+   ;; u8.16
+   (u8.16-shuffle #:pshufb    (u8.16) (u8.16 u8.16) :cost 1 :encoding :sse)
    ;; u16.8
    (u16.8-hadd    #:phaddw    (u16.8) (u16.8 u16.8) :cost 3 :encoding :sse)
    (u16.8-hsub    #:phsubw    (u16.8) (u16.8 u16.8) :cost 3 :encoding :sse)
