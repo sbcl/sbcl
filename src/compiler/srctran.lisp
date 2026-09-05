@@ -3198,6 +3198,14 @@
          `(count-trailing-zeros x)))
      (give-up-ir1-transform))))
 
+(deftransform integer-length ((x) (integer) * :node node :important nil)
+  (block nil
+    (or (combination-case x
+          (lognot (*)
+           (splice-fun-args x :any 1)
+           (give-up-ir1-transform)))
+        (give-up-ir1-transform))))
+
 (defoptimizer (%bignum-length derive-type) ((x))
   (one-arg-derive-type
    x
