@@ -666,16 +666,22 @@
                                    (case name
                                      ,@(expand-node (cdr lvars) (cdr specs) spec body))))))))
                    (funcall body))))
-      (destructuring-bind (&key node lvar) (if (listp lvar)
+      (destructuring-bind (&key node dest lvar) (if (listp lvar)
                                                lvar
                                                (list :lvar lvar))
+        (when dest
+          (setf node `(node-dest ,dest)))
         (let* ((pattern-vars (collect-spec-vars spec))
                (body-fun (gensym "MATCH-BODY"))
                (leaf-caller (lambda () `(,body-fun name combination args ,@pattern-vars rotated)))
                (match-form (if node
                                `(multiple-value-bind (name combination args) (combination/cast-name-args ,node)
                                   (declare (ignorable name combination))
-                                  ,@(expand-node nil nil spec leaf-caller :match-name nil))
+                                  ,@(let ((expanded (expand-node nil nil spec leaf-caller :match-name dest)))
+                                      (if dest
+                                          `((case name
+                                              ,@expanded))
+                                          expanded)))
                                (expand (list lvar) (list spec) leaf-caller))))
           `(flet ((,body-fun (name combination args ,@pattern-vars &optional rotated)
                     (declare (ignorable name combination args ,@pattern-vars rotated))
