@@ -489,7 +489,7 @@
   (declare (type lvar lvar))
   (aver (not (lvar-dynamic-extent lvar)))
   (let ((2lvar (make-ir2-lvar nil)))
-    (setf (ir2-lvar-kind 2lvar) :unknown
+    (setf (ir2-lvar-kind 2lvar) :direct
           (ir2-lvar-locs 2lvar)
           (list* (make-normal-tn sb-vm::*fixnum-primitive-type*) ;; arg-count
                  (loop repeat sb-vm::register-arg-count
@@ -535,7 +535,6 @@
                                never (eq (nth-value 1 (values-types (lvar-derived-type arg))) :unknown))
                          (lvar-single-value-p (node-lvar call)))
                     (annotate-fun-lvar (basic-combination-fun call)) ;; can delay, there's mv-call-direct-named
-                    (setf (mv-combination-direct-call call) t)
                     (annotate-unknown-direct-call-values-lvar last-arg)
                     (loop for arg in (cdr reversed-args)
                           do

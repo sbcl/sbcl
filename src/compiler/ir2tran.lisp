@@ -561,7 +561,7 @@
       ;; deleted and won't be annotated
       (when 2lvar
         (ecase (ir2-lvar-kind 2lvar)
-          (:fixed
+          ((:fixed :direct)
            (let ((locs (ir2-lvar-locs 2lvar)))
              (unless (eq locs results)
                (move-results-coerced node block results locs))))
@@ -1375,54 +1375,58 @@
           (ir2-convert-full-call-args node block)
         (let* ((lvar (node-lvar node))
                (fun-lvar (basic-combination-fun node))
-               #+tls-based-mv-return
-               (dest (lvar-dest lvar))
                (locs (ir2-lvar-locs (lvar-info lvar))))
           (multiple-value-bind (fun-tn named) (fun-lvar-tn node block fun-lvar)
-            (cond #+tls-based-mv-return
-                  ((and (mv-combination-p dest)
-                        (mv-combination-direct-call dest))
-                   (let ((register-locs
-                           (list*
-                            (make-arg-count-location)
-                            (loop for i below sb-vm::register-arg-count
-                                  collect (standard-arg-location i)))))
-                     (if named
-                         (vop* call-direct-named node block (fp #-linkage-space fun-tn args)
-                               ((reference-tn-list register-locs t))
-                               arg-locs nargs #+linkage-space named (emit-step-p node))
-                         (vop* call-direct node block (fp fun-tn args)
-                               ((reference-tn-list register-locs t))
-                               arg-locs nargs (emit-step-p node)))
-                     (loop for result in register-locs
-                           for arg in locs
-                           do (emit-move node block result arg))))
-                  (t
-                   (let ((loc-refs (reference-tn-list locs t)))
-                     (cond ((not named)
-                            (vop* multiple-call node block (fp fun-tn args) (loc-refs)
-                                  arg-locs nargs (emit-step-p node)))
-                           #-linkage-space
-                           ((eq fun-tn named)
-                            (vop* static-multiple-call-named node block
-                                  (fp args)
-                                  (loc-refs)
-                                  arg-locs nargs named
-                                  (emit-step-p node)))
-                           (fixed-args-p
-                            (when-vop-existsp (:named sb-vm::fixed-multiple-call-named)
-                              (vop* sb-vm::fixed-multiple-call-named node block
-                                    (fp #-linkage-space fun-tn args) ; args
-                                    (loc-refs) ; results
-                                    arg-locs nargs #+linkage-space named ; info
-                                    (emit-step-p node))))
-                           (t
-                            (vop* multiple-call-named node block
-                                  (fp #-linkage-space fun-tn args) ; args
-                                  (loc-refs) ; results
-                                  arg-locs nargs #+linkage-space named ; info
-                                                 (emit-step-p node)))))))))))
+            (let ((loc-refs (reference-tn-list locs t)))
+              (cond ((not named)
+                     (vop* multiple-call node block (fp fun-tn args) (loc-refs)
+                           arg-locs nargs (emit-step-p node)))
+                    #-linkage-space
+                    ((eq fun-tn named)
+                     (vop* static-multiple-call-named node block
+                           (fp args)
+                           (loc-refs)
+                           arg-locs nargs named
+                           (emit-step-p node)))
+                    (fixed-args-p
+                     (when-vop-existsp (:named sb-vm::fixed-multiple-call-named)
+                       (vop* sb-vm::fixed-multiple-call-named node block
+                             (fp #-linkage-space fun-tn args) ; args
+                             (loc-refs) ; results
+                             arg-locs nargs #+linkage-space named ; info
+                             (emit-step-p node))))
+                    (t
+                     (vop* multiple-call-named node block
+                           (fp #-linkage-space fun-tn args) ; args
+                           (loc-refs)                       ; results
+                           arg-locs nargs #+linkage-space named ; info
+                                          (emit-step-p node)))))))))
   (values))
+
+#+tls-based-mv-return
+(defun ir2-convert-direct-full-call (node block)
+  (declare (type combination node) (type ir2-block block))
+  (multiple-value-bind (fp args arg-locs nargs)
+      (ir2-convert-full-call-args node block)
+    (let* ((lvar (node-lvar node))
+           (fun-lvar (basic-combination-fun node))
+           (locs (ir2-lvar-locs (lvar-info lvar))))
+      (multiple-value-bind (fun-tn named) (fun-lvar-tn node block fun-lvar)
+        (let ((register-locs
+                (list*
+                 (make-arg-count-location)
+                 (loop for i below sb-vm::register-arg-count
+                       collect (standard-arg-location i)))))
+          (if named
+              (vop* call-direct-named node block (fp #-linkage-space fun-tn args)
+                    ((reference-tn-list register-locs t))
+                    arg-locs nargs #+linkage-space named (emit-step-p node))
+              (vop* call-direct node block (fp fun-tn args)
+                    ((reference-tn-list register-locs t))
+                    arg-locs nargs (emit-step-p node)))
+          (loop for result in register-locs
+                for arg in locs
+                do (emit-move node block result arg)))))))
 
 #+(and x86-64 tls-based-mv-return)
 (defun ir2-convert-pass-through-full-call (node block)
@@ -1549,15 +1553,19 @@
   (ponder-full-call node)
   (cond ((node-tail-p node)
          (ir2-convert-tail-full-call node block))
-        #+(and x86-64 tls-based-mv-return)
         ((let ((lvar (node-lvar node)))
            (and lvar
-                (eq (ir2-lvar-kind (lvar-info lvar)) :pass-through)))
-         (ir2-convert-pass-through-full-call node block))
-        ((let ((lvar (node-lvar node)))
-           (and lvar
-                (eq (ir2-lvar-kind (lvar-info lvar)) :unknown)))
-         (ir2-convert-multiple-full-call node block))
+                (case (ir2-lvar-kind (lvar-info lvar))
+                  (:unknown
+                   (ir2-convert-multiple-full-call node block)
+                   t)
+                  (:direct
+                   (ir2-convert-direct-full-call node block)
+                   t)
+                  #+(and x86-64 tls-based-mv-return)
+                  (:pass-through
+                   (ir2-convert-pass-through-full-call node block)
+                   t)))))
         (t
          (ir2-convert-fixed-full-call node block)))
   (values))
@@ -1902,12 +1910,15 @@
                      (lambda-tail-set (node-home-lambda node))))
          (lvar (node-lvar node))
          (2lvar (and lvar (lvar-info lvar)))
-         (fun-lvar (basic-combination-fun node)))
+         (fun-lvar (basic-combination-fun node))
+         #+tls-based-mv-return
+         (last-arg (car (last (basic-combination-args node)))))
     (multiple-value-bind (fun named)
         (fun-lvar-tn node block fun-lvar)
       (cond #+tls-based-mv-return
-            ((mv-combination-direct-call node)
-             (let ((extra-args (ir2-lvar-locs (lvar-info (car (last (basic-combination-args node)))))))
+            ((and last-arg
+                  (eq (ir2-lvar-kind (lvar-info last-arg)) :direct))
+             (let ((extra-args (ir2-lvar-locs (lvar-info last-arg))))
                (multiple-value-bind (fp args arg-locs fixed-args)
                    (ir2-convert-direct-call-args node block (cdr extra-args))
                  (let ((locs (standard-result-tns lvar)))

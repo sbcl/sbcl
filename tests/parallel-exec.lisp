@@ -52,7 +52,7 @@
     (push :test-aprof *features*))
 (in-package run-tests)
 
-(let ((ev (member "--interpret" *posix-argv* :test #'equal)))
+(when (member "--interpret" *posix-argv* :test #'equal)
   (setf *test-evaluator-mode* :interpret)
   (setf *posix-argv* (remove "--interpret" *posix-argv* :test #'equal)))
 
