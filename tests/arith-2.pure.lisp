@@ -1054,6 +1054,11 @@
    (lambda (n)
      (declare ((signed-byte 64) n))
      (logxor n (ash n -63)))
+   (unsigned-byte 63))
+  (assert-type
+   (lambda (x)
+     (declare ((and (signed-byte 64) (not (integer -1 0))) x))
+     (logxor x (ash x (- 63))))
    (unsigned-byte 63)))
 
 (with-test (:name :unsigned-byte-x-p)
