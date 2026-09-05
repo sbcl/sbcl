@@ -1049,6 +1049,13 @@
      (logxor n (- n)))
    (integer * -2)))
 
+(with-test (:name :logxor-ash-type)
+  (assert-type
+   (lambda (n)
+     (declare ((signed-byte 64) n))
+     (logxor n (ash n -63)))
+   (unsigned-byte 63)))
+
 (with-test (:name :unsigned-byte-x-p)
   (checked-compile-and-assert
    ()
