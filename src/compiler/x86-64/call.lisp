@@ -833,9 +833,9 @@
      ,@(unless (eq args :fixed)
          `((:temporary
             (:sc any-reg :offset rcx-offset
-                 ,@ (when (eq direct :call)
-                      `(:from (:argument 1)))
-                 :to :eval)
+                 ,@(when (eq direct :call)
+                     `(:from (:argument 1)))
+                 :to ,(if (and (eq return :fixed) (not (eq direct :return))) :save :eval))
             rcx)))
      ,@(when (eq direct :call)
          '((:temporary (:sc any-reg) counter)))

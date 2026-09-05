@@ -1095,10 +1095,10 @@
                        ,(if named 'name-pass 'lexenv))))
 
      (:temporary (:sc any-reg :offset nargs-offset
-                      ,@ (when (eq direct :call)
-                           `(:from (:argument 1)))
+                      ,@(when (eq direct :call)
+                          `(:from (:argument 1)))
                       :to
-                      ,(cond (direct
+                      ,(cond ((eq direct :return)
                               :eval)
                              ((eq return :fixed)
                               :save)
