@@ -4343,3 +4343,9 @@ is :ANY, the function name is not checked."
                        (declare (ignorable ,@vars))
                        ,(nth nth-arg vars))
                     'transform--to-identity)))
+
+(defun sole-node-dest (node)
+  (let ((lvar (node-lvar node)))
+    (when lvar
+      (and (atom (lvar-uses lvar))
+           (lvar-dest lvar)))))
