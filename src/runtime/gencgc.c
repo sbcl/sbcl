@@ -3205,9 +3205,11 @@ conservative_stack_scan(struct thread* th,
 # elif defined(LISP_FEATURE_SB_THREAD)
 
 #ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
-    lispobj* csp = th->control_stack_pointer;
+    lispobj* csp = (lispobj *) csp_around_foreign_call(th);
+    if (!csp)
+        csp = th->control_stack_pointer;
     if (csp)
-      esp = (void*) csp;
+        esp = (void*) csp;
 #endif
 
     int i;

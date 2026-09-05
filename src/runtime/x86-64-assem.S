@@ -413,8 +413,7 @@ GNAME(arch_scrub_control_stack):
 	/* Select guard boundary based on page protection status */
 	cmpb	$0, THREAD_STATE_WORD_OFFSET(%rdi) // see genesis/thread.h
 	cmovne	%rsi, %rdx              // if protected, stop at soft guard
-	lea	(%rdx, %rcx), %r9       // R9 = guard page upper bound
-	lea	64(%r9), %r9            // 64 byte safety margin
+	lea	64(%rdx, %rcx), %r9       // R9 = guard page upper bound, 64 byte safety margin
 
 	LOAD_PIC_UINT(aggressive_scrub_control_stack, ax)
 	test	%eax, %eax

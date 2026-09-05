@@ -192,7 +192,9 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
     struct timespec t_beginpause;
     clock_gettime(CLOCK_MONOTONIC, &t_beginpause);
 #endif
-
+#if defined LISP_FEATURE_NONSTOP_FOREIGN_CALL && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    thread->control_stack_pointer = (lispobj*)*os_context_register_addr(context, reg_SP);
+#endif
     /* We say that the thread is "stopped" as of now, but the blocking operation
      * occurs below at thread_wait_until_not(STATE_STOPPED). Note that sem_post()
      * is expressly permitted in signal handlers, and set_thread_state uses it */
@@ -203,7 +205,15 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
      * the unused portion of the control stack to reduce conservatism.
      * On the platforms with threads and exact gc it is
      * actually a must. */
-    scrub_control_stack();
+#if defined LISP_FEATURE_NONSTOP_FOREIGN_CALL && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    /* It's coming from handle_foreign_call_trigger, which runs on the
+       altstack (being a memory fault). Instead of getting the right
+       RSP to scrub_thread_control_stack just don't worry about it,
+       the same thread won't be getting stuck on foreign exit forever,
+       a little imprecision is fine. */
+    if (signal != 0)
+#endif
+      scrub_thread_control_stack(thread);
 
     /* Now we wait on a semaphore, which, to be pedantic, is not specified as async-safe.
      * Normally the way to implement a "suspend" operation is to issue any blocking
@@ -272,9 +282,7 @@ handle_foreign_call_trigger (os_context_t *context, os_vm_address_t fault_addres
             else {
                 /* gc_stop_the_world has either already sent a signal
                    or will send it soon, wait for it. */
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-                th->control_stack_pointer = (lispobj*)*os_context_register_addr(context, reg_SP);
-#endif
+
                 /* sigsuspend appears to be broken on macOS, call the
                    handler directly and then ignore it outside of stop_the_world */
                 sig_stop_for_gc_handler(0, NULL, context);
