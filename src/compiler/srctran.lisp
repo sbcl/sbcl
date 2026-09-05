@@ -4152,12 +4152,13 @@
                            (csubtypep result-type type)))
               (values cast-type result-type))))))))
 
-;;; (the fixnum (+ x fixnum)) can use inline arithmetic because X can only be a singed word.
+;;; (the fixnum (+ x fixnum)) can use inline arithmetic because X can only be a signed word.
 (when-vop-existsp (:translate overflow+)
   (macrolet ((def (name types word-var args vop)
                `(deftransform ,name ((x y) ,types
                                      * :node node :important nil)
-                  (when (csubtypep (lvar-type ,word-var) (specifier-type 'sb-vm:signed-word))
+                  (when (or (csubtypep (lvar-type ,word-var) (specifier-type 'word))
+                            (csubtypep (lvar-type ,word-var) (specifier-type 'sb-vm:signed-word)))
                     (give-up-ir1-transform))
                   (delay-ir1-transform node :ir1-phases)
                   (let ((cast (cast-or-check-bound-type node (specifier-type 'fixnum))))

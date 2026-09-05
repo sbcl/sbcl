@@ -916,6 +916,33 @@
               (truncate a 2305843009213693949)))
     ((11094097273866491717) (values 4 1870725237011715921))))
 
+(with-test (:name :overflow+-word
+            :implemented-on (:vop-existsp sb-c::overflow+))
+  (checked-compile-and-assert
+   (:allow-notes nil :optimize :safe)
+   `(lambda (x y)
+      (declare (type (integer 0 ,(ash 1 (- sb-vm:n-word-bits 2))) x)
+               (type (integer 0 5) y))
+      (the fixnum (+ x x y)))
+   ((3 4) 10)
+   ((h 5) (condition 'type-error)))
+  (checked-compile-and-assert
+   (:allow-notes nil :optimize :safe)
+   `(lambda (x y)
+      (declare (type (integer 0 ,(ash 1 (- sb-vm:n-word-bits 2))) x)
+               (type (integer 0 5) y))
+      (the fixnum (- y (+ x x))))
+   ((1 5) 3)
+   ((h 0) (condition 'type-error)))
+  (checked-compile-and-assert
+   (:allow-notes nil :optimize :safe)
+   `(lambda (x y)
+      (declare (sb-vm:word x y))
+      (< (the sb-vm:word (+ x x)) y))
+   ((5 11) t)
+   ((5 10) nil)
+   (((ash 1 (1- sb-vm:n-word-bits)) 0) (condition 'type-error))))
+
 (with-test (:name :logxor-1-type)
   (assert-type
    (lambda (x)
