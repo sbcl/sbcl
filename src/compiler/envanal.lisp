@@ -354,11 +354,10 @@
 (defun leaf-refs-not-escape-elsewhere-p (leaf use &optional visited)
   (dolist (ref (leaf-refs leaf) t)
     (unless (eq use ref)
-      (multiple-value-bind (dest p-lvar)
-          (principal-lvar-end (node-lvar ref))
-        (declare (ignore dest))
-        (unless (or (lvar-dynamic-extent p-lvar)
-                    (ref-good-for-dx-p ref visited))
+      (multiple-value-bind (dest p-lvar) (principal-lvar-end (node-lvar ref))
+        (when (and dest
+                   (not (or (lvar-dynamic-extent p-lvar)
+                            (ref-good-for-dx-p ref visited))))
           (return nil))))))
 
 ;;; Check that REF delivers a value to a combination which is DX safe
