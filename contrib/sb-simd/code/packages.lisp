@@ -1019,6 +1019,7 @@
      #:u32.4-hadd
      #:u16.8-hsub
      #:u32.4-hsub
+     #:u8.16-shuffle
      #:s8.16-shuffle
      #:s8.16-abs
      #:s8.16-sign
