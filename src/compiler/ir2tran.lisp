@@ -1559,6 +1559,7 @@
                   (:unknown
                    (ir2-convert-multiple-full-call node block)
                    t)
+                  #+tls-based-mv-return
                   (:direct
                    (ir2-convert-direct-full-call node block)
                    t)
