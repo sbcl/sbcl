@@ -624,7 +624,7 @@
                (if lvars
                    (let ((lvar (car lvars))
                          (spec (car specs)))
-                     (flet ((match-var (name &optional allow-empty constant)
+                     (flet ((match-var (name &optional allow-empty constant constant-type)
                               (cond ((or (eq name '*)
                                          (and allow-empty
                                               (not name)))
@@ -638,17 +638,21 @@
                                                  body)))
                                     (t
                                      (push name bound-vars)
-                                     `(let ((,name ,(if constant
-                                                        `(lvar-value ,lvar)
-                                                        lvar)))
-                                        ,(expand (cdr lvars) (cdr specs)
-                                                 body))))))
+                                     (let ((expanded (expand (cdr lvars) (cdr specs)
+                                                              body)))
+                                      `(let ((,name ,(if constant
+                                                         `(lvar-value ,lvar)
+                                                         lvar)))
+                                         ,(if constant-type
+                                              `(when (typep ,name ',constant-type)
+                                                 ,expanded)
+                                              expanded)))))))
                        (cond ((typep spec '(cons (eql :type)))
                               `(when (csubtypep (lvar-type ,lvar) (specifier-type ',(second spec)))
                                  ,(match-var (third spec) t)))
                              ((typep spec '(cons (eql :constant)))
                               `(when (constant-lvar-p ,lvar)
-                                 ,(match-var (second spec) t t)))
+                                 ,(match-var (second spec) t t (third spec))))
                              ((symbolp spec)
                               (match-var spec))
                              ((atom spec)
@@ -4325,3 +4329,11 @@ is :ANY, the function name is not checked."
     (setf (lambda-var-sets var)
           (delq1 set (lambda-var-sets var)))
     (delete-filter set (node-lvar set) (set-value set))))
+
+(defun transform-to-identity (nth-arg node n-args)
+  (let ((vars (make-gensym-list n-args)))
+    (transform-call node
+                    `(lambda ,vars
+                       (declare (ignorable ,@vars))
+                       ,(nth nth-arg vars))
+                    'transform--to-identity)))
