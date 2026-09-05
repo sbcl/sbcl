@@ -3267,7 +3267,14 @@
 (deftransform logcount ((x) (integer) * :node node :important nil)
   (let ((dest (node-dest node)))
     (block nil
-      (or (combination-match (:dest node)
+      (or (combination-case x
+            (lognot (*)
+             (splice-fun-args x :any 1)
+             (give-up-ir1-transform))
+            (ash (* (type unsigned-byte))
+             (splice-fun-args x :any #'first)
+             (give-up-ir1-transform)))
+          (combination-match (:dest node)
               (:or (> (logcount x) (integer-length x))
                    (< (integer-length x) (logcount x)))
             (erase-node-type node (values-specifier-type '(values boolean &optional)))
