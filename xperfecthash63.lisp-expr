@@ -1953,5 +1953,14 @@
 (#(67AF46F4 8216D041 E111A059 EE1EF1D5)
  "(SB-ASSEM:.ALIGN SB-ASSEM:.BYTE SB-ASSEM:.SKIP SB-ASSEM:.LISPWORDS)"
  "((& (>> val 12) 3))")
+(#(63C481C2 6A3E03D5 73D42188 937BB764 A4528420 D0F360C2 D1F36255 D5F368A1 D7F36BC7)
+ "(ABS FLOOR * ASH TRUNCATE / %NEGATE + -)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 0 4 0 12 2 0 6)))
+  (let ((b (& val #x7)))
+   (let ((a (>> val 29)))
+    (^ a (aref tab b))))))")
+(#(6A3E03D5 73D42188 937BB764 A4528420 D0F360C2 D1F36255 D5F368A1 D7F36BC7)
+ "(ABS * ASH TRUNCATE / %NEGATE + -)"
+ "((& (- val (>> val 28)) 7))")
 )
 ;; EOF
