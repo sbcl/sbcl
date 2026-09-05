@@ -3843,7 +3843,7 @@
   (deftransform ash ((integer amount) (sb-vm:signed-word (integer * 0)) *
                      :node node
                      :important nil)
-    (when (csubtypep (lvar-type amount) (specifier-type 'sb-vm:signed-word))
+    (when (word-sized-lvar-p amount)
       (give-up-ir1-transform))
     (delay-ir1-transform node :ir1-phases)
     `(ash integer (if (<= amount ,(- sb-vm:n-word-bits))
@@ -4079,9 +4079,8 @@
   (let* ((type (single-value-type (node-asserted-type node)))
          (y (lvar-value y))
          (len (1- (integer-length y))))
-    (unless (or (not (csubtypep (lvar-type x) (specifier-type '(or word sb-vm:signed-word))))
-                (csubtypep type (specifier-type 'word))
-                (csubtypep type (specifier-type 'sb-vm:signed-word))
+    (unless (or (not (word-sized-lvar-p x))
+                (word-sized-type-p type)
                 (>= len sb-vm:n-word-bits))
       (give-up-ir1-transform))
     (unless (= y (ash 1 len))
@@ -4097,8 +4096,7 @@
   (delay-ir1-transform node :ir1-phases)
   (let ((type (single-value-type (node-asserted-type node)))
         (shift (lvar-value amount)))
-    (when (or (csubtypep type (specifier-type 'word))
-              (csubtypep type (specifier-type 'sb-vm:signed-word))
+    (when (or (word-sized-type-p type)
               (>= shift sb-vm:n-word-bits))
       (give-up-ir1-transform))
     `(* integer ,(ash 1 shift))))
@@ -4157,7 +4155,7 @@
   (macrolet ((def (name types word-var args vop)
                `(deftransform ,name ((x y) ,types
                                      * :node node :important nil)
-                  (when (csubtypep (lvar-type ,word-var) (specifier-type 'sb-vm:signed-word))
+                  (when (word-sized-lvar-p ,word-var)
                     (give-up-ir1-transform))
                   (delay-ir1-transform node :ir1-phases)
                   (let ((cast (cast-or-check-bound-type node (specifier-type 'fixnum))))
@@ -4176,17 +4174,14 @@
     (give-up-ir1-transform))
   (delay-ir1-transform node :ir1-phases)
   (let ((type (single-value-type (node-derived-type node))))
-    (unless (and (or (csubtypep (lvar-type x) (specifier-type 'word))
-                     (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
-                 (or (csubtypep (lvar-type y) (specifier-type 'word))
-                     (csubtypep (lvar-type y) (specifier-type 'sb-vm:signed-word))))
+    (unless (and (word-sized-lvar-p x)
+                 (word-sized-lvar-p y))
       (give-up-ir1-transform))
     (multiple-value-bind (cast result-type) (cast-or-check-bound-type node)
       (unless cast
         (give-up-ir1-transform))
       (let* ((vops (fun-info-templates (fun-info-or-lose name)))
-             (wordp (or (csubtypep type (specifier-type 'word))
-                        (csubtypep type (specifier-type 'sb-vm:signed-word)))))
+             (wordp (word-sized-type-p type)))
         (when (if (csubtypep result-type (specifier-type 'fixnum))
                   (or (csubtypep type (specifier-type 'fixnum))
                       (and wordp
@@ -4248,14 +4243,10 @@
   (let ((type (single-value-type (node-derived-type node)))
         (x-type (lvar-type x))
         (y-type (lvar-type y)))
-    (when (or (csubtypep type (specifier-type 'word))
-              (csubtypep type (specifier-type 'sb-vm:signed-word))
+    (when (or (word-sized-type-p type)
               (if swap
-                  (or
-                   (csubtypep y-type (specifier-type 'word))
-                   (csubtypep y-type (specifier-type 'sb-vm:signed-word)))
-                  (or (csubtypep x-type (specifier-type 'word))
-                      (csubtypep x-type (specifier-type 'sb-vm:signed-word)))))
+                  (word-sized-type-p y-type)
+                  (word-sized-type-p x-type)))
       (give-up-ir1-transform))
     (multiple-value-bind (cast result-type) (cast-or-check-bound-type node (specifier-type 'fixnum) t)
       (unless cast
@@ -4335,8 +4326,7 @@
 (when-vop-existsp (:named sb-vm::overflow-ash-t)
   (deftransform ash ((x y) (t word)
                      * :node node :important nil)
-    (or (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
-                    (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
+    (or (unless (word-sized-lvar-p x)
           (delay-ir1-transform node :ir1-phases)
           (let ((cast (cast-or-check-bound-type node (specifier-type 'fixnum))))
             (when cast
@@ -4373,8 +4363,7 @@
 ;; (the fixnum (ash x -1)) can be inlined
 (deftransform ash ((x shift) (t (constant-arg (integer #.(- 1 sb-vm:n-word-bits) -1)))
                    * :node node :important nil :priority :last)
-  (or (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
-                  (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
+  (or (unless (word-sized-lvar-p x)
         (multiple-value-bind (cast result-type) (cast-or-check-bound-type node (specifier-type 'fixnum))
           (when cast
             (delay-ir1-transform node :constraint)
@@ -4391,18 +4380,17 @@
 
 ;;; (the fixnum (* x fixnum))
 (defun unknown-*-transform (x y node)
-  (or (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
-                  (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word))
-                  (csubtypep (lvar-type x) (specifier-type '(or complex float))))
+  (or (unless (or (word-sized-lvar-p x)
+                  (lvar-subtypep x (or complex float)))
         (block nil
           (multiple-value-bind (cast) (cast-or-check-bound-type node (specifier-type 'fixnum))
             (when cast
               (cond ((csubtypep (lvar-type x) (specifier-type 'integer))
                      (delay-ir1-transform node :ir1-phases)
                      (if (and
-                          (not (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0))))
-                          (or (not (types-equal-or-intersect (lvar-type x) (specifier-type '(eql #.(- most-negative-fixnum)))))
-                              (not (types-equal-or-intersect (lvar-type y) (specifier-type '(eql -1))))))
+                          (not (lvar-intersectp y (eql 0)))
+                          (or (not (lvar-intersectp x (eql #.(- most-negative-fixnum))))
+                              (not (lvar-intersectp y (eql -1)))))
                          `(* (the fixnum x) y)
                          `(if (eq y 0)
                               0
