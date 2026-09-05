@@ -39,6 +39,10 @@ endif
 ASSEM_SRC = x86-64-assem.S
 ARCH_SRC = x86-64-arch.c
 
+ifdef LISP_FEATURE_SB_FIBER
+  OS_SRC += fiber.c x86-64-fiber.c
+endif
+
 LINKFLAGS += -arch x86_64 -dynamic -twolevel_namespace -bind_at_load -pagezero_size 0x100000
 
 CFLAGS += -arch x86_64 -fno-omit-frame-pointer

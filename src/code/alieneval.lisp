@@ -1220,20 +1220,23 @@
            (alien-record-type-name type2))
        (eq (alien-record-type-kind type1)
            (alien-record-type-kind type2))
-       (eql (alien-type-bits type1)
-            (alien-type-bits type2))
-       (eql (alien-type-alignment type1)
-            (alien-type-alignment type2))
-       (flet ((match-fields (&optional old)
-                (setf (gethash type1 *alien-type-matches*) (cons type2 old))
-                (every #'record-fields-match-p
-                       (alien-record-type-fields type1)
-                       (alien-record-type-fields type2))))
-         (if *alien-type-matches*
-             (let ((types (gethash type1 *alien-type-matches*)))
-               (or (memq type2 types) (match-fields types)))
-             (let ((*alien-type-matches* (make-hash-table :test #'eq)))
-               (match-fields))))))
+       (or (and (alien-record-type-name type1)
+                (or (null (alien-type-bits type1))
+                    (null (alien-type-bits type2))))
+           (and (eql (alien-type-bits type1)
+                     (alien-type-bits type2))
+                (eql (alien-type-alignment type1)
+                     (alien-type-alignment type2))
+                (flet ((match-fields (&optional old)
+                         (setf (gethash type1 *alien-type-matches*) (cons type2 old))
+                         (every #'record-fields-match-p
+                                (alien-record-type-fields type1)
+                                (alien-record-type-fields type2))))
+                  (if *alien-type-matches*
+                      (let ((types (gethash type1 *alien-type-matches*)))
+                        (or (memq type2 types) (match-fields types)))
+                      (let ((*alien-type-matches* (make-hash-table :test #'eq)))
+                        (match-fields))))))))
 
 
 ;;;; the FUNCTION and VALUES alien types
