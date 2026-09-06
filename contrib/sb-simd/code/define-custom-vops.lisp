@@ -365,7 +365,8 @@
     (def-not sb-simd-avx512bw::u8.64-not)
     (def-not sb-simd-avx512bw::u16.32-not)
     (def-not sb-simd-avx512bw::s8.64-not)
-    (def-not sb-simd-avx512bw::s16.32-not)))
+    (def-not sb-simd-avx512bw::s16.32-not)
+    (def-not sb-simd-avx512fp16::f16.32-not)))
 ;; Neon
 #+arm64
 (progn

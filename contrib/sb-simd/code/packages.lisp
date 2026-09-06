@@ -257,6 +257,7 @@
    #:avx512cd-supported-p
    #:avx512bw-supported-p
    #:avx512vl-supported-p
+   #:avx512fp16-supported-p
    #:neon-supported-p))
 
 (progn
@@ -2512,6 +2513,83 @@
     (:export
      #:u64.8*
      #:s64.8*))
+
+  #+x86-64
+  (defpackage #:sb-simd-avx512fp16
+    (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx512dq)
+    #0#
+    #1#
+    #8#
+    #9#
+    #10#
+    #12#
+    #13#
+    #14#
+    #15=
+    (:export
+     #:f16
+     ;; f16.32
+     #:f16.32
+     #:f16.32!
+     #:f16.32-broadcast
+     #:f16.32+
+     #:f16.32-
+     #:f16.32*
+     #:f16.32/
+     #:f16.32-sqrt
+     #:f16.32-min
+     #:f16.32-max
+     #:f16.32-rcp
+     #:f16.32-rsqrt
+     #:f16.32-scalef
+     #:f16.32-fmadd
+     #:f16.32-fmsub
+     #:f16.32-fnmadd
+     #:f16.32-fnmsub
+     #:f16.32-and
+     #:f16.32-or
+     #:f16.32-xor
+     #:f16.32-andc1
+     #:f16.32-not
+     ;; f16.16
+     #:f16.16
+     #:f16.16!
+     #:f16.16-broadcast
+     #:f16.16+
+     #:f16.16-
+     #:f16.16*
+     #:f16.16/
+     #:f16.16-sqrt
+     #:f16.16-min
+     #:f16.16-max
+     #:f16.16-rcp
+     #:f16.16-rsqrt
+     #:f16.16-fmadd
+     #:f16.16-fmsub
+     #:f16.16-fnmadd
+     #:f16.16-fnmsub
+     ;; f16.8
+     #:f16.8
+     #:f16.8!
+     #:f16.8-broadcast
+     #:f16.8+
+     #:f16.8-
+     #:f16.8*
+     #:f16.8/
+     #:f16.8-sqrt
+     #:f16.8-min
+     #:f16.8-max
+     #:f16.8-rcp
+     #:f16.8-rsqrt
+     #:f16.8-fmadd
+     #:f16.8-fmsub
+     #:f16.8-fnmadd
+     #:f16.8-fnmsub
+     ;; conversions
+     #:f32.16-from-f16.16
+     #:f16.16-from-f32.16
+     #:f16.16-from-s32.16
+     #:s32.16-from-f16.16))
 
   #+arm64
   (defpackage #:sb-simd-arm64
