@@ -408,7 +408,8 @@
                        (inst jmp :nc default-stack-slots))
                      REGS-DEFAULTED
                      (do ((i register-arg-count (1+ i))
-                          (val values (tn-ref-across val)))
+                          (val values (tn-ref-across val))
+                          (prev-cmp))
                          ((null val))
                        (let ((tn (tn-ref-tn val)))
                          (unless (eq (tn-kind tn) :unused)
@@ -416,10 +417,14 @@
                                      (>= i min-values))
                              (let ((default-lab (gen-label)))
                                (defaults (cons default-lab tn))
-                               ;; Note that the max number of values received
-                               ;; is assumed to fit in a :dword register.
-                               (inst cmp :dword rcx-tn (fixnumize i))
-                               (inst jmp :be default-lab)))
+                               (cond ((and (= i (1- nvals))
+                                           (eql prev-cmp (1- i)))
+                                      ;; Reuse the previous comparison if it's the last one
+                                      (inst jmp :e default-lab))
+                                     (t
+                                      (inst cmp :dword rcx-tn (fixnumize i))
+                                      (inst jmp :be default-lab)))
+                               (setf prev-cmp i)))
                            (let ((src (thread-slot-ea (+ thread-mv-return-values-slot
                                                          (- i register-arg-count)))))
                              (inst mov tn (sc-case tn
