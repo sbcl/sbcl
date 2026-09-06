@@ -60,7 +60,12 @@
 
   (defun avx512vl-supported-p ()
     (and (>= (cpuid 0) 7)
-         (logbitp 31 (nth-value 1 (cpuid 7 0))))))
+         (logbitp 31 (nth-value 1 (cpuid 7 0)))))
+
+  (defun avx512fp16-supported-p ()
+    (and (>= (cpuid 0) 7)
+         (avx512f-supported-p)
+         (logbitp 23 (nth-value 3 (cpuid 7 0))))))
 
 #-x86-64
 (progn
@@ -104,6 +109,9 @@
     nil)
 
   (defun avx512vl-supported-p ()
+    nil)
+
+  (defun avx512fp16-supported-p ()
     nil))
 
 (defun neon-supported-p ()
