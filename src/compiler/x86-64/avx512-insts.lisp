@@ -2115,3 +2115,116 @@
                          (t
                           (error "Unsupported operands for VMOVW: ~S, ~S" dst src))))))))
   (def))
+
+;;; AVX10.2 Min/Max Primitives (VMINMAXPS, VMINMAXPD, VMINMAXPH, VMINMAXBF16)
+(macrolet ((def-minmax-packed (name prefix opcode w)
+             (let ((masked-name (symbolicate name "-MASKED")))
+               `(progn
+                  (define-instruction ,name (segment dst src1 src2 imm &optional mask (zeroing 0))
+                    ,@(avx512-inst-printer-list 'ymm-ymm/mem-imm prefix opcode
+                                                :opcode-prefix #x0F3A :w w
+                                                :printer '(:name :tab reg ", " vvvv ", " reg/mem ", " imm))
+                    ,@(loop for k from 1 to 7
+                            append
+                            (avx512-inst-printer-list
+                             'ymm-ymm/mem-imm prefix opcode
+                             :opcode-prefix #x0F3A :w w
+                             :more-fields `((aaa ,k) (z-bit 0))
+                             :printer '(:name :tab reg ", " vvvv ", " reg/mem ", " imm " {" aaa "}"))
+                            append
+                            (avx512-inst-printer-list
+                             'ymm-ymm/mem-imm prefix opcode
+                             :opcode-prefix #x0F3A :w w
+                             :more-fields `((aaa ,k) (z-bit 1))
+                             :printer '(:name :tab reg ", " vvvv ", " reg/mem ", " imm " {" aaa "} {z}")))
+                    (:emitter
+                     (let ((mask-num (cond ((null mask) 0)
+                                           ((integerp mask) mask)
+                                           ((k-register-p mask) (reg-id-num (reg-id mask)))
+                                           (t (error "Invalid mask ~S" mask))))
+                           (z-num (if (or (eq zeroing :z) (eql zeroing 1)) 1 0)))
+                       (emit-avx512-inst segment src2 dst ,prefix ,opcode
+                                         :opcode-prefix #x0F3A
+                                         :vvvv src1
+                                         :w ,w
+                                         :aaa mask-num
+                                         :z z-num
+                                         :disp-n (full-vector-disp-n dst)
+                                         :remaining-bytes 1)
+                       (emit-byte segment imm))))
+                  (define-instruction ,masked-name (segment dst src1 src2 imm mask &optional (zeroing 0))
+                    (:emitter
+                     (let ((mask-num (cond ((integerp mask) mask)
+                                           ((k-register-p mask) (reg-id-num (reg-id mask)))
+                                           (t (error "Invalid mask ~S" mask))))
+                           (z-num (if (or (eq zeroing :z) (eql zeroing 1)) 1 0)))
+                       (emit-avx512-inst segment src2 dst ,prefix ,opcode
+                                         :opcode-prefix #x0F3A
+                                         :vvvv src1
+                                         :w ,w
+                                         :aaa mask-num
+                                         :z z-num
+                                         :disp-n (full-vector-disp-n dst)
+                                         :remaining-bytes 1)
+                       (emit-byte segment imm))))))))
+  (def-minmax-packed vminmaxps #x66 #x52 0)
+  (def-minmax-packed vminmaxpd #x66 #x52 1)
+  (def-minmax-packed vminmaxph nil  #x52 0)
+  (def-minmax-packed vminmaxbf16 #xF2 #x52 0))
+
+;;; AVX10.2 Scalar Min/Max Primitives (VMINMAXSS, VMINMAXSD, VMINMAXSH)
+(macrolet ((def-minmax-scalar (name prefix opcode w disp-n)
+             (let ((masked-name (symbolicate name "-MASKED")))
+               `(progn
+                  (define-instruction ,name (segment dst src1 src2 imm &optional mask (zeroing 0))
+                    ,@(avx512-inst-printer-list 'ymm-ymm/mem-imm prefix opcode
+                                                :opcode-prefix #x0F3A :w w :ll 0
+                                                :printer '(:name :tab reg ", " vvvv ", " reg/mem ", " imm))
+                    ,@(loop for k from 1 to 7
+                            append
+                            (avx512-inst-printer-list
+                             'ymm-ymm/mem-imm prefix opcode
+                             :opcode-prefix #x0F3A :w w :ll 0
+                             :more-fields `((aaa ,k) (z-bit 0))
+                             :printer '(:name :tab reg ", " vvvv ", " reg/mem ", " imm " {" aaa "}"))
+                            append
+                            (avx512-inst-printer-list
+                             'ymm-ymm/mem-imm prefix opcode
+                             :opcode-prefix #x0F3A :w w :ll 0
+                             :more-fields `((aaa ,k) (z-bit 1))
+                             :printer '(:name :tab reg ", " vvvv ", " reg/mem ", " imm " {" aaa "} {z}")))
+                    (:emitter
+                     (let ((mask-num (cond ((null mask) 0)
+                                           ((integerp mask) mask)
+                                           ((k-register-p mask) (reg-id-num (reg-id mask)))
+                                           (t (error "Invalid mask ~S" mask))))
+                           (z-num (if (or (eq zeroing :z) (eql zeroing 1)) 1 0)))
+                       (emit-avx512-inst segment src2 dst ,prefix ,opcode
+                                         :opcode-prefix #x0F3A
+                                         :vvvv src1
+                                         :w ,w
+                                         :ll 0
+                                         :aaa mask-num
+                                         :z z-num
+                                         :disp-n ,disp-n
+                                         :remaining-bytes 1)
+                       (emit-byte segment imm))))
+                  (define-instruction ,masked-name (segment dst src1 src2 imm mask &optional (zeroing 0))
+                    (:emitter
+                     (let ((mask-num (cond ((integerp mask) mask)
+                                           ((k-register-p mask) (reg-id-num (reg-id mask)))
+                                           (t (error "Invalid mask ~S" mask))))
+                           (z-num (if (or (eq zeroing :z) (eql zeroing 1)) 1 0)))
+                       (emit-avx512-inst segment src2 dst ,prefix ,opcode
+                                         :opcode-prefix #x0F3A
+                                         :vvvv src1
+                                         :w ,w
+                                         :ll 0
+                                         :aaa mask-num
+                                         :z z-num
+                                         :disp-n ,disp-n
+                                         :remaining-bytes 1)
+                       (emit-byte segment imm))))))))
+  (def-minmax-scalar vminmaxss #x66 #x53 0 4)
+  (def-minmax-scalar vminmaxsd #x66 #x53 1 8)
+  (def-minmax-scalar vminmaxsh nil  #x53 0 2))
