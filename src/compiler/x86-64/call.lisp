@@ -287,12 +287,151 @@
 ;;;     there are stack values.
 ;;;  -- Reset SP. This must be done whenever other than 1 value is
 ;;;     returned, regardless of the number of values desired.
+#+tls-based-mv-return
+(defun default-unknown-values (vop values node move-temp)
+  (declare (type (or tn-ref null) values))
+  (multiple-value-bind (type name leaf) (sb-c::lvar-fun-type (sb-c::basic-combination-fun node))
+    (let* ((verify (and leaf
+                        (policy node (and (>= safety 1)
+                                          (= debug 3)))
+                        (memq (sb-c::leaf-where-from leaf) '(:declared-verify :defined-here))))
+           (type (if verify
+                     (if (fun-type-p type)
+                         (fun-type-returns type)
+                         *wild-type*)
+                     (sb-c::node-derived-type node)))
+           (min-values (values-type-min-value-count type))
+           (max-values (values-type-max-value-count type))
+           (trust (or (and (= min-values 0)
+                           (= max-values call-arguments-limit))
+                      (not verify)))
+           ;; Count up to the last used value
+           (nvals (loop for i from 1
+                        for tn-ref = values then (tn-ref-across tn-ref)
+                        while tn-ref
+                        unless (eq (tn-kind (tn-ref-tn tn-ref)) :unused)
+                        maximize i)))
+      (flet ((check-nargs ()
+               (assemble ()
+                 (let* ((*location-context* (list* (make-restart-location SKIP)
+                                                   name
+                                                   (type-specifier type)))
+                        (err-lab (generate-error-code vop 'invalid-arg-count-error))
+                        (min min-values)
+                        (max (and (< max-values call-arguments-limit)
+                                  max-values)))
+                   (cond ((eql min max)
+                          (if (zerop max)
+                              (inst test :dword rcx-tn rcx-tn)
+                              (inst cmp :dword rcx-tn (fixnumize max)))
+                          (inst jmp :ne err-lab))
+                         (max
+                          (let ((nargs move-temp))
+                            (if (zerop min)
+                                (setf nargs rcx-tn)
+                                (inst lea :dword move-temp (ea (fixnumize (- min)) rcx-tn)))
+                            (inst cmp :dword nargs (fixnumize (- max min)))
+                            (inst jmp :a err-lab)))
+                         (t
+                          (cond ((= min 1)
+                                 (inst test :dword rcx-tn rcx-tn)
+                                 (inst jmp :e err-lab))
+                                ((plusp min)
+                                 (inst cmp :dword rcx-tn (fixnumize min))
+                                 (inst jmp :b err-lab))))))
+                 SKIP)))
+        (cond
+          ((<= nvals 1)
+           (note-this-location vop :single-value-return)
+           (cond
+             ((and trust
+                   (<= (sb-kernel:values-type-max-value-count type)
+                       register-arg-count)))
+             ((and trust
+                   (not (sb-kernel:values-type-may-be-single-value-p type))))
+             (t
+              (unless trust
+                (inst mov move-temp (fixnumize 1))
+                (inst cmov :nc rcx-tn move-temp)
+                (check-nargs)))))
+          ((<= nvals register-arg-count)
+           (note-this-location vop :unknown-return)
+           (when (or (not trust)
+                     (sb-kernel:values-type-may-be-single-value-p type))
+             (assemble ()
+               (inst jmp :c regs-defaulted)
+               ;; Default the unsupplied registers.
+               (loop repeat (1- nvals)
+                     for tn-ref = (tn-ref-across values) then (tn-ref-across tn-ref)
+                     unless (eq (tn-kind (tn-ref-tn tn-ref)) :unused)
+                     do (inst mov (tn-ref-tn tn-ref) null-tn))
+               regs-defaulted))
+
+           (unless trust
+             (inst mov move-temp (fixnumize 1))
+             (inst cmov :nc rcx-tn move-temp)
+             (check-nargs)))
+          (t
+           (collect ((defaults))
+             (let ((default-stack-slots (gen-label))
+                   (used-registers
+                     (loop repeat (1- register-arg-count)
+                           for tn = (tn-ref-tn (setf values (tn-ref-across values)))
+                           unless (eq (tn-kind tn) :unused)
+                           collect tn
+                           finally (setf values (tn-ref-across values)))))
+               (assemble ()
+                 (note-this-location vop :unknown-return)
+                 (unless trust
+                   (inst mov move-temp (fixnumize 1))
+                   (inst cmov :nc rcx-tn move-temp))
+                 ;; If it returned exactly one value the registers and the
+                 ;; stack slots need to be filled with NIL.
+                 (unless (and trust
+                              (> min-values 1))
+                   (inst jmp :nc default-stack-slots))
+                 REGS-DEFAULTED
+                 (do ((i register-arg-count (1+ i))
+                      (val values (tn-ref-across val)))
+                     ((null val))
+                   (let ((tn (tn-ref-tn val)))
+                     (unless (eq (tn-kind tn) :unused)
+                       (when (or (not trust)
+                                 (>= i min-values))
+                         (let ((default-lab (gen-label)))
+                           (defaults (cons default-lab tn))
+                           ;; Note that the max number of values received
+                           ;; is assumed to fit in a :dword register.
+                           (inst cmp :dword rcx-tn (fixnumize i))
+                           (inst jmp :be default-lab)))
+                       (let ((src (thread-slot-ea (+ thread-mv-return-values-slot
+                                                     (- i register-arg-count)))))
+                         (inst mov tn (sc-case tn
+                                        (control-stack (inst mov move-temp src) move-temp)
+                                        (t src)))))))
+                 DEFAULTING-DONE
+                 (unless trust
+                   (check-nargs))
+                 DONE
+                 (let ((defaults (defaults)))
+                   (when defaults
+                     (assemble (:elsewhere)
+                       (when (or (not trust)
+                                 (<= min-values 1))
+                         (emit-label default-stack-slots)
+                         (loop for reg in used-registers
+                               do (inst mov reg null-tn)))
+                       (dolist (default defaults)
+                         (emit-label (car default))
+                         (inst mov (cdr default) null-tn))
+                       (inst jmp defaulting-done)))))))))))))
+
+#-tls-based-mv-return
 (defun default-unknown-values (vop values nvals node rbx move-temp)
   (declare (type (or tn-ref null) values)
-           (type unsigned-byte nvals)
-           #+tls-based-mv-return (ignore rbx))
+           (type unsigned-byte nvals))
   (multiple-value-bind (type name leaf) (sb-c::lvar-fun-type (sb-c::basic-combination-fun node))
-   (let* ((verify (and leaf
+    (let* ((verify (and leaf
                         (policy node (and (>= safety 1)
                                           (= debug 3)))
                         (memq (sb-c::leaf-where-from leaf) '(:declared-verify :defined-here))))
@@ -306,160 +445,153 @@
            (trust (or (and (= min-values 0)
                            (= max-values call-arguments-limit))
                       (not verify))))
-     (flet ((check-nargs ()
-              (assemble ()
-                (let* ((*location-context* (list* (make-restart-location SKIP)
-                                                  name
-                                                  (type-specifier type)))
-                       (err-lab (generate-error-code vop 'invalid-arg-count-error))
-                       (min min-values)
-                       (max (and (< max-values call-arguments-limit)
-                                 max-values)))
-                  (cond ((eql min max)
-                         (if (zerop max)
-                             (inst test :dword rcx-tn rcx-tn)
-                             (inst cmp :dword rcx-tn (fixnumize max)))
-                         (inst jmp :ne err-lab))
-                        (max
-                         (let ((nargs move-temp))
-                          (if (zerop min)
-                              (setf nargs rcx-tn)
-                              (inst lea :dword move-temp (ea (fixnumize (- min)) rcx-tn)))
-                          (inst cmp :dword nargs (fixnumize (- max min)))
-                          (inst jmp :a err-lab)))
-                        (t
-                         (cond ((= min 1)
-                                (inst test :dword rcx-tn rcx-tn)
-                                (inst jmp :e err-lab))
-                               ((plusp min)
-                                (inst cmp :dword rcx-tn (fixnumize min))
-                                (inst jmp :b err-lab))))))
-                SKIP)))
-       (cond
-         ((<= nvals 1)
-          (note-this-location vop :single-value-return)
-          (cond
-            ((and trust
-                  (<= (sb-kernel:values-type-max-value-count type)
-                      register-arg-count)))
-            ((and trust
-                  (not (sb-kernel:values-type-may-be-single-value-p type)))
-             #-tls-based-mv-return (inst mov rsp-tn rbx))
-            (t
-             #-tls-based-mv-return (inst cmov :c rsp-tn rbx)
-             (unless trust
-               (inst mov move-temp (fixnumize 1))
-               (inst cmov :nc rcx-tn move-temp)
-               (check-nargs)))))
-         ((<= nvals register-arg-count)
-          (note-this-location vop :unknown-return)
-          (when (or (not trust)
-                    (sb-kernel:values-type-may-be-single-value-p type))
-            (assemble ()
-              (inst jmp :c regs-defaulted)
-              ;; Default the unsupplied registers.
-              (let* ((2nd-tn-ref (tn-ref-across values))
-                     (2nd-tn (tn-ref-tn 2nd-tn-ref))
-                     (2nd-tn-live (neq (tn-kind 2nd-tn) :unused)))
-                (when 2nd-tn-live
-                  (inst mov 2nd-tn null-tn))
-                (when (> nvals 2)
-                  ;; FIXME: simplify this logic- don't use 2nd-tn as a proxy
-                  ;; for NIL now that NULL-TN is a thing.
-                  (loop
-                    for tn-ref = (tn-ref-across 2nd-tn-ref)
-                    then (tn-ref-across tn-ref)
-                    for count from 2 below register-arg-count
-                    unless (eq (tn-kind (tn-ref-tn tn-ref)) :unused)
-                    do
-                    (inst mov (tn-ref-tn tn-ref)
-                          (if 2nd-tn-live 2nd-tn null-tn)))))
-              #-tls-based-mv-return (inst mov rbx rsp-tn)
-              regs-defaulted))
+      (flet ((check-nargs ()
+               (assemble ()
+                 (let* ((*location-context* (list* (make-restart-location SKIP)
+                                                   name
+                                                   (type-specifier type)))
+                        (err-lab (generate-error-code vop 'invalid-arg-count-error))
+                        (min min-values)
+                        (max (and (< max-values call-arguments-limit)
+                                  max-values)))
+                   (cond ((eql min max)
+                          (if (zerop max)
+                              (inst test :dword rcx-tn rcx-tn)
+                              (inst cmp :dword rcx-tn (fixnumize max)))
+                          (inst jmp :ne err-lab))
+                         (max
+                          (let ((nargs move-temp))
+                            (if (zerop min)
+                                (setf nargs rcx-tn)
+                                (inst lea :dword move-temp (ea (fixnumize (- min)) rcx-tn)))
+                            (inst cmp :dword nargs (fixnumize (- max min)))
+                            (inst jmp :a err-lab)))
+                         (t
+                          (cond ((= min 1)
+                                 (inst test :dword rcx-tn rcx-tn)
+                                 (inst jmp :e err-lab))
+                                ((plusp min)
+                                 (inst cmp :dword rcx-tn (fixnumize min))
+                                 (inst jmp :b err-lab))))))
+                 SKIP)))
+        (cond
+          ((<= nvals 1)
+           (note-this-location vop :single-value-return)
+           (cond
+             ((and trust
+                   (<= (sb-kernel:values-type-max-value-count type)
+                       register-arg-count)))
+             ((and trust
+                   (not (sb-kernel:values-type-may-be-single-value-p type)))
+              (inst mov rsp-tn rbx))
+             (t
+              (inst cmov :c rsp-tn rbx)
+              (unless trust
+                (inst mov move-temp (fixnumize 1))
+                (inst cmov :nc rcx-tn move-temp)
+                (check-nargs)))))
+          ((<= nvals register-arg-count)
+           (note-this-location vop :unknown-return)
+           (when (or (not trust)
+                     (sb-kernel:values-type-may-be-single-value-p type))
+             (assemble ()
+               (inst jmp :c regs-defaulted)
+               ;; Default the unsupplied registers.
+               (let* ((2nd-tn-ref (tn-ref-across values))
+                      (2nd-tn (tn-ref-tn 2nd-tn-ref))
+                      (2nd-tn-live (neq (tn-kind 2nd-tn) :unused)))
+                 (when 2nd-tn-live
+                   (inst mov 2nd-tn null-tn))
+                 (when (> nvals 2)
+                   ;; FIXME: simplify this logic- don't use 2nd-tn as a proxy
+                   ;; for NIL now that NULL-TN is a thing.
+                   (loop
+                     for tn-ref = (tn-ref-across 2nd-tn-ref)
+                     then (tn-ref-across tn-ref)
+                     for count from 2 below register-arg-count
+                     unless (eq (tn-kind (tn-ref-tn tn-ref)) :unused)
+                     do
+                     (inst mov (tn-ref-tn tn-ref)
+                           (if 2nd-tn-live 2nd-tn null-tn)))))
+               (inst mov rbx rsp-tn)
+               regs-defaulted))
 
-          #-tls-based-mv-return
-          (when (or (not trust)
-                    (< register-arg-count
-                       (sb-kernel:values-type-max-value-count type)))
-            (inst mov rsp-tn rbx))
-          (unless trust
-            (inst mov move-temp (fixnumize 1))
-            (inst cmov :nc rcx-tn move-temp)
-            (check-nargs)))
-         (t
-          (collect ((defaults))
-            (let ((default-stack-slots (gen-label))
-                  (used-registers
-                    (loop for i from 1 below register-arg-count
-                          for tn = (tn-ref-tn (setf values (tn-ref-across values)))
-                          unless (eq (tn-kind tn) :unused)
-                          collect tn
-                          finally (setf values (tn-ref-across values))))
-                  (used-stack-slots-p
-                    (loop for ref = values then (tn-ref-across ref)
-                          while ref
-                          thereis (neq (tn-kind (tn-ref-tn ref)) :unused))))
-              (assemble ()
-                (note-this-location vop :unknown-return)
-                (unless trust
-                  (inst mov move-temp (fixnumize 1))
-                  (inst cmov :nc rcx-tn move-temp))
-                ;; If it returned exactly one value the registers and the
-                ;; stack slots need to be filled with NIL.
-                (cond ((and trust
-                            (> min-values 1)))
-                      (used-stack-slots-p
-                       (inst jmp :nc default-stack-slots))
-                      (t
-                       (inst jmp :c regs-defaulted)
-                       (loop for reg in used-registers
-                             do (inst mov reg null-tn))
-                       (inst jmp done)))
-                REGS-DEFAULTED
-                (do ((i register-arg-count (1+ i))
-                     (val values (tn-ref-across val)))
-                    ((null val))
-                  (let ((tn (tn-ref-tn val)))
-                    (unless (eq (tn-kind tn) :unused)
-                      (when (or (not trust)
-                                (>= i min-values))
-                        (let ((default-lab (gen-label)))
-                          (defaults (cons default-lab tn))
-                          ;; Note that the max number of values received
-                          ;; is assumed to fit in a :dword register.
-                          (inst cmp :dword rcx-tn (fixnumize i))
-                          (inst jmp :be default-lab)))
-                      #+tls-based-mv-return
-                      (let ((src (thread-slot-ea (+ thread-mv-return-values-slot
-                                                    (- i register-arg-count)))))
-                        (inst mov tn (sc-case tn
-                                      (control-stack (inst mov move-temp src) move-temp)
-                                      (t src))))
-                      #-tls-based-mv-return
-                      (sc-case tn
-                        (control-stack
-                         (loadw move-temp rbx (frame-word-offset (+ sp->fp-offset i)))
-                         (inst mov tn move-temp))
-                        (t
-                         (loadw tn rbx (frame-word-offset (+ sp->fp-offset i))))))))
-                DEFAULTING-DONE
-                #-tls-based-mv-return (move rsp-tn rbx)
-                (unless trust
-                  (check-nargs))
-                DONE
-                (let ((defaults (defaults)))
-                  (when defaults
-                    (assemble (:elsewhere)
-                      (when (or (not trust)
-                                (<= min-values 1))
-                        (emit-label default-stack-slots)
+
+           (when (or (not trust)
+                     (< register-arg-count
+                        (sb-kernel:values-type-max-value-count type)))
+             (inst mov rsp-tn rbx))
+           (unless trust
+             (inst mov move-temp (fixnumize 1))
+             (inst cmov :nc rcx-tn move-temp)
+             (check-nargs)))
+          (t
+           (collect ((defaults))
+             (let ((default-stack-slots (gen-label))
+                   (used-registers
+                     (loop for i from 1 below register-arg-count
+                           for tn = (tn-ref-tn (setf values (tn-ref-across values)))
+                           unless (eq (tn-kind tn) :unused)
+                           collect tn
+                           finally (setf values (tn-ref-across values))))
+                   (used-stack-slots-p
+                     (loop for ref = values then (tn-ref-across ref)
+                           while ref
+                           thereis (neq (tn-kind (tn-ref-tn ref)) :unused))))
+               (assemble ()
+                 (note-this-location vop :unknown-return)
+                 (unless trust
+                   (inst mov move-temp (fixnumize 1))
+                   (inst cmov :nc rcx-tn move-temp))
+                 ;; If it returned exactly one value the registers and the
+                 ;; stack slots need to be filled with NIL.
+                 (cond ((and trust
+                             (> min-values 1)))
+                       (used-stack-slots-p
+                        (inst jmp :nc default-stack-slots))
+                       (t
+                        (inst jmp :c regs-defaulted)
                         (loop for reg in used-registers
                               do (inst mov reg null-tn))
-                        #-tls-based-mv-return (move rbx rsp-tn))
-                      (dolist (default defaults)
-                        (emit-label (car default))
-                        (inst mov (cdr default) null-tn))
-                      (inst jmp defaulting-done)))))))))))))
+                        (inst jmp done)))
+                 REGS-DEFAULTED
+                 (do ((i register-arg-count (1+ i))
+                      (val values (tn-ref-across val)))
+                     ((null val))
+                   (let ((tn (tn-ref-tn val)))
+                     (unless (eq (tn-kind tn) :unused)
+                       (when (or (not trust)
+                                 (>= i min-values))
+                         (let ((default-lab (gen-label)))
+                           (defaults (cons default-lab tn))
+                           ;; Note that the max number of values received
+                           ;; is assumed to fit in a :dword register.
+                           (inst cmp :dword rcx-tn (fixnumize i))
+                           (inst jmp :be default-lab)))
+                       (sc-case tn
+                         (control-stack
+                          (loadw move-temp rbx (frame-word-offset (+ sp->fp-offset i)))
+                          (inst mov tn move-temp))
+                         (t
+                          (loadw tn rbx (frame-word-offset (+ sp->fp-offset i))))))))
+                 DEFAULTING-DONE
+                 (move rsp-tn rbx)
+                 (unless trust
+                   (check-nargs))
+                 DONE
+                 (let ((defaults (defaults)))
+                   (when defaults
+                     (assemble (:elsewhere)
+                       (when (or (not trust)
+                                 (<= min-values 1))
+                         (emit-label default-stack-slots)
+                         (loop for reg in used-registers
+                               do (inst mov reg null-tn))
+                         (move rbx rsp-tn))
+                       (dolist (default defaults)
+                         (emit-label (car default))
+                         (inst mov (cdr default) null-tn))
+                       (inst jmp defaulting-done)))))))))))))
 
 ;;;; unknown values receiving
 
@@ -661,14 +793,14 @@
   (:move-args :local-call)
   (:info arg-locs callee target nvals)
   (:vop-var vop)
-  (:ignore nfp arg-locs args callee)
+  (:ignore nfp arg-locs args callee #+tls-based-mv-return nvals)
   (:node-var node)
   (:temporary (:sc any-reg) move-temp)
   (:generator 5
     (move rbp-tn fp)
     (note-this-location vop :call-site)
     (inst call target)
-    (default-unknown-values vop values nvals node rbx-tn move-temp)))
+    (default-unknown-values vop values #-tls-based-mv-return nvals node #-tls-based-mv-return rbx-tn move-temp)))
 
 ;;; Non-TR local call for a variable number of return values passed according
 ;;; to the unknown values convention. The results are the start of the values
@@ -804,24 +936,27 @@
 
      (:vop-var vop)
      (:node-var node)
-     (:info    ,@(unless (or variable (eq return :tail)) '(arg-locs))
-               ,@(unless (or variable (eq direct :call)) '(nargs))
-               ;; Intuitively you might want FUN to be the first codegen arg,
-               ;; but that won't work, because EMIT-ARG-MOVES wants the
-               ;; passing locs in (FIRST (vop-codegen-info vop)).
-               ,@(when named '(fun))
-               ,@(when (and (eq return :fixed)
-                            (neq direct :return))
-                   '(nvals))
-               step-instrumenting
-               ,@(when (eq direct :call)
-                   '(n-fixed)))
+     (:info ,@(unless (or variable (eq return :tail)) '(arg-locs))
+            ,@(unless (or variable (eq direct :call)) '(nargs))
+            ;; Intuitively you might want FUN to be the first codegen arg,
+            ;; but that won't work, because EMIT-ARG-MOVES wants the
+            ;; passing locs in (FIRST (vop-codegen-info vop)).
+            ,@(when named '(fun))
+            ,@(when (and (eq return :fixed)
+                         (neq direct :return))
+                '(nvals))
+            step-instrumenting
+            ,@(when (eq direct :call)
+                '(n-fixed)))
 
-     (:ignore   ,@(unless (or variable (eq return :tail)) '(arg-locs))
-                ,@(unless variable '(args))
-                ,@(when (or (eq direct :return)
-                            (eq return :unboxed)) '(values))
-                ,@(when (eq args :fixed) '(nargs)))
+     (:ignore ,@(unless (or variable (eq return :tail)) '(arg-locs))
+              ,@(unless variable '(args))
+              ,@(when (or (eq direct :return)
+                          (eq return :unboxed)) '(values))
+              #+tls-based-mv-return
+              ,@(when (and (eq return :fixed)
+                           (neq direct :return)) '(nvals))
+              ,@(when (eq args :fixed) '(nargs)))
 
      ;; For anonymous call, RAX is the function. For named call, RAX will be the linkage
      ;; table base if not stepping, or the linkage cell itself if stepping.
@@ -842,7 +977,8 @@
      ,@(when (and (eq return :fixed)
                   (neq direct :return))
          ;; Save it for DEFAULT-UNKNOWN-VALUES to work
-         `((:temporary (:sc unsigned-reg :offset rbx-offset :from :result) rbx)
+         `(#-tls-based-mv-return
+           (:temporary (:sc unsigned-reg :offset rbx-offset :from :result) rbx)
            (:temporary (:sc any-reg) move-temp)))
 
      ;; With variable call, we have to load the
@@ -989,7 +1125,7 @@
                  (inst mov rcx-tn (fixnumize 1))
                  multiple))
              (ecase return
-               (:fixed `((default-unknown-values vop values nvals node rbx move-temp)))
+               (:fixed `((default-unknown-values vop values #-tls-based-mv-return nvals node #-tls-based-mv-return rbx move-temp)))
                (:unknown
                 '((note-this-location vop :unknown-return)
                   (receive-unknown-values values-start nvals start count node)))
