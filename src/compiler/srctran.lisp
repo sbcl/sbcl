@@ -4277,8 +4277,8 @@
     `(ash x ,len)))
 
 ;;; * deals better with ASH that overflows
-(deftransform ash ((integer amount) ((or word sb-vm:signed-word)
-                                     (constant-arg (integer 1 *))) *
+(deftransform ash ((integer amount) (:or ((word (constant-arg (integer 1 *))) *)
+                                         ((signed-word (constant-arg (integer 1 *))) *)) *
                    :important nil
                    :node node)
   ;; Give modular arithmetic optimizers a chance
