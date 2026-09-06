@@ -666,11 +666,13 @@
                                    (case name
                                      ,@(expand-node (cdr lvars) (cdr specs) spec body))))))))
                    (funcall body))))
-      (destructuring-bind (&key node dest lvar) (if (listp lvar)
-                                               lvar
-                                               (list :lvar lvar))
-        (when dest
-          (setf node `(node-dest ,dest)))
+      (destructuring-bind (&key node dest sole-dest lvar) (if (listp lvar)
+                                                              lvar
+                                                              (list :lvar lvar))
+        (cond (dest
+               (setf node `(node-dest ,dest)))
+              (sole-dest
+               (setf node `(sole-node-dest ,sole-dest))))
         (let* ((pattern-vars (collect-spec-vars spec))
                (body-fun (gensym "MATCH-BODY"))
                (leaf-caller (lambda () `(,body-fun name combination args ,@pattern-vars rotated)))
@@ -4349,3 +4351,6 @@ is :ANY, the function name is not checked."
     (when lvar
       (and (atom (lvar-uses lvar))
            (lvar-dest lvar)))))
+
+(defun lvar-single-value-type (lvar)
+  (sb-kernel::convert-to-single-value-type (lvar-derived-type lvar)))

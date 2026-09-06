@@ -3349,13 +3349,13 @@
              (when (= (logcount (abs (lvar-value (second args)))) 1)
                (splice-fun-args x :any #'first)
                `(logcount (%negate x)))))
-          (combination-match (:dest node)
+          (combination-match (:sole-dest node)
               (:or (> (logcount x) (integer-length x))
                    (< (integer-length x) (logcount x)))
             (erase-node-type node (values-specifier-type '(values boolean &optional)))
             (transform-to-identity (if (eq name 'integer-length) 0 1) dest 2)
             (return nil))
-          (combination-match (:dest node)
+          (combination-match (:sole-dest node)
               (:or (< (logcount x) (integer-length x))
                    (> (integer-length x) (logcount x)))
             (erase-node-type node (values-specifier-type '(values boolean &optional)))
@@ -3377,7 +3377,7 @@
         (combination-case (nil :node dest)
           ;; (= (logcount unsigned) 0) => (= x 0)
           (eq (* 0)
-           (erase-node-type node (lvar-derived-type x))
+           (erase-node-type node (lvar-single-value-type x))
            'x)))
       (give-up-ir1-transform)))
 
@@ -3386,7 +3386,7 @@
    (let ((dest (sole-node-dest node)))
      (cond
        ((or
-         (combination-match (:dest node)
+         (combination-match (:sole-dest node)
              (eq (logcount x) (integer-length x))
            (erase-node-type node (values-specifier-type '(values boolean &optional)))
            (transform-to-identity (if rotated 1 0) dest 2)
@@ -3424,7 +3424,7 @@
   (or (let ((dest (sole-node-dest node)))
         (cond
           ;; Don't delay, integer-length is transformed to clz/cls on arm64
-          ((combination-match (:dest node)
+          ((combination-match (:sole-dest node)
                (eq (logcount x) (integer-length x))
              (erase-node-type node (values-specifier-type '(values boolean &optional)))
              (transform-to-identity (if rotated 1 0) dest 2)
@@ -3434,7 +3434,7 @@
            (combination-case (nil :node dest)
              ;; (= (logcount unsigned) 0) => (= x 0)
              (eq (* 0)
-              (erase-node-type node (lvar-derived-type x))
+              (erase-node-type node (lvar-single-value-type x))
               'x)
              (eq (* 1)
               (erase-node-type node (values-specifier-type '(values boolean &optional)))

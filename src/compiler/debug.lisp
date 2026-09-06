@@ -1389,12 +1389,14 @@
   (or (and (listp showp) (member fun-name showp :test 'equal))
       (eq showp t)))
 
-(defun show-transform (kind name new-form &optional combination)
+(defvar *debug-print-transform* nil)
+
+(defun show-transform (kind name new-form &optional combination transform)
   (let ((*print-length* 100)
         (*print-level* 50)
         (*print-right-margin* 128)
         (*print-readably* nil))
-    (format *trace-output* "~&xform (~a) ~S~@[ -> ~S~]~% => ~S~%"
+    (format *trace-output* "~&xform (~a) ~S~@[ -> ~S~]~@[  ~s~]~% => ~S~%"
             kind
             (if combination
                 (cons name
@@ -1405,6 +1407,8 @@
                 name)
             (and combination
                  (type-specifier (node-derived-type combination)))
+            (when *debug-print-transform*
+              transform)
             new-form)))
 
 (defun show-type-derivation (combination type)
