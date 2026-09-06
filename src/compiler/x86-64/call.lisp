@@ -305,12 +305,16 @@
            (trust (or (and (= min-values 0)
                            (= max-values call-arguments-limit))
                       (not verify)))
+           (used-count 0)
+           last-used
            ;; Count up to the last used value
            (nvals (loop for i from 1
                         for tn-ref = values then (tn-ref-across tn-ref)
                         while tn-ref
                         unless (eq (tn-kind (tn-ref-tn tn-ref)) :unused)
-                        maximize i)))
+                        maximize i
+                        and do (incf used-count)
+                               (setf last-used (tn-ref-tn tn-ref)))))
       (flet ((check-nargs ()
                (assemble ()
                  (let* ((*location-context* (list* (make-restart-location SKIP)
@@ -345,10 +349,9 @@
            (note-this-location vop :single-value-return)
            (cond
              ((and trust
-                   (<= (sb-kernel:values-type-max-value-count type)
-                       register-arg-count)))
+                   (<= (values-type-max-value-count type) register-arg-count)))
              ((and trust
-                   (not (sb-kernel:values-type-may-be-single-value-p type))))
+                   (not (values-type-may-be-single-value-p type))))
              (t
               (unless trust
                 (inst mov move-temp (fixnumize 1))
@@ -357,74 +360,87 @@
           ((<= nvals register-arg-count)
            (note-this-location vop :unknown-return)
            (when (or (not trust)
-                     (sb-kernel:values-type-may-be-single-value-p type))
-             (assemble ()
-               (inst jmp :c regs-defaulted)
-               ;; Default the unsupplied registers.
-               (loop repeat (1- nvals)
-                     for tn-ref = (tn-ref-across values) then (tn-ref-across tn-ref)
-                     unless (eq (tn-kind (tn-ref-tn tn-ref)) :unused)
-                     do (inst mov (tn-ref-tn tn-ref) null-tn))
-               regs-defaulted))
+                     (values-type-may-be-single-value-p type))
+             (if (= used-count 1)
+                 (inst cmov :nc last-used null-tn)
+                 (assemble ()
+                   (inst jmp :c regs-defaulted)
+                   ;; Default the unsupplied registers.
+                   (loop repeat (1- nvals)
+                         for tn-ref = (tn-ref-across values) then (tn-ref-across tn-ref)
+                         unless (eq (tn-kind (tn-ref-tn tn-ref)) :unused)
+                         do (inst mov (tn-ref-tn tn-ref) null-tn))
+                   regs-defaulted)))
 
            (unless trust
              (inst mov move-temp (fixnumize 1))
              (inst cmov :nc rcx-tn move-temp)
              (check-nargs)))
           (t
-           (collect ((defaults))
-             (let ((default-stack-slots (gen-label))
-                   (used-registers
-                     (loop repeat (1- register-arg-count)
-                           for tn = (tn-ref-tn (setf values (tn-ref-across values)))
-                           unless (eq (tn-kind tn) :unused)
-                           collect tn
-                           finally (setf values (tn-ref-across values)))))
+           (if (and (= used-count 1)
+                    (or (not trust)
+                        (>= (1- nvals) min-values))
+                    (not (sc-is last-used control-stack)))
                (assemble ()
-                 (note-this-location vop :unknown-return)
-                 (unless trust
-                   (inst mov move-temp (fixnumize 1))
-                   (inst cmov :nc rcx-tn move-temp))
-                 ;; If it returned exactly one value the registers and the
-                 ;; stack slots need to be filled with NIL.
-                 (unless (and trust
-                              (> min-values 1))
-                   (inst jmp :nc default-stack-slots))
-                 REGS-DEFAULTED
-                 (do ((i register-arg-count (1+ i))
-                      (val values (tn-ref-across val)))
-                     ((null val))
-                   (let ((tn (tn-ref-tn val)))
-                     (unless (eq (tn-kind tn) :unused)
-                       (when (or (not trust)
-                                 (>= i min-values))
-                         (let ((default-lab (gen-label)))
-                           (defaults (cons default-lab tn))
-                           ;; Note that the max number of values received
-                           ;; is assumed to fit in a :dword register.
-                           (inst cmp :dword rcx-tn (fixnumize i))
-                           (inst jmp :be default-lab)))
-                       (let ((src (thread-slot-ea (+ thread-mv-return-values-slot
-                                                     (- i register-arg-count)))))
-                         (inst mov tn (sc-case tn
-                                        (control-stack (inst mov move-temp src) move-temp)
-                                        (t src)))))))
-                 DEFAULTING-DONE
-                 (unless trust
-                   (check-nargs))
-                 DONE
-                 (let ((defaults (defaults)))
-                   (when defaults
-                     (assemble (:elsewhere)
-                       (when (or (not trust)
-                                 (<= min-values 1))
-                         (emit-label default-stack-slots)
-                         (loop for reg in used-registers
-                               do (inst mov reg null-tn)))
-                       (dolist (default defaults)
-                         (emit-label (car default))
-                         (inst mov (cdr default) null-tn))
-                       (inst jmp defaulting-done)))))))))))))
+                 (inst mov last-used null-tn)
+                 (inst jmp :nc one)
+                 (inst cmp :dword rcx-tn (fixnumize (1- nvals)))
+                 (inst cmov :g last-used (thread-slot-ea (+ thread-mv-return-values-slot
+                                                            (- (1- nvals) register-arg-count))))
+                 one)
+               (collect ((defaults))
+                 (let ((default-stack-slots (gen-label))
+                       (used-registers
+                         (loop repeat (1- register-arg-count)
+                               for tn = (tn-ref-tn (setf values (tn-ref-across values)))
+                               unless (eq (tn-kind tn) :unused)
+                               collect tn
+                               finally (setf values (tn-ref-across values)))))
+                   (assemble ()
+                     (note-this-location vop :unknown-return)
+                     (unless trust
+                       (inst mov move-temp (fixnumize 1))
+                       (inst cmov :nc rcx-tn move-temp))
+                     ;; If it returned exactly one value the registers and the
+                     ;; stack slots need to be filled with NIL.
+                     (unless (and trust
+                                  (> min-values 1))
+                       (inst jmp :nc default-stack-slots))
+                     REGS-DEFAULTED
+                     (do ((i register-arg-count (1+ i))
+                          (val values (tn-ref-across val)))
+                         ((null val))
+                       (let ((tn (tn-ref-tn val)))
+                         (unless (eq (tn-kind tn) :unused)
+                           (when (or (not trust)
+                                     (>= i min-values))
+                             (let ((default-lab (gen-label)))
+                               (defaults (cons default-lab tn))
+                               ;; Note that the max number of values received
+                               ;; is assumed to fit in a :dword register.
+                               (inst cmp :dword rcx-tn (fixnumize i))
+                               (inst jmp :be default-lab)))
+                           (let ((src (thread-slot-ea (+ thread-mv-return-values-slot
+                                                         (- i register-arg-count)))))
+                             (inst mov tn (sc-case tn
+                                            (control-stack (inst mov move-temp src) move-temp)
+                                            (t src)))))))
+                     DEFAULTING-DONE
+                     (unless trust
+                       (check-nargs))
+                     DONE
+                     (let ((defaults (defaults)))
+                       (when defaults
+                         (assemble (:elsewhere)
+                           (when (or (not trust)
+                                     (<= min-values 1))
+                             (emit-label default-stack-slots)
+                             (loop for reg in used-registers
+                                   do (inst mov reg null-tn)))
+                           (dolist (default defaults)
+                             (emit-label (car default))
+                             (inst mov (cdr default) null-tn))
+                           (inst jmp defaulting-done))))))))))))))
 
 #-tls-based-mv-return
 (defun default-unknown-values (vop values nvals node rbx move-temp)
