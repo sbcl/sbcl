@@ -43,7 +43,7 @@
 #define UD2_INST 0x0b0f
 #define BREAKPOINT_WIDTH 1
 
-int avx_supported = 0, avx2_supported = 0, avx512_supported = 0;
+int avx_supported = 0, avx2_supported = 0, avx512_supported = 0, avx512fp16_supported = 0;
 
 static void cpuid(unsigned info, unsigned subinfo,
                   unsigned *eax, unsigned *ebx, unsigned *ecx, unsigned *edx)
@@ -131,6 +131,9 @@ void tune_asm_routines_for_microarch(void)
                 if ((ebx & (1u << 16)) &&       // AVX512F
                     ((xcr0 & 0xE6) == 0xE6)) {  // OS supports ZMM
                     avx512_supported = 1;
+                    if (edx & (1u << 23)) {     // AVX512_FP16
+                        avx512fp16_supported = 1;
+                    }
                 }
             }
         }
