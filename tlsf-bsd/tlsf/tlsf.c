@@ -120,14 +120,14 @@ typedef struct block_header_t {
     unsigned char widetag;
     unsigned char _flags; // must have at most bits 0, 1, 2 on
     unsigned char unused; // must be zero
-    unsigned char gen; // low 4 must be 0..5 and bit 0x4 can be on
+    unsigned char gen; // low 4 must be 0..6 and bit index 4 (VISITED) can be on
     uint32_t _nwords; // including the header
 #else
     // For this word to read as an object header, the size and widetag
     // are flipped relative to little-endian.
     // I did not actually test this - I am merely guessing that it's right.
     uint32_t _nwords; // including the header
-    unsigned char gen; // low 4 must be 0..5 and bit 0x4 can be on
+    unsigned char gen; // low 4 must be 0..6 and bit index 4 (VISITED) can be on
     unsigned char unused; // must be zero
     unsigned char _flags; // must have at most bits 0, 1, 2 on
     unsigned char widetag;

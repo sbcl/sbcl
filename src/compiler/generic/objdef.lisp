@@ -145,14 +145,13 @@ Code header representation:
   +---------------------------------+
   max total payload size in words = #x3fffff
 
-  |            total words          | gc_gen | 0 | 0 | widetag |
-  |            (4 bytes)            |        |   |   |         |
+  |         total words          | gc_gen | 0 | TLSF | widetag |
+  |         (4 bytes)            |        |   | bits |         |
   +------------------------------------------------------------+  [64-bit words]
-  |                                 |   N boxed header bytes   |
-  |                                 |        (4 bytes)         |
+  |                              |      N boxed header bytes   |
+  |                              |           (4 bytes)         |
   +------------------------------------------------------------+
 
-  the two zero bytes are reserved for future use
   max total payload size in words = uint_max
     (should probably made the same as for 32-bit word size for consistency)
 
