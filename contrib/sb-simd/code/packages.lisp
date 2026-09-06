@@ -252,6 +252,12 @@
    #:avx-supported-p
    #:avx2-supported-p
    #:fma-supported-p
+   #:avx512f-supported-p
+   #:avx512dq-supported-p
+   #:avx512cd-supported-p
+   #:avx512bw-supported-p
+   #:avx512vl-supported-p
+   #:avx512fp16-supported-p
    #:neon-supported-p))
 
 (progn
@@ -2121,6 +2127,470 @@
      #:f64.4-fmaddsub
      #:f64.4-fmsubadd))
 
+  #+x86-64
+  (defpackage #:sb-simd-avx512f
+    (:use #:common-lisp #:sb-simd-internals #:sb-simd-fma)
+    (:shadow
+     #:f32!
+     #:f64!
+     #:u32!
+     #:u64!)
+    #0#
+    #1#
+    #8#
+    #9#
+    #10#
+    #12=
+    (:export
+     #:f32!
+     #:f64!
+     #:u32!
+     #:u64!
+     #:p512
+     ;; f32.16
+     #:make-f32.16
+     #:f32.16
+     #:f32.16!
+     #:f32.16-values
+     #:f32.16-broadcast
+     #:f32.16-if
+     #:f32.16-from-s32.16
+     #:f32.16-from-u32.16
+     #:f32.16-and
+     #:f32.16-or
+     #:f32.16-xor
+     #:f32.16-andc1
+     #:f32.16-not
+     #:f32.16-max
+     #:f32.16-min
+     #:f32.16+
+     #:f32.16-
+     #:f32.16*
+     #:f32.16/
+     #:f32.16-horizontal-and
+     #:f32.16-horizontal-or
+     #:f32.16-horizontal-xor
+     #:f32.16-horizontal-max
+     #:f32.16-horizontal-min
+     #:f32.16-horizontal+
+     #:f32.16-horizontal*
+     #:f32.16=
+     #:f32.16/=
+     #:f32.16<
+     #:f32.16<=
+     #:f32.16>
+     #:f32.16>=
+     #:f32.16-sqrt
+     #:f32.16-reciprocal
+     #:f32.16-rsqrt
+     #:f32.16-round
+     #:f32.16-floor
+     #:f32.16-ceiling
+     #:f32.16-truncate
+     #:f32.8-from-f32.16
+     #:f32.16-insert-f32.8
+     #:f32.16-fmadd
+     #:f32.16-fnmadd
+     #:f32.16-fmsub
+     #:f32.16-fmaddsub
+     #:f32.16-fmsubadd
+     #:f32.16-incf
+     #:f32.16-decf
+     #:f32.16-aref #:f32.16-row-major-aref #:f32.16-sap-ref
+     #:f32.16-non-temporal-aref #:f32.16-non-temporal-row-major-aref #:f32.16-non-temporal-sap-ref
+     ;; f64.8
+     #:make-f64.8
+     #:f64.8
+     #:f64.8!
+     #:f64.8-values
+     #:f64.8-broadcast
+     #:f64.8-if
+     #:f64.8-from-s64.8
+     #:f64.8-from-u64.8
+     #:f64.8-and
+     #:f64.8-or
+     #:f64.8-xor
+     #:f64.8-andc1
+     #:f64.8-not
+     #:f64.8-max
+     #:f64.8-min
+     #:f64.8+
+     #:f64.8-
+     #:f64.8*
+     #:f64.8/
+     #:f64.8-horizontal-and
+     #:f64.8-horizontal-or
+     #:f64.8-horizontal-xor
+     #:f64.8-horizontal-max
+     #:f64.8-horizontal-min
+     #:f64.8-horizontal+
+     #:f64.8-horizontal*
+     #:f64.8=
+     #:f64.8/=
+     #:f64.8<
+     #:f64.8<=
+     #:f64.8>
+     #:f64.8>=
+     #:f64.8-sqrt
+     #:f64.8-round
+     #:f64.8-floor
+     #:f64.8-ceiling
+     #:f64.8-truncate
+     #:f64.4-from-f64.8
+     #:f64.8-insert-f64.4
+     #:f64.8-fmadd
+     #:f64.8-fnmadd
+     #:f64.8-fmsub
+     #:f64.8-fmaddsub
+     #:f64.8-fmsubadd
+     #:f64.8-incf
+     #:f64.8-decf
+     #:f64.8-aref #:f64.8-row-major-aref #:f64.8-sap-ref
+     #:f64.8-non-temporal-aref #:f64.8-non-temporal-row-major-aref #:f64.8-non-temporal-sap-ref
+     ;; u32.16
+     #:make-u32.16
+     #:u32.16
+     #:u32.16!
+     #:u32.16-values
+     #:u32.16-broadcast
+     #:u32.16-if
+     #:u32.16-and
+     #:u32.16-or
+     #:u32.16-xor
+     #:u32.16-andc1
+     #:u32.16-not
+     #:u32.16-max
+     #:u32.16-min
+     #:u32.16+
+     #:u32.16-
+     #:u32.16*
+     #:u32.16=
+     #:u32.16/=
+     #:u32.16>
+     #:u32.16<
+     #:u32.16>=
+     #:u32.16<=
+     #:u32.16-shiftl
+     #:u32.16-shiftr
+     #:u32.8-from-u32.16
+     #:u32.16-insert-u32.8
+     #:u32.16-incf
+     #:u32.16-decf
+     #:u32.16-aref #:u32.16-row-major-aref #:u32.16-sap-ref
+     #:u32.16-non-temporal-aref #:u32.16-non-temporal-row-major-aref #:u32.16-non-temporal-sap-ref
+     ;; u64.8
+     #:make-u64.8
+     #:u64.8
+     #:u64.8!
+     #:u64.8-values
+     #:u64.8-broadcast
+     #:u64.8-if
+     #:u64.8-and
+     #:u64.8-or
+     #:u64.8-xor
+     #:u64.8-andc1
+     #:u64.8-not
+     #:u64.8-max
+     #:u64.8-min
+     #:u64.8+
+     #:u64.8-
+     #:u64.8=
+     #:u64.8/=
+     #:u64.8>
+     #:u64.8<
+     #:u64.8>=
+     #:u64.8<=
+     #:u64.8-shiftl
+     #:u64.8-shiftr
+     #:u64.4-from-u64.8
+     #:u64.8-insert-u64.4
+     #:u64.8-incf
+     #:u64.8-decf
+     #:u64.8-aref #:u64.8-row-major-aref #:u64.8-sap-ref
+     #:u64.8-non-temporal-aref #:u64.8-non-temporal-row-major-aref #:u64.8-non-temporal-sap-ref
+     ;; s32.16
+     #:make-s32.16
+     #:s32.16
+     #:s32.16!
+     #:s32.16-values
+     #:s32.16-broadcast
+     #:s32.16-if
+     #:s32.16-and
+     #:s32.16-or
+     #:s32.16-xor
+     #:s32.16-andc1
+     #:s32.16-not
+     #:s32.16-max
+     #:s32.16-min
+     #:s32.16+
+     #:s32.16-
+     #:s32.16*
+     #:s32.16=
+     #:s32.16/=
+     #:s32.16>
+     #:s32.16<
+     #:s32.16>=
+     #:s32.16<=
+     #:s32.16-shiftl
+     #:s32.16-shiftr
+     #:s32.8-from-s32.16
+     #:s32.16-insert-s32.8
+     #:s32.16-incf
+     #:s32.16-decf
+     #:s32.16-aref #:s32.16-row-major-aref #:s32.16-sap-ref
+     #:s32.16-non-temporal-aref #:s32.16-non-temporal-row-major-aref #:s32.16-non-temporal-sap-ref
+     ;; s64.8
+     #:make-s64.8
+     #:s64.8
+     #:s64.8!
+     #:s64.8-values
+     #:s64.8-broadcast
+     #:s64.8-if
+     #:s64.8-and
+     #:s64.8-or
+     #:s64.8-xor
+     #:s64.8-andc1
+     #:s64.8-not
+     #:s64.8-max
+     #:s64.8-min
+     #:s64.8+
+     #:s64.8-
+     #:s64.8=
+     #:s64.8/=
+     #:s64.8>
+     #:s64.8<
+     #:s64.8>=
+     #:s64.8<=
+     #:s64.8-shiftl
+     #:s64.8-shiftr
+     #:s64.4-from-s64.8
+     #:s64.8-insert-s64.4
+     #:s64.8-incf
+     #:s64.8-decf
+     #:s64.8-aref #:s64.8-row-major-aref #:s64.8-sap-ref
+     #:s64.8-non-temporal-aref #:s64.8-non-temporal-row-major-aref #:s64.8-non-temporal-sap-ref))
+
+  #+x86-64
+  (defpackage #:sb-simd-avx512bw
+    (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx512f)
+    (:shadow
+     #:u8!
+     #:u16!)
+    #0#
+    #1#
+    #8#
+    #9#
+    #10#
+    #12#
+    #13=
+    (:export
+     #:u8!
+     #:u16!
+     ;; u8.64
+     #:make-u8.64
+     #:u8.64
+     #:u8.64!
+     #:u8.64-values
+     #:u8.64-broadcast
+     #:u8.64-if
+     #:u8.64-and
+     #:u8.64-or
+     #:u8.64-xor
+     #:u8.64-andc1
+     #:u8.64-not
+     #:u8.64-max
+     #:u8.64-min
+     #:u8.64+
+     #:u8.64-
+     #:u8.64=
+     #:u8.64/=
+     #:u8.64>
+     #:u8.64<
+     #:u8.64>=
+     #:u8.64<=
+     #:u8.32-from-u8.64
+     #:u8.64-insert-u8.32
+     #:u8.64-incf
+     #:u8.64-decf
+     #:u8.64-aref #:u8.64-row-major-aref #:u8.64-sap-ref
+     #:u8.64-non-temporal-aref #:u8.64-non-temporal-row-major-aref #:u8.64-non-temporal-sap-ref
+     ;; u16.32
+     #:make-u16.32
+     #:u16.32
+     #:u16.32!
+     #:u16.32-values
+     #:u16.32-broadcast
+     #:u16.32-if
+     #:u16.32-and
+     #:u16.32-or
+     #:u16.32-xor
+     #:u16.32-andc1
+     #:u16.32-not
+     #:u16.32-max
+     #:u16.32-min
+     #:u16.32+
+     #:u16.32-
+     #:u16.32=
+     #:u16.32/=
+     #:u16.32>
+     #:u16.32<
+     #:u16.32>=
+     #:u16.32<=
+     #:u16.16-from-u16.32
+     #:u16.32-insert-u16.16
+     #:u16.32-incf
+     #:u16.32-decf
+     #:u16.32-aref #:u16.32-row-major-aref #:u16.32-sap-ref
+     #:u16.32-non-temporal-aref #:u16.32-non-temporal-row-major-aref #:u16.32-non-temporal-sap-ref
+     ;; s8.64
+     #:make-s8.64
+     #:s8.64
+     #:s8.64!
+     #:s8.64-values
+     #:s8.64-broadcast
+     #:s8.64-if
+     #:s8.64-and
+     #:s8.64-or
+     #:s8.64-xor
+     #:s8.64-andc1
+     #:s8.64-not
+     #:s8.64-max
+     #:s8.64-min
+     #:s8.64+
+     #:s8.64-
+     #:s8.64=
+     #:s8.64/=
+     #:s8.64>
+     #:s8.64<
+     #:s8.64>=
+     #:s8.64<=
+     #:s8.32-from-s8.64
+     #:s8.64-insert-s8.32
+     #:s8.64-incf
+     #:s8.64-decf
+     #:s8.64-aref #:s8.64-row-major-aref #:s8.64-sap-ref
+     #:s8.64-non-temporal-aref #:s8.64-non-temporal-row-major-aref #:s8.64-non-temporal-sap-ref
+     ;; s16.32
+     #:make-s16.32
+     #:s16.32
+     #:s16.32!
+     #:s16.32-values
+     #:s16.32-broadcast
+     #:s16.32-if
+     #:s16.32-and
+     #:s16.32-or
+     #:s16.32-xor
+     #:s16.32-andc1
+     #:s16.32-not
+     #:s16.32-max
+     #:s16.32-min
+     #:s16.32+
+     #:s16.32-
+     #:s16.32=
+     #:s16.32/=
+     #:s16.32>
+     #:s16.32<
+     #:s16.32>=
+     #:s16.32<=
+     #:s16.16-from-s16.32
+     #:s16.32-insert-s16.16
+     #:s16.32-incf
+     #:s16.32-decf
+     #:s16.32-aref #:s16.32-row-major-aref #:s16.32-sap-ref
+     #:s16.32-non-temporal-aref #:s16.32-non-temporal-row-major-aref #:s16.32-non-temporal-sap-ref))
+
+  #+x86-64
+  (defpackage #:sb-simd-avx512dq
+    (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx512bw)
+    #0#
+    #1#
+    #8#
+    #9#
+    #10#
+    #12#
+    #13#
+    #14=
+    (:export
+     #:u64.8*
+     #:s64.8*))
+
+  #+x86-64
+  (defpackage #:sb-simd-avx512fp16
+    (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx512dq)
+    #0#
+    #1#
+    #8#
+    #9#
+    #10#
+    #12#
+    #13#
+    #14#
+    #15=
+    (:export
+     #:f16
+     ;; f16.32
+     #:f16.32
+     #:f16.32!
+     #:f16.32-broadcast
+     #:f16.32+
+     #:f16.32-
+     #:f16.32*
+     #:f16.32/
+     #:f16.32-sqrt
+     #:f16.32-min
+     #:f16.32-max
+     #:f16.32-rcp
+     #:f16.32-rsqrt
+     #:f16.32-scalef
+     #:f16.32-fmadd
+     #:f16.32-fmsub
+     #:f16.32-fnmadd
+     #:f16.32-fnmsub
+     #:f16.32-and
+     #:f16.32-or
+     #:f16.32-xor
+     #:f16.32-andc1
+     #:f16.32-not
+     ;; f16.16
+     #:f16.16
+     #:f16.16!
+     #:f16.16-broadcast
+     #:f16.16+
+     #:f16.16-
+     #:f16.16*
+     #:f16.16/
+     #:f16.16-sqrt
+     #:f16.16-min
+     #:f16.16-max
+     #:f16.16-rcp
+     #:f16.16-rsqrt
+     #:f16.16-fmadd
+     #:f16.16-fmsub
+     #:f16.16-fnmadd
+     #:f16.16-fnmsub
+     ;; f16.8
+     #:f16.8
+     #:f16.8!
+     #:f16.8-broadcast
+     #:f16.8+
+     #:f16.8-
+     #:f16.8*
+     #:f16.8/
+     #:f16.8-sqrt
+     #:f16.8-min
+     #:f16.8-max
+     #:f16.8-rcp
+     #:f16.8-rsqrt
+     #:f16.8-fmadd
+     #:f16.8-fmsub
+     #:f16.8-fnmadd
+     #:f16.8-fnmsub
+     ;; conversions
+     #:f32.16-from-f16.16
+     #:f16.16-from-f32.16
+     #:f16.16-from-s32.16
+     #:s32.16-from-f16.16))
+
   #+arm64
   (defpackage #:sb-simd-arm64
     (:use #:common-lisp #:sb-simd-internals #:sb-simd)
@@ -2688,6 +3158,7 @@
 
 (dolist (p '("SB-SIMD" "SB-SIMD-NEON" "SB-SIMD-ARM64"
              "SB-SIMD-AVX" "SB-SIMD-AVX2" "SB-SIMD-FMA"
+             "SB-SIMD-AVX512F" "SB-SIMD-AVX512BW" "SB-SIMD-AVX512DQ"
              "SB-SIMD-INTERNALS" "SB-SIMD-SSE" "SB-SIMD-SSE2"
              "SB-SIMD-SSE3" "SB-SIMD-SSE4.1" "SB-SIMD-SSE4.2"
              "SB-SIMD-SSSE3" "SB-SIMD-X86-64"))

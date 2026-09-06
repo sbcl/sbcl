@@ -1962,5 +1962,15 @@
 (#(6A3E03D5 73D42188 937BB764 A4528420 D0F360C2 D1F36255 D5F368A1 D7F36BC7)
  "(ABS * ASH TRUNCATE / %NEGATE + -)"
  "((& (- val (>> val 28)) 7))")
+(#(5 6 F F38 F3A 9FEA759A A2EA7A53)
+ "(6 :MAP6 5 :MAP5 3898 3896 15)"
+ "((let ((tab #a((4) (unsigned-byte 8) 3 0 7 0)))
+  (+= val #x4c7a405c)
+  (^= val (>> val 16))
+  (+= val (<< val 8))
+  (^= val (>> val 4))
+  (let ((b (& (>> val 8) #x3)))
+   (let ((a (>> (u32+ val (<< val 7)) 30)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF

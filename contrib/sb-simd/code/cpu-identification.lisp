@@ -40,7 +40,32 @@
 
   (defun fma-supported-p ()
     (and (>= (cpuid 0) 1)
-         (logbitp 12 (nth-value 2 (cpuid 1))))))
+         (logbitp 12 (nth-value 2 (cpuid 1)))))
+
+  (defun avx512f-supported-p ()
+    (and (>= (cpuid 0) 7)
+         (logbitp 16 (nth-value 1 (cpuid 7 0)))))
+
+  (defun avx512dq-supported-p ()
+    (and (>= (cpuid 0) 7)
+         (logbitp 17 (nth-value 1 (cpuid 7 0)))))
+
+  (defun avx512cd-supported-p ()
+    (and (>= (cpuid 0) 7)
+         (logbitp 28 (nth-value 1 (cpuid 7 0)))))
+
+  (defun avx512bw-supported-p ()
+    (and (>= (cpuid 0) 7)
+         (logbitp 30 (nth-value 1 (cpuid 7 0)))))
+
+  (defun avx512vl-supported-p ()
+    (and (>= (cpuid 0) 7)
+         (logbitp 31 (nth-value 1 (cpuid 7 0)))))
+
+  (defun avx512fp16-supported-p ()
+    (and (>= (cpuid 0) 7)
+         (avx512f-supported-p)
+         (logbitp 23 (nth-value 3 (cpuid 7 0))))))
 
 #-x86-64
 (progn
@@ -69,6 +94,24 @@
     nil)
 
   (defun fma-supported-p ()
+    nil)
+
+  (defun avx512f-supported-p ()
+    nil)
+
+  (defun avx512dq-supported-p ()
+    nil)
+
+  (defun avx512cd-supported-p ()
+    nil)
+
+  (defun avx512bw-supported-p ()
+    nil)
+
+  (defun avx512vl-supported-p ()
+    nil)
+
+  (defun avx512fp16-supported-p ()
     nil))
 
 (defun neon-supported-p ()
