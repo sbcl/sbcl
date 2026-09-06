@@ -1442,7 +1442,7 @@ is replaced with replacement."
           when pos do (write-string replacement out)
             while pos)))
 
-(defun ir1-to-dot (component output-file)
+(defun ir1-to-dot (component output-file &key show-constraints)
   (with-open-file (stream output-file :if-exists :supersede
                                       :if-does-not-exist :create
                                       :direction :output)
@@ -1471,7 +1471,9 @@ is replaced with replacement."
                          (block-label block)
                          (replace-all
                           (replace-all (with-output-to-string (*standard-output*)
-                                         (print-nodes block))
+                                         (if show-constraints
+                                             (print-constraints block)
+                                             (print-nodes block)))
                                        (string #\Newline)
                                        "\\l")
                           "\""
@@ -1527,20 +1529,19 @@ is replaced with replacement."
     (format t "Not in set2~%")
     (print-conset diff2)))
 
-(defun print-constraints (component &optional kind)
-  (do-blocks (block component)
-    (handler-case (progn
-                    (terpri)
-                    (terpri)
-                    ;(print-conset (block-in block) kind)
-                    (print-nodes block)
-                    (let ((last (block-last block)))
-                      (cond ((if-p last)
-                             (format t "  CONSEQ~%")
-                             (print-conset (if-consequent-constraints last) kind)
-                             (format t "  ALT~%")
-                             (print-conset (if-alternative-constraints last) kind))
-                            (t
-                             (print-conset (block-out block) kind)))))
-      (error (condition)
-        (format t "~&~A...~%" condition)))))
+(defun print-constraints (block &optional kind)
+  (handler-case (progn
+                  (terpri)
+                  (terpri)
+                  (print-conset (block-in block) kind)
+                  (print-nodes block)
+                  (let ((last (block-last block)))
+                    (cond ((if-p last)
+                           (format t "  CONSEQ~%")
+                           (print-conset (if-consequent-constraints last) kind)
+                           (format t "  ALT~%")
+                           (print-conset (if-alternative-constraints last) kind))
+                          (t
+                           (print-conset (block-out block) kind)))))
+    (error (condition)
+      (format t "~&~A...~%" condition))))

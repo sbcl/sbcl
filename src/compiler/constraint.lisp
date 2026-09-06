@@ -1345,18 +1345,24 @@
   (loop for var in vars
         for val in args
         when (and val (lambda-var-constraints var))
-          do (conset-clear-lambda-var target var)
-             (let* ((arg-var (ok-lvar-lambda-var val constraints))
-                    (type (if arg-var
-                              ;; Not strictly necessary to grab the
-                              ;; type from constraints here straight
-                              ;; away, but speeds up convergence.
-                              (type-from-constraints arg-var constraints (lvar-type val))
-                              (lvar-type val))))
-               (when (type-for-constraints-p type)
-                 (conset-add-constraint target 'typep var type nil))
-               (when arg-var
-                 (inherit-constraints (list var) arg-var constraints target)))))
+          do (let ((new (add-set-constraints var val constraints)))
+               (conset-clear-lambda-var target var)
+               (when new
+                 (conset-union target new))
+
+               (let* ((arg-var (ok-lvar-lambda-var val constraints))
+                      (type (if arg-var
+                                ;; Not strictly necessary to grab the
+                                ;; type from constraints here straight
+                                ;; away, but speeds up convergence.
+                                (type-from-constraints arg-var constraints (lvar-type val))
+                                (lvar-type val))))
+                 (when (type-for-constraints-p type)
+                   (conset-add-constraint target 'typep var type nil))
+                 (when arg-var
+                   (inherit-constraints (list var) arg-var constraints target))
+                 (add-eq-constraint var val target)
+                 (add-var-result-constraints var val target target)))))
 
 ;;; Local propagation
 ;;; -- [TODO: For any LAMBDA-VAR ref with a type check, add that
@@ -1787,7 +1793,8 @@
     #+sb-devel
     (when (and *compiler-trace-output*
                (memq :constraints *compile-trace-targets*))
-      (print-constraints component))
+      (do-blocks (block component)
+        (print-constraints block)))
     (loop for node in *blocks-to-terminate*
           do (maybe-terminate-block node nil))
     (mapc #'delete-set *sets-to-delete*))
