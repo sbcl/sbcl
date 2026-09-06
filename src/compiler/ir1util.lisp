@@ -679,8 +679,8 @@
                (match-form (if node
                                `(multiple-value-bind (name combination args) (combination/cast-name-args ,node)
                                   (declare (ignorable name combination))
-                                  ,@(let ((expanded (expand-node nil nil spec leaf-caller :match-name dest)))
-                                      (if dest
+                                  ,@(let ((expanded (expand-node nil nil spec leaf-caller :match-name (or dest sole-dest))))
+                                      (if (or dest sole-dest)
                                           `((case name
                                               ,@expanded))
                                           expanded)))
