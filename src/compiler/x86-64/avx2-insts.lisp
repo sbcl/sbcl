@@ -326,8 +326,8 @@
   (x        :field (byte 1 14) :type 'vex-x)
   (b        :field (byte 1 13) :type 'vex-b)
   (r-prime  :field (byte 1 12) :type 'evex-r-prime)
-  (reserved :field (byte 2 10) :value #b00) ; distinguishes EVEX from BOUND
-  (mm       :field (byte 2 8))
+  (reserved :field (byte 1 11) :value 0) ; bit 11 reserved (0 in EVEX)
+  (mm       :field (byte 3 8))          ; bits 10:8 are mmm (maps 1, 2, 3, 5, 6)
   ;; Byte 2
   (w          :field (byte 1 23) :type 'evex-w)
   (vvvv       :field (byte 4 19) :type 'evex-ymm-vvvv-reg)
@@ -435,9 +435,11 @@
 
   (defun evex-encode-mm (m-mmmm)
     (ecase m-mmmm
-      (#x0F   #b01)
-      (#x0F38 #b10)
-      (#x0F3A #b11))))
+      (#x0F   #b001)
+      (#x0F38 #b010)
+      (#x0F3A #b011)
+      ((:map5 5 #x5) #b101)
+      ((:map6 6 #x6) #b110))))
 
 (defun emit-two-byte-vex (segment r vvvv l pp)
   (emit-bytes segment
@@ -518,7 +520,7 @@
 
 ;;; EVEX prefix encoding for AVX-512
 ;;; EVEX is a 4-byte prefix: 62h | P1 | P2 | P3
-;;; P1: R(7) X(6) B(5) R'(4) 00(3:2) mm(1:0)
+;;; P1: R(7) X(6) B(5) R'(4) 0(3) mmm(2:0)
 ;;; P2: W(7) vvvv(6:3) 1(2) pp(1:0)
 ;;; P3: z(7) L'(6) L(5) b(4) V'(3) aaa(2:0)
 ;;; R, X, B, R', V' are inverted. vvvv is inverted.
@@ -526,12 +528,12 @@
 (defun emit-evex (segment r x b r-prime opcode-prefix w vvvv pp z ll evex-b v-prime aaa)
   (emit-bytes segment
               #x62
-              ;; P1: R X B R' 00 mm
+              ;; P1: R X B R' 0 mmm
               (logior (ash (logxor 1 r) 7)
                       (ash (logxor 1 x) 6)
                       (ash (logxor 1 b) 5)
                       (ash (logxor 1 r-prime) 4)
-                      ;; bits 3:2 are reserved (0)
+                      ;; bit 3 is reserved (0), bits 2:0 are mmm (maps 1, 2, 3, 5, 6)
                       (evex-encode-mm opcode-prefix))
               ;; P2: W vvvv 1 pp
               (logior (ash w 7)
