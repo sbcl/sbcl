@@ -43,7 +43,7 @@
           (sb-vm::%simd-pack-ref-64 pack 2)
           (sb-vm::%simd-pack-ref-64 pack 3)))
 
-#+sb-simd-pack-512
+#+(or x86-64 sb-simd-pack-512)
 (defun %simd-pack-512-ub64s (pack)
   (values (sb-vm::%simd-pack-ref-64 pack 0)
           (sb-vm::%simd-pack-ref-64 pack 1)
@@ -61,13 +61,13 @@
        (multiple-value-bind (a0 a1) (%simd-pack-ub64s a)
          (multiple-value-bind (b0 b1) (%simd-pack-ub64s b)
            (and (= a0 b0) (= a1 b1))))))
-    #+sb-simd-pack-256
+    #+(or x86-64 sb-simd-pack-256)
     (sb-ext:simd-pack-256
      (when (sb-ext:simd-pack-256-p b)
        (multiple-value-bind (a0 a1 a2 a3) (%simd-pack-256-ub64s a)
          (multiple-value-bind (b0 b1 b2 b3) (%simd-pack-256-ub64s b)
            (and (= a0 b0) (= a1 b1) (= a2 b2) (= a3 b3))))))
-    #+sb-simd-pack-512
+    #+(or x86-64 sb-simd-pack-512)
     (sb-ext:simd-pack-512
      (when (sb-ext:simd-pack-512-p b)
        (multiple-value-bind (a0 a1 a2 a3 a4 a5 a6 a7) (%simd-pack-512-ub64s a)

@@ -1545,3 +1545,12 @@
 (define-fake-vop s16.32!-from-s16 (x)
   (%s16.32-broadcast x))
 
+(define-fake-vop sb-simd-avx512fp16:f16.8-broadcast (x)
+  (sb-simd-avx512fp16::%f16.8!-from-p128 (sb-simd-sse2::%u16.8-broadcast x)))
+
+(define-fake-vop sb-simd-avx512fp16:f16.16-broadcast (x)
+  (sb-simd-avx512fp16::%f16.16!-from-p256 (sb-simd-avx::%u16.16-broadcast x)))
+
+(define-fake-vop sb-simd-avx512fp16:f16.32-broadcast (x)
+  (sb-simd-avx512fp16::%f16.32!-from-p512 (sb-simd-avx512bw::%u16.32-broadcast x)))
+
