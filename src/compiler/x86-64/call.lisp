@@ -288,8 +288,9 @@
 ;;;  -- Reset SP. This must be done whenever other than 1 value is
 ;;;     returned, regardless of the number of values desired.
 #+tls-based-mv-return
-(defun default-unknown-values (vop values node move-temp)
-  (declare (type (or tn-ref null) values))
+(defun default-unknown-values (vop values nvals node move-temp)
+  (declare (type (or tn-ref null) values)
+           (type unsigned-byte nvals))
   (multiple-value-bind (type name leaf) (sb-c::lvar-fun-type (sb-c::basic-combination-fun node))
     (let* ((verify (and leaf
                         (policy node (and (>= safety 1)
@@ -307,14 +308,14 @@
                       (not verify)))
            (used-count 0)
            last-used
-           ;; Count up to the last used value
-           (nvals (loop for i from 1
-                        for tn-ref = values then (tn-ref-across tn-ref)
-                        while tn-ref
-                        unless (eq (tn-kind (tn-ref-tn tn-ref)) :unused)
-                        maximize i
-                        and do (incf used-count)
-                               (setf last-used (tn-ref-tn tn-ref)))))
+           last-used-i)
+      (loop for i from 0
+            for tn-ref = values then (tn-ref-across tn-ref)
+            while tn-ref
+            unless (eq (tn-kind (tn-ref-tn tn-ref)) :unused)
+            do (incf used-count)
+               (setf last-used (tn-ref-tn tn-ref)
+                     last-used-i i))
       (flet ((check-nargs ()
                (assemble ()
                  (let* ((*location-context* (list* (make-restart-location SKIP)
@@ -379,14 +380,14 @@
           (t
            (if (and (= used-count 1)
                     (or (not trust)
-                        (>= (1- nvals) min-values))
+                        (>= last-used-i min-values))
                     (not (sc-is last-used control-stack)))
                (assemble ()
                  (inst mov last-used null-tn)
                  (inst jmp :nc one)
-                 (inst cmp :dword rcx-tn (fixnumize (1- nvals)))
+                 (inst cmp :dword rcx-tn (fixnumize last-used-i))
                  (inst cmov :g last-used (thread-slot-ea (+ thread-mv-return-values-slot
-                                                            (- (1- nvals) register-arg-count))))
+                                                            (- last-used-i register-arg-count))))
                  one)
                (collect ((defaults))
                  (let ((default-stack-slots (gen-label))
@@ -814,14 +815,14 @@
   (:move-args :local-call)
   (:info arg-locs callee target nvals)
   (:vop-var vop)
-  (:ignore nfp arg-locs args callee #+tls-based-mv-return nvals)
+  (:ignore nfp arg-locs args callee)
   (:node-var node)
   (:temporary (:sc any-reg) move-temp)
   (:generator 5
     (move rbp-tn fp)
     (note-this-location vop :call-site)
     (inst call target)
-    (default-unknown-values vop values #-tls-based-mv-return nvals node #-tls-based-mv-return rbx-tn move-temp)))
+    (default-unknown-values vop values nvals node #-tls-based-mv-return rbx-tn move-temp)))
 
 ;;; Non-TR local call for a variable number of return values passed according
 ;;; to the unknown values convention. The results are the start of the values
@@ -974,9 +975,6 @@
               ,@(unless variable '(args))
               ,@(when (or (eq direct :return)
                           (eq return :unboxed)) '(values))
-              #+tls-based-mv-return
-              ,@(when (and (eq return :fixed)
-                           (neq direct :return)) '(nvals))
               ,@(when (eq args :fixed) '(nargs)))
 
      ;; For anonymous call, RAX is the function. For named call, RAX will be the linkage
@@ -1146,7 +1144,7 @@
                  (inst mov rcx-tn (fixnumize 1))
                  multiple))
              (ecase return
-               (:fixed `((default-unknown-values vop values #-tls-based-mv-return nvals node #-tls-based-mv-return rbx move-temp)))
+               (:fixed `((default-unknown-values vop values nvals node #-tls-based-mv-return rbx move-temp)))
                (:unknown
                 '((note-this-location vop :unknown-return)
                   (receive-unknown-values values-start nvals start count node)))

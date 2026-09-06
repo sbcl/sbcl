@@ -447,9 +447,18 @@
   (declare (type mv-combination call))
   (setf (basic-combination-kind call) :local)
   (setf (node-tail-p call) nil)
-  (let ((args (basic-combination-args call))
-        (vars (lambda-vars
-               (ref-leaf (lvar-use (basic-combination-fun call))))))
+  (let* ((args (basic-combination-args call))
+        (fun (ref-leaf (lvar-use (basic-combination-fun call))))
+        (vars (lambda-vars fun))
+        (last-used))
+    (loop for c on vars
+          when (leaf-refs (car c))
+          do (setf last-used c))
+    ;; Discard unused variables at the end
+    (when (cdr last-used)
+      (setf vars
+            (setf (lambda-vars fun)
+                  (ldiff vars (cdr last-used)))))
     (if (singleton-p args)
         (annotate-fixed-values-lvar
          (first args)
@@ -464,7 +473,9 @@
                  vars)
          (mapcar #'basic-var-type vars))
         (let ((types (mapcar (lambda (var)
-                               (cons (primitive-type (basic-var-type var))
+                               (cons (when (and #+(or x86-64 arm64)
+                                                (lambda-var-refs var))
+                                       (primitive-type (basic-var-type var)))
                                      (basic-var-type var)))
                              vars)))
           (dolist (arg args)
@@ -476,6 +487,7 @@
                       do
                       (destructuring-bind (&optional prim-type . lvar-type) (pop types)
                         (primitive-types (or prim-type
+                                             #-(or x86-64 arm64)
                                              *backend-t-primitive-type*))
                         (lvar-types (or lvar-type
                                         *universal-type*))))
