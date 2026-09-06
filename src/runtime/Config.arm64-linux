@@ -13,6 +13,11 @@ ASSEM_SRC = arm64-assem.S
 ARCH_SRC = arm64-arch.c
 
 OS_SRC = linux-os.c linux-mman.c arm64-linux-os.c
+
+ifdef LISP_FEATURE_SB_FIBER
+  OS_SRC += fiber.c arm64-fiber.c
+endif
+
 OS_LIBS = -ldl -Wl,-no-as-needed
 
 ifdef LISP_FEATURE_IMMOBILE_SPACE

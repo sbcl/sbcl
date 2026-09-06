@@ -183,6 +183,9 @@
  ;; x86oid Darwin, FreeBSD, and Solaris.
  ; :sb-thread
 
+ ;; low-level fiber primitives support
+ ; :sb-fiber
+
  ;; futex support
  ;;
  ;; While on linux we are able to use futexes for our locking
