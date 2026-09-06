@@ -3206,7 +3206,7 @@
            (give-up-ir1-transform)))
         (let ((dest (sole-node-dest node)))
           (combination-case (nil :node dest)
-            (< (* (constant unsigned-byte))
+            (< (* (constant (integer 0 4096)))
              (let ((k (lvar-value (second args))))
                (erase-node-type node (values-specifier-type '(values boolean &optional)))
                (transform-to-identity 0 dest 2)
@@ -3216,7 +3216,7 @@
                       `(< x ,(ash 1 (1- k))))
                      (t
                       `(typep x '(signed-byte ,k))))))
-            (> (* (constant unsigned-byte))
+            (> (* (constant (integer 0 4096)))
              (let ((k (lvar-value (second args))))
                (erase-node-type node (values-specifier-type '(values boolean &optional)))
                (transform-to-identity 0 dest 2)
@@ -3229,7 +3229,7 @@
                              '(not (or (eq x 0) (eq x -1))))))
                      (t
                       `(not (typep x '(signed-byte ,(1+ k))))))))
-            (eq (* (constant unsigned-byte))
+            (eq (* (constant (integer 0 4096)))
              (let* ((c (lvar-value (second args)))
                     (transform
                       (cond
