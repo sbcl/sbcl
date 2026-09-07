@@ -717,3 +717,94 @@
 (sb-simd-test-suite:define-test s64.8*
   (sb-simd-test-suite:is (sb-simd-test-suite::simd= (s64.8* (s64.8-broadcast -3) (s64.8-broadcast 5))
                                                     (s64.8-broadcast -15))))
+
+(in-package #:sb-simd-avx10.1)
+
+;;; AVX10 decouples ISA version from vector length (VLMAX). Systems with
+;;; AVX10/256 run scalar, 128-bit, and 256-bit operations natively, but
+;;; lack 512-bit registers (#UD on execution). Thus, 512-bit tests are
+;;; guarded on AVX10-512-SUPPORTED-P while shorter widths run unconditionally.
+
+(sb-simd-test-suite:define-test f16.8+
+  (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f16.8+ (f16.8-broadcast #x3c00) (f16.8-broadcast #x4000))
+                                                    (f16.8-broadcast #x4200))))
+
+(sb-simd-test-suite:define-test f16.16+
+  (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f16.16+ (f16.16-broadcast #x3c00) (f16.16-broadcast #x4000))
+                                                    (f16.16-broadcast #x4200))))
+
+(sb-simd-test-suite:define-test f16.32+
+  (when (sb-simd-internals:avx10-512-supported-p)
+    (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f16.32+ (f16.32-broadcast #x3c00) (f16.32-broadcast #x4000))
+                                                      (f16.32-broadcast #x4200)))))
+
+(in-package #:sb-simd-avx10.2)
+
+;; Scalar minmax
+(sb-simd-test-suite:define-test f32-minmax
+  (sb-simd-test-suite:is (= (f32-minmax 3.0f0 5.0f0 4) 3.0f0))
+  (sb-simd-test-suite:is (= (f32-minmax 3.0f0 5.0f0 5) 5.0f0)))
+
+(sb-simd-test-suite:define-test f64-minmax
+  (sb-simd-test-suite:is (= (f64-minmax 3.0d0 5.0d0 4) 3.0d0))
+  (sb-simd-test-suite:is (= (f64-minmax 3.0d0 5.0d0 5) 5.0d0)))
+
+;; Vector f32 minmax (128 / 256 / 512)
+(sb-simd-test-suite:define-test f32.4-minmax
+  (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f32.4-minmax (f32.4-broadcast 3.0f0) (f32.4-broadcast 5.0f0) 4)
+                                                    (f32.4-broadcast 3.0f0)))
+  (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f32.4-minmax (f32.4-broadcast 3.0f0) (f32.4-broadcast 5.0f0) 5)
+                                                    (f32.4-broadcast 5.0f0))))
+
+(sb-simd-test-suite:define-test f32.8-minmax
+  (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f32.8-minmax (f32.8-broadcast 3.0f0) (f32.8-broadcast 5.0f0) 4)
+                                                    (f32.8-broadcast 3.0f0)))
+  (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f32.8-minmax (f32.8-broadcast 3.0f0) (f32.8-broadcast 5.0f0) 5)
+                                                    (f32.8-broadcast 5.0f0))))
+
+(sb-simd-test-suite:define-test f32.16-minmax
+  (when (sb-simd-internals:avx10-512-supported-p)
+    (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f32.16-minmax (f32.16-broadcast 3.0f0) (f32.16-broadcast 5.0f0) 4)
+                                                      (f32.16-broadcast 3.0f0)))
+    (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f32.16-minmax (f32.16-broadcast 3.0f0) (f32.16-broadcast 5.0f0) 5)
+                                                      (f32.16-broadcast 5.0f0)))))
+
+;; Vector f64 minmax (128 / 256 / 512)
+(sb-simd-test-suite:define-test f64.2-minmax
+  (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f64.2-minmax (f64.2-broadcast 3.0d0) (f64.2-broadcast 5.0d0) 4)
+                                                    (f64.2-broadcast 3.0d0)))
+  (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f64.2-minmax (f64.2-broadcast 3.0d0) (f64.2-broadcast 5.0d0) 5)
+                                                    (f64.2-broadcast 5.0d0))))
+
+(sb-simd-test-suite:define-test f64.4-minmax
+  (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f64.4-minmax (f64.4-broadcast 3.0d0) (f64.4-broadcast 5.0d0) 4)
+                                                    (f64.4-broadcast 3.0d0)))
+  (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f64.4-minmax (f64.4-broadcast 3.0d0) (f64.4-broadcast 5.0d0) 5)
+                                                    (f64.4-broadcast 5.0d0))))
+
+(sb-simd-test-suite:define-test f64.8-minmax
+  (when (sb-simd-internals:avx10-512-supported-p)
+    (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f64.8-minmax (f64.8-broadcast 3.0d0) (f64.8-broadcast 5.0d0) 4)
+                                                      (f64.8-broadcast 3.0d0)))
+    (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f64.8-minmax (f64.8-broadcast 3.0d0) (f64.8-broadcast 5.0d0) 5)
+                                                      (f64.8-broadcast 5.0d0)))))
+
+;; Vector f16 minmax (128 / 256 / 512)
+(sb-simd-test-suite:define-test f16.8-minmax
+  (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f16.8-minmax (f16.8-broadcast #x3c00) (f16.8-broadcast #x4000) 4)
+                                                    (f16.8-broadcast #x3c00)))
+  (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f16.8-minmax (f16.8-broadcast #x3c00) (f16.8-broadcast #x4000) 5)
+                                                    (f16.8-broadcast #x4000))))
+
+(sb-simd-test-suite:define-test f16.16-minmax
+  (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f16.16-minmax (f16.16-broadcast #x3c00) (f16.16-broadcast #x4000) 4)
+                                                    (f16.16-broadcast #x3c00)))
+  (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f16.16-minmax (f16.16-broadcast #x3c00) (f16.16-broadcast #x4000) 5)
+                                                    (f16.16-broadcast #x4000))))
+
+(sb-simd-test-suite:define-test f16.32-minmax
+  (when (sb-simd-internals:avx10-512-supported-p)
+    (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f16.32-minmax (f16.32-broadcast #x3c00) (f16.32-broadcast #x4000) 4)
+                                                      (f16.32-broadcast #x3c00)))
+    (sb-simd-test-suite:is (sb-simd-test-suite::simd= (f16.32-minmax (f16.32-broadcast #x3c00) (f16.32-broadcast #x4000) 5)
+                                                      (f16.32-broadcast #x4000)))))
