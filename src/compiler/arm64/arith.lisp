@@ -1009,6 +1009,10 @@
   (sb-c::delay-ir1-transform node :ir1-phases)
   `(- 64 (clz integer)))
 
+(sb-c::def-combination-match-alias integer-length (x)
+  `((- 64 (clz ,x))
+    (- 63 (cls ,x))))
+
 (define-vop ()
   (:translate cls)
   (:policy :fast-safe)

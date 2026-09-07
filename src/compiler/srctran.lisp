@@ -3370,7 +3370,6 @@
   (combination-match2 (node)
     :dest
     (((:or eq eql =) (logcount x) (integer-length x))
-     ;; Don't delay, integer-length is transformed to clz/cls on arm64
      `(not (logtest x (+ x 1))))
     ((eq (logcount x) 0)
      `(eq x 0))

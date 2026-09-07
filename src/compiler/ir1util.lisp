@@ -692,6 +692,17 @@
                (declare (ignorable name combination args rotated))
                ,match-form)))))))
 
+(defvar *combination-match-aliases* (make-hash-table :test #'eq))
+
+(defmacro def-combination-match-alias (name ll &body body)
+  `(setf (gethash ',name *combination-match-aliases*)
+         (lambda (.form.)
+           (destructuring-bind ,ll .form.
+            ,@body))))
+
+(def-combination-match-alias lognot (x)
+  `((- -1 ,x)))
+
 (defmacro combination-match2 ((node) &body clauses)
   (let (bound-vars)
     (labels ((invert-relation (op)
@@ -710,6 +721,15 @@
                (list (invert-relation (car s))
                      (second (cdr s))
                      (first (cdr s))))
+             (expand-aliases (specs)
+               (loop for spec in specs
+                     when (when (listp spec)
+                            (destructuring-bind (name . rest) spec
+                              (let ((alias (gethash name *combination-match-aliases*)))
+                                (when alias
+                                  (funcall alias rest)))))
+                     append it
+                     collect spec))
              (ensure-or (x)
                (let ((specs (if (typep x '(cons (eql :or)))
                                 (cdr x)
@@ -759,7 +779,7 @@
                            (every #'equal-spec a b)))))
              (expand-node (lvars specs spec body)
                (let ((old-bound-vars bound-vars)
-                     (spec (ensure-or spec)))
+                     (spec (expand-aliases (ensure-or spec))))
                  (labels ((gen (&optional sub)
                             (destructuring-bind (name . args) (pop spec)
                               (let* ((variable (position '&rest args))
@@ -910,6 +930,8 @@
            (give-up-ir1-transform))))))
 
 (defun combination-match-transform (combination vars form &rest lvars)
+  (when *show-transforms-p*
+    (show-transform :combination-match (generate-combination-tree (node-lvar combination)) form combination))
   (loop for var in vars
         for lvar in lvars
         when (lvar-p lvar) ;; ignore constants
@@ -927,8 +949,6 @@
           do (flush-dest arg))
     (setf (combination-args combination)
           lvars)
-    (when *show-transforms-p*
-      (show-transform :combination-match 'x form combination))
     (transform-call combination
                     `(lambda ,vars
                        (declare (ignorable ,@vars))
