@@ -436,10 +436,10 @@
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun vex-encode-pp (pp)
     (ecase pp
-      ((nil) 0)
-      (#x66 #b01)
-      (#xF3 #b10)
-      (#xF2 #b11)))
+      ((nil 0) 0)
+      ((#x66 1) #b01)
+      ((#xF3 2) #b10)
+      ((#xF2 3) #b11)))
 
   (defun vex-encode-m-mmmm (m-mmmm)
     (ecase m-mmmm
@@ -452,8 +452,10 @@
       (#x0F   #b001)
       (#x0F38 #b010)
       (#x0F3A #b011)
+      ((:map4 4) #b100)
       ((:map5 5) #b101)
-      ((:map6 6) #b110))))
+      ((:map6 6) #b110)
+      ((:map7 7) #b111))))
 
 (defun emit-two-byte-vex (segment r vvvv l pp)
   (emit-bytes segment
@@ -514,7 +516,7 @@
              (cond ((ea-p thing)
                     (let ((base (ea-base thing)))
                       (if (and base (neq base rip-tn))
-                          (reg-id (tn-reg base))
+                          (reg-id (if (register-p base) base (tn-reg base)))
                           0)))
                    ((register-p thing)
                     (reg-id thing))
@@ -539,85 +541,102 @@
 ;;; P3: z(7) L'(6) L(5) b(4) V'(3) aaa(2:0)
 ;;; R, X, B, R', V' are inverted. vvvv is inverted.
 
-(defun emit-evex (segment r x b r-prime opcode-prefix w vvvv pp z ll evex-b v-prime aaa)
+(defun emit-evex (segment r x b r-prime opcode-prefix w vvvv pp z ll evex-b v-prime aaa
+                  &key (b-prime 0) (x-prime 0) (nd 0) (nf 0) scc dfv)
   (emit-bytes segment
               #x62
-              ;; P1: R X B R' 0 mmm
+              ;; P1: R X B R' B4 mmm
               (logior (ash (logxor 1 r) 7)
                       (ash (logxor 1 x) 6)
                       (ash (logxor 1 b) 5)
                       (ash (logxor 1 r-prime) 4)
-                      ;; bit 3 is reserved (0), bits 2:0 are mmm (maps 1, 2, 3, 5, 6)
+                      (ash (if (eql b-prime 1) 1 0) 3)
                       (evex-encode-mm opcode-prefix))
-              ;; P2: W vvvv 1 pp
-              (logior (ash w 7)
-                      (ash (logandc1 vvvv #b1111) 3)
-                      #b100  ; bit 2 always 1
+              ;; P2: W vvvv ~X4 pp
+              (logior (ash (if (eql w 1) 1 0) 7)
+                      (if dfv
+                          (ash (logand dfv #b1111) 3)
+                          (ash (logandc1 vvvv #b1111) 3))
+                      (ash (logxor 1 (if (eql x-prime 1) 1 0)) 2)
                       (vex-encode-pp pp))
-              ;; P3: z L'L b V' aaa
-              (logior (ash z 7)
-                      (ash ll 5)
-                      (ash evex-b 4)
-                      (ash (logxor 1 v-prime) 3)
-                      aaa)))
+              ;; P3: z L'L b/ND V' aaa/SCC/NF
+              (if scc
+                  (logior (ash (if (eql nd 1) 1 0) 4)
+                          (logand scc #b1111))
+                  (logior (ash z 7)
+                          (ash ll 5)
+                          (ash (if (plusp nd) nd evex-b) 4)
+                          (ash (logxor 1 (if (eql v-prime 1) 1 0)) 3)
+                          (if (plusp nf) (logior (ash nf 2) aaa) aaa)))))
+
+(defun operand-reg-num (r)
+  (cond ((register-p r) (reg-id-num (reg-id r)))
+        ((and (tn-p r) (tn-offset r)) (tn-offset r))
+        (t nil)))
+
+(defun operand-bit3 (r)
+  (let ((num (operand-reg-num r)))
+    (if (and num (logbitp 3 num)) 1 0)))
+
+(defun operand-bit4 (r)
+  (let ((num (operand-reg-num r)))
+    (if (and num (logbitp 4 num)) 1 0)))
 
 (defun determine-evex-flags (thing reg ll vvvv)
   "Extract EVEX prefix flags from operands.
-Returns: ll, r, x, b, r-prime, v-prime.
+Returns: ll, r, x, b, r-prime, v-prime, b-prime, x-prime.
 EVEX uses independent bit3 (R/B) and bit4 (R'/X) for 32-register encoding."
-  (flet ((reg-bit3 (reg-id)
-           ;; Extract bit 3 of 5-bit register number (for R, B in EVEX)
-           (if (logbitp 3 (reg-id-num reg-id)) 1 0))
-         (reg-bit4 (reg-id)
-           ;; Extract bit 4 of 5-bit register number (for R', V', X in EVEX)
-           (if (logbitp 4 (reg-id-num reg-id)) 1 0))
-         (fpr-size (r)
+  (flet ((fpr-size (r)
            (cond ((is-zmm-id-p (reg-id r)) #b10)
                  ((is-ymm-id-p (reg-id r)) #b01)
                  ((xmm-register-p r)       #b00))))
-    (let ((ll (cond (ll ll)
-                    ;; Skip k-registers - they pass xmm-register-p but
-                    ;; aren't XMM/YMM/ZMM, so fpr-size returns wrong value
-                    ((and reg (xmm-register-p reg)
-                              (not (is-kreg-id-p (reg-id reg))))
-                     (fpr-size reg))
-                    ((and (register-p thing) (xmm-register-p thing)
-                          (not (is-kreg-id-p (reg-id thing))))
-                     (fpr-size thing))
-                    ;; Also check vvvv as fallback
-                    ((and vvvv (register-p vvvv) (xmm-register-p vvvv))
-                     (fpr-size vvvv))
-                    (t #b00)))
-          ;; R from reg (ModR/M reg field) - bit 3
-          (r (if (null reg) 0 (reg-bit3 (reg-id reg))))
-          ;; R' from reg - bit 4
-          (r-prime (if (or (null reg) (k-register-p reg)) 0 (reg-bit4 (reg-id reg))))
-          ;; X from EA index, or bit 4 of r/m reg for register-direct
-          ;; In EVEX, X doubles as B' (bit 4 of r/m) when mod=11 (reg-direct)
-          (x (cond ((and (ea-p thing)
-                         (ea-index thing))
-                    (let ((index (ea-index thing)))
-                      (cond ((gpr-p index)
-                             (reg-bit3 (reg-id (tn-reg index))))
-                            ((<= (tn-offset index) 7)
-                             0)
-                            (t 1))))
-                   ((register-p thing)
-                    (reg-bit4 (reg-id thing)))
-                   (t 0)))
-          ;; B from thing (ModR/M r/m field) - bit 3
-          (b (reg-bit3
-              (cond ((ea-p thing)
-                     (let ((base (ea-base thing)))
-                       (if (and base (neq base rip-tn))
-                           (reg-id (tn-reg base))
-                           0)))
+    (let* ((ll (cond (ll ll)
+                     ;; Skip k-registers - they pass xmm-register-p but
+                     ;; aren't XMM/YMM/ZMM, so fpr-size returns wrong value
+                     ((and reg (xmm-register-p reg)
+                               (not (is-kreg-id-p (reg-id reg))))
+                      (fpr-size reg))
+                     ((and (register-p thing) (xmm-register-p thing)
+                           (not (is-kreg-id-p (reg-id thing))))
+                      (fpr-size thing))
+                     ;; Also check vvvv as fallback
+                     ((and vvvv (register-p vvvv) (xmm-register-p vvvv))
+                      (fpr-size vvvv))
+                     (t #b00)))
+           ;; R from reg (ModR/M reg field) - bit 3
+           (r (operand-bit3 reg))
+           ;; R' from reg - bit 4
+           (r-prime (if (or (null reg) (k-register-p reg)) 0 (operand-bit4 reg)))
+           (ea-p (ea-p thing))
+           (base (and ea-p (ea-base thing)))
+           (index (and ea-p (ea-index thing)))
+           ;; X from EA index, or bit 4 of r/m reg for register-direct
+           ;; In EVEX, X doubles as B' (bit 4 of r/m) when mod=11 (reg-direct)
+           (x (cond (index
+                     (operand-bit3 index))
                     ((register-p thing)
-                     (reg-id thing))
-                    (t 0))))
-          ;; V' from vvvv - bit 4 of vvvv register number
-          (v-prime (if vvvv (reg-bit4 (reg-id vvvv)) 0)))
-      (values ll r x b r-prime v-prime))))
+                     (operand-bit4 thing))
+                    (t 0)))
+           (x-prime (if index
+                        (operand-bit4 index)
+                        0))
+           ;; B from thing (ModR/M r/m field) - bit 3
+           (b (cond (ea-p
+                     (if (and base (neq base rip-tn))
+                         (operand-bit3 base)
+                         0))
+                    ((register-p thing)
+                     (operand-bit3 thing))
+                    (t 0)))
+           ;; B' from EA base (bit 4 of base register)
+           (b-prime (cond (ea-p
+                           (if (and base (neq base rip-tn))
+                               (operand-bit4 base)
+                               0))
+                          (t 0)))
+           ;; V' from vvvv - bit 4 of vvvv register number
+           (v-prime (operand-bit4 vvvv)))
+      (values ll r x b r-prime v-prime b-prime x-prime))))
 
 (defun emit-avx512-inst (segment thing reg prefix opcode
                          &key (remaining-bytes 0)
@@ -637,11 +656,12 @@ Common values: 64 for full 512-bit loads, 32 for 256-bit or half-vector,
 Default is 0 (force disp32, never use disp8) for safety -- the CPU
 always applies compression to EVEX disp8, so using the wrong N
 produces silently wrong addresses."
-  (multiple-value-bind (ll r x b r-prime v-prime)
+  (multiple-value-bind (ll r x b r-prime v-prime b-prime x-prime)
       (determine-evex-flags thing reg ll vvvv)
-    (let ((vvvv-num (if vvvv (reg-id-num (reg-id vvvv)) 0)))
+    (let ((vvvv-num (or (operand-reg-num vvvv) 0)))
       (emit-evex segment r x b r-prime opcode-prefix w
-                 vvvv-num prefix z ll evex-b v-prime aaa))
+                 vvvv-num prefix z ll evex-b v-prime aaa
+                 :b-prime b-prime :x-prime x-prime))
     (emit-bytes segment opcode)
     (emit-ea segment thing reg
              :remaining-bytes remaining-bytes
@@ -657,15 +677,19 @@ produces silently wrong addresses."
                             vvvv
                             is4
                             vm)
-  ;; Auto-detect ZMM operands and delegate to EVEX encoding
+  ;; Auto-detect ZMM operands or APX extended GPR operands and delegate to EVEX encoding
   (flet ((evex-reg-p (r)
-           (and (register-p r)
-                (or (is-zmm-id-p (reg-id r))
-                    (is-kreg-id-p (reg-id r))
-                    (>= (reg-id-num (reg-id r)) 16)))))
+           (or (and (register-p r)
+                    (or (is-zmm-id-p (reg-id r))
+                        (is-kreg-id-p (reg-id r))))
+               (let ((num (operand-reg-num r)))
+                 (and num (>= num 16))))))
     (when (or (evex-reg-p reg)
               (evex-reg-p thing)
-              (evex-reg-p vvvv))
+              (evex-reg-p vvvv)
+              (and (ea-p thing)
+                   (or (and (ea-base thing) (evex-reg-p (ea-base thing)))
+                       (and (ea-index thing) (evex-reg-p (ea-index thing))))))
       (return-from emit-avx2-inst
         (emit-avx512-inst segment thing reg prefix opcode
                           :remaining-bytes remaining-bytes
@@ -2076,4 +2100,226 @@ REG is the source (encoded in ModR/M.r/m).
   (def blsr 1)
   (def blsmsk 2)
   (def blsi 3))
+
+;;;; Intel APX (Advanced Performance Extensions) Support
+
+(defun determine-apx-flags (thing reg vvvv)
+  "Extract APX EVEX prefix flags from operands.
+Returns: r, x, b, r-prime, b-prime, v-prime, x-prime."
+  (let* ((r (operand-bit3 reg))
+         (r-prime (operand-bit4 reg))
+         (v-prime (operand-bit4 vvvv))
+         (ea-p (ea-p thing))
+         (base (and ea-p (ea-base thing)))
+         (index (and ea-p (ea-index thing)))
+         (b (cond (ea-p
+                   (if (and base (neq base rip-tn))
+                       (operand-bit3 base)
+                       0))
+                  (t (operand-bit3 thing))))
+         (b-prime (cond (ea-p
+                         (if (and base (neq base rip-tn))
+                             (operand-bit4 base)
+                             0))
+                        (t (operand-bit4 thing))))
+         (x (if index (operand-bit3 index) 0))
+         (x-prime (if index (operand-bit4 index) 0)))
+    (values r x b r-prime b-prime v-prime x-prime)))
+
+(defun emit-apx-inst (segment thing reg opcode
+                      &key (opcode-prefix 4)
+                           (w 1)
+                           vvvv
+                           (pp 0)
+                           (nd 0)
+                           (nf 0)
+                           scc
+                           dfv
+                           (remaining-bytes 0))
+  (multiple-value-bind (r x b r-prime b-prime v-prime x-prime)
+      (determine-apx-flags thing reg vvvv)
+    (let ((vvvv-num (or (operand-reg-num vvvv) 0)))
+      (emit-evex segment r x b r-prime opcode-prefix w
+                 vvvv-num pp 0 0 0 v-prime 0
+                 :b-prime b-prime :x-prime x-prime :nd nd :nf nf :scc scc :dfv dfv)
+      (emit-bytes segment opcode)
+      (emit-ea segment thing reg :remaining-bytes remaining-bytes))))
+
+(defun emit-apx-alu-ndd (segment dst src1 src2 subop &key (nf 0))
+  (let* ((size (or (operand-size dst) (operand-size src1) (operand-size src2) :qword))
+         (w (if (eq size :qword) 1 0))
+         (pp (if (eq size :word) 1 0)))
+    (cond ((integerp src2)
+           (let* ((imm-size (if (and (typep src2 '(signed-byte 8)) (neq size :byte))
+                                :byte
+                                size))
+                  (opcode (cond ((eq size :byte) #x80)
+                                ((eq imm-size :byte) #x83)
+                                (t #x81))))
+             (emit-apx-inst segment src1 subop opcode :vvvv dst :nd 1 :nf nf :w w :pp pp
+                            :remaining-bytes (size-nbyte imm-size))
+             (emit-imm-operand segment src2 imm-size)))
+          ((ea-p src2)
+           (let ((opcode (if (eq size :byte)
+                             (dpb subop (byte 3 3) 2)
+                             (dpb subop (byte 3 3) 3))))
+             (emit-apx-inst segment src2 src1 opcode :vvvv dst :nd 1 :nf nf :w w :pp pp)))
+          (t
+           (let ((opcode (if (eq size :byte)
+                             (dpb subop (byte 3 3) 0)
+                             (dpb subop (byte 3 3) 1))))
+             (emit-apx-inst segment src1 src2 opcode :vvvv dst :nd 1 :nf nf :w w :pp pp))))))
+
+(defun emit-apx-unary-ndd (segment dst src opcode subop &key (nf 0))
+  (let* ((size (or (operand-size dst) (operand-size src) :qword))
+         (w (if (eq size :qword) 1 0))
+         (pp (if (eq size :word) 1 0)))
+    (emit-apx-inst segment src subop (if (eq size :byte) (logand opcode #xFE) opcode)
+                   :vvvv dst :nd 1 :nf nf :w w :pp pp)))
+
+(defun emit-apx-shift-ndd (segment dst src count subop &key (nf 0))
+  (let* ((size (or (operand-size dst) (operand-size src) :qword))
+         (w (if (eq size :qword) 1 0))
+         (pp (if (eq size :word) 1 0)))
+    (cond ((eq count :cl)
+           (let ((opcode (if (eq size :byte) #xD2 #xD3)))
+             (emit-apx-inst segment src subop opcode :vvvv dst :nd 1 :nf nf :w w :pp pp)))
+          ((eql count 1)
+           (let ((opcode (if (eq size :byte) #xD0 #xD1)))
+             (emit-apx-inst segment src subop opcode :vvvv dst :nd 1 :nf nf :w w :pp pp)))
+          ((integerp count)
+           (let ((opcode (if (eq size :byte) #xC0 #xC1)))
+             (emit-apx-inst segment src subop opcode :vvvv dst :nd 1 :nf nf :w w :pp pp
+                            :remaining-bytes 1)
+             (emit-byte segment (logand count #x3F)))))))
+
+;;; APX PUSH2 / POP2
+(define-instruction push2 (segment src1 src2)
+  (:emitter
+   (emit-apx-inst segment src2 6 #xFF :vvvv src1 :nd 1 :w 0)))
+
+(define-instruction pop2 (segment dst1 dst2)
+  (:emitter
+   (emit-apx-inst segment dst2 0 #x8F :vvvv dst1 :nd 1 :w 0)))
+
+;;; APX CFCMOVcc
+(defconstant-eqx +apx-conditions+
+    '((:o . 0) (:no . 1) (:b . 2) (:c . 2) (:nae . 2)
+      (:nb . 3) (:nc . 3) (:ae . 3)
+      (:z . 4) (:e . 4) (:nz . 5) (:ne . 5)
+      (:be . 6) (:na . 6) (:nbe . 7) (:a . 7)
+      (:s . 8) (:ns . 9) (:p . 10) (:pe . 10)
+      (:np . 11) (:po . 11)
+      (:l . 12) (:nge . 12) (:nl . 13) (:ge . 13)
+      (:le . 14) (:ng . 14) (:nle . 15) (:g . 15))
+  #'equalp)
+
+(defun parse-apx-condition (cond)
+  (if (numberp cond)
+      (logand cond 15)
+      (or (cdr (assoc cond +apx-conditions+ :test #'eq))
+          (error "Unknown APX condition: ~S" cond))))
+
+(define-instruction cfcmov (segment cond dst src)
+  (:emitter
+   (let* ((cc (parse-apx-condition cond))
+          (opcode (+ #x40 cc))
+          (size (or (operand-size dst) (operand-size src) :qword))
+          (w (if (eq size :qword) 1 0))
+          (pp (if (eq size :word) 1 0)))
+     (emit-apx-inst segment src dst opcode :w w :pp pp :nd 0))))
+
+;;; APX CCMP / CTEST
+(defun parse-dfv (dfv)
+  (if (numberp dfv)
+      (logand dfv 15)
+      (let ((v 0))
+        (dolist (f dfv v)
+          (case f
+            ((:cf :c) (setf v (logior v 1)))
+            ((:zf :z) (setf v (logior v 2)))
+            ((:sf :s) (setf v (logior v 4)))
+            ((:of :o) (setf v (logior v 8))))))))
+
+(define-instruction ccmp (segment cond op1 op2 &optional (dfv 0))
+  (:emitter
+   (let* ((cc (parse-apx-condition cond))
+          (dfv-val (parse-dfv dfv))
+          (size (or (operand-size op1) (operand-size op2) :qword))
+          (w (if (eq size :qword) 1 0))
+          (pp (if (eq size :word) 1 0)))
+     (cond ((integerp op2)
+            (let* ((imm-size (if (and (typep op2 '(signed-byte 8)) (neq size :byte))
+                                 :byte
+                                 size))
+                   (opcode (cond ((eq size :byte) #x80)
+                                 ((eq imm-size :byte) #x83)
+                                 (t #x81))))
+              (emit-apx-inst segment op1 7 opcode :w w :pp pp :scc cc :dfv dfv-val
+                             :remaining-bytes (size-nbyte imm-size))
+              (emit-imm-operand segment op2 imm-size)))
+           (t
+            (let ((opcode (if (eq size :byte) #x38 #x39)))
+              (emit-apx-inst segment op1 op2 opcode :w w :pp pp :scc cc :dfv dfv-val)))))))
+
+(define-instruction ctest (segment cond op1 op2 &optional (dfv 0))
+  (:emitter
+   (let* ((cc (parse-apx-condition cond))
+          (dfv-val (parse-dfv dfv))
+          (size (or (operand-size op1) (operand-size op2) :qword))
+          (w (if (eq size :qword) 1 0))
+          (pp (if (eq size :word) 1 0)))
+     (cond ((integerp op2)
+            (let* ((opcode (if (eq size :byte) #xF6 #xF7))
+                   (imm-size (if (eq size :byte) :byte (if (eq size :qword) :dword size))))
+              (emit-apx-inst segment op1 0 opcode :w w :pp pp :scc cc :dfv dfv-val
+                             :remaining-bytes (size-nbyte imm-size))
+              (emit-imm-operand segment op2 imm-size)))
+           (t
+            (let ((opcode (if (eq size :byte) #x84 #x85)))
+              (emit-apx-inst segment op1 op2 opcode :w w :pp pp :scc cc :dfv dfv-val)))))))
+
+;;; Explicit NDD ALU instructions
+(macrolet ((def-alu-ndd (name subop)
+             `(define-instruction ,name (segment dst src1 src2 &key (nf 0))
+                (:emitter (emit-apx-alu-ndd segment dst src1 src2 ,subop :nf nf)))))
+  (def-alu-ndd add-ndd #b000)
+  (def-alu-ndd or-ndd  #b001)
+  (def-alu-ndd adc-ndd #b010)
+  (def-alu-ndd sbb-ndd #b011)
+  (def-alu-ndd and-ndd #b100)
+  (def-alu-ndd sub-ndd #b101)
+  (def-alu-ndd xor-ndd #b110))
+
+(macrolet ((def-unary-ndd (name opcode subop)
+             `(define-instruction ,name (segment dst src &key (nf 0))
+                (:emitter (emit-apx-unary-ndd segment dst src ,opcode ,subop :nf nf)))))
+  (def-unary-ndd not-ndd #xF7 #b010)
+  (def-unary-ndd neg-ndd #xF7 #b011)
+  (def-unary-ndd inc-ndd #xFF #b000)
+  (def-unary-ndd dec-ndd #xFF #b001))
+
+(macrolet ((def-shift-ndd (name subop)
+             `(define-instruction ,name (segment dst src count &key (nf 0))
+                (:emitter (emit-apx-shift-ndd segment dst src count ,subop :nf nf)))))
+  (def-shift-ndd rol-ndd #b000)
+  (def-shift-ndd ror-ndd #b001)
+  (def-shift-ndd shl-ndd #b100)
+  (def-shift-ndd shr-ndd #b101)
+  (def-shift-ndd sar-ndd #b111))
+
+(define-instruction imul-ndd (segment dst src1 src2)
+  (:emitter
+   (let* ((size (or (operand-size dst) (operand-size src1) :qword))
+          (w (if (eq size :qword) 1 0))
+          (pp (if (eq size :word) 1 0)))
+     (cond ((integerp src2)
+            (let ((imm-size (if (typep src2 '(signed-byte 8)) :byte size)))
+              (emit-apx-inst segment src1 0 (if (eq imm-size :byte) #x6B #x69)
+                             :vvvv dst :nd 1 :w w :pp pp
+                             :remaining-bytes (size-nbyte imm-size))
+              (emit-imm-operand segment src2 imm-size)))
+           (t
+            (emit-apx-inst segment src1 src2 #xAF :vvvv dst :nd 1 :w w :pp pp))))))
+
 

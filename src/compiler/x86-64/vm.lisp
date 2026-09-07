@@ -151,19 +151,27 @@
 
   (define-gprs t *qword-regs* +qword-register-names+
     #("RAX" "RCX" "RDX" "RBX" "RSP" "RBP" "RSI" "RDI"
-      "R8"  "R9"  "R10" "R11" "R12" "R13" "R14" "R15"))
+      "R8"  "R9"  "R10" "R11" "R12" "R13" "R14" "R15"
+      "R16" "R17" "R18" "R19" "R20" "R21" "R22" "R23"
+      "R24" "R25" "R26" "R27" "R28" "R29" "R30" "R31"))
   (define-gprs nil *dword-regs* +dword-register-names+
     #("EAX" "ECX" "EDX"  "EBX"  "ESP"  "EBP"  "ESI"  "EDI"
-      "R8D" "R9D" "R10D" "R11D" "R12D" "R13D" "R14D" "R15D"))
+      "R8D" "R9D" "R10D" "R11D" "R12D" "R13D" "R14D" "R15D"
+      "R16D" "R17D" "R18D" "R19D" "R20D" "R21D" "R22D" "R23D"
+      "R24D" "R25D" "R26D" "R27D" "R28D" "R29D" "R30D" "R31D"))
   (define-gprs nil *word-regs* +word-register-names+
     #("AX"  "CX"  "DX"   "BX"   "SP"   "BP"   "SI"   "DI"
-      "R8W" "R9W" "R10W" "R11W" "R12W" "R13W" "R14W" "R15W"))
+      "R8W" "R9W" "R10W" "R11W" "R12W" "R13W" "R14W" "R15W"
+      "R16W" "R17W" "R18W" "R19W" "R20W" "R21W" "R22W" "R23W"
+      "R24W" "R25W" "R26W" "R27W" "R28W" "R29W" "R30W" "R31W"))
   ;; High-byte ("h") registers are not generally used on AMD64,
   ;; since they can't be encoded in an instruction that has a REX-prefix,
   ;; but we can sometimes use them.
   (define-gprs nil *byte-regs* +byte-register-names+
     #("AL"  "CL"  "DL"   "BL"   "SPL"  "BPL"  "SIL"  "DIL"
       "R8B" "R9B" "R10B" "R11B" "R12B" "R13B" "R14B" "R15B"
+      "R16B" "R17B" "R18B" "R19B" "R20B" "R21B" "R22B" "R23B"
+      "R24B" "R25B" "R26B" "R27B" "R28B" "R29B" "R30B" "R31B"
       "AH" "CH" "DH" "BH"))
 
   ;; registers used to pass arguments
@@ -183,7 +191,7 @@
 ;;;; SB definitions
 
 (!define-storage-bases
-(define-storage-base registers :finite :size 16)
+(define-storage-base registers :finite :size 32)
 
 (define-storage-base float-registers :finite :size 32)
 (define-storage-base mask-registers :finite :size 8)
