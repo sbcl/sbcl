@@ -13,7 +13,8 @@
                         (associative sb-simd-internals:instruction-record-associative)
                         (prefix sb-simd-internals:instruction-record-prefix)
                         (suffix sb-simd-internals:instruction-record-suffix)
-                        (encoding sb-simd-internals:instruction-record-encoding))
+                        (encoding sb-simd-internals:instruction-record-encoding)
+                        (instruction-set sb-simd-internals:instruction-record-instruction-set))
            (sb-simd-internals:find-function-record instruction-record-name)
          (let* ((asyms (sb-simd-internals:prefixed-symbols "A" (length argument-records)))
                 (rsyms (sb-simd-internals:prefixed-symbols "R" (length result-records)))
@@ -23,7 +24,10 @@
                          (values ,@(mapcar #'sb-simd-internals:value-record-name result-records) &optional)
                          (,@(when (and always-translatable (not (eq encoding :fake-vop)))
                               '(always-translatable))
-                          ,@(when pure '(foldable flushable movable)))
+                          ,@(when pure
+                              (if (sb-simd-internals:instruction-set-available-p instruction-set)
+                                  '(foldable flushable movable)
+                                  '(flushable movable))))
                        :overwrite-fndb-silently t))
                 (arg-types
                   (mapcar #'sb-simd-internals:value-record-primitive-type argument-records))
