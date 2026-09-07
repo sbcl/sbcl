@@ -19,7 +19,9 @@
     (check-package '#:sb-simd-avx512f :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd))
     (check-package '#:sb-simd-avx512bw :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd))
     (check-package '#:sb-simd-avx512dq :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd))
-    (check-package '#:sb-simd-avx512fp16 :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd)))
+    (check-package '#:sb-simd-avx512fp16 :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd))
+    (check-package '#:sb-simd-avx10.1 :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd))
+    (check-package '#:sb-simd-avx10.2 :skip '(f32-fmaddsub f32-fmsubadd f64-fmaddsub f64-fmsubadd)))
   #+arm64
   (check-package '#:sb-simd-neon)
   ;; Ensure that every instruction has a corresponding VOP.

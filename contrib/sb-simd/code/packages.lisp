@@ -258,6 +258,12 @@
    #:avx512bw-supported-p
    #:avx512vl-supported-p
    #:avx512fp16-supported-p
+   #:avx10-supported-p
+   #:avx10.1-supported-p
+   #:avx10.2-supported-p
+   #:avx10-128-supported-p
+   #:avx10-256-supported-p
+   #:avx10-512-supported-p
    #:neon-supported-p))
 
 (progn
@@ -2591,6 +2597,51 @@
      #:f16.16-from-s32.16
      #:s32.16-from-f16.16))
 
+  #+x86-64
+  (defpackage #:sb-simd-avx10.1
+    (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx512fp16)
+    #0#
+    #1#
+    #8#
+    #9#
+    #10#
+    #12#
+    #13#
+    #14#
+    #15#
+    #16=
+    (:export))
+
+  #+x86-64
+  (defpackage #:sb-simd-avx10.2
+    (:use #:common-lisp #:sb-simd-internals #:sb-simd-avx10.1)
+    #0#
+    #1#
+    #8#
+    #9#
+    #10#
+    #12#
+    #13#
+    #14#
+    #15#
+    #16#
+    #17=
+    (:export
+     ;; f16
+     #:f16.8-minmax
+     #:f16.16-minmax
+     #:f16.32-minmax
+     ;; f32
+     #:f32-minmax
+     #:f32.4-minmax
+     #:f32.8-minmax
+     #:f32.16-minmax
+     ;; f64
+     #:f64-minmax
+     #:f64.2-minmax
+     #:f64.4-minmax
+     #:f64.8-minmax))
+
   #+arm64
   (defpackage #:sb-simd-arm64
     (:use #:common-lisp #:sb-simd-internals #:sb-simd)
@@ -3159,6 +3210,7 @@
 (dolist (p '("SB-SIMD" "SB-SIMD-NEON" "SB-SIMD-ARM64"
              "SB-SIMD-AVX" "SB-SIMD-AVX2" "SB-SIMD-FMA"
              "SB-SIMD-AVX512F" "SB-SIMD-AVX512BW" "SB-SIMD-AVX512DQ"
+             "SB-SIMD-AVX512FP16" "SB-SIMD-AVX10.1" "SB-SIMD-AVX10.2"
              "SB-SIMD-INTERNALS" "SB-SIMD-SSE" "SB-SIMD-SSE2"
              "SB-SIMD-SSE3" "SB-SIMD-SSE4.1" "SB-SIMD-SSE4.2"
              "SB-SIMD-SSSE3" "SB-SIMD-X86-64"))

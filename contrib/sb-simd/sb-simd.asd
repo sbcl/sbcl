@@ -35,6 +35,8 @@
         (:file "avx512bw" :if-feature :x86-64)
         (:file "avx512dq" :if-feature :x86-64)
         (:file "avx512fp16" :if-feature :x86-64)
+        (:file "avx10-1" :if-feature :x86-64)
+        (:file "avx10-2" :if-feature :x86-64)
         (:file "arm64" :if-feature :arm64)
         (:file "neon" :if-feature :arm64)))
       (:file "define-types")
