@@ -509,10 +509,12 @@
       (values nil nil nil)))
 
 (defun combination/cast-name-args (combination)
-  (multiple-value-bind (name combination) (combination/cast-name combination)
-    (if name
-        (values name combination (combination-args combination))
-        (values nil nil nil))))
+  (if (lvar-p combination)
+      (lvar-combination/cast-name-args combination)
+      (multiple-value-bind (name combination) (combination/cast-name combination)
+        (if name
+            (values name combination (combination-args combination))
+            (values nil nil nil)))))
 
 (defun check-args (args n-args)
   (when (= (length args) n-args)
@@ -703,7 +705,7 @@
 (def-combination-match-alias lognot (x)
   `((- -1 ,x)))
 
-(defmacro combination-match2 ((node) &body clauses)
+(defmacro combination-match2 ((node &key (transform t)) &body clauses)
   (let (bound-vars)
     (labels ((invert-relation (op)
                (case op
@@ -884,14 +886,16 @@
                      (let* ((pattern-vars (collect-spec-vars spec))
                             (body-fun (gensym "MATCH-BODY"))
                             (matched (lambda ()
-                                       `(return-from .combination-match.
-                                          (,body-fun name combination args ,@pattern-vars))))
+                                       `(,body-fun name combination args ,@pattern-vars)))
                             (branches (expand-node nil nil spec matched)))
                        (push `(,body-fun (name combination args ,@pattern-vars)
                                          (declare (ignorable name combination args ,@pattern-vars))
                                          (let ((new (progn ,@body)))
-                                           (when new
-                                             (combination-match-transform .node. ',pattern-vars new ,@pattern-vars))))
+                                           ,(if transform
+                                                `(when new
+                                                   (return-from .combination-match.
+                                                     (combination-match-transform .node. ',pattern-vars new ,@pattern-vars)))
+                                                'new)))
                              flets)
                        (dolist (branch branches)
                          (destructuring-bind (names form) branch
@@ -924,10 +928,11 @@
              ,(gen-1 (ldiff clauses dest) node)
              ,(when dest
                 (gen-1 (cdr dest) `(node-dest ,node))))
-           ;; Matching multiple combinations may not get reoptimized,
-           ;; so register to get another chance
-           (delay-ir1-transform node :ir1-phases)
-           (give-up-ir1-transform))))))
+           ,@(when transform
+               `(;; Matching multiple combinations may not get reoptimized,
+                 ;; so register to get another chance
+                 (delay-ir1-transform node :ir1-phases)
+                 (give-up-ir1-transform))))))))
 
 (defun combination-match-transform (combination vars form &rest lvars)
   (when *show-transforms-p*
@@ -943,7 +948,8 @@
   (let ((old-args (combination-args combination)))
     (loop for lvar in lvars
           do
-          (extract-lvar lvar combination))
+          (steal-lvar lvar combination lvars)
+          (setf (lvar-dest lvar) combination))
     (loop for arg in old-args
           unless (member arg lvars :test #'eq)
           do (flush-dest arg))
@@ -957,6 +963,17 @@
                     'combination-match2))
   (throw 'give-up-ir1-transform :none))
 
+(defun steal-lvar (lvar final-node all-lvars)
+  (let ((dest (lvar-dest lvar)))
+    (unless (eq final-node dest)
+      (let ((next-lvar (node-lvar dest)))
+        (when next-lvar
+          (setf (combination-args dest)
+                (remove-if (lambda (l) (memq l all-lvars))
+                           (combination-args dest)))
+          (%delete-lvar-use dest)
+          (flush-combination dest)
+          (steal-lvar next-lvar final-node all-lvars))))))
 
 (defun erase-node-type (node type &optional nth-value erase-calls)
   (setf (node-derived-type node)

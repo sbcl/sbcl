@@ -656,7 +656,7 @@
            (if (and (not (word-sized-lvar-p x))
                     (and (csubtypep (lvar-type y) (specifier-type 'fixnum))
                          (not (csubtypep (lvar-type y) (specifier-type 'unsigned-byte)))))
-               ;; Unlike logand, (logtest bignum fixnum) doesn't need
+               ;; Unlike logand, (logtest bignum fixnum) doesn't need to
                ;; bring in the whole bignum for a negative fixnum, the
                ;; extended sign will always match a bignum
                `(if (fixnump ,x-var)
@@ -670,27 +670,14 @@
 
 ;;; (zerop (logand x y)) to (not (logtest x y)) if logtest has a VOP
 (deftransform eq ((x y) (integer (eql 0)) * :node node :important nil)
-  (or (let (cut)
-        (when (or (combination-match x (logand * *)
-                    (vop-transform-applicable-p 'logtest combination))
-                  ;; Will it work if cut-to-width is applied later?
-                  (combination-match x (logand (:type word m) *)
-                    (when (vop-transform-applicable-p 'logtest combination
-                                                      (list (lvar-type m) (specifier-type 'word)))
-                      (setf cut t))))
-          (splice-fun-args x 'logand 2)
-          (if cut
-              (if (lvar-subtypep x word)
-                  `(lambda (x y z)
-                     (declare (ignore z))
-                     (not (logtest x (logand most-positive-word y))))
-                  `(lambda (x y z)
-                     (declare (ignore z))
-                     (not (logtest (logand most-positive-word x) y))))
-              `(lambda (x y z)
-                 (declare (ignore z))
-                 (not (logtest x y))))))
-      (give-up-ir1-transform)))
+  (combination-match2 (node)
+    ((eq (logand x y) 0)
+     (cond ((vop-transform-applicable-p 'logtest combination)
+            `(not (logtest x y)))
+           ((and (lvar-subtypep x word)
+                 (vop-transform-applicable-p 'logtest combination
+                                             (list (lvar-type x) (specifier-type 'word))))
+            `(not (logtest x (logand most-positive-word y))))))))
 
 (defoptimizer (logtest derive-type) ((x y))
   (let ((type (two-arg-derive-type x y #'logand-derive-type-aux)))
@@ -3183,20 +3170,18 @@
 (when-vop-existsp (:translate count-trailing-zeros)
   (deftransform integer-length ((x) (word) * :important nil :node node)
     (delay-ir1-transform node :ir1-phases)
-    (or
-     (combination-match x
-         (sb-vm::lognot-mod64 (:or
-                               (logior n (:or (sb-vm::%negate-mod64 n)
-                                              (logand (sb-vm::%negate-modfx n) #.most-positive-word)))
-                               (logior (logand n #.most-positive-word)
-                                       (:or (sb-vm::%negate-mod64 (logand n #.most-positive-word))
-                                            (logand (sb-vm::%negate-modfx n) #.most-positive-word)))
-                               (logior (logand (mask-signed-field 63 n) #.most-positive-word)
-                                       (logand (sb-vm::%negate-modfx (mask-signed-field 63 n)) #.most-positive-word))))
+    (combination-match2 (node)
+      ((integer-length
+        (sb-vm::lognot-mod64 (:or
+                              (logior n (:or (sb-vm::%negate-mod64 n)
+                                             (logand (sb-vm::%negate-modfx n) #.most-positive-word)))
+                              (logior (logand n #.most-positive-word)
+                                      (:or (sb-vm::%negate-mod64 (logand n #.most-positive-word))
+                                           (logand (sb-vm::%negate-modfx n) #.most-positive-word)))
+                              (logior (logand (mask-signed-field 63 n) #.most-positive-word)
+                                      (logand (sb-vm::%negate-modfx (mask-signed-field 63 n)) #.most-positive-word)))))
        (when (word-sized-lvar-p n)
-         (extract-lvar n node)
-         `(count-trailing-zeros x)))
-     (give-up-ir1-transform))))
+         `(count-trailing-zeros n))))))
 
 (deftransform integer-length ((x) (integer) * :node node :important nil)
   (combination-match2 (node)
@@ -4223,27 +4208,20 @@
 ;;; (+ (ash x 8) (unsigned-byte 8)) can avoid allocating two bignums
 (when-vop-existsp (:translate ash-left-add)
   (deftransform + ((a b) (integer integer) * :node node :important nil)
-    (or (unless (word-sized-result-p node t)
-          (flet ((try (a b ll)
-                   (combination-case a
-                     ((ash *) (* constant)
-                      (let* ((m (lvar-value (second args)))
-                             (shift (if (eq name 'ash)
-                                        m
-                                        (and (plusp m)
-                                             (= (logcount m) 1)
-                                             (1- (integer-length m))))))
-                        (when (and shift
-                                   (<= shift sb-vm:n-word-bits)
-                                   (csubtypep (lvar-type b)
-                                              (make-numeric-type 'unsigned-byte shift)))
-                          (delay-ir1-transform node :ir1-phases)
-                          (splice-fun-args a name #'first)
-                          `(lambda ,ll
-                             (ash-left-add int ,shift add))))))))
-            (or (try a b '(int add))
-                (try b a '(add int)))))
-        (give-up-ir1-transform)))
+    (when (word-sized-result-p node t)
+      (give-up-ir1-transform))
+    (delay-ir1-transform node :ir1-phases)
+    (combination-match2 (node)
+      ((+ ((:or ash *) int (:constant m (integer 1))) add)
+       (let ((shift (if (eq name 'ash)
+                        m
+                        (and (= (logcount m) 1)
+                             (1- (integer-length m))))))
+         (when (and shift
+                    (<= shift sb-vm:n-word-bits)
+                    (csubtypep (lvar-type add)
+                               (make-numeric-type 'unsigned-byte shift)))
+           `(ash-left-add int ,shift add))))))
 
   (deftransform ash-left-add ((integer count add) (t (eql #.sb-vm:n-word-bits) t))
     `(ash-left-word-add integer add)))
@@ -7889,32 +7867,27 @@
 
 (make-defs (($fun = eq eql))
   (deftransform $fun ((x y) (real (constant-arg real)) * :node node :important nil)
-    (or (combination-case x
-          (abs ((type real))
-           (let ((y (lvar-value y)))
-             (cond (($if (eq '$fun '=)
-                         (= y 0)
-                         (eql y 0))
-                    (splice-fun-args x name 1)
-                    nil)
-                   ((and (/= y 0)
-                         (not (float-lvar-p (first args))))
-                    (unless (lvar-subtypep (first args) rational) ;; undo if there's ever an ABS vop for integers
-                      (delay-ir1-transform node :ir1-phases))
-                    (splice-fun-args x name 1)
-                    `(if ($fun x ,y)
-                         t
-                         ($fun x ,(- y))))))))
-        (give-up-ir1-transform))))
+    (combination-match2 (node)
+      (($fun (abs (:type real x)) (:constant y))
+       (cond (($if (eq '$fun '=)
+                   (= y 0)
+                   (eql y 0))
+              `($fun x ,y))
+             ((and (/= y 0)
+                   (not (float-lvar-p (first args))))
+              (unless (lvar-subtypep (first args) rational) ;; undo if there's ever an ABS vop for integers
+                (delay-ir1-transform node :ir1-phases))
+              `(if ($fun x ,y)
+                   t
+                   ($fun x ,(- y)))))))))
 
 (deftransform > ((x y) (real (constant-arg (real 0 0))) * :node node :important nil)
-  (or (unless (and (policy node (plusp float-accuracy))
-                   (types-equal-or-intersect (lvar-type x) (specifier-type 'float)))
-        (combination-case x
-          (abs (*)
-           (splice-fun-args x name 1)
-           `(not (= x ,(lvar-value y))))))
-      (give-up-ir1-transform)))
+  (when (and (policy node (plusp float-accuracy))
+             (lvar-intersectp x float))
+    (give-up-ir1-transform))
+  (combination-match2 (node)
+    ((> (abs x) (:constant c))
+     `(not (= x ,c)))))
 
 (defun word-sized-type-p (type)
   (or (csubtypep type (specifier-type 'word))
