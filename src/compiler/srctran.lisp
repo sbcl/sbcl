@@ -3341,7 +3341,7 @@
   (combination-match2 (node)
     :dest
     ((eq (logcount x) 0)
-     x)))
+     '(eq x 0))))
 
 (deftransform logcount ((x) (signed-word) * :node node :important nil)
   (delay-ir1-transform node :ir1-phases) ;; unsigned transforms are better
