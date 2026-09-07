@@ -364,129 +364,98 @@
          (specifier-type 'integer))))))
 
 (defoptimizer (logxor derive-type) ((x y) node)
-  (let ((type (two-arg-derive-type x y #'logxor-derive-type-aux)))
-    (flet ((try (x y)
-             ;; If it's (logxor x (1- x)) then it will be a positive number,
-             ;; except for 0 => -1. This is used to count unset bits.
-             (or (multiple-value-bind (name combination args)
-                     (combination-matches* '(-) '(* 1) (lvar-uses y) :cast-type (specifier-type 'integer))
-                   (declare (ignore name))
-                   (when combination
-                     (when (same-leaf-ref-p x (car args))
-                       (if (types-equal-or-intersect (lvar-type x) (specifier-type '(eql 0)))
-                           (specifier-type '(integer -1))
-                           (specifier-type '(integer 1))))))
-                 ;; (logxor x (1+ x)) is positive, except -1 => -1.
-                 (multiple-value-bind (name combination args)
-                     (combination-matches* '(+) '(* 1) (lvar-uses y) :cast-type (specifier-type 'integer))
-                   (declare (ignore name))
-                   (when combination
-                     (when (same-leaf-ref-p x (car args))
-                       (if (types-equal-or-intersect (lvar-type x) (specifier-type '(eql -1)))
-                           (specifier-type '(integer -1))
-                           (specifier-type '(integer 1))))))
-                 ;; (logxor x (- x)) is <= 0
-                 (combination-case (x :cast (specifier-type 'integer))
-                   (%negate (*)
-                    (when (same-leaf-ref-p (car args) y)
-                      (multiple-value-bind (len pos neg low high) (integer-type-length (lvar-type y))
-                        (declare (ignore pos neg))
-                        (if len
-                            (make-numeric-type 'integer
-                                               (ash -1 (integer-length (max (abs low) (abs high))))
-                                               (if (<= low 0 high)
-                                                   0
-                                                   -2))
-                            (if (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))
-                                (specifier-type '(integer * 0))
-                                (specifier-type '(integer * -2))))))))
-                 ;; (logxor x (ash x -63))
-                 (combination-match (:node node)
-                     (logxor x (ash x (:constant shift (integer * -1))))
-                   (multiple-value-bind (len pos neg low high) (integer-type-length (lvar-type x))
-                     (declare (ignore pos neg))
-                     (when len
-                       ;; The result is unsigned
-                       (let* ((m (max 0 high (lognot low)))
-                              (max (if (or (<= len (- shift))
-                                           (= m (1- (ash 1 len))))
-                                       m
-                                       (1- (ash 1 len))))
-                              (min (min (cond ((> low 0)
-                                               (ash 1 (1- (integer-length low))))
-                                              ((< high -1)
-                                               (ash 1 (1- (integer-length (lognot high)))))
-                                              (t 0)))))
-                         (make-numeric-type 'integer min max)))))))
-           (add (add)
-             (if (and add type)
-                 (type-intersection type add)
-                 add)))
-      (or (add (try x y))
-          (add (try y x))
-          type))))
+  (add-type-intersection
+   (two-arg-derive-type x y #'logxor-derive-type-aux)
+   (combination-match2 (node :transform nil)
+     ;; If it's (logxor x (1- x)) then it will be a positive number,
+     ;; except for 0 => -1. This is used to count unset bits.
+     ((logxor x (- x 1))
+      (if (lvar-intersectp x (eql 0))
+          (specifier-type '(integer -1))
+          (specifier-type '(integer 1))))
+     ;; (logxor x (1+ x)) is positive, except -1 => -1.
+     ((logxor x (+ x 1))
+      (if (lvar-intersectp x (eql -1))
+          (specifier-type '(integer -1))
+          (specifier-type '(integer 1))))
+     ;; (logxor x (- x)) is <= 0
+     ((logxor x (- x))
+      (multiple-value-bind (len pos neg low high) (integer-type-length (lvar-type x))
+        (declare (ignore pos neg))
+        (if len
+            (make-numeric-type 'integer
+                               (ash -1 (integer-length (max (abs low) (abs high))))
+                               (if (<= low 0 high)
+                                   0
+                                   -2))
+            (if (lvar-intersectp x (eql 0))
+                (specifier-type '(integer * 0))
+                (specifier-type '(integer * -2))))))
+     ;; (logxor x (ash x -63))
+     ((logxor x (ash x (:constant shift (integer * -1))))
+      (multiple-value-bind (len pos neg low high) (integer-type-length (lvar-type x))
+        (declare (ignore pos neg))
+        (when len
+          ;; The result is unsigned
+          (let* ((m (max 0 high (lognot low)))
+                 (max (if (or (<= len (- shift))
+                              (= m (1- (ash 1 len))))
+                          m
+                          (1- (ash 1 len))))
+                 (min (min (cond ((> low 0)
+                                  (ash 1 (1- (integer-length low))))
+                                 ((< high -1)
+                                  (ash 1 (1- (integer-length (lognot high)))))
+                                 (t 0)))))
+            (make-numeric-type 'integer min max))))))))
 
-(defoptimizer (logior derive-type) ((x y))
-  (let ((type (two-arg-derive-type x y #'logior-derive-type-aux)))
-    (flet ((try (x y)
-             ;; (logior x (- x)) has the same width as X and is <= 0
-             (combination-case (x :cast (specifier-type 'integer))
-               (%negate (*)
-                (when (same-leaf-ref-p (car args) y)
-                  (multiple-value-bind (len pos neg low high) (integer-type-length (lvar-type y))
-                    (declare (ignore pos neg))
-                    (let ((int (if len
-                                   (make-numeric-type 'integer
-                                                      (let ((positive (if (plusp high)
-                                                                          (1- (integer-length high))
-                                                                          0))
-                                                            (negative (if (minusp low)
-                                                                          (if (= low (- (ash 1 len)))
-                                                                              len
-                                                                              (1- len))
-                                                                          0)))
-                                                        (- (ash 1 (max positive negative))))
-                                                      0)
-                                   (specifier-type '(integer * 0)))))
-                      (if type
-                          (type-intersection type int)
-                          int))))))))
-      (or (try x y)
-          (try y x)
-          type))))
+(defoptimizer (logior derive-type) ((x y) node)
+  (add-type-intersection
+   (two-arg-derive-type x y #'logior-derive-type-aux)
+   (combination-match2 (node :transform nil)
+     ;; (logior x (- x)) has the same width as X and is <= 0
+     ((logior x (- x))
+      (multiple-value-bind (len pos neg low high) (integer-type-length (lvar-type x))
+        (declare (ignore pos neg))
+        (if len
+            (make-numeric-type 'integer
+                               (let ((positive (if (plusp high)
+                                                   (1- (integer-length high))
+                                                   0))
+                                     (negative (if (minusp low)
+                                                   (if (= low (- (ash 1 len)))
+                                                       len
+                                                       (1- len))
+                                                   0)))
+                                 (- (ash 1 (max positive negative))))
+                               0)
+            (specifier-type '(integer * 0))))))))
 
-(defoptimizer (logand derive-type) ((x y))
-  (let ((type (two-arg-derive-type x y #'logand-derive-type-aux)))
-    (flet ((try (x y)
-             ;; (logand x (- x)) has the same width as (abs most-negative-X) and is >= 0
-             (combination-case (x :cast (specifier-type 'integer))
-               (%negate (*)
-                (when (same-leaf-ref-p (car args) y)
-                  (multiple-value-bind (len pos neg low high) (integer-type-length (lvar-type y))
-                    (declare (ignore pos neg))
-                    (let ((int (if len
-                                   (make-numeric-type 'integer
-                                                      (if (<= low 0 high)
-                                                          0
-                                                          1)
-                                                      (let ((positive (if (plusp high)
-                                                                          (1- (integer-length high))
-                                                                          0))
-                                                            (negative (if (minusp low)
-                                                                          (if (= low (- (ash 1 len)))
-                                                                              (1+ len)
-                                                                              (1- len))
-                                                                          0)))
-                                                        (ash 1 (max positive negative))))
-                                   (if (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))
-                                       (specifier-type '(integer 0))
-                                       (specifier-type '(integer 1))))))
-                      (if type
-                          (type-intersection type int)
-                          int))))))))
-      (or (try x y)
-          (try y x)
-          type))))
+(defoptimizer (logand derive-type) ((x y) node)
+  (add-type-intersection
+   (two-arg-derive-type x y #'logand-derive-type-aux)
+   ;; (logand x (- x)) has the same width as (abs most-negative-X) and is >= 0
+   (combination-match2 (node :transform nil)
+    ((logand x (- x))
+     (multiple-value-bind (len pos neg low high) (integer-type-length (lvar-type y))
+       (declare (ignore pos neg))
+       (if len
+           (make-numeric-type 'integer
+                              (if (<= low 0 high)
+                                  0
+                                  1)
+                              (let ((positive (if (plusp high)
+                                                  (1- (integer-length high))
+                                                  0))
+                                    (negative (if (minusp low)
+                                                  (if (= low (- (ash 1 len)))
+                                                      (1+ len)
+                                                      (1- len))
+                                                  0)))
+                                (ash 1 (max positive negative))))
+           (if (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))
+               (specifier-type '(integer 0))
+               (specifier-type '(integer 1)))))))))
 
 (defoptimizer (logeqv derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)

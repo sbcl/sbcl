@@ -1795,8 +1795,9 @@
 
 (deftransform sb-vm::%make-simple-array ((dims widetag n-bits) * * :node node)
   (combination-match2 (node)
-    ((sb-vm::%make-simple-array (array-dimensions (:type simple-array array)) widetag n-bits)
-     (when (almost-immediately-used-p array nil :flushable t)
+    ((sb-vm::%make-simple-array (array-dimensions array) widetag n-bits)
+     (when (or (lvar-subtypep array simple-array)
+               (almost-immediately-used-p dims nil :flushable t))
        `(sb-vm::%make-simple-array-array-dimensions array widetag n-bits)))))
 
 (deftransform sb-vm::%make-simple-array-array-dimensions ((array widetag n-bits) (vector t t) * :node node)

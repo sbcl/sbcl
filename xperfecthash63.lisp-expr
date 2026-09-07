@@ -1965,5 +1965,11 @@
 (#(56B428A2 C4F34DDE C6F35104 C7F35297 DC33E6FC)
  "(> < = EQL EQ)"
  "((& (^ (>> val 2) (>> val 7)) 7))")
+(#(121068DD 37D0286E 4D61368F 58110E7F 67EE2D1A 6D9A883D 897B4656 A68A3965 F9BA9C52)
+ "#(((:TYPE BIND)) ((:TYPE SB-C::REF)) ((:TYPE DELAY)) ((:TYPE SB-C::ARRAY-INDEX-CAST) (:TYPE CAST)) ((:TYPE SB-C::CSET)) ((:TYPE SB-C::COMBINATION) (:TYPE SB-C::MV-COMBINATION) (:TYPE SB-C::BASIC-COMBINATION)))"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 0 12 2 5 3 2 3)))
+  (let ((b (& (>> val 27) #x7)))
+   (let ((a (>> (<< val 31) 29)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF
