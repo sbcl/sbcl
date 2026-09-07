@@ -607,48 +607,35 @@
   (deffrob ceiling))
 
 (deftransform logtest ((x y) (t (constant-arg t)) * :node node :before-vop t)
-  (let ((y (lvar-value y)))
-    (block nil
-      (cond ((and (plusp y)
-                  (= (logcount y) 1)
-                  (splice-fun-args x 'lognot 1 nil))
-             `(not (logtest x y)))
-            ;; (evenp (+ x even)) => (evenp x) and so on
-            ((and (= y 1)
-                  (multiple-value-bind (name combination)
-                      (combination-matches* '(+ - *) '(* constant) (lvar-uses x)
-                                            :cast-type (specifier-type 'integer))
-                    (when name
-                      (destructuring-bind (l c) (combination-args combination)
-                        (declare (ignore l))
-                        (let ((c (lvar-value c)))
-                          (when (splice-fun-args x :any #'first nil (specifier-type 'integer))
-                            (return (cond ((and (eq name '*)
-                                                (evenp c))
-                                           nil)
-                                          ((or (eq name '*)
-                                               (evenp c))
-                                           `(logtest x 1))
-                                          (t
-                                           `(not (logtest x 1))))))))))))
-            ;; (logtest (logand x #xFF) 1) => (logtest x 1)
-            ((when (combination-matches 'logand '(* constant) (lvar-uses x))
-               (destructuring-bind (l c) (combination-args (lvar-uses x))
-                 (declare (ignorable l))
-                 (let ((c (lvar-value c)))
-                   (cond ((or
-                           ;; unsigned cut-to-width always recuts to the minimum width
-                           (not (vop-existsp :translate sb-vm::*-modfx))
-                           (= c most-positive-word)
-                           (not (word-sized-lvar-p l)))
-                          ;; cut-to-width will insert these again
-                          nil)
-                         ((= (logand y c) y)
-                          (splice-fun-args x :any #'first)
-                          ;; Don't transform, just need to change the first argument.
-                          nil))))))
-            (t
-             (give-up-ir1-transform))))))
+  (combination-match2 (node)
+    ((logtest (lognot x) (:constant c (integer 1)))
+     (when (= (logcount c) 1)
+       `(not (logtest x ,c))))
+    ;; (evenp (+ x even)) => (evenp x) and so on
+    ((logtest (+ x (:constant c)) 1)
+     (if (evenp c)
+         `(logtest x 1)
+         `(not (logtest x 1))))
+    ((logtest (- x (:constant c)) 1)
+     (if (evenp c)
+         `(logtest x 1)
+         `(not (logtest x 1))))
+    ((logtest (* x (:constant c)) 1)
+     (if (evenp c)
+         :nil
+         `(logtest x 1)))
+    ;; (logtest (logand x #xFF) 1) => (logtest x 1)
+    ((logtest (logand x (:constant c1)) (:constant c2))
+     (cond ((or
+             ;; unsigned cut-to-width always recuts to the minimum width
+             (not (vop-existsp :translate sb-vm::*-modfx))
+             (= c1 most-positive-word)
+             (= c1 (ash most-positive-word -1))
+             (not (word-sized-lvar-p x)))
+            ;; cut-to-width will insert these again
+            nil)
+           ((= (logand c1 c2) c2)
+            `(logtest x ,c2))))))
 
 (deftransform logtest ((x y) * * :node node)
   (delay-ir1-transform node :ir1-phases)
@@ -3170,6 +3157,7 @@
 (when-vop-existsp (:translate count-trailing-zeros)
   (deftransform integer-length ((x) (word) * :important nil :node node)
     (delay-ir1-transform node :ir1-phases)
+    (print (generate-combination-tree x))
     (combination-match2 (node)
       ((integer-length
         (sb-vm::lognot-mod64 (:or
@@ -3722,22 +3710,20 @@
   (let* ((size (lvar-value size))
          (posn (lvar-value posn))
          (mask (mask-field (byte size posn) -1)))
-    (cond ((and (<= mask most-positive-word)
-                (or (combination-matches '= '(* 0) (node-dest node))
-                    (combination-matches '> '(* 0) (node-dest node))))
-           (erase-node-type node (values-specifier-type '(values word &optional)))
-           `(logand integer ,mask))
+    (cond ((<= mask most-positive-word)
+           (combination-match2 (node)
+             :dest
+             (((:or eq > :name name) (%ldb posn integer) 0)
+              `(,name (logand integer ,mask) 0))))
           (t
            (give-up-ir1-transform)))))
 
 ;;; Avoid creating bignums
 (deftransform %mask-field ((size posn int) * * :node node)
-  (cond ((or (combination-matches '= '(* 0) (node-dest node))
-             (combination-matches '> '(* 0) (node-dest node)))
-         (erase-node-type node (values-specifier-type '(values unsigned-byte &optional)))
-         `(%ldb size posn int))
-        (t
-         (give-up-ir1-transform))))
+  (combination-match2 (node)
+    :dest
+    (((:or eq > :name name) (%mask-field size posn int) 0)
+     `(,name (%ldb size posn int) 0))))
 
 (deftransform %mask-field ((size posn int) ((integer 0 #.sb-vm:n-word-bits) fixnum integer) word)
   "convert to inline logical operations"
@@ -4212,7 +4198,7 @@
       (give-up-ir1-transform))
     (delay-ir1-transform node :ir1-phases)
     (combination-match2 (node)
-      ((+ ((:or ash *) int (:constant m (integer 1))) add)
+      ((+ ((:or ash * :name name) int (:constant m (integer 1))) add)
        (let ((shift (if (eq name 'ash)
                         m
                         (and (= (logcount m) 1)

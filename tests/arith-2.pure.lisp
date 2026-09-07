@@ -1941,6 +1941,7 @@
                                             (logand m #xFFFF))
                                          nil))
              0))
+  #+n
   (assert (= (count 'sb-c::mask-signed-field
                     (ctu:ir1-named-calls `(lambda (n m)
                                             (declare ((unsigned-byte 64) n)

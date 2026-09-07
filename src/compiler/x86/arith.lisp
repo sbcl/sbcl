@@ -346,7 +346,7 @@
   (:results (r :scs (unsigned-reg)))
   (:info mask)
   (:result-types unsigned-num)
-  (:generator 10
+  (:generator 5
     (move r x)
     (generate-fixnum-test r)
     (inst jmp :nz BIGNUM)
@@ -355,8 +355,20 @@
     BIGNUM
     (loadw r x bignum-digits-offset other-pointer-lowtag)
     DONE
-    (unless (= mask most-positive-word)
+    (unless (eql mask most-positive-word)
       (inst and r mask))))
+
+(define-vop (logand-word-mask/integer-unsigned logand-word-mask)
+  (:args (x :scs (descriptor-reg))
+         (mask :scs (unsigned-reg) :to :save))
+  (:info)
+  (:arg-types t unsigned-num)
+  (:variant-cost 6))
+
+(define-vop (logand-word-mask/unsigned-integer logand-word-mask/integer-unsigned)
+  (:args (mask :scs (unsigned-reg) :to :save)
+         (x :scs (descriptor-reg)))
+  (:arg-types unsigned-num t))
 
 
 (define-vop (fast-+-c/signed=>signed fast-safe-arith-op)
@@ -376,7 +388,7 @@
            (move r x)
            (if (= y 1)
                (inst inc r)
-             (inst add r y))))))
+               (inst add r y))))))
 
 (define-vop (fast-+/unsigned=>unsigned fast-safe-arith-op)
   (:translate +)
