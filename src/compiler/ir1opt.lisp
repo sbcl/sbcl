@@ -2445,37 +2445,38 @@
         (set-types '())
         (every-set-type-suitable-p t))
     (dolist (value values)
-      (multiple-value-bind (step function) (iteration-step-value value var)
+      (multiple-value-bind (steps function) (iteration-step-values value var)
         (unless function ; every value must be ({+,-} VAR STEP)
           (return-from %analyze-set-uses nil))
-        (let ((step-type (weaken-numeric-union-type (lvar-type step)))
-              (set-type (weaken-numeric-union-type (lvar-type value))))
-          ;; In ({+,-} VAR STEP), the type of STEP must be a numeric
-          ;; type matching INITIAL-TYPE.
-          (unless (and (numeric-type-p step-type)
-                       (or (numtype-aspects-eq initial-type step-type)
-                           ;; Detect cases like (LOOP FOR 1.0 to 5.0
-                           ;; ...), where the initial and the step
-                           ;; are of different types, and the step
-                           ;; is less contagious.
-                           (let ((contagion-type (numeric-contagion initial-type
-                                                                    step-type
-                                                                    ;; Adding integers will produce integers
-                                                                    :rational nil)))
-                             (and (numeric-type-p contagion-type)
-                                  (numtype-aspects-eq initial-type contagion-type)))))
-            (return-from %analyze-set-uses nil))
-          ;; Track the directions of the increments/decrements.
-          (let ((non-negative-p (csubtypep step-type (specifier-type '(real 0 *))))
-                (non-positive-p (csubtypep step-type (specifier-type '(real * 0)))))
-            (cond ((or (and (eq function '+) non-negative-p)
-                       (and (eq function '-) non-positive-p))
-                   (setf some-plusp t))
-                  ((or (and (eq function '-) non-negative-p)
-                       (and (eq function '+) non-positive-p))
-                   (setf some-minusp t))
-                  (t ; Can't tell direction
-                   (setf some-plusp t some-minusp t))))
+        (dolist (step steps)
+          (let ((step-type (weaken-numeric-union-type (lvar-type step))))
+            ;; In ({+,-} VAR STEP), the type of STEP must be a numeric
+            ;; type matching INITIAL-TYPE.
+            (unless (and (numeric-type-p step-type)
+                         (or (numtype-aspects-eq initial-type step-type)
+                             ;; Detect cases like (LOOP FOR 1.0 to 5.0
+                             ;; ...), where the initial and the step
+                             ;; are of different types, and the step
+                             ;; is less contagious.
+                             (let ((contagion-type (numeric-contagion initial-type
+                                                                      step-type
+                                                                      ;; Adding integers will produce integers
+                                                                      :rational nil)))
+                               (and (numeric-type-p contagion-type)
+                                    (numtype-aspects-eq initial-type contagion-type)))))
+              (return-from %analyze-set-uses nil))
+            ;; Track the directions of the increments/decrements.
+            (let ((non-negative-p (csubtypep step-type (specifier-type '(real 0 *))))
+                  (non-positive-p (csubtypep step-type (specifier-type '(real * 0)))))
+              (cond ((or (and (eq function '+) non-negative-p)
+                         (and (eq function '-) non-positive-p))
+                     (setf some-plusp t))
+                    ((or (and (eq function '-) non-negative-p)
+                         (and (eq function '+) non-positive-p))
+                     (setf some-minusp t))
+                    (t                    ; Can't tell direction
+                     (setf some-plusp t some-minusp t))))))
+        (let ((set-type (weaken-numeric-union-type (lvar-type value))))
           ;; Ultimately, the derived types of the stepped values must
           ;; match INITIAL-TYPE if we are going to derive new bounds.
           (unless (and (numeric-type-p set-type)
@@ -2490,32 +2491,48 @@
 (defun sets-numeric-contagion (values var initial-type)
   (let (union)
     (dolist (value values)
-      (multiple-value-bind (step function) (iteration-step-value value var)
+      (multiple-value-bind (steps function) (iteration-step-values value var)
         (unless function                ; every value must be ({+,-} VAR STEP)
           (return-from sets-numeric-contagion nil))
-        (let ((step-type (lvar-type step)))
-          (setf union (if union
-                          (type-union union step-type)
-                          step-type)))))
+        (dolist (step steps)
+          (let ((step-type (lvar-type step)))
+            (setf union (if union
+                            (type-union union step-type)
+                            step-type))))))
     (type-union initial-type
                 (numeric-contagion initial-type union
                                    ;; Adding integers will produce integers
                                    :rational nil))))
 
-;;; If VALUE is computed as ({+,-} VAR STEP), one round of stepping a
-;;; loop variable, return the STEP lvar and which function it is. VALUE
-;;; is the lvar the new value arrives on: the value of a SETQ, or the
+;;; If VALUE is computed by a chain of ({+,-} VAR STEP) operations,
+;;; return the STEP lvars and which function they use. VALUE is the
+;;; lvar the new value arrives on: the value of a SETQ, or the
 ;;; argument a local call passes to VAR's own parameter position.
-(defun iteration-step-value (value var)
-  (let* ((use (principal-lvar-use value))
-         (function (%inc-or-dec-p use)))
-    (when function
-      (let ((args (basic-combination-args use)))
-        (when (and (proper-list-of-length-p args 2 2)
-                   (let ((first (principal-lvar-use (first args))))
-                     (and (ref-p first)
-                          (eq (ref-leaf first) var))))
-          (values (second args) function))))))
+(defun iteration-step-values (value var)
+  (labels ((walk (value seen)
+             (let* ((use (principal-lvar-use value))
+                    (function (%inc-or-dec-p use)))
+               (when function
+                 (let ((args (basic-combination-args use)))
+                   (when (proper-list-of-length-p args 2 2)
+                     (let ((first (principal-lvar-use (first args)))
+                           (step (second args)))
+                       (cond ((and (ref-p first)
+                                   (eq (ref-leaf first) var))
+                              (values (list step) function))
+                             ((and (ref-p first)
+                                   (lambda-var-p (ref-leaf first))
+                                   (not (memq (ref-leaf first) seen)))
+                              (let ((next (lambda-var-ref-lvar first)))
+                                (when next
+                                  (multiple-value-bind
+                                        (steps inner-function)
+                                      (walk next
+                                            (cons (ref-leaf first) seen))
+                                    (when (and steps
+                                               (eq function inner-function))
+                                      (values (cons step steps) function))))))))))))))
+    (walk value nil)))
 
 ;;; Infer the type of VAR from the direction in which it is stepped,
 ;;; keeping the bound it moves away from and dropping the one it moves
@@ -3161,8 +3178,10 @@
          (eq (combination-kind use) :known)
          (let ((info (combination-fun-info use)))
            (and info (fun-info-derive-type info)))
-         (some (lambda (a) (eq (combination-arg-lambda-var a) var))
-               (combination-args use))
+         (or
+          (some (lambda (a) (eq (combination-arg-lambda-var a) var))
+                (combination-args use))
+          (and arg (iteration-step-values arg var)))
          t)))
 
 ;;; Return the optimistic type of VAR, given BASE, the union of what
