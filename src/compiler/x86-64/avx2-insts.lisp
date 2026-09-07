@@ -1505,7 +1505,7 @@ REG is the source (encoded in ModR/M.r/m).
                                               :w 0 :disp-n 4)
                   (:emitter
                    (cond
-                     ((or (xmm-register-p src) (zmm-register-p dst))
+                     ((zmm-register-p dst)
                       (emit-avx512-inst segment src dst #x66 #x18
                                         :opcode-prefix #x0f38
                                         :w 0
@@ -1525,7 +1525,7 @@ REG is the source (encoded in ModR/M.r/m).
                                               :w 1 :disp-n 8)
                   (:emitter
                    (cond
-                     ((or (xmm-register-p src) (zmm-register-p dst))
+                     ((zmm-register-p dst)
                       (emit-avx512-inst segment src dst #x66 #x19
                                         :opcode-prefix #x0f38
                                         :w 1
