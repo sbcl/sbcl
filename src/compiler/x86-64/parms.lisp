@@ -204,6 +204,7 @@
 (defconstant cpu-has-avx10-2         4)
 (defconstant cpu-has-avx10-512       5)
 (defconstant cpu-has-avx512-fp16     6)
+(defconstant cpu-has-apx             7)
 
 #+sb-simd-pack
 (progn

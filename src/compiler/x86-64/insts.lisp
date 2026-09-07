@@ -75,7 +75,7 @@
 (defstruct (reg (:predicate register-p)
                 (:copier nil)
                 (:constructor !make-reg (id)))
-  (id 0 :type (unsigned-byte 8)))
+  (id 0 :type (unsigned-byte 16)))
 (declaim (freeze-type reg))
 
 ;;; Default word size for the chip: if the operand size /= :dword
@@ -109,6 +109,12 @@
 (defconstant +fs-segment+      #b00001000000)
 (defconstant +gs-segment+      #b00000100000)
 (defconstant +rex+             #b00000010000)
+;;; APX REX2 prefix dstate property masks (bits 16-20)
+(defconstant +rex2+            #b000000010000000000000000)
+(defconstant +rex2-m0+         #b000000100000000000000000)
+(defconstant +rex2-r4+         #b000001000000000000000000)
+(defconstant +rex2-x4+         #b000010000000000000000000)
+(defconstant +rex2-b4+         #b000100000000000000000000)
 ;;; The next 4 exactly correspond to the bits in the REX prefix itself,
 ;;; to avoid unpacking and stuffing into inst-properties one at a time.
 (defconstant +rex-w+           #b1000)
@@ -883,8 +889,8 @@
 (defstruct (ea (:constructor %ea (segment disp-bits disp base index scale))
                (:copier nil))
   (segment nil :type (member :cs :fs :gs) :read-only t)
-  (base nil :type (or tn null) :read-only t)
-  (index nil :type (or tn null) :read-only t)
+  (base nil :type (or tn reg null) :read-only t)
+  (index nil :type (or tn reg null) :read-only t)
   (scale 1 :type (member 1 2 4 8) :read-only t)
   (disp-bits nil :type (member 8 32 nil) :read-only t)
   (disp 0 :type (or (unsigned-byte 32) (signed-byte 32) fixup
@@ -904,7 +910,7 @@
         (t
          ;; This is ridiculous. READ won't really read an EA in this syntax.
          (format stream "PTR [")
-         (flet ((name (tn) (reg-name (tn-reg tn))))
+         (flet ((name (it) (if (register-p it) (reg-name it) (reg-name (tn-reg it)))))
            (awhen (ea-base ea)
              (write-string (if (eq it rip-tn) "RIP" (name it)) stream)
              (when (ea-index ea)
@@ -951,10 +957,10 @@
         (if is-prefix (pop args) (return))))
     (let ((first (car args)))
       ;; Rather than checking explicitly for all the things that are legal to be
-      ;; a displacement (i.e. LABEL, FIXUP, INTEGER), look for (NOT (OR TN NULL).)
+      ;; a displacement (i.e. LABEL, FIXUP, INTEGER), look for (NOT (OR TN REG NULL).)
       ;; That is, NIL must be a placeholder for absence of base register,
       ;; and not a displacement.
-      (unless (typep first '(or tn null))
+      (unless (typep first '(or tn reg null))
         (setq disp first)
         (pop args)))
     ;; The minimal EA is either an absolute address or an unindexed base register.
@@ -995,12 +1001,11 @@
 
 ;;; Size is :BYTE,:WORD,:DWORD,:QWORD
 ;;; INDEX is the index in the register file for the class and size.
-;;; Byte registers indices 0 through 15 correspond to the uniform register
-;;; set defined by the AMD64 architecture, and indices 20, 21, 22, 23 are
+;;; Byte registers indices 0 through 31 correspond to the uniform register
+;;; set defined by AMD64 and Intel APX, and indices 32, 33, 34, 35 are
 ;;; for the legacy high byte registers AH,CH,DH,BH respectively.
-;;; (indices 16 through 19 are unused)
 (defun make-gpr-id (size index)
-  (logior (ash (if (eq size :byte) (the (mod 24) index) (the (mod 16) index)) 3)
+  (logior (ash (if (eq size :byte) (the (mod 36) index) (the (mod 32) index)) 3)
           (ash (or (position size #(:qword :dword :word :byte))
                    (error "Bad register size ~s" size))
                1)))
@@ -1025,7 +1030,7 @@
 (defun gpr-id-size-class (reg-id) ; an integer 0..3 identifying the size
   (ldb (byte 2 1) reg-id))
 (defun reg-id-num (reg-id)
-  (ldb (byte 5 3) reg-id))
+  (ldb (byte 6 3) reg-id))
 
 ;;; Note that SB-VM has its own variation on these predicates
 ;;; operating on TNs: GPR-TN-P, FLOAT-TN-P
@@ -1090,11 +1095,12 @@
 (defun reg-encoding (reg segment &aux (id (reg-id reg)))
   (cond ((and (is-gpr-id-p id)
               (eq (gpr-id-size-class id) +size-class-byte+)
-              (>= (reg-id-num id) 16))
-         (if (eql (segment-encoder-state segment) +rex+)
-             (bug "Can't encode ~A with REX prefix" (reg-name reg))
-             ; number 16 corresponds to AH which is encoded as 4 and so on
-             (+ (reg-id-num id) -16 4)))
+              (>= (reg-id-num id) 32))
+         (if (or (eql (segment-encoder-state segment) +rex+)
+                 (eql (segment-encoder-state segment) +rex2+))
+             (bug "Can't encode ~A with REX or REX2 prefix" (reg-name reg))
+             ; number 32 corresponds to AH which is encoded as 4 and so on
+             (+ (reg-id-num id) -32 4)))
         (t
          (logand (reg-id-num id) 7))))
 
@@ -1105,19 +1111,19 @@
 (defun get-gpr (size number)
   (svref (load-time-value
           (coerce (append
-                   (loop for i from 0 below 16 collect (!make-reg (make-gpr-id :qword i)))
-                   (loop for i from 0 below 16 collect (!make-reg (make-gpr-id :dword i)))
-                   (loop for i from 0 below 16 collect (!make-reg (make-gpr-id :word i)))
-                   ;; byte reg vector is #(AL CL ... R15B AH CH DH BH)
-                   (loop for i from 0 below 20 collect (!make-reg (make-gpr-id :byte i))))
+                   (loop for i from 0 below 32 collect (!make-reg (make-gpr-id :qword i)))
+                   (loop for i from 0 below 32 collect (!make-reg (make-gpr-id :dword i)))
+                   (loop for i from 0 below 32 collect (!make-reg (make-gpr-id :word i)))
+                   ;; byte reg vector is #(AL CL ... R15B R16B ... R31B AH CH DH BH)
+                   (loop for i from 0 below 36 collect (!make-reg (make-gpr-id :byte i))))
                   'vector)
           t)
-         (+ (if (eq size :byte) (the (mod 20) number) (the (mod 16) number))
+         (+ (if (eq size :byte) (the (mod 36) number) (the (mod 32) number))
             (ecase size
               (:qword  0)
-              (:dword 16)
-              (:word  32)
-              (:byte  48)))))
+              (:dword 32)
+              (:word  64)
+              (:byte  96)))))
 
 (defun get-fpr (regset number)
   (ecase regset
@@ -1167,7 +1173,7 @@
 (defun sb-assem::perform-operand-lowering (operands)
   (mapcar (lambda (operand)
             (cond ((typep operand '(cons tn (eql :high-byte)))
-                   (get-gpr :byte (+ 16 (the (mod 4) (tn-offset (car operand))))))
+                   (get-gpr :byte (+ 32 (the (mod 4) (tn-offset (car operand))))))
                   ((not (typep operand 'tn))
                    ;; EA, literal, fixup, keyword, or REG if reg-in-size was used
                    operand)
@@ -1237,7 +1243,8 @@
             (index (ea-index thing))
             (scale (ea-scale thing))
             (disp (ea-disp thing))
-            (base-encoding (when base (reg-encoding (tn-reg base) segment)))
+            (base-reg (when base (if (register-p base) base (tn-reg base))))
+            (base-encoding (when base-reg (reg-encoding base-reg segment)))
             ;; EVEX compressed displacement: the CPU multiplies disp8 by N
             ;; (the tuple size), so we must encode disp/N. A displacement
             ;; qualifies for disp8 if it's a multiple of N and the quotient
@@ -1271,11 +1278,18 @@
          (let ((ss (1- (integer-length scale)))
                (index (if (null index)
                           #b100
-                          (if (location= index sb-vm::rsp-tn)
+                          (if (or (and (tn-p index) (location= index sb-vm::rsp-tn))
+                                  (and (register-p index)
+                                       (= (reg-id-num (reg-id index)) 4)))
                               (error "can't index off of RSP")
-                              (reg-encoding (if xmm-index
-                                                (get-fpr :xmm (tn-offset index))
-                                                (tn-reg index))
+                              (reg-encoding (cond (xmm-index
+                                                   (if (register-p index)
+                                                       index
+                                                       (get-fpr :xmm (tn-offset index))))
+                                                  ((register-p index)
+                                                   index)
+                                                  (t
+                                                   (tn-reg index)))
                                             segment))))
                (base (if (null base) #b101 base-encoding)))
            (emit-sib-byte segment ss index base)))
@@ -1308,27 +1322,65 @@
 ;;; operand size is qword.
 ;;; R, X and B are NIL or REG-IDs specifying registers the encodings of
 ;;; which may be extended with the REX.R, REX.X and REX.B bit, respectively.
-(defun emit-rex-if-needed (segment width-qword r x b)
+(defun emit-rex-if-needed (segment width-qword r x b &optional map1)
   (declare (type boolean width-qword)
            (type (or null fixnum) r x b))
   (flet ((encoding-bit3-p (reg-id)
            (and reg-id (logbitp 3 (reg-id-num reg-id))))
+         (encoding-bit4-p (reg-id)
+           (and reg-id (logbitp 4 (reg-id-num reg-id))))
          (spl/bpl/sil/dil-p (reg-id)
            (and reg-id
                 (is-gpr-id-p reg-id)
                 (eq (gpr-id-size-class reg-id) +size-class-byte+)
                 (<= 4 (reg-id-num reg-id) 7))))
-    (let ((wrxb (logior (if width-qword         #b1000 0)
-                        (if (encoding-bit3-p r) #b0100 0)
-                        (if (encoding-bit3-p x) #b0010 0)
-                        (if (encoding-bit3-p b) #b0001 0))))
-      (cond ((or (not (eql wrxb 0))
-                 (spl/bpl/sil/dil-p r)
-                 (spl/bpl/sil/dil-p b))
-             (emit-byte segment (logior #x40 wrxb))
-             (setf (segment-encoder-state segment) +rex+))
+    (let ((r4 (encoding-bit4-p r))
+          (x4 (encoding-bit4-p x))
+          (b4 (encoding-bit4-p b)))
+      (cond ((or r4 x4 b4 map1)
+             ;; APX REX2 Prefix (0xD5)
+             ;; Byte 1: [M0(7) | R4(6) | X4(5) | B4(4) | W(3) | R3(2) | X3(1) | B3(0)]
+             (let ((payload (logior (if map1                 #b10000000 0)
+                                    (if r4                   #b01000000 0)
+                                    (if x4                   #b00100000 0)
+                                    (if b4                   #b00010000 0)
+                                    (if width-qword          #b00001000 0)
+                                    (if (encoding-bit3-p r)  #b00000100 0)
+                                    (if (encoding-bit3-p x)  #b00000010 0)
+                                    (if (encoding-bit3-p b)  #b00000001 0))))
+               (emit-byte segment #xD5)
+               (emit-byte segment payload)
+               (setf (segment-encoder-state segment) +rex2+)))
             (t
-             (setf (segment-encoder-state segment) nil))))))
+             (let ((wrxb (logior (if width-qword         #b1000 0)
+                                 (if (encoding-bit3-p r) #b0100 0)
+                                 (if (encoding-bit3-p x) #b0010 0)
+                                 (if (encoding-bit3-p b) #b0001 0))))
+               (cond ((or (not (eql wrxb 0))
+                          (spl/bpl/sil/dil-p r)
+                          (spl/bpl/sil/dil-p b))
+                      (emit-byte segment (logior #x40 wrxb))
+                      (setf (segment-encoder-state segment) +rex+))
+                     (t
+                      (setf (segment-encoder-state segment) nil)))))))))
+
+(defun emit-rex2 (segment &key (w nil) (r nil) (x nil) (b nil) (map 0))
+  (flet ((reg-bit3 (reg) (if (and reg (logbitp 3 (reg-id-num (reg-id reg)))) 1 0))
+         (reg-bit4 (reg) (if (and reg (logbitp 4 (reg-id-num (reg-id reg)))) 1 0)))
+    (let ((r-id (and (register-p r) r))
+          (x-id (and (register-p x) x))
+          (b-id (and (register-p b) b)))
+      (emit-byte segment #xD5)
+      (emit-byte segment
+                 (logior (ash (if (eql map 1) 1 0) 7)
+                         (ash (reg-bit4 r-id) 6)
+                         (ash (reg-bit4 x-id) 5)
+                         (ash (reg-bit4 b-id) 4)
+                         (ash (if w 1 0) 3)
+                         (ash (reg-bit3 r-id) 2)
+                         (ash (reg-bit3 x-id) 1)
+                         (reg-bit3 b-id)))
+      (setf (segment-encoder-state segment) +rex2+))))
 
 ;;; Emit any instruction prefixes as required.
 ;;; THING is a register or memory operand of some kind. It and REG
@@ -1342,7 +1394,7 @@
 ;;; Fixups are assembled using an addressing mode of displacement-only or
 ;;; RIP-plus-displacement (see EMIT-EA), so will not reference an extended
 ;;; register.
-(defun emit-prefixes (segment thing reg operand-size &key lock)
+(defun emit-prefixes (segment thing reg operand-size &key lock map1)
   (declare (type (or tn reg ea fixup null) thing)
            (type (or tn reg integer null) reg)
            (type (member :byte :word :dword :qword :do-not-set) operand-size))
@@ -1363,13 +1415,14 @@
                         (when (register-p reg)
                           (reg-id reg)) ; REX.R
                         (awhen (and ea-p (ea-index thing)) ; REX.X
-                          (reg-id (tn-reg it)))
+                          (reg-id (if (register-p it) it (tn-reg it))))
                         (cond (ea-p ; REX.B
                                (let ((base (ea-base thing)))
                                  (when (and base (neq base rip-tn))
-                                   (reg-id (tn-reg base)))))
+                                   (reg-id (if (register-p base) base (tn-reg base))))))
                               ((register-p thing)
-                               (reg-id thing))))))
+                               (reg-id thing)))
+                        map1)))
 
 (defun operand-size (thing)
   (typecase thing
@@ -3807,7 +3860,13 @@
 
 (defun reg= (a b) ; Return T if A and B are the same register
   ;; NIL is allowed for base and/or index of an EA.
-  (if (not a) (not b) (and b (location= a b))))
+  (cond ((and (not a) (not b)) t)
+        ((or (not a) (not b)) nil)
+        ((and (register-p a) (register-p b))
+         (= (reg-id a) (reg-id b)))
+        ((and (tn-p a) (tn-p b))
+         (location= a b))
+        (t nil)))
 
 (defun ea= (a b) ; Return  T if A and B are the same EA
   (and (eql (ea-scale a) (ea-scale b))
