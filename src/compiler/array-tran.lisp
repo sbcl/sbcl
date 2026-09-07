@@ -659,13 +659,11 @@
                                             (specifier-type 'integer))
                                  (supplied-and-true fill-pointer))
                              '(*))
-                            ((combination-case dims
-                               (list *
+                            ((combination-match2 (dims :transform nil)
+                               ((list &rest args)
                                 (make-list (length args) :initial-element '*))
-                               (list* *
-                                (when (eq (lvar-type (car (last args)))
-                                          (specifier-type 'null))
-                                  (make-list (1- (length args)) :initial-element '*)))))
+                               ((list* (:+ args) (:type null))
+                                (make-list (length args) :initial-element '*))))
                             (t
                              '*)))
                     (spec
@@ -1796,13 +1794,10 @@
                                         n-bits))
 
 (deftransform sb-vm::%make-simple-array ((dims widetag n-bits) * * :node node)
-  (or (combination-match (:node node)
-          (sb-vm::%make-simple-array (array-dimensions array) * *)
-        (when (or (almost-immediately-used-p dims nil :flushable t)
-                  (csubtypep (lvar-type array) (specifier-type 'simple-array)))
-          (extract-lvar-n array 1 node)
-          `(sb-vm::%make-simple-array-array-dimensions dims widetag n-bits)))
-      (give-up-ir1-transform)))
+  (combination-match2 (node)
+    ((sb-vm::%make-simple-array (array-dimensions (:type simple-array array)) widetag n-bits)
+     (when (almost-immediately-used-p array nil :flushable t)
+       `(sb-vm::%make-simple-array-array-dimensions array widetag n-bits)))))
 
 (deftransform sb-vm::%make-simple-array-array-dimensions ((array widetag n-bits) (vector t t) * :node node)
   `(sb-vm::%make-simple-array (array-total-size array) widetag n-bits))

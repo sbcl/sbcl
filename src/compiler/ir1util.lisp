@@ -520,9 +520,17 @@
   (when (= (length args) n-args)
     (values-list args)))
 
-(defun check-min-args (args n-args)
+(defun check-min-args (args n-args &optional plus-pos)
   (when (>= (length args) n-args)
-    (values-list args)))
+    (if plus-pos
+        (let ((n-after (- n-args plus-pos 1)))
+          (values-list
+           (append (subseq args 0 plus-pos)
+                   (list (subseq args plus-pos (- (length args) n-after)))
+                   (last args n-after))))
+        (values-list
+         (append (subseq args 0 n-args)
+                 (list (nthcdr n-args args)))))))
 
 (defmacro combination-match (lvar spec &body body)
   (let (bound-vars)
@@ -755,7 +763,7 @@
                             (cond ((typep s '(cons (eql :type)))
                                    (let ((var (third s)))
                                      (add var)))
-                                  ((typep s '(cons (eql :constant)))
+                                  ((typep s '(cons (member :+ :constant)))
                                    (add (second s)))
                                   ((typep s '(cons (member :or :commutative)))
                                    (mapc #'walk (cdr s)))
@@ -784,12 +792,17 @@
                      (spec (expand-aliases (ensure-or spec))))
                  (labels ((gen (&optional sub)
                             (destructuring-bind (name . args) (pop spec)
-                              (let* ((variable (position '&rest args))
-                                     (arg-count (or variable
-                                                    (length args)))
+                              (let* ((plus (position-if (lambda (x) (typep x '(cons (eql :+)))) args))
+                                     (variable (or plus (position '&rest args)))
+                                     (rest-var (and (not plus) (second (member '&rest args))))
+                                     (arg-count (if plus (length args) (or variable (length args))))
                                      (vars (make-gensym-list arg-count "ARG"))
+                                     (bind-vars (if rest-var
+                                                    (append vars (list rest-var))
+                                                    vars))
                                      (names (ensure-or name))
-                                     (commutative (and (loop for name in names
+                                     (commutative (and (not plus)
+                                                       (loop for name in names
                                                              always (or (typep name '(cons (eql :commutative)))
                                                                         (ir1-attributep (fun-info-attributes (fun-info-or-lose name))
                                                                                         commutative)))
@@ -803,11 +816,17 @@
                                                               name))))
                                 (setf bound-vars old-bound-vars)
                                 (let ((args
-                                        `(or (multiple-value-bind ,vars ,(if variable
-                                                                             `(check-min-args args ,arg-count)
-                                                                             `(check-args args ,arg-count))
-                                               (declare (ignorable ,@vars))
-                                               (when ,(car vars)
+                                        `(or (multiple-value-bind ,bind-vars ,(cond (plus
+                                                                                `(check-min-args .args. ,arg-count ,plus))
+                                                                               (variable
+                                                                                `(check-min-args .args. ,arg-count))
+                                                                               (t
+                                                                                `(check-args .args. ,arg-count)))
+                                               (declare (ignorable ,@bind-vars))
+                                               (when ,(if vars
+                                                          (car vars)
+                                                          (progn (aver rest-var)
+                                                                 t))
                                                  ,(expand lvars specs
                                                           (lambda ()
                                                             (let ((old-bound-vars bound-vars))
@@ -862,6 +881,8 @@
                              ((typep spec '(cons (eql :constant)))
                               `(when (constant-lvar-p ,lvar)
                                  ,(match-var (second spec) t t (third spec))))
+                             ((typep spec '(cons (eql :+)))
+                              (match-var (second spec)))
                              ((symbolp spec)
                               (match-var spec))
                              ((atom spec)
@@ -869,7 +890,7 @@
                                  ,(expand (cdr lvars) (cdr specs)
                                           body)))
                              (t
-                              `(multiple-value-bind (name combination args) (lvar-combination/cast-name-args ,lvar)
+                              `(multiple-value-bind (name combination .args.) (lvar-combination/cast-name-args ,lvar)
                                  (declare (notinline lvar-value-is))
                                  (when combination
                                    (case name
@@ -886,16 +907,15 @@
                      (let* ((pattern-vars (collect-spec-vars spec))
                             (body-fun (gensym "MATCH-BODY"))
                             (matched (lambda ()
-                                       `(,body-fun name combination args ,@pattern-vars)))
+                                       `(,body-fun name combination .args. ,@pattern-vars)))
                             (branches (expand-node nil nil spec matched)))
-                       (push `(,body-fun (name combination args ,@pattern-vars)
-                                         (declare (ignorable name combination args ,@pattern-vars))
+                       (push `(,body-fun (name combination .args. ,@pattern-vars)
+                                         (declare (ignorable name combination .args. ,@pattern-vars))
                                          (let ((new (progn ,@body)))
-                                           ,(if transform
-                                                `(when new
-                                                   (return-from .combination-match.
-                                                     (combination-match-transform .node. ',pattern-vars new ,@pattern-vars)))
-                                                'new)))
+                                           (when new
+                                             ,(if transform
+                                                  `(combination-match-transform .node. ',pattern-vars new ,@pattern-vars)
+                                                  `(return-from .combination-match. new)))))
                              flets)
                        (dolist (branch branches)
                          (destructuring-bind (names form) branch
@@ -918,8 +938,8 @@
                                               (car forms))))))
                    `(let ((.node. ,node))
                       (flet ,flets
-                        (multiple-value-bind (name combination args) (combination/cast-name-args .node.)
-                          (declare (ignorable name combination args))
+                        (multiple-value-bind (name combination .args.) (combination/cast-name-args .node.)
+                          (declare (ignorable name combination .args.))
                           (case name
                             ,@case-branches))))))))
       (let ((dest (member :dest clauses)))
