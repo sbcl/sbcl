@@ -18,7 +18,8 @@
   #+permgen (%primitive sb-vm::gc-remember-layout layout)
   #-immobile-space (%instance-set layout index value)
   #+immobile-space
-  (sb-vm::with-pseudo-atomic-foreign-calls
+  (with-pinned-objects (layout value)
+   (sb-vm::with-pseudo-atomic-foreign-calls
     ;; This is pseudo-atomic because if you mark first and then GC occurs before storing,
     ;; then GC could (possibly) clear the mark, then you store, and now there's a violation
     ;; of the marking invariant. If you mark after the store, then you run the risk of an
@@ -29,16 +30,20 @@
     (alien-funcall (extern-alien "layout_slot_set" (function void unsigned unsigned int))
                    (get-lisp-obj-address layout) (get-lisp-obj-address value)
                    (truly-the (mod 32) index)))
-  value)
+  value))
 (defun %layout-slot-cas (layout index oldval newval)
   #-immobile-space (%instance-cas layout index oldval newval)
   #+immobile-space
-  (sb-vm::with-pseudo-atomic-foreign-calls
+  (with-pinned-objects (layout oldval newval)
+   (sb-vm::with-pseudo-atomic-foreign-calls
+    ;; This code is barely correct. We need the entire call including coercion
+    ;; of the unsigned word to a lispobj to be within pseudo-atomic.
+    ;; It's ok for x86-64 but technically incorrect for arm64. It needs a vop really.
     (%make-lisp-obj
      (alien-funcall (extern-alien "layout_slot_cas"
                                   (function unsigned unsigned unsigned unsigned int))
                     (get-lisp-obj-address layout) (get-lisp-obj-address oldval)
-                    (get-lisp-obj-address newval) (truly-the (mod 32) index)))))
+                    (get-lisp-obj-address newval) (truly-the (mod 32) index))))))
 
 ;;; For lack of any better to place to write up some detail surrounding
 ;;; layout creation for structure types, I'm putting here.
