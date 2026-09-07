@@ -724,7 +724,8 @@ Floats are passed in integer registers."
 
 ;;; Remember when changing this to check that these work:
 ;;; - disassembly, undefined alien, and conversion to ELF core
-(defun emit-c-call (vop rax fun args varargsp #+sb-safepoint pc-save #+win32 rbx)
+(defun emit-c-call (vop rax fun args varargsp #+sb-safepoint pc-save #+win32 rbx
+                    &aux (pseudo-atomic (call-out-pseudo-atomic-p vop)))
   (declare (ignorable varargsp))
   ;; Current PC - don't rely on function to keep it in a form that
   ;; GC understands
@@ -754,9 +755,10 @@ Floats are passed in integer registers."
   ;; Store SP in thread struct, unless the enclosing block says not to
 
   #+(or sb-safepoint nonstop-foreign-call)
-  (when (and #+sb-safepoint
-             (policy (sb-c::vop-node vop) (/= sb-c:insert-safepoints 0)))
-    (inst mov (thread-slot-ea thread-saved-csp-offset) rsp-tn))
+  (unless pseudo-atomic
+    (when (and #+sb-safepoint
+               (policy (sb-c::vop-node vop) (/= sb-c:insert-safepoints 0)))
+      (inst mov (thread-slot-ea thread-saved-csp-offset) rsp-tn)))
 
   #+win32 (inst sub rsp-tn #x20)       ;MS_ABI: shadow zone
 
@@ -766,7 +768,7 @@ Floats are passed in integer registers."
   ;; the UNDEFINED-ALIEN-TRAMP lisp asm routine to recognize the various shapes
   ;; this instruction sequence can take.
   #-win32
-  (pseudo-atomic (:elide-if (not (call-out-pseudo-atomic-p vop)))
+  (pseudo-atomic (:elide-if (not pseudo-atomic))
     (inst call
           #-immobile-space ; always call via RBX
           (cond ((stringp fun) (inst lea rbx-tn (ea (make-fixup fun :foreign) null-tn)) rbx-tn)
@@ -802,11 +804,12 @@ Floats are passed in integer registers."
   #+win32 (inst add rsp-tn #x20)       ;MS_ABI: remove shadow space
 
   ;; Zero the saved CSP, unless this code shouldn't ever stop for GC
-  #+sb-safepoint
-  (when (policy (sb-c::vop-node vop) (/= sb-c:insert-safepoints 0))
-    (inst xor (thread-slot-ea thread-saved-csp-offset) rsp-tn))
-  #+nonstop-foreign-call
-  (inst mov :qword (thread-slot-ea thread-saved-csp-offset) 0))
+  (unless pseudo-atomic
+    #+sb-safepoint
+    (when (policy (sb-c::vop-node vop) (/= sb-c:insert-safepoints 0))
+      (inst xor (thread-slot-ea thread-saved-csp-offset) rsp-tn))
+    #+nonstop-foreign-call
+    (inst mov :qword (thread-slot-ea thread-saved-csp-offset) 0)))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)

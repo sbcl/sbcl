@@ -42,9 +42,7 @@
   ;; In any case, we desire a way to say that certain foreign calls are
   ;; uninterruptible, but this technique has less overhead than WITHOUT-GCING
   ;; which is to be eschewed as no such thing exists in most collectors.
-  ;; If using safepoints, then this reduces to PROGN.
-  `(symbol-macrolet (#-(or sb-safepoint nonstop-foreign-call)
-                     (sb-vm::.pseudo-atomic-call-out. t))
+  `(symbol-macrolet ((sb-vm::.pseudo-atomic-call-out. t))
      ,@body))
 
 ;;;; other miscellaneous stuff
