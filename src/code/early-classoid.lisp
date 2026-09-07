@@ -280,9 +280,6 @@
   ;; access to slot-definitions and locations by name, etc.
   ;; See MAKE-SLOT-TABLE in pcl/slots-boot.lisp for further details.
   (slot-table #(1 nil) :type simple-vector)
-  ;; In lieu of card-marking, this should maintain a so-called intrusive
-  ;; linked list of layouts touched since last GC
-  ; (chain 0 :type sb-vm:word) ; not yet
   (id-word0 0 :type word)
   (id-word1 0 :type word)
   (id-word2 0 :type word)
