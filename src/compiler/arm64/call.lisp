@@ -190,7 +190,7 @@
 ;;;     are stack values.
 ;;;  -- Reset SP.  This must be done whenever other than 1 value is returned,
 ;;;     regardless of the number of values desired.
-
+#+tls-based-mv-return
 (defun default-unknown-values (vop values nvals move-temp node)
   (declare (type (or tn-ref null) values)
            (type unsigned-byte nvals) (type tn move-temp))
@@ -285,6 +285,167 @@
                                   (tn-ref-across val)))
                             ((null val))
                           (let ((tn (tn-ref-tn val)))
+                            (unless (eq (tn-kind tn) :unused)
+                             ,@body)))))
+            ;; If we ARE expecting values on the stack, we need to
+            ;; either move them to their result location or to set their
+            ;; result location to the default.
+            (when expecting-values-on-stack
+              (let (stack-targets-p
+                    (prev-cmp -1))
+                (map-stack-values
+                 (when (and (>= i min-values)
+                            (sc-is tn control-stack))
+                   (setf stack-targets-p i)))
+                ;; If all destinations are registers move NIL into all
+                ;; of them before checking for single value return, that
+                ;; way it doesn't need to set up NARGS and OCFP.
+                (map-stack-values
+                 (when (if stack-targets-p
+                           (> i stack-targets-p)
+                           (>= i min-values))
+                   (inst mov tn null-tn)))
+                (cond ((and trust
+                            (> min-values 1)))
+                      ((or (not trust)
+                           stack-targets-p)
+                       (inst mov tmp-tn (fixnumize 1))
+                       (inst csel nargs-tn tmp-tn nargs-tn :ne)
+                       (unless trust
+                         (check-nargs)))
+                      (t
+                       (inst b :ne DONE)))
+                (map-stack-values
+                 (cond ((< i min-values)
+                        (let ((slot (+ thread-mv-return-values-slot (- i register-arg-count))))
+                          (sc-case tn
+                            (control-stack
+                             (loadw move-temp thread-tn slot)
+                             (store-stack-tn tn move-temp))
+                            (t
+                             (loadw tn thread-tn slot)))))
+                       (t
+                        (let ((dst move-temp)
+                              ;; Reuse the previous comparison if it's the last one
+                              (reuse-cmp (and (= i (1- nvals))
+                                              (eql prev-cmp i))))
+                          (assemble ()
+                            ;; ... Load it if there is a stack value available, or
+                            ;; default it if there isn't.
+                            (unless reuse-cmp
+                              (inst cmp nargs-tn (fixnumize (setf prev-cmp (1+ i)))))
+                            (unless (sc-is tn control-stack)
+                              (setf dst tn))
+                            (when (and stack-targets-p
+                                       (<= i stack-targets-p))
+                              (move dst null-tn))
+                            (inst b (if reuse-cmp :le :lt)
+                                  (if (and stack-targets-p
+                                           (<= i stack-targets-p))
+                                      NONE
+                                      DONE))
+                            (loadw dst thread-tn (+ thread-mv-return-values-slot (- i register-arg-count)))
+                            NONE
+                            (when (sc-is tn control-stack)
+                              (store-stack-tn tn dst))))))))))
+          DONE))))
+  (values))
+
+#-tls-based-mv-return
+(defun default-unknown-values (vop values nvals move-temp node)
+  (declare (type (or tn-ref null) values)
+           (type unsigned-byte nvals) (type tn move-temp))
+  (multiple-value-bind (type name leaf) (sb-c::lvar-fun-type (sb-c::basic-combination-fun node))
+    (let* ((verify (and leaf
+                        (policy node (and (>= safety 1)
+                                          (= debug 3)))
+                        (memq (sb-c::leaf-where-from leaf) '(:declared-verify :defined-here))))
+           (type (if verify
+                     (if (fun-type-p type)
+                         (fun-type-returns type)
+                         *wild-type*)
+                     (sb-c::node-derived-type node)))
+           (min-values (values-type-min-value-count type))
+           (max-values (values-type-max-value-count type))
+           (trust (or (and (= min-values 0)
+                           (= max-values call-arguments-limit))
+                      (not verify)))
+           (expecting-values-on-stack (> nvals register-arg-count)))
+
+      (note-this-location vop (if (<= nvals 1)
+                                  :single-value-return
+                                  :unknown-return))
+      (flet ((check-nargs ()
+               (assemble ()
+                 (let* ((*location-context* (list* (make-restart-location SKIP)
+                                                   name
+                                                   (type-specifier type)))
+                        (err-lab (generate-error-code vop 'invalid-arg-count-error))
+                        (min min-values)
+                        (max (and (< max-values call-arguments-limit)
+                                  max-values)))
+                   (labels ((load-immediate (x)
+                              (add-sub-immediate (fixnumize x))))
+                     (cond ((eql max 0)
+                            (inst cbnz nargs-tn err-lab))
+                           ((eql min max)
+                            (inst cmp nargs-tn (load-immediate max))
+                            (inst b :ne err-lab))
+                           (max
+                            (let ((nargs tmp-tn))
+                              (if (zerop min)
+                                  (setf nargs nargs-tn)
+                                  (inst sub tmp-tn nargs-tn (load-immediate min)))
+                              (inst cmp nargs (load-immediate (- max min))))
+                            (inst b :hi err-lab))
+                           (t
+                            (cond ((= min 1)
+                                   (inst cbz nargs-tn err-lab))
+                                  ((plusp min)
+                                   (inst cmp nargs-tn (load-immediate min))
+                                   (inst b :lo err-lab)))))))
+                 SKIP)))
+        ;; Pick off the single-value case first.
+        (assemble ()
+          ;; Default register values for single-value return case.
+          ;; The callee returns with condition bits CLEAR in the
+          ;; single-value case.
+          (when values
+            (do ((i 1 (1+ i))
+                 (val (tn-ref-across values) (tn-ref-across val)))
+                ((= i (min nvals register-arg-count)))
+              (unless (eq (tn-kind (tn-ref-tn val)) :unused)
+                (cond
+                  ((and trust
+                        (> min-values i)))
+                  (t
+                   (inst csel (tn-ref-tn val) null-tn (tn-ref-tn val) :ne))))))
+
+          ;; If we're not expecting values on the stack, all that
+          ;; remains is to clear the stack frame (for the multiple-
+          ;; value return case).
+          (unless (or expecting-values-on-stack
+                      (and trust
+                           (type-single-value-p type)))
+            (cond ((or (not trust)
+                       (values-type-may-be-single-value-p type))
+                   (inst csel csp-tn ocfp-tn csp-tn :eq)
+                   (unless trust
+                     (inst mov tmp-tn (fixnumize 1))
+                     (inst csel nargs-tn tmp-tn nargs-tn :ne)
+                     (check-nargs)))
+                  ((eq type *empty-type*))
+                  (t
+
+                   (inst mov csp-tn ocfp-tn))))
+          (macrolet ((map-stack-values (&body body)
+                       `(do ((i register-arg-count (1+ i))
+                             (val (do ((i 0 (1+ i))
+                                       (val values (tn-ref-across val)))
+                                      ((= i register-arg-count) val))
+                                  (tn-ref-across val)))
+                            ((null val))
+                          (let ((tn (tn-ref-tn val)))
                             ,@body))))
             ;; If we ARE expecting values on the stack, we need to
             ;; either move them to their result location or to set their
@@ -308,7 +469,7 @@
                             (> min-values 1)))
                       ((or (not trust)
                            stack-targets-p)
-                       #-tls-based-mv-return (inst csel ocfp-tn csp-tn ocfp-tn :ne)
+                       (inst csel ocfp-tn csp-tn ocfp-tn :ne)
                        (inst mov tmp-tn (fixnumize 1))
                        (inst csel nargs-tn tmp-tn nargs-tn :ne)
                        (unless trust
@@ -320,15 +481,6 @@
                         (incf decrement (fixnumize 1)))
                        ((< i min-values)
                         (incf decrement (fixnumize 1))
-                        #+tls-based-mv-return
-                        (let ((slot (+ thread-mv-return-values-slot (- i register-arg-count))))
-                          (sc-case tn
-                            (control-stack
-                             (loadw move-temp thread-tn slot)
-                             (store-stack-tn tn move-temp))
-                            (t
-                             (loadw tn thread-tn slot))))
-                        #-tls-based-mv-return
                         (sc-case tn
                           (control-stack
                            (let* ((next (and (< (1+ i) min-values)
@@ -373,31 +525,21 @@
                           (assemble ()
                             ;; ... Load it if there is a stack value available, or
                             ;; default it if there isn't.
-                            #+tls-based-mv-return
-                            (progn
-                              (inst cmp nargs-tn decrement)
-                              (incf decrement (fixnumize 1)))
-                            #-tls-based-mv-return
-                            (progn
-                             (if (tn-ref-across val) ;; more to come
-                                 (inst subs nargs-tn nargs-tn decrement)
-                                 (inst cmp nargs-tn decrement))
-                             (setf decrement (fixnumize 1)))
+                            (if (tn-ref-across val) ;; more to come
+                                (inst subs nargs-tn nargs-tn decrement)
+                                (inst cmp nargs-tn decrement))
+                            (setf decrement (fixnumize 1))
                             (unless (sc-is tn control-stack)
                               (setf dst tn))
                             (when stack-targets-p
                               (move dst null-tn))
                             (inst b :lt NONE)
-                            #+tls-based-mv-return
-                            (loadw dst thread-tn (+ thread-mv-return-values-slot
-                                                    (- i register-arg-count)))
-                            #-tls-based-mv-return
                             (loadw dst ocfp-tn i)
                             NONE
                             (when (sc-is tn control-stack)
                               (store-stack-tn tn dst))))))))
               ;; Deallocate the callee stack frame.
-              #-tls-based-mv-return (move csp-tn ocfp-tn)))
+              (move csp-tn ocfp-tn)))
           DONE))))
   (values))
 
@@ -1736,4 +1878,3 @@
     ;; single-step-before-trap.
     (inst brk single-step-before-trap)
     DONE))
-
