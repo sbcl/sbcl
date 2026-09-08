@@ -597,7 +597,11 @@
                               (cond
                                 ((not next)
                                  (return))
-                                ((eq (ctran-block next) ,n-block)
+                                ((and (eq (ctran-block next) ,n-block)
+                                      ;; unlink-node only resets node-prev, not node-next
+                                      ;; don't follow node-next if it's been just deleted.
+                                      ;; (node-prev ,node-var)
+                                      )
                                  (ctran-next next))
                                 (t
                                  (let ((start (block-start ,n-block)))
@@ -609,10 +613,10 @@
                                     (ctran-next it))
                                    (t (return)))))
            ,@(when lvar-var
-                   `((,lvar-var (when (valued-node-p ,node-var)
-                                  (node-lvar ,node-var))
-                                (when (valued-node-p ,node-var)
-                                  (node-lvar ,node-var))))))
+               `((,lvar-var (when (valued-node-p ,node-var)
+                              (node-lvar ,node-var))
+                            (when (valued-node-p ,node-var)
+                              (node-lvar ,node-var))))))
           (nil)
        ,@body
        ,@(when restart-p

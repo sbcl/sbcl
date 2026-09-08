@@ -3779,24 +3779,20 @@
        (the (integer -504635362412860905 -99686857090873309) (lognand b 11))))))
 
 (with-test (:name :not-folded-vops)
-  (assert
-   (type-specifiers-equal
-    (caddr
-     (sb-kernel:%simple-fun-type
-      (checked-compile
-       `(lambda ()
-          (floor
-           (dpb 42
-                (byte 15 7)
-                (block b
-                  (loop for lv below 1 count
-                        (floor
-                         (flet ((%f (f1)
-                                  (- (floor f1 f1) (return-from b -9))))
-                           (multiple-value-call #'%f (values (block b3 lv))))
-                         42))))
-           42)))))
-    '(values (integer -99734 -99734) (integer 19 19) &optional))))
+  (assert-type
+   (lambda ()
+     (floor
+      (dpb 42
+           (byte 15 7)
+           (block b
+             (loop for lv below 1 count
+                   (floor
+                    (flet ((%f (f1)
+                             (- (floor f1 f1) (return-from b -9))))
+                      (multiple-value-call #'%f (values (block b3 lv))))
+                    42))))
+      42))
+   nil))
 
 (with-test (:name :bit-ir2opt)
   (checked-compile-and-assert
