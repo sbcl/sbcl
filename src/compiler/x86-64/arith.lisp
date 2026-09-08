@@ -4561,7 +4561,7 @@
                :unused-if (csubtypep (tn-ref-type x-ref)
                                      (specifier-type 'integer)))
               temp)
-  (:generator 10
+  (:generator 9
     (let ((fixnum-mask-p (and (= n-fixnum-tag-bits 1)
                               (= mask (ash most-positive-word -1)))))
       (assemble ()
