@@ -841,7 +841,7 @@
                  (if (eq remaining *empty-type*)
                      `(,predicate ,object)
                      `(or (,predicate ,object)
-                          (typep object ',(type-specifier remaining))))))))
+                          (typep ,object ',(type-specifier remaining))))))))
           (;; Handle (and real (not fixnum)) without comparisons
            ;; by doing (and (not (fixnump x)) (realp x))
            (when (or (numeric-union-type-p type)
@@ -881,8 +881,7 @@
           ;; call to MEMBER
           ((flet ((transform-numeric (type)
                     ;; Check for rationals and integer separately if they do not have the same bounds
-                    (cond ((and (eq (sb-kernel::numtype-aspects-class (sb-kernel::numeric-union-type-aspects type))
-                                    'rational)
+                    (cond ((and (eq (numeric-type-class type) 'rational)
                                 (let ((integer (type-intersection type (specifier-type 'integer))))
                                   (when (numeric-type-p integer)
                                     (let ((rest (sb-kernel::numeric-union-remove-integers type)))
@@ -890,7 +889,8 @@
                                         `(boolean-or
                                           (typep ,object ',(type-specifier integer))
                                           (typep ,object ',(type-specifier rest)))))))))
-                          ((eq (numeric-type-complexp type) :real)
+                          ((and (eq (numeric-type-complexp type) :real)
+                                (not (member (numeric-type-format type) '(double-float #-64-bit single-float))))
                            (let (singletons left-over)
                              (sb-kernel::map-numeric-union-ranges
                               (lambda (low high class)
