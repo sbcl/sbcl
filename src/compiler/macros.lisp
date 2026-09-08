@@ -600,8 +600,7 @@
                                 ((and (eq (ctran-block next) ,n-block)
                                       ;; unlink-node only resets node-prev, not node-next
                                       ;; don't follow node-next if it's been just deleted.
-                                      ;; (node-prev ,node-var)
-                                      )
+                                      (node-prev ,node-var))
                                  (ctran-next next))
                                 (t
                                  (let ((start (block-start ,n-block)))
