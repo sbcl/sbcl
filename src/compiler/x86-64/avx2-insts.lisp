@@ -438,8 +438,8 @@
       (#x0F   #b001)
       (#x0F38 #b010)
       (#x0F3A #b011)
-      ((:map5 5 #x5) #b101)
-      ((:map6 6 #x6) #b110))))
+      ((:map5 5) #b101)
+      ((:map6 6) #b110))))
 
 (defun emit-two-byte-vex (segment r vvvv l pp)
   (emit-bytes segment

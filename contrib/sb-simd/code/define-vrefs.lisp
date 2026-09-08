@@ -18,8 +18,12 @@
            (ecase kind
              (:load
               (if (not (instruction-set-available-p instruction-set))
-                  `(define-missing-instruction ,name
-                     :required-arguments (array index))
+                  `(progn
+                     (define-missing-instruction ,name
+                       :required-arguments (array index))
+                     ,@(when sap
+                         `((define-missing-instruction ,sap
+                             :required-arguments (sap index)))))
                   `(progn
                     (define-inline ,name (array index)
                        (declare (type (array ,element-type) array)
@@ -35,8 +39,12 @@
                             (,sap-vop sap index 0)))))))
              (:store
               (if (not (instruction-set-available-p instruction-set))
-                  `(define-missing-instruction ,name
-                     :required-arguments (value array index))
+                  `(progn
+                     (define-missing-instruction ,name
+                       :required-arguments (value array index))
+                     ,@(when sap
+                         `((define-missing-instruction (setf ,sap)
+                             :required-arguments (value sap index)))))
                   `(progn
                     (define-inline ,name (value array index)
                        (declare (type (array ,element-type) array)
