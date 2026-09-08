@@ -880,24 +880,34 @@
           ;; Turn disjoint singlegton numeric types into a single
           ;; call to MEMBER
           ((flet ((transform-numeric (type)
-                    (when (eq (numeric-type-complexp type) :real)
-                      (let (singletons left-over)
-                        (sb-kernel::map-numeric-union-ranges
-                         (lambda (low high class)
-                           (if (and low
-                                    (eql low high))
-                               (push low singletons)
-                               (push
-                                (let ((bounds (list (or low '*) (or high '*))))
-                                  (if (eq class 'ratio)
-                                      `(and (rational ,@bounds) (not integer))
-                                      (list* class bounds)))
-                                left-over)))
-                         type)
-                        (when singletons
-                          `(boolean-or (member ,object '(,@singletons))
-                                       ,@(and left-over
-                                              `((typep ,object '(or ,@left-over))))))))))
+                    ;; Check for rationals and integer separately if they do not have the same bounds
+                    (cond ((and (eq (sb-kernel::numtype-aspects-class (sb-kernel::numeric-union-type-aspects type))
+                                    'rational)
+                                (let ((integer (type-intersection type (specifier-type 'integer))))
+                                  (when (numeric-type-p integer)
+                                    (let ((rest (sb-kernel::numeric-union-remove-integers type)))
+                                      (unless (eq rest type)
+                                        `(boolean-or
+                                          (typep ,object ',(type-specifier integer))
+                                          (typep ,object ',(type-specifier rest)))))))))
+                          ((eq (numeric-type-complexp type) :real)
+                           (let (singletons left-over)
+                             (sb-kernel::map-numeric-union-ranges
+                              (lambda (low high class)
+                                (if (and low
+                                         (eql low high))
+                                    (push low singletons)
+                                    (push
+                                     (let ((bounds (list (or low '*) (or high '*))))
+                                       (if (eq class 'ratio)
+                                           `(and (rational ,@bounds) (not integer))
+                                           (list* class bounds)))
+                                     left-over)))
+                              type)
+                             (when singletons
+                               `(boolean-or (member ,object '(,@singletons))
+                                            ,@(and left-over
+                                                   `((typep ,object '(or ,@left-over)))))))))))
              (if (numeric-union-type-p type)
                  (transform-numeric type)
                  (let (tests

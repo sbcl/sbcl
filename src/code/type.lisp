@@ -7176,6 +7176,19 @@ expansion happened."
                for high = (aref ranges (1+ i))
                do (funcall function low high format)))))))
 
+(defun numeric-union-remove-integers (type)
+  (let ((ranges (numeric-union-type-ranges type))
+        (aspects (numeric-union-type-aspects type)))
+    (new-numeric-union-type
+     aspects
+     (coerce (loop for i below (length ranges) by 3
+                   for run = (aref ranges i)
+                   unless (eq run #.range-integer-run)
+                   collect run
+                   and collect (aref ranges (+ i 1))
+                   and collect (aref ranges (+ i 2)))
+             'vector))))
+
 ;; (or (integer * -3) (integer 5)) => -3, 5
 ;; (integer 5) => nil, 5
 ;; (integer * -5) => -5, nil
