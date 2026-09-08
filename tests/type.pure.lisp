@@ -1315,3 +1315,13 @@
    (not (type/= (specifier-type '(and unknown unknown2)) (specifier-type '(or vector cons)))))
   (assert
    (not (type/= (specifier-type '(or unknown unknown2)) (specifier-type '(or vector cons))))))
+
+(with-test (:name :numeric-union-rational-split)
+  (checked-compile-and-assert
+      ()
+      `(lambda (j) (typep j '(or (rational 1/2 3) (integer 0))))
+    ((9/2) nil)
+    ((10) t)
+    ((-1) nil)
+    ((1/2) t)
+    ((4/3) t)))

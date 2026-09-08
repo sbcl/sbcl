@@ -7153,15 +7153,28 @@ expansion happened."
   (declare (dynamic-extent function))
   (let ((ranges (numeric-union-type-ranges type))
         (aspects (numeric-union-type-aspects type)))
-    (if (memq (numtype-aspects-class aspects) '(integer rational))
-        (loop for i below (length ranges) by 3
-              for low = (aref ranges (+ i 1))
-              for high = (aref ranges (+ i 2))
-              do (funcall function low high))
-        (loop for i below (length ranges) by 2
-              for low = (aref ranges i)
-              for high = (aref ranges (1+ i))
-              do (funcall function low high)))))
+    (case (numtype-aspects-class aspects)
+      (integer
+       (loop for i below (length ranges) by 3
+             for low = (aref ranges (+ i 1))
+             for high = (aref ranges (+ i 2))
+             do (funcall function low high 'integer)))
+      (rational
+       (loop for i below (length ranges) by 3
+             for run = (aref ranges i)
+             for low = (aref ranges (+ i 1))
+             for high = (aref ranges (+ i 2))
+             do (funcall function low high
+                         (case run
+                           (#.range-integer-run 'integer)
+                           (#.range-rational-run 'rational)
+                           (#.range-ratio-run 'ratio)))))
+      (t
+       (let ((format (numtype-aspects-precision aspects)))
+         (loop for i below (length ranges) by 2
+               for low = (aref ranges i)
+               for high = (aref ranges (1+ i))
+               do (funcall function low high format)))))))
 
 ;; (or (integer * -3) (integer 5)) => -3, 5
 ;; (integer 5) => nil, 5
@@ -7171,7 +7184,8 @@ expansion happened."
   (let (min-left
         min-right)
     (block nil
-      (map-numeric-union-ranges (lambda (low high)
+      (map-numeric-union-ranges (lambda (low high type)
+                                  (declare (ignore type))
                                   (cond ((not (fp-high-ge-high-p high 0))
                                          (setf min-left high))
                                         ((not (fp-low-le-low-p low 0))

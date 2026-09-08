@@ -881,30 +881,23 @@
           ;; call to MEMBER
           ((flet ((transform-numeric (type)
                     (when (eq (numeric-type-complexp type) :real)
-                      (let ((singletons))
+                      (let (singletons left-over)
                         (sb-kernel::map-numeric-union-ranges
-                         (lambda (low high)
-                           (when (and low high
-                                      (eql low high))
-                             (push low singletons)))
+                         (lambda (low high class)
+                           (if (and low
+                                    (eql low high))
+                               (push low singletons)
+                               (push
+                                (let ((bounds (list (or low '*) (or high '*))))
+                                  (if (eq class 'ratio)
+                                      `(and (rational ,@bounds) (not integer))
+                                      (list* class bounds)))
+                                left-over)))
                          type)
                         (when singletons
-                          (let* (left-over
-                                 (class (numeric-type-class type))
-                                 (type-name (ecase class
-                                              ((integer rational)
-                                               class)
-                                              (float
-                                               (numeric-type-format type)))))
-                            (sb-kernel::map-numeric-union-ranges
-                             (lambda (low high)
-                               (unless (and low high
-                                            (eql low high))
-                                 (push (list type-name (or low '*) (or high '*)) left-over)))
-                             type)
-                            `(boolean-or (member ,object '(,@singletons))
-                                         ,@ (and left-over
-                                                 `((typep ,object '(or ,@left-over)))))))))))
+                          `(boolean-or (member ,object '(,@singletons))
+                                       ,@(and left-over
+                                              `((typep ,object '(or ,@left-over))))))))))
              (if (numeric-union-type-p type)
                  (transform-numeric type)
                  (let (tests
