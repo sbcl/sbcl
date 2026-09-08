@@ -847,10 +847,11 @@ invoked. In that case it will store into PLACE and start over."
     (lambda (condition stream)
       (format stream
         "Duplicate key ~S in ~S form, ~
-         occurring in~{~#[~; and~]~{ clause ~a:~%~<  ~S~:>~}~^,~}."
+         occurring in ~{~{clause ~a:~%~<  ~S~:>~}~^~#[~;, and ~:;, ~]~}"
         (case-warning-key condition)
         (case-warning-case-kind condition)
-        (duplicate-case-key-warning-occurrences condition)))))
+        (remove-duplicates (duplicate-case-key-warning-occurrences condition)
+                           :test #'equal)))))
 
 ;;; Return three values:
 ;;; 1. an array of LAYOUT
@@ -1137,16 +1138,15 @@ invoked. In that case it will store into PLACE and start over."
           (case-position 1 (1+ case-position)))
          ((null cases) nil)
       (flet ((check-clause (case-keys)
-               (loop for k in case-keys
-                  for existing = (gethash k keys-seen)
-                  do (when existing
-                       (warn 'duplicate-case-key-warning
-                             :key k
-                             :case-kind name
-                             :occurrences `(,existing (,case-position (,clause))))))
                (let ((record (list case-position (list clause))))
-                 (dolist (k case-keys)
-                   (setf (gethash k keys-seen) record))))
+                 (loop for k in case-keys
+                       for existing = (gethash k keys-seen)
+                       do (when existing
+                            (warn 'duplicate-case-key-warning
+                                  :key k
+                                  :case-kind name
+                                  :occurrences `(,existing (,case-position (,clause)))))
+                          (setf (gethash k keys-seen) record))))
              (testify (k)
                (wrap-if
                 (and (eq test 'typep)

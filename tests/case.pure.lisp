@@ -29,7 +29,8 @@
         ("Duplicate key 2 in CASE form, occurring in clause 1:  ((1 2) 1), and clause 2:  ((2 3) 2)"
          case ((1 2) 1)
               ((2 3) 2))
-
+        ("Duplicate key 1 in CASE form, occurring in clause 1:  ((1 1) 1)"
+         case ((1 1) 1))
         (nil
          case (#1=(1) 1)
               ((#1#) 2)))
