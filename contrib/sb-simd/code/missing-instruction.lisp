@@ -11,8 +11,8 @@
     :reader missing-instruction-record))
   (:report
    (lambda (c s)
-     (with-accessors ((instruction-set instruction-record-instruction-set)
-                      (instruction-name instruction-record-name))
+     (with-accessors ((instruction-set record-instruction-set)
+                      (instruction-name record-name))
          (missing-instruction-record c)
        (format s "Missing ~S instruction ~S."
                (instruction-set-name instruction-set)
