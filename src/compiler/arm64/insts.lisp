@@ -794,13 +794,14 @@
            (type (member 32 64) width)
            (optimize speed))
   (loop with pattern = integer
-        for size of-type (integer 0 32) = (truncate width 2) then (truncate size 2)
-        for try-pattern of-type (unsigned-byte 32) = (ldb (byte size 0) integer)
+        for prev-size = width then size
+        for size of-type (integer 0 32) = (truncate prev-size 2)
+        for try-pattern = (ldb (byte size 0) integer)
         while (and (= try-pattern
-                      (the (unsigned-byte 32) (ldb (byte size size) integer)))
+                      (ldb (byte size size) integer))
                    (> size 1))
         do (setf pattern try-pattern)
-        finally (return (values (* size 2) pattern))))
+        finally (return (values prev-size pattern))))
 
 (defun fixnum-encode-logical-immediate (integer)
   (and (fixnump integer)
