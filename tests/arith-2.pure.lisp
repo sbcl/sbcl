@@ -2655,3 +2655,11 @@
    ((5 11) t)
    ((5 10) nil)
    (((ash 1 (1- sb-vm:n-word-bits)) 0) (condition 'type-error))))
+
+(with-test (:name :cut-to-width-omit-logand)
+  (checked-compile-and-assert
+      ()
+      `(lambda (d)
+         (logand (lognot (logand d -3)) 1))
+    ((-7726172277034401953) 0)
+    ((0) 1)))

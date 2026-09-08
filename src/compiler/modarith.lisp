@@ -200,12 +200,9 @@
                (unless (cond ((and (vop-existsp :named sb-vm::logand-word-mask)
                                    ;; logand-word-mask works without inserting additional cuts
                                    (combination-match2 ((lvar-dest lvar) :transform nil)
-                                     ((logand a b)
-                                      (let ((other-type
-                                              (lvar-type (if (lvar-from-lvar-p b lvar)
-                                                             a
-                                                             b))))
-                                        (csubtypep other-type type))))))
+                                     ((logand (:type unsigned-byte a) b)
+                                      (when (lvar-from-lvar-p b lvar)
+                                        (csubtypep (lvar-type a) type))))))
 
                              (t
                               (combination-match2 ((lvar-dest lvar) :transform nil)
