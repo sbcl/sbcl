@@ -3157,7 +3157,6 @@
 (when-vop-existsp (:translate count-trailing-zeros)
   (deftransform integer-length ((x) (word) * :important nil :node node)
     (delay-ir1-transform node :ir1-phases)
-    (print (generate-combination-tree x))
     (combination-match2 (node)
       ((integer-length
         (sb-vm::lognot-mod64 (:or
