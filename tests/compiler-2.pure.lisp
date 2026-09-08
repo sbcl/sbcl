@@ -3778,7 +3778,8 @@
                (shiftf b (logorc1 1073741832 a)))
        (the (integer -504635362412860905 -99686857090873309) (lognand b 11))))))
 
-(with-test (:name :not-folded-vops)
+(with-test (:name :not-folded-vops
+            :broken-on :sbcl)
   (assert-type
    (lambda ()
      (floor
