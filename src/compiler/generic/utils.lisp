@@ -12,11 +12,6 @@
 
 (in-package "SB-VM")
 
-;;; Make a fixnum out of NUM. (I.e. shift by two bits if it will fit.)
-(defun fixnumize (num)
-  (if (fixnump num)
-      (ash num n-fixnum-tag-bits)
-      (error "~W is too big for a fixnum." num)))
 
 (declaim (inline tn-byte-offset))
 (defun tn-byte-offset (tn)

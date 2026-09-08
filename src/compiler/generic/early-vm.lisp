@@ -199,3 +199,8 @@
 ;;; Convince some usage sites to perform fixnum arithmetic
 (declaim (ftype (sfunction (t) (or (mod #.(length +static-symbols+)) boolean))
                 static-symbol-p))
+
+;;; Make a fixnum out of NUM. (I.e. shift by two bits if it will fit.)
+(declaim (inline fixnumize))
+(defun fixnumize (num)
+  (ash (the sb-xc:fixnum num) n-fixnum-tag-bits))
