@@ -801,22 +801,6 @@ younger_p(lispobj thing, int gen, int keep_gen, int new_gen)
     return is_lisp_pointer(thing) && pointee_gen(thing, keep_gen, new_gen) < gen;
 }
 
-// Scan range between start and end (exclusive) for old-to-young pointers.
-static int
-range_points_to_younger_p(lispobj* obj, lispobj* end,
-                          int gen, int keep_gen, int new_gen)
-{
-#ifdef DEBUG
-  lispobj* __attribute__((unused)) saved_obj = obj, __attribute__((unused)) header = *obj;
-#endif
-    do {
-        lispobj thing = *obj;
-        if (is_lisp_pointer(thing) && pointee_gen(thing, keep_gen, new_gen) < gen)
-            return 1; // yes, points to younger
-    } while (++obj < end);
-    return 0; // no, does not point to younger
-}
-
 // Scan a fixed-size object for old-to-young pointers.
 // Since fixed-size objects are boxed and on known boundaries,
 // we never start in the middle of random bytes, so the answer is exact.
@@ -848,18 +832,18 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
         return 1;
     struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
     gc_assert(bitmap.nwords == 1);
-    if (bitmap.bits[0] != (sword_t)-1) {
+    // the bitmap of a LAYOUT is never the default (all-tagged) bitmap
+    gc_assert(bitmap.bits[0] != (sword_t)-1);
+    {
         sword_t mask = bitmap.bits[0];
         lispobj* where = obj + 1;
         lispobj* limit = obj + n_words;
         for ( ; where < limit ; ++where, mask >>= 1 )
-            if ((mask & 1) != 0 && younger_p(*where, gen, keep_gen, new_gen))
-                return 1;
+            if ((mask & 1) != 0 && younger_p(*where, gen, keep_gen, new_gen)) return 1;
         return 0;
     }
-    // FALLTHROUGH_INTENDED
   }
-  return range_points_to_younger_p(obj+1, obj+n_words, gen, keep_gen, new_gen);
+  lose("Unhandled widetag in fixedobj_points_to_younger");
 }
 
 /// The next two functions are analogous to 'update_page_write_prot()'
