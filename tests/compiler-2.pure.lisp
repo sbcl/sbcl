@@ -5346,3 +5346,15 @@
        (:optimize :default)
        `(lambda (a) (ftype-test-unused-opt3 1 0.0 a))
      ((1) (condition 'type-error)))))
+
+(with-test (:name :mv-wrong-nargs-comparison)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (funcall a)
+         (multiple-value-bind (a b c d e f g h) (funcall b)
+           (declare (ignore a b c d e f))
+           (values g h)))
+    (((lambda () (values 1 2 3 4 5 6 7 :b))
+      (lambda () (values 1 2 3 4 5 6 7)))
+     (values 7 nil))))

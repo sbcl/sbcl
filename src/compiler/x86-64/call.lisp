@@ -418,14 +418,14 @@
                                      (>= i min-values))
                              (let ((default-lab (gen-label)))
                                (defaults (cons default-lab tn))
-                               (cond ((and (= i (1- nvals))
-                                           (eql prev-cmp (1- i)))
-                                      ;; Reuse the previous comparison if it's the last one
-                                      (inst jmp :e default-lab))
-                                     (t
-                                      (inst cmp :dword rcx-tn (fixnumize i))
-                                      (inst jmp :be default-lab)))
-                               (setf prev-cmp i)))
+                               (cond
+                                 ((and (= i (1- nvals))
+                                       (eql prev-cmp i))
+                                  ;; Reuse the previous comparison if it's the last one
+                                  (inst jmp :e default-lab))
+                                 (t
+                                  (inst cmp :dword rcx-tn (fixnumize (setf prev-cmp (1+ i))))
+                                  (inst jmp :b default-lab)))))
                            (let ((src (thread-slot-ea (+ thread-mv-return-values-slot
                                                          (- i register-arg-count)))))
                              (inst mov tn (sc-case tn
