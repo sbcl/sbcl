@@ -2429,16 +2429,6 @@
 ;;;
 ;;; such that the modifications either all increment or all decrement
 ;;; VAR.
-(declaim (inline %inc-or-dec-p))
-(defun %inc-or-dec-p (node)
-  (and (combination-p node)
-       (eq (combination-kind node) :known)
-       (fun-info-p (combination-fun-info node))
-       (not (node-to-be-deleted-p node))
-       (let ((source-name (uncross (combination-fun-source-name node))))
-         (when (memq source-name '(- +))
-           source-name))))
-
 (defun %analyze-set-uses (values var initial-type)
   (let ((some-plusp nil)
         (some-minusp nil)
@@ -2510,28 +2500,25 @@
 ;;; argument a local call passes to VAR's own parameter position.
 (defun iteration-step-values (value var)
   (labels ((walk (value seen)
-             (let* ((use (principal-lvar-use value))
-                    (function (%inc-or-dec-p use)))
-               (when function
-                 (let ((args (basic-combination-args use)))
-                   (when (proper-list-of-length-p args 2 2)
-                     (let ((first (principal-lvar-use (first args)))
-                           (step (second args)))
-                       (cond ((and (ref-p first)
-                                   (eq (ref-leaf first) var))
-                              (values (list step) function))
-                             ((and (ref-p first)
-                                   (lambda-var-p (ref-leaf first))
-                                   (not (memq (ref-leaf first) seen)))
-                              (let ((next (lambda-var-ref-lvar first)))
-                                (when next
-                                  (multiple-value-bind
-                                        (steps inner-function)
-                                      (walk next
-                                            (cons (ref-leaf first) seen))
-                                    (when (and steps
-                                               (eq function inner-function))
-                                      (values (cons step steps) function))))))))))))))
+             (combination-match2 ((lvar-uses value) :transform nil)
+               ((:or ((:or + :name function) x step) ;; commutative
+                     ((:or - :name function) x step))
+                (let ((x-use (principal-lvar-use x)))
+                  (when (ref-p x-use)
+                    (let ((x-leaf (ref-leaf x-use)))
+                      (cond ((eq x-leaf var)
+                             (return-from walk
+                               (values (list step) function)))
+                            ((and (lambda-var-p x-leaf)
+                                  (not (memq x-leaf seen)))
+                             (let ((next (lambda-var-ref-lvar x-use)))
+                               (when next
+                                 (multiple-value-bind (steps inner-function)
+                                     (walk next (cons x-leaf seen))
+                                   (when (and steps
+                                              (eq function inner-function))
+                                     (return-from walk
+                                       (values (cons step steps) function)))))))))))))))
     (walk value nil)))
 
 ;;; Infer the type of VAR from the direction in which it is stepped,
@@ -2579,16 +2566,30 @@
                                                 :high high)))
         (sets-numeric-contagion values var initial-type))))
 
-(deftransform + ((x y) * * :result result)
+(defoptimizer (+ optimizer) ((x y) node)
   "check for iteration variable reoptimization"
-  (let ((dest (principal-lvar-end result))
-        (use (principal-lvar-use x)))
-    (when (and (ref-p use)
-               (set-p dest)
-               (eq (ref-leaf use)
-                   (set-var dest)))
-      (reoptimize-lvar (set-value dest))))
-  (give-up-ir1-transform))
+  (let ((dest (principal-lvar-end (node-lvar node))))
+    (when (set-p dest)
+      (flet ((same-var-p (lvar)
+               (let ((use (principal-lvar-use lvar)))
+                 (and (ref-p use)
+                      (eq (ref-leaf use)
+                          (set-var dest))))))
+        (when (or (same-var-p x)
+                  (same-var-p y))
+          (reoptimize-lvar (set-value dest)))))))
+
+(defoptimizer (- optimizer) ((x y) node)
+  "check for iteration variable reoptimization"
+  (let ((dest (principal-lvar-end (node-lvar node))))
+    (when (set-p dest)
+      (flet ((same-var-p (lvar)
+               (let ((use (principal-lvar-use lvar)))
+                 (and (ref-p use)
+                      (eq (ref-leaf use)
+                          (set-var dest))))))
+        (when (same-var-p x)
+          (reoptimize-lvar (set-value dest)))))))
 
 ;;; Remove bounds
 (defun simplify-numeric-type (x)

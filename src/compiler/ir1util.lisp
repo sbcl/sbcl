@@ -901,9 +901,9 @@
                                      (name-var (extract-name-var name-spec))
                                      (names (ensure-or name-spec))
                                      (commutative (and (not plus)
-                                                       (loop for name in names
-                                                             always (or (typep name '(cons (eql :commutative)))
-                                                                        (unless (eq name :*)
+                                                       (or (find :commutative names)
+                                                           (loop for name in names
+                                                                 always (unless (eq name :*)
                                                                           (ir1-attributep (fun-info-attributes (fun-info-or-lose name))
                                                                                           commutative))))
                                                        (not (or (integerp (car (last args)))

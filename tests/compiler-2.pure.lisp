@@ -5358,3 +5358,14 @@
     (((lambda () (values 1 2 3 4 5 6 7 :b))
       (lambda () (values 1 2 3 4 5 6 7)))
      (values 7 nil))))
+
+(with-test (:name :set-var-step-commutativity)
+  (assert-type
+   (lambda (n s)
+     (let ((x 0))
+       (loop repeat n
+             do
+             (let ((l (length s)))
+               (setq x (+ l x))))
+       x))
+   unsigned-byte))
