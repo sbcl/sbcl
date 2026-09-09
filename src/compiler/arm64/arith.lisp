@@ -2036,6 +2036,77 @@
     (inst adc hi hi zr-tn)
     (inst str hi (@ r (extend index :lsl 3)))))
 
+(define-vop (bignum-multiply-loop)
+  (:args (a* :scs (descriptor-reg))
+         (la :scs (unsigned-reg))
+         (b* :scs (descriptor-reg))
+         (lb :scs (unsigned-reg))
+         (r* :scs (descriptor-reg)))
+  (:arg-types bignum unsigned-num bignum unsigned-num bignum)
+  (:temporary (:sc descriptor-reg) a b-base b r-row-base r)
+  (:temporary (:sc unsigned-reg) outer-len inner-len
+                                 x b-digit r-digit lo hi carry)
+  (:generator 40
+    (inst add-sub a a* (- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag))
+    (inst add-sub b-base b* (- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag))
+    (inst add-sub r-row-base r* (- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag))
+
+
+    (inst ldr x (@ a n-word-bytes :post-index))
+    (inst mov b b-base)
+    (inst mov r r-row-base)
+    (inst mov inner-len lb)
+    (inst adds hi zr-tn zr-tn) ;; clear carry
+
+    ROW0-LOOP
+    (inst ldr b-digit (@ b n-word-bytes :post-index))
+    (inst mul lo b-digit x)
+    (inst adcs lo lo hi)
+    (inst umulh hi b-digit x)
+    (inst str lo (@ r n-word-bytes :post-index))
+    (inst sub inner-len inner-len 1)
+    (inst cbnz inner-len ROW0-LOOP)
+
+    (inst adc hi hi zr-tn)
+    (inst str hi (@ r))
+
+    (inst subs outer-len la 1)
+    (inst b :eq DONE)
+
+    (inst add r-row-base r-row-base n-word-bytes)
+
+    OUTER-LOOP
+    (inst ldr x (@ a n-word-bytes :post-index))
+    (inst mov b b-base)
+    (inst mov r r-row-base)
+    (inst mov inner-len lb)
+    (inst adds carry zr-tn zr-tn) ;; clear carry
+
+    INNER-LOOP
+    (inst ldr b-digit (@ b n-word-bytes :post-index))
+    (inst ldr r-digit (@ r))
+
+    (inst mul lo b-digit x)
+    (inst umulh hi b-digit x)
+
+    (inst adcs lo lo carry)
+    (inst adc carry hi zr-tn)
+
+    (inst adds lo lo r-digit)
+
+    (inst str lo (@ r n-word-bytes :post-index))
+    (inst sub inner-len inner-len 1)
+    (inst cbnz inner-len INNER-LOOP)
+
+    (inst adc carry carry zr-tn)
+    (inst str carry (@ r))
+
+    (inst add r-row-base r-row-base n-word-bytes)
+    (inst subs outer-len outer-len 1)
+    (inst b :ne OUTER-LOOP)
+
+    DONE))
+
 (define-vop (bignum-mult-and-add-3-arg)
   (:translate sb-bignum:%multiply-and-add)
   (:policy :fast-safe)

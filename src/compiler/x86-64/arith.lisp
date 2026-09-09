@@ -4158,6 +4158,74 @@
     (inst adc hi 0)
     (inst mov (ea #1# r index 8) hi)))
 
+(define-vop (bignum-mulx-multiply-loop)
+  (:args (a* :scs (descriptor-reg))
+         (la :scs (unsigned-reg unsigned-stack))
+         (b* :scs (descriptor-reg))
+         (lb :scs (unsigned-reg unsigned-stack))
+         (r* :scs (descriptor-reg)))
+  (:arg-types bignum unsigned-num bignum unsigned-num bignum)
+  (:temporary (:sc unsigned-reg :offset rdx-offset) rdx)
+  (:temporary (:sc unsigned-reg) a b-end r-end index carry lo hi outer-len)
+  (:generator 40
+    (inst mov :dword index lb)
+    (inst lea b-end (ea #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) b* index 8))
+    (inst lea r-end (ea #1# r* index 8))
+
+    (inst mov rdx (ea #1# a*))
+
+    (inst neg index)
+    (zeroize carry) ;; clears cf
+
+    ROW0-LOOP
+    (inst mulx hi lo (ea 0 b-end index 8))
+    (inst adc lo carry)
+    (inst mov carry hi)
+    (inst mov (ea 0 r-end index 8) lo)
+
+    (inst inc index)
+    (inst jmp :nz ROW0-LOOP)
+
+    (inst adc carry 0)
+    (inst mov (ea r-end) carry)
+
+    (inst mov :dword index la)
+    (inst dec :dword index)
+    (inst jmp :z DONE)
+    (inst mov :dword outer-len index)
+
+    (inst lea a (ea (+ #1# n-word-bytes) a*))
+    (inst add r-end n-word-bytes)
+
+    OUTER-LOOP
+    (inst mov rdx (ea a))
+    (inst add a n-word-bytes)
+
+    (inst mov :dword index lb)
+    (inst neg index)
+    (zeroize carry) ;; clears cf
+
+    INNER-LOOP
+    (inst mulx hi lo (ea 0 b-end index 8))
+
+    (inst adc lo carry)
+    (inst adc hi 0)
+
+    (inst add (ea 0 r-end index 8) lo)
+    (inst mov carry hi)
+
+    (inst inc index)
+    (inst jmp :nz INNER-LOOP)
+
+    (inst adc carry 0)
+    (inst mov (ea r-end) carry)
+
+    (inst add r-end n-word-bytes)
+    (inst dec :dword outer-len)
+    (inst jmp :nz OUTER-LOOP)
+
+    DONE))
+
 (define-vop (bignum-mult-and-add-3-arg)
   (:translate sb-bignum:%multiply-and-add)
   (:policy :fast-safe)
