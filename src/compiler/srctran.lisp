@@ -319,8 +319,8 @@
                 (args (loop for arg in args
                             for transform =
                             (when subseq
-                              (combination-case (arg :cast (specifier-type 'sequence))
-                                ((list vector) *
+                              (combination-match2 ((lvar-uses arg) :transform nil :unravel-casts nil)
+                                (((:or list vector) &rest args)
                                  (splice-fun-args arg :any nil)
                                  (list* ''sb-impl::%splice
                                         (length args)
@@ -329,7 +329,14 @@
                                               do
                                               (push sym vars)
                                               collect sym)))
-                                ((subseq vector-subseq) *
+                                ((string (:type character))
+                                 (splice-fun-args arg :any nil)
+                                 (list* ''sb-impl::%splice
+                                        1
+                                        (let ((sym (gensym)))
+                                          (push sym vars)
+                                          (list sym))))
+                                (((:or subseq vector-subseq) &rest args)
                                  ;; Nothing should be modifying the original sequence
                                  (when (almost-immediately-used-p arg (lvar-use arg) :flushable t)
                                    (destructuring-bind (sequence start &optional end) args
@@ -340,8 +347,8 @@
                                            (car (push (gensym) vars))
                                            (when end
                                              (car (push (gensym) vars)))))))
-                                (make-array *
-                                 (multiple-value-bind (args unknown) (resolve-key-args args (info :function :type name))
+                                ((make-array &rest args)
+                                 (multiple-value-bind (args unknown) (resolve-key-args args (info :function :type 'make-array))
                                    (unless unknown
                                      (destructuring-bind (length &key element-type initial-element initial-contents
                                                                       fill-pointer adjustable displaced-to displaced-index-offset)
@@ -366,17 +373,16 @@
                                                      (wrap-if element-type
                                                               `(the ,(type-specifier element-type))
                                                               (car (push (gensym) vars))))))))))))
-                                (%make-list *
-                                 (destructuring-bind (length initial-element) args
-                                   (when (splice-fun-args arg :any (lambda (args)
-                                                                     (declare (ignore args))
-                                                                     (if initial-element
-                                                                         (list length initial-element)
-                                                                         length)))
-                                     (list ''sb-impl::%repeat
-                                           (car (push (gensym) vars))
-                                           (and initial-element
-                                                (car (push (gensym) vars)))))))))
+                                ((%make-list length initial-element)
+                                 (when (splice-fun-args arg :any (lambda (args)
+                                                                   (declare (ignore args))
+                                                                   (if initial-element
+                                                                       (list length initial-element)
+                                                                       length)))
+                                   (list ''sb-impl::%repeat
+                                         (car (push (gensym) vars))
+                                         (and initial-element
+                                              (car (push (gensym) vars))))))))
                             if transform
                             append (progn (setf new t
                                                 subseqp t)

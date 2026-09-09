@@ -1971,5 +1971,8 @@
   (let ((b (& (>> val 27) #x7)))
    (let ((a (>> (<< val 31) 29)))
     (^ a (aref tab b))))))")
+(#(9F68C87 8BD63E3B A45D9F5E D1AAA153 D9E47BF0 E487643D F5B1443E)
+ "(%MAKE-LIST MAKE-ARRAY VECTOR-SUBSEQ SUBSEQ STRING VECTOR LIST)"
+ "((& (- (>> val 13) (>> val 28)) 7))")
 )
 ;; EOF

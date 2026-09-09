@@ -560,10 +560,17 @@
                    (list (subseq args plus-pos (- (length args) n-after)))
                    (last args n-after))))
         (values-list
-         (append (loop for arg in args
-                       for type in types
-                       collect (unravel-casts-typed arg type))
-                 (list (nthcdr n-args args)))))))
+         (flet ((check-arg ()
+                  (let ((arg (pop args))
+                        (type (pop types)))
+                    (if type
+                        (unravel-casts-typed arg type)
+                        arg))))
+          (append (loop repeat n-args
+                        while args
+                        collect (check-arg))
+                  (list (loop while args
+                              collect (check-arg)))))))))
 
 (defmacro combination-match (lvar spec &body body)
   (let (bound-vars)
@@ -756,7 +763,7 @@
    `((%negate ,a))
    t)) ;; don't include (- x)
 
-(defmacro combination-match2 ((node &key (transform t)) &body clauses)
+(defmacro combination-match2 ((node &key (transform t) (unravel-casts t)) &body clauses)
   (let (bound-vars)
     (labels ((clean-name-spec (list)
                (loop for tail = list then (cdr tail)
@@ -910,8 +917,9 @@
                                                                 (typep (car (last args)) '(cons (eql :constant)))
                                                                 (equal-spec (first args)
                                                                             (second args))))))
-                                     (casts (when (singleton-p names)
-                                              (fun-types arg-count (car names))))
+                                     (casts (and unravel-casts
+                                                 (when (singleton-p names)
+                                                   (fun-types arg-count (car names)))))
                                      (names (loop for name in names
                                                   collect (if (typep name '(cons (eql :commutative)))
                                                               (second name)
