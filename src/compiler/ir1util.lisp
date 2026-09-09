@@ -382,16 +382,22 @@
                    (not (lambda-var-sets var)))
           (let-lvar-dest (node-lvar (car refs)) single-use))))))
 
+(declaim (inline lvar-single-value-p))
+(defun lvar-single-value-p (lvar)
+  (or (not lvar) (%lvar-single-value-p lvar)))
+
 (defun mv-bind-unused-p (lvar nth-value)
   (when lvar
-    (let ((dest (lvar-dest lvar)))
-      (when (and (mv-combination-p dest)
-                 (eq (basic-combination-kind dest) :local))
-        (let ((fun (combination-lambda dest)))
-          (when (functional-kind-eq fun mv-let)
-            (let ((var (nth nth-value (mv-let-arg-vars lvar fun dest))))
-              (and var
-                   (notany #'node-lvar (leaf-refs var))))))))))
+    (or (and (> nth-value 0)
+             (lvar-single-value-p lvar))
+        (let ((dest (lvar-dest lvar)))
+          (when (and (mv-combination-p dest)
+                     (eq (basic-combination-kind dest) :local))
+            (let ((fun (combination-lambda dest)))
+              (when (functional-kind-eq fun mv-let)
+                (let ((var (nth nth-value (mv-let-arg-vars lvar fun dest))))
+                  (and var
+                       (notany #'node-lvar (leaf-refs var)))))))))))
 
 (defun combination-matches-args (args specs)
   (loop do (if args
@@ -432,14 +438,6 @@
                       (funcall cast-type type)
                       (eq type cast-type))))
        (combination/cast-name (lvar-uses (cast-value node)))))))
-
-(defun combination-matches* (names args combination &key cast-type)
-  (multiple-value-bind (name combination)
-      (combination/cast-name combination cast-type)
-    (when combination
-      (when (and (memq name names)
-                 (combination-matches-args (combination-args combination) args))
-        (values name combination (combination-args combination))))))
 
 ;;; Will bind NAME, COMBINATION, ARGS
 (defmacro combination-case (lvar &body cases)
@@ -1344,10 +1342,6 @@
       (setf (node-lvar node) lvar)))
 
   (values))
-
-(declaim (inline lvar-single-value-p))
-(defun lvar-single-value-p (lvar)
-  (or (not lvar) (%lvar-single-value-p lvar)))
 
 ;;; Return true if LVAR destination is executed immediately after
 ;;; NODE. Cleanups are ignored.
@@ -3443,13 +3437,6 @@ is :ANY, the function name is not checked."
                  (setf (node-derived-type inside) *wild-type*)
                  (flush-dest lvar)
                  inside-args)))))))
-
-(defun extract-lvar (lvar final-node)
-  (let ((dest (lvar-dest lvar)))
-    (or (eq final-node dest)
-        (let* ((next-lvar (node-lvar dest)))
-          (aver (splice-fun-args next-lvar :any (constantly lvar) nil))
-          (extract-lvar lvar final-node)))))
 
 (defun extract-lvar-n (lvar n &optional outer-node)
   (labels ((extract (lvar n)

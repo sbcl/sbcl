@@ -4521,29 +4521,27 @@
            (when (and (types-equal-or-intersect (lvar-type y) (specifier-type 'complex))
                       (policy node (plusp float-accuracy)))
              (give-up-ir1-transform)))
-    (or (when ($if (member '$fun '(* /))
-                   t
-                   (or (lvar-single-value-p (node-lvar node))
-                       (mv-bind-unused-p (node-lvar node) 1)))
-          (when (remove-paired-negate x y node
-                                      ($if (member '$fun '(truncate round floor ceiling))
-                                           t
-                                           nil)
-                                      ($if (member '$fun '(ftruncate fround ffloor fceiling))
-                                           t
-                                           nil))
-            ($unless (member '$fun '(* /))
-              (erase-node-type node t 1)))
-          ($unless (member '$fun '(floor ceiling ffloor fceiling))
-           (combination-match (:node node) ($fun (abs (:type real x)) (abs (:type real y)))
-             (extract-lvar-n x 1 node)
-             (extract-lvar-n y 1 node)
-             `(values (abs ($fun x y))
-                      ($unless (member '$fun '(* /))
-                               ,(progn
-                                  (erase-node-type node *wild-type*)
-                                  0))))))
-        (give-up-ir1-transform))))
+    ($unless (member '$fun '(* /))
+             (unless (mv-bind-unused-p (node-lvar node) 1)
+               (give-up-ir1-transform)))
+    (when (remove-paired-negate x y node
+                                ($if (member '$fun '(truncate round floor ceiling))
+                                     t
+                                     nil)
+                                ($if (member '$fun '(ftruncate fround ffloor fceiling))
+                                     t
+                                     nil))
+      ($unless (member '$fun '(* /))
+               (erase-node-type node t 1)))
+    ($if (member '$fun '(floor ceiling ffloor fceiling))
+         (give-up-ir1-transform)
+         (combination-match2 (node)
+           (($fun (abs (:type real x)) (abs (:type real y)))
+            `(values (abs ($fun x y))
+                     ($unless (member '$fun '(* /))
+                              ,(progn
+                                 (erase-node-type node t 1)
+                                 0))))))))
 
 (deftransform * ((x y) (t t) * :node node :priority :last)
   (or
@@ -4943,8 +4941,7 @@
 
 (flet ((single-value-fun (combination name)
          (let ((lvar (node-lvar combination)))
-           (when (or (lvar-single-value-p lvar)
-                     (mv-bind-unused-p lvar 1))
+           (when (mv-bind-unused-p lvar 1)
              (let ((args (combination-args combination)))
                (unless (cdr args)
                  (setf (cdr args)
@@ -5795,8 +5792,7 @@
  (deftransform $fun ((x c) (rational (constant-arg (and rational (not (integer -1 1)))))
                          * :important nil :node node)
    (let* ((constant (lvar-value c))
-          (single-value (or (lvar-single-value-p (node-lvar node))
-                            (mv-bind-unused-p (node-lvar node) 1)))
+          (single-value (mv-bind-unused-p (node-lvar node) 1))
           (new-c (associate-multiplication-constants x constant node :divide '$fun
                                                                      :single-value-truncate single-value)))
      (cond ((or (not new-c)

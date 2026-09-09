@@ -1833,8 +1833,7 @@
 
 (deftransform unary-truncate ((x) * * :result result :node node)
   (delay-ir1-transform node :constraint)
-  (unless (or (lvar-single-value-p result)
-              (mv-bind-unused-p result 1))
+  (unless (mv-bind-unused-p result 1)
     (give-up-ir1-transform))
   (erase-node-type node t 1)
   `(values (%unary-truncate x) 0))
