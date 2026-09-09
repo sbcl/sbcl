@@ -580,7 +580,7 @@ comparison.")
           'vector))
 
 (defun whitespacep (char)
-  (find char (coerce '(#\Tab #\Space #\Page #\Newline #\Return) 'string)))
+  (find char '(#\Tab #\Space #\Page #\Newline #\Return)))
 
 (defun blankp (line)
   (null (indentation line)))
