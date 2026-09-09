@@ -426,6 +426,14 @@
   (define-riscvi-arith-instruction or #b0000000 #b110)
   (define-riscvi-arith-instruction and #b0000000 #b111))
 
+;; Zba sh1add/sh2add/sh3add compute rd = rs2 + (rs1 << n) for n in
+;; {1,2,3}, fusing a shift and add into one instruction.  They let the
+;; array element VOPs derive a byte address from a tagged fixnum index
+;; without a separate slli+add pair.
+(define-register-arith-instruction sh1add #b0010000 #b010 #b0110011)
+(define-register-arith-instruction sh2add #b0010000 #b100 #b0110011)
+(define-register-arith-instruction sh3add #b0010000 #b110 #b0110011)
+
 (defun coerce-signed (unsigned-value width)
   (if (logbitp (1- width) unsigned-value)
       (dpb unsigned-value (byte (1- width) 0) -1)

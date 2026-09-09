@@ -97,6 +97,33 @@
 (defconstant fixnum-as-word-index-needs-temp
   (cl:/= sb-vm:word-shift sb-vm:n-fixnum-tag-bits))
 
+;;; Return a list of forms computing LIP = OBJECT + (INDEX << SHIFT),
+;;; preferring a Zba shNadd instruction when SHIFT is 1, 2 or 3 and the
+;;; build has :ZBA. A negative SHIFT is an arithmetic right shift
+;;; (used for sub-word vector elements); TEMP is the scratch register
+;;; needed when the shift is not folded into the add.
+(defun scaled-address-forms (lip object index shift temp)
+  (cond ((zerop shift)
+         `((inst add ,lip ,object ,index)))
+        ((when (and (member :zba *backend-subfeatures*)
+                    (member shift '(1 2 3))))
+         `((inst ,(ecase shift (1 'sh1add) (2 'sh2add) (3 'sh3add))
+                 ,lip ,index ,object)))
+        ((minusp shift)
+         `((inst srai ,temp ,index ,(- shift))
+           (inst add ,lip ,object ,temp)))
+        (t
+         `((inst slli ,temp ,index ,shift)
+           (inst add ,lip ,object ,temp)))))
+
+;;; Whether a scratch TEMP register must be allocated for the address
+;;; computation described by SCALED-ADDRESS-FORMS.
+(defun scaled-address-needs-temp-p (shift)
+  (and (not (zerop shift))
+       (if (member :zba *backend-subfeatures*)
+           (not (member shift '(1 2 3)))
+           t)))
+
 (defun load-symbol (reg symbol)
   (inst addi reg null-tn (static-symbol-offset symbol)))
 
@@ -273,22 +300,22 @@ and
     `(integer ,(first truncated) ,(second truncated))))
 
 (defmacro define-full-reffer (name type offset lowtag scs eltype &optional translate)
-  `(progn
-     (define-vop (,name)
-       ,@(when translate `((:translate ,translate)))
-       (:policy :fast-safe)
-       (:args (object :scs (descriptor-reg))
-              (index :scs (any-reg)))
-       (:arg-types ,type tagged-num)
-       (:temporary (:scs (non-descriptor-reg)) lip)
-       ,@(when fixnum-as-word-index-needs-temp
-           `((:temporary (:sc non-descriptor-reg) temp)))
-       (:results (value :scs ,scs))
-       (:result-types ,eltype)
-       (:generator 5
-         (with-fixnum-as-word-index (index temp)
-           (inst add lip object index))
-         (loadw value lip ,offset ,lowtag)))
+  (let ((shift (- word-shift n-fixnum-tag-bits)))
+    `(progn
+       (define-vop (,name)
+         ,@(when translate `((:translate ,translate)))
+         (:policy :fast-safe)
+         (:args (object :scs (descriptor-reg))
+                (index :scs (any-reg)))
+         (:arg-types ,type tagged-num)
+         (:temporary (:scs (non-descriptor-reg)) lip)
+         ,@(when (scaled-address-needs-temp-p shift)
+             `((:temporary (:sc non-descriptor-reg) temp)))
+         (:results (value :scs ,scs))
+         (:result-types ,eltype)
+         (:generator 5
+           ,@(scaled-address-forms 'lip 'object 'index shift 'temp)
+           (loadw value lip ,offset ,lowtag)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate `((:translate ,translate)))
        (:policy :fast-safe)
@@ -299,24 +326,24 @@ and
        (:results (value :scs ,scs))
        (:result-types ,eltype)
        (:generator 4
-         (loadw value object (+ ,offset index) ,lowtag)))))
+         (loadw value object (+ ,offset index) ,lowtag))))))
 
 (defmacro define-full-setter (name type offset lowtag scs eltype &optional translate)
-  `(progn
-     (define-vop (,name)
-       ,@(when translate `((:translate ,translate)))
-       (:policy :fast-safe)
-       (:args (object :scs (descriptor-reg))
-              (index :scs (any-reg))
-              (value :scs ,scs))
-       (:arg-types ,type tagged-num ,eltype)
-       (:temporary (:scs (non-descriptor-reg)) lip)
-       ,@(when fixnum-as-word-index-needs-temp
-           `((:temporary (:sc non-descriptor-reg) temp)))
-       (:generator 3
-         (with-fixnum-as-word-index (index temp)
-           (inst add lip object index))
-         (storew value lip ,offset ,lowtag)))
+  (let ((shift (- word-shift n-fixnum-tag-bits)))
+    `(progn
+       (define-vop (,name)
+         ,@(when translate `((:translate ,translate)))
+         (:policy :fast-safe)
+         (:args (object :scs (descriptor-reg))
+                (index :scs (any-reg))
+                (value :scs ,scs))
+         (:arg-types ,type tagged-num ,eltype)
+         (:temporary (:scs (non-descriptor-reg)) lip)
+         ,@(when (scaled-address-needs-temp-p shift)
+             `((:temporary (:sc non-descriptor-reg) temp)))
+         (:generator 3
+           ,@(scaled-address-forms 'lip 'object 'index shift 'temp)
+           (storew value lip ,offset ,lowtag)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
            `((:translate ,translate)))
@@ -328,7 +355,7 @@ and
          (:constant (load/store-index #.n-word-bytes ,(eval lowtag) ,(eval offset)))
          ,eltype)
        (:generator 1
-         (storew value object (+ ,offset index) ,lowtag)))))
+         (storew value object (+ ,offset index) ,lowtag))))))
 
 (defmacro define-partial-reffer (name type size signed offset lowtag scs eltype &optional translate)
   (let ((shift (- (integer-length size) n-fixnum-tag-bits 1)))
@@ -339,18 +366,12 @@ and
          (:args (object :scs (descriptor-reg)) (index :scs (any-reg)))
          (:arg-types ,type positive-fixnum)
          (:temporary (:scs (non-descriptor-reg)) lip)
-         ,@(unless (zerop shift)
+         ,@(when (scaled-address-needs-temp-p shift)
              `((:temporary (:sc non-descriptor-reg) temp)))
          (:results (value :scs ,scs))
          (:result-types ,eltype)
          (:generator 5
-           ,@(cond ((zerop shift)
-                    `((inst add lip object index)))
-                   (t
-                    `(,(if (minusp shift)
-                           `(inst srai temp index ,(- shift))
-                           `(inst slli temp index ,shift))
-                      (inst add lip object temp))))
+           ,@(scaled-address-forms 'lip 'object 'index shift 'temp)
            (inst ,(ecase size
                     (1 (if signed 'lb 'lbu))
                     (2 (if signed 'lh 'lhu))
@@ -385,16 +406,10 @@ and
                 (value :scs ,scs))
          (:arg-types ,type positive-fixnum ,eltype)
          (:temporary (:scs (non-descriptor-reg)) lip)
-         ,@(unless (zerop shift)
+         ,@(when (scaled-address-needs-temp-p shift)
              `((:temporary (:sc non-descriptor-reg) temp)))
          (:generator 5
-           ,@(cond ((zerop shift)
-                    '((inst add lip object index)))
-                   (t
-                    `(,(if (minusp shift)
-                           `(inst srai temp index ,(- shift))
-                           `(inst slli temp index ,shift))
-                      (inst add lip object temp))))
+           ,@(scaled-address-forms 'lip 'object 'index shift 'temp)
            (inst ,(ecase size (1 'sb) (2 'sh) (4 'sw))
                  value lip (- (* ,offset n-word-bytes) ,lowtag))))
        (define-vop (,(symbolicate name "-C"))
@@ -425,16 +440,12 @@ and
                 (index :scs (any-reg)))
          (:arg-types ,type tagged-num)
          (:temporary (:scs (non-descriptor-reg)) lip)
-         ,@(unless (zerop shift)
+         ,@(when (scaled-address-needs-temp-p shift)
              `((:temporary (:sc non-descriptor-reg) temp)))
          (:results (value :scs ,scs))
          (:result-types ,eltype)
          (:generator 5
-           ,@(cond ((zerop shift)
-                    `((inst add lip object index)))
-                   (t
-                    `((inst slli temp index ,shift)
-                      (inst add lip object temp))))
+           ,@(scaled-address-forms 'lip 'object 'index shift 'temp)
            (inst fload ,format value lip (- (* ,offset n-word-bytes) ,lowtag))))
        (define-vop (,(symbolicate name "-C"))
          (:note ,note)
@@ -464,15 +475,11 @@ and
                 (value :scs ,scs ,@(when resultp '(:target result))))
          (:arg-types ,type tagged-num ,eltype)
          (:temporary (:scs (non-descriptor-reg)) lip)
-         ,@(unless (zerop shift)
+         ,@(when (scaled-address-needs-temp-p shift)
              `((:temporary (:sc non-descriptor-reg) temp)))
          ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,eltype)))
          (:generator 5
-           ,@(cond ((zerop shift)
-                    `((inst add lip object index)))
-                   (t
-                    `((inst slli temp index ,shift)
-                      (inst add lip object temp))))
+           ,@(scaled-address-forms 'lip 'object 'index shift 'temp)
            (inst fstore ,format value lip (- (* ,offset n-word-bytes) ,lowtag))
            ,@(when resultp
                `((unless (location= result value) (inst fmove ,format result value))))))
@@ -505,16 +512,12 @@ and
               (index :scs (any-reg)))
        (:arg-types ,type tagged-num)
        (:temporary (:scs (non-descriptor-reg)) lip)
-       ,@(unless (zerop shift)
+       ,@(when (scaled-address-needs-temp-p shift)
            `((:temporary (:sc non-descriptor-reg) temp)))
        (:results (value :scs ,scs))
        (:result-types ,eltype)
        (:generator 6
-         ,@(cond ((zerop shift)
-                  `((inst add lip object index)))
-                 (t
-                  `((inst slli temp index ,shift)
-                    (inst add lip object temp))))
+         ,@(scaled-address-forms 'lip 'object 'index shift 'temp)
          ,(ecase format
             #+64-bit
             (:single
@@ -540,15 +543,11 @@ and
               (value :scs ,scs ,@(when resultp '(:target result))))
        (:arg-types ,type tagged-num ,eltype)
        (:temporary (:scs (non-descriptor-reg)) lip)
-       ,@(unless (zerop shift)
+       ,@(when (scaled-address-needs-temp-p shift)
            `((:temporary (:sc non-descriptor-reg) temp)))
        ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,eltype)))
        (:generator 6
-         ,@(cond ((zerop shift)
-                  `((inst add lip object index)))
-                 (t
-                  `((inst slli temp index ,shift)
-                    (inst add lip object temp))))
+         ,@(scaled-address-forms 'lip 'object 'index shift 'temp)
          ,(ecase format
             #+64-bit
             (:single
