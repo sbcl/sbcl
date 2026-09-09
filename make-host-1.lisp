@@ -47,7 +47,6 @@
                                         "make-host-1 stopped due to~%~a" c)))))
                       (simple-warning
                         (lambda (c)
-                          (declare (ignore c))
                           (if last-form
                               (setf warn (type-of c))
                               (when (and *fail-on-warnings*
