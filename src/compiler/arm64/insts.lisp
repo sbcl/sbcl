@@ -831,23 +831,10 @@
                              ;; Set unused bits to 1 so that the size can be calcuted correctly.
                              (ldb (byte 6 0) (ash -1 (integer-length size))))))))))
 
-(defun rotate-byte (count size pos integer)
-  ;; Taken from sb-rotate-byte
-  (let ((count (nth-value 1 (round count size)))
-        (mask (1- (ash 1 size))))
-    (logior (logand integer (lognot (ash mask pos)))
-            (let ((field (logand (ash mask pos) integer)))
-              (logand (ash mask pos)
-                      (if (> count 0)
-                          (logior (ash field count)
-                                  (ash field (- count size)))
-                          (logior (ash field count)
-                                  (ash field (+ count size)))))))))
-
 (defun decode-logical-immediate (n immr imms)
   ;; DecodeBitMasks() From the ARM manual
   (declare (type bit n)
-           (type (unsigned-byte 6) imms imms))
+           (type (unsigned-byte 6) immr imms))
   (let* ((length (if (zerop n)
                      (1- (integer-length (ldb (byte 6 0) (lognot imms))))
                      6))
@@ -855,12 +842,15 @@
          (s (logand imms levels))
          (r (logand immr levels))
          (bits (ldb (byte (1+ s) 0) -1))
-         (pattern (rotate-byte (- r) (ash 1 length) 0 bits))
+         (size (1+ levels))
+         ;; Rotate right
+         (pattern (logand (ldb (byte size 0) -1)
+                          (logior (ash bits (- r))
+                                  (ash bits (- size r)))))
          (result 0))
     (declare (type (unsigned-byte 64) result))
-    (loop for i below 64 by (1+ levels)
-          do (setf (ldb (byte (1+ levels) i) result)
-                   pattern))
+    (loop for i below 64 by size
+          do (setf (ldb (byte size i) result) pattern))
     result))
 
 (defun emit-logical-reg-inst (segment opc n rd rn rm)
