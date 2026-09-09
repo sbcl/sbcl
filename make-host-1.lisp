@@ -31,25 +31,30 @@
     ;; UNDEFINED-VARIABLE does not cause COMPILE-FILE to return warnings-p
     ;; unless outside a compilation unit. You find out about it only upon
     ;; exit of SUMMARIZE-COMPILATION-UNIT. So we set up a handler for that.
-    `(let (warnp style-warnp)
+    `(let (warnp style-warnp
+           last-form)
        (handler-bind ((style-warning
                         ;; Any unmuffled STYLE-WARNING should fail
                         ;; These would typically be from undefined functions,
                         ;; or optional-and-key when that was visible.
                         (lambda (c)
                           (signal c) ; won't do SETQ if MUFFLE-WARNING is invoked
-                          (when (and *fail-on-warnings*
-                                     (string>= (cl:lisp-implementation-version) "2.1"))
-                            (cerror "Proceed anyway"
-                                    "make-host-1 stopped due to~%~a" c))))
+                          (if last-form
+                              (setf style-warnp (type-of c))
+                              (when (and *fail-on-warnings*
+                                         (string>= (cl:lisp-implementation-version) "2.1"))
+                                (cerror "Proceed anyway"
+                                        "make-host-1 stopped due to~%~a" c)))))
                       (simple-warning
                         (lambda (c)
                           (declare (ignore c))
-                          (when (and *fail-on-warnings*
-                                     (string>= (cl:lisp-implementation-version) "2.1"))
-                            (cerror "Proceed anyway"
-                                    "make-host-1 stopped due to~%~a" c)))))
-         (with-compilation-unit () ,@forms))
+                          (if last-form
+                              (setf warn (type-of c))
+                              (when (and *fail-on-warnings*
+                                         (string>= (cl:lisp-implementation-version) "2.1"))
+                                (cerror "Proceed anyway"
+                                        "make-host-1 stopped due to~%~a" c))))))
+         (with-compilation-unit () ,@forms (setf last-form t)))
        (when (and (string>= (cl:lisp-implementation-version) "2.1")
                   (or warnp style-warnp) *fail-on-warnings*)
          (cerror "Proceed anyway"
