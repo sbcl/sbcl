@@ -33,16 +33,22 @@
     ;; exit of SUMMARIZE-COMPILATION-UNIT. So we set up a handler for that.
     `(let (warnp style-warnp)
        (handler-bind ((style-warning
-                       ;; Any unmuffled STYLE-WARNING should fail
-                       ;; These would typically be from undefined functions,
-                       ;; or optional-and-key when that was visible.
-                       (lambda (c)
-                         (signal c) ; won't do SETQ if MUFFLE-WARNING is invoked
-                         (setq style-warnp 'style-warning)))
+                        ;; Any unmuffled STYLE-WARNING should fail
+                        ;; These would typically be from undefined functions,
+                        ;; or optional-and-key when that was visible.
+                        (lambda (c)
+                          (signal c) ; won't do SETQ if MUFFLE-WARNING is invoked
+                          (when (and *fail-on-warnings*
+                                     (string>= (cl:lisp-implementation-version) "2.1"))
+                            (cerror "Proceed anyway"
+                                    "make-host-1 stopped due to~%~a" c))))
                       (simple-warning
                         (lambda (c)
                           (declare (ignore c))
-                          (setq warnp 'warning))))
+                          (when (and *fail-on-warnings*
+                                     (string>= (cl:lisp-implementation-version) "2.1"))
+                            (cerror "Proceed anyway"
+                                    "make-host-1 stopped due to~%~a" c)))))
          (with-compilation-unit () ,@forms))
        (when (and (string>= (cl:lisp-implementation-version) "2.1")
                   (or warnp style-warnp) *fail-on-warnings*)
