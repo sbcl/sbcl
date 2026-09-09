@@ -1140,3 +1140,21 @@
      (let ((x (cons v "b")))
        (setf (car x) 10)
        x))))
+
+(with-test (:name :bad-make-array-dimensions)
+  (assert (nth-value 2
+                     (checked-compile
+                      '(lambda (x)
+                        (declare (integer x))
+                        (make-array (list* 1 x)))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      '(lambda (x)
+                        (make-array (list* -1 x)))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      '(lambda (x)
+                        (make-array (list 'a x)))
+                      :allow-warnings t))))

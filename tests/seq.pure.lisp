@@ -1150,5 +1150,5 @@
   (assert (equal
            (ctu:ir1-named-calls
             `(lambda (i)
-               (concatenate 'string (string (code-char i)))))
-           '(sb-kernel:%concatenate-to-string-subseq))))
+               (concatenate 'base-string (string (code-char i)))))
+           '(sb-kernel:%concatenate-to-base-string-subseq))))

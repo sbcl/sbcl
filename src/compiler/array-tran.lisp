@@ -626,14 +626,38 @@
   (assert-new-value-type new-value array))
 
 (defun check-array-dimensions (dims node)
-  (or (typep dims 'index)
-      (and (proper-list-p dims)
-           (every (lambda (x)
-                    (typep x 'index))
-                  dims))
-      (let ((*compiler-error-context* node))
-        (setf (basic-combination-kind node) :error)
-        (compiler-warn "Bad array dimensions: ~s" dims))))
+  (flet ((fail (message dims)
+           (let ((*compiler-error-context* node))
+             (setf (basic-combination-kind node) :error)
+             (compiler-warn message dims)
+             (return-from check-array-dimensions))))
+    (if (constant-lvar-p dims)
+        (let ((dims (lvar-value dims)))
+          (unless (or (typep dims 'index)
+                      (and (proper-list-p dims)
+                           (every (lambda (x)
+                                    (typep x 'index))
+                                  dims)))
+            (fail "Bad array dimensions: ~s" dims)))
+        (combination-match2 ((lvar-uses dims) :transform nil)
+          ((list &rest args)
+           (loop for arg in args
+                 unless (lvar-intersectp arg index)
+                 do (fail "Bad array dimension in a call to LIST: ~s"
+                          (if (constant-lvar-p arg)
+                              (lvar-value arg)
+                              (type-specifier (lvar-type arg))))))
+          ((list* (:+ args) last)
+           (unless (lvar-intersectp last list)
+             (fail "Bad array dimensions,~%LIST* with the last argument of type ~s"
+                   (type-specifier (lvar-type last))))
+           (loop for arg in args
+                 unless (lvar-intersectp arg index)
+                 do (fail "Bad array dimension in a call to LIST*: ~s"
+                          (if (constant-lvar-p arg)
+                              (lvar-value arg)
+                              (type-specifier (lvar-type arg))))))))
+    t))
 
 (defun derive-make-array-type (dims element-type adjustable
                                fill-pointer displaced-to
@@ -650,8 +674,6 @@
                       (cond ((constant-lvar-p dims)
                              (let* ((val (lvar-value dims))
                                     (cdims (ensure-list val)))
-                               (unless (check-array-dimensions val node)
-                                 (return-from derive-make-array-type))
                                (if simple
                                    cdims
                                    (length cdims))))
@@ -682,7 +704,9 @@
                 (cond
                   ((or (null ctype) (contains-unknown-type-p ctype)) '*)
                   (t (upgraded-array-element-type element-type)))))))
-    (cond ((not element-type)
+    (cond ((not (check-array-dimensions dims node))
+           nil)
+          ((not element-type)
            (if (typep node 'mv-combination)
                (derive '*)
                (derive t)))
@@ -1707,8 +1731,6 @@
       (when (or (contains-unknown-type-p element-type-ctype)
                 (not (proper-list-p dims)))
         (give-up-ir1-transform))
-      (unless (check-array-dimensions dims call)
-        (give-up-ir1-transform))
       (cond ((singleton-p dims)
              (transform-make-array-vector (car dims) element-type
                                           initial-element initial-contents call
@@ -1848,15 +1870,14 @@
                                                  displaced-index-offset
                                                  &allow-other-keys)
                                           node)
+  (unless (check-array-dimensions dims node)
+    (return-from adjust-array-derive-type-optimizer))
   (let* ((array-type (lvar-type array))
          (complex (conservative-array-type-complexp array-type))
          (simple (null complex))
          (complex (eq complex t))
          (dims (if (constant-lvar-p dims)
-                   (let ((value (lvar-value dims)))
-                     (if (check-array-dimensions value node)
-                         value
-                         (return-from adjust-array-derive-type-optimizer)))
+                   (lvar-value dims)
                    '*)))
     (unless complex
       (let ((null (specifier-type 'null)))
