@@ -70,11 +70,18 @@
   ;; size is arbitrary here since the printer determines it
   (get-gpr :qword (if (dstate-getprop dstate +rex-r+) (+ value 8) value)))
 
-;;; A register field that can be extended by REX.B.
+;;; A register field that can be extended by REX.B. In an EVEX-encoded,
+;;; register-direct (mod=11) instruction, this field's own extension bit
+;;; is REX.B, but the otherwise-unused REX.X doubles as B' (bit 4),
+;;; permitting registers 16-31 -- mirroring the same trick DECODE-MOD-R/M
+;;; uses for its register-direct case.
 (defun prefilter-reg-b (dstate value)
   (declare (type (mod 8) value) (type disassem-state dstate))
   ;; size is arbitrary here since the printer determines it
-  (get-gpr :qword (if (dstate-getprop dstate +rex-b+) (+ value 8) value)))
+  (let ((value (if (dstate-getprop dstate +rex-b+) (+ value 8) value)))
+    (if (and (dstate-getprop dstate +evex+) (dstate-getprop dstate +rex-x+))
+        (get-fpr :xmm (+ value 16))
+        (get-gpr :qword value))))
 
 ;; This reader extracts the 'imm' operand in "MOV reg,imm" format.
 ;; KLUDGE: the REG instruction format can not define a reader

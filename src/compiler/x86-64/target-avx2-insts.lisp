@@ -101,6 +101,26 @@
       (print-mem-ref :ref value nil stream dstate)
       (print-half-ymmreg-rm value stream dstate)))
 
+;;; Printer for the register-direct source operand of a 2x-widening move
+;;; (VPMOV[SZ]X{BW,WD,DQ}): its width is always one step below the
+;;; destination's vector length (xmm source for an xmm or ymm dest,
+;;; ymm source for a zmm dest).
+(defun print-ymmreg-rm-one-size-down (value stream dstate)
+  (let* ((offset (etypecase value
+                   ((mod 32) value)
+                   (reg (reg-num value))))
+         (reg (get-fpr (if (dstate-getprop dstate +evex-l1+) :ymm :xmm)
+                       offset))
+         (name (reg-name reg)))
+    (if stream
+        (write-string name stream)
+        (operand name dstate))))
+
+(defun print-ymmreg/mem-one-size-down (value stream dstate)
+  (if (machine-ea-p value)
+      (print-mem-ref :ref value nil stream dstate)
+      (print-ymmreg-rm-one-size-down value stream dstate)))
+
 (defun invert-4 (dstate value)
   (declare (ignore dstate))
   (logxor value #b1111))

@@ -670,7 +670,15 @@
   (def %test-vinserti32x4-masked-zmm-disp8)
   (def %test-vinserti32x4-masked-z-zmm-disp8)
   (def %test-vinserti32x8-masked-ymm-disp8)
-  (def %test-vinserti32x8-masked-z-ymm-disp8))
+  (def %test-vinserti32x8-masked-z-ymm-disp8)
+  ;; Extended (16-31) register number tests -- these registers can only be
+  ;; addressed via EVEX, even at XMM/YMM width where nothing else about the
+  ;; instruction would otherwise require EVEX.
+  (def %test-vpslldq-high-xmm-disasm)
+  (def %test-vpand-high-xmm-disasm)
+  (def %test-vpinsrq-high-xmm-disasm)
+  (def %test-vpaddq-high-ymm-disasm)
+  (def %test-vpmovzxbd-high-zmm-disasm))
 
 ;; instruction vops
 
@@ -763,6 +771,80 @@
     (inst vpinsrq xmm2 xmm2 rax 1)
     (inst vpslldq xmm2 xmm2 1)
     (inst vpand xmm xmm2 xmm2)))
+
+(defmacro define-test-vop-same-reg-imm (name inst reg-sc reg-offset imm)
+  "Generate a VOP for a register-only shift/insert-style instruction where
+   the destination register is also the (only) source: op(reg, reg, imm)."
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (:sc ,reg-sc :offset ,reg-offset) vec)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       (inst ,inst vec vec ,imm)
+       (inst xor :dword res res))))
+
+(defmacro define-test-vop-same-reg (name inst reg-sc reg-offset)
+  "Generate a VOP for a register-only instruction where the destination
+   register is also the (only) source: op(reg, reg)."
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (:sc ,reg-sc :offset ,reg-offset) vec)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       (inst ,inst vec vec)
+       (inst xor :dword res res))))
+
+(defmacro define-test-vop-same-reg-alu (name inst reg-sc reg-offset)
+  "Generate a VOP for a register-only three-operand ALU instruction where
+   a single register is used as the destination and both sources:
+   op(reg, reg, reg). Unlike DEFINE-TEST-VOP-THREE-REG, this uses one
+   :TEMPORARY (not three wired to the same location, which the compiler
+   rejects as a conflict)."
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (:sc ,reg-sc :offset ,reg-offset) vec)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       (inst ,inst vec vec vec)
+       (inst xor :dword res res))))
+
+(defmacro define-test-vop-same-reg-gpr-imm
+    (name inst reg-sc reg-offset gpr-sc gpr-offset imm)
+  "Generate a VOP for an instruction where the destination register is also
+   the vector source, with a separate GPR operand and an immediate:
+   op(reg, reg, gpr, imm)."
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (:sc ,reg-sc :offset ,reg-offset) vec)
+     (:temporary (:sc ,gpr-sc :offset ,gpr-offset) gpr)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       (inst ,inst vec vec gpr ,imm)
+       (inst xor :dword res res))))
+
+(defmacro define-test-vop-mask-mem (name inst mask-sc mask-off reg-sc reg-off disp &optional imm)
+  "Generate a VOP for an instruction with mask destination and memory source: mask = op(reg, mem)."
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (:sc ,mask-sc :offset ,mask-off) mask)
+     (:temporary (:sc ,reg-sc :offset ,reg-off) vec)
+     (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       ,(if imm
+            `(inst ,inst mask vec (ea ,disp rsp) ,imm)
+            `(inst ,inst mask vec (ea ,disp rsp)))
+       (inst xor :dword res res))))
 
 (define-vop (%test-evex-high-registers-poke)
   (:translate %test-evex-high-registers-poke)
@@ -2105,6 +2187,20 @@
 (define-test-vop-load %test-auto-promoted-vrcpps-disp8 vrcpps single-avx512-reg 0 64)
 (define-test-vop-load %test-auto-promoted-vpmovsxbw-disp8 vpmovsxbw int-avx512-reg 0 32)
 (define-test-vop-three-reg %test-vpand-zmm-disasm vpand int-avx512-reg 0 int-avx512-reg 1 int-avx512-reg 2)
+;; COMPLEX-DOUBLE-REG is XMM-width regardless of its offset, and INT-AVX2-REG
+;; is YMM-width regardless of its offset (see PERFORM-OPERAND-LOWERING) --
+;; forcing an offset of 16-31 exercises a register that can only be
+;; addressed via EVEX even though the operation itself is only XMM/YMM-wide.
+(define-test-vop-same-reg-imm %test-vpslldq-high-xmm-disasm vpslldq
+  complex-double-reg 30 1)
+(define-test-vop-same-reg-alu %test-vpand-high-xmm-disasm vpand
+  complex-double-reg 30)
+(define-test-vop-same-reg-gpr-imm %test-vpinsrq-high-xmm-disasm vpinsrq
+  complex-double-reg 30 unsigned-reg rax-offset 1)
+(define-test-vop-three-reg %test-vpaddq-high-ymm-disasm vpaddq
+  int-avx2-reg 20 int-avx2-reg 21 int-avx2-reg 22)
+(define-test-vop-same-reg %test-vpmovzxbd-high-zmm-disasm vpmovzxbd
+  int-avx512-reg 25)
 (define-test-vop-load %test-vmovdqa-zmm-disasm vmovdqa single-avx512-reg 0 64)
 (define-test-vop-load %test-vbroadcastf128-zmm-disasm vbroadcastf128 single-avx512-reg 0 16)
 (define-test-vop-reg-reg-mem %test-vpermt2d-zmm-disp8 vpermt2d single-avx512-reg 0 single-avx512-reg 1 64)
@@ -2509,8 +2605,10 @@
     (assert (search "VPMOVSXDQ ZMM29, YMM17" text))
     (assert (search "VPMOVZXWD ZMM18, YMM28" text))
     (assert (search "VPMOVZXWQ ZMM29, XMM16" text))))
-;; call avx2-inst-printer-list for vmovdqu and assert it is restricted to
-;; L'L = 512 (ll = 2), uses disp-n = 64 => selects evex-ymmreg/mem-disp64.
+;; call avx2-inst-printer-list for vmovdqu and assert that its auto-promoted
+;; ZMM-width (LL = #b10) EVEX form uses disp-n = 64 => evex-ymmreg/mem-disp64.
+;; (Auto-promotion generates one EVEX printer per width -- XMM/YMM/ZMM --
+;; each with its own disp-n, so the ZMM one must be picked out specifically.)
 (with-test (:name :auto-promoted-evex-disp8-printer)
   (let* ((asm-pkg (find-package "SB-X86-64-ASM"))
          (printer-fun (find-symbol "AVX2-INST-PRINTER-LIST" asm-pkg))
@@ -2529,14 +2627,22 @@
                           (and (eq (first form) :printer)
                                (let ((name (second form)))
                                  (and (symbolp name)
-                                      (search "EVEX-" (symbol-name name))))))
+                                      (search "EVEX-" (symbol-name name))
+                                      (equal (second (assoc 'sb-x86-64-asm::ll
+                                                             (third form)))
+                                             2)))))
                         printer-forms)))
         (assert evex-form)
         (let ((fields (third evex-form)))
-          ;; Auto-promoted EVEX forms are ZMM-only, so L'L = #b10.
-          (assert (equal (second (assoc 'll fields)) 2))
+          (assert (equal (second (assoc 'sb-x86-64-asm::ll fields)) 2))
           ;; The full-vector ZMM memory form uses compressed displacement N=64.
-          (assert (eq (third (assoc 'reg/mem fields)) disp64)))))))
+          ;; The reg/mem field is (REG/MEM NIL :TYPE '<type>) -- the type name
+          ;; is quoted since it's evaluated when this list is later spliced
+          ;; into the instruction's compiled :PRINTER clause.
+          (assert (eq (second
+                       (getf (cddr (assoc 'sb-x86-64-asm::reg/mem fields))
+                             :type))
+                      disp64)))))))
 
 (with-test (:name :auto-promoted-vmovaps-disp8-printer)
   (let* ((asm-pkg (find-package "SB-X86-64-ASM"))
@@ -2557,11 +2663,17 @@
                           (and (eq (first form) :printer)
                                (let ((name (second form)))
                                  (and (symbolp name)
-                                      (search "EVEX-" (symbol-name name))))))
+                                      (search "EVEX-" (symbol-name name))
+                                      (equal (second (assoc 'sb-x86-64-asm::ll
+                                                             (third form)))
+                                             2)))))
                         printer-forms)))
         (assert evex-form)
         (let ((fields (third evex-form)))
-          (assert (eq (third (assoc 'reg/mem fields)) disp64)))))))
+          (assert (eq (second
+                       (getf (cddr (assoc 'sb-x86-64-asm::reg/mem fields))
+                             :type))
+                      disp64)))))))
 
 ;; Printer metadata: W=0 and W=1 entries have correct disp-n
 (with-test (:name :scalar-unsigned-convert-printer-disp-n)
@@ -2573,8 +2685,11 @@
                (find-if (lambda (form)
                           (and (eq (first form) :printer)
                                (let ((fields (third form)))
-                                 (and (eql (second (assoc 'w fields)) w)
-                                      (assoc 'reg/mem fields)))))
+                                 (and (eql (second
+                                            (assoc 'sb-x86-64-asm::w fields))
+                                           w)
+                                      (assoc 'sb-x86-64-asm::reg/mem
+                                             fields)))))
                         forms)))
         (let ((w0-forms (funcall printer-fun inst-format #xf3 #x7b
                                  :nds t :w 0 :disp-n 4))
@@ -2584,12 +2699,12 @@
                 (w1-form (find-disp-n w1-forms 1)))
             (assert w0-form)
             (assert w1-form)
-            (let ((w0-reg/mem (assoc 'reg/mem (third w0-form)))
-                  (w1-reg/mem (assoc 'reg/mem (third w1-form))))
-              ;; The third element of the reg/mem field is the arg type.
-              (assert (eq (third w0-reg/mem)
+            (let ((w0-reg/mem (assoc 'sb-x86-64-asm::reg/mem (third w0-form)))
+                  (w1-reg/mem (assoc 'sb-x86-64-asm::reg/mem (third w1-form))))
+              ;; The reg/mem field is (REG/MEM NIL :TYPE '<type>).
+              (assert (eq (second (getf (cddr w0-reg/mem) :type))
                           (find-symbol "EVEX-YMMREG/MEM-DISP4" asm-pkg)))
-              (assert (eq (third w1-reg/mem)
+              (assert (eq (second (getf (cddr w1-reg/mem) :type))
                           (find-symbol "EVEX-YMMREG/MEM-DISP8" asm-pkg))))))))))
 
 ;; EVEX high registers: R', V', X-as-B'
@@ -3254,6 +3369,50 @@
     sb-vm::%test-vpand-zmm-disasm
   ("VPANDD" "ZMM0" "ZMM1" "ZMM2")
   :unexpected ("VPAND "))
+
+;; Extended (16-31) register numbers require EVEX even at XMM/YMM width,
+;; where nothing about the operation itself (vector width, opcode map)
+;; would otherwise force EVEX encoding.
+;; VPSLLDQ is a register-only shift: the format's only vector operand
+;; besides VVVV is a ModRM.rm-decoded, B-extended-only "REG" field
+;; (unlike a generic reg/mem operand), which needed its own EVEX B' fix.
+(define-evex-disasm-test
+    :evex-high-register-xmm-vpslldq
+    sb-vm::%test-vpslldq-high-xmm-disasm
+  ("VPSLLDQ" "XMM30" "1"))
+
+;; Same idea for a plain 3-register ALU op: VPAND auto-promotes to the
+;; explicit EVEX VPANDD encoding once any operand needs EVEX for any reason,
+;; not just because the vector is ZMM-wide.
+(define-evex-disasm-test
+    :evex-high-register-xmm-vpand
+    sb-vm::%test-vpand-high-xmm-disasm
+  ("VPANDD" "XMM30" "XMM30" "XMM30")
+  :unexpected ("VPAND "))
+
+;; VPINSRQ mixes two XMM operands with a plain GPR operand and an immediate.
+;; The GPR (RAX) must decode normally -- it must not be pulled into the
+;; extended vector-register-numbering path meant for the XMM operands.
+(define-evex-disasm-test
+    :evex-high-register-xmm-vpinsrq
+    sb-vm::%test-vpinsrq-high-xmm-disasm
+  ("VPINSRQ" "XMM30" "XMM30" "RAX" "1"))
+
+;; The same extended-register-number fix, exercised at YMM width instead
+;; of XMM, using three distinct registers (20, 21, 22).
+(define-evex-disasm-test
+    :evex-high-register-ymm-vpaddq
+    sb-vm::%test-vpaddq-high-ymm-disasm
+  ("VPADDQ" "YMM20" "YMM21" "YMM22"))
+
+;; Combines two fixes at once: VPMOVZXBD's register-direct source must
+;; print one size down from the (extended-numbered) ZMM destination, i.e.
+;; XMM25, not ZMM25.
+(define-evex-disasm-test
+    :evex-high-register-zmm-vpmovzxbd
+    sb-vm::%test-vpmovzxbd-high-zmm-disasm
+  ("VPMOVZXBD" "ZMM25" "XMM25")
+  :unexpected ("ZMM25, ZMM25"))
 
 ;; vmovdqa skip: explicit VMOVDQA32 should be used
 (define-evex-disasm-test
