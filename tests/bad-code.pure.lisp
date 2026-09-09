@@ -1156,5 +1156,24 @@
   (assert (nth-value 2
                      (checked-compile
                       '(lambda (x)
+                        (make-array (cons x 1)))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      '(lambda (x)
                         (make-array (list 'a x)))
+                      :allow-warnings t))))
+
+(with-test (:name :improper-list*)
+  (assert (nth-value 2
+                     (checked-compile
+                      '(lambda (x)
+                        (declare (integer x))
+                        (remove 0 (list* 1 x)))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      '(lambda (x)
+                        (declare (integer x))
+                        (remove 2 (cons x 1)))
                       :allow-warnings t))))

@@ -4476,7 +4476,7 @@
            (lambda () (append nil 10)) (integer 10 10)
            (lambda (x) (append x 10)) (or (integer 10 10) cons)
            (lambda (x) (append x (cons 1 2))) cons
-           (lambda (x y) (append x (cons 1 2) y)) cons
+           (lambda (x y) (append x (list 1 2) y)) cons
            (lambda (x y) (nconc x (the list y) x)) t
            (lambda (x y) (nconc (the atom x) y)) t
            (lambda (x y) (nconc (the (or null (eql 10)) x) y)) t

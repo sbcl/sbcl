@@ -321,6 +321,11 @@
             ((cast-p dest)
              (lvar-dest-var (node-lvar dest)))))))
 
+(defmacro lvar-intersectp (lvar type)
+  `(types-equal-or-intersect (lvar-type ,lvar) (specifier-type ',type)))
+(defmacro lvar-subtypep  (lvar type)
+  `(csubtypep (lvar-type ,lvar) (specifier-type ',type)))
+
 (defun immediately-used-let-dest (node &optional flushable)
   (let ((lvar (node-lvar node)))
     (when lvar
@@ -742,7 +747,7 @@
                (declare (ignorable name combination args rotated))
                ,match-form)))))))
 
-(defvar *combination-match-aliases* (make-hash-table :test #'eq))
+(defglobal *combination-match-aliases* (make-hash-table :test #'eq))
 
 (defmacro def-combination-match-alias (name ll &body body)
   `(pushnew ',(if (integerp ll)
@@ -4512,7 +4517,16 @@ is :ANY, the function name is not checked."
            (loop for (call . values) in values
                  do (let ((*compiler-error-context* call))
                       (report values)))
-           t))))))
+           t)
+          #-sb-xc-host
+          (t
+           (combination-match2 ((lvar-uses lvar) :transform nil)
+             ((list* (:+ args) last)
+              (unless (lvar-intersectp last list)
+                (warn 'type-warning
+                      :format-control
+                      "~@<LIST* with the last argument ~s creates an improper list.~@:>"
+                      :format-arguments (list (type-specifier (lvar-type last)))))))))))))
 
 (defun process-lvar-hook-annotation (lvar annotation)
   (when (constant-lvar-p lvar)
@@ -4752,11 +4766,6 @@ is :ANY, the function name is not checked."
 (defun after-ir1-phases-p ()
   (and (boundp '*component-being-compiled*)
        (> (component-phase-counter *component-being-compiled*) 0)))
-
-(defmacro lvar-intersectp (lvar type)
-  `(types-equal-or-intersect (lvar-type ,lvar) (specifier-type ',type)))
-(defmacro lvar-subtypep  (lvar type)
-  `(csubtypep (lvar-type ,lvar) (specifier-type ',type)))
 
 (defun combination-name (combination)
   (lvar-fun-name (combination-fun combination) t))
