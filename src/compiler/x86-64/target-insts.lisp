@@ -244,11 +244,11 @@
 
 (defun print-xmmreg (value stream dstate)
   (let* ((reg (get-fpr :xmm
-                           ;; FIXME: why are we seeing a value from the GPR
-                           ;; prefilter instead of XMM prefilter here sometimes?
-                           (etypecase value
-                             ((unsigned-byte 4) value)
-                             (reg (reg-num value)))))
+                       ;; FIXME: why are we seeing a value from the GPR
+                       ;; prefilter instead of XMM prefilter here sometimes?
+                       (etypecase value
+                         ((mod 32) value)
+                         (reg (reg-num value)))))
          (name (reg-name reg)))
     (if stream
         (write-string name stream)

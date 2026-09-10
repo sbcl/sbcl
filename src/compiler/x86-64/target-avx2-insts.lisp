@@ -15,7 +15,7 @@
 ;;; Does NOT use EVEX R' - R' belongs only to the ModRM.reg field.
 (defun print-ymmreg-rm (value stream dstate)
   (let* ((offset (etypecase value
-                   ((unsigned-byte 4) value)
+                   ((mod 32) value)
                    (reg (reg-num value))))
          (reg (get-fpr (cond ((dstate-getprop dstate +evex-l1+) :zmm)
                              ((dstate-getprop dstate +vex-l+) :ymm)
@@ -29,7 +29,7 @@
 ;;; Uses EVEX V' to form a 5-bit register number.
 (defun print-ymmreg-vvvv (value stream dstate)
   (let* ((offset (etypecase value
-                   ((unsigned-byte 4) value)
+                   ((mod 32) value)
                    (reg (reg-num value))))
          (offset (if (dstate-getprop dstate +evex-v-prime+)
                      (+ offset 16)
@@ -45,7 +45,7 @@
 
 (defun print-ymmreg (value stream dstate)
   (let* ((offset (etypecase value
-                   ((unsigned-byte 4) value)
+                   ((mod 32) value)
                    (reg (reg-num value))))
          ;; For EVEX, R' provides bit 4 of the reg field (registers 16-31).
          ;; This flag is set by the evex-r-prime prefilter.
@@ -63,7 +63,7 @@
 
 (defun print-kreg (value stream dstate)
   (let* ((offset (etypecase value
-                   ((unsigned-byte 4) value)
+                   ((mod 32) value)
                    (reg (reg-num value))))
          (reg (get-fpr :kreg offset))
          (name (reg-name reg)))
@@ -80,6 +80,26 @@
   (if (machine-ea-p value)
       (print-mem-ref :ref value nil stream dstate)
       (print-ymmreg-rm value stream dstate)))
+
+;;; Printer for half-width vector operands (e.g. 2x widening conversions).
+;;; In 512-bit EVEX mode (+evex-l1+), half width is YMM.
+;;; In 256-bit or 128-bit mode, half width is XMM.
+(defun print-half-ymmreg-rm (value stream dstate)
+  (let* ((offset (etypecase value
+                   ((mod 32) value)
+                   (reg (reg-num value))))
+         (reg (get-fpr (cond ((dstate-getprop dstate +evex-l1+) :ymm)
+                             (t :xmm))
+                       offset))
+         (name (reg-name reg)))
+    (if stream
+        (write-string name stream)
+        (operand name dstate))))
+
+(defun print-half-ymmreg/mem (value stream dstate)
+  (if (machine-ea-p value)
+      (print-mem-ref :ref value nil stream dstate)
+      (print-half-ymmreg-rm value stream dstate)))
 
 (defun invert-4 (dstate value)
   (declare (ignore dstate))

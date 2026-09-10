@@ -27,6 +27,10 @@
   :prefilter #'prefilter-xmmreg/mem
   :printer #'print-ymmreg/mem)
 
+(define-arg-type half-ymmreg/mem
+  :prefilter #'prefilter-xmmreg/mem
+  :printer #'print-half-ymmreg/mem)
+
 (macrolet ((define-disp-arg-type (name n)
              `(define-arg-type ,name
                 :prefilter (lambda (dstate mod r/m)
@@ -97,6 +101,16 @@
 (define-arg-type vex-b
   :prefilter  (lambda (dstate value)
                 (dstate-setprop dstate (if (plusp value) 0 +rex-b+))))
+
+(define-arg-type evex-ymmreg-b
+  :prefilter (lambda (dstate value)
+               (let ((full-reg (if (dstate-getprop dstate +rex-b+) (+ value 8) value)))
+                 (get-fpr :xmm
+                          (if (and (dstate-getprop dstate +evex+)
+                                   (dstate-getprop dstate +rex-x+))
+                              (+ full-reg 16)
+                              full-reg))))
+  :printer #'print-ymmreg-rm)
 
 (defconstant-eqx +avx-conditions+
     #(:eq :lt :le :unord :neq :nlt :nle :ord :eq_uq
@@ -388,7 +402,7 @@
   (b11 :field (byte 2 (+ start 14))
        :value #b11)
   (reg :field (byte 3 (+ start 8))
-       :type 'ymmreg-b)
+       :type 'evex-ymmreg-b)
   (imm :type 'imm-byte))
 
 (define-evex-instruction-format (reg-ymm/mem 16
@@ -825,12 +839,15 @@ REG is the source (encoded in ModR/M.r/m).
        ;; Generate EVEX printer entries so VEX instructions auto-promoted
        ;; to EVEX can be disassembled. Map 0F is always safe (no EVEX-only
        ;; instructions reuse those opcodes). Map 0F38 has many conflicts
-       ;; (broadcasts, vmaskmov vs vscalef, etc.), so we only include the
-       ;; FMA range (#x96-#xBF) which is safe. Map 0F3A is skipped entirely.
+       ;; (broadcasts, vmaskmov vs vscalef, etc.), so we include the
+       ;; sign/zero extension ranges (#x20-#x25, #x30-#x35) and the FMA
+       ;; range (#x96-#xBF) which are safe. Map 0F3A is skipped entirely.
        (when (or evex
                  (= opcode-prefix #x0F)
                  (and (= opcode-prefix #x0F38)
-                      (<= #x96 opcode #xbf)))
+                      (or (<= #x20 opcode #x25)
+                          (<= #x30 opcode #x35)
+                          (<= #x96 opcode #xbf))))
          (avx512-inst-printer-list inst-format-stem prefix opcode
                                    :more-fields more-fields
                                    :printer printer
@@ -1031,13 +1048,15 @@ REG is the source (encoded in ModR/M.r/m).
              `(define-instruction ,name (segment dst src)
                 ,@(avx2-inst-printer-list 'ymm-ymm/mem prefix opcode
                                           :opcode-prefix opcode-prefix
-                                          :more-fields (and (eq l :from-thing)
-                                                            '((reg nil :type 'xmmreg))))
+                                          :more-fields (case l
+                                                         (:from-thing '((reg nil :type 'xmmreg)))
+                                                         (:xmm-src '((reg/mem nil :type 'xmmreg/mem)))
+                                                         (:half-src '((reg/mem nil :type 'half-ymmreg/mem)))))
                 (:emitter
                  (emit-avx2-inst segment src dst ,prefix ,opcode
                                  :opcode-prefix ,opcode-prefix
                                  :evex-w ,evex-w
-                                 ,@(and l
+                                 ,@(and (or (numberp l) (eq l :from-thing))
                                        `(:l ,l)))))))
   ;; moves
   (def vmovshdup #xf3 #x16)
@@ -1071,19 +1090,19 @@ REG is the source (encoded in ModR/M.r/m).
 
   (def vaesimc #x66 #xdb #x0f38)
 
-  (def vpmovsxbw #x66 #x20 #x0f38)
-  (def vpmovsxbd #x66 #x21 #x0f38)
-  (def vpmovsxbq #x66 #x22 #x0f38)
-  (def vpmovsxwd #x66 #x23 #x0f38)
-  (def vpmovsxwq #x66 #x24 #x0f38)
-  (def vpmovsxdq #x66 #x25 #x0f38)
+  (def vpmovsxbw #x66 #x20 #x0f38 :half-src)
+  (def vpmovsxbd #x66 #x21 #x0f38 :xmm-src)
+  (def vpmovsxbq #x66 #x22 #x0f38 :xmm-src)
+  (def vpmovsxwd #x66 #x23 #x0f38 :half-src)
+  (def vpmovsxwq #x66 #x24 #x0f38 :xmm-src)
+  (def vpmovsxdq #x66 #x25 #x0f38 :half-src)
 
-  (def vpmovzxbw #x66 #x30 #x0f38)
-  (def vpmovzxbd #x66 #x31 #x0f38)
-  (def vpmovzxbq #x66 #x32 #x0f38)
-  (def vpmovzxwd #x66 #x33 #x0f38)
-  (def vpmovzxwq #x66 #x34 #x0f38)
-  (def vpmovzxdq #x66 #x35 #x0f38))
+  (def vpmovzxbw #x66 #x30 #x0f38 :half-src)
+  (def vpmovzxbd #x66 #x31 #x0f38 :xmm-src)
+  (def vpmovzxbq #x66 #x32 #x0f38 :xmm-src)
+  (def vpmovzxwd #x66 #x33 #x0f38 :half-src)
+  (def vpmovzxwq #x66 #x34 #x0f38 :xmm-src)
+  (def vpmovzxdq #x66 #x35 #x0f38 :half-src))
 
 (macrolet ((def (name prefix)
              `(define-instruction ,name (segment dst src pattern)
