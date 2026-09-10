@@ -623,6 +623,7 @@
     (try `(vaddps ,xmm31 ,xmm16 ,xmm17))
     (try `(vminmaxss ,xmm31 ,xmm16 ,xmm17 0))))
 
+#+x86-64
 (test-util:with-test (:name :apx-extended-registers-and-instructions)
   (let ((r16 (sb-x86-64-asm::get-gpr :qword 16))
         (r17 (sb-x86-64-asm::get-gpr :qword 17))
