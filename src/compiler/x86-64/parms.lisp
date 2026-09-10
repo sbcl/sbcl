@@ -200,6 +200,11 @@
 (defconstant cpu-has-ymm-registers   0)
 (defconstant cpu-has-popcnt          1)
 (defconstant cpu-has-zmm-registers   2)
+(defconstant cpu-has-avx10           3)
+(defconstant cpu-has-avx10-2         4)
+(defconstant cpu-has-avx10-512       5)
+(defconstant cpu-has-avx512-fp16     6)
+(defconstant cpu-has-apx             7)
 
 #+sb-simd-pack
 (progn

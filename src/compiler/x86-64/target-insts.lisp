@@ -17,21 +17,59 @@
 
 (defun sb-disassem::pre-decode (chunk dstate)
   (let ((byte (ldb (byte 8 0) chunk)))
-    (case byte
-      ((#x64  ; FS:
-        #x65  ; GS:
-        #x66  ; operand size modifier
-        #x67  ; address size modifier
-        #xf0  ; LOCK
-        #xf2  ; REPNE or SSE inst
-        #xf3) ; REP or SSE inst
-       ;; If the next byte is a REX prefix, then strip it out, recording the 'wrxb'
-       ;; bits in the dstate, and return the chunk as if the REX byte were absent.
-       (let ((next (ldb (byte 8 8) chunk)))
-         (when (= (logand next #xf0) #x40)
-           (dstate-setprop dstate (logior +rex+ (logand next #b1111)))
-           (let ((new (logior byte (ash (ldb (byte 48 16) chunk) 8))))
-             (return-from sb-disassem::pre-decode (values new 1))))))))
+    (cond ((= byte #xD5)
+           ;; Direct REX2 prefix (not preceded by legacy prefixes)
+           (let ((next (ldb (byte 8 8) chunk)))
+             (dstate-setprop dstate
+                             (logior +rex+
+                                     +rex2+
+                                     (if (logbitp 3 next) +rex-w+ 0)
+                                     (if (logbitp 2 next) +rex-r+ 0)
+                                     (if (logbitp 1 next) +rex-x+ 0)
+                                     (if (logbitp 0 next) +rex-b+ 0)
+                                     (if (logbitp 6 next) +rex2-r4+ 0)
+                                     (if (logbitp 5 next) +rex2-x4+ 0)
+                                     (if (logbitp 4 next) +rex2-b4+ 0)
+                                     (if (logbitp 7 next) +rex2-m0+ 0)))
+             (if (logbitp 7 next)
+                 ;; M0=1: implies 0x0F escape opcode map. Insert #x0F.
+                 (let ((new (logior #x0F (ash (ldb (byte 48 16) chunk) 8))))
+                   (return-from sb-disassem::pre-decode (values new 1)))
+                 ;; M0=0: 2 bytes consumed from chunk.
+                 (let ((new (ldb (byte 48 16) chunk)))
+                   (return-from sb-disassem::pre-decode (values new 2))))))
+          ((member byte '(#x64  ; FS:
+                          #x65  ; GS:
+                          #x66  ; operand size modifier
+                          #x67  ; address size modifier
+                          #xf0  ; LOCK
+                          #xf2  ; REPNE or SSE inst
+                          #xf3)) ; REP or SSE inst
+           (let ((next (ldb (byte 8 8) chunk)))
+             (cond ((= (logand next #xf0) #x40)
+                    (dstate-setprop dstate (logior +rex+ (logand next #b1111)))
+                    (let ((new (logior byte (ash (ldb (byte 48 16) chunk) 8))))
+                      (return-from sb-disassem::pre-decode (values new 1))))
+                   ((= next #xD5)
+                    (let ((payload (ldb (byte 8 16) chunk)))
+                      (dstate-setprop dstate
+                                      (logior +rex+
+                                              +rex2+
+                                              (if (logbitp 3 payload) +rex-w+ 0)
+                                              (if (logbitp 2 payload) +rex-r+ 0)
+                                              (if (logbitp 1 payload) +rex-x+ 0)
+                                              (if (logbitp 0 payload) +rex-b+ 0)
+                                              (if (logbitp 6 payload) +rex2-r4+ 0)
+                                              (if (logbitp 5 payload) +rex2-x4+ 0)
+                                              (if (logbitp 4 payload) +rex2-b4+ 0)
+                                              (if (logbitp 7 payload) +rex2-m0+ 0)))
+                      (if (logbitp 7 payload)
+                          (let ((new (logior byte
+                                             (ash #x0F 8)
+                                             (ash (ldb (byte 40 24) chunk) 16))))
+                            (return-from sb-disassem::pre-decode (values new 1)))
+                          (let ((new (logior byte (ash (ldb (byte 40 24) chunk) 8))))
+                            (return-from sb-disassem::pre-decode (values new 2)))))))))))
   (values chunk 0))
 
 (defmethod print-object ((reg reg) stream)
@@ -64,24 +102,27 @@
     (dstate-setprop dstate +operand-size-8+))
   value)
 
-;;; A register field that can be extended by REX.R.
+;;; A register field that can be extended by REX.R or REX2.R4.
 (defun prefilter-reg-r (dstate value)
   (declare (type (mod 8) value) (type disassem-state dstate))
   ;; size is arbitrary here since the printer determines it
-  (get-gpr :qword (if (dstate-getprop dstate +rex-r+) (+ value 8) value)))
+  (get-gpr :qword (+ value
+                     (if (dstate-getprop dstate +rex-r+) 8 0)
+                     (if (dstate-getprop dstate +rex2-r4+) 16 0))))
 
-;;; A register field that can be extended by REX.B. In an EVEX-encoded,
-;;; register-direct (mod=11) instruction, this field's own extension bit
-;;; is REX.B, but the otherwise-unused REX.X doubles as B' (bit 4),
-;;; permitting registers 16-31 -- mirroring the same trick DECODE-MOD-R/M
-;;; uses for its register-direct case.
+;;; A register field that can be extended by REX.B or REX2.B4. In an
+;;; EVEX-encoded, register-direct (mod=11) instruction, this field's own
+;;; extension bit is REX.B, but the otherwise-unused REX.X doubles as B'
+;;; (bit 4), permitting registers 16-31 -- mirroring the same trick
+;;; DECODE-MOD-R/M uses for its register-direct case.
 (defun prefilter-reg-b (dstate value)
   (declare (type (mod 8) value) (type disassem-state dstate))
   ;; size is arbitrary here since the printer determines it
-  (let ((value (if (dstate-getprop dstate +rex-b+) (+ value 8) value)))
+  (let ((rex-b-value (if (dstate-getprop dstate +rex-b+) (+ value 8) value)))
     (if (and (dstate-getprop dstate +evex+) (dstate-getprop dstate +rex-x+))
-        (get-fpr :xmm (+ value 16))
-        (get-gpr :qword value))))
+        (get-fpr :xmm (+ rex-b-value 16))
+        (get-gpr :qword (+ rex-b-value
+                           (if (dstate-getprop dstate +rex2-b4+) 16 0))))))
 
 ;; This reader extracts the 'imm' operand in "MOV reg,imm" format.
 ;; KLUDGE: the REG instruction format can not define a reader
@@ -113,15 +154,16 @@
   (declare (type (or null stream) stream)
            (type disassem-state dstate))
   (let* ((num (etypecase value
-               ((unsigned-byte 4) value)
+               ((mod 32) value)
                ;; Decode and re-encode, because the size is always
                ;; initially :qword.
                (reg (reg-num value))))
          (reg (get-gpr width
                        (if (and (eq width :byte)
-                                (not (dstate-getprop dstate +rex+))
+                                (not (or (dstate-getprop dstate +rex+)
+                                         (dstate-getprop dstate +rex2+)))
                                 (<= 4 num 7))
-                           (+ 16 -4 num) ; legacy high-byte register
+                           (+ 32 -4 num) ; legacy high-byte register
                            num))))
     (when (and note
                (= (reg-num reg) sb-vm:card-table-reg))
@@ -359,21 +401,25 @@
                 ;; size.
                 (* disp8 disp-n)))
              (#b10 (read-signed-suffix 32 dstate))))
-         (extend (bit-name reg)
-           (logior (if (dstate-getprop dstate bit-name) 8 0) reg)))
+         (extend (bit-name reg &optional bit4-name)
+           (logior (if (dstate-getprop dstate bit-name) 8 0)
+                   (if (and bit4-name (dstate-getprop dstate bit4-name)) 16 0)
+                   reg)))
     (declare (inline extend))
-    (let ((full-reg (extend +rex-b+ r/m)))
+    (let* ((base-full-reg (logior (if (dstate-getprop dstate +rex-b+) 8 0) r/m))
+           (gpr-full-reg (logior (if (dstate-getprop dstate +rex2-b4+) 16 0)
+                                 base-full-reg)))
       (cond ((= mod #b11) ; register direct mode
              (case regclass
-               (gpr (get-gpr :qword full-reg))
+               (gpr (get-gpr :qword gpr-full-reg)) ; size is not really known here
                (fpr
                 ;; EVEX B' (bit 4 of r/m for register-direct) is carried
                 ;; by the EVEX X bit, which sets +rex-x+.
                 (get-fpr :xmm
                          (if (and (dstate-getprop dstate +evex+)
                                   (dstate-getprop dstate +rex-x+))
-                             (+ full-reg 16)
-                             full-reg)))))
+                             (+ base-full-reg 16)
+                             base-full-reg)))))
             ((= r/m #b100) ; SIB byte - rex.b is "don't care"
              (let* ((sib (the (unsigned-byte 8) (read-suffix 8 dstate)))
                     (vsib-p (dstate-getprop dstate +vsib+))
@@ -389,10 +435,10 @@
                                                   0))))
                             (get-fpr :xmm index-num))
                           ;; Normal GPR index
-                          (extend +rex-x+ index-raw))))
+                          (extend +rex-x+ index-raw +rex2-x4+))))
                (make-machine-ea
                 (unless (and (= mod #b00) (= base-reg #b101))
-                  (extend +rex-b+ base-reg))
+                  (extend +rex-b+ base-reg +rex2-b4+))
                 (cond ((/= mod #b00) (displacement))
                       ((= base-reg #b101) (read-signed-suffix 32 dstate)))
                 ;; For normal addressing, SIB.index=4 means "no index".
@@ -401,9 +447,10 @@
                     index-reg
                     (unless (= index-reg #b100) index-reg))
                 (ash 1 (ldb (byte 2 6) sib)))))
-            ((/= mod #b00) (make-machine-ea full-reg (displacement)))
+            ((/= mod #b00) (make-machine-ea gpr-full-reg (displacement)))
+            ;; rex.b is not decoded in determining RIP-relative mode
             ((= r/m #b101) (make-machine-ea :rip (read-signed-suffix 32 dstate)))
-            (t (make-machine-ea full-reg))))))
+            (t (make-machine-ea gpr-full-reg))))))
 
 (defun prefilter-reg/mem (dstate mod r/m)
   (decode-mod-r/m dstate mod r/m 'gpr))

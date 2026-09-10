@@ -44,6 +44,8 @@
 #define BREAKPOINT_WIDTH 1
 
 int avx_supported = 0, avx2_supported = 0, avx512_supported = 0, avx512fp16_supported = 0;
+int avx10_supported = 0, avx10_version = 0, avx10_128_supported = 0, avx10_256_supported = 0, avx10_512_supported = 0;
+int apx_supported = 0;
 
 static void cpuid(unsigned info, unsigned subinfo,
                   unsigned *eax, unsigned *ebx, unsigned *ecx, unsigned *edx)
@@ -114,7 +116,8 @@ void tune_asm_routines_for_microarch(void)
     unsigned int eax, ebx, ecx, edx, xcr0;
 
     cpuid(0, 0, &eax, &ebx, &ecx, &edx);
-    if (eax >= 1) { // see if we can execute basic id function 1
+    unsigned int max_basic_leaf = eax;
+    if (max_basic_leaf >= 1) { // see if we can execute basic id function 1
         unsigned avx_mask = 0x18000000; // OXSAVE and AVX
         cpuid(1, 0, &eax, &ebx, &ecx, &edx);
         cpuid_fn1_ecx = ecx;
@@ -124,27 +127,58 @@ void tune_asm_routines_for_microarch(void)
             if ((xcr0 & 0x06) == 0x06) { // YMM and XMM
                 avx_supported = 1;
 
-                cpuid(7, 0, &eax, &ebx, &ecx, &edx);
-                if  (ebx & 0x20)  {
-                    avx2_supported = 1;
-                }
-                if ((ebx & (1u << 16)) &&       // AVX512F
-                    ((xcr0 & 0xE6) == 0xE6)) {  // OS supports ZMM
-                    avx512_supported = 1;
-                    if (edx & (1u << 23)) {     // AVX512_FP16
-                        avx512fp16_supported = 1;
+                if (max_basic_leaf >= 7) {
+                    cpuid(7, 0, &eax, &ebx, &ecx, &edx);
+                    unsigned int max_subleaf_7 = eax;
+                    if (ebx & 0x20) {
+                        avx2_supported = 1;
+                    }
+                    if ((ebx & (1u << 16)) &&       // AVX512F
+                        ((xcr0 & 0xE6) == 0xE6)) {  // OS supports ZMM
+                        avx512_supported = 1;
+                        if (edx & (1u << 23)) {     // AVX512_FP16
+                            avx512fp16_supported = 1;
+                        }
+                    }
+                    if (max_subleaf_7 >= 1) {
+                        cpuid(7, 1, &eax, &ebx, &ecx, &edx);
+                        if (edx & (1u << 21)) { // APX_F (Leaf 7/1 EDX[21])
+                            apx_supported = 1;
+                        }
+                        if ((edx & (1u << 19)) && (max_basic_leaf >= 0x24)) {
+                            cpuid(0x24, 0, &eax, &ebx, &ecx, &edx);
+                            avx10_version = ebx & 0xFF;
+                            if (avx10_version >= 1) {
+                                avx10_supported = 1;
+                                if (ebx & (1u << 16)) avx10_128_supported = 1;
+                                if (ebx & (1u << 17)) avx10_256_supported = 1;
+                                if ((ebx & (1u << 18)) && ((xcr0 & 0xE6) == 0xE6)) {
+                                    avx10_512_supported = 1;
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
     }
     int our_cpu_feature_bits = 0;
-    // avx2_supported gets copied into bit 1 of cpu_feature_bits
-    if (avx2_supported) our_cpu_feature_bits |= 1;
-    // avx512 supported in bit 3
-    if (avx512_supported) our_cpu_feature_bits |= 4;
-    // POPCNT = ECX bit 23, which gets copied into bit 2 in cpu_feature_bits
-    if (cpuid_fn1_ecx & (1<<23)) our_cpu_feature_bits |= 2;
+    // avx2_supported gets copied into bit 0 of cpu_feature_bits
+    if (avx2_supported) our_cpu_feature_bits |= (1 << 0);
+    // POPCNT = ECX bit 23, which gets copied into bit 1 in cpu_feature_bits
+    if (cpuid_fn1_ecx & (1<<23)) our_cpu_feature_bits |= (1 << 1);
+    // avx512 supported in bit 2
+    if (avx512_supported) our_cpu_feature_bits |= (1 << 2);
+    // avx10 supported in bit 3
+    if (avx10_supported) our_cpu_feature_bits |= (1 << 3);
+    // avx10-2 supported in bit 4
+    if (avx10_supported && avx10_version >= 2) our_cpu_feature_bits |= (1 << 4);
+    // avx10-512 supported in bit 5
+    if (avx10_512_supported) our_cpu_feature_bits |= (1 << 5);
+    // avx512_fp16 supported in bit 6
+    if (avx512fp16_supported) our_cpu_feature_bits |= (1 << 6);
+    // apx supported in bit 7
+    if (apx_supported) our_cpu_feature_bits |= (1 << 7);
     consts->cpu_feature_bits = our_cpu_feature_bits;
 
 #ifdef LISP_FEATURE_WIN32
