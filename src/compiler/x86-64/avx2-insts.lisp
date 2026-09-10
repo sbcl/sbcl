@@ -392,7 +392,9 @@
  (r :field (byte 1 15) :type 'vex-r) (x :field (byte 1 14) :type 'vex-x)
  (b :field (byte 1 13) :type 'vex-b)
  (r-prime :field (byte 1 12) :type 'evex-r-prime)
- (reserved :field (byte 2 10) :value 0) (mm :field (byte 2 8))
+ ;; bit 11 is reserved (must be 0); bits 10:8 are mmm, selecting opcode
+ ;; map 1/2/3 (0F/0F38/0F3A) or, for AVX-512_FP16, map 5/6.
+ (reserved :field (byte 1 11) :value 0) (mm :field (byte 3 8))
  (w :field (byte 1 23) :type 'evex-w)
  (vvvv :field (byte 4 19) :type 'evex-ymm-vvvv-reg)
  (evex-fixed :field (byte 1 18) :value 1 :type 'evex-fixed)
