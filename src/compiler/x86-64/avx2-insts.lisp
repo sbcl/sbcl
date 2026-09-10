@@ -1026,7 +1026,8 @@ computes X/V' from the vector index rather than from THING's GPR index."
                             evex-w
                             vvvv
                             is4
-                            vm)
+                            vm
+                            (disp-n 0))
   ;; Auto-detect ZMM operands or APX extended GPR operands and delegate to EVEX encoding
   (flet ((evex-reg-p (r)
            (or (and (register-p r)
@@ -1051,10 +1052,13 @@ computes X/V' from the vector index rather than from THING's GPR index."
                           :w (or evex-w w)
                           :vvvv vvvv
                           :vm vm
-                          ;; Force disp32 for auto-promoted VEX instructions:
-                          ;; the correct N depends on tuple type which varies
-                          ;; per instruction. disp-n=0 disables disp8 entirely.
-                          :disp-n 0))))
+                          ;; Force disp32 (disp-n=0 disables disp8 compression)
+                          ;; unless the caller passed an explicit disp-n --
+                          ;; the correct N depends on tuple type, which a
+                          ;; generic auto-promoted VEX instruction doesn't
+                          ;; know, but some callers (e.g. narrowing
+                          ;; conversions) compute it themselves.
+                          :disp-n disp-n))))
   (emit-vex segment vvvv thing reg prefix opcode-prefix l w)
   (emit-bytes segment opcode)
   (when is4
