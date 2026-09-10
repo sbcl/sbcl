@@ -47,6 +47,16 @@
           (sb-vm::%simd-pack-ref-double pack 6)
           (sb-vm::%simd-pack-ref-double pack 7)))
 
+(defun %simd-pack-512-ints (pack)
+  (values (sb-vm::%simd-pack-ref-64 pack 0)
+          (sb-vm::%simd-pack-ref-64 pack 1)
+          (sb-vm::%simd-pack-ref-64 pack 2)
+          (sb-vm::%simd-pack-ref-64 pack 3)
+          (sb-vm::%simd-pack-ref-64 pack 4)
+          (sb-vm::%simd-pack-ref-64 pack 5)
+          (sb-vm::%simd-pack-ref-64 pack 6)
+          (sb-vm::%simd-pack-ref-64 pack 7)))
+
 (defun make-constant-packs ()
   (values (sb-ext:%make-simd-pack-512-ub64 1 2 3 4 5 6 7 8)
           (sb-ext:%make-simd-pack-512-ub32 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
@@ -115,8 +125,7 @@
                                                        (ldb (byte 64 0) -1)
                                                        (ldb (byte 64 0) -1)))
           for pack in (list i i0 i-1)
-          do (print (list p0 p1 p2 p3 p4 p5 p6 p7))
-             (assert (eql p0 (sb-kernel:%simd-pack-512-0 pack)))
+          do (assert (eql p0 (sb-kernel:%simd-pack-512-0 pack)))
              (assert (eql p1 (sb-kernel:%simd-pack-512-1 pack)))
              (assert (eql p2 (sb-kernel:%simd-pack-512-2 pack)))
              (assert (eql p3 (sb-kernel:%simd-pack-512-3 pack)))
@@ -316,6 +325,7 @@
                   type-error)))
 
 ;; evex patch
+(push-package)
 (cl:in-package "SB-VM")
 
 (macrolet ((def (name)
@@ -454,10 +464,10 @@
     (inst vpmovzxwd zmm18 ymm28)
     (inst vpmovzxwq zmm29 xmm16)))
 
-(cl:in-package :test-util)
+(test-util:pop-package)
 
 (with-test (:name :evex-high-register-disassembly)
-  (let* ((fun (compile nil
+  (let* ((fun (checked-compile
                        '(lambda ()
                          (sb-vm::%test-evex-high-regs))))
          (text (with-output-to-string (s)
@@ -481,7 +491,7 @@
 |#
 
 (with-test (:name :evex-compressed-displacement-vector-lengths)
-  (let* ((fun (compile nil
+  (let* ((fun (checked-compile
                        '(lambda ()
                          (sb-vm::%test-evex-disp-vector-lengths))))
          (text (with-output-to-string (s)
@@ -491,7 +501,7 @@
     (assert (search "VMOVDQU64 ZMM2, [RSP+64]" text))))
 
 (with-test (:name :evex-compressed-displacement)
-  (let* ((fun (compile nil
+  (let* ((fun (checked-compile
                        '(lambda ()
                          (sb-vm::%test-evex-disp8))))
          (text (with-output-to-string (s)
@@ -502,7 +512,7 @@
     (assert (not (search "[RSP+1]" text)))))
 
 (with-test (:name :evex-compressed-displacement-negative)
-  (let* ((fun (compile nil
+  (let* ((fun (checked-compile
                        '(lambda ()
                          (sb-vm::%test-evex-disp-negative))))
          (text (with-output-to-string (s)
@@ -510,7 +520,7 @@
     (assert (search "VMOVDQU64 ZMM0, [RSP-64]" text))))
 
 (with-test (:name :evex-compressed-displacement-nonmultiple)
-  (let* ((fun (compile nil
+  (let* ((fun (checked-compile
                        '(lambda ()
                          (sb-vm::%test-evex-disp-nonmultiple))))
          (text (with-output-to-string (s)
@@ -518,7 +528,7 @@
     (assert (search "VMOVDQU64 ZMM0, [RSP+65]" text))))
 
 (with-test (:name :evex-compressed-displacement-large)
-  (let* ((fun (compile nil
+  (let* ((fun (checked-compile
                        '(lambda ()
                          (sb-vm::%test-evex-disp-large))))
          (text (with-output-to-string (s)
@@ -526,7 +536,7 @@
     (assert (search "VMOVDQU64 ZMM0, [RSP+8192]" text))))
 
 (with-test (:name :evex-disassembler-vpmov-and-high-reg-shifts)
-  (let* ((fun (compile nil '(lambda () (sb-vm::%test-evex-vpmovzx-vpslldq-disassem))))
+  (let* ((fun (checked-compile '(lambda () (sb-vm::%test-evex-vpmovzx-vpslldq-disassem))))
          (text (with-output-to-string (s)
                  (disassemble fun :stream s))))
     (assert (search "VPMOVZXBD ZMM20, XMM10" text))
@@ -538,7 +548,7 @@
     (assert (search "VPANDD XMM10, XMM30, XMM30" text))))
 
 (with-test (:name :evex-disassembler-high-registers-poke)
-  (let* ((fun (compile nil '(lambda () (sb-vm::%test-evex-high-registers-poke))))
+  (let* ((fun (checked-compile '(lambda () (sb-vm::%test-evex-high-registers-poke))))
          (text (with-output-to-string (s)
                  (disassemble fun :stream s))))
     (assert (search "VPSLLDQ XMM16, XMM16, 2" text))
@@ -556,3 +566,25 @@
     (assert (search "VPMOVSXDQ ZMM29, YMM17" text))
     (assert (search "VPMOVZXWD ZMM18, YMM28" text))
     (assert (search "VPMOVZXWQ ZMM29, XMM16" text))))
+
+(with-test (:name :constant-1)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda ()
+         (%simd-pack-512-ints
+          sb-vm::(inline-vop (((x int-avx512-reg sb-vm::simd-pack-512-ub64)
+                               (sb-ext:%make-simd-pack-512-ub64 . #.(make-list 8 :initial-element (ldb (byte 64 0) -1)))))
+                     ((r int-avx512-reg sb-vm::simd-pack-512-ub64))
+                   (move r x))))
+    (() #1=(values 18446744073709551615 18446744073709551615 18446744073709551615
+                   18446744073709551615 18446744073709551615 18446744073709551615
+                   18446744073709551615 18446744073709551615)))
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda ()
+         (%simd-pack-512-ints
+          sb-vm::(inline-vop (((x double-avx512-reg simd-pack-512-double)
+                               (sb-ext:%make-simd-pack-512-double . #.(make-list 8 :initial-element (sb-kernel:%make-double-float -1)))))
+                     ((r int-avx512-reg sb-vm::simd-pack-512-ub64))
+                   (move r x))))
+    (() #1#)))
