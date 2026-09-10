@@ -141,7 +141,9 @@
    (u32.16!-from-p512     #:vmovdqu64    (u32.16) (p512)          :cost 1 :encoding :move :always-translatable nil)
    (make-u32.16           nil            (u32.16) (u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32) :cost 1 :encoding :fake-vop)
    (u32.16-values         nil            (u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32 u32) (u32.16) :cost 1 :encoding :fake-vop)
-   (u32.16-broadcast      #:vpbroadcastd (u32.16) (u32)           :cost 1)
+   ;; NOTE: this branch's VPBROADCASTD only accepts an XMM/memory source; the
+   ;; GPR-source form is the separate VPBROADCASTD-GPR mnemonic (opcode 0x7C).
+   (u32.16-broadcast      #:vpbroadcastd-gpr (u32.16) (u32)           :cost 1)
    (u32.16-blend          nil            (u32.16) (u32.16 u32.16 u32.16) :cost 2 :encoding :custom)
    (two-arg-u32.16+       #:vpaddd       (u32.16) (u32.16 u32.16) :cost 1 :associative t)
    (two-arg-u32.16-       #:vpsubd       (u32.16) (u32.16 u32.16) :cost 1)
@@ -171,7 +173,8 @@
    (u64.8!-from-p512      #:vmovdqu64    (u64.8)  (p512)          :cost 1 :encoding :move :always-translatable nil)
    (make-u64.8            nil            (u64.8)  (u64 u64 u64 u64 u64 u64 u64 u64) :cost 1 :encoding :fake-vop)
    (u64.8-values          nil            (u64 u64 u64 u64 u64 u64 u64 u64) (u64.8) :cost 1 :encoding :fake-vop)
-   (u64.8-broadcast       #:vpbroadcastq (u64.8)  (u64)           :cost 1)
+   ;; See note above at U32.16-BROADCAST: needs the GPR-source mnemonic.
+   (u64.8-broadcast       #:vpbroadcastq-gpr (u64.8)  (u64)           :cost 1)
    (u64.8-blend           nil            (u64.8)  (u64.8 u64.8 u64.8) :cost 2 :encoding :custom)
    (two-arg-u64.8+        #:vpaddq       (u64.8)  (u64.8 u64.8)   :cost 1 :associative t)
    (two-arg-u64.8-        #:vpsubq       (u64.8)  (u64.8 u64.8)   :cost 1)
@@ -200,7 +203,8 @@
    (s32.16!-from-p512     #:vmovdqu64    (s32.16) (p512)          :cost 1 :encoding :move :always-translatable nil)
    (make-s32.16           nil            (s32.16) (s32 s32 s32 s32 s32 s32 s32 s32 s32 s32 s32 s32 s32 s32 s32 s32) :cost 1 :encoding :fake-vop)
    (s32.16-values         nil            (s32 s32 s32 s32 s32 s32 s32 s32 s32 s32 s32 s32 s32 s32 s32 s32) (s32.16) :cost 1 :encoding :fake-vop)
-   (s32.16-broadcast      #:vpbroadcastd (s32.16) (s32)           :cost 1)
+   ;; See note above at U32.16-BROADCAST: needs the GPR-source mnemonic.
+   (s32.16-broadcast      #:vpbroadcastd-gpr (s32.16) (s32)           :cost 1)
    (s32.16-blend          nil            (s32.16) (s32.16 s32.16 u32.16) :cost 2 :encoding :custom)
    (two-arg-s32.16+       #:vpaddd       (s32.16) (s32.16 s32.16) :cost 1 :associative t)
    (two-arg-s32.16-       #:vpsubd       (s32.16) (s32.16 s32.16) :cost 1)
@@ -230,7 +234,8 @@
    (s64.8!-from-p512      #:vmovdqu64    (s64.8)  (p512)          :cost 1 :encoding :move :always-translatable nil)
    (make-s64.8            nil            (s64.8)  (s64 s64 s64 s64 s64 s64 s64 s64) :cost 1 :encoding :fake-vop)
    (s64.8-values          nil            (s64 s64 s64 s64 s64 s64 s64 s64) (s64.8) :cost 1 :encoding :fake-vop)
-   (s64.8-broadcast       #:vpbroadcastq (s64.8)  (s64)           :cost 1)
+   ;; See note above at U32.16-BROADCAST: needs the GPR-source mnemonic.
+   (s64.8-broadcast       #:vpbroadcastq-gpr (s64.8)  (s64)           :cost 1)
    (s64.8-blend           nil            (s64.8)  (s64.8 s64.8 u64.8) :cost 2 :encoding :custom)
    (two-arg-s64.8+        #:vpaddq       (s64.8)  (s64.8 s64.8)   :cost 1 :associative t)
    (two-arg-s64.8-        #:vpsubq       (s64.8)  (s64.8 s64.8)   :cost 1)
