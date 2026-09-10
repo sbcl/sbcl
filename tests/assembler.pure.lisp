@@ -386,7 +386,7 @@
     (test-assemble `(vplzcntq ,zmm0 ,zmm1)
                    "62F2FD4844C1     VPLZCNTQ ZMM0, ZMM1")
     (test-assemble `(vpconflictd-masked ,zmm0 ,zmm1 ,k1 :z)
-                   "62F27DC9C4C1     VPCONFLICTD-MASKED ZMM0, ZMM1 {K1} {z}")
+                   "62F27DC9C4C1     VPCONFLICTD-MASKED-Z ZMM0, ZMM1 {K1}{z}")
     (test-assemble `(vplzcntd-masked ,zmm0 ,zmm1 ,k1)
                    "62F27D4944C1     VPLZCNTD-MASKED ZMM0, ZMM1 {K1}")
     (try `(vpbroadcastmb2q ,zmm0 ,k1))
@@ -525,5 +525,3 @@
                    "62F57D087EC0     VMOVW EAX, XMM0")
     (test-assemble `(vmovsh ,xmm0 ,xmm1 ,xmm2)
                    "62F5760810C2     VMOVSH XMM0, XMM1, XMM2")))
-
-

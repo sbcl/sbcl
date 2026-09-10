@@ -17,7 +17,6 @@
   (format t "~&INFO: simd-pack-512 not supported")
   (invoke-restart 'run-tests::skip-file))
 
-
 (defun %simd-pack-512-singles (pack)
   (values (sb-vm::%simd-pack-ref-single pack 0)
           (sb-vm::%simd-pack-ref-single pack 1)
@@ -35,7 +34,6 @@
           (sb-vm::%simd-pack-ref-single pack 13)
           (sb-vm::%simd-pack-ref-single pack 14)
           (sb-vm::%simd-pack-ref-single pack 15)))
-
 
 (defun %simd-pack-512-doubles (pack)
   (values (sb-vm::%simd-pack-ref-double pack 0)
@@ -99,7 +97,6 @@
                                              (sb-kernel:make-double-float
                                               -1 (ldb (byte 32 0) -1)))))
 
-
 (with-test (:name :compile-simd-pack-512-512)
   (multiple-value-bind (i i0 i-1
                         f f0 f-1
@@ -149,7 +146,10 @@
              (dolist (pack packs)
                (flet ((do-it ()
                         (with-output-to-string (stream)
-                          (write pack :stream stream :pretty t :escape nil))))
+                          (write pack
+                            :stream stream
+                            :pretty t
+                            :escape nil))))
                  (case expect
                    (print-not-readable
                     (assert-error (do-it) print-not-readable))
@@ -229,7 +229,6 @@
                             '(1d0 2d0 3d0 4d0 5d0 6d0 7d0 8d0)))))
       (when tmp-fasl (delete-file tmp-fasl))
       (delete-file *tmp-filename*))))
-
 
 (with-test (:name :spilling)
   (checked-compile-and-assert
@@ -685,9 +684,15 @@
 (define-vop (%test-evex-high-regs)
     (:translate %test-evex-high-regs)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 16) z16)
-  (:temporary (:sc single-avx512-reg :offset 17) z17)
-  (:temporary (:sc single-avx512-reg :offset 18) z18)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 16) z16)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 17) z17)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 18) z18)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -697,8 +702,12 @@
 (define-vop (%test-evex-disp8)
   (:translate %test-evex-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -708,10 +717,18 @@
 (define-vop (%test-evex-disp-vector-lengths)
   (:translate %test-evex-disp-vector-lengths)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm)
-  (:temporary (:sc single-avx2-reg :offset 1) ymm)
-  (:temporary (:sc single-avx512-reg :offset 2) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm)
+  (:temporary (
+                :sc single-avx2-reg
+                :offset 1) ymm)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 2) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -723,8 +740,12 @@
 (define-vop (%test-evex-disp-negative)
   (:translate %test-evex-disp-negative)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -734,8 +755,12 @@
 (define-vop (%test-evex-disp-nonmultiple)
   (:translate %test-evex-disp-nonmultiple)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -745,8 +770,12 @@
 (define-vop (%test-evex-disp-large)
   (:translate %test-evex-disp-large)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -756,10 +785,18 @@
 (define-vop (%test-evex-vpmovzx-vpslldq-disassem)
   (:translate %test-evex-vpmovzx-vpslldq-disassem)
   (:policy :fast-safe)
-  (:temporary (:sc unsigned-reg :offset rax-offset) rax)
-  (:temporary (:sc complex-double-reg :offset 10) xmm)
-  (:temporary (:sc complex-double-reg :offset 30) xmm2)
-  (:temporary (:sc int-avx512-reg :offset 20) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rax-offset) rax)
+  (:temporary (
+                :sc complex-double-reg
+                :offset 10) xmm)
+  (:temporary (
+                :sc complex-double-reg
+                :offset 30) xmm2)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 20) zmm)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -772,13 +809,231 @@
     (inst vpslldq xmm2 xmm2 1)
     (inst vpand xmm xmm2 xmm2)))
 
+(defmacro define-test-vop-masked-reg-reg-mem
+    (name inst sc1 off1 sc2 off2 disp mask &optional imm)
+  "Generate a VOP for a masked three-operand instruction with memory as the third operand and mask immediate."
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (
+                   :sc ,sc1
+                   :offset ,off1) vec1)
+     (:temporary (
+                   :sc ,sc2
+                   :offset ,off2) vec2)
+     (:temporary (
+                   :sc unsigned-reg
+                   :offset rsp-offset) rsp)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       ,(if imm
+            `(inst ,inst vec1 vec2 (ea ,disp rsp) ,mask ,imm)
+            `(inst ,inst vec1 vec2 (ea ,disp rsp) ,mask))
+       (inst xor :dword res res))))
+
+(defmacro define-test-vop-load (name inst reg-sc reg-offset disp &optional imm)
+  "Generate a VOP for a load instruction: reg = op(mem)."
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (
+                   :sc ,reg-sc
+                   :offset ,reg-offset) vec)
+     (:temporary (
+                   :sc unsigned-reg
+                   :offset rsp-offset) rsp)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       ,(if imm
+            `(inst ,inst vec (ea ,disp rsp) ,imm)
+            `(inst ,inst vec (ea ,disp rsp)))
+       (inst xor :dword res res))))
+
+(defmacro define-test-vop-store (name inst reg-sc reg-offset disp)
+  "Generate a VOP for a store instruction: op(mem, reg)."
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (
+                   :sc ,reg-sc
+                   :offset ,reg-offset) vec)
+     (:temporary (
+                   :sc unsigned-reg
+                   :offset rsp-offset) rsp)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       (inst ,inst (ea ,disp rsp) vec)
+       (inst xor :dword res res))))
+
+(defmacro define-test-vop-three-reg (name inst sc1 off1 sc2 off2 sc3 off3 &optional imm)
+  "Generate a VOP for a three-register instruction, optionally with an immediate."
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (
+                   :sc ,sc1
+                   :offset ,off1) vec1)
+     (:temporary (
+                   :sc ,sc2
+                   :offset ,off2) vec2)
+     (:temporary (
+                   :sc ,sc3
+                   :offset ,off3) vec3)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       ,(if imm
+            `(inst ,inst vec1 vec2 vec3 ,imm)
+            `(inst ,inst vec1 vec2 vec3))
+       (inst xor :dword res res))))
+
+(defmacro define-test-vop-reg-reg-mem (name inst sc1 off1 sc2 off2 disp &optional imm)
+  "Generate a VOP for a three-operand instruction with memory as the third operand: reg1 = op(reg1, reg2, mem)."
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (
+                   :sc ,sc1
+                   :offset ,off1) vec1)
+     (:temporary (
+                   :sc ,sc2
+                   :offset ,off2) vec2)
+     (:temporary (
+                   :sc unsigned-reg
+                   :offset rsp-offset) rsp)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       ,(if imm
+            `(inst ,inst vec1 vec2 (ea ,disp rsp) ,imm)
+            `(inst ,inst vec1 vec2 (ea ,disp rsp)))
+       (inst xor :dword res res))))
+
+(defmacro define-test-vop-same-reg-mem (name inst reg-sc reg-offset disp)
+  "Generate a VOP for an instruction where the destination register is also a source: op(reg, reg, mem)."
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (
+                   :sc ,reg-sc
+                   :offset ,reg-offset) vec)
+     (:temporary (
+                   :sc unsigned-reg
+                   :offset rsp-offset) rsp)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       (inst ,inst vec vec (ea ,disp rsp))
+       (inst xor :dword res res))))
+
+(defmacro define-test-vop-mask-reg-reg (name inst mask-sc mask-off sc1 off1 sc2 off2 &optional imm)
+  "Generate a VOP for an instruction with mask destination and two register sources: mask = op(reg1, reg2)."
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (
+                   :sc ,mask-sc
+                   :offset ,mask-off) mask)
+     (:temporary (
+                   :sc ,sc1
+                   :offset ,off1) vec1)
+     (:temporary (
+                   :sc ,sc2
+                   :offset ,off2) vec2)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       ,(if imm
+            `(inst ,inst mask vec1 vec2 ,imm)
+            `(inst ,inst mask vec1 vec2))
+       (inst xor :dword res res))))
+
+(defmacro define-test-vop-scalar-to-gp (name inst disp)
+  "Generate a VOP for a scalar-to-GP conversion: res = op(mem)."
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (
+                   :sc unsigned-reg
+                   :offset rsp-offset) rsp)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       (inst ,inst res (ea ,disp rsp))
+       (inst xor :dword res res))))
+
+(defmacro define-test-vop-multi-load (name &rest specs)
+  "Generate a VOP that performs multiple load instructions in sequence.
+   Each spec is a list (inst reg-sc reg-offset disp)."
+  (let ((vec-names (loop for i from 1 to (length specs)
+                         collect (intern (format nil "VEC~D" i)))))
+    `(define-vop (,name)
+       (:translate ,name)
+       (:policy :fast-safe)
+       ,@(loop for spec in specs
+               for vec in vec-names
+               collect `(:temporary (
+                                      :sc ,(second spec)
+                                      :offset ,(third spec)) ,vec))
+       (:temporary (
+                     :sc unsigned-reg
+                     :offset rsp-offset) rsp)
+       (:results (res :scs (unsigned-reg)))
+       (:result-types unsigned-num)
+       (:generator 1
+         ,@(loop for spec in specs
+                 for vec in vec-names
+                 collect `(inst ,(first spec) ,vec (ea ,(fourth spec) rsp)))
+         (inst xor :dword res res)))))
+
+(defmacro define-test-vop-store-imm (name inst reg-sc reg-offset disp imm)
+  "Generate a VOP for a store instruction with immediate: op(mem, reg, imm)."
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (
+                   :sc ,reg-sc
+                   :offset ,reg-offset) vec)
+     (:temporary (
+                   :sc unsigned-reg
+                   :offset rsp-offset) rsp)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       (inst ,inst (ea ,disp rsp) vec ,imm)
+       (inst xor :dword res res))))
+
+(defmacro define-test-vop-mask-single-mem (name inst mask-sc mask-off disp &optional imm)
+  "Generate a VOP for an instruction with mask destination and a single memory/register source: mask = op(mem)."
+  `(define-vop (,name)
+     (:translate ,name)
+     (:policy :fast-safe)
+     (:temporary (
+                   :sc ,mask-sc
+                   :offset ,mask-off) mask)
+     (:temporary (
+                   :sc unsigned-reg
+                   :offset rsp-offset) rsp)
+     (:results (res :scs (unsigned-reg)))
+     (:result-types unsigned-num)
+     (:generator 1
+       ,(if imm
+            `(inst ,inst mask (ea ,disp rsp) ,imm)
+            `(inst ,inst mask (ea ,disp rsp)))
+       (inst xor :dword res res))))
+
 (defmacro define-test-vop-same-reg-imm (name inst reg-sc reg-offset imm)
   "Generate a VOP for a register-only shift/insert-style instruction where
    the destination register is also the (only) source: op(reg, reg, imm)."
   `(define-vop (,name)
      (:translate ,name)
      (:policy :fast-safe)
-     (:temporary (:sc ,reg-sc :offset ,reg-offset) vec)
+     (:temporary (
+                   :sc ,reg-sc
+                   :offset ,reg-offset) vec)
      (:results (res :scs (unsigned-reg)))
      (:result-types unsigned-num)
      (:generator 1
@@ -791,7 +1046,9 @@
   `(define-vop (,name)
      (:translate ,name)
      (:policy :fast-safe)
-     (:temporary (:sc ,reg-sc :offset ,reg-offset) vec)
+     (:temporary (
+                   :sc ,reg-sc
+                   :offset ,reg-offset) vec)
      (:results (res :scs (unsigned-reg)))
      (:result-types unsigned-num)
      (:generator 1
@@ -807,7 +1064,9 @@
   `(define-vop (,name)
      (:translate ,name)
      (:policy :fast-safe)
-     (:temporary (:sc ,reg-sc :offset ,reg-offset) vec)
+     (:temporary (
+                   :sc ,reg-sc
+                   :offset ,reg-offset) vec)
      (:results (res :scs (unsigned-reg)))
      (:result-types unsigned-num)
      (:generator 1
@@ -822,8 +1081,12 @@
   `(define-vop (,name)
      (:translate ,name)
      (:policy :fast-safe)
-     (:temporary (:sc ,reg-sc :offset ,reg-offset) vec)
-     (:temporary (:sc ,gpr-sc :offset ,gpr-offset) gpr)
+     (:temporary (
+                   :sc ,reg-sc
+                   :offset ,reg-offset) vec)
+     (:temporary (
+                   :sc ,gpr-sc
+                   :offset ,gpr-offset) gpr)
      (:results (res :scs (unsigned-reg)))
      (:result-types unsigned-num)
      (:generator 1
@@ -835,9 +1098,15 @@
   `(define-vop (,name)
      (:translate ,name)
      (:policy :fast-safe)
-     (:temporary (:sc ,mask-sc :offset ,mask-off) mask)
-     (:temporary (:sc ,reg-sc :offset ,reg-off) vec)
-     (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+     (:temporary (
+                   :sc ,mask-sc
+                   :offset ,mask-off) mask)
+     (:temporary (
+                   :sc ,reg-sc
+                   :offset ,reg-off) vec)
+     (:temporary (
+                   :sc unsigned-reg
+                   :offset rsp-offset) rsp)
      (:results (res :scs (unsigned-reg)))
      (:result-types unsigned-num)
      (:generator 1
@@ -849,13 +1118,27 @@
 (define-vop (%test-evex-high-registers-poke)
   (:translate %test-evex-high-registers-poke)
   (:policy :fast-safe)
-  (:temporary (:sc complex-double-reg :offset 16) xmm16)
-  (:temporary (:sc complex-double-reg :offset 30) xmm30)
-  (:temporary (:sc complex-double-reg :offset 31) xmm31)
-  (:temporary (:sc single-avx2-reg :offset 17) ymm17)
-  (:temporary (:sc single-avx2-reg :offset 28) ymm28)
-  (:temporary (:sc int-avx512-reg :offset 18) zmm18)
-  (:temporary (:sc int-avx512-reg :offset 29) zmm29)
+  (:temporary (
+                :sc complex-double-reg
+                :offset 16) xmm16)
+  (:temporary (
+                :sc complex-double-reg
+                :offset 30) xmm30)
+  (:temporary (
+                :sc complex-double-reg
+                :offset 31) xmm31)
+  (:temporary (
+                :sc single-avx2-reg
+                :offset 17) ymm17)
+  (:temporary (
+                :sc single-avx2-reg
+                :offset 28) ymm28)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 18) zmm18)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 29) zmm29)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -879,9 +1162,15 @@
 (define-vop (%test-auto-promoted-vaddps)
   (:translate %test-auto-promoted-vaddps)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 16) z16)
-  (:temporary (:sc single-avx512-reg :offset 17) z17)
-  (:temporary (:sc single-avx512-reg :offset 18) z18)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 16) z16)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 17) z17)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 18) z18)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -892,9 +1181,15 @@
 (define-vop (%test-auto-promoted-vaddpd)
   (:translate %test-auto-promoted-vaddpd)
   (:policy :fast-safe)
-  (:temporary (:sc double-avx512-reg :offset 16) z16)
-  (:temporary (:sc double-avx512-reg :offset 17) z17)
-  (:temporary (:sc double-avx512-reg :offset 18) z18)
+  (:temporary (
+                :sc double-avx512-reg
+                :offset 16) z16)
+  (:temporary (
+                :sc double-avx512-reg
+                :offset 17) z17)
+  (:temporary (
+                :sc double-avx512-reg
+                :offset 18) z18)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -904,8 +1199,12 @@
 (define-vop (%test-auto-promoted-vpbroadcastq)
   (:translate %test-auto-promoted-vpbroadcastq)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -915,8 +1214,12 @@
 (define-vop (%test-auto-promoted-vmovdqu)
   (:translate %test-auto-promoted-vmovdqu)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -926,9 +1229,15 @@
 (define-vop (%test-evex-vpternlogd)
   (:translate %test-evex-vpternlogd)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 0) z0)
-  (:temporary (:sc int-avx512-reg :offset 1) z1)
-  (:temporary (:sc int-avx512-reg :offset 2) z2)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) z0)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 1) z1)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 2) z2)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -939,9 +1248,15 @@
 (define-vop (%test-evex-vpermt2d)
   (:translate %test-evex-vpermt2d)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 0) z0)
-  (:temporary (:sc int-avx512-reg :offset 1) z1)
-  (:temporary (:sc int-avx512-reg :offset 2) z2)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) z0)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 1) z1)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 2) z2)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -951,9 +1266,15 @@
 (define-vop (%test-evex-vblendmps)
   (:translate %test-evex-vblendmps)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 16) z16)
-  (:temporary (:sc single-avx512-reg :offset 17) z17)
-  (:temporary (:sc single-avx512-reg :offset 18) z18)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 16) z16)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 17) z17)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 18) z18)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -963,9 +1284,15 @@
 (define-vop (%test-evex-vpcmpd)
   (:translate %test-evex-vpcmpd)
   (:policy :fast-safe)
-  (:temporary (:sc mask-reg :offset 1) k1)
-  (:temporary (:sc int-avx512-reg :offset 0) z0)
-  (:temporary (:sc int-avx512-reg :offset 1) z1)
+  (:temporary (
+                :sc mask-reg
+                :offset 1) k1)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) z0)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 1) z1)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -975,8 +1302,12 @@
 (define-vop (%test-evex-vpmovqd)
   (:translate %test-evex-vpmovqd)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 0) z0)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) z0)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -986,8 +1317,12 @@
 (define-vop (%test-auto-promoted-vmovaps-disp8)
   (:translate %test-auto-promoted-vmovaps-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -997,8 +1332,12 @@
 (define-vop (%test-auto-promoted-vmovaps-disp-nonmultiple)
   (:translate %test-auto-promoted-vmovaps-disp-nonmultiple)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1008,8 +1347,12 @@
 (define-vop (%test-broadcast-f32x4-disp8)
   (:translate %test-broadcast-f32x4-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1019,8 +1362,12 @@
 (define-vop (%test-broadcast-f32x4-disp32)
   (:translate %test-broadcast-f32x4-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1030,8 +1377,12 @@
 (define-vop (%test-broadcast-f64x4-disp8)
   (:translate %test-broadcast-f64x4-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc double-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc double-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1041,8 +1392,12 @@
 (define-vop (%test-broadcast-f64x4-disp32)
   (:translate %test-broadcast-f64x4-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc double-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc double-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1052,8 +1407,12 @@
 (define-vop (%test-compress-disp8)
   (:translate %test-compress-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1063,8 +1422,12 @@
 (define-vop (%test-compress-disp32)
   (:translate %test-compress-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1074,8 +1437,12 @@
 (define-vop (%test-expand-disp8)
   (:translate %test-expand-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1085,8 +1452,12 @@
 (define-vop (%test-expand-disp32)
   (:translate %test-expand-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1096,9 +1467,15 @@
 (define-vop (%test-vpcmpd-disp8)
   (:translate %test-vpcmpd-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc mask-reg :offset 1) k1)
-  (:temporary (:sc int-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc mask-reg
+                :offset 1) k1)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1108,9 +1485,15 @@
 (define-vop (%test-vpcmpd-disp32)
   (:translate %test-vpcmpd-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc mask-reg :offset 1) k1)
-  (:temporary (:sc int-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc mask-reg
+                :offset 1) k1)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1120,9 +1503,15 @@
 (define-vop (%test-vptestmd-disp8)
   (:translate %test-vptestmd-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc mask-reg :offset 1) k1)
-  (:temporary (:sc int-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc mask-reg
+                :offset 1) k1)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1132,9 +1521,15 @@
 (define-vop (%test-vptestmd-disp32)
   (:translate %test-vptestmd-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc mask-reg :offset 1) k1)
-  (:temporary (:sc int-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc mask-reg
+                :offset 1) k1)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1144,8 +1539,12 @@
 (define-vop (%test-vpmovqd-xmm-disp8)
   (:translate %test-vpmovqd-xmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1155,8 +1554,12 @@
 (define-vop (%test-vpmovqd-ymm-disp8)
   (:translate %test-vpmovqd-ymm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx2-reg :offset 1) ymm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx2-reg
+                :offset 1) ymm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1166,8 +1569,12 @@
 (define-vop (%test-vpmovqd-zmm-disp8)
   (:translate %test-vpmovqd-zmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 2) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 2) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1177,8 +1584,12 @@
 (define-vop (%test-vpmovqd-zmm-disp32)
   (:translate %test-vpmovqd-zmm-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 2) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 2) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1188,8 +1599,12 @@
 (define-vop (%test-vpmovsqb-xmm-disp8)
   (:translate %test-vpmovsqb-xmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1199,8 +1614,12 @@
 (define-vop (%test-vpmovsqb-ymm-disp8)
   (:translate %test-vpmovsqb-ymm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx2-reg :offset 1) ymm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx2-reg
+                :offset 1) ymm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1210,8 +1629,12 @@
 (define-vop (%test-vpmovsqb-zmm-disp8)
   (:translate %test-vpmovsqb-zmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 2) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 2) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1221,8 +1644,12 @@
 (define-vop (%test-vpmovsqb-zmm-disp32)
   (:translate %test-vpmovsqb-zmm-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 2) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 2) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1233,8 +1660,12 @@
 (define-vop (%test-vrcp14ps-xmm-disp8)
   (:translate %test-vrcp14ps-xmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1244,8 +1675,12 @@
 (define-vop (%test-vrcp14ps-ymm-disp8)
   (:translate %test-vrcp14ps-ymm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx2-reg :offset 1) ymm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx2-reg
+                :offset 1) ymm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1255,8 +1690,12 @@
 (define-vop (%test-vrcp14ps-zmm-disp8)
   (:translate %test-vrcp14ps-zmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 2) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 2) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1266,8 +1705,12 @@
 (define-vop (%test-vrcp14ps-zmm-disp32)
   (:translate %test-vrcp14ps-zmm-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 2) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 2) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1278,8 +1721,12 @@
 (define-vop (%test-vpabsq-zmm-disp8)
   (:translate %test-vpabsq-zmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 3) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 3) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1289,9 +1736,15 @@
 (define-vop (%test-valignd-xmm-disp8)
   (:translate %test-valignd-xmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm0)
-  (:temporary (:sc single-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1301,9 +1754,15 @@
 (define-vop (%test-valignd-ymm-disp8)
   (:translate %test-valignd-ymm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx2-reg :offset 1) ymm1)
-  (:temporary (:sc int-avx2-reg :offset 2) ymm2)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx2-reg
+                :offset 1) ymm1)
+  (:temporary (
+                :sc int-avx2-reg
+                :offset 2) ymm2)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1313,9 +1772,15 @@
 (define-vop (%test-valignd-zmm-disp8)
   (:translate %test-valignd-zmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 1) zmm1)
-  (:temporary (:sc int-avx512-reg :offset 2) zmm2)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 1) zmm1)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 2) zmm2)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1325,9 +1790,15 @@
 (define-vop (%test-valignd-zmm-disp32)
   (:translate %test-valignd-zmm-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 1) zmm1)
-  (:temporary (:sc int-avx512-reg :offset 2) zmm2)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 1) zmm1)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 2) zmm2)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1337,9 +1808,15 @@
 (define-vop (%test-vrangess-disp8)
   (:translate %test-vrangess-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm0)
-  (:temporary (:sc single-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1349,9 +1826,15 @@
 (define-vop (%test-vrangess-disp32)
   (:translate %test-vrangess-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm0)
-  (:temporary (:sc single-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1361,9 +1844,15 @@
 (define-vop (%test-vrangesd-disp8)
   (:translate %test-vrangesd-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc double-sse-reg :offset 0) xmm0)
-  (:temporary (:sc double-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc double-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc double-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1373,8 +1862,12 @@
 (define-vop (%test-vrndscaleps-xmm-disp8)
   (:translate %test-vrndscaleps-xmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1384,8 +1877,12 @@
 (define-vop (%test-vrndscaleps-zmm-disp8)
   (:translate %test-vrndscaleps-zmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 2) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 2) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1395,8 +1892,12 @@
 (define-vop (%test-vrndscaleps-zmm-disp32)
   (:translate %test-vrndscaleps-zmm-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 2) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 2) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1406,8 +1907,12 @@
 (define-vop (%test-vrndscaless-disp8)
   (:translate %test-vrndscaless-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1417,8 +1922,12 @@
 (define-vop (%test-vrndscaless-disp32)
   (:translate %test-vrndscaless-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1428,8 +1937,12 @@
 (define-vop (%test-vrndscalesd-disp8)
   (:translate %test-vrndscalesd-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc double-sse-reg :offset 0) xmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc double-sse-reg
+                :offset 0) xmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1439,9 +1952,15 @@
 (define-vop (%test-vfixupimmps-xmm-disp8)
   (:translate %test-vfixupimmps-xmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm0)
-  (:temporary (:sc single-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1451,9 +1970,15 @@
 (define-vop (%test-vfixupimmps-zmm-disp8)
   (:translate %test-vfixupimmps-zmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 1) zmm1)
-  (:temporary (:sc single-avx512-reg :offset 2) zmm2)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 1) zmm1)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 2) zmm2)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1463,9 +1988,15 @@
 (define-vop (%test-vfixupimmps-zmm-disp32)
   (:translate %test-vfixupimmps-zmm-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 1) zmm1)
-  (:temporary (:sc single-avx512-reg :offset 2) zmm2)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 1) zmm1)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 2) zmm2)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1475,9 +2006,15 @@
 (define-vop (%test-vfixupimmss-disp8)
   (:translate %test-vfixupimmss-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm0)
-  (:temporary (:sc single-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1487,9 +2024,15 @@
 (define-vop (%test-vfixupimmss-disp32)
   (:translate %test-vfixupimmss-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm0)
-  (:temporary (:sc single-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1499,9 +2042,15 @@
 (define-vop (%test-vfixupimmsd-disp8)
   (:translate %test-vfixupimmsd-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc double-sse-reg :offset 0) xmm0)
-  (:temporary (:sc double-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc double-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc double-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1511,9 +2060,15 @@
 (define-vop (%test-vreducess-disp8)
   (:translate %test-vreducess-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm0)
-  (:temporary (:sc single-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1523,9 +2078,15 @@
 (define-vop (%test-vreducess-disp32)
   (:translate %test-vreducess-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm0)
-  (:temporary (:sc single-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1535,9 +2096,15 @@
 (define-vop (%test-vreducesd-disp8)
   (:translate %test-vreducesd-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc double-sse-reg :offset 0) xmm0)
-  (:temporary (:sc double-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc double-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc double-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1547,9 +2114,15 @@
 (define-vop (%test-vgetmantss-disp8)
   (:translate %test-vgetmantss-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm0)
-  (:temporary (:sc single-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1559,9 +2132,15 @@
 (define-vop (%test-vgetmantss-disp32)
   (:translate %test-vgetmantss-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm0)
-  (:temporary (:sc single-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1571,9 +2150,15 @@
 (define-vop (%test-vgetmantsd-disp8)
   (:translate %test-vgetmantsd-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc double-sse-reg :offset 0) xmm0)
-  (:temporary (:sc double-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc double-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc double-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1583,9 +2168,15 @@
 (define-vop (%test-vgetexpss-disp8)
   (:translate %test-vgetexpss-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm0)
-  (:temporary (:sc single-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1595,9 +2186,15 @@
 (define-vop (%test-vgetexpss-disp32)
   (:translate %test-vgetexpss-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm0)
-  (:temporary (:sc single-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1607,9 +2204,15 @@
 (define-vop (%test-vgetexpsd-disp8)
   (:translate %test-vgetexpsd-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc double-sse-reg :offset 0) xmm0)
-  (:temporary (:sc double-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc double-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc double-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1619,9 +2222,15 @@
 (define-vop (%test-vscalefps-xmm-disp8)
   (:translate %test-vscalefps-xmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm0)
-  (:temporary (:sc single-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1631,9 +2240,15 @@
 (define-vop (%test-vscalefps-zmm-disp8)
   (:translate %test-vscalefps-zmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 1) zmm1)
-  (:temporary (:sc single-avx512-reg :offset 2) zmm2)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 1) zmm1)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 2) zmm2)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1643,9 +2258,15 @@
 (define-vop (%test-vscalefps-zmm-disp32)
   (:translate %test-vscalefps-zmm-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 1) zmm1)
-  (:temporary (:sc single-avx512-reg :offset 2) zmm2)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 1) zmm1)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 2) zmm2)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1655,9 +2276,15 @@
 (define-vop (%test-vscalefss-disp8)
   (:translate %test-vscalefss-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm0)
-  (:temporary (:sc single-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1667,9 +2294,15 @@
 (define-vop (%test-vscalefss-disp32)
   (:translate %test-vscalefss-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm0)
-  (:temporary (:sc single-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1679,9 +2312,15 @@
 (define-vop (%test-vscalefsd-disp8)
   (:translate %test-vscalefsd-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc double-sse-reg :offset 0) xmm0)
-  (:temporary (:sc double-sse-reg :offset 1) xmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc double-sse-reg
+                :offset 0) xmm0)
+  (:temporary (
+                :sc double-sse-reg
+                :offset 1) xmm1)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1693,7 +2332,9 @@
   (:policy :fast-safe)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:generator 1
     (inst vcvtss2usi res (ea 4 rsp))
     (inst xor :dword res res)))
@@ -1703,7 +2344,9 @@
   (:policy :fast-safe)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:generator 1
     (inst vcvtss2usi res (ea 5 rsp))
     (inst xor :dword res res)))
@@ -1713,7 +2356,9 @@
   (:policy :fast-safe)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:generator 1
     (inst vcvtsd2usi res (ea 8 rsp))
     (inst xor :dword res res)))
@@ -1723,7 +2368,9 @@
   (:policy :fast-safe)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:generator 1
     (inst vcvttss2usi res (ea 4 rsp))
     (inst xor :dword res res)))
@@ -1733,7 +2380,9 @@
   (:policy :fast-safe)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:generator 1
     (inst vcvttsd2usi res (ea 8 rsp))
     (inst xor :dword res res)))
@@ -1741,10 +2390,14 @@
 (define-vop (%test-vcvtusi2sd-disp8)
   (:translate %test-vcvtusi2sd-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc double-sse-reg :offset 0) xmm)
+  (:temporary (
+                :sc double-sse-reg
+                :offset 0) xmm)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:generator 1
     (inst vcvtusi2sd xmm xmm (ea 8 rsp))
     (inst xor :dword res res)))
@@ -1752,10 +2405,14 @@
 (define-vop (%test-vcvtusi2sd-disp32)
   (:translate %test-vcvtusi2sd-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc double-sse-reg :offset 0) xmm)
+  (:temporary (
+                :sc double-sse-reg
+                :offset 0) xmm)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:generator 1
     (inst vcvtusi2sd xmm xmm (ea 9 rsp))
     (inst xor :dword res res)))
@@ -1763,10 +2420,14 @@
 (define-vop (%test-vcvtusi2ss-disp8)
   (:translate %test-vcvtusi2ss-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-sse-reg :offset 0) xmm)
+  (:temporary (
+                :sc single-sse-reg
+                :offset 0) xmm)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:generator 1
     (inst vcvtusi2ss xmm xmm (ea 8 rsp))
     (inst xor :dword res res)))
@@ -1774,8 +2435,12 @@
 (define-vop (%test-vcvtps2udq-zmm-disp8)
   (:translate %test-vcvtps2udq-zmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1785,8 +2450,12 @@
 (define-vop (%test-vcvtps2udq-zmm-disp32)
   (:translate %test-vcvtps2udq-zmm-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1796,8 +2465,12 @@
 (define-vop (%test-vcvtudq2pd-zmm-disp8)
   (:translate %test-vcvtudq2pd-zmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc double-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc double-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1807,8 +2480,12 @@
 (define-vop (%test-vcvtudq2pd-xmm-disp8)
   (:translate %test-vcvtudq2pd-xmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc double-sse-reg :offset 0) xmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc double-sse-reg
+                :offset 0) xmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1818,8 +2495,12 @@
 (define-vop (%test-vcvtps2qq-zmm-disp8)
   (:translate %test-vcvtps2qq-zmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1829,8 +2510,12 @@
 (define-vop (%test-vcvtps2qq-zmm-disp32)
   (:translate %test-vcvtps2qq-zmm-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1840,8 +2525,12 @@
 (define-vop (%test-vcvtpd2qq-zmm-disp8)
   (:translate %test-vcvtpd2qq-zmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1851,8 +2540,12 @@
 (define-vop (%test-vcvtqq2ps-zmm-disp8)
   (:translate %test-vcvtqq2ps-zmm-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1862,8 +2555,12 @@
 (define-vop (%test-vcvtqq2ps-zmm-disp32)
   (:translate %test-vcvtqq2ps-zmm-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1873,8 +2570,12 @@
 (define-vop (%test-auto-promoted-vcvtdq2pd-disp8)
   (:translate %test-auto-promoted-vcvtdq2pd-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc double-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc double-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1884,8 +2585,12 @@
 (define-vop (%test-auto-promoted-vcvtdq2pd-disp32)
   (:translate %test-auto-promoted-vcvtdq2pd-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc double-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc double-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1895,8 +2600,12 @@
 (define-vop (%test-auto-promoted-vcvtps2dq-disp8)
   (:translate %test-auto-promoted-vcvtps2dq-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1906,8 +2615,12 @@
 (define-vop (%test-auto-promoted-vcvtps2dq-disp32)
   (:translate %test-auto-promoted-vcvtps2dq-disp32)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1917,8 +2630,12 @@
 (define-vop (%test-auto-promoted-vrcpps-disp8)
   (:translate %test-auto-promoted-vrcpps-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1928,8 +2645,12 @@
 (define-vop (%test-auto-promoted-vpmovsxbw-disp8)
   (:translate %test-auto-promoted-vpmovsxbw-disp8)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1939,9 +2660,15 @@
 (define-vop (%test-vpand-zmm-disasm)
   (:translate %test-vpand-zmm-disasm)
   (:policy :fast-safe)
-  (:temporary (:sc int-avx512-reg :offset 0) zmm0)
-  (:temporary (:sc int-avx512-reg :offset 1) zmm1)
-  (:temporary (:sc int-avx512-reg :offset 2) zmm2)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) zmm0)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 1) zmm1)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 2) zmm2)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1951,8 +2678,12 @@
 (define-vop (%test-vmovdqa-zmm-disasm)
   (:translate %test-vmovdqa-zmm-disasm)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1962,8 +2693,12 @@
 (define-vop (%test-vbroadcastf128-zmm-disasm)
   (:translate %test-vbroadcastf128-zmm-disasm)
   (:policy :fast-safe)
-  (:temporary (:sc single-avx512-reg :offset 0) zmm)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc single-avx512-reg
+                :offset 0) zmm)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -1976,11 +2711,19 @@
     `(define-vop (,name)
        (:translate ,name)
        (:policy :fast-safe)
-       (:temporary (:sc ,data-sc :offset ,data-off) data)
-       (:temporary (:sc ,index-sc :offset ,index-off) index)
+       (:temporary (
+                     :sc ,data-sc
+                     :offset ,data-off) data)
+       (:temporary (
+                     :sc ,index-sc
+                     :offset ,index-off) index)
        ,@(when base-sc
-           `((:temporary (:sc ,base-sc :offset ,base-off) base)
-             (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)))
+           `((:temporary (
+                           :sc ,base-sc
+                           :offset ,base-off) base)
+             (:temporary (
+                           :sc unsigned-reg
+                           :offset rsp-offset) rsp)))
        (:results (res :scs (unsigned-reg)))
        (:result-types unsigned-num)
        (:generator 1
@@ -1996,8 +2739,12 @@
   `(define-vop (,name)
      (:translate ,name)
      (:policy :fast-safe)
-     (:temporary (:sc ,reg-sc :offset ,reg-off) vec)
-     (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+     (:temporary (
+                   :sc ,reg-sc
+                   :offset ,reg-off) vec)
+     (:temporary (
+                   :sc unsigned-reg
+                   :offset rsp-offset) rsp)
      (:results (res :scs (unsigned-reg)))
      (:result-types unsigned-num)
      (:generator 1
@@ -2008,25 +2755,16 @@
   `(define-vop (,name)
      (:translate ,name)
      (:policy :fast-safe)
-     (:temporary (:sc ,reg-sc :offset ,reg-off) vec)
-     (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+     (:temporary (
+                   :sc ,reg-sc
+                   :offset ,reg-off) vec)
+     (:temporary (
+                   :sc unsigned-reg
+                   :offset rsp-offset) rsp)
      (:results (res :scs (unsigned-reg)))
      (:result-types unsigned-num)
      (:generator 1
        (inst ,inst vec (ea ,disp rsp) ,mask)
-       (inst xor :dword res res))))
-
-(defmacro define-test-vop-masked-reg-mem-imm
-    (name inst reg-sc reg-off disp mask imm)
-  `(define-vop (,name)
-     (:translate ,name)
-     (:policy :fast-safe)
-     (:temporary (:sc ,reg-sc :offset ,reg-off) vec)
-     (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
-     (:results (res :scs (unsigned-reg)))
-     (:result-types unsigned-num)
-     (:generator 1
-       (inst ,inst vec (ea ,disp rsp) ,mask ,imm)
        (inst xor :dword res res))))
 
 (defmacro define-test-vop-masked-mem-reg-imm
@@ -2034,8 +2772,12 @@
   `(define-vop (,name)
      (:translate ,name)
      (:policy :fast-safe)
-     (:temporary (:sc ,reg-sc :offset ,reg-off) vec)
-     (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+     (:temporary (
+                   :sc ,reg-sc
+                   :offset ,reg-off) vec)
+     (:temporary (
+                   :sc unsigned-reg
+                   :offset rsp-offset) rsp)
      (:results (res :scs (unsigned-reg)))
      (:result-types unsigned-num)
      (:generator 1
@@ -2047,8 +2789,12 @@
   `(define-vop (,name)
      (:translate ,name)
      (:policy :fast-safe)
-     (:temporary (:sc ,reg-sc :offset ,reg-off) vec)
-     (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+     (:temporary (
+                   :sc ,reg-sc
+                   :offset ,reg-off) vec)
+     (:temporary (
+                   :sc unsigned-reg
+                   :offset rsp-offset) rsp)
      (:results (res :scs (unsigned-reg)))
      (:result-types unsigned-num)
      (:generator 1
@@ -2058,11 +2804,19 @@
 (define-vop (%test-vp2intersectd)
   (:translate %test-vp2intersectd)
   (:policy :fast-safe)
-  (:temporary (:sc mask-reg :offset 1) k1)
-  (:temporary (:sc mask-reg :offset 2) k2)
-  (:temporary (:sc int-avx512-reg :offset 0) zmm0)
+  (:temporary (
+                :sc mask-reg
+                :offset 1) k1)
+  (:temporary (
+                :sc mask-reg
+                :offset 2) k2)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 0) zmm0)
   ;;(:temporary (:sc int-avx512-reg :offset 1) zmm1)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -2073,11 +2827,19 @@
 (define-vop (%test-vp2intersectq)
   (:translate %test-vp2intersectq)
   (:policy :fast-safe)
-  (:temporary (:sc mask-reg :offset 3) k3)
-  (:temporary (:sc mask-reg :offset 4) k4)
-  (:temporary (:sc int-avx512-reg :offset 2) zmm2)
+  (:temporary (
+                :sc mask-reg
+                :offset 3) k3)
+  (:temporary (
+                :sc mask-reg
+                :offset 4) k4)
+  (:temporary (
+                :sc int-avx512-reg
+                :offset 2) zmm2)
   ;; (:temporary (:sc int-avx512-reg :offset 3) zmm3)
-  (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
+  (:temporary (
+                :sc unsigned-reg
+                :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
@@ -2255,34 +3017,41 @@
 (define-test-vop-mask-single-mem %test-vfpclassss-disp8 vfpclassss mask-reg 1 4 #x1)
 (define-test-vop-vsib %test-vsib-no-base-low-index vgatherdps-z
   single-avx512-reg 0 single-avx512-reg 1 64 4 1)
-(define-test-vop-vsib %test-vsib-high-index vgatherdps-z single-avx512-reg 0
-  single-avx512-reg 16 0 4 1 :base-sc unsigned-reg :base-off rax-offset)
-(define-test-vop-vsib %test-vsib-high-base-high-index vgatherdps-z
-  single-avx512-reg 0 single-avx512-reg 16 0 8 2 :base-sc unsigned-reg :base-off
-  r8-offset)
-(define-test-vop-vsib %test-vsib-scatter-low-index vscatterdps-z
-  single-avx512-reg 0 single-avx512-reg 3 0 4 3 :base-sc unsigned-reg :base-off
-  rax-offset :reverse-p t)
-(define-test-vop-vsib %test-vsib-scale-2 vgatherdps-z single-avx512-reg 0
-  single-avx512-reg 5 0 2 4 :base-sc unsigned-reg :base-off rbx-offset)
-(define-test-vop-vsib %test-vsib-scale-8 vgatherdps-z single-avx512-reg 0
-  single-avx512-reg 7 0 8 5 :base-sc unsigned-reg :base-off rdx-offset)
-(define-test-vop-vsib %test-vsib-disp8 vgatherdps-z single-avx512-reg 0
-  single-avx512-reg 2 8 4 6 :base-sc unsigned-reg :base-off rax-offset)
-(define-test-vop-vsib %test-vsib-disp8-compressed vgatherdps-z single-avx512-reg
-  0 single-avx512-reg 1 4 4 1 :base-sc unsigned-reg :base-off rax-offset)
-(define-test-vop-vsib %test-vsib-scatter-disp8-compressed vscatterdps-z
-  single-avx512-reg 0 single-avx512-reg 1 4 4 1 :base-sc unsigned-reg :base-off
-  rax-offset :reverse-p t)
-(define-test-vop-vsib %test-vsib-qword-disp8-compressed vpgatherqq-z
-  int-avx512-reg 0 int-avx512-reg 2 8 8 2 :base-sc unsigned-reg :base-off
-  rbx-offset)
-(define-test-vop-vsib %test-vsib-nonmultiple-disp32 vgatherdps-z
-  single-avx512-reg 0 single-avx512-reg 3 5 4 3 :base-sc unsigned-reg :base-off
-  rcx-offset)
-(define-test-vop-vsib %test-vsib-high-index-disp8-compressed vgatherdps-z
-  single-avx512-reg 0 single-avx512-reg 16 4 4 4 :base-sc unsigned-reg :base-off
-  rdx-offset)
+(define-test-vop-vsib %test-vsib-high-index vgatherdps-z single-avx512-reg 0 single-avx512-reg 16 0 4 1
+  :base-sc unsigned-reg
+  :base-off rax-offset)
+(define-test-vop-vsib %test-vsib-high-base-high-index vgatherdps-z single-avx512-reg 0 single-avx512-reg 16 0 8 2
+  :base-sc unsigned-reg
+  :base-off r8-offset)
+(define-test-vop-vsib %test-vsib-scatter-low-index vscatterdps-z single-avx512-reg 0 single-avx512-reg 3 0 4 3
+  :base-sc unsigned-reg
+  :base-off rax-offset
+  :reverse-p t)
+(define-test-vop-vsib %test-vsib-scale-2 vgatherdps-z single-avx512-reg 0 single-avx512-reg 5 0 2 4
+  :base-sc unsigned-reg
+  :base-off rbx-offset)
+(define-test-vop-vsib %test-vsib-scale-8 vgatherdps-z single-avx512-reg 0 single-avx512-reg 7 0 8 5
+  :base-sc unsigned-reg
+  :base-off rdx-offset)
+(define-test-vop-vsib %test-vsib-disp8 vgatherdps-z single-avx512-reg 0 single-avx512-reg 2 8 4 6
+  :base-sc unsigned-reg
+  :base-off rax-offset)
+(define-test-vop-vsib %test-vsib-disp8-compressed vgatherdps-z single-avx512-reg 0 single-avx512-reg 1 4 4 1
+  :base-sc unsigned-reg
+  :base-off rax-offset)
+(define-test-vop-vsib %test-vsib-scatter-disp8-compressed vscatterdps-z single-avx512-reg 0 single-avx512-reg 1 4 4 1
+  :base-sc unsigned-reg
+  :base-off rax-offset
+  :reverse-p t)
+(define-test-vop-vsib %test-vsib-qword-disp8-compressed vpgatherqq-z int-avx512-reg 0 int-avx512-reg 2 8 8 2
+  :base-sc unsigned-reg
+  :base-off rbx-offset)
+(define-test-vop-vsib %test-vsib-nonmultiple-disp32 vgatherdps-z single-avx512-reg 0 single-avx512-reg 3 5 4 3
+  :base-sc unsigned-reg
+  :base-off rcx-offset)
+(define-test-vop-vsib %test-vsib-high-index-disp8-compressed vgatherdps-z single-avx512-reg 0 single-avx512-reg 16 4 4 4
+  :base-sc unsigned-reg
+  :base-off rdx-offset)
 (define-test-vop-masked-reg-reg-mem %test-vaddps-masked-z-disp8
   vaddps-masked-z single-avx512-reg 0 single-avx512-reg 1 64 1)
 (define-test-vop-masked-reg-reg-mem %test-vaddps-masked-z-disp32
@@ -2291,12 +3060,12 @@
   vpaddq-masked-z int-avx512-reg 0 int-avx512-reg 1 64 1)
 (define-test-vop-masked-reg-reg-mem %test-vaddpd-masked-z-disp8
   vaddpd-masked-z double-avx512-reg 0 double-avx512-reg 1 64 1)
-(define-test-vop-vsib %test-vgatherdps-z-zero
-  vgatherdps-z-zero single-avx512-reg 0 single-avx512-reg 1 0 4 1
-  :base-sc unsigned-reg :base-off rax-offset)
-(define-test-vop-vsib %test-vsib-no-disp
-  vgatherdps-z single-avx512-reg 0 single-avx512-reg 1 0 4 1
- :base-sc unsigned-reg :base-off rax-offset)
+(define-test-vop-vsib %test-vgatherdps-z-zero vgatherdps-z-zero single-avx512-reg 0 single-avx512-reg 1 0 4 1
+  :base-sc unsigned-reg
+  :base-off rax-offset)
+(define-test-vop-vsib %test-vsib-no-disp vgatherdps-z single-avx512-reg 0 single-avx512-reg 1 0 4 1
+  :base-sc unsigned-reg
+  :base-off rax-offset)
 (define-test-vop-load %test-vpconflictd-zmm-disp8 vpconflictd int-avx512-reg 0 64)
 (define-test-vop-load %test-vpconflictq-zmm-disp8 vpconflictq int-avx512-reg 0 64)
 (define-test-vop-load %test-vplzcntd-xmm-disp8 vplzcntd int-sse-reg 0 16)
@@ -2616,12 +3385,10 @@
          (disp64 (find-symbol "EVEX-YMMREG/MEM-DISP64" asm-pkg)))
     (when (and printer-fun inst-format disp64)
       (let* ((printer-forms
-               (funcall printer-fun
-                        inst-format
-                        #xf3       ; prefix
-                        #x6f       ; opcode
-                        :opcode-prefix #x0f
-                        :w 0))
+               (funcall printer-fun inst-format #xf3 ; prefix
+                 #x6f ; opcode
+                 :opcode-prefix #x0f
+                 :w 0))
              (evex-form
                (find-if (lambda (form)
                           (and (eq (first form) :printer)
@@ -2651,13 +3418,11 @@
          (disp64 (find-symbol "EVEX-YMMREG/MEM-DISP64" asm-pkg)))
     (when (and printer-fun inst-format disp64)
       (let* ((printer-forms
-               (funcall printer-fun
-                        inst-format
-                        nil        ; prefix for vmovaps
-                        #x28       ; opcode-from
-                        :opcode-prefix #x0f
-                        :w 0
-                        :disp-n 64))
+               (funcall printer-fun inst-format nil ; prefix for vmovaps
+                 #x28 ; opcode-from
+                 :opcode-prefix #x0f
+                 :w 0
+                 :disp-n 64))
              (evex-form
                (find-if (lambda (form)
                           (and (eq (first form) :printer)
@@ -2692,9 +3457,13 @@
                                              fields)))))
                         forms)))
         (let ((w0-forms (funcall printer-fun inst-format #xf3 #x7b
-                                 :nds t :w 0 :disp-n 4))
+                          :nds t
+                          :w 0
+                          :disp-n 4))
               (w1-forms (funcall printer-fun inst-format #xf3 #x7b
-                                 :nds t :w 1 :disp-n 8)))
+                          :nds t
+                          :w 1
+                          :disp-n 8)))
           (let ((w0-form (find-disp-n w0-forms 0))
                 (w1-form (find-disp-n w1-forms 1)))
             (assert w0-form)
@@ -3844,45 +4613,18 @@
     sb-vm::%test-vsib-high-index-disp8-compressed
   ("VGATHERDPS" "ZMM0" "ZMM16*4+4" "K4"))
 
-(define-evex-disasm-test
-    :evex-vaddps-masked-z-disp32-fallback
-    sb-vm::%test-vaddps-masked-z-disp32
-  ("VADDPS" "ZMM0" "ZMM1" "[RSP+65]" "{K1}{z}"))
-
 ;; Zeroing masked arithmetic: single precision
 (define-evex-disasm-test
     :evex-vaddps-masked-z-compressed-disp8
     sb-vm::%test-vaddps-masked-z-disp8
-  ("VADDPS" "ZMM0" "ZMM1" "[RSP+64]" "{K1}{z}")
+  ("VADDPS" "ZMM0" "ZMM1" "[RSP+64]" "{K1} {z}")
   :unexpected ("[RSP+1]"))
 
 ;; Zeroing masked arithmetic: single precision, disp32 fallback
 (define-evex-disasm-test
     :evex-vaddps-masked-z-disp32-fallback
     sb-vm::%test-vaddps-masked-z-disp32
-  ("VADDPS" "ZMM0" "ZMM1" "[RSP+65]" "{K1}{z}"))
-
-;; Zeroing masked integer arithmetic: qword
-(define-evex-disasm-test
-    :evex-vpaddq-masked-z-compressed-disp8
-    sb-vm::%test-vpaddq-masked-z-disp8
-  ("VPADDQ" "ZMM0" "ZMM1" "[RSP+64]" "{K1}{z}")
-  :unexpected ("[RSP+1]"))
-
-;; Zeroing masked double precision
-(define-evex-disasm-test
-    :evex-vaddpd-masked-z-compressed-disp8
-    sb-vm::%test-vaddpd-masked-z-disp8
-  ("VADDPD" "ZMM0" "ZMM1" "[RSP+64]" "{K1}{z}")
-  :unexpected ("[RSP+1]"))
-
-
-;; Zeroing masked arithmetic: single precision
-(define-evex-disasm-test
-    :evex-vaddps-masked-z-compressed-disp8
-    sb-vm::%test-vaddps-masked-z-disp8
-  ("VADDPS" "ZMM0" "ZMM1" "[RSP+64]" "{K1}{z}")
-  :unexpected ("[RSP+1]"))
+  ("VADDPS" "ZMM0" "ZMM1" "[RSP+65]" "{K1} {z}"))
 
 ;; Zeroing masked integer arithmetic: qword
 (define-evex-disasm-test
@@ -4047,7 +4789,7 @@
 (define-evex-disasm-test
     :evex-vdivpd-masked-z-zmm-disp8
     sb-vm::%test-vdivpd-masked-z-zmm-disp8
-  ("VDIVPD" "ZMM0" "ZMM1" "[RSP+64]" "{K5}{z}")
+  ("VDIVPD" "ZMM0" "ZMM1" "[RSP+64]" "{K5} {z}")
   :unexpected ("[RSP+1]"))
 
 ;; Broadcast subtract single precision
@@ -4096,7 +4838,7 @@
 (define-evex-disasm-test
     :evex-vminps-masked-z-zmm-disp8
     sb-vm::%test-vminps-masked-z-zmm-disp8
-  ("VMINPS" "ZMM0" "ZMM1" "[RSP+64]" "{K4}{z}")
+  ("VMINPS" "ZMM0" "ZMM1" "[RSP+64]" "{K4} {z}")
   :unexpected ("[RSP+1]"))
 
 ;; Zeroing max double
@@ -4201,7 +4943,7 @@
 (define-evex-disasm-test
     :evex-vpmaxsq-masked-z-zmm-disp8
     sb-vm::%test-vpmaxsq-masked-z-zmm-disp8
-  ("VPMAXSQ" "ZMM0" "ZMM1" "[RSP+64]" "{K5}{z}")
+  ("VPMAXSQ" "ZMM0" "ZMM1" "[RSP+64]" "{K5} {z}")
   :unexpected ("[RSP+1]"))
 
 (define-evex-disasm-test
@@ -4219,7 +4961,7 @@
 (define-evex-disasm-test
     :evex-vfmadd132ps-masked-z-zmm-disp8
     sb-vm::%test-vfmadd132ps-masked-z-zmm-disp8
-  ("VFMADD132PS" "ZMM0" "ZMM1" "[RSP+64]" "{K4}{z}")
+  ("VFMADD132PS" "ZMM0" "ZMM1" "[RSP+64]" "{K4} {z}")
   :unexpected ("[RSP+1]"))
 
 (define-evex-disasm-test
@@ -4249,7 +4991,7 @@
 (define-evex-disasm-test
     :evex-vfmsub213pd-masked-z-zmm-disp8
     sb-vm::%test-vfmsub213pd-masked-z-zmm-disp8
-  ("VFMSUB213PD" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
+  ("VFMSUB213PD" "ZMM0" "ZMM1" "[RSP+64]" "{K3} {z}")
   :unexpected ("[RSP+1]"))
 
 (define-evex-disasm-test
@@ -4267,7 +5009,7 @@
 (define-evex-disasm-test
     :evex-vfmaddsub213pd-masked-z-zmm-disp8
     sb-vm::%test-vfmaddsub213pd-masked-z-zmm-disp8
-  ("VFMADDSUB213PD" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
+  ("VFMADDSUB213PD" "ZMM0" "ZMM1" "[RSP+64]" "{K3} {z}")
   :unexpected ("[RSP+1]"))
 
 (define-evex-disasm-test
@@ -4327,7 +5069,7 @@
 (define-evex-disasm-test
     :evex-vpsrlvq-masked-z-zmm-disp8
     sb-vm::%test-vpsrlvq-masked-z-zmm-disp8
-  ("VPSRLVQ" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
+  ("VPSRLVQ" "ZMM0" "ZMM1" "[RSP+64]" "{K3} {z}")
   :unexpected ("[RSP+1]"))
 
 (define-evex-disasm-test
@@ -4503,7 +5245,7 @@
 (define-evex-disasm-test
     :evex-vscalefpd-masked-z-zmm-disp8
     sb-vm::%test-vscalefpd-masked-z-zmm-disp8
-  ("VSCALEFPD" "ZMM0" "ZMM1" "[RSP+64]" "{K5}{z}")
+  ("VSCALEFPD" "ZMM0" "ZMM1" "[RSP+64]" "{K5} {z}")
   :unexpected ("[RSP+1]"))
 
 (define-evex-disasm-test
@@ -4686,7 +5428,7 @@
 (define-evex-disasm-test
     :evex-vpconflictq-masked-z-zmm-disp8
     sb-vm::%test-vpconflictq-masked-z-zmm-disp8
-  ("VPCONFLICTQ" "ZMM0" "[RSP+64]" "{K3}{z}")
+  ("VPCONFLICTQ" "ZMM0" "[RSP+64]" "{K3} {z}")
   :unexpected ("[RSP+1]"))
 
 ;; Masked leading zero count dword
@@ -4700,7 +5442,7 @@
 (define-evex-disasm-test
     :evex-vplzcntq-masked-z-zmm-disp8
     sb-vm::%test-vplzcntq-masked-z-zmm-disp8
-  ("VPLZCNTQ" "ZMM0" "[RSP+64]" "{K5}{z}")
+  ("VPLZCNTQ" "ZMM0" "[RSP+64]" "{K5} {z}")
   :unexpected ("[RSP+1]"))
 
 ;; Masked VAESENC
@@ -4714,7 +5456,7 @@
 (define-evex-disasm-test
     :evex-vaesenclast-masked-z-zmm-disp8
     sb-vm::%test-vaesenclast-masked-z-zmm-disp8
-  ("VAESENCLAST" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
+  ("VAESENCLAST" "ZMM0" "ZMM1" "[RSP+64]" "{K3} {z}")
   :unexpected ("[RSP+1]"))
 
 ;; Masked VAESDEC
