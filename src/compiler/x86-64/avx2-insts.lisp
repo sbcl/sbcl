@@ -352,17 +352,6 @@
  (reg :field (byte 3 (+ start 11)) :type 'kreg))
 
 
-(define-evex-instruction-format (ymm-ymm-imm 16
-                                 :default-printer '(:name :tab vvvv ", " reg ", " imm))
-  (op  :field (byte 8 (+ start 0)))
-  (/i  :field (byte 3 (+ start 11)))
-  (b11 :field (byte 2 (+ start 14))
-       :value #b11)
-  (reg :field (byte 3 (+ start 8))
-       :type 'evex-ymmreg-b)
-  (imm :type 'imm-byte))
-
-
 (define-vex-instruction-format
  (reg-kreg/mem 16 :default-printer '(:name :tab reg ", " reg/mem))
  (op :field (byte 8 (+ start 0)))
@@ -388,22 +377,6 @@
  (reg :field (byte 3 (+ start 11)) :type 'kreg) (imm :type 'imm-byte))
 
 
-(define-instruction-format (evex 32) (evex-prefix :field (byte 8 0) :value 98)
- (r :field (byte 1 15) :type 'vex-r) (x :field (byte 1 14) :type 'vex-x)
- (b :field (byte 1 13) :type 'vex-b)
- (r-prime :field (byte 1 12) :type 'evex-r-prime)
- ;; bit 11 is reserved (must be 0); bits 10:8 are mmm, selecting opcode
- ;; map 1/2/3 (0F/0F38/0F3A) or, for AVX-512_FP16, map 5/6.
- (reserved :field (byte 1 11) :value 0) (mm :field (byte 3 8))
- (w :field (byte 1 23) :type 'evex-w)
- (vvvv :field (byte 4 19) :type 'evex-ymm-vvvv-reg)
- (evex-fixed :field (byte 1 18) :value 1 :type 'evex-fixed)
- (pp :field (byte 2 16)) (z-bit :field (byte 1 31))
- (ll :field (byte 2 29) :type 'evex-ll) (evex-b :field (byte 1 28))
- (v-prime :field (byte 1 27) :type 'evex-v-prime)
- (aaa :field (byte 3 24) :type 'opmask-reg))
-
-
 (defmacro define-evex-instruction-format
           ((format-name length-in-bits &key default-printer include)
            &body arg-specs)
@@ -414,6 +387,17 @@
           'evex)
      :default-printer ,default-printer)
     ,@(subst 32 'start arg-specs)))
+
+
+(define-evex-instruction-format (ymm-ymm-imm 16
+                                 :default-printer '(:name :tab vvvv ", " reg ", " imm))
+  (op  :field (byte 8 (+ start 0)))
+  (/i  :field (byte 3 (+ start 11)))
+  (b11 :field (byte 2 (+ start 14))
+       :value #b11)
+  (reg :field (byte 3 (+ start 8))
+       :type 'evex-ymmreg-b)
+  (imm :type 'imm-byte))
 
 
 (define-evex-instruction-format
@@ -457,13 +441,6 @@
      (:if (dir :constant 0) (reg ", " reg/mem) (reg/mem ", " reg))
      (reg ", " vvvv ", " reg/mem))))
  (op :field (byte 7 (+ start 1))) (dir :field (byte 1 (+ start 0))))
-
-
-(define-evex-instruction-format
- (ymm-ymm-imm 16 :default-printer '(:name :tab vvvv ", " reg ", " imm))
- (op :field (byte 8 (+ start 0))) (/i :field (byte 3 (+ start 11)))
- (b11 :field (byte 2 (+ start 14)) :value 3)
- (reg :field (byte 3 (+ start 8)) :type 'ymmreg-b) (imm :type 'imm-byte))
 
 
 (define-evex-instruction-format

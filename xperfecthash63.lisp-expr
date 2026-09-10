@@ -1987,15 +1987,6 @@
 (#(A49305EF D0241AE7 E55E7F8C EE9A5410)
  "(SB-PCL::%CLASS SB-PCL::%PARAMETER SB-PCL::%VARIABLE-REBINDING SPECIAL)"
  "((& (>> val 8) 3))")
-(#(29085F3F 555EA088 8A2CAA21 922EF550 9A26078C)
- "(:DISP32 :DISP8 :CS :GS :FS)"
- "((& (+ (>> val 3) (>> val 17)) 7))")
-(#(359CB801 4D28C61A 53351B33 A2DD0906 B9B79FF6)
- "(FUNCTION SB-IMPL::PREDICATE SB-IMPL::KEY SB-IMPL::TEST SB-IMPL::TEST-NOT)"
- "((& (^ (>> val 3) (>> val 6)) 7))")
-(#(0 2EF3F4BC B6CE09C5 C99FDFD4 E9FE1D98)
- "(:AVX512 :COMPUTE-ONLY :FORCE-TO-STACK NIL T)"
- "((& (+ val (>> val 5)) 7))")
 (#(20F3DEB2 27DEC9AD 2DF3F329 42D83FFB 497F147D 8CDBDD0D 9B1DBA5A A569A1AB)
  "(:ALLOW-OTHER-KEYS :DISP-N :EVEX-B :Z :AAA :OPCODE-PREFIX :W :LL)"
  "((& (- (>> val 6) (>> val 31)) 7))")
@@ -2030,16 +2021,6 @@
  "((let ((tab #a((8) (unsigned-byte 8) 0 0 5 8 0 12 1 0)))
   (let ((b (& val #x7)))
    (let ((a (>> (<< val 5) 29)))
-    (^ a (aref tab b))))))")
-(#(5 6 F F38 F3A 9FEA759A A2EA7A53)
- "(6 :MAP6 5 :MAP5 3898 3896 15)"
- "((let ((tab #a((4) (unsigned-byte 8) 3 0 7 0)))
-  (+= val #x4c7a405c)
-  (^= val (>> val 16))
-  (+= val (<< val 8))
-  (^= val (>> val 4))
-  (let ((b (& (>> val 8) #x3)))
-   (let ((a (>> (u32+ val (<< val 7)) 30)))
     (^ a (aref tab b))))))")
 )
 ;; EOF
