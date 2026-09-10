@@ -33,26 +33,13 @@
                       (symbol-package name))
          (error "No unpacker found for ~S." name)))))
 
-(defun %simd-pack-ub64s (pack)
-  (values (sb-vm::%simd-pack-ref-64 pack 0)
-          (sb-vm::%simd-pack-ref-64 pack 1)))
-
-(defun %simd-pack-256-ub64s (pack)
-  (values (sb-vm::%simd-pack-ref-64 pack 0)
-          (sb-vm::%simd-pack-ref-64 pack 1)
-          (sb-vm::%simd-pack-ref-64 pack 2)
-          (sb-vm::%simd-pack-ref-64 pack 3)))
-
+;; NOTE: SB-VM::%SIMD-PACK-REF-64 (a generic per-lane accessor) doesn't
+;; exist on this branch; SB-VM:%SIMD-PACK-512-UB64S (all 8 lanes at once)
+;; already does what's needed here, so just re-export it under the name
+;; SIMD= expects.
 #+(or x86-64 sb-simd-pack-512)
 (defun %simd-pack-512-ub64s (pack)
-  (values (sb-vm::%simd-pack-ref-64 pack 0)
-          (sb-vm::%simd-pack-ref-64 pack 1)
-          (sb-vm::%simd-pack-ref-64 pack 2)
-          (sb-vm::%simd-pack-ref-64 pack 3)
-          (sb-vm::%simd-pack-ref-64 pack 4)
-          (sb-vm::%simd-pack-ref-64 pack 5)
-          (sb-vm::%simd-pack-ref-64 pack 6)
-          (sb-vm::%simd-pack-ref-64 pack 7)))
+  (sb-vm::%simd-pack-512-ub64s pack))
 
 (defun simd= (a b)
   (typecase a
