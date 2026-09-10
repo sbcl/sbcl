@@ -793,8 +793,8 @@
                                    ,@(vop-parse-before-load parse)))))
                 ,@(binds)
                 ,@(extra-arg-refs parse))
-           (declare (ignore ,@(vop-parse-ignores parse)
-                            ,@(and (neq (vop-parse-before-load parse) :unspecified)
+           (declare (ignorable ,@(vop-parse-ignores parse))
+                    (ignore ,@(and (neq (vop-parse-before-load parse) :unspecified)
                                    `(,dummy))))
            ,@(loads)
            ;; RETURN-FROM can exit the ASSEMBLE while continuing on with saves.
@@ -1852,6 +1852,7 @@
             (arg-types)
             (infos)
             (temps)
+            (temp-names)
             (results)
             (result-types)
             (label-tags))
@@ -1913,7 +1914,8 @@
                         (input `(the ,(primtype-to-type type) ,arg))))
                      (t
                       (temps `(:temporary (:sc ,sc ,@rest)
-                                          ,name)))))
+                                          ,name))
+                      (temp-names name))))
       (loop for result in results
             for (name this-sc) = result
             for (nil sc type . rest) = (if this-sc
@@ -1940,6 +1942,12 @@
                                                          (list* :result-types (result-types)))
                                                     (and (infos)
                                                          (list* :info (infos)))
+                                                    ;; Inline-vop's callers routinely reserve more
+                                                    ;; temporaries than they end up using (e.g. while
+                                                    ;; exploring instruction encodings at the REPL),
+                                                    ;; so don't warn about unused ones.
+                                                    (and (temp-names)
+                                                         (list* :ignore (temp-names)))
                                                     (list* :generator 0
                                                            (if (label-tags)
                                                                `((let ,(loop for tag in (label-tags)
