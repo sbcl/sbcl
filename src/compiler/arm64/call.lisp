@@ -1404,20 +1404,19 @@
                    (inst csel nargs-tn tmp-tn nargs-tn :ne)))
                (ecase return
                  (:fixed
-                  '((default-unknown-values vop values nvals move-temp node)
-                    (when cur-nfp
-                      (load-stack-tn cur-nfp nfp-save))))
+                  '((default-unknown-values vop values nvals move-temp node)))
                  (:unknown
                   '((note-this-location vop :unknown-return)
-                    (receive-unknown-values node values-start nvals start count)
-                    (when cur-nfp
-                      (load-stack-tn cur-nfp nfp-save))))
+                    (receive-unknown-values node values-start nvals start count)))
                  ((:unboxed)
                   '((when cur-nfp
                       (load-stack-tn cur-nfp nfp-save))))
                  (:pass-through
                   '((note-this-location vop :unknown-return)))
-                 (:tail)))))))
+                 (:tail)))
+         ,(unless (eq return :tail)
+            `(when cur-nfp
+               (load-stack-tn cur-nfp nfp-save)))))))
 
 (define-full-call call nil :fixed nil)
 (define-full-call call-named t :fixed nil)
