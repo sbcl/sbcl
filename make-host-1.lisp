@@ -44,7 +44,7 @@
                       (simple-warning
                         (lambda (c)
                           (when last-form
-                            (setf warn (type-of c))))))
+                            (setf warnp (type-of c))))))
          (with-compilation-unit () ,@forms (setf last-form t)))
        ;; Catch only the warnings from with-compilation-unit, the others will be handled in
        ;; host-cload-stem

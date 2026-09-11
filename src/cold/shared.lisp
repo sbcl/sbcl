@@ -773,8 +773,6 @@
     (funcall fn)))
 (compile 'in-host-compilation-mode)
 
-(defvar *handled-warnings* nil)
-
 (defmacro stop-on-warnings (&body forms)
   #-sbcl
   `(progn ,@forms)
@@ -784,11 +782,9 @@
          (handler-bind ((style-warning
                           (lambda (c)
                             (signal c)
-                            (push c *handled-warnings*)
                             (setf style-warnp (type-of c))))
                         (simple-warning
                           (lambda (c)
-                            (push c *handled-warnings*)
                             (setf warnp (type-of c)))))
            ,@forms)
        (when (and (string>= (cl:lisp-implementation-version) "2.1")
