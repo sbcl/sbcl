@@ -204,12 +204,17 @@
                                 (classify-field-sysv-amd64 type)
                                 (floor (alien-type-alignment type) 8))))))
         (walk record-type 0))
-      (if (member :memory eightbytes)
-          ;; If anything goes to memory then everything goes too
-          (setf eightbytes '(:memory))
-          ;; Convert remaining :no-class to :integer (padding bytes are treated as integer)
-          (setf eightbytes
-                (mapcar (lambda (c) (if (eq c :no-class) :integer c)) eightbytes)))
+      (cond ((member :memory eightbytes)
+             ;; If anything goes to memory then everything goes too
+          (setf eightbytes '(:memory)))
+            (t
+             ;; Convert remaining :no-class to :integer (padding bytes are treated as integer)
+             (setf eightbytes
+                   (mapcar (lambda (c) (if (eq c :no-class) :integer c)) eightbytes))
+             ;; The last byte might be single
+             (when (and (eq (car (last eightbytes)) :double)
+                        (<= (- byte-size (* 8 (1- num-eightbytes))) 4))
+               (setf (car (last eightbytes)) :single))))
       (sb-alien::make-struct-classification
        :register-slots eightbytes
        :size byte-size
@@ -266,7 +271,7 @@ Floats are passed in integer registers."
               (int-results 0)
               (sse-results 0))
           (dolist (class (sb-alien::struct-classification-register-slots classification))
-            (case class
+            (ecase class
               (:integer
                (push (make-wired-tn* 'unsigned-byte-64
                                      unsigned-reg-sc-number
@@ -276,6 +281,12 @@ Floats are passed in integer registers."
               (:double
                (push (make-wired-tn* 'double-float
                                      double-reg-sc-number
+                                     sse-results)
+                     result-tns)
+               (incf sse-results))
+              (:single
+               (push (make-wired-tn* 'single-float
+                                     single-reg-sc-number
                                      sse-results)
                      result-tns)
                (incf sse-results))))
@@ -415,7 +426,7 @@ Floats are passed in integer registers."
               (offsets nil)
               (offset 0))
           (dolist (class slots)
-            (case class
+            (ecase class
               (:integer
                (push (int-arg state 'unsigned-byte-64
                               unsigned-reg-sc-number
@@ -427,7 +438,13 @@ Floats are passed in integer registers."
                                 double-reg-sc-number
                                 double-stack-sc-number)
                      arg-tns)
-               (push (cons offset :double) offsets)))
+               (push (cons offset :double) offsets))
+              (:single
+               (push (float-arg state 'single-float
+                                single-reg-sc-number
+                                single-stack-sc-number)
+                     arg-tns)
+               (push (cons offset :single) offsets)))
             (incf offset 8))
           (setf arg-tns (nreverse arg-tns))
           (setf offsets (nreverse offsets))
@@ -442,7 +459,7 @@ Floats are passed in integer registers."
                      for load-size = (min 8 (- struct-size off))
                      do (let ((vop (ecase class
                                      (:integer 'load-struct-int-arg)
-                                     (:double 'load-struct-sse-arg))))
+                                     ((:single :double) 'load-struct-sse-arg))))
                           (sb-c::emit-and-insert-vop
                            call block
                            (sb-c::template-or-lose vop)
@@ -983,7 +1000,7 @@ Floats are passed in integer registers."
                         (struct-size (sb-alien::struct-classification-size classification))
                         (slots (sb-alien::struct-classification-register-slots classification))
                         (n-int (count :integer slots))
-                        (n-fp (count :double slots))
+                        (n-fp (count-if (lambda (x) (member x '(:single :double))) slots))
                         ;; Don't mix stack/registers
                         (use-registers (and (<= n-int (length gprs))
                                             (<= n-fp (length fprs)))))
@@ -1042,7 +1059,7 @@ Floats are passed in integer registers."
                                       (setf gpr rax)
                                       (inst mov gpr (ea (- stack-args-offset n-word-bytes) rsp)))
                                     (inst mov (ea slot-offset rsp) gpr)))
-                                 (:double
+                                 ((:double :single)
                                   (let ((fpr (and use-registers
                                                   (pop fprs))))
                                     (cond (fpr
@@ -1184,7 +1201,7 @@ Floats are passed in integer registers."
                                               (1 rdx))))
                                 (inst mov target (ea offset rsp)))
                               (incf int-reg-idx))
-                             (:double
+                             ((:single :double)
                               (let ((target (case sse-reg-idx
                                               (0 xmm0)
                                               (1 xmm1))))

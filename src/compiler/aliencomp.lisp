@@ -665,22 +665,13 @@
            (incf offset 8)
            (incf temp-idx))
           (:double
-           (cond
-             ((= slot-size 8)
+           (ecase slot-size
+             (8
               (push `(setf (sb-sys:sap-ref-double ,result-sap ,offset)
                            ,(nth temp-idx temps))
-                    stores))
-             ((= slot-size 4)
-              (push `(setf (sb-sys:sap-ref-32 ,result-sap ,offset)
-                           (sb-kernel:double-float-low-bits
-                            ,(nth temp-idx temps)))
-                    stores))
-             (t
-              (error "Unexpected :double slot size ~A at offset ~A ~
-                      (struct size ~A)" slot-size offset bytes)))
+                    stores)))
            (incf offset 8)
            (incf temp-idx))
-          ;; :single is ARM64 HFA only - x86-64 classifies all floats as :double
           (:single
            (push `(setf (sb-sys:sap-ref-single ,result-sap ,offset)
                         ,(nth temp-idx temps))
@@ -888,7 +879,7 @@
                       (case class
                         (:integer (specifier-type '(unsigned-byte 64)))
                         (:double (specifier-type 'double-float))
-                        (:single! (specifier-type 'single-float))
+                        (:single (specifier-type 'single-float))
                         (t *universal-type*)))
                     register-slots)))))
       (t
