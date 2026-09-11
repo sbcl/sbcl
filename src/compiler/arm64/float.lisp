@@ -1024,7 +1024,7 @@
          (:real
           (move-float r x))
          (:imag
-          (inst ins r 0 x 1 :s))))
+          (inst dup r x :s 1))))
       (complex-single-stack
        (inst ldr r
              (@ (current-nfp-tn vop)
@@ -1060,7 +1060,7 @@
          (:real
           (move-float r x))
          (:imag
-          (inst ins r 0 x 1 :d))))
+          (inst dup r x :d 1))))
       (complex-double-stack
        (loadw r (current-nfp-tn vop) (+ (ecase slot (:real 0) (:imag 1))
                                         (tn-offset x)))))))

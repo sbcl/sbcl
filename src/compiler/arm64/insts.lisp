@@ -4079,7 +4079,7 @@
                                    (fpr-offset rn)
                                    (fpr-offset rd))))))
          (t
-          (assert (null size)) ; implicit from the dest width
+          (the (member nil :d :s) size)
           (multiple-value-bind (imm shift)
               (cond ((single-register-p rd)
                      (values #b00100 3))
