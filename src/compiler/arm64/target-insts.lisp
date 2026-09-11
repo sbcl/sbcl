@@ -650,6 +650,21 @@
                  (write-char #\, stream)))
       (format stream " }"))))
 
+(defun print-simd-element-reg (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (size l m rm4 h) value
+    (let ((reg (logior (ash m 4) rm4)))
+      (case size
+        (#b11
+         (let ((index h))
+           (format stream "V~d.D[~d]" reg index)))
+        (#b10
+         (let ((index (logior (ash h 1) l)))
+           (format stream "V~d.S[~d]" reg index)))
+        (#b01
+         (let ((index (logior (ash h 2) (ash l 1) m)))
+           (format stream "V~d.H[~d]" rm4 index)))))))
+
 (defun print-sys-reg (value stream dstate)
   (declare (ignore dstate))
   (princ (decode-sys-reg value) stream))

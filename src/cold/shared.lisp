@@ -274,8 +274,8 @@
                (funcall (compile nil (read-from-file pathname))
                         (read-from-file "^base-target-features.lisp-expr")))
              (customizer-file-name
-              (custom-or-default 'cl-user::*sbcl-customize-target-features-file*
-                                 "customize-target-features.lisp"))
+               (custom-or-default 'cl-user::*sbcl-customize-target-features-file*
+                                  "customize-target-features.lisp"))
              (customizer (if (probe-file customizer-file-name)
                              (compile nil
                                       (read-from-file customizer-file-name))
@@ -341,6 +341,14 @@
             (unless (or int3-enable int4-enable ud2-enable)
               ;; don't love the name, but couldn't think of a better one
               (push :sw-int-avoidance sb-xc:*features*))))
+
+        (when (member :avx2 backend-subfeatures)
+          (push :sse4 backend-subfeatures)
+          (push :avx backend-subfeatures))
+
+        (when (member :sse4 backend-subfeatures)
+          (push :sse3 backend-subfeatures))
+
         (when (or (target-featurep :arm64)
                   (and (target-featurep :x86-64)
                        (member :sse4 backend-subfeatures)))
