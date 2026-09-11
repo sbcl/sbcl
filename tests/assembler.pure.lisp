@@ -410,7 +410,7 @@
     (test-assemble `(vpdpwssds ,zmm0 ,zmm1 ,zmm2)
                    "62F2754853C2     VPDPWSSDS ZMM0, ZMM1, ZMM2")
     (test-assemble `(vpdpbusd-masked ,zmm0 ,zmm1 ,zmm2 ,k1 :z)
-                   "62F275C950C2     VPDPBUSD-MASKED-Z ZMM0, ZMM1, ZMM2 {K1}{z}")
+                   "62F275C950C2     VPDPBUSD-MASKED ZMM0, ZMM1, ZMM2 {K1} {z}")
 
     ;; AVX-512BF16 (Bfloat16 Operations)
     (test-assemble `(vcvtne2ps2bf16 ,zmm0 ,zmm1 ,zmm2)
