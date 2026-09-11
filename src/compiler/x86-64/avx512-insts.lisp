@@ -3240,48 +3240,6 @@
   (def-scalar-arith-masked vaddss #xF3 #x58 0)
   (def-scalar-arith-masked vaddss #xF3 #x58 0 :z t))
 
-(macrolet ((def-bf16-masked (name prefix opcode w &key z)
-             (let* ((z-bit
-                     (if z 1 0))
-                    (ins-name
-                     (symbolicate name (if z "-MASKED-Z" "-MASKED")))
-                    (mask-printer
-                     (if z
-                         '(:name :tab reg ", " vvvv ", " reg/mem " {" aaa
-                           "}{z}")
-                         '(:name :tab reg ", " vvvv ", " reg/mem " {" aaa
-                           "}")))
-                    (printer-forms
-                     (loop for k from 1 to 7
-                           append
-                           (loop for ll in '(0 1 2)
-                                 append
-                                 (avx512-inst-printer-list 'ymm-ymm/mem prefix opcode
-                                                           :opcode-prefix #x0F38
-                                                           :w w
-                                                           :nds t
-                                                           :ll ll
-                                                           :disp-n (case ll (0 16) (1 32) (2 64))
-                                                           :evex-b 0
-                                                           :more-fields
-                                                           (list (list 'aaa k)
-                                                                 (list 'z-bit z-bit))
-                                                           :printer mask-printer)))))
-               `(define-instruction ,ins-name (segment dst src1 src2 mask)
-                 ,@printer-forms
-                 (:emitter (aver (and (integerp mask) (<= 1 mask 7)))
-                  (emit-avx512-inst segment src2 dst ,prefix ,opcode
-                    :opcode-prefix #x0F38
-                    :vvvv src1
-                    :w ,w
-                    :aaa mask
-                    :z ,z-bit
-                    :disp-n (cond ((zmm-register-p dst) 64)
-                                  ((ymm-register-p dst) 32)
-                                  ((xmm-register-p dst) 16) (t 0))))))))
-  (def-bf16-masked vcvtne2ps2bf16 #xF2 #x72 0 :z t)
-  (def-bf16-masked vdpbf16ps #xF2 #x52 0 :z t))
-
 (macrolet ((def-bf16-2op-masked (name prefix opcode w &key z)
              (let* ((z-bit
                      (if z 1 0))

@@ -3160,7 +3160,7 @@ that take no separate immediate."
 (define-test-vop-masked-reg-reg-mem %test-vpdpwssd-masked-z-zmm-disp8 vpdpwssd-masked int-avx512-reg 0 int-avx512-reg 1 64 3 nil :z)
 (define-test-vop-reg-reg-mem %test-vpdpbusd-bcast-xmm-disp8 vpdpbusd-bcast int-sse-reg 0 int-sse-reg 1 4)
 (define-test-vop-masked-reg-reg-mem %test-vcvtne2ps2bf16-masked-zmm-disp8 vcvtne2ps2bf16-masked int-avx512-reg 0 int-avx512-reg 1 64 2)
-(define-test-vop-masked-reg-reg-mem %test-vdpbf16ps-masked-z-zmm-disp8 vdpbf16ps-masked-z int-avx512-reg 0 int-avx512-reg 1 64 3)
+(define-test-vop-masked-reg-reg-mem %test-vdpbf16ps-masked-z-zmm-disp8 vdpbf16ps-masked int-avx512-reg 0 int-avx512-reg 1 64 3 nil :z)
 (define-test-vop-masked-reg-mem %test-vcvtneps2bf16-masked-zmm-disp8 vcvtneps2bf16-masked int-avx512-reg 0 64 2)
 (define-test-vop-masked-reg-mem %test-vcvtneps2bf16-masked-z-zmm-disp8 vcvtneps2bf16-masked-z int-avx512-reg 0 64 3)
 (define-test-vop-masked-reg-reg-mem %test-vpermt2d-masked-zmm-disp8 vpermt2d-masked int-avx512-reg 0 int-avx512-reg 1 64 2)
@@ -5209,7 +5209,7 @@ that take no separate immediate."
 (define-evex-disasm-test
     :evex-vdpbf16ps-masked-z-zmm-disp8
     sb-vm::%test-vdpbf16ps-masked-z-zmm-disp8
-  ("VDPBF16PS" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
+  ("VDPBF16PS" "ZMM0" "ZMM1" "[RSP+64]" "{K3} {z}")
   :unexpected ("[RSP+1]"))
 
 (define-evex-disasm-test
