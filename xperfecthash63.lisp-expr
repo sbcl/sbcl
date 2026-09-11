@@ -1987,33 +1987,5 @@
 (#(A49305EF D0241AE7 E55E7F8C EE9A5410)
  "(SB-PCL::%CLASS SB-PCL::%PARAMETER SB-PCL::%VARIABLE-REBINDING SPECIAL)"
  "((& (>> val 8) 3))")
-(#(22F3E1D8 28F3EB4A 2DF3F329 38F4047A 42D83FFB DBA660EE)
- "(:ALLOW-OTHER-KEYS :MAP :B :X :R :W)"
- "((& (+ (>> val 15) (>> val 23)) 7))")
-(#(4 5 6 7 F F38 F3A 9FEA759A A0EA772D A1EA78C0 A2EA7A53)
- "(7 :MAP7 6 :MAP6 5 :MAP5 4 :MAP4 3898 3896 15)"
- "((let ((tab #a((8) (unsigned-byte 8) 5 9 8 0 2 6 0 0)))
-  (+= val #x1369777c)
-  (^= val (>> val 16))
-  (+= val (<< val 8))
-  (^= val (>> val 4))
-  (let ((b (& (>> val 3) #x7)))
-   (let ((a (>> (u32+ val (<< val 6)) 29)))
-    (^ a (aref tab b))))))")
-(#(30BB9868 42D83FFB AA0D732F C5197F4A C7198270 D3F36E24)
- "(:ALLOW-OTHER-KEYS :DFV :SCC :NF :ND :B-PRIME)"
- "((& (^ (>> val 6) (>> val 7)) 7))")
-(#(27DEC9AD 2DF3F329 42D83FFB 5023D356 AA0D732F BEFFDDF2 C425F32A C5197F4A C7198270 D3F36E24)
- "(:ALLOW-OTHER-KEYS :REMAINING-BYTES :DFV :SCC :NF :ND :PP :VVVV :W :OPCODE-PREFIX)"
- "((let ((tab #a((8) (unsigned-byte 8) 0 12 0 0 0 15 0 3)))
-  (let ((b (& val #x7)))
-   (let ((a (>> (<< val 5) 29)))
-    (^ a (aref tab b))))))")
-(#(20F3DEB2 29F3ECDD 35F3FFC1 39F4060D 771B4317 8725E9A3 A6FD7993 D4E7FBAE)
- "(:O :OF :S :SF :Z :ZF :C :CF)"
- "((& (+ (>> val 2) (>> val 19)) 7))")
-(#(30BB9868 42D83FFB AA0D732F C5197F4A C7198270 D3F36E24 DB8F1B72)
- "(:ALLOW-OTHER-KEYS :DFV :SCC :NF :ND :X-PRIME :B-PRIME)"
- "((& (+ (>> val 1) (>> val 31)) 7))")
 )
 ;; EOF
