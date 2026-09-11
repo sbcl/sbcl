@@ -861,8 +861,7 @@
   (:generator 5
     (sc-case float
       (double-reg
-       (inst fmov hi-bits float)
-       (inst asr hi-bits hi-bits 32))
+       (inst smov hi-bits float 1 :s))
       (double-stack
         (inst ldrsw hi-bits
               (@ (current-nfp-tn vop)
@@ -892,8 +891,7 @@
   (:generator 5
     (sc-case float
       (double-reg
-       (inst fmov lo-bits float)
-       (inst and lo-bits lo-bits (ldb (byte 32 0) -1)))
+       (inst fmov (32-bit-reg lo-bits) float))
       (double-stack
        (inst ldr (32-bit-reg lo-bits)
              (@ (current-nfp-tn vop)

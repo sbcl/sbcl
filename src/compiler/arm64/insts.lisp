@@ -3247,7 +3247,9 @@
                                      (fpr-offset rn) (fpr-offset rd)))
          ((and (register-p rd)
                (fp-register-p rn))
-          (let* ((type (fp-reg-type rn))
+          (let* ((type (if (sc-is rd 32-bit-reg)
+                           0
+                           (fp-reg-type rn)))
                  (128-p (= type #b10)))
             (when (and 128-p
                        (not (eql vector-index 1)))
@@ -3261,7 +3263,9 @@
                                 (fpr-offset rn) (gpr-offset rd))))
          ((and (register-p rn)
                (fp-register-p rd))
-          (let* ((type (fp-reg-type rd))
+          (let* ((type (if (sc-is rn 32-bit-reg)
+                           0
+                           (fp-reg-type rd)))
                  (128-p (= type #b10)))
             (when (and 128-p
                        (not (eql vector-index 1)))
