@@ -1758,7 +1758,7 @@
               do
               ;; Process the newly enqueued blocks in the same order
               (setf *constraint-blocks*
-                    (sort *constraint-blocks* #'< :key #'block-number))
+                    (sort *constraint-blocks* #'> :key #'block-number))
               (let ((current-end (car (last *constraint-blocks*))))
                 (loop for block = (pop *constraint-blocks*)
                       do
