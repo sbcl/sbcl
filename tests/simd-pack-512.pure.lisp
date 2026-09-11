@@ -2765,7 +2765,7 @@ that take no separate immediate."
        (inst ,inst vec (ea ,disp rsp) ,mask ,imm)
        (inst xor :dword res res))))
 
-(defmacro define-test-vop-masked-reg-mem (name inst reg-sc reg-off disp mask)
+(defmacro define-test-vop-masked-reg-mem (name inst reg-sc reg-off disp mask &optional zeroing)
   `(define-vop (,name)
      (:translate ,name)
      (:policy :fast-safe)
@@ -2778,7 +2778,9 @@ that take no separate immediate."
      (:results (res :scs (unsigned-reg)))
      (:result-types unsigned-num)
      (:generator 1
-       (inst ,inst vec (ea ,disp rsp) ,mask)
+       ,(if zeroing
+            `(inst ,inst vec (ea ,disp rsp) ,mask ,zeroing)
+            `(inst ,inst vec (ea ,disp rsp) ,mask))
        (inst xor :dword res res))))
 
 (defmacro define-test-vop-masked-mem-reg-imm
@@ -3239,11 +3241,11 @@ that take no separate immediate."
 (define-test-vop-masked-reg-mem %test-vpconflictd-masked-zmm-disp8
   vpconflictd-masked int-avx512-reg 0 64 2)
 (define-test-vop-masked-reg-mem %test-vpconflictq-masked-z-zmm-disp8
-  vpconflictq-masked-z int-avx512-reg 0 64 3)
+  vpconflictq-masked int-avx512-reg 0 64 3 :z)
 (define-test-vop-masked-reg-mem %test-vplzcntd-masked-xmm-disp8
   vplzcntd-masked int-sse-reg 0 16 4)
 (define-test-vop-masked-reg-mem %test-vplzcntq-masked-z-zmm-disp8
-  vplzcntq-masked-z int-avx512-reg 0 64 5)
+  vplzcntq-masked int-avx512-reg 0 64 5 :z)
 (define-test-vop-masked-reg-reg-mem %test-vaesenc-masked-zmm-disp8
   vaesenc-masked int-avx512-reg 0 int-avx512-reg 1 64 2)
 (define-test-vop-masked-reg-reg-mem %test-vaesenclast-masked-z-zmm-disp8
