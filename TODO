@@ -43,10 +43,6 @@ THREADING INTERFACE
   local variables are needed. Sessions and sharing the terminal need
   to be thought about.
 
-PEEPHOLE OPTIMIZER
-
-  Have you ever read SBCL disassembly?
-
 FINISHING EXTERNAL FORMATS
 
   Byte order marks. Newline conventions. A way to specify an external
