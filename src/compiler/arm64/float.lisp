@@ -600,20 +600,17 @@
                                                (zerop (tn-value tn))))))
                   (:arg-types ,complex-type ,complex-type)
                   (:temporary (:sc ,complex-sc) mask)
-                  (:conditional :ne)
+                  (:conditional :eq)
                   (:vop-var vop)
                   (:policy :fast-safe)
                   (:generator 3
                     (when (sc-is y fp-immediate)
                       (setf y (tn-value y)))
                     (inst fcmeq mask x y ,float-size)
-                    ,@(if (eq real-type 'double-float)
-                          `((inst uminv mask mask ,byte-size)
-                            (inst umov tmp-tn mask 0 :b)
-                            (inst cmp tmp-tn 0))
-                          `((inst umov tmp-tn mask 0 :d)
-                            (inst cmn tmp-tn 1)
-                            (change-vop-flags vop '(:eq))))))
+                    ,(if (eq real-type 'double-float)
+                         `(inst xtn mask mask :2s))
+                    (inst umov tmp-tn mask 0 :d)
+                    (inst cmn tmp-tn 1)))
                 (define-vop (,eql-complex-complex-name)
                   (:translate eql)
                   (:args (x :scs (,complex-sc))
@@ -811,8 +808,7 @@
       (signed-reg
        (sc-case float
          (single-reg
-          (inst fmov bits float)
-          (inst sxtw bits bits))
+          (inst smov bits float 0 :s))
          (single-stack
           (inst ldrsw bits
                 (@ (current-nfp-tn vop)
@@ -822,12 +818,7 @@
       (signed-stack
        (sc-case float
          (single-reg
-          (storew (32-bit-reg float) (current-nfp-tn vop) (tn-offset bits)))
-         ((single-stack descriptor-reg)
-          ;; Fun and games: This also affects PPC, silently.
-          ;; Hopefully it's a non-issue, but I'd rather have the
-          ;; explicit error than a silent miscompilation.
-          (bug "Unable to extract single-float bits from ~S to ~S" float bits)))))))
+          (storew (32-bit-reg float) (current-nfp-tn vop) (tn-offset bits))))))))
 
 (define-vop (double-float-bits)
   (:args (float :scs (double-reg descriptor-reg)))
