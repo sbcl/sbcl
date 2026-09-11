@@ -315,7 +315,8 @@
       #+win32 sb-impl::*waitable-timer-handle*
       #+win32 sb-impl::*timer-thread*
       sb-unicode::*name->char-buffers*
-      sb-impl::*finalizer-thread*)))
+      sb-impl::*finalizer-thread*
+      sb-impl::*read-line-buffers*)))
 
 (defun collect-symbol-values ()
   (let (result)
