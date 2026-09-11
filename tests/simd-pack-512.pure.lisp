@@ -3353,7 +3353,6 @@
            (assert (search s text)))
          (dolist (s ',unexpected)
            (assert (not (search s text)))))))
-(test-util:pop-package)
 
 (with-test (:name :evex-high-register-disassembly)
   (let* ((fun (checked-compile
@@ -4719,7 +4718,7 @@
 (define-evex-disasm-test
     :evex-vaddpd-masked-z-compressed-disp8
     sb-vm::%test-vaddpd-masked-z-disp8
-  ("VADDPD" "ZMM0" "ZMM1" "[RSP+64]" "{K1}{z}")
+  ("VADDPD" "ZMM0" "ZMM1" "[RSP+64]" "{K1} {z}")
   :unexpected ("[RSP+1]"))
 
 (define-evex-disasm-test
@@ -4871,7 +4870,7 @@
 (define-evex-disasm-test
     :evex-vdivpd-masked-z-zmm-disp8
     sb-vm::%test-vdivpd-masked-z-zmm-disp8
-  ("VDIVPD" "ZMM0" "ZMM1" "[RSP+64]" "{K5} {z}")
+  ("VDIVPD" "ZMM0" "ZMM1" "[RSP+64]" "{K5}{z}")
   :unexpected ("[RSP+1]"))
 
 ;; Broadcast subtract single precision
@@ -4920,7 +4919,7 @@
 (define-evex-disasm-test
     :evex-vminps-masked-z-zmm-disp8
     sb-vm::%test-vminps-masked-z-zmm-disp8
-  ("VMINPS" "ZMM0" "ZMM1" "[RSP+64]" "{K4} {z}")
+  ("VMINPS" "ZMM0" "ZMM1" "[RSP+64]" "{K4}{z}")
   :unexpected ("[RSP+1]"))
 
 ;; Zeroing max double
@@ -5018,14 +5017,14 @@
 (define-evex-disasm-test
     :evex-vpminsd-masked-z-zmm-disp8
     sb-vm::%test-vpminsd-masked-z-zmm-disp8
-  ("VPMINSD" "ZMM0" "ZMM1" "[RSP+64]" "{K4}{z}")
+  ("VPMINSD" "ZMM0" "ZMM1" "[RSP+64]" "{K4} {z}")
   :unexpected ("[RSP+1]"))
 
 ;; Zeroing signed qword max
 (define-evex-disasm-test
     :evex-vpmaxsq-masked-z-zmm-disp8
     sb-vm::%test-vpmaxsq-masked-z-zmm-disp8
-  ("VPMAXSQ" "ZMM0" "ZMM1" "[RSP+64]" "{K5} {z}")
+  ("VPMAXSQ" "ZMM0" "ZMM1" "[RSP+64]" "{K5}{z}")
   :unexpected ("[RSP+1]"))
 
 (define-evex-disasm-test
@@ -5049,7 +5048,7 @@
 (define-evex-disasm-test
     :evex-vfmadd213pd-masked-z-zmm-disp8
     sb-vm::%test-vfmadd213pd-masked-z-zmm-disp8
-  ("VFMADD213PD" "ZMM0" "ZMM1" "[RSP+64]" "{K5}{z}")
+  ("VFMADD213PD" "ZMM0" "ZMM1" "[RSP+64]" "{K5} {z}")
   :unexpected ("[RSP+1]"))
 
 (define-evex-disasm-test
@@ -5073,7 +5072,7 @@
 (define-evex-disasm-test
     :evex-vfmsub213pd-masked-z-zmm-disp8
     sb-vm::%test-vfmsub213pd-masked-z-zmm-disp8
-  ("VFMSUB213PD" "ZMM0" "ZMM1" "[RSP+64]" "{K3} {z}")
+  ("VFMSUB213PD" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
   :unexpected ("[RSP+1]"))
 
 (define-evex-disasm-test
@@ -5109,7 +5108,7 @@
 (define-evex-disasm-test
     :evex-vfmsubadd213pd-masked-z-zmm-disp8
     sb-vm::%test-vfmsubadd213pd-masked-z-zmm-disp8
-  ("VFMSUBADD213PD" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
+  ("VFMSUBADD213PD" "ZMM0" "ZMM1" "[RSP+64]" "{K3} {z}")
   :unexpected ("[RSP+1]"))
 
 (define-evex-disasm-test
@@ -5139,7 +5138,7 @@
 (define-evex-disasm-test
     :evex-vpsubw-masked-z-zmm-disp8
     sb-vm::%test-vpsubw-masked-z-zmm-disp8
-  ("VPSUBW" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
+  ("VPSUBW" "ZMM0" "ZMM1" "[RSP+64]" "{K3} {z}")
   :unexpected ("[RSP+1]"))
 
 (define-evex-disasm-test
@@ -5151,7 +5150,7 @@
 (define-evex-disasm-test
     :evex-vpsrlvq-masked-z-zmm-disp8
     sb-vm::%test-vpsrlvq-masked-z-zmm-disp8
-  ("VPSRLVQ" "ZMM0" "ZMM1" "[RSP+64]" "{K3} {z}")
+  ("VPSRLVQ" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
   :unexpected ("[RSP+1]"))
 
 (define-evex-disasm-test
@@ -5187,7 +5186,7 @@
 (define-evex-disasm-test
     :evex-vpdpwssd-masked-z-zmm-disp8
     sb-vm::%test-vpdpwssd-masked-z-zmm-disp8
-  ("VPDPWSSD" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
+  ("VPDPWSSD" "ZMM0" "ZMM1" "[RSP+64]" "{K3} {z}")
   :unexpected ("[RSP+1]"))
 
 (define-evex-disasm-test
@@ -5229,7 +5228,7 @@
 (define-evex-disasm-test
     :evex-vpermt2q-masked-z-zmm-disp8
     sb-vm::%test-vpermt2q-masked-z-zmm-disp8
-  ("VPERMT2Q" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
+  ("VPERMT2Q" "ZMM0" "ZMM1" "[RSP+64]" "{K3} {z}")
   :unexpected ("[RSP+1]"))
 
 (define-evex-disasm-test
@@ -5253,7 +5252,7 @@
 (define-evex-disasm-test
     :evex-vpshldvw-masked-z-zmm-disp8
     sb-vm::%test-vpshldvw-masked-z-zmm-disp8
-  ("VPSHLDVW" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
+  ("VPSHLDVW" "ZMM0" "ZMM1" "[RSP+64]" "{K3} {z}")
   :unexpected ("[RSP+1]"))
 
 (define-evex-disasm-test
@@ -5538,7 +5537,7 @@
 (define-evex-disasm-test
     :evex-vaesenclast-masked-z-zmm-disp8
     sb-vm::%test-vaesenclast-masked-z-zmm-disp8
-  ("VAESENCLAST" "ZMM0" "ZMM1" "[RSP+64]" "{K3} {z}")
+  ("VAESENCLAST" "ZMM0" "ZMM1" "[RSP+64]" "{K3}{z}")
   :unexpected ("[RSP+1]"))
 
 ;; Masked VAESDEC
@@ -5552,7 +5551,7 @@
 (define-evex-disasm-test
     :evex-vaesdeclast-masked-z-ymm-disp8
     sb-vm::%test-vaesdeclast-masked-z-ymm-disp8
-  ("VAESDECLAST" "YMM1" "YMM2" "[RSP+32]" "{K5}{z}")
+  ("VAESDECLAST" "YMM1" "YMM2" "[RSP+32]" "{K5} {z}")
   :unexpected ("[RSP+1]"))
 
 ;; Unmasked EVEX VAESENC ZMM
@@ -5872,6 +5871,8 @@
     sb-vm::%test-vinserti32x8-masked-z-ymm-disp8
   ("VINSERTI32X8" "YMM1" "YMM2" "[RSP+32]" "{K3}{z}")
   :unexpected ("[RSP+1]"))
+
+(test-util:pop-package)
 
 (with-test (:name :constant-1)
   (checked-compile-and-assert
