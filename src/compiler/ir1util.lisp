@@ -4847,3 +4847,26 @@ is :ANY, the function name is not checked."
   (if (and type1 type2)
       (type-intersection type1 type2)
       (or type1 type2)))
+
+(defun template-translates (fun-name args result-type)
+  (let ((vops (fun-info-templates (fun-info-or-lose fun-name))))
+    (flet ((subp (lvar type)
+             (cond
+               ((not (constant-type-p type))
+                (csubtypep (lvar-type lvar) type))
+               ((not (constant-lvar-p lvar))
+                nil)
+               (t
+                (let ((value (lvar-value lvar))
+                      (type (type-specifier (constant-type-type type))))
+                  (if (typep type '(cons (eql satisfies)))
+                      (funcall (second type) value)
+                      (sb-xc:typep value type)))))))
+      (loop for vop in vops
+            for params = (fun-type-required (vop-info-type vop))
+            thereis (and (= (length args)
+                            (length params))
+                         (csubtypep result-type (single-value-type (fun-type-returns (vop-info-type vop))))
+                         (loop for param in params
+                               for arg in args
+                               always (subp arg param)))))))

@@ -4615,28 +4615,15 @@
               `(%primitive sb-vm::overflow-negate-t x ',(type-specifier cast)))))
         (give-up-ir1-transform))))
 
-(defun template-translates (fun-name args result-type)
-  (let ((vops (fun-info-templates (fun-info-or-lose fun-name))))
-    (flet ((subp (lvar type)
-             (cond
-               ((not (constant-type-p type))
-                (csubtypep (lvar-type lvar) type))
-               ((not (constant-lvar-p lvar))
-                nil)
-               (t
-                (let ((value (lvar-value lvar))
-                      (type (type-specifier (constant-type-type type))))
-                  (if (typep type '(cons (eql satisfies)))
-                      (funcall (second type) value)
-                      (sb-xc:typep value type)))))))
-      (loop for vop in vops
-            for params = (fun-type-required (vop-info-type vop))
-            thereis (and (= (length args)
-                            (length params))
-                         (csubtypep result-type (single-value-type (fun-type-returns (vop-info-type vop))))
-                         (loop for param in params
-                               for arg in args
-                               always (subp arg param)))))))
+(when-vop-existsp (:named sb-vm::+/unsigned=>integer)
+  (deftransform + ((a b) (word (constant-arg (integer #.(- most-positive-word) -1))) * :important nil)
+    (if (lvar-subtypep a signed-word)
+        (give-up-ir1-transform)
+        `(- a ,(- (lvar-value b)))))
+  (deftransform - ((a b) (word (constant-arg (integer #.(- most-positive-word) -1))) * :important nil)
+    (if (lvar-subtypep a signed-word)
+        (give-up-ir1-transform)
+        `(+ a ,(- (lvar-value b))))))
 
 (deftransform floor ((number divisor) (integer integer) * :node node)
   (delay-ir1-transform node :constraint)
