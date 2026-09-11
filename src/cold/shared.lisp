@@ -773,17 +773,42 @@
     (funcall fn)))
 (compile 'in-host-compilation-mode)
 
+(defvar *handled-warnings* nil)
+
+(defmacro stop-on-warnings (&body forms)
+  #-sbcl
+  `(progn ,@forms)
+  #+sbcl
+  `(let (warnp style-warnp)
+     (multiple-value-prog1
+         (handler-bind ((style-warning
+                          (lambda (c)
+                            (signal c)
+                            (push c *handled-warnings*)
+                            (setf style-warnp (type-of c))))
+                        (simple-warning
+                          (lambda (c)
+                            (push c *handled-warnings*)
+                            (setf warnp (type-of c)))))
+           ,@forms)
+       (when (and (string>= (cl:lisp-implementation-version) "2.1")
+                  (or warnp style-warnp) *fail-on-warnings*)
+         (cerror "Proceed anyway"
+                 "make-host-1 stopped due to unexpected ~A." (or warnp style-warnp))))))
+
 ;;; Process a file as source code for the cross-compiler, compiling it
 ;;; (if necessary) in the appropriate environment, then loading it
 ;;; into the cross-compilation host Common lisp.
 (defun host-cload-stem (stem flags)
   (loop
-   (with-simple-restart (recompile "Recompile")
-     (let ((compiled-filename (in-host-compilation-mode
-                               (lambda ()
-                                 (compile-stem stem flags :host-compile)))))
-       (return
-         (load compiled-filename))))))
+   (stop-on-warnings
+     (with-simple-restart (recompile "Recompile")
+       (let ((compiled-filename (in-host-compilation-mode
+                                 (lambda ()
+                                   (stop-on-warnings
+                                     (compile-stem stem flags :host-compile))))))
+         (return
+           (load compiled-filename)))))))
 (compile 'host-cload-stem)
 
 ;;; like HOST-CLOAD-STEM, except that we don't bother to compile

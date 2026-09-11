@@ -39,21 +39,15 @@
                         ;; or optional-and-key when that was visible.
                         (lambda (c)
                           (signal c) ; won't do SETQ if MUFFLE-WARNING is invoked
-                          (if last-form
-                              (setf style-warnp (type-of c))
-                              (when (and *fail-on-warnings*
-                                         (string>= (cl:lisp-implementation-version) "2.1"))
-                                (cerror "Proceed anyway"
-                                        "make-host-1 stopped due to~%~a" c)))))
+                          (when last-form
+                            (setf style-warnp (type-of c)))))
                       (simple-warning
                         (lambda (c)
-                          (if last-form
-                              (setf warn (type-of c))
-                              (when (and *fail-on-warnings*
-                                         (string>= (cl:lisp-implementation-version) "2.1"))
-                                (cerror "Proceed anyway"
-                                        "make-host-1 stopped due to~%~a" c))))))
+                          (when last-form
+                            (setf warn (type-of c))))))
          (with-compilation-unit () ,@forms (setf last-form t)))
+       ;; Catch only the warnings from with-compilation-unit, the others will be handled in
+       ;; host-cload-stem
        (when (and (string>= (cl:lisp-implementation-version) "2.1")
                   (or warnp style-warnp) *fail-on-warnings*)
          (cerror "Proceed anyway"
