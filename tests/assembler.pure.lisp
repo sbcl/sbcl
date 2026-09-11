@@ -362,7 +362,7 @@
     (test-assemble `(vbroadcastss ,ymm0 ,xmm1)
                    "C4E27D18C1       VBROADCASTSS YMM0, XMM1")
     (test-assemble `(vbroadcastss ,zmm0 ,xmm1)
-                   "62F27D4818C1     VBROADCASTSS ZMM0, ZMM1")
+                   "62F27D4818C1     VBROADCASTSS ZMM0, XMM1")
     (test-assemble `(vbroadcastsd ,ymm0 ,xmm1)
                    "C4E27D19C1       VBROADCASTSD YMM0, XMM1")
     (test-assemble `(vbroadcastsd ,zmm0 ,xmm1)
@@ -410,7 +410,7 @@
     (test-assemble `(vpdpwssds ,zmm0 ,zmm1 ,zmm2)
                    "62F2754853C2     VPDPWSSDS ZMM0, ZMM1, ZMM2")
     (test-assemble `(vpdpbusd-masked ,zmm0 ,zmm1 ,zmm2 ,k1 :z)
-                   "62F275C950C2     VPDPBUSD-MASKED ZMM0, ZMM1, ZMM2 {K1} {z}")
+                   "62F275C950C2     VPDPBUSD-MASKED-Z ZMM0, ZMM1, ZMM2 {K1}{z}")
 
     ;; AVX-512BF16 (Bfloat16 Operations)
     (test-assemble `(vcvtne2ps2bf16 ,zmm0 ,zmm1 ,zmm2)

@@ -1987,6 +1987,41 @@
 (#(A49305EF D0241AE7 E55E7F8C EE9A5410)
  "(SB-PCL::%CLASS SB-PCL::%PARAMETER SB-PCL::%VARIABLE-REBINDING SPECIAL)"
  "((& (>> val 8) 3))")
+(#(20F3DEB2 27DEC9AD 2DF3F329 42D83FFB 497F147D 8CDBDD0D 9B1DBA5A A569A1AB)
+ "(:ALLOW-OTHER-KEYS :DISP-N :EVEX-B :Z :AAA :OPCODE-PREFIX :W :LL)"
+ "((& (- (>> val 6) (>> val 31)) 7))")
+(#(27DEC9AD 2DF3F329 36F40154 42D83FFB 8CDBDD0D B869BF94)
+ "(:ALLOW-OTHER-KEYS :DISP-N :OPCODE-PREFIX :EVEX-W :W :L)"
+ "((& (^ (>> val 2) (>> val 23)) 7))")
+(#(27DEC9AD 2DF3F329 36F40154 42D83FFB 5023D356 591C658C 8CDBDD0D A005BD53 B869BF94 C425F32A)
+ "(:ALLOW-OTHER-KEYS :DISP-N :VM :IS4 :VVVV :EVEX-W :W :OPCODE-PREFIX :L :REMAINING-BYTES)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 8 14 5 0 2 6 0)))
+  (let ((b (& val #x7)))
+   (let ((a (>> val 29)))
+    (^ a (aref tab b))))))")
+(#(C41A383 21034D20 2CB990D4 D82F5903 F57166FD FBEA0CB3)
+ "(SB-X86-64-ASM::YMM-YMM/MEM SB-X86-64-ASM::YMM-YMM/MEM-IMM SB-X86-64-ASM::YMM-YMM/MEM-DIR SB-X86-64-ASM::YMM-YMM/MEM-YMM SB-X86-64-ASM::REG-YMM/MEM SB-X86-64-ASM::2MASK-NDS)"
+ "((& (^ (>> val 4) (>> val 13)) 7))")
+(#(27DEC9AD 2DF3F329 402C2D11 42D83FFB 8CDBDD0D 8F0E568A 9127DEAB 9B1DBA5A A569A1AB B7131B20 C26EC306)
+ "(:ALLOW-OTHER-KEYS :EVEX-B :DISP-N :NDS :LL :W :XMMREG-MEM-SIZE :REG-MEM-SIZE :OPCODE-PREFIX :PRINTER :MORE-FIELDS)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 3 3 0 0 13 10 0)))
+  (let ((b (& val #x7)))
+   (let ((a (>> (<< val 5) 29)))
+    (^ a (aref tab b))))))")
+(#(30 32 34 B0 B2 B4 F0 F2)
+ "#(24 25 26 88 89 90 120 121)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 7 7 0)))
+  (+= val #x86869bfe)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 1) #x3)))
+   (let ((a (>> (u32+ val (<< val 24)) 30)))
+    (^ a (aref tab b))))))")
+(#(4003714 19694478 27DEC9AD 2DF3F329 36F40154 402C2D11 42D83FFB 8CDBDD0D 8F0E568A 9127DEAB B7131B20 C26EC306)
+ "(:ALLOW-OTHER-KEYS :EVEX :AUTO-EVEX :DISP-N :NDS :L :W :XMMREG-MEM-SIZE :REG-MEM-SIZE :OPCODE-PREFIX :PRINTER :MORE-FIELDS)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 0 5 8 0 12 1 0)))
+  (let ((b (& val #x7)))
+   (let ((a (>> (<< val 5) 29)))
+    (^ a (aref tab b))))))")
 (#(22F3E1D8 28F3EB4A 2DF3F329 38F4047A 42D83FFB DBA660EE)
  "(:ALLOW-OTHER-KEYS :MAP :B :X :R :W)"
  "((& (+ (>> val 15) (>> val 23)) 7))")

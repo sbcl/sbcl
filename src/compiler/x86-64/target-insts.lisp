@@ -110,13 +110,19 @@
                      (if (dstate-getprop dstate +rex-r+) 8 0)
                      (if (dstate-getprop dstate +rex2-r4+) 16 0))))
 
-;;; A register field that can be extended by REX.B or REX2.B4.
+;;; A register field that can be extended by REX.B or REX2.B4. In an
+;;; EVEX-encoded, register-direct (mod=11) instruction, this field's own
+;;; extension bit is REX.B, but the otherwise-unused REX.X doubles as B'
+;;; (bit 4), permitting registers 16-31 -- mirroring the same trick
+;;; DECODE-MOD-R/M uses for its register-direct case.
 (defun prefilter-reg-b (dstate value)
   (declare (type (mod 8) value) (type disassem-state dstate))
   ;; size is arbitrary here since the printer determines it
-  (get-gpr :qword (+ value
-                     (if (dstate-getprop dstate +rex-b+) 8 0)
-                     (if (dstate-getprop dstate +rex2-b4+) 16 0))))
+  (let ((rex-b-value (if (dstate-getprop dstate +rex-b+) (+ value 8) value)))
+    (if (and (dstate-getprop dstate +evex+) (dstate-getprop dstate +rex-x+))
+        (get-fpr :xmm (+ rex-b-value 16))
+        (get-gpr :qword (+ rex-b-value
+                           (if (dstate-getprop dstate +rex2-b4+) 16 0))))))
 
 ;; This reader extracts the 'imm' operand in "MOV reg,imm" format.
 ;; KLUDGE: the REG instruction format can not define a reader
@@ -406,26 +412,41 @@
       (cond ((= mod #b11) ; register direct mode
              (case regclass
                (gpr (get-gpr :qword gpr-full-reg)) ; size is not really known here
-               (fpr (get-fpr :xmm
-                             (if (and (dstate-getprop dstate +evex+)
-                                      (dstate-getprop dstate +rex-x+))
-                                 (+ base-full-reg 16)
-                                 base-full-reg)))))
+               (fpr
+                ;; EVEX B' (bit 4 of r/m for register-direct) is carried
+                ;; by the EVEX X bit, which sets +rex-x+.
+                (get-fpr :xmm
+                         (if (and (dstate-getprop dstate +evex+)
+                                  (dstate-getprop dstate +rex-x+))
+                             (+ base-full-reg 16)
+                             base-full-reg)))))
             ((= r/m #b100) ; SIB byte - rex.b is "don't care"
              (let* ((sib (the (unsigned-byte 8) (read-suffix 8 dstate)))
-                    (index-reg (logior (if (dstate-getprop dstate +rex-x+) 8 0)
-                                       (if (dstate-getprop dstate +rex2-x4+) 16 0)
-                                       (ldb (byte 3 3) sib)))
-                    (base-reg (ldb (byte 3 0) sib)))
-               ;; mod=0 and base=RBP means no base reg
-               (make-machine-ea (unless (and (= mod #b00) (= base-reg #b101))
-                                  (logior (if (dstate-getprop dstate +rex-b+) 8 0)
-                                          (if (dstate-getprop dstate +rex2-b4+) 16 0)
-                                          base-reg))
-                                (cond ((/= mod #b00) (displacement))
-                                      ((= base-reg #b101) (read-signed-suffix 32 dstate)))
-                                (unless (= index-reg #b100) index-reg) ; index can't be RSP
-                                (ash 1 (ldb (byte 2 6) sib)))))
+                    (vsib-p (dstate-getprop dstate +vsib+))
+                    (index-raw (ldb (byte 3 3) sib))
+                    (base-reg (ldb (byte 3 0) sib))
+                    (index-reg
+                      (if vsib-p
+                          ;; VSIB: SIB.index is a vector register.
+                          ;; Low 3 bits in SIB.index; high bit from EVEX.V'.
+                          (let ((index-num (+ index-raw
+                                              (if (dstate-getprop dstate +evex-v-prime+)
+                                                  16
+                                                  0))))
+                            (get-fpr :xmm index-num))
+                          ;; Normal GPR index
+                          (extend +rex-x+ index-raw +rex2-x4+))))
+               (make-machine-ea
+                (unless (and (= mod #b00) (= base-reg #b101))
+                  (extend +rex-b+ base-reg +rex2-b4+))
+                (cond ((/= mod #b00) (displacement))
+                      ((= base-reg #b101) (read-signed-suffix 32 dstate)))
+                ;; For normal addressing, SIB.index=4 means "no index".
+                ;; For VSIB, index=4 is a valid vector register and must not be suppressed.
+                (if vsib-p
+                    index-reg
+                    (unless (= index-reg #b100) index-reg))
+                (ash 1 (ldb (byte 2 6) sib)))))
             ((/= mod #b00) (make-machine-ea gpr-full-reg (displacement)))
             ;; rex.b is not decoded in determining RIP-relative mode
             ((= r/m #b101) (make-machine-ea :rip (read-signed-suffix 32 dstate)))

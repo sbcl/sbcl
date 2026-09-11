@@ -134,5 +134,7 @@
       (let* ((after (- after (car discount)))
              (delta (- after before)))
         (format t "~&Consed ~D bytes discounting ~D bytes~%" delta (car discount))
-        ;; Should be less than this amount of overhead
-        (assert (< delta 500000))))))
+        ;; Should be less than this amount of overhead. (Bumped from 500000
+        ;; after adding the VFNMSUB132/213/231{PD,PS,SD,SS} instructions grew
+        ;; the compiled system's total code size.)
+        (assert (< delta 600000))))))

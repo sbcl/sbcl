@@ -76,7 +76,7 @@
   ;; what to align to in most cases
   (alignment sb-vm:n-word-bytes :type alignment :read-only t)
   (byte-order sb-c:*backend-byte-order*
-              :type (member :big-endian :little-endian))
+   :type (member :big-endian :little-endian))
   ;; current instruction as found in instruction space
   (inst)
   (operands (make-array 10) :read-only t) ; enough for anybody
@@ -85,7 +85,7 @@
   ;; non-prefix instruction is processed
   (inst-properties 0 :type fixnum)
   (filtered-values (make-array max-filtered-value-index)
-                   :type filtered-value-vector)
+   :type filtered-value-vector)
   ;; to avoid consing decoded values, a prefilter can keep a chain
   ;; of objects in these slots. The objects returned here
   ;; are reusable for the next instruction.
@@ -96,9 +96,9 @@
   (argument-column 0 :type column)
   ;; to make output look nicer
   (output-state :beginning
-                :type (member :beginning
-                              :block-boundary
-                              nil))
+   :type (member :beginning
+                 :block-boundary
+                 nil))
   (previous-chunk) ; as an integer, however much was fetched
   (known-register-contents)
 

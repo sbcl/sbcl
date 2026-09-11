@@ -425,13 +425,15 @@
               unsigned-num unsigned-num unsigned-num unsigned-num)
   (:results (dst :scs (int-avx512-reg)))
   (:result-types simd-pack-512-ub64)
-  (:temporary (:scs (int-avx512-reg)) tmp1 tmp2 tmp3)
+  (:temporary (:sc int-avx512-reg) tmp1 tmp2)
+  (:temporary (:sc double-reg) x0 x1 x2 x3)
   (:generator 8
-    ;; "xmm views" of zmm regs
-    (let ((x0 (sb-c:make-random-tn (sb-c:sc-or-lose 'sb-vm::double-reg) (sb-c:tn-offset dst)))
-          (x1 (sb-c:make-random-tn (sb-c:sc-or-lose 'sb-vm::double-reg) (sb-c:tn-offset tmp1)))
-          (x2 (sb-c:make-random-tn (sb-c:sc-or-lose 'sb-vm::double-reg) (sb-c:tn-offset tmp2)))
-          (x3 (sb-c:make-random-tn (sb-c:sc-or-lose 'sb-vm::double-reg) (sb-c:tn-offset tmp3))))
+    (let ((tmp1-y (sb-c:make-random-tn
+                   (sb-c:sc-or-lose 'sb-vm::int-avx2-reg)
+                   (sb-c:tn-offset tmp1)))
+          (tmp2-y (sb-c:make-random-tn
+                   (sb-c:sc-or-lose 'sb-vm::int-avx2-reg)
+                   (sb-c:tn-offset tmp2))))
 
       (inst vmovq x0 p0)
       (inst vpinsrq x0 x0 p1 1)
@@ -445,10 +447,17 @@
       (inst vmovq x3 p6)
       (inst vpinsrq x3 x3 p7 1)
 
-      (inst vinserti64x2 dst dst x1 1)
+      (inst vpxorq tmp1 tmp1 tmp1)
+      (inst vinserti64x2 tmp1 tmp1 x0 0)
+      (inst vinserti64x2 tmp1 tmp1 x1 1)
+
+      (inst vpxorq tmp2 tmp2 tmp2)
+      (inst vinserti64x2 tmp2 tmp2 x2 0)
       (inst vinserti64x2 tmp2 tmp2 x3 1)
 
-      (inst vinserti64x4 dst dst tmp2 1))))
+      (inst vpxorq dst dst dst)
+      (inst vinserti64x4 dst dst tmp1-y 0)
+      (inst vinserti64x4 dst dst tmp2-y 1))))
 
 (defmacro simd-pack-512-dispatch (pack &body body)
   (check-type pack symbol)
@@ -488,24 +497,34 @@
          (p7 :scs (double-reg)))
   (:arg-types double-float double-float double-float double-float
               double-float double-float double-float double-float)
-  (:temporary (:scs (double-avx512-reg)) tmp1 tmp2 tmp3)
+  (:temporary (:sc double-avx512-reg) tmp1 tmp2)
+  (:temporary (:sc double-reg) x0 x1 x2 x3)
   (:results (dst :scs (double-avx512-reg) :from (:argument 0)))
   (:result-types simd-pack-512-double)
   (:generator 4
-    (let ((x0  (sb-c:make-random-tn (sb-c:sc-or-lose 'sb-vm::double-reg) (sb-c:tn-offset dst)))
-          (x1 (sb-c:make-random-tn (sb-c:sc-or-lose 'sb-vm::double-reg) (sb-c:tn-offset tmp1)))
-          (x2 (sb-c:make-random-tn (sb-c:sc-or-lose 'sb-vm::double-reg) (sb-c:tn-offset tmp2)))
-          (x3 (sb-c:make-random-tn (sb-c:sc-or-lose 'sb-vm::double-reg) (sb-c:tn-offset tmp3))))
+    (let ((tmp1-y (sb-c:make-random-tn
+                   (sb-c:sc-or-lose 'sb-vm::double-avx2-reg)
+                   (sb-c:tn-offset tmp1)))
+          (tmp2-y (sb-c:make-random-tn
+                   (sb-c:sc-or-lose 'sb-vm::double-avx2-reg)
+                   (sb-c:tn-offset tmp2))))
 
       (inst vunpcklpd x0 p0 p1)
       (inst vunpcklpd x1 p2 p3)
       (inst vunpcklpd x2 p4 p5)
       (inst vunpcklpd x3 p6 p7)
 
-      (inst vinsertf64x2 dst dst x1 1)
+      (inst vpxorq tmp1 tmp1 tmp1)
+      (inst vinsertf64x2 tmp1 tmp1 x0 0)
+      (inst vinsertf64x2 tmp1 tmp1 x1 1)
+
+      (inst vpxorq tmp2 tmp2 tmp2)
+      (inst vinsertf64x2 tmp2 tmp2 x2 0)
       (inst vinsertf64x2 tmp2 tmp2 x3 1)
 
-      (inst vinsertf64x4 dst dst tmp2 1))))
+      (inst vpxorq dst dst dst)
+      (inst vinsertf64x4 dst dst tmp1-y 0)
+      (inst vinsertf64x4 dst dst tmp2-y 1))))
 
 (define-vop (%make-simd-pack-512-single)
   (:translate %make-simd-pack-512-single)

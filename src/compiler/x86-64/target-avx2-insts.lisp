@@ -101,6 +101,26 @@
       (print-mem-ref :ref value nil stream dstate)
       (print-half-ymmreg-rm value stream dstate)))
 
+;;; Printer for the register-direct source operand of a 2x-widening move
+;;; (VPMOV[SZ]X{BW,WD,DQ}): its width is always one step below the
+;;; destination's vector length (xmm source for an xmm or ymm dest,
+;;; ymm source for a zmm dest).
+(defun print-ymmreg-rm-one-size-down (value stream dstate)
+  (let* ((offset (etypecase value
+                   ((mod 32) value)
+                   (reg (reg-num value))))
+         (reg (get-fpr (if (dstate-getprop dstate +evex-l1+) :ymm :xmm)
+                       offset))
+         (name (reg-name reg)))
+    (if stream
+        (write-string name stream)
+        (operand name dstate))))
+
+(defun print-ymmreg/mem-one-size-down (value stream dstate)
+  (if (machine-ea-p value)
+      (print-mem-ref :ref value nil stream dstate)
+      (print-ymmreg-rm-one-size-down value stream dstate)))
+
 (defun invert-4 (dstate value)
   (declare (ignore dstate))
   (logxor value #b1111))
@@ -143,6 +163,44 @@
         (write-string name stream)
         (operand name dstate))))
 
+(defun print-vsib/mem (value stream dstate)
+  (if (not (machine-ea-p value))
+      (print-ymmreg/mem value stream dstate)
+      (let ((base (machine-ea-base value))
+            (disp (machine-ea-disp value))
+            (index (machine-ea-index value))
+            (scale (machine-ea-scale value)))
+        (flet ((write-vector-index (reg)
+                 (let ((id (reg-id reg)))
+                   (format stream "~a~d"
+                           (cond ((dstate-getprop dstate +evex-l1+) "ZMM")
+                                 ((dstate-getprop dstate +vex-l+) "YMM")
+                                 (t "XMM"))
+                           (reg-id-num id))))
+               (write-disp (disp)
+                 (cond
+                   ((integerp disp)
+                    (unless (zerop disp)
+                      (format stream "~@d" disp)))
+                   ((label-p disp)
+                    (print-label disp stream dstate))
+                   (t
+                    (princ disp stream)))))
+          (when stream
+            (write-char #\[ stream)
+            (when base
+              (print-reg base stream dstate))
+            (when index
+              (when base (write-char #\+ stream))
+              (write-vector-index index)
+              (unless (= scale 1)
+                (format stream "*~d" scale)))
+            (when (or base index)
+              (write-disp disp))
+            (unless (or base index)
+              (write-disp disp))
+            (write-char #\] stream))))))
+
 ;;; APX EVEX printers
 (defun print-apx-gpr-vvvv (value stream dstate)
   (let* ((v-low (logxor value #b1111))
@@ -163,4 +221,3 @@
     (if stream
         (write-string "{nf} " stream)
         (operand "{nf} " dstate))))
-

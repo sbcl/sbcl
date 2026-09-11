@@ -33,26 +33,32 @@
                       (symbol-package name))
          (error "No unpacker found for ~S." name)))))
 
+;; NOTE: SB-VM::%SIMD-PACK-REF-64 (a generic per-lane accessor) doesn't
+;; exist on this branch; the individual per-lane accessors
+;; (%SIMD-PACK-LOW/HIGH, %SIMD-PACK-256-0..3, %SIMD-PACK-512-0..7) already
+;; do what's needed here, so build the unpackers SIMD= expects out of
+;; those instead.
 (defun %simd-pack-ub64s (pack)
-  (values (sb-vm::%simd-pack-ref-64 pack 0)
-          (sb-vm::%simd-pack-ref-64 pack 1)))
+  (values (sb-vm::%simd-pack-low pack)
+          (sb-vm::%simd-pack-high pack)))
 
+#+(or x86-64 sb-simd-pack-256)
 (defun %simd-pack-256-ub64s (pack)
-  (values (sb-vm::%simd-pack-ref-64 pack 0)
-          (sb-vm::%simd-pack-ref-64 pack 1)
-          (sb-vm::%simd-pack-ref-64 pack 2)
-          (sb-vm::%simd-pack-ref-64 pack 3)))
+  (values (sb-vm::%simd-pack-256-0 pack)
+          (sb-vm::%simd-pack-256-1 pack)
+          (sb-vm::%simd-pack-256-2 pack)
+          (sb-vm::%simd-pack-256-3 pack)))
 
 #+(or x86-64 sb-simd-pack-512)
 (defun %simd-pack-512-ub64s (pack)
-  (values (sb-vm::%simd-pack-ref-64 pack 0)
-          (sb-vm::%simd-pack-ref-64 pack 1)
-          (sb-vm::%simd-pack-ref-64 pack 2)
-          (sb-vm::%simd-pack-ref-64 pack 3)
-          (sb-vm::%simd-pack-ref-64 pack 4)
-          (sb-vm::%simd-pack-ref-64 pack 5)
-          (sb-vm::%simd-pack-ref-64 pack 6)
-          (sb-vm::%simd-pack-ref-64 pack 7)))
+  (values (sb-vm::%simd-pack-512-0 pack)
+          (sb-vm::%simd-pack-512-1 pack)
+          (sb-vm::%simd-pack-512-2 pack)
+          (sb-vm::%simd-pack-512-3 pack)
+          (sb-vm::%simd-pack-512-4 pack)
+          (sb-vm::%simd-pack-512-5 pack)
+          (sb-vm::%simd-pack-512-6 pack)
+          (sb-vm::%simd-pack-512-7 pack)))
 
 (defun simd= (a b)
   (typecase a

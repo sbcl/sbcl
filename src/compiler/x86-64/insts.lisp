@@ -3540,6 +3540,9 @@
   ;; Such slop would not work for big-endian machines.
   (let ((size (align-of constant)))
     (emit section
+          ;; A 64-byte (:zword) constant wants 6 bits of alignment, but the
+          ;; assembler's .align only goes up to SB-ASSEM::MAX-ALIGNMENT (32
+          ;; bytes); cap it there rather than erroring.
           `(.align ,(min sb-assem::max-alignment (integer-length (1- size))))
           label
           (cond ((eq (car constant) :jump-table)
