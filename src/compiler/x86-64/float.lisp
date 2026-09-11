@@ -794,6 +794,50 @@
     (inst mulpd imag y)
     (inst addpd r imag)))
 
+(define-vop (*/complex-double-float/sse3)
+  (:translate *)
+  (:args (x :scs (complex-double-reg))
+         (y :scs (complex-double-reg)))
+  (:arg-types complex-double-float complex-double-float)
+  (:results (r :scs (complex-double-reg) :from :load))
+  (:result-types complex-double-float)
+  (:policy :fast-safe)
+  (:guard (member :sse3 *backend-subfeatures*))
+  (:temporary (:sc complex-double-reg) temp)
+  (:generator 14
+    (move r x)
+    (inst shufpd r r #b01)
+    (move temp y)
+    (inst unpckhpd temp temp)
+    (inst mulpd temp r)
+
+    (inst movddup r y)
+    (inst mulpd r x)
+
+    (inst addsubpd r temp)))
+
+(define-vop (*/complex-single-float/sse3)
+  (:translate *)
+  (:args (x :scs (complex-single-reg) :target r)
+         (y :scs (complex-single-reg)))
+  (:arg-types complex-single-float complex-single-float)
+  (:results (r :scs (complex-single-reg)))
+  (:result-types complex-single-float)
+  (:policy :fast-safe)
+  (:guard (member :sse3 *backend-subfeatures*))
+  (:temporary (:sc complex-single-reg) temp1 temp2)
+  (:generator 14
+    (inst movsldup temp1 y)
+    (inst mulps    temp1 x)
+
+    (inst movshdup temp2 y)
+    (move r x)
+    (inst shufps   r r #b11100001)
+    (inst mulps    temp2 r)
+
+    (move r temp1)
+    (inst addsubps r temp2)))
+
 (define-vop (fsqrt)
   (:args (x :scs (double-reg)))
   (:results (y :scs (double-reg)))
@@ -805,10 +849,10 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1
-     (unless (location= x y)
-       (inst xorpd y y))
-     (note-float-location 'sqrt vop x)
-     (inst sqrtsd y x)))
+    (unless (location= x y)
+      (inst xorpd y y))
+    (note-float-location 'sqrt vop x)
+    (inst sqrtsd y x)))
 
 (define-vop ()
   (:args (x :scs (single-reg)))
