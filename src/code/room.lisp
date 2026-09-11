@@ -1534,7 +1534,7 @@ We could try a few things to mitigate this:
       (format t "~5x ~s~%" (car x) (cdr x)))
     (format t "Wasted indices:~%")
     (let ((n 0))
-      (loop for i from thread-lisp-thread-slot below (length used)
+      (loop for i from primitive-thread-object-length below (length used)
             do (when (zerop (bit used i))
                  (format t " ~5x" i)
                  (incf n)

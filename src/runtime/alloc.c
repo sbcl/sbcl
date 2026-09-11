@@ -701,6 +701,7 @@ alloc_thread_struct(void* spaces) {
         (lispobj*)((char*)th->binding_stack_start+BINDING_STACK_SIZE);
     set_binding_stack_pointer(th,th->binding_stack_start);
     th->this = th;
+    th->current_fiber = NIL;
     th->os_thread = 0;
     // Once allocated, the allocation profiling buffer sticks around.
     // If present and enabled, assign into the new thread.

@@ -3,7 +3,6 @@
 (defpackage :sb-fiber
   (:use :cl :sb-alien :sb-ext)
   (:export
-   #:*current-fiber*
    #:current-fiber
    #:*default-fiber-stack-size*
    #:*default-fiber-binding-stack-size*

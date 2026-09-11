@@ -607,9 +607,12 @@ during backtrace.
   ;; hardcode a 3 here or oversize the array and let confusion reign.
   ;; Also remember, limit is an exclusive upper bound so "size" is 1 less.
   (mv-return-values :length #.(- (1- sb-xc:multiple-values-limit) 3))
-  ;; The *current-thread* MUST be the last slot in the C thread structure.
-  ;; It it the only slot that needs to be noticed by the garbage collector.
-  (lisp-thread :pointer t :special sb-thread:*current-thread*))
+  ;; The garbage collector scans the C thread structure from LISP-THREAD
+  ;; through the end of thread-local storage, so every slot that holds a
+  ;; Lisp object must come at or after this point.
+  (lisp-thread :pointer t :special sb-thread:*current-thread*)
+  ;; The fiber currently running on this thread, or NIL.
+  (current-fiber))
 
 (defconstant code-header-size-shift #+64-bit 32 #-64-bit n-widetag-bits)
 (defconstant-eqx code-serialno-byte

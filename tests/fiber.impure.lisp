@@ -176,7 +176,7 @@
                                           (dotimes (_ 1000)
                                             (incf count) (yield-fiber))))))
                            (dotimes (_ 1000)
-                             (switch-fiber *current-fiber* child))
+                             (switch-fiber (current-fiber) child))
                            (release-fiber child)
                            (sb-thread:with-mutex (lock)
                              (setf (aref results idx) count))))))))))
@@ -198,7 +198,7 @@
                            (sb-thread:wait-on-semaphore start)
                            (handler-case
                                (progn (dotimes (_ 5000)
-                                        (switch-fiber *current-fiber* c))
+                                        (switch-fiber (current-fiber) c))
                                       (setf (aref results idx) :ok))
                              (error (e) (setf (aref results idx) e)))
                            (release-fiber c)))))))))
@@ -486,7 +486,7 @@
 
 (with-test (:name (:fiber :make-fiber :partial-failure-releases-sap))
   (with-main-fiber (main)
-    (assert (eq main *current-fiber*))
+    (assert (eq main (current-fiber)))
     (let (got-error)
       (with-injected-register-failure (releases)
         (handler-case (make-fiber (lambda ()))
@@ -500,7 +500,7 @@
         (release-fiber f)))))
 
 (with-test (:name (:fiber :make-main-fiber :partial-failure-releases-sap))
-  (assert (null *current-fiber*))
+  (assert (null (current-fiber)))
   (let ((got-error nil))
     (with-injected-register-failure (releases)
       (handler-case (make-main-fiber)
@@ -509,7 +509,7 @@
       (assert (= 1 releases) ()
               "expected one %fiber-release call, got ~D" releases))
     ;; A failed make-main-fiber must not publish the partial wrapper.
-    (assert (null *current-fiber*))
+    (assert (null (current-fiber)))
     ;; Recovery: a subsequent make-main-fiber works.
     (let ((m (make-main-fiber)))
       (assert (fiber-alive-p m))
@@ -623,3 +623,84 @@
                (error "expected DEAD-FIBER-ERROR; none signaled"))
       (dead-fiber-error () :ok))
     (sb-thread:join-thread other)))
+
+;;; --- Current-fiber storage ---
+
+(with-test (:name (:fiber :current-fiber :not-visible-across-threads))
+  (let ((promoted (sb-thread:make-semaphore))
+        (release (sb-thread:make-semaphore))
+        (a-main nil)
+        (b-result nil))
+    (let ((a (sb-thread:make-thread
+              (lambda ()
+                (setf a-main (make-main-fiber :name "thread-A-main"))
+                (sb-thread:signal-semaphore promoted)
+                (sb-thread:wait-on-semaphore release))
+              :name "thread-A")))
+      (sb-thread:wait-on-semaphore promoted)
+      ;; Neither this thread nor a fresh one sees A's main fiber.
+      (assert (not (eq a-main (current-fiber))))
+      (sb-thread:join-thread
+       (sb-thread:make-thread
+        (lambda ()
+          (assert (null (current-fiber)))
+          (with-fiber-thread ()
+            (assert (not (eq a-main (current-fiber))))
+            (let ((f (make-fiber (lambda () 42))))
+              (setf b-result (resume-fiber f)))))
+        :name "thread-B"))
+      (sb-thread:signal-semaphore release)
+      (sb-thread:join-thread a))
+    (assert (eql 42 b-result))))
+
+;;; RELEASE-FIBER on one thread must not clear another thread's current
+;;; fiber, even when that thread is mid-fiber.
+(with-test (:name (:fiber :current-fiber :release-does-not-cross-threads))
+  (let ((ready (sb-thread:make-semaphore))
+        (go (sb-thread:make-semaphore))
+        (result nil))
+    (let ((worker (sb-thread:make-thread
+                   (lambda ()
+                     (with-fiber-thread ()
+                       (let ((f (make-fiber
+                                 (lambda ()
+                                   (sb-thread:signal-semaphore ready)
+                                   (sb-thread:wait-on-semaphore go)
+                                   (yield-fiber :yielded)
+                                   :finished))))
+                         (resume-fiber f)
+                         (setf result (resume-fiber f)))))
+                   :name "worker")))
+      (sb-thread:wait-on-semaphore ready)
+      ;; Promote and release a main fiber here while the worker's fiber
+      ;; is suspended inside its entry function.
+      (release-fiber (make-main-fiber))
+      (assert (null (current-fiber)))
+      (sb-thread:signal-semaphore go)
+      (sb-thread:join-thread worker))
+    (assert (eq :finished result))))
+
+;;; A dynamic binding is not involved anywhere: a nested
+;;; WITH-FIBER-THREAD inside a worker fiber (a no-op) followed by
+;;; resuming a brand-new fiber used to crash, because the binding it
+;;; pushed onto the worker's binding stack was swapped against TLS
+;;; after the switch had stored the new fiber.
+(with-test (:name (:fiber :current-fiber :nested-with-fiber-thread-in-worker))
+  (with-fiber-thread ()
+    (let* ((seen-in-n nil)
+           (n (make-fiber (lambda ()
+                            (setf seen-in-n (current-fiber))
+                            :n-done)
+                          :name "N"))
+           (w nil))
+      (setf w (make-fiber (lambda ()
+                            (with-fiber-thread ()
+                              (assert (eq w (current-fiber)))
+                              (let ((r (resume-fiber n)))
+                                (assert (eq w (current-fiber)))
+                                r)))
+                          :name "W"))
+      (assert (eq :n-done (resume-fiber w)))
+      (assert (eq n seen-in-n))
+      (release-fiber n)
+      (release-fiber w))))

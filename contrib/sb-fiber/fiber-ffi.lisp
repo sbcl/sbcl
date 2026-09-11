@@ -188,12 +188,25 @@ the slot); otherwise a no-op."
   (print-unreadable-object (fiber stream :type t :identity t)
     (format stream "~@[~A ~]~A" (fiber-name fiber) (fiber-state fiber))))
 
-(defvar *current-fiber* nil
-  "Fiber currently running on this thread, or NIL.")
+;;; The current fiber is stored in a slot of the C thread structure.
+
+(declaim (inline current-fiber (setf %current-fiber))
+         (ftype (function () (or null fiber)) current-fiber))
+(defun current-fiber ()
+  "Return the fiber currently running on this thread, or NIL if the
+thread has no main fiber."
+  (sb-sys:sap-ref-lispobj (sb-thread:current-thread-sap)
+                          (ash sb-vm::thread-current-fiber-slot sb-vm:word-shift)))
+
+(defun (setf %current-fiber) (fiber)
+  (declare (type (or null fiber) fiber))
+  (setf (sb-sys:sap-ref-lispobj (sb-thread:current-thread-sap)
+                                (ash sb-vm::thread-current-fiber-slot sb-vm:word-shift))
+        fiber))
 
 (define-alien-callable sb-fiber-lisp-entry void
     ((arg unsigned-long))
-  (let ((f *current-fiber*))
+  (let ((f (current-fiber)))
     (when (and f (fiber-function f))
       (assert (= arg (sb-sys:sap-int (fiber-sap f))))
       (let ((sb-kernel:*handler-clusters* sb-kernel::**initial-handler-clusters**)

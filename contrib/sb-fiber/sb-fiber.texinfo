@@ -20,8 +20,8 @@ to.  @var{name}, if supplied, is a string label used by
 thread exit; @code{release-fiber} is only needed if you want to
 reclaim resources sooner.
 
-The calling thread must already have a main fiber bound in
-@code{*current-fiber*}.  Use @code{make-main-fiber} or
+The calling thread must already have a current fiber.  Use
+@code{make-main-fiber} or
 @code{with-fiber-thread} to establish one before calling
 @code{make-fiber}; otherwise an error is signalled.
 
@@ -33,16 +33,21 @@ re-signaled in the caller's context.
 @end deffn
 
 @deffn Function make-main-fiber &key name
-Create a fiber representing the current thread's own stack and bind
-@code{*current-fiber*}.  Most code should use
+Create a fiber representing the current thread's own stack and make
+it the thread's current fiber.  Most code should use
 @code{with-fiber-thread}; @code{make-main-fiber} is the explicit form
 for callers that manage fiber-thread lifetime by hand.
 @end deffn
 
 @deffn Macro with-fiber-thread () &body body
 Register a main fiber on the calling thread for the dynamic extent of
-@var{body} and release it on exit.  A no-op if @code{*current-fiber*}
-is already bound on entry (nesting is safe).
+@var{body} and release it on exit.  A no-op if the thread already has
+a current fiber on entry (nesting is safe).
+@end deffn
+
+@deffn Function current-fiber
+The fiber currently running on the calling thread, or @code{nil} if
+the thread has no main fiber.
 @end deffn
 
 @deffn Function fiber-name fiber
@@ -80,8 +85,8 @@ to the current thread; @var{from} must be @code{:running} and
 The switch preserves the resumed fiber's control stack, binding stack,
 @code{*handler-clusters*}, @code{*restart-clusters*}, current catch
 and unwind-protect chains, callee-saved registers, and (on x86-64)
-the SSE control word.  @code{*current-fiber*} (per-thread) tracks the
-resumed fiber.
+the SSE control word.  @code{current-fiber} reports the resumed
+fiber.
 
 If @var{to}'s entry function previously escaped via an unhandled
 condition, that condition is re-signaled here in the caller's
@@ -91,7 +96,7 @@ context.
 @deffn Function resume-fiber to &rest values
 Suspend the current fiber and resume @var{to}, delivering @var{values}
 as multiple values.  Equivalent to
-@code{(switch-fiber *current-fiber* to . values)}; supplied as the
+@code{(switch-fiber (current-fiber) to . values)}; supplied as the
 common-case shorthand and to make the trio symmetric:
 
 @itemize
@@ -100,7 +105,7 @@ common-case shorthand and to make the trio symmetric:
 @item @code{switch-fiber} -- explicit @code{from}/@code{to} form.
 @end itemize
 
-Errors if @code{*current-fiber*} is unbound.
+Errors if the thread has no current fiber.
 @end deffn
 
 @deffn Function yield-fiber &rest values
@@ -111,7 +116,7 @@ if the current fiber has never been resumed.
 @end deffn
 
 @deffn Function join-fiber fiber
-Resume @var{fiber} from @code{*current-fiber*} repeatedly until its
+Resume @var{fiber} from the current fiber repeatedly until its
 entry function returns; return that function's values as multiple
 values.  Parallels @code{sb-thread:join-thread} for cooperative
 coroutines.
@@ -204,8 +209,8 @@ states).
 @deffn Condition no-current-fiber-error
 Signaled when an operation that requires a current fiber
 (@code{make-fiber}, @code{resume-fiber}, @code{yield-fiber},
-@code{with-fiber-pinned}) runs on a thread with no fiber bound in
-@code{*current-fiber*}.  Establish one with @code{make-main-fiber} or
+@code{with-fiber-pinned}) runs on a thread that has no current fiber.
+Establish one with @code{make-main-fiber} or
 @code{with-fiber-thread}.  Reader
 @code{no-current-fiber-error-operation} returns the operator that
 signaled, or @code{nil}.  Carries no fiber.

@@ -23,6 +23,14 @@
   `(with-main-fiber (,main)
      (with-fiber (,child ,entry-fn ,@make-args) ,@body)))
 
+;;; Simulates a thread with no main fiber
+(defmacro without-current-fiber (&body body)
+  (let ((saved (gensym "SAVED")))
+    `(let ((,saved (current-fiber)))
+       (setf (sb-fiber::%current-fiber) nil)
+       (unwind-protect (progn ,@body)
+         (setf (sb-fiber::%current-fiber) ,saved)))))
+
 ;;; --- Lifecycle ---
 
 (with-test (:name (:fiber :make-and-destroy))
@@ -42,7 +50,7 @@
       (release-fiber f))))
 
 (with-test (:name (:fiber :make-fiber :requires-main-fiber))
-  (let ((sb-fiber::*current-fiber* nil))
+  (without-current-fiber
     (assert-error (make-fiber (lambda ())))))
 
 (with-test (:name (:fiber :with-fiber-cleans-up))
@@ -54,25 +62,25 @@
       (assert (not (fiber-alive-p captured))))))
 
 (with-test (:name (:fiber :with-fiber-thread :creates-and-releases))
-  (let ((sb-fiber::*current-fiber* nil))
+  (without-current-fiber
     (with-fiber-thread ()
-      (assert (typep *current-fiber* 'fiber))
-      (assert (fiber-alive-p *current-fiber*)))
-    (assert (null *current-fiber*))))
+      (assert (typep (current-fiber) 'fiber))
+      (assert (fiber-alive-p (current-fiber))))
+    (assert (null (current-fiber)))))
 
 (with-test (:name (:fiber :with-fiber-thread :nested-is-noop))
-  ;; If *CURRENT-FIBER* is already bound, the inner WITH-FIBER-THREAD
-  ;; must not create or release anything.
+  ;; If the thread already has a current fiber, the inner
+  ;; WITH-FIBER-THREAD must not create or release anything.
   (with-main-fiber (outer)
     (with-fiber-thread ()
-      (assert (eq outer *current-fiber*)))
-    (assert (eq outer *current-fiber*))
+      (assert (eq outer (current-fiber))))
+    (assert (eq outer (current-fiber)))
     (assert (fiber-alive-p outer))))
 
 (with-test (:name (:fiber :make-main-fiber))
   (with-main-fiber (main)
     (assert (fiber-alive-p main))
-    (assert (eq main *current-fiber*))))
+    (assert (eq main (current-fiber)))))
 
 (with-test (:name (:fiber :fiber-thread))
   (with-main+child (main f (lambda ()))
@@ -162,7 +170,7 @@
         caught-in-child)
     (with-main+child (main child
                            (lambda ()
-                             (interrupt-fiber *current-fiber* c)
+                             (interrupt-fiber (current-fiber) c)
                              (handler-case (yield-fiber)
                                (simple-error (e) (setf caught-in-child e)))
                              :done))
@@ -191,8 +199,8 @@
     (with-main+child (main child
                            (lambda ()
                              (push :child log)
-                             (switch-fiber *current-fiber*
-                                           (fiber-return-fiber *current-fiber*))
+                             (switch-fiber (current-fiber)
+                                           (fiber-return-fiber (current-fiber)))
                              (push :child-again log)))
       (push :main log)
       (switch-fiber main child)
@@ -226,7 +234,7 @@
 
 (with-test (:name (:fiber :yield-fiber :no-return-fiber-errors))
   (with-main-fiber (main)
-    (assert (eq main *current-fiber*))
+    (assert (eq main (current-fiber)))
     (assert-error (yield-fiber))))
 
 (with-test (:name (:fiber :resume-fiber :basic))
@@ -244,8 +252,8 @@
 
 (with-test (:name (:fiber :resume-fiber :no-current-fiber-errors))
   (with-main+child (main f (lambda ()))
-    (assert (eq main *current-fiber*))
-    (let ((sb-fiber::*current-fiber* nil))
+    (assert (eq main (current-fiber)))
+    (without-current-fiber
       (assert-error (resume-fiber f) no-current-fiber-error))))
 
 (with-test (:name (:fiber :yield-preserves-resumer-return-fiber))
@@ -384,7 +392,7 @@
     (assert (not (fiber-pinned-p main)))))
 
 (with-test (:name (:fiber :with-fiber-pinned :no-current-fiber-errors))
-  (let ((sb-fiber::*current-fiber* nil))
+  (without-current-fiber
     (assert-error (with-fiber-pinned () :unreachable) no-current-fiber-error)))
 
 (with-test (:name (:fiber :with-fiber-pinned :switch-from-pinned-errors))
@@ -426,7 +434,7 @@
             (assert (= 2 (pinned-fiber-error-depth c)))))))))
 
 (with-test (:name (:fiber :conditions :no-current-fiber))
-  (let ((sb-fiber::*current-fiber* nil))
+  (without-current-fiber
     (let ((c (handler-case (make-fiber (lambda ()))
                (fiber-error (e) e))))          ; caught via the base class
       (assert (typep c 'no-current-fiber-error))

@@ -20,9 +20,9 @@ structures to hold callee-saved registers that are preserved when a
 fiber is switched.
 
 Lisp manages argument validation, catch and unwind chain save and
-install, `*current-fiber*`, re-signaling conditions captured by the
-trampoline, and defines the VOP that implements register swap inline
-at the `switch-fiber` call site.
+install, re-signaling conditions captured by the trampoline, and
+defines the VOP that implements register swap inline at the
+`switch-fiber` call site.
 
 ## Stack layout
 
@@ -100,13 +100,15 @@ When a fiber's entry function returns normally, control re-enters
 The resuming fiber exits PA via its own VOP tail or
 `sb_fiber_exit_pa`.
 
-The Lisp wrapper for the resumed fiber is found via
-`*current-fiber*`. The Lisp shim sets it to `to` before the swap, and
-TLS persists across the stack swap unchanged.
+The Lisp wrapper for the resumed fiber is found via the
+`current_fiber` slot of `struct thread`.  The Lisp shim stores `to`
+there before the swap.  The resumed side stores itself again after the
+swap because the C auto-return path does not write the slot.
 
 ## Image survival
 
 A saved core's restart restores Lisp wrappers but not the C
-`sb_fiber_ctx` structs they point at.  An `*init-hooks*` callback
-clears `*current-fiber*` on startup; user code holding wrappers across
-`save-lisp-and-die` is on its own, like `sb-thread`.
+`sb_fiber_ctx` structs they point at.  Thread structures are rebuilt
+at startup, so every thread begins with no current fiber; user code
+holding wrappers across `save-lisp-and-die` is on its own, like
+`sb-thread`.

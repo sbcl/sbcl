@@ -39,18 +39,18 @@ and register it with the current thread.  Caller arranges
     f))
 
 (defun make-main-fiber (&key name)
-  "Create a fiber representing the current thread's own stack and bind
-*CURRENT-FIBER* to it.  NAME is a string label used by PRINT-OBJECT."
+  "Create a fiber representing the current thread's own stack and make
+it this thread's current fiber.  NAME is a string label used by
+PRINT-OBJECT."
   (with-fiber-sap (sap (%fiber-create-main (sb-thread:current-thread-sap)))
-    (setf *current-fiber* (%install-fiber sap nil name))))
+    (setf (%current-fiber) (%install-fiber sap nil name))))
 
 (defmacro with-fiber-thread ((&key name) &body body)
   "Register a main fiber on the calling thread for the dynamic extent
-of BODY and release it on exit.  A no-op if BODY is reached with
-*CURRENT-FIBER* already bound.  NAME is forwarded to MAKE-MAIN-FIBER."
+of BODY and release it on exit.  A no-op if the thread already has a
+current fiber.  NAME is forwarded to MAKE-MAIN-FIBER."
   (let ((created (gensym "CREATED")))
-    `(let* ((*current-fiber* *current-fiber*)
-            (,created (unless *current-fiber* (make-main-fiber :name ,name))))
+    `(let ((,created (unless (current-fiber) (make-main-fiber :name ,name))))
        (unwind-protect (progn ,@body)
          (when ,created (release-fiber ,created))))))
 
@@ -65,13 +65,13 @@ When FUNCTION returns, the fiber is marked DEAD and control switches
 back to its most recent resumer, delivering FUNCTION's return value
 as that resumer's SWITCH-FIBER value.
 
-The calling thread must already have a main fiber bound in
-*CURRENT-FIBER*.  Use MAKE-MAIN-FIBER or WITH-FIBER-THREAD to establish
-one before calling MAKE-FIBER.  Signals an error otherwise.
+The calling thread must already have a current fiber.  Use
+MAKE-MAIN-FIBER or WITH-FIBER-THREAD to establish one before calling
+MAKE-FIBER.  Signals an error otherwise.
 
 Fibers are auto-released when their owning thread exits; explicit
 RELEASE-FIBER is only needed if you want to reclaim resources sooner."
-  (unless *current-fiber*
+  (unless (current-fiber)
     (error 'no-current-fiber-error :operation 'make-fiber))
   (with-fiber-sap (sap (%fiber-create stack-size binding-stack-size))
     (%install-fiber sap function name)))
@@ -92,8 +92,8 @@ exits."
     (%fiber-release (shiftf (fiber-sap fiber) (sb-sys:int-sap 0)))
     (setf (fiber-thread fiber)     nil
           (fiber-released-p fiber) t)
-    (when (eq *current-fiber* fiber)
-      (setf *current-fiber* nil))))
+    (when (eq (current-fiber) fiber)
+      (setf (%current-fiber) nil))))
 
 (defun fiber-state (fiber)
   "Return the current state of FIBER as a keyword: :NEW, :RUNNABLE,
@@ -110,13 +110,6 @@ released."
   (declare (type fiber fiber))
   (and (not (fiber-released-p fiber))
        (/= (%fiber-state fiber) +fiber-dead+)))
-
-(declaim (inline current-fiber)
-         (ftype (function () (or null fiber)) current-fiber))
-(defun current-fiber ()
-  "Return the fiber currently running on this thread, or NIL if no
-main fiber is bound."
-  *current-fiber*)
 
 ;;; --- Stack-usage accessors ---
 
@@ -184,18 +177,17 @@ alone (yield semantics -- preserves TO's prior caller chain)."
     (if update-return-p
         (stage-return from to from-sap to-ctx values)
         (setf (fiber-value to) values))
-    (setf *current-fiber* to)
+    (setf (%current-fiber) to)
     (%switch-prep from-sap to-sap)
     (swap-frames th-sap from-ctx to-ctx)
     (flip-states from-ctx to-ctx)
     (%swap-regs from-sap to-sap)
-    ;; Control re-enters here when some later switch resumes from.
-    (setf *current-fiber* from))
-  ;; Post-resume delivery (each a no-op unless its slot is set).  Order is
-  ;; deliberate: from's own staged interrupt fires first, in from's context,
-  ;; and if it does it unwinds and preempts the rest -- an interrupt on the
-  ;; resumed fiber outranks delivering to's escape.  to is already dead once
-  ;; it has an escape, so a preempted escape is dropped, not redelivered.
+    ;; C auto-return taken when a fiber's entry function returns does
+    ;; not touch the slot, so store it again here.
+    (setf (%current-fiber) from))
+  ;; Post-resume delivery (each a no-op unless its slot is set).
+  ;; From's own staged interrupt fires first, in from's context, and
+  ;; if it does it unwinds and preempts the rest.
   (deliver-pending from)
   (maybe-escape to)
   (maybe-escape-throw to)
@@ -211,8 +203,8 @@ switch back to FROM delivers, also as multiple values."
 
 (defun resume-fiber (to &rest values)
   "Suspend the current fiber and resume TO, delivering VALUES as
-multiple values.  Equivalent to (SWITCH-FIBER *CURRENT-FIBER* TO
-. VALUES): sets TO's return-fiber to *CURRENT-FIBER*, so YIELD-FIBER
+multiple values.  Equivalent to (SWITCH-FIBER (CURRENT-FIBER) TO
+. VALUES): sets TO's return-fiber to the current fiber, so YIELD-FIBER
 inside TO comes back here.
 
   YIELD-FIBER  -- suspend self, deliver to the return fiber, preserve
@@ -221,7 +213,7 @@ inside TO comes back here.
                   that fiber's return fiber.
   SWITCH-FIBER -- explicit FROM/TO form of RESUME-FIBER."
   (declare (type fiber to))
-  (let ((from *current-fiber*))
+  (let ((from (current-fiber)))
     (unless from
       (error 'no-current-fiber-error :operation 'resume-fiber))
     (%switch from to values t)))
@@ -237,7 +229,7 @@ inside TO comes back here.
 as multiple values to the resumer.  Returns whatever the next
 switch-in delivers (as multiple values).  Errors if the current fiber
 has no recorded return fiber (never resumed)."
-  (let ((self *current-fiber*))
+  (let ((self (current-fiber)))
     (unless self
       (error 'no-current-fiber-error :operation 'yield-fiber))
     (let ((target (fiber-return-fiber self)))
@@ -301,7 +293,7 @@ will only suspend a fiber with a pin count of zero."
   "Increment the current fiber's pin count for the dynamic extent of
 BODY; SWITCH-FIBER refuses to suspend a pinned fiber.  Pins nest."
   (let ((f (gensym "PINNED-FIBER")))
-    `(let ((,f (or *current-fiber*
+    `(let ((,f (or (current-fiber)
                    (error 'no-current-fiber-error
                           :operation 'with-fiber-pinned))))
        (incf (fiber-pin-count ,f))
