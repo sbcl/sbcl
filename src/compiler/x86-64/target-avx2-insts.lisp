@@ -143,24 +143,3 @@
         (write-string name stream)
         (operand name dstate))))
 
-;;; APX EVEX printers
-(defun print-apx-gpr-vvvv (value stream dstate)
-  (let* ((v-low (logxor value #b1111))
-         (reg-num (if (dstate-getprop dstate +evex-v-prime+)
-                      (+ v-low 16)
-                      v-low)))
-    (print-reg-with-width reg-num (inst-operand-size dstate) stream dstate)))
-
-(defun print-apx-gpr-vvvv-default-qword (value stream dstate)
-  (let* ((v-low (logxor value #b1111))
-         (reg-num (if (dstate-getprop dstate +evex-v-prime+)
-                      (+ v-low 16)
-                      v-low)))
-    (print-reg-with-width reg-num (inst-operand-size-default-qword dstate) stream dstate)))
-
-(defun print-apx-nf (value stream dstate)
-  (when (eql value 1)
-    (if stream
-        (write-string "{nf} " stream)
-        (operand "{nf} " dstate))))
-

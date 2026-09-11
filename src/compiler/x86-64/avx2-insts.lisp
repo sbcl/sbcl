@@ -432,245 +432,6 @@
   (reg     :field (byte 3 (+ 32 11))
            :type 'reg))
 
-;;; APX EVEX arg-types and instruction formats
-
-(define-arg-type apx-evex-r
-  :prefilter (lambda (dstate value)
-               (when (zerop value)
-                 (dstate-setprop dstate +rex-r+))))
-
-(define-arg-type apx-evex-x
-  :prefilter (lambda (dstate value)
-               (when (zerop value)
-                 (dstate-setprop dstate +rex-x+))))
-
-(define-arg-type apx-evex-b
-  :prefilter (lambda (dstate value)
-               (when (zerop value)
-                 (dstate-setprop dstate +rex-b+))))
-
-(define-arg-type apx-evex-r-prime
-  :prefilter (lambda (dstate value)
-               (when (zerop value)
-                 (dstate-setprop dstate +rex2-r4+))))
-
-(define-arg-type apx-evex-b4
-  :prefilter (lambda (dstate value)
-               (when (plusp value)
-                 (dstate-setprop dstate +rex2-b4+))))
-
-(define-arg-type apx-evex-x4-prime
-  :prefilter (lambda (dstate value)
-               (when (zerop value)
-                 (dstate-setprop dstate +rex2-x4+))))
-
-(define-arg-type apx-evex-w
-  :prefilter (lambda (dstate value)
-               (when (plusp value)
-                 (dstate-setprop dstate +rex-w+))))
-
-(define-arg-type apx-evex-pp
-  :prefilter (lambda (dstate value)
-               (when (= value 1)
-                 (dstate-setprop dstate +operand-size-16+))))
-
-(define-arg-type apx-evex-v-prime
-  :prefilter (lambda (dstate value)
-               (when (zerop value)
-                 (dstate-setprop dstate +evex-v-prime+))))
-
-(define-arg-type apx-gpr-vvvv
-  :printer #'print-apx-gpr-vvvv)
-
-(define-arg-type apx-gpr-vvvv-default-qword
-  :printer #'print-apx-gpr-vvvv-default-qword)
-
-(define-arg-type apx-nf
-  :printer #'print-apx-nf)
-
-;;; APX EVEX base format: 32 bits (prefix #x62, Map 4)
-(define-instruction-format (apx-evex 32)
-  (evex-prefix :field (byte 8 0) :value #x62)
-  ;; Byte 1
-  (r        :field (byte 1 15) :type 'apx-evex-r)
-  (x        :field (byte 1 14) :type 'apx-evex-x)
-  (b        :field (byte 1 13) :type 'apx-evex-b)
-  (r-prime  :field (byte 1 12) :type 'apx-evex-r-prime)
-  (b4       :field (byte 1 11) :type 'apx-evex-b4)
-  (mm       :field (byte 3 8)  :value #b100) ; Map 4
-  ;; Byte 2
-  (w        :field (byte 1 23) :type 'apx-evex-w)
-  (vvvv     :field (byte 4 19) :type 'apx-gpr-vvvv)
-  (x4-prime :field (byte 1 18) :type 'apx-evex-x4-prime)
-  (pp       :field (byte 2 16) :type 'apx-evex-pp)
-  ;; Byte 3
-  (z-bit    :field (byte 1 31))
-  (ll       :field (byte 2 29))
-  (nd       :field (byte 1 28))
-  (v-prime  :field (byte 1 27) :type 'apx-evex-v-prime)
-  (nf       :field (byte 1 26) :type 'apx-nf)
-  (aaa      :field (byte 2 24)))
-
-(defmacro define-apx-instruction-format ((format-name length-in-bits
-                                          &key default-printer include)
-                                         &body arg-specs)
-  `(define-instruction-format (,(symbolicate "APX-" format-name) (+ 32 ,length-in-bits)
-                               :include ,(if include
-                                             (symbolicate "APX-" include)
-                                             'apx-evex)
-                               :default-printer ,default-printer)
-     ,@(subst 32 'start arg-specs)))
-
-(define-apx-instruction-format (ndd-reg-reg 16
-                                :default-printer '(nf :name :tab vvvv ", " reg/mem ", " reg))
-  (op      :field (byte 8 (+ start 0)))
-  (width   :field (byte 1 (+ start 0)) :type 'width)
-  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
-           :type 'reg/mem)
-  (reg     :field (byte 3 (+ start 11))
-           :type 'reg))
-
-(define-apx-instruction-format (ndd-reg-mem 16
-                                :default-printer '(nf :name :tab vvvv ", " reg ", " reg/mem))
-  (op      :field (byte 8 (+ start 0)))
-  (width   :field (byte 1 (+ start 0)) :type 'width)
-  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
-           :type 'reg/mem)
-  (reg     :field (byte 3 (+ start 11))
-           :type 'reg))
-
-(define-apx-instruction-format (ndd-reg-imm 16
-                                :default-printer '(nf :name :tab vvvv ", " reg/mem ", " imm))
-  (op      :field (byte 8 (+ start 0)))
-  (width   :field (byte 1 (+ start 0)) :type 'width)
-  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
-           :type 'sized-reg/mem)
-  (reg     :field (byte 3 (+ start 11)))
-  (imm     :type 'signed-imm-data))
-
-(define-apx-instruction-format (ndd-reg-imm8 16
-                                :default-printer '(nf :name :tab vvvv ", " reg/mem ", " imm))
-  (op      :field (byte 8 (+ start 0)))
-  (width   :field (byte 1 (+ start 0)) :type 'width)
-  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
-           :type 'sized-reg/mem)
-  (reg     :field (byte 3 (+ start 11)))
-  (imm     :type 'signed-imm-byte))
-
-(define-apx-instruction-format (ndd-unary 16
-                                :default-printer '(nf :name :tab vvvv ", " reg/mem))
-  (op      :field (byte 8 (+ start 0)))
-  (width   :field (byte 1 (+ start 0)) :type 'width)
-  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
-           :type 'sized-reg/mem)
-  (reg     :field (byte 3 (+ start 11))))
-
-(define-apx-instruction-format (ndd-shift-imm 16
-                                :default-printer '(nf :name :tab vvvv ", " reg/mem ", " imm))
-  (op      :field (byte 8 (+ start 0)))
-  (width   :field (byte 1 (+ start 0)) :type 'width)
-  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
-           :type 'sized-reg/mem)
-  (reg     :field (byte 3 (+ start 11)))
-  (imm     :type 'imm-byte))
-
-(define-apx-instruction-format (ndd-shift-1 16
-                                :default-printer '(nf :name :tab vvvv ", " reg/mem ", 1"))
-  (op      :field (byte 8 (+ start 0)))
-  (width   :field (byte 1 (+ start 0)) :type 'width)
-  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
-           :type 'sized-reg/mem)
-  (reg     :field (byte 3 (+ start 11))))
-
-(define-apx-instruction-format (ndd-shift-cl 16
-                                :default-printer '(nf :name :tab vvvv ", " reg/mem ", CL"))
-  (op      :field (byte 8 (+ start 0)))
-  (width   :field (byte 1 (+ start 0)) :type 'width)
-  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
-           :type 'sized-reg/mem)
-  (reg     :field (byte 3 (+ start 11))))
-
-(define-apx-instruction-format (push2 16
-                                :default-printer '(:name :tab vvvv ", " reg/mem))
-  (vvvv    :type 'apx-gpr-vvvv-default-qword)
-  (op      :field (byte 8 (+ start 0)) :value #xFF)
-  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
-           :type 'sized-reg/mem-default-qword)
-  (reg     :field (byte 3 (+ start 11)) :value 6))
-
-(define-apx-instruction-format (pop2 16
-                                :default-printer '(:name :tab vvvv ", " reg/mem))
-  (vvvv    :type 'apx-gpr-vvvv-default-qword)
-  (op      :field (byte 8 (+ start 0)) :value #x8F)
-  (reg/mem :fields (list (byte 2 (+ start 14)) (byte 3 (+ start 8)))
-           :type 'sized-reg/mem-default-qword)
-  (reg     :field (byte 3 (+ start 11)) :value 0))
-
-(define-instruction-format (apx-cfcmov (+ 32 16)
-                             :include apx-evex
-                             :default-printer '('cfcmov cc :tab reg ", " reg/mem))
-  (op      :field (byte 4 (+ 32 4)) :value #x4)
-  (cc      :field (byte 4 (+ 32 0)) :type 'condition-code)
-  (reg/mem :fields (list (byte 2 (+ 32 14)) (byte 3 (+ 32 8)))
-           :type 'reg/mem)
-  (reg     :field (byte 3 (+ 32 11))
-           :type 'reg))
-
-(define-instruction-format (apx-ccmp (+ 32 16)
-                             :include apx-evex
-                             :default-printer '('ccmp scc :tab reg/mem ", " reg ", " dfv))
-  (scc     :field (byte 4 24) :type 'condition-code)
-  (dfv     :field (byte 4 19))
-  (op      :field (byte 8 (+ 32 0)))
-  (reg/mem :fields (list (byte 2 (+ 32 14)) (byte 3 (+ 32 8)))
-           :type 'reg/mem)
-  (reg     :field (byte 3 (+ 32 11))
-           :type 'reg))
-
-(define-instruction-format (apx-ccmp-imm (+ 32 16)
-                                 :include apx-evex
-                                 :default-printer '('ccmp scc :tab reg/mem ", " imm ", " dfv))
-  (scc     :field (byte 4 24) :type 'condition-code)
-  (dfv     :field (byte 4 19))
-  (op      :field (byte 8 (+ 32 0)))
-  (reg/mem :fields (list (byte 2 (+ 32 14)) (byte 3 (+ 32 8)))
-           :type 'sized-reg/mem)
-  (reg     :field (byte 3 (+ 32 11)))
-  (imm     :type 'signed-imm-data))
-
-(define-instruction-format (apx-ccmp-imm8 (+ 32 16)
-                                  :include apx-evex
-                                  :default-printer '('ccmp scc :tab reg/mem ", " imm ", " dfv))
-  (scc     :field (byte 4 24) :type 'condition-code)
-  (dfv     :field (byte 4 19))
-  (op      :field (byte 8 (+ 32 0)))
-  (reg/mem :fields (list (byte 2 (+ 32 14)) (byte 3 (+ 32 8)))
-           :type 'sized-reg/mem)
-  (reg     :field (byte 3 (+ 32 11)))
-  (imm     :type 'signed-imm-byte))
-
-(define-instruction-format (apx-ctest (+ 32 16)
-                             :include apx-evex
-                             :default-printer '('ctest scc :tab reg/mem ", " reg ", " dfv))
-  (scc     :field (byte 4 24) :type 'condition-code)
-  (dfv     :field (byte 4 19))
-  (op      :field (byte 8 (+ 32 0)))
-  (reg/mem :fields (list (byte 2 (+ 32 14)) (byte 3 (+ 32 8)))
-           :type 'reg/mem)
-  (reg     :field (byte 3 (+ 32 11))
-           :type 'reg))
-
-(define-instruction-format (apx-ctest-imm (+ 32 16)
-                                  :include apx-evex
-                                  :default-printer '('ctest scc :tab reg/mem ", " imm ", " dfv))
-  (scc     :field (byte 4 24) :type 'condition-code)
-  (dfv     :field (byte 4 19))
-  (op      :field (byte 8 (+ 32 0)))
-  (reg/mem :fields (list (byte 2 (+ 32 14)) (byte 3 (+ 32 8)))
-           :type 'sized-reg/mem)
-  (reg     :field (byte 3 (+ 32 11)))
-  (imm     :type 'signed-imm-data))
-
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun vex-encode-pp (pp)
@@ -2434,12 +2195,10 @@ Returns: r, x, b, r-prime, b-prime, v-prime, x-prime."
 
 ;;; APX PUSH2 / POP2
 (define-instruction push2 (segment src1 src2)
-  (:printer apx-push2 ())
   (:emitter
    (emit-apx-inst segment src2 6 #xFF :vvvv src1 :nd 1 :w 0)))
 
 (define-instruction pop2 (segment dst1 dst2)
-  (:printer apx-pop2 ())
   (:emitter
    (emit-apx-inst segment dst2 0 #x8F :vvvv dst1 :nd 1 :w 0)))
 
@@ -2462,7 +2221,6 @@ Returns: r, x, b, r-prime, b-prime, v-prime, x-prime."
           (error "Unknown APX condition: ~S" cond))))
 
 (define-instruction cfcmov (segment cond dst src)
-  (:printer apx-cfcmov ())
   (:emitter
    (let* ((cc (parse-apx-condition cond))
           (opcode (+ #x40 cc))
@@ -2484,11 +2242,6 @@ Returns: r, x, b, r-prime, b-prime, v-prime, x-prime."
             ((:of :o) (setf v (logior v 8))))))))
 
 (define-instruction ccmp (segment cond op1 op2 &optional (dfv 0))
-  (:printer apx-ccmp ((op #x39)))
-  (:printer apx-ccmp ((op #x38)))
-  (:printer apx-ccmp-imm ((op #x81) (reg 7)))
-  (:printer apx-ccmp-imm ((op #x80) (reg 7)))
-  (:printer apx-ccmp-imm8 ((op #x83) (reg 7)))
   (:emitter
    (let* ((cc (parse-apx-condition cond))
           (dfv-val (parse-dfv dfv))
@@ -2510,10 +2263,6 @@ Returns: r, x, b, r-prime, b-prime, v-prime, x-prime."
               (emit-apx-inst segment op1 op2 opcode :w w :pp pp :scc cc :dfv dfv-val)))))))
 
 (define-instruction ctest (segment cond op1 op2 &optional (dfv 0))
-  (:printer apx-ctest ((op #x85)))
-  (:printer apx-ctest ((op #x84)))
-  (:printer apx-ctest-imm ((op #xF7) (reg 0)))
-  (:printer apx-ctest-imm ((op #xF6) (reg 0)))
   (:emitter
    (let* ((cc (parse-apx-condition cond))
           (dfv-val (parse-dfv dfv))
@@ -2532,23 +2281,8 @@ Returns: r, x, b, r-prime, b-prime, v-prime, x-prime."
 
 ;;; Explicit NDD ALU instructions
 (macrolet ((def-alu-ndd (name subop)
-             (let ((msym (intern (subseq (string name) 0 (- (length (string name)) 4)))))
-               `(define-instruction ,name (segment dst src1 src2 &key (nf 0))
-                  (:printer apx-ndd-reg-reg ((op ,(dpb subop (byte 3 3) 1)))
-                            :default :print-name ',msym)
-                  (:printer apx-ndd-reg-reg ((op ,(dpb subop (byte 3 3) 0)))
-                            :default :print-name ',msym)
-                  (:printer apx-ndd-reg-mem ((op ,(dpb subop (byte 3 3) 3)))
-                            :default :print-name ',msym)
-                  (:printer apx-ndd-reg-mem ((op ,(dpb subop (byte 3 3) 2)))
-                            :default :print-name ',msym)
-                  (:printer apx-ndd-reg-imm ((op #x81) (reg ,subop))
-                            :default :print-name ',msym)
-                  (:printer apx-ndd-reg-imm ((op #x80) (reg ,subop))
-                            :default :print-name ',msym)
-                  (:printer apx-ndd-reg-imm8 ((op #x83) (reg ,subop))
-                            :default :print-name ',msym)
-                  (:emitter (emit-apx-alu-ndd segment dst src1 src2 ,subop :nf nf))))))
+             `(define-instruction ,name (segment dst src1 src2 &key (nf 0))
+                (:emitter (emit-apx-alu-ndd segment dst src1 src2 ,subop :nf nf)))))
   (def-alu-ndd add-ndd #b000)
   (def-alu-ndd or-ndd  #b001)
   (def-alu-ndd adc-ndd #b010)
@@ -2558,34 +2292,16 @@ Returns: r, x, b, r-prime, b-prime, v-prime, x-prime."
   (def-alu-ndd xor-ndd #b110))
 
 (macrolet ((def-unary-ndd (name opcode subop)
-             (let ((msym (intern (subseq (string name) 0 (- (length (string name)) 4)))))
-               `(define-instruction ,name (segment dst src &key (nf 0))
-                  (:printer apx-ndd-unary ((op ,opcode) (reg ,subop))
-                            :default :print-name ',msym)
-                  (:printer apx-ndd-unary ((op ,(logand opcode #xFE)) (reg ,subop))
-                            :default :print-name ',msym)
-                  (:emitter (emit-apx-unary-ndd segment dst src ,opcode ,subop :nf nf))))))
+             `(define-instruction ,name (segment dst src &key (nf 0))
+                (:emitter (emit-apx-unary-ndd segment dst src ,opcode ,subop :nf nf)))))
   (def-unary-ndd not-ndd #xF7 #b010)
   (def-unary-ndd neg-ndd #xF7 #b011)
   (def-unary-ndd inc-ndd #xFF #b000)
   (def-unary-ndd dec-ndd #xFF #b001))
 
 (macrolet ((def-shift-ndd (name subop)
-             (let ((msym (intern (subseq (string name) 0 (- (length (string name)) 4)))))
-               `(define-instruction ,name (segment dst src count &key (nf 0))
-                  (:printer apx-ndd-shift-imm ((op #xC1) (reg ,subop))
-                            :default :print-name ',msym)
-                  (:printer apx-ndd-shift-imm ((op #xC0) (reg ,subop))
-                            :default :print-name ',msym)
-                  (:printer apx-ndd-shift-1 ((op #xD1) (reg ,subop))
-                            :default :print-name ',msym)
-                  (:printer apx-ndd-shift-1 ((op #xD0) (reg ,subop))
-                            :default :print-name ',msym)
-                  (:printer apx-ndd-shift-cl ((op #xD3) (reg ,subop))
-                            :default :print-name ',msym)
-                  (:printer apx-ndd-shift-cl ((op #xD2) (reg ,subop))
-                            :default :print-name ',msym)
-                  (:emitter (emit-apx-shift-ndd segment dst src count ,subop :nf nf))))))
+             `(define-instruction ,name (segment dst src count &key (nf 0))
+                (:emitter (emit-apx-shift-ndd segment dst src count ,subop :nf nf)))))
   (def-shift-ndd rol-ndd #b000)
   (def-shift-ndd ror-ndd #b001)
   (def-shift-ndd shl-ndd #b100)
@@ -2593,12 +2309,6 @@ Returns: r, x, b, r-prime, b-prime, v-prime, x-prime."
   (def-shift-ndd sar-ndd #b111))
 
 (define-instruction imul-ndd (segment dst src1 src2)
-  (:printer apx-ndd-reg-reg ((op #xAF))
-            :default :print-name 'imul)
-  (:printer apx-ndd-reg-imm ((op #x69) (reg 0))
-            :default :print-name 'imul)
-  (:printer apx-ndd-reg-imm8 ((op #x6B) (reg 0))
-            :default :print-name 'imul)
   (:emitter
    (let* ((size (or (operand-size dst) (operand-size src1) :qword))
           (w (if (eq size :qword) 1 0))
