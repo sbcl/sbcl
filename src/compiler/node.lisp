@@ -537,6 +537,9 @@
   ;; Cache the environment of a block during lifetime analysis. :NONE
   ;; if no cached value has been stored yet.
   (environment-cache :none :type (or null environment (member :none)))
+  ;; this flag is used specifically to determine if this block must
+  ;; still be processed as part of a worklist algorithm.
+  (worklist-flag nil :type boolean)
   ;; A table for keeping track of which source-paths have already had
   ;; a %MARK-COVERAGE function converted for them.
   (source-path-marks nil :type (or null hash-table)))

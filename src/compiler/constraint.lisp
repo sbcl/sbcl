@@ -54,8 +54,7 @@
 (defvar *constraint-universe*)
 (defvar *blocks-to-terminate*)
 (defvar *sets-to-delete*)
-(defvar *constraint-blocks*)
-(defvar *constraint-blocks-p*)
+(defvar *constraint-blocks-pending*)
 
 (defstruct (vector-length-constraint
             (:constructor %make-vector-length-constraint (var))
@@ -1475,8 +1474,7 @@
                    (constraint-propagate-from-args args vars gen new)
                    (unless (and call-in (conset= call-in new))
                      (setf (combination-constraints-in node) new)
-                     (when *constraint-blocks-p*
-                       (enqueue-block-for-constraints (lambda-block fun)))))))
+                     (enqueue-block-for-constraints (lambda-block fun))))))
               ((mv-let)
                (add-mv-let-result-constraints vars args gen)))))))))
   gen)
@@ -1708,22 +1706,10 @@
               (rest-of-blocks block)))))
     (values (leading-blocks) (rest-of-blocks))))
 
-;;; Append OBJ to the end of LIST as if by NCONC but only if it is not
-;;; a member already.
-(defun nconc-new (obj list)
-  (do ((x list (cdr x))
-       (prev nil x))
-      ((endp x) (if prev
-                    (progn
-                      (setf (cdr prev) (list obj))
-                      list)
-                    (list obj)))
-    (when (eql (car x) obj)
-      (return-from nconc-new list))))
-
 (defun enqueue-block-for-constraints (block)
   (when (block-type-check block)
-    (setq *constraint-blocks* (nconc-new block *constraint-blocks*))))
+    (setf (block-worklist-flag block) t)
+    (setq *constraint-blocks-pending* t)))
 
 (defun find-and-propagate-constraints (component)
   (clear-flags component)
@@ -1735,7 +1721,8 @@
     ;; USE-RESULT-CONSTRAINTS later.
     (dolist (block leading-blocks)
       (setf (block-in block) (compute-block-in block t))
-      (find-block-type-constraints block t))
+      (find-block-type-constraints block t)
+      (setf (block-worklist-flag block) nil))
     ;; We can only start joining types on blocks in which
     ;; constraint propagation might have to run multiple times (to
     ;; fixpoint) once all type constraints are definitely
@@ -1745,29 +1732,23 @@
     ;; done, hence any inherited type constraints from such
     ;; constraints will be wrong as well.
     (dolist (join-types-p '(nil t))
-      (let ((*constraint-blocks-p* t)
-            (*constraint-blocks* (copy-list rest-of-blocks)))
-        ;; The rest of the blocks.
-        (dolist (block rest-of-blocks)
-          (aver (eq block (pop *constraint-blocks*)))
-          (setf (block-in block) (compute-block-in block join-types-p))
-          (mapc #'enqueue-block-for-constraints
-                (find-block-type-constraints block nil)))
-        ;; Propagate constraints
-        (loop while *constraint-blocks*
-              do
-              ;; Process the newly enqueued blocks in the same order
-              (setf *constraint-blocks*
-                    (sort *constraint-blocks* #'> :key #'block-number))
-              (let ((current-end (car (last *constraint-blocks*))))
-                (loop for block = (pop *constraint-blocks*)
-                      do
-                      (unless (or (block-delete-p block)
-                                  (eq block (component-tail component)))
-                        (when (update-block-in block join-types-p)
-                          (mapc #'enqueue-block-for-constraints
-                                (find-block-type-constraints block nil))))
-                      until (eq block current-end))))))
+      ;; The rest of the blocks.
+      (dolist (block rest-of-blocks)
+        (setf (block-in block) nil)
+        (setf (block-worklist-flag block) t))
+
+      (loop
+        (let ((*constraint-blocks-pending* nil))
+          ;; Propagate constraints
+          (do-blocks (block component)
+            (unless (block-delete-p block)
+              (when (block-worklist-flag block)
+                (setf (block-worklist-flag block) nil)
+                (when (update-block-in block join-types-p)
+                  (mapc #'enqueue-block-for-constraints
+                        (find-block-type-constraints block nil))))))
+          (unless *constraint-blocks-pending*
+            (return)))))
 
     rest-of-blocks))
 
@@ -1785,8 +1766,7 @@
         (setf (if-consequent-constraints last) nil))))
 
   (let (*blocks-to-terminate*
-        *sets-to-delete*
-        *constraint-blocks-p*)
+        *sets-to-delete*)
     (dolist (block (find-and-propagate-constraints component))
       (unless (block-delete-p block)
         (use-result-constraints block)))
