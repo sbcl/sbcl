@@ -140,6 +140,7 @@
   (define-arg-type simd-ld-st-n-regs :printer #'print-simd-ld-st-n-regs)
   (define-arg-type struct-imm-writeback :printer #'print-struct-imm-writeback)
   (define-arg-type fp-imm :printer #'print-fp-imm)
+  (define-arg-type simd-element-reg :printer #'print-simd-element-reg)
 
   (define-arg-type sys-reg :printer #'print-sys-reg)
 
@@ -2861,6 +2862,39 @@
                               (fpr-offset rn)
                               (fpr-offset rd))))
 
+(def-emitter simd-scalar-x-indexed
+  (#b0 1 31)
+  (q 1 30)
+  (#b0 1 29)
+  (#b01111 5 24)
+  (size 2 22)
+  (l 1 21)
+  (m 1 20)
+  (rm 4 16)
+  (opcode 4 12)
+  (h 1 11)
+  (#b0 1 10)
+  (rn 5 5)
+  (rd 5 0))
+
+(define-instruction-format (simd-scalar-x-indexed 32
+                            :default-printer '(:name :tab rd ", " rn ", " rm))
+  (op1 :field (byte 1 31) :value #b0)
+  (q :field (byte 1 30))
+  (op2 :field (byte 1 29) :value #b0)
+  (op3 :field (byte 5 24) :value #b01111)
+  (size :field (byte 2 22))
+  (l :field (byte 1 21))
+  (m :field (byte 1 20))
+  (rm4 :field (byte 4 16))
+  (op :field (byte 4 12))
+  (h :field (byte 1 11))
+  (op4 :field (byte 1 10) :value #b0)
+  (rm :fields (list (byte 2 22) (byte 1 21) (byte 1 20) (byte 4 16) (byte 1 11))
+      :type 'simd-element-reg)
+  (rn :fields (list (byte 1 30) (byte 2 22) (byte 5 5)) :type 'simd-float-reg)
+  (rd :fields (list (byte 1 30) (byte 2 22) (byte 5 0)) :type 'simd-float-reg))
+
 (defmacro def-fp-data-processing-2 (name op)
   `(define-instruction ,name (segment rd rn rm)
      (:printer fp-data-processing-2 ((op ,op)))
@@ -2904,8 +2938,6 @@
                                         (fpr-offset rn)
                                         (fpr-offset rd)))))))
 
-(def-fp-data-processing-2+simd fmul #b0000
-  #b1 #b0 #b11011)
 (def-fp-data-processing-2+simd fdiv #b0001
   #b1 #b0 #b11111)
 (def-fp-data-processing-2+simd fadd #b0010
@@ -2921,6 +2953,56 @@
 (def-fp-data-processing-2+simd fminnm #b0111
   #b0 #b1 #b11000)
 (def-fp-data-processing-2 fnmul #b1000)
+
+(defun encode-simd-x-element (vector-size rm index)
+  (let ((offset (fpr-offset rm)))
+    (multiple-value-bind (q size l h)
+        (ecase vector-size
+          (:2s
+           (the (integer 0 1) index)
+           (values 0 #b10 (logand index 1) 0))
+          (:4s
+           (the (integer 0 3) index)
+           (values 1 #b10 (logand index 1) (ldb (byte 1 1) index)))
+          (:2d
+           (the (integer 0 1) index)
+           (values 1 #b11 0 (logand index 1))))
+      (values q
+              size
+              l
+              h
+              (ldb (byte 1 4) offset)
+              (ldb (byte 4 0) offset)))))
+
+(define-instruction fmul
+    (segment rd rn rm &optional vector-size index)
+  (:printer fp-data-processing-2 ((op #b0)))
+  (:printer simd-three-same-float ((u #b1) (neg #b0) (op #b11011)))
+  (:printer simd-scalar-x-indexed ((op #b1001)))
+  (:emitter
+   (cond
+     (index
+      (multiple-value-bind (q size l h m rm4)
+          (encode-simd-x-element vector-size rm index)
+        (emit-simd-scalar-x-indexed segment
+                                    q
+                                    size
+                                    l
+                                    m
+                                    rm4
+                                    #b1001
+                                    h
+                                    (fpr-offset rn)
+                                    (fpr-offset rd))))
+     (vector-size (aver (member vector-size '(:2s :4s :2d)))
+                  (multiple-value-bind (q size)
+                      (encode-vector-size vector-size)
+                    (emit-simd-three-same-float segment q #b1 #b0 (logand #b1 size)
+                                                (fpr-offset rm) #b11011 (fpr-offset rn)
+                                                (fpr-offset rd))))
+     (t
+      (emit-fp-data-processing-2 segment (fp-reg-type rn) (fpr-offset rm) #b0
+                                 (fpr-offset rn) (fpr-offset rd))))))
 
 (defmacro def-fp-data-processing-3 (name o1 o2)
   `(define-instruction ,name (segment rd rn rm ra)
@@ -5332,8 +5414,8 @@
 (defpattern "fmul + fsub -> fmsub" ((fmul) (fsub)) (stmt next)
   (when (policy (sb-c::vop-node (sb-assem::stmt-vop stmt))
             (= sb-c::float-accuracy 0))
-    (destructuring-bind (dst1 srcn1 srcm1 &optional vector-size1) (stmt-operands stmt)
-      (unless vector-size1
+    (destructuring-bind (dst1 srcn1 srcm1 &optional vector-size1 index1) (stmt-operands stmt)
+      (unless (or vector-size1 index1)
         (destructuring-bind (dst2 srcn2 srcm2 &optional vector-size2) (stmt-operands next)
           (unless vector-size2
             (when (and (location= dst1 srcm2)
@@ -5347,8 +5429,8 @@
 (defpattern "fmul + fadd -> fmadd" ((fmul) (fadd)) (stmt next)
   (when (policy (sb-c::vop-node (sb-assem::stmt-vop stmt))
             (= sb-c::float-accuracy 0))
-    (destructuring-bind (dst1 srcn1 srcm1 &optional vector-size1) (stmt-operands stmt)
-      (unless vector-size1
+    (destructuring-bind (dst1 srcn1 srcm1 &optional vector-size1 index1) (stmt-operands stmt)
+      (unless (or vector-size1 index1)
         (destructuring-bind (dst2 srcn2 srcm2 &optional vector-size2) (stmt-operands next)
           (unless vector-size2
             (when (and (or (location= dst1 srcm2)
@@ -5362,8 +5444,8 @@
               next)))))))
 
 (defpattern "fmul + fneg -> fnmul" ((fmul) (fneg)) (stmt next)
-  (destructuring-bind (dst1 srcn1 srcm1 &optional vector-size1) (stmt-operands stmt)
-    (unless vector-size1
+  (destructuring-bind (dst1 srcn1 srcm1 &optional vector-size1 index1) (stmt-operands stmt)
+    (unless (or vector-size1 index1)
       (destructuring-bind (dst2 srcn2 &optional vector-size2) (stmt-operands next)
         (unless vector-size2
           (when (and (location= dst1 srcn2)
@@ -5376,8 +5458,8 @@
 (defpattern "fneg + fmul -> fnmul" ((fneg) (fmul)) (stmt next)
   (destructuring-bind (dst1 srcn1 &optional vector-size1) (stmt-operands stmt)
     (unless vector-size1
-      (destructuring-bind (dst2 srcn2 srcm2 &optional vector-size1) (stmt-operands next)
-        (unless vector-size1
+      (destructuring-bind (dst2 srcn2 srcm2 &optional vector-size2 index2) (stmt-operands next)
+        (unless (or vector-size2 index2)
           (when (and (or (location= dst1 srcn2)
                          (location= dst1 srcm2))
                      (stmt-delete-safe-p dst1 dst2 '(*)))

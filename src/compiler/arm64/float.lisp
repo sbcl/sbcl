@@ -371,28 +371,34 @@
                             (:policy :fast-safe)
                             (:args (x :scs (,real-sc)) (y :scs (,complex-sc)))
                             (:results (r :scs (,complex-sc)))
-                            ,@(when duplicatep `((:temporary (:sc ,complex-sc) dup)))
+                            ,@(when (eq duplicatep t) `((:temporary (:sc ,complex-sc) dup)))
                             (:arg-types ,real-type ,complex-type)
                             (:result-types ,complex-type)
                             (:generator ,cost
-                               ,@(if duplicatep
-                                     `((inst zip1 dup x x ,complex-inst-size)
-                                       (inst ,inst r dup y ,complex-inst-size))
-                                     `((inst ,inst r x y ,complex-inst-size))))))
+                               ,@(cond ((integerp duplicatep)
+                                        `((inst ,inst r y x ,complex-inst-size ,duplicatep)))
+                                       (duplicatep
+                                        `((inst zip1 dup x x ,complex-inst-size)
+                                          (inst ,inst r dup y ,complex-inst-size)))
+                                       (t
+                                        `((inst ,inst r x y ,complex-inst-size)))))))
                        (when complex-real-name
                          `(define-vop (,complex-real-name)
                             (:translate ,op)
                             (:policy :fast-safe)
                             (:args (x :scs (,complex-sc)) (y :scs (,real-sc)))
                             (:results (r :scs (,complex-sc)))
-                            ,@(when duplicatep `((:temporary (:sc ,complex-sc) dup)))
+                            ,@(when (eq duplicatep t) `((:temporary (:sc ,complex-sc) dup)))
                             (:arg-types ,complex-type ,real-type)
                             (:result-types ,complex-type)
                             (:generator ,cost
-                               ,@(if duplicatep
-                                     `((inst zip1 dup y y ,complex-inst-size)
-                                       (inst ,inst r x dup ,complex-inst-size))
-                                     `((inst ,inst r x y ,complex-inst-size)))))))))
+                              ,@(cond ((integerp duplicatep)
+                                       `((inst ,inst r x y ,complex-inst-size ,duplicatep)))
+                                      (duplicatep
+                                       `((inst zip1 dup y y ,complex-inst-size)
+                                         (inst ,inst r x dup ,complex-inst-size)))
+                                      (t
+                                       `((inst ,inst r x y ,complex-inst-size))))))))))
                `(progn
                   ,@(gen single-real-complex-name single-complex-real-name
                          'single-float 'complex-single-float
@@ -406,7 +412,7 @@
   (frob - fsub 3 nil
         -/real-complex-single-float -/complex-real-single-float
         -/real-complex-double-float -/complex-real-double-float)
-  (frob * fmul 6 t
+  (frob * fmul 6 0
         */real-complex-single-float */complex-real-single-float
         */real-complex-double-float */complex-real-double-float)
   (frob / fdiv 20 t
@@ -456,7 +462,7 @@
   (frob conjugate/complex-single-float complex-single-reg complex-single-float :s :2s)
   (frob conjugate/complex-double-float complex-double-reg complex-double-float :d :2d))
 
-(macrolet ((frob (name sc type complex-inst-size real-inst-size cost swap-y)
+(macrolet ((frob (name sc type complex-inst-size cost ext-shift ext-type)
              `(define-vop (,name)
                 (:args (x :scs (,sc)) (y :scs (,sc)))
                 (:results (r :scs (,sc)))
@@ -464,32 +470,15 @@
                 (:policy :fast-safe)
                 (:arg-types ,type ,type)
                 (:result-types ,type)
-                (:temporary (:sc ,sc) real imag swap-y)
+                (:temporary (:sc ,sc) real imag)
                 (:generator ,cost
-                   ;; We want x * y = (rx*ry - ix*iy) + (rx*iy + ix*ry)*i.
-                   ;; We separate that into x * y = real + imag where
-                   ;;   real =  rx*ry + rx*iy*i
-                   ;;   imag = -ix*iy + ix*ry*i
-                   ;; (named after the parts of x that appear in them).
-                   ;; Denote a vector which holds real part r and
-                   ;; imaginary part i as [r i].
-                   ;; Start with [ rx rx]
-                   (inst trn1 real x x ,complex-inst-size)
-                   ;;        and [-ix ix]
-                   (inst trn2 imag x x ,complex-inst-size)
-                   (inst fneg imag imag ,complex-inst-size)
-                   (inst ins imag 1 x 1 ,real-inst-size)
-                   ,swap-y
-                   ;; Then we compute real = [ rx*ry rx*iy]
-                   (inst fmul real real y ,complex-inst-size)
-                   ;;             and imag = [-ix*iy ix*ry]
-                   (inst fmul imag imag swap-y ,complex-inst-size)
-                   ;; and finally add those to obtain x * y.
-                   (inst fadd r real imag ,complex-inst-size)))))
-  (frob */complex-single-float complex-single-reg complex-single-float :2s :s 20
-        (inst rev64 swap-y y :2s))
-  (frob */complex-double-float complex-double-reg complex-double-float :2d :d 25
-        (inst ext swap-y y y 8 :16b)))
+                  (inst fmul real y x ,complex-inst-size 0)
+                  (inst fneg imag y ,complex-inst-size)
+                  (inst ext imag imag y ,ext-shift ,ext-type)
+                  (inst fmul imag imag x ,complex-inst-size 1)
+                  (inst fadd r real imag ,complex-inst-size)))))
+  (frob */complex-single-float complex-single-reg complex-single-float :2s 13 4 :8b)
+  (frob */complex-double-float complex-double-reg complex-double-float :2d 17 8 :16b))
 
 (define-vop (fsqrtd)
   (:args (x :scs (double-reg)))
