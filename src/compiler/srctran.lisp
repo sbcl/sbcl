@@ -9653,47 +9653,34 @@
                             when lvar
                             collect var)))))
 
-#+sb-thread
-(progn
-  (defoptimizer (sb-thread::call-with-mutex derive-type) ((function mutex))
-    (let ((type (lvar-fun-type function t t)))
-      (when (fun-type-p type)
-        (fun-type-returns type))))
-
-  (defoptimizer (sb-thread::call-with-mutex-timed derive-type) ((function mutex waitp timeout))
-    (let ((type (lvar-fun-type function t t)))
-      (when (fun-type-p type)
-        (let ((null-p (not (and (constant-lvar-p waitp)
-                                (lvar-value waitp)
-                                (lvar-value-is timeout nil)))))
-          (if null-p
-              (values-type-union (fun-type-returns type)
-                                 (values-specifier-type '(values null &optional)))
-              (fun-type-returns type))))))
-
-  (macrolet ((copy (to from)
-               `(setf (fun-info-derive-type (fun-info-or-lose ',to))
-                      (fun-info-derive-type (fun-info-or-lose ',from)))))
-    (copy sb-thread::call-with-recursive-lock-timed sb-thread::call-with-mutex-timed)
-    (copy sb-thread::call-with-recursive-lock sb-thread::call-with-mutex)
-    (copy sb-thread::fast-call-with-mutex sb-thread::call-with-mutex)
-    (copy sb-thread::fast-call-with-recursive-lock sb-thread::call-with-recursive-lock))
-
-  (defoptimizer (sb-thread::call-with-system-mutex derive-type) ((function mutex))
-    (let ((type (lvar-fun-type function t t)))
-      (when (fun-type-p type)
-        (fun-type-returns type))))
-
-  (setf (fun-info-derive-type (fun-info-or-lose 'sb-thread::call-with-system-mutex/allow-with-interrupts))
-        (setf (fun-info-derive-type (fun-info-or-lose 'sb-thread::call-with-system-mutex/without-gcing))
-              (fun-info-derive-type (fun-info-or-lose 'sb-thread::call-with-system-mutex)))))
-
-(defoptimizer (sb-impl::%with-standard-io-syntax derive-type) ((function))
+(defoptimizers derive-type
+    (sb-impl::%with-standard-io-syntax
+     sb-unix::with-deferrable-signals-unblocked
+     .
+     #.(append #+sb-thread
+               '(sb-thread::call-with-mutex sb-thread::call-with-system-mutex
+                 sb-thread::call-with-recursive-lock sb-thread::fast-call-with-mutex
+                 sb-thread::fast-call-with-recursive-lock sb-thread::call-with-system-mutex/allow-with-interrupts
+                 sb-thread::call-with-system-mutex/without-gcing)))
+    ((function &rest args))
   (let ((type (lvar-fun-type function t t)))
     (when (fun-type-p type)
       (fun-type-returns type))))
 
-(defoptimizer (call-with-timing derive-type) ((timer function &rest arguments))
+#+sb-thread
+(defoptimizers derive-type (sb-thread::call-with-mutex-timed
+                            sb-thread::call-with-recursive-lock-timed) ((function mutex waitp timeout))
+  (let ((type (lvar-fun-type function t t)))
+    (when (fun-type-p type)
+      (let ((null-p (not (and (constant-lvar-p waitp)
+                              (lvar-value waitp)
+                              (lvar-value-is timeout nil)))))
+        (if null-p
+            (values-type-union (fun-type-returns type)
+                               (values-specifier-type '(values null &optional)))
+            (fun-type-returns type))))))
+
+(defoptimizer (call-with-timing derive-type) ((x function &rest arguments))
   (let ((type (lvar-fun-type function t t)))
     (when (fun-type-p type)
       (fun-type-returns type))))

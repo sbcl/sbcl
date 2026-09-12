@@ -121,8 +121,8 @@ WITHOUT-INTERRUPTS in:
                               (*interrupts-enabled*
                                 ,',outer-allow-with-interrupts))
                           (with-deferrable-signals-unblocked
-                            ,',outer-allow-with-interrupts
-                            #'body)))))
+                            #'body
+                            ,',outer-allow-with-interrupts)))))
                 (let ((*interrupts-enabled* nil)
                       (,outer-allow-with-interrupts *allow-with-interrupts*)
                       (*allow-with-interrupts* nil))
@@ -165,8 +165,8 @@ by ALLOW-WITH-INTERRUPTS."
             (*interrupts-enabled* (or ,enablep ,allowp)))
        (dx-flet ((body () ,@body))
          (with-deferrable-signals-unblocked
-             (and ,allowp (not ,enablep))
-           #'body)))))
+             #'body
+           (and ,allowp (not ,enablep)))))))
 
 (defmacro allow-with-interrupts (&body body)
   (declare (ignore body))

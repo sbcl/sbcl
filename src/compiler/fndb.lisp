@@ -2134,6 +2134,8 @@
 
 (defknown call-with-timing (function-designator function-designator &rest t) *
   (call))
+(defknown sb-unix::with-deferrable-signals-unblocked (function t) *
+  (call))
 
 ;;; Even though ANSI defines LISP-IMPLEMENTATION-TYPE and
 ;;; LISP-IMPLEMENTATION-VERSION to possibly punt and return NIL, we

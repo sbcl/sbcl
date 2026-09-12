@@ -85,7 +85,7 @@
     (alien-funcall %unblock-deferrable-signals 0)
     nil))
 
-(defun with-deferrable-signals-unblocked (enable-interrupts function)
+(defun with-deferrable-signals-unblocked (function enable-interrupts)
   (cond ((and enable-interrupts
               *unblock-deferrables-on-enabling-interrupts-p*)
          (unwind-protect
