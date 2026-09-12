@@ -49,7 +49,7 @@ then
     android_run tools-for-build/grovel-headers > output/stuff-groveled-from-headers.lisp
 else
     ( cd tools-for-build; $GNUMAKE -I../src/runtime grovel-headers )
-    tools-for-build/grovel-headers > output/stuff-groveled-from-headers.lisp
+    $SBCL_RUNNER tools-for-build/grovel-headers > output/stuff-groveled-from-headers.lisp
 fi
 touch -r tools-for-build/grovel-headers.c output/stuff-groveled-from-headers.lisp
 
