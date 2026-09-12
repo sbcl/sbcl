@@ -758,20 +758,19 @@
         (assert (eq (caaddr ops) 'sb-x86-64-asm::mov))
         (assert (eq (car (fourth ops)) 'sb-x86-64-asm::ret))))
 
-    ;; F. :dword symmetric move elimination
+    ;; F. 64-bit symmetric move elimination
     (let* ((stream (sb-assem:make-asmstream))
            (section (sb-assem::asmstream-code-section stream)))
       (setf sb-assem::*asmstream* stream)
       (sb-assem:assemble (section)
-        (inst mov :dword rax-tn rbx-tn)
-        (inst mov :dword rbx-tn rax-tn)
+        (inst mov rax-tn rbx-tn)
+        (inst mov rbx-tn rax-tn)
         (inst ret))
       (sb-assem::combine-instructions section)
       (let ((ops (collect-ops section)))
-        ;; IGNORE, MOV (:dword prefix 6), RET (2nd move eliminated)
+        ;; IGNORE, MOV, RET (2nd move eliminated)
         (assert (= (length ops) 3))
         (assert (eq (caadr ops) 'sb-x86-64-asm::mov))
-        (assert (eq (cadadr ops) 6))
         (assert (eq (caaddr ops) 'sb-x86-64-asm::ret))))
 
     ;; G. Constant shift + TEST elimination

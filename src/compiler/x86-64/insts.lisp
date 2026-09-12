@@ -3848,8 +3848,8 @@
 (defpattern "mov dst,src + mov src,dst elim" ((mov) (mov)) (stmt next)
   (binding* (((size1 dst1 src1) (parse-2-operands stmt))
              ((size2 dst2 src2) (parse-2-operands next)))
-    (when (and (memq size1 '(:dword :qword))
-               (eq size1 size2)
+    (when (and (eq size1 :qword)
+               (eq size2 :qword)
                (alias-p dst2 src1)
                (alias-p dst1 src2))
       #+nil
