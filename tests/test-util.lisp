@@ -845,7 +845,9 @@
                                          form &body cases)
   (flet ((make-case-form (case)
            (if (typep case '(cons (member :return-type)))
-               `',case
+               `',(if (typep (cadr case) '(cons (eql values)))
+                      case
+                      `(,(car case) (values ,(cadr case) &optional)))
                (destructuring-bind (args values &key (test ''equal testp)
                                                      allow-conditions)
                    case

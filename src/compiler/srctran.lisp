@@ -7847,7 +7847,7 @@
                    (= y 0)
                    (eql y 0))
               `($fun x ,y))
-             ((and (/= y 0)
+             ((and (plusp y)
                    (not (float-lvar-p x)))
               (unless (lvar-subtypep x rational) ;; undo if there's ever an ABS vop for integers
                 (delay-ir1-transform node :ir1-phases))

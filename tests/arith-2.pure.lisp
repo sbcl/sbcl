@@ -2663,3 +2663,14 @@
          (logand (lognot (logand d -3)) 1))
     ((-7726172277034401953) 0)
     ((0) 1)))
+
+
+(with-test (:name :abs-to-eql)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (declare (rational a))
+         (eql (abs a) -5))
+    (:return-type null)
+    ((5) nil)
+    ((-5) nil)))
