@@ -51,6 +51,10 @@
       ((single-avx512-reg double-avx512-reg)
        (aver (float-tn-p src))
        (inst vmovups dst src))
+      ((signed-128-reg)
+       (with-128-parts (lo-src hi-src src lo-dst hi-dst dst)
+         (move lo-dst lo-src)
+         (move hi-dst hi-src)))
       (t
        (if size
            (inst mov size dst src)

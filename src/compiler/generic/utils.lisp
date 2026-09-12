@@ -692,3 +692,22 @@
 
 (defmacro callback_wrapper_trampoline ()
     '(foreign-symbol-address "callback_wrapper_trampoline"))
+
+#+x86-64
+(defun 128-reg-parts (x)
+  (sc-case x
+    (signed-128-reg
+     (values
+      (make-random-tn (sc-or-lose 'unsigned-reg) (tn-offset x))
+      (make-random-tn (sc-or-lose 'signed-reg) (1+ (tn-offset x)))))))
+
+#+x86-64
+(defmacro with-128-parts ((lo hi reg &rest more) &body body)
+  (labels ((expand (regs)
+             (if regs
+                 (destructuring-bind (lo hi reg . more) regs
+                   `(multiple-value-bind (,lo ,hi) (128-reg-parts ,reg)
+                      ,(expand more)))
+                 `(assemble ()
+                    ,@body))))
+    (expand (list* lo hi reg more))))

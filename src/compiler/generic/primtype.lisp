@@ -47,6 +47,10 @@
 (!def-primitive-type signed-byte-64 (signed-reg descriptor-reg)
   :type (signed-byte 64))
 
+#+x86-64
+(!def-primitive-type signed-byte-128 (descriptor-reg signed-128-reg)
+                     :type (signed-byte 128))
+
 (define-load-time-global *fixnum-primitive-type* (primitive-type-or-lose 'fixnum))
 
 (/show0 "primtype.lisp 53")
@@ -297,145 +301,89 @@
                `(values (primitive-type-or-lose ',type) t))
              (part-of (type)
                `(values (primitive-type-or-lose ',type) nil)))
-    (flet ((maybe-numeric-type-union (t1 t2)
-             (let ((t1-name (primitive-type-name t1))
-                   (t2-name (primitive-type-name t2)))
-               (case t1-name
-                 (positive-fixnum
-                  (if (or (eq t2-name 'fixnum)
-                          (eq t2-name
-                              (ecase n-machine-word-bits
-                                (32 'signed-byte-32)
-                                (64 'signed-byte-64)))
-                          (eq t2-name
-                              (ecase n-machine-word-bits
-                                (32 'unsigned-byte-31)
-                                (64 'unsigned-byte-63)))
-                          (eq t2-name
-                              (ecase n-machine-word-bits
-                                (32 'unsigned-byte-32)
-                                (64 'unsigned-byte-64))))
-                      t2))
-                 (fixnum
-                  (case t2-name
-                    (#.(ecase n-machine-word-bits
-                         (32 'signed-byte-32)
-                         (64 'signed-byte-64))
-                       t2)
-                    (#.(ecase n-machine-word-bits
-                         (32 'unsigned-byte-31)
-                         (64 'unsigned-byte-63))
-                       (primitive-type-or-lose
-                        (ecase n-machine-word-bits
-                          (32 'signed-byte-32)
-                          (64 'signed-byte-64))))))
-                 (#.(ecase n-machine-word-bits
-                      (32 'signed-byte-32)
-                      (64 'signed-byte-64))
-                  (if (eq t2-name
-                          (ecase n-machine-word-bits
-                            (32 'unsigned-byte-31)
-                            (64 'unsigned-byte-63)))
-                      t1))
-                 (#.(ecase n-machine-word-bits
-                      (32 'unsigned-byte-31)
-                      (64 'unsigned-byte-63))
-                    (if (eq t2-name
-                            (ecase n-machine-word-bits
-                              (32 'unsigned-byte-32)
-                              (64 'unsigned-byte-64)))
-                        t2))
-                 ((bignum integer)
-                  (cond ((and (eq t1-name 'bignum)
-                              (eq t2-name 'bignum))
-                         t1)
-                        ((memq t2-name '(positive-fixnum fixnum
-                                         integer bignum
-                                         . #.(ecase n-machine-word-bits
-                                               (32 '(unsigned-byte-31 unsigned-byte-32 signed-byte-32))
-                                               (64 '(unsigned-byte-63 unsigned-byte-64 signed-byte-64)))))
-                         (primitive-type-or-lose 'integer))))))))
-      (etypecase type
-        (numeric-type
-         (let ((lo (numeric-type-low type))
-               (hi (numeric-type-high type)))
-           (case (numeric-type-complexp type)
-             (:real
-              (case (numeric-type-class type)
-                (integer
-                 (cond ((and hi lo)
-                        (dolist (spec
-                                  `((positive-fixnum 0 ,most-positive-fixnum)
-                                    ,@(ecase n-machine-word-bits
-                                        (32
-                                         `((unsigned-byte-31
-                                            0 ,(1- (ash 1 31)))
-                                           (unsigned-byte-32
-                                            0 ,(1- (ash 1 32)))))
-                                        (64
-                                         `((unsigned-byte-63
-                                            0 ,(1- (ash 1 63)))
-                                           (unsigned-byte-64
-                                            0 ,(1- (ash 1 64))))))
-                                    (fixnum ,most-negative-fixnum
-                                            ,most-positive-fixnum)
-                                    ,(ecase n-machine-word-bits
-                                       (32
-                                        `(signed-byte-32 ,(ash -1 31)
-                                                         ,(1- (ash 1 31))))
-                                       (64
-                                        `(signed-byte-64 ,(ash -1 63)
-                                                         ,(1- (ash 1 63))))))
-                                 (if (or (< hi most-negative-fixnum)
-                                         (> lo most-positive-fixnum))
-                                     (part-of bignum)
-                                     (part-of integer)))
-                          (let ((type (car spec))
-                                (min (cadr spec))
-                                (max (caddr spec)))
-                            (when (<= min lo hi max)
-                              (return (values
-                                       (primitive-type-or-lose type)
-                                       (and (= lo min) (= hi max))))))))
-                       ((or (and hi (< hi most-negative-fixnum))
-                            (and lo (> lo most-positive-fixnum)))
-                        (part-of bignum))
-                       (t
-                        (part-of integer))))
-                (float
-                 (let ((exact (and (null lo) (null hi))))
-                   (case (numeric-type-format type)
-                     ((short-float single-float)
-                      (values (primitive-type-or-lose 'single-float)
-                              exact))
-                     ((double-float)
-                      (values (primitive-type-or-lose 'double-float)
-                              exact))
+    (etypecase type
+      (numeric-type
+       (let ((lo (numeric-type-low type))
+             (hi (numeric-type-high type)))
+         (case (numeric-type-complexp type)
+           (:real
+            (case (numeric-type-class type)
+              (integer
+               (cond ((and hi lo)
+                      (dolist (spec
+                               `((positive-fixnum 0 ,most-positive-fixnum)
+                                 ,@(ecase n-machine-word-bits
+                                     (32
+                                      `((unsigned-byte-31
+                                         0 ,(1- (ash 1 31)))
+                                        (unsigned-byte-32
+                                         0 ,(1- (ash 1 32)))))
+                                     (64
+                                      `((unsigned-byte-63
+                                         0 ,(1- (ash 1 63)))
+                                        (unsigned-byte-64
+                                         0 ,(1- (ash 1 64))))))
+                                 (fixnum ,most-negative-fixnum
+                                         ,most-positive-fixnum)
+                                 ,(ecase n-machine-word-bits
+                                    (32
+                                     `(signed-byte-32 ,(ash -1 31)
+                                                      ,(1- (ash 1 31))))
+                                    (64
+                                     `(signed-byte-64 ,(ash -1 63)
+                                                      ,(1- (ash 1 63)))))
+                                 #+x86-64
+                                 (signed-byte-128 ,(ash -1 127) ,(1- (ash 1 127))))
+                               (if (or (< hi most-negative-fixnum)
+                                       (> lo most-positive-fixnum))
+                                   (part-of bignum)
+                                   (part-of integer)))
+                        (let ((type (car spec))
+                              (min (cadr spec))
+                              (max (caddr spec)))
+                          (when (<= min lo hi max)
+                            (return (values
+                                     (primitive-type-or-lose type)
+                                     (and (= lo min) (= hi max))))))))
+                     ((or (and hi (< hi most-negative-fixnum))
+                          (and lo (> lo most-positive-fixnum)))
+                      (part-of bignum))
                      (t
-                      (any)))))
-                (t
-                 (any))))
-             (:complex
-              (if (eq (numeric-type-class type) 'float)
+                      (part-of integer))))
+              (float
                   (let ((exact (and (null lo) (null hi))))
                     (case (numeric-type-format type)
                       ((short-float single-float)
-                       (values (primitive-type-or-lose 'complex-single-float)
+                       (values (primitive-type-or-lose 'single-float)
                                exact))
-                      ((double-float long-float)
-                       (values (primitive-type-or-lose 'complex-double-float)
+                      ((double-float)
+                       (values (primitive-type-or-lose 'double-float)
                                exact))
                       (t
-                       (part-of complex))))
-                  (part-of complex)))
-             (t
-              (any)))))
-        (array-type
-         (if (or (array-type-complexp type)
-                 (not (singleton-p (array-type-dimensions type))))
-             (any)
-             ;; EQ is ok to compare by because all CTYPEs representing
-             ;; array specializations are interned objects.
+                       (any)))))
+              (t
+               (any))))
+           (:complex
+            (if (eq (numeric-type-class type) 'float)
+                (let ((exact (and (null lo) (null hi))))
+                  (case (numeric-type-format type)
+                    ((short-float single-float)
+                     (values (primitive-type-or-lose 'complex-single-float)
+                             exact))
+                    ((double-float long-float)
+                     (values (primitive-type-or-lose 'complex-double-float)
+                             exact))
+                    (t
+                     (part-of complex))))
+                (part-of complex)))
+           (t
+            (any)))))
+      (array-type
+       (if (or (array-type-complexp type)
+               (not (singleton-p (array-type-dimensions type))))
+           (any)
+           ;; EQ is ok to compare by because all CTYPEs representing
+           ;; array specializations are interned objects.
              (let ((saetp (find (array-type-specialized-element-type type)
                                 *specialized-array-element-type-properties*
                                 :key #'saetp-ctype :test #'eq)))
@@ -444,129 +392,126 @@
                             (saetp-primitive-type-name saetp))
                            (eq (first (array-type-dimensions type)) '*))
                    (any)))))
-        ((or union-type numeric-union-type)
-         (if (type= type (specifier-type 'list))
-             (exactly list)
-             (let ((types (sb-kernel::flatten-numeric-union-types type)))
-               (multiple-value-bind (res exact) (primitive-type (first types))
-                 (dolist (type (rest types) (values res exact))
-                   (multiple-value-bind (ptype ptype-exact)
-                       (primitive-type type)
-                     (unless ptype-exact (setq exact nil))
-                     (unless (eq ptype res)
-                       (let ((new-ptype
-                              (or (maybe-numeric-type-union res ptype)
-                                  (maybe-numeric-type-union ptype res))))
-                         (if new-ptype
-                             (setq res new-ptype)
-                             (return (any)))))))))))
-        (intersection-type
-         (let ((types (intersection-type-types type))
-               (res (any)))
-           ;; why NIL for the exact?  Well, we assume that the
-           ;; intersection type is in fact doing something for us:
-           ;; that is, that each of the types in the intersection is
-           ;; in fact cutting off some of the type lattice.  Since no
-           ;; intersection type is represented by a primitive type and
-           ;; primitive types are mutually exclusive, it follows that
-           ;; no intersection type can represent the entirety of the
-           ;; primitive type.  (And NIL is the conservative answer,
-           ;; anyway).  -- CSR, 2006-09-14
-           (dolist (type types (values res nil))
-             (when (csubtypep type (specifier-type 'function))
-               ;; Things like (AND STANDARD-OBJECT FUNCTION) are callable as functions.
-               (part-of function))
-             (multiple-value-bind (ptype)
-                 (primitive-type type)
-               (cond
-                 ;; if the result so far is (any), any improvement on
-                 ;; the specificity of the primitive type is valid.
-                 ((eq res (any))
-                  (setq res ptype))
-                 ;; if the primitive type returned is (any), the
-                 ;; result so far is valid.  Likewise, if the
-                 ;; primitive type is the same as the result so far,
-                 ;; everything is fine.
-                 ((or (eq ptype (any)) (eq ptype res)))
-                 ;; otherwise, we have something hairy and confusing,
-                 ;; such as (and condition funcallable-instance).
-                 ;; Punt.
-                 (t (return (any))))))))
-        (member-type
-         (let (res)
-           (block nil
-             (mapc-member-type-members
-              (lambda (member)
-                (let ((ptype (primitive-type-of member)))
-                  (if res
-                      (unless (eq ptype res)
-                        (let ((new-ptype (or (maybe-numeric-type-union res ptype)
-                                             (maybe-numeric-type-union ptype res))))
-                          (if new-ptype
-                              (setq res new-ptype)
-                              (return (any)))))
-                      (setf res ptype))))
-              type)
-             res)))
-        (named-type
-         (ecase (named-type-name type)
-           ((t *) (values *backend-t-primitive-type* t))
-           ((instance) (exactly instance))
-           ((funcallable-instance) (part-of function))
-           ((extended-sequence) (any))
-           ((nil) (any))))
-        (character-set-type
-         (if (eq type (specifier-type 'character))
-             (exactly character)
-             (part-of character)))
-        #+sb-simd-pack
-        (simd-pack-type
-         (let ((mask (simd-pack-type-tag-mask type)))
-           (if (= (logcount mask) 1)
-               (values (primitive-type-or-lose
-                        (svref +simd-pack-128-primtypes+ (simd-pack-mask->tag mask)))
-                       t)
-               (any))))
-        #+sb-simd-pack-256
-        (simd-pack-256-type
-         (let ((mask (simd-pack-256-type-tag-mask type)))
-           (if (= (logcount mask) 1)
-               (values (primitive-type-or-lose
-                        (svref +simd-pack-256-primtypes+ (simd-pack-mask->tag mask)))
-                       t)
-               (any))))
-        #+sb-simd-pack-512
-        (simd-pack-512-type
-         (let ((mask (simd-pack-512-type-tag-mask type)))
-           (if (= (logcount mask) 1)
-               (values (primitive-type-or-lose
-                        (svref +simd-pack-512-primtypes+ (simd-pack-mask->tag mask)))
-                       t)
-               (any))))
-        (cons-type
-         (part-of list))
-        (built-in-classoid
-         (case (classoid-name type)
-           ((complex function system-area-pointer weak-pointer)
-            (values (primitive-type-or-lose (classoid-name type)) t))
-           ((pathname logical-pathname)
-            (part-of instance))
-           #+sb-simd-pack-512
-           (simd-pack-512-mask
-            (values (primitive-type-or-lose 'simd-pack-512-mask-type) t))
-           (t
-            (any))))
-        (fun-designator-type
-         (any))
-        (fun-type
-         (exactly function))
-        (classoid
-         (if (csubtypep type (specifier-type 'function))
-             (part-of function)
-             (part-of instance)))
-        (ctype
-         (if (csubtypep type (specifier-type 'function))
-             (part-of function)
-             (any)))))))
+      (numeric-union-type
+       (let ((ptype (primitive-type (sb-kernel::weaken-numeric-union type))))
+         (if (and (eq ptype (primitive-type-or-lose 'integer))
+                  (csubtypep type (specifier-type 'bignum)))
+             (part-of bignum)
+             ptype)))
+      (union-type
+       (if (type= type (specifier-type 'list))
+           (exactly list)
+           (let ((types (sb-kernel::flatten-numeric-union-types type)))
+             (multiple-value-bind (res exact) (primitive-type (first types))
+               (dolist (type (rest types) (values res exact))
+                 (multiple-value-bind (ptype ptype-exact)
+                     (primitive-type type)
+                   (unless ptype-exact (setq exact nil))
+                   (unless (eq ptype res)
+                     (return (any)))))))))
+      (intersection-type
+       (let ((types (intersection-type-types type))
+             (res (any)))
+         ;; why NIL for the exact?  Well, we assume that the
+         ;; intersection type is in fact doing something for us:
+         ;; that is, that each of the types in the intersection is
+         ;; in fact cutting off some of the type lattice.  Since no
+         ;; intersection type is represented by a primitive type and
+         ;; primitive types are mutually exclusive, it follows that
+         ;; no intersection type can represent the entirety of the
+         ;; primitive type.  (And NIL is the conservative answer,
+         ;; anyway).  -- CSR, 2006-09-14
+         (dolist (type types (values res nil))
+           (when (csubtypep type (specifier-type 'function))
+             ;; Things like (AND STANDARD-OBJECT FUNCTION) are callable as functions.
+             (part-of function))
+           (multiple-value-bind (ptype)
+               (primitive-type type)
+             (cond
+               ;; if the result so far is (any), any improvement on
+               ;; the specificity of the primitive type is valid.
+               ((eq res (any))
+                (setq res ptype))
+               ;; if the primitive type returned is (any), the
+               ;; result so far is valid.  Likewise, if the
+               ;; primitive type is the same as the result so far,
+               ;; everything is fine.
+               ((or (eq ptype (any)) (eq ptype res)))
+               ;; otherwise, we have something hairy and confusing,
+               ;; such as (and condition funcallable-instance).
+               ;; Punt.
+               (t (return (any))))))))
+      (member-type
+       (let (res)
+         (block nil
+           (mapc-member-type-members
+            (lambda (member)
+              (let ((ptype (primitive-type-of member)))
+                (if res
+                    (unless (eq ptype res)
+                      (return (any)))
+                    (setf res ptype))))
+            type)
+           res)))
+      (named-type
+       (ecase (named-type-name type)
+         ((t *) (values *backend-t-primitive-type* t))
+         ((instance) (exactly instance))
+         ((funcallable-instance) (part-of function))
+         ((extended-sequence) (any))
+         ((nil) (any))))
+      (character-set-type
+       (if (eq type (specifier-type 'character))
+           (exactly character)
+           (part-of character)))
+      #+sb-simd-pack
+      (simd-pack-type
+       (let ((mask (simd-pack-type-tag-mask type)))
+         (if (= (logcount mask) 1)
+             (values (primitive-type-or-lose
+                      (svref +simd-pack-128-primtypes+ (simd-pack-mask->tag mask)))
+                     t)
+             (any))))
+      #+sb-simd-pack-256
+      (simd-pack-256-type
+       (let ((mask (simd-pack-256-type-tag-mask type)))
+         (if (= (logcount mask) 1)
+             (values (primitive-type-or-lose
+                      (svref +simd-pack-256-primtypes+ (simd-pack-mask->tag mask)))
+                     t)
+             (any))))
+      #+sb-simd-pack-512
+      (simd-pack-512-type
+       (let ((mask (simd-pack-512-type-tag-mask type)))
+         (if (= (logcount mask) 1)
+             (values (primitive-type-or-lose
+                      (svref +simd-pack-512-primtypes+ (simd-pack-mask->tag mask)))
+                     t)
+             (any))))
+      (cons-type
+       (part-of list))
+      (built-in-classoid
+       (case (classoid-name type)
+         ((complex function system-area-pointer weak-pointer)
+          (values (primitive-type-or-lose (classoid-name type)) t))
+         ((pathname logical-pathname)
+          (part-of instance))
+         #+sb-simd-pack-512
+         (simd-pack-512-mask
+          (values (primitive-type-or-lose 'simd-pack-512-mask-type) t))
+         (t
+          (any))))
+      (fun-designator-type
+       (any))
+      (fun-type
+       (exactly function))
+      (classoid
+       (if (csubtypep type (specifier-type 'function))
+           (part-of function)
+           (part-of instance)))
+      (ctype
+       (if (csubtypep type (specifier-type 'function))
+           (part-of function)
+           (any))))))
 
 (/show0 "primtype.lisp end of file")

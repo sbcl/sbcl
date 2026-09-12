@@ -90,6 +90,22 @@
   (let ((b (& (>> val 1) #x3)))
    (let ((a (>> (u32+ val (<< val 26)) 30)))
     (^ a (aref tab b))))))")
+(#(0 4 8 34 36 38)
+ "(27 26 2 28 4 0)"
+ "((let ((tab #a((4) (unsigned-byte 8) 4 0 2 6)))
+  (+= val #x14650a3e)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 1) #x3)))
+   (let ((a (>> (u32+ val (<< val 26)) 30)))
+    (^ a (aref tab b))))))")
+(#(0 4 8 36 38)
+ "(27 2 28 4 0)"
+ "((let ((tab #a((4) (unsigned-byte 8) 2 1 0 5)))
+  (+= val #xe705d0f4)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 2) #x3)))
+   (let ((a (>> (u32+ val (<< val 21)) 30)))
+    (^ a (aref tab b))))))")
 (#(0 58AA11D 33FB65F5 DE12C038)
  "#(:OFFSET :POST-INDEX 0 :PRE-INDEX)"
  "((& (>> val 2) 3))")
@@ -222,6 +238,9 @@
  "((& (^ (>> val 2) (>> val 4)) 7))")
 (#(2 6 A C 18)
  "(1 6 3 12 5)"
+ "((& (+ (>> val 2) (>> val 3) (>> val 4)) 7))")
+(#(2 6 A C 1A)
+ "(1 6 3 13 5)"
  "((& (+ (>> val 2) (>> val 3) (>> val 4)) 7))")
 (#(2 6 A 16 26)
  "(1 5 3 11 19)"
@@ -369,15 +388,30 @@
   (let ((b (>> (<< val 25) 30)))
    (let ((a (& (>> val 1) #x3)))
     (^ a (aref tab b))))))")
+(#(20 22 24 46 48 4A)
+ "(18 17 16 37 36 35)"
+ "((& (>> val 1) 7))")
 (#(24 26 28 48 4A 4C)
  "(20 19 18 38 37 36)"
  "((let ((tab #a((4) (unsigned-byte 8) 0 7 2 5)))
   (let ((b (& (>> val 1) #x3)))
    (let ((a (>> (<< val 25) 30)))
     (^ a (aref tab b))))))")
+(#(26 28 2A 4C 4E 50)
+ "(21 20 19 40 39 38)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 4 6 2)))
+  (let ((b (& (>> val 1) #x3)))
+   (let ((a (>> (<< val 25) 30)))
+    (^ a (aref tab b))))))")
 (#(2A 2C 2E 4E 50 52)
  "(23 22 21 41 40 39)"
  "((let ((tab #a((4) (unsigned-byte 8) 7 0 5 2)))
+  (let ((b (& (>> val 1) #x3)))
+   (let ((a (>> (<< val 25) 30)))
+    (^ a (aref tab b))))))")
+(#(2C 2E 30 52 54 56)
+ "(24 23 22 43 42 41)"
+ "((let ((tab #a((4) (unsigned-byte 8) 4 6 0 2)))
   (let ((b (& (>> val 1) #x3)))
    (let ((a (>> (<< val 25) 30)))
     (^ a (aref tab b))))))")
@@ -503,10 +537,25 @@
    (let ((a (>> (<< val 9) 27)))
     (^ a (aref tab b))))))")
 (#(15115EA 805D985 DBAFDA3 132E85C2 26DFCD3D 2C62CDF1 2FBB375F 2FCB0B8A 4EBA358E 4FA1D6C1 57DA1CEC 59F6CB0B 60D621C0 68E4C2C2
+   7A99ABFA 7B44F7BA 7E1E0B08 7EC15774 7F318E5B 9D748C83 A32D2005 A5D2FA71 D7126502 DAEA59DD E4157BFC F2F895BA FABEE259)
+ "(:BOXING-VARIANT :CHECK-TYPE :GC-BARRIER :OPTIONAL-RESULTS :SAVE-P :POLICY :GUARD :TRANSLATE :RESULT-TYPES :ARG-TYPES :NOTE :NODE-VAR :MOVE-ARGS :RESULT-REFS :ARG-REFS :VOP-VAR :VARIANT-COST :VARIANT-VARS :VARIANT :IGNORE :INFO :BEFORE-LOAD :GENERATOR :TEMPORARY :CONDITIONAL :RESULTS :ARGS)"
+ "((let ((tab #a((16) (unsigned-byte 8) 21 0 15 0 0 31 0 7 15 0 16 0 15 16 3 31)))
+  (let ((b (& (>> val 1) #xf)))
+   (let ((a (>> (<< val 7) 28)))
+    (^ a (aref tab b))))))")
+(#(15115EA 805D985 DBAFDA3 132E85C2 26DFCD3D 2C62CDF1 2FBB375F 2FCB0B8A 4EBA358E 4FA1D6C1 57DA1CEC 59F6CB0B 60D621C0 68E4C2C2
    7A99ABFA 7B44F7BA 7E1E0B08 7EC15774 7F318E5B 9D748C83 A5D2FA71 D7126502 DAEA59DD E4157BFC F2F895BA FABEE259)
  "(:CHECK-TYPE :GC-BARRIER :OPTIONAL-RESULTS :SAVE-P :POLICY :GUARD :TRANSLATE :RESULT-TYPES :ARG-TYPES :NOTE :NODE-VAR :MOVE-ARGS :RESULT-REFS :ARG-REFS :VOP-VAR :VARIANT-COST :VARIANT-VARS :VARIANT :IGNORE :INFO :BEFORE-LOAD :GENERATOR :TEMPORARY :CONDITIONAL :RESULTS :ARGS)"
  "((let ((tab #a((16) (unsigned-byte 8) 21 0 0 0 14 31 24 15 26 0 0 0 18 11 3 31)))
   (let ((b (& (>> val 1) #xf)))
+   (let ((a (>> (<< val 7) 28)))
+    (^ a (aref tab b))))))")
+(#(15115EA 805D985 132E85C2 26DFCD3D 2C62CDF1 2FBB375F 2FCB0B8A 3BAA5C56 3CA49203 42D83FFB 4EBA358E 4FA1D6C1 68E4C2C2 7A99ABFA
+   7A9BD84A 7E1E0B08 7EC15774 9D748C83 A32D2005 A5D2FA71 AD4575D9 B08E958D B58649C9 BDD1B60F C4297528 CFADF401 D7126502
+   DA5197C7 ED5791F8 F682E177 FABEE259 FC06EE2A)
+ "(:ALLOW-OTHER-KEYS :BOXING-VARIANT :CHECK-TYPE :GC-BARRIER :BEFORE-LOAD :MOVE-ARGS :SAVE-P :LTN-POLICY :TRANSLATE :NOTE :INFO-ARGS :NODE-VAR :VOP-VAR :VARIANT-VARS :VARIANT :BODY :COST :GUARD :RESULT-TYPES :ARG-TYPES :CONDITIONAL-P :IGNORES :OPTIONAL-RESULTS :OPERANDS :MORE-RESULTS :MORE-ARGS :TEMPS :RESULTS :ARGS :INHERITS :NAME :SOURCE-LOCATION)"
+ "((let ((tab #a((16) (unsigned-byte 8) 1 7 0 13 21 21 18 22 7 0 16 24 0 31 21 16)))
+  (let ((b (& (>> val 12) #xf)))
    (let ((a (>> (<< val 7) 28)))
     (^ a (aref tab b))))))")
 (#(15115EA 805D985 132E85C2 26DFCD3D 2C62CDF1 2FBB375F 2FCB0B8A 3BAA5C56 3CA49203 42D83FFB 4EBA358E 4FA1D6C1 68E4C2C2 7A99ABFA
@@ -803,6 +852,14 @@
  "((let ((tab #a((16) (unsigned-byte 8) 0 0 0 0 13 0 0 0 0 26 10 7 0 0 0 0)))
   (let ((b (& val #xf)))
    (let ((a (>> (<< val 7) 28)))
+    (^ a (aref tab b))))))")
+(#(D9ED77E 132E85C2 1D77E2C6 23511E3A 26DFCD3D 2C62CDF1 2FBB375F 2FCB0B8A 3573C22C 3884DD16 3CA49203 3EBC6344 42D83FFB 4FA1D6C1
+   5B6BC745 632BDBE5 68E4C2C2 68FDE47B 6E3707AB 74673302 7E1E0B08 899C08B3 A32D2005 A3D2F179 A5D2FA71 AD4575D9 B0113B7E
+   B58649C9 B803E7E1 BFF51002 D7126502 DA5197C7 DAF68EAF EBD01872 F4D7A12A FABEE259)
+ "(:ALLOW-OTHER-KEYS :BOXING-VARIANT :CHECK-TYPE :TRANSLATE :GC-BARRIER :AFTER-SC-SELECTION :MOVE-VOP-P :OPTIONAL-RESULTS :OPTIMIZER :TARGETS :REF-ORDERING :TEMPS :NUM-RESULTS :NUM-ARGS :VARIANT :GENERATOR-FUNCTION :MORE-ARG-LOAD-SCS :RESULT-LOAD-SCS :ARG-LOAD-SCS :MORE-RESULT-COSTS :MORE-ARG-COSTS :RESULT-COSTS :ARG-COSTS :MOVE-ARGS :SAVE-P :INFO-ARG-COUNT :NOTE :COST :LTN-POLICY :GUARD :MORE-RESULTS-TYPE :MORE-ARGS-TYPE :RESULT-TYPES :ARG-TYPES :TYPE :NAME)"
+ "((let ((tab #a((32) (unsigned-byte 8) 0 9 0 0 28 0 0 11 0 9 12 7 19 0 0 59 0 28 60 9 0 0 36 0 0 9 38 9 0 1 7 22)))
+  (let ((b (& val #x1f)))
+   (let ((a (>> val 27)))
     (^ a (aref tab b))))))")
 (#(D9ED77E 132E85C2 1D77E2C6 23511E3A 26DFCD3D 2C62CDF1 2FBB375F 2FCB0B8A 3573C22C 3884DD16 3CA49203 3EBC6344 42D83FFB 4FA1D6C1
    5B6BC745 632BDBE5 68E4C2C2 68FDE47B 6E3707AB 74673302 7E1E0B08 899C08B3 A3D2F179 A5D2FA71 AD4575D9 B0113B7E B58649C9

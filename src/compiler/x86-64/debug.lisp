@@ -88,9 +88,8 @@
   (:translate %make-lisp-obj)
   (:args (value :scs (unsigned-reg unsigned-stack) :target result))
   (:arg-types unsigned-num)
-  (:results (result :scs (descriptor-reg)
-                    :load-if (not (sc-is value unsigned-reg))
-                    ))
+  (:results (result :scs (descriptor-reg any-reg)
+                    :load-if (not (sc-is value unsigned-reg))))
   (:generator 1
     (move result value)))
 

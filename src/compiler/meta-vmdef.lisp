@@ -245,7 +245,7 @@
              (:copier nil)
              #-sb-xc-host (:pure t))
   ;; name of the operand (which we bind to the TN)
-  (name nil :type symbol :read-only t)
+  (name nil :type (or symbol list) :read-only t)
   ;; the way this operand is used:
   (kind (missing-arg) :read-only t
         :type (member :argument :result :temporary
@@ -339,7 +339,8 @@
   (move-args nil :type (member nil :local-call :full-call :known-return :fixed))
   (before-load :unspecified :type (or (member :unspecified) list))
   (gc-barrier nil)
-  (check-type nil))
+  (check-type nil)
+  (boxing-variant nil))
 (declaim (freeze-type vop-parse))
 (defprinter (vop-parse)
   name
@@ -367,7 +368,7 @@
 ;;; The list of slots in the structure, not including the OPERANDS slot.
 ;;; Order here is insignificant; it happens to be alphabetical.
 (defglobal vop-parse-slot-names
-    '(arg-types args before-load body check-type conditional-p cost gc-barrier guard ignores info-args
+    '(arg-types args before-load body boxing-variant check-type conditional-p cost gc-barrier guard ignores info-args
       inherits ltn-policy more-args more-results move-args name node-var note optional-results
       result-types results save-p source-location temps translate variant variant-vars vop-var))
 ;; A sanity-check. Of course if this fails, the likelihood is that you can't even
@@ -431,9 +432,17 @@
 (defun find-operand (name parse &optional
                           (kinds '(:argument :result :temporary))
                           (error-p t))
-  (declare (symbol name) (type vop-parse parse) (list kinds))
-  (let ((found (find name (vop-parse-operands parse)
-                     :key #'operand-parse-name)))
+  (declare ((or list symbol) name) (type vop-parse parse) (list kinds))
+  (let ((found (if (listp name)
+                   (find name (vop-parse-operands parse)
+                         :key #'operand-parse-name
+                         :test #'equal)
+                   (find-if (lambda (n)
+                              (if (listp n)
+                                  (member name n)
+                                  (eql name n)))
+                            (vop-parse-operands parse)
+                            :key #'operand-parse-name))))
     (if found
         (unless (member (operand-parse-kind found) kinds)
           (error "Operand ~S isn't one of these kinds: ~S." name kinds))
@@ -699,27 +708,32 @@
         (temp (operand-parse-temp op))
         (loads (and (eq (operand-parse-kind op) :argument)
                     (call-move-fun parse op t))))
-    (if (eq load t)
-        `(cond (,load-tn
-                ,loads
-                ,load-tn)
-               (t
-                (tn-ref-tn ,temp)))
-        (collect ((binds)
-                  (ignores))
-          (dolist (x (vop-parse-operands parse))
-            (when (member (operand-parse-kind x) '(:argument :result))
-              (let ((name (operand-parse-name x)))
-                (binds `(,name (tn-ref-tn ,(operand-parse-temp x))))
-                (ignores name))))
-          `(cond ((and ,load-tn
-                       (let ,(binds)
-                         (declare (ignorable ,@(ignores)))
-                         ,load))
-                  ,loads
-                  ,load-tn)
-                 (t
-                  (tn-ref-tn ,temp)))))))
+    (wrap-if (listp (operand-parse-name op))
+             `(sb-vm::128-reg-parts)
+             (if (eq load t)
+                 `(cond (,load-tn
+                         ,loads
+                         ,load-tn)
+                        (t
+                         (tn-ref-tn ,temp)))
+                 (collect ((binds)
+                           (ignores))
+                   (dolist (x (vop-parse-operands parse))
+                     (when (member (operand-parse-kind x) '(:argument :result))
+                       (let* ((name (operand-parse-name x))
+                              (name (if (listp name)
+                                        (car name)
+                                        name)))
+                         (binds `(,name (tn-ref-tn ,(operand-parse-temp x))))
+                         (ignores name))))
+                   `(cond ((and ,load-tn
+                                (let ,(binds)
+                                  (declare (ignorable ,@ (ignores)))
+                                  ,load))
+                           ,loads
+                           ,load-tn)
+                          (t
+                           (tn-ref-tn ,temp))))))))
 
 ;;; A vop inherits from a vop with :arg-ref, but it puts its argument
 ;;; into an :info constant, bind the extra arg-refs to NIL.
@@ -738,7 +752,7 @@
                     unless (string= name
                                     #1="OPERAND-PARSE-TEMP"
                                     :end1 (min (length name) (length #1#)))
-                    collect `(,temp)))))))))
+                    collect `(,temp nil)))))))))
 
 ;;; Make a lambda that parses the VOP TN-REFS, does automatic operand
 ;;; loading, and runs the appropriate code generator.
@@ -770,29 +784,29 @@
           ((:more-argument :more-result))))
       `(named-lambda (vop ,(vop-parse-name parse)) (,n-vop)
          (declare (ignorable ,n-vop))
-         (let* (,@(access-operands (vop-parse-args parse)
-                                   (vop-parse-more-args parse)
-                                   `(vop-args ,n-vop))
-                ,@(access-operands (vop-parse-results parse)
-                                   (vop-parse-more-results parse)
-                                   `(vop-results ,n-vop))
-                ,@(access-operands (vop-parse-temps parse) nil
-                                   `(vop-temps ,n-vop))
-                ,@(when (vop-parse-info-args parse)
-                    `((,n-info (vop-codegen-info ,n-vop))
-                      ,@(mapcar (lambda (x) `(,x (pop ,n-info)))
-                                (vop-parse-info-args parse))))
-                ,@(when (vop-parse-variant-vars parse)
-                    `((,n-variant (vop-info-variant (vop-info ,n-vop)))
-                      ,@(mapcar (lambda (x) `(,x (pop ,n-variant)))
-                                (vop-parse-variant-vars parse))))
-                ,@(when (vop-parse-node-var parse)
-                    `((,(vop-parse-node-var parse) (vop-node ,n-vop))))
-                ,@(and (neq (vop-parse-before-load parse) :unspecified)
-                       `((,dummy (progn
-                                   ,@(vop-parse-before-load parse)))))
-                ,@(binds)
-                ,@(extra-arg-refs parse))
+         (binding* (,@(access-operands (vop-parse-args parse)
+                                       (vop-parse-more-args parse)
+                                       `(vop-args ,n-vop))
+                    ,@(access-operands (vop-parse-results parse)
+                                       (vop-parse-more-results parse)
+                                       `(vop-results ,n-vop))
+                    ,@(access-operands (vop-parse-temps parse) nil
+                                       `(vop-temps ,n-vop))
+                    ,@(when (vop-parse-info-args parse)
+                        `((,n-info (vop-codegen-info ,n-vop))
+                          ,@(mapcar (lambda (x) `(,x (pop ,n-info)))
+                                    (vop-parse-info-args parse))))
+                    ,@(when (vop-parse-variant-vars parse)
+                        `((,n-variant (vop-info-variant (vop-info ,n-vop)))
+                          ,@(mapcar (lambda (x) `(,x (pop ,n-variant)))
+                                    (vop-parse-variant-vars parse))))
+                    ,@(when (vop-parse-node-var parse)
+                        `((,(vop-parse-node-var parse) (vop-node ,n-vop))))
+                    ,@(and (neq (vop-parse-before-load parse) :unspecified)
+                           `((,dummy (progn
+                                       ,@(vop-parse-before-load parse)))))
+                    ,@(binds)
+                    ,@(extra-arg-refs parse))
            (declare (ignore ,@(vop-parse-ignores parse)
                             ,@(and (neq (vop-parse-before-load parse) :unspecified)
                                    `(,dummy))))
@@ -868,7 +882,9 @@
         (more nil))
     (collect ((operands))
       (dolist (spec specs)
-        (unless (and (consp spec) (symbolp (first spec)) (oddp (length spec)))
+        (unless (and (consp spec)
+                     (or (typep (first spec) '(or list symbol)))
+                     (oddp (length spec)))
           (error "malformed operand specifier: ~S" spec))
         (when more
           (error "The MORE operand isn't the last operand: ~S" specs))
@@ -1125,6 +1141,8 @@
          (setf (vop-parse-gc-barrier parse) (rest spec)))
         (:check-type
          (setf (vop-parse-check-type parse) (rest spec)))
+        (:boxing-variant
+         (setf (vop-parse-boxing-variant parse) (second spec)))
         (t
          (error "unknown option specifier: ~S" (first spec)))))
     (cond (arg-refs-p
@@ -1587,6 +1605,8 @@
                                            mask)
                                       1)))
                      mask)
+      ,@(when (vop-parse-boxing-variant parse)
+          `(:boxing-variant (template-or-lose ',(vop-parse-boxing-variant parse))))
       #+(and (not sb-xc-host) sb-devel)
       :optimizer
       #+(and (not sb-xc-host) sb-devel)
@@ -1907,10 +1927,15 @@
                       (infos this-sc)
                       (input `(jump-target ',this-sc)))
                      (arg
-                      (args (list* name :scs (list sc) rest))
+                      (args (list* name :scs (ensure-list  sc) rest))
                       (let ((type (or type (sc-to-primtype sc))))
-                        (arg-types type)
-                        (input `(the ,(primtype-to-type type) ,arg))))
+
+                        (cond ((listp type)
+                               (arg-types `(:or ,@type))
+                               (input `(the (or ,@(mapcar #'primtype-to-type type)) ,arg)))
+                              (t
+                               (arg-types type)
+                               (input `(the ,(primtype-to-type type) ,arg))))))
                      (t
                       (temps `(:temporary (:sc ,sc ,@rest)
                                           ,name)))))
@@ -1922,7 +1947,7 @@
             for prev = (if this-sc
                            result
                            prev)
-            do (results (list* name :scs (list sc) rest))
+            do (results (list* name :scs (ensure-list sc) rest))
                (result-types (or type (sc-to-primtype sc))))
       (let ((form
               `(truly-the

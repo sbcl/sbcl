@@ -80,7 +80,7 @@
   (:translate %make-lisp-obj)
   (:args (value :scs (unsigned-reg) :target result))
   (:arg-types unsigned-num)
-  (:results (result :scs (descriptor-reg)))
+  (:results (result :scs (descriptor-reg any-reg)))
   (:generator 1
     (move result value)))
 

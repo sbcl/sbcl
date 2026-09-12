@@ -748,7 +748,8 @@
   (gc-barrier nil)
   (translate nil)
   ;; A bit mask of arguments for which this VOP checks the type
-  (check-type 0 :type fixnum))
+  (check-type 0 :type fixnum)
+  (boxing-variant nil :type (or null vop-info)))
 (!set-load-form-method vop-info (:xc :target) :ignore-it)
 
 (declaim (inline vop-name))

@@ -179,14 +179,22 @@
   (defregset    *c-call-register-arg-offsets* rcx rdx r8 r9)
   (defregset *descriptor-args* rdx rdi rsi rbx rcx r8 r9 r10 r14)
   (defconstant float-reg-count 16))
+
+(defglobal *128-regs* (loop with regs = *qword-regs*
+                            while regs
+                            when (let ((reg (pop regs)))
+                                   (when (eql (1+ reg) (car regs))
+                                     (pop regs)
+                                     reg))
+                            collect it))
 
 ;;;; SB definitions
 
 (!define-storage-bases
-(define-storage-base registers :finite :size 16)
+ (define-storage-base registers :finite :size 16)
 
-(define-storage-base float-registers :finite :size 32)
-(define-storage-base mask-registers :finite :size 8)
+ (define-storage-base float-registers :finite :size 32)
+ (define-storage-base mask-registers :finite :size 8)
 ;;; Start from 2, for the old RBP (aka OCFP) and return address
 (define-storage-base stack :unbounded :size 2 :size-increment 1)
 (define-storage-base constant :non-packed)
@@ -212,6 +220,7 @@
   ;; the non-descriptor stacks
   (signed-stack stack)                  ; (signed-byte 64)
   (unsigned-stack stack)                ; (unsigned-byte 64)
+  (signed-128-stack stack :element-size 2)
   (character-stack stack)               ; non-descriptor characters.
   (sap-stack stack)                     ; System area pointers.
   (single-stack stack)                  ; single-floats
@@ -288,7 +297,12 @@
                 :constant-scs (immediate)
                 :save-p t
                 :alternate-scs (unsigned-stack))
-
+   (signed-128-reg registers
+    :locations #.*128-regs*
+   ; :constant-scs (immediate)
+    :element-size 2
+    :save-p t
+    :alternate-scs (signed-128-stack))
   ;; non-descriptor SINGLE-FLOATs
   (single-reg float-registers
               :locations #.(loop for i to 15 collect i)
@@ -626,15 +640,20 @@
          (offset (tn-offset tn)))
     (ecase sb
       (registers
-       (concatenate 'string
-                    (reg-name (tn-reg tn))
-                    (case (sc-name (tn-sc tn))
-                      (descriptor-reg "(d)")
-                      (any-reg "(a)")
-                      (unsigned-reg "(u)")
-                      (signed-reg "(s)")
-                      (sap-reg "(p)")
-                      (t "(?)"))))
+       (if (sc-is tn signed-128-reg)
+           (multiple-value-bind (lo hi) (128-reg-parts tn)
+             (format nil "~a/~a (s128)"
+                     (reg-name (tn-reg lo))
+                     (reg-name (tn-reg hi))))
+           (concatenate 'string
+                        (reg-name (tn-reg tn))
+                        (case (sc-name (tn-sc tn))
+                          (descriptor-reg "(d)")
+                          (any-reg "(a)")
+                          (unsigned-reg "(u)")
+                          (signed-reg "(s)")
+                          (sap-reg "(p)")
+                          (t "(?)")))))
       (float-registers (format nil "FLOAT~D" offset))
       (stack (format nil "S~D" offset))
       (constant (format nil "Const~D" offset))

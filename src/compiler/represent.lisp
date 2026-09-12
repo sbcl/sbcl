@@ -472,22 +472,36 @@
                  (let ((res (find-move-vop op-tn write-p sc ptype
                                            #'sc-move-vops)))
                    (when res
-                     (let ((temp (make-representation-tn ptype scn)))
-                       (change-tn-ref-tn op temp)
-                       (cond
-                         ((not write-p)
-                          (or
-                           (coerce-from-constant op-tn op temp load-scs)
-                           (emit-move (or (maybe-move-from-fixnum+-1 op-tn temp
-                                                                     op)
-                                          res)
-                                      op-tn temp)))
-                         ((and (null (tn-reads op-tn))
-                               (eq (tn-kind op-tn) :normal)))
-                         (t
-                          (emit-move (or (maybe-move-from-fixnum+-1 temp op-tn op)
-                                         res)
-                                     temp op-tn))))
+                     (cond #+x86-64
+                           ((and write-p
+                                 (sc-is op-tn sb-vm::descriptor-reg)
+                                 (let ((boxing-vop (vop-info-boxing-variant (vop-info vop))))
+                                   (when boxing-vop
+                                     (emit-and-insert-vop node
+                                                          block
+                                                          boxing-vop
+                                                          (reference-tn-refs (vop-args vop) nil)
+                                                          (reference-tn-refs (vop-results vop) t)
+                                                          vop)
+                                     (delete-vop vop)
+                                     t))))
+                           (t
+                            (let ((temp (make-representation-tn ptype scn)))
+                              (change-tn-ref-tn op temp)
+                              (cond
+                                ((not write-p)
+                                 (or
+                                  (coerce-from-constant op-tn op temp load-scs)
+                                  (emit-move (or (maybe-move-from-fixnum+-1 op-tn temp
+                                                                            op)
+                                                 res)
+                                             op-tn temp)))
+                                ((and (null (tn-reads op-tn))
+                                      (eq (tn-kind op-tn) :normal)))
+                                (t
+                                 (emit-move (or (maybe-move-from-fixnum+-1 temp op-tn op)
+                                                res)
+                                            temp op-tn))))))
                      t)))))
       ;; Search the non-stack load SCs first.
       (dotimes (scn sb-vm:sc-number-limit)

@@ -65,7 +65,7 @@
                 DO-STATIC-FUN
                 (tail-call-lisp-fun ',(symbolicate "TWO-ARG-" fun) 2))))
 
-  (define-generic-arith-routine (+ 10)
+  (define-generic-arith-routine (+ 30)
     (move res x)
     (inst add res y)
     (inst jmp :o BIGNUM)
@@ -78,7 +78,7 @@
       (inst sar res (1- n-fixnum-tag-bits)))
     (return-single-word-bignum res rcx res))
 
-  (define-generic-arith-routine (- 10)
+  (define-generic-arith-routine (- 30)
     (move res x)
     (inst sub res y)
     (inst jmp :o BIGNUM)
@@ -120,7 +120,7 @@
 ;;;; negation
 
 (define-assembly-routine (generic-negate
-                          (:cost 10)
+                          (:cost 30)
                           (:return-style :full-call-no-return)
                           (:policy :safe)
                           (:translate %negate)
