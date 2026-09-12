@@ -3696,18 +3696,49 @@
       (delete-stmt stmt)
       next)))
 
+(defun flag-reader-condition (stmt)
+  (loop for s = stmt then (stmt-next s)
+        while s
+        do (when (and (neq s stmt) (stmt-labels s))
+             (return nil))
+           (case (stmt-op s)
+             ((mov lea)
+              ;; Non-flag-affecting instructions: continue scanning
+              )
+             ((jmp set cmov)
+              (let ((cond (car (stmt-operands s))))
+                (return (and (keywordp cond) cond))))
+             (t
+              (return nil)))))
+
+(defun flags-dead-p (stmt)
+  (loop for s = (stmt-next stmt) then (stmt-next s)
+        while s
+        do (when (stmt-labels s)
+             (return nil))
+           (let ((op (stmt-op s)))
+             (case op
+               ((mov lea nop)
+                ;; Flags preserved, continue scanning
+                )
+               ((add sub neg and or xor test cmp)
+                ;; Unconditionally overwrites flags without reading them
+                (return t))
+               ((ret leave)
+                ;; Function return, flags not live
+                (return t))
+               (t
+                ;; Any other instruction (jmp, set, cmov, adc, sbb, call, etc.):
+                ;; conservatively assume flags might be read
+                (return nil))))))
+
 ;;; In {AND,OR,...} reg, src ; TEST reg, reg ; {JMP,SET,CMOV} {:z,:nz,:s,:ns,...}
 ;;; the TEST is unnecessary since ALU operations set the Z and S flags.
 ;;; Per the processor manual, TEST clears OF and CF, so presumably
 ;;; there is not a branch-if on either of those flags.
 ;;; It shouldn't be a problem that removal of TEST leaves more flags affected.
 
-;; TODO:
-;; add adc sub sbb neg sar shl shr
-;; set OF and CF, and while the code below does check for the next
-;; instruction reading this flag, there might be multiple flag-reading
-;; instructions.
-(defpattern "ALU + test" ((and or xor) (test)) (stmt next)
+(defpattern "ALU + test" ((and or xor add sub neg shl shr sar) (test)) (stmt next)
   (binding* (((size1 dst1 src1) (parse-2-operands stmt))
              ((size2 dst2 src2) (parse-2-operands next))
              (next-next (stmt-next next)))
@@ -3721,17 +3752,7 @@
                (not (and (memq (stmt-op stmt) '(sar shl shr))
                          (memq (car (last (stmt-operands stmt)))
                                '(:cl 0))))
-               (let ((flag (cond ((memq (stmt-op next-next) '(jmp set))
-                                  (car (stmt-operands next-next)))
-                                 (t
-                                  (loop for next = next-next then (stmt-next next)
-                                        while next
-                                        do (case (stmt-op next)
-                                             ((mov lea))
-                                             (cmov
-                                              (return (second (stmt-operands next))))
-                                             (t
-                                              (return))))))))
+               (let ((flag (flag-reader-condition next-next)))
                  (or (and (memq (stmt-op stmt) '(and xor or)) ;; the same flags are set
                           (or (eq size2 size1)
                               (and (memq flag '(:ne :e :nz :z))
@@ -3840,13 +3861,133 @@
       (delete-stmt next)
       stmt)))
 
+(defpattern "transitive mov forwarding" ((mov) (mov)) (stmt next)
+  (binding* (((size1 dst1 src1) (parse-2-operands stmt))
+             ((size2 dst2 src2) (parse-2-operands next)))
+    (when (and (memq size1 '(:dword :qword))
+               (eq size1 size2)
+               (gpr-tn-p dst1)
+               (gpr-tn-p src1)
+               (gpr-tn-p dst2)
+               (gpr-tn-p src2)
+               (location= dst1 src2)
+               (not (location= dst1 dst2))
+               (not (location= src1 dst2)))
+      (replace-prefixed next (encode-size-prefix size2) 'mov dst2 src1)
+      next)))
+
+(defpattern "store-to-load forwarding" ((mov) (mov)) (stmt next)
+  (binding* (((size1 dst1 src1) (parse-2-operands stmt))
+             ((size2 dst2 src2) (parse-2-operands next)))
+    (when (and (memq size1 '(:dword :qword))
+               (eq size1 size2)
+               (gpr-tn-p src1)
+               (gpr-tn-p dst2)
+               (or (stack-tn-p dst1) (ea-p dst1))
+               (or (stack-tn-p src2) (ea-p src2))
+               (alias-p dst1 src2))
+      (replace-prefixed next (encode-size-prefix size2) 'mov dst2 src1)
+      next)))
+
+(defpattern "load-after-load forwarding" ((mov) (mov)) (stmt next)
+  (binding* (((size1 dst1 src1) (parse-2-operands stmt))
+             ((size2 dst2 src2) (parse-2-operands next)))
+    (when (and (memq size1 '(:dword :qword))
+               (eq size1 size2)
+               (gpr-tn-p dst1)
+               (gpr-tn-p dst2)
+               (or (stack-tn-p src1) (ea-p src1))
+               (or (stack-tn-p src2) (ea-p src2))
+               (alias-p src1 src2)
+               (or (stack-tn-p src1)
+                   (and (not (reg= dst1 (ea-base src1)))
+                        (not (reg= dst1 (ea-index src1))))))
+      (replace-prefixed next (encode-size-prefix size2) 'mov dst2 dst1)
+      next)))
+
+(defpattern "mov 0 -> xor" ((mov)) (stmt)
+  (binding* (((size dst src) (parse-2-operands stmt)))
+    (when (and (gpr-tn-p dst)
+               (eql src 0)
+               (memq size '(:dword :qword))
+               (flags-dead-p stmt))
+      (replace-prefixed stmt (encode-size-prefix :dword) 'xor dst dst)
+      stmt)))
+
+(defpattern "shl + shl -> shl" ((shl) (shl)) (stmt next)
+  (binding* (((size1 dst1 src1) (parse-2-operands stmt))
+             ((size2 dst2 src2) (parse-2-operands next)))
+    (when (and (gpr-tn-p dst1)
+               (location= dst2 dst1)
+               (eq size1 size2)
+               (integerp src1)
+               (integerp src2)
+               (< (+ src1 src2) (if (eq size1 :dword) 32 64)))
+      (replace-prefixed next (encode-size-prefix size2) 'shl dst2 (+ src1 src2))
+      (add-stmt-labels next (stmt-labels stmt))
+      (delete-stmt stmt)
+      next)))
+
+(defpattern "shr + shr -> shr" ((shr) (shr)) (stmt next)
+  (binding* (((size1 dst1 src1) (parse-2-operands stmt))
+             ((size2 dst2 src2) (parse-2-operands next)))
+    (when (and (gpr-tn-p dst1)
+               (location= dst2 dst1)
+               (eq size1 size2)
+               (integerp src1)
+               (integerp src2)
+               (< (+ src1 src2) (if (eq size1 :dword) 32 64)))
+      (replace-prefixed next (encode-size-prefix size2) 'shr dst2 (+ src1 src2))
+      (add-stmt-labels next (stmt-labels stmt))
+      (delete-stmt stmt)
+      next)))
+
+(defpattern "mov + add -> lea" ((mov) (add)) (stmt next)
+  (binding* (((size1 dst1 src1) (parse-2-operands stmt))
+             ((size2 dst2 src2) (parse-2-operands next)))
+    (when (and (eq size1 :qword)
+               (eq size2 :qword)
+               (not (sb-assem::stmt-labels next))
+               (gpr-tn-p dst1)
+               (gpr-tn-p src1)
+               (gpr-tn-p dst2)
+               (location= dst1 dst2)
+               (typep src2 '(signed-byte 32))
+               (flags-dead-p next))
+      (replace-prefixed next (encode-size-prefix :qword) 'lea dst2 (ea src2 src1))
+      (add-stmt-labels next (stmt-labels stmt))
+      (delete-stmt stmt)
+      next)))
+
+(defpattern "mov r64, r64 elim" ((mov)) (stmt)
+  (binding* (((size dst src) (parse-2-operands stmt)))
+    (when (and (eq size :qword)
+               (gpr-tn-p dst)
+               (gpr-tn-p src)
+               (location= dst src))
+      (let ((next (stmt-next stmt))
+            (prev (stmt-prev stmt)))
+        (when (stmt-labels stmt)
+          (add-stmt-labels (or next prev) (stmt-labels stmt)))
+        (delete-stmt stmt)
+        (or next prev)))))
+
+(defpattern "cmp 0 -> test" ((cmp)) (stmt)
+  (binding* (((size dst src) (parse-2-operands stmt)))
+    (when (and (gpr-tn-p dst)
+               (eql src 0)
+               (memq size '(:dword :qword)))
+      (replace-prefixed stmt (encode-size-prefix size) 'test dst dst)
+      stmt)))
+
 ;;; Return :TAKEN if taking the conditional branch COND1 implies that COND2's
 ;;; branch will be taken, or :NOT-TAKEN if COND2 will fallthrough,
 ;;; or NIL it can't be determined.
 (defun branch-branch-implication (cond1 cond2)
-  (macrolet ((conditions (symbol1 symbol2)
-               `(and (eql ,(encoded-condition symbol1) cond1)
-                     (eql ,(encoded-condition symbol2) cond2))))
+  (macrolet ((cond-is (c sym)
+               `(eql ,c ,(encoded-condition sym)))
+             (cond2-in (&rest syms)
+               `(or ,@(mapcar (lambda (s) `(cond-is cond2 ,s)) syms))))
     (cond ((or (eq cond1 cond2) (eq cond2 :always))
            ;;  conditional to same condition  -> jump to target of 2nd jump
            ;;  conditional to :ALWAYS         -> jump to target of 2nd jump
@@ -3856,15 +3997,33 @@
            ;; A conditional jump to the negation of that condition
            ;; goes to the instruction after the 2nd jump.
            :not-taken)
-          ;; I manually examined a sampling of calls to this function
-          ;; and did not notice other opportunities to return non-NIL
-          ((conditions :a :e) :not-taken) ; above to equal
-          ((conditions :a :ne) :taken) ; above to not-equal
+          ;; Condition (:e / :z) (Zero)
+          ((cond-is cond1 :e)
+           (cond ((cond2-in :be :le) :taken)
+                 ((cond2-in :ne :a :b :g :l) :not-taken)
+                 (t nil)))
+          ;; Condition (:b / :c) (Carry / Below - unsigned)
+          ((cond-is cond1 :b)
+           (cond ((cond2-in :be :ne) :taken)
+                 ((cond2-in :ae :e :a) :not-taken)
+                 (t nil)))
+          ;; Condition (:a) (Above - unsigned)
+          ((cond-is cond1 :a)
+           (cond ((cond2-in :ae :ne) :taken)
+                 ((cond2-in :be :b :e) :not-taken)
+                 (t nil)))
+          ;; Condition (:l) (Less - signed)
+          ((cond-is cond1 :l)
+           (cond ((cond2-in :le :ne) :taken)
+                 ((cond2-in :ge :g :e) :not-taken)
+                 (t nil)))
+          ;; Condition (:g) (Greater - signed)
+          ((cond-is cond1 :g)
+           (cond ((cond2-in :ge :ne) :taken)
+                 ((cond2-in :le :l :e) :not-taken)
+                 (t nil)))
           (t nil))))
 
-;;; Possible enhancement: it should be possible to eliminate more jumps-to-jumps
-;;; by knowing something about implication of one condition upon another, e.g.
-;;; either JC or JZ jumping to JBE would take the second jump, since JBE is (CF=1 or ZF=1).
 (defun sb-assem::perform-jump-to-jump-elimination (starting-stmt label->stmt-map)
   (flet ((jmp-cond (stmt)
            (if (cdr (stmt-operands stmt))
@@ -3874,8 +4033,10 @@
            ;; could be an effective address (only if not a conditional jump)
            (let ((maybe-label (car (last (stmt-operands stmt)))))
              (and (label-p maybe-label) maybe-label))))
-    (do ((stmt starting-stmt (stmt-next stmt)))
+    (do ((stmt starting-stmt next-stmt)
+         (next-stmt nil))
         ((null stmt))
+      (setq next-stmt (stmt-next stmt))
       (when (eq (stmt-op stmt) 'jmp)
         (let* ((to-label (jmp-target stmt))
                (to-stmt (gethash to-label label->stmt-map)))
@@ -3884,12 +4045,46 @@
                      (jmp-target to-stmt)
                      (branch-branch-implication (jmp-cond stmt) (jmp-cond to-stmt)))
             (:taken
-             (setf (car (last (stmt-operands stmt))) (jmp-target to-stmt)))
+             (setf (car (last (stmt-operands stmt))) (jmp-target to-stmt))
+             (setq to-label (jmp-target stmt)
+                   to-stmt (gethash to-label label->stmt-map)))
             (:not-taken
              (let* ((fallthrough (stmt-next to-stmt))
                     (label ; the statement might already be labeled
                      (or (first (ensure-list (stmt-labels fallthrough)))
-                         (let ((label (gen-label))) ; maake a new label
+                         (let ((label (gen-label))) ; make a new label
                            (setf (gethash label label->stmt-map) fallthrough)
                            (add-stmt-labels fallthrough label)))))
-               (setf (car (last (stmt-operands stmt))) label)))))))))
+               (setf (car (last (stmt-operands stmt))) label)
+               (setq to-label label
+                     to-stmt fallthrough))))
+          ;; Jump-over-jump inversion:
+          ;; Jcc L_fallthrough ; JMP L_target ; L_fallthrough:
+          ;; -> J!cc L_target ; L_fallthrough:
+          (when (and (fixnump (jmp-cond stmt))
+                     next-stmt
+                     (not (stmt-labels next-stmt))
+                     (eq (stmt-op next-stmt) 'jmp)
+                     (eq (jmp-cond next-stmt) :always)
+                     (let ((target2 (jmp-target next-stmt))
+                           (after-next (stmt-next next-stmt)))
+                       (and target2
+                            after-next
+                            (or (eq to-stmt after-next)
+                                (member to-label (ensure-list (stmt-labels after-next)))))))
+            (setf (car (stmt-operands stmt)) (negate-condition (car (stmt-operands stmt)))
+                  (cadr (stmt-operands stmt)) (jmp-target next-stmt))
+            (let ((after-next (stmt-next next-stmt)))
+              (delete-stmt next-stmt)
+              (setq next-stmt after-next
+                    to-label (jmp-target stmt)
+                    to-stmt (gethash to-label label->stmt-map))))
+          ;; Eliminate unconditional jump to immediate fallthrough
+          (when (and (eq (jmp-cond stmt) :always)
+                     to-label
+                     next-stmt
+                     (or (eq to-stmt next-stmt)
+                         (member to-label (ensure-list (stmt-labels next-stmt)))))
+            (when (stmt-labels stmt)
+              (add-stmt-labels next-stmt (stmt-labels stmt)))
+            (delete-stmt stmt)))))))

@@ -2068,7 +2068,7 @@
 
 ;;;; Peephole pass
 
-(defmacro defpattern (name (opcodes1 opcodes2) lambda-list &body body)
+(defmacro defpattern (name (opcodes1 &optional opcodes2) lambda-list &body body)
   `(%defpattern ,name ',opcodes1 ',opcodes2 (lambda ,lambda-list ,@body)))
 
 (defparameter *show-peephole-transforms-p* nil)
@@ -2097,34 +2097,34 @@
            (stmt nil)
            (next (section-start section)))
       (loop
-        (setq stmt next next (stmt-next stmt))
         (unless next (return))
-        ;; All the patterns examine exactly 2 instructions for now.
-        ;; It should be possible to create a pattern that matches a sequence
-        ;; of 3 or more instruction or has intervening random stuff
-        ;; (e.g. "MOV reg, ea" + ? + "CMP reg, val") provided that the "?"
-        ;; does not interact with instructions around it.
-        (unless (labeled-statement-p next)
-          (let ((op (stmt-op stmt))
-                (next-op (stmt-op next)))
-            ;; Look for a rule that can be applied
-            (dolist (rule *asm-pattern-matchers*)
-              (destructuring-bind (opcodes1 opcodes2 . action) rule
-                ;; Don't return from the innermost loop until finding a rule that accepts
-                ;; the statement. If the match on opcodes alone is deemed a hit, but the
-                ;; rule fails, we would not try other rules that could have applied.
-                (when (and (member op opcodes1) (member next-op opcodes2))
-                  (let ((new-next (funcall (car action) stmt next)))
-                    (when new-next
-                      (incf (aref *asm-pattern-matchers-invoked* (cadr action)))
-                      (when *show-peephole-transforms-p*
-                        (format t "~&applied ~a~%" (caddr action)))
-                      ;; The rule returns any non-deleted statement. It could be any
-                      ;; line of the pattern. Skip backwards to ensure that we see
-                      ;; patterns with next's predecessor as the first instruction.
-                      (setq next (stmt-prev new-next)
-                            any-changes t)
-                      (return)))))))))
+        (setq stmt next next (stmt-next stmt))
+        (let ((op (stmt-op stmt))
+              (next-op (and next (stmt-op next)))
+              (next-labeled (and next (labeled-statement-p next))))
+          ;; Look for a rule that can be applied
+          (dolist (rule *asm-pattern-matchers*)
+            (destructuring-bind (opcodes1 opcodes2 . action) rule
+              ;; Don't return from the innermost loop until finding a rule that accepts
+              ;; the statement. If the match on opcodes alone is deemed a hit, but the
+              ;; rule fails, we would not try other rules that could have applied.
+              (when (and (member op opcodes1)
+                         (if opcodes2
+                             (and next (not next-labeled) (member next-op opcodes2))
+                             t))
+                (let ((new-next (if opcodes2
+                                    (funcall (car action) stmt next)
+                                    (funcall (car action) stmt))))
+                  (when new-next
+                    (incf (aref *asm-pattern-matchers-invoked* (cadr action)))
+                    (when *show-peephole-transforms-p*
+                      (format t "~&applied ~a~%" (caddr action)))
+                    ;; The rule returns any non-deleted statement. It could be any
+                    ;; line of the pattern. Skip backwards to ensure that we see
+                    ;; patterns with next's predecessor as the first instruction.
+                    (setq next (or (stmt-prev new-next) (section-start section))
+                          any-changes t)
+                    (return))))))))
       (unless any-changes (return))))
   #+x86-64
   ;; Build the label -> stmt map
