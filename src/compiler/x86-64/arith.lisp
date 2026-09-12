@@ -824,8 +824,8 @@
   (:result-types signed-byte-128)
   (:policy :fast-safe)
   (:generator 8
-    (zeroize hi-r)
     (move lo-r x)
+    (zeroize hi-r)
     (inst add lo-r y)
     (inst set :l hi-r)
     (inst neg hi-r)))
@@ -901,11 +901,11 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 10
+    (move lo x)
     (move hi x)
     (inst sar hi 63)
     (move tmp y)
     (inst sar tmp 63)
-    (move lo x)
     (inst sub lo y)
     (inst sbb hi tmp)))
 
@@ -1284,8 +1284,8 @@
   (:policy :fast-safe)
   (:generator 16
     (move hi x-hi)
-    (inst neg hi)
     (move lo x-lo)
+    (inst neg hi)
     (inst neg lo)
     (inst sbb hi 0)))
 
