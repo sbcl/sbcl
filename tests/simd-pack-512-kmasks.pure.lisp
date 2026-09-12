@@ -1,6 +1,5 @@
 ;;;; Potentially side-effectful tests of the AVX-512 mask register infrastructure.
 
-
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
@@ -264,30 +263,6 @@
     (assert (not (search "ALLOC" text)))
     (assert (not (search "KMOVQ" text)))))
 
-(with-test (:name :kandq-disassembly)
-  (let* ((fun (compile nil
-    '(lambda (x y)
-      (declare (type (unsigned-byte 64) x y))
-      (sb-vm::%mask-kandq
-       (sb-vm::%make-mask-from-unsigned x)
-       (sb-vm::%make-mask-from-unsigned y)))))
-         (text (with-output-to-string (s)
-                 (disassemble fun :stream s))))
-    (assert (search "KANDQ" text))
-    (assert (not (search "BYTE #XC4" text)))))
-
-(with-test (:name :kshiftrq-disassembly)
-  (let* ((fun (compile nil
-    '(lambda (x)
-      (declare (type (unsigned-byte 64) x))
-      (sb-vm::%mask-kshiftrq
-       (sb-vm::%make-mask-from-unsigned x)
-       1))))
-         (text (with-output-to-string (s)
-                 (disassemble fun :stream s))))
-    (assert (search "KSHIFTRQ" text))
-    (assert (not (search "BYTE #XC4" text)))))
-
 (with-test (:name :location-print-name)
   (let* ((vm (find-package "SB-VM"))
          (c (find-package "SB-C"))
@@ -329,20 +304,6 @@
     (assert (= value
                (sb-kernel:%simd-pack-512-mask-value read-back)))))
 
-(with-test (:name :mask-reg-sc-locations)
-  (let* ((vm (find-package "SB-VM"))
-         (c (find-package "SB-C"))
-         (mask-reg-name (and vm (find-symbol "MASK-REG" vm)))
-         (sc-or-lose (and c (find-symbol "SC-OR-LOSE" c)))
-         (sc-locations (and c (find-symbol "SC-LOCATIONS" c)))
-         (sc (and sc-or-lose mask-reg-name
-                  (funcall sc-or-lose mask-reg-name)))
-         (locs (and sc-locations sc
-                    (funcall sc-locations sc))))
-    (assert locs)
-    ;; 254 = #b11111110, i.e. K1-K7 only.
-    (assert (= locs #xFE))))
-
 ;; This particular test does not test for avx512 feature per se
 ;; cpu-has-zmm-registers has a low constant number, 2, so
 ;; check if there is a collision, just to be on the safe side.
@@ -364,20 +325,12 @@
     (assert (null collisions) nil
             "CPU feature bits collide: ~S" collisions)))
 
-;; assembly printer
-(with-test (:name :kmovq-disassembly)
-  (let* ((fun (compile nil
-                       '(lambda (x)
-                         (declare (type (unsigned-byte 64) x))
-                         (sb-vm::%mask-to-unsigned
-                          (sb-vm::%mask-identity
-                           (sb-vm::%make-mask-from-unsigned x))))))
-         (text (with-output-to-string (s)
-                 (disassemble fun :stream s))))
-    (assert (search "KMOVQ" text))
-    ;; Ensure we are not seeing raw VEX bytes instead of decoded KMOVQ.
-    (assert (not (search "BYTE #XC4" text)))))
-
+;; This one is a genuine compiler/register-allocator test, not an
+;; assembler/disassembler encoding check: EVAL forces TMP to survive a
+;; call, so the register allocator must spill it, and the point of the
+;; test is that the spill goes through KMOVQ with a memory operand
+;; rather than, say, boxing it. Pure KMOVQ encoding checks (register-
+;; register and register-GPR forms) live in avx512-encoder.pure.lisp.
 (with-test (:name :kmovq-memory-disassembly)
   (let* ((fun (compile nil
                        '(lambda (x y)

@@ -59,7 +59,8 @@
            #:compile-so
            #:vop-existsp
            #:push-package
-           #:pop-package))
+           #:pop-package
+           #:define-evex-disasm-test))
 
 (in-package :test-util)
 
@@ -1159,4 +1160,72 @@
 
 (defmacro pop-package ()
   `(in-package ,(package-name (pop *packages*))))
+
+;; Compiles a niladic SB-VM test function (typically one built on
+;; INLINE-VOP), disassembles it, and checks the disassembly against
+;; EXPECTS -- a structural round-trip check that the encoder produced
+;; bytes the disassembler reads back as the intended mnemonic and
+;; operands. Moved here (from simd-pack-512.pure.lisp, the first file
+;; to use it) so any pure.lisp test file can use it: each pure.lisp
+;; file loads and runs independently, so a macro defined inside one is
+;; invisible to another -- this file (TEST-UTIL) is the one loaded
+;; before all of them.
+;;
+;; Two EXPECTS shapes, auto-detected:
+;; - a single flat list of strings, e.g. ("ZMM16" "ZMM17" "VADDPS") --
+;;   each string is checked with SEARCH against the disassembly as a
+;;   whole, independently of which line it's on (simd-pack-512.pure.lisp's
+;;   original, coarser style: good enough when there's only ever one
+;;   instruction of interest, or when the strings already ARE full
+;;   disassembled lines).
+;; - several grouped lists, e.g. ("VPADDB" "ZMM1" "ZMM2" "ZMM3")
+;;   ("VPSUBB" "ZMM1" "ZMM2" "ZMM3") -- each group's strings must all
+;;   appear together on ONE line of the disassembly. This is the
+;;   precise form: with many similar instructions sharing the same
+;;   register names in one test function, checking a mnemonic and its
+;;   operands independently anywhere in the text (the flat style)
+;;   can't tell a correctly-encoded instruction from a scrambled one
+;;   that merely mentions the same tokens somewhere else.
+;; UNEXPECTED (either shape) is still checked with SEARCH against the
+;; whole disassembly, same as before.
+;; FUNCTION is called two ways, tried in order:
+;; 1. Directly, as a plain function (no VOP/:translate/DEFKNOWN
+;;    involved at all) that itself assembles and disassembles some
+;;    instruction and returns the resulting text as a string -- see
+;;    ASSEMBLE-AND-DISASSEMBLE in avx512-encoder.pure.lisp. This is
+;;    the preferred shape for a pure "does this instruction
+;;    assemble/disassemble correctly" check.
+;; 2. If that signals an error (the shape a :TRANSLATE-hooked VOP's
+;;    stub DEFUN body deliberately has, since it should never actually
+;;    run un-open-coded), FUNCTION is instead compiled inside a fresh
+;;    wrapper lambda and that wrapper is disassembled -- the original
+;;    mechanism, for whatever still genuinely needs a VOP.
+(defmacro define-evex-disasm-test (name function &rest args)
+  (let* ((kw-pos (position :unexpected args))
+         (expect-forms (if kw-pos (subseq args 0 kw-pos) args))
+         (unexpected (if kw-pos (second (nthcdr kw-pos args)) nil))
+         (flat-p (and (= (length expect-forms) 1)
+                      (listp (first expect-forms))
+                      (every #'stringp (first expect-forms)))))
+    `(with-test (:name ,name)
+       (let* ((text (handler-case (funcall ',function)
+                      (error ()
+                        (with-output-to-string (s)
+                          (disassemble (compile nil '(lambda () (,function)))
+                                       :stream s))))))
+         ,(if flat-p
+              `(dolist (s ',(first expect-forms))
+                 (assert (search s text) ()
+                         "~S not found in disassembly:~%~A" s text))
+              `(let ((lines (split-string text #\Newline)))
+                 (dolist (group ',expect-forms)
+                   (assert (some (lambda (line)
+                                   (every (lambda (tok) (search tok line)) group))
+                                 lines)
+                           ()
+                           "No single disassembly line contained all of ~S:~%~A"
+                           group text))))
+         (dolist (s ',unexpected)
+           (assert (not (search s text)) ()
+                   "~S unexpectedly found in disassembly:~%~A" s text))))))
 
