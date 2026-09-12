@@ -43,7 +43,7 @@
 #define UD2_INST 0x0b0f
 #define BREAKPOINT_WIDTH 1
 
-int avx_supported = 0, avx2_supported = 0, avx512_supported = 0, avx512fp16_supported = 0;
+int avx_supported = 0, avx2_supported = 0, avx512_supported = 0, avx512fp16_supported = 0, apx_supported = 0;
 int avx10_supported = 0, avx10_version = 0, avx10_128_supported = 0, avx10_256_supported = 0, avx10_512_supported = 0;
 
 static void cpuid(unsigned info, unsigned subinfo,
@@ -141,6 +141,7 @@ void tune_asm_routines_for_microarch(void)
                     }
                     if (max_subleaf_7 >= 1) {
                         cpuid(7, 1, &eax, &ebx, &ecx, &edx);
+                        if (edx & (1u << 21)) apx_supported = 1;
                         if ((edx & (1u << 19)) && (max_basic_leaf >= 0x24)) {
                             cpuid(0x24, 0, &eax, &ebx, &ecx, &edx);
                             avx10_version = ebx & 0xFF;
@@ -173,6 +174,8 @@ void tune_asm_routines_for_microarch(void)
     if (avx10_512_supported) our_cpu_feature_bits |= (1 << 5);
     // avx512_fp16 supported in bit 6
     if (avx512fp16_supported) our_cpu_feature_bits |= (1 << 6);
+    // apx supported in bit 7
+    if (apx_supported) our_cpu_feature_bits |= (1 << 7);
     consts->cpu_feature_bits = our_cpu_feature_bits;
 
 #ifdef LISP_FEATURE_WIN32
