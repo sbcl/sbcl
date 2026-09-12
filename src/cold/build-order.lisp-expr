@@ -397,6 +397,7 @@
  ("src/compiler/asm-target/insts")
  #+avx2 ("src/compiler/{arch}/avx2-insts")
  #+avx512 ("src/compiler/{arch}/avx512-insts")
+ #+x86-64 ("src/compiler/{arch}/apx-insts")
  ("src/compiler/{arch}/macros")
 
  ("src/assembly/{arch}/support")
