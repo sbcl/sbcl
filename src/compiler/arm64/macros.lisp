@@ -625,3 +625,11 @@
 
 (defun bic-mask (x)
   (ldb (byte 64 0) (lognot x)))
+
+(defun stp-stack (a b stack &optional (fp cfp-tn) (tmp tmp-tn))
+  (let ((offset (tn-byte-offset stack)))
+    (cond ((ldp-stp-offset-p offset)
+           (inst stp a b (@ fp offset)))
+          (t
+           (inst str a (@ fp (load-store-offset offset tmp)))
+           (inst str b (@ fp (load-store-offset (+ offset 8) tmp)))))))

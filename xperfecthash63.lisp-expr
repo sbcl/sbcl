@@ -2099,5 +2099,16 @@
   (let ((b (& val #xf)))
    (let ((a (>> (u32+ val (<< val 23)) 28)))
     (^ a (aref tab b))))))")
+(#(0 4 A 2A 2C)
+ "(5 0 21 2 22)"
+ "((& (+ (>> val 2) (>> val 5)) 7))")
+(#(0 4 8 A 2A 2C)
+ "(5 0 21 2 4 22)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 0 7 5)))
+  (+= val #xd7f616cc)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 1) #x3)))
+   (let ((a (>> (u32+ val (<< val 26)) 30)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF

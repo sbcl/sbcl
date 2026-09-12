@@ -54,7 +54,8 @@
   (:policy :fast-safe)
   (:translate sb-c::%type-check-error/c)
   (:args (object :scs (descriptor-reg any-reg unsigned-reg signed-reg
-                       character-reg constant)))
+                       character-reg constant
+                       #+(or arm64 x86-64) signed-128-reg)))
   (:arg-types * (:constant symbol) (:constant t))
   (:info errcode *location-context*)
   (:vop-var vop)

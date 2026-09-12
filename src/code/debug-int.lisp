@@ -2612,7 +2612,21 @@
       (#.immediate-sc-number
        (sb-c:sc+offset-offset sc+offset))
       (#.sb-vm::negative-immediate-sc-number
-       (- (sb-c:sc+offset-offset sc+offset))))))
+       (- (sb-c:sc+offset-offset sc+offset)))
+      #+(or arm64 x86-64)
+      (#.sb-vm::signed-128-reg-sc-number
+       (if escaped
+           (let* ((offset (sb-c:sc+offset-offset sc+offset))
+                  (lo (context-register escaped offset))
+                  (hi (context-register escaped (1+ offset))))
+             (+ (ash (sb-c::mask-signed-field 64 hi) 64)
+                lo))
+           :invalid-value-for-unescaped-register-storage))
+      (#.sb-vm::signed-128-stack-sc-number
+       (with-nfp (nfp)
+         (+ (ash (signed-sap-ref-word nfp (+ (number-stack-offset) 8))
+                 64)
+            (sap-ref-word nfp (number-stack-offset))))))))
 
 ;;; This stores value as the value of DEBUG-VAR in FRAME. In the
 ;;; COMPILED-DEBUG-VAR case, access the current value to determine if

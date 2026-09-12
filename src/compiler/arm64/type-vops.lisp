@@ -563,11 +563,21 @@
   (:args (value :scs (signed-reg)))
   (:policy :fast-safe)
   (:conditional :vc)
-  (:info)
   (:arg-types signed-num)
   (:translate fixnump)
   (:generator 3
     (inst adds zr-tn value value)))
+
+(define-vop (fixnump/s128)
+  (:args ((lo hi) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128)
+  (:translate fixnump)
+  (:policy :fast-safe)
+  (:conditional :eq)
+  (:generator 5
+    (inst asr  tmp-tn lo 62)
+    (inst adds zr-tn lo lo)
+    (inst ccmp hi tmp-tn :vc 0)))
 
 (progn
   (define-vop (>-integer-fixnum)

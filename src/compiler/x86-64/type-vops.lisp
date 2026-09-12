@@ -317,6 +317,24 @@
     ;; The overflow flag will be set if the reg's sign bit changes.
     (inst shl temp 1)))
 
+(define-vop (fixnump/s128)
+  (:args ((lo hi) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128)
+  (:translate fixnump)
+  (:policy :fast-safe)
+  (:info target not-p)
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 5
+    (move temp lo)
+    (inst add temp temp)
+    (inst jmp :o (if not-p target DONE))
+
+    (inst sbb temp temp)
+
+    (inst cmp temp hi)
+    (inst jmp (if not-p :ne :e) target)
+    DONE))
+
 ;;; A (SIGNED-BYTE 64) can be represented with either fixnum or a bignum with
 ;;; exactly one digit.
 
