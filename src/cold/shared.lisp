@@ -797,12 +797,11 @@
 ;;; into the cross-compilation host Common lisp.
 (defun host-cload-stem (stem flags)
   (loop
-   (stop-on-warnings
-     (with-simple-restart (recompile "Recompile")
+   (with-simple-restart (recompile "Recompile")
+     (stop-on-warnings
        (let ((compiled-filename (in-host-compilation-mode
                                  (lambda ()
-                                   (stop-on-warnings
-                                     (compile-stem stem flags :host-compile))))))
+                                   (compile-stem stem flags :host-compile)))))
          (return
            (load compiled-filename)))))))
 (compile 'host-cload-stem)

@@ -472,8 +472,7 @@
                  (let ((res (find-move-vop op-tn write-p sc ptype
                                            #'sc-move-vops)))
                    (when res
-                     (cond #+x86-64
-                           ((and write-p
+                     (cond ((and write-p
                                  (sc-is op-tn sb-vm::descriptor-reg)
                                  (let ((boxing-vop (vop-info-boxing-variant (vop-info vop))))
                                    (when boxing-vop

@@ -21,6 +21,14 @@
        (inst mov ,n-dst ,n-src ,@(when vector-size
                                    `(,vector-size))))))
 
+(defmacro move-128 (dst src)
+  (once-only ((n-dst dst)
+              (n-src src))
+    `(unless (location= ,n-dst ,n-src)
+       (with-128-parts (lo-dst hi-dst ,n-dst lo-src hi-src ,n-src)
+         (inst mov lo-dst lo-src)
+         (inst mov hi-dst hi-src)))))
+
 (defmacro move-float (dst src)
   (once-only ((n-dst dst)
               (n-src src))

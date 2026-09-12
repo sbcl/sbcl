@@ -727,7 +727,7 @@
 (define-vop (*/s128*s128=>s128)
   (:translate *)
   (:args ((lo-x hi-x) :scs (signed-128-reg))
-         ((y-lo y-hi) :scs (signed-128-reg)))
+         ((lo-y hi-y) :scs (signed-128-reg)))
   (:arg-types signed-byte-128 signed-byte-128)
   (:temporary (:sc signed-reg :offset rax-offset) rax)
   (:temporary (:sc signed-reg :offset rdx-offset) rdx)
@@ -738,14 +738,14 @@
   (:vop-var vop)
   (:generator 12
     (move tmp hi-x)
-    (inst imul tmp y-lo)
+    (inst imul tmp lo-y)
 
     (move rax lo-x)
-    (inst imul rax y-hi)
+    (inst imul rax hi-y)
     (inst add tmp rax)
 
     (move rax lo-x)
-    (inst mul y-lo)
+    (inst mul lo-y)
 
     (inst add rdx tmp)
 
@@ -754,7 +754,7 @@
 
 (define-vop (*/s128*signed=>s128)
   (:translate *)
-  (:args ((x-lo x-hi) :scs (signed-128-reg))
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
          (y :scs (signed-reg)))
   (:arg-types signed-byte-128 signed-num)
   (:temporary (:sc signed-reg :offset rax-offset) rax)
@@ -765,16 +765,16 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 18
-    (move rax x-lo)
+    (move rax lo-x)
     (inst mul y)
 
-    (move tmp x-hi)
+    (move tmp hi-x)
     (inst imul tmp y)
     (inst add rdx tmp)
 
     (move tmp y)
     (inst sar tmp 63)
-    (inst imul tmp x-lo)
+    (inst imul tmp lo-x)
     (inst add rdx tmp)
 
     (move lo rax)
@@ -783,7 +783,7 @@
 (define-vop (*/signed*s128=>s128 */s128*signed=>s128)
   (:translate *)
   (:args (y :scs (signed-reg))
-         ((x-lo x-hi) :scs (signed-128-reg)))
+         ((lo-x hi-x) :scs (signed-128-reg)))
   (:arg-types signed-num signed-byte-128))
 
 (define-vop (+/signed=>integer)
@@ -911,18 +911,18 @@
 
 (define-vop (-/s128-s128=>s128)
   (:translate -)
-  (:args ((x-lo x-hi) :scs (signed-128-reg) :target lo)
-         ((y-lo y-hi) :scs (signed-128-reg) :to :save))
+  (:args ((lo-x hi-x) :scs (signed-128-reg) :target lo)
+         ((lo-y hi-y) :scs (signed-128-reg) :to :save))
   (:arg-types signed-byte-128 signed-byte-128)
   (:results ((lo hi) :scs (signed-128-reg)))
   (:result-types signed-byte-128)
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 13
-    (move lo x-lo)
-    (inst sub lo y-lo)
-    (move hi x-hi)
-    (inst sbb hi y-hi)))
+    (move lo lo-x)
+    (inst sub lo lo-y)
+    (move hi hi-x)
+    (inst sbb hi hi-y)))
 
 (define-vop (-/s128-signed=>s128)
   (:translate -)
@@ -1277,14 +1277,14 @@
 
 (define-vop (%negate/s128=>s128)
   (:translate %negate)
-  (:args ((x-lo x-hi) :scs (signed-128-reg)))
+  (:args ((lo-x hi-x) :scs (signed-128-reg)))
   (:arg-types signed-byte-128)
   (:results ((lo hi) :scs (signed-128-reg)))
   (:result-types signed-byte-128)
   (:policy :fast-safe)
   (:generator 16
-    (move hi x-hi)
-    (move lo x-lo)
+    (move hi hi-x)
+    (move lo lo-x)
     (inst neg hi)
     (inst neg lo)
     (inst sbb hi 0)))

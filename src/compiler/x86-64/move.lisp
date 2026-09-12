@@ -439,7 +439,7 @@
          (inst jmp :nc SIGN-EXTEND)
 
          (loadw lo-y x bignum-digits-offset other-pointer-lowtag)
-         (inst cmp :dword (ea (- 1 other-pointer-lowtag) x) 1)
+         (inst cmp :byte (ea (- 1 other-pointer-lowtag) x) 1)
          (inst jmp :e SIGN-EXTEND)
 
          (loadw hi-y x (1+ bignum-digits-offset) other-pointer-lowtag)

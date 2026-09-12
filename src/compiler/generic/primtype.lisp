@@ -47,7 +47,7 @@
 (!def-primitive-type signed-byte-64 (signed-reg descriptor-reg)
   :type (signed-byte 64))
 
-#+x86-64
+#+(or arm64 x86-64)
 (!def-primitive-type signed-byte-128 (descriptor-reg signed-128-reg)
                      :type (signed-byte 128))
 
@@ -332,7 +332,7 @@
                                     (64
                                      `(signed-byte-64 ,(ash -1 63)
                                                       ,(1- (ash 1 63)))))
-                                 #+x86-64
+                                 #+(or arm64 x86-64)
                                  (signed-byte-128 ,(ash -1 127) ,(1- (ash 1 127))))
                                (if (or (< hi most-negative-fixnum)
                                        (> lo most-positive-fixnum))

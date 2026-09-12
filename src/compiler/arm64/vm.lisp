@@ -18,7 +18,7 @@
 
 ;;;; register specs
 
-(defvar *register-names* (make-array 32 :initial-element nil))
+(defglobal *register-names* (make-array 32 :initial-element nil))
 
 (macrolet ((defreg (name offset)
              (let ((offset-sym (symbolicate name "-OFFSET")))
@@ -91,6 +91,13 @@
 
   (defconstant float-reg-count 32))
 
+(defglobal *128-regs* (loop with regs = non-descriptor-regs
+                            while regs
+                            when (let ((reg (pop regs)))
+                                   (when (eql (1+ reg) (car regs))
+                                     (pop regs)
+                                     reg))
+                            collect it))
 
 ;;;; SB and SC definition:
 
@@ -137,10 +144,11 @@
 
   (32-bit-reg registers
               :locations #.(loop for i below 32 collect i))
-
   ;; The non-descriptor stacks.
   (signed-stack non-descriptor-stack)    ; (signed-byte 64)
   (unsigned-stack non-descriptor-stack)  ; (unsigned-byte 64)
+
+  (signed-128-stack non-descriptor-stack :element-size 2)
   (character-stack non-descriptor-stack) ; non-descriptor characters.
   (sap-stack non-descriptor-stack)       ; System area pointers.
   (single-stack non-descriptor-stack)    ; single-floats
@@ -181,6 +189,13 @@
                 :constant-scs (immediate)
                 :save-p t
                 :alternate-scs (unsigned-stack))
+
+  (signed-128-reg registers
+                  :locations #.*128-regs*
+                  ;; :constant-scs (immediate)
+                  :element-size 2
+                  :save-p t
+                  :alternate-scs (signed-128-stack))
 
   ;; Random objects that must not be seen by GC.  Used only as temporaries.
   (non-descriptor-reg registers
@@ -318,9 +333,16 @@
   (let ((sb (sb-name (sc-sb (tn-sc tn))))
         (offset (tn-offset tn)))
     (ecase sb
-      (registers (format nil "~:[~;W~]~A"
-                         (sc-is tn 32-bit-reg)
-                         (svref *register-names* offset)))
+      (registers
+       (sc-case tn
+         (signed-128-reg
+          (format nil "~a/~a"
+                  (svref *register-names* offset)
+                  (svref *register-names* (1+ offset))))
+         (t
+          (format nil "~:[~;W~]~A"
+                  (sc-is tn 32-bit-reg)
+                  (svref *register-names* offset)))))
       (control-stack (format nil "CS~D" offset))
       (non-descriptor-stack (format nil "NS~D" offset))
       (constant (format nil "Const~D" offset))

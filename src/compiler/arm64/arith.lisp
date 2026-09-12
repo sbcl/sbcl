@@ -2310,15 +2310,13 @@
   (:generator 1
     (inst lsl result digit count)))
 
-(define-vop (*/signed=>integer)
+(define-vop (*/signed=>s128)
   (:translate *)
-  (:args (x :scs (signed-reg))
-         (y :scs (signed-reg immediate)))
+  (:args (x :scs (signed-reg) :to :save)
+         (y :scs (signed-reg immediate) :to :save))
   (:arg-types signed-num signed-num)
-  (:temporary (:sc signed-reg) high low)
-  (:temporary (:sc signed-reg :from (:argument 2)) header)
-  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
-  (:results (r :scs (descriptor-reg)))
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 10
@@ -2328,29 +2326,69 @@
                   (plusp value)
                   (= (logcount value) 1))
              (let ((shift (1- (integer-length value))))
-               (inst lsl low x shift)
-               (inst asr high x (- 64 shift))))
+               (inst lsl lo x shift)
+               (inst asr hi x (- 64 shift))))
             (t
              (when value
-               (load-immediate-word low value)
-               (setf y low))
-             ;; Put SMULH first, avoids the madd peephole optimizers
-             (inst smulh high x y)
-             (inst mul low x y))))
-    (inst mov header (bignum-header-for-length 2))
-    (inst cmp high (asr low 63))
-    (inst b :ne allocate)
-    (inst adds r low low)
-    (inst b :vc done)
-    (inst mov header (bignum-header-for-length 1))
-    #+bignum-assertions
-    (inst mov high 0)
-    allocate
-    (with-fixed-allocation
-        (r lr nil (+ 2 bignum-digits-offset))
-      (storew-pair header 0 low bignum-digits-offset tmp-tn)
-      (storew high tmp-tn 2))
-    DONE))
+               (load-immediate-word lo value)
+               (setf y lo))
+             (inst smulh hi x y)
+             (inst mul lo x y))))))
+
+(define-vop (*/s128*s128=>s128)
+  (:translate *)
+  (:args ((lo-x hi-x) :scs (signed-128-reg) :target lo)
+         ((lo-y hi-y) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128 signed-byte-128)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 12
+    (cond
+      ((location= lo-x lo-y) ;; a square
+       (inst umulh tmp-tn lo-x lo-x)
+       (inst mul   hi     hi-x lo-x)
+       (inst add   hi     tmp-tn   (lsl hi 1))
+       (inst mul   lo     lo-x lo-x))
+      (t
+       (when (location= lo lo-y)
+         (rotatef lo-x lo-y)
+         (rotatef hi-x hi-y))
+       (inst umulh tmp-tn lo-x lo-y)
+       (inst madd  hi     hi-x lo-y tmp-tn)
+       (inst madd  hi     lo-x hi-y hi)
+       (inst mul   lo     lo-x lo-y)))))
+
+(define-vop (*/s128*signed=>s128)
+  (:translate *)
+  (:args ((lo-x hi-x) :scs (signed-128-reg) :target lo)
+         (y :scs (signed-reg)))
+  (:arg-types signed-byte-128 signed-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 11
+    (cond
+      ((location= lo lo-x)
+       (inst umulh tmp-tn lo-x y)
+       (inst madd  tmp-tn hi-x y tmp-tn)
+       (inst asr   hi y 63)
+       (inst madd  hi lo-x hi tmp-tn)
+       (inst mul   lo lo-x y))
+      (t
+       (inst umulh lo lo-x y)
+       (inst madd  lo hi-x y lo)
+       (inst asr   hi y 63)
+       (inst madd  hi lo-x hi lo)
+       (inst mul   lo lo-x y)))))
+
+(define-vop (*/signed*s128=>s128 */s128*signed=>s128)
+  (:translate *)
+  (:args (y :scs (signed-reg))
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types signed-num signed-byte-128))
 
 (define-vop (*/unsigned=>integer)
   (:translate *)
@@ -2363,7 +2401,7 @@
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 12
+  (:generator 20
     (let ((value (and (sc-is y immediate)
                         (tn-value y))))
         (cond ((and value
@@ -2512,7 +2550,7 @@
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 10
+  (:generator 20
     (if (sc-is y immediate)
         (let ((y (tn-value y)))
           (if (minusp y)
@@ -2532,6 +2570,50 @@
       (storew high tmp-tn 2))
     DONE))
 
+(define-vop (+/signed+signed=>s128)
+  (:translate +)
+  (:boxing-variant +/signed=>integer)
+  (:args (x :scs (signed-reg))
+         (y :scs (signed-reg)))
+  (:arg-types signed-num signed-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:policy :fast-safe)
+  (:generator 10
+    (inst adds lo x y)
+    (inst csetm hi :lt)))
+
+(define-vop (+/s128+s128=>s128)
+  (:translate +)
+  (:args ((lo-x hi-x) :scs (signed-128-reg) :target lo)
+         ((lo-y hi-y) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128 signed-byte-128)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:policy :fast-safe)
+  (:generator 12
+    (inst adds lo lo-x lo-y)
+    (inst adc  hi hi-x hi-y)))
+
+(define-vop (+/s128+signed=>s128)
+  (:translate +)
+  (:args ((lo-x hi-x) :scs (signed-128-reg) :target lo)
+         (y :scs (signed-reg)))
+  (:arg-types signed-byte-128 signed-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:policy :fast-safe)
+  (:generator 11
+    (inst asr  tmp-tn y 63)
+    (inst adds lo lo-x y)
+    (inst adc  hi hi-x tmp-tn)))
+
+(define-vop (+/signed+s128=>s128 +/s128+signed=>s128)
+  (:translate +)
+  (:args (y :scs (signed-reg))
+         ((lo-x hi-x) :scs (signed-128-reg) :target lo))
+  (:arg-types signed-num signed-byte-128))
+
 (define-vop (-/signed=>integer)
   (:translate -)
   (:args (x :scs (signed-reg))
@@ -2543,7 +2625,7 @@
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 10
+  (:generator 20
     (if (sc-is y immediate)
         (let ((y (tn-value y)))
           (if (minusp y)
@@ -2563,6 +2645,57 @@
       (storew high tmp-tn 2))
     DONE))
 
+(define-vop (-/signed-signed=>s128)
+  (:translate -)
+  (:boxing-variant -/signed=>integer)
+  (:args (x :scs (signed-reg) :target lo)
+         (y :scs (signed-reg)))
+  (:arg-types signed-num signed-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:policy :fast-safe)
+  (:generator 10
+    (inst subs lo x y)
+    (inst csetm hi :lt)))
+
+(define-vop (-/s128-s128=>s128)
+  (:translate -)
+  (:args ((lo-x hi-x) :scs (signed-128-reg) :target lo)
+         ((y-lo y-hi) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128 signed-byte-128)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:policy :fast-safe)
+  (:generator 13
+    (inst subs lo lo-x y-lo)
+    (inst sbc  hi hi-x y-hi)))
+
+(define-vop (-/s128-signed=>s128)
+  (:translate -)
+  (:args ((lo-x hi-x) :scs (signed-128-reg) :target lo)
+         (y :scs (signed-reg)))
+  (:arg-types signed-byte-128 signed-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:policy :fast-safe)
+  (:generator 12
+    (inst asr  tmp-tn y 63)
+    (inst subs lo lo-x y)
+    (inst sbc  hi hi-x tmp-tn)))
+
+(define-vop (-/signed-s128=>s128)
+  (:translate -)
+  (:args (y :scs (signed-reg))
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types signed-num signed-byte-128)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:policy :fast-safe)
+  (:generator 12
+    (inst asr  tmp-tn y 63)
+    (inst subs lo y lo-x)
+    (inst sbc  hi tmp-tn hi-x)))
+
 (define-vop (+/unsigned=>integer)
   (:translate +)
   (:args (x :scs (unsigned-reg))
@@ -2574,7 +2707,7 @@
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 10
+  (:generator 20
     (inst adds low x (if (sc-is y immediate)
                          (add-sub-immediate (tn-value y) high)
                          y))
@@ -2603,7 +2736,7 @@
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 10
+  (:generator 20
     (inst subs low x (if (sc-is y immediate)
                          (add-sub-immediate (tn-value y) high)
                          y))
@@ -2635,7 +2768,7 @@
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 10
+  (:generator 20
     (inst negs low x)
     (inst mov header (bignum-header-for-length 2))
     (inst csetm high :cc)
@@ -2665,7 +2798,7 @@
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 10
+  (:generator 20
     (inst negs low x)
     (inst csetm high :cs)
     (inst mov header (bignum-header-for-length 2))
@@ -2679,6 +2812,30 @@
       (storew-pair header 0 low bignum-digits-offset tmp-tn)
       (storew high tmp-tn 2))
     DONE))
+
+(define-vop (%negate/signed=>s128)
+  (:translate %negate)
+  (:boxing-variant %negate/signed=>integer)
+  (:args (x :scs (signed-reg) :target lo))
+  (:arg-types signed-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:policy :fast-safe)
+  (:generator 10
+    (inst negs lo x)
+    (inst csetm hi :lt)))
+
+(define-vop (%negate/s128=>s128)
+  (:translate %negate)
+  (:args ((lo-x hi-x) :scs (signed-128-reg) :target lo))
+  (:arg-types signed-byte-128)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:policy :fast-safe)
+  (:generator 12
+    (inst negs lo lo-x)
+    (inst sbc  hi zr-tn hi-x)))
+
 
 (define-vop (overflow*-fixnum)
   (:translate overflow*)
