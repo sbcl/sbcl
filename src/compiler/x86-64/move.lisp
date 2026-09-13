@@ -610,8 +610,8 @@
               (move-immediate lo-y low)
               (move-immediate hi-y high)))
            ((signed-128-stack)
-            (move-immediate (ea (frame-word-offset (tn-offset y)) fp) low)
-            (move-immediate (ea (frame-word-offset (1+ (tn-offset y))) fp) high))))))))
+            (move-immediate (ea (frame-word-offset (tn-offset y)) fp) low tmp)
+            (move-immediate (ea (frame-word-offset (1+ (tn-offset y))) fp) high tmp))))))))
 
 (define-move-vop move-128-arg :move-arg
   (signed-128-reg descriptor-reg any-reg signed-reg unsigned-reg immediate)
