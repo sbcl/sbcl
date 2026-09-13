@@ -69,13 +69,20 @@
   (values))
 
 ;;; Move all the code and entry points from OLD to NEW. The code in
-;;; OLD is inserted at the head of NEW. This is also called during LET
-;;; conversion when we are about in insert the body of a LET in a
-;;; different component. [A local call can be to a different component
-;;; before FIND-INITIAL-DFO runs.]
-(declaim (ftype (function (component component) (values)) join-components))
-(defun join-components (new old)
+;;; OLD is inserted after AFTER-BLOCK, by default the head of
+;;; NEW. This is also called during LET conversion when we are about
+;;; in insert the body of a LET in a different component. [A local
+;;; call can be to a different component before FIND-INITIAL-DFO
+;;; runs.]
+;;;
+;;; KLUDGE: INSERT-LET-BODY has to use this instead of
+;;; MERGE-COMPONENTS because NEW component may contain slots that need
+;;; to be preserved
+(declaim (ftype (function (component component &optional cblock) (values))
+                join-components))
+(defun join-components (new old &optional (after-block (component-head new)))
   (aver (eq (component-kind new) (component-kind old)))
+  (aver (eq new (block-component after-block)))
   (let ((old-head (component-head old))
         (old-tail (component-tail old))
         (head (component-head new))
@@ -87,10 +94,10 @@
 
     (let ((old-next (block-next old-head))
           (old-last (block-prev old-tail))
-          (next (block-next head)))
+          (next (block-next after-block)))
       (unless (eq old-next old-tail)
-        (setf (block-next head) old-next)
-        (setf (block-prev old-next) head)
+        (setf (block-next after-block) old-next)
+        (setf (block-prev old-next) after-block)
 
         (setf (block-prev next) old-last)
         (setf (block-next old-last) next))
@@ -113,6 +120,25 @@
       (unlink-blocks old-head ep)
       (link-blocks head ep)))
   (values))
+
+;;; Returns a component with the code and entry points of B followed
+;;; by those of A. Both A or B may be destructively modified. This
+;;; finds the component with fewer blocks and JOIN-COMPONENTS into the
+;;; component with more blocks so that overall run time is
+;;; O(min(|A|,|B|)).
+(defun merge-components (a b)
+  (declare (type component a b))
+  (do ((block-a (block-next (component-head a)) (block-next block-a))
+       (block-b (block-next (component-head b)) (block-next block-b))
+       (tail-a (component-tail a))
+       (tail-b (component-tail b)))
+      (nil)
+    (cond ((eq block-a tail-a)
+           (join-components b a (block-prev (component-tail b)))
+           (return b))
+          ((eq block-b tail-b)
+           (join-components a b)
+           (return a)))))
 
 ;;; Do a depth-first walk from BLOCK, inserting ourself in the DFO
 ;;; after HEAD.
@@ -163,8 +189,7 @@
                 ((eq home-component component)
                  component)
                 (t
-                 (join-components home-component component)
-                 home-component))))))
+                 (merge-components home-component component)))))))
 
 ;;; This is somewhat similar to FIND-DFO-AUX, except that it merges
 ;;; the current component with any strange component, rather than the
@@ -185,8 +210,7 @@
     (cond
      ((not (or (eq this component)
                (eq (component-kind this) :initial)))
-      (join-components this component)
-      this)
+      (merge-components this component))
      ((block-flag block) component)
      (t
       (setf (block-flag block) t)
@@ -267,8 +291,7 @@
      ((eq old-lambda-component component)
       component)
      ((not (eq (component-kind old-lambda-component) :initial))
-      (join-components old-lambda-component component)
-      old-lambda-component)
+      (merge-components old-lambda-component component))
      ((block-flag bind-block)
       component)
      (t
