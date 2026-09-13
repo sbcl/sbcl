@@ -5027,6 +5027,9 @@
            (move r lo))
           ((eql mask (1- (expt 2 32)))
            (move r lo :dword))
+          ((and (not (integerp mask))
+                (location= r mask))
+           (inst and mask lo))
           (t
            (move r lo)
            (inst and r mask)))))
