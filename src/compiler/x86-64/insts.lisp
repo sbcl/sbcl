@@ -15,7 +15,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from this package into SB-VM
   (import '(negate-condition
-            plausible-signed-imm32-operand-p
+            imm32-p
             ea-p ea-base ea-index size-nbyte alias-p
             ea ea-disp rip-relative-ea) "SB-VM")
   (import 'sb-assem::&prefix)
@@ -133,7 +133,7 @@
 ;;; if you pass in #xfffffffffffffffc but are operating on a :dword - it returns
 ;;; a small negative, which encodes to a dword.  Apparently the system assembler
 ;;; considers this a "feature", and merely truncates, though it does warn.
-(defun plausible-signed-imm32-operand-p (imm)
+(defun imm32-p (imm)
   (typecase imm
     ((signed-byte 32) imm)
     ;; Alternatively, the lower bound #xFFFFFFFF80000000 could
@@ -144,13 +144,13 @@
 ;;; Like above but for 8 bit signed immediate operands. In this case we need
 ;;; to know the operand size, because, for example #xffcf is a signed imm8
 ;;; if the operand size is :word, but it is not if the operand size is larger.
-(defun plausible-signed-imm8-operand-p (imm operand-size)
+(defun imm8-p (imm operand-size)
   (cond ((typep imm '(signed-byte 8))
          imm)
         ((eq operand-size :qword)
          ;; Try the imm32 test, and if the result is (signed-byte 8),
          ;; then return it, otherwise return NIL.
-         (let ((imm (plausible-signed-imm32-operand-p imm)))
+         (let ((imm (imm32-p imm)))
            (when (typep imm '(signed-byte 8))
              imm)))
         (t
@@ -1490,7 +1490,7 @@
                            ;; Instruction size: 5 if no REX prefix, or 6 with.
                            (emit-byte+reg segment #xB8 dst)
                            (emit-dword segment src))
-                          ((plausible-signed-imm32-operand-p src)
+                          ((imm32-p src)
                            ;; It's either a signed-byte-32, or a large unsigned
                            ;; value whose 33 high bits are all 1.
                            ;; Encode as C7 which sign-extends a 32-bit imm to 64 bits.
@@ -1520,7 +1520,7 @@
                   ;; If IMMEDIATE32-P returns NIL, use the original value,
                   ;; which will signal an error in EMIT-IMMEDIATE
                   (imm-val (or (and (eq size :qword)
-                                    (plausible-signed-imm32-operand-p src))
+                                    (imm32-p src))
                                src)))
               (emit-prefixes segment dst nil size)
               (emit-byte segment (opcode+size-bit #xC6 size))
@@ -1675,7 +1675,7 @@
             ;; REX.W is not needed for :qword immediates because the default
             ;; operand size is 64 bits and the immediate value (8 or 32 bits)
             ;; is always sign-extended.
-            (binding* ((imm (or (plausible-signed-imm32-operand-p src) src))
+            (binding* ((imm (or (imm32-p src) src))
                        ((opcode operand-size)
                         (if (typep imm '(signed-byte 8))
                             (values #x6A :byte)
@@ -1825,7 +1825,7 @@
            (setq src (sized-thing src size)
                  dst (sized-thing dst size))
            (acond
-            ((and (neq size :byte) (plausible-signed-imm8-operand-p src size))
+            ((and (neq size :byte) (imm8-p src size))
              (emit-prefixes segment dst nil size :lock (lockp prefix))
              (emit-byte segment #x83)
              (emit-ea segment dst opcode :remaining-bytes 1)
@@ -1846,7 +1846,7 @@
              (if (fixup-p src)
                  (emit-absolute-fixup segment src)
                  (let ((imm (or (and (eq size :qword)
-                                     (plausible-signed-imm32-operand-p src))
+                                     (imm32-p src))
                                 src)))
                    (emit-imm-operand segment imm size))))
             (t
@@ -2088,7 +2088,7 @@
             ;; TEST has no form that sign-extends an 8-bit immediate,
             ;; so all we need to be concerned with is whether a positive
             ;; qword is bitwise equivalent to a signed dword.
-            (awhen (and (eq size :qword) (plausible-signed-imm32-operand-p that))
+            (awhen (and (eq size :qword) (imm32-p that))
               (setq that it))
             (cond ((accumulator-p this)
                    (emit-byte segment (opcode+size-bit #xA8 size)))

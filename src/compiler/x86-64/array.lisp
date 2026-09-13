@@ -394,7 +394,7 @@
                    (or (eq result-tn left) (eq result-tn right))
                    (or (not (constant-tn-p comparand))
                        (and (tn-sc comparand)
-                            (plausible-signed-imm32-operand-p
+                            (imm32-p
                              (encode-value-if-immediate comparand)))))
           (let* ((new-args (sb-c:reference-tn-list
                             (list (tn-ref-tn (vop-args vop))

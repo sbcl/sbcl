@@ -315,7 +315,7 @@
        (inst cmp x (move-immediate temp (immediate-tn-repr y))))
       ((sc-is y immediate)
        (let* ((value (encode-value-if-immediate y))
-              (immediate (plausible-signed-imm32-operand-p value)))
+              (immediate (imm32-p value)))
          (when (and (null (tn-value y)) (tn-ref-type x-tn-ref))
            ;; if the complement of X's type with respect to type NULL can't
            ;; be a cons, then we don't need a 4-byte comparison against NIL.

@@ -188,7 +188,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
       ;; shadow bits under the mask.
       (cond ((not mask)
              (inst cmp size (ea temp) 0))
-            ((or (neq size :qword) (plausible-signed-imm32-operand-p mask))
+            ((or (neq size :qword) (imm32-p mask))
              (inst test size (ea temp)
                    (ldb (byte (* 8 nbytes) 0) mask)))
             (t
@@ -219,7 +219,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
     (inst mov size (ea temp) 0))
   (when (sc-is value constant immediate)
     (setq value
-          (cond ((plausible-signed-imm32-operand-p (tn-value value))
+          (cond ((imm32-p (tn-value value))
                  (tn-value value))
                 ((null (tn-value value))
                  null-tn)

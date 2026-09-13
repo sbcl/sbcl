@@ -388,7 +388,7 @@
   (:args (val :scs (any-reg descriptor-reg)
               :load-if (not (let ((imm (encode-value-if-immediate val)))
                               (or (fixup-p imm)
-                                  (plausible-signed-imm32-operand-p imm))))))
+                                  (imm32-p imm))))))
   (:temporary (:sc unsigned-reg) bsp tmp)
   (:info symbol)
   (:generator 10
@@ -447,7 +447,7 @@
   (unless newvalp (return-from binding-stack-push))
   (let ((repr (encode-value-if-immediate newval)))
     (cond ((or (gpr-tn-p repr) (fixup-p repr)
-               (plausible-signed-imm32-operand-p repr))
+               (imm32-p repr))
            (setq newval repr))
           ((nil-relative-p repr)
            (move-immediate (setq newval val-temp) repr))

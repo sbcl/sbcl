@@ -469,7 +469,7 @@
                                 'immediate
                                 `(immediate (let ((value (tn-value tn)))
                                               (and (integerp value)
-                                                   (plausible-signed-imm32-operand-p (,(if tagged 'fixnumize 'progn) value)))))))))
+                                                   (imm32-p (,(if tagged 'fixnumize 'progn) value)))))))))
        (:arg-types ,type tagged-num ,el-type)
        (:arg-refs obj-ref ind-ref val-ref)
        (:vop-var vop)

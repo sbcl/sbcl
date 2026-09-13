@@ -34,10 +34,10 @@
                 null-tn))
            (t
             (register-inline-constant :qword x)))))
-;; If 'plausible-signed-imm32-operand-p' is true, use it; otherwise use a RIP-relative constant
+;; If 'imm32-p' is true, use it; otherwise use a RIP-relative constant
 ;; or possibly return the NIL-based address of one of +POPULAR-RAW-CONSTANTS+
 (defun constantize (x)
-  (awhen (plausible-signed-imm32-operand-p x)
+  (awhen (imm32-p x)
     (return-from constantize it))
   (ref-shared-qword-literal x))
 
@@ -207,7 +207,14 @@
                   (:translate ,translate)
                   (:generator 1
                    ,@(or c/fixnum=>fixnum
-                         `((move r x) (inst ,op r (constantize (fixnumize y)))))))
+                         `((let ((fy (fixnumize y)))
+                             (cond ((and (not (imm32-p fy))
+                                         (not (location= x r)))
+                                    (inst mov r fy)
+                                    (inst ,op r x))
+                                   (t
+                                    (move r x)
+                                    (inst ,op r (constantize fy)))))))))
                 (define-vop (,(symbolicate "FAST-" translate "/SIGNED=>SIGNED")
                              fast-signed-binop)
                   (:translate ,translate)
@@ -218,7 +225,14 @@
                   (:arg-refs x-ref)
                   (:translate ,translate)
                   (:generator ,untagged-penalty
-                   ,@(or c/signed=>signed `((move r x) (inst ,op r (constantize y))))))
+                   ,@(or c/signed=>signed
+                       `((cond ((and (not (imm32-p y))
+                                     (not (location= x r)))
+                                (inst mov r y)
+                                (inst ,op r x))
+                               (t
+                                (move r x)
+                                (inst ,op r (constantize y))))))))
                 (define-vop (,(symbolicate "FAST-"
                                            translate
                                            "/UNSIGNED=>UNSIGNED")
@@ -234,7 +248,13 @@
                   (:translate ,translate)
                   (:generator ,untagged-penalty
                    ,@(or c/unsigned=>unsigned
-                         `((move r x) (inst ,op r (constantize y)))))))))
+                       `((cond ((and (not (imm32-p y))
+                                     (not (location= x r)))
+                                (inst mov r y)
+                                (inst ,op r x))
+                               (t
+                                (move r x)
+                                (inst ,op r (constantize y)))))))))))
 
   ;; The following have microoptimizations for some special cases
   ;; not caught by the front end.
@@ -259,28 +279,32 @@
               (unless (location= x r)
                 (inst mov (if gpr-r-p :dword :qword) r x))
               (inst and :dword r y))
-             ((and (not (plausible-signed-imm32-operand-p y))
-                   (let* ((width (sb-c::unsigned-type-width (tn-ref-type x-ref)))
-                          (extra-ones (and width
-                                           (dpb -1 (byte (- 64 (1+ width)) (1+ width)) y))))
-                     ;; Try filling the zeros in the mask with ones where the integer already has zeros,
-                     ;; which might sign-extend the mask into a negative 32-bit immediate
-                     (cond ((plausible-signed-imm32-operand-p extra-ones)
-                            (move r x)
-                            (inst and r extra-ones)
-                            t)
-                           (t
-                            (let* ((int (sb-c::type-approximate-interval (tn-ref-type x-ref)))
-                                   (mask (logandc1 (logior y fixnum-tag-mask)
-                                                   (ldb (byte (+ (integer-length (sb-c::interval-high int)) n-fixnum-tag-bits) 0) -1))))
-                              (when (and (>= (sb-c::interval-low int) 0)
-                                         (= (logcount mask) 1))
-                                (move r x)
-                                (inst btr r (1- (integer-length mask)))
-                                t)))))))
-             (t
+             ((imm32-p y)
               (move r x)
-              (inst and r (constantize y))))))
+              (inst and r y))
+             ((let* ((width (sb-c::unsigned-type-width (tn-ref-type x-ref)))
+                     (extra-ones (and width
+                                      (dpb -1 (byte (- 64 (1+ width)) (1+ width)) y))))
+                ;; Try filling the zeros in the mask with ones where the integer already has zeros,
+                ;; which might sign-extend the mask into a negative 32-bit immediate
+                (cond ((imm32-p extra-ones)
+                       (move r x)
+                       (inst and r extra-ones)
+                       t)
+                      (t
+                       (let* ((int (sb-c::type-approximate-interval (tn-ref-type x-ref)))
+                              (mask (logandc1 (logior y fixnum-tag-mask)
+                                              (ldb (byte (+ (integer-length (sb-c::interval-high int)) n-fixnum-tag-bits) 0) -1))))
+                         (when (and (>= (sb-c::interval-low int) 0)
+                                    (= (logcount mask) 1))
+                           (move r x)
+                           (inst btr r (1- (integer-length mask)))
+                           t))))))
+             ((location= x r)
+              (inst and r (constantize y)))
+             (t
+              (inst mov r y)
+              (inst and r x)))))
     :c/unsigned=>unsigned
     ((let ((gpr-r-p (gpr-tn-p r)))
        (cond ((eql y most-positive-word)
@@ -294,23 +318,26 @@
              ((and gpr-r-p
                    (eql y (1- (expt 2 8))))
               (inst movzx '(:byte :dword) r x))
-             ((and (not (plausible-signed-imm32-operand-p y))
-                   (let* ((width (sb-c::unsigned-type-width (tn-ref-type x-ref)))
-                          (extra-ones (and width
-                                           (dpb -1 (byte (- 64 width) width) y))))
-                     ;; Try filling the zeros in the mask with ones where the integer already has zeros,
-                     ;; which might sign-extend the mask into a negative 32-bit immediate
-                     (when (plausible-signed-imm32-operand-p extra-ones)
-                       (move r x)
-                       (inst and r extra-ones)
-                       t))))
-             ((and (not (plausible-signed-imm32-operand-p y))
-                   (= (logcount (logandc1 y most-positive-word)) 1))
+             ((imm32-p y)
+              (move r x)
+              (inst and r y))
+             ((let* ((width (sb-c::unsigned-type-width (tn-ref-type x-ref)))
+                     (extra-ones (and width
+                                      (dpb -1 (byte (- 64 width) width) y))))
+                ;; Try filling the zeros in the mask with ones where the integer already has zeros,
+                ;; which might sign-extend the mask into a negative 32-bit immediate
+                (when (imm32-p extra-ones)
+                  (move r x)
+                  (inst and r extra-ones)
+                  t)))
+             ((= (logcount (logandc1 y most-positive-word)) 1)
               (move r x)
               (inst btr r (1- (integer-length (logandc1 y most-positive-word)))))
+             ((location= x r)
+              (inst and r (constantize y)))
              (t
-              (move r x)
-              (inst and r (constantize y))))))
+              (inst mov r y)
+              (inst and r x)))))
     :c/signed=>signed
     ((let ((gpr-r-p (gpr-tn-p r)))
        (cond ((and gpr-r-p
@@ -322,59 +349,83 @@
              ((and gpr-r-p
                    (eql y (1- (expt 2 8))))
               (inst movzx '(:byte :dword) r x))
-             ((and (not (plausible-signed-imm32-operand-p y))
-                   (let* ((width (sb-c::unsigned-type-width (tn-ref-type x-ref)))
-                          (extra-ones (and width
-                                           (dpb -1 (byte (- 64 width) width) y))))
-                     ;; Try filling the zeros in the mask with ones where the integer already has zeros,
-                     ;; which might sign-extend the mask into a negative 32-bit immediate
-                     (when (plausible-signed-imm32-operand-p extra-ones)
-                       (move r x)
-                       (inst and r extra-ones)
-                       t))))
-             ((and (not (plausible-signed-imm32-operand-p y))
-                   (= (logcount (logandc1 y most-positive-word)) 1))
+             ((imm32-p y)
+              (move r x)
+              (inst and r y))
+             ((let* ((width (sb-c::unsigned-type-width (tn-ref-type x-ref)))
+                     (extra-ones (and width
+                                      (dpb -1 (byte (- 64 width) width) y))))
+                ;; Try filling the zeros in the mask with ones where the integer already has zeros,
+                ;; which might sign-extend the mask into a negative 32-bit immediate
+                (when (imm32-p extra-ones)
+                  (move r x)
+                  (inst and r extra-ones)
+                  t)))
+             ((= (logcount (logandc1 y most-positive-word)) 1)
               (move r x)
               (inst btr r (1- (integer-length (logandc1 y most-positive-word)))))
+             ((location= x r)
+              (inst and r (constantize y)))
              (t
-              (move r x)
-              (inst and r (constantize y)))))))
+              (inst mov r y)
+              (inst and r x))))))
 
   (define-binop logior 2 or
     :c/fixnum=>fixnum
     ((let ((y (fixnumize y)))
-       (move r x)
-       (cond ((and (not (plausible-signed-imm32-operand-p y))
+       (cond ((imm32-p y)
+              (move r x)
+              (inst or r y))
+             ((and (not (imm32-p y))
                    (= (logcount y) 1))
+              (move r x)
               (inst bts r (1- (integer-length y))))
+             ((location= x r)
+              (inst or r (constantize y)))
              (t
-              (inst or r (constantize y))))))
+              (inst mov r y)
+              (inst or r x)))))
     :c/unsigned=>unsigned
     ((cond ((and (gpr-tn-p r) (eql y -1)) ; special-case "OR reg, all-ones"
             ;; I have yet to elicit this case. Can it happen?
             (inst mov r -1))
-           ((and (not (plausible-signed-imm32-operand-p y))
-                 (= (logcount y) 1))
+           ((imm32-p y)
+            (move r x)
+            (inst or r y))
+           ((= (logcount y) 1)
             (move r x)
             (inst bts r (1- (integer-length y))))
+           ((location= x r)
+            (inst or r (constantize y)))
            (t
-            (move r x)
-            (inst or r (constantize y)))))
+            (inst mov r y)
+            (inst or r x))))
     :c/signed=>signed
-    ((move r x)
-     (cond ((and (not (plausible-signed-imm32-operand-p y))
+    ((cond ((imm32-p y)
+            (move r x)
+            (inst or r y))
+           ((and (not (imm32-p y))
                  (= (logcount (ldb (byte n-word-bits 0) y)) 1))
+            (move r x)
             (inst bts r (1- (integer-length (ldb (byte n-word-bits 0) y)))))
+           ((location= x r)
+            (inst or r (constantize y)))
            (t
-            (inst or r (constantize y))))))
+            (inst mov r y)
+            (inst or r x)))))
 
   (define-binop logxor 2 xor
     :c/unsigned=>unsigned
-    ((move r x)
-     (let ((y (constantize y)))
-       (if (eql y -1) ; special-case "XOR reg, [all-ones]"
-           (inst not r)
-           (inst xor r y))))))
+    ((cond ((imm32-p y)
+            (move r x)
+            (if (eql y most-positive-word) ; special-case "XOR reg, [all-ones]"
+                (inst not r)
+                (inst xor r y)))
+           ((location= x r)
+            (inst xor r (constantize y)))
+           (t
+            (inst mov r y)
+            (inst xor r x))))))
 
 (define-vop (fast-logior-unsigned-signed=>signed fast-safe-arith-op)
   (:args (x :scs (unsigned-reg) :to (:result 1))
@@ -473,6 +524,17 @@
          (setq op 'add y (- y)))
         ((and (eq op 'add) (eql y (ash 1 31)))
          (setq op 'sub y (- y))))
+  (flet ((movabs (x y)
+           (when (and (integerp x)
+                      (not (imm32-p x))
+                      (gpr-tn-p result)
+                      (not (alias-p result y)))
+             (inst mov result x)
+             (inst* op result y)
+             (return-from emit-inline-add-sub))))
+    (movabs x y)
+    (when (eq op 'add)
+      (movabs y x)))
 
   ;; Oversized integers need to become RIP-relative constants
   (when (integerp x) (setq x (constantize x)))
@@ -480,45 +542,45 @@
 
   (let* ((y-is-reg-or-imm32 (or (gpr-tn-p y) (typep y '(signed-byte 32))))
          (commutative (eq op 'add)))
-      (when (alias-p result x)
-        ;; the first two clauses are correct because if the instruction was SUB with
-        ;; an immediate then it got turned into ADD with the negation of the immediate.
-        (cond ((eql y -1) (inst dec x))
-              ((eql y +1) (inst inc x))
-              ((or (gpr-tn-p x) y-is-reg-or-imm32)
-               ;; At most one memory operand. Result could be memory or register.
+    (when (alias-p result x)
+      ;; the first two clauses are correct because if the instruction was SUB with
+      ;; an immediate then it got turned into ADD with the negation of the immediate.
+      (cond ((eql y -1) (inst dec x))
+            ((eql y +1) (inst inc x))
+            ((or (gpr-tn-p x) y-is-reg-or-imm32)
+             ;; At most one memory operand. Result could be memory or register.
                (inst* op x y))
-              (t ; two memory operands: X is not a GPR, Y is neither GPR nor immm
-               (inst mov temp y)
-               (inst* op x temp)))
-        (return-from emit-inline-add-sub))
-      (when (and (alias-p result y) commutative)
-        ;; Result in the same location as Y can happen because we no longer specify
-        ;; that RESULT is live from (:ARGUMENT 0).
-        (cond ((or (gpr-tn-p x) (gpr-tn-p y))
-               (inst* op y x))
-              (t
-               (inst mov temp x)
-               (inst* op y temp)))
-        (return-from emit-inline-add-sub))
-      (let ((reg (if (and (gpr-tn-p result)
-                          ;; If Y aliases RESULT in SUB, then an initial (move reg x)
-                          ;; could clobber Y.
+            (t ; two memory operands: X is not a GPR, Y is neither GPR nor immm
+             (inst mov temp y)
+             (inst* op x temp)))
+      (return-from emit-inline-add-sub))
+    (when (and (alias-p result y) commutative)
+      ;; Result in the same location as Y can happen because we no longer specify
+      ;; that RESULT is live from (:ARGUMENT 0).
+      (cond ((or (gpr-tn-p x) (gpr-tn-p y))
+             (inst* op y x))
+            (t
+             (inst mov temp x)
+             (inst* op y temp)))
+      (return-from emit-inline-add-sub))
+    (let ((reg (if (and (gpr-tn-p result)
+                        ;; If Y aliases RESULT in SUB, then an initial (move reg x)
+                        ;; could clobber Y.
                           (or commutative (not (alias-p result y))))
-                     result
-                     temp)))
-        (cond ((and (eq op 'add) ; LEA can't do subtraction
-                    (gpr-tn-p x) y-is-reg-or-imm32) ; register + (register | imm32)
-               (inst lea reg (if (fixnump y) (ea y x) (ea x y))))
-              (t
-               ;; If commutative, then neither X nor Y is an alias of RESULT.
-               ;; If non-commutative, then RESULT could be Y, in which case REG is
-               ;; TEMP so that we don't trash Y by moving X into it.
+                   result
+                   temp)))
+      (cond ((and (eq op 'add)          ; LEA can't do subtraction
+                  (gpr-tn-p x) y-is-reg-or-imm32) ; register + (register | imm32)
+             (inst lea reg (if (fixnump y) (ea y x) (ea x y))))
+            (t
+             ;; If commutative, then neither X nor Y is an alias of RESULT.
+             ;; If non-commutative, then RESULT could be Y, in which case REG is
+             ;; TEMP so that we don't trash Y by moving X into it.
                (inst mov reg x)
                (cond ((and (eq op 'add) (eql y 1)) (inst inc reg))
                      ((and (eq op 'add) (eql y -1)) (inst dec reg))
                      (t (inst* op reg y)))))
-        (move result reg))))
+      (move result reg))))
 
 ;;; FIXME: we shouldn't need 12 variants, plus the modular variants, for what should
 ;;; be 1 vop. Certainly + and - can be done by one vop which examines lvar-fun-name.
@@ -935,7 +997,7 @@
 (define-vop (+/s128+signed=>s128)
   (:translate +)
   (:args ((lo-x hi-x) :scs (signed-128-reg) :target lo-r)
-         (y :scs (signed-reg (immediate (plausible-signed-imm32-operand-p (tn-value tn)))) :to :save))
+         (y :scs (signed-reg (immediate (imm32-p (tn-value tn)))) :to :save))
   (:arg-types signed-byte-128 signed-num)
   (:temporary (:sc signed-reg) tmp)
   (:results ((lo-r hi-r) :scs (signed-128-reg)))
@@ -1029,7 +1091,7 @@
 (define-vop (-/s128-signed=>s128)
   (:translate -)
   (:args ((lo-x hi-x) :scs (signed-128-reg) :target lo-r)
-         (y :scs (signed-reg (immediate (plausible-signed-imm32-operand-p (tn-value tn)))) :to :save))
+         (y :scs (signed-reg (immediate (imm32-p (tn-value tn)))) :to :save))
   (:arg-types signed-byte-128 signed-num)
   (:temporary (:sc signed-reg) tmp)
   (:results ((lo-r hi-r) :scs (signed-128-reg)))
@@ -1488,7 +1550,7 @@
   (:translate overflow+)
   (:args (x :scs (unsigned-reg))
          (y :scs (unsigned-reg (immediate
-                                (plausible-signed-imm32-operand-p (tn-value tn))))))
+                                (imm32-p (tn-value tn))))))
   (:arg-types unsigned-num unsigned-num)
   (:info type)
   (:results (r :scs (unsigned-reg) :from (:argument 0)))
@@ -1509,7 +1571,7 @@
   (:translate overflow+)
   (:args (x :scs (signed-reg))
          (y :scs (signed-reg (immediate
-                              (plausible-signed-imm32-operand-p (tn-value tn))))))
+                              (imm32-p (tn-value tn))))))
   (:arg-types signed-num signed-num)
   (:info type)
   (:results (r :scs (signed-reg) :from (:argument 0)))
@@ -1530,7 +1592,7 @@
   (:translate overflow+)
   (:args (x :scs (any-reg))
          (y :scs (any-reg (immediate
-                           (plausible-signed-imm32-operand-p (fixnumize (tn-value tn)))))))
+                           (imm32-p (fixnumize (tn-value tn)))))))
   (:arg-types tagged-num tagged-num)
   (:info type)
   (:results (r :scs (any-reg) :from (:argument 0)))
@@ -1658,7 +1720,7 @@
   (:translate overflow-)
   (:args (x :scs (any-reg))
          (y :scs (any-reg (immediate
-                           (plausible-signed-imm32-operand-p (fixnumize (tn-value tn)))))))
+                           (imm32-p (fixnumize (tn-value tn)))))))
   (:arg-types tagged-num tagged-num)
   (:info type)
   (:results (r :scs (any-reg) :from (:argument 0)))
@@ -3301,7 +3363,7 @@
                     (sc-is y immediate))
            (setf y (tn-value y)))
          (when (integerp y)
-           (acond ((plausible-signed-imm32-operand-p y)
+           (acond ((imm32-p y)
                    (return-from ensure-not-mem+mem (values x it)))
                   ((typep y '(unsigned-byte 32))
                    ;; Rather than a RIP-relative constant, load a dword (w/o sign-extend)
@@ -3370,7 +3432,7 @@
                    t)))
            (change-vop-flags sb-assem::*current-vop* '(:s)))
           ((and (integerp y)
-                (not (plausible-signed-imm32-operand-p y))
+                (not (imm32-p y))
                 (= (logcount (ldb (byte n-word-bits 0) y)) 1))
            (change-vop-flags sb-assem::*current-vop* '(:c))
            (inst bt x (1- (integer-length (ldb (byte n-word-bits 0) y)))))
@@ -3786,8 +3848,8 @@
                                    `(((zerop y)
                                       (change-vop-flags vop '(,zero)))))
                                ((and
-                                 (not (plausible-signed-imm32-operand-p ,(fix 'y)))
-                                 (plausible-signed-imm32-operand-p ,(fix `(+ y ,addend))))
+                                 (not (imm32-p ,(fix 'y)))
+                                 (imm32-p ,(fix `(+ y ,addend))))
                                 (incf y ,addend)
                                 (change-vop-flags
                                  vop
@@ -4725,7 +4787,7 @@
   (:info mask)
   (:result-types unsigned-num)
   (:generator 4
-     (cond ((or (plausible-signed-imm32-operand-p mask)
+     (cond ((or (imm32-p mask)
                 (location= x r))
             (loadw r x bignum-digits-offset other-pointer-lowtag)
             (unless (or (eql mask -1)
@@ -4934,10 +4996,10 @@
         DONE
         (unless (or fixnum-mask-p
                     (= mask most-positive-word))
-          (if (and (not (plausible-signed-imm32-operand-p mask))
+          (if (and (not (imm32-p mask))
                    (= (logcount (logandc1 mask most-positive-word)) 1))
               (inst btr r (1- (integer-length (logandc1 mask most-positive-word))))
-              (inst and r (or (plausible-signed-imm32-operand-p mask)
+              (inst and r (or (imm32-p mask)
                               (constantize mask)))))))))
 
 (define-vop (logand-word-mask/integer-unsigned)
@@ -4997,14 +5059,14 @@
                              :qword)
                      r mask)))))))
 
-(defun plausible-signed-imm32-operand-or-32-mask-p (n)
+(defun imm32-or-32-mask-p (n)
   (or (eql n (1- (expt 2 32)))
-      (plausible-signed-imm32-operand-p n)))
+      (imm32-p n)))
 
 (define-vop (logand-word-mask/integer-unsigned-c logand-word-mask/integer-unsigned)
   (:args (x :scs (descriptor-reg)))
   (:info mask)
-  (:arg-types t (:constant (satisfies plausible-signed-imm32-operand-or-32-mask-p))))
+  (:arg-types t (:constant (satisfies imm32-or-32-mask-p))))
 
 (define-vop (logand-word-mask/unsigned-integer logand-word-mask/integer-unsigned)
   (:args (mask :scs (unsigned-reg) :to :save)
@@ -5015,7 +5077,7 @@
 (define-vop (logand-s128/unsigned)
   (:translate logand)
   (:policy :fast-safe)
-  (:args ((lo) :scs (signed-128-reg))
+  (:args ((lo hi) :scs (signed-128-reg))
          (mask :scs (unsigned-reg)))
   (:arg-types signed-byte-128 unsigned-num)
   (:results (r :scs (unsigned-reg)))
@@ -5030,14 +5092,22 @@
           ((and (not (integerp mask))
                 (location= r mask))
            (inst and mask lo))
+          ((and (integerp mask)
+                (not (imm32-p mask)))
+           (cond ((location= r lo)
+                  (inst mov hi mask)
+                  (inst and r hi))
+                 (t
+                  (inst mov r mask)
+                  (inst and r lo))))
           (t
            (move r lo)
            (inst and r mask)))))
 
 (define-vop (logand-s128/unsigned/c logand-s128/unsigned)
-  (:args ((lo) :scs (signed-128-reg)))
+  (:args ((lo hi) :scs (signed-128-reg)))
   (:info mask)
-  (:arg-types signed-byte-128 (:constant (satisfies plausible-signed-imm32-operand-or-32-mask-p))))
+  (:arg-types signed-byte-128 (:constant (unsigned-byte 64))))
 
 
 (in-package "SB-C")
@@ -5154,7 +5224,7 @@
                                                '(-1))))
                               (int (sb-c::type-approximate-interval (tn-ref-type x-ref))))
                           (flet ((imm (x)
-                                   (cond ((plausible-signed-imm32-operand-p x)
+                                   (cond ((imm32-p x)
                                           x)
                                          (t
                                           (inst mov temp2 x)
@@ -5249,7 +5319,7 @@
                       (when (sb-c::interval-high<=n int orig-hi)
                         (setf hi ,(fixnumize most-positive-fixnum)))
                       (flet ((imm (x &optional (const t) (temp temp2))
-                               (cond ((plausible-signed-imm32-operand-p x)
+                               (cond ((imm32-p x)
                                       x)
                                      (const
                                       (constantize x))

@@ -691,7 +691,7 @@
                                                 (complex-single-reg
                                                  '((fp-immediate (eql (tn-value tn) #c(0f0 0f0)))))
                                                 ((unsigned-reg signed-reg)
-                                                 '((immediate (plausible-signed-imm32-operand-p (tn-value tn)))))))))
+                                                 '((immediate (imm32-p (tn-value tn)))))))))
               (:arg-types * tagged-num ,result-type)
               (:generator 1
                 ,(if (eq result-sc 'complex-double-reg)

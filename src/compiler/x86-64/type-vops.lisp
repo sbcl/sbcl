@@ -1045,15 +1045,15 @@
            (fixnum (if (sc-is fixnum immediate)
                        (let* ((value (fixnumize (tn-value fixnum)))
                               (one (fixnumize 1)))
-                         (cond ((plausible-signed-imm32-operand-p value)
+                         (cond ((imm32-p value)
                                 value)
-                               ((and (plausible-signed-imm32-operand-p (+ value one))
+                               ((and (imm32-p (+ value one))
                                      (or (and (eql comparison :le)
                                               (setf comparison :l))
                                          (and (eql comparison :g)
                                               (setf comparison :ge))))
                                 (setf value (+ value one)))
-                               ((and (plausible-signed-imm32-operand-p (- value one))
+                               ((and (imm32-p (- value one))
                                      (or (and (eql comparison :ge)
                                               (setf comparison :g))
                                          (and (eql comparison :l)
@@ -1118,7 +1118,7 @@
                                         (setf comparison :le)))))
                       (inst test integer integer))
                      (t
-                      (inst cmp integer (if (plausible-signed-imm32-operand-p fixnum)
+                      (inst cmp integer (if (imm32-p fixnum)
                                             fixnum
                                             (progn
                                               (inst mov temp fixnum)
