@@ -886,16 +886,16 @@ garbage_collect_generation(generation_index_t generation, int raise,
         }
     }
 
-    // Thread creation optionally no longer synchronizes the creating and
-    // created thread. When synchronized, the parent thread is responsible
-    // for pinning the start function for handoff to the created thread.
-    // When not synchronized, The startup parameters are pinned via this list
-    // which will always be NIL if the feature is not enabled.
-
-    // I think this can be removed. From a liveness perspective *STARTING-THREADS*
-    // preserves the SB-THREAD:THREAD instance and its startup function,
-    // neither of which will move.
-
+    /* A nascent thread no longer depends on its creator thread to ensure liveness
+     * of the critically important heap objects needed to start itself up, such as
+     * the initial function and arguments. We used to rely on synchronized ownership
+     * transfer of those objects, and a semaphore signaling that hand-off was complete.
+     * (The crux of the problem is that a thread prior to being linked via all_threads
+     * lacks any GC state, especially stack roots.)
+     * Currently the startup is mediated through SB-THREAD::*STARTING-THREADS* which
+     * transiently contains data for zero or more new threads. Not only must data be
+     * kept live, but objects must be pinned (not moved) until the native thread
+     * constructor and new_thread_trampoline have reached a stable state */
 #ifdef STARTING_THREADS
     lispobj pin_list = SYMBOL(STARTING_THREADS)->value;
     for ( ; pin_list != NIL ; pin_list = CONS(pin_list)->cdr ) {
