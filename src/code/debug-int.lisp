@@ -2622,6 +2622,7 @@
              (+ (ash (sb-c::mask-signed-field 64 hi) 64)
                 lo))
            :invalid-value-for-unescaped-register-storage))
+      #+(or arm64 x86-64)
       (#.sb-vm::signed-128-stack-sc-number
        (with-nfp (nfp)
          (+ (ash (signed-sap-ref-word nfp (+ (number-stack-offset) 8))

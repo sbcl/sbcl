@@ -157,7 +157,9 @@
                 (setf (lvar-%derived-type (cast-value node)) type)
                 (do-uses (use value)
                   (let ((type (values-type-intersection (node-derived-type use) type)))
-                    (setf (node-derived-type use) type)))
+                    (setf (node-derived-type use) type)
+                    (if (eq type *empty-type*)
+                        (maybe-terminate-block use nil))))
                 (delete-filter node lvar (cast-value node))))))
           (combination
            (when (eq (combination-kind node) :known)
