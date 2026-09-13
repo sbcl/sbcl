@@ -814,6 +814,73 @@
     (wordpair-to-bignum r twodigit low high node)
     DONE))
 
+(define-vop (+/unsigned=>integer)
+  (:translate +)
+  (:args (x :scs (unsigned-reg))
+         (y :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num)
+  (:results (r :scs (descriptor-reg)))
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:node-var node)
+  (:generator 18
+    (cond ((location= r x))
+          ((location= r y)
+           (setf y x))
+          (t
+           (move r x)))
+    (inst add r y)
+    (inst jmp :c TWO)
+    (inst jmp :s TWO)
+    (inst shl r 1)
+    (inst jmp :no DONE)
+    ;; This is a little like MOVE-FROM-SIGNED or MOVE-FROM-UNSIGNED
+    ;; but not quite the same as either.
+    ;; Restore the bits of R, but we don't need the carry - it has to be 0
+    ;; because if it weren't 0 then OF would have been set.
+    (inst shr r 1)
+    ;; "signed" meaning that bit index 63 which happens to be 0 is
+    ;; in fact a sign bit and not the 64th bit of the significand.
+    (signed=>bignum-in-reg node r)
+    (inst jmp DONE)
+    TWO
+    (two-word-bignum node r)
+    DONE))
+
+(define-vop (-/unsigned=>integer)
+  (:translate -)
+  (:args (x :scs (unsigned-reg) :target low)
+         (y :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num)
+  (:temporary (:sc unsigned-reg :from (:argument 0)) low)
+  (:temporary (:sc unsigned-reg :from :eval) high twodigit)
+  (:temporary (:sc complex-double-reg :offset 0) scratch)
+  (:ignore scratch)
+  (:results (r :scs (descriptor-reg)))
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:node-var node)
+  (:generator 18
+    (move low x)
+    (inst sub low y)
+    (inst mov :byte twodigit 1)
+
+    (inst jmp :c negative)
+    (inst jmp :s allocate)
+    (inst jmp positive)
+    negative
+    (inst jmp :ns allocate)
+    positive
+
+    (move r low)
+    (inst shl r 1)
+    (inst jmp :no DONE)
+    (zeroize twodigit)
+    allocate
+    (inst sbb high high)
+    (wordpair-to-bignum r twodigit low high node)
+    DONE))
+
 (define-vop (+/signed=>s128)
   (:translate +)
   (:boxing-variant +/signed=>integer)
@@ -829,6 +896,41 @@
     (inst add lo-r y)
     (inst set :l hi-r)
     (inst neg hi-r)))
+
+(define-vop (+/unsigned=>s128)
+  (:translate +)
+  (:boxing-variant +/unsigned=>integer)
+  (:args (x :scs (unsigned-reg) :target lo)
+         (y :scs (unsigned-reg) :to :save))
+  (:arg-types unsigned-num unsigned-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:policy :fast-safe)
+  (:generator 10
+    (move lo x)
+    (zeroize hi)
+    (inst add lo y)
+    (inst set :b hi)))
+
+(define-vop (+/unsigned-signed=>s128)
+  (:translate +)
+  (:args (x :scs (unsigned-reg) :target lo)
+         (y :scs (signed-reg) :to :save))
+  (:arg-types unsigned-num signed-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:policy :fast-safe)
+  (:generator 10
+    (move lo x)
+    (move hi y)
+    (inst sar hi 63)
+    (inst add lo y)
+    (inst adc hi 0 )))
+
+(define-vop (+/signed-unsigned=>s128 +/unsigned-signed=>s128)
+  (:args (y :scs (signed-reg) :to :save)
+         (x :scs (unsigned-reg) :target lo))
+  (:arg-types signed-num unsigned-num))
 
 (define-vop (+/s128+signed=>s128)
   (:translate +)
@@ -1131,73 +1233,6 @@
 
 (defun two-word-bignum (node reg)
   (call-reg-specific-asm-routine node "TWO-WORD-BIGNUM-TO-" reg))
-
-(define-vop (+/unsigned=>integer)
-  (:translate +)
-  (:args (x :scs (unsigned-reg))
-         (y :scs (unsigned-reg)))
-  (:arg-types unsigned-num unsigned-num)
-  (:results (r :scs (descriptor-reg)))
-  (:policy :fast-safe)
-  (:vop-var vop)
-  (:node-var node)
-  (:generator 18
-    (cond ((location= r x))
-          ((location= r y)
-           (setf y x))
-          (t
-           (move r x)))
-    (inst add r y)
-    (inst jmp :c TWO)
-    (inst jmp :s TWO)
-    (inst shl r 1)
-    (inst jmp :no DONE)
-    ;; This is a little like MOVE-FROM-SIGNED or MOVE-FROM-UNSIGNED
-    ;; but not quite the same as either.
-    ;; Restore the bits of R, but we don't need the carry - it has to be 0
-    ;; because if it weren't 0 then OF would have been set.
-    (inst shr r 1)
-    ;; "signed" meaning that bit index 63 which happens to be 0 is
-    ;; in fact a sign bit and not the 64th bit of the significand.
-    (signed=>bignum-in-reg node r)
-    (inst jmp DONE)
-    TWO
-    (two-word-bignum node r)
-    DONE))
-
-(define-vop (-/unsigned=>integer)
-  (:translate -)
-  (:args (x :scs (unsigned-reg) :target low)
-         (y :scs (unsigned-reg)))
-  (:arg-types unsigned-num unsigned-num)
-  (:temporary (:sc unsigned-reg :from (:argument 0)) low)
-  (:temporary (:sc unsigned-reg :from :eval) high twodigit)
-  (:temporary (:sc complex-double-reg :offset 0) scratch)
-  (:ignore scratch)
-  (:results (r :scs (descriptor-reg)))
-  (:policy :fast-safe)
-  (:vop-var vop)
-  (:node-var node)
-  (:generator 18
-    (move low x)
-    (inst sub low y)
-    (inst mov :byte twodigit 1)
-
-    (inst jmp :c negative)
-    (inst jmp :s allocate)
-    (inst jmp positive)
-    negative
-    (inst jmp :ns allocate)
-    positive
-
-    (move r low)
-    (inst shl r 1)
-    (inst jmp :no DONE)
-    (zeroize twodigit)
-    allocate
-    (inst sbb high high)
-    (wordpair-to-bignum r twodigit low high node)
-    DONE))
 
 (define-vop (%negate/unsigned=>integer)
   (:translate %negate)
@@ -4976,6 +5011,31 @@
          (x :scs (descriptor-reg) :to :save))
   (:arg-refs mask-ref x-ref)
   (:arg-types unsigned-num t))
+
+(define-vop (logand-s128/unsigned)
+  (:translate logand)
+  (:policy :fast-safe)
+  (:args ((lo) :scs (signed-128-reg))
+         (mask :scs (unsigned-reg)))
+  (:arg-types signed-byte-128 unsigned-num)
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 8
+    (cond ((eql mask most-positive-word)
+           (move r lo))
+          ((eql mask (1- (expt 2 32)))
+           (move r lo :dword))
+          (t
+           (move r lo)
+           (inst and r mask)))))
+
+(define-vop (logand-s128/unsigned/c logand-s128/unsigned)
+  (:args ((lo) :scs (signed-128-reg)))
+  (:info mask)
+  (:arg-types signed-byte-128 (:constant (satisfies plausible-signed-imm32-operand-or-32-mask-p))))
+
 
 (in-package "SB-C")
 

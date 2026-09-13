@@ -1234,6 +1234,11 @@
 
 (define-instruction-macro csetm (rd cond)
   `(inst csinv ,rd zr-tn zr-tn (negate-condition ,cond)))
+
+(define-instruction-macro cinc (rd rn cond)
+  `(let ((rd ,rd)
+         (rn ,rn))
+     (inst csinc rd rn rn (negate-condition ,cond))))
 ;;;
 
 (def-emitter cond-compare
