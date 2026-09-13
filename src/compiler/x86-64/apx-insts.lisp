@@ -215,21 +215,10 @@ Returns: (values r x b r-prime b-prime v-prime x-prime)"
 
 ;;; Conditional Operations: CFCMOVcc
 
-(defconstant-eqx +apx-conditions+
-    '((:o . 0) (:no . 1) (:b . 2) (:c . 2) (:nae . 2)
-      (:nb . 3) (:nc . 3) (:ae . 3)
-      (:z . 4) (:e . 4) (:nz . 5) (:ne . 5)
-      (:be . 6) (:na . 6) (:nbe . 7) (:a . 7)
-      (:s . 8) (:ns . 9) (:p . 10) (:pe . 10)
-      (:np . 11) (:po . 11)
-      (:l . 12) (:nge . 12) (:nl . 13) (:ge . 13)
-      (:le . 14) (:ng . 14) (:nle . 15) (:g . 15))
-  #'equalp)
-
 (defun parse-apx-condition (cond)
   (if (numberp cond)
       (logand cond 15)
-      (or (cdr (assoc cond +apx-conditions+ :test #'eq))
+      (or (encoded-condition cond)
           (error "Unknown APX condition: ~S" cond))))
 
 (define-instruction cfcmov (segment cond dst src)
