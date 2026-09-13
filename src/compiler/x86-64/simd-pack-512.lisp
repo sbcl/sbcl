@@ -183,13 +183,16 @@
 (define-vop (%simd-pack-512-mask-value)
   (:translate sb-kernel:%simd-pack-512-mask-value)
   (:policy :fast-safe)
-  (:args (val :scs (descriptor-reg)))
+  (:args (val :scs (mask-reg descriptor-reg)))
   (:arg-types simd-pack-512-mask-type)
   (:results (dst :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:note "extract simd-pack-512 mask")
-  (:generator 3
-    (loadw dst val simd-pack-512-mask-value-slot other-pointer-lowtag)))
+  (:generator 1
+    (sc-case val
+      (mask-reg       (inst kmovq dst val))
+      (descriptor-reg (loadw dst val simd-pack-512-mask-value-slot
+                             other-pointer-lowtag)))))
 
 ;; simd-pack-512 related
 
