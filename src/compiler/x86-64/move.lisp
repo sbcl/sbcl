@@ -509,7 +509,7 @@
 
 (define-vop (move-128-arg)
   (:args (x :scs (signed-128-reg descriptor-reg any-reg signed-reg unsigned-reg immediate)
-            :target y)
+            :to :save)
          (fp :scs (any-reg)
              :load-if (not (sc-is y signed-128-reg))))
   (:temporary (:sc unsigned-reg) tmp)
