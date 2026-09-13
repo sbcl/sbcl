@@ -4,7 +4,7 @@
 (let ((sb-c::*handled-conditions* sb-c::*handled-conditions*))
   ;; As many useless notes emanate from loading shared as we have configs,
   ;; at (compile nil (read-from-file customizer-file-name))
-  (declaim (muffle-conditions compiler-note))
+  (proclaim '(muffle-conditions compiler-note))
   (load "src/cold/shared.lisp"))
 (in-package "SB-COLD")
 (let* ((build-dir (format nil "obj/xbuild/~A/" cl-user::*config-name*))

@@ -1471,7 +1471,7 @@
   (macrolet ((return-if-not-cont (x)
                `(let ((x ,x))
                   (unless (<= #x80 x #xBF)
-                    (return (values nil nil)))
+                    (return (values nil 0)))
                   x)))
     (let ((index 0))
       (declare (fixnum index))
@@ -1507,13 +1507,13 @@
              ((<= #xE0 b0 #xEF)
               (let ((b1 (return-if-not-cont (sap-ref-8 sap (+ index 1))))
                     (b2 (return-if-not-cont (sap-ref-8 sap (+ index 2)))))
-                (declare (ignore b2 ))
+                (declare (ignore b2))
                 (unless (if (= b0 #xE0)
                             (<= #xA0 b1 #xBF) ; Overlong
                             (if (= b0 #xED)
                                 (<= #x80 b1 #x9F) ; Surrogate halves
                                 t))
-                  (return (values nil nil nil))))
+                  (return (values nil 0 nil))))
               (incf index 3))
              ;; 4 bytes
              ((<= #xF0 b0 #xF4)
@@ -1526,9 +1526,9 @@
                             (if (= b0 #xF4)
                                 (<= #x80 b1 #x8F) ; Too Large
                                 t))
-                  (return (values nil nil nil))))
+                  (return (values nil 0 nil))))
               (incf index 4))
-             (t (return (values nil nil nil)))))
+             (t (return (values nil 0 nil)))))
          (incf codepoints))))))
 
 
