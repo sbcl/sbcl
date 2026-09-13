@@ -7269,6 +7269,17 @@ expansion happened."
             (values nil nil)))
       (values nil nil)))
 
+(defun remove-opaque-type-intersections (type)
+  (if (opaque-type-p type)
+      (typecase type
+        (union-type
+         (%type-union (mapcar #'remove-opaque-type-intersections (union-type-types type))))
+        (intersection-type
+         (%type-union (remove-if #'opaque-type-p (intersection-type-types type))))
+        (t
+         type))
+      type))
+
 
 ;;;; miscellaneous interfaces
 

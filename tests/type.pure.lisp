@@ -1325,3 +1325,7 @@
     ((-1) nil)
     ((1/2) t)
     ((4/3) t)))
+
+(with-test (:name :prim-type-opaque-intersection)
+  (assert (eql (sb-c:primitive-type (sb-kernel:specifier-type '(or (integer -2 -1) (and x (integer 1 2)))))
+               (sb-c:primitive-type (sb-kernel:specifier-type '(OR (integer -2 2)))))))
