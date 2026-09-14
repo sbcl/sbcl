@@ -7,11 +7,25 @@
   (let ((b (& val #xf)))
    (let ((a (>> (u32+ val (<< val 23)) 28)))
     (^ a (aref tab b))))))")
+(#(0 2 4 6 8 A E 10 12 14 16 18 1A 1C 1E 20 22 24 26 28 2C 2E 30 32 7A)
+ "(9 19 61 5 3 11 7 8 10 1 15 14 13 12 25 24 23 22 20 18 2 17 16 0 4)"
+ "((let ((tab #a((16) (unsigned-byte 8) 0 13 1 7 13 15 15 7 13 21 16 18 21 23 18 22)))
+  (let ((b (& (>> val 1) #xf)))
+   (let ((a (>> (<< val 25) 28)))
+    (^ a (aref tab b))))))")
 (#(0 2 4 6 8 A E 10 12 14 16 18 1A 1C 1E 20 22 24 28 2A 2C 2E 7A)
  "(61 4 3 10 7 8 9 5 14 13 12 11 23 22 21 20 18 17 2 16 15 0 1)"
  "((let ((tab #a((16) (unsigned-byte 8) 0 13 1 7 13 7 21 15 16 9 22 17 21 0 18 22)))
   (let ((b (& (>> val 1) #xf)))
    (let ((a (>> (<< val 25) 28)))
+    (^ a (aref tab b))))))")
+(#(0 2 4 6 8 A E 10 14 16 18 1A 1C 1E 20 22 24 26 28 2A 2E 32 34 36 38 3A 3C 3E 40 7A)
+ "(61 5 3 11 7 8 10 1 15 14 13 12 28 27 26 25 17 18 16 31 32 30 29 23 21 2 20 19 0 4)"
+ "((let ((tab #a((16) (unsigned-byte 8) 9 0 21 13 1 3 16 15 7 18 11 17 26 28 24 29)))
+  (+= val #x2c45f2cb)
+  (^= val (>> val 4))
+  (let ((b (& val #xf)))
+   (let ((a (>> (u32+ val (<< val 23)) 28)))
     (^ a (aref tab b))))))")
 (#(0 2 4 1E 20 22 28 2A)
  "(15 16 20 21 2 17 1 0)"
@@ -50,6 +64,22 @@
 (#(0 4 5 C D)
  "(NIL 13 12 4 5)"
  "((& (- val (>> val 2)) 7))")
+(#(0 4 8 A 24 26)
+ "(5 0 18 2 4 19)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 2 4 6)))
+  (+= val #x4d75d31e)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 2) #x3)))
+   (let ((a (>> (u32+ val (<< val 25)) 30)))
+    (^ a (aref tab b))))))")
+(#(0 4 8 A 2A 2C)
+ "(5 0 21 2 4 22)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 0 7 5)))
+  (+= val #xd7f616cc)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 1) #x3)))
+   (let ((a (>> (u32+ val (<< val 26)) 30)))
+    (^ a (aref tab b))))))")
 (#(0 4 8 C E 10 14 18 1C 38 3C)
  "(30 0 14 4 28 8 12 2 6 10 7)"
  "((let ((tab #a((8) (unsigned-byte 8) 1 8 0 8 5 0 0 5)))
@@ -57,6 +87,14 @@
   (^= val (>> val 4))
   (let ((b (& val #x7)))
    (let ((a (>> (u32+ val (<< val 25)) 29)))
+    (^ a (aref tab b))))))")
+(#(0 4 8 C 38 3A)
+ "(6 0 28 2 4 29)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 4 0 6)))
+  (+= val #xc79d0b53)
+  (^= val (>> val 4))
+  (let ((b (& val #x3)))
+   (let ((a (>> (u32+ val (<< val 28)) 30)))
     (^ a (aref tab b))))))")
 (#(0 4 8 1E 20 22 28 2A)
  "(15 16 20 21 2 17 4 0)"
@@ -66,6 +104,14 @@
   (let ((b (& (>> val 4) #x3)))
    (let ((a (>> (u32+ val (<< val 28)) 30)))
     (^ a (aref tab b))))))")
+(#(0 4 8 20 22 24 2C 2E)
+ "(16 17 22 23 2 18 4 0)"
+ "((let ((tab #a((4) (unsigned-byte 8) 2 7 4 0)))
+  (+= val #xeeedc3ac)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 1) #x3)))
+   (let ((a (>> (u32+ val (<< val 27)) 30)))
+    (^ a (aref tab b))))))")
 (#(0 4 8 24 26 28 2E 30)
  "(18 19 23 24 2 20 4 0)"
  "((let ((tab #a((8) (unsigned-byte 8) 0 7 2 4 2 5 5 0)))
@@ -73,6 +119,14 @@
   (^= val (>> val 4))
   (let ((b (& (>> val 1) #x7)))
    (let ((a (>> (u32+ val (<< val 24)) 30)))
+    (^ a (aref tab b))))))")
+(#(0 4 8 26 28 2A 32 34)
+ "(19 20 25 26 2 21 4 0)"
+ "((let ((tab #a((8) (unsigned-byte 8) 7 0 0 7 4 3 0 4)))
+  (+= val #x91313c2a)
+  (^= val (>> val 4))
+  (let ((b (& val #x7)))
+   (let ((a (>> (u32+ val (<< val 25)) 30)))
     (^ a (aref tab b))))))")
 (#(0 4 8 32 34 36)
  "(26 25 2 27 4 0)"
@@ -106,6 +160,9 @@
   (let ((b (& (>> val 2) #x3)))
    (let ((a (>> (u32+ val (<< val 21)) 30)))
     (^ a (aref tab b))))))")
+(#(0 4 A 2A 2C)
+ "(5 0 21 2 22)"
+ "((& (+ (>> val 2) (>> val 5)) 7))")
 (#(0 58AA11D 33FB65F5 DE12C038)
  "#(:OFFSET :POST-INDEX 0 :PRE-INDEX)"
  "((& (>> val 2) 3))")
@@ -242,6 +299,9 @@
 (#(2 6 A C 1A)
  "(1 6 3 13 5)"
  "((& (+ (>> val 2) (>> val 3) (>> val 4)) 7))")
+(#(2 6 A C 32)
+ "(1 6 3 25 5)"
+ "((& (>> val 2) 7))")
 (#(2 6 A 16 26)
  "(1 5 3 11 19)"
  "((& (^ (>> val 2) (>> val 4)) 7))")
@@ -261,15 +321,55 @@
   (let ((b (& (>> val 2) #x3)))
    (let ((a (>> (u32+ val (<< val 21)) 30)))
     (^ a (aref tab b))))))")
+(#(2 6 A 18 2A)
+ "(1 5 3 12 21)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 7 0 1)))
+  (+= val #x9d9bfc9b)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 4) #x3)))
+   (let ((a (>> (u32+ val (<< val 24)) 30)))
+    (^ a (aref tab b))))))")
 (#(2 6 A 18 2C)
  "(1 5 3 12 22)"
  "((let ((tab #a((4) (unsigned-byte 8) 3 1 0 4)))
   (let ((b (& (>> val 2) #x3)))
    (let ((a (>> (<< val 30) 30)))
     (^ a (aref tab b))))))")
+(#(2 6 A 18 30)
+ "(1 5 3 12 24)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 6 3 0)))
+  (let ((b (& (>> val 2) #x3)))
+   (let ((a (>> (<< val 30) 30)))
+    (^ a (aref tab b))))))")
+(#(2 6 A 1A 2A)
+ "(1 5 3 13 21)"
+ "((let ((tab #a((4) (unsigned-byte 8) 3 4 0 0)))
+  (let ((b (& (>> val 2) #x3)))
+   (let ((a (>> (<< val 26) 30)))
+    (^ a (aref tab b))))))")
+(#(2 6 A 1A 30)
+ "(1 5 3 13 24)"
+ "((let ((tab #a((4) (unsigned-byte 8) 2 0 1 5)))
+  (+= val #xe705d0f4)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 2) #x3)))
+   (let ((a (>> (u32+ val (<< val 21)) 30)))
+    (^ a (aref tab b))))))")
 (#(2 A E 10 12 16 18 1A 1C 2C)
  "(14 13 12 11 22 9 8 7 1 5)"
  "((let ((tab #a((8) (unsigned-byte 8) 5 0 0 11 11 5 0 0)))
+  (let ((b (& (>> val 1) #x7)))
+   (let ((a (>> (<< val 26) 29)))
+    (^ a (aref tab b))))))")
+(#(2 A E 10 14 18 1A 1C 1E 2A)
+ "(15 14 13 12 21 10 8 7 1 5)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 0 5 0 11 0 10 5)))
+  (let ((b (& (>> val 1) #x7)))
+   (let ((a (>> (<< val 26) 29)))
+    (^ a (aref tab b))))))")
+(#(2 A E 10 14 18 1A 1C 1E 30)
+ "(15 14 13 12 24 10 8 7 1 5)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 0 11 0 11 0 7 4)))
   (let ((b (& (>> val 1) #x7)))
    (let ((a (>> (<< val 26) 29)))
     (^ a (aref tab b))))))")
@@ -361,9 +461,33 @@
   (let ((b (& (>> val 1) #x3)))
    (let ((a (>> (<< val 26) 30)))
     (^ a (aref tab b))))))")
+(#(A E 10 18 2A)
+ "(12 21 7 8 5)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 5 2 0)))
+  (+= val #x4d75d31e)
+  (^= val (>> val 4))
+  (let ((b (& val #x3)))
+   (let ((a (>> (u32+ val (<< val 25)) 30)))
+    (^ a (aref tab b))))))")
+(#(A E 10 18 30)
+ "(12 24 7 8 5)"
+ "((let ((tab #a((4) (unsigned-byte 8) 1 5 0 0)))
+  (+= val #x4d75d31e)
+  (^= val (>> val 4))
+  (let ((b (& val #x3)))
+   (let ((a (>> (u32+ val (<< val 25)) 30)))
+    (^ a (aref tab b))))))")
 (#(C 2E 34 36 38 3A 3C)
  "(26 30 29 28 27 23 6)"
  "((& (+ (>> val 1) (>> val 2) (>> val 4)) 7))")
+(#(C 32 38 3A 3C 3E 40)
+ "(28 32 31 30 29 25 6)"
+ "((let ((tab #a((4) (unsigned-byte 8) 5 0 7 2)))
+  (+= val #xb29c83f7)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 1) #x3)))
+   (let ((a (>> (u32+ val (<< val 26)) 30)))
+    (^ a (aref tab b))))))")
 (#(14 16 18 1A 1C 1E 20 22 24 26 28 2C)
  "(10 11 12 13 14 15 16 17 18 19 20 22)"
  "((let ((tab #a((8) (unsigned-byte 8) 12 13 0 5 0 8 5 9)))
@@ -388,6 +512,9 @@
   (let ((b (>> (<< val 25) 30)))
    (let ((a (& (>> val 1) #x3)))
     (^ a (aref tab b))))))")
+(#(20 22 24 3C 3E 40)
+ "(18 17 16 32 31 30)"
+ "((& (+ (>> val 1) (>> val 2) (>> val 4)) 7))")
 (#(20 22 24 46 48 4A)
  "(18 17 16 37 36 35)"
  "((& (>> val 1) 7))")
@@ -2044,71 +2171,5 @@
 (#(A49305EF D0241AE7 E55E7F8C EE9A5410)
  "(SB-PCL::%CLASS SB-PCL::%PARAMETER SB-PCL::%VARIABLE-REBINDING SPECIAL)"
  "((& (>> val 8) 3))")
-(#(C 32 38 3A 3C 3E 40)
- "(28 32 31 30 29 25 6)"
- "((let ((tab #a((4) (unsigned-byte 8) 5 0 7 2)))
-  (+= val #xb29c83f7)
-  (^= val (>> val 4))
-  (let ((b (& (>> val 1) #x3)))
-   (let ((a (>> (u32+ val (<< val 26)) 30)))
-    (^ a (aref tab b))))))")
-(#(2 6 A 18 30)
- "(1 5 3 12 24)"
- "((let ((tab #a((4) (unsigned-byte 8) 0 6 3 0)))
-  (let ((b (& (>> val 2) #x3)))
-   (let ((a (>> (<< val 30) 30)))
-    (^ a (aref tab b))))))")
-(#(2 6 A 1A 30)
- "(1 5 3 13 24)"
- "((let ((tab #a((4) (unsigned-byte 8) 2 0 1 5)))
-  (+= val #xe705d0f4)
-  (^= val (>> val 4))
-  (let ((b (& (>> val 2) #x3)))
-   (let ((a (>> (u32+ val (<< val 21)) 30)))
-    (^ a (aref tab b))))))")
-(#(20 22 24 3C 3E 40)
- "(18 17 16 32 31 30)"
- "((& (+ (>> val 1) (>> val 2) (>> val 4)) 7))")
-(#(A E 10 18 30)
- "(12 24 7 8 5)"
- "((let ((tab #a((4) (unsigned-byte 8) 1 5 0 0)))
-  (+= val #x4d75d31e)
-  (^= val (>> val 4))
-  (let ((b (& val #x3)))
-   (let ((a (>> (u32+ val (<< val 25)) 30)))
-    (^ a (aref tab b))))))")
-(#(0 4 8 26 28 2A 32 34)
- "(19 20 25 26 2 21 4 0)"
- "((let ((tab #a((8) (unsigned-byte 8) 7 0 0 7 4 3 0 4)))
-  (+= val #x91313c2a)
-  (^= val (>> val 4))
-  (let ((b (& val #x7)))
-   (let ((a (>> (u32+ val (<< val 25)) 30)))
-    (^ a (aref tab b))))))")
-(#(2 A E 10 14 18 1A 1C 1E 30)
- "(15 14 13 12 24 10 8 7 1 5)"
- "((let ((tab #a((8) (unsigned-byte 8) 0 0 11 0 11 0 7 4)))
-  (let ((b (& (>> val 1) #x7)))
-   (let ((a (>> (<< val 26) 29)))
-    (^ a (aref tab b))))))")
-(#(0 2 4 6 8 A E 10 14 16 18 1A 1C 1E 20 22 24 26 28 2A 2E 32 34 36 38 3A 3C 3E 40 7A)
- "(61 5 3 11 7 8 10 1 15 14 13 12 28 27 26 25 17 18 16 31 32 30 29 23 21 2 20 19 0 4)"
- "((let ((tab #a((16) (unsigned-byte 8) 9 0 21 13 1 3 16 15 7 18 11 17 26 28 24 29)))
-  (+= val #x2c45f2cb)
-  (^= val (>> val 4))
-  (let ((b (& val #xf)))
-   (let ((a (>> (u32+ val (<< val 23)) 28)))
-    (^ a (aref tab b))))))")
-(#(0 4 A 2A 2C)
- "(5 0 21 2 22)"
- "((& (+ (>> val 2) (>> val 5)) 7))")
-(#(0 4 8 A 2A 2C)
- "(5 0 21 2 4 22)"
- "((let ((tab #a((4) (unsigned-byte 8) 0 0 7 5)))
-  (+= val #xd7f616cc)
-  (^= val (>> val 4))
-  (let ((b (& (>> val 1) #x3)))
-   (let ((a (>> (u32+ val (<< val 26)) 30)))
-    (^ a (aref tab b))))))")
 )
 ;; EOF
