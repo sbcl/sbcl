@@ -1002,8 +1002,25 @@ avoiding `atexit(3)` hooks, etc. Otherwise `exit(2)` is called."
 ;;; Windows build.
 #+os-provides-clock-gettime
 (progn
-  (declaim (inline clock-gettime))
+  (declaim (inline !clock-gettime clock-gettime))
   (defun clock-gettime (clockid)
+    (declare (type (signed-byte 32) clockid))
+    (with-alien ((ts (struct timespec)))
+      ;; Check syscall result for users who call pthread_getcpuclockid to obtain a clockid_t
+      ;; for any thread in the process given its sb-thread::thread-os-thread. They don't want
+      ;; random uninitialized bits from stack-allocated TS if the clockid went stale.
+      (if (= 0 (alien-funcall (extern-alien #.(libc-name-for "sb_clock_gettime")
+                                            (function int int (* (struct timespec))))
+                              clockid (addr ts)))
+          ;; 'seconds' is definitely a fixnum for 64-bit, because most-positive-fixnum
+          ;; can express 1E11 years in seconds.
+          (values #+64-bit (truly-the fixnum (slot ts 'tv-sec))
+                  #-64-bit (slot ts 'tv-sec)
+                  (truly-the (integer 0 #.(expt 10 9)) (slot ts 'tv-nsec)))
+          (values nil nil))))
+  ;; This one never return NILs, and so avoids a little math in the consumers.
+  ;; A type deriver using the clockid arg could figure that out, but let's not get crazy.
+  (defun !clock-gettime (clockid) ; Can drop out of the image in tree-shaker
     (declare (type (signed-byte 32) clockid))
     (with-alien ((ts (struct timespec)))
       (alien-funcall (extern-alien #.(libc-name-for "sb_clock_gettime")
@@ -1040,7 +1057,7 @@ the UNIX epoch (January 1st 1970.)"
           ;; offers, and COARSE is about twice as fast, so use that, but only for linux.
           ;; BSD has something similar.
           #+os-provides-clock-gettime
-          (clock-gettime #+linux clock-monotonic-coarse #-linux clock-monotonic)
+          (!clock-gettime #+linux clock-monotonic-coarse #-linux clock-monotonic)
           #-os-provides-clock-gettime
           (multiple-value-bind (c-sec c-usec) (get-time-of-day) (values c-sec (* c-usec 1000)))
 
@@ -1096,7 +1113,7 @@ the UNIX epoch (January 1st 1970.)"
   ;; also use the same trick when clock_gettime should be avoided.
   #+(and os-provides-clock-gettime (not sunos))
   (defun system-internal-run-time ()
-    (multiple-value-bind (sec nsec) (clock-gettime clock-process-cputime-id)
+    (multiple-value-bind (sec nsec) (!clock-gettime clock-process-cputime-id)
       (+ (* sec internal-time-units-per-second)
          (floor (+ nsec (floor nanoseconds-per-internal-time-unit 2))
                 nanoseconds-per-internal-time-unit))))
