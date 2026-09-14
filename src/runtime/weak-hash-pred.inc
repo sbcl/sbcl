@@ -9,7 +9,6 @@ static int survived_gc_yet_VALUE(lispobj __attribute__((unused)) key, lispobj va
 static int survived_gc_yet_AND(lispobj key, lispobj value) {
     int key_nonpointer = !is_lisp_pointer(key);
     int val_nonpointer = !is_lisp_pointer(value);
-    if (key_nonpointer && val_nonpointer) return 1;
     return (key_nonpointer || pointer_survived_gc_yet(key))
         && (val_nonpointer || pointer_survived_gc_yet(value));
 }
