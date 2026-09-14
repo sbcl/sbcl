@@ -30,12 +30,12 @@
 #include <sys/resource.h> // for getrusage()
 #endif
 
-struct unbounded_queue {
+static struct unbounded_queue {
   struct Qblock* head_block;
   struct Qblock* tail_block;
   struct Qblock* recycler;
   long tot_count; // Not used
-} scav_queue;
+} work_queue;
 
 /* Initialized to number of pages in page table
  * and decremented before use. */
@@ -59,19 +59,19 @@ static void gc_enqueue(lispobj object)
 {
     gc_dcheck(is_lisp_pointer(object));
     gc_dcheck(widetag_of(native_pointer(object)) != SIMPLE_FUN_WIDETAG);
-    struct Qblock* block = scav_queue.tail_block;
+    struct Qblock* block = work_queue.tail_block;
     if (block->count == QBLOCK_CAPACITY) {
         struct Qblock* next;
-        next = scav_queue.recycler;
+        next = work_queue.recycler;
         if (next) {
-            scav_queue.recycler = next->next;
+            work_queue.recycler = next->next;
         } else {
             next = (struct Qblock*)get_free_page();
         }
         block = block->next = next;
         block->next = 0;
         block->tail = block->count = 0;
-        scav_queue.tail_block = block;
+        work_queue.tail_block = block;
     }
     block->elements[block->tail] = object;
     if (++block->tail == QBLOCK_CAPACITY) block->tail = 0;
@@ -80,16 +80,16 @@ static void gc_enqueue(lispobj object)
 
 static lispobj gc_dequeue()
 {
-    struct Qblock* block = scav_queue.head_block;
+    struct Qblock* block = work_queue.head_block;
     gc_assert(block->count);
     int index = block->tail - block->count;
     lispobj object = block->elements[index + (index<0 ? QBLOCK_CAPACITY : 0)];
     if (--block->count == 0) {
         struct Qblock* next = block->next;
         if (next) {
-            scav_queue.head_block = next;
-            block->next = scav_queue.recycler;
-            scav_queue.recycler = block;
+            work_queue.head_block = next;
+            block->next = work_queue.recycler;
+            work_queue.recycler = block;
         }
     }
     return object;
@@ -228,9 +228,9 @@ void prepare_for_full_mark_phase()
 {
     free_page = page_table_pages;
     struct Qblock* block = (struct Qblock*)get_free_page();
-    scav_queue.head_block = block;
-    scav_queue.tail_block = block;
-    scav_queue.recycler   = 0;
+    work_queue.head_block = block;
+    work_queue.tail_block = block;
+    work_queue.recycler   = 0;
     block->next = 0;
     block->tail = block->count = 0;
     /* Consume as many bits as cover the entire dynamic space regardless
@@ -257,7 +257,7 @@ void prepare_for_full_mark_phase()
     fullcgcmarks = (void*)os_allocate(markbits_size);
 }
 
-void scav_static_range(lispobj* where, lispobj* end)
+static void enqueue_static_like_range(lispobj* where, lispobj* end)
 {
     while (where < end) {
         lispobj obj = compute_lispobj(where);
@@ -276,11 +276,11 @@ void execute_full_mark_phase()
     trace_object(T_SYMBOL_SLOTS_START);
 #endif
     trace_object(NIL_SYMBOL_SLOTS_START);
-    scav_static_range((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer);
-    scav_static_range((lispobj*)PERMGEN_SPACE_START, permgen_space_free_pointer);
+    enqueue_static_like_range((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer);
+    enqueue_static_like_range((lispobj*)PERMGEN_SPACE_START, permgen_space_free_pointer);
 #ifndef LISP_FEATURE_IMMOBILE_SPACE
     // if NO immobile-space, then text space is equivalent to static space
-    scav_static_range((lispobj*)TEXT_SPACE_START, text_space_highwatermark);
+    enqueue_static_like_range((lispobj*)TEXT_SPACE_START, text_space_highwatermark);
 #endif
     gc_mark_obj(lisp_package_vector);
     gc_mark_obj(lisp_init_function);
@@ -293,9 +293,9 @@ void execute_full_mark_phase()
             trace_object(native_pointer(ptr));
         else
             mark_pair((lispobj*)(ptr - LIST_POINTER_LOWTAG));
-    } while (scav_queue.head_block->count ||
+    } while (work_queue.head_block->count ||
              (test_weak_triggers(pointer_survived_gc_yet, gc_mark_obj) &&
-              scav_queue.head_block->count));
+              work_queue.head_block->count));
     stray_pointer_source_obj = 0;
 
 #ifdef HAVE_GETRUSAGE
