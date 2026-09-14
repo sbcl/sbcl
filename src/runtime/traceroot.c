@@ -967,9 +967,6 @@ __attribute__((unused)) static void add_to_roots(os_context_register_t word, voi
     if (obj) hopscotch_put(arg, compute_lispobj(obj), 1);
 }
 
-extern void visit_context_registers(void (*proc)(os_context_register_t, void*),
-                                    os_context_t *context, void*);
-
 /* Return number of sought objects that had paths to them.
  * Return -1 for invalid input.
  * This must be called inside WITHOUT-GCING. */

@@ -163,6 +163,10 @@ os_context_register_addr(os_context_t *context, int offset);
 os_context_register_t *
 os_context_float_register_addr(os_context_t *context, int offset);
 
+/* Call proc on every register in context capable of holding a lispobj */
+extern void visit_context_registers(void (*proc)(os_context_register_t, void*),
+                                    os_context_t *context, void*);
+
 #ifdef ARCH_HAS_NPC_REGISTER
 os_context_register_t *os_context_npc_addr(os_context_t *context);
 #endif

@@ -618,8 +618,6 @@ static void pin_call_chain_and_boxed_registers(struct thread* th) {
 #endif
 
 #if !GENCGC_IS_PRECISE
-extern void visit_context_registers(void (*proc)(os_context_register_t, void*),
-                                    os_context_t *context, void*);
 static void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 conservative_stack_scan(struct thread* th,
                         __attribute__((unused)) generation_index_t gen,
