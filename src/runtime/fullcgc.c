@@ -99,14 +99,6 @@ static inline sword_t dword_index(uword_t ptr, uword_t base) {
     return (ptr - base) >> (1+WORD_SHIFT);
 }
 
-/* The "canonical" pointer to an object is usually just the object itself.
- * This is true even for SIMPLE-FUN- we don't need to regard only the code base
- * as canonical. */
-static inline lispobj canonical_ptr(lispobj pointer)
-{
-    return pointer;
-}
-
 static __attribute__((unused)) sword_t fixedobj_index_bit_bias, text_index_bit_bias;
 static uword_t *fullcgcmarks;
 static size_t markbits_size;
@@ -127,7 +119,7 @@ static inline sword_t ptr_to_bit_index(lispobj pointer) {
 /* Return true if OBJ has already survived the current GC. */
 static inline bool pointer_survived_gc_yet(lispobj pointer)
 {
-    sword_t mark_index = ptr_to_bit_index(canonical_ptr(pointer));
+    sword_t mark_index = ptr_to_bit_index(pointer);
     if (mark_index < 0) return 1; // "uninteresting" objects always survive GC
     return (fullcgcmarks[mark_index / N_WORD_BITS] >> (mark_index % N_WORD_BITS)) & 1;
 }
@@ -167,7 +159,6 @@ static void __mark_obj(lispobj pointer)
 {
     lispobj* base;
 
-    pointer = canonical_ptr(pointer);
     sword_t mark_index = ptr_to_bit_index(pointer);
     if (mark_index < 0) {
         if (stray_pointer_detector_fn) stray_pointer_detector_fn(pointer);
