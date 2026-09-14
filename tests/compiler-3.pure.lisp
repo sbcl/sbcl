@@ -30,3 +30,18 @@
          #1=(values 0 1 2 3 :c1 :c2 :c3 :c4 :c5 :c6 :c6 :c7 :c7 :c8 :c5 :c4 :c3 :c2 :c1))
     (() #1#)))
 
+(with-test (:name :reuse-move-coercion-scs)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (declare (fixnum a))
+         (+ (let ((v
+                    (if (< 0 a)
+                        13174327107650979063
+                        a)))
+              (if (< v a)
+                  a
+                  v))
+            3))
+    ((12917690363219115) 13174327107650979066)
+    ((-1) 2)))
