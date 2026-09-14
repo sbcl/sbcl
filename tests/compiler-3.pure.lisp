@@ -37,11 +37,12 @@
          (declare (fixnum a))
          (+ (let ((v
                     (if (< 0 a)
-                        13174327107650979063
+                        ,(ldb (byte sb-vm:n-word-bits 0) 13174327107650979063)
                         a)))
               (if (< v a)
                   a
                   v))
             3))
-    ((12917690363219115) 13174327107650979066)
+    (((logand most-positive-fixnum 12917690363219115))
+     (ldb (byte sb-vm:n-word-bits 0) 13174327107650979066))
     ((-1) 2)))
