@@ -203,7 +203,32 @@
 
 ;;; Unless using an arena there is really no way to get a number
 ;;; allocated off the heap
-#-(or x86-64 system-tlabs) (defun copy-number-to-heap (n) n)
+(defun copy-number-to-heap (n)
+  (declare (sb-c::tlab :system))
+  #-system-tlabs n
+  #+system-tlabs
+  (named-let copy ((n n))
+    (if (or (typep n '(or fixnum #+64-bit single-float))
+            (and (typep n '(or bignum double-float (complex float)))
+                 (dynamic-space-obj-p n)))
+        n
+        (typecase n
+          ;; can't use copy-bignum because that uses the active tlab
+          (bignum (let ((new (sb-bignum:%allocate-bignum (sb-bignum:%bignum-length n))))
+                    (sb-bignum::bignum-replace new n)
+                    new))
+          (double-float
+           (%make-double-float (double-float-bits n)))
+          ;; ratio is dynspace-p only if both parts are. copy everything to be safe
+          (ratio (%make-ratio (truly-the integer (copy (%numerator n)))
+                              (truly-the integer (copy (%denominator n)))))
+          ;; Handle complex subtypes by hand so that a vop or IR2-converter is used
+          ((complex single-float) (complex (realpart n) (imagpart n)))
+          ((complex double-float) (complex (realpart n) (imagpart n)))
+          (complex ; same as RATIO
+           (%make-complex (truly-the rational (copy (%realpart n)))
+                          (truly-the rational (copy (%imagpart n)))))
+          (t (bug "~S is not a number" n))))))
 
 (defun hexdump (thing &optional (count 2 countp)
                             ;; pass NIL explicitly if T crashes on you
