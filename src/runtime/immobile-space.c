@@ -536,44 +536,57 @@ lispobj* search_immobile_code(char* ptr) {
     return 0;
 }
 
-/* If 'addr' points to an immobile object, then make the object
-   live by promotion. But if the object is not in the generation
-   being collected, do nothing */
-bool immobile_space_preserve_pointer(void* addr)
+/* If 'addr' is a valid pointer to an immobile object, return the tagged pointer.
+ * 'addr' must already be properly tagged unless it is an interior pointer to code.
+ * If there is no object, return 0. 'match_gen' identifies a single generation to
+ * consider, or -1 to consider all.
+ * IMPORTANT: 'match_gen' does not promise to filter out the objects in non-matching
+ * generations. It is strictly an optimization */
+lispobj immobile_space_obj_from_ambiguous_ptr(void* addr, int match_gen)
 {
-    unsigned char genmask = compacting_p() ? 1<<from_space : 0xff;
-    lispobj* object_start;
-    int valid = 0;
     low_page_index_t page_index;
+    lispobj *object_start;
 
-    if ((page_index = find_fixedobj_page_index(addr)) >= 0
-        && ((fixedobj_pages[page_index].gens & genmask) != 0)) {
+    if ((page_index = find_fixedobj_page_index(addr)) >= 0) {
+        // Quit now if object's generation could not posibly match
+        if (match_gen >= 0 &&
+            ((fixedobj_pages[page_index].gens >> match_gen) & 1) == 0) return 0;
         int obj_spacing = fixedobj_page_obj_align(page_index);
         int obj_index = ((uword_t)addr & (IMMOBILE_CARD_BYTES-1)) / obj_spacing;
         dprintf((logfile,"Pointer %p is to immobile page %d, object %d\n",
                  addr, page_index, obj_index));
         char* page_start_addr = PTR_ALIGN_DOWN(addr, IMMOBILE_CARD_BYTES);
         object_start = (lispobj*)(page_start_addr + obj_index * obj_spacing);
-        valid = !fixnump(*object_start)
-            && properly_tagged_descriptor_p(addr, object_start);
-    } else if (compacting_p() && (lispobj*)addr < tlsf_mem_start) {
-        // Can ignore this pointer if it's point to pseudostatic text
+        if (!fixnump(*object_start) && properly_tagged_descriptor_p(addr, object_start))
+            return (lispobj)addr;
         return 0;
-    } else if ((object_start = search_immobile_code(addr)) != 0) {
-        valid = instruction_ptr_p(addr, object_start)
-                || properly_tagged_descriptor_p(addr, object_start);
     }
-    if (valid && (!compacting_p() ||
-                  immobile_obj_gen_bits(object_start) == from_space)) {
-        dprintf((logfile,"immobile obj @ %p (<- %p) is conservatively live\n",
-                 object_start, addr));
-        if (compacting_p())
-            enliven_immobile_obj(object_start, 0);
-        else
-            gc_mark_obj(compute_lispobj(object_start));
-        return 1;
+    // Avoid searching for a codeblob unless its address is within the
+    // allocatable pages (above the initial high-water-mark) after coreparse.
+    // However, for a full trace (no generationa are roots) always search.
+    if ((addr >= (void*)tlsf_mem_start || match_gen < 0)
+        && (object_start = search_immobile_code(addr)) != 0) {
+        if (properly_tagged_descriptor_p(addr, object_start)
+            || instruction_ptr_p(addr, object_start))
+            return make_lispobj(object_start, OTHER_POINTER_LOWTAG);
     }
     return 0;
+}
+
+/* Look for an immobile object at 'addr'. For a normal gencgc cycle, liven the found
+ * object unless it is not in the generation being collected, in which case do nothing.
+ * For a full mark-and-sweep pass, alway mark an object if found  */
+bool immobile_space_preserve_pointer(void* addr)
+{
+    lispobj obj = immobile_space_obj_from_ambiguous_ptr(addr, from_space);
+    if (!obj) return 0;
+    if (from_space < 0) {
+        gc_mark_obj(obj);
+    } else {
+        if (immobile_obj_gen_bits(native_pointer(obj)) == from_space)
+            enliven_immobile_obj(native_pointer(obj), 0);
+    }
+    return 1;
 }
 
 // Turn a grey node black.
