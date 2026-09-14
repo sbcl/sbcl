@@ -549,8 +549,9 @@ lispobj immobile_space_obj_from_ambiguous_ptr(void* addr, int match_gen)
 
     if ((page_index = find_fixedobj_page_index(addr)) >= 0) {
         // Quit now if object's generation could not posibly match
-        if (match_gen >= 0 &&
-            ((fixedobj_pages[page_index].gens >> match_gen) & 1) == 0) return 0;
+        unsigned char mask = fixedobj_pages[page_index].gens;
+        if (!mask || (match_gen >= 0 && ((mask >> match_gen) & 1) == 0))
+            return 0;
         int obj_spacing = fixedobj_page_obj_align(page_index);
         int obj_index = ((uword_t)addr & (IMMOBILE_CARD_BYTES-1)) / obj_spacing;
         dprintf((logfile,"Pointer %p is to immobile page %d, object %d\n",
