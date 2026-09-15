@@ -1632,12 +1632,12 @@
       (find-vars (car predecessor-outs)))
     (dolist (var vars)
       (let ((in-var-type *empty-type*))
-        (flet ((compute-type (out)
-                 (setq in-var-type
-                       (type-union in-var-type
-                                   (type-from-constraints var out *universal-type*)))))
-          (dolist (out predecessor-outs)
-            (compute-type out)))
+        (dolist (out predecessor-outs)
+          (setq in-var-type
+                (type-union in-var-type
+                            (type-from-constraints var out *universal-type*)))
+          (when (eq in-var-type *universal-type*)
+            (return)))
 
         (when (type-for-constraints-p in-var-type)
           ;; Remove the existing constraints to avoid joining them again later.
