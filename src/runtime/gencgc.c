@@ -3526,9 +3526,8 @@ garbage_collect_generation(generation_index_t generation, int raise,
     {
         struct thread *th;
         for_each_thread(th) {
-            scav_binding_stack((lispobj*)th->binding_stack_start,
-                               (lispobj*)get_binding_stack_pointer(th),
-                               compacting_p() ? 0 : gc_mark_obj);
+            bindingstack_vals_visit(th->binding_stack_start, get_binding_stack_pointer(th),
+                                    compacting_p() ? 0 : gc_mark_obj);
             /* do the tls as well */
             lispobj* from = &th->lisp_thread;
             lispobj* to = (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th);
@@ -3674,7 +3673,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
     scavenge_newspace(new_space);
     if (save_lisp_gc_iteration == 2) finish_code_metadata();
 
-    scan_binding_stack();
+    bindingstack_syms_fix();
     smash_weak_pointers();
     /* Return private-use pages to the general pool so that Lisp can have them */
     gc_dispose_private_pages();

@@ -973,9 +973,8 @@ garbage_collect_generation(generation_index_t generation, int raise,
     {
         struct thread *th;
         for_each_thread(th) {
-            scav_binding_stack((lispobj*)th->binding_stack_start,
-                               (lispobj*)get_binding_stack_pointer(th),
-                               mr_preserve_object);
+            bindingstack_vals_visit(th->binding_stack_start, get_binding_stack_pointer(th),
+                                    mr_preserve_object);
             /* do the tls as well */
             lispobj* from = &th->lisp_thread;
             lispobj* to = (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th);

@@ -133,7 +133,7 @@ int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
         if (verbose)
             fprintf(stderr, " [thread bindings]");
         if (verify((lispobj)th->binding_stack_start,
-                   (lispobj*)get_binding_stack_pointer(th), &state,
+                   get_binding_stack_pointer(th), &state,
                    VERIFYING_UNFORMATTED)) goto out;
         if (verbose)
             fprintf(stderr, " [thread TLS]");

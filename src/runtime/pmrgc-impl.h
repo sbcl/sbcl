@@ -460,8 +460,6 @@ void add_to_weak_vector_list(lispobj* vector, lispobj header);
 
 extern void heap_scavenge(lispobj *start, lispobj *limit);
 extern sword_t scavenge(lispobj *start, sword_t n_words);
-extern void scav_binding_stack(lispobj*, lispobj*, void(*)(lispobj));
-extern void scan_binding_stack(void);
 extern void scan_finalizers();
 extern void cull_weak_hash_tables(int (*[4])(lispobj,lispobj));
 extern void smash_weak_pointers(void);

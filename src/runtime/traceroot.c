@@ -363,8 +363,8 @@ static lispobj examine_threads(struct hopscotch_table* targets,
             }
         // Examine the binding stack
         *root_kind = BINDING_STACK;
-        where = (lispobj*)th->binding_stack_start;
-        end   = (lispobj*)get_binding_stack_pointer(th);
+        where = th->binding_stack_start;
+        end   = get_binding_stack_pointer(th);
         for( ; where < end ; where += 2)
             if (interestingp(*where, targets)) {
                 *root_thread = th;

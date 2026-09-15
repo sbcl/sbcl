@@ -669,9 +669,8 @@ purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
 
-    pscav( (lispobj *)all_threads->binding_stack_start,
-           (lispobj *)get_binding_stack_pointer(all_threads) -
-           all_threads->binding_stack_start,
+    pscav(all_threads->binding_stack_start,
+          get_binding_stack_pointer(all_threads) - all_threads->binding_stack_start,
           0);
 
 #ifdef PRINTNOISE

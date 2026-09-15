@@ -176,9 +176,8 @@ collect_garbage(generation_index_t ignore)
 #endif
     scavenge_control_stack(th);
 
-    scav_binding_stack((lispobj*)th->binding_stack_start,
-                       (lispobj*)get_binding_stack_pointer(th),
-                       0);
+    bindingstack_vals_visit(th->binding_stack_start, get_binding_stack_pointer(th),
+                            0);
 
     heap_scavenge(((lispobj *)STATIC_SPACE_START),
                   current_static_space_free_pointer);
@@ -196,7 +195,7 @@ collect_garbage(generation_index_t ignore)
     print_garbage(from_space, from_space_free_pointer);
 #endif
 
-    scan_binding_stack();
+    bindingstack_syms_fix();
 
     smash_weak_pointers();
     gc_dispose_private_pages();

@@ -146,7 +146,7 @@ extern int dynamic_values_bytes;
 #else
 #  if defined(BINDING_STACK_POINTER)
 #define get_binding_stack_pointer(thread)       \
-    SymbolValue(BINDING_STACK_POINTER, thread)
+    ((lispobj*)SymbolValue(BINDING_STACK_POINTER, thread))
 #define set_binding_stack_pointer(thread,value) \
     SetSymbolValue(BINDING_STACK_POINTER, (lispobj)(value), thread)
 #  else

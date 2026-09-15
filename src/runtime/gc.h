@@ -182,4 +182,7 @@ void remember_all_permgen();
 extern int permgen_remset_count;
 extern lispobj permgen_remset[];
 
+extern void bindingstack_vals_visit(lispobj*, lispobj*, void(*)(lispobj));
+extern void bindingstack_syms_fix(void);
+
 #endif /* _GC_H_ */
