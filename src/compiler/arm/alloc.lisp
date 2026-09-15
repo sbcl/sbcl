@@ -59,7 +59,6 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
   (:results (result :scs (descriptor-reg) :from :argument))
-  (:policy :fast-safe)
   (:translate make-fdefn)
   (:generator 37
     (let ((undefined-tramp-fixup (gen-label)))

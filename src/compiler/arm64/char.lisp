@@ -72,7 +72,6 @@
 ;;;; Other operations:
 (define-vop (char-code)
   (:translate char-code)
-  (:policy :fast-safe)
   (:args (ch :scs (character-reg)))
   (:arg-types character)
   (:results (res :scs (any-reg)))
@@ -82,7 +81,6 @@
 
 (define-vop (code-char)
   (:translate code-char)
-  (:policy :fast-safe)
   (:args (code :scs (any-reg)))
   (:arg-types positive-fixnum)
   (:results (res :scs (character-reg)))
@@ -94,7 +92,6 @@
   (:args (x :scs (character-reg any-reg))
          (y :scs (character-reg any-reg)))
   (:arg-types character character)
-  (:policy :fast-safe)
   (:note "inline comparison")
   (:variant-vars invert-condition)
   (:vop-var vop)
@@ -137,7 +134,6 @@
   (:args (x :scs (character-reg)))
   (:arg-types character (:constant (satisfies char-immediate-p)))
   (:info y)
-  (:policy :fast-safe)
   (:note "inline constant comparison")
   (:generator 2
     (inst cmp x (char-code y))))
@@ -161,7 +157,6 @@
   (:translate base-char-p)
   (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
   (:conditional :eq)
-  (:policy :fast-safe)
   (:generator 4
     (inst and temp value (lognot #x7F00))
     (inst cmp temp character-widetag)))
@@ -172,7 +167,6 @@
   (:arg-types character)
   (:translate base-char-p)
   (:conditional :eq)
-  (:policy :fast-safe)
   (:generator 3
     (inst tst value (lognot #x7FFF))))
 
@@ -182,7 +176,6 @@
   (:arg-types character)
   (:translate base-char-p)
   (:conditional :lt)
-  (:policy :fast-safe)
   (:generator 2
     (inst cmp value base-char-code-limit)))
 

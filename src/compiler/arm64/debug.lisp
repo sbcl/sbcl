@@ -13,7 +13,6 @@
 
 (define-vop ()
   (:translate current-sp)
-  (:policy :fast-safe)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 1
@@ -21,7 +20,6 @@
 
 (define-vop (current-fp-sap)
   (:translate current-fp)
-  (:policy :fast-safe)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 1
@@ -29,7 +27,6 @@
 
 (define-vop ()
   (:translate stack-ref)
-  (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
          (offset :scs (any-reg) :target temp))
   (:arg-types system-area-pointer positive-fixnum)
@@ -42,7 +39,6 @@
 
 (define-vop ()
   (:translate %set-stack-ref)
-  (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
          (offset :scs (any-reg) :target temp)
          (value :scs (descriptor-reg)))
@@ -53,7 +49,6 @@
     (inst str value (@ sap temp))))
 
 (define-vop (code-from-mumble)
-  (:policy :fast-safe)
   (:args (thing :scs (descriptor-reg) :to :result))
   (:results (code :scs (descriptor-reg) :from :eval))
   (:temporary (:scs (non-descriptor-reg)) temp)
@@ -74,7 +69,6 @@
   (:variant fun-pointer-lowtag))
 
 (define-vop (%make-lisp-obj)
-  (:policy :fast-safe)
   (:translate %make-lisp-obj)
   (:args (value :scs (unsigned-reg) :target result))
   (:arg-types unsigned-num)
@@ -83,7 +77,6 @@
     (move result value)))
 
 (define-vop (get-lisp-obj-address)
-  (:policy :fast-safe)
   (:translate sb-di::get-lisp-obj-address)
   (:args (thing :scs (descriptor-reg any-reg) :target result))
   (:results (result :scs (unsigned-reg)))

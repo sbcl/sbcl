@@ -326,7 +326,6 @@
 (define-vop (float-op)
   (:args (x) (y))
   (:results (r))
-  (:policy :fast-safe)
   (:note "inline float arithmetic")
   (:vop-var vop)
   (:save-p :compute-only))
@@ -801,7 +800,6 @@
   (:arg-types complex-double-float complex-double-float)
   (:results (r :scs (complex-double-reg) :from :load))
   (:result-types complex-double-float)
-  (:policy :fast-safe)
   (:guard (member :sse3 *backend-subfeatures*))
   (:temporary (:sc complex-double-reg) temp)
   (:generator 14
@@ -823,7 +821,6 @@
   (:arg-types complex-single-float complex-single-float)
   (:results (r :scs (complex-single-reg)))
   (:result-types complex-single-float)
-  (:policy :fast-safe)
   (:guard (member :sse3 *backend-subfeatures*))
   (:temporary (:sc complex-single-reg) temp1 temp2)
   (:generator 14
@@ -842,7 +839,6 @@
   (:args (x :scs (double-reg)))
   (:results (y :scs (double-reg)))
   (:translate %sqrt)
-  (:policy :fast-safe)
   (:arg-types double-float)
   (:result-types double-float)
   (:note "inline float arithmetic")
@@ -858,7 +854,6 @@
   (:args (x :scs (single-reg)))
   (:results (y :scs (single-reg)))
   (:translate %sqrtf)
-  (:policy :fast-safe)
   (:arg-types single-float)
   (:result-types single-float)
   (:note "inline float arithmetic")
@@ -881,7 +876,6 @@
                   (:args (x :scs (,sc) :target y))
                 (:results (y :scs (,sc)))
                 (:translate ,translate)
-                (:policy :fast-safe)
                 (:arg-types ,type)
                 (:result-types ,type)
                 (:note "inline float arithmetic")
@@ -914,7 +908,6 @@
 ;;;; comparison
 
 (define-vop (float-compare)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:save-p :compute-only)
   (:note "inline float comparison"))
@@ -1174,7 +1167,6 @@
                 (:results (y :scs (,to-sc)))
                 (:arg-types signed-num)
                 (:result-types ,to-type)
-                (:policy :fast-safe)
                 (:note "inline float coercion")
                 (:translate ,translate)
                 (:vop-var vop)
@@ -1194,7 +1186,6 @@
                (:results (y :scs (,to-sc)))
                (:arg-types ,from-type)
                (:result-types ,to-type)
-               (:policy :fast-safe)
                (:note "inline float coercion")
                (:translate ,translate)
                (:vop-var vop)
@@ -1227,7 +1218,6 @@
                (:arg-types ,from-type)
                (:result-types signed-num)
                (:translate ,trans)
-               (:policy :fast-safe)
                (:note "inline float truncate")
                (:vop-var vop)
                (:save-p :compute-only)
@@ -1257,7 +1247,6 @@
   (:arg-types signed-num)
   (:result-types single-float)
   (:translate make-single-float)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 4
     (sc-case res
@@ -1283,7 +1272,6 @@
   (:arg-types signed-num unsigned-num)
   (:result-types double-float)
   (:translate make-double-float)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 4
     (move temp hi-bits)
@@ -1297,7 +1285,6 @@
   (:arg-types signed-num unsigned-num)
   (:result-types double-float)
   (:translate make-double-float)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:guard (member :sse4 *backend-subfeatures*))
   (:generator 2
@@ -1310,7 +1297,6 @@
   (:arg-types signed-num)
   (:result-types double-float)
   (:translate %make-double-float)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 4
     (inst movq res bits)))
@@ -1322,7 +1308,6 @@
   (:arg-types single-float)
   (:result-types signed-num)
   (:translate single-float-bits)
-  (:policy :fast-safe)
   (:generator 4
      (sc-case float
        (single-reg
@@ -1340,7 +1325,6 @@
   (:args (float :scs (descriptor-reg)))
   (:arg-types single-float)
   (:results (res :scs (descriptor-reg)))
-  (:policy :fast-safe)
   (:generator 3
     (move res float)
     ;; preserve only the sign bit and widetag
@@ -1357,7 +1341,6 @@
   (:arg-types single-float single-float)
   (:results (res :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
-  (:policy :fast-safe)
   (:generator 3
     (move temp x)
     (move res y)
@@ -1372,7 +1355,6 @@
   (:arg-types double-float)
   (:result-types signed-num)
   (:translate double-float-bits)
-  (:policy :fast-safe)
   (:generator 5
      (sc-case float
        (double-reg
@@ -1389,7 +1371,6 @@
   (:arg-types double-float)
   (:result-types signed-num)
   (:translate double-float-high-bits)
-  (:policy :fast-safe)
   (:generator 5
      (sc-case float
        (double-reg
@@ -1411,7 +1392,6 @@
   (:arg-types double-float)
   (:result-types unsigned-num)
   (:translate double-float-low-bits)
-  (:policy :fast-safe)
   (:generator 5
      (sc-case float
         (double-reg
@@ -1441,7 +1421,6 @@
   (:results (r :scs (complex-single-reg) :from (:argument 0)))
   (:result-types complex-single-float)
   (:note "inline complex single-float creation")
-  (:policy :fast-safe)
   (:generator 5
     (cond ((sc-is real fp-immediate)
            (inst xorps r r)
@@ -1466,7 +1445,6 @@
   (:results (r :scs (complex-double-reg) :from (:argument 0)))
   (:result-types complex-double-float)
   (:note "inline complex double-float creation")
-  (:policy :fast-safe)
   (:generator 5
     (cond ((sc-is real fp-immediate)
            (inst xorpd r r)
@@ -1485,7 +1463,6 @@
   (:temporary (:sc complex-double-reg) zero)
   (:results (r))
   (:variant-vars offset)
-  (:policy :fast-safe)
   (:generator 3
     (cond ((sc-is x complex-double-reg)
            (move r x)
@@ -1570,7 +1547,6 @@
   (complex (imagpart x) (realpart x)))
 (define-vop (swap-complex-single-float)
   (:translate swap-complex)
-  (:policy :fast-safe)
   (:args (x :scs (complex-single-reg) :target r))
   (:arg-types complex-single-float)
   (:results (r :scs (complex-single-reg)))
@@ -1580,7 +1556,6 @@
      (inst shufps r r #b11110001)))
 (define-vop (swap-complex-double-float)
   (:translate swap-complex)
-  (:policy :fast-safe)
   (:args (x :scs (complex-double-reg) :target r))
   (:arg-types complex-double-float)
   (:results (r :scs (complex-double-reg)))
@@ -1593,7 +1568,6 @@
 (progn
   (define-vop ()
     (:translate round-double)
-    (:policy :fast-safe)
     (:args (x :scs (double-reg) :target r))
     (:arg-types double-float (:constant symbol))
     (:info mode)
@@ -1612,7 +1586,6 @@
 
  (define-vop ()
    (:translate round-single)
-   (:policy :fast-safe)
    (:args (x :scs (single-reg) :target r))
    (:arg-types single-float (:constant symbol))
    (:info mode)

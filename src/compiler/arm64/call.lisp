@@ -77,7 +77,6 @@
   (:args (frame-pointer :scs (descriptor-reg))
          (variable-home-tn :load-if nil))
   (:results (value :scs (descriptor-reg any-reg)))
-  (:policy :fast-safe)
   (:generator 4
     (aver (sc-is variable-home-tn control-stack))
     (load-stack-offset value frame-pointer variable-home-tn)))
@@ -86,7 +85,6 @@
   (:args (frame-pointer :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
   (:results (variable-home-tn :load-if nil))
-  (:policy :fast-safe)
   (:generator 4
     (aver (sc-is variable-home-tn control-stack))
     (store-stack-offset value frame-pointer variable-home-tn)))
@@ -806,7 +804,6 @@
 ;;; typed, so the lowtag is 0.
 (define-vop (more-arg)
   (:translate %more-arg)
-  (:policy :fast-safe)
   (:args (context :scs (descriptor-reg))
          (index :scs (any-reg immediate)))
   (:arg-types * tagged-num)
@@ -826,7 +823,6 @@
 
 (define-vop ()
   (:translate sb-c::%more-kw-arg)
-  (:policy :fast-safe)
   (:args (context :scs (descriptor-reg))
          (index :scs (any-reg)))
   (:arg-types * tagged-num)
@@ -839,7 +835,6 @@
     (inst ldp keyword value (@ temp))))
 
 (define-vop (more-arg-or-nil)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
          (count :scs (any-reg) :to (:result 1)))
   (:arg-types * tagged-num)
@@ -871,7 +866,6 @@
   (:temporary (:scs (any-reg) :from :eval) dst)
   (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
   (:results (result :scs (descriptor-reg)))
-  (:policy :safe)
   (:node-var node)
   (:generator 20
     (move context context-arg)
@@ -934,7 +928,6 @@
 ;;; compute supplied - fixed, and return a pointer that many words
 ;;; below the current stack top.
 (define-vop ()
-  (:policy :fast-safe)
   (:translate sb-c::%more-arg-context)
   (:args (supplied :scs (any-reg)))
   (:arg-types tagged-num (:constant fixnum))
@@ -948,7 +941,6 @@
     (inst sub context csp-tn (lsl count (- word-shift n-fixnum-tag-bits)))))
 
 (define-vop (verify-arg-count)
-  (:policy :fast-safe)
   (:args (nargs :scs (any-reg)))
   (:arg-types positive-fixnum (:constant t) (:constant t))
   (:info min max)
@@ -1870,7 +1862,6 @@
 ;;; Single-stepping
 
 (define-vop (step-instrument-before-vop)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
     #-sb-thread

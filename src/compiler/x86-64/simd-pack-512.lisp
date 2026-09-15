@@ -172,7 +172,6 @@
 
 (define-vop (%make-simd-pack-512-mask)
   (:translate sb-ext:%make-simd-pack-512-mask)
-  (:policy :fast-safe)
   (:args (val :scs (unsigned-reg) :target dst))
   (:arg-types unsigned-num)
   (:results (dst :scs (mask-reg)))
@@ -182,7 +181,6 @@
 
 (define-vop (%simd-pack-512-mask-value)
   (:translate sb-kernel:%simd-pack-512-mask-value)
-  (:policy :fast-safe)
   (:args (val :scs (mask-reg descriptor-reg)))
   (:arg-types simd-pack-512-mask-type)
   (:results (dst :scs (unsigned-reg)))
@@ -344,7 +342,6 @@
   (:arg-types simd-pack-512)
   (:results (dst :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:policy :fast-safe)
   (:generator 3
     (loadw dst x simd-pack-512-p0-slot other-pointer-lowtag)))
 
@@ -385,7 +382,6 @@
 
 (define-allocator (%make-simd-pack-512)
   (:translate %make-simd-pack-512)
-  (:policy :fast-safe)
   (:args (tag :scs (any-reg))
          (p0 :scs (unsigned-reg))
          (p1 :scs (unsigned-reg))
@@ -415,7 +411,6 @@
 
 (define-vop (%make-simd-pack-512-ub64)
   (:translate %make-simd-pack-512-ub64)
-  (:policy :fast-safe)
   (:args (p0 :scs (unsigned-reg))
          (p1 :scs (unsigned-reg))
          (p2 :scs (unsigned-reg))
@@ -480,7 +475,6 @@
 
 (define-vop (%make-simd-pack-512-double)
   (:translate %make-simd-pack-512-double)
-  (:policy :fast-safe)
   (:args (p0 :scs (double-reg) :target dst)
          (p1 :scs (double-reg))
          (p2 :scs (double-reg))
@@ -512,7 +506,6 @@
 
 (define-vop (%make-simd-pack-512-single)
   (:translate %make-simd-pack-512-single)
-  (:policy :fast-safe)
   (:args (p0 :scs (single-reg) :target dst)
          (p1 :scs (single-reg))
          (p2 :scs (single-reg))
@@ -569,7 +562,6 @@
   (:results (dst :scs (single-reg)))
   (:result-types single-float)
   (:temporary (:sc single-reg :from (:argument 0)) tmp)
-  (:policy :fast-safe)
   (:generator 3
     (multiple-value-bind (lane idx) (floor index 4)
       (inst vextractf32x4 tmp x lane)
@@ -589,7 +581,6 @@
   (:results (dst :scs (double-reg)))
   (:result-types double-float)
   (:temporary (:sc double-reg :from (:argument 0)) tmp)
-  (:policy :fast-safe)
   (:generator 3
     (multiple-value-bind (lane idx) (floor index 2)
       (inst vextractf64x2 tmp x lane)
@@ -610,7 +601,6 @@
 
 (define-vop ()
   (:translate sap-ref-512)
-  (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
          (offset :scs (signed-reg immediate)))
   (:arg-types system-area-pointer signed-num)
@@ -624,7 +614,6 @@
 
 (define-vop (set-sap-ref-512)
   (:translate (setf sap-ref-512))
-  (:policy :fast-safe)
   (:args (value :scs (int-avx512-reg))
          (sap :scs (sap-reg))
          (offset :scs (signed-reg immediate)))
@@ -644,7 +633,6 @@
   (:arg-types simd-pack-512-ub64)
   (:results (y :scs (double-avx512-reg)))
   (:result-types simd-pack-512-double)
-  (:policy :fast-safe)
   (:generator 2
     (move x y)))
 
@@ -654,6 +642,5 @@
   (:arg-types simd-pack-512-ub64)
   (:results (y :scs (single-avx512-reg)))
   (:result-types simd-pack-512-single)
-  (:policy :fast-safe)
   (:generator 2
     (move x y)))

@@ -1,7 +1,6 @@
 (in-package "SB-ROTATE-BYTE")
 
 (define-vop (%32bit-rotate-byte/c)
-  (:policy :fast-safe)
   (:translate %unsigned-32-rotate-byte)
   (:note "inline 32-bit constant rotation")
   (:info count)
@@ -18,7 +17,6 @@
         (inst rotrwi res integer (- count)))))
 
 (define-vop (%32bit-rotate-byte-fixnum/c)
-  (:policy :fast-safe)
   (:translate %unsigned-32-rotate-byte)
   (:note "inline 32-bit constant rotation")
   (:info count)
@@ -36,7 +34,6 @@
 
 (macrolet ((def (name arg-type)
              `(define-vop (,name)
-               (:policy :fast-safe)
                (:translate %unsigned-32-rotate-byte)
                (:note "inline 32-bit rotation")
                (:args (count :scs (sb-vm::signed-reg))

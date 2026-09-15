@@ -90,7 +90,6 @@
   (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
   (:temporary (:sc non-descriptor-reg) temp)
   (:results (result :scs (descriptor-reg) :from :load))
-  (:policy :fast-safe)
   (:generator 100
     (inst addu bytes words (+ lowtag-mask
                               (* vector-data-offset n-word-bytes)))
@@ -114,7 +113,6 @@
   (:results (result :scs (descriptor-reg) :from :load))
   (:vop-var vop)
   (:node-var node)
-  (:policy :fast-safe)
   (:generator 100
     (inst addu bytes words (+ lowtag-mask
                               (* vector-data-offset n-word-bytes)))
@@ -137,7 +135,6 @@
       (align-csp temp pa-flag)))) ; why do it again???
 
 (define-vop (make-fdefn)
-  (:policy :fast-safe)
   (:translate make-fdefn)
   (:args (name :scs (descriptor-reg) :to :eval))
   (:temporary (:scs (non-descriptor-reg)) temp)

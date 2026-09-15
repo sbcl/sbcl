@@ -13,7 +13,6 @@
 
 (define-vop ()
   (:translate current-sp)
-  (:policy :fast-safe)
   (:results (res :scs (sap-reg sap-stack)))
   (:result-types system-area-pointer)
   (:generator 1
@@ -21,7 +20,6 @@
 
 (define-vop (current-fp-sap)
   (:translate current-fp)
-  (:policy :fast-safe)
   (:results (res :scs (sap-reg sap-stack)))
   (:result-types system-area-pointer)
   (:generator 1
@@ -32,7 +30,6 @@
 ;;; functions to access other data types.
 (define-vop ()
   (:translate stack-ref)
-  (:policy :fast-safe)
   (:args (sap :scs (sap-reg) :to :eval)
          (offset :scs (any-reg) :target temp))
   (:arg-types system-area-pointer positive-fixnum)
@@ -48,7 +45,6 @@
 
 (define-vop ()
   (:translate %set-stack-ref)
-  (:policy :fast-safe)
   (:args (sap :scs (sap-reg) :to :eval)
          (offset :scs (any-reg) :target temp)
          (value :scs (descriptor-reg)))
@@ -64,7 +60,6 @@
 
 (define-vop ()
   (:translate fun-code-header)
-  (:policy :fast-safe)
   (:args (thing :scs (descriptor-reg)))
   (:results (code :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg :to (:result 0) :target code) temp)
@@ -84,7 +79,6 @@
     (inst cmov :z code null-tn))) ; put NIL into CODE if ZF
 
 (define-vop (%make-lisp-obj)
-  (:policy :fast-safe)
   (:translate %make-lisp-obj)
   (:args (value :scs (unsigned-reg unsigned-stack) :target result))
   (:arg-types unsigned-num)
@@ -94,7 +88,6 @@
     (move result value)))
 
 (define-vop (get-lisp-obj-address)
-  (:policy :fast-safe)
   (:translate sb-di::get-lisp-obj-address)
   (:args (thing :scs (any-reg descriptor-reg control-stack) :target result))
   (:results (result :scs (unsigned-reg)

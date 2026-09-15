@@ -143,8 +143,7 @@
 #+sb-thread
 (define-assembly-routine (alloc-tls-index
                           (:translate ensure-symbol-tls-index)
-                          (:result-types positive-fixnum)
-                          (:policy :fast-safe))
+                          (:result-types positive-fixnum))
     ;; The vop result is unsigned-reg because the assembly routine does not
     ;; fixnumize its answer, which is confusing because it looks like a fixnum.
     ;; But the result of the function ENSURE-SYMBOL-TLS-INDEX is a fixnum whose

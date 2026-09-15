@@ -319,7 +319,6 @@
   `(define-vop (,name)
      ,@(when translate
              `((:translate ,translate)))
-     (:policy :fast-safe)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg)))
      (:arg-types ,type tagged-num)
@@ -335,7 +334,6 @@
   `(define-vop (,name)
      ,@(when translate
              `((:translate ,translate)))
-     (:policy :fast-safe)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg))
             (value :scs ,scs))
@@ -350,7 +348,6 @@
   `(define-vop (,name)
      ,@(when translate
              `((:translate ,translate)))
-     (:policy :fast-safe)
      (:args (object :scs (descriptor-reg))
             (index :scs (unsigned-reg)))
      (:arg-types ,type positive-fixnum)
@@ -371,7 +368,6 @@
   `(define-vop (,name)
      ,@(when translate
              `((:translate ,translate)))
-     (:policy :fast-safe)
      (:args (object :scs (descriptor-reg))
             (index :scs (unsigned-reg))
             (value :scs ,scs))

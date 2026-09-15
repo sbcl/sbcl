@@ -20,7 +20,6 @@
                         (rest (first found)))))
              `(sb-c:define-vop (,vop)
                 (:translate ,vop)
-                (:policy :fast-safe)
                 (:arg-types ,@(mapcar #'sb-simd-internals:value-record-primitive-type argument-records))
                 (:result-types ,@(mapcar #'sb-simd-internals:value-record-primitive-type result-records))
                 (:args

@@ -121,7 +121,6 @@
   (:generator 4 (load-value)))
 
 (define-vop (symbol-global-value)
-  (:policy :fast-safe)
   (:translate symbol-global-value)
   (:args (object :scs (descriptor-reg immediate) :to (:result 1)))
   (:results (value :scs (descriptor-reg any-reg)))
@@ -136,7 +135,6 @@
 (define-vop (%set-symbol-global-value)
   (:args (symbol :scs (descriptor-reg immediate))
          (value :scs (descriptor-reg any-reg immediate)))
-  (:policy :fast-safe)
   (:temporary (:sc unsigned-reg) val-temp)
   (:vop-var vop)
   (:generator 4
@@ -158,7 +156,6 @@
   ;; because RAX serves as the temporary for computing the card mark address.
   (:temporary (:sc descriptor-reg :offset rax-offset :to (:result 0)) rax)
   (:results (result :scs (descriptor-reg any-reg)))
-  (:policy :fast-safe)
   (:vop-var vop)
   (:node-var node)
   (:generator 15
@@ -185,7 +182,6 @@
   (define-vop (set %set-symbol-global-value))
   (define-vop (boundp)
     (:translate boundp)
-    (:policy :fast-safe)
     (:args (symbol :scs (descriptor-reg)))
     (:conditional :ne)
     (:generator 9
@@ -237,7 +233,6 @@
 ;;; NULL-TN to achieve position-independence of NIL's hash.
 ;;; Such minutia I do not care to deal with at the moment.
 (define-vop (symbol-hash)
-  (:policy :fast-safe)
   (:translate symbol-hash)
   (:args (symbol :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
@@ -276,7 +271,6 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:translate symbol-package-id)
-  (:policy :fast-safe)
   (:generator 2
    (inst movzx '(:word :dword) result (ea (- 1 other-pointer-lowtag) symbol))))
 
@@ -331,7 +325,6 @@
 (define-vop (fdefn-fun) ; This vop works on symbols and fdefns
   (:args (fdefn :scs (descriptor-reg)))
   (:results (result :scs (descriptor-reg)))
-  (:policy :fast-safe)
   (:translate fdefn-fun)
   (:generator 2
     (loadw result fdefn fdefn-fun-slot other-pointer-lowtag)
@@ -340,7 +333,6 @@
 
 (define-vop (safe-fdefn-fun)
   (:translate safe-fdefn-fun)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:results (value :scs (descriptor-reg any-reg)))
   (:vop-var vop)
@@ -447,7 +439,6 @@
   (%primitive %set-funinstance-info fin index newval)
   newval)
 (define-vop (%set-funinstance-info)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
          (value :scs (any-reg descriptor-reg)))
@@ -510,7 +501,6 @@
          (inst and :dword result instance-length-mask))))
 
 (define-vop ()
-  (:policy :fast-safe)
   (:translate %instance-length)
   (:args (struct :scs (descriptor-reg)))
   (:results (res :scs (any-reg)))
@@ -610,7 +600,6 @@
 
 (define-vop ()
   (:translate %raw-instance-xchg/word)
-  (:policy :fast-safe)
   (:args (instance :scs (descriptor-reg))
          (newval :scs (unsigned-reg immediate constant) :target result))
   (:info index)
@@ -637,7 +626,6 @@
 
 (define-vop ()
   (:translate code-header-set)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (unsigned-reg))
          (value :scs (any-reg descriptor-reg)))
@@ -671,7 +659,6 @@
          `(progn
             (define-vop ()
               (:translate ,(symbolicate "%RAW-INSTANCE-REF/" suffix))
-              (:policy :fast-safe)
               (:args (object :scs (descriptor-reg)) (index :scs (any-reg immediate)))
               (:arg-types * tagged-num)
               (:results (value :scs (,result-sc)))
@@ -680,7 +667,6 @@
                 (inst ,inst value (instance-slot-ea object index))))
             (define-vop ()
               (:translate ,(symbolicate "%RAW-INSTANCE-SET/" suffix))
-              (:policy :fast-safe)
               (:args (object :scs (descriptor-reg))
                      (index :scs (any-reg immediate))
                      (value :scs (,result-sc ,@(case result-sc
@@ -720,7 +706,6 @@
 
   (define-vop (raw-instance-atomic-incf/word)
     (:translate %raw-instance-atomic-incf/word)
-    (:policy :fast-safe)
     (:args (object :scs (descriptor-reg))
            (index :scs (any-reg))
            (diff :scs (unsigned-reg) :target result))
@@ -733,7 +718,6 @@
 
   (define-vop (raw-instance-atomic-incf-c/word)
     (:translate %raw-instance-atomic-incf/word)
-    (:policy :fast-safe)
     (:args (object :scs (descriptor-reg))
            (diff :scs (unsigned-reg) :target result))
     (:arg-types * (:constant (load/store-index #.n-word-bytes
@@ -776,7 +760,6 @@
 (macrolet
     ((define-dblcas (translate indexedp &rest rest)
        `(define-vop ()
-          (:policy :fast-safe)
           (:translate ,translate)
           (:args (object :scs (descriptor-reg) :to :eval)
                  ,@(when indexedp '((index :scs (any-reg) :to :eval)))

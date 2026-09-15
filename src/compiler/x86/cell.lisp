@@ -60,7 +60,6 @@
   #+sb-thread
   (:temporary (:sc descriptor-reg) tls)
   (:results (result :scs (descriptor-reg any-reg)))
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 15
     ;; This code has to pathological cases: NO-TLS-VALUE-MARKER
@@ -94,7 +93,6 @@
   (:translate symbol-global-value))
 
 (define-vop (symbol-global-value)
-  (:policy :fast-safe)
   (:translate symbol-global-value)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:results (value :scs (descriptor-reg any-reg)))
@@ -126,7 +124,6 @@
   ;; With Symbol-Value, we check that the value isn't the trap object.
   (define-vop (symbol-value)
     (:translate symbol-value)
-    (:policy :fast-safe)
     (:args (object :scs (descriptor-reg) :to (:result 1)))
     (:results (value :scs (descriptor-reg any-reg)))
     (:vop-var vop)
@@ -170,7 +167,6 @@
 #+sb-thread
 (define-vop (boundp)
   (:translate boundp)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:conditional :ne)
   (:temporary (:sc descriptor-reg #+nil(:from (:argument 0))) value)
@@ -187,7 +183,6 @@
 #-sb-thread
 (define-vop (boundp)
   (:translate boundp)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:conditional :ne)
   (:generator 9
@@ -196,7 +191,6 @@
           unbound-marker-widetag)))
 
 (define-vop (symbol-hash)
-  (:policy :fast-safe)
   (:translate symbol-hash)
   (:args (symbol :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
@@ -217,7 +211,6 @@
 
 (define-vop (safe-fdefn-fun)
   (:translate safe-fdefn-fun)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:results (value :scs (descriptor-reg any-reg)))
   (:vop-var vop)
@@ -229,7 +222,6 @@
       (inst jmp :e err-lab))))
 
 (define-vop (set-fdefn-fun)
-  (:policy :fast-safe)
   (:args (function :scs (descriptor-reg))
          (fdefn :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) raw)
@@ -244,7 +236,6 @@
     (storew raw fdefn fdefn-raw-addr-slot other-pointer-lowtag)))
 
 (define-vop (fdefn-makunbound)
-  (:policy :fast-safe)
   (:translate fdefn-makunbound)
   (:args (fdefn :scs (descriptor-reg)))
   (:generator 38
@@ -411,7 +402,6 @@
 ;;;; structure hackery
 
 (define-vop ()
-  (:policy :fast-safe)
   (:translate %instance-length)
   (:args (struct :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
@@ -450,7 +440,6 @@
 
 (define-vop (code-header-set)
   (:translate code-header-set)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
          (value :scs (any-reg descriptor-reg)))
@@ -497,7 +486,6 @@
 
 (define-vop ()
   (:translate %raw-instance-ref/word)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)) (index :scs (any-reg immediate)))
   (:arg-types * tagged-num)
   (:results (value :scs (unsigned-reg)))
@@ -507,7 +495,6 @@
 
 (define-vop ()
   (:translate %raw-instance-set/word)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate))
          (value :scs (unsigned-reg)))
@@ -516,7 +503,6 @@
 
 (define-vop ()
   (:translate %raw-instance-ref/signed-word)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)) (index :scs (any-reg immediate)))
   (:arg-types * tagged-num)
   (:results (value :scs (signed-reg)))
@@ -526,7 +512,6 @@
 
 (define-vop ()
   (:translate %raw-instance-set/signed-word)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate))
          (value :scs (signed-reg)))
@@ -535,7 +520,6 @@
 
 (define-vop (raw-instance-atomic-incf/word)
   (:translate %raw-instance-atomic-incf/word)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate))
          (diff :scs (unsigned-reg) :target result))
@@ -548,7 +532,6 @@
 
 (define-vop ()
   (:translate %raw-instance-ref/single)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)) (index :scs (any-reg immediate)))
   (:arg-types * tagged-num)
   (:results (value :scs (single-reg)))
@@ -559,7 +542,6 @@
 
 (define-vop ()
   (:translate %raw-instance-set/single)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate))
          (value :scs (single-reg)))
@@ -569,7 +551,6 @@
 
 (define-vop ()
   (:translate %raw-instance-ref/double)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)) (index :scs (any-reg immediate)))
   (:arg-types * tagged-num)
   (:results (value :scs (double-reg)))
@@ -580,7 +561,6 @@
 
 (define-vop ()
   (:translate %raw-instance-set/double)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate))
          (value :scs (double-reg)))
@@ -590,7 +570,6 @@
 
 (define-vop ()
   (:translate %raw-instance-ref/complex-single)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate)))
   (:arg-types * positive-fixnum)
@@ -606,7 +585,6 @@
 
 (define-vop ()
   (:translate %raw-instance-set/complex-single)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate))
          (value :scs (complex-single-reg)))
@@ -622,7 +600,6 @@
 
 (define-vop ()
   (:translate %raw-instance-ref/complex-double)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate)))
   (:arg-types * positive-fixnum)
@@ -638,7 +615,6 @@
 
 (define-vop ()
   (:translate %raw-instance-set/complex-double)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate))
          (value :scs (complex-double-reg)))
@@ -679,7 +655,6 @@
 (macrolet
     ((define-cmpxchg-vop (name memory-operand more-stuff &optional index-arg)
        `(define-vop (,name)
-          (:policy :fast-safe)
           ,@more-stuff
           (:args (data :scs (descriptor-reg) :to :eval)
                  ,@index-arg

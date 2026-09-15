@@ -602,7 +602,6 @@ Floats are passed in integer registers."
 
 (define-vop (sign-extend)
   (:translate sign-extend)
-  (:policy :fast-safe)
   (:args (val :scs (signed-reg)))
   (:arg-types signed-num (:constant fixnum))
   (:info size)
@@ -621,7 +620,6 @@ Floats are passed in integer registers."
 
 (define-vop (foreign-symbol-sap)
   (:translate foreign-symbol-sap)
-  (:policy :fast-safe)
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)
@@ -639,7 +637,6 @@ Floats are passed in integer registers."
 
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
-  (:policy :fast-safe)
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)

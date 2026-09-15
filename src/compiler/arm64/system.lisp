@@ -18,14 +18,12 @@
   (:args (arg :scs (any-reg descriptor-reg)))
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
-  (:policy :fast-safe)
   (:generator 1
     ;; result is a fixnum with 32 significant bits
     (inst and res arg #x1FFFFFFFE)))
 
 (define-vop (widetag-of)
   (:translate widetag-of)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg) :from :load))
   (:result-types positive-fixnum)
@@ -70,7 +68,6 @@
 ;;; Return an index suitable for **PRIMITIVE-OBJECT-LAYOUTS**, with
 ;;; instance and funcallable-instance already handled.
 (define-vop (widetag-of-for-layout)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:arg-refs object-ref)
   (:results (result :scs (unsigned-reg) :from :load))
@@ -85,7 +82,6 @@
 
 (define-vop (layout-depthoid)
   (:translate layout-depthoid)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:results (value :scs (any-reg)))
   (:result-types fixnum)
@@ -102,7 +98,6 @@
 
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -111,7 +106,6 @@
 
 (define-vop ()
   (:translate %fun-pointer-widetag)
-  (:policy :fast-safe)
   (:args (function :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -120,7 +114,6 @@
 
 (define-vop (get-header-data)
   (:translate get-header-data)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -130,7 +123,6 @@
 
 (define-vop (set-header-data)
   (:translate set-header-data)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg))
          (data :scs (any-reg immediate)))
   (:arg-types * positive-fixnum)
@@ -146,7 +138,6 @@
 
 (define-vop ()
   (:translate test-header-data-bit)
-  (:policy :fast-safe)
   (:args (array :scs (descriptor-reg)))
   (:info mask)
   (:arg-types t (:constant t))
@@ -166,7 +157,6 @@
   (:results (int :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate binding-stack-pointer-sap)
-  (:policy :fast-safe)
   (:generator 1
     (load-binding-stack-pointer int)))
 
@@ -174,7 +164,6 @@
   (:results (int :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate control-stack-pointer-sap)
-  (:policy :fast-safe)
   (:generator 1
     (move int csp-tn)))
 
@@ -182,7 +171,6 @@
 
 (define-vop (code-instructions)
   (:translate code-instructions)
-  (:policy :fast-safe)
   (:args (code :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:results (sap :scs (sap-reg)))
@@ -194,7 +182,6 @@
 
 (define-vop (code-trailer-ref)
   (:translate code-trailer-ref)
-  (:policy :fast-safe)
   (:args (code :scs (descriptor-reg) :to (:result 0))
          (offset :scs (signed-reg) :to (:result 0)))
   (:arg-types * fixnum)
@@ -219,7 +206,6 @@
     (inst add func code ndescr)))
 
 (define-vop (%closure-fun)
-  (:policy :fast-safe)
   (:translate %closure-fun)
   (:args (function :scs (descriptor-reg)))
   (:results (result :scs (descriptor-reg)))
@@ -231,7 +217,6 @@
 
 (defknown sb-unix::receive-pending-interrupt () (values))
 (define-vop (sb-unix::receive-pending-interrupt)
-  (:policy :fast-safe)
   (:translate sb-unix::receive-pending-interrupt)
   (:generator 1
     (inst brk pending-interrupt-trap)))
@@ -243,7 +228,6 @@
 ;;;; Dummy definition for a spin-loop hint VOP
 (define-vop ()
   (:translate spin-loop-hint)
-  (:policy :fast-safe)
   (:generator 0))
 
 ;;;
@@ -259,7 +243,6 @@
     (:translate current-thread-offset-sap)
     (:info n)
     (:arg-types (:constant (satisfies ldr-str-word-offset-encodable)))
-    (:policy :fast-safe)
     (:generator 1
       (if (= n thread-this-slot)
           (move sap thread-tn)
@@ -271,36 +254,30 @@
     (:translate current-thread-offset-sap)
     (:args (n :scs (signed-reg) :target sap))
     (:arg-types signed-num)
-    (:policy :fast-safe)
     (:generator 2
       (inst ldr sap (@ thread-tn (extend n :lsl word-shift))))))
 
 ;;; Barriers
 (define-vop (%compiler-barrier)
-  (:policy :fast-safe)
   (:translate %compiler-barrier)
   (:generator 3))
 
 (define-vop (%memory-barrier)
-  (:policy :fast-safe)
   (:translate %memory-barrier)
   (:generator 3
     (inst dmb :ish)))
 
 (define-vop (%read-barrier)
-  (:policy :fast-safe)
   (:translate %read-barrier)
   (:generator 3
     (inst dmb :ishld)))
 
 (define-vop (%write-barrier)
-  (:policy :fast-safe)
   (:translate %write-barrier)
   (:generator 3
     (inst dmb :ishst)))
 
 (define-vop (%data-dependency-barrier)
-  (:policy :fast-safe)
   (:translate %data-dependency-barrier)
   (:generator 3))
 
@@ -315,7 +292,6 @@
 
 (define-vop ()
   (:translate sb-lockless:get-next)
-  (:policy :fast-safe)
   (:args (node :scs (descriptor-reg)))
   (:results (next-tagged :scs (descriptor-reg))
             (next-bits :scs (descriptor-reg)))

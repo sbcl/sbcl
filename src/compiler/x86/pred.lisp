@@ -167,7 +167,6 @@
                                (sc-is y control-stack constant)))))
   (:conditional :e)
   (:info)
-  (:policy :fast-safe)
   (:translate eq)
   (:generator 6
     (let ((x-val (encode-value-if-immediate x))

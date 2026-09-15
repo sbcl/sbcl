@@ -56,7 +56,6 @@
                  ,defknown
                  (define-vop (,vop)
                    (:translate ,vop)
-                   (:policy :fast-safe)
                    (:args ,@args)
                    (:info ,@info)
                    (:results ,@results)
@@ -73,7 +72,6 @@
                    ,defknown
                    (define-vop (,vop)
                      (:translate ,vop)
-                     (:policy :fast-safe)
                      (:args (,@(first args) :target ,dst) ,@(rest args))
                      (:info ,@info)
                      (:results ,@results)
@@ -93,7 +91,6 @@
                    ,defknown
                    (define-vop (,vop)
                      (:translate ,vop)
-                     (:policy :fast-safe)
                      (:args (,@(first args) :target ,r) ,@(rest args))
                      (:temporary (:sc ,(first (sb-simd-internals:value-record-scs (first argument-records)))) tmp)
                      (:info ,@info)
@@ -122,7 +119,6 @@
                    ,defknown
                    (define-vop (,vop)
                      (:translate ,vop)
-                     (:policy :fast-safe)
                      (:args (,@(first args) :target ,r) (,@(second args) :to :save) (,@(third args) :target xmm0))
                      (:temporary (:sc ,(first (sb-simd-internals:value-record-scs (second argument-records)))
                                   :from (:argument 2) :to :save :offset 0) xmm0)
@@ -146,7 +142,6 @@
                    ,defknown
                    (define-vop (,vop)
                      (:translate ,vop)
-                     (:policy :fast-safe)
                      (:args (,@(first args) :target ,r) ,@(rest args))
                      (:temporary (:sc ,(first (sb-simd-internals:value-record-scs (first argument-records)))) tmp)
                      (:info ,@info)
@@ -177,7 +172,6 @@
                    ,defknown
                    (define-vop (,vop)
                      (:translate ,vop)
-                     (:policy :fast-safe)
                      (:args (,@(first args) :target ,r) ,@(loop for arg in (rest args) collect (append arg (list :to :save))))
                      (:temporary (:sc ,(first (sb-simd-internals:value-record-scs (first argument-records)))) tmp)
                      (:info ,@info)
@@ -210,7 +204,6 @@
                    ,defknown
                    (define-vop (,vop)
                      (:translate ,vop)
-                     (:policy :fast-safe)
                      (:args ,@args)
                      (:temporary (:sc ,(first (sb-simd-internals:value-record-scs (first argument-records)))) tmp)
                      (:info ,@info)

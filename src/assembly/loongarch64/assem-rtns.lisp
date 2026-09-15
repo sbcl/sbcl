@@ -139,7 +139,6 @@
 
 (define-assembly-routine (unwind
                           (:translate %unwind)
-                          (:policy :fast-safe)
                           (:return-style :full-call-no-return)
                           (:save-p :compute-only))
     ((:arg block (descriptor-reg any-reg) a0-offset)

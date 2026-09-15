@@ -142,7 +142,6 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg immediate)))
   (:variant-vars offset lowtag)
-  (:policy :fast-safe)
   (:temporary (:sc unsigned-reg) val-temp)
   (:vop-var vop)
   (:generator 4
@@ -157,7 +156,6 @@
   (:results (result :scs (any-reg) :from (:argument 1)))
   (:result-types tagged-num)
   (:variant-vars offset lowtag)
-  (:policy :fast-safe)
   (:generator 4
     (move result value)
     (inst xadd :lock (object-slot-ea object offset lowtag) result)))
@@ -188,7 +186,6 @@
             (:variant ,slot list-pointer-lowtag))
           (define-vop (,(symbolicate fun-name "/SAFE"))
             (:translate ,fun-name)
-            (:policy :fast-safe)
             (:args (cell :scs (descriptor-reg))
                    (delta :scs (any-reg immediate)))
             (:results (result :scs (any-reg)))
@@ -258,7 +255,6 @@
 ;;; all be combined into one vop which can indicate which temps aren't
 ;;; used. When these vops were first written, it wasn't an option)
 (define-vop (splat-word)
-  (:policy :fast-safe)
   (:translate splat)
   (:args (vector :scs (descriptor-reg)))
   (:info words value)

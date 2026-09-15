@@ -40,7 +40,6 @@
          (y :scs (any-reg descriptor-reg zero)))
   (:conditional)
   (:info target not-p)
-  (:policy :fast-safe)
   (:translate eq)
   (:generator 3
     (if not-p

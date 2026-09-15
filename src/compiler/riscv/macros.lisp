@@ -304,7 +304,6 @@ and
     `(progn
        (define-vop (,name)
          ,@(when translate `((:translate ,translate)))
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (index :scs (any-reg)))
          (:arg-types ,type tagged-num)
@@ -318,7 +317,6 @@ and
            (loadw value lip ,offset ,lowtag)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate `((:translate ,translate)))
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg)))
        (:info index)
        (:arg-types ,type
@@ -333,7 +331,6 @@ and
     `(progn
        (define-vop (,name)
          ,@(when translate `((:translate ,translate)))
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (index :scs (any-reg))
                 (value :scs ,scs))
@@ -347,7 +344,6 @@ and
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
            `((:translate ,translate)))
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (value :scs ,scs))
        (:info index)
@@ -362,7 +358,6 @@ and
     `(progn
        (define-vop (,name)
          ,@(when translate `((:translate ,translate)))
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg)) (index :scs (any-reg)))
          (:arg-types ,type positive-fixnum)
          (:temporary (:scs (non-descriptor-reg)) lip)
@@ -380,7 +375,6 @@ and
        (define-vop (,(symbolicate name "-C"))
          ,@(when translate
              `((:translate ,translate)))
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg)))
          (:info index)
          (:arg-types ,type
@@ -400,7 +394,6 @@ and
     `(progn
        (define-vop (,name)
          ,@(when translate `((:translate ,translate)))
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (index :scs (any-reg))
                 (value :scs ,scs))
@@ -415,7 +408,6 @@ and
        (define-vop (,(symbolicate name "-C"))
          ,@(when translate
              `((:translate ,translate)))
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (value :scs ,scs))
          (:info index)
@@ -435,7 +427,6 @@ and
        (define-vop (,name)
          (:note ,note)
          ,@(when translate `((:translate ,translate)))
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (index :scs (any-reg)))
          (:arg-types ,type tagged-num)
@@ -450,7 +441,6 @@ and
        (define-vop (,(symbolicate name "-C"))
          (:note ,note)
          ,@(when translate `((:translate ,translate)))
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg)))
          (:info index)
          (:arg-types ,type
@@ -469,7 +459,6 @@ and
        (define-vop (,name)
          (:note ,note)
          ,@(when translate `((:translate ,translate)))
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (index :scs (any-reg))
                 (value :scs ,scs ,@(when resultp '(:target result))))
@@ -486,7 +475,6 @@ and
        (define-vop (,(symbolicate name "-C"))
          (:note ,note)
          ,@(when translate `((:translate ,translate)))
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (value :scs ,scs ,@(when resultp '(:target result))))
          (:info index)
@@ -507,7 +495,6 @@ and
     `(define-vop (,name)
        (:note ,note)
        ,@(when translate `((:translate ,translate)))
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg)))
        (:arg-types ,type tagged-num)
@@ -537,7 +524,6 @@ and
     `(define-vop (,name)
        (:note ,note)
        ,@(when translate `((:translate ,translate)))
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg))
               (value :scs ,scs ,@(when resultp '(:target result))))
@@ -563,7 +549,6 @@ and
 (defmacro define-full-casser (name type offset lowtag scs eltype &optional translate)
   `(define-vop (,name)
      ,@(when translate `((:translate ,translate)))
-     (:policy :fast-safe)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg) :target temp)
             (old-value :scs ,scs)
@@ -587,7 +572,6 @@ and
 (defmacro define-atomic-frobber (name op type offset lowtag scs eltype &optional translate)
   `(define-vop (,name)
      ,@(when translate `((:translate ,translate)))
-     (:policy :fast-safe)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg)
                    ,@(when fixnum-as-word-index-needs-temp

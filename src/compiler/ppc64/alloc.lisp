@@ -169,7 +169,6 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:results (result :scs (descriptor-reg) :from :argument))
-  (:policy :fast-safe)
   (:translate make-fdefn)
   (:generator 37
     (with-fixed-allocation (result pa-flag temp fdefn-widetag fdefn-size)

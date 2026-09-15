@@ -184,7 +184,6 @@
                                   (:note ,note)
                                   (:cost ,cost)
                                   (:translate *)
-                                  (:policy :fast-safe)
                                   (:arg-types ,type ,type)
                                   (:result-types ,type))
                                  ((:arg x ,sc nl0-offset)
@@ -206,7 +205,6 @@
                           (:note "unsigned fixnum truncate")
                           (:cost 45)
                           (:translate truncate)
-                          (:policy :fast-safe)
                           (:arg-types positive-fixnum positive-fixnum)
                           (:result-types positive-fixnum positive-fixnum))
                          ((:arg dividend any-reg nl0-offset)
@@ -228,7 +226,6 @@
 (define-assembly-routine (fixnum-truncate
                           (:note "fixnum truncate")
                           (:cost 50)
-                          (:policy :fast-safe)
                           (:translate truncate)
                           (:arg-types tagged-num tagged-num)
                           (:result-types tagged-num tagged-num))
@@ -252,7 +249,6 @@
 (define-assembly-routine (signed-truncate
                           (:note "(signed-byte 32) truncate")
                           (:cost 60)
-                          (:policy :fast-safe)
                           (:translate truncate)
                           (:arg-types signed-num signed-num)
                           (:result-types signed-num signed-num))

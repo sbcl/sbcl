@@ -346,7 +346,6 @@
 
 (define-vop (%test-evex-high-regs)
   (:translate %test-evex-high-regs)
-  (:policy :fast-safe)
   (:temporary (:sc single-avx512-reg :offset 16) z16)
   (:temporary (:sc single-avx512-reg :offset 17) z17)
   (:temporary (:sc single-avx512-reg :offset 18) z18)
@@ -358,7 +357,6 @@
 
 (define-vop (%test-evex-disp8)
   (:translate %test-evex-disp8)
-  (:policy :fast-safe)
   (:temporary (:sc single-avx512-reg :offset 0) zmm)
   (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
@@ -369,7 +367,6 @@
 
 (define-vop (%test-evex-disp-vector-lengths)
   (:translate %test-evex-disp-vector-lengths)
-  (:policy :fast-safe)
   (:temporary (:sc single-sse-reg :offset 0) xmm)
   (:temporary (:sc single-avx2-reg :offset 1) ymm)
   (:temporary (:sc single-avx512-reg :offset 2) zmm)
@@ -384,7 +381,6 @@
 
 (define-vop (%test-evex-disp-negative)
   (:translate %test-evex-disp-negative)
-  (:policy :fast-safe)
   (:temporary (:sc single-avx512-reg :offset 0) zmm)
   (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
@@ -395,7 +391,6 @@
 
 (define-vop (%test-evex-disp-nonmultiple)
   (:translate %test-evex-disp-nonmultiple)
-  (:policy :fast-safe)
   (:temporary (:sc single-avx512-reg :offset 0) zmm)
   (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
@@ -406,7 +401,6 @@
 
 (define-vop (%test-evex-disp-large)
   (:translate %test-evex-disp-large)
-  (:policy :fast-safe)
   (:temporary (:sc single-avx512-reg :offset 0) zmm)
   (:temporary (:sc unsigned-reg :offset rsp-offset) rsp)
   (:results (res :scs (unsigned-reg)))
@@ -417,7 +411,6 @@
 
 (define-vop (%test-evex-vpmovzx-vpslldq-disassem)
   (:translate %test-evex-vpmovzx-vpslldq-disassem)
-  (:policy :fast-safe)
   (:temporary (:sc unsigned-reg :offset rax-offset) rax)
   (:temporary (:sc complex-double-reg :offset 10) xmm)
   (:temporary (:sc complex-double-reg :offset 30) xmm2)
@@ -436,7 +429,6 @@
 
 (define-vop (%test-evex-high-registers-poke)
   (:translate %test-evex-high-registers-poke)
-  (:policy :fast-safe)
   (:temporary (:sc complex-double-reg :offset 16) xmm16)
   (:temporary (:sc complex-double-reg :offset 30) xmm30)
   (:temporary (:sc complex-double-reg :offset 31) xmm31)

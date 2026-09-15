@@ -13,7 +13,6 @@
 
 ;;;; Allocator for the array header.
 (define-vop (make-array-header)
-  (:policy :fast-safe)
   (:translate make-array-header)
   (:args (type :scs (any-reg))
          (rank :scs (any-reg)))
@@ -52,7 +51,6 @@
 
 (define-vop ()
   (:translate array-rank)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -64,7 +62,6 @@
 ;;;; Bounds checking routine.
 (define-vop (check-bound)
   (:translate %check-bound)
-  (:policy :fast-safe)
   (:args (array :scs (descriptor-reg))
          (bound :scs (any-reg descriptor-reg))
          (index :scs (any-reg descriptor-reg)))
@@ -189,7 +186,6 @@
             (define-vop (,refname)
               (:note "inline array access")
               (:translate data-vector-ref)
-              (:policy :fast-safe)
               (:args (object :scs (descriptor-reg))
                      (index :scs (unsigned-reg)))
               (:arg-types ,type positive-fixnum)
@@ -216,7 +212,6 @@
                 (inst slli value result n-fixnum-tag-bits)))
             (define-vop (,(symbolicate "DATA-VECTOR-REF-C/" type))
               (:translate data-vector-ref)
-              (:policy :fast-safe)
               (:args (object :scs (descriptor-reg)))
               (:arg-types ,type
                 (:constant (integer 0
@@ -239,7 +234,6 @@
             (define-vop (,setname)
               (:note "inline array store")
               (:translate data-vector-set)
-              (:policy :fast-safe)
               (:args (object :scs (descriptor-reg))
                      (index :scs (unsigned-reg) :target shift)
                      (value :scs (unsigned-reg zero immediate)))
@@ -277,7 +271,6 @@
                 (storew old lip vector-data-offset other-pointer-lowtag)))
             (define-vop (,(symbolicate "DATA-VECTOR-SET-C/" type))
               (:translate data-vector-set)
-              (:policy :fast-safe)
               (:args (object :scs (descriptor-reg))
                      (value :scs (unsigned-reg zero immediate)))
               (:arg-types ,type

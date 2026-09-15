@@ -85,7 +85,6 @@
   (:results (int :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:translate sap-int)
-  (:policy :fast-safe)
   (:generator 1
     (move int sap)))
 
@@ -95,7 +94,6 @@
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate int-sap)
-  (:policy :fast-safe)
   (:generator 1
     (move sap int)))
 
@@ -107,7 +105,6 @@
   (:arg-types system-area-pointer signed-num)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
-  (:policy :fast-safe)
   (:generator 2
     (inst add res ptr offset)))
 
@@ -118,7 +115,6 @@
   (:arg-types system-area-pointer (:constant (signed-byte 16)))
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
-  (:policy :fast-safe)
   (:generator 1
     (inst addi res ptr offset)))
 
@@ -127,7 +123,6 @@
   (:args (ptr1 :scs (sap-reg))
          (ptr2 :scs (sap-reg)))
   (:arg-types system-area-pointer system-area-pointer)
-  (:policy :fast-safe)
   (:results (res :scs (signed-reg)))
   (:result-types signed-num)
   (:generator 1
@@ -139,7 +134,6 @@
              `(progn
                    (define-vop (,ref-name)
                      (:translate ,ref-name)
-                     (:policy :fast-safe)
                      (:args (sap :scs (sap-reg))
                       (offset :scs (signed-reg)))
                      (:arg-types system-area-pointer signed-num)
@@ -157,7 +151,6 @@
                               '((inst extsb result result)))))
                    (define-vop (,(symbolicate ref-name "-C"))
                      (:translate ,ref-name)
-                     (:policy :fast-safe)
                      (:args (sap :scs (sap-reg)))
                      (:arg-types system-area-pointer (:constant (signed-byte 16)))
                      (:info offset)
@@ -175,7 +168,6 @@
                               '((inst extsb result result)))))
                    (define-vop (,set-name)
                      (:translate ,set-name)
-                     (:policy :fast-safe)
                      (:args (value :scs (,sc))
                             (sap :scs (sap-reg))
                             (offset :scs (signed-reg)))
@@ -190,7 +182,6 @@
                             value sap offset)))
                    (define-vop (,(symbolicate set-name "-C"))
                      (:translate ,set-name)
-                     (:policy :fast-safe)
                      (:args (value :scs (,sc))
                             (sap :scs (sap-reg)))
                      (:arg-types ,type system-area-pointer (:constant (signed-byte 16)))
@@ -227,7 +218,6 @@
 ;;; Noise to convert normal lisp data objects into SAPs.
 (define-vop (vector-sap)
   (:translate vector-sap)
-  (:policy :fast-safe)
   (:args (vector :scs (descriptor-reg)))
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)

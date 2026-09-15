@@ -175,7 +175,6 @@
   (:arg-types simd-pack)
   (:results (dst :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:policy :fast-safe)
   (:generator 3
     (inst umov dst x 0 :d)))
 
@@ -185,13 +184,11 @@
   (:arg-types simd-pack)
   (:results (dst :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:policy :fast-safe)
   (:generator 3
     (inst umov dst x 1 :d)))
 
 (define-vop (%make-simd-pack)
   (:translate %make-simd-pack)
-  (:policy :fast-safe)
   (:args (tag :scs (any-reg))
          (lo :scs (unsigned-reg))
          (hi :scs (unsigned-reg)))
@@ -209,7 +206,6 @@
 
 (define-vop (%make-simd-pack-ub64)
   (:translate %make-simd-pack-ub64)
-  (:policy :fast-safe)
   (:args (lo :scs (unsigned-reg))
          (hi :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
@@ -262,7 +258,6 @@
 
 (define-vop (%make-simd-pack-double)
   (:translate %make-simd-pack-double)
-  (:policy :fast-safe)
   (:args (lo :scs (double-reg))
          (hi :scs (double-reg)))
   (:arg-types double-float double-float)
@@ -273,7 +268,6 @@
 
 (define-vop (%make-simd-pack-single)
   (:translate %make-simd-pack-single)
-  (:policy :fast-safe)
   (:args (x :scs (single-reg) :target tmp)
          (y :scs (single-reg))
          (z :scs (single-reg))
@@ -297,7 +291,6 @@
   (:info index)
   (:results (dst :scs (single-reg)))
   (:result-types single-float)
-  (:policy :fast-safe)
   (:generator 1
     (inst ins dst 0 x index :s)))
 
@@ -311,13 +304,11 @@
   (:arg-types simd-pack (:constant t))
   (:results (dst :scs (double-reg)))
   (:result-types double-float)
-  (:policy :fast-safe)
   (:generator 3
     (inst ins dst 0 x index :d)))
 
 (define-vop ()
    (:translate sap-ref-128)
-   (:policy :fast-safe)
    (:args (sap :scs (sap-reg))
           (offset :scs (signed-reg)))
    (:arg-types system-area-pointer signed-num)
@@ -328,7 +319,6 @@
 
 (define-vop (%set-sap-ref-128)
    (:translate (setf sap-ref-128))
-   (:policy :fast-safe)
    (:args (value :scs (int-neon-reg))
           (sap :scs (sap-reg))
           (offset :scs (signed-reg)))
@@ -347,7 +337,6 @@
   (:arg-types simd-pack-ub64)
   (:results (y :scs (double-neon-reg)))
   (:result-types simd-pack-double)
-  (:policy :fast-safe)
   (:generator 2
     (move x y :16b)))
 
@@ -357,6 +346,5 @@
   (:arg-types simd-pack-ub64)
   (:results (y :scs (single-neon-reg)))
   (:result-types simd-pack-single)
-  (:policy :fast-safe)
   (:generator 2
     (move x y :16b)))

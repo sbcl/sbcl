@@ -180,7 +180,6 @@
 
 (define-vop (foreign-symbol-sap)
   (:translate foreign-symbol-sap)
-  (:policy :fast-safe)
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)
@@ -191,7 +190,6 @@
 
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
-  (:policy :fast-safe)
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)
@@ -246,7 +244,6 @@
 
 (define-vop (dealloc-number-stack-space)
   (:info amount)
-  (:policy :fast-safe)
   (:temporary (:scs (unsigned-reg) :to (:result 0)) temp)
   (:generator 0
     (unless (zerop amount)

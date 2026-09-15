@@ -165,7 +165,6 @@
 
 (define-vop (%mask-identity)
   (:translate %mask-identity)
-  (:policy :fast-safe)
   (:args (x :scs (mask-reg)))
   (:arg-types simd-pack-512-mask-type)
   (:results (y :scs (mask-reg)))
@@ -175,7 +174,6 @@
 
 (define-vop (%make-mask-from-unsigned)
   (:translate %make-mask-from-unsigned)
-  (:policy :fast-safe)
   (:args (x :scs (unsigned-reg)))
   (:arg-types unsigned-num)
   (:results (y :scs (mask-reg)))
@@ -185,7 +183,6 @@
 
 (define-vop (%mask-to-unsigned)
   (:translate %mask-to-unsigned)
-  (:policy :fast-safe)
   (:args (x :scs (mask-reg)))
   (:arg-types simd-pack-512-mask-type)
   (:results (y :scs (unsigned-reg)))
@@ -195,7 +192,6 @@
 
 (define-vop (%mask-kandq)
   (:translate %mask-kandq)
-  (:policy :fast-safe)
   (:args (x :scs (mask-reg))
          (y :scs (mask-reg)))
   (:arg-types simd-pack-512-mask-type simd-pack-512-mask-type)
@@ -206,7 +202,6 @@
 
 (define-vop (%mask-kshiftrq)
   (:translate %mask-kshiftrq)
-  (:policy :fast-safe)
   (:args (x :scs (mask-reg)))
   (:info count)
   (:arg-types simd-pack-512-mask-type (:constant t))

@@ -60,7 +60,6 @@
   (:args (name :scs (descriptor-reg) :to :eval))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (result :scs (descriptor-reg) :from :argument))
-  (:policy :fast-safe)
   (:translate make-fdefn)
   (:generator 37
     (with-fixed-allocation (result temp fdefn-widetag fdefn-size)

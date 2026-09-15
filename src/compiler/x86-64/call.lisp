@@ -102,7 +102,6 @@
   (:args (frame-pointer :scs (descriptor-reg))
          (variable-home-tn :load-if nil))
   (:results (value :scs (descriptor-reg any-reg)))
-  (:policy :fast-safe)
   (:generator 4
     (aver (sc-is variable-home-tn control-stack))
     (loadw value frame-pointer
@@ -111,7 +110,6 @@
   (:args (frame-pointer :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
   (:results (variable-home-tn :load-if nil))
-  (:policy :fast-safe)
   (:generator 4
     (aver (sc-is variable-home-tn control-stack))
     (storew value frame-pointer
@@ -1587,7 +1585,6 @@
 
 (define-vop ()
   (:translate sb-c::%more-kw-arg)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
          (index :scs (any-reg) :to (:result 1) :target keyword))
   (:arg-types * tagged-num)
@@ -1601,7 +1598,6 @@
 
 (define-vop (more-arg/c)
   (:translate sb-c:%more-arg)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:info index)
   (:arg-types * (:constant (signed-byte #.(- 32 word-shift))))
@@ -1612,7 +1608,6 @@
 
 (define-vop (more-arg)
   (:translate sb-c:%more-arg)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
          (index :scs (any-reg) :to (:result 1) :target value))
   (:arg-types * tagged-num)
@@ -1625,7 +1620,6 @@
                         (ash 1 (- word-shift n-fixnum-tag-bits))))))
 
 (define-vop (more-arg-or-nil)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
          (count :scs (any-reg) :to (:result 1)))
   (:arg-types * tagged-num)
@@ -1644,7 +1638,6 @@
 ;;; in code size.
 (define-allocator (%listify-rest-args)
   (:translate %listify-rest-args)
-  (:policy :safe)
   ;; CONTEXT is used throughout the copying loop
   (:args (context :scs (descriptor-reg) :to :save)
          (count :scs (any-reg) :target rcx))
@@ -1739,7 +1732,6 @@
 ;;; compute supplied - fixed, and return a pointer that many words
 ;;; below the current stack top.
 (define-vop ()
-  (:policy :fast-safe)
   (:translate sb-c::%more-arg-context)
   (:args (supplied :scs (any-reg) :target count))
   (:arg-types positive-fixnum (:constant fixnum))
@@ -1759,7 +1751,6 @@
       (inst sub count (fixnumize fixed)))))
 
 (define-vop (verify-arg-count)
-  (:policy :fast-safe)
   (:args (nargs :scs (any-reg)))
   (:arg-types positive-fixnum (:constant t) (:constant t))
   (:temporary (:sc unsigned-reg :offset rbx-offset) temp)
@@ -1808,7 +1799,6 @@
   #-sb-thread (inst cmp :byte (static-symbol-value-ea 'sb-impl::*stepping*) 0))
 
 (define-vop (step-instrument-before-vop)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
      (emit-single-step-test)

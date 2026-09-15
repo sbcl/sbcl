@@ -23,8 +23,7 @@
      (end-card-index item) ; alias for RAX
      (count end)) ; alias for RCX
 (define-assembly-routine (vector-fill/t ; <-- this could work on raw bits too
-                          (:translate vector-fill/t)
-                          (:policy :fast-safe))
+                          (:translate vector-fill/t))
                          ((:arg  vector (descriptor-reg) (:lisp-reg 0))
                           (:arg  item   (any-reg descriptor-reg) rax-offset)
                           (:arg  start  (any-reg descriptor-reg) (:lisp-reg 1))
@@ -162,7 +161,6 @@
 
 (define-assembly-routine (%data-vector-and-index
                           (:translate %data-vector-and-index)
-                          (:policy :fast-safe)
                           (:arg-types t positive-fixnum)
                           (:result-types t positive-fixnum))
     ((:arg array descriptor-reg (:lisp-reg 0))
@@ -188,7 +186,6 @@
 
 (define-assembly-routine (%data-vector-and-index/check-bound
                           (:translate %data-vector-and-index/check-bound)
-                          (:policy :fast-safe)
                           (:arg-types t positive-fixnum)
                           (:result-types t positive-fixnum)
                           (:save-p :compute-only))
@@ -230,7 +227,6 @@
 
 (define-assembly-routine (%data-vector-pop
                           (:translate %data-vector-pop)
-                          (:policy :fast-safe)
                           (:arg-types t)
                           (:result-types t positive-fixnum)
                           (:save-p :compute-only)
@@ -268,7 +264,6 @@
 
 (define-assembly-routine (%data-vector-push
                           (:translate %data-vector-push)
-                          (:policy :fast-safe)
                           (:arg-types t)
                           (:result-types t t)
                           (:save-p :compute-only)

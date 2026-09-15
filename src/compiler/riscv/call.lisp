@@ -86,7 +86,6 @@
   ;; :unused-if does not work because offsets haven't been assigned
   (:temporary (#|:unused-if (typep (ash (tn-offset variable-home-tn) word-shift) 'short-immediate)|#
                :sc unsigned-reg) tmp)
-  (:policy :fast-safe)
   (:generator 4
     (aver (sc-is variable-home-tn control-stack))
     (load-frame-word value frame-pointer (tn-offset variable-home-tn) 'ancestor-frame-ref tmp)))
@@ -1014,7 +1013,6 @@
           (move cur-nfp nsp-tn))))))
 
 (define-vop (more-arg-or-nil)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
          (count :scs (any-reg) :to (:result 1)))
   (:temporary (:scs (any-reg)) index-temp)
@@ -1043,7 +1041,6 @@
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:results (result :scs (descriptor-reg)))
   (:translate %listify-rest-args)
-  (:policy :safe)
   (:node-var node)
   (:generator 20
     (let* ((enter (gen-label))
@@ -1095,7 +1092,6 @@
 ;;; stack top.
 ;;;
 (define-vop ()
-  (:policy :fast-safe)
   (:translate sb-c::%more-arg-context)
   (:args (supplied :scs (any-reg) .
          #.(cl:when sb-vm::fixnum-as-word-index-needs-temp
@@ -1114,7 +1110,6 @@
       (inst sub context csp-tn count))))
 
 (define-vop (verify-arg-count)
-  (:policy :fast-safe)
   (:args (nargs :scs (any-reg)))
   (:temporary (:scs (unsigned-reg)) temp)
   (:info min max)
@@ -1142,7 +1137,6 @@
 
 (define-vop (step-instrument-before-vop)
   (:temporary (:scs (descriptor-reg)) stepping)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
     (load-stepping stepping)

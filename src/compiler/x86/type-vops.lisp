@@ -164,8 +164,7 @@
 (define-vop (simple-type-predicate)
   (:args (value :scs (any-reg descriptor-reg control-stack)))
   (:conditional)
-  (:info target not-p)
-  (:policy :fast-safe))
+  (:info target not-p))
 
 ;;;; other integer ranges
 

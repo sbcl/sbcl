@@ -292,7 +292,6 @@
   (:args (value :scs (unsigned-reg)))
   (:arg-types unsigned-num)
   (:conditional :eq)
-  (:policy :fast-safe)
   (:translate signed-byte-64-p)
   (:generator 5
     (inst tst value (ash 1 (1- n-word-bits)))))
@@ -544,12 +543,10 @@
   (:arg-refs arg-ref)
   (:args (value :scs (any-reg descriptor-reg)))
   (:conditional :eq)
-  (:policy :fast-safe)
   (:generator 4
     (inst tst value n-fixnum-tag-bits)))
 
 (define-vop (fixnump/unsigned)
-  (:policy :fast-safe)
   (:args (value :scs (unsigned-reg)))
   (:arg-types unsigned-num)
   (:translate fixnump)
@@ -561,7 +558,6 @@
 
 (define-vop (fixnump/signed)
   (:args (value :scs (signed-reg)))
-  (:policy :fast-safe)
   (:conditional :vc)
   (:arg-types signed-num)
   (:translate fixnump)
@@ -572,7 +568,6 @@
   (:args ((lo hi) :scs (signed-128-reg)))
   (:arg-types signed-byte-128)
   (:translate fixnump)
-  (:policy :fast-safe)
   (:conditional :eq)
   (:generator 5
     (inst asr  tmp-tn lo 62)
@@ -589,7 +584,6 @@
     (:conditional)
     (:info target not-p)
     (:arg-refs integer-ref)
-    (:policy :fast-safe)
     (:variant-vars comparison)
     (:variant :gt)
     (:generator 10
@@ -768,7 +762,6 @@
   (:args (value :scs (any-reg descriptor-reg)))
   (:arg-refs value-ref)
   (:conditional :eq)
-  (:policy :fast-safe)
   (:translate single-float-p)
   (:vop-var vop)
   (:generator 7
@@ -872,7 +865,6 @@
   (:translate sb-c::%structure-is-a)
   (:args (x :scs (descriptor-reg)))
   (:arg-types * (:constant t))
-  (:policy :fast-safe)
   (:conditional :eq)
   (:info test-layout)
   (:temporary (:sc unsigned-reg) this-id temp)
@@ -884,7 +876,6 @@
   (:args (object :scs (descriptor-reg)))
   (:arg-types * (:constant t))
   (:arg-refs args)
-  (:policy :fast-safe)
   (:conditional)
   (:info target not-p test-layout)
   (:temporary (:sc descriptor-reg) layout)
@@ -918,7 +909,6 @@
 (define-vop (structure-typep*)
   (:args (layout :scs (descriptor-reg)))
   (:arg-types * (:constant t))
-  (:policy :fast-safe)
   (:info target not-p test-layout)
   (:temporary (:sc unsigned-reg
                :unused-if
@@ -953,7 +943,6 @@
 (define-vop (test-layout-id)
   (:args (id :scs (signed-reg)))
   (:arg-types signed-num (:constant t))
-  (:policy :fast-safe)
   (:info target not-p test-layout)
   (:temporary (:sc non-descriptor-reg) temp)
   (:generator 1

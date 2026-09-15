@@ -479,7 +479,6 @@
   (:translate touch-object)
   (:args (object))
   (:ignore object)
-  (:policy :fast-safe)
   (:arg-types t)
   (:generator 0))
 
@@ -489,7 +488,6 @@
   (:args (object :scs (descriptor-reg any-reg sap-reg
                        signed-reg unsigned-reg)
                  :target res))
-  (:policy :fast-safe)
   (:results (res :scs (descriptor-reg)))
   (:generator 0
     (move res object)))
@@ -500,7 +498,6 @@
 #+(or arm mips ppc sparc)
 (define-vop (+-modfx)
   (:translate +-modfx)
-  (:policy :fast-safe)
   (:args (x :scs (any-reg)) (y :scs (any-reg)))
   (:arg-types tagged-num tagged-num)
   (:results (res :scs (any-reg)))
@@ -513,7 +510,6 @@
 #+(or arm64 loongarch64 riscv x86 x86-64)
 (define-vop (alien-sap)
   (:translate alien-sap)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:results (r :scs (descriptor-reg)))
   (:generator 1

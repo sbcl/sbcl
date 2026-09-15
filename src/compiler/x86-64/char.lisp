@@ -123,7 +123,6 @@
 
 (define-vop (char-code)
   (:translate char-code)
-  (:policy :fast-safe)
   (:args (ch :scs (character-reg character-stack) :target res :load-if nil))
   (:arg-types character)
   (:results (res :scs (unsigned-reg unsigned-stack) :load-if nil))
@@ -133,7 +132,6 @@
 
 (define-vop (code-char)
   (:translate code-char)
-  (:policy :fast-safe)
   (:args (code :scs (unsigned-reg unsigned-stack) :target res :load-if nil))
   (:arg-types positive-fixnum)
   (:results (res :scs (character-reg character-stack) :load-if nil))
@@ -149,7 +147,6 @@
                                (sc-is y character-stack)))))
   (:arg-types character character)
   (:info)
-  (:policy :fast-safe)
   (:note "inline comparison")
   (:generator 3
     (inst cmp :dword x y)))
@@ -170,7 +167,6 @@
   (:args (x :scs (any-reg character-reg character-stack)))
   (:arg-types character (:constant character))
   (:info y)
-  (:policy :fast-safe)
   (:note "inline constant comparison")
   (:generator 2
     (inst cmp :dword x (if (sc-is x any-reg)
@@ -197,7 +193,6 @@
   (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
   (:conditional :z)
   (:save-p :compute-only)
-  (:policy :fast-safe)
   (:generator 4
     (inst lea :dword temp (ea (- character-widetag) value))
     (inst test :dword temp (lognot #x7F00))))
@@ -209,7 +204,6 @@
   (:translate base-char-p)
   (:conditional :z)
   (:save-p :compute-only)
-  (:policy :fast-safe)
   (:generator 3
     (inst test :dword value (lognot #x7FFF))))
 
@@ -220,7 +214,6 @@
   (:translate base-char-p)
   (:conditional :l)
   (:save-p :compute-only)
-  (:policy :fast-safe)
   (:generator 2
     (inst cmp :dword value base-char-code-limit)))
 

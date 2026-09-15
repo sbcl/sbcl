@@ -18,14 +18,12 @@
   (:args (arg :scs (any-reg descriptor-reg) :target res))
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
-  (:policy :fast-safe)
   (:generator 1
     (move res arg)
     (inst and res #x7FFFFFFC))) ; clear sign and fixnum tag bits
 
 (define-vop (widetag-of)
   (:translate widetag-of)
-  (:policy :fast-safe)
   (:args (object :scs (any-reg descriptor-reg)))
   (:temporary (:sc unsigned-reg :offset eax-offset :to (:result 0)) eax)
   (:results (result :scs (unsigned-reg)))
@@ -60,7 +58,6 @@
                        :base layout)))
   (define-vop ()
     (:translate sb-c::layout-depthoid-ge)
-    (:policy :fast-safe)
     (:args (layout :scs (descriptor-reg)))
     (:info k)
     (:arg-types * (:constant (unsigned-byte 16)))
@@ -72,7 +69,6 @@
   (:args (x :scs (descriptor-reg)))
   (:arg-types * (:constant t))
   (:info test)
-  (:policy :fast-safe)
   (:conditional :e)
   (:generator 1
     (inst cmp
@@ -81,7 +77,6 @@
 
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -92,7 +87,6 @@
 
 (define-vop ()
   (:translate %fun-pointer-widetag)
-  (:policy :fast-safe)
   (:args (function :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -102,7 +96,6 @@
 
 (define-vop (get-header-data)
   (:translate get-header-data)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -112,7 +105,6 @@
 
 (define-vop (set-header-data)
   (:translate set-header-data)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg) :to :eval)
          (data :scs (any-reg) :target eax))
   (:arg-types * positive-fixnum)
@@ -125,7 +117,6 @@
 
 (define-vop (test-header-data-bit)
   (:translate test-header-data-bit)
-  (:policy :fast-safe)
   (:args (array :scs (descriptor-reg)))
   (:arg-types t (:constant t))
   (:info mask)
@@ -147,7 +138,6 @@
   (:results (int :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate binding-stack-pointer-sap)
-  (:policy :fast-safe)
   (:generator 1
     (load-binding-stack-pointer int)))
 
@@ -155,7 +145,6 @@
   (:results (int :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate control-stack-pointer-sap)
-  (:policy :fast-safe)
   (:generator 1
     (move int esp-tn)))
 
@@ -163,7 +152,6 @@
 
 (define-vop (code-instructions)
   (:translate code-instructions)
-  (:policy :fast-safe)
   (:args (code :scs (descriptor-reg) :to (:result 0)))
   (:results (sap :scs (sap-reg) :from (:argument 0)))
   (:result-types system-area-pointer)
@@ -178,7 +166,6 @@
 
 (define-vop (code-trailer-ref)
   (:translate code-trailer-ref)
-  (:policy :fast-safe)
   (:args (code :scs (descriptor-reg) :to (:result 0))
          (offset :scs (signed-reg immediate) :to (:result 0)))
   (:arg-types * fixnum)
@@ -221,7 +208,6 @@
 ;;; which doesn't pin a *different* object produced from thin air.
 ;;; (It's output operand is embedded in the object pointed to by its input)
 (define-vop (%closure-fun)
-  (:policy :fast-safe)
   (:translate %closure-fun)
   (:args (function :scs (descriptor-reg)))
   (:results (result :scs (descriptor-reg)))
@@ -234,7 +220,6 @@
 
 (defknown sb-unix::receive-pending-interrupt () (values))
 (define-vop (sb-unix::receive-pending-interrupt)
-  (:policy :fast-safe)
   (:translate sb-unix::receive-pending-interrupt)
   (:generator 1
     (inst break pending-interrupt-trap)))
@@ -247,7 +232,6 @@
   ;; Note that SAP conflicts with N
   (:args (n :scs (any-reg) :to :save :target sap))
   (:arg-types tagged-num)
-  (:policy :fast-safe)
   (:generator 2
     #+win32
     (inst mov sap (make-ea :dword :disp +win32-tib-arbitrary-field-offset+) :fs)
@@ -268,7 +252,6 @@
   (:translate current-thread-offset-sap)
   (:info n)
   (:arg-types (:constant unsigned-byte)) ; UNSIGNED!
-  (:policy :fast-safe)
   (:generator 1 (inst mov sap (make-ea :dword :disp (ash n 2)) :fs)))
 
 (define-vop (halt)
@@ -277,7 +260,6 @@
 
 (defknown float-wait () (values))
 (define-vop (float-wait)
-  (:policy :fast-safe)
   (:translate float-wait)
   (:vop-var vop)
   (:save-p :compute-only)
@@ -319,7 +301,6 @@
 (defknown %read-cycle-counter () (values (unsigned-byte 32) (unsigned-byte 32)) ())
 
 (define-vop (%read-cycle-counter)
-  (:policy :fast-safe)
   (:translate %read-cycle-counter)
   (:temporary (:sc unsigned-reg :offset eax-offset :target lo) eax)
   (:temporary (:sc unsigned-reg :offset edx-offset :target hi) edx)
@@ -358,34 +339,28 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
 ;;;; Memory barrier support
 
 (define-vop (%compiler-barrier)
-  (:policy :fast-safe)
   (:translate %compiler-barrier)
   (:generator 3))
 
 (define-vop (%memory-barrier)
-  (:policy :fast-safe)
   (:translate %memory-barrier)
   (:generator 3
     (inst add (make-ea :dword :base esp-tn) 0 :lock)))
 
 (define-vop (%read-barrier)
-  (:policy :fast-safe)
   (:translate %read-barrier)
   (:generator 3))
 
 (define-vop (%write-barrier)
-  (:policy :fast-safe)
   (:translate %write-barrier)
   (:generator 3))
 
 (define-vop (%data-dependency-barrier)
-  (:policy :fast-safe)
   (:translate %data-dependency-barrier)
   (:generator 3))
 
 (define-vop ()
   (:translate spin-loop-hint)
-  (:policy :fast-safe)
   (:generator 0
     (inst pause)))
 
@@ -395,7 +370,6 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
 
 ;; The only use of CPUID heretofore was for its flushing of the I-pipeline.
 (define-vop (%cpu-identification)
-  (:policy :fast-safe)
   (:translate %cpu-identification)
   (:args (function :scs (unsigned-reg) :target eax)
          (subfunction :scs (unsigned-reg) :target ecx))

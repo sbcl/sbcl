@@ -67,7 +67,6 @@
   (:args (car))
   (:results (result :scs (descriptor-reg)))
   (:ignore car)
-  (:policy :fast-safe)
   (:generator 0
     (inst str null-tn (@ csp-tn n-word-bytes :post-index))
     (inst add-sub result csp-tn (- list-pointer-lowtag (* cons-size n-word-bytes)))))
@@ -79,7 +78,6 @@
   (:temporary (:sc non-descriptor-reg) temp)
   (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
   (:results (result :scs (descriptor-reg) :from :argument))
-  (:policy :fast-safe)
   (:translate make-fdefn)
   (:generator 37
     (with-fixed-allocation (result lr fdefn-widetag fdefn-size)

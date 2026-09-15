@@ -250,7 +250,6 @@
          (words :scs (any-reg immediate)))
   (:results (result :scs (descriptor-reg) :from :load))
   (:arg-types positive-fixnum positive-fixnum positive-fixnum)
-  (:policy :fast-safe)
   (:node-var node)
   (:generator 100
    (flet ((store-widetag (value ptr slot lowtag)
@@ -307,7 +306,6 @@
   (:arg-types positive-fixnum
               positive-fixnum
               positive-fixnum)
-  (:policy :fast-safe)
   (:generator 100
     (inst lea bytes (make-ea :byte :base words :disp
                              (+ (1- (ash 1 n-lowtag-bits))
@@ -335,7 +333,6 @@
 
 
 (define-vop (make-fdefn)
-  (:policy :fast-safe)
   (:translate make-fdefn)
   (:args (name :scs (descriptor-reg) :to :eval))
   (:results (result :scs (descriptor-reg) :from :argument))

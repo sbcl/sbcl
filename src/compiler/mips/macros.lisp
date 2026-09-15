@@ -247,7 +247,6 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
      (define-vop (,name)
        ,@(when translate
            `((:translate ,translate)))
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg)))
        (:arg-types ,type tagged-num)
@@ -260,7 +259,6 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
            `((:translate ,translate)))
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg)))
        (:info index)
        (:arg-types ,type
@@ -277,7 +275,6 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
   `(progn
      (define-vop (,name)
        (:translate ,translate)
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg))
               (value :scs ,scs))
@@ -294,7 +291,6 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
                  (storew value temp ,offset ,lowtag)))))
      (define-vop (,(symbolicate name "-C"))
        (:translate ,translate)
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (value :scs ,scs))
        (:info index)
@@ -319,7 +315,6 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
        (define-vop (,name)
          ,@(when translate
              `((:translate ,translate)))
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (index :scs (unsigned-reg)))
          (:arg-types ,type positive-fixnum)
@@ -338,7 +333,6 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
        (define-vop (,(symbolicate name "-C"))
          ,@(when translate
              `((:translate ,translate)))
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg)))
          (:info index)
          (:arg-types ,type
@@ -362,7 +356,6 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
        (define-vop (,name)
          ,@(when translate
              `((:translate ,translate)))
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (index :scs (unsigned-reg))
                 (value :scs ,scs))
@@ -377,7 +370,6 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
        (define-vop (,(symbolicate name "-C"))
          ,@(when translate
              `((:translate ,translate)))
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (value :scs ,scs))
          (:info index)

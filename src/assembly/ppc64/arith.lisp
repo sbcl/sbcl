@@ -164,7 +164,6 @@
                                   (:note ,note)
                                   (:cost ,cost)
                                   (:translate *)
-                                  (:policy :fast-safe)
                                   (:arg-types ,type ,type)
                                   (:result-types ,type))
                                  ((:arg x ,sc nl0-offset)

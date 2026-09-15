@@ -302,7 +302,6 @@
   (:args (x :scs (any-reg descriptor-reg control-stack))
          (y :scs (any-reg descriptor-reg control-stack immediate constant)))
   (:conditional :e)
-  (:policy :fast-safe)
   (:translate eq)
   (:arg-refs x-tn-ref)
   (:temporary (:sc unsigned-reg) temp) ; TODO: add :unused-if
@@ -379,7 +378,6 @@
   (:info slot)
   (:translate %instance-ref-eq)
   (:conditional :e)
-  (:policy :fast-safe)
   (:generator 1
    (inst cmp :qword
          (ea (+ (- instance-pointer-lowtag)
@@ -394,7 +392,6 @@
   (:translate %instance-types=)
   (:temporary (:sc unsigned-reg) temp)
   (:conditional :e)
-  (:policy :fast-safe)
   (:generator 1
     (let* ((t1 (tn-ref-type args))
            (t2 (tn-ref-type (tn-ref-across args)))
@@ -438,7 +435,6 @@
          (y :scs (any-reg descriptor-reg) :target rsi))
   (:arg-refs x-ref y-ref)
   (:conditional :e)
-  (:policy :fast-safe)
   (:translate eql)
   (:temporary (:sc unsigned-reg :offset rdi-offset :from (:argument 0)) rdi)
   (:temporary (:sc unsigned-reg :offset rsi-offset :from (:argument 1)) rsi)

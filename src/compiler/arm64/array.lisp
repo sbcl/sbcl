@@ -16,7 +16,6 @@
 
 (define-vop (make-array-header)
   (:translate make-array-header)
-  (:policy :fast-safe)
   (:args (type :scs (any-reg))
          (rank :scs (any-reg)))
   (:arg-types tagged-num tagged-num)
@@ -54,7 +53,6 @@
 
 (define-vop ()
   (:translate array-rank)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -65,7 +63,6 @@
 
 (define-vop ()
   (:translate array-rank=)
-  (:policy :fast-safe)
   (:args (array :scs (descriptor-reg)))
   (:temporary (:scs (unsigned-reg)) x)
   (:info rank)
@@ -117,7 +114,6 @@
 ;;;; Bounds checking routine.
 (define-vop (check-bound)
   (:translate %check-bound)
-  (:policy :fast-safe)
   (:args (array :scs (descriptor-reg constant))
          (bound :scs (any-reg descriptor-reg)
                 :load-if (not (and (sc-is bound immediate)
@@ -265,7 +261,6 @@
        (define-vop (,(symbolicate "DATA-VECTOR-REF/" type))
          (:note "inline array access")
          (:translate data-vector-ref)
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (index :scs (unsigned-reg) :to :save))
          (:arg-types ,type positive-fixnum)
@@ -295,7 +290,6 @@
        (define-vop (,(symbolicate "DATA-VECTOR-REF/" type "-C"))
          (:note "inline array access")
          (:translate data-vector-ref)
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg)))
          (:info index)
          (:arg-types ,type (:constant index))
@@ -312,7 +306,6 @@
        (define-vop (,(symbolicate "DATA-VECTOR-SET/" type "-C"))
          (:note "inline array store")
          (:translate data-vector-set)
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (value :scs (unsigned-reg)
                        :load-if (not (and (sc-is value immediate)
@@ -342,7 +335,6 @@
        (define-vop (,(symbolicate "DATA-VECTOR-SET/" type))
          (:note "inline array store")
          (:translate data-vector-set)
-         (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (index :scs (unsigned-reg)
                        ,@(unless (= bits 1)
@@ -396,7 +388,6 @@
   (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))
 
 (define-vop (data-vector-ref/simple-bit-vector-eq)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)) (index :scs (unsigned-reg)))
   (:arg-types simple-bit-vector positive-fixnum)
   (:conditional :eq)
@@ -409,7 +400,6 @@
     (inst tst x 1)))
 
 (define-vop (data-vector-ref/simple-bit-vector-c-eq)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:info index)
   (:arg-types simple-bit-vector (:constant index))
@@ -428,7 +418,6 @@
 
 (define-vop (data-vector-ref/simple-array-complex-double-float)
   (:translate data-vector-ref)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg unsigned-reg signed-reg immediate)))
   (:arg-types simple-array-complex-double-float tagged-num)
@@ -454,7 +443,6 @@
 
 (define-vop (data-vector-set/simple-array-complex-double-float)
   (:translate data-vector-set)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg unsigned-reg signed-reg immediate))
          (value :scs (complex-double-reg)))
@@ -493,21 +481,18 @@
 
 (define-vop (%compare-and-swap-svref word-index-cas)
   (:note "inline array compare-and-swap")
-  (:policy :fast-safe)
   (:variant vector-data-offset other-pointer-lowtag)
   (:translate %compare-and-swap-svref)
   (:arg-types simple-vector positive-fixnum * *))
 
 (define-vop (%compare-and-swap-svref-v8.1 word-index-cas-v8.1)
   (:note "inline array compare-and-swap")
-  (:policy :fast-safe)
   (:variant vector-data-offset other-pointer-lowtag)
   (:translate %compare-and-swap-svref)
   (:arg-types simple-vector positive-fixnum * *))
 
 (define-vop (array-atomic-incf/word)
   (:translate %array-atomic-incf/word)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg) :target offset)
          (diff :scs (unsigned-reg)))
@@ -533,7 +518,6 @@
 
 (define-vop (array-atomic-incf/word-v8.1)
   (:translate %array-atomic-incf/word)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg) :target offset)
          (diff :scs (unsigned-reg)))

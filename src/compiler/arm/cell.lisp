@@ -43,7 +43,6 @@
 (define-vop (checked-cell-ref)
   (:args (object :scs (descriptor-reg) :target obj-temp))
   (:results (value :scs (descriptor-reg any-reg)))
-  (:policy :fast-safe)
   (:vop-var vop)
   (:save-p :compute-only)
   (:temporary (:scs (descriptor-reg) :from (:argument 0)) obj-temp))
@@ -64,7 +63,6 @@
   (:args (object :scs (descriptor-reg)))
   (:conditional)
   (:info target not-p)
-  (:policy :fast-safe)
   (:temporary (:scs (descriptor-reg)) value)
   (:translate boundp)
   (:generator 9
@@ -85,7 +83,6 @@
   (:translate symbol-global-value))
 
 (define-vop (symbol-hash)
-  (:policy :fast-safe)
   (:translate symbol-hash)
   (:args (symbol :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
@@ -105,7 +102,6 @@
 
 (define-vop (safe-fdefn-fun)
   (:translate safe-fdefn-fun)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :target obj-temp))
   (:results (value :scs (descriptor-reg any-reg)))
   (:vop-var vop)
@@ -119,7 +115,6 @@
       (inst b :eq err-lab))))
 
 (define-vop (set-fdefn-fun)
-  (:policy :fast-safe)
   (:args (function :scs (descriptor-reg))
          (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) lip type)
@@ -136,7 +131,6 @@
       (storew function fdefn fdefn-fun-slot other-pointer-lowtag))))
 
 (define-vop (fdefn-makunbound)
-  (:policy :fast-safe)
   (:translate fdefn-makunbound)
   (:args (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) lip temp)
@@ -255,7 +249,6 @@
 ;;;; Instance hackery:
 
 (define-vop ()
-  (:policy :fast-safe)
   (:translate %instance-length)
   (:args (struct :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
@@ -277,7 +270,6 @@
 
 (define-vop (code-header-set)
   (:translate code-header-set)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
          (value :scs (any-reg descriptor-reg)))
@@ -337,7 +329,6 @@
            `(progn
               (define-vop ()
                 (:translate ,(symbolicate "%RAW-INSTANCE-REF/" name))
-                (:policy :fast-safe)
                 (:args (object :scs (descriptor-reg))
                        (index :scs (any-reg)))
                 (:arg-types * positive-fixnum)
@@ -348,7 +339,6 @@
                 (:generator 5 ,@(emit-generator ref-inst nil)))
               (define-vop ()
                 (:translate ,(symbolicate "%RAW-INSTANCE-SET/" name))
-                (:policy :fast-safe)
                 (:args (object :scs (descriptor-reg))
                        (index :scs (any-reg))
                        (value :scs (,value-sc)))

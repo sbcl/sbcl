@@ -17,7 +17,6 @@
 ;;; sorts of problems.
 (define-vop (data-nil-vector-ref)
   (:translate data-nil-vector-ref)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg descriptor-reg) :load-if nil))
   (:ignore index)
@@ -39,7 +38,6 @@
 ;;; signals the right kind of error.
 (define-vop (data-vector-set/simple-array-nil)
   (:translate data-vector-set)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (unsigned-reg))
          (value :scs (descriptor-reg)))
@@ -51,7 +49,6 @@
     (error-call vop 'nil-array-accessed-error object)))
 
 (define-vop (type-check-error/c)
-  (:policy :fast-safe)
   (:translate sb-c::%type-check-error/c)
   (:args (object :scs (descriptor-reg any-reg unsigned-reg signed-reg
                        character-reg constant
@@ -75,7 +72,6 @@
          (value :scs (any-reg descriptor-reg) :target r)
          (type :scs (descriptor-reg constant immediate)
                :to :save))
-  (:policy :fast-safe)
   (:results (r :scs (any-reg descriptor-reg)))
   (:result-types *)
   (:save-p :compute-only)
@@ -106,8 +102,7 @@
                     (name (or translate error)))
              `(define-vop (,name)
                 ,@(when translate
-                    `((:policy :fast-safe)
-                      (:translate ,translate)))
+                    `((:translate ,translate)))
                 (:args ,@(mapcar (lambda (arg)
                                    `(,arg :scs (descriptor-reg any-reg character-reg
                                                 unsigned-reg signed-reg constant
@@ -139,7 +134,6 @@
   (def "FILL-POINTER"            fill-pointer-error           nil array))
 
 (define-vop ()
-  (:policy :fast-safe)
   (:translate op-not-type2-error)
   (:args
    (a :scs
@@ -158,7 +152,6 @@
         (error-call vop 'sb-kernel::op-not-type2-error a b))))
 
 (define-vop ()
-  (:policy :fast-safe)
   (:translate op-not-type1-error)
   (:args
    (a :scs

@@ -88,7 +88,6 @@
   (:args (frame-pointer :scs (descriptor-reg))
          (variable-home-tn :load-if nil))
   (:results (value :scs (descriptor-reg any-reg)))
-  (:policy :fast-safe)
   (:generator 4
     (aver (sc-is variable-home-tn control-stack))
     (loadw value frame-pointer (tn-offset variable-home-tn))))
@@ -96,7 +95,6 @@
   (:args (frame-pointer :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
   (:results (variable-home-tn :load-if nil))
-  (:policy :fast-safe)
   (:generator 4
     (aver (sc-is variable-home-tn control-stack))
     (storew value frame-pointer (tn-offset variable-home-tn))))
@@ -1092,7 +1090,6 @@ default-value-8
 ;;; typed, so the lowtag is 0.
 (define-vop (more-arg)
   (:translate %more-arg)
-  (:policy :fast-safe)
   (:args (context :scs (descriptor-reg)) (index :scs (any-reg)))
   (:arg-types * tagged-num)
   (:temporary (:scs (any-reg)) temp)
@@ -1103,7 +1100,6 @@ default-value-8
    (loadw value temp)))
 (define-vop (more-arg-c)
   (:translate %more-arg)
-  (:policy :fast-safe)
   (:args (context :scs (descriptor-reg)))
   (:info index)
   (:arg-types * (:constant (load/store-index 8 0 0)))
@@ -1113,7 +1109,6 @@ default-value-8
     (loadw value context index)))
 
 (define-vop (more-arg-or-nil)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
          (count :scs (any-reg) :to (:result 1)))
   (:temporary (:scs (any-reg)) temp)
@@ -1141,7 +1136,6 @@ default-value-8
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:results (result :scs (descriptor-reg)))
   (:translate %listify-rest-args)
-  (:policy :safe)
   (:node-var node)
   (:generator 20
     (move context context-arg)
@@ -1219,7 +1213,6 @@ default-value-8
 ;;; stack top.
 ;;;
 (define-vop ()
-  (:policy :fast-safe)
   (:translate sb-c::%more-arg-context)
   (:args (supplied :scs (any-reg)))
   (:arg-types tagged-num (:constant fixnum))
@@ -1233,7 +1226,6 @@ default-value-8
     (inst subu context csp-tn count)))
 
 (define-vop (verify-arg-count)
-  (:policy :fast-safe)
   (:args (nargs :scs (any-reg)))
   (:temporary (:scs (unsigned-reg)) temp)
   (:arg-types positive-fixnum (:constant t) (:constant t))
@@ -1276,7 +1268,6 @@ default-value-8
 
 (define-vop (step-instrument-before-vop)
   (:temporary (:scs (descriptor-reg)) stepping)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
     (load-symbol-value stepping sb-impl::*stepping*)

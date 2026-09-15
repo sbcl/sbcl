@@ -70,7 +70,6 @@
 (define-vop (checked-cell-ref)
   (:args (object :scs (descriptor-reg) :to :save))
   (:results (value :scs (descriptor-reg any-reg)))
-  (:policy :fast-safe)
   (:vop-var vop)
   (:save-p :compute-only))
 
@@ -190,7 +189,6 @@
   (:args (object :scs (descriptor-reg)))
   (:conditional)
   (:info target not-p)
-  (:policy :fast-safe)
   (:temporary (:scs (descriptor-reg)) value)
   (:translate boundp)
   #+sb-thread
@@ -217,7 +215,6 @@
   (:translate symbol-global-value))
 
 (define-vop (symbol-global-value)
-  (:policy :fast-safe)
   (:translate symbol-global-value)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:results (value :scs (descriptor-reg any-reg)))
@@ -230,7 +227,6 @@
       (inst b :eq err-lab))))
 
 (define-vop (symbol-hash)
-  (:policy :fast-safe)
   (:translate symbol-hash)
   (:args (symbol :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
@@ -250,7 +246,6 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:translate symbol-package-id)
-  (:policy :fast-safe)
   (:generator 1
     #.(assert (= sb-impl::package-id-bits 16))
     (inst ldrh result (@ symbol (- 2 other-pointer-lowtag))))) ; little-endian
@@ -267,7 +262,6 @@
   #+sb-thread
   (:temporary (:sc any-reg) tls-index)
   (:temporary (:sc non-descriptor-reg) lip)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 15
     (emit-gengc-barrier symbol nil lip (vop-nth-arg 2 vop))
@@ -309,7 +303,6 @@
   #+sb-thread
   (:temporary (:sc any-reg) tls-index)
   (:temporary (:sc non-descriptor-reg) lip)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:guard (member :arm-v8.1 *backend-subfeatures*))
   (:generator 14
@@ -338,7 +331,6 @@
 
 (define-vop (safe-fdefn-fun)
   (:translate safe-fdefn-fun)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to :save))
   (:results (value :scs (descriptor-reg any-reg)))
   (:vop-var vop)
@@ -352,7 +344,6 @@
     RETRY))
 
 (define-vop (set-fdefn-fun)
-  (:policy :fast-safe)
   (:args (function :scs (descriptor-reg))
          (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) lip)
@@ -370,7 +361,6 @@
     (storew function fdefn fdefn-fun-slot other-pointer-lowtag)))
 
 (define-vop (fdefn-makunbound)
-  (:policy :fast-safe)
   (:translate fdefn-makunbound)
   (:args (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
@@ -612,7 +602,6 @@
 ;;;; Instance hackery:
 
 (define-vop ()
-  (:policy :fast-safe)
   (:translate %instance-length)
   (:args (struct :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
@@ -628,7 +617,6 @@
   instance-pointer-lowtag (descriptor-reg any-reg) * %instance-set)
 
 (define-vop (%instance-cas word-index-cas)
-  (:policy :fast-safe)
   (:translate %instance-cas)
   (:variant instance-slots-offset instance-pointer-lowtag)
   (:arg-types instance tagged-num * *))
@@ -653,7 +641,6 @@
   (:translate %raw-instance-cas/signed-word))
 
 (define-vop (%instance-cas-v8.1 word-index-cas-v8.1)
-  (:policy :fast-safe)
   (:translate %instance-cas)
   (:variant instance-slots-offset instance-pointer-lowtag)
   (:arg-types instance tagged-num * *))
@@ -686,7 +673,6 @@
 #-darwin-jit
 (define-vop (code-header-set)
   (:translate code-header-set)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
          (value :scs (any-reg descriptor-reg)))
@@ -783,7 +769,6 @@
            `(progn
               (define-vop ()
                 (:translate ,(symbolicate "%RAW-INSTANCE-REF/" name))
-                (:policy :fast-safe)
                 (:args (object :scs (descriptor-reg))
                        (index :scs (any-reg immediate)))
                 (:arg-types * positive-fixnum)
@@ -793,7 +778,6 @@
                 (:generator 5 ,@(emit-generator 'ldr nil)))
               (define-vop ()
                 (:translate ,(symbolicate "%RAW-INSTANCE-SET/" name))
-                (:policy :fast-safe)
                 (:args (object :scs (descriptor-reg))
                        (index :scs (any-reg immediate))
                        (value :scs (,value-sc (,immediate-sc
@@ -815,7 +799,6 @@
 
 (define-vop (raw-instance-atomic-incf/word)
   (:translate %raw-instance-atomic-incf/word)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
          (diff :scs (unsigned-reg)))
@@ -840,7 +823,6 @@
 
 (define-vop (raw-instance-atomic-incf/word-v8.1)
   (:translate %raw-instance-atomic-incf/word)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
          (diff :scs (unsigned-reg)))

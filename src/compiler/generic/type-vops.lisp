@@ -196,7 +196,6 @@
 (macrolet ((def (name lowtag)
              `(define-vop ()
                 (:translate ,name)
-                (:policy :fast-safe)
                 (:args (x :scs (descriptor-reg)))
                 (:results (res :scs (unsigned-reg)))
                 (:result-types unsigned-num)

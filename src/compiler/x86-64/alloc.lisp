@@ -508,7 +508,6 @@
   (:vop-var vop)
   (:node-var node)
   (:translate acons)
-  (:policy :fast-safe)
   (:generator 10
     (cond
       ((node-stack-allocate-p node)
@@ -603,7 +602,6 @@
   (:args (car))
   (:results (result :scs (descriptor-reg)))
   (:ignore car)
-  (:policy :fast-safe)
   (:generator 0
     (inst push null-tn)
     (inst lea result (ea (- list-pointer-lowtag n-word-bytes) rsp-tn))))
@@ -734,7 +732,6 @@
     (:arg-types #+ubsan (:constant t)
                 positive-fixnum positive-fixnum positive-fixnum)
     (:temporary (:sc unsigned-reg) temp)
-    (:policy :fast-safe)
     (:generator 100
       #+ubsan
       (when (want-shadow-bits)
@@ -815,7 +812,6 @@
     #+ubsan (:temporary (:sc any-reg :offset rax-offset) rax)
     #+ubsan (:temporary (:sc any-reg :offset rcx-offset) rcx)
     #+ubsan (:temporary (:sc any-reg :offset rdi-offset) rdi)
-    (:policy :fast-safe)
     (:generator 10
       #+ubsan
       (when (want-shadow-bits)
@@ -870,7 +866,6 @@
     (:temporary (:sc unsigned-reg) bytes)
     (:node-var node)
     (:vop-var vop)
-    (:policy :fast-safe)
     (:generator 10
       (let ((size (calc-size-in-bytes words bytes)))
         ;; Compute tagged pointer sooner than later since access off RSP
@@ -925,7 +920,6 @@
            (element :scs (any-reg descriptor-reg)))
     (:results (result :scs (descriptor-reg) :from :load))
     (:arg-types positive-fixnum *)
-    (:policy :fast-safe)
     (:node-var node)
     (:vop-var vop)
     (:temporary (:sc unsigned-reg) bytes)
@@ -956,7 +950,6 @@
            (element :scs (any-reg descriptor-reg)))
     (:results (result :scs (descriptor-reg) :from :load))
     (:arg-types positive-fixnum *)
-    (:policy :fast-safe)
     (:temporary (:sc descriptor-reg) tail next limit)
     (:generator 20
       (multiple-value-bind (size scale)
@@ -996,7 +989,6 @@
       done))) ; label needed by calc-size-in-bytes
 
 (define-allocator (make-fdefn)
-  (:policy :fast-safe)
   (:translate make-fdefn)
   (:args (name :scs (descriptor-reg) :to :eval))
   (:results (result :scs (descriptor-reg) :from :argument))

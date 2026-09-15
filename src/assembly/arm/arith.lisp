@@ -16,7 +16,6 @@
 (define-assembly-routine (signed-truncate
                           (:note "(signed-byte 32) truncate")
                           (:cost 60)
-                          (:policy :fast-safe)
                           (:translate truncate)
                           (:arg-types signed-num signed-num)
                           (:result-types signed-num signed-num))

@@ -45,7 +45,6 @@
   (:temporary (:sc descriptor-reg :to (:result 0)) cell)
   #+gs-seg (:temporary (:sc unsigned-reg) thread-temp)
   (:results (result :scs (descriptor-reg any-reg)))
-  (:policy :fast-safe)
   (:vop-var vop)
   (:node-var node)
   (:generator 15
@@ -186,7 +185,6 @@
 
 (define-vop (symbol-value)
   (:translate symbol-value)
-  (:policy :fast-safe)
   (:args (symbol :scs (descriptor-reg constant immediate) :to (:result 1)))
   (:arg-refs symbol-ref)
   (:temporary (:unused-if (or (symbol-always-has-tls-value-p symbol-ref (sb-c::vop-node vop))
@@ -213,7 +211,6 @@
 
 (define-vop (boundp)
   (:translate boundp)
-  (:policy :fast-safe)
   (:args (symbol :scs (descriptor-reg constant immediate)))
   (:node-var node)
   (:conditional :ne)
@@ -565,12 +562,10 @@
   ;; be used unless the variable is proclaimed as fixnum.
   ;; All stores are checked in a safe policy, so this
   ;; vop is safe because it increments a known fixnum.
-  (:policy :fast-safe)
   (:arg-types * tagged-num)
   (:variant symbol-value-slot other-pointer-lowtag))
 
 (define-vop (atomic-dec-symbol-global-value cell-xsub)
   (:translate %atomic-dec-symbol-global-value)
-  (:policy :fast-safe)
   (:arg-types * tagged-num)
   (:variant symbol-value-slot other-pointer-lowtag))

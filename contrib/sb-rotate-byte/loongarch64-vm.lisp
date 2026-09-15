@@ -2,7 +2,6 @@
 
 ;;; 32-bit
 (define-vop (%32bit-rotate-byte/c)
-  (:policy :fast-safe)
   (:translate %unsigned-32-rotate-byte)
   (:note "inline 32-bit constant rotation")
   (:args (integer :scs (sb-vm::unsigned-reg) :target result))
@@ -25,7 +24,6 @@
         (inst srli.d result result 32)))))
 
 (define-vop (%32bit-rotate-byte)
-  (:policy :fast-safe)
   (:translate %unsigned-32-rotate-byte)
   (:note "inline 32-bit rotation")
   (:args (count :scs (sb-vm::signed-reg))
@@ -51,7 +49,6 @@
 
 ;;; 64-bit
 (define-vop (%64bit-rotate-byte/c)
-  (:policy :fast-safe)
   (:translate %unsigned-64-rotate-byte)
   (:note "inline 64-bit constant rotation")
   (:args (integer :scs (sb-vm::unsigned-reg) :target result))
@@ -70,7 +67,6 @@
       (inst or result result temp))))
 
 (define-vop (%64bit-rotate-byte)
-  (:policy :fast-safe)
   (:translate %unsigned-64-rotate-byte)
   (:note "inline 64-bit rotation")
   (:args (count :scs (sb-vm::signed-reg))

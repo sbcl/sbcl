@@ -134,7 +134,7 @@ In CMUCL, the :guard argument to VOPs provided a way of disallowing
 the use of a particular VOP in compiled code. As an example, from the
 SPARC code in CMUCL,
 
-(DEFINE-VOP? (FAST-V8-TRUNCATE/SIGNED=>SIGNED? FAST-SAFE-ARITH-OP?)
+(DEFINE-VOP? (FAST-V8-TRUNCATE/SIGNED=>SIGNED?)
   (:TRANSLATE TRUNCATE?)
   ...
   (:GUARD (OR (BACKEND-FEATUREP :SPARC-V8)

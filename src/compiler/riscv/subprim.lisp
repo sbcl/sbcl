@@ -23,7 +23,6 @@
   (:temporary (:scs (any-reg) :to (:result 0) :target result)
               count)
   (:results (result :scs (any-reg descriptor-reg)))
-  (:policy :fast-safe)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 50

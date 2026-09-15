@@ -195,7 +195,6 @@
 
 (define-vop (sign-extend)
   (:translate sign-extend)
-  (:policy :fast-safe)
   ;; Need to wire this to EAX since in x86 some dword registers don't
   ;; have a matching word or byte register.
   (:args (val :scs (signed-reg) :target eax))
@@ -221,7 +220,6 @@
 
 (define-vop (foreign-symbol-sap)
   (:translate foreign-symbol-sap)
-  (:policy :fast-safe)
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)
@@ -232,7 +230,6 @@
 
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
-  (:policy :fast-safe)
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)

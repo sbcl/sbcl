@@ -21,7 +21,6 @@
     (:arg-types * tagged-num)
     (:results (res :scs (complex-double-reg)))
     (:result-types complex-double-float)
-    (:policy :fast-safe)
     (:generator 3
       (inst lsl offset index (1+ (- word-shift n-fixnum-tag-bits)))
       (inst add offset offset (- (* vector-data-offset n-word-bytes)
@@ -35,7 +34,6 @@
            (index :scs (any-reg)))
     (:temporary (:scs (non-descriptor-reg) :from (:argument 2)) offset)
     (:arg-types complex-double-float * tagged-num)
-    (:policy :fast-safe)
     (:generator 3
       (inst lsl offset index (1+ (- word-shift n-fixnum-tag-bits)))
       (inst add offset offset (- (* vector-data-offset n-word-bytes)

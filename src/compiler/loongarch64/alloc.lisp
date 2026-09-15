@@ -55,7 +55,6 @@
   (:args (name :scs (descriptor-reg) :to :eval))
   (:temporary (:sc non-descriptor-reg) pa-flag temp)
   (:results (result :scs (descriptor-reg) :from :argument))
-  (:policy :fast-safe)
   (:translate make-fdefn)
   (:generator 37
     (with-fixed-allocation (result pa-flag fdefn-widetag fdefn-size)
@@ -74,7 +73,6 @@
               positive-fixnum)
   (:temporary (:sc non-descriptor-reg) bytes pa-flag)
   (:results (result :scs (descriptor-reg) :from :load))
-  (:policy :fast-safe)
   (:generator 100
     (pseudo-atomic (pa-flag)
       (with-fixnum-as-word-index (words bytes)
@@ -96,7 +94,6 @@
   (:results (result :scs (descriptor-reg) :from :load))
   (:vop-var vop)
   (:node-var node)
-  (:policy :fast-safe)
   (:generator 100
     (pseudo-atomic (pa-flag)
       (with-fixnum-as-word-index (words bytes)

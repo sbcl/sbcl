@@ -53,7 +53,6 @@
   (:args (object :scs (descriptor-reg)))
   (:results (value :scs (descriptor-reg any-reg)))
   (:variant-vars offset lowtag)
-  (:policy :fast-safe)
   (:generator 4
     (loadw value object offset lowtag)))
 
@@ -61,7 +60,6 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
   (:variant-vars offset lowtag)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 4
     (emit-gengc-barrier object nil tmp-tn (vop-nth-arg 1 vop))
@@ -78,7 +76,6 @@
   (:results (result :scs (any-reg descriptor-reg) :from :load))
   (:result-types *)
   (:variant-vars offset lowtag)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 5
     (cond
@@ -117,7 +114,6 @@
   (:results (result :scs (any-reg descriptor-reg) :from (:argument 2)))
   (:result-types *)
   (:variant-vars offset lowtag)
-  (:policy :fast-safe)
   (:guard (member :arm-v8.1 *backend-subfeatures*))
   (:vop-var vop)
   (:generator 3
@@ -137,7 +133,6 @@
 
 (define-vop (%vector-cas-pair)
   (:translate %vector-cas-pair)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 0))
          (index :scs (any-reg))
          (old1 :scs (any-reg descriptor-reg))
@@ -154,7 +149,6 @@
   (:results (result1 :scs (any-reg descriptor-reg))
             (result2 :scs (any-reg descriptor-reg)))
   (:result-types * *)
-  (:policy :fast-safe)
   (:generator 3
     (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
     (inst add-sub lip lip (- (* vector-data-offset n-word-bytes) other-pointer-lowtag))

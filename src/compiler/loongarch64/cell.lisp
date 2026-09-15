@@ -74,7 +74,6 @@
   (:temporary (:sc non-descriptor-reg) lip)
   (:results (result :scs (descriptor-reg any-reg)
                     :from :load))
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 15
     #+sb-thread
@@ -142,7 +141,6 @@
 (define-vop (checked-cell-ref)
   (:args (object :scs (descriptor-reg) :to :save))
   (:results (value :scs (descriptor-reg any-reg)))
-  (:policy :fast-safe)
   (:vop-var vop)
   (:save-p :compute-only)
   (:temporary (:scs (non-descriptor-reg)) temp))
@@ -180,7 +178,6 @@
   (:args (object :scs (descriptor-reg)))
   (:conditional)
   (:info target not-p)
-  (:policy :fast-safe)
   (:temporary (:scs (descriptor-reg)) value)
   #+sb-thread (:temporary (:scs (non-descriptor-reg)) lip)
   (:temporary (:scs (non-descriptor-reg)) temp)
@@ -227,7 +224,6 @@
   (:translate symbol-global-value))
 
 (define-vop (symbol-global-value)
-  (:policy :fast-safe)
   (:translate symbol-global-value)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:results (value :scs (descriptor-reg any-reg)))
@@ -242,7 +238,6 @@
 
 (progn
 (define-vop (symbol-hash)
-  (:policy :fast-safe)
   (:translate symbol-hash)
   (:args (symbol :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
@@ -260,13 +255,11 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:translate symbol-package-id)
-  (:policy :fast-safe)
   (:generator 1
    (inst ld.hu result symbol (- 2 other-pointer-lowtag)))))
 
 (define-vop (safe-fdefn-fun)
   (:translate safe-fdefn-fun)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to :save))
   (:results (value :scs (descriptor-reg any-reg)))
   (:vop-var vop)
@@ -277,7 +270,6 @@
       (inst beq value null-tn err-lab))))
 
 (define-vop (set-fdefn-fun)
-  (:policy :fast-safe)
   (:args (function :scs (descriptor-reg))
          (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) lip)
@@ -294,7 +286,6 @@
 
 
 (define-vop (fdefn-makunbound)
-  (:policy :fast-safe)
   (:translate fdefn-makunbound)
   (:args (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
@@ -442,7 +433,6 @@
   (:variant value-cell-value-slot other-pointer-lowtag))
 
 (define-vop ()
-  (:policy :fast-safe)
   (:translate %instance-length)
   (:args (struct :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
@@ -466,7 +456,6 @@
 
 (define-vop (code-header-set)
   (:translate code-header-set)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
          (value :scs (any-reg descriptor-reg zero)))

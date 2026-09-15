@@ -127,7 +127,6 @@
   (:arg-refs x-ref)
   (:vop-var vop)
   (:conditional :eq)
-  (:policy :fast-safe)
   (:translate eq)
   (:generator 7
     (let ((value (sc-case y

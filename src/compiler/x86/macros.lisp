@@ -223,7 +223,6 @@
   `(progn
      (define-vop (,name)
          ,@(when translate `((:translate ,translate)))
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg) :to :eval)
               (index :scs (any-reg immediate unsigned-reg) :to :result)
               (old-value :scs ,scs :target eax)
@@ -257,7 +256,6 @@
      (define-vop (,name)
        ,@(when translate
            `((:translate ,translate)))
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg immediate unsigned-reg)))
        (:arg-types ,type tagged-num)
@@ -284,7 +282,6 @@
      (define-vop (,name)
        ,@(when translate
            `((:translate ,translate)))
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg immediate unsigned-reg)))
        (:arg-types ,type tagged-num
@@ -316,7 +313,6 @@
     `(define-vop (,name)
        ,@(when translate
            `((:translate ,translate)))
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg immediate))
               (value :scs ,scs))

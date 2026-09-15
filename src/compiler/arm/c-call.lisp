@@ -177,7 +177,6 @@
 
 (define-vop (foreign-symbol-sap)
   (:translate foreign-symbol-sap)
-  (:policy :fast-safe)
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)
@@ -193,7 +192,6 @@
 
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
-  (:policy :fast-safe)
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)
@@ -250,7 +248,6 @@
 
 (define-vop (dealloc-number-stack-space)
   (:info amount)
-  (:policy :fast-safe)
   (:generator 0
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount +number-stack-alignment-mask+)
@@ -266,7 +263,6 @@
               (hi-bits :scs (unsigned-reg)))
     (:arg-types double-float)
     (:result-types unsigned-num unsigned-num)
-    (:policy :fast-safe)
     (:generator 1
       (inst fmrrd lo-bits hi-bits double)))
 
@@ -277,7 +273,6 @@
     (:results (double :scs (double-reg)))
     (:arg-types unsigned-num unsigned-num)
     (:result-types double-float)
-    (:policy :fast-safe)
     (:generator 1
       (inst fmdrr double lo-bits hi-bits)))
 
@@ -286,7 +281,6 @@
     (:results (bits :scs (unsigned-reg)))
     (:arg-types single-float)
     (:result-types unsigned-num)
-    (:policy :fast-safe)
     (:generator 1
       (inst fmrs bits single)))
 
@@ -296,7 +290,6 @@
     (:results (single :scs (single-reg)))
     (:arg-types unsigned-num)
     (:result-types single-float)
-    (:policy :fast-safe)
     (:generator 1
       (inst fmsr single bits))))
 

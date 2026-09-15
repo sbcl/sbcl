@@ -293,8 +293,7 @@
 (define-vop (simple-type-predicate)
   (:args (value :scs (any-reg descriptor-reg control-stack)))
   (:conditional)
-  (:arg-refs args)
-  (:policy :fast-safe))
+  (:arg-refs args))
 
 (define-vop (fixnump/unsigned-byte-64 simple-type-predicate)
   (:args (value :scs (unsigned-reg)))
@@ -321,7 +320,6 @@
   (:args ((lo hi) :scs (signed-128-reg)))
   (:arg-types signed-byte-128)
   (:translate fixnump)
-  (:policy :fast-safe)
   (:info target not-p)
   (:temporary (:sc unsigned-reg) temp)
   (:generator 5
@@ -342,7 +340,6 @@
   (:args (value :scs (any-reg descriptor-reg)))
   (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
   (:conditional :z)
-  (:policy :fast-safe)
   (:translate pointerp)
   (:generator 3
     ;; Since TEST will examine only the low 2 bits, it doesn't matter if we flip just
@@ -399,7 +396,6 @@
   (:args (value :scs (unsigned-reg)))
   (:arg-types unsigned-num)
   (:conditional :ns)
-  (:policy :fast-safe)
   (:translate signed-byte-64-p)
   (:generator 5
     (inst test value value)))
@@ -410,7 +406,6 @@
                 (:args (value :scs (signed-reg)))
                 (:arg-types signed-num)
                 (:conditional :z)
-                (:policy :fast-safe)
                 (:temporary (:sc unsigned-reg) temp)
                 (:generator 2
                   (inst movsx '(,src-size :qword) temp value)
@@ -424,7 +419,6 @@
   (:args (value :scs (any-reg descriptor-reg)))
   (:conditional :z)
   (:arg-refs arg-ref)
-  (:policy :fast-safe)
   (:temporary (:sc unsigned-reg) temp)
   (:generator 6
     (inst lea temp (ea (ash (expt 2 7) n-fixnum-tag-bits) value))
@@ -435,7 +429,6 @@
   (:args (value :scs (any-reg descriptor-reg)))
   (:conditional :z)
   (:arg-refs arg-ref)
-  (:policy :fast-safe)
   (:temporary (:sc unsigned-reg) temp)
   (:generator 6
     (inst lea temp (ea (ash (expt 2 15) n-fixnum-tag-bits) value))
@@ -446,7 +439,6 @@
   (:args (value :scs (any-reg descriptor-reg)))
   (:conditional :z)
   (:arg-refs arg-ref)
-  (:policy :fast-safe)
   (:temporary (:sc unsigned-reg) temp temp2)
   (:generator 6
     (move temp value)
@@ -846,7 +838,6 @@
                             (immediate (reg-or-legal-imm32-p tn)))))
   (:temporary (:sc unsigned-reg) temp)
   (:conditional :z)
-  (:policy :fast-safe)
   (:translate car-eq-if-listp)
   (:generator 3
     (inst lea temp (ea (- list-pointer-lowtag) value))
@@ -886,7 +877,6 @@
 
 (define-vop (widetag=)
   (:translate widetag=)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:info widetag)
   (:arg-types * (:constant t))
@@ -899,7 +889,6 @@
 (progn
  (define-vop ()
    (:translate %instance-layout)
-   (:policy :fast-safe)
    (:args (object :scs (descriptor-reg)))
    (:results (res :scs (descriptor-reg)))
    (:variant-vars lowtag)
@@ -908,7 +897,6 @@
     (inst mov :dword res (ea (- 4 lowtag) object))))
  (define-vop ()
    (:translate %set-instance-layout)
-   (:policy :fast-safe)
    (:args (object :scs (descriptor-reg))
           (value :scs (any-reg descriptor-reg)))
    (:vop-var vop)
@@ -926,7 +914,6 @@
      (inst mov :dword (ea (- 4 fun-pointer-lowtag) object) value)))
  (define-vop ()
   (:translate sb-c::layout-eq)
-  (:policy :fast-safe)
   (:conditional :e)
   (:args (object :scs (descriptor-reg))
          (layout :scs (descriptor-reg immediate)))
@@ -1037,7 +1024,6 @@
   (:conditional)
   (:info target not-p)
   (:arg-refs integer-ref)
-  (:policy :fast-safe)
   (:variant-vars comparison)
   (:variant :g)
   (:generator 8
@@ -1221,7 +1207,6 @@
                   layout)))
   (define-vop ()
     (:translate layout-depthoid)
-    (:policy :fast-safe)
     (:args (layout :scs (descriptor-reg)))
     (:results (res :scs (any-reg)))
     (:result-types fixnum)
@@ -1229,7 +1214,6 @@
       (inst movsx '(:dword :qword) res (read-depthoid))))
   (define-vop ()
     (:translate sb-c::layout-depthoid-ge)
-    (:policy :fast-safe)
     (:args (layout :scs (descriptor-reg)))
     (:info k)
     (:arg-types * (:constant (unsigned-byte 16)))
@@ -1276,7 +1260,6 @@
   (:args (x :scs (descriptor-reg)))
   (:arg-types * (:constant t))
   (:info test)
-  (:policy :fast-safe)
   (:conditional :e)
   (:generator 1
     (structure-is-a x test)))
@@ -1286,7 +1269,6 @@
   (:args (object :scs (descriptor-reg)))
   (:arg-types * (:constant t))
   (:arg-refs args)
-  (:policy :fast-safe)
   (:conditional)
   (:info target not-p test-layout)
   (:temporary (:sc descriptor-reg) layout)
@@ -1322,7 +1304,6 @@
 (define-vop (structure-typep*)
   (:args (layout :scs (descriptor-reg)))
   (:arg-types * (:constant t))
-  (:policy :fast-safe)
   (:info target not-p test-layout)
   (:generator 4
     (structure-is-a layout test-layout target not-p done)
@@ -1357,7 +1338,6 @@
 (define-vop (test-layout-id)
   (:args (id :scs (signed-reg)))
   (:arg-types signed-num (:constant t))
-  (:policy :fast-safe)
   (:info target not-p test-layout)
   (:generator 1
     (inst cmp :dword id (ensure-layout-id-fixup-or-imm test-layout))

@@ -262,7 +262,6 @@
       `(define-vop (,name)
          (:translate logcount)
          (:note ,(format nil "inline ~a logcount" arg-type))
-         (:policy :fast-safe)
          (:args (arg :scs (,arg-sc)))
          (:arg-types ,arg-type)
          (:results (result :scs (unsigned-reg)))
@@ -498,7 +497,6 @@
                           (:translate eql)
                           ;; :safe would imply signaling an error
                           ;; if the args are not integer, which this doesn't.
-                          (:policy :fast-safe)
                           (:conditional :e)
                           (:cost 10)
                           (:arg-types (:or integer bignum) *))

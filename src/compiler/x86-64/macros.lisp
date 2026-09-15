@@ -306,7 +306,6 @@
   `(progn
      (define-vop (,name)
        (:translate ,translate)
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg) :to :eval)
               (index :scs (any-reg signed-reg unsigned-reg
                                    (immediate
@@ -362,7 +361,6 @@
   `(progn
      (define-vop (,name)
        (:translate ,translate)
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg signed-reg unsigned-reg)))
        (:arg-types ,type tagged-num)
@@ -376,7 +374,6 @@
                              object index (index-scale n-word-bytes index)))))
      (define-vop (,(symbolicate name "-C"))
        (:translate ,translate)
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg)))
        (:info index)
        (:arg-types ,type
@@ -411,7 +408,6 @@
   `(progn
      (define-vop (,name)
        (:translate ,translate)
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg signed-reg unsigned-reg)))
        (:info addend)
@@ -432,7 +428,6 @@
      ;; and use a vop that only takes the object and just ONE index?
      (define-vop (,(symbolicate name "-C"))
        (:translate ,translate)
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg)))
        (:info index addend)
        (:arg-types ,type
@@ -458,7 +453,6 @@
         (barrier (member name '(instance-index-set %closure-index-set %weakvec-set))))
     `(define-vop (,name)
        (:translate ,translate)
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg signed-reg unsigned-reg
                                    (immediate

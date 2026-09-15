@@ -21,7 +21,6 @@
   (:temporary (:scs (any-reg) :to (:result 0) :target result)
               count)
   (:results (result :scs (any-reg descriptor-reg)))
-  (:policy :fast-safe)
   (:vop-var vop)
   (:node-var node)
   (:save-p :compute-only)

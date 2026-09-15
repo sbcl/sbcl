@@ -61,7 +61,6 @@
   (:translate fringe-binary-node-p)
   (:args (x :scs (sb-vm::descriptor-reg)))
   (:conditional :l)
-  (:policy :fast-safe)
   (:generator 1
     (sb-assem:inst cmp :byte (sb-x86-64-asm::ea (- 1 sb-vm:instance-pointer-lowtag) x)
                    (ash (+ 3 sb-vm:instance-data-start)

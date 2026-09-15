@@ -20,14 +20,12 @@
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:temporary (:scs (non-descriptor-reg)) temp)
-  (:policy :fast-safe)
   (:generator 1
     (inst li temp #x7FFFFFFC)
     (inst and res arg temp)))
 
 (define-vop (widetag-of)
   (:translate widetag-of)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:results (result :scs (unsigned-reg)))
@@ -71,7 +69,6 @@
   (:translate sb-c::%structure-is-a)
   (:args (x :scs (descriptor-reg)))
   (:arg-types * (:constant t))
-  (:policy :fast-safe)
   (:conditional)
   ;; "extra" info in conditional vops follows the 2 super-magical info args
   (:info target not-p test-layout)
@@ -84,7 +81,6 @@
 
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -93,7 +89,6 @@
 
 (define-vop ()
   (:translate %fun-pointer-widetag)
-  (:policy :fast-safe)
   (:args (function :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -102,7 +97,6 @@
 
 (define-vop (get-header-data)
   (:translate get-header-data)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -112,7 +106,6 @@
 
 (define-vop (set-header-data)
   (:translate set-header-data)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg))
          (data :scs (any-reg immediate zero)))
   (:arg-types * positive-fixnum)
@@ -141,7 +134,6 @@
   (:results (int :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate binding-stack-pointer-sap)
-  (:policy :fast-safe)
   (:generator 1
     (move int bsp-tn)))
 
@@ -149,7 +141,6 @@
   (:results (int :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate control-stack-pointer-sap)
-  (:policy :fast-safe)
   (:generator 1
     (move int csp-tn)))
 
@@ -158,7 +149,6 @@
 
 (define-vop (code-instructions)
   (:translate code-instructions)
-  (:policy :fast-safe)
   (:args (code :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:results (sap :scs (sap-reg)))
@@ -173,7 +163,6 @@
 
 (define-vop (code-trailer-ref)
   (:translate code-trailer-ref)
-  (:policy :fast-safe)
   (:args (code :scs (descriptor-reg) :to (:result 0))
          (offset :scs (signed-reg) :to (:result 0)))
   (:arg-types * fixnum)
@@ -213,7 +202,6 @@
 
 (defknown sb-unix::receive-pending-interrupt () (values))
 (define-vop (sb-unix::receive-pending-interrupt)
-  (:policy :fast-safe)
   (:translate sb-unix::receive-pending-interrupt)
   (:generator 1
     (inst break 0 pending-interrupt-trap)))
@@ -240,7 +228,6 @@
 ;;;; Dummy definition for a spin-loop hint VOP
 (define-vop (spin-loop-hint)
   (:translate spin-loop-hint)
-  (:policy :fast-safe)
   (:generator 0))
 
 (define-vop (sb-c::mark-covered)

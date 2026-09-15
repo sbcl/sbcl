@@ -126,7 +126,6 @@
   (:args (current-block))
   (:ignore current-block)
   (:temporary (:sc unsigned-reg) #+sb-thread tls block)
-  (:policy :fast-safe)
   (:generator 17
     (load-tl-symbol-value block *current-catch-block*)
     (loadw block block catch-block-previous-catch-slot)
@@ -137,7 +136,6 @@
   (:ignore current-block)
   ;; NOTE: When we have both #+sb-thread and #+win32, we only need one temp
   (:temporary (:sc unsigned-reg) block #+sb-thread tls #+win32 seh-frame)
-  (:policy :fast-safe)
   (:generator 17
     (load-tl-symbol-value block *current-unwind-protect-block*)
     #+win32

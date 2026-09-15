@@ -14,7 +14,6 @@
 
 (macrolet ((def (name sys)
              `(define-assembly-routine (,name
-                                        (:policy :fast-safe)
                                         (:arg-types positive-fixnum
                                                     positive-fixnum
                                                     positive-fixnum))
@@ -48,7 +47,6 @@
   (def sys-allocate-vector-on-heap t))
 
 (define-assembly-routine (allocate-vector-on-stack
-                          (:policy :fast-safe)
                           (:arg-types positive-fixnum
                                       positive-fixnum
                                       positive-fixnum))
@@ -78,7 +76,6 @@
   (inst b :lt LOOP))
 
 (define-assembly-routine (allocate-vector-on-number-stack
-                          (:policy :fast-safe)
                           (:arg-types positive-fixnum
                                       positive-fixnum
                                       positive-fixnum))
@@ -107,7 +104,6 @@
 
 (define-assembly-routine (%data-vector-and-index
                           (:translate %data-vector-and-index)
-                          (:policy :fast-safe)
                           (:arg-types t positive-fixnum)
                           (:result-types t positive-fixnum))
     ((:arg array descriptor-reg r0-offset)
@@ -132,7 +128,6 @@
 
 (define-assembly-routine (%data-vector-and-index/check-bound
                           (:translate %data-vector-and-index/check-bound)
-                          (:policy :fast-safe)
                           (:arg-types t positive-fixnum)
                           (:result-types t positive-fixnum)
                           (:save-p :compute-only))
@@ -177,7 +172,6 @@
 
 (define-assembly-routine (%data-vector-pop
                           (:translate %data-vector-pop)
-                          (:policy :fast-safe)
                           (:arg-types t)
                           (:result-types t positive-fixnum)
                           (:save-p :compute-only)
@@ -213,7 +207,6 @@
 
 (define-assembly-routine (%data-vector-push
                           (:translate %data-vector-push)
-                          (:policy :fast-safe)
                           (:arg-types t)
                           (:result-types t t)
                           (:save-p :compute-only)

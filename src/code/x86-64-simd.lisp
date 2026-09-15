@@ -17,7 +17,6 @@
     (:arg-types * tagged-num)
     (:results (res :scs (int-sse-reg)))
     (:result-types simd-pack-ub32)
-    (:policy :fast-safe)
     (:generator 3
       (inst movdqa res
         (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
@@ -31,7 +30,6 @@
            (vector :scs (descriptor-reg))
            (index :scs (any-reg)))
     (:arg-types simd-pack-ub32 * tagged-num)
-    (:policy :fast-safe)
     (:generator 3
       (inst movdqa (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
                      vector

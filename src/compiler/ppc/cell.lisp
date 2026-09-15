@@ -61,7 +61,6 @@
          (new :scs (descriptor-reg any-reg)))
   (:temporary (:sc non-descriptor-reg) temp)
   (:results (result :scs (descriptor-reg any-reg) :from :load))
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 15
     (inst sync)
@@ -100,7 +99,6 @@
 (define-vop (checked-cell-ref)
   (:args (object :scs (descriptor-reg) :target obj-temp))
   (:results (value :scs (descriptor-reg any-reg)))
-  (:policy :fast-safe)
   (:vop-var vop)
   (:save-p :compute-only)
   (:temporary (:scs (descriptor-reg) :from (:argument 0)) obj-temp))
@@ -121,7 +119,6 @@
   (:translate symbol-global-value))
 
 (define-vop (symbol-hash)
-  (:policy :fast-safe)
   (:translate symbol-hash)
   (:args (symbol :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
@@ -157,7 +154,6 @@
   ;; With Symbol-Value, we check that the value isn't the trap object.
   (define-vop (symbol-value)
     (:translate symbol-value)
-    (:policy :fast-safe)
     (:args (object :scs (descriptor-reg) :to (:result 1)))
     (:results (value :scs (descriptor-reg any-reg)))
     (:vop-var vop)
@@ -203,7 +199,6 @@
   (:args (object :scs (descriptor-reg)))
   (:conditional)
   (:info target not-p)
-  (:policy :fast-safe)
   (:temporary (:scs (descriptor-reg)) value)
   (:translate boundp)
   #+sb-thread
@@ -226,7 +221,6 @@
 
 (define-vop (safe-fdefn-fun)
   (:translate safe-fdefn-fun)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :target obj-temp))
   (:results (value :scs (descriptor-reg any-reg)))
   (:vop-var vop)
@@ -240,7 +234,6 @@
       (inst beq err-lab))))
 
 (define-vop (set-fdefn-fun)
-  (:policy :fast-safe)
   (:args (function :scs (descriptor-reg))
          (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) lip type)
@@ -257,7 +250,6 @@
       (storew function fdefn fdefn-fun-slot other-pointer-lowtag)))
 
 (define-vop (fdefn-makunbound)
-  (:policy :fast-safe)
   (:translate fdefn-makunbound)
   (:args (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
@@ -399,7 +391,6 @@
 ;;;; Instance hackery:
 
 (define-vop ()
-  (:policy :fast-safe)
   (:translate %instance-length)
   (:args (struct :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
@@ -409,19 +400,16 @@
     (inst srwi res res instance-length-shift)))
 
 (define-vop (instance-index-ref word-index-ref)
-  (:policy :fast-safe)
   (:translate %instance-ref)
   (:variant instance-slots-offset instance-pointer-lowtag)
   (:arg-types instance positive-fixnum))
 
 (define-vop (instance-index-set word-index-set)
-  (:policy :fast-safe)
   (:translate %instance-set)
   (:variant instance-slots-offset instance-pointer-lowtag)
   (:arg-types instance positive-fixnum *))
 
 (define-vop (%instance-cas word-index-cas)
-  (:policy :fast-safe)
   (:translate %instance-cas)
   (:variant instance-slots-offset instance-pointer-lowtag)
   (:arg-types instance tagged-num * *))
@@ -450,12 +438,10 @@
 
 (define-vop (code-header-ref word-index-ref)
   (:translate code-header-ref)
-  (:policy :fast-safe)
   (:variant 0 other-pointer-lowtag))
 
 (define-vop (code-header-set)
   (:translate code-header-set)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
          (value :scs (any-reg descriptor-reg)))
@@ -501,14 +487,12 @@
 (macrolet ((def (suffix sc primtype)
              `(progn
                 (define-vop (,(symbolicate "%RAW-INSTANCE-REF/" suffix) word-index-ref)
-                  (:policy :fast-safe)
                   (:translate ,(symbolicate "%RAW-INSTANCE-REF/" suffix))
                   (:variant instance-slots-offset instance-pointer-lowtag)
                   (:arg-types instance positive-fixnum)
                   (:results (value :scs (,sc)))
                   (:result-types ,primtype))
                 (define-vop (,(symbolicate "%RAW-INSTANCE-SET/" suffix) word-index-set)
-                  (:policy :fast-safe)
                   (:translate ,(symbolicate "%RAW-INSTANCE-SET/" suffix))
                   (:variant instance-slots-offset instance-pointer-lowtag)
                   (:arg-types instance positive-fixnum ,primtype)
@@ -518,7 +502,6 @@
 
 (define-vop (raw-instance-atomic-incf/word)
   (:translate %raw-instance-atomic-incf/word)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg)) ; FIXME: allow immediate
          (diff :scs (unsigned-reg)))
@@ -543,7 +526,6 @@
 
 (define-vop ()
   (:translate %raw-instance-ref/single)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg)))
   (:arg-types * positive-fixnum)
@@ -557,7 +539,6 @@
 
 (define-vop ()
   (:translate %raw-instance-set/single)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
          (value :scs (single-reg)))
@@ -570,7 +551,6 @@
 
 (define-vop ()
   (:translate %raw-instance-ref/double)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg)))
   (:arg-types * positive-fixnum)
@@ -584,7 +564,6 @@
 
 (define-vop ()
   (:translate %raw-instance-set/double)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
          (value :scs (double-reg)))
@@ -597,7 +576,6 @@
 
 (define-vop ()
   (:translate %raw-instance-ref/complex-single)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg)))
   (:arg-types * positive-fixnum)
@@ -613,7 +591,6 @@
 
 (define-vop ()
   (:translate %raw-instance-set/complex-single)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
          (value :scs (complex-single-reg)))
@@ -628,7 +605,6 @@
 
 (define-vop ()
   (:translate %raw-instance-ref/complex-double)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg)))
   (:arg-types * positive-fixnum)
@@ -644,7 +620,6 @@
 
 (define-vop ()
   (:translate %raw-instance-set/complex-double)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
          (value :scs (complex-double-reg)))

@@ -77,7 +77,6 @@
   (:args (frame-pointer :scs (descriptor-reg))
          (variable-home-tn :load-if nil))
   (:results (value :scs (descriptor-reg any-reg)))
-  (:policy :fast-safe)
   (:generator 4
     (aver (sc-is variable-home-tn control-stack))
     (load-stack-offset value frame-pointer variable-home-tn)))
@@ -86,7 +85,6 @@
   (:args (frame-pointer :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
   (:results (variable-home-tn :load-if nil))
-  (:policy :fast-safe)
   (:generator 4
     (aver (sc-is variable-home-tn control-stack))
     (store-stack-offset value frame-pointer variable-home-tn)))
@@ -420,7 +418,6 @@
 ;;; typed, so the lowtag is 0.
 (define-vop (more-arg)
   (:translate %more-arg)
-  (:policy :fast-safe)
   (:args (context :scs (descriptor-reg))
          (index :scs (any-reg)))
   (:arg-types * tagged-num)
@@ -432,7 +429,6 @@
     (loadw value temp)))
 
 (define-vop (more-arg-or-nil)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
          (count :scs (any-reg) :to (:result 1)))
   (:arg-types * tagged-num)
@@ -467,7 +463,6 @@
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
   (:results (result :scs (descriptor-reg)))
   (:translate %listify-rest-args)
-  (:policy :safe)
   (:node-var node)
   (:generator 20
     (move context context-arg)
@@ -526,7 +521,6 @@
 ;;; below the current stack top.
 (define-vop ()
   (:translate sb-c::%more-arg-context)
-  (:policy :fast-safe)
   (:args (supplied :scs (any-reg)))
   (:arg-types tagged-num (:constant fixnum))
   (:info fixed)
@@ -539,7 +533,6 @@
     (inst sub context csp-tn count)))
 
 (define-vop (verify-arg-count)
-  (:policy :fast-safe)
   (:args (nargs :scs (any-reg)))
   (:arg-types positive-fixnum (:constant t) (:constant t))
   (:temporary (:sc unsigned-reg :offset nl2-offset) temp)
@@ -1120,7 +1113,6 @@
 
 (define-vop (step-instrument-before-vop)
   (:temporary (:scs (descriptor-reg)) stepping)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
     (load-symbol-value stepping sb-impl::*stepping*)

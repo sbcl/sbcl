@@ -61,7 +61,6 @@
   (:results (start :scs (any-reg) :from :load)
             (count :scs (any-reg)))
   (:info nvals)
-  (:policy :fast-safe)
   (:temporary (:scs (descriptor-reg)) temp)
   (:generator 20
     (move start csp-tn)
@@ -84,7 +83,6 @@
 (define-vop (values-list)
   (:args (arg :scs (descriptor-reg) :target list))
   (:arg-types list)
-  (:policy :fast-safe)
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
   (:temporary (:scs (descriptor-reg) :from (:argument 0)) list)

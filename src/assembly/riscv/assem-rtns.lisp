@@ -161,8 +161,7 @@
   (inst jal zero-tn (make-fixup 'unwind :assembly-routine)))
 
 (define-assembly-routine (unwind
-                          (:translate %unwind)
-                          (:policy :fast-safe))
+                          (:translate %unwind))
   ((:arg block (descriptor-reg any-reg) a0-offset)
    (:arg start (descriptor-reg any-reg) ocfp-offset)
    (:arg count (descriptor-reg any-reg) nargs-offset)

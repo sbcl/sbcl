@@ -18,7 +18,6 @@
   (:args (arg :scs (any-reg descriptor-reg) :target res))
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
-  (:policy :fast-safe)
   (:generator 1
     ;; This produces 31 bits of significance which is fine- it avoids a raw constant
     ;; (bit index 31 of the result can be on, which is still a positive fixnum because the
@@ -36,7 +35,6 @@
 ;;; pointer and doing one memory access for all 3 non-list pointer types.
 (define-vop (widetag-of)
   (:translate widetag-of)
-  (:policy :fast-safe)
   (:args (object :scs (any-reg descriptor-reg)))
   (:temporary (:sc unsigned-reg :target result :to (:result 0)) temp)
   (:results (result :scs (unsigned-reg)))
@@ -63,7 +61,6 @@
 (progn
 ;; ~16 instructions vs. 35
 (define-vop ()
-    (:policy :fast-safe)
     (:translate layout-of)
     (:args (object :scs (descriptor-reg)))
     (:temporary (:sc unsigned-reg :offset rax-offset) rax)
@@ -108,7 +105,6 @@
                                   null-tn rax 8))
       DONE))
 (define-vop ()
-    (:policy :fast-safe)
     (:translate %instanceoid-layout)
     (:args (object :scs (descriptor-reg) :to :save))
     (:temporary (:sc unsigned-reg) temp)
@@ -126,14 +122,12 @@
              `(inst movzx '(:byte :dword) ,target (ea (- ,lowtag) ,source))))
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 1 (load-type result object other-pointer-lowtag)))
 (define-vop ()
   (:translate %fun-pointer-widetag)
-  (:policy :fast-safe)
   (:args (function :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -141,7 +135,6 @@
 
 (define-vop (get-header-data)
   (:translate get-header-data)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -153,7 +146,6 @@
 ;;; on objects in immobile space which reserve byte 3 of the header for GC.
 (define-vop ()
   (:translate set-header-data)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg) :to :eval)
          (data :scs (any-reg) :target temp))
   (:arg-types * positive-fixnum)
@@ -180,7 +172,6 @@
 
 (define-vop (logior-header-bits)
   (:translate logior-header-bits)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg))
          (bits :scs (unsigned-reg immediate)))
   (:arg-refs dummy bits-ref)
@@ -200,7 +191,6 @@
            (bug "Unhandled")))))
 (define-vop ()
   (:translate assign-vector-flags)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:info bits)
   (:arg-types t (:constant (unsigned-byte 8)))
@@ -209,7 +199,6 @@
       bits)))
 (define-vop ()
   (:translate reset-header-bits)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:arg-types t (:constant (unsigned-byte 24)))
   (:info bits)
@@ -218,7 +207,6 @@
       (inst and :lock :byte (ea (- (1+ shift) other-pointer-lowtag) x) (logandc1 imm8 #xff)))))
 (define-vop (test-header-data-bit)
   (:translate test-header-data-bit)
-  (:policy :fast-safe)
   (:args (array :scs (descriptor-reg)))
   (:info mask)
   (:arg-types t (:constant t))
@@ -233,7 +221,6 @@
   (:results (int :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate binding-stack-pointer-sap)
-  (:policy :fast-safe)
   (:generator 1
     (load-binding-stack-pointer int)))
 
@@ -241,7 +228,6 @@
   (:results (int :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate control-stack-pointer-sap)
-  (:policy :fast-safe)
   (:generator 1
     (move int rsp-tn)))
 
@@ -249,7 +235,6 @@
 
 (define-vop (code-instructions)
   (:translate code-instructions)
-  (:policy :fast-safe)
   (:args (code :scs (descriptor-reg) :to (:result 0)))
   (:results (sap :scs (sap-reg) :from (:argument 0)))
   (:result-types system-area-pointer)
@@ -260,7 +245,6 @@
 
 (define-vop (code-trailer-ref)
   (:translate code-trailer-ref)
-  (:policy :fast-safe)
   (:args (code :scs (descriptor-reg) :to (:result 0))
          (offset :scs (signed-reg immediate) :to (:result 0)))
   (:arg-types * fixnum)
@@ -294,7 +278,6 @@
 ;;; which doesn't pin a *different* object produced from thin air.
 ;;; (It's output operand is embedded in the object pointed to by its input)
 (define-vop (%closure-fun)
-  (:policy :fast-safe)
   (:translate %closure-fun)
   (:args (function :scs (descriptor-reg)))
   (:results (result :scs (descriptor-reg)))
@@ -307,7 +290,6 @@
 
 (defknown sb-unix::receive-pending-interrupt () (values))
 (define-vop (sb-unix::receive-pending-interrupt)
-  (:policy :fast-safe)
   (:translate sb-unix::receive-pending-interrupt)
   (:generator 1
     (inst break pending-interrupt-trap)))
@@ -318,7 +300,6 @@
   (:translate current-thread-offset-sap)
   (:args (index :scs (any-reg immediate) :target sap))
   (:arg-types tagged-num)
-  (:policy :fast-safe)
   (:generator 2
     (let (#+gs-seg (thread-tn nil))
       (inst mov sap
@@ -366,7 +347,6 @@
 (defknown %read-cycle-counter () (values (unsigned-byte 32) (unsigned-byte 32)) ())
 
 (define-vop (%read-cycle-counter)
-  (:policy :fast-safe)
   (:translate %read-cycle-counter)
   (:temporary (:sc unsigned-reg :offset rax-offset :target lo) eax)
   (:temporary (:sc unsigned-reg :offset rdx-offset :target hi) edx)
@@ -412,34 +392,29 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
 ;;; the barrier is irrelevant, but (a) that won't happen, and (b) we never
 ;;; had an instcombine pass so who cares if occasionally it fails to apply?
 (define-vop (%compiler-barrier)
-  (:policy :fast-safe)
   (:translate %compiler-barrier)
   (:generator 3
     ;; inhibit instcombine across any barrier
     (inst .skip 0)))
 
 (define-vop (%memory-barrier)
-  (:policy :fast-safe)
   (:translate %memory-barrier)
   (:generator 3
     (inst mfence)))
 
 (define-vop (%read-barrier)
-  (:policy :fast-safe)
   (:translate %read-barrier)
   (:generator 3
     ;; inhibit instcombine across any barrier
     (inst .skip 0)))
 
 (define-vop (%write-barrier)
-  (:policy :fast-safe)
   (:translate %write-barrier)
   (:generator 3
     ;; inhibit instcombine across any barrier
     (inst .skip 0)))
 
 (define-vop (%data-dependency-barrier)
-  (:policy :fast-safe)
   (:translate %data-dependency-barrier)
   (:generator 3
     ;; inhibit instcombine across any barrier
@@ -447,7 +422,6 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
 
 (define-vop ()
   (:translate spin-loop-hint)
-  (:policy :fast-safe)
   (:generator 0
     (inst pause)))
 
@@ -458,7 +432,6 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
 ;; This instruction does in fact not utilize all bits of the full width (Rxx)
 ;; regs so it would be wonderful to share this verbatim with x86 32-bit.
 (define-vop (%cpu-identification)
-  (:policy :fast-safe)
   (:translate %cpu-identification)
   (:args (function :scs (unsigned-reg) :target eax)
          (subfunction :scs (unsigned-reg) :target ecx))
@@ -494,7 +467,6 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
 
 (define-vop ()
   (:translate sb-lockless:get-next)
-  (:policy :fast-safe)
   (:args (node :scs (descriptor-reg)))
   (:results (next-tagged :scs (descriptor-reg))
             (next-bits :scs (descriptor-reg)))
@@ -542,7 +514,6 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
 #+ultrafutex
 (define-vop (quick-try-mutex)
   (:translate quick-try-mutex)
-  (:policy :fast-safe)
   (:args (m :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg :offset 0) old) ; RAX
   (:temporary (:sc unsigned-reg) new)

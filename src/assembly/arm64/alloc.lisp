@@ -3,8 +3,7 @@
 #+sb-thread
 (define-assembly-routine (alloc-tls-index
                           (:translate ensure-symbol-tls-index)
-                          (:result-types positive-fixnum)
-                          (:policy :fast-safe))
+                          (:result-types positive-fixnum))
     ((:arg symbol (descriptor-reg) r10-offset)
      (:temp free-tls-index (non-descriptor-reg) nl1-offset)
 

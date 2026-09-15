@@ -284,14 +284,12 @@
 #-sb-assembling
 (define-vop ()
   (:translate %continue-unwind)
-  (:policy :fast-safe)
   (:generator 0
     (inst ret)))
 
 (define-assembly-routine (unwind
                           (:return-style :none)
                           (:translate %unwind)
-                          (:policy :fast-safe)
                           (:save-p :compute-only))
                          ((:arg block (any-reg descriptor-reg) rax-offset)
                           (:arg start (any-reg descriptor-reg) rbx-offset)
@@ -363,7 +361,6 @@
 ;;; because they'll automatically get a vop and an assembly routine this way,
 ;;; where tramps only get the assembly routine.
 (define-assembly-routine (update-object-layout
-                          (:policy :fast-safe)
                           (:translate update-object-layout)
                           (:return-style :raw))
     ((:arg x (descriptor-reg) (:lisp-reg 0))
@@ -373,7 +370,6 @@
     (call-lisp-fun 'update-object-layout 1 nil)))
 
 (define-assembly-routine (sb-impl:install-hash-table-lock
-                          (:policy :fast-safe)
                           (:translate sb-impl:install-hash-table-lock)
                           (:return-style :raw))
     ((:arg x (descriptor-reg) (:lisp-reg 0))

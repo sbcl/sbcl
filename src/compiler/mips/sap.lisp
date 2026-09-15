@@ -89,7 +89,6 @@
   (:results (int :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:translate sap-int)
-  (:policy :fast-safe)
   (:generator 1
     (move int sap)))
 
@@ -99,7 +98,6 @@
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate int-sap)
-  (:policy :fast-safe)
   (:generator 1
     (move sap int)))
 
@@ -111,7 +109,6 @@
   (:arg-types system-area-pointer signed-num)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
-  (:policy :fast-safe)
   (:generator 2 (inst addu res ptr offset)))
 (define-vop (pointer+/c)
   (:translate sap+)
@@ -120,7 +117,6 @@
   (:arg-types system-area-pointer (:constant (signed-byte 16)))
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
-  (:policy :fast-safe)
   ;; This generator is only superficially identical to the above because
   ;; assembly code need not distinguish between 'addiu' and 'addu' even though
   ;; technically those are different opcodes. The native assembler also
@@ -137,7 +133,6 @@
   (:args (ptr1 :scs (sap-reg))
          (ptr2 :scs (sap-reg)))
   (:arg-types system-area-pointer system-area-pointer)
-  (:policy :fast-safe)
   (:results (res :scs (signed-reg)))
   (:result-types signed-num)
   (:generator 1
@@ -149,7 +144,6 @@
     `(progn
        (define-vop (,ref-name)
          (:translate ,ref-name)
-         (:policy :fast-safe)
          (:args (object :scs (sap-reg) :target sap)
                 (offset :scs (signed-reg)))
          (:arg-types system-area-pointer signed-num)
@@ -181,7 +175,6 @@
                        (inst lwc1-odd result sap n-word-bytes))))))))
        (define-vop (,(symbolicate ref-name "-C"))
          (:translate ,ref-name)
-         (:policy :fast-safe)
          (:args (object :scs (sap-reg)))
          (:arg-types system-area-pointer
                      (:constant ,(if (eq size :double)
@@ -216,7 +209,6 @@
                      (inst lwc1-odd result object (+ offset n-word-bytes)))))))))
        (define-vop (,set-name)
          (:translate ,set-name)
-         (:policy :fast-safe)
          (:args (value :scs (,sc) :to :eval) ; VALUE has to conflict with SAP
                 (object :scs (sap-reg) :target sap)
                 (offset :scs (signed-reg)))
@@ -243,7 +235,6 @@
                      (inst swc1-odd value sap n-word-bytes))))))))
        (define-vop (,(symbolicate set-name "-C"))
          (:translate ,set-name)
-         (:policy :fast-safe)
          (:args (value :scs (,sc))
                 (object :scs (sap-reg)))
          (:arg-types ,type system-area-pointer
@@ -295,7 +286,6 @@
 ;;; Noise to convert normal lisp data objects into SAPs.
 (define-vop (vector-sap)
   (:translate vector-sap)
-  (:policy :fast-safe)
   (:args (vector :scs (descriptor-reg)))
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)

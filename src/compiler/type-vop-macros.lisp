@@ -222,8 +222,7 @@
   (:temporary (:sc unsigned-reg #+x86 :offset #+x86 eax-offset) temp)
   (:conditional)
   (:info target not-p)
-  (:arg-refs args)
-  (:policy :fast-safe))
+  (:arg-refs args))
 ;; A vop that accepts a computed set of widetags.
 (define-vop (%other-pointer-subtype-p type-predicate)
   (:translate %other-pointer-subtype-p)
@@ -241,8 +240,7 @@
   (:temporary (:sc non-descriptor-reg) temp)
   (:conditional)
   (:info target not-p)
-  (:arg-refs args)
-  (:policy :fast-safe))
+  (:arg-refs args))
 ;; A vop that accepts a computed set of widetags.
 (define-vop (%other-pointer-subtype-p type-predicate)
   (:translate %other-pointer-subtype-p)

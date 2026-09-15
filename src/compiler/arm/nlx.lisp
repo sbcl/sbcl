@@ -127,7 +127,6 @@
   (:args (current-block))
   (:ignore current-block)
   (:temporary (:scs (any-reg)) block)
-  (:policy :fast-safe)
   (:generator 17
     (load-symbol-value block *current-catch-block*)
     (loadw block block catch-block-previous-catch-slot)
@@ -137,7 +136,6 @@
   (:args (current-block))
   (:ignore current-block)
   (:temporary (:scs (any-reg)) block)
-  (:policy :fast-safe)
   (:generator 17
     (load-symbol-value block *current-unwind-protect-block*)
     (loadw block block unwind-block-uwp-slot)

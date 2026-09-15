@@ -18,13 +18,11 @@
   (:args (arg :scs (any-reg descriptor-reg)))
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
-  (:policy :fast-safe)
   (:generator 1
     (inst rlwinm res arg 0 1 29)))
 
 (define-vop (widetag-of)
   (:translate widetag-of)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:eval 1)))
   (:results (result :scs (unsigned-reg) :from (:eval 0)))
   (:result-types positive-fixnum)
@@ -61,7 +59,6 @@
   (:translate sb-c::%structure-is-a)
   (:args (x :scs (descriptor-reg)))
   (:arg-types * (:constant t))
-  (:policy :fast-safe)
   (:conditional)
   ;; "extra" info in conditional vops follows the 2 super-magical info args
   (:info target not-p test-layout)
@@ -80,7 +77,6 @@
 
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -89,7 +85,6 @@
 
 (define-vop ()
   (:translate %fun-pointer-widetag)
-  (:policy :fast-safe)
   (:args (function :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -98,7 +93,6 @@
 
 (define-vop (get-header-data)
   (:translate get-header-data)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -108,7 +102,6 @@
 
 (define-vop (set-header-data)
   (:translate set-header-data)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg))
          (data :scs (any-reg immediate zero)))
   (:arg-types * positive-fixnum)
@@ -137,7 +130,6 @@
   (:results (int :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate binding-stack-pointer-sap)
-  (:policy :fast-safe)
   (:generator 1
     (move int bsp-tn)))
 
@@ -145,7 +137,6 @@
   (:results (int :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate control-stack-pointer-sap)
-  (:policy :fast-safe)
   (:generator 1
     (move int csp-tn)))
 
@@ -154,7 +145,6 @@
 
 (define-vop (code-instructions)
   (:translate code-instructions)
-  (:policy :fast-safe)
   (:args (code :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:results (sap :scs (sap-reg)))
@@ -166,7 +156,6 @@
 
 (define-vop (code-trailer-ref)
   (:translate code-trailer-ref)
-  (:policy :fast-safe)
   (:args (code :scs (descriptor-reg) :to (:result 0))
          (offset :scs (signed-reg) :to (:result 0)))
   (:arg-types * fixnum)
@@ -200,7 +189,6 @@
 
 (defknown sb-unix::receive-pending-interrupt () (values))
 (define-vop (sb-unix::receive-pending-interrupt)
-  (:policy :fast-safe)
   (:translate sb-unix::receive-pending-interrupt)
   (:generator 1
     (inst unimp pending-interrupt-trap)))
@@ -212,7 +200,6 @@
   (:translate current-thread-offset-sap)
   (:args (n :scs (signed-reg) :target sap))
   (:arg-types signed-num)
-  (:policy :fast-safe)
   (:generator 2
     (inst slwi n n word-shift)
     (inst lwzx sap thread-base-tn n)))
@@ -238,37 +225,31 @@
 ;;;; Memory barrier support
 
 (define-vop (%compiler-barrier)
-  (:policy :fast-safe)
   (:translate %compiler-barrier)
   (:generator 3))
 
 (define-vop (%memory-barrier)
-  (:policy :fast-safe)
   (:translate %memory-barrier)
   (:generator 3
      (inst sync)))
 
 (define-vop (%read-barrier)
-  (:policy :fast-safe)
   (:translate %read-barrier)
   (:generator 3
      (inst sync)))
 
 (define-vop (%write-barrier)
-  (:policy :fast-safe)
   (:translate %write-barrier)
   (:generator 3
     (inst sync)))
 
 (define-vop (%data-dependency-barrier)
-  (:policy :fast-safe)
   (:translate %data-dependency-barrier)
   (:generator 3))
 
 ;;;; Dummy definition for a spin-loop hint VOP
 (define-vop ()
   (:translate spin-loop-hint)
-  (:policy :fast-safe)
   (:generator 0))
 
 (define-vop (sb-c::mark-covered)
@@ -281,7 +262,6 @@
 
 (define-vop ()
   (:translate sb-lockless:get-next)
-  (:policy :fast-safe)
   (:args (node :scs (descriptor-reg)))
   (:results (next-tagged :scs (descriptor-reg))
             (next-bits :scs (descriptor-reg)))

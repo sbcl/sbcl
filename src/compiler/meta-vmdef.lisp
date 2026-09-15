@@ -328,10 +328,9 @@
   ;; an efficiency note associated with this VOP
   (note nil :type (or string null))
   ;; a list of the names of functions this VOP is a translation of and
-  ;; the policy that allows this translation to be done. :FAST is a
-  ;; safe default, since it isn't a safe policy.
+  ;; the policy that allows this translation to be done.
   (translate () :type list)
-  (ltn-policy :fast :type ltn-policy)
+  (ltn-policy :fast-safe :type ltn-policy)
   ;; stuff used by life analysis
   (save-p nil :type (member t nil :compute-only :force-to-stack #+sb-simd-pack-512 :avx512))
   ;; info about how to emit MOVE-ARG VOPs for the &MORE operand in

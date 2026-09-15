@@ -545,7 +545,6 @@
 
 (define-assembly-routine (unwind
                           (:translate %unwind)
-                          (:policy :fast-safe)
                           (:return-style :full-call-no-return)
                           (:save-p :compute-only))
     ((:arg block (any-reg descriptor-reg) r0-offset)
@@ -613,7 +612,6 @@
 #-sb-assembling
 (define-vop ()
   (:translate %continue-unwind)
-  (:policy :fast-safe)
   (:generator 0
     (inst ldr lr-tn (@ csp-tn -8 :pre-index))
     (inst ret)))

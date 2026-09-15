@@ -86,7 +86,6 @@
   (:results (int :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:translate sap-int)
-  (:policy :fast-safe)
   (:generator 1
     (move int sap)))
 (define-vop (int-sap)
@@ -95,7 +94,6 @@
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate int-sap)
-  (:policy :fast-safe)
   (:generator 1
     (move sap int)))
 
@@ -110,7 +108,6 @@
   (:results (res :scs (sap-reg) :from (:argument 0)
                  :load-if (not (location= ptr res))))
   (:result-types system-area-pointer)
-  (:policy :fast-safe)
   (:generator 1
     (cond ((and (sc-is ptr sap-reg) (sc-is res sap-reg)
                 (not (location= ptr res)))
@@ -133,7 +130,6 @@
   (:args (ptr1 :scs (sap-reg) :target res)
          (ptr2 :scs (sap-reg)))
   (:arg-types system-area-pointer system-area-pointer)
-  (:policy :fast-safe)
   (:results (res :scs (signed-reg) :from (:argument 0)))
   (:result-types signed-num)
   (:generator 1
@@ -176,7 +172,6 @@
                   ,@(when (implements-cas-sap-ref ref-name)
                       `((define-vop (,(symbolicate "CAS-" ref-name))
                           (:translate (cas ,ref-name))
-                          (:policy :fast-safe)
                           (:args (oldval :scs (,sc) :target eax)
                                  (newval :scs (,sc))
                                  (sap :scs (sap-reg))
@@ -190,7 +185,6 @@
                             (emit-cas-sap-ref ,size ,signed sap offset oldval newval result eax)))))
                   (define-vop (,ref-name)
                     (:translate ,ref-name)
-                    (:policy :fast-safe)
                     (:args (sap :scs (sap-reg))
                            (offset :scs (signed-reg immediate)))
                     (:arg-types system-area-pointer signed-num)
@@ -211,7 +205,6 @@
                                               :index offset)))))))
                   (define-vop (,set-name)
                     (:translate ,set-name)
-                    (:policy :fast-safe)
                     (:args (value :scs (,sc))
                            (sap :scs (sap-reg))
                            (offset :scs (signed-reg immediate)))
@@ -249,7 +242,6 @@
 
 (define-vop ()
   (:translate sap-ref-double)
-  (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
          (offset :scs (signed-reg immediate)))
   (:arg-types system-area-pointer signed-num)
@@ -266,7 +258,6 @@
 
 (define-vop ()
   (:translate %set-sap-ref-double)
-  (:policy :fast-safe)
   (:args (value :scs (double-reg))
          (sap :scs (sap-reg))
          (offset :scs (signed-reg)))
@@ -279,7 +270,6 @@
 
 (define-vop ()
   (:translate sap-ref-single)
-  (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
          (offset :scs (signed-reg immediate)))
   (:arg-types system-area-pointer signed-num)
@@ -296,7 +286,6 @@
 
 (define-vop ()
   (:translate %set-sap-ref-single)
-  (:policy :fast-safe)
   (:args (value :scs (single-reg))
          (sap :scs (sap-reg))
          (offset :scs (signed-reg)))
@@ -307,7 +296,6 @@
 
 (define-vop ()
   (:translate sap-ref-long)
-  (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
          (offset :scs (signed-reg)))
   (:arg-types system-area-pointer signed-num)
@@ -321,7 +309,6 @@
 
 (define-vop (vector-sap)
   (:translate vector-sap)
-  (:policy :fast-safe)
   (:args (vector :scs (descriptor-reg) :target sap))
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)

@@ -85,7 +85,6 @@
 (define-vop (values-list)
   (:args (arg :scs (descriptor-reg) :target list))
   (:arg-refs arg-ref)
-  (:policy :fast-safe)
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
   (:temporary (:sc descriptor-reg :from (:argument 0) :to (:result 1)) list)

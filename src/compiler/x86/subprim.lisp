@@ -22,7 +22,6 @@
   (:temporary (:sc descriptor-reg :from (:argument 0)) ptr)
   (:results (count :scs (any-reg)))
   (:result-types positive-fixnum)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 40

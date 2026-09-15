@@ -94,7 +94,6 @@
   (:args (current-block))
   ;; picking RAX avoids touching result registers if this is a pass-through cleanup
   (:temporary (:sc unsigned-reg :offset rax-offset) block)
-  (:policy :fast-safe)
   (:generator 17
     (inst mov block (catch-block-ea current-block catch-block-previous-catch-slot))
     (store-tl-symbol-value block *current-catch-block*)))
@@ -102,7 +101,6 @@
 (define-vop (%unwind-protect-breakup)
   (:args (current-block))
   (:temporary (:sc unsigned-reg :offset rax-offset) block)
-  (:policy :fast-safe)
   (:generator 17
      (inst mov block (unwind-block-ea current-block unwind-block-uwp-slot))
      (store-tl-symbol-value block *current-unwind-protect-block*)))

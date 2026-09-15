@@ -63,7 +63,6 @@
 
 (define-allocator (make-array-header)
   (:translate make-array-header)
-  (:policy :fast-safe)
   (:args (type :scs (any-reg))
          (rank :scs (any-reg)))
   (:arg-types positive-fixnum positive-fixnum)
@@ -101,7 +100,6 @@
                     (- (/ array-rank-position n-byte-bits) other-pointer-lowtag)))
 (define-vop ()
   (:translate array-rank)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -111,7 +109,6 @@
 
 (define-vop ()
   (:translate array-rank=)
-  (:policy :fast-safe)
   (:args (array :scs (descriptor-reg)))
   (:info rank)
   (:arg-types * (:constant t))
@@ -198,7 +195,6 @@
 
 (define-vop (check-bound)
   (:translate %check-bound)
-  (:policy :fast-safe)
   (:args (array :scs (descriptor-reg constant))
          (bound :scs (any-reg descriptor-reg)
                 :load-if (not (and (sc-is bound immediate)
@@ -300,12 +296,10 @@
   ;;  "The first argument is a (SIMPLE-ARRAY * (1)), not a SIMPLE-STRING."
   ;; for pretty much any general type-unknown AREF.
   ;; (:note "inline array access")
-  (:translate data-vector-ref-with-offset)
-  (:policy :fast-safe))
+  (:translate data-vector-ref-with-offset))
 (define-vop (dvset)
   ;; (:note "inline array store")
-  (:translate data-vector-set-with-offset)
-  (:policy :fast-safe))
+  (:translate data-vector-set-with-offset))
 
 ;;; variants which affect an entire lispword-sized value.
 ;;; Toplevel macro for ease of viewing the expansion.
@@ -425,7 +419,6 @@
           (encode-value-if-immediate comparand))))
 
 (define-vop (data-vector-ref-with-offset/constant-simple-vector)
-  (:policy :fast-safe)
   (:args (object :scs (constant))
          (index :scs (any-reg)))
   (:temporary (:sc unsigned-reg) array)
@@ -466,7 +459,6 @@
 
 (define-vop (data-vector-set-with-offset/simple-bit-vector)
   (:translate data-vector-set-with-offset)
-  (:policy :fast-safe)
   ;; Arg order is (VECTOR INDEX ADDEND VALUE)
   (:arg-types simple-bit-vector tagged-num (:constant (eql 0)) positive-fixnum)
   (:args (bv :scs (descriptor-reg))
@@ -548,7 +540,6 @@
     (inst and :dword result (fixnumize 1))))
 
 (define-vop (data-vector-ref-with-offset/simple-bit-vector-c-eq)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:arg-types simple-bit-vector
               (:constant (integer 0 #x3ffffffff)) (:constant (integer 0 0)))
@@ -563,7 +554,6 @@
             (ash 1 bit)))))
 
 (define-vop (data-vector-ref-with-offset/simple-bit-vector-eq)
-  (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (signed-reg unsigned-reg)))
   (:info addend)
@@ -1057,7 +1047,6 @@
 
 (define-vop (array-atomic-incf/word)
   (:translate %array-atomic-incf/word)
-  (:policy :fast-safe)
   (:args (array :scs (descriptor-reg))
          (index :scs (any-reg))
          (diff :scs (unsigned-reg) :target result))

@@ -431,7 +431,6 @@
   (:args (x) (y))
   (:results (r))
   (:variant-vars format operation)
-  (:policy :fast-safe)
   (:note "inline float arithmetic")
   (:vop-var vop)
   (:save-p :compute-only)
@@ -469,7 +468,6 @@
                 (:args (x :scs (,sc)))
                 (:results (y :scs (,sc)))
                 (:translate ,translate)
-                (:policy :fast-safe)
                 (:arg-types ,type)
                 (:result-types ,type)
                 (:note "inline float arithmetic")
@@ -491,7 +489,6 @@
   (:conditional)
   (:info target not-p)
   (:variant-vars format operation complement)
-  (:policy :fast-safe)
   (:note "inline float comparison")
   (:vop-var vop)
   (:save-p :compute-only)
@@ -538,7 +535,6 @@
                   (:results (y :scs (,to-sc)))
                   (:arg-types ,from-type)
                   (:result-types ,to-type)
-                  (:policy :fast-safe)
                   (:note "inline float coercion")
                   (:translate ,translate)
                   (:vop-var vop)
@@ -572,7 +568,6 @@
                 (:arg-types ,from-type)
                 (:result-types signed-num)
                 (:translate %unary-round)
-                (:policy :fast-safe)
                 (:note "inline float round")
                 (:vop-var vop)
                 (:save-p :compute-only)
@@ -598,7 +593,6 @@
                 (:arg-types ,from-type)
                 (:result-types signed-num)
                 (:translate ,name)
-                (:policy :fast-safe)
                 (:note "inline float truncate")
                 (:vop-var vop)
                 (:save-p :compute-only)
@@ -629,7 +623,6 @@
   (:arg-types signed-num)
   (:result-types single-float)
   (:translate make-single-float)
-  (:policy :fast-safe)
   (:generator 2
     (inst mtc1 res bits)))
 
@@ -640,7 +633,6 @@
   (:arg-types signed-num unsigned-num)
   (:result-types double-float)
   (:translate make-double-float)
-  (:policy :fast-safe)
   (:generator 2
     (inst mtc1 res lo-bits)
     (inst mtc1-odd res hi-bits)))
@@ -651,7 +643,6 @@
   (:arg-types single-float)
   (:result-types signed-num)
   (:translate single-float-bits)
-  (:policy :fast-safe)
   (:generator 2
     (inst mfc1 bits float)))
 
@@ -661,7 +652,6 @@
   (:arg-types double-float)
   (:result-types signed-num)
   (:translate double-float-high-bits)
-  (:policy :fast-safe)
   (:generator 2
     (inst mfc1-odd hi-bits float)))
 
@@ -671,7 +661,6 @@
   (:arg-types double-float)
   (:result-types unsigned-num)
   (:translate double-float-low-bits)
-  (:policy :fast-safe)
   (:generator 2
     (inst mfc1 lo-bits float)
     (inst nop)))
@@ -688,7 +677,6 @@
                :load-if (not (sc-is r complex-single-stack))))
   (:result-types complex-single-float)
   (:note "inline complex single-float creation")
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 5
     (sc-case r
@@ -714,7 +702,6 @@
                :load-if (not (sc-is r complex-double-stack))))
   (:result-types complex-double-float)
   (:note "inline complex double-float creation")
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 5
     (sc-case r
@@ -739,7 +726,6 @@
   (:results (r :scs (single-reg)))
   (:result-types single-float)
   (:variant-vars slot)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
     (sc-case x
@@ -771,7 +757,6 @@
   (:results (r :scs (double-reg)))
   (:result-types double-float)
   (:variant-vars slot)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
     (sc-case x

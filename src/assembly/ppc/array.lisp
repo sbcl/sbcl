@@ -13,7 +13,6 @@
 (in-package "SB-VM")
 
 (define-assembly-routine (allocate-vector-on-heap
-                          (:policy :fast-safe)
                           (:arg-types positive-fixnum
                                       positive-fixnum
                                       positive-fixnum))
@@ -39,7 +38,6 @@
   (move result vector))
 
 (define-assembly-routine (allocate-vector-on-stack
-                          (:policy :fast-safe)
                           (:arg-types positive-fixnum
                                       positive-fixnum
                                       positive-fixnum))

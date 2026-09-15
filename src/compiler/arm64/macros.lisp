@@ -369,7 +369,6 @@
   `(define-vop (,name)
      ,@(when translate
          `((:translate ,translate)))
-     (:policy :fast-safe)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg unsigned-reg signed-reg immediate)))
      (:arg-types ,type tagged-num)
@@ -394,7 +393,6 @@
     ((data-vector-set/simple-vector %weakvec-set)
      `(define-vop (,name)
         (:translate ,translate)
-        (:policy :fast-safe)
         (:args (object :scs (descriptor-reg))
                (index :scs (any-reg unsigned-reg signed-reg immediate))
                (value :scs (,@scs zero)))
@@ -429,7 +427,6 @@
     (t
      `(define-vop (,name)
         (:translate ,translate)
-        (:policy :fast-safe)
         (:args (object :scs (descriptor-reg))
                (index :scs (any-reg unsigned-reg signed-reg immediate))
                (value :scs (,@scs ,(case el-type
@@ -466,7 +463,6 @@
   `(define-vop (,name)
      ,@(when translate
          `((:translate ,translate)))
-     (:policy :fast-safe)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg unsigned-reg signed-reg immediate)))
      (:arg-types ,type tagged-num)
@@ -515,7 +511,6 @@
       `(define-vop (,name)
          ,@(when translate
              `((:translate ,translate)))
-         (:policy :fast-safe)
          (:args ,@(when setf-p
                     value)
                 (object :scs (descriptor-reg))

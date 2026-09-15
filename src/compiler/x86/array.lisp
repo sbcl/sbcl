@@ -15,7 +15,6 @@
 
 (define-vop (make-array-header)
   (:translate make-array-header)
-  (:policy :fast-safe)
   (:args (type :scs (any-reg))
          (rank :scs (any-reg)))
   (:arg-types positive-fixnum positive-fixnum)
@@ -52,7 +51,6 @@
                     (- (/ array-rank-position n-byte-bits) other-pointer-lowtag)))
 (define-vop ()
   (:translate array-rank)
-  (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -65,7 +63,6 @@
 
 (define-vop ()
   (:translate array-rank=)
-  (:policy :fast-safe)
   (:args (array :scs (descriptor-reg)))
   (:info rank)
   (:arg-types * (:constant t))
@@ -81,7 +78,6 @@
 ;;;; bounds checking routine
 (define-vop (check-bound)
   (:translate %check-bound)
-  (:policy :fast-safe)
   (:args (array :scs (descriptor-reg constant))
          (bound :scs (any-reg descriptor-reg)
                 :load-if (not (and (sc-is bound immediate)
@@ -160,17 +156,14 @@
 
 ;;; Ancestors
 (define-vop (dvref)
-  (:translate data-vector-ref-with-offset)
-  (:policy :fast-safe))
+  (:translate data-vector-ref-with-offset))
 (define-vop (dvset)
-  (:translate data-vector-set-with-offset)
-  (:policy :fast-safe))
+  (:translate data-vector-set-with-offset))
 
 ;;; variants which affect an entire lispword-sized value.
 (defmacro define-full-setter+addend (name type offset lowtag scs el-type)
   `(progn
      (define-vop (,name dvset)
-       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg immediate))
               (value :scs ,scs))
@@ -680,7 +673,6 @@
 
 (define-vop (array-atomic-incf/word)
   (:translate %array-atomic-incf/word)
-  (:policy :fast-safe)
   (:args (array :scs (descriptor-reg))
          (index :scs (any-reg))
          (diff :scs (unsigned-reg) :target result))

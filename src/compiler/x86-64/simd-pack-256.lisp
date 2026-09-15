@@ -161,7 +161,6 @@
   (:arg-types simd-pack-256)
   (:results (dst :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:policy :fast-safe)
   (:generator 3
     (loadw dst x simd-pack-256-p0-slot other-pointer-lowtag)))
 
@@ -182,7 +181,6 @@
 
 (define-allocator (%make-simd-pack-256)
   (:translate %make-simd-pack-256)
-  (:policy :fast-safe)
   (:args (tag :scs (any-reg))
          (p0 :scs (unsigned-reg))
          (p1 :scs (unsigned-reg))
@@ -202,7 +200,6 @@
 
 (define-vop (%make-simd-pack-256-ub64)
   (:translate %make-simd-pack-256-ub64)
-  (:policy :fast-safe)
   (:args (p0 :scs (unsigned-reg))
          (p1 :scs (unsigned-reg))
          (p2 :scs (unsigned-reg))
@@ -239,7 +236,6 @@
 
 (define-vop (%make-simd-pack-256-double)
   (:translate %make-simd-pack-256-double)
-  (:policy :fast-safe)
   (:args (p0 :scs (double-reg) :target dst)
          (p1 :scs (double-reg))
          (p2 :scs (double-reg))
@@ -255,7 +251,6 @@
 
 (define-vop (%make-simd-pack-256-single)
   (:translate %make-simd-pack-256-single)
-  (:policy :fast-safe)
   (:args (p0 :scs (single-reg) :target dst)
          (p1 :scs (single-reg))
          (p2 :scs (single-reg))
@@ -290,7 +285,6 @@
   (:results (dst :scs (single-reg)))
   (:result-types single-float)
   (:temporary (:sc single-avx2-reg :from (:argument 0)) tmp)
-  (:policy :fast-safe)
   (:generator 3
     (cond ((>= index 4)
            (decf index 4)
@@ -314,7 +308,6 @@
   (:results (dst :scs (double-reg)))
   (:result-types double-float)
   (:temporary (:sc double-avx2-reg :from (:argument 0)) tmp)
-  (:policy :fast-safe)
   (:generator 3
     (cond ((>= index 2)
            (decf index 2)
@@ -335,7 +328,6 @@
 
 (define-vop ()
   (:translate sap-ref-256)
-  (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
          (offset :scs (signed-reg immediate)))
   (:arg-types system-area-pointer signed-num)
@@ -349,7 +341,6 @@
 
 (define-vop (set-sap-ref-256)
   (:translate (setf sap-ref-256))
-  (:policy :fast-safe)
   (:args (value :scs (int-avx2-reg))
          (sap :scs (sap-reg))
          (offset :scs (signed-reg immediate)))
@@ -369,7 +360,6 @@
   (:arg-types simd-pack-256-ub64)
   (:results (y :scs (double-avx2-reg)))
   (:result-types simd-pack-256-double)
-  (:policy :fast-safe)
   (:generator 2
     (move x y)))
 
@@ -379,6 +369,5 @@
   (:arg-types simd-pack-256-ub64)
   (:results (y :scs (single-avx2-reg)))
   (:result-types simd-pack-256-single)
-  (:policy :fast-safe)
   (:generator 2
     (move x y)))

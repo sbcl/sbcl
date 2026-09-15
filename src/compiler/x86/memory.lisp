@@ -18,14 +18,12 @@
   (:args (object :scs (descriptor-reg)))
   (:results (value :scs (descriptor-reg any-reg)))
   (:variant-vars offset lowtag)
-  (:policy :fast-safe)
   (:generator 4
     (loadw value object offset lowtag)))
 (define-vop (cell-set)
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
   (:variant-vars offset lowtag)
-  (:policy :fast-safe)
   (:generator 4
     (storew value object offset lowtag)))
 

@@ -153,7 +153,6 @@
   (:arg-types simd-pack)
   (:results (dst :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:policy :fast-safe)
   (:generator 3
     (inst movq dst x)))
 
@@ -165,7 +164,6 @@
   (:temporary (:sc sse-reg :from (:argument 0)) tmp)
   (:results (dst :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:policy :fast-safe)
   (:generator 3
     (move tmp x)
     (inst psrldq tmp 8)
@@ -176,14 +174,12 @@
   (:arg-types simd-pack)
   (:results (dst :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:policy :fast-safe)
   (:guard (member :sse4 *backend-subfeatures*))
   (:generator 1
     (inst pextrq dst x 1)))
 
 (define-allocator (%make-simd-pack)
   (:translate %make-simd-pack)
-  (:policy :fast-safe)
   (:args (tag :scs (any-reg))
          (lo :scs (unsigned-reg))
          (hi :scs (unsigned-reg)))
@@ -199,7 +195,6 @@
 
 (define-vop (%make-simd-pack-ub64)
   (:translate %make-simd-pack-ub64)
-  (:policy :fast-safe)
   (:args (lo :scs (unsigned-reg))
          (hi :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
@@ -254,7 +249,6 @@
 
 (define-vop (%make-simd-pack-double)
   (:translate %make-simd-pack-double)
-  (:policy :fast-safe)
   (:args (lo :scs (double-reg) :target dst)
          (hi :scs (double-reg) :target tmp))
   (:arg-types double-float double-float)
@@ -268,7 +262,6 @@
 
 (define-vop (%make-simd-pack-single)
   (:translate %make-simd-pack-single)
-  (:policy :fast-safe)
   (:args (x :scs (single-reg) :target dst)
          (y :scs (single-reg) :target tmp)
          (z :scs (single-reg))
@@ -296,7 +289,6 @@
   (:results (dst :scs (single-reg)))
   (:result-types single-float)
   (:temporary (:sc single-sse-reg :from (:argument 0)) tmp)
-  (:policy :fast-safe)
   (:generator 3
               (cond ((and (zerop index)
                           (not (location= x dst)))
@@ -321,7 +313,6 @@
   (:results (dst :scs (double-reg)))
   (:result-types double-float)
   (:temporary (:sc double-sse-reg :from (:argument 0)) tmp)
-  (:policy :fast-safe)
   (:generator 3
     (cond ((and (zerop index)
                 (not (location= x dst)))
@@ -342,7 +333,6 @@
 
 (define-vop ()
   (:translate sap-ref-128)
-  (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
          (offset :scs (signed-reg immediate)))
   (:arg-types system-area-pointer signed-num)
@@ -356,7 +346,6 @@
 
 (define-vop (set-sap-ref-128)
   (:translate (setf sap-ref-128))
-  (:policy :fast-safe)
   (:args (value :scs (int-sse-reg))
          (sap :scs (sap-reg))
          (offset :scs (signed-reg immediate)))
@@ -376,7 +365,6 @@
   (:arg-types simd-pack-ub64)
   (:results (y :scs (double-sse-reg)))
   (:result-types simd-pack-double)
-  (:policy :fast-safe)
   (:generator 2
     (move x y)))
 
@@ -386,6 +374,5 @@
   (:arg-types simd-pack-ub64)
   (:results (y :scs (single-sse-reg)))
   (:result-types simd-pack-single)
-  (:policy :fast-safe)
   (:generator 2
     (move x y)))

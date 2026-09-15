@@ -30,7 +30,6 @@
   (:args (object :scs (descriptor-reg)))
   (:results (value :scs (descriptor-reg any-reg)))
   (:variant-vars offset lowtag)
-  (:policy :fast-safe)
   (:generator 4
     (loadw value object offset lowtag)))
 ;;;
@@ -38,7 +37,6 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
   (:variant-vars offset lowtag)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:temporary (:sc non-descriptor-reg) t1)
   (:generator 4
@@ -56,7 +54,6 @@
   (:arg-types * tagged-num *)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:variant-vars offset lowtag)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 5
    (emit-gengc-barrier object nil (list temp) (vop-nth-arg 2 vop))
@@ -104,7 +101,6 @@
          `((:results (value :scs (any-reg descriptor-reg)))
            (:result-types *)))
      (:variant-vars offset lowtag)
-     (:policy :fast-safe)
      (:generator 5
        (sc-case index
          ((immediate)
@@ -153,7 +149,6 @@
   (:results (result :scs (any-reg descriptor-reg) :from :load))
   (:result-types *)
   (:variant-vars offset lowtag)
-  (:policy :fast-safe)
   (:vop-var vop)
   (:generator 5
     (let ((ea

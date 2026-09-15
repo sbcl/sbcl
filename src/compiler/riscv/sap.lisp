@@ -88,7 +88,6 @@
   (:results (int :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:translate sap-int)
-  (:policy :fast-safe)
   (:generator 1
     (move int sap)))
 
@@ -98,7 +97,6 @@
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate int-sap)
-  (:policy :fast-safe)
   (:generator 1
     (move sap int)))
 
@@ -110,7 +108,6 @@
   (:arg-types system-area-pointer signed-num)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
-  (:policy :fast-safe)
   (:generator 2
     (inst add res ptr offset)))
 
@@ -121,7 +118,6 @@
   (:arg-types system-area-pointer (:constant short-immediate))
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
-  (:policy :fast-safe)
   (:generator 1
     (inst addi res ptr offset)))
 
@@ -130,7 +126,6 @@
   (:args (ptr1 :scs (sap-reg))
          (ptr2 :scs (sap-reg)))
   (:arg-types system-area-pointer system-area-pointer)
-  (:policy :fast-safe)
   (:results (res :scs (signed-reg)))
   (:result-types signed-num)
   (:generator 1
@@ -190,7 +185,6 @@
                       ;; I don't feel up to the task of emulating it in software.
                       `((define-vop (,(symbolicate "CAS-" ref-name))
                           (:translate (cas ,ref-name))
-                          (:policy :fast-safe)
                           (:args (oldval :scs (,sc))
                                  (newval :scs (,sc))
                                  (sap :scs (sap-reg))
@@ -213,7 +207,6 @@
                            EXIT)))))
                   (define-vop (,ref-name)
                     (:translate ,ref-name)
-                    (:policy :fast-safe)
                     (:args (object :scs (sap-reg) :target sap)
                            (offset :scs (signed-reg)))
                     (:arg-types system-area-pointer signed-num)
@@ -225,7 +218,6 @@
                       (sap-ref result sap 0 ,signed ,size)))
                   (define-vop (,(symbolicate ref-name "-C"))
                     (:translate ,ref-name)
-                    (:policy :fast-safe)
                     (:args (sap :scs (sap-reg)))
                     (:arg-types system-area-pointer
                                 (:constant short-immediate))
@@ -236,7 +228,6 @@
                       (sap-ref result sap offset ,signed ,size)))
                   (define-vop (,set-name)
                     (:translate ,set-name)
-                    (:policy :fast-safe)
                     ;; this is untested, but it matches the MIPS vop
                     (:args (value :scs (,sc) :to :eval) ; VALUE has to conflict with SAP
                            (object :scs (sap-reg) :target sap)
@@ -248,7 +239,6 @@
                       (sap-set value sap 0 ,size)))
                   (define-vop (,(symbolicate set-name "-C"))
                     (:translate ,set-name)
-                    (:policy :fast-safe)
                     (:args (value :scs (,sc))
                            (sap :scs (sap-reg)))
                     (:arg-types ,type system-area-pointer (:constant short-immediate))
@@ -285,7 +275,6 @@
 ;;; Noise to convert normal lisp data objects into SAPs.
 (define-vop (vector-sap)
   (:translate vector-sap)
-  (:policy :fast-safe)
   (:args (vector :scs (descriptor-reg)))
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
