@@ -44,7 +44,7 @@ SBCL_TOP="../../"
 SBCL_HOME="$SBCL_TOP/obj/sbcl-home"
 export SBCL_HOME SBCL_TOP
 
-SBCL="$SBCL_TOP/src/runtime/sbcl --noinform --core $SBCL_TOP/output/sbcl.core \
+SBCL="$SBCL_RUNNER $SBCL_TOP/src/runtime/sbcl --noinform --core $SBCL_TOP/output/sbcl.core \
 --lose-on-corruption --disable-debugger --no-sysinit --no-userinit"
 export SBCL
 

@@ -52,12 +52,12 @@ elif [ "x$1" != x ]; then
 fi
 if [ "$warm_compile" = yes ]; then
     echo //doing warm init - compilation phase
-    ./src/runtime/sbcl --core output/cold-sbcl.core \
+    $SBCL_RUNNER ./src/runtime/sbcl --core output/cold-sbcl.core \
      --lose-on-corruption $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit \
      --eval '(sb-fasl::!warm-load "src/cold/warm.lisp")' --quit
 fi
 echo //doing warm init - load and dump phase
-./src/runtime/sbcl --noinform --core output/cold-sbcl.core \
+$SBCL_RUNNER ./src/runtime/sbcl --noinform --core output/cold-sbcl.core \
                    --lose-on-corruption $SBCL_MAKE_TARGET_2_OPTIONS \
                    --no-sysinit --no-userinit --noprint <<EOF
 (progn ${devel})
@@ -73,7 +73,7 @@ echo //doing warm init - load and dump phase
  (sb-ext:save-lisp-and-die "output/sbcl.core"))
 EOF
 
-./src/runtime/sbcl --noinform --core output/sbcl.core \
+$SBCL_RUNNER ./src/runtime/sbcl --noinform --core output/sbcl.core \
                    --no-sysinit --no-userinit --noprint <<EOF
   (load "validate-float.lisp")
   (check-float-file "output/xfloat-math.lisp-expr")
