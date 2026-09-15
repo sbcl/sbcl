@@ -15,47 +15,10 @@
 
 ;;;; utilities
 
-;;; Return the LTN-POLICY indicated by the node policy.
-;;;
-;;; FIXME: It would be tidier to use an LTN-POLICY object (an instance
-;;; of DEFSTRUCT LTN-POLICY) instead of a keyword, and have queries
-;;; like LTN-POLICY-SAFE-P become slot accessors. If we do this,
-;;; grep for and carefully review use of literal keywords, so that
-;;; things like
-;;;   (EQ (TEMPLATE-LTN-POLICY TEMPLATE) :SAFE)
-;;; don't get overlooked.
-;;;
-;;; FIXME: Classic CMU CL went to some trouble to cache LTN-POLICY
-;;; values in LTN-ANALYZE so that they didn't have to be recomputed on
-;;; every block. I stripped that out (the whole DEFMACRO FROB thing)
-;;; because I found it too confusing. Thus, it might be that the
-;;; new uncached code spends an unreasonable amount of time in
-;;; this lookup function. This function should be profiled, and if
-;;; it's a significant contributor to runtime, we can cache it in
-;;; some more local way, e.g. by adding a CACHED-LTN-POLICY slot to
-;;; the NODE structure, and doing something like
-;;;   (DEFUN NODE-LTN-POLICY (NODE)
-;;;     (OR (NODE-CACHED-LTN-POLICY NODE)
-;;;         (SETF (NODE-CACHED-LTN-POLICY NODE)
-;;;               (NODE-UNCACHED-LTN-POLICY NODE)))
-(defun node-ltn-policy (node)
-  (declare (type node node))
-  (policy node
-          (let ((eff-space (max space
-                                ;; on the theory that if the code is
-                                ;; smaller, it will take less time to
-                                ;; compile (could lose if the smallest
-                                ;; case is out of line, and must
-                                ;; allocate many linkage registers):
-                                compilation-speed)))
-            (if (zerop safety)
-                (if (>= speed eff-space) :fast :small)
-                (if (>= speed eff-space) :fast-safe :small-safe)))))
-
 ;;; Return true if LTN-POLICY is a safe policy.
 (defun ltn-policy-safe-p (ltn-policy)
   (ecase ltn-policy
-    ((:safe :fast-safe :small-safe) t)
+    ((:fast-safe :small-safe) t)
     ((:small :fast) nil)))
 
 ;;; For possibly-new blocks, make sure that there is an associated
@@ -721,12 +684,10 @@
                  (error "Neither LVAR nor TN supplied."))))))))
 
 ;;; Check that the argument type restriction for TEMPLATE are
-;;; satisfied in call. If an argument's TYPE-CHECK is :NO-CHECK and
-;;; our policy is safe, then only :SAFE templates are OK.
-(defun template-args-ok (template call safe-p)
+;;; satisfied in call.
+(defun template-args-ok (template call)
   (declare (type template template)
            (type combination call))
-  (declare (ignore safe-p))
   (let ((mtype (template-more-args-type template)))
     (do ((args (basic-combination-args call) (cdr args))
          (types (template-arg-types template) (cdr types)))
@@ -807,7 +768,7 @@
       (operand-restriction-ok (first types) (primitive-type result-type)))
      (t t))))
 
-;;; Return true if CALL is an ok use of TEMPLATE according to SAFE-P.
+;;; Return true if CALL is an ok use of TEMPLATE
 ;;; -- If the template has a GUARD that isn't true, then we ignore the
 ;;;    template, not even considering it to be rejected.
 ;;; -- If the argument type restrictions aren't satisfied, then we
@@ -823,18 +784,15 @@
 ;;;
 ;;; If the template is *not* ok, then the second value is a keyword
 ;;; indicating which aspect failed.
-(defun is-ok-template-use (template call safe-p)
+(defun is-ok-template-use (template call)
   (declare (type template template) (type combination call))
   (let* ((guard (template-guard template))
          (lvar (node-lvar call))
          (dtype (node-derived-type call)))
     (cond ((and guard (not (funcall guard call)))
            (values nil :guard))
-          ((not (template-args-ok template call safe-p))
-           (values nil
-                   (if (and safe-p (template-args-ok template call nil))
-                       :arg-check
-                       :arg-types)))
+          ((not (template-args-ok template call))
+           (values nil :arg-types))
           ((template-conditional-p template)
            (or (vop-existsp :named sb-vm::move-conditional-result)
                (let ((dest (lvar-dest lvar)))
@@ -855,14 +813,14 @@
 ;;; 3. The tail of Templates for templates we haven't examined yet.
 ;;;
 ;;; We just call IS-OK-TEMPLATE-USE until it returns true.
-(defun find-template (templates call safe-p)
+(defun find-template (templates call)
   (declare (list templates) (type combination call))
   (do ((templates templates (rest templates))
        (rejected nil))
       ((null templates)
        (values nil rejected nil))
     (let ((template (first templates)))
-      (when (is-ok-template-use template call safe-p)
+      (when (is-ok-template-use template call)
         (return (values template rejected (rest templates))))
       (setq rejected template))))
 
@@ -870,46 +828,25 @@
 ;;; return the appropriate template, or NIL if none can be found. We
 ;;; scan the templates (ordered by increasing cost) looking for a
 ;;; template whose restrictions are satisfied and that has our policy.
-;;;
-;;; If we find a template that doesn't have our policy, but has a
-;;; legal alternate policy, then we also record that to return as a
-;;; last resort. If our policy is safe, then only safe policies are
-;;; O.K., otherwise anything goes.
-;;;
-;;; If we find a template with :SAFE policy, then we return it, or any
-;;; cheaper fallback template. The theory behind this is that if it is
-;;; cheapest, small and safe, we can't lose. If it is not cheapest,
-;;; then we use the fallback, which won't have the desired policy, but
-;;; :SAFE isn't desired either, so we might as well go with the
-;;; cheaper one. The main reason for doing this is to make sure that
-;;; cheap safe templates are used when they apply and the current
-;;; policy is something else. This is useful because :SAFE has the
-;;; additional semantics of implicit argument type checking, so we may
-;;; be forced to define a template with :SAFE policy when it is really
-;;; small and fast as well.
-(defun find-template-for-ltn-policy (call ltn-policy)
-  (declare (type combination call)
-           (type ltn-policy ltn-policy))
-  (let ((safe-p (ltn-policy-safe-p ltn-policy))
-        (current (fun-info-templates (basic-combination-fun-info call)))
+(defun find-template-for-ltn-policy (call)
+  (declare (type combination call))
+  (let ((current (fun-info-templates (basic-combination-fun-info call)))
         (fallback nil)
         (rejected nil))
     (loop
-     (multiple-value-bind (template this-reject more)
-         (find-template current call safe-p)
+     (multiple-value-bind (template this-reject more) (find-template current call)
        (unless rejected
          (setq rejected this-reject))
        (setq current more)
        (unless template
          (return (values fallback rejected)))
-       (let ((tcpolicy (template-ltn-policy template)))
-         (cond ((eq tcpolicy ltn-policy)
-                (return (values template rejected)))
-               ((eq tcpolicy :safe)
-                (return (values (or fallback template) rejected)))
-               ((or (not safe-p) (eq tcpolicy :fast-safe))
-                (unless fallback
-                  (setq fallback template)))))))))
+       (ecase (template-ltn-policy template)
+         ;; handle :small :small-safe if they are ever used
+         ((:fast-safe :safe)
+          (return (values template rejected)))
+         (:fast
+          (when (policy call (zerop safety))
+            (return (values template rejected)))))))))
 
 (defvar *efficiency-note-limit* 2
   "This is the maximum number of possible optimization alternatives will be
@@ -925,18 +862,16 @@
 ;;; figure out any reason why TEMPLATE was rejected. Users should
 ;;; never see these messages, but they can happen in situations where
 ;;; the VM definition is messed up somehow.
-(defun strange-template-failure (template call ltn-policy frob)
+(defun strange-template-failure (template call frob)
   (declare (type template template) (type combination call)
-           (type ltn-policy ltn-policy) (type function frob))
+           (type function frob))
   (funcall frob "This shouldn't happen!  Bug?")
   (multiple-value-bind (win why)
-      (is-ok-template-use template call (ltn-policy-safe-p ltn-policy))
+      (is-ok-template-use template call)
     (aver (not win))
     (ecase why
       (:guard
        (funcall frob "template guard failed"))
-      (:arg-check
-       (funcall frob "The template isn't safe, yet we were counting on it."))
       (:arg-types
        (funcall frob "argument types invalid")
        (funcall frob "argument primitive types:~%  ~S"
@@ -982,13 +917,12 @@
 ;;; We go to some trouble to make the whole multi-line output into a
 ;;; single call to COMPILER-NOTIFY so that repeat messages are
 ;;; suppressed, etc.
-(defun note-rejected-templates (call ltn-policy template)
-  (declare (type combination call) (type ltn-policy ltn-policy)
+(defun note-rejected-templates (call template)
+  (declare (type combination call)
            (type (or template null) template))
-
-  (collect ((losers))
-    (let ((safe-p (ltn-policy-safe-p ltn-policy))
-          (verbose-p (policy call (= inhibit-warnings 0)))
+  (let ((safe-p (policy call (plusp safety))))
+    (collect ((losers))
+    (let ((verbose-p (policy call (= inhibit-warnings 0)))
           (max-cost (- (template-cost
                         (or template
                             (template-or-lose 'call-named)))
@@ -997,10 +931,9 @@
         (when (> (template-cost try) max-cost) (return))
         (let ((guard (template-guard try)))
           (when (and (or (not guard) (funcall guard call))
-                     (or (not safe-p)
-                         (ltn-policy-safe-p (template-ltn-policy try)))
-                     (not (and (eq ltn-policy :safe)
-                               (eq (template-ltn-policy try) :fast-safe)))
+                     (ecase (template-ltn-policy try)
+                       ((:fast-safe :safe) t)
+                       (:fast (not safe-p)))
                      (or verbose-p
                          (and (template-note try)
                               (valid-fun-use
@@ -1029,13 +962,13 @@
                      (template-cost loser))
               (cond
                ((and valid strict-valid)
-                (strange-template-failure loser call ltn-policy #'lose1))
+                (strange-template-failure loser call #'lose1))
                ((not valid)
                 (aver (not (valid-fun-use call type
                                           :lossage-fun #'lose1
                                           :unwinnage-fun #'lose1))))
                (t
-                (aver (ltn-policy-safe-p ltn-policy))
+                (aver safe-p)
                 (lose1 "can't trust output type assertion under safe policy")))
               (notes 1))))
 
@@ -1049,7 +982,7 @@
                                  . ,(messages))
                                `("forced to do full call"
                                  nil
-                                 . ,(messages))))))))
+                                 . ,(messages)))))))))
   (values))
 
 ;;; If a function has a special-case annotation method use that,
@@ -1058,15 +991,14 @@
 ;;; full call.
 (defun ltn-analyze-known-call (call)
   (declare (type combination call))
-  (let* ((ltn-policy (node-ltn-policy call))
-         (info (basic-combination-fun-info call))
+  (let* ((info (basic-combination-fun-info call))
          (method (fun-info-ltn-annotate info))
          (args (basic-combination-args call))
          (hook (fun-info-ir2-hook info)))
     (when hook
       (funcall hook call))
     (when method
-      (funcall method call ltn-policy)
+      (funcall method call)
       (return-from ltn-analyze-known-call (values)))
 
     (dolist (arg args)
@@ -1074,13 +1006,13 @@
             (make-ir2-lvar (primitive-type (lvar-type arg)))))
 
     (multiple-value-bind (template rejected)
-        (find-template-for-ltn-policy call ltn-policy)
+        (find-template-for-ltn-policy call)
       ;; If we are unable to use some templates due to unsatisfied
       ;; operand type restrictions and our policy enables efficiency
       ;; notes, then we call NOTE-REJECTED-TEMPLATES.
       (when (and rejected
                  (policy call (> speed inhibit-warnings)))
-        (note-rejected-templates call ltn-policy template))
+        (note-rejected-templates call template))
       ;; If we are forced to do a full call, we check to see whether
       ;; the function called is the same as the current function. If
       ;; so, we give a warning, as this is probably a botched attempt

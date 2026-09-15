@@ -337,8 +337,8 @@
            '#.(list (sb-vm:saetp-typecode (find-saetp 't))
                     (sb-vm:saetp-typecode (find-saetp 'fixnum))))))
 (defoptimizer (allocate-vector ltn-annotate)
-    ((#+ubsan poisoned type length words) call ltn-policy)
-  (vectorish-ltn-annotate-helper call ltn-policy
+    ((#+ubsan poisoned type length words) call)
+  (vectorish-ltn-annotate-helper call
                                  (if (sb-c:msan-unpoison sb-c:*compilation*)
                                      'sb-vm::allocate-vector-on-stack+msan-unpoison
                                      'sb-vm::allocate-vector-on-stack)
@@ -358,7 +358,7 @@
                                `(integer 0 ,(- (/ +backend-page-bytes+ sb-vm:n-word-bytes)
                                                sb-vm:vector-data-offset))))))))
 
-(defun vectorish-ltn-annotate-helper (call ltn-policy dx-template not-dx-template)
+(defun vectorish-ltn-annotate-helper (call dx-template not-dx-template)
   (let* ((args (basic-combination-args call))
          (template-name (if (node-stack-allocate-p call)
                             dx-template
@@ -367,7 +367,7 @@
     (dolist (arg args)
       (setf (lvar-info arg)
             (make-ir2-lvar (primitive-type (lvar-type arg)))))
-    (aver (is-ok-template-use template call (ltn-policy-safe-p ltn-policy)))
+    (aver (is-ok-template-use template call))
     (setf (basic-combination-info call) template)
     (setf (node-tail-p call) nil)
     (dolist (arg args)
@@ -398,8 +398,8 @@
 (progn
   (defoptimizer (%make-list stack-allocate-result) ((length element) node)
     t)
-  (defoptimizer (%make-list ltn-annotate) ((length element) call ltn-policy)
-    (vectorish-ltn-annotate-helper call ltn-policy
+  (defoptimizer (%make-list ltn-annotate) ((length element) call)
+    (vectorish-ltn-annotate-helper call
                                    'sb-vm::allocate-list-on-stack
                                    'sb-vm::allocate-list-on-heap)))
 
