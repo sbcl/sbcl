@@ -46,3 +46,13 @@
     (((logand most-positive-fixnum 12917690363219115))
      (ldb (byte sb-vm:n-word-bits 0) 13174327107650979066))
     ((-1) 2)))
+
+(with-test (:name :node-conservative-type-list-uses)
+  (assert-type
+   (lambda (x y)
+     (declare ((vector * 10) x)
+              ((vector * 20) y))
+     (length (the string (if *
+                             x
+                             y))))
+   (mod 21)))
