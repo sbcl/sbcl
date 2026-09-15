@@ -54,6 +54,17 @@
     (let ((addr (get-lisp-obj-address x)))
       (< sb-vm:dynamic-space-start addr (sap-int (dynamic-space-free-pointer))))))
 
+#+system-tlabs
+(progn
+(declaim (inline sb-vm::force-to-heap-p))
+(defun sb-vm::force-to-heap-p (x)
+  (and (not (zerop (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-arena-slot))))
+       (or (dynamic-space-obj-p x)
+           ;; Saving a core may relocate any unboxed vector or 0-length simple-vector from
+           ;; dynamic into readonly space, therefore those must be thought of as equivalent
+           ;; in terms of their governance of a pending allocation going to the heap.
+           (read-only-space-obj-p x)))))
+
 (define-alien-variable ("TEXT_SPACE_START" sb-vm:text-space-start) sb-kernel::os-vm-size-t)
 
 #+(or x86-64 immobile-space)

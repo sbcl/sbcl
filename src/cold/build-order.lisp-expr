@@ -235,7 +235,6 @@
  ("src/code/target-c-call"    :not-host)
 
  ("src/code/misc-aliens" :not-host)
- #+system-tlabs ("src/code/arena" :not-host)
  ("src/code/weak"             :not-host)
  ("src/code/array"            :not-host)
 
@@ -565,6 +564,7 @@
  ;; defines SB-DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
  ("src/code/debug-int" :not-host)
  ("src/code/gc"                :not-host)
+ #+system-tlabs ("src/code/arena" :not-host)
 
  ("src/code/interr" :not-host)
 
