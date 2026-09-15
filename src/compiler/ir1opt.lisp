@@ -3716,7 +3716,8 @@
                                        asserted)))))))
            (delete-cast cast)
            t)
-          ((listp (lvar-uses value))
+          ((and (listp (lvar-uses value))
+                (not (eq (cast-type-to-check cast) *wild-type*)))
            ;; Turn (the vector (if x y #())) into
            ;; (if x (the vector y) #())
            (let ((ctran (node-next cast))
