@@ -622,3 +622,16 @@
     (try `(vminmaxph ,ymm31 ,ymm16 ,ymm17 0))
     (try `(vaddps ,xmm31 ,xmm16 ,xmm17))
     (try `(vminmaxss ,xmm31 ,xmm16 ,xmm17 0))))
+
+(test-util:with-test (:name :insert-stmt-linking)
+  (let ((s1 (sb-assem::make-stmt nil nil nil 'op1 nil))
+        (s2 (sb-assem::make-stmt nil nil nil 'op2 nil))
+        (s-mid (sb-assem::make-stmt nil nil nil 'op-mid nil)))
+    (setf (sb-assem::stmt-next s1) s2
+          (sb-assem::stmt-prev s2) s1)
+    (sb-assem::insert-stmt s-mid s1)
+    (assert (eq (sb-assem::stmt-next s1) s-mid))
+    (assert (eq (sb-assem::stmt-next s-mid) s2))
+    (assert (eq (sb-assem::stmt-prev s-mid) s1))
+    (assert (eq (sb-assem::stmt-prev s2) s-mid))))
+

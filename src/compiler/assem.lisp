@@ -366,7 +366,7 @@
           (stmt-prev stmt) predecessor
           (stmt-next stmt) successor)
     (when successor
-      (stmt-prev successor) stmt))
+      (setf (stmt-prev successor) stmt)))
   stmt)
 
 (defun delete-stmt (stmt)
