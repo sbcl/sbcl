@@ -75,7 +75,7 @@
        ,(make-fun name)
        ,(make-fun name t))))
 
-#+(or x86 x86-64 arm-vfp arm64 riscv loongarch64) ;; for constant folding
+#+(or x86 x86-64 arm-vfp arm64 riscv loongarch64 ppc64) ;; for constant folding
 (macrolet ((def (name ll)
              `(defun ,name ,ll (,name ,@ll))))
   (def %sqrt (x))

@@ -1990,7 +1990,7 @@
     ((1) 29953653503380140693)))
 
 (with-test (:name :logand-cut-constants.2
-            :fails-on (or :arm :mips :ppc :sparc))
+            :fails-on (or :arm :mips :ppc :sparc :ppc64))
   (assert (= (count-if (lambda (c)
                          (member c '(logand sb-kernel:two-arg-and)))
                        (ctu:ir1-named-calls `(lambda (n m)

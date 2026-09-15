@@ -481,3 +481,11 @@
   (:result-types fixnum)
   (:generator 1
     (inst* (ecase size (8 'extsb) (16 'extsh) (32 'extsw)) res val)))
+
+#-sb-xc-host
+(defun sign-extend (x size)
+  (declare (type (signed-byte 64) x))
+  (ecase size
+    (8 (sign-extend x size))
+    (16 (sign-extend x size))
+    (32 (sign-extend x size))))
