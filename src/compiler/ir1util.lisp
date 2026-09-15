@@ -4713,13 +4713,20 @@ is :ANY, the function name is not checked."
     (if first
         (nthcdr (+ first 2) path))))
 
-(defun combination-derive-type-for-arg-types (combination types)
+(defun combination-derive-type-for-arg-types (combination types &optional mv)
   (let* ((info (basic-combination-fun-info combination))
          (deriver (and info
                        (fun-info-derive-type info))))
     (when deriver
       (handler-bind ((warning #'muffle-warning))
-        (let ((mock (copy-structure combination)))
+        (let ((mock (if mv
+                        #-sb-xc-host
+                        ;; Some type derivers dispatch on mv-combinations,
+                        ;; this is useful to handle unknown-keys
+                        (sb-kernel::copy-struct-to-different-class combination 'mv-combination)
+                        #+sb-xc-host
+                        (return-from combination-derive-type-for-arg-types)
+                        (copy-structure combination))))
           (setf (basic-combination-args mock)
                 (loop for type in types
                       collect (if (lvar-p type)

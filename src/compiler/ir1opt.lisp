@@ -1417,13 +1417,23 @@
            (process-info ()
              (check-important-result node info)
              (check-proper-sequences node info)
-             (let ((type (derive-combination-type node show)))
-               (when type
-                 (derive-node-type node type)
-                 (when (eq (node-derived-type node) *empty-type*)
-                   (if (node-deleted node)
-                       (return-from ir1-optimize-combination))
-                   (maybe-terminate-block node nil))))))
+             (if (eq kind :unknown-keys)
+                 (when (ir1-attributep (fun-info-attributes info) mv-deriver)
+                   (let* ((known-types
+                            (loop repeat (combination-info node)
+                                  for arg in args
+                                  collect (lvar-derived-type arg))))
+                     (when known-types
+                       (let ((type (combination-derive-type-for-arg-types node known-types t)))
+                         (when type
+                           (derive-node-type node type))))))
+                 (let ((type (derive-combination-type node show)))
+                   (when type
+                     (derive-node-type node type)
+                     (when (eq (node-derived-type node) *empty-type*)
+                       (if (node-deleted node)
+                           (return-from ir1-optimize-combination))
+                       (maybe-terminate-block node nil)))))))
       (ecase kind
         (:local
          (let ((fun (combination-lambda node)))
@@ -1435,10 +1445,13 @@
          (clear-reoptimize-args))
         ((:full :unknown-keys)
          (clear-reoptimize-args)
-         (cond (info
+         (cond ((and info
+                     (eq kind :full))
                 ;; This is a known function marked NOTINLINE
                 (process-info))
                (t
+                (when info
+                  (process-info))
                 ;; Check against the DEFINED-TYPE unless TYPE is already good.
                 (let* ((fun (basic-combination-fun node))
                        (uses (lvar-uses fun))
@@ -1609,7 +1622,11 @@
        (values nil nil))
       (unknown-keys
        (setf (basic-combination-kind call) :unknown-keys)
-       (values leaf nil))
+       (let ((info (info :function :info (leaf-source-name leaf))))
+         (when info
+           (setf (basic-combination-fun-info call) info
+                 (basic-combination-info call) unknown-keys)) ;; first unknown arg
+         (values leaf nil)))
       ((eq inlinep 'notinline)
        (let ((info (info :function :info (leaf-source-name leaf))))
          (when info

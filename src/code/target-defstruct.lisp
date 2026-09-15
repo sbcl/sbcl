@@ -409,7 +409,33 @@
                   (%instance-set res i (%instance-ref structure i))
                   (%raw-instance-set/word
                    res i (%raw-instance-ref/word structure i))))
-            res)))))
+            res))))
+
+;;; Have to be compatible in some way
+(defun copy-struct-to-different-class (structure new-layout)
+  (let* ((layout (%instance-layout structure))
+         (new-layout (find-layout new-layout))
+         (len (dd-length (layout-dd new-layout)))
+         (parent (aref (layout-inherits new-layout) (1- (length (layout-inherits new-layout))))))
+    (aver (eq (aref (layout-inherits layout) (1- (length (layout-inherits layout))))
+              parent))
+    (aver (= (dd-length (layout-dd new-layout))
+             len))
+    #+(or x86 x86-64)
+    (let ((res (%new-instance* new-layout len)))
+      (fast-loop res))
+    #-(or x86 x86-64)
+    (if (logtest (layout-flags new-layout) sb-vm::+strictly-boxed-flag+)
+        (let ((res (%new-instance new-layout len)))
+          (fast-loop res))
+        (let ((res (%make-instance/mixed len)))
+          (%set-instance-layout res new-layout)
+          (do-layout-bitmap (i taggedp new-layout len)
+            (if taggedp
+                (%instance-set res i (%instance-ref structure i))
+                (%raw-instance-set/word
+                 res i (%raw-instance-ref/word structure i))))
+          res)))))
 
 ;;; Like above, but copy all slots (including the LAYOUT) as though boxed.
 ;;; If the structure might contain raw slots and the GC is precise,

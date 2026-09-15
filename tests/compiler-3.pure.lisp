@@ -56,3 +56,13 @@
                              x
                              y))))
    (mod 21)))
+
+(with-test (:name :unknown-keys-type-derivation)
+  (assert-type
+   (lambda (a)
+     (make-array 1 a t))
+   (vector))
+  (assert-type
+   (lambda (a)
+     (make-array 1 :element-type t a 0))
+   (vector t)))

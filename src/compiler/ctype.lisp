@@ -133,9 +133,8 @@
             ((report-arg-count-mismatch fun nil type nargs nil #'note-lossage))
             (t
              (check-fixed-and-rest args (append required optional) rest)
-             (when (and keyp
-                        (check-key-args fun args max-args type))
-               (setf unknown-keys t))))
+             (when keyp
+               (setf unknown-keys (check-key-args fun args max-args type)))))
 
           (when result-test
             (let* ((out-type (node-asserted-type call))
@@ -343,7 +342,7 @@ and no value was provided for it." name)))))))))))
            (note-lossage "The ~:R argument of type ~s cannot be used as a keyword."
                          n (type-specifier (lvar-type k))))
           ((not (constant-lvar-p k))
-           (setf unknown-keys t)
+           (setf unknown-keys (1- n))
            ;; An unknown key may turn out to be :ALLOW-OTHER-KEYS at runtime,
            ;; so we cannot signal full warnings for keys that look bad.
            (unless allow-other-keys
