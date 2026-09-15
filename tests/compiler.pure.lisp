@@ -942,9 +942,9 @@
       '(lambda (x) (logand x x 0))
     ((-1) 0)))
 
-;;; MISC.99 from Paul Dietz' random tester: FAST-ASH-MOD32-C VOP
+;;; MISC.99 from Paul Dietz' random tester: ash-MOD32-C VOP
 ;;; produced wrong result for shift >=32 on X86
-(with-test (:name (compile mask-field :fast-ash-mod32-c-vop 18))
+(with-test (:name (compile mask-field :ash-mod32-c-vop 18))
   (checked-compile-and-assert ()
       '(lambda (a)
          (declare (type (integer 4303063 101130078) a))
@@ -954,13 +954,13 @@
 ;;; rewrite the test case to get the unsigned-byte 32/64
 ;;; implementation even after implementing some modular arithmetic
 ;;; with signed-byte 30:
-(with-test (:name (compile mask-field :fast-ash-mod32-c-vop 30))
+(with-test (:name (compile mask-field :ash-mod32-c-vop 30))
   (checked-compile-and-assert ()
       '(lambda (a)
         (declare (type (integer 4303063 101130078) a))
         (mask-field (byte 30 2) (ash a 77)))
     ((57132532) 0)))
-(with-test (:name (compile mask-field :fast-ash-mod32-c-vop 64))
+(with-test (:name (compile mask-field :ash-mod32-c-vop 64))
   (checked-compile-and-assert ()
       '(lambda (a)
          (declare (type (integer 4303063 101130078) a))
@@ -968,13 +968,13 @@
     ((57132532) 0)))
 ;;; and a similar test case for the signed masking extension (not the
 ;;; final interface, so change the call when necessary):
-(with-test (:name (compile sb-c::mask-signed-field :fast-ash-mod32-c-vop 30))
+(with-test (:name (compile sb-c::mask-signed-field :ash-mod32-c-vop 30))
   (checked-compile-and-assert ()
       '(lambda (a)
          (declare (type (integer 4303063 101130078) a))
          (sb-c::mask-signed-field 30 (ash a 77)))
     ((57132532) 0)))
-(with-test (:name (compile sb-c::mask-signed-field :fast-ash-mod32-c-vop 61))
+(with-test (:name (compile sb-c::mask-signed-field :ash-mod32-c-vop 61))
   (checked-compile-and-assert ()
       '(lambda (a)
          (declare (type (integer 4303063 101130078) a))

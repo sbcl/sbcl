@@ -112,16 +112,16 @@
             (change-vop-flags vop invert-condition))
           (inst cmp y (asr x 8))))))))
 
-(define-vop (fast-char=/character character-compare)
+(define-vop (char=/character character-compare)
   (:translate char=)
   (:conditional :eq))
 
-(define-vop (fast-char>/character character-compare)
+(define-vop (char>/character character-compare)
   (:translate char>)
   (:conditional :gt)
   (:variant '(:lt)))
 
-(define-vop (fast-char</character character-compare)
+(define-vop (char</character character-compare)
   (:translate char<)
   (:conditional :lt)
   (:variant '(:gt)))
@@ -138,15 +138,15 @@
   (:generator 2
     (inst cmp x (char-code y))))
 
-(define-vop (fast-char=/character/c character-compare/c)
+(define-vop (char=/character/c character-compare/c)
   (:translate char=)
   (:conditional :eq))
 
-(define-vop (fast-char>/character/c character-compare/c)
+(define-vop (char>/character/c character-compare/c)
   (:translate char>)
   (:conditional :gt))
 
-(define-vop (fast-char</character/c character-compare/c)
+(define-vop (char</character/c character-compare/c)
   (:translate char<)
   (:conditional :lt))
 

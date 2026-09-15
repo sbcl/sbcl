@@ -162,15 +162,15 @@
   (:generator 3
     (inst cmp x y)))
 
-(define-vop (fast-char=/character character-compare)
+(define-vop (char=/character character-compare)
   (:translate char=)
   (:conditional :e))
 
-(define-vop (fast-char</character character-compare)
+(define-vop (char</character character-compare)
   (:translate char<)
   (:conditional :b))
 
-(define-vop (fast-char>/character character-compare)
+(define-vop (char>/character character-compare)
   (:translate char>)
   (:conditional :a))
 
@@ -182,14 +182,14 @@
   (:generator 2
     (inst cmp x (char-code y))))
 
-(define-vop (fast-char=/character/c character-compare/c)
+(define-vop (char=/character/c character-compare/c)
   (:translate char=)
   (:conditional :e))
 
-(define-vop (fast-char</character/c character-compare/c)
+(define-vop (char</character/c character-compare/c)
   (:translate char<)
   (:conditional :b))
 
-(define-vop (fast-char>/character/c character-compare/c)
+(define-vop (char>/character/c character-compare/c)
   (:translate char>)
   (:conditional :a))

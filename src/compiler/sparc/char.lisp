@@ -113,15 +113,15 @@
     (inst b (if not-p not-condition condition) target)
     (inst nop)))
 
-(define-vop (fast-char=/character character-compare)
+(define-vop (char=/character character-compare)
   (:translate char=)
   (:variant :eq :ne))
 
-(define-vop (fast-char</character character-compare)
+(define-vop (char</character character-compare)
   (:translate char<)
   (:variant :ltu :geu))
 
-(define-vop (fast-char>/character character-compare)
+(define-vop (char>/character character-compare)
   (:translate char>)
   (:variant :gtu :leu))
 
@@ -139,14 +139,14 @@
     (inst b (if not-p not-condition condition) target)
     (inst nop)))
 
-(define-vop (fast-char=/character/c character-compare/c)
+(define-vop (char=/character/c character-compare/c)
   (:translate char=)
   (:variant :eq :ne))
 
-(define-vop (fast-char</character/c character-compare/c)
+(define-vop (char</character/c character-compare/c)
   (:translate char<)
   (:variant :ltu :geu))
 
-(define-vop (fast-char>/character/c character-compare/c)
+(define-vop (char>/character/c character-compare/c)
   (:translate char>)
   (:variant :gtu :leu))

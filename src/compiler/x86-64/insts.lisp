@@ -3748,16 +3748,16 @@
                         (and (eq size2 size1)
                              ;; Assume there's no overflow for signed arithmetic
                              (memq (vop-name (sb-assem::stmt-vop stmt))
-                                   '(sb-vm::fast--/fixnum=>fixnum
-                                     sb-vm::fast-+/fixnum=>fixnum
-                                     sb-vm::fast--/signed=>signed
-                                     sb-vm::fast-+/signed=>signed
-                                     sb-vm::fast---c/fixnum=>fixnum
-                                     sb-vm::fast-+-c/fixnum=>fixnum
-                                     sb-vm::fast---c/signed=>signed
-                                     sb-vm::fast-+-c/signed=>signed
-                                     sb-vm::fast-negate/fixnum
-                                     sb-vm::fast-negate/signed))))))))
+                                   '(sb-vm::-/fixnum=>fixnum
+                                     sb-vm::+/fixnum=>fixnum
+                                     sb-vm::-/signed=>signed
+                                     sb-vm::+/signed=>signed
+                                     sb-vm::--c/fixnum=>fixnum
+                                     sb-vm::+-c/fixnum=>fixnum
+                                     sb-vm::--c/signed=>signed
+                                     sb-vm::+-c/signed=>signed
+                                     sb-vm::negate/fixnum
+                                     sb-vm::negate/signed))))))))
       (delete-stmt next)
       next-next)))
 

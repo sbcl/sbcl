@@ -102,15 +102,15 @@
     (inst cmplw x y)
     (inst b? (if not-p not-condition condition) target)))
 
-(define-vop (fast-char=/character character-compare)
+(define-vop (char=/character character-compare)
   (:translate char=)
   (:variant :eq :ne))
 
-(define-vop (fast-char</character character-compare)
+(define-vop (char</character character-compare)
   (:translate char<)
   (:variant :lt :ge))
 
-(define-vop (fast-char>/character character-compare)
+(define-vop (char>/character character-compare)
   (:translate char>)
   (:variant :gt :le))
 
@@ -125,14 +125,14 @@
     (inst cmplwi x (char-code y))
     (inst b? (if not-p not-condition condition) target)))
 
-(define-vop (fast-char=/character/c character-compare/c)
+(define-vop (char=/character/c character-compare/c)
   (:translate char=)
   (:variant :eq :ne))
 
-(define-vop (fast-char</character/c character-compare/c)
+(define-vop (char</character/c character-compare/c)
   (:translate char<)
   (:variant :lt :ge))
 
-(define-vop (fast-char>/character/c character-compare/c)
+(define-vop (char>/character/c character-compare/c)
   (:translate char>)
   (:variant :gt :le))
