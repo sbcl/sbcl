@@ -103,7 +103,9 @@
      (cond ((eql val 0) (zeroize target))
            (t (inst mov target val))))
     ;; Likewise if the value is small enough.
-    ((typep val '(or (signed-byte 32) #+(or immobile-space permgen) fixup))
+    ((or (imm32-p val)
+         #+(or immobile-space permgen)
+         (fixup-p val))
      ;; This logic is similar to that of STOREW*.
      ;; It would be nice to pull it all together in one place.
      ;; The basic idea is that storing any byte-aligned 8-bit value
