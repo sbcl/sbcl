@@ -198,8 +198,14 @@
                    :end (conset-max conset)))))
 
   (defun copy-conset (conset)
-    (let ((ret (%copy-conset conset)))
-      (setf (conset-vector ret) (copy-seq (conset-vector conset)))
+    (let* ((ret (%copy-conset conset))
+           (vector (conset-vector conset))
+           (size (align-up (conset-max conset)
+                           (* 2 sb-vm:n-word-bits))))
+      (setf (conset-vector ret)
+            (if (< size (length vector))
+                (subseq vector 0 size)
+                (copy-seq vector)))
       ret))
 
   (defun %conset-grow (conset new-size)
