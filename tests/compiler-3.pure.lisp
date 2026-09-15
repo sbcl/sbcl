@@ -66,3 +66,24 @@
    (lambda (a)
      (make-array 1 :element-type t a 0))
    (vector t)))
+
+(with-test (:name :ir1-final-unreachable-cast-uses)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a y)
+         (declare ((or null (mod 5)) y))
+         (let ((x (if y (1+ y))))
+           (if a (+ x 3))))
+    ((nil nil) nil)
+    ((t 2) 6))
+  (checked-compile-and-assert
+      ()
+      `(lambda (a y)
+         (declare ((or null fixnum) y))
+         (let ((x (if y
+                      (+ y 2)
+                      nil)))
+           (when a
+             (+ x 3))))
+    ((nil nil) nil)
+    ((t 2) 7)))
