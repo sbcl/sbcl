@@ -4976,7 +4976,7 @@
     (cond ((eql mask most-positive-word)
            (move r lo))
           ((eql mask (1- (expt 2 32)))
-           (move r lo :dword))
+           (inst mov :dword r lo))
           ((and (not (integerp mask))
                 (location= r mask))
            (inst and mask lo))

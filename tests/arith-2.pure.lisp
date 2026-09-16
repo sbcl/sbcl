@@ -2664,7 +2664,6 @@
     ((-7726172277034401953) 0)
     ((0) 1)))
 
-
 (with-test (:name :abs-to-eql)
   (checked-compile-and-assert
       ()
@@ -2674,3 +2673,13 @@
     (:return-type null)
     ((5) nil)
     ((-5) nil)))
+
+(with-test (:name :logand-32-bit-move)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+            (declare ((integer -12218175131601637519 -1) b))
+            (lognor (the bit a) (lognand b 4294967295)))
+    ((1 -2977959350051721783) 3231526344)
+    ((0 -2977959350051721783) 3231526345)
+    ((0 -5) 4294967291)))
