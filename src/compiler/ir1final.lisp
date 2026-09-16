@@ -156,7 +156,6 @@
                     (type (node-derived-type node)))
                 (unless (and lvar
                              ;; don't confuse stack-analyze
-                             (eq (nth-value 1 (values-types (lvar-derived-type lvar))) :unknown)
                              (do-uses (use value)
                                (unless (only-harmless-cleanups (node-block use)
                                                                (node-block node))

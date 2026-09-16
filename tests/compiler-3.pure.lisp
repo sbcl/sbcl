@@ -90,4 +90,14 @@
   (checked-compile '(lambda ()
                      (declare (optimize (safety 0)))
                      (the integer (flet ((f () (catch 'x)))
-                                    (f))))))
+                                    (f)))))
+  (checked-compile '(lambda ()
+                     (declare (optimize (safety 0)))
+                     (throw 'x
+                       (the integer
+                            (flet ((f () (round 0)))
+                              (block a
+                                (values nil
+                                        (block b
+                                          (let ((* (lambda () (return-from b))))
+                                            (return-from a (f))))))))))))
