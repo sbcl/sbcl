@@ -101,3 +101,7 @@
                                         (block b
                                           (let ((* (lambda () (return-from b))))
                                             (return-from a (f))))))))))))
+
+(with-test (:name :throw-any-reg)
+  (checked-compile `(lambda () (throw (the fixnum *) 1))
+                   :allow-style-warnings t))
