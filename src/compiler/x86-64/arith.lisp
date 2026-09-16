@@ -1340,7 +1340,7 @@
   (:result-types signed-byte-128)
   (:generator 15
     (move lo x)
-    (move hi lo)
+    (move hi x)
     (inst sar hi 63)
     (inst neg hi)
     (inst neg lo)
