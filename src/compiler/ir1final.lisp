@@ -159,7 +159,7 @@
                   (let ((type (values-type-intersection (node-derived-type use) type)))
                     (setf (node-derived-type use) type)
                     (when (eq type *empty-type*)
-                      (delete-lvar-use use))))
+                      (%delete-lvar-use use))))
                 (delete-filter node lvar (cast-value node))))))
           (combination
            (when (eq (combination-kind node) :known)
