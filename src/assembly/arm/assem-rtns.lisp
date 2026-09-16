@@ -166,7 +166,7 @@
 
 (define-assembly-routine (throw
                           (:return-style :none))
-                         ((:arg target descriptor-reg r0-offset)
+                         ((:arg target (descriptor-reg any-reg) r0-offset)
                           (:arg start any-reg r8-offset)
                           (:arg count any-reg nargs-offset)
                           (:temp catch any-reg r1-offset)
