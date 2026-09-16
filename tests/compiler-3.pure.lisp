@@ -100,7 +100,10 @@
                                 (values nil
                                         (block b
                                           (let ((* (lambda () (return-from b))))
-                                            (return-from a (f))))))))))))
+                                            (return-from a (f)))))))))))
+  (checked-compile '(lambda (v)
+                     (declare (optimize (safety 0)))
+                     (the integer (if v (funcall v))))))
 
 (with-test (:name :throw-any-reg)
   (checked-compile `(lambda () (throw (the fixnum *) 1))
