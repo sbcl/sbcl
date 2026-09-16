@@ -86,4 +86,8 @@
            (when a
              (+ x 3))))
     ((nil nil) nil)
-    ((t 2) 7)))
+    ((t 2) 7))
+  (checked-compile '(lambda ()
+                     (declare (optimize (safety 0)))
+                     (the integer (flet ((f () (catch 'x)))
+                                    (f))))))
