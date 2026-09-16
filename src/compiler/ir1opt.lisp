@@ -1622,11 +1622,12 @@
        (values nil nil))
       (unknown-keys
        (setf (basic-combination-kind call) :unknown-keys)
-       (let ((info (info :function :info (leaf-source-name leaf))))
-         (when info
-           (setf (basic-combination-fun-info call) info
-                 (basic-combination-info call) unknown-keys)) ;; first unknown arg
-         (values leaf nil)))
+       (when leaf
+         (let ((info (info :function :info (leaf-source-name leaf))))
+           (when info
+             (setf (basic-combination-fun-info call) info
+                   (basic-combination-info call) unknown-keys)))) ;; first unknown arg
+       (values leaf nil))
       ((eq inlinep 'notinline)
        (let ((info (info :function :info (leaf-source-name leaf))))
          (when info
