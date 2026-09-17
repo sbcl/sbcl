@@ -257,10 +257,11 @@
                              (loop for arg in (basic-combination-args (let-combination fun))
                                    for nvals = (nth-value 1 (values-types (lvar-derived-type arg)))
                                    when (eq nvals :unknown) return nil
-                                   when (<= n-value nvals) do (return-from mv-principal-lvar-ref-use
-                                                                (values (if no-casts
-                                                                            (lvar-uses arg)
-                                                                            (principal-lvar-use arg)) n-value))
+                                   when (< n-value nvals) do (return-from mv-principal-lvar-ref-use
+                                                               (values (if no-casts
+                                                                           (lvar-uses arg)
+                                                                           (principal-lvar-use arg))
+                                                                       n-value))
                                    do (decf n-value nvals))
                              use))
                           (let
