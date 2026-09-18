@@ -3882,7 +3882,7 @@
 ;;;; Modular functions
 
 (defmacro define-mod-binop ((name prototype) function)
-  (if (search "*-" (string prototype)) ; *- doesn't accept stack locations yet
+  (if (search "*/" (string prototype)) ; *- doesn't accept stack locations yet
       `(define-vop (,name ,prototype)
            (:args (x :target r :scs (unsigned-reg signed-reg)
                      :load-if (not (and (or (sc-is x unsigned-stack)
@@ -3916,7 +3916,7 @@
          (:translate ,function))))
 
 (defmacro define-mod-binop-c ((name prototype) function)
-  (if (search "*-" (string prototype)) ; *- doesn't accept stack locations yet
+  (if (search "*/" (string prototype)) ; *- doesn't accept stack locations yet
       `(define-vop (,name ,prototype)
          (:args (x :target r :scs (unsigned-reg signed-reg) :load-if t))
          (:info y)
