@@ -117,16 +117,14 @@ If you run into a signal related bug, you are getting fatal errors
 such as @code{signal N is [un]blocked} or just hangs, and you want to
 send a useful bug report then:
 
-@cindex LDB
 @itemize
-@item Compile SBCL with LDB enabled (feature @code{:sb-ldb}, see
-  @code{base-target-features.lisp-expr}).
+@item Compile SBCL with @ref{ldb} enabled.
 
 @item Isolate a smallish test case, run it.
 
 @item If it just hangs kill it with @code{sigabrt}: @code{kill -ABRT <pidof sbcl>}.
 
-@item Print the backtrace from ldb by typing @code{ba}.
+@item Print the backtrace from @ref{ldb} by typing @code{ba}.
 
 @item Attach gdb: @code{gdb -p <pidof sbcl>} and get backtraces for all
   threads: @code{thread apply all ba}.

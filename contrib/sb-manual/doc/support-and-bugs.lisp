@@ -98,14 +98,13 @@
   such as `signal N is [un]blocked` or just hangs, and you want to
   send a useful bug report then:
 
-  - Compile SBCL with @LDB enabled (feature `:SB-LDB`, see
-    `base-target-features.lisp-expr`).
+  - Compile SBCL with @LDB enabled.
 
   - Isolate a smallish test case, run it.
 
   - If it just hangs kill it with `SIGABRT`: `kill -ABRT <pidof sbcl>`.
 
-  - Print the backtrace from ldb by typing `ba`.
+  - Print the backtrace from @LDB by typing `ba`.
 
   - Attach gdb: `gdb -p <pidof sbcl>` and get backtraces for all
     threads: `thread apply all ba`.

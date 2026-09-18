@@ -16,6 +16,7 @@
   (@breakpoint-commands section)
   (@function-tracing section)
   (@single-stepping section)
+  (@ldb section)
   (@enabling-and-disabling-the-debugger section))
 
 (defsection @debugger-entry (:title "Debugger Entry")
@@ -881,6 +882,26 @@
   - `stop`: Stop the single stepper and resumes normal execution."
   (step macro))
 
+(defsection @ldb (:title "LDB")
+  "\\LDB, the low-level debugger, is implemented in C and can work
+  even when the Lisp @DEBUGGER cannot due to e.g. heap or stack
+  exhaustion. Failed assertions in the low-level runtime (see
+  @COMMAND-LINE-OPTIONS) trigger entering \\LDB if it's
+
+  - available (if SBCL was not compiled with `--without-sb-ldb`) and
+
+  - not disabled (see `--disable-ldb` in @RUNTIME-OPTIONS and
+    SB-EXT:DISABLE-DEBUGGER).
+
+  Else, a backtrace of at most 100 stack frames is printed, and SBCL
+  exits with a non-zero exit code.
+
+  The commands supported can be explored at the \\LDB prompt by typing
+  `help` followed by an enter.
+
+  Also see the related `--lose-on-corruption` option in
+  @RUNTIME-OPTIONS.")
+
 (defsection @enabling-and-disabling-the-debugger
     (:title "Enabling and Disabling the Debugger"
      :concepts (("debugger," "enabling")
@@ -890,7 +911,7 @@
                 ~enabling-ldb
                 ~disabling-ldb))
   "In certain contexts (e.g. non-interactive applications), it may be
-  desirable to turn off the SBCL debugger (and possibly re-enable it).
-  The functions here control the debugger."
+  desirable to turn off the SBCL debugger and @LDB (and possibly
+  re-enable them)."
   (sb-ext:disable-debugger function)
   (sb-ext:enable-debugger function))

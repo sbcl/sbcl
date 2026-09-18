@@ -16,6 +16,7 @@
 * Breakpoint Commands: breakpoint commands.
 * Function Tracing: function tracing.
 * Single Stepping: single stepping.
+* LDB: ldb.
 * Enabling and Disabling the Debugger: enabling and disabling the debugger.
 @end menu
 
@@ -1224,6 +1225,30 @@ outside the lexical scope of the form can be stepped into only if the
 functions in question have been compiled with sufficient @code{debug} policy
 to be at least partially steppable.
 @end deffn
+@node ldb
+@section LDB
+
+LDB, the low-level debugger, is implemented in C and can work
+even when the Lisp @ref{debugger} cannot due to e.g. heap or stack
+exhaustion. Failed assertions in the low-level runtime (see
+@ref{command line options}) trigger entering LDB if it's
+
+@itemize
+@item available (if SBCL was not compiled with @code{--without-sb-ldb}) and
+
+@item not disabled (see @code{--disable-ldb} in @ref{runtime options} and
+  @code{sb-ext:disable-debugger}).
+@end itemize
+
+Else, a backtrace of at most 100 stack frames is printed, and SBCL
+exits with a non-zero exit code.
+
+The commands supported can be explored at the LDB prompt by typing
+@code{help} followed by an enter.
+
+Also see the related @code{--lose-on-corruption} option in
+@ref{runtime options}.
+
 @node enabling and disabling the debugger
 @cindex debugger, enabling
 @cindex debugger, disabling
@@ -1236,17 +1261,23 @@ to be at least partially steppable.
 @section Enabling and Disabling the Debugger
 
 In certain contexts (e.g. non-interactive applications), it may be
-desirable to turn off the SBCL debugger (and possibly re-enable it).
-The functions here control the debugger.
+desirable to turn off the SBCL debugger and @ref{ldb} (and possibly
+re-enable them).
 
 @anchor{Function sb-ext disable-debugger}
 @ffindex @sortas{disable-debugger sb-ext} disable-debugger [sb-ext]
 @deffn{Function} sb-ext:disable-debugger
-When invoked, this function will turn off both the SBCL debugger
-and @code{ldb} (the low-level debugger).  See also @code{enable-debugger}.
+When invoked, this function will turn off both the @ref{debugger}
+and @ref{ldb} (the low-level debugger), similar to specifying
+@code{--disable-debugger} (see @ref{toplevel options}) and
+@code{--disable-ldb} (see @ref{runtime options}) on the command line.
+See also @code{enable-debugger}.
 @end deffn
 @anchor{Function sb-ext enable-debugger}
 @ffindex @sortas{enable-debugger sb-ext} enable-debugger [sb-ext]
 @deffn{Function} sb-ext:enable-debugger
-Restore the debugger if it has been turned off by @code{disable-debugger}.
+Restore the @ref{debugger} and @ref{ldb} if they have been
+turned off by @code{disable-debugger}, @code{--disable-debugger} (see
+@ref{toplevel options}) or @code{--disable-ldb} (see
+@ref{runtime options}).
 @end deffn

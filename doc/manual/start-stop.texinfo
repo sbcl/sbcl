@@ -336,7 +336,7 @@ which is mainly useful for acting as part of a shell pipeline; doing
 so under most other circumstances would mean giving up large parts
 of the flexibility and robustness of Common Lisp. See
 @ref{debugger entry} and the command line option @code{--disable-debugger} in
-@ref{runtime options}.
+@ref{toplevel options}.
 
 @node command line options
 @section Command Line Options
@@ -384,9 +384,6 @@ system.
 
 @cindex disabling LDB
 @cindex LDB, disabling
-@cindex LDB
-@cindex enabling LDB
-@cindex LDB, enabling
 @itemize
 @item @code{--core <corefilename>}
 
@@ -419,8 +416,10 @@ and @code{--disable-debugger} options.
 
 @item @code{--disable-ldb}
 
-Disable the low-level debugger. Only effective if SBCL is
-compiled with LDB. disabling LDB
+Disable the @ref{ldb}, the low-level debugger. Only effective if SBCL
+is compiled with LDB. When LDB is not available or is
+disabled, SBCL exits with a non-zero exit code whenever it would
+enter LDB. 
 
 @item @code{--lose-on-corruption}
 
@@ -430,7 +429,7 @@ corrupt the image. By default, SBCL prints a warning, then tries
 to continue and handle the error in Lisp, but this will not
 always work, and SBCL may malfunction or even hang. With this
 option, upon encountering such an error, SBCL will exit instead
-of invoking LDB (if present and enabled enabling LDB).
+of invoking @ref{ldb} (if present and enabled).
 
 @item @code{--script <filename>}
 

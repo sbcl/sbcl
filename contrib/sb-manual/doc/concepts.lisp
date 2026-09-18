@@ -94,15 +94,11 @@
                                    :keys (("logical" "pathname")
                                           ("pathname," "logical"))))
 
-(define-concept @ldb (:title "LDB" :keys ("LDB")))
-
-(define-concept ~disabling-ldb (:title "disabling LDB"
-                                :keys (("disabling" "LDB")
+(define-concept ~disabling-ldb (:keys (("disabling" "LDB")
                                        ("LDB," "disabling"))))
 
-(define-concept ~enabling-ldb (:title "enabling LDB"
-                                :keys (("enabling" "LDB")
-                                       ("LDB," "enabling"))))
+(define-concept ~enabling-ldb (:keys (("enabling" "LDB")
+                                      ("LDB," "enabling"))))
 (define-concept ~repl (:keys ("Read-Eval-Print Loop" "REPL")))
 
 (define-concept @repl (:title "REPL" :keys (~repl)))

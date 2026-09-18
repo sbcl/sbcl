@@ -105,7 +105,7 @@
   so under most other circumstances would mean giving up large parts
   of the flexibility and robustness of Common Lisp. See
   @DEBUGGER-ENTRY and the command line option `--disable-debugger` in
-  @RUNTIME-OPTIONS.")
+  @TOPLEVEL-OPTIONS.")
 
 (defsection @command-line-options (:title "Command Line Options")
   "Command line options can be considered an advanced topic; for ordinary
@@ -173,8 +173,10 @@
 
   - `--disable-ldb`
 
-      Disable the low-level debugger. Only effective if SBCL is
-      compiled with @LDB. ~DISABLING-LDB
+      Disable the @LDB, the low-level debugger. Only effective if SBCL
+      is compiled with \\LDB. When \\LDB is not available or is
+      disabled, SBCL exits with a non-zero exit code whenever it would
+      enter \\LDB. ~DISABLING-LDB
 
   - `--lose-on-corruption`
 
@@ -184,7 +186,7 @@
       to continue and handle the error in Lisp, but this will not
       always work, and SBCL may malfunction or even hang. With this
       option, upon encountering such an error, SBCL will exit instead
-      of invoking @LDB (if present and enabled ~ENABLING-LDB).
+      of invoking @LDB (if present and enabled).
 
   - `--script <filename>`
 
