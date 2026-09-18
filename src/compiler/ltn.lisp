@@ -572,7 +572,6 @@
   (let* ((test (if-test node))
          (use (lvar-uses test)))
     (unless (and (combination-p use)
-                 (immediately-used-p test use)
                  (let ((info (basic-combination-info use)))
                    (and (template-p info)
                         (template-conditional-p info))))
