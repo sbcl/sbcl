@@ -132,63 +132,66 @@
          (ref-leaf ref))))
 
 ;;; Look through casts and variables, m-v-bind+values
-(defun map-all-uses (function lvar &optional (cast t))
-  (declare (dynamic-extent function))
+(defun map-all-uses (function lvar &key (cast t) var-home)
+  (declare (dynamic-extent function var-home))
   (let (seen)
-   (labels ((recurse-lvar (lvar)
-              (do-uses (use lvar)
-                (recurse use)))
-            (recurse (use)
-              (cond ((ref-p use)
-                     (let ((lvar (lambda-var-ref-lvar use)))
-                       (cond (lvar
-                              (recurse-lvar lvar))
-                             ((let ((var (ref-leaf use)))
-                                (when (and (lambda-var-p var)
-                                           (not (lambda-var-sets var)))
-                                  (let* ((fun (lambda-var-home var))
-                                         (vars (lambda-vars fun)))
-                                    (cond ((functional-kind-eq fun mv-let)
-                                           (let* ((fun (lambda-var-home var))
-                                                  (n-value (position-or-lose var vars))
-                                                  (args (basic-combination-args (let-combination fun))))
-                                             (when (singleton-p args)
-                                               (let ((all-processed t))
-                                                 (do-uses (use (car args))
-                                                   (unless (when (and (combination-p use)
-                                                                      (eq (lvar-fun-name (combination-fun use))
-                                                                          'values))
-                                                             (let ((lvar (nth n-value (combination-args use))))
-                                                               (when lvar
-                                                                 (recurse-lvar lvar)
-                                                                 t)))
-                                                     (setf all-processed nil)))
-                                                 all-processed))))
-                                          ((not (memq fun seen))
-                                           (push fun seen)
-                                           (dolist (ref (leaf-refs fun))
-                                             (let* ((lvar (node-lvar ref))
-                                                    (combination (and lvar
-                                                                      (lvar-dest lvar))))
-                                               (when (and (combination-p combination)
-                                                          (eq (combination-kind combination) :local)
-                                                          (eq (combination-fun combination)
-                                                              lvar))
-                                                 (loop for v in vars
-                                                       for arg in (combination-args combination)
-                                                       when (eq v var)
-                                                       do
-                                                       (do-uses (use arg)
-                                                         (recurse use))))))))))))
-                             (t
-                              (funcall function use)))))
+    (labels ((recurse-lvar (lvar)
+               (do-uses (use lvar)
+                 (recurse use)))
+             (recurse (use)
+               (cond ((ref-p use)
+                      (let ((lvar (lambda-var-ref-lvar use))
+                            (var (ref-leaf use)))
+                        (when (and var-home
+                                   (lambda-var-p var))
+                          (funcall var-home var))
+                        (cond (lvar
+                               (recurse-lvar lvar))
+                              ((when (and (lambda-var-p var)
+                                          (not (lambda-var-sets var)))
+                                 (let* ((fun (lambda-var-home var))
+                                        (vars (lambda-vars fun)))
+                                   (cond ((functional-kind-eq fun mv-let)
+                                          (let* ((fun (lambda-var-home var))
+                                                 (n-value (position-or-lose var vars))
+                                                 (args (basic-combination-args (let-combination fun))))
+                                            (when (singleton-p args)
+                                              (let ((all-processed t))
+                                                (do-uses (use (car args))
+                                                  (unless (when (and (combination-p use)
+                                                                     (eq (lvar-fun-name (combination-fun use))
+                                                                         'values))
+                                                            (let ((lvar (nth n-value (combination-args use))))
+                                                              (when lvar
+                                                                (recurse-lvar lvar)
+                                                                t)))
+                                                    (setf all-processed nil)))
+                                                all-processed))))
+                                         ((not (memq fun seen))
+                                          (push fun seen)
+                                          (dolist (ref (leaf-refs fun))
+                                            (let* ((lvar (node-lvar ref))
+                                                   (combination (and lvar
+                                                                     (lvar-dest lvar))))
+                                              (when (and (combination-p combination)
+                                                         (eq (combination-kind combination) :local)
+                                                         (eq (combination-fun combination)
+                                                             lvar))
+                                                (loop for v in vars
+                                                      for arg in (combination-args combination)
+                                                      when (eq v var)
+                                                      do
+                                                      (do-uses (use arg)
+                                                        (recurse use)))))))))))
+                              (t
+                               (funcall function use)))))
 
-                    ((and cast
-                          (cast-p use))
-                     (recurse-lvar (cast-value use)))
-                    (t
-                     (funcall function use)))))
-     (recurse-lvar lvar))))
+                     ((and cast
+                           (cast-p use))
+                      (recurse-lvar (cast-value use)))
+                     (t
+                      (funcall function use)))))
+      (recurse-lvar lvar))))
 
 (defun map-all-dests (function node &optional (nth-value 0))
   (declare (dynamic-extent function))
@@ -196,9 +199,10 @@
     (labels ((call (node lvar nth-value)
                (let ((continue (funcall function node lvar nth-value)))
                  (when continue
-                   (recurse node (if (eq continue t)
-                                     0
-                                     continue)))))
+                   (when (valued-node-p node)
+                     (recurse node (if (eq continue t)
+                                       0
+                                       continue))))))
              (recurse-node (node lvar nth-value)
                (cond ((and (combination-p node)
                            ;; Only the first value is used

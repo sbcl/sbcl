@@ -321,13 +321,14 @@
   (:arg-types signed-byte-128)
   (:translate fixnump)
   (:info target not-p)
+  (:conditional)
   (:temporary (:sc unsigned-reg) temp)
   (:generator 5
     (move temp lo)
     (inst add temp temp)
     (inst jmp :o (if not-p target DONE))
 
-    (inst sbb temp temp)
+    (inst  sbb temp temp)
 
     (inst cmp temp hi)
     (inst jmp (if not-p :ne :e) target)

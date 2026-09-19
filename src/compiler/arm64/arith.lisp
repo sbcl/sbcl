@@ -454,6 +454,10 @@
                (setf y tmp-tn))
              (inst mul r x y))))))
 
+(define-vop (*/signed-fixnum=>fixnum */fixnum=>fixnum)
+  (:args (y :scs (signed-reg))
+         (x :scs (any-reg))))
+
 (define-vop (*/signed=>signed */fixnum=>fixnum)
   (:args (x :scs (signed-reg))
          (y :scs (signed-reg immediate)))

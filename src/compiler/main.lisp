@@ -599,6 +599,8 @@ necessary, since type inference may take arbitrarily long to converge.")
   ;; IR2-convert renumbers blocks according to forward emit order.
   (find-dominators component)
 
+  (select-tagging component)
+
   (ir2-convert component)
 
   (when (policy *lexenv* (>= speed compilation-speed))

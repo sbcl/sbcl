@@ -3169,7 +3169,7 @@
     (map-all-uses (lambda (node)
                     (when use
                       (return-from fold-list-accessors))
-                    (setf use node)) cons nil)
+                    (setf use node)) cons :cast nil)
     (when (setf name (combination-is use '(list list*)))
       (map-refs (lambda (ref lvar)
                   (declare (ignore lvar))

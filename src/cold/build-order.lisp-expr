@@ -463,6 +463,7 @@
  ("src/compiler/ltv")
  ("src/compiler/gtn")
  ("src/compiler/ltn")
+ ("src/compiler/select-tagging")
  ("src/compiler/stack")
  ("src/compiler/control")
  ("src/compiler/entry")

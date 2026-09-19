@@ -5297,6 +5297,7 @@
   (destructuring-bind (dst1 src1 immr1 imms1) (stmt-operands stmt)
     (destructuring-bind (dst2 src2 immr2 imms2) (stmt-operands next)
       (when (and (/= imms1 63)
+                 (fixnump imms2) ;; can be a fixup
                  (/= imms2 63)
                  (= (1+ imms1) immr1)
                  (= (1+ imms2) immr2)

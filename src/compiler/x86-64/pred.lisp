@@ -305,7 +305,7 @@
   (:translate eq)
   (:arg-refs x-tn-ref)
   (:temporary (:sc unsigned-reg) temp) ; TODO: add :unused-if
-  (:generator 6
+  (:generator 1
     (cond
       ((sc-is y constant)
        (inst cmp x (cond ((sc-is x descriptor-reg any-reg) y)
