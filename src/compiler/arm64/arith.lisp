@@ -1173,6 +1173,7 @@
   (:info size posn)
   (:results (res :scs (any-reg)))
   (:result-types tagged-num)
+  (:related-args y)
   (:generator 2
     (move res y)
     (inst bfm res x (- (1- n-word-bits) posn) (1- (if (>= (+ size posn)
@@ -1191,6 +1192,7 @@
   (:info size posn)
   (:results (res :scs (unsigned-reg signed-reg)))
   (:result-types (:or unsigned-num signed-num))
+  (:related-args y)
   (:generator 3
     (move res y)
     (inst bfm res x (if (= posn 0)

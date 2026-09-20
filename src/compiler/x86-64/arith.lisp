@@ -5318,6 +5318,7 @@
   (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
   (:results (res :scs (any-reg)))
   (:result-types tagged-num)
+  (:related-args y)
   (:generator 2
     (move res y)
     (unless (csubtypep (tn-ref-type posn-ref) (specifier-type '(mod 64)))
@@ -5343,6 +5344,7 @@
   (:ignore size)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
+  (:related-args y)
   (:generator 3
     (move res y)
     (unless (csubtypep (tn-ref-type posn-ref) (specifier-type '(mod 64)))
@@ -5366,6 +5368,7 @@
   (:ignore size)
   (:results (res :scs (signed-reg)))
   (:result-types signed-num)
+  (:related-args y)
   (:generator 3
     (move res y)
     (unless (csubtypep (tn-ref-type posn-ref) (specifier-type '(mod 64)))
