@@ -922,35 +922,32 @@
   (def ash-left/signed=>signed ash-left-c/signed=>signed signed-reg signed-num signed-reg 3)
   (def ash-left/unsigned=>unsigned ash-left-c/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
 
-(define-vop (ash-left-modfx/fixnum=>fixnum
-             ash-left/fixnum=>fixnum)
+(define-vop (ash-left-modfx/fixnum=>fixnum ash-left/fixnum=>fixnum)
   (:variant t)
   (:translate ash-left-modfx))
 
-(define-vop (ash-left-modfx-c/fixnum=>fixnum
-             ash-left-c/fixnum=>fixnum)
+(define-vop (ash-left-modfx/signed=>signed ash-left/signed=>signed)
+  (:variant t)
   (:translate ash-left-modfx))
 
-(define-vop (ash-left-mod64-c/fixnum=>fixnum
-             ash-left-c/fixnum=>fixnum)
+(define-vop (ash-left-modfx-c/fixnum=>fixnum ash-left-c/fixnum=>fixnum)
+  (:translate ash-left-modfx))
+
+(define-vop (ash-left-mod64-c/fixnum=>fixnum ash-left-c/fixnum=>fixnum)
   (:translate ash-left-mod64))
 
-(define-vop (ash-left-mod64/fixnum=>fixnum
-             ash-left/fixnum=>fixnum)
+(define-vop (ash-left-mod64/fixnum=>fixnum ash-left/fixnum=>fixnum)
   (:variant t)
   (:translate ash-left-mod64))
 
-(define-vop (ash-left-mod64/unsigned=>unsigned
-             ash-left/unsigned=>unsigned)
+(define-vop (ash-left-mod64/unsigned=>unsigned ash-left/unsigned=>unsigned)
   (:variant t)
   (:translate ash-left-mod64))
 
-(define-vop (ash-left-mod64-c/unsigned=>unsigned
-             ash-left-c/unsigned=>unsigned)
+(define-vop (ash-left-mod64-c/unsigned=>unsigned ash-left-c/unsigned=>unsigned)
   (:translate ash-left-mod64))
 
-(define-vop (ash-modfx/signed=>signed
-             ash/signed=>signed)
+(define-vop (ash-modfx/signed=>signed ash/signed=>signed)
   (:translate ash-modfx))
 
 (define-vop (ash-modfx/unsigned=>signed ash/signed/unsigned)

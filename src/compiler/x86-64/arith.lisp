@@ -2796,8 +2796,7 @@
         (move ecx amount)
       (inst shl result :cl))))
 
-(define-vop (ash-left/fixnum-modfx=>fixnum
-             ash-left/fixnum=>fixnum)
+(define-vop (ash-left-modfx/fixnum=>fixnum ash-left/fixnum=>fixnum)
   (:translate ash-left-modfx)
   (:arg-refs nil amount-ref)
   (:generator 3
@@ -2811,12 +2810,19 @@
       OKAY
       (inst shl result :cl))))
 
-(define-vop (ash-left-mod64-c/unsigned=>unsigned
-             ash-c/unsigned=>unsigned)
+(define-vop (ash-left-modfx/signed=>signed ash-left-modfx/fixnum=>fixnum)
+  (:args (number :scs (signed-reg control-stack) :target result)
+         (amount :scs (unsigned-reg) :target ecx))
+  (:results (result :scs (signed-reg control-stack) :from (:argument 0)))
+  (:variant-cost 4))
+
+(define-vop (ash-left-mod64-c/unsigned=>unsigned ash-c/unsigned=>unsigned)
   (:translate ash-left-mod64))
 
-(define-vop (ash-left-modfx-c/fixnum=>fixnum
-             ash-c/fixnum=>fixnum)
+(define-vop (ash-left-modfx-c/fixnum=>fixnum ash-c/fixnum=>fixnum)
+  (:translate ash-left-modfx))
+
+(define-vop (ash-left-modfx-c/signed=>siggned ash-c/signed=>signed)
   (:translate ash-left-modfx))
 
 (define-vop (ash-left/unsigned-mod64=>unsigned
