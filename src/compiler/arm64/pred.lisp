@@ -128,7 +128,7 @@
   (:vop-var vop)
   (:conditional :eq)
   (:translate eq)
-  (:generator 7
+  (:generator 1
     (let ((value (sc-case y
                    (immediate
                     (let ((value (tn-value y)))
