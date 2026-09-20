@@ -61,16 +61,15 @@
   (:generator 1
     (move val cfp-tn)))
 
-;;; Used for computing the caller's NFP for use in known-values return.  Only
-;;; works assuming there is no variable size stuff on the nstack.
+;;; Used for computing the caller's NFP for use in known-values return.
 (define-vop (compute-old-nfp)
   (:results (val :scs (any-reg)))
   (:vop-var vop)
   (:generator 1
     (let ((nfp (current-nfp-tn vop)))
       (when nfp
-        ;; FIXME-ARM: taken form MIPS is this correct? (phs)
-        (inst add val nfp (bytes-needed-for-non-descriptor-stack-frame))))))
+        (loadw val cfp-tn ocfp-save-offset)
+        (loadw val val nfp-save-offset)))))
 
 ;;; Accessing a slot from an earlier stack frame is definite hackery.
 (define-vop (ancestor-frame-ref)
