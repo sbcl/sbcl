@@ -19,7 +19,11 @@
 (defconstant sb-fasl:+backend-fasl-file-implementation+ :arm)
 
   ;; Minumum observed value, not authoritative.
-(defconstant +backend-page-bytes+ #-netbsd 4096 #+netbsd 8192)
+(defconstant +backend-page-bytes+
+  ;; normally, it's 4K, but running on a 64-bit kernel may require
+  ;; using 64K pages
+  #-netbsd 65536
+  #+netbsd 8192)
 
 ;;; The size in bytes of GENCGC cards, i.e. the granularity at which
 ;;; writes to old generations are logged.  With mprotect-based write
