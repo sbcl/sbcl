@@ -339,7 +339,8 @@
   (before-load :unspecified :type (or (member :unspecified) list))
   (gc-barrier nil)
   (check-type nil)
-  (boxing-variant nil))
+  (boxing-variant nil)
+  (related-args nil))
 (declaim (freeze-type vop-parse))
 (defprinter (vop-parse)
   name
@@ -369,7 +370,8 @@
 (defglobal vop-parse-slot-names
     '(arg-types args before-load body boxing-variant check-type conditional-p cost gc-barrier guard ignores info-args
       inherits ltn-policy more-args more-results move-args name node-var note optional-results
-      result-types results save-p source-location temps translate variant variant-vars vop-var))
+      result-types results save-p source-location temps translate variant variant-vars vop-var
+      related-args))
 ;; A sanity-check. Of course if this fails, the likelihood is that you can't even
 ;; get this far in cross-compilaion. So it's probably not worth much.
 (eval-when (#+sb-xc :compile-toplevel)
@@ -1142,6 +1144,8 @@
          (setf (vop-parse-check-type parse) (rest spec)))
         (:boxing-variant
          (setf (vop-parse-boxing-variant parse) (second spec)))
+        (:related-args
+         (setf (vop-parse-related-args parse) (rest spec)))
         (t
          (error "unknown option specifier: ~S" (first spec)))))
     (cond (arg-refs-p
@@ -1553,6 +1557,14 @@
                      (template-or-lose ',(vop-parse-name ,parse))))
        (list ,slot ,form)))
 
+(defun arg-name-bitmask (args parse)
+  (let ((mask 0))
+    (loop for arg in args
+          do (setf (ldb (byte 1 (position arg (vop-parse-operands parse) :key #'operand-parse-name))
+                        mask)
+                   1))
+    mask))
+
 ;;; Return a form that creates a VOP-INFO structure which describes VOP.
 (defun set-up-vop-info (iparse parse)
   (declare (type vop-parse parse) (type (or vop-parse null) iparse))
@@ -1596,16 +1608,17 @@
       ;; TODO: inherit it?
       ,(make-after-sc-function parse)
       :gc-barrier ',(vop-parse-gc-barrier parse)
-      :check-type ,(let ((mask 0)
-                         (spec (vop-parse-check-type parse)))
-                     (unless (equal spec '(t))
-                       (loop for arg in spec
-                             do (setf (ldb (byte 1 (position arg (vop-parse-operands parse) :key #'operand-parse-name))
-                                           mask)
-                                      1)))
-                     mask)
+      :check-type ,(let ((spec (vop-parse-check-type parse)))
+                     (if (equal spec '(t))
+                         0
+                         (arg-name-bitmask spec parse)))
       ,@(when (vop-parse-boxing-variant parse)
           `(:boxing-variant (template-or-lose ',(vop-parse-boxing-variant parse))))
+      :related-args ,(let ((spec (vop-parse-related-args parse)))
+                       (if spec
+                           (arg-name-bitmask spec parse)
+                           -1))
+
       #+(and (not sb-xc-host) sb-devel)
       :optimizer
       #+(and (not sb-xc-host) sb-devel)

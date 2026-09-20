@@ -736,6 +736,7 @@
   (:temporary (:sc non-descriptor-reg) temp)
   (:arg-refs nil amount-ref)
   (:variant-vars variant)
+  (:related-args number)
   (:generator 5
     (let ((negative (csubtypep (tn-ref-type amount-ref)
                                (specifier-type `(integer * 0)))))
@@ -800,6 +801,7 @@
   (:temporary (:sc non-descriptor-reg) temp)
   (:arg-refs nil amount-ref)
   (:variant-vars variant)
+  (:related-args number)
   (:generator 5
     (let ((positive (csubtypep (tn-ref-type amount-ref)
                                (specifier-type '(integer 0)))))
@@ -888,6 +890,7 @@
                   (:arg-refs nil amount-ref)
                   (:results (result :scs (,result-type)))
                   (:result-types ,type)
+                  (:related-args number)
                   (:generator ,cost
                     (cond ((and cut
                                 (not (csubtypep (tn-ref-type amount-ref)

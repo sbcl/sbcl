@@ -749,7 +749,9 @@
   (translate nil)
   ;; A bit mask of arguments for which this VOP checks the type
   (check-type 0 :type fixnum)
-  (boxing-variant nil :type (or null vop-info)))
+  (boxing-variant nil :type (or null vop-info))
+  ;; Which args prefer the same tagging as the results?
+  (related-args -1 :type fixnum))
 (!set-load-form-method vop-info (:xc :target) :ignore-it)
 
 (declaim (inline vop-name))

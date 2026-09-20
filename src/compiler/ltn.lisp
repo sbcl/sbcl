@@ -829,8 +829,10 @@
       (setq rejected template))))
 
 (defun tagged-template-p (vop-info)
-  (and (loop for costs in (vop-info-arg-costs vop-info)
-             always (eql (svref costs sb-vm:any-reg-sc-number) 0))
+  (and (loop for related fixnum = (vop-info-related-args vop-info)  then (ash related -1)
+             for costs in (vop-info-arg-costs vop-info)
+             always (or (not (logbitp 0 related))
+                        (eql (svref costs sb-vm:any-reg-sc-number) 0)))
        (loop for costs in (vop-info-result-costs vop-info)
              always (eql (svref costs sb-vm:any-reg-sc-number) 0))))
 

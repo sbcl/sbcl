@@ -2722,9 +2722,10 @@
   (:result-types tagged-num)
   (:note "inline ASH")
   (:temporary (:sc unsigned-reg) temp)
+  (:related-args number)
   (:generator 3
     (with-shift-operands
-      (move ecx amount)
+        (move ecx amount)
       ;; The result-type ensures us that this shift will not overflow.
       (inst shl result :cl))))
 
@@ -2773,9 +2774,10 @@
   (:result-types signed-num)
   (:note "inline ASH")
   (:temporary (:sc unsigned-reg) temp)
+  (:related-args number)
   (:generator 4
     (with-shift-operands
-      (move ecx amount)
+        (move ecx amount)
       (inst shl result :cl))))
 
 (define-vop (ash-left/unsigned=>unsigned)
@@ -2788,9 +2790,10 @@
   (:result-types unsigned-num)
   (:note "inline ASH")
   (:temporary (:sc unsigned-reg) temp)
+  (:related-args number)
   (:generator 4
     (with-shift-operands
-      (move ecx amount)
+        (move ecx amount)
       (inst shl result :cl))))
 
 (define-vop (ash-left/fixnum-modfx=>fixnum
@@ -2840,9 +2843,10 @@
   (:result-types unsigned-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
   (:temporary (:sc unsigned-reg) temp)
+  (:related-args number)
   (:generator 4
     (with-shift-operands
-      (move rcx amount)
+        (move rcx amount)
       (inst shr result :cl))))
 
 (define-vop (%ash/right/signed)
@@ -2854,9 +2858,10 @@
   (:result-types signed-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
   (:temporary (:sc unsigned-reg) temp)
+  (:related-args number)
   (:generator 4
     (with-shift-operands
-      (move rcx amount)
+        (move rcx amount)
       (inst sar result :cl))))
 
 (define-vop (%ash/right/fixnum)
@@ -2868,9 +2873,10 @@
   (:result-types tagged-num)
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
   (:temporary (:sc unsigned-reg) temp)
+  (:related-args number)
   (:generator 3
     (with-shift-operands
-      (move rcx amount)
+        (move rcx amount)
       (inst sar result :cl)
       (inst and result (lognot fixnum-tag-mask)))))
 ) ; end MACROLET
@@ -2885,6 +2891,7 @@
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) ecx)
   (:arg-refs nil amount-ref)
   (:variant-vars check-amount signed)
+  (:related-args number)
   (:note "inline ASH")
   (:generator 5
     (let ((amount-width (if (csubtypep (tn-ref-type amount-ref)
@@ -3133,6 +3140,7 @@
   (:temporary (:sc any-reg :from (:eval 0) :to (:eval 1)) zero)
   (:note "inline ASH")
   (:guard (member :cmov *backend-subfeatures*))
+  (:related-args number)
   (:generator 4
     (move result number)
     (move ecx amount)
