@@ -288,6 +288,10 @@
                        (move r x)
                        (inst and r extra-ones)
                        t)
+                      ((= y (fixnumize most-positive-fixnum))
+                       (move r x)
+                       (inst btr r 63)
+                       t)
                       (t
                        (let* ((int (sb-c::type-approximate-interval (tn-ref-type x-ref)))
                               (mask (logandc1 (logior y fixnum-tag-mask)
