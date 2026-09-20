@@ -3562,7 +3562,12 @@ is :ANY, the function name is not checked."
 ;;; Change the LEAF that a REF refers to.
 (defun change-ref-leaf (ref leaf &key recklessly)
   (declare (type ref ref) (type leaf leaf))
-  (unless (eq (ref-leaf ref) leaf)
+  (unless (or (eq (ref-leaf ref) leaf)
+              (and (constant-p leaf)
+                   ;; Don't move constants to type errors
+                   (combination-match2 ((node-dest ref) :transform nil)
+                     (((:or %type-check-error %type-check-error/c) x &rest)
+                      (lvar-from-lvar-p x (node-lvar ref))))))
     (push ref (leaf-refs leaf))
     (update-ref-dependencies leaf ref)
     (delete-ref ref)
