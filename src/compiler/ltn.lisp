@@ -829,12 +829,17 @@
       (setq rejected template))))
 
 (defun tagged-template-p (vop-info)
-  (and (loop for related fixnum = (vop-info-related-args vop-info)  then (ash related -1)
-             for costs in (vop-info-arg-costs vop-info)
-             always (or (not (logbitp 0 related))
-                        (eql (svref costs sb-vm:any-reg-sc-number) 0)))
-       (loop for costs in (vop-info-result-costs vop-info)
-             always (eql (svref costs sb-vm:any-reg-sc-number) 0))))
+  (let ((untagged t))
+    (and (loop for related fixnum = (vop-info-related-args vop-info) then (ash related -1)
+               for costs in (vop-info-arg-costs vop-info)
+               always (or (not (logbitp 0 related))
+                          (progn
+                            (unless (eql (svref costs sb-vm:signed-reg-sc-number) 0)
+                              (setf untagged nil))
+                            (eql (svref costs sb-vm:any-reg-sc-number) 0))))
+         (not untagged)
+         (loop for costs in (vop-info-result-costs vop-info)
+               always (eql (svref costs sb-vm:any-reg-sc-number) 0)))))
 
 ;;; Given a partially annotated known call and a translation policy,
 ;;; return the appropriate template, or NIL if none can be found. We
