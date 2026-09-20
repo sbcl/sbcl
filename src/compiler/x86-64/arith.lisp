@@ -5157,7 +5157,7 @@
                                         (inst test x x)
                                         (change-vop-flags vop '(:ge)))
                                        ((and (= (logcount (+ hi 1)) 1)
-                                             (> fhi 127))
+                                             (not (imm32-p fhi)))
                                         (change-vop-flags vop '(:e))
                                         (move temp x)
                                         (inst shr temp (integer-length fhi)))
