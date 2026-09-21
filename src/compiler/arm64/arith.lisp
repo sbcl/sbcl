@@ -922,32 +922,35 @@
   (def ash-left/signed=>signed ash-left-c/signed=>signed signed-reg signed-num signed-reg 3)
   (def ash-left/unsigned=>unsigned ash-left-c/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
 
-(define-vop (ash-left-modfx/fixnum=>fixnum ash-left/fixnum=>fixnum)
+(define-vop (ash-left-modfx/fixnum=>fixnum
+             ash-left/fixnum=>fixnum)
   (:variant t)
   (:translate ash-left-modfx))
 
-(define-vop (ash-left-modfx/signed=>signed ash-left/signed=>signed)
-  (:variant t)
+(define-vop (ash-left-modfx-c/fixnum=>fixnum
+             ash-left-c/fixnum=>fixnum)
   (:translate ash-left-modfx))
 
-(define-vop (ash-left-modfx-c/fixnum=>fixnum ash-left-c/fixnum=>fixnum)
-  (:translate ash-left-modfx))
-
-(define-vop (ash-left-mod64-c/fixnum=>fixnum ash-left-c/fixnum=>fixnum)
+(define-vop (ash-left-mod64-c/fixnum=>fixnum
+             ash-left-c/fixnum=>fixnum)
   (:translate ash-left-mod64))
 
-(define-vop (ash-left-mod64/fixnum=>fixnum ash-left/fixnum=>fixnum)
+(define-vop (ash-left-mod64/fixnum=>fixnum
+             ash-left/fixnum=>fixnum)
   (:variant t)
   (:translate ash-left-mod64))
 
-(define-vop (ash-left-mod64/unsigned=>unsigned ash-left/unsigned=>unsigned)
+(define-vop (ash-left-mod64/unsigned=>unsigned
+             ash-left/unsigned=>unsigned)
   (:variant t)
   (:translate ash-left-mod64))
 
-(define-vop (ash-left-mod64-c/unsigned=>unsigned ash-left-c/unsigned=>unsigned)
+(define-vop (ash-left-mod64-c/unsigned=>unsigned
+             ash-left-c/unsigned=>unsigned)
   (:translate ash-left-mod64))
 
-(define-vop (ash-modfx/signed=>signed ash/signed=>signed)
+(define-vop (ash-modfx/signed=>signed
+             ash/signed=>signed)
   (:translate ash-modfx))
 
 (define-vop (ash-modfx/unsigned=>signed ash/signed/unsigned)
@@ -1235,26 +1238,20 @@
                      (vopcu   (symbolicate name "-C/UNSIGNED=>UNSIGNED"))
                      (vopf    (symbolicate name "/FIXNUM=>FIXNUM"))
                      (vopcf   (symbolicate name "-C/FIXNUM=>FIXNUM"))
-                     (vops    (symbolicate name "/SIGNED=>SIGNED"))
-                     (vopcs   (symbolicate name "-C/SIGNED=>SIGNED"))
                      (vop64u  (symbolicate name "-MOD64/WORD=>UNSIGNED"))
                      (vop64f  (symbolicate name "-MOD64/FIXNUM=>FIXNUM"))
                      (vop64cu (symbolicate name "-MOD64-C/WORD=>UNSIGNED"))
                      (vopfxf  (symbolicate name "-MODFX/FIXNUM=>FIXNUM"))
-                     (vopfxcf (symbolicate name "-MODFX-C/FIXNUM=>FIXNUM"))
-                     (vopfxs  (symbolicate name "-MODFX/SIGNED=>SIGNED"))
-                     (vopfxcs (symbolicate name "-MODFX-C/SIGNED=>SIGNED")))
+                     (vopfxcf (symbolicate name "-MODFX-C/FIXNUM=>FIXNUM")))
                  `(progn
                     (define-modular-fun ,fun64 (x y) ,name :untagged nil 64)
                     (define-modular-fun ,funfx (x y) ,name :tagged t ,n-fixnum-bits)
                     (define-mod-binop (,vop64u ,vopu) ,fun64 ,y-scs)
                     (define-vop (,vop64f ,vopf) (:translate ,fun64))
                     (define-vop (,vopfxf ,vopf) (:translate ,funfx))
-                    (define-vop (,vopfxs ,vops) (:translate ,funfx))
                     ,@(when -c-p
                         `((define-mod-binop-c (,vop64cu ,vopcu) ,fun64)
-                          (define-vop (,vopfxcf ,vopcf) (:translate ,funfx))
-                          (define-vop (,vopfxcs ,vopcs) (:translate ,funfx))))))))
+                          (define-vop (,vopfxcf ,vopcf) (:translate ,funfx))))))))
   (def + t)
   (def - t)
   (def * nil (immediate)))

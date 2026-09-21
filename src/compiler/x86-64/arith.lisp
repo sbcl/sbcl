@@ -2796,7 +2796,8 @@
         (move ecx amount)
       (inst shl result :cl))))
 
-(define-vop (ash-left-modfx/fixnum=>fixnum ash-left/fixnum=>fixnum)
+(define-vop (ash-left/fixnum-modfx=>fixnum
+             ash-left/fixnum=>fixnum)
   (:translate ash-left-modfx)
   (:arg-refs nil amount-ref)
   (:generator 3
@@ -2810,19 +2811,12 @@
       OKAY
       (inst shl result :cl))))
 
-(define-vop (ash-left-modfx/signed=>signed ash-left-modfx/fixnum=>fixnum)
-  (:args (number :scs (signed-reg control-stack) :target result)
-         (amount :scs (unsigned-reg) :target ecx))
-  (:results (result :scs (signed-reg control-stack) :from (:argument 0)))
-  (:variant-cost 4))
-
-(define-vop (ash-left-mod64-c/unsigned=>unsigned ash-c/unsigned=>unsigned)
+(define-vop (ash-left-mod64-c/unsigned=>unsigned
+             ash-c/unsigned=>unsigned)
   (:translate ash-left-mod64))
 
-(define-vop (ash-left-modfx-c/fixnum=>fixnum ash-c/fixnum=>fixnum)
-  (:translate ash-left-modfx))
-
-(define-vop (ash-left-modfx-c/signed=>siggned ash-c/signed=>signed)
+(define-vop (ash-left-modfx-c/fixnum=>fixnum
+             ash-c/fixnum=>fixnum)
   (:translate ash-left-modfx))
 
 (define-vop (ash-left/unsigned-mod64=>unsigned
@@ -3953,16 +3947,12 @@
                    (vopcu   (symbolicate name "-C/UNSIGNED=>UNSIGNED"))
                    (vopf    (symbolicate name "/FIXNUM=>FIXNUM"))
                    (vopcf   (symbolicate name "-C/FIXNUM=>FIXNUM"))
-                   (vops    (symbolicate name "/SIGNED=>SIGNED"))
-                   (vopcs   (symbolicate name "-C/SIGNED=>SIGNED"))
                    (vop64u  (symbolicate name "-MOD64/WORD=>UNSIGNED"))
                    (vop64f  (symbolicate name "-MOD64/FIXNUM=>FIXNUM"))
                    (vop64cu (symbolicate name "-MOD64-C/WORD=>UNSIGNED"))
                    (vop64cf (symbolicate name "-MOD64-C/FIXNUM=>FIXNUM"))
                    (vopfxf  (symbolicate name "-MODFX/FIXNUM=>FIXNUM"))
-                   (vopfxcf (symbolicate name "-MODFX-C/FIXNUM=>FIXNUM"))
-                   (vopfxs  (symbolicate name "-MODFX/SIGNED=>SIGNED"))
-                   (vopfxcs (symbolicate name "-MODFX-C/SIGNED=>SIGNED")))
+                   (vopfxcf (symbolicate name "-MODFX-C/FIXNUM=>FIXNUM")))
                (declare (ignore vop64cf)) ; maybe someone will want it some day
                `(progn
                   (define-modular-fun ,fun64 (x y) ,name :untagged nil 64)
@@ -3973,10 +3963,8 @@
                   ;; and which translates the normal function and the modular function?
                   (define-vop (,vop64f ,vopf) (:translate ,fun64))
                   (define-vop (,vopfxf ,vopf) (:translate ,funfx))
-                  (define-vop (,vopfxs ,vops) (:translate ,funfx))
                   (define-mod-binop-c (,vop64cu ,vopcu) ,fun64)
-                  (define-vop (,vopfxcf ,vopcf) (:translate ,funfx))
-                  (define-vop (,vopfxcs ,vopcs) (:translate ,funfx))))))
+                  (define-vop (,vopfxcf ,vopcf) (:translate ,funfx))))))
   (def +)
   (def -)
   (def *))
