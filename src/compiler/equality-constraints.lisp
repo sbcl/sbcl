@@ -353,6 +353,31 @@
                                           (constraint-not-p con)
                                           (equality-constraint-amount con)))))))
 
+(defun inherit-equality-constraints-excluding (vars from-var exclude constraints target)
+  (do-conset-constraints-intersection
+      (con (constraints (lambda-var-equality-constraints from-var)))
+    (let ((replace-x (if (eq from-var (constraint-var (constraint-x con)))
+                         t
+                         (aver (eq from-var (constraint-var (constraint-y con)))))))
+      (dolist (var vars)
+        (flet ((replace-var (var with)
+                 (if (vector-length-constraint-p var)
+                     (make-vector-length-constraint with)
+                     with)))
+          (multiple-value-bind (x y)
+              (if replace-x
+                  (values (replace-var (constraint-x con) var) (constraint-y con))
+                  (values (constraint-x con) (replace-var (constraint-y con) var)))
+            (unless (member-if (lambda (c)
+                                 (and (not (eq var c))
+                                      (or (eq c (constraint-var x))
+                                          (eq c (constraint-var y)))))
+                               exclude)
+              (conset-add-equality-constraint target (equality-constraint-operator con)
+                                              x y
+                                              (constraint-not-p con)
+                                              (equality-constraint-amount con)))))))))
+
 ;;; Ignore AMOUNT
 (defun join-equality-constraints (var block in pred-outs all-previous-outs-computed)
   (let* ((constraints (make-hash-table :test #'equal))

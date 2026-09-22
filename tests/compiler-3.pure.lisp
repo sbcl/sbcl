@@ -144,3 +144,17 @@
                     (logand #xFFFFFFF k)
                     (logand #xFFFFFFF l))))))
    ((1000) (values 3000 4000 5000 6000 7000 8000 9000 10000 11000 12000 13000 14000))))
+
+(with-test (:name :recursive-calls-inherit-constraints)
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (labels ((m (i j)
+                 (if (> i 5)
+                     (values i j)
+                     ((lambda (&optional jj)
+                        (m (+ i 1) jj) )
+                      i))))
+
+        (m 0 0)))
+   (() (values 6 5))))

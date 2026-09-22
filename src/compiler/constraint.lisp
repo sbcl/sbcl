@@ -647,6 +647,26 @@
                                    (constraint-not-p con)))))))
   (inherit-equality-constraints vars from-var constraints target))
 
+(defun inherit-constraints-excluding (vars from-var exclude constraints target)
+  (do-inheritable-constraints (con (constraints from-var))
+    (let ((eq-x (eq from-var (constraint-x con)))
+          (eq-y (eq from-var (constraint-y con))))
+      (dolist (var vars)
+        (let ((x (if eq-x var (constraint-x con)))
+              (y (if eq-y var (constraint-y con))))
+          (unless (or (eq x y)
+                      (member-if (lambda (c)
+                                   (and (not (eq c var))
+                                        (or (eq c x)
+                                            (eq c y))))
+                                 exclude))
+            (conset-add-constraint target
+                                   (constraint-kind con)
+                                   x
+                                   y
+                                   (constraint-not-p con)))))))
+  (inherit-equality-constraints-excluding vars from-var exclude constraints target))
+
 ;; Add an (EQL LAMBDA-VAR LAMBDA-VAR) constraint on VAR1 and VAR2 and
 ;; inherit each other's constraints.
 (defun add-eql-var-var-constraint (var1 var2 constraints
@@ -1359,7 +1379,13 @@
                  (when (type-for-constraints-p type)
                    (conset-add-constraint target 'typep var type nil))
                  (when arg-var
-                   (inherit-constraints (list var) arg-var constraints target))
+                   ;; Don't inherit constraints that have one of the
+                   ;; lambda vars, it would be about the value it's
+                   ;; bound around the call, not what it will be at
+                   ;; the bind site.
+                   (inherit-constraints-excluding (list var) arg-var
+                                                  vars
+                                                  constraints target))
                  (add-eq-constraint var val target)
                  (add-var-result-constraints var val target target)))))
 
