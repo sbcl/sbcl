@@ -725,14 +725,14 @@
     (inst mul :qword (ref-shared-qword-literal y))
     (move r eax)))
 
-(defun wordpair-to-bignum (result flag low high node &optional xmm0)
-  (declare (ignore xmm0))
+(defun wordpair-to-bignum (result flag low high xmm node)
+  (aver (= (tn-offset xmm) 15))
   (inst push high)
   (inst push low)
   (inst mov :byte result flag)
   (call-reg-specific-asm-routine node "BIGNUM-TO-" result))
-(defun unsigned-wordpair-to-bignum (result flag low high node &optional xmm0)
-  (declare (ignore xmm0))
+(defun unsigned-wordpair-to-bignum (result flag low high xmm node)
+  (aver (= (tn-offset xmm) 15))
   (inst push high)
   (inst push low)
   (inst mov :byte result flag)
@@ -746,8 +746,7 @@
   (:temporary (:sc signed-reg :offset rax-offset :from (:argument 0)) rax)
   (:temporary (:sc signed-reg :offset rdx-offset :from (:argument 1)) rdx)
   (:temporary (:sc signed-reg :from :eval) twodigit)
-  (:temporary (:sc complex-double-reg :offset 0) scratch)
-  (:ignore scratch)
+  (:temporary (:sc complex-double-reg :offset 15) scratch)
   (:results (r :scs (descriptor-reg)))
   (:vop-var vop)
   (:node-var node)
@@ -761,7 +760,7 @@
     (inst jmp :no DONE)
     (zeroize twodigit) ; = "no"
     allocate
-    (wordpair-to-bignum r twodigit rax rdx node)
+    (wordpair-to-bignum r twodigit rax rdx scratch node)
     DONE))
 
 (define-vop (*/signed=>s128)
@@ -848,8 +847,7 @@
   (:arg-types signed-num signed-num)
   (:temporary (:sc signed-reg :from (:argument 0)) low)
   (:temporary (:sc signed-reg :from :eval) high twodigit)
-  (:temporary (:sc complex-double-reg :offset 0) scratch)
-  (:ignore scratch)
+  (:temporary (:sc complex-double-reg :offset 15) scratch)
   (:results (r :scs (descriptor-reg)))
   (:vop-var vop)
   (:node-var node)
@@ -865,7 +863,7 @@
     allocate
     ;; high := CF broadcast into all bits. Ignored if single-digit
     (inst sbb high high)
-    (wordpair-to-bignum r twodigit low high node)
+    (wordpair-to-bignum r twodigit low high scratch node)
     DONE))
 
 (define-vop (+/unsigned=>integer)
@@ -907,8 +905,7 @@
   (:arg-types unsigned-num unsigned-num)
   (:temporary (:sc unsigned-reg :from (:argument 0)) low)
   (:temporary (:sc unsigned-reg :from :eval) high twodigit)
-  (:temporary (:sc complex-double-reg :offset 0) scratch)
-  (:ignore scratch)
+  (:temporary (:sc complex-double-reg :offset 15) scratch)
   (:results (r :scs (descriptor-reg)))
   (:vop-var vop)
   (:node-var node)
@@ -930,7 +927,7 @@
     (zeroize twodigit)
     allocate
     (inst sbb high high)
-    (wordpair-to-bignum r twodigit low high node)
+    (wordpair-to-bignum r twodigit low high scratch node)
     DONE))
 
 (define-vop (+/signed=>s128)
@@ -1018,8 +1015,7 @@
   (:arg-types signed-num signed-num)
   (:temporary (:sc signed-reg :from (:argument 0)) low)
   (:temporary (:sc signed-reg :from :eval) high twodigit)
-  (:temporary (:sc complex-double-reg :offset 0) scratch)
-  (:ignore scratch)
+  (:temporary (:sc complex-double-reg :offset 15) scratch)
   (:results (r :scs (descriptor-reg)))
   (:vop-var vop)
   (:node-var node)
@@ -1035,7 +1031,7 @@
     allocate
     (inst cmc)
     (inst sbb high high)
-    (wordpair-to-bignum r twodigit low high node)
+    (wordpair-to-bignum r twodigit low high scratch node)
     DONE))
 
 (define-vop (-/signed=>s128)
@@ -1125,8 +1121,7 @@
   (:temporary (:sc unsigned-reg :offset rax-offset :from (:argument 0)) rax)
   (:temporary (:sc unsigned-reg :offset rdx-offset :from (:argument 1)) rdx)
   (:temporary (:sc signed-reg :from (:argument 2)) multidigit)
-  (:temporary (:sc complex-double-reg :offset 0) scratch)
-  (:ignore scratch)
+  (:temporary (:sc complex-double-reg :offset 15) scratch)
   (:results (r :scs (descriptor-reg)))
   (:vop-var vop)
   (:node-var node)
@@ -1145,7 +1140,7 @@
     (inst jmp :no DONE)
     (zeroize multidigit)
     allocate
-    (unsigned-wordpair-to-bignum r multidigit rax rdx node)
+    (unsigned-wordpair-to-bignum r multidigit rax rdx scratch node)
     DONE))
 
 (define-vop (ash-left-add-signed)
@@ -1159,8 +1154,7 @@
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)
                :unused-if (sc-is shift immediate)) rcx)
   (:temporary (:sc signed-reg :from :eval) twodigit)
-  (:temporary (:sc complex-double-reg :offset 0) scratch)
-  (:ignore scratch)
+  (:temporary (:sc complex-double-reg :offset 15) scratch)
   (:results (r :scs (descriptor-reg)))
   (:vop-var vop)
   (:node-var node)
@@ -1194,7 +1188,7 @@
     (inst jmp :no DONE)
     (zeroize twodigit)
     allocate
-    (wordpair-to-bignum r twodigit rax rdx node)
+    (wordpair-to-bignum r twodigit rax rdx scratch node)
     DONE))
 
 (define-vop ()
@@ -1203,8 +1197,7 @@
          (add :scs (unsigned-reg)))
   (:arg-types signed-num unsigned-num)
   (:temporary (:sc signed-reg) twodigit)
-  (:temporary (:sc complex-double-reg :offset 0) scratch)
-  (:ignore scratch)
+  (:temporary (:sc complex-double-reg :offset 15) scratch)
   (:results (r :scs (descriptor-reg)))
   (:vop-var vop)
   (:node-var node)
@@ -1219,7 +1212,7 @@
     (inst jmp :no DONE)
     (zeroize twodigit)
     allocate
-    (wordpair-to-bignum r twodigit add x node)
+    (wordpair-to-bignum r twodigit add x scratch node)
     DONE))
 
 (define-vop (ash-left-add-unsigned)
@@ -1233,8 +1226,7 @@
   (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)
                :unused-if (sc-is shift immediate)) rcx)
   (:temporary (:sc signed-reg :from (:argument 2)) multidigit)
-  (:temporary (:sc complex-double-reg :offset 0) scratch)
-  (:ignore scratch)
+  (:temporary (:sc complex-double-reg :offset 15) scratch)
   (:results (r :scs (descriptor-reg)))
   (:vop-var vop)
   (:node-var node)
@@ -1260,7 +1252,7 @@
     (inst jmp :no DONE)
     (zeroize multidigit)
     allocate
-    (unsigned-wordpair-to-bignum r multidigit rax rdx node)
+    (unsigned-wordpair-to-bignum r multidigit rax rdx scratch node)
     DONE))
 
 (defun signed=>bignum-in-reg (node reg) ; arg/result in same reg
@@ -1279,8 +1271,7 @@
   (:arg-types unsigned-num)
   (:temporary (:sc unsigned-reg :from (:argument 0)) low)
   (:temporary (:sc unsigned-reg :from :eval) high twodigit)
-  (:temporary (:sc complex-double-reg :offset 0) scratch)
-  (:ignore scratch)
+  (:temporary (:sc complex-double-reg :offset 15) scratch)
   (:results (r :scs (descriptor-reg)))
   (:vop-var vop)
   (:node-var node)
@@ -1302,7 +1293,7 @@
     (zeroize twodigit)
     allocate
     (inst sbb high high)
-    (wordpair-to-bignum r twodigit low high node)
+    (wordpair-to-bignum r twodigit low high scratch node)
     DONE))
 
 (define-vop (%negate/signed=>integer)
@@ -1311,8 +1302,7 @@
   (:arg-types signed-num)
   (:temporary (:sc signed-reg :from (:argument 0)) low)
   (:temporary (:sc signed-reg :from :eval) high twodigit)
-  (:temporary (:sc complex-double-reg :offset 0) scratch)
-  (:ignore scratch)
+  (:temporary (:sc complex-double-reg :offset 15) scratch)
   (:results (r :scs (descriptor-reg)))
   (:vop-var vop)
   (:node-var node)
@@ -1328,7 +1318,7 @@
     allocate
     (inst cmc)
     (inst sbb high high)
-    (wordpair-to-bignum r twodigit low high node)
+    (wordpair-to-bignum r twodigit low high scratch node)
     DONE))
 
 (define-vop (%negate/signed=>s128)

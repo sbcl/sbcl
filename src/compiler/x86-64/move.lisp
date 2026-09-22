@@ -488,7 +488,7 @@
   (:temporary (:sc unsigned-reg) twodigit)
   (:vop-var vop)
   (:node-var node)
-  (:temporary (:sc complex-double-reg :offset 0) xmm0)
+  (:temporary (:sc complex-double-reg :offset 15) xmm)
   (:generator 30
     (inst mov :byte twodigit 1)
     ;; Is hi a sign extended from lo?
@@ -502,7 +502,7 @@
     (inst jmp :no DONE)
     (zeroize twodigit)
     TWO
-    (wordpair-to-bignum y twodigit lo hi node xmm0)
+    (wordpair-to-bignum y twodigit lo hi xmm node)
     DONE))
 
 (define-move-vop move-from-128 :move
