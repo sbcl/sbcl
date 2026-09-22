@@ -214,7 +214,8 @@
                          (let ((name (if (consp name)
                                          (second name)
                                          name)))
-                           (system-package-p (symbol-package name))))))
+                           (when (symbolp name)
+                             (system-package-p (symbol-package name)))))))
           (setf where :declared-verify))
         (when (typep name
                      '(cons (eql sb-impl::specialized-xep)))
