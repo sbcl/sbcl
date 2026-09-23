@@ -1,5 +1,56 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.6.8:
+  * minor incompatible change: structure slots defined as :READ-ONLY can be
+    written using SLOT-VALUE with the constant slot name, matching the
+    existing behaviour if the slot name is provided as a variable.
+  * enhancement: addition of u8.16-shuffle to SSE3 SB-SIMD support.  (thanks
+    to Qiantan Hong)
+  * enhancement: addition of some AVX512 support to SB-SIMD.  (thanks to Aaron
+    Estrada)
+  * bug fix: address a number of issues in the SB-SIMD contributed module.
+    (thanks to Sylvia Harrington)
+  * bug fix: don't improperly inherit dynamic extent nature of transformations
+    of lists constructed with dynamic extent.
+  * bug fix: don't call SB-GMP exponential function with a non-rational base.
+    (thanks to Ilia Gradina)
+  * bug fix: compiler internal error from stack manipulation in inline- and
+    dynamic-extent-heavy code.  (lp#2156347, reported by Vasily Postnicov)
+  * bug fix: the SB-MANUAL contributed module should build more reliably on
+    Windows.  (lp#2165787)
+  * bug fix: be more conservative when inferring types of components of
+    composite data structures lexically following a declaration in the
+    presence of possible side effects.  (lp#2165835)
+  * bug fix: compiler miscompilation of type checks of unused optional
+    arguments.  (lp#2165974, reported by Vasily Postnicov)
+  * bug fix: test consistency checks of system variables now correctly ignore
+    SB-IMPL::*READ-LINE-BUFFERS*, affecting particularly large heaps.
+    (lp#2167121, reported by 3b)
+  * bug fix: miscompilation through too-optimistic reuse of storage locations.
+    (lp#2167208)
+  * bug fix: compiler error from off-by-one access to internal data
+    structures.  (lp#2167568)
+  * bug fix: compiler error from compilation of nested functions with
+    non-local exits.  (lp#2167725)
+  * bug fix: compiler error after incautious value coalescing.  (lp#2167800)
+  * optimization: microoptimizations to the return sequence to generic
+    arithmetic assembly routines on x86-64.
+  * optimization: checks for whether floats are integral are more compact.
+  * optimization: on arm64, integer-length is more efficient on
+    machine-word-sized integers.
+  * optimization: certain basic operations on numeric RATIO types have a fast
+    path.
+  * optimization: the GMP-INTEXP used in the SB-GMP implementation of EXPT is faster.
+  * optimization: self- and mutually-referential functions can be
+    automatically stack-allocated when the system can prove that no function
+    reference can escape.
+  * optimization: the compiler can propagate equality constraints over local calls.
+  * optimization: the compiler can make use of register pairs for unboxed signed
+    128-bit simple arithmetic on ARM64 and x86-64.
+  * optimization: constraint propagation is somewhat faster.
+  * optimization: provide the compiler with smarts for type inference for
+    SB-SYS:WITH-INTERRUPTS.  (lp#2167153, reported by Vasily Postnicov)
+
 changes in sbcl-2.6.8 relative to sbcl-2.6.7:
   * minor incompatible change: FILE-POSITION on composite streams returns a
     more accurate result for CONCATENATED-STREAM, and NULL on TWO-WAY-STREAM
