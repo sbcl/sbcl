@@ -1273,15 +1273,102 @@
             (when type
               (type-intersection current-type type)))))))))
 
+;;;; Threshold widening
+
+;;; Widening thresholds computed on demand.
+(defvar *widening-thresholds*)
+
+;;; Grovel over all constants in the COMPONENT and collect any
+;;; relevant threshold values (i.e. those constants +/- 1) into a list
+;;; of increasing order. We also collect power of two bounds since
+;;; those are quite common (as in the types INDEX, FIXNUM,
+;;; (UNSIGNED-BYTE N)).
+(defun component-widening-thresholds (component)
+  (let ((constants '())
+        (thresholds (copy-list
+                     '#.(loop for k to sb-vm:n-word-bits
+                              for x = (ash 1 k)
+                              nconc (list (- x) (1- x) x)))))
+    (do-blocks (block component)
+      (do-nodes (node nil block)
+        (when (and (ref-p node)
+                   (constant-p (ref-leaf node)))
+          (let ((value (constant-value (ref-leaf node))))
+            (when (integerp value)
+              (push (1- value) thresholds)
+              (push value thresholds)
+              (push (1+ value) thresholds)
+              (push value constants))))))
+    (flet ((sorted-set (numbers)
+             (let ((sorted (sort numbers #'<)))
+               (loop for tail on sorted do
+                 (loop while (and (cdr tail) (= (car tail) (cadr tail))) do
+                   (setf (cdr tail) (cddr tail))))
+               sorted)))
+      (cons (sorted-set thresholds) (sorted-set constants)))))
+
+(defun integer-type-hull (type)
+  (let ((hull (weaken-numeric-union-type type)))
+    (when (and (numeric-type-p hull)
+               (eq (numeric-type-class hull) 'integer))
+      hull)))
+
+;;; Return the integer type between NEW and its supertype OLD where
+;;; the bounds of NEW are moved out to the nearest threshold within
+;;; OLD, excluding only the thresholds that NEW itself excludes.
+(defun widen-integer-type (old new component)
+  (let ((old-hull (integer-type-hull old))
+        (new-hull (and (neq old new)
+                       (integer-type-hull new))))
+    (unless (and old-hull new-hull)
+      (return-from widen-integer-type new))
+    (unless *widening-thresholds*
+      (setq *widening-thresholds* (component-widening-thresholds component)))
+    (let ((thresholds (car *widening-thresholds*))
+          (constants (cdr *widening-thresholds*)))
+      (flet ((widen-low (low old-low)
+               (when low
+                 (let ((threshold (find low thresholds :test #'>= :from-end t)))
+                   (if (and threshold old-low)
+                       (max threshold old-low)
+                       (or threshold old-low)))))
+             (widen-high (high old-high)
+               (when high
+                 (let ((threshold (find high thresholds :test #'<=)))
+                   (if (and threshold old-high)
+                       (min threshold old-high)
+                       (or threshold old-high))))))
+        (let ((result
+                (type-intersection
+                 old
+                 (make-numeric-type 'integer
+                                    (widen-low (numeric-type-low new-hull)
+                                               (numeric-type-low old-hull))
+                                    (widen-high (numeric-type-high new-hull)
+                                                (numeric-type-high old-hull))))))
+          (dolist (x constants result)
+            (when (and (ctypep x result)
+                       (not (ctypep x new)))
+              (setf result (type-difference result
+                                            (make-numeric-type 'integer x x))))))))))
+
+
 ;;; Given the set of CONSTRAINTS for a variable and the current set of
 ;;; restrictions from flow analysis IN, set the type for REF
-;;; accordingly.
+;;; accordingly. To improve the convergence speed of constraint
+;;; propagation, we widen integer types after a ref is narrowed for
+;;; the first time. Otherwise, the interplay of IR1 optimization and
+;;; CP will cause the types of expressions in loops such as (LOOP
+;;; (WHEN (ZEROP I) (RETURN)) (SETQ I (- I 2))) where I is initially
+;;; non-negative to create overly precise types which keep adding
+;;; excluded points and do not contribute anything useful until the
+;;; reoptimize limit is hit.
 (defun constrain-ref-type (ref in)
   (declare (type ref ref) (type conset in))
-  (let ((leaf (ref-leaf ref)))
+  (let* ((leaf (ref-leaf ref))
+         (old-type (single-value-type (node-derived-type ref))))
     (multiple-value-bind (type set)
-        (type-from-constraints leaf in (single-value-type (node-derived-type ref))
-                               ref)
+        (type-from-constraints leaf in old-type ref)
       (when type
         (unless set
           (setf (lambda-var-unused-initial-value leaf) nil))
@@ -1290,8 +1377,13 @@
         (cond ((logtest sb-kernel::ctype-contains-class
                         (sb-kernel::type-flags type)))
               (t
-               (derive-node-type ref
-                                 (make-single-value-type type))
+               (let ((derived (node-derived-type ref)))
+                 (when (ref-constraint-narrowed-p ref)
+                   (setq type (widen-integer-type old-type type
+                                                  (node-component ref))))
+                 (derive-node-type ref (make-single-value-type type))
+                 (unless (eq derived (node-derived-type ref))
+                   (setf (ref-constraint-narrowed-p ref) t)))
                (when (eq (node-derived-type ref) *empty-type*)
                  ;; Terminating blocks early may leave loops with
                  ;; just one entry point, resulting in
@@ -1798,7 +1890,8 @@
         (setf (if-consequent-constraints last) nil))))
 
   (let (*blocks-to-terminate*
-        *sets-to-delete*)
+        *sets-to-delete*
+        (*widening-thresholds* nil))
     (dolist (block (find-and-propagate-constraints component))
       (unless (block-delete-p block)
         (use-result-constraints block)))

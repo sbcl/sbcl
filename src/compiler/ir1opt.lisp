@@ -2369,6 +2369,7 @@
 (declaim (start-block ir1-optimize-set constant-reference-p delete-let
                       propagate-let-args propagate-local-call-args
                       propagate-to-refs propagate-from-sets
+                      weaken-numeric-union-type
                       converged-type-of-combination
                       maybe-infer-iteration-var-type
                       ir1-optimize-mv-combination
