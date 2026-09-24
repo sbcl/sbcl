@@ -378,57 +378,78 @@
                                               (constraint-not-p con)
                                               (equality-constraint-amount con)))))))))
 
-;;; Ignore AMOUNT
-(defun join-equality-constraints (var block in pred-outs all-previous-outs-computed)
-  (let* ((constraints (make-hash-table :test #'equal))
-         (i -1))
-    (loop for out in pred-outs
-          do
-          (incf i)
-          (do-equality-constraints (in-con in-op not-p amount) var out
-            (let ((existing (gethash (list in-con in-op not-p) constraints)))
-              (cond ((= (if existing
-                            (car existing)
-                            -1)
-                        (1- i))
-                     (setf (gethash (list in-con in-op not-p) constraints)
-                           (list i
-                                 (if existing
-                                     (min amount (second existing))
-                                     amount)
-                                 (second existing))))
-                    ((and existing
-                          (= (car existing) i))
-                     ;; Maximize the current block value while
-                     ;; not exceeding the overall minimal amount.
-                     (let ((overall-min (third existing))
-                           (block-max (max amount (second existing))))
-                       (setf (gethash (list in-con in-op not-p) constraints)
-                             (list i
-                                   (if overall-min
-                                       (min block-max overall-min)
-                                       block-max)
-                                   overall-min))))))))
+;;; A relation (OP VAR Y NOT-P) being joined by
+;;; JOIN-EQUALITY-CONSTRAINTS. INDEX is the last predecessor it was
+;;; found in, AMOUNT the joined amount so far, and PREVIOUS-AMOUNT the
+;;; joined amount before that predecessor.
+(defstruct (joined-equality
+            (:constructor make-joined-equality (y op not-p amount))
+            (:copier nil)
+            (:predicate nil))
+  (y nil :read-only t)
+  (op nil :read-only t)
+  (not-p nil :read-only t)
+  (index 0 :type index)
+  (amount 0 :type integer)
+  (previous-amount nil :type (or null integer)))
 
-    (when (and all-previous-outs-computed
-               (block-in block))
-      ;; If the amount has changed from the previous computation then
-      ;; it's probably being changed in a loop, remove that constraint
-      (do-equality-constraints (in-con in-op not-p amount) var (block-in block)
-        (let ((new (gethash (list in-con in-op not-p) constraints)))
-          (when (and (eql (car new) i)
-                     (not (eql (second new) amount)))
-            (setf (second new)
-                  (if (> (second new) amount)
-                      ;; Stop growing
-                      amount
-                      ;; Decrease directly to zero
-                      0))))))
-    (dohash ((key value) constraints)
-      (when (= (car value) i)
-        (destructuring-bind (y op not-p) key
-          (conset-add-equality-constraint in op var y not-p (second value)))))))
-
+;;; Join the equality constraints on VAR in PRED-OUTS into IN. A
+;;; relation holds after the join if it holds in every predecessor,
+;;; with the smallest of the largest amounts found in each.
+(defun join-equality-constraints (var block in pred-outs all-previous-outs-computed)
+  (let ((joined '())
+        (last-index (1- (length pred-outs))))
+    (flet ((find-joined (y op not-p)
+             (dolist (j joined)
+               (when (and (eq (joined-equality-y j) y)
+                          (eq (joined-equality-op j) op)
+                          (eq (joined-equality-not-p j) not-p))
+                 (return j)))))
+      (loop for out in pred-outs
+            for i from 0
+            do (do-equality-constraints (y op not-p amount) var out
+                 (let ((j (find-joined y op not-p)))
+                   (cond ((null j)
+                          (when (= i 0)
+                            (push (make-joined-equality y op not-p amount) joined)))
+                         ((= (joined-equality-index j) (1- i))
+                          ;; First found in this predecessor.
+                          (let ((previous (joined-equality-amount j)))
+                            (setf (joined-equality-index j) i
+                                  (joined-equality-previous-amount j) previous
+                                  (joined-equality-amount j) (min amount previous))))
+                         ((= (joined-equality-index j) i)
+                          ;; Maximize the current block value while
+                          ;; not exceeding the overall minimal amount.
+                          (let ((previous (joined-equality-previous-amount j))
+                                (block-max (max amount (joined-equality-amount j))))
+                            (setf (joined-equality-amount j)
+                                  (if previous
+                                      (min block-max previous)
+                                      block-max))))))))
+      (when (and all-previous-outs-computed
+                 (block-in block))
+        ;; If the amount has changed from the previous computation then
+        ;; it's probably being changed in a loop, remove that constraint
+        (do-equality-constraints (y op not-p amount) var (block-in block)
+          (let ((j (find-joined y op not-p)))
+            (when (and j
+                       (= (joined-equality-index j) last-index)
+                       (/= (joined-equality-amount j) amount))
+              (setf (joined-equality-amount j)
+                    (if (> (joined-equality-amount j) amount)
+                        ;; Stop growing
+                        amount
+                        ;; Decrease directly to zero
+                        0))))))
+      ;; In the order they were found in the first predecessor.
+      (dolist (j (nreverse joined))
+        (when (= (joined-equality-index j) last-index)
+          (conset-add-equality-constraint in (joined-equality-op j) var
+                                          (joined-equality-y j)
+                                          (joined-equality-not-p j)
+                                          (joined-equality-amount j)))))))
+
 (defun try-equality-constraint (call gen)
   (let ((constraint (fun-info-equality-constraint (basic-combination-fun-info call)))
         (lvar (node-lvar call)))
