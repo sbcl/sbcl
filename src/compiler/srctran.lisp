@@ -1027,8 +1027,32 @@
                                                (float-infinity-or-nan-p high))
                                     (floor high))))))))
 
+;;; Constraint propagation asks for the intervals of a few types over
+;;; and over, so they are cached. Callers may modify the intervals
+;;; they get, so they get a copy.
 (defun type-approximate-interval (type &optional integer)
   (declare (type ctype type))
+  (multiple-value-bind (interval complex)
+      (case integer
+        ((nil) (%type-approximate-interval type))
+        ((t) (%type-approximate-integer-interval type))
+        (t (compute-type-approximate-interval type integer)))
+    (values (and interval
+                 (%make-interval (copy-interval-limit (interval-low interval))
+                                 (copy-interval-limit (interval-high interval))))
+            complex)))
+
+(defun-cached (%type-approximate-interval
+               :hash-bits 8 :hash-function #'sb-kernel::type-%bits :values 2)
+    ((type eq))
+  (compute-type-approximate-interval type nil))
+
+(defun-cached (%type-approximate-integer-interval
+               :hash-bits 8 :hash-function #'sb-kernel::type-%bits :values 2)
+    ((type eq))
+  (compute-type-approximate-interval type t))
+
+(defun compute-type-approximate-interval (type integer)
   (let ((types (prepare-arg-for-derive-type type nil))
         (result nil)
         complex)
@@ -1040,7 +1064,7 @@
                     (t
                      type))))
         (unless (numeric-union-type-p type)
-          (return-from type-approximate-interval (values nil nil)))
+          (return-from compute-type-approximate-interval (values nil nil)))
         (let ((interval (numeric-type->interval type integer)))
           (when (eq (numeric-type-complexp type) :complex)
             (setf complex t))
