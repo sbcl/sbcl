@@ -542,7 +542,11 @@
   (worklist-flag nil :type boolean)
   ;; A table for keeping track of which source-paths have already had
   ;; a %MARK-COVERAGE function converted for them.
-  (source-path-marks nil :type (or null hash-table)))
+  (source-path-marks nil :type (or null hash-table))
+  ;; Slots used for Tarjan's algorithm.
+  (scc-index nil :type (or null index))
+  (scc-lowlink 0 :type index)
+  (scc nil :type list))
 (defmethod print-object ((cblock cblock) stream)
   (if (boundp '*compilation*)
       (print-unreadable-object (cblock stream :type t :identity t)

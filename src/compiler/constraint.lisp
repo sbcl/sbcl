@@ -1797,84 +1797,123 @@
           (t
            (setf (block-in block) in)))))
 
-;;; Return two lists: one of blocks that precede all loops and
-;;; therefore require only one constraint propagation pass and the
-;;; rest.
-;;;
-;;; Trailing blocks that succeed all loops could be found and handled
-;;; similarly. In practice though, these more complex solutions are
-;;; slightly worse performancewise.
-(defun leading-component-blocks (component)
-  (declare (type component component))
-  (collect ((leading-blocks) (rest-of-blocks))
-    (do-blocks (block component)
-      (let ((leading t)
-            (bind (block-start-node block))
-            fun)
-        (if (and (bind-p bind)
-                 (functional-kind-eq (setf fun (bind-lambda bind)) nil optional cleanup))
-            (loop for ref in (lambda-refs fun)
-                  for call = (node-dest ref)
-                  for call-block = (and call
-                                        (node-block call))
-                  do (unless (and call-block
-                                  (block-flag call-block))
-                       (setq leading nil)))
-            (dolist (pred (block-pred block))
-              (unless (block-flag pred)
-                (setq leading nil))))
-        (setf (block-flag block) leading)
-        (when (block-type-check block)
-          (if leading
-              (leading-blocks block)
-              (rest-of-blocks block)))))
-    (values (leading-blocks) (rest-of-blocks))))
+;;; This is like BLOCK-PRED but includes blocks of local calls to
+;;; lambda entry point blocks.
+(defun constraint-predecessors (block)
+  (let ((bind (block-start-node block)))
+    (if (and (bind-p bind)
+             (functional-kind-eq (bind-lambda bind) nil optional cleanup))
+        (collect ((pred))
+          (dolist (ref (lambda-refs (bind-lambda bind)))
+            (let ((call (node-dest ref)))
+              (when call
+                (pred (node-block call)))))
+          (pred))
+        (block-pred block))))
+
+;;; Return the strongly connected components of the constraint flow
+;;; graph of COMPONENT in topological order by running Tarjan's
+;;; algorithm on the constraint predecessor relation. The blocks of
+;;; the SCCs are themselves also sorted in topological order.
+(defun constraint-sccs (component)
+  (do-blocks (block component)
+    (setf (block-scc-index block) nil
+          (block-scc block) nil))
+  (let ((index 0)
+        (stack '())
+        (sccs '()))
+    (labels ((visit (block)
+               (setf (block-scc-index block) index
+                     (block-scc-lowlink block) index)
+               (incf index)
+               (push block stack)
+               (dolist (pred (constraint-predecessors block))
+                 (unless (eq pred (component-head component))
+                   (cond ((not (block-scc-index pred))
+                          (visit pred)
+                          (setf (block-scc-lowlink block)
+                                (min (block-scc-lowlink block)
+                                     (block-scc-lowlink pred))))
+                         ((not (block-scc pred))
+                          (setf (block-scc-lowlink block)
+                                (min (block-scc-lowlink block)
+                                     (block-scc-index pred)))))))
+               (when (= (block-scc-lowlink block)
+                        (block-scc-index block))
+                 (let ((scc (list nil)))
+                   (loop
+                     (let ((member (pop stack)))
+                       (setf (block-scc member) scc)
+                       (when (eq member block)
+                         (return))))
+                   (push scc sccs)))))
+     (do-blocks (root component)
+       (unless (block-scc-index root)
+         (visit root)))
+     (do-blocks (block component)
+       (push block (car (block-scc block))))
+     (dolist (scc sccs)
+       (setf (car scc) (nreverse (car scc))))
+     (nreverse sccs))))
 
 (defun enqueue-block-for-constraints (block)
   (when (block-type-check block)
     (setf (block-worklist-flag block) t)
     (setq *constraint-blocks-pending* t)))
 
+;;; Propagate constraints through a cyclic strongly connected
+;;; component to a fixpoint.
+(defun propagate-constraints-in-scc (blocks)
+  (flet ((frob (join-types-p)
+           (dolist (block blocks)
+             (setf (block-in block) nil)
+             (setf (block-worklist-flag block) t))
+           (loop
+             (setq *constraint-blocks-pending* nil)
+             (dolist (block blocks)
+               (when (block-worklist-flag block)
+                 (setf (block-worklist-flag block) nil)
+                 (when (and (not (block-delete-p block))
+                            (update-block-in block join-types-p))
+                   (mapc #'enqueue-block-for-constraints
+                         (find-block-type-constraints block nil)))))
+             (unless *constraint-blocks-pending*
+               (return)))))
+    ;; We can only start joining types on blocks in which constraint
+    ;; propagation might have to run multiple times (to fixpoint) once
+    ;; all type constraints are definitely correct. They may not be
+    ;; the first time around because EQL constraint propagation is
+    ;; optimistic, i.e. un-EQL variables may be considered EQL before
+    ;; constraint propagation is done, hence any inherited type
+    ;; constraints from such constraints will be wrong as well.
+    (frob nil)
+    (frob t))
+  (dolist (block blocks)
+    (unless (block-delete-p block)
+      (use-result-constraints block))))
+
+;;; Propagate constraints through the strongly connected components of
+;;; COMPONENT in topological order. This order allows us to fixpoint
+;;; on each SCC independently, and acyclic components only need to be
+;;; processed once.
 (defun find-and-propagate-constraints (component)
-  (clear-flags component)
-  (multiple-value-bind (leading-blocks rest-of-blocks)
-      (leading-component-blocks component)
-    ;; Update every block once to account for changes in the
-    ;; IR1. The constraints of the lead blocks cannot be changed
-    ;; after the first pass so we might as well use them and skip
-    ;; USE-RESULT-CONSTRAINTS later.
-    (dolist (block leading-blocks)
-      (setf (block-in block) (compute-block-in block t))
-      (find-block-type-constraints block t)
-      (setf (block-worklist-flag block) nil))
-    ;; We can only start joining types on blocks in which
-    ;; constraint propagation might have to run multiple times (to
-    ;; fixpoint) once all type constraints are definitely
-    ;; correct. They may not be the first time around because EQL
-    ;; constraint propagation is optimistic, i.e. un-EQL variables
-    ;; may be considered EQL before constraint propagation is
-    ;; done, hence any inherited type constraints from such
-    ;; constraints will be wrong as well.
-    (dolist (join-types-p '(nil t))
-      ;; The rest of the blocks.
-      (dolist (block rest-of-blocks)
-        (setf (block-in block) nil)
-        (setf (block-worklist-flag block) t))
-
-      (loop
-        (let ((*constraint-blocks-pending* nil))
-          ;; Propagate constraints
-          (do-blocks (block component)
-            (unless (block-delete-p block)
-              (when (block-worklist-flag block)
-                (setf (block-worklist-flag block) nil)
-                (when (update-block-in block join-types-p)
-                  (mapc #'enqueue-block-for-constraints
-                        (find-block-type-constraints block nil))))))
-          (unless *constraint-blocks-pending*
-            (return)))))
-
-    rest-of-blocks))
+  (let ((*constraint-blocks-pending* nil))
+    (dolist (scc (constraint-sccs component))
+      (let* ((scc (car scc))
+             (blocks (remove-if-not (lambda (block)
+                                      (block-type-check block))
+                                    scc)))
+        (cond ((null blocks))
+              ((or (cdr scc)
+                   (let ((block (first scc)))
+                     (memq block (constraint-predecessors block))))
+               (propagate-constraints-in-scc blocks))
+              (t
+               (let ((block (car blocks)))
+                 (setf (block-worklist-flag block) nil)
+                 (unless (block-delete-p block)
+                   (setf (block-in block) (compute-block-in block t))
+                   (find-block-type-constraints block t)))))))))
 
 (defun constraint-propagate (component)
   (declare (type component component))
@@ -1892,9 +1931,7 @@
   (let (*blocks-to-terminate*
         *sets-to-delete*
         (*widening-thresholds* nil))
-    (dolist (block (find-and-propagate-constraints component))
-      (unless (block-delete-p block)
-        (use-result-constraints block)))
+    (find-and-propagate-constraints component)
     #+sb-devel
     (when (and *compiler-trace-output*
                (memq :constraints *compile-trace-targets*))

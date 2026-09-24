@@ -2237,5 +2237,11 @@
   (let ((b (& (>> val 2) #xf)))
    (let ((a (>> (<< val 7) 28)))
     (^ a (aref tab b))))))")
+(#(58E3020F 6C414B8A 771B4317 98A9616D 9F1704E1 B39B1FAB CA8CA715 CC2284AB CEAFAA9A D280FA56 DE0A9C1B)
+ "(:BY :BELOW :ABOVE :DOWNTO :TO :UPTO :UPFROM :DOWNFROM :FROM :IN :OF)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 0 11 5 12 0 0 6)))
+  (let ((b (& (>> val 5) #x7)))
+   (let ((a (>> (<< val 5) 29)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF
