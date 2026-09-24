@@ -420,7 +420,7 @@ necessary, since type inference may take arbitrarily long to converge.")
       (ir1-optimize component fastp)
       (let ((walk-reoptimized (component-reoptimize component)))
         (unless walk-reoptimized
-          (publish-optimistic-types component))
+          (publish-optimistic-types component fastp))
         (cond ((component-reoptimize component)
                (setf reoptimized t)
                ;; Don't count optimistic type publishing towards the

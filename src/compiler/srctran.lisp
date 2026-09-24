@@ -2135,9 +2135,10 @@
                           (csubtypep (specifier-type '(eql 0)) x)
                           (csubtypep y (specifier-type '(and integer (not (eql 0))))))
                  (return
-                   (let ((result (%two-arg-derive-type (type-intersection x (specifier-type '(and integer (not (eql 0)))))
-                                                       y
-                                                       #'*-derive-type-aux)))
+                   (let* ((x (type-intersection x (specifier-type '(and integer (not (eql 0))))))
+                          (result (if (eq x *empty-type*)
+                                      x
+                                      (%two-arg-derive-type x y #'*-derive-type-aux))))
                      (when result
                        (type-union result (specifier-type '(eql 0)))))))))
         ;; If one of the integer arguments is non zero seperate the zero

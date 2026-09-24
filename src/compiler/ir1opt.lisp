@@ -838,15 +838,31 @@
                    (when (find-result-type return)
                      (go :restart)))
                  (res (return-result-type return)))))
-           (unless (type= (res) (tail-set-type tails))
-             (setf (tail-set-type tails) (res))
-             (dolist (fun (tail-set-funs tails))
-               (let* ((entry-type (fun-type-change-return (leaf-type fun) (res)))
-                      (ref-type (make-single-value-type entry-type)))
-                 (setf (leaf-type fun) entry-type)
-                 (dolist (ref (leaf-refs fun))
-                   (setf (node-derived-type ref) ref-type)
-                   (reoptimize-lvar (node-lvar ref)))))))))))
+           (update-tail-set-type tails (res)))))))
+
+;;; Set the return type of all functions in TAIL-SET, as well as the
+;;; type of their references.
+(defun update-tail-set-type (tail-set type)
+  (let ((bound (tail-set-recursive-type tail-set)))
+    (when bound
+      (setf type (values-type-intersection type bound))
+      ;; Widen numeric types here, so that iterated solving doesn't
+      ;; accumulate unhelpful numeric types that have many excluded
+      ;; points.
+      (when (type-single-value-p type)
+        (setf type (values-type-intersection
+                    bound
+                    (make-single-value-type
+                     (weaken-numeric-union-type (single-value-type type))))))))
+  (unless (type= type (tail-set-type tail-set))
+    (setf (tail-set-type tail-set) type)
+    (dolist (fun (tail-set-funs tail-set))
+      (let* ((entry-type (fun-type-change-return (leaf-type fun) type))
+             (ref-type (make-single-value-type entry-type)))
+        (setf (leaf-type fun) entry-type)
+        (dolist (ref (leaf-refs fun))
+          (setf (node-derived-type ref) ref-type)
+          (reoptimize-lvar (node-lvar ref)))))))
 
 ;;;; IF optimization
 
@@ -3166,12 +3182,21 @@
                    (not (lambda-var-deleted var))
                    (optimistic-type-propagatable-fun-p home))
           (setf (lambda-var-optimistic-type var) *empty-type*)
-          (setf (lambda-optimistic-pending home) t)
-          (dolist (ref (leaf-refs home))
-            (let ((dest (node-dest ref)))
-              (when (and dest (combination-p dest) (node-prev dest))
-                (reoptimize-node dest))))
+          (note-optimistic-pending home)
           t))))
+
+;;; Note that the optimistic types of the variables of FUN are pending
+;;; for reanalysis, and reoptimize FUN's local calls.
+(defun note-optimistic-pending (fun)
+  (setf (lambda-optimistic-pending fun) t)
+  (dolist (ref (leaf-refs fun))
+    (let ((dest (node-dest ref)))
+      (when (and (combination-p dest)
+                 (eq (combination-kind dest) :local)
+                 (eq (basic-combination-fun dest) (node-lvar ref))
+                 (node-prev dest)
+                 (block-type-check (node-block dest)))
+        (reoptimize-node dest)))))
 
 ;;; The LAMBDA-VAR ARG references, looking through a cast.
 (defun combination-arg-lambda-var (arg)
@@ -3190,27 +3215,68 @@
               (init-variable-optimistic-type leaf)
               leaf))))
 
-;;; Return the optimistic type of the lvar ARG by taking into account
-;;; any variable references which may have optimistic types. Otherwise
-;;; fall back to any derived types.
-(defun optimistic-arg-types (arg)
-  (declare (type (or null lvar) arg))
-  (if (null arg)
-      (list *universal-type*)
-      (let* ((has-optimistic-p nil)
-             (types (mapcar (lambda (use)
-                              (let ((var (optimistic-var use)))
-                                (cond (var
-                                       (setf has-optimistic-p t)
-                                       (lambda-var-optimistic-type var))
-                                      (t
-                                       (single-value-type (node-derived-type use))))))
-                            (ensure-list (lvar-uses arg)))))
-        ;; Fall back to LVAR-TYPE if no tracked parameters were
-        ;; present, since it takes casts into account as well.
-        (if has-optimistic-p
-            types
-            (list (lvar-type arg))))))
+;;; Arbitrary. In principal it would be better to not have a depth
+;;; cutoff and to iterate types to fixpoint.
+(defparameter *optimistic-solve-depth* 8)
+
+;;; Return the optimistic type of LVAR computed from the optimistic
+;;; types of its uses, or NIL if it doesn't depend on them. Known
+;;; functions, casts and LET variables are looked through to a DEPTH,
+;;; which is zero for the arguments of local calls, as
+;;; NOTE-OPTIMISTIC-CHANGE notes the changes of those only.
+(defun lvar-optimistic-type (lvar &optional (depth 0))
+  (let ((type nil)
+        (dependent nil))
+    (do-uses (use lvar)
+      (let* ((optimistic (node-optimistic-type use depth))
+             (use-type (or optimistic (single-value-type (node-derived-type use)))))
+        (when optimistic
+          (setf dependent t))
+        (setf type (if type (type-union type use-type) use-type))))
+    (and dependent type)))
+
+(defun node-optimistic-type (node depth)
+  (typecase node
+    (ref
+     (let ((var (ref-leaf node)))
+       (when (lambda-var-p var)
+         (if (and (plusp depth)
+                  (not (lambda-var-sets var))
+                  (functional-kind-eq (lambda-var-home var) let))
+             (lvar-optimistic-type (let-var-initial-value var) (1- depth))
+             (and (optimistic-var node)
+                  (lambda-var-optimistic-type var))))))
+    (combination
+     (case (combination-kind node)
+       (:local
+        (let* ((tail-set (lambda-tail-set (combination-lambda node)))
+               (type (and tail-set
+                          (or (tail-set-optimistic-type tail-set)
+                              (and (recursive-tail-set-p tail-set)
+                                   (setf (tail-set-optimistic-type tail-set)
+                                         *empty-type*))))))
+          (and type
+               (type-intersection (single-value-type type)
+                                  (single-value-type (node-derived-type node))))))
+       (:known
+        (when (plusp depth)
+          ;; Type derivers may look at the arguments themselves, such
+          ;; as whether they are constant, so only make up the ones
+          ;; that depend on the optimistic types.
+          (let* ((dependent nil)
+                 (args (loop for arg in (combination-args node)
+                             for type = (lvar-optimistic-type arg (1- depth))
+                             when type
+                               do (setf dependent t)
+                             collect (or type arg))))
+            (when dependent
+              (if (member *empty-type* args)
+                  *empty-type*
+                  (let ((type (combination-derive-type-for-arg-types node args)))
+                    (and type (single-value-type type))))))))))
+    (cast
+     (and (plusp depth)
+          (lvar-optimistic-type (cast-value node) (1- depth))))))
 
 ;;; Return true if ARG carries VAR forward from its own previous value
 ;;; rather than delivering an unrelated one.
@@ -3240,20 +3306,19 @@
         (dolist (step steps type)
           (setf type (type-union type (lvar-type step)))))))
 
-;;; Note that anything affected by the optimistic type of VAR is
-;;; pending for reanalysis.
-(defun note-optimistic-change (var)
-  (dolist (ref (leaf-refs var))
-    (let* ((lvar (node-lvar ref))
-           (dest (and lvar (lvar-dest lvar))))
-      (when (and dest
-                 (combination-p dest)
-                 (eq (combination-kind dest) :local)
-                 (neq lvar (basic-combination-fun dest)))
-        (let ((callee (combination-lambda dest)))
-          (when callee
-            (setf (lambda-optimistic-pending callee) t)))
-        (reoptimize-lvar lvar)))))
+;;; Note that anything affected by the optimistic type of the value of
+;;; NODE is pending for reanalysis.
+(defun note-optimistic-change (node)
+  (let* ((lvar (node-lvar node))
+         (dest (and lvar (lvar-dest lvar))))
+    (when (and dest
+               (combination-p dest)
+               (eq (combination-kind dest) :local)
+               (neq lvar (basic-combination-fun dest)))
+      (let ((callee (combination-lambda dest)))
+        (when callee
+          (setf (lambda-optimistic-pending callee) t)))
+      (reoptimize-lvar lvar))))
 
 ;;; Compute the union of the optimistic types of every variable of FUN
 ;;; across all calls and update those types whenever there is a reason
@@ -3285,9 +3350,11 @@
                       do (cond ((optimistic-step-p arg var)
                                 (push arg (aref steps i)))
                                (t
-                                (dolist (type (optimistic-arg-types arg))
-                                  (setf (aref accum-types i)
-                                        (type-union (aref accum-types i) type)))))))))
+                                (setf (aref accum-types i)
+                                      (type-union (aref accum-types i)
+                                                  (cond ((null arg) *universal-type*)
+                                                        ((lvar-optimistic-type arg))
+                                                        (t (lvar-type arg)))))))))))
 
         (loop for var in vars
               for i from 0
@@ -3296,21 +3363,27 @@
                                                        (aref steps i))))
                      (unless (type= new (lambda-var-optimistic-type var))
                        (setf (lambda-var-optimistic-type var) new)
-                       (note-optimistic-change var)))))))
+                       (mapc #'note-optimistic-change (leaf-refs var))))))))
   (values))
 
-;;; Check whether any functions in COMPONENT are still waiting for the
-;;; optimistic types of any of their variables to reach fixpoint. If
-;;; the types have settled, then publish the types by propagating them
-;;; to their corresponding variable refs (which in turn may cause
-;;; reoptimization of the component).
+;;; Solve for the result types of recursive functions in COMPONENT,
+;;; and check whether any functions in COMPONENT are still waiting for
+;;; the optimistic types of any of their variables to reach
+;;; fixpoint. If the types have settled, publish them by propagating
+;;; them to their corresponding variable refs and the references to
+;;; the functions (which in turn may cause reoptimization of the
+;;; component).
 ;;;
 ;;; If the optimistic type of a variable is empty, its function must
 ;;; be unreachable and will be cleaned up later.
-(defun publish-optimistic-types (component)
+(defun publish-optimistic-types (component fastp)
   (declare (type component component))
   (flet ((check (fun)
            (when (lambda-optimistic-pending fun)
+             ;; Fast walks go past its calls without reanalyzing them,
+             ;; so go back to them once walks are full again.
+             (unless fastp
+               (note-optimistic-pending fun))
              (return-from publish-optimistic-types nil)))
          (propagate (fun)
            (unless (functional-kind-eq fun deleted zombie)
@@ -3322,13 +3395,140 @@
                    ;; eligible for optimistic type propagation.
                    (aver (not (functional-entry-fun fun)))
                    (propagate-to-refs var type)))))))
+    (solve-optimistic-result-types component)
     (dolist (fun (component-lambdas component))
       (check fun)
       (mapc #'check (lambda-lets fun)))
     (dolist (fun (component-lambdas component))
       (propagate fun)
-      (mapc #'propagate (lambda-lets fun))))
+      (mapc #'propagate (lambda-lets fun))
+      (let* ((tail-set (lambda-tail-set fun))
+             (type (and tail-set (tail-set-optimistic-type tail-set))))
+        (unless (member type (list nil *empty-type* *wild-type*))
+          (let ((old (tail-set-recursive-type tail-set)))
+            (setf (tail-set-recursive-type tail-set)
+                  (if old (values-type-intersection old type) type))
+            (update-tail-set-type tail-set (tail-set-type tail-set)))))))
   (values))
+
+;;;; types of results of recursive functions
+
+;;;; We solve for tail set types of non-tail recursive functions
+;;;; optimistically so that the types are not instantly poisoned by
+;;;; *WILD-TYPE*. That means starting at the empty type and
+;;;; fixpointing upwards towards the least fixpoint by propagating the
+;;;; type through the dataflow and widening interval types which do
+;;;; not immediately converge. This is done in tandem with the
+;;;; optimistic solve of the parameter types as the result type and
+;;;; parameter types may depend on each other. Once the fixpoint is
+;;;; reached, it is safe to publish the optimistic type.
+
+;;; Return true if the functions of TAIL-SET use the value of a call to
+;;; one of them, possibly through other functions.
+(defun recursive-tail-set-p (tail-set)
+  (let ((seen '()))
+    (labels ((recursive-p (callee)
+               (dolist (fun (tail-set-funs callee))
+                 (dolist (ref (leaf-refs fun))
+                   (let ((call (node-dest ref)))
+                     (when (and (combination-p call)
+                                (eq (combination-kind call) :local)
+                                (node-lvar call)
+                                (not (return-p (node-dest call))))
+                       (let ((caller (lambda-tail-set (node-home-lambda call))))
+                         (cond ((eq caller tail-set)
+                                (return-from recursive-tail-set-p t))
+                               ((and caller (not (memq caller seen)))
+                                (push caller seen)
+                                (recursive-p caller))))))))))
+      (recursive-p tail-set)
+      nil)))
+
+;;; Solve for the types returned by recursive functions in COMPONENT
+;;; and note the calls whose types changed. Like
+;;; CONVERGED-TYPE-OF-COMBINATION, derive the results twice starting
+;;; from those without the recursive calls, and failing that, drop the
+;;; numeric bounds that moved and try again. If the types don't
+;;; converge, they are *WILD-TYPE*.
+(defun solve-optimistic-result-types (component)
+  (let ((tail-sets '()))
+    (dolist (fun (component-lambdas component))
+      (let ((tail-set (lambda-tail-set fun)))
+        (when tail-set
+          (pushnew tail-set tail-sets :test #'eq))))
+    (let ((old (mapcar #'tail-set-optimistic-type tail-sets))
+          (recursive (remove-if-not #'recursive-tail-set-p tail-sets)))
+      (labels ((result-type (tail-set)
+                 (let ((type *empty-type*))
+                   (dolist (fun (tail-set-funs tail-set) type)
+                     (let ((return (lambda-return fun)))
+                       (when return
+                         (let ((result-type (return-result-type return)))
+                           (setf type (values-type-union
+                                       type
+                                       (acond ((and (or (eq result-type *empty-type*)
+                                                        (type-single-value-p result-type))
+                                                    (lvar-optimistic-type (return-result return)
+                                                                          *optimistic-solve-depth*))
+                                               (make-single-value-type it))
+                                              (t
+                                               result-type))))))))))
+               (derive (types)
+                 ;; The result types if the recursive calls return TYPES.
+                 (loop for tail-set in recursive
+                       for type in types
+                       do (setf (tail-set-optimistic-type tail-set) type))
+                 (mapcar #'result-type recursive))
+               (join (types)
+                 (mapcar #'values-type-union types (derive types)))
+               (fixpoint-p (types)
+                 (every #'values-subtypep (derive types) types)))
+        (dolist (tail-set tail-sets)
+          (setf (tail-set-optimistic-type tail-set) nil))
+        (let* ((initial (derive (make-list (length recursive)
+                                           :initial-element *empty-type*)))
+               (joined (join initial))
+               (types (if (fixpoint-p joined)
+                          joined
+                          (let ((joined (join (mapcar #'widen-numeric-bounds initial joined))))
+                            (when (fixpoint-p joined)
+                              joined)))))
+          (loop for tail-set in recursive
+                for type in (or types
+                                (make-list (length recursive)
+                                           :initial-element *wild-type*))
+                do (setf (tail-set-optimistic-type tail-set) type))))
+      (loop for tail-set in tail-sets
+            for type in old
+            for new = (tail-set-optimistic-type tail-set)
+            unless (if (and type new) (type= type new) (eq type new))
+              do (dolist (fun (tail-set-funs tail-set))
+                   (dolist (ref (leaf-refs fun))
+                     (let ((call (node-dest ref)))
+                       (when (combination-p call)
+                         (note-optimistic-change call)))))))))
+
+;;; Drop the numeric bounds of the single value NEW that differ from
+;;; those of OLD.
+(defun widen-numeric-bounds (old new)
+  (let ((old-hull (weaken-numeric-union-type (single-value-type old)))
+        (new-hull (weaken-numeric-union-type (single-value-type new))))
+    (if (and (type-single-value-p old)
+             (type-single-value-p new)
+             (numeric-type-p old-hull)
+             (numeric-type-p new-hull)
+             (eq (numeric-type-class old-hull) (numeric-type-class new-hull))
+             (eq (numeric-type-complexp old-hull) (numeric-type-complexp new-hull)))
+        (values-type-union
+         new
+         (make-single-value-type
+          (modified-numeric-type
+           new-hull
+           :low (and (equal (numeric-type-low old-hull) (numeric-type-low new-hull))
+                     (numeric-type-low new-hull))
+           :high (and (equal (numeric-type-high old-hull) (numeric-type-high new-hull))
+                      (numeric-type-high new-hull)))))
+        new)))
 
 (defun count-values (call &optional min butlast)
   (loop for (arg . next) on (basic-combination-args call)

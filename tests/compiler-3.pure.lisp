@@ -219,3 +219,193 @@
    (:return-type (integer 1 2))
    (('a (make-array 1)) 2)
    (('(a) (make-array 1)) 1)))
+
+(with-test (:name (:recursive-local-function-result-type :count))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (declare (type (integer 0 100) x))
+      (labels ((f (n) (if (zerop n) 0 (1+ (f (1- n))))))
+        (f x)))
+   (:return-type unsigned-byte)
+   ((0) 0)
+   ((100) 100)))
+
+(with-test (:name (:recursive-local-function-result-type :fib))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (declare (type (integer 0 30) x))
+      (labels ((fib (n) (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))
+        (fib x)))
+   (:return-type unsigned-byte)
+   ((0) 0)
+   ((1) 1)
+   ((20) 6765)))
+
+(with-test (:name (:recursive-local-function-result-type :tree-depth))
+  (checked-compile-and-assert
+   ()
+   `(lambda (tree)
+      (labels ((depth (x)
+                 (if (consp x)
+                     (1+ (max (depth (car x)) (depth (cdr x))))
+                     0)))
+        (depth tree)))
+   (:return-type unsigned-byte)
+   ((nil) 0)
+   (('(1 (2 (3)))) 5)))
+
+(with-test (:name (:recursive-local-function-result-type :count-leaves))
+  (checked-compile-and-assert
+   ()
+   `(lambda (tree)
+      (labels ((c (x)
+                 (cond ((null x) 0)
+                       ((atom x) 1)
+                       (t (+ (c (car x)) (c (cdr x)))))))
+        (c tree)))
+   (:return-type unsigned-byte)
+   ((nil) 0)
+   (('(a (b c) d)) 4)))
+
+(with-test (:name (:recursive-local-function-result-type :max))
+  (checked-compile-and-assert
+   ()
+   `(lambda (l)
+      (declare (list l))
+      (labels ((f (l)
+                 (if l
+                     (max (the fixnum (car l)) (f (cdr l)))
+                     0)))
+        (f l)))
+   ;; FIXME: Ideally this would be (AND FIXNUM UNSIGNED-BYTE).
+   ;; MAX becomes (IF (> R A) R A), and knowing that A is not negative
+   ;; in the second branch would take the relation between A and R.
+   (:return-type fixnum)
+   ((nil) 0)
+   (('(-5 3 -2)) 3)))
+
+(with-test (:name (:recursive-local-function-result-type :mutual))
+  (assert-type
+   (lambda (x)
+     (declare (type (integer 0 100) x))
+     (labels ((ev (n) (if (zerop n) t (od (1- n))))
+              (od (n) (if (zerop n) nil (ev (1- n)))))
+       (ev x)))
+   boolean))
+
+(with-test (:name (:recursive-local-function-result-type :list))
+  (assert-type
+   (lambda (x)
+     (declare (type (integer 0 100) x))
+     (labels ((f (n) (if (zerop n) nil (cons n (f (1- n))))))
+       (f x)))
+   list))
+
+;;; Result types of recursive functions and optimistic parameter types
+;;; depending on each other.
+(with-test (:name (:recursive-local-function-result-type :parameter-from-result))
+  (checked-compile-and-assert
+   ()
+   `(lambda (n)
+      (declare (type (integer 0 100) n))
+      (labels ((f (n) (if (zerop n) 0 (1+ (f (1- n)))))
+               (g (x) (if (< x 10) (g (1+ x)) x)))
+        (g (f n))))
+   (:return-type (integer 10))
+   ((3) 10)
+   ((20) 20)))
+
+(with-test (:name (:recursive-local-function-result-type :result-from-parameter))
+  (checked-compile-and-assert
+   ()
+   `(lambda (n)
+      (declare (type (integer 0 100) n))
+      (labels ((f (n acc) (if (zerop n) acc (1+ (f (1- n) (1+ acc))))))
+        (f n 0)))
+   (:return-type unsigned-byte)
+   ((0) 0)
+   ((5) 10)))
+
+(with-test (:name (:recursive-local-function-result-type :result-to-own-parameter))
+  (checked-compile-and-assert
+   ()
+   `(lambda (n)
+      (declare (type (integer 0 100) n))
+      (labels ((f (n) (if (zerop n) 0 (1+ (f (min 100 (f (1- n))))))))
+        (f n)))
+   (:return-type unsigned-byte)
+   ((0) 0)
+   ((1) 1)
+   ((2) 2)))
+
+(with-test (:name (:recursive-local-function-result-type :parameter-result-cycle))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (declare (type (integer 0 5) x))
+      (labels ((f (p n) (if (zerop n) p (1+ (f (f p (1- n)) (1- n))))))
+        (f 0 x)))
+   (:return-type unsigned-byte)
+   ((0) 0)
+   ((2) 3)))
+
+;;; F and G are in different tail sets.
+(with-test (:name (:recursive-local-function-result-type :mutual-tail-sets))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (declare (type (integer 0 100) x))
+      (labels ((f (n) (if (zerop n) 0 (1+ (g (1- n)))))
+               (g (n) (if (zerop n) 0 (* 2 (f (1- n))))))
+        (+ (f x) (g x))))
+   (:return-type unsigned-byte)
+   ((0) 0)
+   ((3) 5)))
+
+(with-test (:name (:recursive-local-function-result-type :stored-into-array))
+  (checked-compile-and-assert
+   ()
+   `(lambda (n v)
+      (declare (type (integer 0 10) n) (type (vector fixnum) v))
+      (labels ((f (n) (if (zerop n) 0 (setf (aref v 0) (1+ (f (1- n)))))))
+        (f n)))
+   ((3 (make-array 1 :element-type 'fixnum :adjustable t)) 3))
+  (checked-compile-and-assert
+   ()
+   `(lambda (n v)
+      (declare (type (integer 0 10) n) (type (simple-array fixnum (1)) v))
+      (labels ((f (n) (if (zerop n) 0 (setf (aref v 0) (1+ (f (1- n)))))))
+        (f n)))
+   (:return-type (and fixnum unsigned-byte))
+   ((3 (make-array 1 :element-type 'fixnum)) 3)))
+
+(with-test (:name (:recursive-local-function-result-type :multiple-values))
+  (checked-compile-and-assert
+   ()
+   `(lambda (n)
+      (declare (type (integer 0 10) n))
+      (labels ((f (n)
+                 (if (zerop n)
+                     (values 0 :x)
+                     (let ((r (f (1- n))))
+                       (values (1+ r) :y)))))
+        (f n)))
+   (:return-type (values number (member :x :y) &optional))
+   ((0) (values 0 :x))
+   ((3) (values 3 :y)))
+  ;; BOTH is in the tail set of the lambda, and returns what SUBTYPEP does.
+  (assert-type
+   (lambda (x y)
+     (flet ((both (type) (and (typep x type) (subtypep y type))))
+       (or (both 'number) (both 'cons))))
+   (values boolean &optional boolean)))
+
+(with-test (:name (:recursive-local-function-result-type :stored-into-cons))
+  (assert-type
+   (lambda (n c)
+     (declare (type (integer 0 10) n))
+     (labels ((f (n) (if (zerop n) 0 (setf (car c) (1+ (f (1- n)))))))
+       (f n)))
+   unsigned-byte))

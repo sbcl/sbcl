@@ -6420,6 +6420,16 @@
                                0)
                       'integer))))
 
+(with-test (:name (:local-call-arg-type :stepped-by-array-store))
+  (checked-compile-and-assert
+   ()
+   `(lambda (n v)
+      (declare (fixnum n) (type (vector fixnum) v))
+      (labels ((rec (i x)
+                 (if (zerop i) x (rec (1- i) (setf (aref v 0) x)))))
+        (rec n 0)))
+   ((3 (make-array 1 :element-type 'fixnum :adjustable t)) 0)))
+
 ;;; Check that the types from loops written with DO and with local
 ;;; calls infer to the same type.
 (with-test (:name (:local-call-arg-type :spelling-parity))

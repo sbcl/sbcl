@@ -755,6 +755,12 @@
   ;; This is the union across all the functions of the return node's
   ;; RESULT-TYPE, excluding local calls.
   (type *wild-type* :type ctype)
+  ;; a bound on the types returned by these functions if they call
+  ;; each other, see PUBLISH-OPTIMISTIC-TYPES.
+  (recursive-type nil :type (or null ctype))
+  ;; the type assumed to be returned by these functions if they call
+  ;; each other, see SOLVE-OPTIMISTIC-RESULT-TYPES.
+  (optimistic-type nil :type (or null ctype))
   ;; some info used by the back end
   (info nil))
 (defprinter (tail-set :identity t)

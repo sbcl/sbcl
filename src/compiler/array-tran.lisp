@@ -138,18 +138,22 @@
 ;;; The ``new-value'' for array setters must fit in the array, and the
 ;;; return type is going to be the same as the new-value for SETF
 ;;; functions.
+(defun new-value-type (new-value array)
+  (let ((type (type-array-element-type (lvar-type array))))
+    (if (eq type *wild-type*)
+        (lvar-type new-value)
+        (type-intersection (lvar-type new-value) type))))
+
+;;; Return true if the call is deleted, as it can't store NEW-VALUE.
 (defun assert-new-value-type (new-value array)
   (let ((type (type-array-element-type (lvar-type array)))
-        (value-type (lvar-type new-value)))
-    (cond ((eq type *wild-type*)
-           value-type)
-          (t
-           (assert-lvar-type
-            new-value
-            type
-            (lexenv-policy (node-lexenv (lvar-dest new-value)))
-            'aref-context)
-           (type-intersection value-type type)))))
+        (call (lvar-dest new-value)))
+    (unless (eq type *wild-type*)
+      (assert-lvar-type new-value
+                        type
+                        (lexenv-policy (node-lexenv call))
+                        'aref-context))
+    (node-deleted call)))
 
 (defoptimizers externally-checkable-type
     (hairy-data-vector-set/check-bounds
@@ -499,6 +503,9 @@
   (sequence-elements-type sequence))
 
 (defoptimizer ((setf aref) derive-type) ((new-value array &rest subscripts))
+  (new-value-type new-value array))
+
+(defoptimizer ((setf aref) optimizer) ((new-value array &rest subscripts))
   (assert-new-value-type new-value array))
 
 (defoptimizers derive-type
@@ -601,6 +608,12 @@
      hairy-data-vector-set/check-bounds)
     ;; DATA-VECTOR-SET is never used for value, so it doesn't need a type deriver.
     ((array index new-value))
+  (new-value-type new-value array))
+
+(defoptimizers optimizer
+    (hairy-data-vector-set
+     hairy-data-vector-set/check-bounds)
+    ((array index new-value))
   (assert-new-value-type new-value array))
 
 ;;; Figure out the type of the data vector if we know the argument
@@ -623,6 +636,9 @@
   (sequence-elements-type array))
 
 (defoptimizer (%set-row-major-aref derive-type) ((array index new-value))
+  (new-value-type new-value array))
+
+(defoptimizer (%set-row-major-aref optimizer) ((array index new-value))
   (assert-new-value-type new-value array))
 
 (defun check-array-dimensions (dims node)
