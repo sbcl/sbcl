@@ -28,7 +28,7 @@
   (delete-lvar-cast-if (specifier-type 'real) n)
   `(if (floatp n)
        (truly-the float n)
-       (%single-float n)))
+       (%single-float (truly-the (not float) n))))
 
 (deftransform float ((n) (float))
   'n)
