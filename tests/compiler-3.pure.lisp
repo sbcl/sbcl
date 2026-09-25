@@ -192,3 +192,30 @@
       (when (typep f 'single-float)
         (values (round f))))
    :allow-notes nil))
+
+(with-test (:name (:local-function-result-type :through-cast))
+  (checked-compile-and-assert
+   ()
+   `(lambda (n v)
+      (declare (type (integer 0 10) n) (simple-vector v))
+      (labels ((f (n)
+                 (if (zerop n)
+                     0
+                     (multiple-value-prog1 (f (1- n))
+                       (setf (svref v n) n)))))
+        (f n)))
+   (:return-type (eql 0))
+   ((3 (make-array 4 :initial-element nil)) 0))
+  ;; F is in the tail set of the lambda.
+  (checked-compile-and-assert
+   ()
+   `(lambda (x v)
+      (declare (simple-vector v))
+      (flet ((f (x) (if (consp x) 1 2)))
+        (if (symbolp x)
+            (f x)
+            (multiple-value-prog1 (f x)
+              (setf (svref v 0) x)))))
+   (:return-type (integer 1 2))
+   (('a (make-array 1)) 2)
+   (('(a) (make-array 1)) 1)))
