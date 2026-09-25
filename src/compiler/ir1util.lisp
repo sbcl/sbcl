@@ -3564,10 +3564,20 @@ is :ANY, the function name is not checked."
   (declare (type ref ref) (type leaf leaf))
   (unless (or (eq (ref-leaf ref) leaf)
               (and (constant-p leaf)
-                   ;; Don't move constants to type errors
-                   (combination-match2 ((node-dest ref) :transform nil)
-                     (((:or %type-check-error %type-check-error/c) x &rest)
-                      (lvar-from-lvar-p x (node-lvar ref))))))
+                   (or
+                    ;; Don't move constants to type errors
+                    (combination-match2 ((node-dest ref) :transform nil)
+                      (((:or %type-check-error %type-check-error/c) x &rest)
+                       (lvar-from-lvar-p x (node-lvar ref))))
+                    ;; Or if there's a conflict with an lvar-type-annotation
+                    (let* ((lvar (lambda-var-ref-lvar ref))
+                           (annotations (and lvar
+                                             (lvar-annotations lvar))))
+                      (loop for annnot in annotations
+                            thereis (and (lvar-type-annotation-p annnot)
+                                         (not (ctypep (constant-value leaf)
+                                                      (lvar-type-annotation-type annnot)))))))))
+
     (push ref (leaf-refs leaf))
     (update-ref-dependencies leaf ref)
     (delete-ref ref)

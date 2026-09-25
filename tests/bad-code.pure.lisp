@@ -1177,3 +1177,12 @@
                         (declare (integer x))
                         (remove 2 (cons x 1)))
                       :allow-warnings t))))
+
+(with-test (:name :check-type-constants)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (&optional (a nil p))
+                         (when p
+                           (check-type p cons)
+                           a))
+                      :allow-warnings t))))
