@@ -296,6 +296,23 @@
   (:generator 5
     (inst tst value (ash 1 (1- n-word-bits)))))
 
+(define-vop (signed-byte-64-p/s128)
+  (:args ((lo hi) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128)
+  (:conditional :eq)
+  (:translate signed-byte-64-p)
+  (:generator 6
+    (inst cmp hi (asr lo 63))))
+
+(define-vop (unsigned-byte-64-p/s128)
+  (:args ((lo hi) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128)
+  (:conditional :eq)
+  (:translate unsigned-byte-64-p)
+  (:ignore lo)
+  (:generator 6
+    (inst cmp hi 0)))
+
 ;;; An (UNSIGNED-BYTE 64) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with
 ;;; exactly two digits and the second digit all zeros.

@@ -451,6 +451,26 @@
       (inst test :byte value fixnum-tag-mask))
     out))
 
+(define-vop (signed-byte-64-p/s128)
+  (:args ((lo hi) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128)
+  (:conditional :e)
+  (:translate signed-byte-64-p)
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 6
+    (move temp lo)
+    (inst sar temp 63)
+    (inst cmp hi temp)))
+
+(define-vop (unsigned-byte-64-p/s128)
+  (:args ((lo hi) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128)
+  (:conditional :e)
+  (:translate unsigned-byte-64-p)
+  (:ignore lo)
+  (:generator 6
+    (inst test hi hi)))
+
 ;;; An (unsigned-byte 64) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with
 ;;; exactly two digits and the second digit all zeros.
