@@ -751,7 +751,9 @@
   (check-type 0 :type fixnum)
   (boxing-variant nil :type (or null vop-info))
   ;; Which args prefer the same tagging as the results?
-  (related-args -1 :type fixnum))
+  (related-args -1 :type fixnum)
+  ;; :commutative is for multiplication, where it can be (* tagged untagged) => tagged
+  (tag nil :type (member nil :tagged :untagged :commutative)))
 (!set-load-form-method vop-info (:xc :target) :ignore-it)
 
 (declaim (inline vop-name))

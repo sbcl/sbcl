@@ -340,7 +340,8 @@
   (gc-barrier nil)
   (check-type nil)
   (boxing-variant nil)
-  (related-args nil))
+  (related-args nil)
+  (tag nil))
 (declaim (freeze-type vop-parse))
 (defprinter (vop-parse)
   name
@@ -371,7 +372,7 @@
     '(arg-types args before-load body boxing-variant check-type conditional-p cost gc-barrier guard ignores info-args
       inherits ltn-policy more-args more-results move-args name node-var note optional-results
       result-types results save-p source-location temps translate variant variant-vars vop-var
-      related-args))
+      related-args tag))
 ;; A sanity-check. Of course if this fails, the likelihood is that you can't even
 ;; get this far in cross-compilaion. So it's probably not worth much.
 (eval-when (#+sb-xc :compile-toplevel)
@@ -1146,6 +1147,8 @@
          (setf (vop-parse-boxing-variant parse) (second spec)))
         (:related-args
          (setf (vop-parse-related-args parse) (rest spec)))
+        (:tag
+         (setf (vop-parse-tag parse) (second spec)))
         (t
          (error "unknown option specifier: ~S" (first spec)))))
     (cond (arg-refs-p
@@ -1569,11 +1572,11 @@
 (defun set-up-vop-info (iparse parse)
   (declare (type vop-parse parse) (type (or vop-parse null) iparse))
   (let ((same-operands
-         (and iparse
-              (equal (vop-parse-operands parse)
-                     (vop-parse-operands iparse))
-              (equal (vop-parse-info-args iparse)
-                     (vop-parse-info-args parse))))
+          (and iparse
+               (equal (vop-parse-operands parse)
+                      (vop-parse-operands iparse))
+               (equal (vop-parse-info-args iparse)
+                      (vop-parse-info-args parse))))
         (variant (vop-parse-variant parse)))
 
     (let ((nvars (length (vop-parse-variant-vars parse))))
@@ -1599,10 +1602,10 @@
       ,@(make-costs-and-restrictions parse)
       ,@(make-emit-function-and-friends parse)
       ,@(inherit-vop-info :generator-function iparse
-          (and same-operands
-               (equal (vop-parse-body parse) (vop-parse-body iparse)))
-          (unless (eq (vop-parse-body parse) :unspecified)
-            (make-generator-function parse)))
+                          (and same-operands
+                               (equal (vop-parse-body parse) (vop-parse-body iparse)))
+                          (unless (eq (vop-parse-body parse) :unspecified)
+                            (make-generator-function parse)))
       :variant (list ,@variant)
       :after-sc-selection
       ;; TODO: inherit it?
@@ -1618,6 +1621,7 @@
                        (if spec
                            (arg-name-bitmask spec parse)
                            -1))
+      :tag ,(vop-parse-tag parse)
 
       #+(and (not sb-xc-host) sb-devel)
       :optimizer
@@ -1859,6 +1863,7 @@
                   (quotify-slots))))
            ,@(unless (eq (vop-parse-body parse) :unspecified)
                `((let ((,n-res ,(set-up-vop-info inherited-parse parse)))
+                   (fill-template-tagging ,n-res)
                    (store-vop-info ,n-res)
                    ,@(set-up-fun-translation parse n-res))))
            ,@(when (equal (vop-parse-check-type parse) '(t))
@@ -2091,6 +2096,11 @@
     (cerror "Continue" "Duplicate vop name: ~s" vop-info))
   (setf (gethash (vop-info-name vop-info) *backend-template-names*)
         vop-info))
+
+(defun fill-template-tagging (vop-info)
+  (unless (vop-info-tag vop-info)
+    (setf (vop-info-tag vop-info)
+          (template-tagging vop-info))))
 
 (defun undefine-vop (name)
   (let ((parse (gethash name *backend-parsed-vops*)))
