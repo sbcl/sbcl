@@ -4561,6 +4561,7 @@
                    :to (:result 0) :target hi) edx)
   (:results (hi :scs (any-reg)))
   (:result-types positive-fixnum)
+  (:tag :commutative)
   (:generator 15
     (move eax x)
     (inst mul y)

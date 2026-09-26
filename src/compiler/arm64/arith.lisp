@@ -2153,6 +2153,7 @@
   (:temporary (:sc unsigned-reg) temp)
   (:results (hi :scs (any-reg)))
   (:result-types positive-fixnum)
+  (:tag :commutative)
   (:generator 15
     (inst umulh temp x y)
     (inst and hi temp (bic-mask fixnum-tag-mask))))
