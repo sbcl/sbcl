@@ -4897,3 +4897,32 @@ is :ANY, the function name is not checked."
                          (loop for param in params
                                for arg in args
                                always (subp arg param)))))))
+
+(defun double-word-sized-type-p (type)
+  #-(or x86-64 arm64)
+  (or (csubtypep type (specifier-type 'word))
+      (csubtypep type (specifier-type 'sb-vm:signed-word)))
+  #+(or x86-64 arm64)
+  (csubtypep type (specifier-type '(signed-byte 128))))
+
+(defun word-sized-type-p (type)
+  (or (csubtypep type (specifier-type 'word))
+      (csubtypep type (specifier-type 'sb-vm:signed-word))))
+
+(defun double-word-sized-lvar-p (lvar)
+  (double-word-sized-type-p (lvar-type lvar)))
+
+(defun word-sized-lvar-p (lvar)
+  (word-sized-type-p (lvar-type lvar)))
+
+(defun float-lvar-p (lvar)
+  (or (csubtypep (lvar-type lvar) (specifier-type 'single-float))
+      (csubtypep (lvar-type lvar) (specifier-type 'double-float))))
+
+(defun single-value-result-type (node &optional asserted)
+  (single-value-type (if asserted
+                         (node-asserted-type node)
+                         (node-derived-type node))))
+
+(defun word-sized-result-p (node &optional asserted)
+  (word-sized-type-p (single-value-result-type node asserted)))

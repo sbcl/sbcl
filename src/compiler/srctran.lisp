@@ -6657,7 +6657,7 @@
 (defun transform-eq-on-words (fun x y)
   (flet ((try-sword (x y x-v y-v)
            (when (not (or (csubtypep (lvar-type x) (specifier-type 'fixnum))
-                          (csubtypep (lvar-type y) (specifier-type 'word))))
+                          (double-word-sized-lvar-p y)))
              `(if (#+64-bit sb-kernel:signed-byte-64-p
                    #-64-bit sb-kernel:signed-byte-32-p
                    ,y-v)
@@ -6665,7 +6665,7 @@
                   nil)))
          (try-word (x y x-v y-v)
            (when (not (or (csubtypep (lvar-type x) (specifier-type 'fixnum))
-                          (csubtypep (lvar-type y) (specifier-type 'sb-vm:signed-word))))
+                          (double-word-sized-lvar-p y)))
              `(if (#+64-bit sb-kernel:unsigned-byte-64-p
                    #-64-bit sb-kernel:unsigned-byte-32-p
                    ,y-v)
@@ -7862,25 +7862,6 @@
   (combination-match2 (node)
     ((> (abs x) (:constant c))
      `(not (= x ,c)))))
-
-(defun word-sized-type-p (type)
-  (or (csubtypep type (specifier-type 'word))
-      (csubtypep type (specifier-type 'sb-vm:signed-word))))
-
-(defun word-sized-lvar-p (lvar)
-  (word-sized-type-p (lvar-type lvar)))
-
-(defun float-lvar-p (lvar)
-  (or (csubtypep (lvar-type lvar) (specifier-type 'single-float))
-      (csubtypep (lvar-type lvar) (specifier-type 'double-float))))
-
-(defun single-value-result-type (node &optional asserted)
-  (single-value-type (if asserted
-                         (node-asserted-type node)
-                         (node-derived-type node))))
-
-(defun word-sized-result-p (node &optional asserted)
-  (word-sized-type-p (single-value-result-type node asserted)))
 
 (defun word-interval-p (interval)
   (let ((low (interval-low interval))

@@ -3860,6 +3860,153 @@
 (define-vop (if-eql-c/unsigned conditional-c/unsigned)
   (:translate eql)
   (:generator 5 (emit-optimized-cmp x y temp)))
+;;; =========================================================================
+;;; EQL VOPs
+;;; =========================================================================
+
+(define-vop (if-eql/s128)
+  (:translate eql)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         ((lo-y hi-y) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128 signed-byte-128)
+  (:temporary (:sc unsigned-reg) temp1 temp2)
+  (:conditional :e)
+  (:generator 10
+    (inst mov temp1 lo-x)
+    (inst xor temp1 lo-y)
+    (inst mov temp2 hi-x)
+    (inst xor temp2 hi-y)
+    (inst or temp1 temp2)))
+
+(define-vop (if-eql/s128-signed)
+  (:translate eql)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (signed-reg)))
+  (:arg-types signed-byte-128 signed-num)
+  (:temporary (:sc signed-reg) temp1 temp2)
+  (:conditional :e)
+  (:generator 9
+    (inst mov temp1 y)
+    (inst sar temp1 63)
+    (inst xor temp1 hi-x)
+    (inst mov temp2 lo-x)
+    (inst xor temp2 y)
+    (inst or temp1 temp2)))
+
+(define-vop (if-eql/signed-s128 if-eql/s128-signed)
+  (:translate eql)
+  (:args (y :scs (signed-reg))
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types signed-num signed-byte-128))
+
+(define-vop (if-eql/s128-unsigned)
+  (:translate eql)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (unsigned-reg)))
+  (:arg-types signed-byte-128 unsigned-num)
+  (:temporary (:sc unsigned-reg) temp)
+  (:conditional :e)
+  (:generator 8
+    (inst mov temp lo-x)
+    (inst xor temp y)
+    (inst or temp hi-x)))
+
+(define-vop (if-eql/unsigned-s128 if-eql/s128-unsigned)
+  (:args (y :scs (unsigned-reg))
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types unsigned-num signed-byte-128))
+
+(define-vop (if-</s128)
+  (:translate <)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         ((lo-y hi-y) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128 signed-byte-128)
+  (:temporary (:sc signed-reg) temp)
+  (:conditional :l)
+  (:generator 10
+    (inst mov temp hi-x)
+    (inst cmp lo-x lo-y)
+    (inst sbb temp hi-y)))
+
+(define-vop (if->/s128 if-</s128)
+  (:translate >)
+  (:args ((lo-y hi-y) :scs (signed-128-reg))
+         ((lo-x hi-x) :scs (signed-128-reg))))
+
+(define-vop (if-</s128-signed)
+  (:translate <)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (signed-reg)))
+  (:arg-types signed-byte-128 signed-num)
+  (:temporary (:sc signed-reg) temp-hi temp-y)
+  (:conditional :l)
+  (:generator 9
+    (inst mov temp-hi hi-x)
+    (inst mov temp-y y)
+    (inst sar temp-y 63)
+    (inst cmp lo-x y)
+    (inst sbb temp-hi temp-y)))
+
+(define-vop (if-</signed-s128)
+  (:translate <)
+  (:args (x :scs (signed-reg))
+         ((lo-y hi-y) :scs (signed-128-reg)))
+  (:arg-types signed-num signed-byte-128)
+  (:temporary (:sc signed-reg) temp)
+  (:conditional :l)
+  (:generator 9
+    (inst mov temp x)
+    (inst sar temp 63)
+    (inst cmp x lo-y)
+    (inst sbb temp hi-y)))
+
+(define-vop (if->/s128-signed if-</signed-s128)
+  (:translate >)
+  (:args ((lo-y hi-y) :scs (signed-128-reg))
+         (x :scs (signed-reg)))
+  (:arg-types signed-byte-128 signed-num))
+
+(define-vop (if->/signed-s128 if-</s128-signed)
+  (:translate >)
+  (:args (y :scs (signed-reg))
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types signed-num signed-byte-128))
+
+(define-vop (if-</s128-unsigned)
+  (:translate <)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (unsigned-reg)))
+  (:arg-types signed-byte-128 unsigned-num)
+  (:temporary (:sc signed-reg) temp)
+  (:conditional :l)
+  (:generator 8
+    (inst mov temp hi-x)
+    (inst cmp lo-x y)
+    (inst sbb temp 0)))
+
+(define-vop (if-</unsigned-s128)
+  (:translate <)
+  (:args (x :scs (unsigned-reg))
+         ((lo-y hi-y) :scs (signed-128-reg)))
+  (:arg-types unsigned-num signed-byte-128)
+  (:temporary (:sc signed-reg) temp)
+  (:conditional :l)
+  (:generator 8
+    (inst xor temp temp)
+    (inst cmp x lo-y)
+    (inst sbb temp hi-y)))
+
+(define-vop (if->/s128-unsigned if-</unsigned-s128)
+  (:translate >)
+  (:args ((lo-y hi-y) :scs (signed-128-reg))
+         (x :scs (unsigned-reg)))
+  (:arg-types signed-byte-128 unsigned-num))
+
+(define-vop (if->/unsigned-s128 if-</s128-unsigned)
+  (:translate >)
+  (:args (y :scs (unsigned-reg))
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types unsigned-num signed-byte-128))
 
 ;;;; 64-bit logical operations
 
@@ -3875,9 +4022,9 @@
                 (:results (r :scs (unsigned-reg) :from (:argument 0)))
                 (:result-types unsigned-num)
                 (:generator 1
-                 (move r num)
-                 (move rcx amount :dword)
-                 (inst ,operation r :cl)))))
+                  (move r num)
+                  (move rcx amount :dword)
+                  (inst ,operation r :cl)))))
   (define shift-towards-start shr)
   (define shift-towards-end   shl))
 

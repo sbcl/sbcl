@@ -1439,6 +1439,128 @@
   (:variant-cost 6)
   (:translate eq))
 
+(define-vop (if-eql/s128)
+  (:translate eql)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         ((lo-y hi-y) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128 signed-byte-128)
+  (:conditional :eq)
+  (:generator 10
+    (inst cmp lo-x lo-y)
+    (inst ccmp hi-x hi-y :eq 0)))
+
+(define-vop (if-eql/s128-signed)
+  (:translate eql)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (signed-reg)))
+  (:arg-types signed-byte-128 signed-num)
+  (:conditional :eq)
+  (:generator 9
+    (inst cmp hi-x (asr y 63))
+    (inst ccmp lo-x y :eq 0)))
+
+(define-vop (if-eql/signed-s128 if-eql/s128-signed)
+  (:translate eql)
+  (:args (y :scs (signed-reg))
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types signed-num signed-byte-128))
+
+(define-vop (if-eql/s128-unsigned)
+  (:translate eql)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (unsigned-reg)))
+  (:arg-types signed-byte-128 unsigned-num)
+  (:conditional :eq)
+  (:generator 8
+    (inst cmp lo-x y)
+    (inst ccmp hi-x 0 :eq 0)))
+
+(define-vop (if-eql/unsigned-s128 if-eql/s128-unsigned)
+  (:args (y :scs (unsigned-reg))
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types unsigned-num signed-byte-128))
+
+(define-vop (if-</s128)
+  (:translate <)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         ((lo-y hi-y) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128 signed-byte-128)
+  (:conditional :lt)
+  (:generator 10
+    (inst cmp lo-x lo-y)
+    (inst sbcs zr-tn hi-x hi-y)))
+
+(define-vop (if->/s128 if-</s128)
+  (:translate >)
+  (:args ((lo-y hi-y) :scs (signed-128-reg))
+         ((lo-x hi-x) :scs (signed-128-reg))))
+
+(define-vop (if-</s128-signed)
+  (:translate <)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (signed-reg)))
+  (:arg-types signed-byte-128 signed-num)
+  (:conditional :lt)
+  (:generator 9
+    (inst asr tmp-tn y 63)
+    (inst cmp lo-x y)
+    (inst sbcs zr-tn hi-x tmp-tn)))
+
+(define-vop (if-</signed-s128)
+  (:translate <)
+  (:args (x :scs (signed-reg))
+         ((lo-y hi-y) :scs (signed-128-reg)))
+  (:arg-types signed-num signed-byte-128)
+  (:conditional :lt)
+  (:generator 9
+    (inst asr tmp-tn x 63)
+    (inst cmp x lo-y)
+    (inst sbcs zr-tn tmp-tn hi-y)))
+
+(define-vop (if->/s128-signed if-</signed-s128)
+  (:translate >)
+  (:args ((lo-y hi-y) :scs (signed-128-reg))
+         (x :scs (signed-reg)))
+  (:arg-types signed-byte-128 signed-num))
+
+(define-vop (if->/signed-s128 if-</s128-signed)
+  (:translate >)
+  (:args (y :scs (signed-reg))
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types signed-num signed-byte-128))
+
+(define-vop (if-</s128-unsigned)
+  (:translate <)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (unsigned-reg)))
+  (:arg-types signed-byte-128 unsigned-num)
+  (:conditional :lt)
+  (:generator 8
+    (inst cmp lo-x y)
+    (inst sbcs zr-tn hi-x zr-tn)))
+
+(define-vop (if-</unsigned-s128)
+  (:translate <)
+  (:args (x :scs (unsigned-reg))
+         ((lo-y hi-y) :scs (signed-128-reg)))
+  (:arg-types unsigned-num signed-byte-128)
+  (:conditional :lt)
+  (:generator 8
+    (inst cmp x lo-y)
+    (inst sbcs zr-tn zr-tn hi-y)))
+
+(define-vop (if->/s128-unsigned if-</unsigned-s128)
+  (:translate >)
+  (:args ((lo-y hi-y) :scs (signed-128-reg))
+         (x :scs (unsigned-reg)))
+  (:arg-types signed-byte-128 unsigned-num))
+
+(define-vop (if->/unsigned-s128 if-</s128-unsigned)
+  (:translate >)
+  (:args (y :scs (unsigned-reg))
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types unsigned-num signed-byte-128))
+
 (deftransform logtest ((x y) (:or ((signed-word signed-word) *)
                                   ((word word) *)
                                   ((signed-word word) *)

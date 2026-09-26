@@ -165,7 +165,11 @@
   (def if-eq-character/c char=/character/c 2)
   (def if-eq-integer/c if-eql-integer/c 2)
   (def if-eq-signed if-eql/signed 5)
-  (def if-eq-unsigned if-eql/unsigned 5))
+  (def if-eq-unsigned if-eql/unsigned 5)
+  (def if-eq/s128-unsigned if-eql/s128-unsigned 8)
+  (def if-eq/unsigned-s128 if-eql/unsigned-s128 8)
+  (def if-eq/s128-signed if-eql/s128-signed 9)
+  (def if-eq/signed-s128 if-eql/signed-s128 9))
 
 (define-vop (jump-table)
   (:args (index :scs (signed-reg unsigned-reg any-reg)
