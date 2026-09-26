@@ -434,6 +434,7 @@
   (:args (x :scs (any-reg))
          (y :scs (signed-reg immediate))) ;; one operand needs to be untagged
   (:translate *)
+  (:tag :commutative)
   (:generator 2
     (let (value)
       (cond ((and (sc-is y immediate)
@@ -453,10 +454,6 @@
                (load-immediate-word tmp-tn value)
                (setf y tmp-tn))
              (inst mul r x y))))))
-
-(define-vop (*/signed-fixnum=>fixnum */fixnum=>fixnum)
-  (:args (y :scs (signed-reg))
-         (x :scs (any-reg))))
 
 (define-vop (*/signed=>signed */fixnum=>fixnum)
   (:args (x :scs (signed-reg))
