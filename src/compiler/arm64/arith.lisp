@@ -162,6 +162,8 @@
        (:args (x :scs (any-reg))
               (y :scs (any-reg signed-reg unsigned-reg)))
        (:translate ,translate)
+       ,@(when (member translate '(+ logior logxor))
+           `((:tag :commutative)))
        (:generator 2
          (inst ,op r x (if (sc-is y any-reg)
                            y
@@ -462,9 +464,10 @@
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
   (:note "inline (signed-byte 64) arithmetic")
+  (:tag :untagged)
   (:variant-cost 3))
 
-(define-vop (*/unsigned=>unsigned */fixnum=>fixnum)
+(define-vop (*/unsigned=>unsigned */signed=>signed)
   (:args (x :scs (unsigned-reg))
          (y :scs (unsigned-reg immediate)))
   (:arg-types unsigned-num unsigned-num)

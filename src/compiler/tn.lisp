@@ -623,7 +623,13 @@
       (loop for related fixnum = (vop-info-related-args vop-info) then (ash related -1)
             for costs in (vop-info-arg-costs vop-info)
             when (logbitp 0 related)
-            do (account costs))
+            do (let ((untag (eql (svref costs sb-vm:signed-reg-sc-number) 0))
+                     (tag (eql (svref costs sb-vm:any-reg-sc-number) 0)))
+                 (unless (and tag untag)
+                   (when untag
+                     (setf tagged 0))
+                   (when tag
+                     (setf untagged 0)))))
       (mapc #'account (vop-info-result-costs vop-info)))
     (cond ((zerop (logxor tagged untagged))
            nil)
