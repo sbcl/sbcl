@@ -294,7 +294,7 @@
 ;;; the part of %DEFSTRUCT which makes sense only on the target SBCL
 ;;;
 (defmacro set-layout-equalp-impl (layout newval)
-  `(%instance-set ,layout (get-dsd-index layout equalp-impl) ,newval))
+  `(%layout-slot-set ,layout (get-dsd-index layout equalp-impl) ,newval))
 
 (defun assign-equalp-impl (type-name function)
   (set-layout-equalp-impl (find-layout type-name) function))
