@@ -4051,7 +4051,7 @@
 
   (deftransform ash ((integer amount) (t (integer * 0)) signed-word
                      :node node :important nil)
-    (when (double-word-sized-lvar-p amount)
+    (when (word-sized-lvar-p amount)
       (give-up-ir1-transform))
     (delay-ir1-transform node :ir1-phases)
     `(ash integer (if (fixnump amount)
@@ -4061,7 +4061,7 @@
 
   (deftransform ash ((integer amount) (t (integer * 0)) word
                      :node node :important nil)
-    (when (double-word-sized-lvar-p amount)
+    (when (word-sized-lvar-p amount)
       (give-up-ir1-transform))
     (delay-ir1-transform node :ir1-phases)
     `(if (fixnump amount)

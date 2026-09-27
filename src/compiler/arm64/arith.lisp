@@ -790,6 +790,224 @@
         (t
          (inst asr r hi-x 63))))))
 
+(define-vop (ash/s128)
+  (:translate ash)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (amount :scs (signed-reg) :to :save))
+  (:arg-types signed-byte-128 signed-num)
+  (:arg-refs nil amount-ref)
+  (:temporary (:sc signed-reg) count tmp)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 15
+    (let* ((type (tn-ref-type amount-ref))
+           (negative (csubtypep type (specifier-type '(integer * 0))))
+           (small    (csubtypep type (specifier-type '(integer -63 63))))
+           (medium   (csubtypep type (specifier-type '(integer -127 127)))))
+      (cond
+        ((not small)
+         (assemble ()
+           (unless negative
+             (inst tbz amount 63 left))
+
+           (inst neg count amount)
+           (inst cmp count 64)
+           (inst b :ge right-64)
+           (inst mvn tmp count)
+           (inst lslv tmp hi-x tmp)
+           (inst lsrv lo-r lo-x count)
+           (inst orr lo-r lo-r (lsl tmp 1))
+           (inst asrv hi-r hi-x count)
+           (inst b done)
+
+           right-64
+           (inst sub tmp count 64)
+           (inst cmp tmp 64)
+           (inst csinv tmp tmp zr-tn :lo)
+           (inst asrv lo-r hi-x tmp)
+           (inst asr hi-r hi-x 63)
+           (inst b done)
+
+           left
+           (unless negative
+             (assemble ()
+               (inst cmp amount 64)
+               (inst b :ge left-64)
+               (inst mvn tmp amount)
+               (inst lsrv tmp lo-x tmp)
+               (inst lslv lo-r lo-x amount)
+               (inst lslv hi-r hi-x amount)
+               (inst orr hi-r hi-r (lsr tmp 1))
+               (inst b done)
+
+               left-64
+               (inst sub tmp amount 64)
+               (inst lslv hi-r lo-x tmp)
+               (unless medium
+                 (inst cmp amount 128)
+                 (inst csel hi-r zr-tn hi-r :ge))
+               (inst mov lo-r 0)))))
+        (negative
+         (inst neg count amount)
+         (inst mvn tmp count)
+         (inst lslv tmp hi-x tmp)
+         (inst lsrv lo-r lo-x count)
+         (inst orr lo-r lo-r (lsl tmp 1))
+         (inst asrv hi-r hi-x count))
+        (t
+         (assemble ()
+           (inst tbz amount 63 left)
+           (inst neg count amount)
+           (inst mvn tmp count)
+           (inst lslv tmp hi-x tmp)
+           (inst lsrv lo-r lo-x count)
+           (inst orr lo-r lo-r (lsl tmp 1))
+           (inst asrv hi-r hi-x count)
+           (inst b done)
+           left
+           (inst mvn tmp amount)
+           (inst lsrv tmp lo-x tmp)
+           (inst lslv lo-r lo-x amount)
+           (inst lslv hi-r hi-x amount)
+           (inst orr hi-r hi-r (lsr tmp 1))))))
+    done))
+
+(define-vop (ash/s128=>signed)
+  (:translate ash)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (amount :scs (signed-reg) :to :save))
+  (:arg-types signed-byte-128 signed-num)
+  (:arg-refs nil amount-ref)
+  (:temporary (:sc signed-reg) count tmp)
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:generator 10
+    (let* ((type (tn-ref-type amount-ref))
+           (negative (csubtypep type (specifier-type '(integer * 0))))
+           (small    (csubtypep type (specifier-type '(integer -63 63)))))
+      (cond
+        ((not small)
+         (assemble ()
+           (unless negative
+             (inst tbz amount 63 left))
+
+           (inst neg count amount)
+           (inst cmp count 64)
+           (inst b :ge right-64)
+           (inst mvn tmp count)
+           (inst lslv tmp hi-x tmp)
+           (inst lsrv r lo-x count)
+           (inst orr r r (lsl tmp 1))
+           (inst b done)
+
+           right-64
+           (inst sub tmp count 64)
+           (inst cmp tmp 64)
+           (inst csinv tmp tmp zr-tn :lo)
+           (inst asrv r hi-x tmp)
+           (inst b done)
+
+           left
+           (unless negative
+             (inst lslv r lo-x amount)
+             (inst cmp amount 64)
+             (inst csel r zr-tn r :ge))))
+
+        (negative
+         (inst neg count amount)
+         (inst mvn tmp count)
+         (inst lslv tmp hi-x tmp)
+         (inst lsrv r lo-x count)
+         (inst orr r r (lsl tmp 1)))
+
+        (t
+         (assemble ()
+           (inst tbz amount 63 left)
+           (inst neg count amount)
+           (inst mvn tmp count)
+           (inst lslv tmp hi-x tmp)
+           (inst lsrv r lo-x count)
+           (inst orr r r (lsl tmp 1))
+           (inst b done)
+
+           left
+           (inst lslv r lo-x amount)))))
+    done))
+
+(define-vop (ash/s128=>unsigned ash/s128=>signed)
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num))
+
+(define-vop (ash/signed=>s128)
+  (:translate ash)
+  (:args (x :scs (signed-reg) :to :save)
+         (amount :scs (signed-reg) :to :save))
+  (:arg-types signed-num signed-num)
+  (:temporary (:sc signed-reg) count tmp)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 15
+    (inst tbnz amount 63 right)
+
+    (inst cmp amount 64)
+    (inst b :ge left-64)
+    (inst mvn tmp amount)
+    (inst asrv hi x tmp)
+    (inst asr hi hi 1)
+    (inst lslv lo x amount)
+    (inst b done)
+
+    left-64
+    (inst sub tmp amount 64)
+    (inst lslv hi x tmp)
+    (inst cmp amount 128)
+    (inst csel hi zr-tn hi :ge)
+    (inst mov lo 0)
+    (inst b done)
+
+    right
+    (inst neg count amount)
+    (inst cmp count 64)
+    (inst csinv count count zr-tn :lo)
+    (inst asrv lo x count)
+    (inst asr hi x 63)
+    done))
+
+(define-vop (ash/unsigned=>s128)
+  (:translate ash)
+  (:args (x :scs (unsigned-reg) :to :save)
+         (amount :scs (signed-reg) :to :save))
+  (:arg-types unsigned-num signed-num)
+  (:temporary (:sc signed-reg) count tmp)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 15
+    (inst tbnz amount 63 right)
+
+    (inst cmp amount 64)
+    (inst b :ge left-64)
+    (inst mvn tmp amount)
+    (inst lsrv hi x tmp)
+    (inst lsr hi hi 1)
+    (inst lslv lo x amount)
+    (inst b done)
+
+    left-64
+    (inst sub tmp amount 64)
+    (inst lslv hi x tmp)
+    (inst cmp amount 128)
+    (inst csel hi zr-tn hi :ge)
+    (inst mov lo 0)
+    (inst b done)
+
+    right
+    (inst neg count amount)
+    (inst lsrv lo x count)
+    (inst cmp count 64)
+    (inst csel lo zr-tn lo :ge)
+    (inst mov hi 0)
+    done))
+
 (define-vop (ash/signed/unsigned)
   (:note "inline ASH")
   (:args (number)

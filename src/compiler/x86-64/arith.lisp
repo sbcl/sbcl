@@ -3162,6 +3162,249 @@
          (move r hi-x)
          (inst sar r (min 63 (- amount 64))))))))
 
+(define-vop (ash/s128)
+  (:translate ash)
+  (:args ((lo-x hi-x) :scs (signed-128-reg) :to :save)
+         (amount :scs (signed-reg) :target rcx))
+  (:arg-types signed-byte-128 signed-num)
+  (:arg-refs nil amount-ref)
+  (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 1)) rcx)
+  (:temporary (:sc signed-reg) tmp)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 15
+    (let* ((type (tn-ref-type amount-ref))
+           (negative (csubtypep type (specifier-type '(integer * 0))))
+           (small    (csubtypep type (specifier-type '(integer -63 63))))
+           (medium   (csubtypep type (specifier-type '(integer -127 127)))))
+      (move rcx amount)
+      (cond
+        ((not small)
+         (assemble ()
+           (unless negative
+             (inst test rcx rcx)
+             (inst jmp :ns left))
+
+           (inst neg rcx)
+           (inst cmp rcx 64)
+           (inst jmp :ge right-64)
+           (move lo-r lo-x)
+           (move hi-r hi-x)
+           (inst shrd lo-r hi-r :cl)
+           (inst sar hi-r :cl)
+           (inst jmp done)
+
+           right-64
+           (inst sub rcx 64)
+           (inst mov tmp 63)
+           (inst cmp rcx 63)
+           (inst cmov :g rcx tmp)
+           (move lo-r hi-x)
+           (inst sar lo-r :cl)
+           (move hi-r hi-x)
+           (inst sar hi-r 63)
+           (inst jmp done)
+
+           left
+           (unless negative
+             (assemble ()
+               (inst cmp rcx 64)
+               (inst jmp :ge left-64)
+               (move lo-r lo-x)
+               (move hi-r hi-x)
+               (inst shld hi-r lo-r :cl)
+               (inst shl lo-r :cl)
+               (inst jmp done)
+
+               left-64
+               (inst sub rcx 64)
+               (move hi-r lo-x)
+               (inst shl hi-r :cl)
+               (unless medium
+                 (zeroize tmp)
+                 (inst cmp amount 128)
+                 (inst cmov :ge hi-r tmp))
+               (zeroize lo-r)))))
+
+        (negative
+         (inst neg rcx)
+         (move lo-r lo-x)
+         (move hi-r hi-x)
+         (inst shrd lo-r hi-r :cl)
+         (inst sar hi-r :cl))
+
+        (t
+         (assemble ()
+           (inst test rcx rcx)
+           (inst jmp :s right)
+           (move lo-r lo-x)
+           (move hi-r hi-x)
+           (inst shld hi-r lo-r :cl)
+           (inst shl lo-r :cl)
+           (inst jmp done)
+
+           right
+           (inst neg rcx)
+           (move lo-r lo-x)
+           (move hi-r hi-x)
+           (inst shrd lo-r hi-r :cl)
+           (inst sar hi-r :cl)))))
+    done))
+
+(define-vop (ash/s128=>signed)
+  (:translate ash)
+  (:args ((lo-x hi-x) :scs (signed-128-reg) :to :save)
+         (amount :scs (signed-reg) :target rcx))
+  (:arg-types signed-byte-128 signed-num)
+  (:arg-refs nil amount-ref)
+  (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 1)) rcx)
+  (:temporary (:sc signed-reg) tmp)
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:generator 10
+    (let* ((type (tn-ref-type amount-ref))
+           (negative (csubtypep type (specifier-type '(integer * 0))))
+           (small    (csubtypep type (specifier-type '(integer -63 63)))))
+      (move rcx amount)
+      (cond
+        ((not small)
+         (assemble ()
+           (unless negative
+             (inst test rcx rcx)
+             (inst jmp :ns left))
+
+           (inst neg rcx)
+           (inst cmp rcx 64)
+           (inst jmp :ge right-64)
+           (move r lo-x)
+           (inst shrd r hi-x :cl)
+           (inst jmp done)
+
+           right-64
+           (inst sub rcx 64)
+           (inst mov tmp 63)
+           (inst cmp rcx 63)
+           (inst cmov :g rcx tmp)
+           (move r hi-x)
+           (inst sar r :cl)
+           (inst jmp done)
+
+           left
+           (unless negative
+             (move r lo-x)
+             (inst shl r :cl)
+             (zeroize tmp)
+             (inst cmp rcx 64)
+             (inst cmov :ge r tmp))))
+
+        (negative
+         (inst neg :dword rcx)
+         (move r lo-x)
+         (inst shrd r hi-x :cl))
+
+        (t
+         (assemble ()
+           (inst test :dword rcx rcx)
+           (inst jmp :s right)
+           (move r lo-x)
+           (inst shl r :cl)
+           (inst jmp done)
+
+           right
+           (inst neg :dword rcx)
+           (move r lo-x)
+           (inst shrd r hi-x :cl)))))
+    done))
+
+(define-vop (ash/s128=>unsigned ash/s128=>signed)
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num))
+
+(define-vop (ash/signed=>s128)
+  (:translate ash)
+  (:args (x :scs (signed-reg))
+         (amount :scs (signed-reg) :target rcx))
+  (:arg-types signed-num signed-num)
+  (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 1)) rcx)
+  (:temporary (:sc signed-reg) tmp)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 15
+    (move rcx amount)
+    (inst test rcx rcx)
+    (inst jmp :s right)
+
+    (inst cmp rcx 64)
+    (inst jmp :ge left-64)
+    (move lo x)
+    (move hi x)
+    (inst sar hi 63)
+    (inst shld hi lo :cl)
+    (inst shl lo :cl)
+    (inst jmp done)
+
+    left-64
+    (inst sub rcx 64)
+    (move hi x)
+    (inst shl hi :cl)
+    (zeroize tmp)
+    (inst cmp amount 128)
+    (inst cmov :ge hi tmp)
+    (inst xor lo lo)
+    (inst jmp done)
+
+    right
+    (inst neg rcx)
+    (inst mov tmp 63)
+    (inst cmp rcx 63)
+    (inst cmov :g rcx tmp)
+    (move lo x)
+    (move hi x)
+    (inst sar lo :cl)
+    (inst sar hi 63)
+    done))
+
+(define-vop (ash/unsigned=>s128)
+  (:translate ash)
+  (:args (x :scs (unsigned-reg))
+         (amount :scs (signed-reg) :target rcx))
+  (:arg-types unsigned-num signed-num)
+  (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 1)) rcx)
+  (:temporary (:sc signed-reg) tmp)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 15
+    (move rcx amount)
+    (inst test rcx rcx)
+    (inst jmp :s right)
+
+    (inst cmp rcx 64)
+    (inst jmp :ge left-64)
+    (move lo x)
+    (zeroize hi)
+    (inst shld hi lo :cl)
+    (inst shl lo :cl)
+    (inst jmp done)
+
+    left-64
+    (inst sub rcx 64)
+    (move hi x)
+    (inst shl hi :cl)
+    (zeroize tmp)
+    (inst cmp amount 128)
+    (inst cmov :ge hi tmp)
+    (zeroize lo)
+    (inst jmp done)
+
+    right
+    (inst neg rcx)
+    (move lo x)
+    (inst shr lo :cl)
+    (zeroize hi)
+    (inst cmp rcx 64)
+    (inst cmov :ge lo hi)
+    done))
+
 ;;; Given an unsigned 32-bit dividend and magic numbers, compute the truncated quotient.
 ;;; The 2nd through 4th args are 'magic', 'add', 'shift'.
 (defknown udiv32-via-multiply ((unsigned-byte 32)
