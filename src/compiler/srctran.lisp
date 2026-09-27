@@ -3809,8 +3809,7 @@
 
 (deftransform ash ((integer amount) (integer (constant-arg (integer (#.(- sb-vm:n-word-bits)) -1))) *
                    :node node :important nil)
-  (when (or (csubtypep (lvar-type integer) (specifier-type 'word))
-            (csubtypep (lvar-type integer) (specifier-type 'sb-vm:signed-word)))
+  (when (double-word-sized-lvar-p integer)
     (give-up-ir1-transform))
   (delay-ir1-transform node :ir1-phases)
   `(ash-right integer ,(- (lvar-value amount))))
@@ -4039,20 +4038,20 @@
 ;; (ash (unsigned-byte 128) -64) produces a word sized result
 (when-vop-existsp (:translate ash-right-two-words)
   (deftransform ash ((integer amount) (t fixnum) signed-word :node node :important nil)
-    (if (or (word-sized-lvar-p integer)
+    (if (or (double-word-sized-lvar-p integer)
             (combination-matches 'logand `(* ,most-positive-word) (node-dest node)))
         (give-up-ir1-transform)
         `(mask-signed-field ,sb-vm:n-word-bits (logand (ash integer amount) ,most-positive-word))))
 
   (deftransform ash ((integer amount) (t fixnum) word :node node :important nil)
-    (if (or (word-sized-lvar-p integer)
+    (if (or (double-word-sized-lvar-p integer)
             (combination-matches 'logand `(* ,most-positive-word) (node-dest node)))
         (give-up-ir1-transform)
         `(logand (ash integer amount) ,most-positive-word)))
 
   (deftransform ash ((integer amount) (t (integer * 0)) signed-word
                      :node node :important nil)
-    (when (word-sized-lvar-p amount)
+    (when (double-word-sized-lvar-p amount)
       (give-up-ir1-transform))
     (delay-ir1-transform node :ir1-phases)
     `(ash integer (if (fixnump amount)
@@ -4062,7 +4061,7 @@
 
   (deftransform ash ((integer amount) (t (integer * 0)) word
                      :node node :important nil)
-    (when (word-sized-lvar-p amount)
+    (when (double-word-sized-lvar-p amount)
       (give-up-ir1-transform))
     (delay-ir1-transform node :ir1-phases)
     `(if (fixnump amount)

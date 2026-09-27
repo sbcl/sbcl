@@ -85,6 +85,26 @@
   (:generator 2
     (inst mvn res x)))
 
+(define-vop (lognot/unsigned=>s128)
+  (:translate lognot)
+  (:args (x :scs (unsigned-reg)))
+  (:arg-types unsigned-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 9
+    (inst mvn lo x)
+    (inst mov hi -1)))
+
+(define-vop (lognot/s128)
+  (:translate lognot)
+  (:args ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (inst mvn lo-r lo-x)
+    (inst mvn hi-r hi-x)))
+
 
 ;;;; Binary fixnum operations.
 
@@ -727,6 +747,48 @@
            (inst mov result 0))
           (t
            (inst asr result number 63)))))
+
+(define-vop (ash-right-c/s128)
+  (:translate ash)
+  (:args ((lo-x hi-x) :scs (signed-128-reg)))
+  (:info amount)
+  (:arg-types signed-byte-128 (:constant (integer -63 -1)))
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (let ((amount (- amount)))
+      (inst extr lo-r hi-x lo-x amount)
+      (inst asr hi-r hi-x amount))))
+
+(define-vop (ash-right-c/s128=>unsigned)
+  (:translate ash)
+  (:args ((lo-x hi-x) :scs (signed-128-reg)))
+  (:info amount)
+  (:arg-types signed-byte-128 (:constant (integer -63 -1)))
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 9
+    (let ((amount (- amount)))
+      (inst extr r hi-x lo-x amount))))
+
+(define-vop (ash-right-c/s128=>signed)
+  (:translate ash)
+  (:args ((lo-x hi-x) :scs (signed-128-reg)))
+  (:info amount)
+  (:arg-types signed-byte-128 (:constant (integer * -1)))
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:generator 8
+    (let ((amount (- amount)))
+      (cond
+        ((< amount 64)
+         (inst extr r hi-x lo-x amount))
+        ((= amount 64)
+         (move r hi-x))
+        ((< amount 127)
+         (inst asr r hi-x (- amount 64)))
+        (t
+         (inst asr r hi-x 63))))))
 
 (define-vop (ash/signed/unsigned)
   (:note "inline ASH")

@@ -110,6 +110,29 @@
   (:translate lognot)
   (:vop-var vop)
   (:generator 2 (emit-inline-neg 'not x res temp vop nil)))
+
+(define-vop (lognot/unsigned=>s128)
+  (:translate lognot)
+  (:args (x :scs (unsigned-reg)))
+  (:arg-types unsigned-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 9
+    (move lo x)
+    (inst not lo)
+    (inst mov hi -1)))
+
+(define-vop (lognot/s128)
+  (:translate lognot)
+  (:args ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (move lo-r lo-x)
+    (move hi-r hi-x)
+    (inst not lo-r)
+    (inst not hi-r)))
 
 ;;;; binary fixnum operations
 
@@ -3094,12 +3117,57 @@
   (:variant t t)
   (:translate ash-mod64))
 
+(define-vop (ash-right-c/s128)
+  (:translate ash)
+  (:args ((lo-x hi-x) :scs (signed-128-reg)))
+  (:info amount)
+  (:arg-types signed-byte-128 (:constant (integer -63 -1)))
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (let ((amount (- amount)))
+      (move lo-r lo-x)
+      (inst shrd lo-r hi-x amount)
+      (move hi-r hi-x)
+      (inst sar hi-r amount))))
+
+(define-vop (ash-right-c/s128=>unsigned)
+  (:translate ash)
+  (:args ((lo-x hi-x) :scs (signed-128-reg)))
+  (:info amount)
+  (:arg-types signed-byte-128 (:constant (integer -63 -1)))
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 8
+    (let ((amount (- amount)))
+      (move r lo-x)
+      (inst shrd r hi-x amount))))
+
+(define-vop (ash-right-c/s128=>signed)
+  (:translate ash)
+  (:args ((lo-x hi-x) :scs (signed-128-reg)))
+  (:info amount)
+  (:arg-types signed-byte-128 (:constant (integer * -1)))
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:generator 8
+    (let ((amount (- amount)))
+      (cond
+        ((< amount 64)
+         (move r lo-x)
+         (inst shrd r hi-x amount))
+        ((= amount 64)
+         (move r hi-x))
+        (t
+         (move r hi-x)
+         (inst sar r (min 63 (- amount 64))))))))
+
 ;;; Given an unsigned 32-bit dividend and magic numbers, compute the truncated quotient.
 ;;; The 2nd through 4th args are 'magic', 'add', 'shift'.
 (defknown udiv32-via-multiply ((unsigned-byte 32)
                                (unsigned-byte 32) bit (integer 0 31))
-  (unsigned-byte 32)
-  (flushable))
+    (unsigned-byte 32)
+    (flushable))
 (define-vop ()
   (:translate udiv32-via-multiply)
   (:args (dividend :scs (unsigned-reg))
