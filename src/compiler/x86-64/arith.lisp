@@ -6063,15 +6063,15 @@
   (:result-types tagged-num)
   (:related-args y)
   (:generator 2
-    (unless (csubtypep (tn-ref-type posn-ref) (specifier-type '(mod 64)))
-      (inst cmp posn 64)
-      (inst jmp :ae done))
     (cond ((location= posn temp)
            (move res y)
            (inst inc :dword temp))
           (t
            (inst lea :dword temp (ea 1 posn))
            (move res y)))
+    (unless (csubtypep (tn-ref-type posn-ref) (specifier-type '(mod 64)))
+      (inst cmp temp 64)
+      (inst jmp :ae done))
     (if (logbitp 0 new)
         (inst bts res temp)
         (inst btr res temp))
