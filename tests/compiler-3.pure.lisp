@@ -158,3 +158,12 @@
 
         (m 0 0)))
    (() (values 6 5))))
+
+(with-test (:name :eq-integer-word)
+  (checked-compile
+   `(lambda (n m)
+      (declare (optimize speed)
+               (integer m)
+               (fixnum n))
+      (eql m (logior (1+ n) 1)))
+   :allow-notes nil))
