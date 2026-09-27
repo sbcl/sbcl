@@ -2993,6 +2993,28 @@
     (inst subs lo y lo-x)
     (inst sbc  hi tmp-tn hi-x)))
 
+(define-vop (-/s128-unsigned=>s128)
+  (:translate -)
+  (:args ((lo-x hi-x) :scs (signed-128-reg) :target lo)
+         (y :scs (unsigned-reg)))
+  (:arg-types signed-byte-128 unsigned-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 11
+    (inst subs lo lo-x y)
+    (inst sbc  hi hi-x zr-tn)))
+
+(define-vop (-/unsigned-s128=>s128)
+  (:translate -)
+  (:args (y :scs (unsigned-reg))
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types unsigned-num signed-byte-128)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 11
+    (inst subs lo y lo-x)
+    (inst sbc  hi zr-tn hi-x)))
+
 (define-vop (%negate/unsigned=>integer)
   (:translate %negate)
   (:args (x :scs (unsigned-reg)))
