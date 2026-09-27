@@ -88,8 +88,21 @@
                 (incf (aref cap (logxor e 1)) bot))))))
 
 (defun tagged-template-results-p (vop-info)
-  (loop for costs in (vop-info-result-costs vop-info)
-        always (eql (svref costs sb-vm:any-reg-sc-number) 0)))
+  (if (vop-info-p vop-info)
+      (let* ((costs (car (vop-info-result-costs vop-info)))
+             (tagged (eql (svref costs sb-vm:any-reg-sc-number) 0))
+             (untagged (or (eql (svref costs sb-vm:signed-reg-sc-number) 0)
+                           (eql (svref costs sb-vm:unsigned-reg-sc-number) 0))))
+        (cond
+          ((and tagged untagged)
+           (values 0 0))
+          (untagged
+           (values 0 1))
+          (tagged
+           (values 1 0))
+          (t
+           (values 1 0))))
+      (values 1 0)))
 
 (defun combination-arg-template-position (arg node)
   (let ((args (combination-args node)))
@@ -111,7 +124,7 @@
           ((not (eql (svref costs sb-vm:signed-reg-sc-number) 0))
            (values (boxing-cost lvar) 0))
           (t
-           (values (1- (boxing-cost lvar)) 0)))))
+           (values 0 0)))))
 
 (defun boxing-cost (lvar)
   (let ((2lvar  (lvar-info lvar)))
@@ -194,11 +207,9 @@
                                      (map-all-uses (lambda (use)
                                                      (cond ((combination-p use)
                                                             (let ((template (combination-info use)))
-                                                              (unless (consp template)
-                                                                (if (and (vop-info-p template)
-                                                                         (not (tagged-template-results-p template)))
-                                                                    (incf untagged)
-                                                                    (incf tagged)))))
+                                                              (multiple-value-bind (tag untag) (tagged-template-results-p template)
+                                                                (incf tagged tag)
+                                                                (incf untagged untag))))
                                                            ((set-p use)
                                                             (handle-var (set-var use)))
                                                            (t

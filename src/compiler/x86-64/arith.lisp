@@ -4298,6 +4298,14 @@
          (unsigned :scs (unsigned-reg)))
   (:arg-types signed-num unsigned-num))
 
+(define-vop (eq-unsigned-signed eql-unsigned-signed)
+  (:variant-cost 6)
+  (:translate eq))
+
+(define-vop (eq-signed-unsigned eql-signed-unsigned)
+  (:variant-cost 6)
+  (:translate eq))
+
 (define-vop (if-eql/signed conditional/signed)
   (:translate eql)
   (:generator 6 (emit-optimized-cmp x y temp)))

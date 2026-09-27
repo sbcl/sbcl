@@ -167,3 +167,19 @@
                (fixnum n))
       (eql m (logior (1+ n) 1)))
    :allow-notes nil))
+
+(with-test (:name :select-tagging)
+  (checked-compile
+   `(lambda (x)
+      (declare (optimize speed))
+      (let ((digit (sb-bignum:%bignum-ref x 1)))
+        (= (sb-c::mask-signed-field 16 digit)
+           digit)))
+   :allow-notes nil)
+  (checked-compile
+   `(lambda (x)
+      (declare (optimize speed))
+      (let ((digit (sb-c::mask-signed-field 64 (sb-bignum:%bignum-ref x 1))))
+        (= (sb-c::mask-signed-field 16 digit)
+           digit)))
+   :allow-notes nil))
