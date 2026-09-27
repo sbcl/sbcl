@@ -512,17 +512,13 @@
                          (= (logcount (1+ high)) 1)
                          (> high most-positive-word))
                     `(unsigned-byte-x-p ,object ,(integer-length high)))
-                   ;; (signed-byte n-word-bits^x)
+                   ;; (signed-byte x>n-word-bits)
                    ((and
                      low
                      (eql high (- -1 low))
                      (= (logcount (1+ high)) 1)
                      (> high (ash most-positive-word -1))
-                     (multiple-value-bind (q r) (truncate (1+ (integer-length high)) sb-vm:n-word-bits)
-                       (when (zerop r)
-                         `(or (fixnump ,object)
-                              (and (bignump ,object)
-                                   (<= (%bignum-length ,object) ,q)))))))))
+                     `(signed-byte-x-p ,object ,(1+ (integer-length high)))))))
            `(and (typep ,object ',base)
                  ,(transform-numeric-bound-test object type base))))
       (:complex
@@ -2094,9 +2090,33 @@
         tval)))))
 
 (when-vop-existsp (:translate unsigned-byte-x-p)
-  (deftransform unsigned-byte-x-p
-      ((object x) (t t) * :important nil :node node)
+  (deftransform unsigned-byte-x-p ((object x) (t t) * :important nil :node node)
     (ir1-transform-type-predicate object (make-numeric-type 'unsigned-byte (lvar-value x)) node)))
+
+(deftransform signed-byte-x-p ((object x) (t t) * :important nil :node node)
+  (block nil
+    (catch 'give-up-ir1-transform
+      (return (ir1-transform-type-predicate object
+                                            (make-numeric-type 'signed-byte (lvar-value x)) node)))
+    (delay-ir1-transform node :ir1-phases)
+    (let ((x (lvar-value x)))
+      (multiple-value-bind (q r) (truncate x sb-vm:n-word-bits)
+        `(if (fixnump object)
+             t
+             (if (bignump object)
+                 ,(if (zerop r)
+                      `(<= (%bignum-length (truly-the bignum object)) ,q)
+                      (multiple-value-bind (digits left) (truncate (1- x) sb-vm:n-word-bits)
+                        `(let ((len (%bignum-length (truly-the bignum object))))
+                           (cond
+                             ((< len ,(1+ digits)) t)
+                             ((> len ,(1+ digits)) nil)
+                             (t
+                              (let* ((digit (sb-bignum:%bignum-ref (truly-the bignum object) ,digits))
+                                     (signed-digit (mask-signed-field sb-vm:n-word-bits digit)))
+                                (= (mask-signed-field ,(1+ left) signed-digit)
+                                   signed-digit)))))))))))))
+
 
 (deftransform %other-pointer-p ((object))
   (let ((type (lvar-type object)))

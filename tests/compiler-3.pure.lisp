@@ -168,7 +168,8 @@
       (eql m (logior (1+ n) 1)))
    :allow-notes nil))
 
-(with-test (:name :select-tagging)
+(with-test (:name :select-tagging
+            :implemented-on (or :arm64 :x86-64))
   (checked-compile
    `(lambda (x)
       (declare (optimize speed))
@@ -179,7 +180,7 @@
   (checked-compile
    `(lambda (x)
       (declare (optimize speed))
-      (let ((digit (sb-c::mask-signed-field 64 (sb-bignum:%bignum-ref x 1))))
+      (let ((digit (sb-c::mask-signed-field sb-vm:n-word-bits (sb-bignum:%bignum-ref x 1))))
         (= (sb-c::mask-signed-field 16 digit)
            digit)))
    :allow-notes nil))

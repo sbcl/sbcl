@@ -71,7 +71,7 @@
            non-null-symbol-p)
     (t) boolean (movable foldable flushable))
 
-(defknown unsigned-byte-x-p
+(defknown (signed-byte-x-p unsigned-byte-x-p)
     (t (integer #.(1+ sb-vm:n-word-bits)))
     boolean (movable foldable flushable always-translatable))
 
