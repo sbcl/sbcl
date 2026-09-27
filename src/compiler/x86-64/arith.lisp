@@ -3140,8 +3140,11 @@
   (:result-types unsigned-num)
   (:generator 8
     (let ((amount (- amount)))
-      (move r lo-x)
-      (inst shrd r hi-x amount))))
+      (cond ((location= r hi-x)
+             (inst shld r lo-x (- 64 amount)))
+            (t
+             (move r lo-x)
+             (inst shrd r hi-x amount))))))
 
 (define-vop (ash-right-c/s128=>signed)
   (:translate ash)
@@ -3154,8 +3157,11 @@
     (let ((amount (- amount)))
       (cond
         ((< amount 64)
-         (move r lo-x)
-         (inst shrd r hi-x amount))
+         (cond ((location= r hi-x)
+                (inst shld r lo-x (- 64 amount)))
+               (t
+                (move r lo-x)
+                (inst shrd r hi-x amount))))
         ((= amount 64)
          (move r hi-x))
         (t
