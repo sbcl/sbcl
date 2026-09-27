@@ -3139,6 +3139,17 @@
     (inst negs lo x)
     (inst csetm hi :lt)))
 
+(define-vop (%negate/unsigned=>s128)
+  (:translate %negate)
+  (:boxing-variant %negate/unsigned=>integer)
+  (:args (x :scs (unsigned-reg) :target lo))
+  (:arg-types unsigned-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (inst negs lo x)
+    (inst csetm hi :cc)))
+
 (define-vop (%negate/s128=>s128)
   (:translate %negate)
   (:args ((lo-x hi-x) :scs (signed-128-reg) :target lo))

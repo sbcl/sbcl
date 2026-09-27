@@ -7606,8 +7606,7 @@
 ;;; already restricted to a fixnum on one side.
 (macrolet ((def (name x y type-x type-y check-range &optional non-fixnum)
                `(deftransform ,name ((,x ,y) (,type-x ,type-y) * :node node :important nil)
-                  (cond ((or (csubtypep (lvar-type i) (specifier-type 'word))
-                             (csubtypep (lvar-type i) (specifier-type 'sb-vm:signed-word)))
+                  (cond ((double-word-sized-lvar-p i)
                          (give-up-ir1-transform))
                         (t
                          ;; Give the range-transform optimizers a chance to trigger.

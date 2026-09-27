@@ -1403,7 +1403,7 @@
   (:results (r :scs (descriptor-reg)))
   (:vop-var vop)
   (:node-var node)
-  (:generator 8
+  (:generator 20
     (move low x)
     (inst neg low)
     (inst mov :byte twodigit 1)
@@ -1434,7 +1434,7 @@
   (:results (r :scs (descriptor-reg)))
   (:vop-var vop)
   (:node-var node)
-  (:generator 20
+  (:generator 19
     (move low x)
     (inst neg low)
     (inst mov :byte twodigit 1)
@@ -1463,6 +1463,18 @@
     (inst neg hi)
     (inst neg lo)
     (inst sbb hi 0)))
+
+(define-vop (%negate/unsigned=>s128)
+  (:translate %negate)
+  (:boxing-variant %negate/unsigned=>integer)
+  (:args (x :scs (unsigned-reg)))
+  (:arg-types unsigned-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 14
+    (move lo x)
+    (inst neg lo)
+    (inst sbb hi hi)))
 
 (define-vop (%negate/s128=>s128)
   (:translate %negate)
