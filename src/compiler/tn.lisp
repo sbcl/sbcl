@@ -614,15 +614,21 @@
 
 (defun template-tagging (vop-info)
   (let ((untagged 1)
-        (tagged 1))
+        (tagged 1)
+        (related (vop-info-related-args vop-info))
+        (arg-positions (loop with i = 0
+                             for type in (vop-info-arg-types vop-info)
+                             unless (typep type '(cons (eql :constant)))
+                             collect i
+                             do (incf i))))
     (flet ((account (costs)
              (when (eql (svref costs sb-vm:signed-reg-sc-number) 0)
                (setf tagged 0))
              (when (eql (svref costs sb-vm:any-reg-sc-number) 0)
                (setf untagged 0))))
-      (loop for related fixnum = (vop-info-related-args vop-info) then (ash related -1)
-            for costs in (vop-info-arg-costs vop-info)
-            when (logbitp 0 related)
+      (loop for costs in (vop-info-arg-costs vop-info)
+            for i in arg-positions
+            when (logbitp i related)
             do (let ((untag (eql (svref costs sb-vm:signed-reg-sc-number) 0))
                      (tag (eql (svref costs sb-vm:any-reg-sc-number) 0)))
                  (unless (and tag untag)

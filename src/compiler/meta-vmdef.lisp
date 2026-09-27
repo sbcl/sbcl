@@ -1561,10 +1561,17 @@
        (list ,slot ,form)))
 
 (defun arg-name-bitmask (args parse)
-  (let ((mask 0))
+  (let ((mask 0)
+        (operands (if (and (vop-parse-info-args parse)
+                           (listp (vop-parse-arg-types parse)))
+                      (loop with names = (vop-parse-args parse)
+                            for type in (vop-parse-arg-types parse)
+                            collect (if (typep type '(cons (eql :constant)))
+                                        nil
+                                        (operand-parse-name (pop names))))
+                      (mapcar #'operand-parse-name (vop-parse-args parse)))))
     (loop for arg in args
-          do (setf (ldb (byte 1 (position arg (vop-parse-operands parse) :key #'operand-parse-name))
-                        mask)
+          do (setf (ldb (byte 1 (position arg operands)) mask)
                    1))
     mask))
 
