@@ -2982,7 +2982,7 @@
       (storew high tmp-tn 2))
     DONE))
 
-(define-vop (-/signed-signed=>s128)
+(define-vop (-/signed=>s128)
   (:translate -)
   (:boxing-variant -/signed=>integer)
   (:args (x :scs (signed-reg) :target lo)
@@ -2994,7 +2994,31 @@
     (inst subs lo x y)
     (inst csetm hi :lt)))
 
-(define-vop (-/s128-s128=>s128)
+(define-vop (-/unsigned-signed=>s128)
+  (:translate -)
+  (:args (x :scs (unsigned-reg) :target lo)
+         (y :scs (signed-reg) :to :save))
+  (:arg-types unsigned-num signed-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (inst subs lo x y)
+    (inst asr hi y 63)
+    (inst sbc hi zr-tn hi)))
+
+(define-vop (-/signed-unsigned=>s128)
+  (:translate -)
+  (:args (x :scs (signed-reg) :target lo)
+         (y :scs (unsigned-reg) :to :save))
+  (:arg-types signed-num unsigned-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (inst asr tmp-tn x 63)
+    (inst subs lo x y)
+    (inst sbc hi tmp-tn zr-tn)))
+
+(define-vop (-/s128=>s128)
   (:translate -)
   (:args ((lo-x hi-x) :scs (signed-128-reg) :target lo)
          ((y-lo y-hi) :scs (signed-128-reg)))
