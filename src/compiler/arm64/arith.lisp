@@ -2543,6 +2543,24 @@
              (inst smulh hi x y)
              (inst mul lo x y))))))
 
+(define-vop (*/unsigned*signed=>s128)
+  (:translate *)
+  (:args (x :scs (unsigned-reg) :to :save)
+         (y :scs (signed-reg) :to :save))
+  (:arg-types unsigned-num signed-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 11
+    (inst umulh hi x y)
+    (inst and lo x (asr y 63))
+    (inst sub hi hi lo)
+    (inst mul lo x y)))
+
+(define-vop (*/signed*unsigned=>s128 */unsigned*signed=>s128)
+  (:args (y :scs (signed-reg) :to :save)
+         (x :scs (unsigned-reg) :to :save))
+  (:arg-types signed-num unsigned-num))
+
 (define-vop (*/s128*s128=>s128)
   (:translate *)
   (:args ((lo-x hi-x) :scs (signed-128-reg) :target lo)
@@ -2593,6 +2611,24 @@
   (:args (y :scs (signed-reg))
          ((lo-x hi-x) :scs (signed-128-reg)))
   (:arg-types signed-num signed-byte-128))
+
+(define-vop (*/s128*unsigned=>s128)
+  (:translate *)
+  (:args ((lo-x hi-x) :scs (signed-128-reg) :to :save)
+         (y :scs (unsigned-reg) :to :save))
+  (:arg-types signed-byte-128 unsigned-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (inst umulh hi lo-x y)
+    (inst madd hi y hi-x hi)
+    (inst mul lo lo-x y)))
+
+(define-vop (*/unsigned*s128=>s128 */s128*unsigned=>s128)
+  (:translate *)
+  (:args (y :scs (unsigned-reg))
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types unsigned-num signed-byte-128))
 
 (define-vop (*/unsigned=>integer)
   (:translate *)
