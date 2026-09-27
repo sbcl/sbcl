@@ -1012,6 +1012,25 @@
          ((lo-x hi-x) :scs (signed-128-reg) :target lo-r))
   (:arg-types signed-num signed-byte-128))
 
+(define-vop (+/s128+unsigned=>s128)
+  (:translate +)
+  (:args ((lo-x hi-x) :scs (signed-128-reg) :target lo-r)
+         (y :scs (unsigned-reg) :to :save))
+  (:arg-types signed-byte-128 unsigned-num)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (move lo-r lo-x)
+    (move hi-r hi-x)
+    (inst add lo-r y)
+    (inst adc hi-r 0)))
+
+(define-vop (+/unsigned+s128=>s128 +/s128+unsigned=>s128)
+  (:translate +)
+  (:args (y :scs (unsigned-reg) :to :save)
+         ((lo-x hi-x) :scs (signed-128-reg) :target lo-r))
+  (:arg-types unsigned-num signed-byte-128))
+
 (define-vop (-/signed=>integer)
   (:translate -)
   (:args (x :scs (signed-reg) :target low)
