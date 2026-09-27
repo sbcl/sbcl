@@ -128,7 +128,7 @@
   (:vop-var vop)
   (:conditional :eq)
   (:translate eq)
-  (:generator 1
+  (:generator 2
     (let ((value (sc-case y
                    (immediate
                     (let ((value (tn-value y)))
@@ -161,9 +161,9 @@
              `(define-vop (,eq-name ,eql-name)
                 (:translate eq)
                 (:variant-cost ,cost))))
-  (def if-eq-character char=/character 3)
-  (def if-eq-character/c char=/character/c 2)
-  (def if-eq-integer/c if-eql-integer/c 2)
+  (def if-eq-character char=/character 2)
+  (def if-eq-character/c char=/character/c 1)
+  (def if-eq-integer/c if-eql-integer/c 1)
   (def if-eq-signed if-eql/signed 5)
   (def if-eq-unsigned if-eql/unsigned 5)
   (def if-eq/s128-unsigned if-eql/s128-unsigned 8)

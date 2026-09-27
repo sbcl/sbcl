@@ -305,7 +305,7 @@
   (:translate eq)
   (:arg-refs x-tn-ref)
   (:temporary (:sc unsigned-reg) temp) ; TODO: add :unused-if
-  (:generator 1
+  (:generator 2
     (cond
       ((sc-is y constant)
        (inst cmp x (cond ((sc-is x descriptor-reg any-reg) y)
@@ -359,8 +359,8 @@
              `(define-vop (,eq-name ,eql-name)
                 (:translate eq)
                 (:variant-cost ,cost))))
-  (def if-eq-character char=/character 3)
-  (def if-eq-character/c char=/character/c 2)
+  (def if-eq-character char=/character 2)
+  (def if-eq-character/c char=/character/c 1)
   (def if-eq-signed if-eql/signed 5)
   (def if-eq-signed/c if-eql-c/signed 4)
   (def if-eq-unsigned if-eql/unsigned 5)
