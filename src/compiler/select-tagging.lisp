@@ -216,6 +216,7 @@
                       (result (node-lvar node)))
                   (declare (fixnum tagged untagged))
                   (add-lvar result)
+                  (push result seen-lvars)
                   (map-all-dests
                    (lambda (dest lvar nth-value)
                      (declare (ignorable lvar nth-value))
@@ -227,7 +228,11 @@
                   (when (> tagged 0)
                     (add-edge net :source result (* tagged 10)))
                   (when (> untagged 0)
-                    (add-edge net result :sink (* untagged 10))))))))))
+                    (add-edge net result :sink (* untagged 10))))))
+            ;; Somehow all lvars are constant
+            (unless seen-lvars
+              (setf (combination-info node)
+                    (car (combination-info node))))))))
     (when (> (length (net-to net)) 0)
       (let ((tagged-p (min-cut net)))
         (loop for node being the hash-key of (net-table net)
