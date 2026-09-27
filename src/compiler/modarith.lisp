@@ -556,7 +556,7 @@
     ((logior a a)
      'a)
     ((logior (logand a *) a)
-     a)))
+     'a)))
 
 (deftransform logxor ((a b) (t t) * :important nil :node node)
   (combination-match2 (node)
