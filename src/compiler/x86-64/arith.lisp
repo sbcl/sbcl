@@ -5184,6 +5184,117 @@
          ((lo-x hi-x) :scs (signed-128-reg)))
   (:arg-types signed-num signed-byte-128))
 
+(define-vop (logior-s128)
+  (:translate logior)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         ((lo-y hi-y) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128 signed-byte-128)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 12
+    (cond
+      ((location= lo-y lo-r)
+       (inst or lo-r lo-x)
+       (inst or hi-r hi-x))
+      (t
+       (move lo-r lo-x)
+       (move hi-r hi-x)
+       (inst or lo-r lo-y)
+       (inst or hi-r hi-y)))))
+
+(define-vop (logior-s128/signed)
+  (:translate logior)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (signed-reg)))
+  (:arg-types signed-byte-128 signed-num)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:temporary (:sc signed-reg) temp)
+  (:result-types signed-byte-128)
+  (:generator 10
+    (move temp y)
+    (move lo-r lo-x)
+    (inst or lo-r temp)
+    (move hi-r hi-x)
+    (inst sar temp 63)
+    (inst or hi-r temp)))
+
+(define-vop (logior-signed/s128 logior-s128/signed)
+  (:args (y :scs (signed-reg))
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types signed-num signed-byte-128))
+
+(define-vop (logior-s128/unsigned)
+  (:translate logior)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (unsigned-reg) :to :save))
+  (:arg-types signed-byte-128 unsigned-num)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (move lo-r lo-x)
+    (inst or lo-r y)
+    (move hi-r hi-x)))
+
+(define-vop (logior-unsigned/s128 logior-s128/unsigned)
+  (:args (y :scs (unsigned-reg) :to :save)
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types unsigned-num signed-byte-128))
+
+(define-vop (logxor-s128)
+  (:translate logxor)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         ((lo-y hi-y) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128 signed-byte-128)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 12
+    (cond
+      ((location= lo-y lo-r)
+       (inst xor lo-r lo-x)
+       (inst xor hi-r hi-x))
+      (t
+       (move lo-r lo-x)
+       (move hi-r hi-x)
+       (inst xor lo-r lo-y)
+       (inst xor hi-r hi-y)))))
+
+(define-vop (logxor-s128/signed)
+  (:translate logxor)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (signed-reg)))
+  (:arg-types signed-byte-128 signed-num)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:temporary (:sc signed-reg) temp)
+  (:result-types signed-byte-128)
+  (:generator 10
+    (move temp y)
+    (move lo-r lo-x)
+    (inst xor lo-r temp)
+    (move hi-r hi-x)
+    (inst sar temp 63)
+    (inst xor hi-r temp)))
+
+(define-vop (logxor-signed/s128 logxor-s128/signed)
+  (:args (y :scs (signed-reg))
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types signed-num signed-byte-128))
+
+(define-vop (logxor-s128/unsigned)
+  (:translate logxor)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (unsigned-reg) :to :save))
+  (:arg-types signed-byte-128 unsigned-num)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (move lo-r lo-x)
+    (inst xor lo-r y)
+    (move hi-r hi-x)))
+
+(define-vop (logxor-unsigned/s128 logxor-s128/unsigned)
+  (:args (y :scs (unsigned-reg) :to :save)
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types unsigned-num signed-byte-128))
 
 (in-package "SB-C")
 

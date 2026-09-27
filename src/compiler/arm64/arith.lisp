@@ -1838,6 +1838,92 @@
          ((lo-x hi-x) :scs (signed-128-reg)))
   (:arg-types signed-num signed-byte-128))
 
+(define-vop (logior-s128)
+  (:translate logior)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         ((lo-y hi-y) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128 signed-byte-128)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 12
+    (inst orr lo-r lo-x lo-y)
+    (inst orr hi-r hi-x hi-y)))
+
+(define-vop (logior-s128/signed)
+  (:translate logior)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (signed-reg) :to :save))
+  (:arg-types signed-byte-128 signed-num)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (inst orr lo-r lo-x y)
+    (inst orr hi-r hi-x (asr y 63))))
+
+(define-vop (logior-signed/s128 logior-s128/signed)
+  (:args (y :scs (signed-reg) :to :save)
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types signed-num signed-byte-128))
+
+(define-vop (logior-s128/unsigned)
+  (:translate logior)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (unsigned-reg) :to :save))
+  (:arg-types signed-byte-128 unsigned-num)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (inst orr lo-r lo-x y)
+    (move hi-r hi-x)))
+
+(define-vop (logior-unsigned/s128 logior-s128/unsigned)
+  (:args (y :scs (unsigned-reg) :to :save)
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types unsigned-num signed-byte-128))
+
+(define-vop (logxor-s128)
+  (:translate logxor)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         ((lo-y hi-y) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128 signed-byte-128)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 12
+    (inst eor lo-r lo-x lo-y)
+    (inst eor hi-r hi-x hi-y)))
+
+(define-vop (logxor-s128/signed)
+  (:translate logxor)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (signed-reg) :to :save))
+  (:arg-types signed-byte-128 signed-num)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (inst eor lo-r lo-x y)
+    (inst eor hi-r hi-x (asr y 63))))
+
+(define-vop (logxor-signed/s128 logxor-s128/signed)
+  (:args (y :scs (signed-reg) :to :save)
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types signed-num signed-byte-128))
+
+(define-vop (logxor-s128/unsigned)
+  (:translate logxor)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (unsigned-reg) :to :save))
+  (:arg-types signed-byte-128 unsigned-num)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (inst eor lo-r lo-x y)
+    (move hi-r hi-x)))
+
+(define-vop (logxor-unsigned/s128 logxor-s128/unsigned)
+  (:args (y :scs (unsigned-reg) :to :save)
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types unsigned-num signed-byte-128))
+
 ;;;; Bignum stuff.
 
 (define-vop (bignum-length get-header-data)
