@@ -3056,6 +3056,69 @@
          (move r hi-x)
          (inst sar r (min 63 (- amount 64))))))))
 
+(define-vop (ash-left-c/s128)
+  (:translate ash)
+  (:args ((lo-x hi-x) :scs (signed-128-reg)))
+  (:info amount)
+  (:arg-types signed-byte-128 (:constant (integer 1 63)))
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 11
+    (move hi-r hi-x)
+    (inst shld hi-r lo-x amount)
+    (move lo-r lo-x)
+    (inst shl lo-r amount)))
+
+(define-vop (ash-left-c/unsigned=>s128)
+  (:translate ash)
+  (:args (x :scs (unsigned-reg)))
+  (:info amount)
+  (:arg-types unsigned-num (:constant (integer 1 63)))
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (move lo-r x)
+    (move hi-r x)
+    (inst shr hi-r (- 64 amount))
+    (inst shl lo-r amount)))
+
+(define-vop (ash-left-c/fixnum=>s128)
+  (:translate ash)
+  (:args (x :scs (any-reg)))
+  (:info amount)
+  (:arg-types tagged-num (:constant (integer 2 65)))
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 8
+    (decf amount)
+    (cond
+      ((= amount 64)
+       (move hi-r x)
+       (zeroize lo-r))
+      (t
+       (move lo-r x)
+       (move hi-r x)
+       (inst sar hi-r (- 64 amount))
+       (inst shl lo-r amount)))))
+
+(define-vop (ash-left-c/signed=>s128)
+  (:translate ash)
+  (:args (x :scs (signed-reg)))
+  (:info amount)
+  (:arg-types signed-num (:constant (integer 1 64)))
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 9
+    (cond
+      ((= amount 64)
+       (move hi-r x)
+       (zeroize lo-r))
+      (t
+       (move lo-r x)
+       (move hi-r x)
+       (inst sar hi-r (- 64 amount))
+       (inst shl lo-r amount)))))
+
 (define-vop (ash/s128)
   (:translate ash)
   (:args ((lo-x hi-x) :scs (signed-128-reg) :to :save)

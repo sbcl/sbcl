@@ -4170,30 +4170,11 @@
   "convert x*2^k to shift"
   ;; Delay to make sure the surrounding casts are apparent.
   (delay-ir1-transform node :ir1-phases)
-  (let* ((type (single-value-type (node-asserted-type node)))
-         (y (lvar-value y))
+  (let* ((y (lvar-value y))
          (len (1- (integer-length y))))
-    (unless (or (not (word-sized-lvar-p x))
-                (word-sized-type-p type)
-                (>= len sb-vm:n-word-bits))
-      (give-up-ir1-transform))
     (unless (= y (ash 1 len))
       (give-up-ir1-transform))
     `(ash x ,len)))
-
-;;; * deals better with ASH that overflows
-(deftransform ash ((integer amount) (:or ((word (constant-arg (integer 1 *))) *)
-                                         ((signed-word (constant-arg (integer 1 *))) *)) *
-                   :important nil
-                   :node node)
-  ;; Give modular arithmetic optimizers a chance
-  (delay-ir1-transform node :ir1-phases)
-  (let ((type (single-value-type (node-asserted-type node)))
-        (shift (lvar-value amount)))
-    (when (or (word-sized-type-p type)
-              (>= shift sb-vm:n-word-bits))
-      (give-up-ir1-transform))
-    `(* integer ,(ash 1 shift))))
 
 ;;; (+ (ash x 8) (unsigned-byte 8)) can avoid allocating two bignums
 (deftransform + ((a b) (integer integer) * :node node :important nil)
