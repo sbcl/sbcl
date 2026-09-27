@@ -73,7 +73,7 @@
 
 (defknown (signed-byte-x-p unsigned-byte-x-p)
     (t (integer #.(1+ sb-vm:n-word-bits)))
-    boolean (movable foldable flushable always-translatable))
+    boolean (movable flushable always-translatable))
 
 (defknown car-eq-if-listp (t t) boolean (movable foldable flushable))
 

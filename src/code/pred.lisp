@@ -160,29 +160,6 @@
   (def-type-predicate-wrapper sb-c::string-designator-p)
   (def-type-predicate-wrapper vectorp))
 
-(sb-c::when-vop-existsp (:translate sb-c::unsigned-byte-x-p)
-  (defun sb-c::unsigned-byte-x-p (x width)
-    (and (typep x 'unsigned-byte)
-         (< x (ash 1 width)))))
-
-(defun signed-byte-x-p (x bits)
-  (declare (type (and (integer 65) fixnum) bits)
-           (optimize speed))
-  (typecase x
-    (fixnum
-     t)
-    (bignum
-     (multiple-value-bind (digits left) (truncate (1- bits) sb-vm:n-word-bits)
-       (let ((len (sb-bignum:%bignum-length x)))
-         (cond
-           ((< len (1+ digits)) t)
-           ((> len (1+ digits)) nil)
-           (t
-            (let* ((digit (sb-bignum:%bignum-ref x (1- len)))
-                   (signed-digit (sb-c::mask-signed-field sb-vm:n-word-bits digit)))
-              (= (sb-c::mask-signed-field (1+ left) signed-digit)
-                 signed-digit)))))))))
-
 (sb-c::when-vop-existsp (:translate car-eq-if-listp)
   (defun car-eq-if-listp (value object)
     (car-eq-if-listp value object)))

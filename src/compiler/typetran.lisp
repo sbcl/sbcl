@@ -2099,7 +2099,8 @@
       (return (ir1-transform-type-predicate object
                                             (make-numeric-type 'signed-byte (lvar-value x)) node)))
     (delay-ir1-transform node :ir1-phases)
-    (let ((x (lvar-value x)))
+    (let ((x (lvar-value x))
+          (unsigned (lvar-subtypep object unsigned-byte)))
       (multiple-value-bind (q r) (truncate x sb-vm:n-word-bits)
         `(if (fixnump object)
              t
@@ -2112,11 +2113,11 @@
                              ((< len ,(1+ digits)) t)
                              ((> len ,(1+ digits)) nil)
                              (t
-                              (let* ((digit (sb-bignum:%bignum-ref (truly-the bignum object) ,digits))
-                                     (signed-digit (mask-signed-field sb-vm:n-word-bits digit)))
-                                (= (mask-signed-field ,(1+ left) signed-digit)
-                                   signed-digit)))))))))))))
-
+                              (let ((digit (sb-bignum:%bignum-ref (truly-the bignum object) ,digits)))
+                                ,(if unsigned
+                                     `(typep digit '(unsigned-byte ,left))
+                                     `(typep (mask-signed-field sb-vm:n-word-bits digit)
+                                             '(signed-byte ,(1+ left))))))))))))))))
 
 (deftransform %other-pointer-p ((object))
   (let ((type (lvar-type object)))
