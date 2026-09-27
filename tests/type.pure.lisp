@@ -1329,3 +1329,9 @@
 (with-test (:name :prim-type-opaque-intersection)
   (assert (eql (sb-c:primitive-type (sb-kernel:specifier-type '(or (integer -2 -1) (and x (integer 1 2)))))
                (sb-c:primitive-type (sb-kernel:specifier-type '(OR (integer -2 2)))))))
+
+(with-test (:name :float-overflow)
+  (assert (equal (multiple-value-list (types-equal-or-intersect
+                                       (specifier-type '(real -174405461149511774174041808601745792450680267 -130065457264652917778248017974577785845017674))
+                                       (specifier-type 'single-float)))
+                 '(nil t))))

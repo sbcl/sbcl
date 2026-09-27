@@ -3044,21 +3044,25 @@ expansion happened."
          (cond
            ((cl:typep nbound 'single-float) bound)
            (t
-            (ecase upperp
-              ((nil)
-               (when (sb-xc:< nbound ns) (return-from inner-coerce-float-bound ns)))
-              ((t)
-               (when (sb-xc:> nbound ps) (return-from inner-coerce-float-bound ps))))
+            (if upperp
+                (cond
+                  ((sb-xc:> nbound ps) (return-from inner-coerce-float-bound ps))
+                  ((sb-xc:< nbound ns) (return-from inner-coerce-float-bound (list ns))))
+                (cond
+                  ((sb-xc:< nbound ns) (return-from inner-coerce-float-bound ns))
+                  ((sb-xc:> nbound ps) (return-from inner-coerce-float-bound (list ps)))))
             (make-bound (coerce nbound 'single-float)))))
         (double-float
          (cond
            ((cl:typep nbound 'double-float) bound)
            (t
-            (ecase upperp
-              ((nil)
-               (when (sb-xc:< nbound nd) (return-from inner-coerce-float-bound nd)))
-              ((t)
-               (when (sb-xc:> nbound pd) (return-from inner-coerce-float-bound pd))))
+            (if upperp
+                (cond
+                  ((sb-xc:> nbound pd) (return-from inner-coerce-float-bound pd))
+                  ((sb-xc:< nbound nd) (return-from inner-coerce-float-bound (list nd))))
+                (cond
+                  ((sb-xc:< nbound nd) (return-from inner-coerce-float-bound nd))
+                  ((sb-xc:> nbound pd) (return-from inner-coerce-float-bound (list pd)))))
             (make-bound (coerce nbound 'double-float)))))))))
 ) ; end MACROLET
 
