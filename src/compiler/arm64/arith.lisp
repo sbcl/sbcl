@@ -2208,19 +2208,9 @@
 
 (define-vop (bignum-length get-header-data)
   (:translate sb-bignum:%bignum-length)
-  (:results (res :scs (unsigned-reg any-reg)))
+  (:results (res :scs (unsigned-reg)))
   (:generator 6
-    (sc-case res
-      (unsigned-reg
-       #.(assert (subtypep 'sb-bignum:bignum-length '(unsigned-byte 32)))
-       (inst ldr (32-bit-reg res) (@ x (1+ (- other-pointer-lowtag)))))
-      (any-reg
-       (loadw res x 0 other-pointer-lowtag)
-       #.(assert (zerop (ash bignum-widetag
-                             (- n-fixnum-tag-bits n-widetag-bits))))
-       (inst lsr res res (if (sc-is res any-reg)
-                             (- n-widetag-bits n-fixnum-tag-bits)
-                             n-widetag-bits))))))
+    (inst ldr (32-bit-reg res) (@ x (1+ (- other-pointer-lowtag))))))
 
 (define-vop (bignum-set-length set-header-data)
   (:translate sb-bignum:%bignum-set-length))
