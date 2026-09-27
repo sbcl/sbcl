@@ -4196,25 +4196,21 @@
     `(* integer ,(ash 1 shift))))
 
 ;;; (+ (ash x 8) (unsigned-byte 8)) can avoid allocating two bignums
-(when-vop-existsp (:translate ash-left-add)
-  (deftransform + ((a b) (integer integer) * :node node :important nil)
-    (when (word-sized-result-p node t)
-      (give-up-ir1-transform))
-    (delay-ir1-transform node :ir1-phases)
-    (combination-match2 (node)
-      ((+ ((:or ash * :name name) int (:constant m (integer 1))) add)
-       (let ((shift (if (eq name 'ash)
-                        m
-                        (and (= (logcount m) 1)
-                             (1- (integer-length m))))))
-         (when (and shift
-                    (<= shift sb-vm:n-word-bits)
-                    (csubtypep (lvar-type add)
-                               (make-numeric-type 'unsigned-byte shift)))
-           `(ash-left-add int ,shift add))))))
-
-  (deftransform ash-left-add ((integer count add) (t (eql #.sb-vm:n-word-bits) t))
-    `(ash-left-word-add integer add)))
+(deftransform + ((a b) (integer integer) * :node node :important nil)
+  (when (double-word-sized-result-p node t)
+    (give-up-ir1-transform))
+  (delay-ir1-transform node :ir1-phases)
+  (combination-match2 (node)
+    ((+ ((:or ash * :name name) int (:constant m (integer 1))) add)
+     (let ((shift (if (eq name 'ash)
+                      m
+                      (and (= (logcount m) 1)
+                           (1- (integer-length m))))))
+       (when (and shift
+                  (<= shift sb-vm:n-word-bits)
+                  (csubtypep (lvar-type add)
+                             (make-numeric-type 'unsigned-byte shift)))
+         `(ash-left-add int ,shift add))))))
 
 (defun cast-or-check-bound-type (node &optional type fixnum)
   (unless (and type

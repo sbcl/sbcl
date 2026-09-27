@@ -4926,3 +4926,6 @@ is :ANY, the function name is not checked."
 
 (defun word-sized-result-p (node &optional asserted)
   (word-sized-type-p (single-value-result-type node asserted)))
+
+(defun double-word-sized-result-p (node &optional asserted)
+  (double-word-sized-type-p (single-value-result-type node asserted)))

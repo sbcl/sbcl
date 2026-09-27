@@ -1527,20 +1527,12 @@ and the number of 0 bits if INTEGER is negative."
     ((bignum)
      (bignum-ashift-right integer count))))
 
-(sb-c::when-vop-existsp (:translate ash-left-add)
-  (defun ash-left-add (integer count add)
-    (etypecase integer
-      (fixnum
-       (ash-left-add (truly-the fixnum integer) count add))
-      (bignum
-       (sb-bignum::bignum-ashift-left-add integer count add))))
-
-  (defun ash-left-word-add (integer add)
-    (etypecase integer
-      (fixnum
-       (ash-left-word-add integer add))
-      (bignum
-       (sb-bignum::bignum-ashift-left-add integer sb-vm:n-word-bits add)))))
+(defun ash-left-add (integer count add)
+  (etypecase integer
+    (fixnum
+     (+ (ash (truly-the fixnum integer) count) add))
+    (bignum
+     (sb-bignum::bignum-ashift-left-add integer count add))))
 
 (defun ash-right-two-words (word2 word1 count)
   (logand most-positive-word
