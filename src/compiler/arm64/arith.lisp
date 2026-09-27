@@ -1801,8 +1801,6 @@
   (:arg-types signed-byte-128 unsigned-num)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:vop-var vop)
-  (:save-p :compute-only)
   (:generator 9
     (if (eql mask most-positive-word)
         (move r lo)
@@ -1812,6 +1810,33 @@
   (:args ((lo) :scs (signed-128-reg)))
   (:info mask)
   (:arg-types signed-byte-128 (:constant (satisfies logical-immediate-or-word-mask))))
+
+(define-vop (logand-s128)
+  (:translate logand)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         ((lo-y hi-y) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128 signed-byte-128)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 12
+    (inst and lo-r lo-x lo-y)
+    (inst and hi-r hi-x hi-y)))
+
+(define-vop (logand-s128/signed)
+  (:translate logand)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (signed-reg) :to :save))
+  (:arg-types signed-byte-128 signed-num)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (inst and lo-r lo-x y)
+    (inst and hi-r hi-x (asr y 63))))
+
+(define-vop (logand-signed/s128 logand-s128/signed)
+  (:args (y :scs (signed-reg) :to :save)
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types signed-num signed-byte-128))
 
 ;;;; Bignum stuff.
 
@@ -2416,7 +2441,6 @@
   (:arg-types signed-num signed-num)
   (:results ((lo hi) :scs (signed-128-reg)))
   (:result-types signed-byte-128)
-  (:vop-var vop)
   (:generator 10
     (let ((value (and (sc-is y immediate)
                       (tn-value y))))
@@ -2440,7 +2464,6 @@
   (:arg-types signed-byte-128 signed-byte-128)
   (:results ((lo hi) :scs (signed-128-reg)))
   (:result-types signed-byte-128)
-  (:vop-var vop)
   (:generator 12
     (cond
       ((location= lo-x lo-y) ;; a square
@@ -2464,7 +2487,6 @@
   (:arg-types signed-byte-128 signed-num)
   (:results ((lo hi) :scs (signed-128-reg)))
   (:result-types signed-byte-128)
-  (:vop-var vop)
   (:generator 11
     (cond
       ((location= lo lo-x)

@@ -5120,8 +5120,6 @@
   (:arg-types signed-byte-128 unsigned-num)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:vop-var vop)
-  (:save-p :compute-only)
   (:generator 8
     (cond ((eql mask most-positive-word)
            (move r lo))
@@ -5146,6 +5144,45 @@
   (:args ((lo hi) :scs (signed-128-reg)))
   (:info mask)
   (:arg-types signed-byte-128 (:constant (unsigned-byte 64))))
+
+(define-vop (logand-s128)
+  (:translate logand)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         ((lo-y hi-y) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128 signed-byte-128)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 12
+    (cond
+      ((location= lo-y lo-r)
+       (inst and lo-r lo-x)
+       (inst and hi-r hi-x))
+      (t
+       (move lo-r lo-x)
+       (move hi-r hi-x)
+       (inst and lo-r lo-y)
+       (inst and hi-r hi-y)))))
+
+(define-vop (logand-s128/signed)
+  (:translate logand)
+  (:args ((lo-x hi-x) :scs (signed-128-reg))
+         (y :scs (signed-reg)))
+  (:arg-types signed-byte-128 signed-num)
+  (:results ((lo-r hi-r) :scs (signed-128-reg)))
+  (:temporary (:sc signed-reg) temp)
+  (:result-types signed-byte-128)
+  (:generator 10
+    (move temp y)
+    (move lo-r lo-x)
+    (inst and lo-r temp)
+    (move hi-r hi-x)
+    (inst sar temp 63)
+    (inst and hi-r temp)))
+
+(define-vop (logand-signed/s128 logand-s128/signed)
+  (:args (y :scs (signed-reg))
+         ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types signed-num signed-byte-128))
 
 
 (in-package "SB-C")
