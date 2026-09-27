@@ -492,6 +492,8 @@
   (combination-match2 (node)
     ((logand a a)
      'a)
+    ((logand (logior a *) a)
+     'a)
     ((logand (:type unsigned-byte a) (logand b (:constant c)))
      (block nil
        (let* ((width (or (unsigned-type-width (lvar-type a))
@@ -552,6 +554,13 @@
 (deftransform logior ((a b) (t t) * :important nil :node node)
   (combination-match2 (node)
     ((logior a a)
+     'a)
+    ((logior (logand a *) a)
+     a)))
+
+(deftransform logxor ((a b) (t t) * :important nil :node node)
+  (combination-match2 (node)
+    ((logxor (logxor a b) b)
      'a)))
 
 ;;; Combine (ash (ash x 1) 1) into (ash x 2)
