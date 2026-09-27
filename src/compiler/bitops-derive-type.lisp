@@ -407,7 +407,9 @@
                                  ((< high -1)
                                   (ash 1 (1- (integer-length (lognot high)))))
                                  (t 0)))))
-            (make-numeric-type 'integer min max))))))))
+            (make-numeric-type 'integer min max)))))
+     ((logxor (lognot a) a)
+      (specifier-type '(eql -1))))))
 
 (defoptimizer (logior derive-type) ((x y) node)
   (add-type-intersection
@@ -429,33 +431,37 @@
                                                    0)))
                                  (- (ash 1 (max positive negative))))
                                0)
-            (specifier-type '(integer * 0))))))))
+            (specifier-type '(integer * 0)))))
+     ((logior (lognot a) a)
+      (specifier-type '(eql -1))))))
 
 (defoptimizer (logand derive-type) ((x y) node)
   (add-type-intersection
    (two-arg-derive-type x y #'logand-derive-type-aux)
-   ;; (logand x (- x)) has the same width as (abs most-negative-X) and is >= 0
    (combination-match2 (node :transform nil)
-    ((logand x (- x))
-     (multiple-value-bind (len pos neg low high) (integer-type-length (lvar-type y))
-       (declare (ignore pos neg))
-       (if len
-           (make-numeric-type 'integer
-                              (if (<= low 0 high)
-                                  0
-                                  1)
-                              (let ((positive (if (plusp high)
-                                                  (1- (integer-length high))
-                                                  0))
-                                    (negative (if (minusp low)
-                                                  (if (= low (- (ash 1 len)))
-                                                      (1+ len)
-                                                      (1- len))
-                                                  0)))
-                                (ash 1 (max positive negative))))
-           (if (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))
-               (specifier-type '(integer 0))
-               (specifier-type '(integer 1)))))))))
+     ;; (logand x (- x)) has the same width as (abs most-negative-X) and is >= 0
+     ((logand x (- x))
+      (multiple-value-bind (len pos neg low high) (integer-type-length (lvar-type y))
+        (declare (ignore pos neg))
+        (if len
+            (make-numeric-type 'integer
+                               (if (<= low 0 high)
+                                   0
+                                   1)
+                               (let ((positive (if (plusp high)
+                                                   (1- (integer-length high))
+                                                   0))
+                                     (negative (if (minusp low)
+                                                   (if (= low (- (ash 1 len)))
+                                                       (1+ len)
+                                                       (1- len))
+                                                   0)))
+                                 (ash 1 (max positive negative))))
+            (if (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))
+                (specifier-type '(integer 0))
+                (specifier-type '(integer 1))))))
+     ((logand (lognot a) a)
+      (specifier-type '(eql 0))))))
 
 (defoptimizer (logeqv derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
