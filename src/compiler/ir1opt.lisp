@@ -791,8 +791,12 @@
                        (setf (node-derived-type combination) type)
                        (principal-lvar-single-valuify (node-lvar combination))
                        (reoptimize-lvar (node-lvar combination))))
-                   (setf (return-result-type node) type
-                         (tail-set-type (lambda-tail-set lambda)) type)
+                   (let ((tail-set (lambda-tail-set lambda)))
+                     (setf (return-result-type node) type
+                           (tail-set-type tail-set) type
+                           ;; What the functions return has changed
+                           ;; from what this bound was found for.
+                           (tail-set-recursive-type tail-set) nil))
                    (do-uses (use lvar)
                      (reoptimize-node use))
                    (let ((defined-fun (and (functional-inline-expanded lambda)
