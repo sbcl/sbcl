@@ -2075,6 +2075,25 @@
   (cond ((and same-arg
               (ratio-type-p x))
          (specifier-type '(and ratio (rational 0))))
+        ((or (and (rational-type-p x)
+                  (eq y (specifier-type '(eql 0))))
+             (and (rational-type-p y)
+                  (eq x (specifier-type '(eql 0)))))
+         (specifier-type '(eql 0)))
+        ((and (integer-type-p x)
+              (integer-type-p y)
+              (flet ((try-zero (x y)
+                       (when (and (csubtypep (specifier-type '(eql 0)) x)
+                                  (csubtypep y (specifier-type '(and integer (not (eql 0))))))
+                         (return-from *-derive-type-aux
+                           (let* ((x (type-intersection x (specifier-type '(and integer (not (eql 0))))))
+                                  (result (%two-arg-derive-type x y #'*-derive-type-aux)))
+                             (when result
+                               (type-union result (specifier-type '(eql 0)))))))))
+                ;; If one of the integer arguments is non zero seperate the zero
+                ;; result from the rest of the result range.
+                (try-zero x y)
+                (try-zero y x))))
         ((and (numeric-type-real-p x)
               (numeric-type-real-p y))
          (let* ((x-interval (numeric-type->interval x))
@@ -2126,33 +2145,15 @@
         (t
          (numeric-contagion x y))))
 
-(defoptimizer (* derive-type) ((x y))
-  (let ((x-type (lvar-type x))
-        (y-type (lvar-type y)))
-    (block nil
-      (flet ((try-zero (x y)
-               (when (and (csubtypep x (specifier-type 'integer))
-                          (csubtypep (specifier-type '(eql 0)) x)
-                          (csubtypep y (specifier-type '(and integer (not (eql 0))))))
-                 (return
-                   (let* ((x (type-intersection x (specifier-type '(and integer (not (eql 0))))))
-                          (result (if (eq x *empty-type*)
-                                      x
-                                      (%two-arg-derive-type x y #'*-derive-type-aux))))
-                     (when result
-                       (type-union result (specifier-type '(eql 0)))))))))
-        ;; If one of the integer arguments is non zero seperate the zero
-        ;; result from the rest of the result range.
-        (try-zero x-type y-type)
-        (try-zero y-type x-type)
-        (two-arg-derive-type x y #'*-derive-type-aux)))))
+(defoptimizer (* derive-type) ((x y) node)
+  (two-arg-derive-type x y #'*-derive-type-aux))
 
 (defoptimizer (%signed-multiply-high derive-type) ((x y))
   (two-arg-derive-type x y
                        (lambda (x y same-arg)
                          (let* ((type (*-derive-type-aux x y same-arg))
-                                (low (numeric-type-low type))
-                                (high (numeric-type-high type)))
+                                (low (numeric-union-type-low type))
+                                (high (numeric-union-type-high type)))
                            (when (and low high)
                              (make-numeric-type 'integer
                                                 (ash low (- sb-vm:n-word-bits))
@@ -5919,9 +5920,6 @@
 (deftransform - ((x y) ((constant-arg (member 0)) rational))
   "convert (- 0 x) to negate"
   '(%negate y))
-(deftransform * ((x y) (rational (constant-arg (member 0))))
-  "convert (* x 0) to 0"
-  0)
 
 ;;; Can it be detected when NODE returns minus zero?
 ;;; E.g. (+ -0.0 0) is 0.0

@@ -471,3 +471,30 @@
            (f 0)))
     ((t) 0)
     ((nil) 0)))
+
+(with-test (:name :*-rational-by-zero-type)
+  (assert-type
+   (lambda (n)
+     (declare (rational n))
+     (* n 0))
+   (eql 0))
+  (assert-type
+   (lambda (n)
+     (declare ((rational 4 9) n))
+     (* n 0))
+   (eql 0))
+  (assert-type
+   (lambda (n)
+     (declare (integer n))
+     (* n 8))
+   (or (integer * -8) (integer 0 0) (integer 8)))
+  (assert-type
+   (lambda (n)
+     (declare ((or float integer) n))
+     (* n 7))
+   (or float (integer * -7) (integer 0 0) (integer 7)))
+  (assert-type
+   (lambda (n)
+     (declare (real n))
+     (* n 0))
+   (or float (eql 0))))
