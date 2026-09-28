@@ -23,29 +23,6 @@
 ;;; and work on if these functions traded in nodes, blocks, and
 ;;; lambda-vars directly.
 
-;;; Problems:
-;;;
-;;; -- Constraint propagation badly interacts with bottom-up type
-;;; inference. Consider
-;;;
-;;; (defun foo (n &aux (i 42))
-;;;   (declare (optimize speed))
-;;;   (declare (fixnum n)
-;;;            #+nil (type (integer 0) i))
-;;;   (tagbody
-;;;      (setq i 0)
-;;;    :loop
-;;;      (when (>= i n) (go :exit))
-;;;      (setq i (1+ i))
-;;;      (go :loop)
-;;;    :exit))
-;;;
-;;; In this case CP cannot even infer that I is of class INTEGER.
-;;;
-;;; -- In the above example if we place the check after SETQ, CP will
-;;; fail to infer (< I FIXNUM): it does not understand that this
-;;; constraint follows from (TYPEP I (INTEGER 0 0)).
-
 (in-package "SB-C")
 
 ;;; *CONSTRAINT-UNIVERSE* gets bound in IR1-PHASES to a fresh,

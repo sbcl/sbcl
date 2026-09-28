@@ -2546,10 +2546,11 @@
             (setf union (if union
                             (type-union union step-type)
                             step-type))))))
-    (type-union initial-type
-                (numeric-contagion initial-type union
-                                   ;; Adding integers will produce integers
-                                   :rational nil))))
+    (let ((contagion (numeric-contagion initial-type union
+                                        ;; Adding integers will produce integers
+                                        :rational nil)))
+      (and contagion
+           (type-union initial-type contagion)))))
 
 ;;; If VALUE is computed by a chain of ({+,-} VAR STEP) operations,
 ;;; return the STEP lvars and which function they use. VALUE is the
@@ -2761,7 +2762,9 @@
                             (neq (leaf-defined-type var) *universal-type*))
                        (leaf-defined-type var)))))
           (when initial-type
-            (propagate-from-sets var initial-type))))))
+            (propagate-from-sets var initial-type)))
+        (when (lambda-var-optimistic-type var)
+          (note-optimistic-pending home)))))
   (derive-node-type node (make-single-value-type
                           (lvar-type (set-value node))))
   (setf (node-reoptimize node) nil)
@@ -3169,18 +3172,19 @@
                                   (length vars)))
                     (return nil))))))))
 
-;;; Return whether VAR is eligible for optimistic parameter type
-;;; inference. If it is, initialize the optimistic type of VAR to the
-;;; empty type if needed. Set variables are currently too hairy to
-;;; handle.
+;;; Return whether VAR is eligible for optimistic type inference. If
+;;; it is, initialize the optimistic type of VAR to the empty type if
+;;; needed.
 (defun init-variable-optimistic-type (var)
   (declare (type lambda-var var))
   (or (lambda-var-optimistic-type var)
       (let ((home (lambda-var-home var)))
         (when (and home
-                   (not (basic-var-sets var))
                    (not (lambda-var-deleted var))
-                   (optimistic-type-propagatable-fun-p home))
+                   (optimistic-type-propagatable-fun-p home)
+                   (let ((component (lambda-component home)))
+                     (every (lambda (set) (eq (node-component set) component))
+                            (lambda-var-sets var))))
           (setf (lambda-var-optimistic-type var) *empty-type*)
           (note-optimistic-pending home)
           t))))
@@ -3314,19 +3318,25 @@
 (defun note-optimistic-change (node)
   (let* ((lvar (node-lvar node))
          (dest (and lvar (lvar-dest lvar))))
-    (when (and dest
-               (combination-p dest)
-               (eq (combination-kind dest) :local)
-               (neq lvar (basic-combination-fun dest)))
-      (let ((callee (combination-lambda dest)))
-        (when callee
-          (setf (lambda-optimistic-pending callee) t)))
-      (reoptimize-lvar lvar))))
+    (cond ((and (combination-p dest)
+                (eq (combination-kind dest) :local)
+                (neq lvar (basic-combination-fun dest)))
+           (let ((callee (combination-lambda dest)))
+             (when callee
+               (setf (lambda-optimistic-pending callee) t)))
+           (reoptimize-lvar lvar))
+          ((set-p dest)
+           (let ((var (set-var dest)))
+             (when (and (lambda-var-p var)
+                        (lambda-var-optimistic-type var))
+               (setf (lambda-optimistic-pending (lambda-var-home var)) t)))
+           (reoptimize-lvar lvar)))))
 
 ;;; Compute the union of the optimistic types of every variable of FUN
 ;;; across all calls and update those types whenever there is a reason
 ;;; to do so. If any types ended up growing, we note that things have
-;;; changed.
+;;; changed. Set variables are handled similarly by treating their set
+;;; values like call arguments.
 (defun accumulate-optimistic-arg-types (call fun)
   (declare (type basic-combination call) (type clambda fun))
   (let* ((vars (lambda-vars fun))
@@ -3343,21 +3353,28 @@
             (steps (make-array (length vars) :initial-element nil)))
         (declare (dynamic-extent accum-types steps))
 
-        (dolist (ref (leaf-refs fun))
-          (let ((dest (node-dest ref)))
-            (when dest
-              (loop for var in vars
-                    for arg in (basic-combination-args dest)
-                    for i from 0
-                    when (lambda-var-optimistic-type var)
-                      do (cond ((optimistic-step-p arg var)
-                                (push arg (aref steps i)))
-                               (t
-                                (setf (aref accum-types i)
-                                      (type-union (aref accum-types i)
-                                                  (cond ((null arg) *universal-type*)
-                                                        ((lvar-optimistic-type arg))
-                                                        (t (lvar-type arg)))))))))))
+        (flet ((accumulate (arg var i)
+                 (cond ((optimistic-step-p arg var)
+                        (push arg (aref steps i)))
+                       (t
+                        (setf (aref accum-types i)
+                              (type-union (aref accum-types i)
+                                          (cond ((null arg) *universal-type*)
+                                                ((lvar-optimistic-type arg))
+                                                (t (lvar-type arg)))))))))
+          (dolist (ref (leaf-refs fun))
+            (let ((dest (node-dest ref)))
+              (when dest
+                (loop for var in vars
+                      for arg in (basic-combination-args dest)
+                      for i from 0
+                      when (lambda-var-optimistic-type var)
+                        do (accumulate arg var i)))))
+          (loop for var in vars
+                for i from 0
+                when (lambda-var-optimistic-type var)
+                  do (dolist (set (lambda-var-sets var))
+                       (accumulate (set-value set) var i))))
 
         (loop for var in vars
               for i from 0

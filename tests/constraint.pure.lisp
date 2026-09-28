@@ -2363,3 +2363,51 @@
                           (t start))))))
        (recurse 0 (length seq))))
    (or null (mod #.(1- array-dimension-limit)))))
+
+(with-test (:name (:loop-var-type :set-before-loop))
+  (assert-type
+   (lambda (n)
+     (declare (fixnum n))
+     (let ((i 42) (seen 0))
+       (setq i 0)
+       (loop (when (>= i n) (return seen))
+             (setq seen i)
+             (setq i (1+ i)))))
+   (mod #.most-positive-fixnum)))
+
+(with-test (:name (:loop-var-type :test-after-set))
+  (assert-type
+   (lambda (n)
+     (declare (fixnum n))
+     (let ((i 42) (seen 0))
+       (setq i 0)
+       (loop (setq seen i)
+             (setq i (1+ i))
+             (when (>= i n) (return seen)))))
+   (mod #.most-positive-fixnum)))
+
+(with-test (:name (:loop-var-type :reset-in-loop))
+  (assert-type
+   (lambda (n c)
+     (declare (fixnum n))
+     (let ((i 0) (seen 0))
+       (loop (when (>= i n) (return seen))
+             (setq seen i)
+             (if c (setq i (1+ i)) (setq i 0)))))
+   (mod #.most-positive-fixnum)))
+
+(with-test (:name (:loop-var-type :initial-value))
+  (assert-type
+   (lambda (n)
+     (declare (fixnum n))
+     (let ((i 0) (seen 0))
+       (loop (when (>= i n) (return seen))
+             (setq seen i)
+             (setq i (1+ i)))))
+   (mod #.most-positive-fixnum))
+  (assert-type
+   (lambda (n)
+     (declare (fixnum n))
+     (labels ((f (i seen) (if (>= i n) seen (f (1+ i) i))))
+       (f 0 0)))
+   (mod #.most-positive-fixnum)))

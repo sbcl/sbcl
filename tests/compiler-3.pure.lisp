@@ -419,3 +419,16 @@
         (integerp (f (cdr c) n))))
    (((cons 1 :x) 0) nil)
    (((cons 1 256) 1) t)))
+
+;;; FOUND is set to what G returns, which is only solved for once
+;;; FOUND's type is first assumed.
+(with-test (:name (:optimistic-type :set-to-recursive-result))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (let ((found nil))
+        (labels ((g (y) (if (consp y) (list (g (car y))) y)))
+          (setq found (g x)))
+        (if found :yes :no)))
+   ((5) :yes)
+   ((nil) :no)))
