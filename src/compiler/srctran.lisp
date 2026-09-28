@@ -1932,17 +1932,18 @@
 ;;; really represent the same lvar. This is useful for deriving the
 ;;; type of things like (* x x), which should always be positive. If
 ;;; we didn't do this, we wouldn't be able to tell.
-(defun two-arg-derive-type (arg1 arg2 derive-fun)
+(defun two-arg-derive-type (arg1 arg2 derive-fun &optional split-number)
   (%two-arg-derive-type (lvar-type arg1) (lvar-type arg2)
-                        derive-fun (same-leaf-ref-p arg1 arg2)))
+                        derive-fun (same-leaf-ref-p arg1 arg2) split-number))
 
-(defun %two-arg-derive-type (arg1-type arg2-type derive-fun &optional same-leaf)
+(defun %two-arg-derive-type (arg1-type arg2-type derive-fun &optional same-leaf split-number)
   (declare (type function derive-fun))
-  (unless (or (and (eq arg1-type (specifier-type 'number))
-                   (or (eq arg2-type (specifier-type 'number))
-                       (eq arg2-type (specifier-type 'real))))
-              (and (eq arg1-type (specifier-type 'real))
-                   (eq arg2-type (specifier-type 'number))))
+  (unless (and (not (and same-leaf split-number))
+               (or (and (eq arg1-type (specifier-type 'number))
+                        (or (eq arg2-type (specifier-type 'number))
+                            (eq arg2-type (specifier-type 'real))))
+                   (and (eq arg1-type (specifier-type 'real))
+                        (eq arg2-type (specifier-type 'number)))))
     (labels ((deriver (x y same-arg)
                (if (and (numeric-type-p x) (numeric-type-p y))
                    (funcall derive-fun x y same-arg)
@@ -2026,7 +2027,7 @@
               (ratio-type-p x))
          (specifier-type 'ratio))
         ((and same-arg
-              (ratio-type-p x))
+              (complex/rational-type-p x))
          (specifier-type '(integer 0 0)))
         ((and (numeric-type-real-p x)
               (numeric-type-real-p y))
@@ -2036,7 +2037,8 @@
                                 (numeric-type->interval y)))
                 (result
                   ;; (- X X) is always 0.
-                  (if same-arg
+                  (if (and same-arg
+                           (bounded-numeric-type-p x))
                       (make-interval :low 0 :high 0)
                       (interval-sub x-interval y-interval)))
                 (result-type (numeric-contagion x y)))
@@ -2069,7 +2071,7 @@
          (numeric-contagion x y))))
 
 (defoptimizer (- derive-type) ((x y))
-  (two-arg-derive-type x y #'--derive-type-aux))
+  (two-arg-derive-type x y #'--derive-type-aux t))
 
 (defun *-derive-type-aux (x y same-arg)
   (cond ((and same-arg

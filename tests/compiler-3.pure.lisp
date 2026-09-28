@@ -542,3 +542,19 @@
    (lambda (n)
      (ffloor 0 (the rational n)))
    (values (single-float 0.0 0.0) (eql 0) &optional)))
+
+(with-test (:name :-zero-type)
+  (assert-type
+   (lambda (n)
+     (declare ((real 10 20) n))
+     (- n n))
+   (member 0.0d0 0.0 0))
+  (assert-type
+   (lambda (n)
+     (declare (rational n))
+     (- n n))
+   (eql 0))
+  (assert-type
+   (lambda (n)
+     (- n n))
+   (or (eql 0) float (complex float))))
