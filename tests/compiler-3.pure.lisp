@@ -502,3 +502,43 @@
    (lambda (n)
      (* n 0))
    (or (eql 0) float (complex float))))
+
+(with-test (:name :/zero-type)
+  (assert-type
+   (lambda (n)
+     (declare (rational n))
+     (/ 0 n))
+   (eql 0))
+  (assert-type
+   (lambda (n)
+     (/ 0 n))
+   (or (eql 0) float (complex float)))
+  (assert-type
+   (lambda (n)
+     (truncate 0 n))
+   (values (eql 0) (member 0.0d0 0.0 0) &optional))
+  (assert-type
+   (lambda (n)
+     (truncate 0.0 n))
+   (values (eql 0) (member 0.0d0 0.0) &optional))
+  (assert-type
+   (lambda (m n)
+     (declare ((real 0 0) m))
+     (truncate m n))
+   (values (eql 0) (real 0 0) &optional))
+  (assert-type
+   (lambda (n)
+     (floor 0 n))
+   (values (eql 0) (member 0.0d0 0.0 0) &optional))
+  (assert-type
+   (lambda (n)
+     (ceiling 0 n))
+   (values (eql 0) (member 0.0d0 0.0 0) &optional))
+  (assert-type
+   (lambda (n)
+     (ffloor 0 n))
+   (values float (or float (integer 0 0)) &optional))
+  (assert-type
+   (lambda (n)
+     (ffloor 0 (the rational n)))
+   (values (single-float 0.0 0.0) (eql 0) &optional)))
