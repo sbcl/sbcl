@@ -1706,7 +1706,10 @@
         (block-out pred))))
 
 ;;; Join the constraints coming from the predecessors of BLOCK on
-;;; every constrained variable into the constraint set IN.
+;;; every constrained variable into the constraint set IN, their
+;;; intersection. A predecessor with no other constraints on a variable
+;;; than those in IN bounds the types in the others, so the variable is
+;;; only joined if every predecessor has other constraints on it.
 (defun join-type-constraints (in block predecessor-outs all-previous-outs-computed)
   (let ((vars '())
         (equality-vars))
@@ -1715,11 +1718,12 @@
                (let ((kind  (constraint-kind con))
                      (y     (constraint-y con))
                      (not-p (constraint-not-p con)))
-                 (when (or (member kind '(typep < >))
-                           (and (eq kind 'eql) (or (not not-p)
-                                                   (constant-p y)))
-                           (and (eq kind '=) (and (numeric-type-p y)
-                                                  (not not-p))))
+                 (when (and (or (member kind '(typep < >))
+                                (and (eq kind 'eql) (or (not not-p)
+                                                        (constant-p y)))
+                                (and (eq kind '=) (and (numeric-type-p y)
+                                                       (not not-p))))
+                            (not (conset-member con in)))
                    (pushnew (constraint-x con) vars))
                  (when (and (eq kind 'equality)
                             (/= (equality-constraint-amount con) 0))
@@ -1731,8 +1735,12 @@
       (let ((in-var-type *empty-type*))
         (dolist (out predecessor-outs)
           (setq in-var-type
-                (type-union in-var-type
-                            (type-from-constraints var out *universal-type*)))
+                (if (do-propagatable-constraints (con (out var))
+                      (unless (conset-member con in)
+                        (return t)))
+                    (type-union in-var-type
+                                (type-from-constraints var out *universal-type*))
+                    *universal-type*))
           (when (eq in-var-type *universal-type*)
             (return)))
 
