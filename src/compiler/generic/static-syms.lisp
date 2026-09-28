@@ -10,25 +10,14 @@
 (in-package "SB-VM")
 
 ;;;; routines for dealing with static symbols
-;;;; These functions get recompiled in warm build
 
-#-sb-xc
+;;; Quoting the value of +STATIC-SYMBOLS+ makes STATIC-SYMBOL-P usable in
+;;; cold-init right away, before named constants have been patched in.
+;;; Otherwise there would be sensitivity to the order in which you're
+;;; allowed to call this.
 (defun static-symbol-p (symbol)
-  (if symbol (position symbol +static-symbols+) t))
-
-#+sb-xc ; this less-than-ideal replica of the above achieves 2 things:
-;; 1. causes STATIC-SYMBOL-P to be usable in cold-init right away,
-;;    before named constants have been patched in. Otherwise there would
-;;    be sensitivity to the order in which you're allowed to call this.
-;; 2. NOTINLINE avoids producing an xperfecthash entry (I don't like that
-;;    adding/removing a static symbol cuased the oracle files to change)
-;; This function gets recompiled in warm build using the #-sb-xc above.
-(defun static-symbol-p (symbol)
-  (declare (notinline position))
   (if symbol (position symbol '#.+static-symbols+) t))
 
-(locally
-#+sb-xc (declare (notinline position))
 ;;; There are no static fdefns with linkage-space, but this predicate tests the nature
 ;;; of the function, not the fdefn, e.g. could it be called from an assembly routine.
 ;;; Also static-ness imparts changed behavior in LTN-ANALYZE-KNOWN-CALL and FUN-LVAR-TN.
@@ -53,4 +42,4 @@
 (defun static-fun-offset (name)
   (+ (static-fdefn-offset name)
      (- other-pointer-lowtag)
-     (* fdefn-raw-addr-slot n-word-bytes)))))
+     (* fdefn-raw-addr-slot n-word-bytes))))
