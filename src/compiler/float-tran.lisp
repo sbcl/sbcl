@@ -1763,14 +1763,6 @@
                         (t &optional (constant-arg (member 1))))
   '(unary-truncate x))
 
-(deftransform round ((x &optional by)
-                     (t &optional (constant-arg (member 1))))
-  '(let ((res (%unary-round x)))
-    (values res (locally
-                    (declare (flushable %single-float
-                                        %double-float))
-                  (- x res)))))
-
 (deftransform %unary-truncate ((x) (single-float))
   `(values (unary-truncate x)))
 (deftransform %unary-truncate ((x) (double-float))

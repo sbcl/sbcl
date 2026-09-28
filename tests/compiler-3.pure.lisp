@@ -184,3 +184,12 @@
         (= (sb-c::mask-signed-field 16 digit)
            digit)))
    :allow-notes nil))
+
+(with-test (:name :round-transform-too-early
+            :implemented-on :round-float)
+  (checked-compile
+   `(lambda (f)
+      (declare (optimize speed))
+      (when (typep f 'single-float)
+        (values (round f))))
+   :allow-notes nil))
