@@ -612,7 +612,7 @@
 (defun hash-based-slot-mapper-lexpr (slots unique-hashes lambda-name)
   (flet ((hash (s) (ldb (byte 32 0) (symbol-hash s))))
     ;; power-of-2 sizing generally results in fewer instructions
-    (binding* ((lexpr (sb-c:make-perfect-hash-lambda unique-hashes nil))
+    (binding* ((lexpr (sb-c:make-perfect-hash-lambda unique-hashes))
                (nbuckets (power-of-two-ceiling (length unique-hashes)))
                ((body decls) (parse-body (cddr lexpr) nil))
                (optimize-decl (pop decls)))

@@ -64,8 +64,8 @@
                       #'sb-kernel::symbol-name-hash
                       symbols))
          (n (length hashes))
-         (expr1 (sb-c:make-perfect-hash-lambda hashes :dummy t nil nil))
-         (expr2 (sb-c:make-perfect-hash-lambda hashes :dummy nil nil nil))
+         (expr1 (sb-c:make-perfect-hash-lambda hashes t nil nil))
+         (expr2 (sb-c:make-perfect-hash-lambda hashes nil nil nil))
          (fun1 (compile nil expr1))
          (fun2 (compile nil expr2))
          (range1 (map 'list fun1 hashes))
@@ -725,32 +725,6 @@ After:
                    (primitive-object-size (sb-kernel:fun-code-header f)))
                 ;; instruction count delta
                 (- (length g-inst-model) (length f-inst-model)))))))
-
-;;; This tested the 32-bit code generator, but now that it's enabled,
-;;; the perfect hash function itself it tested (in COMPILE-PERFECT-HASH) which means
-;;; that both the function and the codegen have to be correct.  But I still want to
-;;; keep the logic that guesses whether 32-bit untagged arithmetic in UNSIGNED-REG
-;;; is better than arithmetic on tagged words.
-(with-test (:name :32-bit-codegen :skipped-on :sbcl)
-  (flet ((test-file (filename)
-           (let ((tests (with-open-file (f filename)
-                          (let ((*read-base* 16)) (read f))))
-                 (wins 0))
-             (dolist (testcase tests)
-               (sb-int:binding*
-                   ((inputs (coerce (car testcase) '(array (unsigned-byte 32) (*))))
-                    (lambda (sb-c:make-perfect-hash-lambda inputs))
-                    ((winner n-temps) (test-uint32-arithmetic lambda inputs nil)))
-                   (assert (<= n-temps 3))
-                   (when (eq winner 'g)
-                     (incf wins))))
-             (let ((n-trials (length tests)))
-               (format t "32-bit modular vop wins ~d/~d times (~,,2F%)~%"
-                       wins n-trials (/ wins n-trials))))))
-    (mapc #'test-file
-          '("../xperfecthash30.lisp-expr"
-            "../xperfecthash63.lisp-expr"
-            "../xperfecthash61.lisp-expr"))))
 
 ;;; Complicated expressions can be compiled much more concisely using the 32-bit modular
 ;;; math vop because it removes instructions that mask intermediate results to

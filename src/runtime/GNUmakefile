@@ -74,7 +74,7 @@ COMMON_SRC = alloc.c arena.c backtrace.c breakpoint.c coalesce.c	\
 	coreparse.c dynbind.c funcall.c gc-common.c globals.c		\
 	hopscotch.c interr.c interrupt.c largefile.c main.c		\
 	math.c monitor.c murmur_hash.c os-common.c parse.c              \
-	perfecthash.c print.c time.c                                    \
+	print.c time.c                                                  \
 	regnames.c runtime.c safepoint.c save.c                         \
 	sc-offset.c search.c stringspace.c thread.c stop-the-world.c    \
 	validate.c var-io.c vars.c wrap.c

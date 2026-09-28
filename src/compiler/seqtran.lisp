@@ -3879,7 +3879,7 @@
                  ;; trying to simplify the calculation at the expense of a few extra cells.
                  ;; Minimal will always be right.
                (minimal t)
-               (lambda (or (make-perfect-hash-lambda hashes items minimal)
+               (lambda (or (make-perfect-hash-lambda hashes minimal)
                            (return-from try-perfect-find/position-map
                              ;; TRANSFORM-LIST-ITEM-SEEK is prepared to see :FAIL.
                              ;; FIND/POSITION transforms don't understand that

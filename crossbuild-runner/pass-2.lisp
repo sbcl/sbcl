@@ -23,7 +23,6 @@
 (load "src/cold/set-up-cold-packages.lisp")
 (load "src/cold/defun-load-or-cload-xcompiler.lisp")
 (load-or-cload-xcompiler #'host-load-stem)
-(preload-perfect-hash-generator (perfect-hash-generator-journal :input))
 
 ;;; Redefine STEM-SOURCE-PATH to take 'stuff-groveled-from-headers' from the
 ;;; configuration-dependent location, but otherwise the normal locpation.

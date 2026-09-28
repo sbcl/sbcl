@@ -182,8 +182,7 @@
         (return-from ub32-collection-uniquep nil))
       (add-to-xset x dedup))))
 
-;;; This cache is not used for cross-compiling because there's already
-;;; another cache-like layer (the journal files)
+;;; This cache is not used for cross-compiling.
 (defglobal *phash-lambda-cache* nil)
 
 ;;; MINIMAL (the default) returns a a function that returns an output
@@ -197,11 +196,9 @@
 ;;; and it might run slower! In no way does it say anything about the speed
 ;;; of the generated function. So you pretty much don't want to supply it.
 ;;; Indeed one should avoid passing either optional arg to this function.
-(defun make-perfect-hash-lambda (array &optional objects
-                                       (minimal t) (fast nil)
-                                       (cacheable #-sb-xc-host t))
+(defun make-perfect-hash-lambda (array &optional (minimal t) (fast nil)
+                                                 (cacheable #-sb-xc-host t))
   (declare (type (simple-array (unsigned-byte 32) (*)) array))
-  (declare (ignorable objects minimal fast))
   (when (or (< (length array) 3) ; one or two keys - why are you doing this?
             (>= (length array) (ash 1 31))) ; insanity if this many
     (return-from make-perfect-hash-lambda))
@@ -209,59 +206,49 @@
     (return-from make-perfect-hash-lambda))
   ;; no dups present
   (let* ((cache *phash-lambda-cache*)
-         ;; LOGXOR is commutative and associative, which matters to
-         ;; EMULATE-GENERATE-PERFECT-HASH-SEXPR. Cross-compiling sorts the key array
-         ;; to make the xperfecthash files insensitive to the exact manner by which
-         ;; consumers of this function provide the keys. It's not important for the
-         ;; target compiler- the cache only helps repeated calls, in contrast
-         ;; to the cross-compiler which lives or dies by the journal file.
+         ;; The generated function doesn't depend on the order of the keys, but
+         ;; the cache key and the generator's choices do. Canonicalize, so that
+         ;; the result doesn't depend on how the caller happened to order them.
+         (array (sort (copy-seq array) #'<))
          (digest (reduce #'logxor array))
          (invert-keys)
-         ;; The cross-compiler records the string directly. Regression tests look for
-         ;; certain comments in the string to assert coverage of the generator.
+         ;; Regression tests look for certain comments in the string
+         ;; to assert coverage of the generator.
          (string)
          (expr))
-    #+sb-xc-host
-    (setq string (sb-cold::emulate-generate-perfect-hash-sexpr array objects digest)
-            ;; don't rebind anything except *PACKAGE* for read-from-string,
-            ;; especially as we need to keep our #\A charmacro
-          expr (let ((*package* #.(find-package "SB-C"))) (read-from-string string)))
     #-sb-xc-host
-    (flet ((generate-ph (keys)
-             (sb-unix::newcharstar-string
-              (sb-sys:with-pinned-objects (keys)
-                (alien-funcall
-                 (extern-alien
-                  "lisp_perfhash_with_options"
-                  (function (* char) int system-area-pointer int))
-                 (logior (if minimal 1 0) (if fast 2 0))
-                 (sb-sys:vector-sap keys) (length keys))))))
+    (progn
       (unless cache
         ;; A race that clobbers the global is benign. At worst it discards
         ;; work done some in another thread to cache something.
         (setf cache (make-hash-table :test 'equalp :synchronized t)
               *phash-lambda-cache* cache))
-      ;; The generated function doesn't depend on the order of the keys, but
-      ;; the cache key and the generator's choices do. Canonicalize.
-      (setq array (sort (copy-seq array) #'<))
       (dx-let ((cache-key (cons digest array)))
         ;; Purposely return empty-string if we hit the cache
         (awhen (gethash cache-key cache)
-          (return-from make-perfect-hash-lambda (values it ""))))
-      (setq string (generate-ph array))
-      ;; generator might have trouble with 0 key
-      (when (and (not string) (position 0 array))
-        (setq string (generate-ph (map '(simple-array (unsigned-byte 32) (*))
-                                       (lambda (x) (logxor x #xFFFFFFFF))
-                                       array))
-              invert-keys t))
-      (unless string
-        (return-from make-perfect-hash-lambda (values nil nil)))
-      ;; string won't account for inverted keys but that's fine
-      ;; as the resulting expression will
-      (setq expr (with-standard-io-syntax
-                     (let ((*package* #.(find-package "SB-C")))
-                       (read-from-string string)))))
+          (return-from make-perfect-hash-lambda (values it "")))))
+    (setq string (generate-perfect-hash-sexpr array minimal fast))
+    ;; generator might have trouble with 0 key
+    (when (and (not string) (position 0 array))
+      (setq string (generate-perfect-hash-sexpr
+                    (map '(simple-array (unsigned-byte 32) (*))
+                         (lambda (x) (logxor x #xFFFFFFFF))
+                         array)
+                    minimal fast)
+            invert-keys t))
+    (unless string
+      (return-from make-perfect-hash-lambda (values nil nil)))
+    ;; string won't account for inverted keys but that's fine
+    ;; as the resulting expression will
+    (setq expr
+          #+sb-xc-host
+          ;; don't rebind anything except *PACKAGE* for read-from-string,
+          ;; especially as we need to keep our #\A charmacro
+          (let ((*package* #.(find-package "SB-C"))) (read-from-string string))
+          #-sb-xc-host
+          (with-standard-io-syntax
+            (let ((*package* #.(find-package "SB-C")))
+              (read-from-string string))))
     (let ((tables))
       ;; Change array constants into symbol-macrolets
       (dotimes (i 2)
@@ -407,4 +394,4 @@
   (binding* ((type (minperfhash-key-universe-type objects) :exit-if-null)
              (hashfn (prehash-function-for-mph-generator type))
              (hashes (map '(simple-array (unsigned-byte 32) 1) hashfn objects)))
-    (make-perfect-hash-lambda hashes objects)))
+    (make-perfect-hash-lambda hashes)))
