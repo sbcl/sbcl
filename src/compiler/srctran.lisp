@@ -2075,9 +2075,9 @@
   (cond ((and same-arg
               (ratio-type-p x))
          (specifier-type '(and ratio (rational 0))))
-        ((or (and (rational-type-p x)
+        ((or (and (complex/rational-type-p x)
                   (eq y (specifier-type '(eql 0))))
-             (and (rational-type-p y)
+             (and (complex/rational-type-p y)
                   (eq x (specifier-type '(eql 0)))))
          (specifier-type '(eql 0)))
         ((and (integer-type-p x)

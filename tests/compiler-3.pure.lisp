@@ -497,4 +497,8 @@
    (lambda (n)
      (declare (real n))
      (* n 0))
-   (or float (eql 0))))
+   (or float (eql 0)))
+  (assert-type
+   (lambda (n)
+     (* n 0))
+   (or (eql 0) float (complex float))))

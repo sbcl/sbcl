@@ -946,6 +946,11 @@
        (memq (numeric-type-class x) '(integer rational))
        (eq (numeric-type-complexp x) :real)))
 
+(defun complex/rational-type-p (x)
+  (declare (type ctype x))
+  (and (numeric-type-p x)
+       (memq (numeric-type-class x) '(integer rational))))
+
 (defun float-type-p (x)
   (declare (type ctype x))
   (and (numeric-type-p x)
