@@ -1333,7 +1333,7 @@ word breaking rules specified in UAX #29. Returns a list of strings"
       ((binary-search cp aterms) :aterm)
       ((binary-search cp scontinues) :scontinue)
       ((proplist-p character :sentence-terminal) :sterm)
-      ((and (or (member gc '(:Po :Ps :Pe :Pf :Pi))
+      ((and (or (member gc '(:Ps :Pe))
                 (eql (line-break-class character) :qu)))
        :close)
       (t nil))))
@@ -1344,7 +1344,7 @@ algorithm simpler..
 Specifically,
 - Combines any character with the following extend of format characters
 - Combines CR + LF into '(CR LF)
-- Combines any run of :cp*:close* into one character"
+- Combines any run of :close* :sp* into one character"
   (let ((chars (coerce string 'list))
         cluster clusters last-seen sp-run)
     (labels ((flush () (if (cdr cluster) (push (nreverse cluster) clusters)
@@ -1357,10 +1357,10 @@ Specifically,
        for type = (sentence-break-class ch)
        do (cond
             ((and (eql last-seen :cr) (eql type :lf)) (nobrk ch) (flush) (setf last-seen nil))
-            ((eql last-seen :cr) (brk ch) (setf last-seen nil))
-            ((eql type :cr) (nobrk ch) (setf last-seen :cr))
-            ((eql type :lf) (brk ch) (setf last-seen nil))
             ((eql type :sep) (brk ch) (setf last-seen nil))
+            ((eql last-seen :cr) (flush) (nobrk ch) (setf last-seen type))
+            ((eql type :cr) (flush) (nobrk ch) (setf last-seen :cr))
+            ((eql type :lf) (brk ch) (setf last-seen nil))
             ((and last-seen (or (eql type :extend) (eql type :format)))
              (nobrk ch))
             ((eql type :close)

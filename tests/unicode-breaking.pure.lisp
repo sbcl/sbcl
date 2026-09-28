@@ -89,6 +89,28 @@
 
 (test-sentences)
 
+(with-test (:name (:sentence-breaking :test1) :skipped-on (not :sb-unicode))
+  ;; CRLF should be its own entity, not joined up with Aterm (.)
+  (assert (equal (sb-unicode:sentences (format nil "1.~C~C " #\Return #\Linefeed))
+                 (list (format nil "1.~C~C" #\Return #\Linefeed) " "))))
+
+(with-test (:name (:sentence-breaking :test2) :skipped-on (not :sb-unicode))
+  ;; the second Close ()) should not extend the Aterm Close* Sp* sequence
+  (assert (equal (sb-unicode:sentences "1.) (B")
+                 (list "1.) " "(B"))))
+
+(with-test (:name (:sentence-breaking :test3) :skipped-on (not :sb-unicode))
+  ;; Other Punctuation (*) should not be treated as Close
+  (assert (equal (sb-unicode:sentences "1.* X")
+                 (list "1." "* X"))))
+
+(with-test (:name (:sentence-breaking :test4) :skipped-on (not :sb-unicode))
+  ;; the U+200D (ZWJ) should extend the Aterm (.)
+  (assert (equal (sb-unicode:sentences (format nil "1~C.~C X" #\Return #\U+200D))
+                 (list (format nil "1~C" #\Return)
+                       (format nil ".~C " #\U+200D)
+                       "X"))))
+
 (defun process-line-break-line (line)
   (let ((elements (split-string line #\Space)))
     (mapcar #'(lambda (e)
