@@ -11,9 +11,6 @@
 
 (enable-test-parallelism)
 
-;;; Can't properly decode errors where the call stack is not pinned.
-#-(or arm64 mips ppc64 riscv x86 x86-64) (invoke-restart 'run-tests::skip-file)
-
 (defun test-ops (ops types arguments &key (result-types types) (b-arguments arguments))
   (flet ((normalize-type (type)
            (sb-kernel:type-specifier (sb-kernel:specifier-type type))))

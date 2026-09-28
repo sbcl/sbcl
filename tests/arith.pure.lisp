@@ -471,12 +471,14 @@
                    (let ((fast (checked-compile
                                 `(lambda ,vars
                                    (,op ,@args))
-                                :allow-warnings (eq op '/)))
+                                :allow-warnings (eq op '/)
+                                :allow-style-warnings (eq op '/)))
                          (slow (checked-compile
                                 `(lambda ,vars
                                    (declare (notinline ,op))
                                    (,op ,@args))
-                                :allow-warnings (eq op '/))))
+                                :allow-warnings (eq op '/)
+                                :allow-style-warnings (eq op '/))))
                      (loop repeat 3
                            do (let* ((call-args (loop repeat (length vars)
                                                       collect (- (random 21) 10)))

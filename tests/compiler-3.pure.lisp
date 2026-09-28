@@ -541,7 +541,11 @@
   (assert-type
    (lambda (n)
      (ffloor 0 (the rational n)))
-   (values (single-float 0.0 0.0) (eql 0) &optional)))
+   (values (single-float 0.0 0.0) (eql 0) &optional))
+  (assert-type
+   (lambda (n)
+     (/ n 0))
+   (or float (complex float))))
 
 (with-test (:name :-zero-type)
   (assert-type
