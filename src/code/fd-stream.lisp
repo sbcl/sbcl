@@ -953,17 +953,26 @@
 ;;; as multiple values the routine, the real type transfered, and the
 ;;; number of bytes per element.
 (defun pick-output-routine (type buffering &optional entry)
-  (when (subtypep type 'character)
-    (return-from pick-output-routine
-      (values (ecase buffering
-                (:none (ef-write-char-none-buffered-fun entry))
-                (:line (ef-write-char-line-buffered-fun entry))
-                (:full (ef-write-char-full-buffered-fun entry)))
-              'character
-              1
-              (ef-write-n-bytes-fun entry)
-              (ef-count-chars entry)
-              (ef-replacement entry))))
+  (cond ((equal type '(unsigned-byte 8))
+         (return-from pick-output-routine
+           (values
+            (ecase buffering
+              (:full #'output-unsigned-byte-full-buffered)
+              (:none #'output-unsigned-byte-none-buffered))
+            type
+            1)))
+        ((or (eq type 'character)
+             (subtypep type 'character))
+         (return-from pick-output-routine
+           (values (ecase buffering
+                     (:none (ef-write-char-none-buffered-fun entry))
+                     (:line (ef-write-char-line-buffered-fun entry))
+                     (:full (ef-write-char-full-buffered-fun entry)))
+                   'character
+                   1
+                   (ef-write-n-bytes-fun entry)
+                   (ef-count-chars entry)
+                   (ef-replacement entry)))))
   (dolist (entry *output-routines*)
     (when (and (subtypep type (first entry))
                (eq buffering (second entry))
@@ -1324,16 +1333,21 @@
 ;;; values the routine, the real type transfered, and the number of
 ;;; bytes per element (and for character types string input routine).
 (defun pick-input-routine (type &optional entry)
-  (when (subtypep type 'character)
-    (return-from pick-input-routine
-      (values (ef-read-char-fun entry)
-              'character
-              1
-              (ef-read-n-chars-fun entry)
-              (ef-count-chars entry)
-              (ef-replacement entry))))
+  (cond ((equal type '(unsigned-byte 8))
+         (return-from pick-input-routine
+           (values #'input-unsigned-8bit-byte type 1)))
+        ((or (eq type 'character)
+             (subtypep type 'character))
+         (return-from pick-input-routine
+           (values (ef-read-char-fun entry)
+                   'character
+                   1
+                   (ef-read-n-chars-fun entry)
+                   (ef-count-chars entry)
+                   (ef-replacement entry)))))
   (dolist (entry *input-routines*)
-    (when (and (subtypep type (first entry))
+    (when (and (or (equal type (first entry))
+                   (subtypep type (first entry)))
                (not (fourth entry)))
       (return-from pick-input-routine
         (values (symbol-function (second entry))
