@@ -558,3 +558,33 @@
    (lambda (n)
      (- n n))
    (or (eql 0) float (complex float))))
+
+(with-test (:name :/-same-type)
+  (assert-type
+   (lambda (n)
+     (declare ((real 1 20) n))
+     (/ n n))
+   (real 1 1))
+  (assert-type
+   (lambda (n)
+     (declare ((real 1) n))
+     (/ n n))
+   (or (eql 1) float))
+  (assert-type
+   (lambda (n)
+     (/ n n))
+   (or (eql 1) float (complex float)))
+  (assert-type
+   (lambda (n)
+     (truncate n n))
+   (values (eql 1) (member 0 0d0 0f0) &optional))
+  (assert-type
+   (lambda (n)
+     (declare (rational n))
+     (truncate n n))
+   (values (eql 1) (eql 0) &optional))
+  (assert-type
+   (lambda (n)
+     (declare (rational n))
+     (ffloor n n))
+   (values (single-float 1.0 1.0) (integer 0 0) &optional)))

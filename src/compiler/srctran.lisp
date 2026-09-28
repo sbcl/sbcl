@@ -2165,11 +2165,12 @@
   (%signed-multiply-high-derive-type-optimizer node))
 
 (defun /-derive-type-aux (x y same-arg)
-  (cond ((and (ratio-type-p x)
-              (cond (same-arg
-                     (specifier-type '(integer 1 1)))
-                    ((integer-type-p y)
-                     (specifier-type 'ratio)))))
+  (cond ((and same-arg
+              (complex/rational-type-p x))
+         (specifier-type '(integer 1 1)))
+        ((and (ratio-type-p x)
+              (integer-type-p y))
+         (specifier-type 'ratio))
         ((and (eq x (specifier-type '(eql 0)))
               (complex/rational-type-p y))
          (specifier-type '(eql 0)))
@@ -2182,13 +2183,10 @@
                 (result-type (numeric-contagion x y))
                 (y-integerp (eq (numeric-type-class y) 'integer))
                 (result
-                  ;; (/ X X) is always 1, except if X can contain 0. In
-                  ;; that case, we shouldn't optimize the division away
-                  ;; because we want 0/0 to signal an error.
-                  (if (and same-arg
-                           (not (interval-contains-p
-                                 0 (interval-closure x-interval))))
-                      (make-interval :low 1 :high 1)
+                  (if same-arg
+                      (if (bounded-numeric-type-p x) ;; no nans
+                          (make-interval :low 1 :high 1)
+                          (make-interval))
                       (interval-div x-interval y-interval
                                     (and (memq (numeric-type-class x) '(integer rational))
                                          y-integerp)))))
@@ -2227,7 +2225,7 @@
          (numeric-contagion x y))))
 
 (defoptimizer (/ derive-type) ((x y) node)
-  (let ((type (two-arg-derive-type x y #'/-derive-type-aux)))
+  (let ((type (two-arg-derive-type x y #'/-derive-type-aux t)))
     (when (eq type *empty-type*)
       (let ((*compiler-error-context* node))
         (setf (combination-kind node) :error
@@ -2553,14 +2551,18 @@
              (make-numeric-type rem-type low high nil))))))
 
 (defun truncate-derive-type-quot-aux (num div same-arg)
-  (declare (ignore same-arg))
-  (when (and (numeric-type-real-p num)
-             (numeric-type-real-p div))
-    (truncate-derive-type-quot num div)))
+  (cond (same-arg
+         (specifier-type '(eql 1)))
+        ((and (numeric-type-real-p num)
+              (numeric-type-real-p div))
+         (truncate-derive-type-quot num div))))
 
 (defun truncate-derive-type-rem-aux (num div same-arg)
-  (declare (ignore same-arg))
-  (cond ((not (and (numeric-type-real-p num)
+  (cond (same-arg
+         (type-intersection
+          (numeric-contagion num div)
+          (specifier-type '(member 0d0 0f0 0))))
+        ((not (and (numeric-type-real-p num)
                    (numeric-type-real-p div)))
          nil)
         ((truncate-zero-rem-type num div))
@@ -2637,22 +2639,26 @@
         (when (and quot rem)
           (make-values-type (list quot rem))))))
 
-(defun fceiling-derive-type-quot-aux (number-type divisor-type same-arg)
-  (declare (ignore same-arg))
+(defun fceiling-derive-type-quot-aux (number-type divisor-type same)
   (when (and (numeric-type-real-p number-type)
              (numeric-type-real-p divisor-type))
     (ceiling-quotient-bound-aux number-type divisor-type
+                                same
                                 (numeric-type-format
                                  (numeric-contagion number-type divisor-type :float t)))))
 
 (defoptimizer (fceiling derive-type) ((number &optional divisor) node)
-  (let* ((divisor (if divisor
+  (let* ((same
+           (and divisor
+                (same-leaf-ref-p number divisor)))
+         (divisor (if divisor
                       (lvar-type divisor)
                       (specifier-type '(eql 1))))
          (number (lvar-type number))
-         (quot (%two-arg-derive-type number divisor #'fceiling-derive-type-quot-aux))
+         (quot (%two-arg-derive-type number divisor #'fceiling-derive-type-quot-aux same))
          (rem (%two-arg-derive-type number divisor (lambda (n d same)
-                                                     (ceiling-rem-bound-aux n d same t)))))
+                                                     (ceiling-rem-bound-aux n d same t))
+                                    same)))
     (if (eq quot *empty-type*)
         (let ((*compiler-error-context* node))
           (setf (combination-kind node) :error
@@ -2661,22 +2667,27 @@
         (when (and quot rem)
           (make-values-type (list quot rem))))))
 
-(defun ffloor-derive-type-quot-aux (number-type divisor-type same-arg)
-  (declare (ignore same-arg))
+(defun ffloor-derive-type-quot-aux (number-type divisor-type same)
   (when (and (numeric-type-real-p number-type)
              (numeric-type-real-p divisor-type))
     (floor-quotient-bound-aux number-type divisor-type
+                              same
                               (numeric-type-format
                                (numeric-contagion number-type divisor-type :float t)))))
 
 (defoptimizer (ffloor derive-type) ((number &optional divisor) node)
-  (let* ((divisor (if divisor
+  (let* ((same
+           (and divisor
+                (same-leaf-ref-p number divisor)))
+         (divisor (if divisor
                       (lvar-type divisor)
                       (specifier-type '(eql 1))))
          (number (lvar-type number))
-         (quot (%two-arg-derive-type number divisor #'ffloor-derive-type-quot-aux))
+         (quot (%two-arg-derive-type number divisor #'ffloor-derive-type-quot-aux
+                                     same))
          (rem (%two-arg-derive-type number divisor (lambda (n d same)
-                                                     (floor-rem-bound-aux n d same t)))))
+                                                     (floor-rem-bound-aux n d same t))
+                                    same)))
     (if (eq quot *empty-type*)
         (let ((*compiler-error-context* node))
           (setf (combination-kind node) :error
@@ -2731,62 +2742,75 @@
              (r-aux (symbolicate r-name "-AUX")))
          `(progn
             ;; Compute type of quotient (first) result.
-            (defun ,q-aux (number-type divisor-type &optional float)
-              (or (truncate-zero-quot-type number-type divisor-type float)
-                  (let* ((number-interval (numeric-type->interval number-type))
-                         (divisor-interval (numeric-type->interval divisor-type))
-                         (div (interval-div number-interval divisor-interval
-                                            (and (rational-type-p number-type)
-                                                 (integer-type-p divisor-type)))))
-                    (flet ((make-quot (div)
-                             (let ((quot (if float
-                                             (,(symbolicate "F" q-name) div number-interval divisor-interval)
-                                             (,q-name div))))
-                               (make-numeric-type (or float 'integer)
-                                                  (interval-low quot)
-                                                  (interval-high quot)
-                                                  nil))))
-                      (cond ((null div)
-                             *empty-type*)
-                            ((listp div)
-                             (type-union (make-quot (first div))
-                                         (make-quot (second div))))
-                            (t
-                             (make-quot div)))))))
+            (defun ,q-aux (number-type divisor-type &optional same float)
+              (cond ((and same
+                          (if float
+                              (and (or (rational-type-p number-type)
+                                       (bounded-numeric-type-p number-type))
+                                   (make-numeric-type float 1 1))
+                              (specifier-type '(eql 1)))))
+                    ((truncate-zero-quot-type number-type divisor-type float))
+                    (t
+                     (let* ((number-interval (numeric-type->interval number-type))
+                            (divisor-interval (numeric-type->interval divisor-type))
+                            (div (interval-div number-interval divisor-interval
+                                               (and (rational-type-p number-type)
+                                                    (integer-type-p divisor-type)))))
+                       (flet ((make-quot (div)
+                                (let ((quot (if float
+                                                (,(symbolicate "F" q-name) div number-interval divisor-interval)
+                                                (,q-name div))))
+                                  (make-numeric-type (or float 'integer)
+                                                     (interval-low quot)
+                                                     (interval-high quot)
+                                                     nil))))
+                         (cond ((null div)
+                                *empty-type*)
+                               ((listp div)
+                                (type-union (make-quot (first div))
+                                            (make-quot (second div))))
+                               (t
+                                (make-quot div))))))))
             ;; Compute type of remainder.
             (defun ,r-aux (number-type divisor-type &optional same float)
-              (declare (ignore same))
-              (or (truncate-zero-rem-type number-type divisor-type float)
-                  ;; Floats introduce rounding errors
-                  (if (or (and (memq (numeric-type-class number-type) '(integer rational))
-                               (memq (numeric-type-class divisor-type) '(integer rational)))
-                          (and (eq (numeric-type-class number-type) 'float)
-                               (eq divisor-type (specifier-type '(eql 1)))))
-                      (let* ((divisor-interval
-                               (numeric-type->interval divisor-type))
-                             (number-interval
-                               (numeric-type->interval number-type))
-                             (rem (,r-name number-interval divisor-interval))
-                             (result-type (rem-result-type number-type divisor-type)))
-                        (when (member result-type '(float single-float double-float
-                                                    #+long-float long-float))
-                          ;; Make sure that the limits on the interval have
-                          ;; the right type.
-                          (setf rem (interval-func (lambda (x)
-                                                     (coerce-for-bound x result-type))
-                                                   rem)))
-                        (make-numeric-type result-type
-                                           (interval-low rem) (interval-high rem)))
-                      (numeric-contagion number-type divisor-type))))
+              (cond ((and same
+                          (or (not float)
+                              (rational-type-p number-type)
+                              (bounded-numeric-type-p number-type))
+                          (type-intersection
+                           (numeric-contagion number-type divisor-type)
+                           (specifier-type '(member 0d0 0f0 0)))))
+                    ((truncate-zero-rem-type number-type divisor-type float))
+                    ;; Floats introduce rounding errors
+                    ((or (and (memq (numeric-type-class number-type) '(integer rational))
+                              (memq (numeric-type-class divisor-type) '(integer rational)))
+                         (and (eq (numeric-type-class number-type) 'float)
+                              (eq divisor-type (specifier-type '(eql 1)))))
+                     (let* ((divisor-interval
+                              (numeric-type->interval divisor-type))
+                            (number-interval
+                              (numeric-type->interval number-type))
+                            (rem (,r-name number-interval divisor-interval))
+                            (result-type (rem-result-type number-type divisor-type)))
+                       (when (member result-type '(float single-float double-float
+                                                   #+long-float long-float))
+                         ;; Make sure that the limits on the interval have
+                         ;; the right type.
+                         (setf rem (interval-func (lambda (x)
+                                                    (coerce-for-bound x result-type))
+                                                  rem)))
+                       (make-numeric-type result-type
+                                          (interval-low rem) (interval-high rem))))
+                    (t
+                     (numeric-contagion number-type divisor-type))))
             ;; the optimizer itself
             (defoptimizer (,name derive-type) ((number divisor))
-              (flet ((derive-q (n d same-arg)
-                       (declare (ignore same-arg))
+              (flet ((derive-q (n d same)
                        (when (and (numeric-type-real-p n)
                                   (numeric-type-real-p d))
-                         (,q-aux n d)))
-                     (derive-r (num div same-arg)
-                       (declare (ignore same-arg))
+                         (,q-aux n d same)))
+                     (derive-r (num div same)
+                       (declare (ignore same))
                        (when (and (numeric-type-real-p num)
                                   (numeric-type-real-p div))
                          (,r-aux num div))))
