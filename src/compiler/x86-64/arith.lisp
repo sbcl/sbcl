@@ -4272,9 +4272,6 @@
 (define-vop (if-eql-c/unsigned conditional-c/unsigned)
   (:translate eql)
   (:generator 5 (emit-optimized-cmp x y temp)))
-;;; =========================================================================
-;;; EQL VOPs
-;;; =========================================================================
 
 (define-vop (if-eql/s128)
   (:translate eql)

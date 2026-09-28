@@ -722,7 +722,7 @@
   (unsigned-reg) (signed-128-reg))
 
 (define-vop (move-to-128)
-  (:args (x :scs (descriptor-reg any-reg immediate) :to :save))
+  (:args (x :scs (descriptor-reg any-reg immediate constant) :to :save))
   (:arg-refs x-ref)
   (:results ((lo-y hi-y) :scs (signed-128-reg)))
   (:result-refs results)
@@ -730,7 +730,7 @@
   (:generator 40
     (let ((unsigned (tn-subtypep x-ref unsigned-byte)))
       (sc-case x
-        (immediate
+        ((immediate constant)
          (load-immediate-word lo-y (ldb (byte 64 0) (tn-value x)))
          (load-immediate-word hi-y (ldb (byte 64 64) (tn-value x))))
         (any-reg

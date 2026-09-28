@@ -1549,9 +1549,7 @@
 ;;; Also track stack alignment by consecutive stack-allocating VOPs.
 (defun optimize-constant-loads (component)
   (let* ((register-sb (sb-or-lose 'sb-vm::registers))
-         (loaded-constants
-           (make-array (sb-size register-sb)
-                       :initial-element nil))
+         (loaded-constants (make-array (sb-size register-sb) :initial-element nil))
          (aligned-stack))
     (do-ir2-blocks (block component)
       (fill loaded-constants nil)
@@ -1571,7 +1569,11 @@
                               (eql (tn-offset a) (tn-offset b)))))
                    (remove-constant (tn)
                      (when (register-p tn)
-                       (setf (svref loaded-constants (tn-offset tn)) nil)))
+                       (setf (svref loaded-constants (tn-offset tn)) nil)
+                       (ecase (sc-element-size (tn-sc tn))
+                         (1)
+                         (2
+                          (setf (svref loaded-constants (1+ (tn-offset tn))) nil)))))
                    (remove-gc-barrier (tn)
                      (when (register-p tn)
                        (setf 2block-gc-barriers
