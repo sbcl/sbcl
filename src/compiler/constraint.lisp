@@ -1707,7 +1707,7 @@
 
 ;;; Join the constraints coming from the predecessors of BLOCK on
 ;;; every constrained variable into the constraint set IN.
-(defun join-type-constraints (in block predecessor-outs &optional equality-only all-previous-outs-computed)
+(defun join-type-constraints (in block predecessor-outs all-previous-outs-computed)
   (let ((vars '())
         (equality-vars))
     (flet ((find-vars (out)
@@ -1715,12 +1715,11 @@
                (let ((kind  (constraint-kind con))
                      (y     (constraint-y con))
                      (not-p (constraint-not-p con)))
-                 (when (and (not equality-only)
-                            (or (member kind '(typep < >))
-                                (and (eq kind 'eql) (or (not not-p)
-                                                        (constant-p y)))
-                                (and (eq kind '=) (and (numeric-type-p y)
-                                                       (not not-p)))))
+                 (when (or (member kind '(typep < >))
+                           (and (eq kind 'eql) (or (not not-p)
+                                                   (constant-p y)))
+                           (and (eq kind '=) (and (numeric-type-p y)
+                                                  (not not-p))))
                    (pushnew (constraint-x con) vars))
                  (when (and (eq kind 'equality)
                             (/= (equality-constraint-amount con) 0))
@@ -1750,7 +1749,7 @@
     (dolist (var equality-vars)
       (join-equality-constraints var block in predecessor-outs all-previous-outs-computed))))
 
-(defun compute-block-in (block join-types-p)
+(defun compute-block-in (block)
   (let ((in nil)
         (bind (block-start-node block))
         (all-previous-outs-computed t)
@@ -1787,11 +1786,11 @@
                       (conset-intersection in out)
                       (setq in (copy-conset out)))))))))
     (when (rest outs)
-      (join-type-constraints in block (nreverse outs) (not join-types-p) all-previous-outs-computed))
+      (join-type-constraints in block (nreverse outs) all-previous-outs-computed))
     (or in (make-conset))))
 
-(defun update-block-in (block join-types-p)
-  (let ((in (compute-block-in block join-types-p)))
+(defun update-block-in (block)
+  (let ((in (compute-block-in block)))
     (cond ((and (block-in block) (conset= in (block-in block)))
            nil)
           (t
@@ -1864,30 +1863,20 @@
 ;;; Propagate constraints through a cyclic strongly connected
 ;;; component to a fixpoint.
 (defun propagate-constraints-in-scc (blocks)
-  (flet ((frob (join-types-p)
-           (dolist (block blocks)
-             (setf (block-in block) nil)
-             (setf (block-worklist-flag block) t))
-           (loop
-             (setq *constraint-blocks-pending* nil)
-             (dolist (block blocks)
-               (when (block-worklist-flag block)
-                 (setf (block-worklist-flag block) nil)
-                 (when (and (not (block-delete-p block))
-                            (update-block-in block join-types-p))
-                   (mapc #'enqueue-block-for-constraints
-                         (find-block-type-constraints block nil)))))
-             (unless *constraint-blocks-pending*
-               (return)))))
-    ;; We can only start joining types on blocks in which constraint
-    ;; propagation might have to run multiple times (to fixpoint) once
-    ;; all type constraints are definitely correct. They may not be
-    ;; the first time around because EQL constraint propagation is
-    ;; optimistic, i.e. un-EQL variables may be considered EQL before
-    ;; constraint propagation is done, hence any inherited type
-    ;; constraints from such constraints will be wrong as well.
-    (frob nil)
-    (frob t))
+  (dolist (block blocks)
+    (setf (block-in block) nil)
+    (setf (block-worklist-flag block) t))
+  (loop
+    (setq *constraint-blocks-pending* nil)
+    (dolist (block blocks)
+      (when (block-worklist-flag block)
+        (setf (block-worklist-flag block) nil)
+        (when (and (not (block-delete-p block))
+                   (update-block-in block))
+          (mapc #'enqueue-block-for-constraints
+                (find-block-type-constraints block nil)))))
+    (unless *constraint-blocks-pending*
+      (return)))
   (dolist (block blocks)
     (unless (block-delete-p block)
       (use-result-constraints block))))
@@ -1912,7 +1901,7 @@
                (let ((block (car blocks)))
                  (setf (block-worklist-flag block) nil)
                  (unless (block-delete-p block)
-                   (setf (block-in block) (compute-block-in block t))
+                   (setf (block-in block) (compute-block-in block))
                    (find-block-type-constraints block t)))))))))
 
 (defun constraint-propagate (component)

@@ -2350,3 +2350,16 @@
               (incf count 1))))
         count))
    ((0 7) 7)))
+
+(with-test (:name :join-types-in-loops)
+  (assert-type
+   (lambda (value seq)
+     (declare (simple-vector seq) (fixnum value))
+     (labels ((recurse (start end)
+                (when (< start end)
+                  (let ((i (+ start (truncate (- end start) 2))))
+                    (cond ((< value (svref seq i)) (recurse start i))
+                          ((> value (svref seq i)) (recurse (1+ i) end))
+                          (t start))))))
+       (recurse 0 (length seq))))
+   (or null (mod #.(1- array-dimension-limit)))))
