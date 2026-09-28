@@ -9,13 +9,14 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        options: [--with-sb-thread, --without-sb-thread, --without-sb-unicode]
+        options: [--with-sb-thread, --without-sb-thread]
         arch: [x86, x86-64]
         subfeatures: ['']
         include:
           - { arch: x86-64, subfeatures: sse4, options: --with-sb-thread --with-nonstop-foreign-call --with-tls-based-mv-return }
           - { arch: x86-64, subfeatures: fasteval, options: --with-sb-fasteval --without-sb-eval --with-nonstop-foreign-call }
           - { arch: x86-64, options: --with-mark-region-gc --with-nonstop-foreign-call }
+          - { arch: x86-64, options: --without-sb-unicode --with-nonstop-foreign-call }
 
       fail-fast: false
 

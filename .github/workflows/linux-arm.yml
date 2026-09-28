@@ -12,6 +12,7 @@ jobs:
     - uses: actions/checkout@v1
     - name: install host sbcl
       run: |
+        lscpu
         sudo dpkg --add-architecture armhf
         sudo apt-get -qq update | true
         sudo apt-get -qq install
