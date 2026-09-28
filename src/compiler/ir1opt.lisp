@@ -3300,8 +3300,11 @@
            (neq base *empty-type*)
            (or (maybe-infer-iteration-var-type var steps base)
                (and (not (cdr steps))
-                    (converged-type-of-combination
-                     var (principal-lvar-ref-use (car steps) t) base))))
+                    ;; The converged type starts from BASE as the step
+                    ;; accepts it, which BASE itself may not be.
+                    (let ((type (converged-type-of-combination
+                                 var (principal-lvar-ref-use (car steps) t) base)))
+                      (and type (type-union base type))))))
       (let ((type base))
         (dolist (step steps type)
           (setf type (type-union type (lvar-type step)))))))

@@ -409,3 +409,13 @@
      (labels ((f (n) (if (zerop n) 0 (setf (car c) (1+ (f (1- n)))))))
        (f n)))
    unsigned-byte))
+
+(with-test (:name (:optimistic-type :step-narrower-than-initial-value))
+  (checked-compile-and-assert
+   ()
+   `(lambda (c n)
+      (declare (fixnum n))
+      (labels ((f (x n) (if (<= n 0) x (f (ash x -8) (1- n)))))
+        (integerp (f (cdr c) n))))
+   (((cons 1 :x) 0) nil)
+   (((cons 1 256) 1) t)))
