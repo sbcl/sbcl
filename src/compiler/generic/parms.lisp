@@ -93,7 +93,6 @@
          (small-space-forms
           (mapcan
            (lambda (name-and-size)
-             (declare (notinline member)) ; no xperfecthash
              (destructuring-bind (space size) name-and-size
                (let* ((relocatable
                        (member space `(#+relocatable-static-space ,@'(safepoint static)

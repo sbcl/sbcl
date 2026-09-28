@@ -1090,13 +1090,13 @@ invoked. In that case it will store into PLACE and start over."
                           (cdr default)))))))))
 
 (defun should-attempt-hash-based-case-dispatch (keys)
-  ;; Guess a good minimum table size, with a slight bias against using the xperfecthash files.
+  ;; Guess a good minimum table size.
   ;; If there are a mixture of key types, penalize slightly be requiring a larger minimum
   ;; number of keys. If we don't do that, then the expression can have a ridiculous amount
   ;; of math in it that would surely outweigh any savings over an IF/ELSE chain.
   ;; Technically I should generate the perfect hash function and then decide how costly it is
   ;; using PHASH-CONVERT-TO-2-OPERAND-CODE as the cost model (number of instructions).
-  (let ((minimum #+sb-xc-host 5 #-sb-xc-host 4))
+  (let ((minimum 4))
     (when (and (some #'symbolp keys) (or (some #'integerp keys) (some #'characterp keys)))
       (incf minimum 2))
     (>= (length keys) minimum)))

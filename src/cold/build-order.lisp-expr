@@ -626,9 +626,6 @@
 (("src/code/room" ; for MAP-ALLOCATED-OBJECTS
   #+x86-64 "src/code/text-space" ; needs src/code/room
   "src/code/warm-error"
-  ;; Redefine some functions that contributed to far too numerous
-  ;; xperfecthash entries due to variation by build configuration.
-  "src/compiler/generic/static-syms"
  #+(and sb-futex (or arm64 x86-64)) "src/code/rwlock"
   "src/code/icf"
   "src/code/defpackage")
