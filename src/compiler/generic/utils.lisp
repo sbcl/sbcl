@@ -711,3 +711,9 @@
                  `(assemble ()
                     ,@body))))
     (expand (list* lo hi reg more))))
+
+(defmacro tn-subtypep  (tn-ref type)
+  `(csubtypep (tn-ref-type ,tn-ref) (specifier-type ',type)))
+
+(defmacro tn-intersectp (tn-ref type)
+  `(types-equal-or-intersect (tn-ref-type ,tn-ref) (specifier-type ',type)))

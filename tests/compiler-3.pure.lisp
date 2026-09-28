@@ -185,8 +185,7 @@
            digit)))
    :allow-notes nil))
 
-(with-test (:name :round-transform-too-early
-            :implemented-on :round-float)
+(with-test (:name :round-transform-too-early)
   (checked-compile
    `(lambda (f)
       (declare (optimize speed))

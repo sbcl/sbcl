@@ -721,36 +721,52 @@
 (define-move-vop s128-move-unsigned :move
   (unsigned-reg) (signed-128-reg))
 
-(define-vop (move-to-128/integer)
+(define-vop (move-to-128)
   (:args (x :scs (descriptor-reg any-reg immediate) :to :save))
+  (:arg-refs x-ref)
   (:results ((lo-y hi-y) :scs (signed-128-reg)))
   (:result-refs results)
   (:note "integer to untagged 128 coercion")
   (:generator 40
-    (sc-case x
-      (immediate
-       (load-immediate-word lo-y (ldb (byte 64 0) (tn-value x)))
-       (load-immediate-word hi-y (ldb (byte 64 64) (tn-value x))))
-      (any-reg
-       (inst asr lo-y x 1)
-       (inst asr hi-y x 63))
-      (t
-       (assemble ()
+    (let ((unsigned (tn-subtypep x-ref unsigned-byte)))
+      (sc-case x
+        (immediate
+         (load-immediate-word lo-y (ldb (byte 64 0) (tn-value x)))
+         (load-immediate-word hi-y (ldb (byte 64 64) (tn-value x))))
+        (any-reg
          (inst asr lo-y x 1)
-         (inst tbz x 0 SIGN-EXTEND)
+         (if unsigned
+             (inst mov hi-y 0)
+             (inst asr hi-y x 63)))
 
-         (loadw lo-y x bignum-digits-offset other-pointer-lowtag)
-         (inst ldrb tmp-tn (@ x (- 1 other-pointer-lowtag)))
-         (inst tbnz tmp-tn 0 SIGN-EXTEND)
+        (t
+         (if unsigned
+             (assemble ()
+               (inst mov hi-y 0)
+               (inst asr lo-y x 1)
+               (inst tbz x 0 DONE)
 
-         (loadw hi-y x (1+ bignum-digits-offset) other-pointer-lowtag)
-         (inst b DONE)
+               (loadw lo-y x bignum-digits-offset other-pointer-lowtag)
+               (inst ldrb tmp-tn (@ x (- 1 other-pointer-lowtag)))
+               (inst tbnz tmp-tn 0 DONE)
 
-         SIGN-EXTEND
-         (inst asr hi-y lo-y 63)
-         DONE)))))
+               (loadw hi-y x (1+ bignum-digits-offset) other-pointer-lowtag))
+             (assemble ()
+               (inst asr lo-y x 1)
+               (inst tbz x 0 SIGN-EXTEND)
 
-(define-move-vop move-to-128/integer :move
+               (loadw lo-y x bignum-digits-offset other-pointer-lowtag)
+               (inst ldrb tmp-tn (@ x (- 1 other-pointer-lowtag)))
+               (inst tbnz tmp-tn 0 SIGN-EXTEND)
+
+               (loadw hi-y x (1+ bignum-digits-offset) other-pointer-lowtag)
+               (inst b DONE)
+
+               SIGN-EXTEND
+               (inst asr hi-y lo-y 63))))))
+    done))
+
+(define-move-vop move-to-128 :move
   (any-reg descriptor-reg)
   (signed-128-reg))
 

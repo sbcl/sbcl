@@ -442,42 +442,56 @@
 (define-move-vop s128-move-unsigned :move
   (unsigned-reg) (signed-128-reg))
 
-(define-vop (move-to-128/integer)
+(define-vop (move-to-128)
   (:args (x :scs (descriptor-reg any-reg immediate) :to :save))
+  (:arg-refs x-ref)
   (:results ((lo-y hi-y) :scs (signed-128-reg)))
   (:result-refs results)
   (:note "integer to untagged 128 coercion")
   (:generator 40
-    (sc-case x
-      (immediate
-       (let ((low (ldb (byte 64 0) (tn-value x)))
-             (high (ldb (byte 64 64) (tn-value x))))
-         (move-immediate lo-y low)
-         (move-immediate hi-y high)))
-      (any-reg
-       (move lo-y x)
-       (inst sar lo-y 1)
-       (move hi-y x)
-       (inst sar hi-y 63))
-      (t
-       (assemble ()
+    (let ((unsigned (tn-subtypep x-ref unsigned-byte)))
+      (sc-case x
+        (immediate
+         (let ((low (ldb (byte 64 0) (tn-value x)))
+               (high (ldb (byte 64 64) (tn-value x))))
+           (move-immediate lo-y low)
+           (move-immediate hi-y high)))
+        (any-reg
          (move lo-y x)
          (inst sar lo-y 1)
-         (inst jmp :nc SIGN-EXTEND)
+         (move hi-y x)
+         (inst sar hi-y 63))
+        (t
+         (if unsigned
+             (assemble ()
+               (move lo-y x)
+               (zeroize hi-y)
+               (inst sar lo-y 1)
+               (inst jmp :nc DONE)
 
-         (loadw lo-y x bignum-digits-offset other-pointer-lowtag)
-         (inst cmp :byte (ea (- 1 other-pointer-lowtag) x) 1)
-         (inst jmp :e SIGN-EXTEND)
+               (loadw lo-y x bignum-digits-offset other-pointer-lowtag)
+               (inst cmp :byte (ea (- 1 other-pointer-lowtag) x) 1)
+               (inst jmp :e DONE)
 
-         (loadw hi-y x (1+ bignum-digits-offset) other-pointer-lowtag)
-         (inst jmp DONE)
+               (loadw hi-y x (1+ bignum-digits-offset) other-pointer-lowtag))
+             (assemble ()
+               (move lo-y x)
+               (inst sar lo-y 1)
+               (inst jmp :nc SIGN-EXTEND)
 
-         SIGN-EXTEND
-         (move hi-y lo-y)
-         (inst sar hi-y 63)
-         DONE)))))
+               (loadw lo-y x bignum-digits-offset other-pointer-lowtag)
+               (inst cmp :byte (ea (- 1 other-pointer-lowtag) x) 1)
+               (inst jmp :e SIGN-EXTEND)
 
-(define-move-vop move-to-128/integer :move
+               (loadw hi-y x (1+ bignum-digits-offset) other-pointer-lowtag)
+               (inst jmp DONE)
+
+               SIGN-EXTEND
+               (move hi-y lo-y)
+               (inst sar hi-y 63))))))
+    DONE))
+
+(define-move-vop move-to-128 :move
   (any-reg descriptor-reg)
   (signed-128-reg))
 
