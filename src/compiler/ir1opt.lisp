@@ -3239,6 +3239,10 @@
 ;;; cutoff and to iterate types to fixpoint.
 (defparameter *optimistic-solve-depth* 8)
 
+;;; Arbitrary. The number of times the type assumed to be returned by
+;;; recursive functions can change before it stops following changes.
+(defparameter *optimistic-result-change-limit* 8)
+
 ;;; Return the optimistic type of LVAR computed from the optimistic
 ;;; types of its uses, or NIL if it doesn't depend on them. Known
 ;;; functions, casts and LET variables are looked through to a DEPTH,
@@ -3295,8 +3299,11 @@
                   (let ((type (combination-derive-type-for-arg-types node args)))
                     (and type (single-value-type type))))))))))
     (cast
-     (and (plusp depth)
-          (lvar-optimistic-type (cast-value node) (1- depth))))))
+     (let ((type (and (plusp depth)
+                      (lvar-optimistic-type (cast-value node) (1- depth)))))
+       (and type
+            (type-intersection type
+                               (single-value-type (node-derived-type node))))))))
 
 ;;; Return true if ARG carries VAR forward from its own previous value
 ;;; rather than delivering an unrelated one.
@@ -3533,7 +3540,30 @@
                 for type in (or types
                                 (make-list (length recursive)
                                            :initial-element *wild-type*))
-                do (setf (tail-set-optimistic-type tail-set) type))))
+                for previous = (nth (position tail-set tail-sets) old)
+                do (setf (tail-set-optimistic-type tail-set)
+                         ;; Widen result types to guarantee convergence.
+                         (let ((changes (tail-set-optimistic-changes tail-set)))
+                           (cond ((or (null previous)
+                                      (eq previous *empty-type*)
+                                      (and (values-subtypep type previous)
+                                           (values-subtypep previous type)))
+                                  type)
+                                 ((values-subtypep type previous)
+                                  (cond ((< changes *optimistic-result-change-limit*)
+                                         (incf (tail-set-optimistic-changes tail-set))
+                                         type)
+                                        (t
+                                         previous)))
+                                 ((< changes *optimistic-result-change-limit*)
+                                  (incf (tail-set-optimistic-changes tail-set))
+                                  (if (zerop changes)
+                                      (values-type-union previous type)
+                                      (widen-numeric-bounds
+                                       previous
+                                       (values-type-union previous type))))
+                                 (t
+                                  *wild-type*)))))))
       (loop for tail-set in tail-sets
             for type in old
             for new = (tail-set-optimistic-type tail-set)
@@ -3545,26 +3575,43 @@
                          (note-optimistic-change call)))))))))
 
 ;;; Drop the numeric bounds of the single value NEW that differ from
-;;; those of OLD.
+;;; those of OLD, for each kind of number separately.
 (defun widen-numeric-bounds (old new)
-  (let ((old-hull (weaken-numeric-union-type (single-value-type old)))
-        (new-hull (weaken-numeric-union-type (single-value-type new))))
-    (if (and (type-single-value-p old)
-             (type-single-value-p new)
-             (numeric-type-p old-hull)
-             (numeric-type-p new-hull)
-             (eq (numeric-type-class old-hull) (numeric-type-class new-hull))
-             (eq (numeric-type-complexp old-hull) (numeric-type-complexp new-hull)))
-        (values-type-union
-         new
-         (make-single-value-type
-          (modified-numeric-type
-           new-hull
-           :low (and (equal (numeric-type-low old-hull) (numeric-type-low new-hull))
-                     (numeric-type-low new-hull))
-           :high (and (equal (numeric-type-high old-hull) (numeric-type-high new-hull))
-                      (numeric-type-high new-hull)))))
-        new)))
+  (if (and (type-single-value-p old)
+           (type-single-value-p new))
+      (let ((old-parts (let ((old (single-value-type old)))
+                         (if (union-type-p old) (union-type-types old) (list old)))))
+        (flet ((widen (new)
+                 (let* ((old (and (numeric-union-type-p new)
+                                  (find-if (lambda (old)
+                                             (and (numeric-union-type-p old)
+                                                  (eq (numeric-type-class old)
+                                                      (numeric-type-class new))
+                                                  (eq (numeric-type-format old)
+                                                      (numeric-type-format new))
+                                                  (eq (numeric-type-complexp old)
+                                                      (numeric-type-complexp new))))
+                                           old-parts)))
+                        (old-hull (and old (weaken-numeric-union-type old)))
+                        (new-hull (weaken-numeric-union-type new)))
+                   (if (and old
+                            (numeric-type-p old-hull)
+                            (numeric-type-p new-hull))
+                       (type-union
+                        new
+                        (modified-numeric-type
+                         new-hull
+                         :low (and (equal (numeric-type-low old-hull) (numeric-type-low new-hull))
+                                   (numeric-type-low new-hull))
+                         :high (and (equal (numeric-type-high old-hull) (numeric-type-high new-hull))
+                                    (numeric-type-high new-hull))))
+                       new))))
+          (let ((new (single-value-type new)))
+            (make-single-value-type
+             (if (union-type-p new)
+                 (apply #'type-union (mapcar #'widen (union-type-types new)))
+                 (widen new))))))
+      new))
 
 (defun count-values (call &optional min butlast)
   (loop for (arg . next) on (basic-combination-args call)

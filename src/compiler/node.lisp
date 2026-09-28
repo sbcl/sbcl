@@ -761,6 +761,8 @@
   ;; the type assumed to be returned by these functions if they call
   ;; each other, see SOLVE-OPTIMISTIC-RESULT-TYPES.
   (optimistic-type nil :type (or null ctype))
+  ;; the number of times OPTIMISTIC-TYPE has changed across solves
+  (optimistic-changes 0 :type index)
   ;; some info used by the back end
   (info nil))
 (defprinter (tail-set :identity t)

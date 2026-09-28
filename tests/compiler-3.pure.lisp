@@ -603,3 +603,47 @@
   (assert (not (ctu:ir1-named-calls `(lambda (n)
                                        (declare ((integer 10 300) n))
                                        (ffloor n n))))))
+
+(with-test (:name (:recursive-local-function-result-type :parameter-from-own-result :lp2168790))
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (flet ((f (n)
+               (1+ n)))
+        (f (f 0))))
+   (() 2)))
+
+(with-test (:name (:recursive-local-function-result-type :parameter-from-own-result :shrinking))
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (flet ((f (n)
+               (* n n)))
+        (f (f 2))))
+   (() 16)))
+
+(with-test (:name (:recursive-local-function-result-type :parameter-from-own-result :mixed-numbers))
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (flet ((f (n)
+               (+ n 0.5)))
+        (f (f 0))))
+   (() 1.0)))
+
+(with-test (:name (:recursive-local-function-result-type :parameter-from-own-result :characters))
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (flet ((f (c)
+               (code-char (1+ (char-code c)))))
+        (f (f #\a))))
+   (() #\c)))
+
+(with-test (:name (:recursive-local-function-result-type :parameter-from-own-result :oscillating))
+  (assert-type
+   (lambda ()
+     (flet ((f (n)
+              (- 1 n)))
+       (f (f (f 5)))))
+   (or (integer -4 -4) (integer 5 5))))
