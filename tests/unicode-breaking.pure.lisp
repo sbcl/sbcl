@@ -106,9 +106,9 @@
 
 (with-test (:name (:sentence-breaking :test4) :skipped-on (not :sb-unicode))
   ;; the U+200D (ZWJ) should extend the Aterm (.)
-  (assert (equal (sb-unicode:sentences (format nil "1~C.~C X" #\Return #\U+200D))
+  (assert (equal (sb-unicode:sentences (format nil "1~C.~C X" #\Return (code-char 8205)))
                  (list (format nil "1~C" #\Return)
-                       (format nil ".~C " #\U+200D)
+                       (format nil ".~C " (code-char 8205))
                        "X"))))
 
 (defun process-line-break-line (line)
