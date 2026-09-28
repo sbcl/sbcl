@@ -376,6 +376,7 @@
  ("src/compiler/constraint-back")
  ("src/compiler/saptran")
  ("src/compiler/modarith")
+ ("src/compiler/perfect-hash")
  ("src/compiler/sxhash")
  ("src/code/quantifiers")
  ("src/compiler/bitops-derive-type")

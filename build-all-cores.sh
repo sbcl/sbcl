@@ -145,12 +145,6 @@ obj/xbuild/{cfg}.core: obj/xbuild/{cfg}/xc.core
   (load "validate-float.lisp")
   (dolist (pathname (directory "obj/xbuild/**/xfloat-math.lisp-expr"))
     (check-float-file pathname))
-  (dolist (nbits '(30 61 63))
-    (let* ((filename (format nil "xperfecthash~D.lisp-expr" nbits))
-           (sources (directory (format nil "obj/xbuild/*/from-xc/~A" filename))))
-      (when sources
-        (funcall (intern "UPDATE-PERFECT-HASHFUNS" "SB-COLD")
-                 sources filename))))
   (format t "~&Success~%"))
 (sb-ext:exit :code (sb-ext:process-exit-code *process*))
 EOF

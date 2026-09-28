@@ -784,7 +784,7 @@
                (t (other type)))))
     (flet ((typehash (x) (ldb (byte 32 0) (layout-clos-hash (classoid-layout x)))))
       (let* ((hashes (map '(array (unsigned-byte 32) 1) #'typehash (structs)))
-             (lexpr (or (make-perfect-hash-lambda hashes (mapcar 'classoid-name (structs)))
+             (lexpr (or (make-perfect-hash-lambda hashes)
                         (return-from transform-frozen-struct-union-typep nil)))
              (phashfun (compile-perfect-hash lexpr hashes))
              (min-size (length (structs)))
