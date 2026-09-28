@@ -1549,13 +1549,15 @@
 ;;; Also track stack alignment by consecutive stack-allocating VOPs.
 (defun optimize-constant-loads (component)
   (let* ((register-sb (sb-or-lose 'sb-vm::registers))
-         (loaded-constants (make-array (sb-size register-sb) :initial-element nil))
+         (loaded-constants (make-array (sb-size register-sb)))
+         (2block-gc-barriers 0)
          (aligned-stack))
+    (declare (type (unsigned-byte #.(sb-size (sb-or-lose 'sb-vm::registers))) 2block-gc-barriers))
     (do-ir2-blocks (block component)
       (fill loaded-constants nil)
+      (setf 2block-gc-barriers 0)
       (setf aligned-stack nil)
-      (do ((2block-gc-barriers)
-           (vop (ir2-block-start-vop block) (vop-next vop)))
+      (do ((vop (ir2-block-start-vop block) (vop-next vop)))
           ((null vop))
         (let ((info (vop-info vop)))
           (labels ((register-p (tn)
@@ -1576,12 +1578,14 @@
                           (setf (svref loaded-constants (1+ (tn-offset tn))) nil)))))
                    (remove-gc-barrier (tn)
                      (when (register-p tn)
-                       (setf 2block-gc-barriers
-                             (delete (tn-offset tn) 2block-gc-barriers))))
+                       (ecase (sc-element-size (tn-sc tn))
+                         (1
+                          (setf (ldb (byte 1 (tn-offset tn)) 2block-gc-barriers) 0))
+                         (2
+                          (setf (ldb (byte 2 (tn-offset tn)) 2block-gc-barriers) 0)))))
                    (remove-written-tns ()
-                     (cond ((memq (vop-info-save-p info)
-                                  '(t :force-to-stack))
-                            (setf 2block-gc-barriers nil)
+                     (cond ((memq (vop-info-save-p info) '(t :force-to-stack))
+                            (setf 2block-gc-barriers 0)
                             (fill loaded-constants nil))
                            (t
                             (do ((ref (vop-results vop) (tn-ref-across ref)))
@@ -1615,16 +1619,16 @@
                            (register (register-p tn)))
                       (if (and
                            (not (and register
-                                     (memq (tn-offset tn) 2block-gc-barriers)))
+                                     (logbitp (tn-offset tn) 2block-gc-barriers)))
                            (sb-vm::require-gengc-barrier-p tn
                                                            (sb-vm::vop-nth-arg value vop)
                                                            (and allocator
                                                                 (nth allocator (vop-codegen-info vop)))))
                           (when register
-                            (push (tn-offset tn) 2block-gc-barriers))
+                            (setf (ldb (byte 1 (tn-offset tn)) 2block-gc-barriers) 1))
                           (nsubst nil barrier (vop-codegen-info vop)))))
                   ;; FIXME: can't straddle an allocation sequences
-                  (setf 2block-gc-barriers nil)))
+                  (setf 2block-gc-barriers 0)))
             (case (vop-name vop)
               ((move sb-vm::move-arg)
                (let* ((args (vop-args vop))
