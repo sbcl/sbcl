@@ -17,7 +17,7 @@
 (deftype alignment () '(integer 0 64))
 (deftype offset () 'fixnum)
 (deftype address () 'word)
-(deftype disassem-length () '(and unsigned-byte fixnum))
+(deftype disassem-length () 'index)
 (deftype column () '(integer 0 1000))
 
 (defconstant max-filtered-value-index 32)

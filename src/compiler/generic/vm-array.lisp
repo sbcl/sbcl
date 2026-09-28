@@ -186,12 +186,17 @@
         (dovector (saetp *specialized-array-element-type-properties* a)
           (setf (aref a (saetp-typecode saetp)) (saetp-n-bits-shift saetp))))
   #'equalp)
+
+(declaim (inline simple-array-widetag->bits-per-elt))
 (defun simple-array-widetag->bits-per-elt (widetag)
+  (declare (type (unsigned-byte #.n-widetag-bits) widetag))
   #+sb-xc-host (saetp-n-bits (find widetag *specialized-array-element-type-properties*
                                    :key #'saetp-typecode))
-  #-sb-xc-host (if (= widetag simple-array-nil-widetag)
-                   0
-                   (ash 1 (aref %%simple-array-n-bits-shifts%% widetag))))
+  #-sb-xc-host (truly-the (integer 0 #.(loop for s across %%simple-array-n-bits-shifts%%
+                                             unless (= s (1- sb-vm:n-word-bits))
+                                             maximize (ash 1 s)))
+                          (logand most-positive-fixnum
+                                  (ash 1 (aref %%simple-array-n-bits-shifts%% widetag)))))
 
 ;;; I don't understand why we didn't use this more often, instead of
 ;;; having introduced special cases. Oh well, what's done is done.

@@ -26,8 +26,7 @@
 
 (defun allocate-static-vector (widetag length words)
   (declare (type (unsigned-byte #.n-widetag-bits) widetag)
-           (type word words)
-           (type index length))
+           (type index length words))
   ;; Static space starts out zeroed, so it looks a bunch of cons cells
   ;; containing (0 . 0) above the free pointer. Therefore bumping the pointer
   ;; merely exposes a new range of cons cells, if GC should happen to run
@@ -57,8 +56,7 @@
 #+darwin-jit
 (defun allocate-static-code-vector (widetag length words)
   (declare (type (unsigned-byte #.n-widetag-bits) widetag)
-           (type word words)
-           (type index length))
+           (type index words length))
   (or (with-system-mutex (*allocator-mutex*)
         (let* ((pointer *static-code-space-free-pointer*)
                (nbytes (pad-data-block (+ words vector-data-offset)))

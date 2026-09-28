@@ -2173,7 +2173,6 @@
 ;;; Divide X by Y when Y fits in a word.
 (defun bignum-truncate-single-digit (x y)
   (declare (type bignum x)
-           (type (or word sb-vm:signed-word) y)
            (optimize (safety 0)))
   (labels
       ((bignum-truncate-single-digit (x len-x y)
@@ -2242,7 +2241,7 @@
                        (t
                         y)))
                 (t
-                 y)))
+                 (the word y))))
            (len-x (%bignum-length x)))
       (declare (word y))
       (multiple-value-bind (q r)

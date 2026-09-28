@@ -500,10 +500,11 @@
                                   (t
                                    (cons (format nil "LVAR~a" (incf lvar-count))
                                          (type-specifier (single-value-type (node-derived-type node)))))))))
-                 (let ((uses (lvar-uses lvar)))
-                   (if (listp uses)
-                       (list* 'or (mapcar #'gen-use uses))
-                       (gen-use uses))))))
+                 (when lvar
+                   (let ((uses (lvar-uses lvar)))
+                     (if (listp uses)
+                         (list* 'or (mapcar #'gen-use uses))
+                         (gen-use uses)))))))
       (if (node-p lvar)
           (gen-lvar (node-lvar lvar))
           (gen-lvar lvar)))))
