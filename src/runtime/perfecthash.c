@@ -149,12 +149,18 @@ static void scrambleinit(
     ub4      *scramble,                        /* hash is a^scramble[tab[b]] */
     ub4       smax)                /* scramble values should be in 0..smax-1 */
 {
-  ub4 i;
+  ub4 i, nbits = mylog2(smax);
+  /* Only scramble[0..max(smax,256)-1] is ever read: augment() tries values
+   * below smax (or below 256 when blen >= USE_SCRAMBLE, in which case smax
+   * is at least that large anyway), and make_c() prints the first 256.
+   * Filling all SCRAMBLE_LEN entries dominated the runtime for small key sets. */
+  ub4 n = smax > UB1MAXVAL+1 ? smax : UB1MAXVAL+1;
+  if (n > SCRAMBLE_LEN) n = SCRAMBLE_LEN;
 
   /* fill scramble[] with distinct random integers in 0..smax-1 */
-  for (i=0; i<SCRAMBLE_LEN; ++i)
+  for (i=0; i<n; ++i)
   {
-    scramble[i] = permute(i, mylog2(smax));
+    scramble[i] = permute(i, nbits);
   }
 }
 

@@ -229,7 +229,7 @@
     #-sb-xc-host
     (flet ((generate-ph (keys)
              (sb-unix::newcharstar-string
-              (sb-sys:with-pinned-objects (array)
+              (sb-sys:with-pinned-objects (keys)
                 (alien-funcall
                  (extern-alien
                   "lisp_perfhash_with_options"
@@ -241,6 +241,9 @@
         ;; work done some in another thread to cache something.
         (setf cache (make-hash-table :test 'equalp :synchronized t)
               *phash-lambda-cache* cache))
+      ;; The generated function doesn't depend on the order of the keys, but
+      ;; the cache key and the generator's choices do. Canonicalize.
+      (setq array (sort (copy-seq array) #'<))
       (dx-let ((cache-key (cons digest array)))
         ;; Purposely return empty-string if we hit the cache
         (awhen (gethash cache-key cache)
