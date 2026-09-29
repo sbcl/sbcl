@@ -2397,10 +2397,22 @@
 
 (defun fold-call-derived-to-constant (call)
   (let ((type (node-derived-type call)))
-    (when (type-single-value-p type)
-      (multiple-value-bind (single-p value) (type-singleton-p (single-value-type type))
-        (when single-p
-          (replace-combination-with-constant value call))))))
+    (cond ((type-single-value-p type)
+           (multiple-value-bind (single-p value) (type-singleton-p (single-value-type type))
+             (when single-p
+               (replace-combination-with-constant value call))))
+          ((and (values-type-p type)
+                (not (values-type-rest type))
+                (null (values-type-optional type))
+                (not (combination-is call '(values)))
+                (every #'type-singleton-p (values-type-required type)))
+           (transform-call call `(lambda (&rest args)
+                                   (declare (ignore args))
+                                   (values ,@(loop for vt in (values-type-required type)
+                                                   for value = (nth-value 1 (type-singleton-p vt))
+                                                   collect `',value)))
+                           'constant)
+           t))))
 
 ;;;; local call optimization
 

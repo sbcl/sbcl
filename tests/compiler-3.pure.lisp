@@ -599,4 +599,11 @@
   (assert-type
    (lambda (n)
      (ftruncate n n))
-   (values float (or float (eql 0)) &optional)))
+   (values float (or float (eql 0)) &optional))
+  (assert (not (ctu:ir1-named-calls `(lambda (n)
+                                       (declare ((integer 10) n))
+                                       (ffloor n n))))))
+
+(defun f (n)
+  (declare ((integer 10) n))
+  (ffloor n n))
