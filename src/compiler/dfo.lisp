@@ -389,7 +389,8 @@
             (let ((res (dfo-scavenge-dependency-graph component-lambda
                                                       new)))
               (when (eq res new)
-                (aver (not (member new (components))))
+                ;; This aver is slow.
+                ;;(aver (not (member new (components))))
                 (components new)
                 (setq new (make-empty-component)))))
           (aver (eq (component-kind initial-component) :initial))
