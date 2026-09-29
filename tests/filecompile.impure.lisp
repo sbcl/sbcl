@@ -22,7 +22,7 @@
                   (ignore-errors (sb-impl::read-object? rt stream char))
                 (when (and (eql resultp 1) (consp result))
                   (push (list start (car result) (file-position stream)) forms))
-                (values resultp result)))))
+                (values (or resultp 0) result)))))
     (loop until (eq (read stream nil stream) stream))
     (nreverse forms)))
 

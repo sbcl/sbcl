@@ -666,3 +666,36 @@
               (- 1 n)))
        (f (f (f 5)))))
    (or (integer -4 -4) (integer 5 5))))
+
+(with-test (:name :the-lambda)
+  (checked-compile
+   `(lambda ()
+      (declare (optimize speed))
+      (the (function (fixnum))
+           (lambda (n) (> n 1))))
+   :allow-notes nil)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda ()
+                         (the (function * (values integer &optional))
+                              (lambda (n) (+ n 1.0))))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda ()
+                         (the (function * (values integer &optional))
+                              (lambda (&optional (n 0)) (+ n 1.0))))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda ()
+                         (the (function * (values integer &optional))
+                              (lambda (&key (n 0)) (+ n 1.0))))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda ()
+                         (let ((n (lambda (&optional (n 0)) (+ n 1.0))))
+                           (values (the (function * (values integer &optional)) n)
+                                   n)))
+                      :allow-warnings t))))
