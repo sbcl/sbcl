@@ -3599,7 +3599,7 @@
      ;; Relative fixups don't exist with movable code,
      ;; so in the #-immobile-code case, there's nothing to assert.
      #+(and immobile-code (not sb-xc-host))
-     (unless (immobile-space-obj-p code)
+     (unless (or (immobile-space-obj-p code) (eq flavor :code-object))
        (error "Can't compute fixup relative to movable object ~S" code))
      (setf (signed-sap-ref-32 sap offset) (- value (+ (sap-int sap) offset 4))))
     (:absolute ; 64-bit jump table target address

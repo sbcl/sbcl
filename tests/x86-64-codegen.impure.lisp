@@ -1552,3 +1552,14 @@
          (disp32 (caddr found)))
     (assert (search "660F7F4200       MOVDQA [RDX], XMM0" disp8))
     (assert (search "660F7F8200000000 MOVDQA [RDX], XMM0" disp32))))
+
+;;; Just smoke-test that self-relative code fixups work in dynamic space
+(with-test (:name :relative-fixup-to-movable-code)
+   (let ((f (let ((sb-c::*compile-to-memory-space* :dynamic))
+              (compile
+               nil
+               '(lambda ()
+                 sb-vm::(values (inline-vop () ((res descriptor-reg))
+                                 (inst lea res (rip-relative-ea
+                                                (make-fixup nil :code-object))))))))))
+     (assert (eq (sb-kernel:fun-code-header f) (funcall f)))))
