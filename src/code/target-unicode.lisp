@@ -1678,7 +1678,7 @@ it defaults to 80 characters"
 
 ;;; I wanted to check the the performance of a non-minimal perfect hash function.
 ;;; As expected, the simpler non-minimal formula is faster, but it uses 2^16
-;;; cells for the key and value vectors which is either less or more wsteful
+;;; cells for the key and value vectors which is either less or more wasteful
 ;;; than a hash-table depending on machine word size.
 ;;;
 ;;; Core file sizes:
