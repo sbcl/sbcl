@@ -1120,13 +1120,11 @@ the first."
 ;;; rational when comparing with a rational, but infinities can't be
 ;;; converted to a rational, so we show some initiative and do it this
 ;;; way instead.)
-  (defun basic-compare (op &key infinite-x-finite-y infinite-y-finite-x
-                        ;; See comment at TWO-ARG-= for why only = is quiet.
-                        &aux (quiet-op (if (eq op '=) 'quiet= op)))
+  (defun basic-compare (op &key infinite-x-finite-y infinite-y-finite-x)
     `(((fixnum fixnum) (,op x y))
-      ((single-float single-float) (,quiet-op x y))
+      ((single-float single-float) (,op x y))
       (((foreach single-float double-float) double-float)
-       (,quiet-op (coerce x 'double-float) y))
+       (,op (coerce x 'double-float) y))
       #+long-float
       (((foreach single-float double-float long-float) long-float)
        (,op (coerce x 'long-float) y))
@@ -1152,7 +1150,7 @@ the first."
                                             (= '=))
                                          y x (dispatch-type x)))))
       ((double-float single-float)
-       (,quiet-op x (coerce y 'double-float)))
+       (,op x (coerce y 'double-float)))
       (((foreach single-float double-float #+long-float long-float) ratio)
        (with-float-inf-or-nan-test x
          ,infinite-x-finite-y
@@ -1290,14 +1288,6 @@ the first."
 ;;;   from signaling an invalid operation exception on quiet NaNs, any Common Lisp implementation
 ;;;   claiming IEEE-conforming float arithmetic must implement '=' using quiet comparison semantics.
 ;;;   And since SBCL pushes :ieee-floating-point onto *FEATURES*, we claim IEEE conformance.
-;;;
-;;; The logic below implements what is stated above when and only when both X and Y are
-;;; floating-point. It does not necessarily conform when either of X or Y is another number type.
-;;; It probably should generally be quiet if either is a quiet NaN. This is not easy because type
-;;; conversions may need to perform *ordered* comparisons on one operand in order to coerce it to
-;;; match the other operand, and sometimes a conversion entails a range check, and range checks
-;;; are allowed to signal invalid-operation. Quiet semantics may involve pre-checking
-;;; to avoid falling into those code paths.
 (defun two-arg-= (x y)
   (declare (explicit-check))
   (number-dispatch ((x number) (y number))
