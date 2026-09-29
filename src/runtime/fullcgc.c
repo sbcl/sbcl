@@ -30,69 +30,18 @@
 #include <sys/resource.h> // for getrusage()
 #endif
 
-static struct unbounded_queue {
-  struct Qblock* head_block;
-  struct Qblock* tail_block;
-  struct Qblock* recycler;
-  long tot_count; // Not used
-} work_queue;
-
-/* Initialized to number of pages in page table
- * and decremented before use. */
-static page_index_t free_page;
-
-/* The whole-page allocator works backwards from the end of dynamic space.
- * If it collides with 'next_free_page', then you lose.
- * TODO: It would be reasonably simple to have this request more memory from
- * the OS instead of failing on overflow */
-static void* get_free_page() {
-    --free_page;
-    if (free_page < next_free_page)
-        lose("Needed more space to GC");
-    set_page_type(page_table[free_page], PAGE_TYPE_UNBOXED);
-    char* mem = page_address(free_page);
-    prepare_pages(1, free_page, free_page, PAGE_TYPE_UNBOXED, -1);
-    return mem;
-}
+static struct unbounded_queue work_queue;
 
 static void gc_enqueue(lispobj object)
 {
     gc_dcheck(is_lisp_pointer(object));
     gc_dcheck(widetag_of(native_pointer(object)) != SIMPLE_FUN_WIDETAG);
-    struct Qblock* block = work_queue.tail_block;
-    if (block->count == QBLOCK_CAPACITY) {
-        struct Qblock* next;
-        next = work_queue.recycler;
-        if (next) {
-            work_queue.recycler = next->next;
-        } else {
-            next = (struct Qblock*)get_free_page();
-        }
-        block = block->next = next;
-        block->next = 0;
-        block->tail = block->count = 0;
-        work_queue.tail_block = block;
-    }
-    block->elements[block->tail] = object;
-    if (++block->tail == QBLOCK_CAPACITY) block->tail = 0;
-    ++block->count;
+    gc_worklist_enqueue(&work_queue, object);
 }
 
 static lispobj gc_dequeue()
 {
-    struct Qblock* block = work_queue.head_block;
-    gc_assert(block->count);
-    int index = block->tail - block->count;
-    lispobj object = block->elements[index + (index<0 ? QBLOCK_CAPACITY : 0)];
-    if (--block->count == 0) {
-        struct Qblock* next = block->next;
-        if (next) {
-            work_queue.head_block = next;
-            block->next = work_queue.recycler;
-            work_queue.recycler = block;
-        }
-    }
-    return object;
+    return gc_worklist_dequeue(&work_queue);
 }
 
 static inline sword_t dword_index(uword_t ptr, uword_t base) {
@@ -198,6 +147,27 @@ inline void gc_mark_obj(lispobj thing) {
     if (is_lisp_pointer(thing)) __mark_obj(thing);
 }
 
+/* Mark an object without enqueueing it, needed in two circumstances:
+ *  - for weak hash tables entries that get splatted, we need to feed the list
+ *    of available k/v cells back to Lisp for reuse. This is done using ordinary
+ *    lists because we can't legally manipulate the table's "next" vector.
+ *    The world being stopped does not imply that GC has freedome to perform observable
+ *    effects on a table which may be in the middle of doing a PUTHASH.
+ *    (without-gcing was fully banished from the hash-table code long ago)
+ *  - for finalizers we have to inform Lisp of the items that got splatted.
+ *    Those too are fed back using ordinary lists.
+ *
+ * We MUST NOT arrange to visit the CAR and CDR of 'thing' because all worklist
+ * procesing is done. There is an assertion that the worklist is empty after this.
+ */
+void gc_mark_obj_no_enq(lispobj thing) {
+    gc_assert(is_lisp_pointer(thing));
+    sword_t mark_index = ptr_to_bit_index(thing);
+    uword_t wordindex = mark_index / N_WORD_BITS;
+    uword_t bit = (uword_t)1 << (mark_index % N_WORD_BITS);
+    fullcgcmarks[wordindex] |= bit;
+}
+
 static inline void mark_pair(lispobj* where)
 {
     gc_mark_obj(where[0]);
@@ -217,13 +187,7 @@ void gc_mark_range(lispobj* where, long count) {
 
 void prepare_for_full_mark_phase()
 {
-    free_page = page_table_pages;
-    struct Qblock* block = (struct Qblock*)get_free_page();
-    work_queue.head_block = block;
-    work_queue.tail_block = block;
-    work_queue.recycler   = 0;
-    block->next = 0;
-    block->tail = block->count = 0;
+    gc_queue_init(&work_queue);
     /* Consume as many bits as cover the entire dynamic space regardless
      * of its current usage.  Same for the other spaces.
      * This previously tried to be clever about using only as many bits for
@@ -288,6 +252,7 @@ void execute_full_mark_phase()
              (test_weak_triggers(pointer_survived_gc_yet, gc_mark_obj) &&
               work_queue.head_block->count));
     stray_pointer_source_obj = 0;
+    gc_queue_destroy(&work_queue);
 
 #ifdef HAVE_GETRUSAGE
     getrusage(RUSAGE_SELF, &after);
@@ -296,8 +261,7 @@ void execute_full_mark_phase()
              (a.field.tv_usec-b.field.tv_usec)) / 1000000.0
     if (gencgc_verbose)
         fprintf(stderr,
-                "[Mark phase: %d pages used, ET=%f+%f sys+usr]\n",
-                (int)(page_table_pages - free_page),
+                "[Mark phase: ET=%f+%f sys+usr]\n",
                 timediff(before, after, ru_stime), timediff(before, after, ru_utime));
 #endif
 }
@@ -443,14 +407,6 @@ static uword_t sweep_possibly_large(lispobj* where, lispobj* end,
 void dispose_markbits() {
     os_deallocate((void*)fullcgcmarks, markbits_size);
     fullcgcmarks = 0; markbits_size = 0;
-    page_index_t page;
-    // Give back all private-use pages and indicate need-to-zero
-    for (page = free_page; page < page_table_pages; ++page) {
-        gc_assert((page_table[page].type & PAGE_TYPE_MASK) == PAGE_TYPE_UNBOXED);
-        gc_assert(!page_bytes_used(page));
-        set_page_need_to_zero(page, 1);
-        set_page_type(page_table[page], FREE_PAGE_FLAG);
-      }
 }
 
 void execute_full_sweep_phase()

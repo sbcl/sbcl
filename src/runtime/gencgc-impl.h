@@ -412,6 +412,7 @@ extern void acquire_gc_page_table_lock(void), release_gc_page_table_lock(void);
 
 void gc_mark_range(lispobj*start, long count);
 void gc_mark_obj(lispobj);
+void gc_mark_obj_no_enq(lispobj);
 void gc_dispose_private_pages();
 void add_to_weak_vector_list(lispobj* vector, lispobj header);
 

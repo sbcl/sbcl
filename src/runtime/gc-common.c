@@ -1826,7 +1826,7 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
 #ifdef LISP_FEATURE_MARK_REGION_GC
                 mr_preserve_leaf(cons->car);
 #else
-                if (!compacting_p()) gc_mark_obj(cons->car);
+                if (!compacting_p()) gc_mark_obj_no_enq(cons->car);
 #endif
             } else { // small values
                 cons = (struct cons*)
@@ -1847,7 +1847,7 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
 #ifdef LISP_FEATURE_MARK_REGION_GC
             mr_preserve_leaf(hash_table->smashed_cells);
 #else
-            if (!compacting_p()) gc_mark_obj(hash_table->smashed_cells);
+            if (!compacting_p()) gc_mark_obj_no_enq(hash_table->smashed_cells);
 #endif
 
         } else {
@@ -2464,7 +2464,7 @@ static void push_in_ordinary_list(struct symbol* list_holder, lispobj element)
 #ifdef LISP_FEATURE_MARK_REGION_GC
     set_allocation_bit_mark(cons);
 #else
-    if (!compacting_p()) gc_mark_obj(new);
+    if (!compacting_p()) gc_mark_obj_no_enq(new);
 #endif
 }
 static void push_in_alist(struct symbol* list_holder, lispobj key, lispobj val)
@@ -2476,7 +2476,7 @@ static void push_in_alist(struct symbol* list_holder, lispobj key, lispobj val)
 #ifdef LISP_FEATURE_MARK_REGION_GC
     set_allocation_bit_mark(cons);
 #else
-    if (!compacting_p()) gc_mark_obj(pair);
+    if (!compacting_p()) gc_mark_obj_no_enq(pair);
 #endif
     push_in_ordinary_list(list_holder, pair);
 }
