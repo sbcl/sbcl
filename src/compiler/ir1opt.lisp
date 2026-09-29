@@ -850,7 +850,7 @@
   (let ((bound (tail-set-recursive-type tail-set)))
     (when bound
       (setf type (values-type-intersection type bound))
-      ;; Widen numeric types here, so that iterated solving doesn't
+      ;; Weaken numeric types here, so that iterated solving doesn't
       ;; accumulate unhelpful numeric types that have many excluded
       ;; points.
       (when (type-single-value-p type)
