@@ -1120,11 +1120,13 @@ the first."
 ;;; rational when comparing with a rational, but infinities can't be
 ;;; converted to a rational, so we show some initiative and do it this
 ;;; way instead.)
-  (defun basic-compare (op &key infinite-x-finite-y infinite-y-finite-x)
+  (defun basic-compare (op &key infinite-x-finite-y infinite-y-finite-x
+                        ;; See comment at TWO-ARG-= for why only = is quiet.
+                        &aux (quiet-op (if (eq op '=) 'quiet= op)))
     `(((fixnum fixnum) (,op x y))
-      ((single-float single-float) (,op x y))
+      ((single-float single-float) (,quiet-op x y))
       (((foreach single-float double-float) double-float)
-       (,op (coerce x 'double-float) y))
+       (,quiet-op (coerce x 'double-float) y))
       #+long-float
       (((foreach single-float double-float long-float) long-float)
        (,op (coerce x 'long-float) y))
@@ -1150,7 +1152,7 @@ the first."
                                             (= '=))
                                          y x (dispatch-type x)))))
       ((double-float single-float)
-       (,op x (coerce y 'double-float)))
+       (,quiet-op x (coerce y 'double-float)))
       (((foreach single-float double-float #+long-float long-float) ratio)
        (with-float-inf-or-nan-test x
          ,infinite-x-finite-y
@@ -1265,6 +1267,37 @@ the first."
     ((bignum bignum)
      (>= (bignum-compare x y) 0))))
 
+;;; If comparing two floating-point numbers for equality, we never signal
+;;; invalid operation on quiet NaNs.
+;;;  The requirement that = must act as a quiet comparison is not explicit in the
+;;;  ANSI Common Lisp standard text itself, but rather stems from IEEE Std 754 and the
+;;;  standard X3J13 issue write-up that added FLOATING-POINT-INVALID-OPERATION to Common Lisp.
+;;;   * IEEE 754 explicitly defines standard equality (== in C/C++, = in Lisp/Fortran) using the
+;;;     quiet operation: compareQuietEqual (or compareQuietNotEqual):
+;;;       Returns false (or true for not-equal) if an operand is NaN. It _must_ _not_ signal the
+;;;       invalid operation exception when encountering quiet NaNs. It only signals an invalid
+;;;       operation exception if an operand is a signaling NaN.
+;;;   * In contrast, ordered comparisons (<, <=, >, >=) are defined by IEEE 754 to
+;;;     signal invalid-operation on _any_ NaN (which may raise SIGFPE depending on control bits).
+;;;   * The ANSI Common Lisp standard does not mention NaNs by name because the committee
+;;;     deliberately avoided mandating IEEE 754 hardware. However, the rationale and exact semantics
+;;;     for the floating-point conditions were imported directly from IEEE 754 via committee issue
+;;;     FLOATING-POINT-CONDITION-NAMES.
+;;;       The condition type FLOATING-POINT-INVALID-OPERATION represents the invalid operation
+;;;       exception defined by IEEE 754.
+;;;   Because ANSI CL aligns the definition of FLOATING-POINT-INVALID-OPERATION directly with the
+;;;   IEEE 754 invalid operation exception, and IEEE 754 strictly prohibits compareQuietEqual
+;;;   from signaling an invalid operation exception on quiet NaNs, any Common Lisp implementation
+;;;   claiming IEEE-conforming float arithmetic must implement '=' using quiet comparison semantics.
+;;;   And since SBCL pushes :ieee-floating-point onto *FEATURES*, we claim IEEE conformance.
+;;;
+;;; The logic below implements what is stated above when and only when both X and Y are
+;;; floating-point. It does not necessarily conform when either of X or Y is another number type.
+;;; It probably should generally be quiet if either is a quiet NaN. This is not easy because type
+;;; conversions may need to perform *ordered* comparisons on one operand in order to coerce it to
+;;; match the other operand, and sometimes a conversion entails a range check, and range checks
+;;; are allowed to signal invalid-operation. Quiet semantics may involve pre-checking
+;;; to avoid falling into those code paths.
 (defun two-arg-= (x y)
   (declare (explicit-check))
   (number-dispatch ((x number) (y number))
