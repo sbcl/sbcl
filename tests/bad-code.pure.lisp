@@ -1186,3 +1186,10 @@
                            (check-type p cons)
                            a))
                       :allow-warnings t))))
+
+(with-test (:name :truncate-by-0)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (a)
+                         (truncate a 0))
+                      :allow-warnings t))))

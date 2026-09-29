@@ -2230,9 +2230,8 @@
 (defoptimizer (/ derive-type) ((x y) node)
   (let ((type (two-arg-derive-type x y #'/-derive-type-aux t)))
     (when (eq type *empty-type*)
-      (let ((*compiler-error-context* node))
-        (setf (combination-kind node) :error
-              (combination-info node) (list #'compiler-warn "division by zero"))))
+      (setf (combination-kind node) :error
+            (combination-info node) (list #'compiler-warn "division by zero")))
     type))
 
 (defconstant +left-shift-derive-type-cutoff+ 256)
@@ -2486,6 +2485,11 @@
   (let* ((number-interval (numeric-type->interval number-type))
          (divisor-interval (numeric-type->interval divisor-type)))
     (cond ((truncate-zero-quot-type number-type divisor-type float))
+          ((and (csubtypep divisor-type (specifier-type '(real 0 0)))
+                (or (not float)
+                    (and (rational-type-p number-type)
+                         (rational-type-p divisor-type))))
+           *empty-type*)
           ((and (not float)
                 (rational-type-p number-type)
                 (integer-type-p divisor-type))
@@ -2502,10 +2506,6 @@
                                   (make-quot (second div))))
                      (t
                       (make-quot div))))))
-          ((and float
-                (rational-type-p number-type)
-                (eq divisor-type (specifier-type '(eql 0))))
-           *empty-type*)
           (t
            (multiple-value-bind (quot conservative)
                (if (and (member (interval-high divisor-interval) '(1 1f0 1d0))
@@ -2588,7 +2588,7 @@
         (rem (two-arg-derive-type number divisor
                                   #'truncate-derive-type-rem-aux)))
     (if (eq quot *empty-type*)
-        (let ((*compiler-error-context* node))
+        (progn
           (setf (combination-kind node) :error
                 (combination-info node) (list #'compiler-warn "division by zero"))
           quot)
@@ -2644,7 +2644,7 @@
                                                      (truncate-derive-type-rem-aux n d same t))
                                     same)))
     (if (eq quot *empty-type*)
-        (let ((*compiler-error-context* node))
+        (progn
           (setf (combination-kind node) :error
                 (combination-info node) (list #'compiler-warn "division by zero"))
           quot)
@@ -2672,7 +2672,7 @@
                                                      (ceiling-rem-bound-aux n d same t))
                                     same)))
     (if (eq quot *empty-type*)
-        (let ((*compiler-error-context* node))
+        (progn
           (setf (combination-kind node) :error
                 (combination-info node) (list #'compiler-warn "division by zero"))
           quot)
@@ -2701,7 +2701,7 @@
                                                      (floor-rem-bound-aux n d same t))
                                     same)))
     (if (eq quot *empty-type*)
-        (let ((*compiler-error-context* node))
+        (progn
           (setf (combination-kind node) :error
                 (combination-info node) (list #'compiler-warn "division by zero"))
           quot)
@@ -2762,6 +2762,11 @@
                                    (make-numeric-type float 1 1))
                               (specifier-type '(eql 1)))))
                     ((truncate-zero-quot-type number-type divisor-type float))
+                    ((and (csubtypep divisor-type (specifier-type '(real 0 0)))
+                          (or (not float)
+                              (and (rational-type-p number-type)
+                                   (rational-type-p divisor-type))))
+                     *empty-type*)
                     (t
                      (let* ((number-interval (numeric-type->interval number-type))
                             (divisor-interval (numeric-type->interval divisor-type))
