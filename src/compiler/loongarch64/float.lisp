@@ -417,7 +417,7 @@
   (frob <= fcmp.sle.s fcmp.sle.d nil <=/single-float <=/double-float)
   (frob > fcmp.slt.s fcmp.slt.d t >/single-float >/double-float)
   (frob >= fcmp.sle.s fcmp.sle.d t >=/single-float >=/double-float)
-  (frob = fcmp.seq.s fcmp.seq.d nil =/single-float =/double-float)
+  (frob = fcmp.ceq.s fcmp.ceq.d nil =/single-float =/double-float)
   (frob quiet= fcmp.ceq.s fcmp.ceq.d nil quiet=/single-float quiet=/double-float))
 
 (macrolet ((frob (name translate
