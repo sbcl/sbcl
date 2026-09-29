@@ -1435,17 +1435,17 @@
 
 (defknown sb-vm::%vector-widetag-and-n-bits-shift ((read-only type-specifier))
     (values (integer 128 255) (integer 0 7))
-    (flushable foldable recursive no-verify-arg-count))
+    (foldable recursive no-verify-arg-count))
 (defknown sb-vm::%vector-widetag-and-n-bits-shift-list (&rest t)
     (values (integer 128 255) (integer 0 7))
-    (flushable))
+    ())
 
 (defknown sb-vm::%string-widetag-and-n-bits-shift (type-specifier)
     (values (member #+sb-unicode #.sb-vm:simple-character-string-widetag
                     #.sb-vm:simple-base-string-widetag)
             (member #+sb-unicode 5
                     3))
-    (flushable foldable no-verify-arg-count))
+    (foldable no-verify-arg-count))
 
 (defknown (sb-vm::initial-contents-list-error sb-vm::initial-contents-error) (t t) nil (no-verify-arg-count))
 (defknown sb-vm::fill-vector-initial-contents (t t sequence) t (no-verify-arg-count)

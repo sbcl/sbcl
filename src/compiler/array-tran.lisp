@@ -2857,7 +2857,8 @@
                                             (specifier-type `(not (eql ,sb-vm:simple-base-string-widetag)))))))))
     result))
 
-(defoptimizer (sb-vm::%vector-widetag-and-n-bits-shift fold-p) ((type))
+(defoptimizers fold-p (sb-vm::%vector-widetag-and-n-bits-shift
+                       sb-vm::%string-widetag-and-n-bits-shift) ((type))
   (let ((type (careful-specifier-type type)))
     (and type
          (not (contains-unknown-type-p type)))))
