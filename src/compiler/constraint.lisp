@@ -1561,7 +1561,7 @@
              (when new
                (conset-union gen new)))
 
-           (let ((type (single-value-type (node-derived-type node))))
+           (let ((type (lvar-type (set-value node))))
              (when (type-for-constraints-p type)
                (conset-add-constraint gen 'typep var type nil)))
            (unless (policy node (> compilation-speed speed))

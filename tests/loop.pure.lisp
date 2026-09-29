@@ -413,10 +413,11 @@
    (compile nil `(lambda ()
                    (loop with a of-type (and fixnum string) return a)))
    warning)
+  ;; Also that the sum starts out as NIL, which + doesn't accept.
   (assert-signal
    (compile nil `(lambda ()
                    (loop for i to 10 sum i of-type (and fixnum string))))
-   warning))
+   warning 2))
 
 (with-test (:name :loop-repeat-const)
   ;; without explicit constant-folding in LOOP-DO-REPEAT, the type of this loop's

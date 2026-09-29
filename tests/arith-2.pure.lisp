@@ -381,7 +381,7 @@
    (lambda (n)
      (loop for i below n
            sum (coerce n 'single-float)))
-   (or (integer 0 0) single-float)))
+   (or (integer 0 0) (member 0.0) (single-float (0.0)))))
 
 (with-test (:name :overflow-transform-order)
   (checked-compile-and-assert

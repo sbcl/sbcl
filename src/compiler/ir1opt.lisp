@@ -624,9 +624,6 @@
                                         (lvar-type value)
                                         (lvar-derived-type value))))))
         (cset
-         ;; PROPAGATE-FROM-SETS can do a better job if NODE-REOPTIMIZE
-         ;; is accurate till the node actually has been reoptimized.
-         (setf (node-reoptimize node) t)
          (ir1-optimize-set node))
         (cast
          (ir1-optimize-cast node)))))
@@ -2419,12 +2416,10 @@
 (declaim (start-block ir1-optimize-set constant-reference-p delete-let
                       propagate-let-args propagate-local-call-args
                       propagate-to-refs propagate-from-sets
-                      converged-types widen-numeric-bounds
+                      converged-types widen-numeric-bounds converged-var-type
                       weaken-numeric-union-type
-                      converged-type-of-combination
-                      maybe-infer-iteration-var-type
                       ir1-optimize-mv-combination
-                      substitute-single-use-lvar iteration-step-values))
+                      substitute-single-use-lvar))
 
 ;;; Propagate TYPE to LEAF and its REFS, marking things changed.
 ;;;
@@ -2462,179 +2457,12 @@
       (sb-kernel::weaken-numeric-union type)
       type))
 
-;;; Iteration variable: only SETQs of the form:
-;;;
-;;; (let ((var initial))
-;;;   ...
-;;;   (setq var (+/- var step_1))
-;;;   ...
-;;;   (setq var (+/- var step_k))
-;;;   ...)
-;;;
-;;; such that the modifications either all increment or all decrement
-;;; VAR.
-(defun %analyze-set-uses (values var initial-type)
-  (let ((some-plusp nil)
-        (some-minusp nil)
-        (set-types '())
-        (every-set-type-suitable-p t))
-    (dolist (value values)
-      (multiple-value-bind (steps function) (iteration-step-values value var)
-        (unless function ; every value must be ({+,-} VAR STEP)
-          (return-from %analyze-set-uses nil))
-        (dolist (step steps)
-          (let ((step-type (weaken-numeric-union-type (lvar-type step))))
-            ;; In ({+,-} VAR STEP), the type of STEP must be a numeric
-            ;; type matching INITIAL-TYPE.
-            (unless (and (numeric-type-p step-type)
-                         (or (numtype-aspects-eq initial-type step-type)
-                             ;; Detect cases like (LOOP FOR 1.0 to 5.0
-                             ;; ...), where the initial and the step
-                             ;; are of different types, and the step
-                             ;; is less contagious.
-                             (let ((contagion-type (numeric-contagion initial-type
-                                                                      step-type
-                                                                      ;; Adding integers will produce integers
-                                                                      :rational nil)))
-                               (and (numeric-type-p contagion-type)
-                                    (numtype-aspects-eq initial-type contagion-type)))))
-              (return-from %analyze-set-uses nil))
-            ;; Track the directions of the increments/decrements.
-            (let ((non-negative-p (csubtypep step-type (specifier-type '(real 0 *))))
-                  (non-positive-p (csubtypep step-type (specifier-type '(real * 0)))))
-              (cond ((or (and (eq function '+) non-negative-p)
-                         (and (eq function '-) non-positive-p))
-                     (setf some-plusp t))
-                    ((or (and (eq function '-) non-negative-p)
-                         (and (eq function '+) non-positive-p))
-                     (setf some-minusp t))
-                    (t                    ; Can't tell direction
-                     (setf some-plusp t some-minusp t))))))
-        (let ((set-type (weaken-numeric-union-type (lvar-type value))))
-          ;; Ultimately, the derived types of the stepped values must
-          ;; match INITIAL-TYPE if we are going to derive new bounds.
-          (unless (and (numeric-type-p set-type)
-                       (numtype-aspects-eq set-type initial-type))
-            (setf every-set-type-suitable-p nil))
-          (push set-type set-types))))
-    (values (cond ((and some-plusp (not some-minusp)) '+)
-                  ((and some-minusp (not some-plusp)) '-)
-                  (t '*))
-            set-types every-set-type-suitable-p)))
-
-(defun sets-numeric-contagion (values var initial-type)
-  (let (union)
-    (dolist (value values)
-      (multiple-value-bind (steps function) (iteration-step-values value var)
-        (unless function                ; every value must be ({+,-} VAR STEP)
-          (return-from sets-numeric-contagion nil))
-        (dolist (step steps)
-          (let ((step-type (lvar-type step)))
-            (setf union (if union
-                            (type-union union step-type)
-                            step-type))))))
-    (let ((contagion (numeric-contagion initial-type union
-                                        ;; Adding integers will produce integers
-                                        :rational nil)))
-      (and contagion
-           (type-union initial-type contagion)))))
-
-;;; If VALUE is computed by a chain of ({+,-} VAR STEP) operations,
-;;; return the STEP lvars and which function they use. VALUE is the
-;;; lvar the new value arrives on: the value of a SETQ, or the
-;;; argument a local call passes to VAR's own parameter position.
-(defun iteration-step-values (value var)
-  (labels ((walk (value seen)
-             (combination-match2 ((lvar-uses value) :transform nil)
-               ((:or ((:or + :name function) x step) ;; commutative
-                     ((:or - :name function) x step))
-                (let ((x-use (principal-lvar-use x)))
-                  (when (ref-p x-use)
-                    (let ((x-leaf (ref-leaf x-use)))
-                      (cond ((eq x-leaf var)
-                             (return-from walk
-                               (values (list step) function)))
-                            ((and (lambda-var-p x-leaf)
-                                  (not (memq x-leaf seen)))
-                             (let ((next (lambda-var-ref-lvar x-use)))
-                               (when next
-                                 (multiple-value-bind (steps inner-function)
-                                     (walk next (cons x-leaf seen))
-                                   (when (and steps
-                                              (eq function inner-function))
-                                     (return-from walk
-                                       (values (cons step steps) function)))))))))))))))
-    (walk value nil)))
-
-;;; Infer the type of VAR from the direction in which it is stepped,
-;;; keeping the bound it moves away from and dropping the one it moves
-;;; towards. VALUES are the lvars the stepped values arrive on.
-(defun maybe-infer-iteration-var-type (var values initial-type)
-  (binding* ((values values :exit-if-null)
-             (initial-type (weaken-numeric-union-type initial-type))
-             ((direction set-types every-set-type-suitable-p)
-              (when (numeric-type-p initial-type)
-                (%analyze-set-uses values var initial-type))))
-    (if direction
-        (labels ((leftmost (x y cmp cmp=)
-                   (cond ((eq x nil) nil)
-                         ((eq y nil) nil)
-                         ((listp x)
-                          (let ((x1 (first x)))
-                            (cond ((listp y)
-                                   (let ((y1 (first y)))
-                                     (if (funcall cmp x1 y1) x y)))
-                                  (t
-                                   (if (funcall cmp x1 y) x y)))))
-                         ((listp y)
-                          (let ((y1 (first y)))
-                            (if (funcall cmp= x y1) x y)))
-                         (t (if (funcall cmp x y) x y)))))
-          (multiple-value-bind (low high)
-              (ecase direction
-                (+
-                 (values (numeric-type-low initial-type)
-                         (when every-set-type-suitable-p
-                           (reduce (lambda (x y) (leftmost x y #'> #'>=)) set-types
-                                   :initial-value (numeric-type-high initial-type)
-                                   :key #'numeric-type-high)))
-                 )
-                (-
-                 (values (when every-set-type-suitable-p
-                           (reduce (lambda (x y) (leftmost x y #'< #'<=)) set-types
-                                   :initial-value (numeric-type-low initial-type)
-                                   :key #'numeric-type-low))
-                         (numeric-type-high initial-type)))
-                (*
-                 (values nil nil)))
-            (modified-numeric-type initial-type :low low
-                                                :high high)))
-        (sets-numeric-contagion values var initial-type))))
-
-(defoptimizer (+ optimizer) ((x y) node)
-  "check for iteration variable reoptimization"
-  (let ((dest (principal-lvar-end (node-lvar node))))
-    (when (set-p dest)
-      (flet ((same-var-p (lvar)
-               (let ((use (principal-lvar-use lvar)))
-                 (and (ref-p use)
-                      (eq (ref-leaf use)
-                          (set-var dest))))))
-        (when (or (same-var-p x)
-                  (same-var-p y))
-          (reoptimize-lvar (set-value dest)))))))
-
-(defoptimizer (- optimizer) ((x y) node)
-  "check for iteration variable reoptimization"
-  (let ((dest (principal-lvar-end (node-lvar node))))
-    (when (set-p dest)
-      (flet ((same-var-p (lvar)
-               (let ((use (principal-lvar-use lvar)))
-                 (and (ref-p use)
-                      (eq (ref-leaf use)
-                          (set-var dest))))))
-        (when (same-var-p x)
-          (reoptimize-lvar (set-value dest)))))))
+;;; Weaken the numeric type of each kind of number type in a union.
+(defun numeric-hulls (type)
+  (if (union-type-p type)
+      (apply #'type-union (mapcar #'weaken-numeric-union-type
+                                  (union-type-types type)))
+      (weaken-numeric-union-type type)))
 
 ;;; Drop the numeric bounds of the single value NEW that differ from
 ;;; those of OLD, for each kind of number separately.
@@ -2675,102 +2503,98 @@
                  (widen new))))))
       new))
 
-;;; Arbitrary. The number of times CONVERGED-TYPES widens the types
-;;; before giving up on them.
-(defparameter *type-convergence-widenings* 4)
+;;; Arbitrary. In principal it would be better to not have a depth
+;;; cutoff and to iterate types to fixpoint.
+(defparameter *optimistic-solve-depth* 8)
 
-;;; Starting from INITIAL, a list of values types, find types that
-;;; contain what DERIVE returns for them, a list of the types the values
-;;; step to. Take one step, and then drop the numeric bounds that keep
-;;; moving until the types contain their steps. Return NIL if they
-;;; don't.
+;;; Arbitrary.
+(defparameter *type-convergence-limit* 4)
+
+;;; Starting from INITIAL-TYPES, call DERIVE and widen numeric bounds
+;;; repeatedly until we hit a fixpoint. Since this widening can
+;;; potentially drop non-trivial bounds entirely, we try to recover
+;;; them by iterating one final time without widening, in case this
+;;; would also be a fixpoint. Return NIL if we hit
+;;; *TYPE-CONVERGENCE-LIMIT* before a fixpoint is reached.
 ;;;
-;;; Feeding types derived from values back into those values is where
-;;; iterating a union upward would need widening to prevent ascending
-;;; up the type lattice forever.
-(defun converged-types (initial derive)
+;;; A fixpoint is needed in the presence of cyclic dataflow, as a
+;;; value's type may propagate to itself in such a
+;;; situation. Therefore, a type convergence limit is also needed,
+;;; since even if we can achieve a fixpoint in a finite number of
+;;; iterations, it may take a long time to do so. Widening serves to
+;;; speed up convergence and allows us to avoid giving up entirely.
+(defun converged-types (initial-types derive)
   (declare (function derive))
-  (let ((types (mapcar #'values-type-union initial (funcall derive initial))))
-    (loop repeat *type-convergence-widenings*
-          for derived = (funcall derive types)
-          when (every #'values-subtypep derived types)
-            return types
-          do (setf types (mapcar (lambda (type derived)
-                                   (widen-numeric-bounds
-                                    type (values-type-union type derived)))
-                                 types derived)))))
+  (declare (dynamic-extent derive))
+  (flet ((next (types)
+           (mapcar #'values-type-union initial-types (funcall derive types))))
+    (let ((types (next initial-types)))
+      (dotimes (widened *type-convergence-limit*)
+        (let ((derived (funcall derive types)))
+          (when (every #'values-subtypep derived types)
+            (return
+              (if (plusp widened)
+                  (let ((narrowed
+                          (mapcar (lambda (type next)
+                                    (if (and (type-single-value-p type)
+                                             (type-single-value-p next))
+                                        (make-single-value-type
+                                         (type-intersection
+                                          (single-value-type type)
+                                          (numeric-hulls (single-value-type next))))
+                                        type))
+                                  types (next types))))
+                    (if (every #'values-subtypep (funcall derive narrowed) narrowed)
+                        narrowed
+                        types))
+                  types)))
+          (setf types (mapcar (lambda (type derived)
+                                (widen-numeric-bounds
+                                 type (values-type-union type derived)))
+                              types derived)))))))
 
-;;; Try to invoke the type deriver of FUNCTION in (setf x (function x))
-(defun set-type-of-combination (var set initial-type)
-  (let ((combination (principal-lvar-ref-use (set-value set) t)))
-    (when (and (combination-p combination)
-               (eq (combination-kind combination) :known))
-      (converged-type-of-combination var combination initial-type))))
-
-;;; The type VAR converges to when its value is fed back through
-;;; COMBINATION, a known function of VAR, starting from INITIAL-TYPE.
-;;; Return NIL if doing this will not converge.
-(defun converged-type-of-combination (var combination initial-type)
-  (let* ((info (combination-fun-info combination))
-         (deriver (and info
-                       (fun-info-derive-type info)))
-         (args (combination-args combination))
-         (arg-type *universal-type*)
-         (var-args))
-    (when deriver
-      (map-combination-args-and-types
-       (lambda (arg type lvars &optional annotation)
-         (declare (ignore lvars annotation))
-         (when (eq (combination-arg-lambda-var arg) var)
-           (setf arg-type (type-intersection arg-type type))
-           (push arg var-args)))
-       combination)
-      (when (and var-args
-                 ;; Type derivers expect the right types
-                 (neq (type-intersection initial-type arg-type) *empty-type*))
-        (flet ((derive (types)
-                 (let* ((type (type-intersection (single-value-type (car types))
-                                                 arg-type))
-                        (derived (combination-derive-type-for-arg-types
-                                  combination
-                                  (loop for arg in args
-                                        collect (if (memq arg var-args)
-                                                    type
-                                                    arg)))))
-                   (unless derived
-                     (return-from converged-type-of-combination))
-                   (list (make-single-value-type (single-value-type derived))))))
-          (declare (dynamic-extent #'derive))
-          (let ((types (converged-types
-                        (list (make-single-value-type initial-type))
-                        #'derive)))
-            (and types
-                 (single-value-type (car types)))))))))
+;;; Return the type VAR converges to starting from INITIAL-TYPE given
+;;; that VAR takes on VALUES. The type of each value may itself depend
+;;; on the type of VAR, so this computation is optimistic in
+;;; nature. Return NIL if computing the type this way does not
+;;; converge, or the initial type is empty.
+(defun converged-var-type (var initial-type values)
+  (when (eq initial-type *empty-type*)
+    (return-from converged-var-type))
+  (flet ((derive (types)
+           (let ((type (single-value-type (car types))))
+             (collect ((derived *empty-type* type-union))
+               (dolist (value values)
+                 (let ((value-type (numeric-hulls (lvar-type value))))
+                   (derived
+                    (let ((type
+                            (lvar-optimistic-type
+                             value *optimistic-solve-depth*
+                             (lambda (node)
+                               (and (ref-p node)
+                                    (eq (ref-leaf node) var)
+                                    type))
+                             (lvar-dest value))))
+                      (if type
+                          (type-intersection type value-type)
+                          value-type)))))
+               (list (make-single-value-type (derived)))))))
+    (let ((types (converged-types (list (make-single-value-type initial-type))
+                                  #'derive)))
+      (and types
+           (single-value-type (car types))))))
 
 ;;; Figure out the type of a LET variable that has sets. We compute
-;;; the union of the INITIAL-TYPE and the types of all the set
+;;; the union of the initial value TYPE and the types of all the set
 ;;; values and do a PROPAGATE-TO-REFS with this type.
-(defun propagate-from-sets (var initial-type)
-  (let ((types nil)
-        (sets (lambda-var-sets var)))
-    (or (and sets
-             (not (cdr sets))
-             (let ((type (set-type-of-combination var (car sets) initial-type)))
-               (when type
-                 (push type types))))
-        (dolist (set sets)
-          (let ((type (lvar-type (set-value set))))
-            (push type types)
-            (when (and (node-reoptimize set)
-                       (not (node-to-be-deleted-p set)))
-              (let ((old-type (node-derived-type set)))
-                (unless (values-subtypep old-type type)
-                  (derive-node-type set (make-single-value-type type))))
-              (setf (node-reoptimize set) nil)))))
-    (let ((res-type (or (maybe-infer-iteration-var-type
-                         var (mapcar #'set-value sets) initial-type)
-                        (apply #'type-union initial-type types))))
-      (propagate-to-refs var res-type)))
+(defun propagate-from-sets (var type)
+  (collect ((res type type-union))
+    (dolist (set (lambda-var-sets var))
+      (res (lvar-type (set-value set))))
+    (propagate-to-refs var (or (converged-var-type
+                                var type (mapcar #'set-value
+                                                 (lambda-var-sets var)))
+                               (res))))
   (values))
 
 ;;; If a LET variable, find the initial value's type and do
@@ -2795,7 +2619,6 @@
           (note-optimistic-pending home)))))
   (derive-node-type node (make-single-value-type
                           (lvar-type (set-value node))))
-  (setf (node-reoptimize node) nil)
   (values))
 
 ;;; Return true if the value of REF will always be the same (and is
@@ -3247,10 +3070,6 @@
               (init-variable-optimistic-type leaf)
               leaf))))
 
-;;; Arbitrary. In principal it would be better to not have a depth
-;;; cutoff and to iterate types to fixpoint.
-(defparameter *optimistic-solve-depth* 8)
-
 ;;; Arbitrary. The number of times the type assumed to be returned by
 ;;; recursive functions can change before it stops following changes.
 (defparameter *optimistic-result-change-limit* 8)
@@ -3260,18 +3079,50 @@
 ;;; functions, casts and LET variables are looked through to a DEPTH,
 ;;; which is zero for the arguments of local calls, as
 ;;; NOTE-OPTIMISTIC-CHANGE notes the changes of those only.
-(defun lvar-optimistic-type (lvar &optional (depth 0))
+;;; ASSUMED-TYPE returns the type assumed for the value of a variable
+;;; reference or local call, or NIL if there is none. DEPENDENT-NODE, if
+;;; any, is reoptimized when a derived type used in place of looking
+;;; further changes, as the optimistic type can change with it even
+;;; when the types of the nodes looked through don't.
+(defun lvar-optimistic-type (lvar &optional (depth 0)
+                                            (assumed-type #'optimistic-assumed-node-type)
+                                            dependent-node)
+  (declare (function assumed-type))
+  (declare (dynamic-extent assumed-type))
   (let ((type nil)
         (dependent nil))
     (do-uses (use lvar)
-      (let* ((optimistic (node-optimistic-type use depth))
-             (use-type (or optimistic (single-value-type (node-derived-type use)))))
-        (when optimistic
-          (setf dependent t))
+      (let ((use-type (node-optimistic-type use depth assumed-type
+                                            dependent-node)))
+        (cond (use-type
+               (setf dependent t))
+              (t
+               (when dependent-node
+                 (pushnew dependent-node (lvar-dependent-nodes lvar) :test #'eq))
+               (setf use-type (single-value-type (node-derived-type use)))))
         (setf type (if type (type-union type use-type) use-type))))
     (and dependent type)))
 
-(defun node-optimistic-type (node depth)
+;;; The optimistic type of an optimistic variable reference or of a
+;;; call to a recursive function.
+(defun optimistic-assumed-node-type (node)
+  (typecase node
+    (ref
+     (and (optimistic-var node)
+          (lambda-var-optimistic-type (ref-leaf node))))
+    (combination
+     (let* ((tail-set (lambda-tail-set (combination-lambda node)))
+            (type (and tail-set
+                       (or (tail-set-optimistic-type tail-set)
+                           (and (recursive-tail-set-p tail-set)
+                                (setf (tail-set-optimistic-type tail-set)
+                                      *empty-type*))))))
+       (and type
+            (type-intersection (single-value-type type)
+                               (single-value-type (node-derived-type node))))))))
+
+(defun node-optimistic-type (node depth assumed-type dependent-node)
+  (declare (function assumed-type))
   (typecase node
     (ref
      (let ((var (ref-leaf node)))
@@ -3279,21 +3130,13 @@
          (if (and (plusp depth)
                   (not (lambda-var-sets var))
                   (functional-kind-eq (lambda-var-home var) let))
-             (lvar-optimistic-type (let-var-initial-value var) (1- depth))
-             (and (optimistic-var node)
-                  (lambda-var-optimistic-type var))))))
+             (lvar-optimistic-type (let-var-initial-value var) (1- depth)
+                                   assumed-type dependent-node)
+             (funcall assumed-type node)))))
     (combination
      (case (combination-kind node)
        (:local
-        (let* ((tail-set (lambda-tail-set (combination-lambda node)))
-               (type (and tail-set
-                          (or (tail-set-optimistic-type tail-set)
-                              (and (recursive-tail-set-p tail-set)
-                                   (setf (tail-set-optimistic-type tail-set)
-                                         *empty-type*))))))
-          (and type
-               (type-intersection (single-value-type type)
-                                  (single-value-type (node-derived-type node))))))
+        (funcall assumed-type node))
        (:known
         (when (plusp depth)
           ;; Type derivers may look at the arguments themselves, such
@@ -3301,34 +3144,49 @@
           ;; that depend on the optimistic types.
           (let* ((dependent nil)
                  (args (loop for arg in (combination-args node)
-                             for type = (lvar-optimistic-type arg (1- depth))
+                             for type = (lvar-optimistic-type arg (1- depth)
+                                                              assumed-type
+                                                              dependent-node)
                              when type
                                do (setf dependent t)
                              collect (or type arg))))
             (when dependent
-              (if (member *empty-type* args)
-                  *empty-type*
-                  (let ((type (combination-derive-type-for-arg-types node args)))
-                    (and type (single-value-type type))))))))))
+              ;; Type derivers expect the types the function accepts.
+              (map-combination-args-and-types
+               (lambda (arg type lvars &optional annotation)
+                 (declare (ignore lvars annotation))
+                 (let ((cell (nthcdr (position arg (combination-args node)) args)))
+                   (when (ctype-p (car cell))
+                     (setf (car cell) (type-intersection (car cell) type)))))
+               node)
+              (single-value-type
+               (cond ((member *empty-type* args)
+                      *empty-type*)
+                     ((combination-derive-type-for-arg-types node args))
+                     (t
+                      (when dependent-node
+                        (pushnew dependent-node (lvar-dependent-nodes (node-lvar node))
+                                 :test #'eq))
+                      (node-derived-type node))))))))))
     (cast
      (let ((type (and (plusp depth)
-                      (lvar-optimistic-type (cast-value node) (1- depth)))))
+                      (lvar-optimistic-type (cast-value node) (1- depth)
+                                            assumed-type dependent-node))))
        (and type
             (type-intersection type
-                               (single-value-type (node-derived-type node))))))))
+                               (single-value-type (cast-asserted-type node))))))))
 
 ;;; Return true if ARG carries VAR forward from its own previous value
 ;;; rather than delivering an unrelated one.
 (defun optimistic-step-p (arg var)
-  (let ((use (and arg (principal-lvar-ref-use arg t))))
-    (and (combination-p use)
-         (eq (combination-kind use) :known)
-         (let ((info (combination-fun-info use)))
-           (and info (fun-info-derive-type info)))
-         (or
-          (some (lambda (a) (eq (combination-arg-lambda-var a) var))
-                (combination-args use))
-          (and arg (iteration-step-values arg var)))
+  (flet ((assumed-type (node)
+           (and (ref-p node)
+                (eq (ref-leaf node) var)
+                *universal-type*)))
+    (declare (dynamic-extent #'assumed-type))
+    (and arg
+         (not (eq (lvar-lambda-var arg) var))
+         (lvar-optimistic-type arg *optimistic-solve-depth* #'assumed-type)
          t)))
 
 ;;; Return the optimistic type of VAR, given BASE, the union of what
@@ -3336,14 +3194,7 @@
 ;;; arguments that step it from its own previous value.
 (defun optimistic-assumed-type (var base steps)
   (or (and steps
-           (neq base *empty-type*)
-           (or (maybe-infer-iteration-var-type var steps base)
-               (and (not (cdr steps))
-                    ;; The converged type starts from BASE as the step
-                    ;; accepts it, which BASE itself may not be.
-                    (let ((type (converged-type-of-combination
-                                 var (principal-lvar-ref-use (car steps) t) base)))
-                      (and type (type-union base type))))))
+           (converged-var-type var base steps))
       (let ((type base))
         (dolist (step steps type)
           (setf type (type-union type (lvar-type step)))))))
