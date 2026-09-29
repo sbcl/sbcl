@@ -894,7 +894,7 @@
 ;;; = on quiet NaNs must not signal FLOATING-POINT-INVALID-OPERATION, even with
 ;;; the :invalid trap enabled (the default), whether or not = is open-coded.
 (with-test (:name (= :quiet-nan :no-invalid-trap)
-            :fails-on (not (or :arm64 :ppc :ppc64 :x86-64)))
+            :fails-on (not (or :arm64 :ppc :ppc64 ::x86 x86-64)))
   (let* ((qnan-s (sb-kernel:make-single-float #x7FC00000))
          (qnan-d (sb-kernel:make-double-float #x7FF80000 0))
          (args (list qnan-s qnan-d 1.0 1d0)))

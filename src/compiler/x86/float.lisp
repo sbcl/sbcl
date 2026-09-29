@@ -1170,7 +1170,7 @@
   (:note "inline float comparison")
   (:ignore temp)
   (:variant-vars quiet)
-  (:variant nil)
+  (:variant t)
   (:generator 3
     (note-this-location vop :internal-error)
     (cond
@@ -1556,23 +1556,6 @@
      (inst and ah-tn #x45)              ; C3 C2 C0
      (unless (zerop code)
         (inst cmp ah-tn code))))
-
-(define-vop (=0/single-float float-test)
-  (:translate =)
-  (:args (x :scs (single-reg)))
-  (:arg-types single-float (:constant (single-float 0f0 0f0)))
-  (:variant #x40))
-(define-vop (=0/double-float float-test)
-  (:translate =)
-  (:args (x :scs (double-reg)))
-  (:arg-types double-float (:constant (double-float 0d0 0d0)))
-  (:variant #x40))
-#+long-float
-(define-vop (=0/long-float float-test)
-  (:translate =)
-  (:args (x :scs (long-reg)))
-  (:arg-types long-float (:constant (long-float 0l0 0l0)))
-  (:variant #x40))
 
 (define-vop (<0/single-float float-test)
   (:translate <)
