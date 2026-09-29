@@ -133,10 +133,22 @@ is replaced with replacement."
                       (string-upcase
                        (subseq property 0 (position #\# property)))
                       "KEYWORD")))
+      (declare (special *tested*))
       (loop for i in codepoints
+            do (setf (aref *tested* i) 1)
             unless (eql expected (funcall fn (code-char i)))
             do (error "Character ~S has the wrong value for the tested property.  Wanted ~S, got ~S."
                       (code-char i) expected (funcall fn (code-char i)))))))
+
+(defun test-properties-missing (fn expected)
+  (declare (special *tested*))
+  (loop for i below #+sb-unicode #x110000 #-sb-unicode 256
+        for char = (code-char i)
+        for actual = (funcall fn char)
+        unless (or (= (aref *tested* i) 1)
+                   (eql actual expected))
+        do (error "Expected ~S for ~S to be ~S: got ~S"
+                  fn char expected actual)))
 
 (defun test-unallocated-bidi-class (code class missing)
   (loop for ((start . end) . expected) in missing
@@ -153,14 +165,14 @@ is replaced with replacement."
              ("Right_To_Left" . :R)
              ("Arabic_Letter" . :AL)
              ("European_Terminator" . :ET)))
-          (tested (make-array #x110000 :initial-element 0 :element-type 'bit))
+          (*tested* (make-array #x110000 :initial-element 0 :element-type 'bit))
           missing)
+      (declare (special *tested*))
       (with-test (:name (:bidi-class :assigned))
         (loop for line = (read-line s nil nil)
               while line
               unless (or (string= "" line) (eql 0 (position #\# line)))
               do (test-property-line #'bidi-class line)
-              and do (loop for code in (line-codepoints line) do (setf (aref tested code) 1))
               when (eql (mismatch missing-prefix line) (length missing-prefix))
               do (let* ((semipos (position #\; line))
                         (rangetext (subseq line (length missing-prefix) semipos))
@@ -182,7 +194,7 @@ is replaced with replacement."
       (with-test (:name (:bidi-class :missing))
         (loop for code from 0 to (min (1- char-code-limit) #x10FFFF)
               for char = (code-char code)
-              if (= (aref tested code) 0)
+              if (= (aref *tested* code) 0)
               do (test-unallocated-bidi-class code (bidi-class char) missing))))))
 
 (test-bidi-class)
@@ -190,52 +202,65 @@ is replaced with replacement."
 (defun test-hangul-syllable-type ()
   (declare (optimize (debug 2)))
   (with-open-file (s "data/HangulSyllableType.txt" :external-format :utf-8)
-    (with-test (:name (:hangul-syllable-type))
-      (loop for line = (read-line s nil nil)
-            while line
-            unless (or (string= "" line) (eql 0 (position #\# line)))
-            do (test-property-line #'hangul-syllable-type line)))))
+    (let ((*tested* (make-array #x110000 :element-type 'bit)))
+      (declare (special *tested*))
+      (with-test (:name (:hangul-syllable-type))
+        (loop for line = (read-line s nil nil)
+              while line
+              unless (or (string= "" line) (eql 0 (position #\# line)))
+              do (test-property-line #'hangul-syllable-type line)))
+      (with-test (:name (:hangul-syllable-type :missing))
+        (test-properties-missing 'hangul-syllable-type nil)))))
 
 (test-hangul-syllable-type)
 
 (defun test-east-asian-width ()
   (declare (optimize (debug 2)))
-  (with-open-file (s "../tools-for-build/EastAsianWidth.txt"
-                     :external-format :utf-8)
-    (with-test (:name (:east-asian-width))
-      (loop for line = (read-line s nil nil)
-            while line
-            unless (or (string= "" line) (eql 0 (position #\# line)))
-            do (test-property-line #'east-asian-width line)))))
+  (with-open-file (s "../tools-for-build/EastAsianWidth.txt" :external-format :utf-8)
+    (let ((*tested* (make-array #x110000 :element-type 'bit)))
+      (declare (special *tested*))
+      (with-test (:name (:east-asian-width))
+        (loop for line = (read-line s nil nil)
+              while line
+              unless (or (string= "" line) (eql 0 (position #\# line)))
+              do (test-property-line #'east-asian-width line)))
+      (with-test (:name (:east-asian-width :missing))
+        (test-properties-missing 'east-asian-width :n)))))
 
 (test-east-asian-width)
 
 (defun test-script ()
   (declare (optimize (debug 2)))
-  (with-open-file (s "../tools-for-build/Scripts.txt"
-                     :external-format :utf-8)
-    (with-test (:name (:script))
-      (loop for line = (read-line s nil nil)
-            while line
-            unless (or (string= "" line) (eql 0 (position #\# line)))
-            do (test-property-line #'script (substitute #\- #\_ line))))))
+  (with-open-file (s "../tools-for-build/Scripts.txt" :external-format :utf-8)
+    (let ((*tested* (make-array #x110000 :element-type 'bit)))
+      (declare (special *tested*))
+      (with-test (:name (:script))
+        (loop for line = (read-line s nil nil)
+              while line
+              unless (or (string= "" line) (eql 0 (position #\# line)))
+              do (test-property-line #'script (substitute #\- #\_ line))))
+      (with-test (:name (:script :missing))
+        (test-properties-missing 'script :unknown)))))
 
 (test-script)
 
 (defun test-block ()
   (declare (optimize (debug 2)))
-  (with-open-file (s "../tools-for-build/Blocks.txt"
-                     :external-format :utf-8)
-    (with-test (:name (:block))
-      (loop for line = (read-line s nil nil)
-            while line
-            unless (or (string= "" line) (eql 0 (position #\# line)))
-            do (test-property-line
-                #'char-block
-                (replace
-                 (substitute #\- #\Space line)
-                 "; "
-                 :start1 (position #\; line)))))))
+  (with-open-file (s "../tools-for-build/Blocks.txt" :external-format :utf-8)
+    (let ((*tested* (make-array #x110000 :element-type 'bit)))
+      (declare (special *tested*))
+      (with-test (:name (:block))
+        (loop for line = (read-line s nil nil)
+              while line
+              unless (or (string= "" line) (eql 0 (position #\# line)))
+              do (test-property-line
+                  #'char-block
+                  (replace
+                   (substitute #\- #\Space line)
+                   "; "
+                   :start1 (position #\; line)))))
+      (with-test (:name (:block :missing))
+        (test-properties-missing 'char-block :no-block)))))
 
 (test-block)
 
@@ -313,51 +338,63 @@ is replaced with replacement."
 
 (defun test-grapheme-break-class ()
   (declare (optimize (debug 2)))
-  (with-open-file (s "data/GraphemeBreakProperty.txt"
-                     :external-format :utf-8)
-    (with-test (:name (:grapheme-break-class))
-      (loop for line = (read-line s nil nil)
-            while line
-            unless (or (string= "" line) (eql 0 (position #\# line)))
-            do (test-property-line #'grapheme-break-class
-                                   (replace-all "SpacingMark" "SPACING-MARK"
-                                                (substitute #\- #\_ line)))))))
+  (with-open-file (s "data/GraphemeBreakProperty.txt" :external-format :utf-8)
+    (let ((*tested* (make-array #x110000 :element-type 'bit)))
+      (declare (special *tested*))
+      (with-test (:name (:grapheme-break-class))
+        (loop for line = (read-line s nil nil)
+              while line
+              unless (or (string= "" line) (eql 0 (position #\# line)))
+              do (test-property-line #'grapheme-break-class
+                                     (replace-all "SpacingMark" "SPACING-MARK"
+                                                  (substitute #\- #\_ line)))))
+      (with-test (:name (:grapheme-break-class :missing))
+        (test-properties-missing 'grapheme-break-class nil)))))
 
 (test-grapheme-break-class)
 
 (defun test-word-break-class ()
   (declare (optimize (debug 2)))
-  (with-open-file (s "data/WordBreakProperty.txt"
-                     :external-format :utf-8)
-    (with-test (:name (:word-break-class))
-      (loop for line = (read-line s nil nil)
-            while line
-            unless (or (string= "" line) (eql 0 (position #\# line)))
-            do (test-property-line #'word-break-class
-                                   (substitute #\- #\_ line))))))
+  (with-open-file (s "data/WordBreakProperty.txt" :external-format :utf-8)
+    (let ((*tested* (make-array #x110000 :element-type 'bit)))
+      (declare (special *tested*))
+      (with-test (:name (:word-break-class))
+        (loop for line = (read-line s nil nil)
+              while line
+              unless (or (string= "" line) (eql 0 (position #\# line)))
+              do (test-property-line #'word-break-class
+                                     (substitute #\- #\_ line))))
+      (with-test (:name (:word-break-class :missing))
+        (test-properties-missing 'word-break-class nil)))))
 
 (test-word-break-class)
 
 (defun test-sentence-break-class ()
   (declare (optimize (debug 2)))
-  (with-open-file (s "data/SentenceBreakProperty.txt"
-                     :external-format :utf-8)
-    (with-test (:name (:sentence-break-class))
-      (loop for line = (read-line s nil nil)
-            while line
-            unless (or (string= "" line) (eql 0 (position #\# line)))
-            do (test-property-line #'sentence-break-class line)))))
+  (with-open-file (s "data/SentenceBreakProperty.txt" :external-format :utf-8)
+    (let ((*tested* (make-array #x110000 :element-type 'bit)))
+      (declare (special *tested*))
+      (with-test (:name (:sentence-break-class))
+        (loop for line = (read-line s nil nil)
+              while line
+              unless (or (string= "" line) (eql 0 (position #\# line)))
+              do (test-property-line #'sentence-break-class line)))
+      (with-test (:name (:sentence-break-class :missing))
+        (test-properties-missing 'sentence-break-class nil)))))
 
 (test-sentence-break-class)
 
 (defun test-line-break-class ()
   (declare (optimize (debug 2)))
-  (with-open-file (s "../tools-for-build/LineBreak.txt"
-                     :external-format :utf-8)
-    (with-test (:name (:line-break-class))
-      (loop for line = (read-line s nil nil)
-            while line
-            unless (or (string= "" line) (eql 0 (position #\# line)))
-            do (test-property-line #'line-break-class line)))))
+  (let ((*tested* (make-array #x110000 :element-type 'bit)))
+    (declare (special *tested*))
+    (with-open-file (s "../tools-for-build/LineBreak.txt" :external-format :utf-8)
+      (with-test (:name (:line-break-class))
+        (loop for line = (read-line s nil nil)
+              while line
+              unless (or (string= "" line) (eql 0 (position #\# line)))
+              do (test-property-line #'line-break-class line)))
+      (with-test (:name (:line-break-class :missing))
+        (test-properties-missing 'line-break-class :xx)))))
 
 (test-line-break-class)

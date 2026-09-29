@@ -706,10 +706,10 @@ If the character is not a Hangul syllable or Jamo, returns NIL"
         (and (<= #xa960 cp) (<= cp #xa97c))) :L)
       ((or
         (and (<= #x1160 cp) (<= cp #x11a7))
-        (and (<= #xd7B0 cp) (<= cp #xd7C6))) :V)
+        (and (<= #xd7b0 cp) (<= cp #xd7c6))) :V)
       ((or
         (and (<= #x11a8 cp) (<= cp #x11ff))
-        (and (<= #xd7c8 cp) (<= cp #xd7fb))) :T)
+        (and (<= #xd7cb cp) (<= cp #xd7fb))) :T)
       ((and (<= #xac00 cp) (<= cp #xd7a3))
        (if (= 0 (rem (- cp #xac00) 28)) :LV :LVT)))))
 
@@ -1051,12 +1051,13 @@ The result is not guaranteed to have the same length as the input."
            #x106A #x106B #x106C #x106D #x1083 #x1087 #x1088 #x1089 #x108A
            #x108B #x108C #x108F #x109A #x109B #x109C #x19B0 #x19B1 #x19B2
            #x19B3 #x19B4 #x19B8 #x19B9 #x19BB #x19BC #x19BD #x19BE #x19BF
-           #x19C0 #x19C8 #x19C9 #x1A61 #x1A63 #x1A64 #xAA7B #xAA7D)))
+           #x19C0 #x19C8 #x19C9 #x1A61 #x1A63 #x1A64 #xAA7B #xAA7D #x11720
+           #x11721)))
     (cond
       ((not character) nil)
       ((= cp 10) :LF)
       ((= cp 13) :CR)
-      ((or (and (member gc '(:Zl :Zp :Cc :Cs :Cf))
+      ((or (and (member gc '(:Zl :Zp :Cc :Cf))
                 (not (proplist-p character :prepended-concatenation-mark))
                 (not (<= #x200C cp #x200D))
                 ;; not documented but in the normative file
@@ -1312,7 +1313,8 @@ word breaking rules specified in UAX #29. Returns a list of strings"
       ((not character) nil)
       ((= cp 10) :LF)
       ((= cp 13) :CR)
-      ((or (eql (grapheme-break-class character) :extend)
+      ((or (member gc '(:Mn :Me))
+           (proplist-p character :other-grapheme-extend)
            (= cp #x200D)
            (eql gc :mc))
        :extend)
