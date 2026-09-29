@@ -975,7 +975,7 @@
   (:conditional not :p :ne)
   (:vop-var vop)
   (:variant-vars quiet)
-  (:variant nil)
+  (:variant t)
   (:generator 3
     (when (or (location= y xmm)
               (and (not (float-tn-p x)) (float-tn-p y)))
@@ -1008,7 +1008,7 @@
   (:temporary (:sc double-reg :from :eval) xmm)
   (:conditional not :p :ne)
   (:variant-vars quiet)
-  (:variant nil)
+  (:variant t)
   (:vop-var vop)
   (:generator 3
     (when (or (location= y xmm)

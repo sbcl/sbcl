@@ -1272,8 +1272,8 @@ the first."
 ;;;  The requirement that = must act as a quiet comparison is not explicit in the
 ;;;  ANSI Common Lisp standard text itself, but rather stems from IEEE Std 754 and the
 ;;;  standard X3J13 issue write-up that added FLOATING-POINT-INVALID-OPERATION to Common Lisp.
-;;;   * IEEE 754 explicitly defines standard equality (== in C/C++, = in Lisp/Fortran) using the
-;;;     quiet operation: compareQuietEqual (or compareQuietNotEqual):
+;;;   * IEEE 754 defines equality comparison (e.g. == in C, per C Annex F) using the
+;;;     quiet operation compareQuietEqual (or compareQuietNotEqual):
 ;;;       Returns false (or true for not-equal) if an operand is NaN. It _must_ _not_ signal the
 ;;;       invalid operation exception when encountering quiet NaNs. It only signals an invalid
 ;;;       operation exception if an operand is a signaling NaN.

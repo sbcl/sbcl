@@ -890,3 +890,28 @@
                                     (opaque-identity 1d0))
     (assert (plusp q))
     (assert (typep r 'double-float))))
+
+;;; = on quiet NaNs must not signal FLOATING-POINT-INVALID-OPERATION, even with
+;;; the :invalid trap enabled (the default), whether or not = is open-coded.
+(with-test (:name (= :quiet-nan :no-invalid-trap)
+            :fails-on (not (or :x86-64 :arm64)))
+  (let* ((qnan-s (sb-kernel:make-single-float #x7FC00000))
+         (qnan-d (sb-kernel:make-double-float #x7FF80000 0))
+         (args (list qnan-s qnan-d 1.0 1d0)))
+    ;; Full call
+    (dolist (x args)
+      (dolist (y args)
+        (when (or (sb-ext:float-nan-p x) (sb-ext:float-nan-p y))
+          (assert (not (sb-kernel:two-arg-= (opaque-identity x) (opaque-identity y))))
+          (assert (not (funcall (opaque-identity #'=) x y))))))
+    ;; Constant folding
+    (checked-compile `(lambda () (= ,qnan-d 1d0)))
+    (checked-compile `(lambda () (= ,qnan-s ,qnan-d)))
+    ;; Open-coded
+    (let ((f (checked-compile '(lambda (x y) (declare (double-float x y)) (= x y))))
+          (g (checked-compile '(lambda (x y) (declare (single-float x y)) (= x y))))
+          (z (checked-compile '(lambda (x) (declare (double-float x)) (zerop x)))))
+      (assert (not (funcall f qnan-d 1d0)))
+      (assert (not (funcall f qnan-d qnan-d)))
+      (assert (not (funcall g qnan-s 1.0)))
+      (assert (not (funcall z qnan-d))))))
