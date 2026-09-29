@@ -1281,9 +1281,10 @@
                    (push value thresholds)
                    (push (1+ value) thresholds)
                    (push value constants))
-                  ((and (sb-xc:typep value 'real)
-                        ;; not a NaN
-                        (sb-xc:= value value))
+                  ((floatp value)
+                   (unless (float-nan-p value)
+                     (push value thresholds)))
+                  ((ratiop value)
                    (push value thresholds)))))))
     (flet ((sorted-set (numbers)
              (let ((sorted (sort numbers #'sb-xc:<)))
