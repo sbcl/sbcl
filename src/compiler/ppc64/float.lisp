@@ -472,7 +472,7 @@
   (frob < :lt :ge </single-float </double-float)
   (frob quiet< :lt :ge quiet</single-float quiet</double-float t)
   (frob > :gt :le >/single-float >/double-float)
-  (frob = :eq :ne =/single-float =/double-float)
+  (frob = :eq :ne =/single-float =/double-float t)
   (frob quiet= :eq :ne quiet=/single-float quiet=/double-float t))
 
 
