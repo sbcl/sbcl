@@ -654,6 +654,14 @@
                                         (dolist (x (the integer x))))
                                       :allow-warnings 'sb-int:type-warning))))
 
+(with-test (:name :flushed-annotated-value-mismatch)
+  (assert (nth-value 2
+                     (checked-compile '(lambda (x)
+                                        (let ((y (sb-kernel:the* (list :use-annotations t)
+                                                                 (the integer x))))
+                                          (atom y)))
+                                      :allow-warnings 'sb-int:type-warning))))
+
 (with-test (:name :loop-list-mismatch)
   (assert (nth-value 2
                      (checked-compile '(lambda (x)
