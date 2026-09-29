@@ -2419,6 +2419,7 @@
 (declaim (start-block ir1-optimize-set constant-reference-p delete-let
                       propagate-let-args propagate-local-call-args
                       propagate-to-refs propagate-from-sets
+                      converged-types widen-numeric-bounds
                       weaken-numeric-union-type
                       converged-type-of-combination
                       maybe-infer-iteration-var-type
@@ -2457,39 +2458,9 @@
 
 ;;; Turn (or (integer 1 1) (integer 3 3)) to (integer 1 3)
 (defun weaken-numeric-union-type (type)
-  (cond ((union-type-p type)
-         (let ((low  nil)
-               (high nil)
-               class
-               (format :no))
-           (dolist (part (union-type-types type)
-                         (make-numeric-union-type :class class
-                                                  :format format
-                                                  :low low
-                                                  :high high))
-             (unless (and (numeric-type-real-p part)
-                          (if class
-                              (eql (numeric-type-class part) class)
-                              (setf class (numeric-type-class part)))
-                          (cond ((eq format :no)
-                                 (setf format (numeric-type-format part))
-                                 t)
-                                ((eql (numeric-type-format part) format))))
-               (return type))
-             (let ((this-low (numeric-type-low part))
-                   (this-high (numeric-type-high part)))
-               (unless (and this-low this-high)
-                 (return type))
-               (when (consp this-low)
-                 (setf this-low (car this-low)))
-               (when (consp this-high)
-                 (setf this-high (car this-high)))
-               (setf low  (sb-xc:min this-low  (or low  this-low))
-                     high (sb-xc:max this-high (or high this-high)))))))
-        ((typep type 'numeric-union-type)
-         (sb-kernel::weaken-numeric-union  type))
-        (t
-         type)))
+  (if (numeric-union-type-p type)
+      (sb-kernel::weaken-numeric-union type)
+      type))
 
 ;;; Iteration variable: only SETQs of the form:
 ;;;
@@ -2665,15 +2636,69 @@
         (when (same-var-p x)
           (reoptimize-lvar (set-value dest)))))))
 
-;;; Remove bounds
-(defun simplify-numeric-type (x)
-  (macrolet ((m (&rest types)
-               `(cond ,@(loop for type in types
-                              collect
-                              `((csubtypep x (specifier-type ',type))
-                                (specifier-type ',type)))
-                      (t x))))
-    (m single-float double-float integer float real)))
+;;; Drop the numeric bounds of the single value NEW that differ from
+;;; those of OLD, for each kind of number separately.
+(defun widen-numeric-bounds (old new)
+  (if (and (type-single-value-p old)
+           (type-single-value-p new))
+      (let ((old-parts (let ((old (single-value-type old)))
+                         (if (union-type-p old) (union-type-types old) (list old)))))
+        (flet ((widen (new)
+                 (let* ((old (and (numeric-union-type-p new)
+                                  (find-if (lambda (old)
+                                             (and (numeric-union-type-p old)
+                                                  (eq (numeric-type-class old)
+                                                      (numeric-type-class new))
+                                                  (eq (numeric-type-format old)
+                                                      (numeric-type-format new))
+                                                  (eq (numeric-type-complexp old)
+                                                      (numeric-type-complexp new))))
+                                           old-parts)))
+                        (old-hull (and old (weaken-numeric-union-type old)))
+                        (new-hull (weaken-numeric-union-type new)))
+                   (if (and old
+                            (numeric-type-p old-hull)
+                            (numeric-type-p new-hull))
+                       (type-union
+                        new
+                        (modified-numeric-type
+                         new-hull
+                         :low (and (equal (numeric-type-low old-hull) (numeric-type-low new-hull))
+                                   (numeric-type-low new-hull))
+                         :high (and (equal (numeric-type-high old-hull) (numeric-type-high new-hull))
+                                    (numeric-type-high new-hull))))
+                       new))))
+          (let ((new (single-value-type new)))
+            (make-single-value-type
+             (if (union-type-p new)
+                 (apply #'type-union (mapcar #'widen (union-type-types new)))
+                 (widen new))))))
+      new))
+
+;;; Arbitrary. The number of times CONVERGED-TYPES widens the types
+;;; before giving up on them.
+(defparameter *type-convergence-widenings* 4)
+
+;;; Starting from INITIAL, a list of values types, find types that
+;;; contain what DERIVE returns for them, a list of the types the values
+;;; step to. Take one step, and then drop the numeric bounds that keep
+;;; moving until the types contain their steps. Return NIL if they
+;;; don't.
+;;;
+;;; Feeding types derived from values back into those values is where
+;;; iterating a union upward would need widening to prevent ascending
+;;; up the type lattice forever.
+(defun converged-types (initial derive)
+  (declare (function derive))
+  (let ((types (mapcar #'values-type-union initial (funcall derive initial))))
+    (loop repeat *type-convergence-widenings*
+          for derived = (funcall derive types)
+          when (every #'values-subtypep derived types)
+            return types
+          do (setf types (mapcar (lambda (type derived)
+                                   (widen-numeric-bounds
+                                    type (values-type-union type derived)))
+                                 types derived)))))
 
 ;;; Try to invoke the type deriver of FUNCTION in (setf x (function x))
 (defun set-type-of-combination (var set initial-type)
@@ -2685,55 +2710,42 @@
 ;;; The type VAR converges to when its value is fed back through
 ;;; COMBINATION, a known function of VAR, starting from INITIAL-TYPE.
 ;;; Return NIL if doing this will not converge.
-;;;
-;;; Feeding a type derived from a variable back into that variable is
-;;; where iterating a union upward would need widening to prevent
-;;; ascending up the type lattice forever. To avoid that, we do only
-;;; one step, and take the result of deriving and unioning only if the
-;;; second derivation agrees with the first to get a fast
-;;; fixpiint. Numeric bounds are the usual reason for not converging,
-;;; so failing that it tries again with the bounds dropped.
 (defun converged-type-of-combination (var combination initial-type)
   (let* ((info (combination-fun-info combination))
          (deriver (and info
                        (fun-info-derive-type info)))
          (args (combination-args combination))
+         (arg-type *universal-type*)
          (var-args))
     (when deriver
       (map-combination-args-and-types
        (lambda (arg type lvars &optional annotation)
          (declare (ignore lvars annotation))
          (when (eq (combination-arg-lambda-var arg) var)
-           (setf initial-type
-                 ;; Type derivers expect the right types
-                 (type-intersection initial-type type))
+           (setf arg-type (type-intersection arg-type type))
            (push arg var-args)))
        combination)
       (when (and var-args
-                 (neq initial-type *empty-type*))
-        (labels ((derive (type)
-                   (single-value-type
-                    (or
-                     (combination-derive-type-for-arg-types combination
-                                                            (loop for arg in args
-                                                                  collect (if (memq arg var-args)
-                                                                              type
-                                                                              arg)))
-                     (return-from converged-type-of-combination))))
-                 (converges-p (initial-type)
-                   (let ((derived (derive initial-type)))
-                     (when derived
-                       ;; Does it converge to the same type again?
-                       (let* ((union (type-union derived initial-type))
-                              (again-derived (derive union)))
-                         (when (type= derived again-derived)
-                           union))))))
-          ;; Some functions preserve bounds, like LOGIOR
-          (or (converges-p initial-type)
-              ;; remove bounds or the types won't converge
-              (let ((simple (simplify-numeric-type initial-type)))
-                (unless (eq simple initial-type)
-                  (converges-p simple)))))))))
+                 ;; Type derivers expect the right types
+                 (neq (type-intersection initial-type arg-type) *empty-type*))
+        (flet ((derive (types)
+                 (let* ((type (type-intersection (single-value-type (car types))
+                                                 arg-type))
+                        (derived (combination-derive-type-for-arg-types
+                                  combination
+                                  (loop for arg in args
+                                        collect (if (memq arg var-args)
+                                                    type
+                                                    arg)))))
+                   (unless derived
+                     (return-from converged-type-of-combination))
+                   (list (make-single-value-type (single-value-type derived))))))
+          (declare (dynamic-extent #'derive))
+          (let ((types (converged-types
+                        (list (make-single-value-type initial-type))
+                        #'derive)))
+            (and types
+                 (single-value-type (car types)))))))))
 
 ;;; Figure out the type of a LET variable that has sets. We compute
 ;;; the union of the INITIAL-TYPE and the types of all the set
@@ -3488,10 +3500,8 @@
       nil)))
 
 ;;; Solve for the types returned by recursive functions in COMPONENT
-;;; and note the calls whose types changed. Like
-;;; CONVERGED-TYPE-OF-COMBINATION, derive the results twice starting
-;;; from those without the recursive calls, and failing that, drop the
-;;; numeric bounds that moved and try again. If the types don't
+;;; and note the calls whose types changed. The results are converged
+;;; starting from those without the recursive calls. If they don't
 ;;; converge, they are *WILD-TYPE*.
 (defun solve-optimistic-result-types (component)
   (let ((tail-sets '()))
@@ -3521,21 +3531,13 @@
                  (loop for tail-set in recursive
                        for type in types
                        do (setf (tail-set-optimistic-type tail-set) type))
-                 (mapcar #'result-type recursive))
-               (join (types)
-                 (mapcar #'values-type-union types (derive types)))
-               (fixpoint-p (types)
-                 (every #'values-subtypep (derive types) types)))
+                 (mapcar #'result-type recursive)))
         (dolist (tail-set tail-sets)
           (setf (tail-set-optimistic-type tail-set) nil))
-        (let* ((initial (derive (make-list (length recursive)
-                                           :initial-element *empty-type*)))
-               (joined (join initial))
-               (types (if (fixpoint-p joined)
-                          joined
-                          (let ((joined (join (mapcar #'widen-numeric-bounds initial joined))))
-                            (when (fixpoint-p joined)
-                              joined)))))
+        (let ((types (converged-types
+                      (derive (make-list (length recursive)
+                                         :initial-element *empty-type*))
+                      #'derive)))
           (loop for tail-set in recursive
                 for type in (or types
                                 (make-list (length recursive)
@@ -3573,45 +3575,6 @@
                      (let ((call (node-dest ref)))
                        (when (combination-p call)
                          (note-optimistic-change call)))))))))
-
-;;; Drop the numeric bounds of the single value NEW that differ from
-;;; those of OLD, for each kind of number separately.
-(defun widen-numeric-bounds (old new)
-  (if (and (type-single-value-p old)
-           (type-single-value-p new))
-      (let ((old-parts (let ((old (single-value-type old)))
-                         (if (union-type-p old) (union-type-types old) (list old)))))
-        (flet ((widen (new)
-                 (let* ((old (and (numeric-union-type-p new)
-                                  (find-if (lambda (old)
-                                             (and (numeric-union-type-p old)
-                                                  (eq (numeric-type-class old)
-                                                      (numeric-type-class new))
-                                                  (eq (numeric-type-format old)
-                                                      (numeric-type-format new))
-                                                  (eq (numeric-type-complexp old)
-                                                      (numeric-type-complexp new))))
-                                           old-parts)))
-                        (old-hull (and old (weaken-numeric-union-type old)))
-                        (new-hull (weaken-numeric-union-type new)))
-                   (if (and old
-                            (numeric-type-p old-hull)
-                            (numeric-type-p new-hull))
-                       (type-union
-                        new
-                        (modified-numeric-type
-                         new-hull
-                         :low (and (equal (numeric-type-low old-hull) (numeric-type-low new-hull))
-                                   (numeric-type-low new-hull))
-                         :high (and (equal (numeric-type-high old-hull) (numeric-type-high new-hull))
-                                    (numeric-type-high new-hull))))
-                       new))))
-          (let ((new (single-value-type new)))
-            (make-single-value-type
-             (if (union-type-p new)
-                 (apply #'type-union (mapcar #'widen (union-type-types new)))
-                 (widen new))))))
-      new))
 
 (defun count-values (call &optional min butlast)
   (loop for (arg . next) on (basic-combination-args call)

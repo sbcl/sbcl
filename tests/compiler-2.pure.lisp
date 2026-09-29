@@ -4622,19 +4622,23 @@
      (declare (optimize speed))
      (values (sb-kernel:%with-array-data-macro (the string x) 0 10)))
    simple-string)
-  (assert-type
-   (lambda (n m)
-     (let ((f most-positive-single-float))
-       (tagbody
-        :next
-          (unless (> f n)
-            (go :end))
-          (funcall m f)
-          (setq f (/ f 2.0))
-          (go :next)
-        :end)
-       f))
-   single-float)
+  (assert (sb-kernel:values-subtypep
+           (sb-kernel:values-specifier-type
+            (caddr
+             (sb-kernel:%simple-fun-type
+              (checked-compile
+               '(lambda (n m)
+                 (let ((f most-positive-single-float))
+                   (tagbody
+                    :next
+                      (unless (> f n)
+                        (go :end))
+                      (funcall m f)
+                      (setq f (/ f 2.0))
+                      (go :next)
+                    :end)
+                   f))))))
+           (sb-kernel:values-specifier-type '(values single-float &optional))))
   (assert-type
    (lambda (l)
      (let ((r 0))

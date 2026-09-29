@@ -640,6 +640,25 @@
         (f (f #\a))))
    (() #\c)))
 
+(with-test (:name (:setq-derive-type :declared-counter))
+  (assert-type
+   (lambda (l)
+     (let ((c 0))
+       (declare (fixnum c))
+       (dolist (x l c)
+         (when x
+           (incf c)))))
+   (and unsigned-byte fixnum)))
+
+(with-test (:name (:setq-derive-type :negated))
+  (assert-type
+   (lambda (n)
+     (declare (fixnum n))
+     (let ((x 1))
+       (dotimes (i n x)
+         (setq x (- x)))))
+   (or (integer -1 -1) (integer 1 1))))
+
 (with-test (:name (:recursive-local-function-result-type :parameter-from-own-result :oscillating))
   (assert-type
    (lambda ()
