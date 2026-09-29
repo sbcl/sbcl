@@ -2411,3 +2411,21 @@
      (labels ((f (i seen) (if (>= i n) seen (f (1+ i) i))))
        (f 0 0)))
    (mod #.most-positive-fixnum)))
+
+(with-test (:name (:widening :float))
+  ;; The type of F used to lose one more halving each round of
+  ;; constraint propagation until the reoptimize limit.
+  (assert-type
+   (lambda (n m)
+     (let ((f 1000.0))
+       (declare (type (single-float 0.0 1000.0) f))
+       (tagbody
+        :next
+          (unless (> f n)
+            (go :end))
+          (funcall m f)
+          (setq f (/ f 2.0))
+          (go :next)
+        :end)
+       f))
+   (or (single-float 0.0 500.0) (single-float 1000.0 1000.0))))

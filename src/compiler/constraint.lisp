@@ -1261,10 +1261,10 @@
 (defvar *widening-thresholds*)
 
 ;;; Grovel over all constants in the COMPONENT and collect any
-;;; relevant threshold values (i.e. those constants +/- 1) into a list
-;;; of increasing order. We also collect power of two bounds since
-;;; those are quite common (as in the types INDEX, FIXNUM,
-;;; (UNSIGNED-BYTE N)).
+;;; relevant threshold values (i.e. those constants, and integer
+;;; constants +/- 1) into a list of increasing order. We also collect
+;;; power of two bounds since those are quite common (as in the types
+;;; INDEX, FIXNUM, (UNSIGNED-BYTE N)).
 (defun component-widening-thresholds (component)
   (let ((constants '())
         (thresholds (copy-list
@@ -1276,59 +1276,97 @@
         (when (and (ref-p node)
                    (constant-p (ref-leaf node)))
           (let ((value (constant-value (ref-leaf node))))
-            (when (integerp value)
-              (push (1- value) thresholds)
-              (push value thresholds)
-              (push (1+ value) thresholds)
-              (push value constants))))))
+            (cond ((integerp value)
+                   (push (1- value) thresholds)
+                   (push value thresholds)
+                   (push (1+ value) thresholds)
+                   (push value constants))
+                  ((and (sb-xc:typep value 'real)
+                        ;; not a NaN
+                        (sb-xc:= value value))
+                   (push value thresholds)))))))
     (flet ((sorted-set (numbers)
-             (let ((sorted (sort numbers #'<)))
+             (let ((sorted (sort numbers #'sb-xc:<)))
                (loop for tail on sorted do
-                 (loop while (and (cdr tail) (= (car tail) (cadr tail))) do
+                 (loop while (and (cdr tail) (eql (car tail) (cadr tail))) do
                    (setf (cdr tail) (cddr tail))))
                sorted)))
       (cons (sorted-set thresholds) (sorted-set constants)))))
 
-(defun integer-type-hull (type)
-  (let ((hull (weaken-numeric-union-type type)))
-    (when (and (numeric-type-p hull)
-               (eq (numeric-type-class hull) 'integer))
-      hull)))
+;;; Move BOUND, a numeric bound, out to the nearest threshold satisfying
+;;; USABLE-P, above it if ABOVE and below it otherwise, but not beyond
+;;; OLD-BOUND.
+(defun widen-numeric-bound (bound old-bound usable-p above)
+  (declare (function usable-p))
+  (flet ((value (bound)
+           (if (consp bound) (car bound) bound)))
+    (when bound
+      (let* ((value (value bound))
+             (threshold (if above
+                            (find-if (lambda (x)
+                                       (and (funcall usable-p x) (sb-xc:<= value x)))
+                                     (car *widening-thresholds*))
+                            (find-if (lambda (x)
+                                       (and (funcall usable-p x) (sb-xc:>= value x)))
+                                     (car *widening-thresholds*)
+                                     :from-end t))))
+        (if (and threshold
+                 (or (not old-bound)
+                     (if above
+                         (sb-xc:< threshold (value old-bound))
+                         (sb-xc:> threshold (value old-bound)))))
+            threshold
+            old-bound)))))
 
-;;; Return the integer type between NEW and its supertype OLD where
-;;; the bounds of NEW are moved out to the nearest threshold within
-;;; OLD, excluding only the thresholds that NEW itself excludes.
-(defun widen-integer-type (old new component)
-  (let ((old-hull (integer-type-hull old))
-        (new-hull (and (neq old new)
-                       (integer-type-hull new))))
-    (unless (and old-hull new-hull)
-      (return-from widen-integer-type new))
-    (unless *widening-thresholds*
-      (setq *widening-thresholds* (component-widening-thresholds component)))
-    (let ((thresholds (car *widening-thresholds*))
-          (constants (cdr *widening-thresholds*)))
-      (flet ((widen-low (low old-low)
-               (when low
-                 (let ((threshold (find low thresholds :test #'>= :from-end t)))
-                   (if (and threshold old-low)
-                       (max threshold old-low)
-                       (or threshold old-low)))))
-             (widen-high (high old-high)
-               (when high
-                 (let ((threshold (find high thresholds :test #'<=)))
-                   (if (and threshold old-high)
-                       (min threshold old-high)
-                       (or threshold old-high))))))
-        (let ((result
-                (type-intersection
-                 old
-                 (make-numeric-type 'integer
-                                    (widen-low (numeric-type-low new-hull)
-                                               (numeric-type-low old-hull))
-                                    (widen-high (numeric-type-high new-hull)
-                                                (numeric-type-high old-hull))))))
-          (dolist (x constants result)
+;;; Return the type between NEW and its supertype OLD where the bounds
+;;; of each kind of real number in NEW are moved out to the nearest
+;;; threshold of that kind within the bounds of that kind in OLD,
+;;; excluding only the integer thresholds that NEW itself excludes.
+(defun widen-numeric-type (old new component)
+  (let ((old-parts (if (union-type-p old) (union-type-types old) (list old)))
+        (widened nil))
+    (labels ((real-p (type)
+               (and (numeric-union-type-p type)
+                    (eq (numeric-type-complexp type) :real)))
+             (same-kind-p (type1 type2)
+               (and (real-p type1)
+                    (real-p type2)
+                    (eq (numeric-type-class type1) (numeric-type-class type2))
+                    (eq (numeric-type-format type1) (numeric-type-format type2))))
+             (widen (new)
+               (let* ((old (find new old-parts :test #'same-kind-p))
+                      (old-hull (and old (weaken-numeric-union-type old)))
+                      (new-hull (and old (weaken-numeric-union-type new))))
+                 (unless (and old-hull
+                              (numeric-type-p old-hull)
+                              (numeric-type-p new-hull))
+                   (return-from widen new))
+                 (unless *widening-thresholds*
+                   (setq *widening-thresholds*
+                         (component-widening-thresholds component)))
+                 (let* ((format (numeric-type-format new-hull))
+                        (usable-p (case (numeric-type-class new-hull)
+                                    (integer #'integerp)
+                                    (rational #'rationalp)
+                                    (t (lambda (x) (sb-xc:typep x format))))))
+                   (setf widened t)
+                   (modified-numeric-type
+                    new-hull
+                    :low (widen-numeric-bound (numeric-type-low new-hull)
+                                              (numeric-type-low old-hull)
+                                              usable-p nil)
+                    :high (widen-numeric-bound (numeric-type-high new-hull)
+                                               (numeric-type-high old-hull)
+                                               usable-p t))))))
+      (when (eq old new)
+        (return-from widen-numeric-type new))
+      (let ((parts (if (union-type-p new)
+                       (mapcar #'widen (union-type-types new))
+                       (list (widen new)))))
+        (unless widened
+          (return-from widen-numeric-type new))
+        (let ((result (type-intersection old (apply #'type-union parts))))
+          (dolist (x (cdr *widening-thresholds*) result)
             (when (and (ctypep x result)
                        (not (ctypep x new)))
               (setf result (type-difference result
@@ -1338,7 +1376,7 @@
 ;;; Given the set of CONSTRAINTS for a variable and the current set of
 ;;; restrictions from flow analysis IN, set the type for REF
 ;;; accordingly. To improve the convergence speed of constraint
-;;; propagation, we widen integer types after a ref is narrowed for
+;;; propagation, we widen numeric types after a ref is narrowed for
 ;;; the first time. Otherwise, the interplay of IR1 optimization and
 ;;; CP will cause the types of expressions in loops such as (LOOP
 ;;; (WHEN (ZEROP I) (RETURN)) (SETQ I (- I 2))) where I is initially
@@ -1361,7 +1399,7 @@
               (t
                (let ((derived (node-derived-type ref)))
                  (when (ref-constraint-narrowed-p ref)
-                   (setq type (widen-integer-type old-type type
+                   (setq type (widen-numeric-type old-type type
                                                   (node-component ref))))
                  (derive-node-type ref (make-single-value-type type))
                  (unless (eq derived (node-derived-type ref))
