@@ -2485,7 +2485,7 @@
 (defun truncate-derive-type-quot (number-type divisor-type &optional float)
   (let* ((number-interval (numeric-type->interval number-type))
          (divisor-interval (numeric-type->interval divisor-type)))
-    (cond ((truncate-zero-quot-type number-type divisor-type))
+    (cond ((truncate-zero-quot-type number-type divisor-type float))
           ((and (not float)
                 (rational-type-p number-type)
                 (integer-type-p divisor-type))
@@ -2560,15 +2560,19 @@
               (numeric-type-real-p div))
          (truncate-derive-type-quot num div))))
 
-(defun truncate-derive-type-rem-aux (num div same-arg)
+(defun truncate-derive-type-rem-aux (num div same-arg &optional float)
   (cond (same-arg
          (type-intersection
           (numeric-contagion num div)
-          (specifier-type '(member 0d0 0f0 0))))
+          (if (and float
+                   (not (or (bounded-numeric-type-p num)
+                            (rational-type-p num))))
+              (specifier-type '(or float (eql 0)))
+              (specifier-type '(member 0d0 0f0 0)))))
         ((not (and (numeric-type-real-p num)
                    (numeric-type-real-p div)))
          nil)
-        ((truncate-zero-rem-type num div))
+        ((truncate-zero-rem-type num div float))
         ;; Floats introduce rounding errors
         ((or (and (memq (numeric-type-class num) '(integer rational))
                   (memq (numeric-type-class div) '(integer rational)))
@@ -2628,12 +2632,17 @@
                                 (numeric-contagion number-type divisor-type :float t)))))
 
 (defoptimizer (ftruncate derive-type) ((number &optional divisor) node)
-  (let* ((divisor (if divisor
+  (let* ((same
+           (and divisor
+                (same-leaf-ref-p number divisor)))
+         (divisor (if divisor
                       (lvar-type divisor)
                       (specifier-type '(eql 1))))
          (number (lvar-type number))
-         (quot (%two-arg-derive-type number divisor #'ftruncate-derive-type-quot-aux))
-         (rem (%two-arg-derive-type number divisor #'truncate-derive-type-rem-aux)))
+         (quot (%two-arg-derive-type number divisor #'ftruncate-derive-type-quot-aux same))
+         (rem (%two-arg-derive-type number divisor (lambda (n d same)
+                                                     (truncate-derive-type-rem-aux n d same t))
+                                    same)))
     (if (eq quot *empty-type*)
         (let ((*compiler-error-context* node))
           (setf (combination-kind node) :error

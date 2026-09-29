@@ -545,7 +545,11 @@
   (assert-type
    (lambda (n)
      (/ n 0))
-   (or float (complex float))))
+   (or float (complex float)))
+  (assert-type
+   (lambda (n)
+     (ftruncate 0 n))
+   (values float (or float (eql 0)) &optional)))
 
 (with-test (:name :-zero-type)
   (assert-type
@@ -591,4 +595,8 @@
    (lambda (n)
      (declare (rational n))
      (ffloor n n))
-   (values (single-float 1.0 1.0) (integer 0 0) &optional)))
+   (values (single-float 1.0 1.0) (integer 0 0) &optional))
+  (assert-type
+   (lambda (n)
+     (ftruncate n n))
+   (values float (or float (eql 0)) &optional)))
