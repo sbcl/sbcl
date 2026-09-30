@@ -2934,18 +2934,23 @@
 ;;; of LVAR and set COMPONENT-REOPTIMIZE.
 (defun flush-dest (lvar)
   (declare (type (or lvar null) lvar))
-  (unless (null lvar)
+  (when lvar
+    ;; Don't lose failing annotations by converting to casts
     (dolist (annotation (lvar-annotations lvar))
       (when (and (lvar-type-annotation-p annotation)
                  (not (lvar-annotation-fired annotation))
                  (lvar-uses lvar)
                  (block nil
                    (do-uses (use lvar t)
-                     (when (block-delete-p (node-block use))
+                     (when (node-to-be-deleted-p use)
                        (return nil)))))
-        (let ((*compiler-error-context* annotation))
-          (process-lvar-type-annotation lvar annotation))
-        (setf (lvar-annotation-fired annotation) t)))
+        (when (process-lvar-type-annotation lvar annotation nil)
+          (setf (lvar-annotation-fired annotation) t)
+          (do-uses (use lvar)
+            (unless (node-to-be-deleted-p use)
+              (assert-node-type use
+                                (lvar-type-annotation-type annotation)
+                                (lexenv-policy (node-lexenv use))))))))
     (setf (lvar-dest lvar) nil)
     (do-uses (use lvar)
       (flush-node use))
@@ -4564,7 +4569,7 @@ is :ANY, the function name is not checked."
              (lvar-value lvar))
     t))
 
-(defun process-lvar-type-annotation (lvar annotation)
+(defun process-lvar-type-annotation (lvar annotation &optional (warnp t))
   (let* ((uses (lvar-uses lvar))
          (context (lvar-type-annotation-context annotation))
          (condition (typecase context
@@ -4579,20 +4584,22 @@ is :ANY, the function name is not checked."
                        'type-warning)))
          (type (lvar-type-annotation-type annotation)))
     (cond ((not (types-equal-or-intersect (lvar-type lvar) type))
-           (if (symbolp condition)
-               (%compile-time-type-error-warn annotation (type-specifier type)
-                                              (type-specifier (lvar-type lvar))
-                                              (let ((path (lvar-annotation-source-path annotation)))
-                                                (if (eq (car path) 'detail)
-                                                    (second path)
-                                                    (list
-                                                     (if (eq (car path) 'original-source-start)
-                                                         (find-original-source path)
-                                                         (car path)))))
-                                              :condition condition)
-               (setf (sb-kernel::dsd-bits condition)
-                     (logior sb-kernel::dsd-default-error
-                             (sb-kernel::dsd-bits condition)))))
+           (if warnp
+               (if (symbolp condition)
+                   (%compile-time-type-error-warn annotation (type-specifier type)
+                                                  (type-specifier (lvar-type lvar))
+                                                  (let ((path (lvar-annotation-source-path annotation)))
+                                                    (if (eq (car path) 'detail)
+                                                        (second path)
+                                                        (list
+                                                         (if (eq (car path) 'original-source-start)
+                                                             (find-original-source path)
+                                                             (car path)))))
+                                                  :condition condition)
+                   (setf (sb-kernel::dsd-bits condition)
+                         (logior sb-kernel::dsd-default-error
+                                 (sb-kernel::dsd-bits condition))))
+               t))
           ((consp uses)
            (let ((condition (case condition
                               (type-warning 'type-style-warning)
@@ -4611,15 +4618,17 @@ is :ANY, the function name is not checked."
                                     always (or (memq use bad)
                                                (neq path (source-path-before-transforms use)))))
                      do
-                     (if (symbolp condition)
-                         (%compile-time-type-error-warn bad-use
-                                                        (type-specifier type)
-                                                        (type-specifier (node-derived-type bad-use))
-                                                        (list (node-source-form bad-use))
-                                                        :condition condition)
-                         (setf (sb-kernel::dsd-bits condition)
-                               (logior sb-kernel::dsd-default-error
-                                       (sb-kernel::dsd-bits condition)))))))))))
+                     (if warnp
+                         (if (symbolp condition)
+                             (%compile-time-type-error-warn bad-use
+                                                            (type-specifier type)
+                                                            (type-specifier (node-derived-type bad-use))
+                                                            (list (node-source-form bad-use))
+                                                            :condition condition)
+                             (setf (sb-kernel::dsd-bits condition)
+                                   (logior sb-kernel::dsd-default-error
+                                           (sb-kernel::dsd-bits condition))))
+                         (return t)))))))))
 
 (defun process-lvar-sequence-bounds-annotation (lvar annotation)
   (destructuring-bind (start end) (lvar-dependent-annotation-deps annotation)

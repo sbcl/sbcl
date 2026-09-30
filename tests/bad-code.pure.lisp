@@ -660,7 +660,13 @@
                                         (let ((y (sb-kernel:the* (list :use-annotations t)
                                                                  (the integer x))))
                                           (atom y)))
-                                      :allow-warnings 'sb-int:type-warning))))
+                                      :allow-warnings 'sb-int:type-warning)))
+  (checked-compile '(lambda (x)
+                     (when x
+                       (unless x
+                         (let ((y (sb-kernel:the* (list :use-annotations t)
+                                                  (the integer x))))
+                           (atom y)))))))
 
 (with-test (:name :loop-list-mismatch)
   (assert (nth-value 2
