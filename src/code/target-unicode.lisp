@@ -1467,8 +1467,9 @@ sentence breaking rules specified in UAX #29"
 
 (defun line-break-annotate (string)
   (let ((chars (line-prebreak string))
-        first second t1 t2 tail (ret (list :cant))
+        zeroth first second (t0 :sot) t1 t2 tail (ret (list :cant))
         state after-spaces nri)
+    (declare (ignorable zeroth))
     (macrolet ((cmpush (thing)
                  (let ((gthing (gensym)))
                    `(let ((,gthing ,thing))
@@ -1558,12 +1559,8 @@ sentence breaking rules specified in UAX #29"
          (between :qu :any :cant) ; LB19
          (between :any :cb :can)  ; LB20
          (between :cb :any :can)  ; LB20
-         (when (and (eql t1 :hl) (member t2 '(:hy :ba)))
-           (cmpush :cant) (cmpush second)
-           (setf first second tail (cdr tail))
-           (setf second (car tail))
-           (cmpush (if second :cant :must)) (cmpush second)
-           (setf after-spaces :can) (go tail)) ; LB21a
+         (when (eql t0 :hl)
+           (between '(:hy :ba) :any :cant)) ; LB21a
          (between :any '(:ba :hy :ns) :cant)   ; LB21
          (between :bb :any :cant)              ; LB21
          (between :sy :hl :cant)               ; LB21b
@@ -1595,6 +1592,7 @@ sentence breaking rules specified in UAX #29"
              (between :any :em :cant)))               ; LB30b
          (between :any :any :can)       ; LB31
        tail
+         (setf zeroth first t0 t1)
          (setf first second)
          (setf tail (cdr tail))
          (setf second (car tail))
