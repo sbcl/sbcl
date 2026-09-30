@@ -166,12 +166,23 @@
 
                 DO-STATIC-FUN
                 (call-lisp-fun ',static-fn 2)
-                ;; X now holds T or NIL corresponding to the answer but it needs
-                ;; to be returned as :L or :G in EFLAGS. We rely on address of T
-                ;; being less address of NIL (asserted above)
+                ;; X now holds T or NIL corresponding to the answer, but it needs to
+                ;; get returned in EFLAGS according to the stated :CONDITIONAL result.
+                ;; We rely on T having a lower memory address than NIL (asserted above).
+                ;;
+                ;; If doing a non-strict inequality test, the result of TWO-ARG-[<>]=
+                ;; is displaced by 1 from NIL because the math works out as follows:
+                ;; * for :LE, if X is T then 1+X is less-or-equal NIL
+                ;;            if X is NIL then 1+X is not less-or-equal NIL
+                ;; * for :GE, if X is T then NIL is greater-or-equal 1+X
+                ;;            if X is NIL then NIL is not greater-or-equal 1+X
+                ,@(when (member test '(:le :ge)) `((inst inc x)))
+
                 ,@(ecase test
-                    (:l `((inst cmp x null-tn)))
-                    (:g `((inst cmp null-tn x)))))))
+                    ((:l :le) `((inst cmp x null-tn)))
+                    ((:g :ge) `((inst cmp null-tn x)))))))
+  (define-cond-assem-rtn generic-<= <= two-arg-<= :le)
+  (define-cond-assem-rtn generic->= >= two-arg->= :ge)
   (define-cond-assem-rtn generic-< < two-arg-< :l)
   (define-cond-assem-rtn generic-> > two-arg-> :g))
 
