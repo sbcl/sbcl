@@ -750,3 +750,10 @@
                            (values (the (function * (values integer &optional)) n)
                                    n)))
                       :allow-warnings t))))
+
+(with-test (:name :principal-lvar-ref-recursion)
+  (checked-compile `(lambda ()
+                      (declare (optimize debug))
+                      (labels ((m (z vars)
+                                 (m z vars)))
+                        (m 1 (error "x"))))))

@@ -112,18 +112,21 @@
     (recurse ref ref)))
 
 (defun principal-lvar-ref (lvar &optional casts)
-  (labels ((recurse (lvar ref)
-             (if lvar
-                 (let ((use (lvar-uses lvar)))
-                   (cond ((ref-p use)
-                          (recurse (lambda-var-ref-lvar use) use))
-                         ((and casts
-                               (cast-p use))
-                          (recurse (cast-value use) ref))
-                         (t
-                          ref)))
-                 ref)))
-    (recurse lvar nil)))
+  (let (seen)
+    (labels ((recurse (lvar ref)
+               (if lvar
+                   (let ((use (lvar-uses lvar)))
+                     (cond ((ref-p use)
+                            (unless (memq lvar seen)
+                              (push lvar seen)
+                              (recurse (lambda-var-ref-lvar use) use)))
+                           ((and casts
+                                 (cast-p use))
+                            (recurse (cast-value use) ref))
+                           (t
+                            ref)))
+                   ref)))
+      (recurse lvar nil))))
 
 (defun lvar-lambda-var (lvar)
   (let ((ref (principal-lvar-ref lvar)))
