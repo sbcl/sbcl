@@ -1766,10 +1766,6 @@
             (return)))
 
         (when (type-for-constraints-p in-var-type)
-          ;; Remove the existing constraints to avoid joining them again later.
-          (do-propagatable-constraints (con (in var))
-            (when (eq (constraint-kind con) 'typep)
-              (conset-delete con in)))
           (conset-adjoin (find-or-create-constraint 'typep
                                                     var
                                                     in-var-type

@@ -2429,3 +2429,30 @@
         :end)
        f))
    (or (single-float 0.0 500.0) (single-float 1000.0 1000.0))))
+
+(with-test (:name (:constraint-loop :lp2168862))
+  (checked-compile-and-assert
+   ()
+   `(lambda (f)
+      (prog ((lv4 0)
+             (lv2 0))
+       next-loop
+         (if (> lv4 1)
+             (return))
+       next-loop2
+         (if (> lv2 1)
+             (go end-loop))
+         (let ((v3 lv2))
+           (if (< 1 v3)
+               (block nil (funcall f (lambda () (return))))
+               (let ((v3 lv4)
+                     (v6 lv2))
+                 (if (= v6 v3)
+                     (let ((lv2 0))
+                       (tagbody tag (incf lv2)))))))
+         (incf lv2)
+         (go next-loop2)
+       end-loop
+         (incf lv4)
+         (go next-loop)))
+   ((#'funcall) nil)))
