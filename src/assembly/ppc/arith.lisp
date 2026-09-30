@@ -370,34 +370,3 @@
 
   RETURN-T
   (load-symbol res t))
-
-(define-assembly-routine (generic-/=
-                          (:cost 10)
-                          (:return-style :full-call)
-                          (:policy :safe)
-                          (:translate /=)
-                          (:save-p t))
-                         ((:arg x (descriptor-reg any-reg) a0-offset)
-                          (:arg y (descriptor-reg any-reg) a1-offset)
-
-                          (:res res descriptor-reg a0-offset)
-
-                          (:temp lra descriptor-reg lra-offset)
-                          (:temp lip any-reg lip-offset)
-
-                          (:temp nargs any-reg nargs-offset)
-                          (:temp ocfp any-reg ocfp-offset))
-  (inst or nargs x y)
-  (inst andi. nargs nargs 3)
-  (inst cmpw :cr1 x y)
-  (inst bne DO-STATIC-FN)
-  (inst beq :cr1 RETURN-NIL)
-
-  (load-symbol res t)
-  (inst mflr lra)
-  (lisp-return lra lip :offset 2)
-
-  DO-STATIC-FN (tail-call-fallback-fun two-arg-/=)
-
-  RETURN-NIL
-  (inst mr res null-tn))

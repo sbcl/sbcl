@@ -406,39 +406,3 @@
   (move ocfp cfp-tn)
   (inst j lip)
   (inst move cfp-tn csp-tn))
-
-
-(define-assembly-routine (generic-/=
-                          (:cost 10)
-                          (:return-style :full-call)
-                          (:policy :safe)
-                          (:translate /=)
-                          (:save-p t))
-                         ((:arg x (descriptor-reg any-reg) a0-offset)
-                          (:arg y (descriptor-reg any-reg) a1-offset)
-
-                          (:res res descriptor-reg a0-offset)
-
-                          (:temp temp non-descriptor-reg nl0-offset)
-                          (:temp lra descriptor-reg lra-offset)
-                          (:temp lip any-reg lip-offset)
-                          (:temp nargs any-reg nargs-offset)
-                          (:temp ocfp any-reg ocfp-offset))
-  (inst or temp x y)
-  (inst and temp fixnum-tag-mask)
-  (inst bne temp DO-STATIC-FUN)
-  (inst nop)
-
-  (inst beq x y DONE)
-  (inst move res null-tn)
-  (load-symbol res t)
-
-  DONE
-  (lisp-return lra lip :offset 2)
-
-  DO-STATIC-FUN
-  (inst lw lip null-tn (static-fun-offset 'two-arg-/=))
-  (inst li nargs (fixnumize 2))
-  (move ocfp cfp-tn)
-  (inst j lip)
-  (inst move cfp-tn csp-tn))

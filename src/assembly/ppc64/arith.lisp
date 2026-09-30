@@ -209,7 +209,6 @@
           DONE)))
 
   (define-cond-assem-rtn generic-= = two-arg-=    (inst isel res res null-tn :eq))
-  (define-cond-assem-rtn generic-/= /= two-arg-/= (inst isel res null-tn res :eq))
   (define-cond-assem-rtn generic-< < two-arg-<    (inst isel res res null-tn :lt))
   (define-cond-assem-rtn generic-<= <= two-arg-<= (inst isel res null-tn res :gt))
   (define-cond-assem-rtn generic-> > two-arg->    (inst isel res res null-tn :gt))

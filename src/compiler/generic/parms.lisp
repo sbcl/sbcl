@@ -294,7 +294,7 @@
 
 (defconstant-eqx common-static-fdefns
     `(;; This is the standard set of assembly routines that need to call into lisp.
-      ;; A few backends add TWO-ARG-/= and others to this, in their {arch}/parms
+      ;; A few backends add TWO-ARG-<= and others to this, in their {arch}/parms
       two-arg-+
       two-arg--
       two-arg-*

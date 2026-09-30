@@ -113,7 +113,7 @@
   #'equalp)
 
 (defconstant-eqx +static-fdefns+
-    `#(two-arg-<= two-arg->= two-arg-/= ,@common-static-fdefns)
+    `#(two-arg-<= two-arg->= ,@common-static-fdefns)
   #'equalp)
 
 ;;;; Pseudo-atomic trap number

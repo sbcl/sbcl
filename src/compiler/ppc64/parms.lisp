@@ -116,7 +116,7 @@
   ;; with a slightly differenet way of looking up the fdefn; however ltn decides
   ;; whether to warn or not about "recursion in known fun" based on whether the
   ;; fdefn is static, which isn't expressing exactly the right notion.
-    `#(two-arg-<= two-arg->= two-arg-/= %negate ,@common-static-fdefns)
+    `#(two-arg-<= two-arg->= %negate ,@common-static-fdefns)
   #'equalp)
 
 #+sb-xc-host (defparameter lisp-linkage-space-addr #x1500000000) ; arbitrary
