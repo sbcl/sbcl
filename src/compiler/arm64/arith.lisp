@@ -262,7 +262,7 @@
   (:arg-types tagged-num (:constant fixnum))
   (:arg-refs x-ref)
   (:translate logand)
-  (:generator 0
+  (:generator 1
     (block nil
       (let* ((y-untagged y)
              (y (fixnumize y))
@@ -342,12 +342,29 @@
   (:translate logand)
   (:args (x :scs (signed-reg any-reg)))
   (:arg-types signed-num (:constant (satisfies ubfm-mask-p)))
-  (:generator 1
-    (sc-case x
+  (:results (r :scs (signed-reg any-reg)))
+  (:result-types signed-num)
+  (:generator 0
+    (sc-case r
       (any-reg
-       (inst ubfm r x n-fixnum-tag-bits (+ n-fixnum-tag-bits (1- (integer-length y)))))
+       (sc-case x
+         (any-reg
+          (inst and r x (fixnumize y)))
+         (t
+          (inst ubfiz r x n-fixnum-tag-bits (integer-length y)))))
       (t
-       (inst and r x y)))))
+       (sc-case x
+         (any-reg
+          (inst ubfm r x n-fixnum-tag-bits (+ n-fixnum-tag-bits (1- (integer-length y)))))
+         (t
+          (inst and r x y)))))))
+
+(define-vop (logand-c/ubfm-unsigned=>unsigned logand-c/ubfm-signed=>signed)
+  (:translate logand)
+  (:args (x :scs (unsigned-reg any-reg)))
+  (:arg-types unsigned-num)
+  (:results (r :scs (unsigned-reg any-reg)))
+  (:result-types unsigned-num))
 
 (define-vop (logand-c/unsigned=>unsigned logand-c/signed=>signed)
   (:args (x :scs (unsigned-reg)))
