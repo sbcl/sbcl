@@ -749,6 +749,14 @@ necessary, since type inference may take arbitrarily long to converge.")
     (when *compile-component-hook*
       (funcall *compile-component-hook* component)))
 
+  (when *check-consistency*
+    ;; IR2 conversion renumbered the blocks in emit order.
+    (find-dfo component)
+    (maybe-mumble "Dom ")
+    (find-dominators component)
+    (maybe-mumble "Loop ")
+    (loop-analyze component))
+
   (clear-constant-info)
   (values))
 

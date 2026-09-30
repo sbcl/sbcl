@@ -74,7 +74,6 @@
                  (unless (or (eq block tail)
                              (eq (block-component block) c))
                    (barf "~S is not in ~S." block c)))
-               #+(or)
                (let ((component-outer-loop (component-outer-loop c)))
                  (when (or (loop-blocks component-outer-loop)
                            (loop-inferiors component-outer-loop))
