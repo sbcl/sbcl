@@ -215,6 +215,9 @@
                                                                 (incf untagged untag))))
                                                            ((set-p use)
                                                             (handle-var (set-var use)))
+                                                           ((and (ref-p use)
+                                                                 (lambda-var-p (ref-leaf use))
+                                                                 (memq (ref-leaf use) seen-vars)))
                                                            (t
                                                             (incf tagged))))
                                                    lvar
