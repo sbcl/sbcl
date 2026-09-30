@@ -1137,18 +1137,16 @@ the first."
          nil
          (make-fixnum-float-comparer ,op x y (dispatch-type y))))
       (((foreach single-float double-float) fixnum)
-       (if (eql y 0)
-           (,op x (coerce 0 '(dispatch-type x)))
-           (with-float-inf-or-nan-test x
-             ,infinite-x-finite-y
-             nil
-             (make-fixnum-float-comparer ,(case op
-                                            (> '<)
-                                            (< '>)
-                                            (>= '<=)
-                                            (<= '>=)
-                                            (= '=))
-                                         y x (dispatch-type x)))))
+       (with-float-inf-or-nan-test x
+         ,infinite-x-finite-y
+         nil
+         (make-fixnum-float-comparer ,(case op
+                                        (> '<)
+                                        (< '>)
+                                        (>= '<=)
+                                        (<= '>=)
+                                        (= '=))
+                                     y x (dispatch-type x))))
       ((double-float single-float)
        (,op x (coerce y 'double-float)))
       (((foreach single-float double-float #+long-float long-float) ratio)
@@ -1420,7 +1418,7 @@ the first."
       (range<<= low x high)))
   (defun check-range<=< (low x high)
     (when (typep x 'fixnum)
-      (range<=< low x high))) )
+      (range<=< low x high))))
 
 
 ;;;; logicals
