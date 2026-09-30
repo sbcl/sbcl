@@ -718,7 +718,7 @@
   (let* ((int (type-approximate-interval (lvar-type index)))
          (targets (jump-table-targets node))
          (otherwise (assoc 'otherwise targets))
-         (targets (sort (remove otherwise targets) #'< :key #'car))
+         (targets (sort (remove otherwise (copy-list targets)) #'< :key #'car))
          (min (caar targets))
          (max (caar (last targets)))
          (sparse (and (policy node (= jump-table 3))

@@ -23,7 +23,7 @@
 (defvar *entry-points-argument*)
 (declaim (type list *entry-points-argument*))
 
-(defvar *check-consistency* nil)
+(defvar *check-consistency* t)
 
 (defvar *compile-verbose* t
   "The default for the :VERBOSE argument to COMPILE-FILE.")
@@ -806,14 +806,7 @@ necessary, since type inference may take arbitrarily long to converge.")
     (let ((ir1-namespace *ir1-namespace*))
       (clrhash (free-funs ir1-namespace))
       (clrhash (free-vars ir1-namespace))
-      (let* ((eql-constants (eql-constants ir1-namespace))
-             #+arm64
-             (nil-constant (gethash nil eql-constants)))
-        (clrhash eql-constants)
-        ;; Something might break if it's removed, unclear what.
-        #+arm64
-        (when nil-constant
-          (setf (gethash nil eql-constants) nil-constant)))
+      (clrhash (eql-constants ir1-namespace))
       (clrhash (similar-constants ir1-namespace)))))
 
 ;;;; trace output

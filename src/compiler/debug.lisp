@@ -404,6 +404,15 @@
       (exit
        (unless (proper-list-of-length-p succ 0 1)
          (barf "EXIT node with strange number of successors: ~S" last)))
+      (jump-table
+       (let ((targets (jump-table-targets last)))
+         (unless (and (every (lambda (target) (memq (cdr target) succ)) targets)
+                      (every (lambda (b) (find b targets :key #'cdr)) succ))
+           (barf "The targets of ~S don't match SUCC for ~S." last block))))
+      (vop-jumper
+       (let ((default (vop-jumper-default last)))
+         (when (and default (not (memq default succ)))
+           (barf "The default of ~S isn't in SUCC for ~S." last block))))
       (t
        (unless (or (= (length succ) 1) (node-tail-p last)
                    (and (block-delete-p block) (null succ)))
@@ -489,6 +498,9 @@
      (check-dest (jump-table-index node) node)
      (unless (eq (block-last (node-block node)) node)
        (barf "JUMP-TABLE not at block end: ~S" node)))
+    (vop-jumper
+     (unless (eq (block-last (node-block node)) node)
+       (barf "VOP-JUMPER not at block end: ~S" node)))
     (cset
      (check-dest (set-value node) node))
     (cast
@@ -845,7 +857,15 @@
                                          (sc-number
                                           (tn-sc
                                            (or load-tn tn))))
-                                  '(or (eql t) function)))
+                                  '(or (eql t) function))
+                           ;; CHOOSE-ZERO-TN reads 0 from the zero
+                           ;; register where ZERO-SC is allowed.
+                           #+arm64
+                           (and (not load-tn)
+                                (eql (sc-number (tn-sc tn)) sb-vm:any-reg-sc-number)
+                                (eql (tn-offset tn) sb-vm::zr-offset)
+                                (typep (svref (car scs) sb-vm:zero-sc-number)
+                                       '(or (eql t) function))))
                  (barf "operand restriction not satisfied: ~S" op))))))
     (do-ir2-blocks (block component)
       (do ((vop (ir2-block-last-vop block) (vop-prev vop)))

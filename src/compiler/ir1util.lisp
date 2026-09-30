@@ -2766,6 +2766,15 @@
       ((logtest original-kind (functional-kind-attributes let mv-let assignment))
        (let ((bind-block (node-block bind)))
          (mark-for-deletion bind-block))
+       ;; The reference to the LET is dead now too. If its block is
+       ;; being deleted, DELETE-BLOCK takes care of it.
+       (let ((ref (first (leaf-refs clambda))))
+         (when (and ref
+                    (null (rest (leaf-refs clambda)))
+                    (not (block-delete-p (node-block ref))))
+           (delete-lvar-use ref)
+           (delete-ref ref)
+           (unlink-node ref)))
        (let ((home (lambda-home clambda)))
          (setf (lambda-lets home) (delete clambda (lambda-lets home)))))
       (t
