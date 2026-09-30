@@ -979,8 +979,10 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
            ((eql base 2)
             (mpz-mul-2exp 1 power))
            ((typep base 'ratio)
-            (sb-kernel::%make-ratio (sb-ext:truly-the integer (gmp-intexp (numerator base) power))
-                                    (sb-ext:truly-the integer (gmp-intexp (denominator base) power))))
+            (if (zerop power)
+                1
+                (sb-kernel::%make-ratio (sb-ext:truly-the integer (gmp-intexp (numerator base) power))
+                                        (sb-ext:truly-the integer (gmp-intexp (denominator base) power)))))
            (t
             (mpz-pow base power))))))
 
