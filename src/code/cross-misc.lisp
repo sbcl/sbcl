@@ -103,8 +103,6 @@
 (defun vector-with-fill-pointer-p (x)
   (if (symbolp x) nil (error "Called VECTOR-WITH-FILL-POINTER-P on ~S" x)))
 
-(defparameter sb-vm::*backend-cross-foldable-predicates* nil)
-
 ;; The definition of TYPE-SPECIFIER for the target appears in the file
 ;; 'deftypes-for-target' - it allows CLASSes and CLASOIDs as specifiers.
 ;; Instances are never used as specifiers when building SBCL,

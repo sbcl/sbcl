@@ -26,46 +26,6 @@
 (define-condition cross-type-giving-up (cross-type-warning)
   ((message :initform "giving up conservatively")))
 
-;; Return T if SYMBOL is a predicate acceptable for use in a SATISFIES type
-;; specifier. We assume that anything in CL: is allowed.
-(defvar *seen-xtypep-preds* nil)
-(defun acceptable-cross-typep-pred (symbol usage)
-  #+nil
-  (cond ((not (fboundp symbol))
-         (format t "~&XTYPEP: ~S is not fboundp~%" symbol))
-        ((not (member symbol *seen-xtypep-preds*))
-         (format t "~&XTYPEP: checking applicability of ~S for ~S~%"
-                 symbol usage)
-         (push symbol *seen-xtypep-preds*)))
-  ;; For USAGE = TYPEP, always call the predicate.
-  ;; For USAGE = CTYPEP, call it only if it is a foldable function.
-  ;;
-  ;; Exceptions:
-  ;; 1. CLOSUREP and SIMPLE-FUN-P. These can get called from WEAKEN-TYPE with
-  ;;    a symbol as the argument. It's ok to call either one in that case.
-  ;;
-  ;; 2. UNBOUND-MARKER-P is needed when compiling CLOSURE-EXTRA-VALUES
-  ;;    and maybe some other things too.
-  ;;
-  ;; 3. VECTOR-WITH-FILL-POINTER-P - as long as the argument is not a vector
-  ;;    we can safely say that the answer is NIL.
-  ;;
-  ;; 4. LEGAL-FUN-NAME-P and EXTENDED-FUNCTION-DESIGNATOR-P.
-  ;;    These are harmless enough to call, so why not.
-  ;;
-  ;; 5. Anything else needed by a particular backend.
-  (or (member symbol
-              '(closurep simple-fun-p unbound-marker-p
-                sb-impl::vector-with-fill-pointer-p
-                legal-fun-name-p extended-function-designator-p
-                numeric-type-p proper-list-p))
-      (member symbol sb-vm::*backend-cross-foldable-predicates*)
-      (and (eq (sb-xc:symbol-package symbol) *cl-package*)
-           (or (eq usage 'sb-xc:typep)
-               (awhen (info :function :info symbol)
-                 (sb-c::ir1-attributep (sb-c::fun-info-attributes it)
-                                       sb-c:foldable))))))
-
 ;;; Return true of any SBCL-internal package.
 ;;; Defined here so that CROSS-TYPEP can use it.
 ;;; The target variant of this is in src/code/package.
@@ -246,7 +206,7 @@
                       ;; for the initial pprint dispatch table.
                       ((and (eq obj nil) (member predicate '(fboundp macro-function)))
                        (values nil t))
-                      ((acceptable-cross-typep-pred predicate caller)
+                      ((fboundp predicate)
                        (values (funcall predicate obj) t))
                       (t
                        (uncertain))))

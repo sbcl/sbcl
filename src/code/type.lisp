@@ -2192,8 +2192,6 @@ expansion happened."
       ;; PATHNAMEs are INSTANCEs based on the lowtag criterion
       (or (eq x (specifier-type 'logical-pathname))
           (eq x (specifier-type 'pathname)))))
-(eval-when (:compile-toplevel :execute)
-  (pushnew 'classoid-definitely-instancep sb-vm::*backend-cross-foldable-predicates*))
 
 (defun classoid-is-or-inherits (sub super)
   (or (classoid-inherits-from sub super)
