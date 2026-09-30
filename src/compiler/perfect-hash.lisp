@@ -62,10 +62,9 @@
                  (incf i))))))))
 
 ;;; Return the ceiling of the log base 2 of VAL.
+(declaim (inline phash-log2))
 (defun phash-log2 (val)
-  (let ((i 0))
-    (loop (when (>= (ash 1 i) val) (return i))
-          (incf i))))
+  (integer-length (1- val)))
 
 ;;; Compute p(x), where p is a permutation of 0..(1<<nbits)-1.
 ;;; permute(0)=0. This is intended and useful.
@@ -451,12 +450,11 @@
                    (setq diffbits 0)
                    (do-keys (k)
                      (setq diffbits (logior diffbits (logxor first (aref hash k))))))
-                 (setq lowbit (let ((i 0))
-                                (loop (when (or (= i 32) (logbitp i diffbits)) (return i))
-                                      (incf i))))
-                 (setq highbit (let ((i 31))
-                                 (loop (when (or (= i 0) (logbitp i diffbits)) (return i))
-                                       (decf i)))))
+                 (if (zerop diffbits)
+                     (setf lowbit 32
+                           highbit 0)
+                     (setf lowbit (count-trailing-zeros diffbits)
+                           highbit (1- (integer-length diffbits)))))
                ;; Guns aren't enough. Bring out the Bomb. Use TAB.
                ;; This finds the initial (A,B) when we need to use TAB, producing
                ;; a different (A,B) every time it's called, trying all reasonable
@@ -593,6 +591,7 @@
                ;; Initialize (A,B) when keys are integers. Return T if we found
                ;; a perfect hash and no more work is needed.
                (inithex (alen blen salt)
+                 (declare (type (unsigned-byte 32) alen blen))
                  (when (< nkeys 3)
                    (error "Can't generate a perfect hash of fewer than 3 keys"))
                  (setlow)
@@ -671,6 +670,7 @@
                    (labels
                        ;; Try to apply an augmenting path. With ROLLBACK, undo it.
                        ((apply-path (tail rollback)
+                          (declare (type (unsigned-byte 32) tail))
                           (let ((child (1- tail)) parent)
                             (loop
                               (when (= child 0) (return t))
@@ -826,6 +826,7 @@
                          (bad-initkey 0)
                          (bad-perfect 0)
                          (trysalt 1))
+                     (declare (type (unsigned-byte 32) trysalt))
                      (setq tabh (make-array (if minimal nkeys smax)
                                             :element-type '(signed-byte 32)))
                      (allocate-tabb blen)
@@ -871,7 +872,8 @@
 (defun emit-perfect-hash-sexpr (blen smax scramble tab lines used comments)
   (declare (type (simple-array (unsigned-byte 32) (*)) scramble)
            (type (simple-array (unsigned-byte 16) (*)) tab)
-           (type simple-vector lines))
+           (type simple-vector lines)
+           (type (unsigned-byte 32) blen smax used))
   (with-output-to-string (stream)
     (let ((extra-parens 0))
       (write-char #\( stream)
