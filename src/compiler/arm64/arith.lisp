@@ -262,7 +262,7 @@
   (:arg-types tagged-num (:constant fixnum))
   (:arg-refs x-ref)
   (:translate logand)
-  (:generator 1
+  (:generator 0
     (block nil
       (let* ((y-untagged y)
              (y (fixnumize y))
@@ -332,6 +332,22 @@
                                   (return))))))
                        ((load-immediate-word tmp-tn y))))))
         (inst and r x imm)))))
+
+(defun ubfm-mask-p (n)
+  (and (typep n '(unsigned-byte 63))
+       (plusp n)
+       (zerop (logand n (1+ n)))))
+
+(define-vop (logand-c/ubfm-signed=>signed signed-binop-c)
+  (:translate logand)
+  (:args (x :scs (signed-reg any-reg)))
+  (:arg-types signed-num (:constant (satisfies ubfm-mask-p)))
+  (:generator 1
+    (sc-case x
+      (any-reg
+       (inst ubfm r x n-fixnum-tag-bits (+ n-fixnum-tag-bits (1- (integer-length y)))))
+      (t
+       (inst and r x y)))))
 
 (define-vop (logand-c/unsigned=>unsigned logand-c/signed=>signed)
   (:args (x :scs (unsigned-reg)))
