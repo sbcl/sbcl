@@ -45,3 +45,44 @@
       (alien-funcall (extern-alien "compact_instance_layout_pointer_test"
                                    (function int unsigned))
                      (sb-kernel:get-lisp-obj-address v)))))
+
+(defvar *a*)
+(with-test (:name :partially-pinned-boxed-page
+                  ;; just cargo-culted from the previous test
+            :skipped-on (or :win32
+                            :gc-stress
+                            (:not (:and :gencgc :compact-instance-header :soft-card-marks)))
+            :fails-on (and :darwin :x86-64)) ;; can't compile the .so
+  (let ((array (sb-kernel:%make-lisp-obj
+                (alien-funcall
+                 (extern-alien "setup_pinning_test" (function sb-alien:word)))))
+        (print nil))
+    (setq *a* array)
+    (let ((x (aref array 2)) (y (aref array 4)))
+      (when print
+        (format t "~&Expecting to pin ~X and ~X~%"
+                (sb-kernel:get-lisp-obj-address x)
+                (sb-kernel:get-lisp-obj-address y)))
+      (sb-sys:with-pinned-objects (x y)
+        ;; (setf (extern-alien "gencgc_verbose" int) 4)
+        (gc)
+        (let* ((index (sb-vm:find-page-index (sb-kernel:get-lisp-obj-address x)))
+               (nwords (ash (slot (deref sb-vm::page-table index) 'sb-vm::words-used*) -1))
+               (page-base (sb-sys:int-sap (logandc2 (sb-kernel:get-lisp-obj-address x)
+                                                    (1- sb-vm:gencgc-page-bytes)))))
+          (assert (= nwords (* 12 7)))
+          (when print
+            (let* ((words-per-row 8)
+                   (nlines (ceiling nwords words-per-row))
+                   (addr page-base))
+              (dotimes (i nlines)
+                (format t "~x:~{ ~16x~}~%"
+                        (sb-sys:sap-int addr)
+                        (loop repeat words-per-row for offset from 0 by sb-vm:n-word-bytes
+                              collect (sb-sys:sap-ref-word addr offset)))
+                (setf addr (sb-sys:sap+ addr (* words-per-row sb-vm:n-word-bytes))))))
+          (assert (= (loop for offset from 0 by 8 repeat nwords
+                           count (= (logand (sb-sys:sap-ref-word page-base offset)
+                                            sb-vm:widetag-mask)
+                                    sb-vm:simple-vector-widetag))
+                     2)))))))

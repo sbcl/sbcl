@@ -171,3 +171,67 @@ int compact_instance_layout_pointer_test(lispobj arg)
     run_cardmark_test(PAGE_TYPE_BOXED, young_layout, old_layout, stackptr);
     return 0;
 }
+
+
+static page_index_t get_a_page(int type)
+{
+    int i;
+    page_index_t trypage = next_free_page;
+    for (i = 0; i < 10; ++i) {
+        if (page_table[trypage].type == 0) {
+            page_table[trypage].type = type;
+            gc_assert(page_table[trypage].scan_start_offset_ == 0);
+            /* I do not understand why the 'gen' field can't be zeroized
+             * when a page is empty. reset_page_flags() has a comment questioning
+             * the same thing but unfortunately the author (me) left no indication
+             * of what the failure mode was */
+            page_table[trypage].gen = 0;
+            next_free_page = trypage+1;
+            return trypage;
+        }
+    }
+    lose("Could not get a page for test setup");
+}
+
+lispobj make_simple_vector(page_index_t page, int nelem, lispobj element)
+{
+    int aligned_nelem = ALIGN_UP(nelem, 2);
+    int words_used = page_words_used(page);
+    int total_words = aligned_nelem + 2;
+    page_table[page].words_used_ += total_words;
+    generations[0].bytes_allocated += total_words * N_WORD_BYTES;
+    bytes_allocated += total_words * N_WORD_BYTES;
+    lispobj* where = (lispobj*)page_address(page) + words_used;
+    struct vector* v = (void*)where;
+    v->header = SIMPLE_VECTOR_WIDETAG;
+    v->length_ = make_fixnum(nelem);
+    if (nelem) v->data[nelem] = 0; // possibly the padding word
+    for (int i = 0; i<nelem; ++i) v->data[i] = element;
+    return make_lispobj(where, OTHER_POINTER_LOWTAG);
+}
+
+lispobj make_character(int c) { return (c << 8) | CHARACTER_WIDETAG; }
+/*
+ * Create a boxed page with some simple-vectors on it.
+ * Arrange so that at GC time we have:
+ * |------+------+--------+------+------+------+--------+
+ * | live | live | pinned | dead | live | dead | pinned |
+ * |------+------+--------+------+------+------+--------+
+ * Depositing fillers should ensure that the headers
+ * of the dead objects are overwritten
+ */
+lispobj setup_pinning_test()
+{
+    page_index_t p1 = get_a_page(PAGE_TYPE_BOXED);
+    page_index_t p2 = get_a_page(PAGE_TYPE_BOXED);
+
+    struct vector* v = (void*)native_pointer(make_simple_vector(p1, 5, 0));
+    v->data[0] = make_simple_vector(p2, 10, make_character('a'));
+    v->data[1] = make_simple_vector(p2, 10, make_character('b'));
+    v->data[2] = make_simple_vector(p2, 10, make_character('c'));
+    make_simple_vector(p2, 10, make_character('d'));
+    v->data[3] = make_simple_vector(p2, 10, make_character('e'));
+    make_simple_vector(p2, 10, make_character('f'));
+    v->data[4] = make_simple_vector(p2, 10, make_character('g'));
+    return make_lispobj(v, OTHER_POINTER_LOWTAG);
+}

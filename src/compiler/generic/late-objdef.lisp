@@ -137,12 +137,40 @@
     (dolist (entry *scav/trans/size*)
       (when (member (second entry) '("bignum" "unboxed" "filler") :test 'string=)
         (setf bits (logior bits (ash 1 (ash (car entry) -2))))))
-    (format stream "static inline int leaf_obj_widetag_p(unsigned char widetag) {~%")
-    #+64-bit (format stream "  return (0x~XLU >> (widetag>>2)) & 1;" bits)
-    #-64-bit (format stream "  int bit = widetag>>2;
+
+    (flet ((generate-matcher (bits fun-name)
+             (format stream "static inline int ~A(unsigned char widetag) {~%" fun-name)
+             #+64-bit (format stream "  return (0x~XLU >> (widetag>>2)) & 1;" bits)
+             #-64-bit (format stream "  int bit = widetag>>2;
   return (bit<32 ? 0x~XU >> bit : 0x~XU >> (bit-32)) & 1;"
                       (ldb (byte 32 0) bits) (ldb (byte 32 32) bits))
-    (format stream "~%}~%"))
+             (format stream "~%}~%")))
+
+      (generate-matcher bits "leaf_obj_widetag_p")
+      ;; We can accept/reject ambiguous pointers with 100% certainty based on the widetag
+      ;; as long as the page type is BOXED - those pages will not contain objects that
+      ;; confuse the test. Raw bits may incorrectly be treated as a pointer, but the test
+      ;; of whether the word itself is an object header is perfectly sound.
+      ;; Note that this list below does not imply that objects of this widetag can only
+      ;; be found on PAGE_TYPE_BOXED. These are a bunch of counterexamples:
+      ;;  * A RATIO with fixnum numerator and denominator could go on PAGE_TYPE_UNBOXED.
+      ;;  * A SIMPLE-VECTOR which is hash-table storage and/or weak goes on PAGE_TYPE_MIXED.
+      ;;  * While most INSTANCE-WIDETAG objects can go on boxed pages, those with raw slots
+      ;;    can not, nor can any with a custom scavenge function. The latter applies to
+      ;;    lockfree list nodes, which have a transient representation where an untagged
+      ;;    value points to the next node. Refer to target-lflist.lisp for details.
+      ;;  * FUNCALLABLE-INSTANCE-WIDETAG goes on PAGE_TYPE_CODE if #+executable-funinstances
+      ;;    (x86-64). Instruction bytes must not be treated as widetags. They happen
+      ;;    not to resemble any widetag, but that's just random coincidence.
+      (let ((list `(,ratio-widetag ,complex-rational-widetag
+                    ,closure-widetag ,funcallable-instance-widetag ,value-cell-widetag
+                    ,instance-widetag
+                    ,complex-vector-widetag ,complex-array-widetag
+                    ,complex-bit-vector-widetag ,complex-base-string-widetag
+                    #+sb-unicode ,complex-character-string-widetag
+                    ,simple-vector-widetag ,simple-array-widetag)))
+        (generate-matcher (loop for i in list sum (ash 1 (ash i -2)))
+                          "widetag_good_for_boxed_page_p"))))
 
   (format stream "~%#ifdef WANT_SCAV_TRANS_SIZE_TABLES~%")
   (let ((lowtag-tbl (make-array 256 :initial-element 0)))

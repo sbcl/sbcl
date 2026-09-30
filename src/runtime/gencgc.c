@@ -1441,9 +1441,20 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
         return 0;
     }
 
-    /* For non-code, the pointer's lowtag and widetag must correspond.
+    /* Boxed pages are especially easy to handle: a pointer that points to a word holding a
+     * good widetag where compute_lispobj reconstructs the pointer in 'addr' is accepted
+     * as an unambiguous pointer, even if accidentally taking raw bits to be a descriptor.
      * The putative object header can safely be read even if it turns out
      * that the pointer is not valid, because 'addr' was in bounds for the page.
+     */
+    if (page->type == PAGE_TYPE_BOXED) {
+        unsigned char widetag = widetag_of(native_pointer(addr));
+        if (other_immediate_lowtag_p(widetag) && widetag_good_for_boxed_page_p(widetag)
+            && compute_lispobj(native_pointer(addr)) == addr)
+            return addr;
+        return 0;
+    }
+    /* For all other page types, the pointer's lowtag and widetag must correspond.
      * Note that this can falsely pass if looking at the interior of an unboxed
      * array that masquerades as a Lisp object header by random chance. */
     if (widetag_of(native_pointer(addr)) != FILLER_WIDETAG
@@ -1498,6 +1509,24 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
         && widetag_of(object_start) != FILLER_WIDETAG)
         return addr;
     return 0;
+}
+#endif
+
+#ifdef LISP_FEATURE_X86_64
+lispobj dynamic_space_obj_from_ambiguous_ptr(void* word, page_index_t page)
+{
+
+    lispobj result = 0;
+    lispobj object = conservative_root_p((lispobj)word, page);
+    if (object) {
+        if (object != AMBIGUOUS_POINTER)
+            return object;
+        lispobj* found = search_dynamic_space(word);
+        if (found && widetag_of(found) != FILLER_WIDETAG
+            && compute_lispobj(found) == (lispobj)word)
+            result = (lispobj)word;
+    }
+    return result;
 }
 #endif
 
@@ -1767,6 +1796,17 @@ void deposit_filler(char* from, char* to) {
     gc_assert((nwords - 1) <= 0x7FFFFF);
     page_index_t page = find_page_index(from);
     gc_assert(find_page_index(to-1) == page);
+
+    /* With boxed pages, clobbering stale object headers guarantees that any word satisfying
+     * widetag_good_for_boxed_page_p is live. This makes it trivial to detect stack words that
+     * point to objects without having to iterate from page_scan_start looking for a match.
+     * We could walk the dead range with precision, stomping on only the headers words, however
+     * using a blunt tool is ok too, so just zero-fill. Stepping by objects at this point is
+     * tricky because forwarded resized objects leave a gap at their old size, not their new
+     * size. After zero-filling, we also place a filler object.
+     */
+    if (page_table[page].type == PAGE_TYPE_BOXED) memset(from, 0, nbytes);
+
     *(lispobj*)from = make_filler_header(nwords);
     long unsigned last_card;
     switch (page_table[page].type) {
