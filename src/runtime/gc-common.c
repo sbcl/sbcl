@@ -156,6 +156,23 @@ static inline void scav1(lispobj* addr, lispobj object)
 #endif
 }
 
+//// General boxed object scav/trans/size functions
+
+#define DEF_SCAV_BOXED(suffix, sizer) \
+  static sword_t __attribute__((unused)) \
+  scav_##suffix(lispobj *where, lispobj header) { \
+      return 1 + scavenge(where+1, sizer(header)); \
+  } \
+  static sword_t size_##suffix(lispobj *where) { return 1 + sizer(*where); }
+
+DEF_SCAV_BOXED(boxed, BOXED_NWORDS)
+DEF_SCAV_BOXED(short_boxed, SHORT_BOXED_NWORDS)
+
+static lispobj trans_boxed(lispobj object) {
+    return gc_copy_object(object, 1 + BOXED_NWORDS(*native_pointer(object)),
+                          boxed_region, PAGE_TYPE_BOXED);
+}
+
 inline void gc_scav_pair(lispobj where[2])
 {
     lispobj object = where[0];
@@ -488,12 +505,12 @@ static sword_t size_code_blob(lispobj *where)
     return code_total_nwords((struct code*)where);
 }
 
-#if FUN_SELF_FIXNUM_TAGGED
 /* Closures hold a pointer to the raw simple-fun entry address instead of the
  * tagged object so that a native call instruction can be used more easily */
 static sword_t
 scav_closure(lispobj *where, lispobj header)
 {
+#if FUN_SELF_FIXNUM_TAGGED
     struct closure *closure = (struct closure *)where;
     if (closure->fun) {
         lispobj fun = fun_taggedptr_from_self(closure->fun);
@@ -506,8 +523,10 @@ scav_closure(lispobj *where, lispobj header)
     // Payload includes 'fun' which was just looked at, so subtract it.
     scavenge(1 + &closure->fun, payload_words - 1);
     return 1 + payload_words;
-}
+#else
+    return scav_short_boxed(where, header);
 #endif
+}
 
 /*
  * instances
@@ -773,23 +792,6 @@ static sword_t size_consfiller(lispobj *where)
     return 2;
 }
 #endif
-
-//// General boxed object scav/trans/size functions
-
-#define DEF_SCAV_BOXED(suffix, sizer) \
-  static sword_t __attribute__((unused)) \
-  scav_##suffix(lispobj *where, lispobj header) { \
-      return 1 + scavenge(where+1, sizer(header)); \
-  } \
-  static sword_t size_##suffix(lispobj *where) { return 1 + sizer(*where); }
-
-DEF_SCAV_BOXED(boxed, BOXED_NWORDS)
-DEF_SCAV_BOXED(short_boxed, SHORT_BOXED_NWORDS)
-
-static lispobj trans_boxed(lispobj object) {
-    return gc_copy_object(object, 1 + BOXED_NWORDS(*native_pointer(object)),
-                          boxed_region, PAGE_TYPE_BOXED);
-}
 
 /* Symbol */
 
