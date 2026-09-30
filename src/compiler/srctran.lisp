@@ -10756,6 +10756,11 @@
                      (record-late-xref :calls name use)
                      (change-ref-leaf use (find-global-fun name t) :recklessly t))))))))
 
+(defoptimizer (%coerce-callable-for-call derive-type) ((fun) node)
+  (let ((type (lvar-intersection fun (not boolean)))) ;; these symbols won't get fbound
+    (when (fun-type-p type)
+      type)))
+
 (defoptimizer (open derive-type) ((filename
                                    &key
                                    direction

@@ -330,6 +330,8 @@
   `(types-equal-or-intersect (lvar-type ,lvar) (specifier-type ',type)))
 (defmacro lvar-subtypep  (lvar type)
   `(csubtypep (lvar-type ,lvar) (specifier-type ',type)))
+(defmacro lvar-intersection  (lvar type)
+  `(type-intersection (lvar-type ,lvar) (specifier-type ',type)))
 
 (defun immediately-used-let-dest (node &optional flushable)
   (let ((lvar (node-lvar node)))

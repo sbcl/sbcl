@@ -1201,3 +1201,10 @@
                       `(lambda (a)
                          (truncate a 0))
                       :allow-warnings t))))
+
+(with-test (:name :ftype-or-null)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (f)
+                         (car (funcall (the (or null (function * float)) f))))
+                      :allow-warnings t))))

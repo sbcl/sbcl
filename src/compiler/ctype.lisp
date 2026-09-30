@@ -1196,7 +1196,7 @@ and no value was provided for it." name)))))))))))
                  :format-control
                  "~@<Derived type of ~/sb-impl:print-type-specifier/ is ~
                     ~2I~_~/sb-impl:print-type-specifier/, ~
-                    ~I~_conflicting with the declared function return type ~
+                    ~I~_conflicting with the declared function type ~
                     ~2I~_~/sb-impl:print-type-specifier/.~@:>"
                  :format-arguments (list detail dtype atype)))
           ((singleton-p detail)
