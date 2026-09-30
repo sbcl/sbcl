@@ -156,13 +156,14 @@
 
                             (multiple-value-bind (components top-components)
                                 (find-initial-dfo (list lambda))
-                              (dolist (component (append components top-components))
-                                (let (#+sb-devel
-                                      (*compiler-trace-output*
-                                        (unless (and (not *debug-trace-toplevel-components*)
-                                                     (eq (component-kind component) :toplevel))
-                                          *compiler-trace-output*)))
-                                  (compile-component component))))
+                              (let ((*all-components* (append components top-components)))
+                                (dolist (component *all-components*)
+                                  (let (#+sb-devel
+                                        (*compiler-trace-output*
+                                          (unless (and (not *debug-trace-toplevel-components*)
+                                                       (eq (component-kind component) :toplevel))
+                                            *compiler-trace-output*)))
+                                    (compile-component component)))))
 
                             (fix-core-source-info *source-info* *compile-object*
                                                   (policy (lambda-bind lambda)

@@ -25,6 +25,11 @@
 
 (defvar *check-consistency* t)
 
+;;; A list of all components currently being compiled. This is
+;;; convenient for debugging the compiler as we can easily check IR
+;;; consistency at any point.
+(defvar *all-components*)
+
 (defvar *compile-verbose* t
   "The default for the :VERBOSE argument to COMPILE-FILE.")
 (defvar *compile-print* nil
@@ -1537,11 +1542,12 @@ necessary, since type inference may take arbitrarily long to converge.")
   (maybe-mumble "IDFO ")
   (multiple-value-bind (components top-components)
       (find-initial-dfo lambdas)
-    (when *check-consistency*
-      (maybe-mumble "[Check]~%")
-      (check-ir1-consistency (append components top-components)))
+    (let ((*all-components* (append components top-components))
+          (top-level-closure nil))
+      (when *check-consistency*
+        (maybe-mumble "[Check]~%")
+        (check-ir1-consistency *all-components*))
 
-    (let ((top-level-closure nil))
       (dolist (component components)
         (compile-component component)
         (when (replace-toplevel-xeps component)
@@ -1549,12 +1555,14 @@ necessary, since type inference may take arbitrarily long to converge.")
 
       (when *check-consistency*
         (maybe-mumble "[Check]~%")
-        (check-ir1-consistency (append components top-components)))
+        (check-ir1-consistency *all-components*))
 
       (if load-time-value-p
           (compile-load-time-value-lambda lambdas)
           (compile-toplevel-lambdas lambdas top-level-closure)))
 
+    (dolist (component components)
+      (clear-ir1-info component))
     (clear-ir1-namespace))
   (values))
 

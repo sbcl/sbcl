@@ -445,7 +445,8 @@
   (loop
    (let ((did-something nil))
      (dolist (clambda clambdas)
-       (let ((component (lambda-component clambda)))
+       (let* ((component (lambda-component clambda))
+              (*all-components* (list component)))
          (when (or (component-new-functionals component)
                    (component-reanalyze-functionals component))
            (setf did-something t)
