@@ -534,8 +534,8 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
       (__gmpz_powm (addr rop) (addr gbase) (addr gexp) (addr gmod)))))
 
 (defgmpfun mpz-gcd (a b)
-  (with-mpz-results ((result (min (blength a)
-                                  (blength b))))
+  (with-mpz-results ((result (1+ (min (blength a)
+                                      (blength b)))))
     (with-mpz-vars ((a ga) (b gb))
       (__gmpz_gcd (addr result) (addr ga) (addr gb)))))
 

@@ -288,3 +288,11 @@
   (assert (= (sb-gmp::gmp-intexp (test-util:opaque-identity 1/2)
                                  (test-util:opaque-identity 0))
              1)))
+
+(test-util:with-test (:name :gcd)
+  (assert (= (sb-gmp::mpz-gcd (test-util:opaque-identity (- (expt 2 63)))
+                              (test-util:opaque-identity (- (expt 2 63))))
+             (expt 2 63)))
+  (assert (= (sb-gmp::mpz-gcd (test-util:opaque-identity (- (expt 2 63)) )
+                              (test-util:opaque-identity (expt 2 63)))
+             (expt 2 63))))
