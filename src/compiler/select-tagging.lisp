@@ -156,9 +156,7 @@
                      (when both
                        (add-edge net node lvar (* 10 (boxing-cost lvar)))))
                    (read-costs (lvar node)
-                     (cond ((constant-lvar-p lvar)
-                            (values 0 0))
-                           ((combination-p node)
+                     (cond ((combination-p node)
                             (let ((template (combination-info node)))
                               (cond ((atom template)
                                      (if (vop-info-p template)
@@ -197,7 +195,8 @@
                                                 (map-all-dests
                                                  (lambda (dest lvar nth-value)
                                                    (declare (ignorable nth-value))
-                                                   (unless (memq lvar seen-lvars)
+                                                   (unless (or (constant-lvar-p lvar)
+                                                               (memq lvar seen-lvars))
                                                      (push lvar seen-lvars)
                                                      (multiple-value-bind (tag untag) (read-costs lvar dest)
                                                        (incf tagged tag)
