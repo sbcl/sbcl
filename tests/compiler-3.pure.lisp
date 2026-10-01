@@ -758,3 +758,11 @@
                       (labels ((m (z vars)
                                  (m z vars)))
                         (m 1 (error "x"))))))
+
+(with-test (:name :mv-call-lambda-type)
+  (assert-type
+   (lambda (f)
+     (multiple-value-call
+         (lambda (&rest r) (1+ (car r)))
+       (funcall f)))
+   number))

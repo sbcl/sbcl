@@ -217,9 +217,13 @@
                            (functional-type entry-fun))
                           ((and (intersection-type-p lvar-type)
                                 (find-if #'fun-type-p (intersection-type-types lvar-type))))
-                          ((and (not (fun-type-p lvar-type))
-                                (lambda-p entry-fun)
-                                (functional-kind-eq entry-fun nil)
+                          ((and (or (not (fun-type-p lvar-type))
+                                    (and asserted-type
+                                         (not (constant-p leaf))))
+                                (or (lambda-p entry-fun)
+                                    (and (optional-dispatch-p entry-fun)
+                                         (setf entry-fun (optional-dispatch-main-entry entry-fun))))
+                                (functional-kind-eq entry-fun nil optional)
                                 (lambda-tail-set entry-fun))
                            (make-fun-type :wild-args t
                                           :returns
