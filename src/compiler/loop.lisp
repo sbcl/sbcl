@@ -32,6 +32,8 @@
 (defun find-dominators (component)
   (let ((head (loop-head (component-outer-loop component)))
         changed)
+    (do-blocks (block component :tail)
+      (setf (block-dominator block) nil))
     (setf (block-dominator head) head)
     (dfo-as-needed component)
     (loop
@@ -48,10 +50,6 @@
             (setq changed t))))
       (unless changed (return)))
     (setf (block-dominator head) nil)))
-
-(defun clear-dominators (component)
-  (do-blocks (block component)
-    (setf (block-dominator block) nil)))
 
 ;;; DOMINATES-P  --  Internal
 ;;;
