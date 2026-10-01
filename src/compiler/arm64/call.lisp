@@ -1006,6 +1006,7 @@
   (:temporary (:scs (descriptor-reg) :from (:eval 0)) move-temp)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:temporary (:sc any-reg :offset ocfp-offset :from (:eval 0)) ocfp)
+  (:temporary (:sc non-descriptor-reg :offset lr-offset))
   (:ignore arg-locs args ocfp)
   (:generator 5
     (let ((cur-nfp (current-nfp-tn vop)))
@@ -1040,6 +1041,7 @@
   (:vop-var vop)
   (:node-var node)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
+  (:temporary (:sc non-descriptor-reg :offset lr-offset))
   (:generator 20
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
@@ -1075,6 +1077,7 @@
   (:ignore args res save)
   (:vop-var vop)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
+  (:temporary (:sc non-descriptor-reg :offset lr-offset))
   (:generator 5
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
