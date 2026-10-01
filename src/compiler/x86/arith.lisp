@@ -743,7 +743,12 @@
            (inst lea result (make-ea :dword :index number :scale 8)))
           (t
            (move result number)
-           (cond ((plusp amount) (inst shl result amount))
+           (cond ((> amount 31)
+                   (if (sc-is result signed-reg)
+                       (inst xor result result)
+                       (inst mov result 0)))
+                 ((plusp amount)
+                  (inst shl result amount))
                  (t (inst sar result (min 31 (- amount)))))))))
 
 (define-vop (ash-c/unsigned=>unsigned)
