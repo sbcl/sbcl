@@ -183,7 +183,12 @@
       (let ((digit (sb-c::mask-signed-field sb-vm:n-word-bits (sb-bignum:%bignum-ref x 1))))
         (= (sb-c::mask-signed-field 16 digit)
            digit)))
-   :allow-notes nil))
+   :allow-notes nil)
+  (checked-compile
+   `(lambda (a n)
+      (let ((v (- (ldb (byte 32 0) n))))
+        (setq v 32768)
+        (ldb (byte 32 0) (+ a v))))))
 
 (with-test (:name :round-transform-too-early)
   (checked-compile
