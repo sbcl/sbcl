@@ -45,6 +45,6 @@
      "Kawi" "Nag_Mundari"))
 
  (*line-break-classes*
-    ("XX" "AI" "AL" "B2" "BA" "BB" "BK" "CB" "CJ" "CL" "CM" "CP" "CR" "EB" "EM"
-     "EX" "GL" "HL" "HY" "ID" "IN" "IS" "LF" "NL" "NS" "NU" "OP" "PO" "PR" "QU"
-     "RI" "SA" "SG" "SP" "SY" "WJ" "ZW" "ZWJ")))
+    ("XX" "AI" "AK" "AL" "AP" "AS" "B2" "BA" "BB" "BK" "CB" "CJ" "CL" "CM" "CP"
+     "CR" "EB" "EM" "EX" "GL" "HL" "HY" "ID" "IN" "IS" "LF" "NL" "NS" "NU" "OP"
+     "PO" "PR" "QU" "RI" "SA" "SG" "SP" "SY" "VF" "VI" "WJ" "ZW" "ZWJ")))

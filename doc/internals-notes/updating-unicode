@@ -1,4 +1,4 @@
-Updating Unicode versions (notes on the 10.0.0-15.0.0 updates):
+Updating Unicode versions (notes on the 10.0.0-15.1.0 updates):
 
 1. Download ucd.zip for the version to update to, along with UCA's
    allkeys.txt and CollationTest.zip, and confusables.txt from
@@ -7,21 +7,17 @@ Updating Unicode versions (notes on the 10.0.0-15.0.0 updates):
 
    (See tools-for-build/update-unicode-datafiles.sh)
 
-   a. obsolete: replaced by confusables.txt.  (think about
-      ConfusablesEdited.txt which claims to be version 12: maybe
-      that's the first version Confusables.txt existed?  Cross that
-      bridge when we get to it.)
+2. Look at the data files, and adjust tools-for-build files:
 
-2. Look at the data files, and adjust more-ucd-consts.lisp-expr
+   - more-ucd-consts.lisp-expr: for major Unicode versions, scripts
+     are likely to have been added.  Minor versions might extend
+     various other classes.
 
-   At least scripts are likely to have been added.
+   - ucd.lisp: new properties in PropList.txt or
+     DerivedNormalizationProbs.txt will need to be added to
+     slurp-proplist.
 
 3. Try to build.
-
-   (This didn't go wrong this time; there may be fewer hard-coded
-   things than there were in the distant past.  I was slightly
-   surprised that I adjusted more-ucd-consts.lisp-expr correctly first
-   time.)
 
 4. Run tests.  Expect failures:
 
@@ -61,3 +57,7 @@ Updating Unicode versions (notes on the 10.0.0-15.0.0 updates):
         existing scripts have new blocks added.  Supporting this
         involves changing the else branch in COLLATION-KEY in
         target-unicode.
+
+5. Build but turn off the :sb-unicode feature: use the
+   --without-sb-unicode flag to make.sh.  Run tests again to verify that
+   the tests are resistant to this build option.

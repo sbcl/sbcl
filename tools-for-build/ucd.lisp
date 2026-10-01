@@ -274,7 +274,7 @@ Length should be adjusted when the standard changes.")
               (split-string
                (string-right-trim " " (subseq line 0 (position #\# line))) #\;)
             (let ((range (parse-codepoint-range codepoints))
-                  (index (index-or-lose value *east-asian-widths* "East Asian width")))
+                  (index (index-or-lose (subseq value 1) *east-asian-widths* "East Asian width")))
               (loop for i from (car range) to (cadr range)
                  do (setf (gethash i hash) index))))
        finally (return hash)))
@@ -304,6 +304,7 @@ Length should be adjusted when the standard changes.")
               (split-string
                (string-right-trim " " (subseq line 0 (position #\# line))) #\;)
             (let* ((range (parse-codepoint-range codepoints))
+                   (value (subseq value 1))
                    ;; Hangul syllables are marked as "Unknown", and programmatically
                    ;; handled in SB-UNICODE:LINE-BREAK-CLASS
                    (value
@@ -787,6 +788,7 @@ Length should be adjusted when the standard changes.")
     (parse-property s :other-grapheme-extend)
     (parse-property s :ids-binary-operator)
     (parse-property s :ids-trinary-operator)
+    (parse-property s :ids-unary-operator)
     (parse-property s :radical)
     (parse-property s :unified-ideograph)
     (parse-property s :other-default-ignorable-code-point)
@@ -795,6 +797,8 @@ Length should be adjusted when the standard changes.")
     (parse-property s :logical-order-exception)
     (parse-property s :other-id-start)
     (parse-property s :other-id-continue)
+    (parse-property s :id-compat-math-continue)
+    (parse-property s :id-compat-math-start)
     (parse-property s :sentence-terminal)
     (parse-property s :variation-selector)
     (parse-property s :pattern-white-space)
@@ -822,6 +826,7 @@ Length should be adjusted when the standard changes.")
     (parse-property s) ;; Expands_On_NFKD
     (parse-property s) ;; Expands_On_NFKC
     (parse-property s) ;; NFKC_CF
+    (parse-property s) ;; NFKC_SCF
     (parse-property s)) ;; Changes_When_NFKC_Casefolded
 
   (with-input-utf8-file (s "DerivedCoreProperties")
@@ -844,7 +849,11 @@ Length should be adjusted when the standard changes.")
     (parse-property s :default-ignorable-code-point)
     (parse-property s :grapheme-extend)
     (parse-property s :grapheme-base)
-    (parse-property s :grapheme-link))
+    (parse-property s :grapheme-link)
+    (parse-property s) ;; Indic Conjunct Break header
+    (parse-property s :indic-conjunct-break=linker)
+    (parse-property s :indic-conjunct-break=consonant)
+    (parse-property s :indic-conjunct-break=extend))
 
   (with-input-arbitrary-utf8-file (s "emoji-data")
     (parse-property s) ;; Initial comments
