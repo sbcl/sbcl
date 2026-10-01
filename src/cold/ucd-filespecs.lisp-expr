@@ -18,6 +18,7 @@
  "tools-for-build/CaseFolding.txt"
  "tools-for-build/PropList.txt"
  "tools-for-build/DerivedNormalizationProps.txt"
+ "tools-for-build/DerivedCoreProperties.txt"
  "tools-for-build/more-ucd-consts.lisp-expr")
 
 ;; Outputs
@@ -36,6 +37,7 @@
  "output/ucd/confusables.lisp-expr"
  "output/ucd/decomp.dat"
  "output/ucd/DerivedAge.txt"
+ "output/ucd/DerivedCoreProperties.txt"
  "output/ucd/DerivedNormalizationProps.txt"
  "output/ucd/EastAsianWidth.txt"
  "output/ucd/emoji-data.txt"

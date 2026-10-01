@@ -824,6 +824,28 @@ Length should be adjusted when the standard changes.")
     (parse-property s) ;; NFKC_CF
     (parse-property s)) ;; Changes_When_NFKC_Casefolded
 
+  (with-input-utf8-file (s "DerivedCoreProperties")
+    (parse-property s) ;; Initial comments
+    (parse-property s :math)
+    (parse-property s :alphabetic)
+    (parse-property s :lowercase)
+    (parse-property s :uppercase)
+    (parse-property s :cased)
+    (parse-property s :case-ignorable)
+    (parse-property s :changes-when-lowercased)
+    (parse-property s :changes-when-uppercased)
+    (parse-property s :changes-when-titlecased)
+    (parse-property s :changes-when-casefolded)
+    (parse-property s :changes-when-casemapped)
+    (parse-property s :id-start)
+    (parse-property s :id-continue)
+    (parse-property s :xid-start)
+    (parse-property s :xid-continue)
+    (parse-property s :default-ignorable-code-point)
+    (parse-property s :grapheme-extend)
+    (parse-property s :grapheme-base)
+    (parse-property s :grapheme-link))
+
   (with-input-arbitrary-utf8-file (s "emoji-data")
     (parse-property s) ;; Initial comments
     (parse-property s :emoji)
