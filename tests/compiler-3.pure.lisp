@@ -771,3 +771,46 @@
          (lambda (&rest r) (1+ (car r)))
        (funcall f)))
    number))
+
+(with-test (:name :local-call-coerce-tns)
+  `(lambda ()
+     (declare (optimize speed (safety 0)))
+     (labels ((f0 ()
+                (ldb (byte 32 0)
+                     (let ((l (funcall *)))
+                       (do () ((> * l) *)
+                         (return *)))))
+              (f1 (a)
+                (funcall * (+ a (f0))))
+              (f2 (a)
+                (cond (*
+                       (ldb (byte 11 1) a))
+                      ((f1 a)
+                       a)
+                      (t (f0)))
+                ))
+       (values (f1 1)
+               (f2 (f0))
+               (f2 2))))
+  (checked-compile
+   `(lambda (n m)
+      (declare (optimize (speed 0) (debug 2)))
+      (labels ((f1 (a)
+                 a
+                 32)
+               (f2 (a)
+                 (block nil
+                   (return
+                     ((lambda (p)
+                        (values
+                         (ceiling p
+                                  (let ((d a))
+                                    (if (<= -1 d 5)
+                                        d)))))
+                      (let ((o (ash 1 (logand a 7))))
+                        (loop while (funcall n (- a))
+                              do (setq o (ldb (byte 32 0) (f1 a))))
+                        o)))
+                   (f1 1))))
+        (or * * 4)
+        (values (f2 (f2 (- (ldb (byte 32 0) m) 2))))))))
