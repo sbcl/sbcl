@@ -749,7 +749,8 @@
                          (let ((n (lambda (&optional (n 0)) (+ n 1.0))))
                            (values (the (function * (values integer &optional)) n)
                                    n)))
-                      :allow-warnings t))))
+                      :allow-warnings t)))
+  (checked-compile `(lambda () (the (function * list) (lambda (&rest r) r)))))
 
 (with-test (:name :principal-lvar-ref-recursion)
   (checked-compile `(lambda ()

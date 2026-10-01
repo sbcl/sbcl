@@ -1070,82 +1070,85 @@ call themselves or each other."
 
 ;;; Add types, arg-count mismatch will be handled by something else
 (defun fun-type-from-lambda (fun-type lambda)
-  (typecase lambda
-    (clambda
-     (let ((req (fun-type-required fun-type))
-           (opt (fun-type-optional fun-type)))
-       (make-fun-type :required (loop for var in (lambda-vars lambda)
-                                      collect (cond (req
-                                                     (pop req))
-                                                    (opt
-                                                     (type-union (pop opt)
-                                                                 (specifier-type 'null)))
-                                                    (t
-                                                     *universal-type*)))
-                      :returns (fun-type-returns fun-type))))
-    (optional-dispatch
-     (let ((req (fun-type-required fun-type))
-           (opt (fun-type-optional fun-type))
-           (key (fun-type-keywords fun-type))
-           (rest (fun-type-rest fun-type))
-           new-req
-           new-opt
-           new-key
-           new-rest
-           (vars (optional-dispatch-arglist lambda))
-           mismatch)
-       (flet ((next-pos ()
-                (or (pop req)
-                    (pop opt))))
-         (loop while vars
-               do (let ((info (lambda-var-arg-info (car vars))))
-                    (case (if info
-                              (arg-info-kind info)
-                              :required)
-                      (:required
-                       (push (cond (req
-                                    (pop req))
-                                   (opt
-                                    (pop opt)
-                                    *universal-type*)
-                                   (t
-                                    (setf mismatch t)
-                                    *universal-type*))
-                             new-req))
-                      (:optional
-                       (let ((type (next-pos)))
-                         (push (cond (type)
-                                     (t
-                                      (setf mismatch t)
-                                      *universal-type*)) new-opt)))
-                      (t
-                       (return))))
-                  (pop vars))
-         (when (or req opt)
-           (setf mismatch t))
-         (loop while vars
-               do (let ((info (lambda-var-arg-info (pop vars))))
-                    (ecase (if info
-                               (arg-info-kind info)
-                               :required)
-                      (:keyword
-                       (let ((exist (find (arg-info-key info) key :key #'key-info-name)))
-                         (push (if (or mismatch (not exist))
-                                   (make-key-info (arg-info-key info)
-                                                  *universal-type*)
-                                   exist)
-                               new-key)))
-                      (:rest
-                       (setf new-rest (if mismatch
-                                          *universal-type*
-                                          rest))))))
-         (make-fun-type :required (nreverse new-req)
-                        :optional (nreverse new-opt)
-                        :keywords (sb-kernel::intern-key-infos (nreverse new-key))
-                        :rest new-rest
-                        :keyp (optional-dispatch-keyp lambda)
-                        :allowp (optional-dispatch-allowp lambda)
-                        :returns (fun-type-returns fun-type)))))))
+  (if (fun-type-wild-args fun-type)
+      fun-type
+      (typecase lambda
+        (clambda
+         (let ((req (fun-type-required fun-type))
+               (opt (fun-type-optional fun-type)))
+           (make-fun-type :required (loop for var in (lambda-vars lambda)
+                                          collect (cond (req
+                                                         (pop req))
+                                                        (opt
+                                                         (type-union (pop opt)
+                                                                     (specifier-type 'null)))
+                                                        (t
+                                                         *universal-type*)))
+                          :returns (fun-type-returns fun-type))))
+        (optional-dispatch
+         (let ((req (fun-type-required fun-type))
+               (opt (fun-type-optional fun-type))
+               (key (fun-type-keywords fun-type))
+               (rest (fun-type-rest fun-type))
+               new-req
+               new-opt
+               new-key
+               new-rest
+               (vars (optional-dispatch-arglist lambda))
+               mismatch)
+           (flet ((next-pos ()
+                    (or (pop req)
+                        (pop opt))))
+             (loop while vars
+                   do (let ((info (lambda-var-arg-info (car vars))))
+                        (case (if info
+                                  (arg-info-kind info)
+                                  :required)
+                          (:required
+                           (push (cond (req
+                                        (pop req))
+                                       (opt
+                                        (pop opt)
+                                        *universal-type*)
+                                       (t
+                                        (setf mismatch t)
+                                        *universal-type*))
+                                 new-req))
+                          (:optional
+                           (let ((type (next-pos)))
+                             (push (cond (type)
+                                         (t
+                                          (setf mismatch t)
+                                          *universal-type*)) new-opt)))
+                          (t
+                           (return))))
+                      (pop vars))
+             (when (or req opt)
+               (setf mismatch t))
+             (loop while vars
+                   do (let ((info (lambda-var-arg-info (pop vars))))
+                        (ecase (if info
+                                   (arg-info-kind info)
+                                   :required)
+                          (:keyword
+                           (let ((exist (find (arg-info-key info) key :key #'key-info-name)))
+                             (push (if (or mismatch (not exist))
+                                       (make-key-info (arg-info-key info)
+                                                      *universal-type*)
+                                       exist)
+                                   new-key)))
+                          (:rest
+                           (setf new-rest (if mismatch
+                                              *universal-type*
+                                              (or rest
+                                                  *universal-type*)))))))
+             (make-fun-type :required (nreverse new-req)
+                            :optional (nreverse new-opt)
+                            :keywords (sb-kernel::intern-key-infos (nreverse new-key))
+                            :rest new-rest
+                            :keyp (optional-dispatch-keyp lambda)
+                            :allowp (optional-dispatch-allowp lambda)
+                            :returns (fun-type-returns fun-type))))))))
 
 ;;;; the THE special operator, and friends
 
