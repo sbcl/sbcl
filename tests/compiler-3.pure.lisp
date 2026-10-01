@@ -814,3 +814,16 @@
                    (f1 1))))
         (or * * 4)
         (values (f2 (f2 (- (ldb (byte 32 0) m) 2))))))))
+
+(with-test (:name :let-lvar-dest-single-use)
+  (checked-compile-and-assert
+      ()
+      `(lambda (n)
+         (declare (fixnum n))
+         (flet ((f (a)
+                  (eql a 0)))
+           (values (f (rem n 3))
+                   (f n))))
+    ((0) (values t t))
+    ((1) (values nil nil))
+    ((3) (values t nil))))

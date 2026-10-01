@@ -303,15 +303,17 @@
                       (lvar-dest lvar))))
       (if (and (combination-p dest)
                (eq (basic-combination-kind dest) :local))
-          (let* ((fun (combination-lambda dest))
-                 (n (position-or-lose lvar
-                                      (combination-args dest)))
-                 (var (nth n (lambda-vars fun)))
-                 (refs (leaf-refs var)))
-            (when (and refs
-                       (not (cdr refs))
-                       (not (lambda-var-sets var)))
-              (let-lvar-dest (node-lvar (car refs)) single-use)))
+          (let ((fun (combination-lambda dest)))
+            (when (or (not single-use)
+                      (not (cdr (leaf-refs fun))))
+              (let* ((n (position-or-lose lvar
+                                          (combination-args dest)))
+                     (var (nth n (lambda-vars fun)))
+                     (refs (leaf-refs var)))
+                (when (and refs
+                           (not (cdr refs))
+                           (not (lambda-var-sets var)))
+                  (let-lvar-dest (node-lvar (car refs)) single-use)))))
           dest))))
 
 (defun lvar-dest-var (lvar)
