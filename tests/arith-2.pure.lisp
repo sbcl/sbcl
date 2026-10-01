@@ -1353,7 +1353,16 @@
          (declare (fixnum a))
          (truly-the bit (ash a 90)))
     ((0) 0)
-    ((1) 0)))
+    ((1) 0))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare (fixnum a))
+      (let ((v (make-array 1 :element-type '(unsigned-byte 32))))
+        (setf (aref v 0) (truly-the bit (ash a 90)))
+        (aref (opaque-identity v) 0)))
+   ((0) 0)
+   ((1) 0)))
 
 (with-test (:name :range-unsigned-comparison)
   (checked-compile-and-assert

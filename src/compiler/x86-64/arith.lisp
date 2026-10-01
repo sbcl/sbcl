@@ -2783,7 +2783,10 @@
     (cond ((encodable-as-lea) (generate-lea))
           (t
            (with-shift-operands
-            (cond ((plusp amount) (inst shl result amount))
+            (cond ((> amount 63)
+                   (zeroize result))
+                  ((plusp amount)
+                   (inst shl result amount))
                   (t (inst sar result (min 63 (- amount))))))))))
 
 (define-vop (ash-c/unsigned=>unsigned)
