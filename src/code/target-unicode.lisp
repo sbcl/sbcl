@@ -713,36 +713,15 @@ If the character is not a Hangul syllable or Jamo, returns NIL"
       ((and (<= #xac00 cp) (<= cp #xd7a3))
        (if (= 0 (rem (- cp #xac00) 28)) :LV :LVT)))))
 
-(defun line-break-class (character &key resolve)
-  "Returns the line breaking class of CHARACTER, as specified in UAX #14.
-If :RESOLVE is NIL, returns the character class found in the property file.
-If :RESOLVE is non-NIL, certain line-breaking classes will be mapped to other
-classes as specified in the applicable standards. Additionally, if :RESOLVE
-is :EAST-ASIAN, Ambigious (class :AI) characters will be mapped to the
-Ideographic (:ID) class instead of Alphabetic (:AL)."
-  (when (and resolve (listp character)) (setf character (car character)))
-  (when (and resolve (not character)) (return-from line-break-class :nil))
-  (let ((raw-class
-         (svref-or-null #.(read-ucd-constant '*line-break-classes*)
-                        (aref +character-misc-database+ (+ 7 (misc-index character)))))
-        (syllable-type (hangul-syllable-type character)))
-    (when syllable-type
-      (setf raw-class
-            (cdr (assoc syllable-type
-                        '((:l . :JL) (:v . :JV) (:t . :JT)
-                          (:lv . :H2) (:lvt . :H3))))))
-    (when resolve
-      (setf raw-class
-            (case raw-class
-              (:ai (if (eql resolve :east-asian) :ID :AL))
-              (:xx :al)
-              (:sa (if (member (general-category character) '(:Mn :Mc)) :cm :al))
-              (:cj :ns)
-              (:sg (error "The character ~S is a surrogate, which should not
-appear in an SBCL string. The line-breaking behavior of surrogates is undefined."
-                          character))
-              (t raw-class))))
-    raw-class))
+(defun line-break-class (character)
+  "Returns the line breaking class of CHARACTER, as specified in the
+Unicode character database."
+  (let ((syllable-type (hangul-syllable-type character)))
+    (if syllable-type
+        (cdr (assoc syllable-type
+                    '((:l . :JL) (:v . :JV) (:t . :JT) (:lv . :H2) (:lvt . :H3))))
+        (svref-or-null #.(read-ucd-constant '*line-break-classes*)
+                       (aref +character-misc-database+ (+ 7 (misc-index character)))))))
 
 (defun uppercase-p (character)
   "Returns T if CHARACTER has the Unicode property Uppercase and NIL otherwise"
@@ -1455,11 +1434,26 @@ sentence breaking rules specified in UAX #29"
                    (brk))))
           (t (nobrk))))))))
 
+;;; Handles the resolution of line breaking classes according to rule LB1
+(defun lb1-line-break-class (character)
+  (when (listp character) (setf character (car character)))
+  (when (null character) (return-from lb1-line-break-class :nil))
+  (let ((class (line-break-class character)))
+    (case class
+      (:ai :al)
+      (:xx :al)
+      (:sa (if (member (general-category character) '(:mn :mc)) :cm :al))
+      (:cj :ns)
+      (:sg (error "The character ~S is a surrogate, which should not
+appear in an SBCL string. The line-breaking behavior of surrogates is undefined."
+                  character))
+      (t class))))
+
 (defun line-prebreak (string)
   (let ((chars (coerce string 'list))
         cluster clusters last-seen)
     (loop for char in chars
-       for type = (line-break-class char :resolve t)
+       for type = (lb1-line-break-class char)
        do
          (when
              (and cluster
@@ -1526,7 +1520,7 @@ sentence breaking rules specified in UAX #29"
                    `(when
                         (and ,atest
                              (loop for c in tail
-                                for type = (line-break-class c :resolve t)
+                                for type = (lb1-line-break-class c)
                                 do
                                   (when (not (eql type :sp))
                                     (return ,btest))))
@@ -1548,8 +1542,8 @@ sentence breaking rules specified in UAX #29"
       (tagbody
        top
          (when (not first) (go end))
-         (setf t1 (line-break-class first :resolve t))
-         (setf t2 (line-break-class second :resolve t))
+         (setf t1 (lb1-line-break-class first))
+         (setf t2 (lb1-line-break-class second))
          (if (and (eql t1 :ri) (eql t2 :ri)) (incf nri) (setf nri 0))
          (between :any :nil :must)      ; LB3
          (when (and (eql state :eat-spaces) (eql t2 :sp))
@@ -1580,7 +1574,7 @@ sentence breaking rules specified in UAX #29"
          (between :any :sp :cant) ; LB7, here after all AFTER-SPACES calls
          (when (and (eql t2 :qu)
                     (eql (general-category (if (consp second) (car second) second)) :pf)
-                    (member (line-break-class (cadr tail) :resolve t)
+                    (member (lb1-line-break-class (cadr tail))
                             '(:sp :gl :wj :cl :qu :cp :ex :is :sy :bk :cr :lf :nl :zw :nil)))
            (between :any :qu :cant)) ; LB15b
          (between :sp :any :can)  ; LB18
@@ -1618,7 +1612,7 @@ sentence breaking rules specified in UAX #29"
            (between :vi :any :cant))               ; LB28a
          (when (and (aksara-p first t1)
                     (aksara-p second t2)
-                    (eql (line-break-class (cadr tail) :resolve t) :vf))
+                    (eql (lb1-line-break-class (cadr tail)) :vf))
            (between :any :any :cant))              ; LB28a
          (unless (member (east-asian-width (if (consp second) (car second) second)) '(:h :w :f))
            (between '(:al :hl :nu) :op :cant))        ; LB30
