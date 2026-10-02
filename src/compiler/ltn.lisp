@@ -798,12 +798,14 @@
           ((not (template-args-ok template call))
            (values nil :arg-types))
           ((template-conditional-p template)
-           (or (vop-existsp :named sb-vm::move-conditional-result)
-               (let ((dest (lvar-dest lvar)))
-                 (if (and (if-p dest)
-                          (immediately-used-p (if-test dest) call))
-                     (values t nil)
-                     (values nil :conditional)))))
+           (if-vop-existsp (:named sb-vm::move-conditional-result)
+             ;; it might go to a cast that has no lvar, which will be deleted in ltn-analyze-cast
+             (principal-lvar-end lvar)
+             (let ((dest (lvar-dest lvar)))
+               (if (and (if-p dest)
+                        (immediately-used-p (if-test dest) call))
+                   (values t nil)
+                   (values nil :conditional)))))
           ((template-results-ok template dtype (lvar-single-value-p (node-lvar call)))
            (values t nil))
           (t
@@ -1067,7 +1069,7 @@
   (values))
 
 ;;; CASTs are merely lvar annotations than nodes. So we wait until
-;;; value consumer deside how values should be passed, and after that
+;;; value consumer decide how values should be passed, and after that
 ;;; we propagate this decision backwards through CAST chain. The
 ;;; exception is a dangling CAST with a type check, which we process
 ;;; immediately.
