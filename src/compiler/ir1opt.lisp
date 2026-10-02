@@ -880,7 +880,8 @@
       (let ((info (combination-fun-info combination)))
         (when (and info
                    (flushable-combination-p combination)
-                   (skip-nodes-before-node-p block combination))
+                   (skip-nodes-before-node-p block combination)
+                   (immediately-used-p test combination))
           (loop for arg in (combination-args combination)
                 for uses = (lvar-uses arg)
                 for type = (lvar-type arg)

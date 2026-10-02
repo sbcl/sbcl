@@ -827,3 +827,16 @@
     ((0) (values t t))
     ((1) (values nil nil))
     ((3) (values t nil))))
+
+(with-test (:name :bypass-if)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x n j)
+         (let ((n (car (if x n nil))))
+           (incf j)
+           (if n
+               1
+               j)))
+    ((1 nil 3) 4)
+    ((1 '(a) 3) 1)
+    ((nil '(a) 3) 4)))
