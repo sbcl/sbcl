@@ -2951,17 +2951,17 @@
   (:result-types signed-byte-128)
   (:generator 11
     (cond
-      ((location= lo lo-x)
+      ((location= y hi)
+       (inst mul   lo lo-x y)
+       (inst umulh tmp-tn lo-x y)
+       (inst madd  tmp-tn hi-x y tmp-tn)
+       (inst asr   hi y 63)
+       (inst madd  hi lo-x hi tmp-tn))
+      (t
        (inst umulh tmp-tn lo-x y)
        (inst madd  tmp-tn hi-x y tmp-tn)
        (inst asr   hi y 63)
        (inst madd  hi lo-x hi tmp-tn)
-       (inst mul   lo lo-x y))
-      (t
-       (inst umulh lo lo-x y)
-       (inst madd  lo hi-x y lo)
-       (inst asr   hi y 63)
-       (inst madd  hi lo-x hi lo)
        (inst mul   lo lo-x y)))))
 
 (define-vop (*/signed*s128=>s128 */s128*signed=>s128)
