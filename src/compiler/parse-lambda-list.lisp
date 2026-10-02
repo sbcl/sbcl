@@ -326,40 +326,40 @@
         (flet ((scan-opt/key (list what-kind description)
                  (dolist (arg list)
                    (when (defaultp arg what-kind)
-                     ;; FIXME:  (DEFUN F (&OPTIONAL (A B C D)) 42) crashes the
-                     ;; compiler, but not as consequence of the new parser.
-                     ;; (This is not a regression)
-                     (destructuring-bind (var &optional default sup-p) arg
-                       (if (and (consp var) (eq what-kind '&key))
-                           (cond ((singleton-p (cdr var))
-                                  (destructuring-bind (keyword-name var) var
-                                    (unless (symbolp keyword-name)
-                                      (croak "keyword-name in ~S is not a symbol" arg))
-                                    (need-bindable var description)))
-                                 (t
-                                  (croak "invalid &KEY syntax: ~S" var)))
-                           (need-bindable var description))
-                       ;; Inform the user about a possibly malformed
-                       ;; destructuring list (&OPTIONAL (A &OPTIONAL B)).
-                       ;; It's technically legal but unlikely to be right,
-                       ;; as A's default form is the symbol &OPTIONAL,
-                       ;; which is an unlikely name for a local variable,
-                       ;; and an illegal name for a DEFVAR or such,
-                       ;; being in the CL package.
-                       (unless silent
-                         (check-suspicious "default" default)
-                         (check-suspicious "supplied-p variable" sup-p)))))))
+                     (if (proper-list-of-length-p arg 1 3)
+                         (destructuring-bind (var &optional default sup-p) arg
+                           (if (and (consp var) (eq what-kind '&key))
+                               (cond ((singleton-p (cdr var))
+                                      (destructuring-bind (keyword-name var) var
+                                        (unless (symbolp keyword-name)
+                                          (croak "keyword-name in ~S is not a symbol" arg))
+                                        (need-bindable var description)))
+                                     (t
+                                      (croak "invalid &KEY syntax: ~S" var)))
+                               (need-bindable var description))
+                           ;; Inform the user about a possibly malformed
+                           ;; destructuring list (&OPTIONAL (A &OPTIONAL B)).
+                           ;; It's technically legal but unlikely to be right,
+                           ;; as A's default form is the symbol &OPTIONAL,
+                           ;; which is an unlikely name for a local variable,
+                           ;; and an illegal name for a DEFVAR or such,
+                           ;; being in the CL package.
+                           (unless silent
+                             (check-suspicious "default" default)
+                             (check-suspicious "supplied-p variable" sup-p)))
+                         (croak "malformed &key ~s" arg))))))
           (scan-opt/key optional '&optional "&OPTIONAL parameter name")
           (when rest
             (need-bindable (car rest) "&REST argument"))
           (scan-opt/key keys '&key "&KEY parameter name")
           (dolist (arg aux)
             (when (defaultp arg '&aux)
-              ;; FIXME: also potentially compiler-crash-inducing
-              (destructuring-bind (var &optional init-form) arg
-                (declare (ignore init-form))
-                ;; &AUX is not destructured
-                (need-symbol var "&AUX parameter name"))))))
+              (if (proper-list-of-length-p arg 1 2)
+                  (destructuring-bind (var &optional init-form) arg
+                    (declare (ignore init-form))
+                    ;; &AUX is not destructured
+                    (need-symbol var "&AUX parameter name"))
+                  (croak "malformed &aux ~s" arg))))))
 
     ;; Voila.
       (values (logior seen (if (oddp rest-bits) (bits &body) 0))
