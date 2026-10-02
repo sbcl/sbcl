@@ -5108,6 +5108,7 @@
                                                safe-vops)
   (or (location= dst1 dst2)
       (and
+       (sb-c::tn-reads dst1)
        (not (tn-ref-next (sb-c::tn-reads dst1)))
        (let ((vop (tn-ref-vop (sb-c::tn-reads dst1))))
          (and vop
@@ -5118,7 +5119,11 @@
                                         (sb-c::fun-info-templates (sb-c::fun-info-or-lose fun))))
                     ;; descriptor-allocating VOPs often read the arguments multiple times
                     (not (sc-is (tn-ref-tn (sb-c::vop-results vop))
-                                sb-vm::descriptor-reg)))
+                                sb-vm::descriptor-reg sb-vm::signed-128-reg))
+                    (do ((ref (sb-c::vop-args vop) (tn-ref-across ref)))
+                        ((null ref) t)
+                      (when (sc-is (tn-ref-tn (sb-c::vop-results vop)) sb-vm::signed-128-reg)
+                        (return))))
                (and (not safe-vops)
                     (not safe-translates))))))))
 
