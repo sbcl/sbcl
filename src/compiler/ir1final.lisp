@@ -252,7 +252,9 @@
                            (eq ref-lvar
                                (node-lvar alt-ref))
                            (eq next
-                               (next-node alt-ref)))
+                               (next-node alt-ref))
+                           ;; Doesn't go to a cast without an lvar
+                           (principal-lvar-end ref-lvar))
                   (let ((target (node-block next)))
                     (cond ((eq (ctran-kind (node-prev if)) :block-start)
                            (loop for pred in (block-pred block)

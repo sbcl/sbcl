@@ -791,7 +791,6 @@
 (defun is-ok-template-use (template call)
   (declare (type template template) (type combination call))
   (let* ((guard (template-guard template))
-         (lvar (node-lvar call))
          (dtype (node-derived-type call)))
     (cond ((and guard (not (funcall guard call)))
            (values nil :guard))
@@ -799,9 +798,8 @@
            (values nil :arg-types))
           ((template-conditional-p template)
            (if-vop-existsp (:named sb-vm::move-conditional-result)
-             ;; it might go to a cast that has no lvar, which will be deleted in ltn-analyze-cast
-             (principal-lvar-end lvar)
-             (let ((dest (lvar-dest lvar)))
+             t
+             (let ((dest (node-dest call)))
                (if (and (if-p dest)
                         (immediately-used-p (if-test dest) call))
                    (values t nil)
