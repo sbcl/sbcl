@@ -824,6 +824,7 @@
           (let ((dest (lvar-dest lvar)))
             (cond ((when-vop-existsp (:named sb-vm::move-conditional-result)
                      (unless (and (if-p dest)
+                                  (atom (lvar-uses (if-test dest)))
                                   (immediately-used-p (if-test dest) call))
                        (ir2-convert-conditional-result call block template args info-args lvar)
                        t)))
