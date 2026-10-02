@@ -79,7 +79,7 @@
 ;;;;
 ;;;; Analogous to COMPILER-ERROR, but simpler.
 
-(define-condition eval-error (encapsulated-condition)
+(define-condition eval-error (encapsulated-condition program-error)
   ()
   (:report (lambda (condition stream)
              (print-object (encapsulated-condition condition) stream))))
