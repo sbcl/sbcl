@@ -280,7 +280,10 @@
 (defun find-lexically-apparent-fun (name context &optional (error-on-macro t))
   (let ((var (lexenv-find name funs :test #'equal)))
     (cond ((leaf-p var)
-           var)
+           (or (and (functional-p var)
+                    ;; Can avoid LOCALL-ALREADY-LET-CONVERTED
+                    (functional-entry-fun var))
+               var))
           (var
            (aver (and (consp var) (eq (car var) 'macro)))
            (if error-on-macro
@@ -1219,10 +1222,18 @@
 ;;; are converting inline expansions for local functions during
 ;;; optimization.
 (defun ir1-convert-local-combination (start next result form functional)
-  (assure-functional-live-p functional)
-  (ir1-convert-combination start next result
-                           form
-                           (maybe-reanalyze-functional functional)))
+  (let ((functional
+          (cond ((functional-kind-eq functional let mv-let assignment deleted zombie)
+                 ;; Try inlining an already converted lambda
+                 (let ((inline (functional-inline-expansion functional)))
+                   (if inline
+                       (ir1-convert-lambda inline)
+                       (throw 'locall-already-let-converted functional))))
+                (t
+                 functional))))
+    (ir1-convert-combination start next result
+                             form
+                             (maybe-reanalyze-functional functional))))
 
 ;;;; PROCESS-DECLS
 

@@ -840,3 +840,26 @@
     ((1 nil 3) 4)
     ((1 '(a) 3) 1)
     ((nil '(a) 3) 4)))
+
+(with-test (:name :ir1-optimize-mv-call-dead)
+  (checked-compile
+   `(lambda (n)
+      (labels ((f1 (&key)
+                 1)
+               (f2 ()
+                 (apply #'f1 nil)))
+        (declare (inline f2))
+        (+ (apply #'f2 n)
+           (apply #'f2 nil)))))
+  (checked-compile
+   `(lambda ()
+      (labels ((f0 (a))
+               (f1 (b c))
+               (f3 ()
+                 (f1 (f1 (f0 127) 2))))
+        (declare
+         (inline f0)
+         (inline f3))
+        (+ #'f3 (apply #'f3 nil))))
+   :allow-warnings t
+   :allow-style-warnings t))

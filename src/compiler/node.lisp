@@ -1351,6 +1351,8 @@
              :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
   %debug-name
+  (kind :test (> kind 1)
+        :princ (decode-functional-kind-attributes kind))
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   arglist
