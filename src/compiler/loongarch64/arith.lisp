@@ -96,7 +96,7 @@
   (:result-types signed-num)
   (:note "inline signed unboxed arithmetic"))
 
-(defmacro define-binop (translate cost untagged-cost r-op &optional i-op)
+(defmacro define-binop (translate cost untagged-cost r-op &optional i-op c-type fc-type)
   `(progn
      (define-vop (,(symbolicate translate "/FIXNUM=>FIXNUM")
                   fixnum-binop)
@@ -117,21 +117,30 @@
          `((define-vop (,(symbolicate translate "-C/FIXNUM=>FIXNUM")
                         fixnum-binop-c)
              (:translate ,translate)
+             ,@(when fc-type
+                 `((:arg-types tagged-num (:constant ,fc-type))))
              (:generator ,cost
                (inst ,i-op r x (fixnumize y))))
            (define-vop (,(symbolicate translate "-C/SIGNED=>SIGNED")
                         signed-binop-c)
              (:translate ,translate)
+             ,@(when c-type
+                 `((:arg-types signed-num (:constant ,c-type))))
              (:generator ,untagged-cost
                (inst ,i-op r x y)))
            (define-vop (,(symbolicate translate
                                       "-C/UNSIGNED=>UNSIGNED")
                         unsigned-binop-c)
              (:translate ,translate)
+             ,@(when c-type
+                 `((:arg-types unsigned-num (:constant ,c-type))))
              (:generator ,untagged-cost
                (inst ,i-op r x y)))))))
 (define-binop + 1 5 add.d addi.d)
-(define-binop - 1 5 sub.d subi)
+(define-binop - 1 5 sub.d subi
+  (integer #.(- (1- (ash 1 11))) #.(ash 1 11))
+  (integer #.(- (1- (ash 1 (- 11 n-fixnum-tag-bits))))
+           #.(ash 1 (- 11 n-fixnum-tag-bits))))
 (define-binop logior 1 3 or s_ori)
 (define-binop logxor 1 3 xor s_xori)
 (define-binop logand 1 3 and s_andi)
