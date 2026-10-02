@@ -842,8 +842,12 @@
   (:results ((lo-r hi-r) :scs (signed-128-reg)))
   (:result-types signed-byte-128)
   (:generator 10
-    (inst lsr hi-r x (- 64 amount))
-    (inst lsl lo-r x amount)))
+    (cond ((location= hi-r x)
+           (inst lsl lo-r x amount)
+           (inst lsr hi-r x (- 64 amount)))
+          (t
+           (inst lsr hi-r x (- 64 amount))
+           (inst lsl lo-r x amount)))))
 
 (define-vop (ash-left-c/fixnum=>s128)
   (:translate ash)
@@ -858,6 +862,9 @@
       ((= amount 64)
        (move hi-r x)
        (inst mov lo-r 0))
+      ((location= hi-r x)
+       (inst lsl lo-r x amount)
+       (inst asr hi-r x (- 64 amount)))
       (t
        (inst asr hi-r x (- 64 amount))
        (inst lsl lo-r x amount)))))
@@ -874,6 +881,9 @@
       ((= amount 64)
        (move hi-r x)
        (inst mov lo-r 0))
+      ((location= hi-r x)
+       (inst lsl lo-r x amount)
+       (inst asr hi-r x (- 64 amount)))
       (t
        (inst asr hi-r x (- 64 amount))
        (inst lsl lo-r x amount)))))
