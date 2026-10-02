@@ -735,11 +735,8 @@ Ideographic (:ID) class instead of Alphabetic (:AL)."
       (setf raw-class
             (case raw-class
               (:ai (if (eql resolve :east-asian) :ID :AL))
-              ; If we see :CM when resolving, we have a CM that isn't subject
-              ; to LB9, so we do LB10 (:ZWJ handled in LINE-BREAK-ANNOTATE)
-              ((:xx :cm) :al)
-              (:sa (if (member (general-category character) '(:Mn :Mc))
-                       :CM :AL))
+              (:xx :al)
+              (:sa (if (member (general-category character) '(:Mn :Mc)) :cm :al))
               (:cj :ns)
               (:sg (error "The character ~S is a surrogate, which should not
 appear in an SBCL string. The line-breaking behavior of surrogates is undefined."
@@ -1462,7 +1459,7 @@ sentence breaking rules specified in UAX #29"
   (let ((chars (coerce string 'list))
         cluster clusters last-seen)
     (loop for char in chars
-       for type = (line-break-class char)
+       for type = (line-break-class char :resolve t)
        do
          (when
              (and cluster
@@ -1565,9 +1562,9 @@ sentence breaking rules specified in UAX #29"
                (setf state nil after-spaces nil) (go tail))
          (after-spaces :zw :any :can)                ; LB8
          (between :zwj :any :cant)                   ; LB8a
-         ;; LB9 and LB10 (for CM) handled in LINE-BREAK-CLASS / LINE-PREBREAK
-         (when (eql t1 :zwj) (setf t1 :al))          ; LB10 (for ZWJ)
-         (when (eql t2 :zwj) (setf t2 :al))          ; LB10 (for ZWJ)
+         ;; LB9 handled in LINE-PREBREAK
+         (when (member t1 '(:zwj :cm)) (setf t1 :al))          ; LB10
+         (when (member t2 '(:zwj :cm)) (setf t2 :al))          ; LB10
          (between :any :wj :cant)                    ; LB11
          (between :wj :any :cant)                    ; LB11
          (between :gl :any :cant)                    ; LB12

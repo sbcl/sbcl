@@ -129,8 +129,7 @@
      (split-string (remove +mul+ (remove +div+ string)) #\Space)
      :test #'string=)) 'string))
 
-(with-test (:name (:line-breaking)
-            :skipped-on (not :sb-unicode))
+(with-test (:name (:line-breaking) :skipped-on (not :sb-unicode))
   (let* ((line-break-exceptions (make-hash-table :test 'equal))
          (strings
            (with-open-file (s "data/line-break-exceptions.lisp-expr" :external-format :utf-8)
@@ -156,3 +155,11 @@
                                  ()
                                  "~@<line ~D: ~S - expected: ~S, actual; ~S~:@>"
                                  n string expected actual)))))))))
+
+(with-test (:name (:line-breaking :test1) :skipped-on (not :sb-unicode))
+  ;; line-break class SA[gc=Mn|Mc] should be resolved to CM and
+  ;; clustered with its preceding character.
+  (let* ((string (map 'string 'code-char '(#x41 #x102b #x20)))
+         (annotated (sb-unicode::line-break-annotate string))
+         (expected `(:cant ,(code-char #x41) :cant ,(code-char #x102b) :cant ,(code-char #x20) :must)))
+    (assert (equal annotated expected))))
