@@ -439,13 +439,13 @@
          (y :scs (unsigned-reg)))
   (:arg-refs x-ref)
   (:arg-types signed-num unsigned-num)
-  (:results (r :scs (descriptor-reg)))
+  (:results (r :scs (descriptor-reg any-reg)))
   (:translate logior)
   (:temporary (:sc unsigned-reg) low)
   (:temporary (:sc unsigned-reg) header)
   (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
   (:vop-var vop)
-  (:generator 10
+  (:generator 20
     (let ((fixnum (csubtypep (tn-ref-type x-ref) (specifier-type 'fixnum))))
       (assemble ()
         ;; Untag here or instcombine thinks all logior VOPs
@@ -2996,7 +2996,7 @@
   (:temporary (:sc unsigned-reg) high low)
   (:temporary (:sc unsigned-reg :from (:argument 2)) header)
   (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
-  (:results (r :scs (descriptor-reg)))
+  (:results (r :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:generator 20
     (let ((value (and (sc-is y immediate)
@@ -3037,7 +3037,7 @@
   (:temporary (:sc signed-reg) high low)
   (:temporary (:sc signed-reg :from (:argument 2)) header)
   (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
-  (:results (r :scs (descriptor-reg)))
+  (:results (r :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:generator 20
     (if (sc-is y immediate)
@@ -3067,7 +3067,7 @@
   (:temporary (:sc unsigned-reg) high low)
   (:temporary (:sc unsigned-reg :from (:argument 2)) header)
   (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
-  (:results (r :scs (descriptor-reg)))
+  (:results (r :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:generator 20
     (inst adds low x (if (sc-is y immediate)
@@ -3095,7 +3095,7 @@
   (:temporary (:sc unsigned-reg) high low)
   (:temporary (:sc unsigned-reg :from (:argument 2)) header)
   (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
-  (:results (r :scs (descriptor-reg)))
+  (:results (r :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:generator 20
     (inst subs low x (if (sc-is y immediate)
@@ -3214,7 +3214,7 @@
   (:temporary (:sc signed-reg) high low)
   (:temporary (:sc signed-reg :from (:argument 2)) header)
   (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
-  (:results (r :scs (descriptor-reg)))
+  (:results (r :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:generator 20
     (if (sc-is y immediate)
@@ -3336,7 +3336,7 @@
   (:temporary (:sc unsigned-reg) high low)
   (:temporary (:sc unsigned-reg :from (:argument 2)) header)
   (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
-  (:results (r :scs (descriptor-reg)))
+  (:results (r :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:generator 20
     (inst negs low x)
@@ -3365,7 +3365,7 @@
   (:temporary (:sc signed-reg) high low)
   (:temporary (:sc signed-reg :from (:argument 2)) header)
   (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
-  (:results (r :scs (descriptor-reg)))
+  (:results (r :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:generator 20
     (inst negs low x)

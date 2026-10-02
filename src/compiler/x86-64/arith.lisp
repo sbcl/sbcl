@@ -774,10 +774,10 @@
   (:temporary (:sc signed-reg :offset rdx-offset :from (:argument 1)) rdx)
   (:temporary (:sc signed-reg :from :eval) twodigit)
   (:temporary (:sc complex-double-reg :offset 15) scratch)
-  (:results (r :scs (descriptor-reg)))
+  (:results (r :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:node-var node)
-  (:generator 11
+  (:generator 20
     (move rax x)
     (inst imul y)
     (inst mov :byte twodigit 1) ; = "yes"
@@ -924,7 +924,7 @@
   (:temporary (:sc signed-reg :from (:argument 0)) low)
   (:temporary (:sc signed-reg :from :eval) high twodigit)
   (:temporary (:sc complex-double-reg :offset 15) scratch)
-  (:results (r :scs (descriptor-reg)))
+  (:results (r :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:node-var node)
   (:generator 20
@@ -947,7 +947,7 @@
   (:args (x :scs (unsigned-reg))
          (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
-  (:results (r :scs (descriptor-reg)))
+  (:results (r :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:node-var node)
   (:generator 18
@@ -982,7 +982,7 @@
   (:temporary (:sc unsigned-reg :from (:argument 0)) low)
   (:temporary (:sc unsigned-reg :from :eval) high twodigit)
   (:temporary (:sc complex-double-reg :offset 15) scratch)
-  (:results (r :scs (descriptor-reg)))
+  (:results (r :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:node-var node)
   (:generator 18
@@ -1111,7 +1111,7 @@
   (:temporary (:sc signed-reg :from (:argument 0)) low)
   (:temporary (:sc signed-reg :from :eval) high twodigit)
   (:temporary (:sc complex-double-reg :offset 15) scratch)
-  (:results (r :scs (descriptor-reg)))
+  (:results (r :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:node-var node)
   (:generator 20
@@ -1273,10 +1273,10 @@
   (:temporary (:sc unsigned-reg :offset rdx-offset :from (:argument 1)) rdx)
   (:temporary (:sc signed-reg :from (:argument 2)) multidigit)
   (:temporary (:sc complex-double-reg :offset 15) scratch)
-  (:results (r :scs (descriptor-reg)))
+  (:results (r :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:node-var node)
-  (:generator 11
+  (:generator 20
     (move rax x)
     (inst mul y)
     (inst mov :byte multidigit 1) ; might need 2 or 3 digits to represent
@@ -1311,7 +1311,7 @@
   (:temporary (:sc unsigned-reg :from (:argument 0)) low)
   (:temporary (:sc unsigned-reg :from :eval) high twodigit)
   (:temporary (:sc complex-double-reg :offset 15) scratch)
-  (:results (r :scs (descriptor-reg)))
+  (:results (r :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:node-var node)
   (:generator 20
@@ -1342,7 +1342,7 @@
   (:temporary (:sc signed-reg :from (:argument 0)) low)
   (:temporary (:sc signed-reg :from :eval) high twodigit)
   (:temporary (:sc complex-double-reg :offset 15) scratch)
-  (:results (r :scs (descriptor-reg)))
+  (:results (r :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:node-var node)
   (:generator 19
