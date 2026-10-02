@@ -5104,29 +5104,6 @@
               (delete-stmt next)
               next-next)))))))
 
-(defun stmt-delete-safe-p (dst1 dst2 &optional safe-translates
-                                               safe-vops)
-  (or (location= dst1 dst2)
-      (and
-       (sb-c::tn-reads dst1)
-       (not (tn-ref-next (sb-c::tn-reads dst1)))
-       (let ((vop (tn-ref-vop (sb-c::tn-reads dst1))))
-         (and vop
-              (or
-               (memq (vop-name vop) safe-vops)
-               (and (loop for fun in safe-translates
-                          thereis (memq (sb-c::vop-info vop)
-                                        (sb-c::fun-info-templates (sb-c::fun-info-or-lose fun))))
-                    ;; descriptor-allocating VOPs often read the arguments multiple times
-                    (not (sc-is (tn-ref-tn (sb-c::vop-results vop))
-                                sb-vm::descriptor-reg sb-vm::signed-128-reg))
-                    (do ((ref (sb-c::vop-args vop) (tn-ref-across ref)))
-                        ((null ref) t)
-                      (when (sc-is (tn-ref-tn (sb-c::vop-results vop)) sb-vm::signed-128-reg)
-                        (return))))
-               (and (not safe-vops)
-                    (not safe-translates))))))))
-
 (defun tagged-mask-p (x)
   (and (integerp x)
        (plusp x)
@@ -5152,7 +5129,7 @@
                          (untagged-mask-p mask))
                      (= immr 63)
                      (= imms 62)
-                     (stmt-delete-safe-p dst1 dst2 '(logand)))
+                     (location= dst1 dst2))
             (replace-stmt next 'ubfm dst2 src1 63 (+ (logcount mask) (if tagged -1 -2)))
             (add-stmt-labels next (stmt-labels stmt))
             (delete-stmt stmt)
@@ -5167,7 +5144,7 @@
                   (untagged-mask-p mask)
                   (= immr 63)
                   (= imms 62)
-                  (stmt-delete-safe-p dst1 dst2 nil '(sb-vm::move-from-word/fixnum)))
+                  (location= dst1 dst2))
          (replace-stmt next 'ubfm dst2 src1 63 (1- (logcount mask)))
          (add-stmt-labels next (stmt-labels stmt))
          (delete-stmt stmt)
@@ -5183,7 +5160,7 @@
                    (= (integer-length mask) 63)
                    (= immr 1)
                    (= imms 63)
-                   (stmt-delete-safe-p dst1 dst2 '(logand)))
+                   (location= dst1 dst2))
           (replace-stmt next 'ubfm dst2 src1 immr imms)
           (add-stmt-labels next (stmt-labels stmt))
           (delete-stmt stmt)
@@ -5198,7 +5175,7 @@
                    (tagged-mask-p mask)
                    (= immr 1)
                    (= imms 63)
-                   (stmt-delete-safe-p dst1 dst2 nil '(sb-vm::move-to-word/fixnum)))
+                   (location= dst1 dst2))
           ;; Leave the ASR if the sign bit is left,
           ;; but the AND is not needed.
           (if (= (integer-length mask) 64)
@@ -5217,7 +5194,7 @@
             (and (location= dst1 src2)
                  (integerp mask1)
                  (integerp mask2)
-                 (stmt-delete-safe-p dst1 dst2 '(logand)))
+                 (location= dst1 dst2))
           (let ((mask (logand mask1 mask2)))
             (when (or (zerop mask)
                       (encode-logical-immediate mask))
@@ -5239,9 +5216,7 @@
                   (location= dst1 srcm)
                   (location= dst1 srcn))
                  (not (location= srcn srcm))
-                 (stmt-delete-safe-p dst1 dst2
-                                     '(+ sb-vm::+-mod64 sb-vm::+-modfx
-                                       logand logior logxor)))
+                 (location= dst1 dst2))
         (replace-operands next dst2 (if (location= dst1 srcm) srcn srcm) (lsl src1 (- 63 imms)))
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
@@ -5257,9 +5232,7 @@
                   (location= dst1 srcm)
                   (location= dst1 srcn))
                  (not (location= srcn srcm))
-                 (stmt-delete-safe-p dst1 dst2
-                                     '(+ sb-vm::+-mod64 sb-vm::+-modfx
-                                       logand logior logxor)))
+                 (location= dst1 dst2))
         (replace-operands next dst2 (if (location= dst1 srcm) srcn srcm) (asr src1 immr))
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
@@ -5274,9 +5247,7 @@
                  (tn-p srcm)
                  (location= dst1 srcm)
                  (not (location= srcn srcm))
-                 (stmt-delete-safe-p dst1 dst2
-                                     '(- sb-vm::--mod64 sb-vm::--modfx
-                                       %negate)))
+                 (location= dst1 dst2))
         (replace-operands next dst2 srcn (lsl src1 (- 63 imms)))
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
@@ -5290,9 +5261,7 @@
                  (tn-p srcm)
                  (location= dst1 srcm)
                  (not (location= srcn srcm))
-                 (stmt-delete-safe-p dst1 dst2
-                                     '(- sb-vm::--mod64 sb-vm::--modfx
-                                       %negate)))
+                 (location= dst1 dst2))
         (replace-operands next dst2 srcn (asr src1 immr))
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
@@ -5307,11 +5276,7 @@
                  (= (1+ imms1) immr1)
                  (= (1+ imms2) immr2)
                  (location= dst1 src2)
-                 (stmt-delete-safe-p dst1 dst2
-                                     '(ash
-                                       sb-vm::ash-left-mod64
-                                       sb-vm::ash-left-modfx)
-                                     '(sb-vm::move-from-word/fixnum)))
+                 (location= dst1 dst2))
         (let ((shift (+ (- 63 imms1)
                         (- 63 imms2))))
           (when (<= shift 63)
@@ -5325,8 +5290,7 @@
     (destructuring-bind (dst2 src2 immr2 imms2) (stmt-operands next)
       (when (and (= imms1 imms2 63)
                  (location= dst1 src2)
-                 (stmt-delete-safe-p dst1 dst2
-                                     nil '(sb-vm::move-to-word/fixnum)))
+                 (location= dst1 dst2))
         (replace-operands next dst2 src1 (min (+ immr1 immr2) 63) 63)
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
@@ -5339,11 +5303,7 @@
       (cond ((and (= immr1 0)
                   (= (1+ imms2) immr2)
                   (location= dst1 src2)
-                  (stmt-delete-safe-p dst1 dst2
-                                      '(ash
-                                        sb-vm::ash-left-mod64
-                                        sb-vm::ash-left-modfx)
-                                      '(sb-vm::move-from-word/fixnum)))
+                  (location= dst1 dst2))
              (replace-stmt next 'sbfm dst2 src1 immr2 imms1)
              (add-stmt-labels next (stmt-labels stmt))
              (delete-stmt stmt)
@@ -5351,10 +5311,7 @@
             ((and (> immr1 imms1)
                   (= (1+ imms2) immr2)
                   (location= dst1 src2)
-                  (stmt-delete-safe-p dst1 dst2
-                                      '(ash
-                                        sb-vm::ash-left-mod64
-                                        sb-vm::ash-left-modfx)))
+                  (location= dst1 dst2))
              (replace-stmt next 'sbfm dst2 src1 (mod (+ immr1 immr2) 64) imms1)
              (add-stmt-labels next (stmt-labels stmt))
              (delete-stmt stmt)
@@ -5372,7 +5329,7 @@
                  (sc-is srcm sb-vm::any-reg)
                  (location= srcn zr-tn)
                  (location= dst1 src2)
-                 (stmt-delete-safe-p dst1 dst2 nil '(sb-vm::move-to-word/fixnum)))
+                 (location= dst1 dst2))
         (replace-stmt next 'sub dst2 srcn (asr srcm 1))
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
@@ -5386,9 +5343,7 @@
                  (tn-p srcm2)
                  (location= dst1 srcm2)
                  (not (location= srcn2 srcm2))
-                 (stmt-delete-safe-p dst1 dst2
-                                     '(- sb-vm::--mod64 sb-vm::--modfx
-                                       %negate sb-vm::%negate-mod64 sb-vm::%negate-modfx)))
+                 (location= dst1 dst2))
         (replace-stmt next 'msub dst2 srcn1 srcm1 srcn2)
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
@@ -5403,8 +5358,7 @@
                  (not (location= srcn2 srcm2))
                  (or (location= dst1 srcm2)
                      (location= dst1 srcn2))
-                 (stmt-delete-safe-p dst1 dst2
-                                     '(+ sb-vm::+-mod64 sb-vm::+-modfx)))
+                 (location= dst1 dst2))
         (replace-stmt next 'madd dst2 srcn1 srcm1 (if (location= dst1 srcm2) srcn2 srcm2))
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
@@ -5419,7 +5373,7 @@
                  (tn-p srcm1)
                  (or (location= dst1 srcn2)
                      (location= dst1 srcm2))
-                 (stmt-delete-safe-p dst1 dst2 '(* sb-vm::*-mod64 sb-vm::*-modfx)))
+                 (location= dst1 dst2))
         (replace-stmt next 'msub dst2 srcm1 (if (location= dst1 srcm2) srcn2 srcm2) zr-tn)
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
@@ -5436,7 +5390,7 @@
           (unless vector-size2
             (when (and (location= dst1 srcm2)
                        (not (location= srcn2 srcm2))
-                       (stmt-delete-safe-p dst1 dst2 '(-)))
+                       (location= dst1 dst2))
               (replace-stmt next 'fmsub dst2 srcn1 srcm1 srcn2)
               (add-stmt-labels next (stmt-labels stmt))
               (delete-stmt stmt)
@@ -5452,7 +5406,7 @@
             (when (and (or (location= dst1 srcm2)
                            (location= dst1 srcn2))
                        (not (location= srcn2 srcm2))
-                       (stmt-delete-safe-p dst1 dst2 '(+)))
+                       (location= dst1 dst2))
               (replace-stmt next 'fmadd dst2 srcn1 srcm1
                             (if (location= dst1 srcm2) srcn2 srcm2))
               (add-stmt-labels next (stmt-labels stmt))
@@ -5465,7 +5419,7 @@
       (destructuring-bind (dst2 srcn2 &optional vector-size2) (stmt-operands next)
         (unless vector-size2
           (when (and (location= dst1 srcn2)
-                     (stmt-delete-safe-p dst1 dst2 '(%negate)))
+                     (location= dst1 dst2))
             (replace-stmt next 'fnmul dst2 srcn1 srcm1)
             (add-stmt-labels next (stmt-labels stmt))
             (delete-stmt stmt)
@@ -5478,7 +5432,7 @@
         (unless (or vector-size2 index2)
           (when (and (or (location= dst1 srcn2)
                          (location= dst1 srcm2))
-                     (stmt-delete-safe-p dst1 dst2 '(*)))
+                     (location= dst1 dst2))
             (replace-stmt next 'fnmul dst2 (if (location= dst1 srcm2) srcn2 srcm2) srcn1)
             (add-stmt-labels next (stmt-labels stmt))
             (delete-stmt stmt)
