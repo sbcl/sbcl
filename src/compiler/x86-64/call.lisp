@@ -361,7 +361,8 @@
            (when (or (not trust)
                      (values-type-may-be-single-value-p type))
              (if (= used-count 1)
-                 (inst cmov :nc last-used null-tn)
+                 (unless (eql last-used-i 0)
+                   (inst cmov :nc last-used null-tn))
                  (assemble ()
                    (inst jmp :c regs-defaulted)
                    ;; Default the unsupplied registers.

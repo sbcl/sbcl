@@ -886,3 +886,15 @@
                 1)
             (f n i))))
     ((5 3) (values 1 nil))))
+
+(with-test (:name :default-unknown-values-unused)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (multiple-value-call #'max
+        (ceiling (case (logand a 3)
+                   (0 32)
+                   (1 (round a)))
+                 1023)
+        32))
+   ((100) 32)))
