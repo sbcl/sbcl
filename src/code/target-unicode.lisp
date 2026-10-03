@@ -1465,7 +1465,7 @@ appear in an SBCL string. The line-breaking behavior of surrogates is undefined.
                (push (nreverse cluster) clusters)
                (push (car cluster) clusters))
            (setf cluster nil))
-         (unless (or (eql type :cm) (eql type :zwj))
+         (when (null cluster)
            (setf last-seen type))
          (push char cluster))
     (if (cdr cluster)
@@ -1555,7 +1555,9 @@ appear in an SBCL string. The line-breaking behavior of surrogates is undefined.
          (when after-spaces (cmpush after-spaces) (cmpush second)
                (setf state nil after-spaces nil) (go tail))
          (after-spaces :zw :any :can)                ; LB8
-         (between :zwj :any :cant)                   ; LB8a
+         (let ((tl (if (listp first) (lb1-line-break-class (car (last first))) t1)))
+           (when (eql tl :zwj)                       ; LB8a
+             (cmpush :cant) (cmpush second) (go tail)))
          ;; LB9 handled in LINE-PREBREAK
          (when (member t1 '(:zwj :cm)) (setf t1 :al))          ; LB10
          (when (member t2 '(:zwj :cm)) (setf t2 :al))          ; LB10

@@ -21,6 +21,8 @@ changes relative to sbcl-2.6.9:
     ** bug fix: Complex Context-Dependent characters are handled as Alphabetic
        or Combining Marks according to the default resolution in Unicode
        line-breaking.
+    ** bug fix: combining marks attached to otherwise unattached zero-width
+       joiners no longer inhibit line breaks.
 
 changes in sbcl-2.6.9 relative to sbcl-2.6.8:
   * minor incompatible change: structure slots defined as :READ-ONLY can be
