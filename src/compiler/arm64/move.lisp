@@ -423,8 +423,16 @@
                         (rotatef dest1 dest2)
                         (rotatef source1 source2))
                       (when fp-load-tn
-                        (load-stack-tn fp-load-tn fp)
-                        (setf fp fp-load-tn))
+                        (let ((fp-tn (cond ((not (or (location= fp-load-tn source1)
+                                                     (location= fp-load-tn source2)))
+                                            fp-load-tn)
+                                           ((not (or (location= tmp-tn source1)
+                                                     (location= tmp-tn source2)))
+                                            tmp-tn)
+                                           (t
+                                            (return-from do-moves)))))
+                          (load-stack-tn fp-tn fp)
+                          (setf fp fp-tn)))
                       (inst stp source1 source2
                             (@ fp (tn-byte-offset dest1)))
                       t)
