@@ -1195,7 +1195,19 @@
                   (+ (funcall m (logand j #xFFFFFF))
                      (funcall m (logand j #xFFFFFF)))))))
    ((1234 #'+) 4936)
-   ((3 #'-) -12)))
+   ((3 #'-) -12))
+  (checked-compile
+   `(lambda (j)
+      (declare (optimize (speed 0)))
+      (let ((v 0))
+        (declare ((signed-byte 64) v))
+        (labels ((f ()
+                   (incf v)))
+          (f)
+          (when j
+            (setf v j))
+          (f))
+        v))))
 
 (with-test (:name :arith-negative-zero)
   (assert-type

@@ -267,10 +267,11 @@
     not-target))
 
 (define-vop (signed-byte-64-p-move-to-word signed-byte-64-p)
-  (:results (r :scs (signed-reg unsigned-reg)))
+  (:results (r :scs (signed-reg unsigned-reg) :load-if nil))
   (:result-types signed-num)
   (:translate)
   (:generator 10
+    (aver (sc-is r unsigned-reg signed-reg))
     (let ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))))
       (multiple-value-bind (yep nope)
           (if not-p
@@ -447,10 +448,11 @@
     NOT-TARGET))
 
 (define-vop (unsigned-byte-64-p-move-to-word unsigned-byte-64-p)
-  (:results (r :scs (signed-reg unsigned-reg)))
+  (:results (r :scs (signed-reg unsigned-reg) :load-if nil))
   (:result-types unsigned-num)
   (:translate)
   (:generator 10
+    (aver (sc-is r unsigned-reg signed-reg))
     (let* ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum)))
            (other-pointer-p (fixnum-or-other-pointer-tn-ref-p args t))
            (not-signed-byte-64-p (not (types-equal-or-intersect (tn-ref-type args) (specifier-type 'signed-word))))
@@ -513,12 +515,14 @@
 (define-vop (un/signed-byte-64-p-move-to-word signed-byte-64-p)
   ;; Ideally, this would use a single register but the rest of the stuff
   ;; depends on their storage class.
-  (:results (rs :scs (signed-reg unsigned-reg))
-            (ru :scs (signed-reg unsigned-reg)))
+  (:results (rs :scs (signed-reg unsigned-reg) :load-if nil)
+            (ru :scs (signed-reg unsigned-reg) :load-if nil))
   (:info target not-p target-unsigned not-p-unsigned unsigned-fall-through)
   (:result-types signed-num unsigned-num)
   (:translate)
   (:generator 10
+    (aver (sc-is rs unsigned-reg signed-reg))
+    (aver (sc-is ru unsigned-reg signed-reg))
     (let ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))))
       (assemble ()
         (when fixnum-p

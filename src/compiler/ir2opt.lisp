@@ -1222,7 +1222,14 @@
 (labels ((make-mov-vop (tn vop)
            ;; Ensure that the result won't go to a stack tn
            (let ((new-tn (make-restricted-tn (tn-primitive-type tn)
-                                             (sc-number (tn-sc tn)) (tn-type tn))))
+                                             (sc-case tn
+                                               ((sb-vm::any-reg sb-vm::signed-reg sb-vm::unsigned-reg)
+                                                (sc-number (tn-sc tn)))
+                                               (sb-vm::signed-stack
+                                                #.(sc-number (sc-or-lose 'sb-vm::signed-reg)))
+                                               (sb-vm::unsigned-stack
+                                                #.(sc-number (sc-or-lose 'sb-vm::unsigned-reg))))
+                                             (tn-type tn))))
              (emit-and-insert-vop (vop-node vop) (vop-block vop)
                                   (template-or-lose 'sb-vm::word-move)
                                   (reference-tn new-tn nil)

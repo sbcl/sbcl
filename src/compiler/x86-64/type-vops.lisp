@@ -371,11 +371,13 @@
   (:args (value :scs (any-reg descriptor-reg) :to :save))
   (:arg-refs value-ref)
   (:info target not-p flags)
-  (:results (r :scs (unsigned-reg signed-reg)))
+  (:results (r :scs (unsigned-reg signed-reg)
+               :load-if nil))
   (:result-types signed-num)
   (:translate)
   (:generator 10
     (aver (equal (conditional-flags-flags flags) '(:z)))
+    (aver (sc-is r unsigned-reg signed-reg))
     (let ((fixnum-p (types-equal-or-intersect (tn-ref-type value-ref) (specifier-type 'fixnum))))
       (multiple-value-bind (yep nope)
           (if not-p
@@ -535,9 +537,11 @@
     not-target))
 
 (define-vop (unsigned-byte-64-p-move-to-word type-predicate)
-  (:results (r :scs (signed-reg unsigned-reg) :from :load))
+  (:results (r :scs (signed-reg unsigned-reg) :from :load
+               :load-if nil))
   (:result-types unsigned-num)
   (:generator 10
+    (aver (sc-is r unsigned-reg signed-reg))
     (let* ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum)))
            (not-signed-byte-64-p (not (types-equal-or-intersect (tn-ref-type args) (specifier-type 'signed-word))))
            (unsigned-p (or not-signed-byte-64-p
