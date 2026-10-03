@@ -414,7 +414,8 @@ necessary, since type inference may take arbitrarily long to converge.")
   (let ((count 0)
         (cleared-reanalyze nil)
         (fastp nil)
-        reoptimized)
+        reoptimized
+        optimistic-once)
     (loop
       (when (component-reanalyze component)
         (setf count 0
@@ -423,14 +424,22 @@ necessary, since type inference may take arbitrarily long to converge.")
               (component-reanalyze component) nil))
       (setf (component-reoptimize component) nil)
       (ir1-optimize component fastp)
-      (let ((walk-reoptimized (component-reoptimize component)))
-        (unless walk-reoptimized
-          (publish-optimistic-types component fastp))
-        (cond ((component-reoptimize component)
-               (setf reoptimized t)
-               ;; Don't count optimistic type publishing towards the
-               ;; iteration budget, as it is cheaper than the rest of
-               ;; ir1 optimization.
+     (let ((walk-reoptimized (component-reoptimize component)))
+       (unless walk-reoptimized
+         (publish-optimistic-types component fastp))
+       (cond ((not (component-reoptimize component))
+              (return))
+             ;; Go again, but once
+             ((and (not optimistic-once)
+                   (not walk-reoptimized))
+              (setf reoptimized t
+                    optimistic-once t
+                    count 0))
+             (t
+              (setf reoptimized t)
+              ;; Don't count optimistic type publishing towards the
+              ;; iteration budget, as it is cheaper than the rest of
+              ;; ir1 optimization.
                (when walk-reoptimized
                  (incf count))
                (when (and (>= count *max-optimize-iterations*)
@@ -439,9 +448,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                  (maybe-mumble "*")
                  (event ir1-optimize-maxed-out)
                  (ir1-optimize-last-effort component)
-                 (return)))
-              (t
-               (return))))
+                 (return)))))
       (when (setq fastp (>= count *max-optimize-iterations*))
         (ir1-optimize-last-effort component))
       (maybe-mumble (if fastp "-" ".")))
