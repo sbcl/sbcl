@@ -42,15 +42,20 @@
 
 (defun node-constant (node &optional ignore-types)
   (when node
-    (let ((type (node-derived-type node)))
+    (let ((type (node-derived-type node))
+          seen)
       (labels ((process-ref (ref)
                  (when (ref-p ref)
                    (let (leaf)
-                     (if (constant-p (setf leaf (ref-leaf ref)))
-                         (when (or ignore-types
-                                   (ctypep (constant-value leaf) (single-value-type type)))
-                           (values leaf ref))
-                         (process-lvar (lambda-var-ref-lvar ref))))))
+                     (cond ((constant-p (setf leaf (ref-leaf ref)))
+                            (when (or ignore-types
+                                      (ctypep (constant-value leaf) (single-value-type type)))
+                              (values leaf ref)))
+                           ((memq ref seen)
+                            nil)
+                           (t
+                            (push ref seen)
+                            (process-lvar (lambda-var-ref-lvar ref)))))))
                (process-lvar (lvar)
                  (when lvar
                    (process-ref (lvar-uses (principal-lvar lvar)))))
@@ -63,18 +68,23 @@
 
 (defun lvar-constant (lvar &optional ignore-types)
   (declare (type lvar lvar))
-  (let ((type (lvar-type lvar)))
+  (let ((type (lvar-type lvar))
+        seen)
     (labels ((process-lvar (lvar)
                (when lvar
                  (let* ((principal-lvar (principal-lvar lvar))
                         (principal-use (lvar-uses principal-lvar))
                         leaf)
                    (when (ref-p principal-use)
-                     (if (constant-p (setf leaf (ref-leaf principal-use)))
-                         (when (or ignore-types
-                                   (ctypep (constant-value leaf) type))
-                           (values leaf principal-use))
-                         (process-lvar (lambda-var-ref-lvar principal-use))))))))
+                     (cond ((constant-p (setf leaf (ref-leaf principal-use)))
+                            (when (or ignore-types
+                                      (ctypep (constant-value leaf) type))
+                              (values leaf principal-use)))
+                           ((memq lvar seen)
+                            nil)
+                           (t
+                            (push lvar seen)
+                            (process-lvar (lambda-var-ref-lvar principal-use)))))))))
       (process-lvar lvar))))
 
 (defun constant-node-p (node)

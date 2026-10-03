@@ -762,7 +762,14 @@
                       (declare (optimize debug))
                       (labels ((m (z vars)
                                  (m z vars)))
-                        (m 1 (error "x"))))))
+                        (m 1 (error "x")))))
+  (checked-compile `(lambda ()
+                      (labels ((f (a)
+                                 (if (plusp a)
+                                     (f a)
+                                     (catch 'a))))
+                        (+ (f) (f *))))
+                   :allow-warnings t))
 
 (with-test (:name :mv-call-lambda-type)
   (assert-type
