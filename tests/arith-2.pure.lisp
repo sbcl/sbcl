@@ -1118,7 +1118,17 @@
    (((1- (expt 2 160))) t)
    (((expt 2 160)) nil)
    (((- (expt 2 160))) nil)
-   (('a) nil)))
+   (('a) nil))
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (typep a '(unsigned-byte 127)))
+    ((1) t)
+    ((-1) nil)
+    (((ash -1 127)) nil)
+    (((ash 1 127)) nil)
+    (((ash -1 126)) nil)
+    (((ash 1 126)) t)))
 
 
 (with-test (:name :signed-byte-x-p)
