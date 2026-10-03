@@ -324,14 +324,19 @@
                                               (try-imm (dpb -1 (byte (- 32 width) width) y))))))
                               (load-immediate-word tmp-tn y t)
                               ;; Use BIC if the inverted constant can be loaded with one instruction
-                              (let ((inverted (ldb (byte (or width
-                                                             n-fixnum-bits) 0)
+                              (let ((inverted (ldb (byte (or width 64) 0)
                                                    (lognot y))))
                                 (when (load-immediate-word tmp-tn inverted t)
                                   (inst bic r x tmp-tn)
                                   (return))))))
                        ((load-immediate-word tmp-tn y))))))
         (inst and r x imm)))))
+
+(define-vop (logand-c/unsigned=>unsigned logand-c/signed=>signed)
+  (:args (x :scs (unsigned-reg)))
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:arg-types unsigned-num (:constant integer)))
 
 (defun ubfm-mask-p (n)
   (and (typep n '(unsigned-byte 63))
@@ -365,12 +370,6 @@
   (:arg-types unsigned-num)
   (:results (r :scs (unsigned-reg any-reg)))
   (:result-types unsigned-num))
-
-(define-vop (logand-c/unsigned=>unsigned logand-c/signed=>signed)
-  (:args (x :scs (unsigned-reg)))
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:arg-types unsigned-num (:constant (satisfies encode-logical-immediate))))
 
 (define-vop (-/unsigned-signed)
   (:translate -)
