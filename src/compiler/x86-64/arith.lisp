@@ -6227,8 +6227,12 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 2
-    (move result b)
-    (move ecx count :dword)
+    (cond ((location= result count)
+           (move ecx count :dword)
+           (move result b))
+          (t
+           (move result b)
+           (move ecx count :dword)))
     (inst shrd result a :cl)))
 
 ;; Based on TargetLowering::expandBITREVERSE in llvm/lib/CodeGen/SelectionDAG/TargetLowering.cpp
