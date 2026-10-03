@@ -925,6 +925,8 @@ NOTE: This interface is experimental and subject to change."
   (labels ((replace-symbols (expr)
              (typecase expr
                (null expr)
+               (keyword
+                (concatenate 'string ":" (symbol-name expr)))
                (symbol
                 (symbol-name expr))
                (cons

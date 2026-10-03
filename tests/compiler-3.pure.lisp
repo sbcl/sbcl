@@ -870,3 +870,19 @@
         (+ #'f3 (apply #'f3 nil))))
    :allow-warnings t
    :allow-style-warnings t))
+
+(with-test (:name :number-stack-unread-arg)
+  (checked-compile-and-assert
+      ()
+      `(lambda (i n)
+         (declare ((signed-byte 64) i))
+         (labels ((f (a b)
+                    (if (plusp a)
+                        (f (1- a) b)
+                        (catch 'a))))
+           (values
+            (if (< i -17592186044417)
+                i
+                1)
+            (f n i))))
+    ((5 3) (values 1 nil))))

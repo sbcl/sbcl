@@ -319,22 +319,28 @@
 #-c-stack-is-control-stack
 (defun note-number-stack-tn (refs)
   (declare (type (or tn-ref null) refs))
-
   (do ((ref refs (tn-ref-next ref)))
       ((null ref))
-    (let* ((lambda (block-home-lambda
-                    (ir2-block-block
-                     (vop-block (tn-ref-vop ref)))))
+    (let* ((vop (tn-ref-vop ref))
+           (lambda (block-home-lambda (ir2-block-block (vop-block vop))))
            (tails (lambda-tail-set lambda)))
       (flet ((frob (fun)
                (setf (ir2-environment-number-stack-p
-                      (environment-info
-                       (lambda-environment fun)))
+                      (environment-info (lambda-environment fun)))
                      t)))
         (frob lambda)
         (when tails
           (dolist (fun (tail-set-funs tails))
-            (frob fun))))))
+            (frob fun)))
+        ;; A number stack might be allocated for a local call arg but it
+        ;; might be never read in the callee, yet allocate-frame needs
+        ;; to know where to put the argument.
+        ;; TODO: don't issue move-args for such arguments
+        (when (eq (vop-info-move-vop-p (vop-info vop)) :move-arg)
+          (let ((call (vop-node vop)))
+            (when (and (combination-p call)
+                       (eq (combination-kind call) :local))
+              (frob (combination-lambda (vop-node vop)))))))))
 
   (values))
 
