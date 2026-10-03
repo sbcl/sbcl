@@ -75,7 +75,8 @@
   (:generator 1
     (let ((nfp (current-nfp-tn vop)))
       (when nfp
-        (inst addi val nfp (bytes-needed-for-non-descriptor-stack-frame))))))
+        (loadw val cfp-tn ocfp-save-offset)
+        (loadw val val nfp-save-offset)))))
 
 ;;; Accessing a slot from an earlier stack frame is definite hackery.
 (define-vop (ancestor-frame-ref)

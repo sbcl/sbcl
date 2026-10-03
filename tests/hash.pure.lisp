@@ -469,7 +469,8 @@
     (try 'sxhash)
     (try 'sb-int:murmur-hash-word/fixnum)))
 
-(with-test (:name :instance-or-number-or-null-hash)
+(with-test (:name :instance-or-number-or-null-hash
+            :implemented-on (:vop-existsp "SB-VM::ASH-LEFT-MODFX"))
   (flet ((get-callees (x-type)
            (ctu:find-named-callees
             (compile nil `(lambda (x) (sxhash (the ,x-type x)))))))

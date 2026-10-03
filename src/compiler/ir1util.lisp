@@ -4966,3 +4966,11 @@ is :ANY, the function name is not checked."
 
 (defun double-word-sized-result-p (node &optional asserted)
   (double-word-sized-type-p (single-value-result-type node asserted)))
+
+(defmacro lvar-value-typed (lvar type)
+  `(let ((.lvar. ,lvar))
+     (and (constant-lvar-p .lvar.)
+          (let ((value (:dbg (lvar-value .lvar.))))
+            (when (typep value ,type)
+              (break)
+              value)))))

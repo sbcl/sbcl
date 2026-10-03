@@ -498,8 +498,7 @@
      (block nil
        (let* ((width (or (unsigned-type-width (lvar-type a))
                          (return)))
-              (full-mask (if (constant-lvar-p a)
-                             (lvar-value a)
+              (full-mask (or (lvar-value-typed a 'unsigned-byte)
                              (ldb (byte width 0) -1)))
               (cut (logand c full-mask)))
          (cond ((and
@@ -518,8 +517,7 @@
        (let* ((width (or (unsigned-type-width (lvar-type a))
                          (return)))
               (full-mask (ldb (byte width 0) -1))
-              (mask (if (constant-lvar-p a)
-                        (lvar-value a)
+              (mask (or (lvar-value-typed a 'unsigned-byte)
                         full-mask))
               (cut (logand c mask)))
          (cond ((= cut full-mask)
