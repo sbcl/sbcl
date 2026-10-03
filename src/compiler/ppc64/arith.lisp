@@ -168,20 +168,27 @@
 (!define-var-binop lognor 2 nor nil t)
 
 (defun generate-+-c (r x y)
-  (cond ((typep y '(signed-byte 16))
-         (inst addi r x y))
-        ;; See if this can be done as an addis + addi.
-        ;; If bit 15 is on, 1 is added to the high part to undo the
-        ;; effect of sign-extension from the low. The post-adjustment
-        ;; high part needs to fit in (signed-byte 16)
-        ((typep (+ (ash y -16) (ldb (byte 1 15) y)) '(signed-byte 16))
-         (inst addis r x (+ (ash y -16) (ldb (byte 1 15) y)))
-         (let ((low (ldb (byte 16 0) y)))
-           (unless (zerop low)
-             (inst addi r r low))))
-        (t
-         (inst lr temp-reg-tn y)
-         (inst add r x temp-reg-tn))))
+  (flet ((try (y)
+           (cond ((typep y '(signed-byte 16))
+                  (inst addi r x y)
+                  t)
+                 ;; See if this can be done as an addis + addi.
+                 ;; If bit 15 is on, 1 is added to the high part to undo the
+                 ;; effect of sign-extension from the low. The post-adjustment
+                 ;; high part needs to fit in (signed-byte 16)
+                 ((typep (+ (ash y -16) (ldb (byte 1 15) y)) '(signed-byte 16))
+                  (inst addis r x (+ (ash y -16) (ldb (byte 1 15) y)))
+                  (let ((low (ldb (byte 16 0) y)))
+                    (unless (zerop low)
+                      (inst addi r r low)))
+                  t))))
+    (cond ((try y))
+          ((try (sb-c::mask-signed-field 64 y)))
+          (t
+           (if (typep y '(or (signed-byte 64) (unsigned-byte 64)))
+               (inst lr temp-reg-tn y)
+               (inst lr temp-reg-tn (ldb (byte 64 0) y)))
+           (inst add r x temp-reg-tn)))))
 
 (macrolet ((define-const-binop (translate untagged-penalty)
              `(progn
