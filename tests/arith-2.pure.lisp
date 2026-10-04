@@ -2312,8 +2312,7 @@
                                          nil))
              1)))
 
-(with-test (:name :logtest
-            :fails-on :ppc64)
+(with-test (:name :logtest)
   (checked-compile-and-assert
       ()
       `(lambda (p1)
@@ -2326,7 +2325,15 @@
       `(lambda (a)
          (logtest a (the (unsigned-byte 30) a)))
     ((8) t)
-    ((0) nil)))
+    ((0) nil))
+  (checked-compile
+   `(lambda (m)
+      (declare ((unsigned-byte ,sb-vm:n-word-bits) m))
+      (logtest m (ldb (byte ,(- sb-vm:n-word-bits 2) 0) -1))))
+  (checked-compile
+   `(lambda (m)
+      (declare ((signed-byte ,sb-vm:n-word-bits) m))
+      (logtest m (ldb (byte ,(- sb-vm:n-word-bits 2) 0) -1)))))
 
 (with-test (:name :logtest-integer-fixnum
             :implemented-on (or :arm64 :x86-64 :x86))

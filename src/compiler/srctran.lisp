@@ -636,7 +636,11 @@
              ;; unsigned cut-to-width always recuts to the minimum width
              (not (vop-existsp :translate sb-vm::*-modfx))
              (= c1 most-positive-word)
-             (= c1 (ash most-positive-word -1))
+             (if (fixnump (ash most-positive-word -2))
+                 (= c1 (ash most-positive-word -1))
+                 (and (typep c1 'word)
+                      (= (logcount (1+ c1)) 1)
+                      (>= (integer-length c1) sb-vm:n-fixnum-bits)))
              (not (word-sized-lvar-p x)))
             ;; cut-to-width will insert these again
             nil)
