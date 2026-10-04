@@ -108,7 +108,7 @@
                 (symbol (values (symbolp obj) t)) ; 1:1 correspondence with host
                 (function
                  (if (functionp obj)
-                     (uncertain)
+                     (values t t)
                      ;; probably not a function. What about FMT-CONTROL instances?
                      (values nil t)))
                 ((system-area-pointer stream fdefn weak-pointer file-stream
