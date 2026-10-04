@@ -101,6 +101,8 @@ clean:
 	rm -f $(PSFILES) $(PDFFILES) html-stamp generated-texinfo-stamp
 	rm -f $(TMPFILES) $(INDEXFILES)
 	rm -f sbcl.info sbcl.info-* asdf.info
+	rm -f sbcl.dd sbcl.dds sbcl.ff sbcl.ffs sbcl.tt sbcl.tts \
+		sbcl.vv sbcl.vvs
 
 .PHONY: distclean
 distclean: clean

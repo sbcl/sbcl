@@ -19,11 +19,9 @@
 
   Before sending mail, check the list archives at either
 
-  <http://sourceforge.net/mailarchive/forum.php?forum_name=sbcl-help>
+  - <http://sourceforge.net/mailarchive/forum.php?forum_name=sbcl-help> or
 
-  or
-
-  <http://news.gmane.org/gmane.lisp.steel-bank.general>
+  - the `gmane.lisp.steel-bank.general` news group on `news.gmane.io`
 
   to see if your question has been answered already. Checking the bug
   database is also worth it (see @REPORTING-BUGS), to see if the issue

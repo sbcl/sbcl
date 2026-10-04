@@ -25,11 +25,11 @@ good question.
 
 Before sending mail, check the list archives at either
 
-@url{http://sourceforge.net/mailarchive/forum.php?forum_name=sbcl-help}
+@itemize
+@item @url{http://sourceforge.net/mailarchive/forum.php?forum_name=sbcl-help} or
 
-or
-
-@url{http://news.gmane.org/gmane.lisp.steel-bank.general}
+@item the @code{gmane.lisp.steel-bank.general} news group on @code{news.gmane.io}
+@end itemize
 
 to see if your question has been answered already. Checking the bug
 database is also worth it (see @ref{reporting bugs}), to see if the issue

@@ -151,7 +151,7 @@
   "SBCL fasl-format is binary compatible only with the exact SBCL version
   it was generated with. While this is obviously suboptimal, it has
   proven more robust than trying to maintain fasl compatibility across
-  versions: accidentally breaking things is far too easy, and can lead
+  versions: accidentally breaking things is far too easy and can lead
   to hard to diagnose bugs.
 
   The following snippet handles fasl recompilation automatically for
