@@ -895,7 +895,15 @@
                 i
                 1)
             (f n i))))
-    ((5 3) (values 1 nil))))
+    ((5 3) (values 1 nil)))
+  (checked-compile
+   `(lambda ()
+      (labels ((f (a)
+                 (if (f 1.0d0)
+                     (f a)
+                     1)))
+        (if (f 4.0d0)
+            0)))))
 
 (with-test (:name :default-values-constantp)
   (checked-compile

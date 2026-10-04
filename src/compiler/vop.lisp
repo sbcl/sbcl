@@ -462,7 +462,9 @@
   old-fp
   return-pc
   return-pc-pass
-  closure-save-tn)
+  closure-save-tn
+  #-c-stack-is-control-stack
+  number-stack-p)
 
 ;;; A RETURN-INFO is used by GTN to represent the return strategy and
 ;;; locations for all the functions in a given TAIL-SET. It is stored

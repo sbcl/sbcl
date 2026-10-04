@@ -1099,5 +1099,6 @@
       (frob ir2-component-normal-tns nil)
       (frob ir2-component-wired-tns t)
       (frob ir2-component-restricted-tns t)
+      (frob ir2-component-alias-tns nil)
       (unwire-nfp-save-tn 2comp component)))
   (values))

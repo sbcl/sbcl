@@ -1242,7 +1242,7 @@
                ;; hairy internal objects such as ENVIRONMENT can be printed.
                ;; See also the comment above FUNCALL-WITH-DEBUG-IO-SYNTAX.
                (let (#-sb-xc-host (*current-level-in-print* 0)
-                     (*print-level* 2)
+                     (*print-level* 3)
                      (*print-length* 15))
                  (format stream "{~{~S~^ ~}} " (vop-codegen-info vop)))))
       (pprint-newline :linear))
