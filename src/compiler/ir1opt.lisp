@@ -258,7 +258,7 @@
                        derived-values-type))
                  derived-values-type))))
     (if (listp node)
-        (apply #'values-type-union (mapcar #'node-type node))
+        (reduce #'values-type-union node :key #'node-type)
         (node-type node))))
 
 (defun conservative-type (type)

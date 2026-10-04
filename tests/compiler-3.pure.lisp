@@ -55,7 +55,16 @@
      (length (the string (if *
                              x
                              y))))
-   (mod 21)))
+   (mod 21))
+  (checked-compile `(lambda (a)
+                      (declare (optimize debug))
+                      (nth 0
+                           (handler-case 1
+                             (error ()
+                               (typecase a
+                                 ((member -3) (list 3))
+                                 (integer (list 1)))))))
+                   :allow-style-warnings t))
 
 (with-test (:name :unknown-keys-type-derivation)
   (assert-type
