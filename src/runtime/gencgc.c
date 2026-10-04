@@ -574,7 +574,7 @@ struct new_area {
 static struct new_area *new_areas;
 static int new_areas_index;
 int new_areas_index_hwm; // high water mark
-
+int new_unboxed_areas = 0;
 /* Add a new area to new_areas. */
 static void
 add_new_area(page_index_t first_page, size_t offset, size_t size)
@@ -711,6 +711,8 @@ gc_close_region(struct alloc_region *alloc_region, int page_type)
         /* Add the region to the new_areas if requested. */
         if (boxed_type_p(page_type))
             add_new_area(first_page, orig_first_page_bytes_used, region_size);
+        else
+            new_unboxed_areas = 1;
 
     } else if (!orig_first_page_bytes_used) {
         /* The first page is completely unused. Unallocate it */
@@ -804,7 +806,10 @@ void *gc_alloc_large(sword_t nbytes, int page_type)
                   et_bzeroing);
 
     /* Add the region to the new_areas if requested. */
-    if (boxed_type_p(page_type)) add_new_area(first_page, 0, nbytes);
+    if (boxed_type_p(page_type))
+        add_new_area(first_page, 0, nbytes);
+    else
+        new_unboxed_areas = 1;
 
     // page may have not needed zeroing, but first word was stored,
     // turning the putative object temporarily into a page filler object.
@@ -1222,7 +1227,10 @@ copy_potential_large_object(lispobj object, sword_t nwords,
 
         /* Add the region to the new_areas if requested. */
         gc_in_situ_live_nwords += nbytes>>WORD_SHIFT;
-        if (boxed_type_p(page_type)) add_new_area(first_page, 0, nbytes);
+        if (boxed_type_p(page_type))
+            add_new_area(first_page, 0, nbytes);
+        else
+            new_unboxed_areas = 1;
 
         return object;
     }
@@ -2719,6 +2727,7 @@ scavenge_newspace(generation_index_t generation)
     /* Turn on the recording of new areas. */
     gc_assert(new_areas_index == 0);
     new_areas = new_areas_1;
+    new_unboxed_areas = 0;
 
     /* Start with a full scavenge. */
     if (GC_LOGGING) fprintf(gc_activitylog(), "newspace full scav\n");
@@ -2729,7 +2738,7 @@ scavenge_newspace(generation_index_t generation)
 
     while (1) {
         if (GC_LOGGING) fprintf(gc_activitylog(), "newspace loop\n");
-        if (!new_areas_index && immobile_worklist_is_empty()) { // possible stopping point
+        if (!new_areas_index && !new_unboxed_areas && immobile_worklist_is_empty()) { // possible stopping point
             if (!test_weak_triggers(0, 0))
                 break; // no work to do
             // testing of triggers can't detect whether any triggering object
@@ -2737,8 +2746,13 @@ scavenge_newspace(generation_index_t generation)
             // from the pending list. So check again if allocations occurred,
             // which is only if not all triggers referenced already-live objects.
             gc_close_collector_regions(0); // update new_areas from regions
-            if (!new_areas_index && immobile_worklist_is_empty())
+            if (!new_areas_index && immobile_worklist_is_empty()) {
+                if (new_unboxed_areas) {
+                    new_unboxed_areas = 0;
+                    continue;
+                }
                 break; // still no work to do
+            }
         }
         /* Move the current to the previous new areas */
         struct new_area *previous_new_areas = new_areas;
@@ -2750,6 +2764,7 @@ scavenge_newspace(generation_index_t generation)
         /* Prepare to record new areas. Alternate between using new_areas_1 and 2 */
         new_areas = (new_areas == new_areas_1) ? new_areas_2 : new_areas_1;
         new_areas_index = 0;
+        new_unboxed_areas = 0;
 
         drain_immobile_space_worklist();
         /* Check whether previous_new_areas had overflowed. */

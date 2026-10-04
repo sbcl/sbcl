@@ -9,6 +9,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(setf (sb-alien:extern-alien "verify_gens" char) 0)
+
 ;;; Apparently the entirety of 'hash.impure.lisp' is inadequate to
 ;;; sufficiently exercise weak hash tables.  I had a blatant omission
 ;;; in setting 'rehash' on a weak table, and yet no tests in that file failed.
@@ -53,3 +55,18 @@
     (setf (gethash 10 hash) (sb-kernel:%make-lisp-obj sb-vm:other-pointer-lowtag))
     (sb-ext:gc :full t)
     hash))
+
+(defvar *root*)
+(defvar *chain*)
+
+(with-test (:name :unboxed-weak-chain)
+  (let ((values (loop repeat 2000
+                      collect (make-string 1))))
+    (setf *root* (first values)
+          *chain* (loop for (k v) on values
+                        while v
+                        collect (let ((h (make-hash-table :test 'eq :weakness :key)))
+                                  (setf (gethash k h) v)
+                                  h))))
+
+  (sb-ext:gc :full t))
