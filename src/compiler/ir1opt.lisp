@@ -2246,6 +2246,19 @@
                      (%constant-fold-call-multiple-uses combination mu-constant mv-bind mv-bind-nth)
                      (%constant-fold-call combination)))))))))
 
+(defun constant-args-match-types (call args)
+  (map-combination-args-and-types
+   (lambda (arg type lvars &optional annotation)
+     (declare (ignore annotation))
+     (let ((value (loop for lvar in lvars
+                        for value in args
+                        when (eq arg lvar)
+                        return value)))
+       (unless (ctypep value type)
+         (return-from constant-args-match-types))))
+   call)
+  t)
+
 ;;; Replace a call to a foldable function of constant arguments with
 ;;; the result of evaluating the form. If there is an error during the
 ;;; evaluation, we give a warning and leave the call alone, making the
@@ -2271,8 +2284,9 @@
            (info (combination-fun-info call))
            (folder (fun-info-folder info))
            (fold-p (fun-info-fold-p info)))
-      (when (or (not fold-p)
-                (apply fold-p args))
+      (when (and (or (not fold-p)
+                     (apply fold-p args))
+                 (constant-args-match-types call args))
        (multiple-value-bind (values win ignore) (careful-call (or folder
                                                            fun-name)
                                                        args)
@@ -2339,9 +2353,10 @@
                                                                  (ref-value use))
                                                              (value arg)))
                            do
-                           (when fold-p
-                             (unless (apply fold-p constants)
-                               (return-from %constant-fold-call-multiple-uses)))
+                           (unless (and (or (not fold-p)
+                                            (apply fold-p constants))
+                                        (constant-args-match-types call constants))
+                             (return-from %constant-fold-call-multiple-uses))
                            collect
                            (multiple-value-bind (values win) (careful-call folder constants)
                              (unless win
