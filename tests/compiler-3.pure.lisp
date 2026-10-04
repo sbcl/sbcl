@@ -757,7 +757,7 @@
                       :allow-warnings t)))
   (checked-compile `(lambda () (the (function * list) (lambda (&rest r) r)))))
 
-(with-test (:name :principal-lvar-ref-recursion)
+(with-test (:name :lvar-ref-recursion)
   (checked-compile `(lambda ()
                       (declare (optimize debug))
                       (labels ((m (z vars)
@@ -769,7 +769,17 @@
                                      (f a)
                                      (catch 'a))))
                         (+ (f) (f *))))
-                   :allow-warnings t))
+                   :allow-warnings t)
+  (checked-compile `(lambda (a)
+                      (labels ((f (a b)
+                                 (if (plusp a)
+                                     (f (1- a) b)
+                                     a)))
+                        (+ (lognot a)
+                           (f 1
+                              (if (>= 5 a)
+                                  8
+                                  (mod a 8))))))))
 
 (with-test (:name :mv-call-lambda-type)
   (assert-type
