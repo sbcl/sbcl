@@ -4230,7 +4230,7 @@
                         ,(car (last vars))
                         (list ,@(reverse (butlast vars))))))))))
         (initialize-vector *
-         (setf (combination-args combination) (reverse args))
+         (setf (combination-args combination) (list* (car args) (reverse (cdr args))))
          (remove-lvar-dx sequence)
          'sequence))
       (give-up-ir1-transform)))

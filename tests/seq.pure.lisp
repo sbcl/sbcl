@@ -1152,3 +1152,10 @@
             `(lambda (i)
                (concatenate 'base-string (string (code-char i)))))
            '(sb-kernel:%concatenate-to-base-string-subseq))))
+
+(with-test (:name :reverse-initialize-vector)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (x y)
+         (reverse (make-array 2 :initial-contents (list x y))))
+    ((1 2) #(2 1) :test #'equalp)))
