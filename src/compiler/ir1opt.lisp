@@ -1483,10 +1483,11 @@
       (ecase kind
         (:local
          (let ((fun (combination-lambda node)))
-           (accumulate-optimistic-arg-types node fun)
-           (if (functional-kind-eq fun let)
-               (propagate-let-args node fun)
-               (propagate-local-call-args node fun))))
+           (unless (functional-kind-eq fun deleted zombie)
+             (accumulate-optimistic-arg-types node fun)
+             (if (functional-kind-eq fun let)
+                 (propagate-let-args node fun)
+                 (propagate-local-call-args node fun)))))
         (:error
          (clear-reoptimize-args))
         ((:full :unknown-keys)

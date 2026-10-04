@@ -917,3 +917,17 @@
                  (declare (ignore c a))
                  (f 1 2 :c (f 3 d :c 3))))
         (f 1 2 :c 4)))))
+
+(with-test (:name :accumulate-optimistic-arg-types-delete-fun)
+ (checked-compile
+  `(lambda ()
+     (declare (optimize speed))
+     (labels ((f1 ()
+                (if nil
+                    (labels ((g12 (n14 x16)
+                               (print (g13 2 (<= n14 x16))))
+                             (g13 (n15 x17)
+                               (let ((r19 (g12 1 2)))
+                                 (error "~a" r19))))
+                      (g12 0 1)))))
+       (f1)))))
