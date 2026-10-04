@@ -3255,3 +3255,10 @@
          (funcall (if (integerp m) #'inline-fun) 2)))
      (assert (eq (test 1 2) t)))
    :load t))
+
+(with-test (:name :member-dump-constants)
+  (assert (not (ctu:file-compile
+                `((defconstant +f+ (lambda ()))
+                  (defun f (y)
+                    (when (member y (list nil 10 +f+))
+                      t)))))))
