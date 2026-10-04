@@ -2897,7 +2897,7 @@
           (unless (or (eq ref this-ref) (not dest))
             (setq union
                   (mapcar (lambda (this-arg old)
-                            (when old
+                            (when (and this-arg old)
                               (setf (lvar-reoptimize this-arg) nil)
                               (cons (lvar-type this-arg) old)))
                           (basic-combination-args dest)

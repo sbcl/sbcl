@@ -899,3 +899,11 @@
       (flet ((f (&key c (d (if nil c)))
                d))
         (f :c 4)))))
+
+(with-test (:name :propagate-to-args-deleted-args)
+  (checked-compile
+   `(lambda ()
+      (labels ((f (a b &key c (d (if nil b)))
+                 (declare (ignore c a))
+                 (f 1 2 :c (f 3 d :c 3))))
+        (f 1 2 :c 4)))))
