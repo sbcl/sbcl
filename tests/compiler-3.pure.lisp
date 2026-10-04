@@ -887,14 +887,15 @@
             (f n i))))
     ((5 3) (values 1 nil))))
 
-(with-test (:name :default-unknown-values-unused)
-  (checked-compile-and-assert
-   ()
-   `(lambda (a)
-      (multiple-value-call #'max
-        (ceiling (case (logand a 3)
-                   (0 32)
-                   (1 (round a)))
-                 1023)
-        32))
-   ((100) 32)))
+(with-test (:name :default-values-constantp)
+  (checked-compile
+   `(lambda ()
+      (flet ((f (b &key c (d (if nil b)))
+               (values c d)))
+        (f 1 :c 4))
+      (flet ((f (b &key c (d (if 1 2 b)))
+               (values c d)))
+        (f 1 :c 4))
+      (flet ((f (&key c (d (if nil c)))
+               d))
+        (f :c 4)))))

@@ -92,60 +92,61 @@
 
 ;;; Bug reported by Paul Dietz: CONSTANTP on a self-evaluating object
 ;;; must return T
-(assert (constantp (find-class 'symbol)))
-(assert (constantp #p""))
+(with-test (:name :constantp)
+ (assert (constantp (find-class 'symbol)))
+ (assert (constantp #p""))
 
 ;;; More CONSTANTP tests
 ;;;              form                   constantp sb-int:constant-form-value
-(dolist (test '((t                      t         t)
-                (x                      nil)
-                ('x                     t         x)
-                (:keyword               t         :keyword)
-                (42                     t         42)
-                ((if t :ok x)           t         :ok)
-                ((if t x :no)           nil)
-                ((progn
-                   (error "oops")
-                   t)                   nil)
-                ((progn 1 2 3)          t         3)
-                ((block foo :good)      t         :good)
-                ((block foo
-                   (return-from foo t)) nil)
-                ((progv
-                     (list (gensym))
-                     '(1)
-                   (+ 1))               nil)
-                ((progv
-                     '(x)
-                     (list (random 2))
-                   x)                   nil)
-                ((progv
-                     '(x)
-                     '(1)
-                   (1+ x))              t         2)
-                ((progv '(x) '(t)
-                   (if x 1 2))          t         1)
-                ((unwind-protect 1 nil) t         1)
-                ((unwind-protect 1
-                   (xxx))               nil)
-                ((the integer 1)        t         1)
-                ((the integer (+ 1 1))  t         2)
-                ((the integer (foo))    nil)
-                ((the symbol 1)         nil)
-                ((the "bad type" 1)     nil)
-                ((multiple-value-prog1
-                     (+ 1 1)
-                   :nada)               t         2)
-                ((multiple-value-prog1
-                     :nada
-                   (/ 1 0))             nil)
-                ((/ 1 0)                nil)
-                ((/ 1 1)                t         1)
-                ((+ 1 2)                t         3)))
-  (destructuring-bind (form c &optional v) test
-    (assert (eql (constantp form) c))
-    (when c
-      (assert (eql v (sb-int:constant-form-value form))))))
+ (dolist (test '((t                      t         t)
+                 (x                      nil)
+                 ('x                     t         x)
+                 (:keyword               t         :keyword)
+                 (42                     t         42)
+                 ((if t :ok 1)           t         :ok)
+                 ((if t :no x)           nil)
+                 ((progn
+                    (error "oops")
+                    t)                   nil)
+                 ((progn 1 2 3)          t         3)
+                 ((block foo :good)      t         :good)
+                 ((block foo
+                    (return-from foo t)) nil)
+                 ((progv
+                      (list (gensym))
+                      '(1)
+                    (+ 1))               nil)
+                 ((progv
+                      '(x)
+                      (list (random 2))
+                    x)                   nil)
+                 ((progv
+                      '(x)
+                      '(1)
+                    (1+ x))              t         2)
+                 ((progv '(x) '(t)
+                    (if x 1 2))          t         1)
+                 ((unwind-protect 1 nil) t         1)
+                 ((unwind-protect 1
+                    (xxx))               nil)
+                 ((the integer 1)        t         1)
+                 ((the integer (+ 1 1))  t         2)
+                 ((the integer (foo))    nil)
+                 ((the symbol 1)         nil)
+                 ((the "bad type" 1)     nil)
+                 ((multiple-value-prog1
+                      (+ 1 1)
+                    :nada)               t         2)
+                 ((multiple-value-prog1
+                      :nada
+                    (/ 1 0))             nil)
+                 ((/ 1 0)                nil)
+                 ((/ 1 1)                t         1)
+                 ((+ 1 2)                t         3)))
+   (destructuring-bind (form c &optional v) test
+     (assert (eql (constantp form) c))
+     (when c
+       (assert (eql v (sb-int:constant-form-value form)))))))
 
 ;;; DEFPARAMETER must assign a dynamic variable
 (let ((var (gensym)))

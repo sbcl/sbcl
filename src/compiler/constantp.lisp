@@ -165,9 +165,12 @@
 (!defconstantp if (test then &optional else)
    :test
    (and (constantp* test)
-        (constantp* (if (constant-form-value* test)
-                        then
-                        else)))
+        ;; Don't check only one branch based on test, the unreachable
+        ;; branch might hide things like reference to variables, which
+        ;; will become unused if it's used to move code around.
+        ;; (Which is done for &key and &optional processing)
+        (constantp* then)
+        (constantp* else))
    :eval (if (constant-form-value* test)
              (constant-form-value* then)
              (constant-form-value* else)))
