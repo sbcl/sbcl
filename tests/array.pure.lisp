@@ -1172,3 +1172,19 @@
   (checked-compile
    `(lambda (s)
       (setf (char s 0) (code-char 233)))))
+
+(with-test (:name :constant-array-equalp)
+  (macrolet ((notes (val)
+               `(nth-value
+                 4 (checked-compile
+                    (quote
+                     (lambda (array)
+                       (declare (type (or (simple-array character)
+                                          (simple-array fixnum)
+                                          number)
+                                      array))
+                       (when (equalp array ,val)
+                         (print 'hello))))))))
+    (assert (notes #2a((1 2) (a 4))))
+    (assert (null (notes #2a((1 2) (5 4)))))
+    (assert (null (notes #.(make-array 3 :fill-pointer 2 :displaced-to #(1 2 a)))))))

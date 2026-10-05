@@ -7252,6 +7252,19 @@
                                              always (equal-comparison-p (pop cdr)))
                                        (equal-comparison-p cdr))))))
                         `(equal x y))))))
+           ;; (equalp (the (array fixnum) x) #(1 t)) => nil
+           (constant-array-mismatch (x-type const)
+             (when (constant-lvar-p const)
+               (let ((et (type-array-element-type (type-intersection x-type
+                                                                     (specifier-type 'array)))))
+                 (unless (or (eq et *wild-type*)
+                             (eq et *universal-type*))
+                   (let ((const (lvar-value const)))
+                     (when (typep const '(and array (not (array nil))))
+                       (loop for i below (if (vectorp const)
+                                             (length const)
+                                             (array-total-size const))
+                             thereis (not (ctypep (row-major-aref const i) et)))))))))
            ;; (equalp x (list y))
            ;; (equalp x (cons car cdr))
            (unroll-list (lvar x y)
@@ -7271,6 +7284,8 @@
             ((transform-array-dimensions-equal x y node t))
             ((unroll-constant x 'y y-type))
             ((unroll-constant y 'x x-type))
+            ((constant-array-mismatch x-type y)
+             nil)
             ((unroll-list x 'x 'y))
             ((unroll-list y 'y 'x))
             (t
