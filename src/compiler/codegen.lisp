@@ -279,6 +279,13 @@
                               ;; Mark the loop as aligned by saving the IR1 block aligned.
                               (setf (loop-info cloop) 1block)
                               filler-pattern))))
+              (when alignp
+                ;; Don't align loops in &key processing, they are unlikely to benefit.
+                (let ((lambda (block-home-lambda 1block)))
+                  (when (and (functional-kind-eq lambda optional)
+                             (eq (optional-dispatch-more-entry (lambda-optional-dispatch lambda))
+                                 lambda))
+                    (setf alignp nil))))
               (setf filler-pattern :long-nop)
               (emit-block-header (block-label 1block)
                                  (ir2-block-%trampoline-label block)
