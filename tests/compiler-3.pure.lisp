@@ -967,3 +967,14 @@
                                  (error "~a" r19))))
                       (g12 0 1)))))
        (f1)))))
+
+(with-test (:name :nlx-restore-nsp)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (-
+          (block nil
+            (unwind-protect 9
+              (return (- (ldb (byte 63 0) a) 4611686018427387905))))
+          (- (ldb (byte 63 0) b) 4611686018427387904)))
+    ((4611686018427387903 0) 4611686018427387902)))
