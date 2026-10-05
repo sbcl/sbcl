@@ -5680,6 +5680,24 @@
          ((lo-x hi-x) :scs (signed-128-reg)))
   (:arg-types unsigned-num signed-byte-128))
 
+(define-vop (logior/unsigned-signed=>s128)
+  (:translate logior)
+  (:args (x :scs (unsigned-reg) :target lo)
+         (y :scs (signed-reg) :to :save))
+  (:arg-types unsigned-num signed-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (move lo x)
+    (inst or lo y)
+    (move hi y)
+    (inst sar hi 63)))
+
+(define-vop (logior/signed-unsigned=>s128 logior/unsigned-signed=>s128)
+  (:args (y :scs (signed-reg) :to :save)
+         (x :scs (unsigned-reg) :target lo))
+  (:arg-types signed-num unsigned-num))
+
 (define-vop (logxor-s128)
   (:translate logxor)
   (:args ((lo-x hi-x) :scs (signed-128-reg))

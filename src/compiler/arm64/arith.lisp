@@ -465,56 +465,6 @@
   (:translate logior)
   (:generator 3
     (inst orr r x y)))
-
-(define-vop (logior-signed-unsigned=>integer)
-  (:args (x :scs (signed-reg any-reg) :to :save)
-         (y :scs (unsigned-reg)))
-  (:arg-refs x-ref)
-  (:arg-types signed-num unsigned-num)
-  (:results (r :scs (descriptor-reg any-reg)))
-  (:translate logior)
-  (:temporary (:sc unsigned-reg) low)
-  (:temporary (:sc unsigned-reg) header)
-  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
-  (:vop-var vop)
-  (:generator 20
-    (let ((fixnum (csubtypep (tn-ref-type x-ref) (specifier-type 'fixnum))))
-      (assemble ()
-        ;; Untag here or instcombine thinks all logior VOPs
-        ;; use their operands once
-        (inst orr low y (if (sc-is x any-reg)
-                            (asr x n-fixnum-tag-bits)
-                            x))
-        (if fixnum
-            (inst add r low low)
-            (inst adds r low low))
-        (inst mov header (bignum-header-for-length 1))
-        (inst tbnz x 63 (if fixnum
-                            done
-                            negative))
-        (inst tst low (ash (1- (ash 1 (- n-word-bits
-                                         n-positive-fixnum-bits)))
-                           n-positive-fixnum-bits))
-        (inst b :eq done)
-        (inst tbz low 63 allocate)
-        (inst mov header (bignum-header-for-length 2))
-        (inst b allocate)
-        negative
-        (unless fixnum
-          (inst b :vc DONE))
-        allocate
-        (with-fixed-allocation
-            (r lr nil (+ 2 bignum-digits-offset))
-          (storew-pair header 0 low bignum-digits-offset tmp-tn)
-          (storew zr-tn tmp-tn 2))
-        DONE))))
-
-(define-vop (logior-unsigned-signed=>integer logior-signed-unsigned=>integer)
-  (:args (y :scs (unsigned-reg))
-         (x :scs (signed-reg)))
-  (:arg-refs nil x-ref)
-  (:arg-types unsigned-num signed-num))
-
 ;;; Multiplication
 
 (define-vop (*/fixnum=>fixnum fixnum-binop)
@@ -2293,6 +2243,22 @@
          ((lo-x hi-x) :scs (signed-128-reg)))
   (:arg-types unsigned-num signed-byte-128))
 
+(define-vop (logior/unsigned-signed=>s128)
+  (:translate logior)
+  (:args (x :scs (unsigned-reg) :target lo)
+         (y :scs (signed-reg) :to :save))
+  (:arg-types unsigned-num signed-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (inst orr lo x y)
+    (inst asr hi y 63)))
+
+(define-vop (logior/signed-unsigned=>s128 logior/unsigned-signed=>s128)
+  (:args (y :scs (signed-reg) :to :save)
+         (x :scs (unsigned-reg) :target lo))
+  (:arg-types signed-num unsigned-num))
+
 (define-vop (logxor-s128)
   (:translate logxor)
   (:args ((lo-x hi-x) :scs (signed-128-reg))
@@ -3055,7 +3021,6 @@
                (when (sc-is y immediate)
                  (load-immediate-word low value)
                  (setf y low))
-               ;; Put UMULH first, avoids the madd peephole optimizers
                (inst umulh high x y)
                (inst mul low x y))))
     (inst mov header (bignum-header-for-length 3))
