@@ -719,3 +719,13 @@
 
 (defmacro tn-intersectp (tn-ref type)
   `(types-equal-or-intersect (tn-ref-type ,tn-ref) (specifier-type ',type)))
+
+(defun immediate-value (tn)
+  (if (sc-is tn immediate)
+      (tn-value tn)
+      tn))
+
+(defun fixnum-immediate-value (tn)
+  (if (sc-is tn immediate)
+      (fixnumize (tn-value tn))
+      tn))
