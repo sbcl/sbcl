@@ -1193,11 +1193,12 @@
     (when target
       (let* ((tn (tn-ref-tn target))
              (loc (tn-offset tn)))
-        (when (and (eq (sc-sb sc) (sc-sb (tn-sc tn)))
+        (when (and (not (eq (tn-kind tn) :unused))
+                   (eq (sc-sb sc) (sc-sb (tn-sc tn)))
                    (sc-locations-member (the sb-vm:finite-sc-offset loc)
                                         (sc-locations sc))
                    (not (load-tn-conflicts-in-sc op sc loc nil)))
-              (return-from select-load-tn-location loc)))))
+          (return-from select-load-tn-location loc)))))
 
   (do-sc-locations (loc (sc-locations sc) nil (sc-element-size sc))
     (unless (load-tn-conflicts-in-sc op sc loc nil)

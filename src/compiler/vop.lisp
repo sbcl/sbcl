@@ -755,7 +755,9 @@
   ;; Which args prefer the same tagging as the results?
   (related-args -1 :type fixnum)
   ;; :commutative is for multiplication, where it can be (* tagged untagged) => tagged
-  (tag nil :type (member nil :tagged :untagged :commutative)))
+  (tag nil :type (member nil :tagged :untagged :commutative))
+  (arg-tags 0 :type fixnum)
+  (result-tags 0 :type fixnum))
 (!set-load-form-method vop-info (:xc :target) :ignore-it)
 
 (declaim (inline vop-name))

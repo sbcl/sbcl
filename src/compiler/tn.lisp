@@ -612,49 +612,99 @@
           (return)))))
   (values))
 
-(defun template-tagging (vop-info)
-  (let ((untagged 1)
-        (tagged 1)
-        (related (vop-info-related-args vop-info))
-        (arg-positions (loop with i = 0
+(defun template-tagging (vop-info specified)
+  (let ((arg-positions (loop with i = 0
                              for type in (vop-info-arg-types vop-info)
                              unless (typep type '(cons (eql :constant)))
                              collect i
                              do (incf i)))
-        args
-        results)
-    (flet ((account (costs)
-             (when (or (eql (svref costs sb-vm:signed-reg-sc-number) 0)
-                       (eql (svref costs sb-vm:unsigned-reg-sc-number) 0))
-               (setf tagged 0))
-             (when (eql (svref costs sb-vm:any-reg-sc-number) 0)
-               (setf untagged 0)))
-           (combine ()
-             (cond ((zerop (logxor tagged untagged))
-                    nil)
-                   ((zerop untagged)
-                    :tagged)
-                   (t
-                    :untagged))))
-      (loop for costs in (vop-info-arg-costs vop-info)
-            for i in arg-positions
-            when (logbitp i related)
-            do (let ((untag (or (eql (svref costs sb-vm:signed-reg-sc-number) 0)
-                                (eql (svref costs sb-vm:unsigned-reg-sc-number) 0)))
-                     (tag (eql (svref costs sb-vm:any-reg-sc-number) 0)))
-                 (unless (and tag untag)
-                   (when untag
-                     (setf tagged 0))
-                   (when tag
-                     (setf untagged 0)))))
-      (setf args (combine))
-      (setf untagged 1
-            tagged 1)
-      (mapc #'account (vop-info-result-costs vop-info))
-      (setf results (combine))
-      (cond ((eq args results)
-             args)
-            ((not args)
-             results)
-            ((not results)
-             args)))))
+        (arg-tags 0)
+        (result-tags 0)
+        (manual-tag (consp specified)))
+    (when (consp specified)
+      (destructuring-bind (args &optional results) specified
+        (loop for i in arg-positions
+              for tag in args
+              do (setf (ldb (byte 2 (* i 2)) arg-tags)
+                       (ecase tag
+                         (:tagged 1)
+                         (:untagged 2)
+                         ((nil)
+                          0))))
+        (loop for i from 0
+              for tag in results
+              do (setf (ldb (byte 2 (* i 2)) result-tags)
+                       (ecase tag
+                         (:tagged 1)
+                         (:untagged 2)
+                         ((nil)
+                          0)))))
+      (setf specified nil))
+    (let ((untagged 1)
+          (tagged 1)
+          (related (vop-info-related-args vop-info))
+          args
+          results)
+      (flet ((combine ()
+               (cond ((zerop (logxor tagged untagged))
+                      nil)
+                     ((zerop untagged)
+                      :tagged)
+                     (t
+                      :untagged))))
+        (loop for costs in (vop-info-arg-costs vop-info)
+              for i in arg-positions
+              when (logbitp i related)
+              do (let ((untag (or (eql (svref costs sb-vm:signed-reg-sc-number) 0)
+                                  (eql (svref costs sb-vm:unsigned-reg-sc-number) 0)
+                                  #+(or x86-64 arm64)
+                                  (eql (svref costs sb-vm::signed-128-reg-sc-number) 0)))
+                       (tag (or (eql (svref costs sb-vm:any-reg-sc-number) 0)
+                                (eql (svref costs sb-vm:descriptor-reg-sc-number) 0))))
+                   (unless (and tag untag)
+                     (when untag
+                       (setf tagged 0))
+                     (when tag
+                       (setf untagged 0)))
+                   (unless manual-tag
+                     (setf (ldb (byte 2 (* i 2)) arg-tags)
+                           (cond ((and tag untag)
+                                  0)
+                                 (tag
+                                  1)
+                                 (2))))))
+        (setf args (combine))
+        (setf untagged 1
+              tagged 1)
+        (loop for i from 0
+              for costs in (vop-info-result-costs vop-info)
+              do
+              (let ((untag (or (eql (svref costs sb-vm:signed-reg-sc-number) 0)
+                               (eql (svref costs sb-vm:unsigned-reg-sc-number) 0)
+                               #+(or x86-64 arm64)
+                               (eql (svref costs sb-vm::signed-128-reg-sc-number) 0)))
+                    (tag (or (eql (svref costs sb-vm:any-reg-sc-number) 0)
+                             (eql (svref costs sb-vm:descriptor-reg-sc-number) 0))))
+                (when untag
+                  (setf tagged 0))
+                (when tag
+                  (setf untagged 0))
+                (unless manual-tag
+                  (setf (ldb (byte 2 (* i 2)) result-tags)
+                        (cond ((and tag untag)
+                               0)
+                              (tag
+                               1)
+                              (2))))))
+        (setf (vop-info-arg-tags vop-info) arg-tags
+              (vop-info-result-tags vop-info) result-tags)
+        (cond (specified)
+              (t
+               (setf results (combine))
+               (setf specified
+                     (cond ((eq args results)
+                            args)
+                           ((not args)
+                            results)
+                           ((not results)
+                            args)))))))))

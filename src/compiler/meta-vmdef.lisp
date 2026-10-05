@@ -1148,7 +1148,10 @@
         (:related-args
          (setf (vop-parse-related-args parse) (rest spec)))
         (:tag
-         (setf (vop-parse-tag parse) (second spec)))
+         (setf (vop-parse-tag parse)
+               (if (consp (second spec))
+                   (cdr spec)
+                   (second spec))))
         (t
          (error "unknown option specifier: ~S" (first spec)))))
     (cond (arg-refs-p
@@ -1628,7 +1631,6 @@
                        (if spec
                            (arg-name-bitmask spec parse)
                            -1))
-      :tag ,(vop-parse-tag parse)
 
       #+(and (not sb-xc-host) sb-devel)
       :optimizer
@@ -1866,7 +1868,7 @@
                   (quotify-slots))))
            ,@(unless (eq (vop-parse-body parse) :unspecified)
                `((let ((,n-res ,(set-up-vop-info inherited-parse parse)))
-                   (fill-template-tagging ,n-res)
+                   (fill-template-tagging ,n-res ',(vop-parse-tag parse))
                    (store-vop-info ,n-res)
                    ,@(set-up-fun-translation parse n-res))))
            ,@(when (equal (vop-parse-check-type parse) '(t))
@@ -2100,10 +2102,9 @@
   (setf (gethash (vop-info-name vop-info) *backend-template-names*)
         vop-info))
 
-(defun fill-template-tagging (vop-info)
-  (unless (vop-info-tag vop-info)
-    (setf (vop-info-tag vop-info)
-          (template-tagging vop-info))))
+(defun fill-template-tagging (vop-info specified)
+  (setf (vop-info-tag vop-info)
+        (template-tagging vop-info specified)))
 
 (defun undefine-vop (name)
   (let ((parse (gethash name *backend-parsed-vops*)))

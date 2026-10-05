@@ -196,7 +196,7 @@
                       (funcall function use)))))
       (recurse-lvar lvar))))
 
-(defun map-all-dests (function node &optional (nth-value 0))
+(defun map-all-dests (function node &key (nth-value 0) cast)
   (declare (dynamic-extent function))
   (let (seen)
     (labels ((call (node lvar nth-value)
@@ -237,6 +237,9 @@
                         (when next-dest
                           (recurse-node next-dest next-lvar
                                         (position lvar (combination-args node))))))
+                     ((and cast
+                           (cast-p node))
+                      (recurse node nth-value))
                      (t
                       (call node lvar nth-value))))
              (recurse (node nth-value)

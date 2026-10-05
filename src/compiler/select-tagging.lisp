@@ -88,23 +88,18 @@
                 (incf (aref cap (logxor e 1)) bot))))))
 
 (defun tagged-template-results-p (vop-info)
-  (if (vop-info-p vop-info)
-      (let* ((costs (car (vop-info-result-costs vop-info)))
-             (tagged (eql (svref costs sb-vm:any-reg-sc-number) 0))
-             (untagged (or (eql (svref costs sb-vm:signed-reg-sc-number) 0)
-                           (eql (svref costs sb-vm:unsigned-reg-sc-number) 0)
-                           #+(or x86-64 arm64)
-                           (eql (svref costs sb-vm::signed-128-reg-sc-number) 0))))
-        (cond
-          ((and tagged untagged)
-           (values 0 0))
-          (untagged
-           (values 0 1))
-          (tagged
-           (values 1 0))
-          (t
-           (values 1 0))))
-      (values 1 0)))
+  (cond ((vop-info-p vop-info)
+         (case (ldb (byte 2 0) (vop-info-result-tags vop-info)) ;; TODO: multiple results
+           (1
+            (values 1 0))
+           (2
+            (values 0 1))
+           (t
+            (values 0 0))))
+        ;; ((listp vop-info)
+        ;;  (values 0 0))
+        (t
+         (values 1 0))))
 
 (defun combination-arg-template-position (arg node)
   (let ((args (combination-args node)))
@@ -113,21 +108,15 @@
                       args))))
 
 (defun tagged-template-arg-p (lvar n vop-info)
-  (let ((costs (loop with arg-costs = (vop-info-arg-costs vop-info)
-                     for i from 0
-                     for arg-type in (vop-info-arg-types vop-info)
-                     when (= i n)
-                     return (car arg-costs)
-                     unless (typep arg-type '(cons (eql :constant)))
-                     do (pop arg-costs))))
-    (aver costs)
-    (cond ((not (eql (svref costs sb-vm:any-reg-sc-number) 0))
-           (values 0 1))
-          ((not (or (eql (svref costs sb-vm:signed-reg-sc-number) 0)
-                    (eql (svref costs sb-vm:unsigned-reg-sc-number) 0)))
-           (values (boxing-cost lvar) 0))
-          (t
-           (values 0 0)))))
+  (declare ((unsigned-byte 8) n))
+  (let ((tagging (ldb (byte 2 (* n 2)) (vop-info-arg-tags vop-info))))
+    (case tagging
+      (1
+       (values (boxing-cost lvar) 0))
+      (2
+       (values 0 1))
+      (t
+       (values 0 0)))))
 
 (defun boxing-cost (lvar)
   (let ((2lvar  (lvar-info lvar)))
@@ -174,6 +163,10 @@
                                     (t
                                      ;; Flexible VOP, no costs
                                      (values 0 0)))))
+                           ((jump-table-p node)
+                            (tagged-template-arg-p lvar
+                                                   0
+                                                   (template-or-lose 'jump-table)))
                            (t
                             (values 1 0)))))
 
@@ -246,7 +239,8 @@
                              (incf tagged tag)
                              (incf untagged untag)))
                          nil)
-                       node)
+                       node
+                       :cast t)
                       (when (> tagged 0)
                         (add-edge net :source result (* tagged 10)))
                       (when (> untagged 0)
