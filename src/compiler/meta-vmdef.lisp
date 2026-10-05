@@ -271,7 +271,8 @@
   (scs nil :type (or symbol list) :read-only t)
   ;; If non-null, we are a temp wired to this offset in SC.
   (offset nil :type (or unsigned-byte null) :read-only t)
-  (unused-if nil))
+  (unused-if nil)
+  (custom-sc-costs nil))
 (declaim (freeze-type operand-parse))
 
 (defun operand-parse-sc (parse) ; Enforce a single symbol
@@ -949,6 +950,8 @@
                  (unless (eq kind :argument)
                    (error "can only specify :TO in an argument: ~S" spec))
                  (setq key :dies value (parse-time-spec value)))
+                (:sc-costs
+                 (setf key :custom-sc-costs))
                 (t
                  (error "unknown keyword in operand specifier: ~S" spec)))
               (setf (getf res key) value)))
@@ -1216,8 +1219,10 @@
     (dolist (sc-name (reverse scs))
       (let ((load-sc (gethash sc-name *backend-sc-names*)))
         (cond (load-sc
-               (let* ((load-scn (sc-number load-sc)))
-                 (setf (svref costs load-scn) 0)
+               (let* ((load-scn (sc-number load-sc))
+                      (custom-cost (getf (operand-parse-custom-sc-costs op) sc-name 0)))
+                 (setf (svref costs load-scn)
+                       custom-cost)
                  (setf (svref load-scs load-scn) t)
                  (dolist (op-sc (append (when load-p
                                           (sc-constant-scs load-sc))
@@ -1233,7 +1238,9 @@
 
                      (let ((op-cost (svref costs op-scn)))
                        (when (or (not op-cost) (< load op-cost))
-                         (setf (svref costs op-scn) load)))
+                         (setf (svref costs op-scn) (if (eql load 0)
+                                                        custom-cost
+                                                        load))))
 
                      (let ((op-load (svref load-scs op-scn)))
                        (unless (eq op-load t)
@@ -1247,7 +1254,10 @@
                                          (svref (sc-move-costs load-sc) i)
                                          (svref (sc-move-costs op-sc) load-scn))))
                            (when cost
-                             (setf (svref costs i) cost)))))))))
+                             (setf (svref costs i)
+                                   (if (eql cost 0)
+                                       custom-cost
+                                       cost))))))))))
               ((let ((cond-sc (getf *backend-cond-scs* sc-name)))
                  (when cond-sc
                    (push cond-sc cond-scs))))
