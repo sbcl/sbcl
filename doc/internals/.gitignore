@@ -15,7 +15,7 @@
 sbcl-internals.info
 sbcl-internals.pdf
 sbcl-internals.ps
-sbcl-internals/
+sbcl-internals_html/
 html-stamp
 discriminating-functions.pdf
 discriminating-functions.txt
