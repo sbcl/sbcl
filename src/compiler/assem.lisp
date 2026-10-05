@@ -409,7 +409,7 @@
   ;; - a function to emit a postit
   (let ((last (section-tail section))
         (vop (if (boundp '*current-vop*) *current-vop*)))
-    (dolist (thing things (setf (section-tail section) last))
+    (sb-kernel:do-rest-arg ((thing) things 0 (setf (section-tail section) last))
       (if (label-p thing) ; Accumulate multiple labels until the next instruction
           (if (stmt-op last)
               (setq last (insert-stmt (make-stmt thing vop 0 nil nil) last))
@@ -2023,7 +2023,8 @@
                      (%emit-alignment segment *current-vop* bits pattern)))
 (%def-inst-encoder '.byte
                    (lambda (segment &rest bytes)
-                     (dolist (byte bytes) (emit-byte segment byte))))
+                     (sb-kernel:do-rest-arg ((byte) bytes)
+                       (emit-byte segment byte))))
 (%def-inst-encoder '.bytes
                    (lambda (segment bytes)
                      (map nil (lambda (byte) (emit-byte segment byte)) bytes)))

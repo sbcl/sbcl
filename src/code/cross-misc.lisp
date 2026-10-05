@@ -468,3 +468,12 @@
 (defun %denominator (x)
   (check-type x ratio)
   (denominator x))
+
+(defmacro do-rest-arg (((var &optional index-var) rest-var
+                        &optional (start 0) result)
+                       &body body)
+  (assert (eql start 0))
+  (assert (not index-var))
+  `(dolist (,var ,rest-var ,@(when result
+                               `(,result)))
+     ,@body))

@@ -237,10 +237,12 @@
 
 (defun error-call (vop error-code &rest values)
   "Cause an error.  ERROR-CODE is the error to cause."
+  (declare (dynamic-extent values))
   (emit-error-break vop error-trap (error-number-or-lose error-code) values))
 
 (defun cerror-call (vop error-code &rest values)
   "Cause a continuable error.  ERROR-CODE is the error to cause."
+  (declare (dynamic-extent values))
   (emit-error-break vop cerror-trap (error-number-or-lose error-code) values))
 
 ;;; Does the TN definitely hold *any* of the 4 pointer types

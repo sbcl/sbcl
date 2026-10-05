@@ -92,9 +92,12 @@
 (defvar *current-path*)
 
 (defun call-with-current-source-form (thunk &rest forms)
-  (let ((*current-path* (or (and (some #'identity forms)
-                                 (boundp '*source-paths*)
-                                 (some #'get-source-path forms))
+  (declare (dynamic-extent thunk))
+  (let ((*current-path* (or (when (boundp '*source-paths*)
+                              (do-rest-arg ((form) forms)
+                                (let ((path (get-source-path form)))
+                                  (when path
+                                    (return path)))))
                             (and (boundp '*current-path*)
                                  *current-path*))))
     (funcall thunk)))
