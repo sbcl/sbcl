@@ -34,13 +34,13 @@
   "Designator for a function of zero arguments called to obtain a
 pathname designator for the default sysinit file, or NIL. If the
 function returns NIL, no sysinit file is used unless one has been
-specified on the command-line.")
+specified on the command line.")
 
 (define-load-time-global *userinit-pathname-function* #'userinit-pathname
   "Designator for a function of zero arguments called to obtain a
 pathname designator or a stream for the default userinit file, or NIL.
 If the function returns NIL, no userinit file is used unless one has
-been specified on the command-line.")
+been specified on the command line.")
 
 
 ;;;; miscellaneous utilities for working with with TOPLEVEL

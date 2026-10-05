@@ -1874,13 +1874,9 @@ Returns the sentence breaking class of @code{character}, as specified in UAX #29
 @end deffn
 @anchor{Function sb-unicode line-break-class}
 @ffindex @sortas{line-break-class sb-unicode} line-break-class [sb-unicode]
-@deffn{Function} sb-unicode:line-break-class character &key resolve
-Returns the line breaking class of @code{character}, as specified in UAX #14.
-If @code{:resolve} is @code{nil}, returns the character class found in the property file.
-If @code{:resolve} is non-@code{nil}, certain line-breaking classes will be mapped to other
-classes as specified in the applicable standards. Additionally, if @code{:resolve}
-is @code{:east-asian}, Ambigious (class @code{:ai}) characters will be mapped to the
-Ideographic (@code{:id}) class instead of Alphabetic (@code{:al}).
+@deffn{Function} sb-unicode:line-break-class character
+Returns the line breaking class of @code{character}, as specified in the
+Unicode character database.
 @end deffn
 @node string operations
 @cindex normalization of strings
@@ -1958,7 +1954,7 @@ with variable-weight characters, as described in UTS #10
 @deffn{Function} sb-unicode:unicode= string1 string2 &key start1 end1 start2 end2 strict
 Determines whether @code{string1} and @code{string2} are canonically equivalent according
 to Unicode. The @code{start} and @code{end} arguments behave like the arguments to @code{string=}.
-If @code{:strict} is @code{nil}, @code{unicode=} tests compatibility equavalence instead.
+If @code{:strict} is @code{nil}, @code{unicode=} tests compatibility equivalence instead.
 @end deffn
 @anchor{Function sb-unicode unicode-equal}
 @ffindex @sortas{unicode-equal sb-unicode} unicode-equal [sb-unicode]
@@ -1966,7 +1962,7 @@ If @code{:strict} is @code{nil}, @code{unicode=} tests compatibility equavalence
 Determines whether @code{string1} and @code{string2} are canonically equivalent after
 casefolding (that is, ignoring case differences) according to Unicode. The
 @code{start} and @code{end} arguments behave like the arguments to @code{string=}. If @code{:strict} is
-@code{nil}, @code{unicode=} tests compatibility equavalence instead.
+@code{nil}, @code{unicode=} tests compatibility equivalence instead.
 @end deffn
 @anchor{Function sb-unicode unicode<=}
 @ffindex @sortas{unicode<= sb-unicode} unicode<= [sb-unicode]

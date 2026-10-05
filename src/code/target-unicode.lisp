@@ -1870,7 +1870,7 @@ it defaults to 80 characters"
 (defun unicode= (string1 string2 &key (start1 0) end1 (start2 0) end2 (strict t))
   "Determines whether STRING1 and STRING2 are canonically equivalent according
 to Unicode. The START and END arguments behave like the arguments to STRING=.
-If :STRICT is NIL, UNICODE= tests compatibility equavalence instead."
+If :STRICT is NIL, UNICODE= tests compatibility equivalence instead."
   (let ((str1 (normalize-string (subseq string1 start1 end1) (if strict :nfd :nfkd)))
         (str2 (normalize-string (subseq string2 start2 end2) (if strict :nfd :nfkd))))
     (string= str1 str2)))
@@ -1879,7 +1879,7 @@ If :STRICT is NIL, UNICODE= tests compatibility equavalence instead."
   "Determines whether STRING1 and STRING2 are canonically equivalent after
 casefolding (that is, ignoring case differences) according to Unicode. The
 START and END arguments behave like the arguments to STRING=. If :STRICT is
-NIL, UNICODE= tests compatibility equavalence instead."
+NIL, UNICODE= tests compatibility equivalence instead."
   (let ((str1 (normalize-string (subseq string1 start1 end1) (if strict :nfd :nfkd)))
         (str2 (normalize-string (subseq string2 start2 end2) (if strict :nfd :nfkd))))
     (string=

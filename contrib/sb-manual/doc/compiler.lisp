@@ -1,13 +1,11 @@
 (in-package :sb-manual)
 
 (defsection @compiler (:title "Compiler")
-  "This chapter will discuss most compiler issues other than efficiency,
-  including compiler error messages, the SBCL compiler's unusual
-  approach to type safety in the presence of type declarations, the
-  effects of various compiler optimization policies, and the way that
-  inlining and open coding may cause optimized code to differ from a
-  naive translation. Efficiency issues are sufficiently varied and
-  separate that they have their own chapter, @EFFICIENCY."
+  "This chapter will discuss most compiler issues other than @EFFICIENCY,
+  including compiler messages, type safety in the presence of type
+  declarations, the effects of various optimization policies, and the
+  way that inlining and open coding may cause optimized code to differ
+  from a naive translation."
   (@diagnostic-messages section)
   (@handling-of-types section)
   (@compiler-policy section)
@@ -27,13 +25,13 @@
     (:title "Controlling Verbosity"
      :concepts (("compiler" "messsage" "verbosity")
                 ("verbosity" "of compiler messsages")))
-  "The compiler can be quite verbose in its diagnostic reporting, rather
-  more then some users would prefer -- the amount of noise emitted can
-  be controlled, however.
+  "The compiler can be quite verbose in its diagnostic reporting – rather
+  more than some users would prefer. However, the amount of noise
+  emitted can be controlled.
 
-  To control emission of compiler diagnostics (of any severity other
-  than ERROR: @DIAGNOSTIC-SEVERITY) use the SB-EXT:MUFFLE-CONDITIONS
-  and SB-EXT:UNMUFFLE-CONDITIONS declarations, specifying the type of
+  To control emission of compiler diagnostics (except those with
+  @DIAGNOSTIC-SEVERITY error) use the SB-EXT:MUFFLE-CONDITIONS and
+  SB-EXT:UNMUFFLE-CONDITIONS declarations, specifying the type of
   condition that is to be muffled (the muffling is done using an
   associated MUFFLE-WARNING restart).
 
@@ -301,7 +299,7 @@
       ;   Asserted type FIXNUM conflicts with derived type (VALUES NULL &OPTIONAL).
 
   This message is not saying that there is a problem somewhere in this
-  LET -- it is saying that there is a problem with the LET itself. In
+  LET – it is saying that there is a problem with the LET itself. In
   this example, the problem is that `A`'s NIL initial value is not a
   FIXNUM.")
 
@@ -878,13 +876,18 @@
 
 (defsection @interpreter (:title "Interpreter"
                           :concepts ("interpreter"))
-  "By default SBCL implements EVAL by calling the native code
-  compiler.
+  "By default, SBCL implements EVAL by calling the native-code
+  compiler. There are two, mutually exclusive interpreter
+  implementations: sb-eval (the default) and sb-fasteval. These are
+  intended for when using the compiler is undesirable, for example due
+  to compilation overhead.
 
-  SBCL also includes an interpreter for use in special cases where
-  using the compiler is undesirable, for example due to compilation
-  overhead. Unlike in some other Lisp implementations, in SBCL
-  interpreted code is not safer or more debuggable than compiled code."
+  An interpreterless SBCL can be compiled by passing
+  `--without-sb-eval` to `make.sh`, while sb-fasteval can be enabled
+  with `--without-sb-eval --with-sb-fasteval.`
+
+  Unlike in some other Lisp implementations, in SBCL interpreted code
+  is not safer or more debuggable than compiled code."
   (sb-ext:*evaluator-mode* variable))
 
 (defsection @advanced-compiler-use-and-efficiency-hints

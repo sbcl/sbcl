@@ -87,8 +87,8 @@
 
   Note, however, that there is a hard limit on the number of distinct
   symbols that can be bound dynamically in threaded builds (see
-  `--tls-limit` in @RUNTIME-OPTIONS). Exceeding this limit triggers
-  the low-level error `Thread local storage exhausted.`")
+  `--tls-limit` in @RUNTIME-OPTIONS). Exceeding this limit invokes
+  @LDB with the error `Thread local storage exhausted.`")
 
 (defsection @atomic-operations (:title "Atomic Operations")
   "Following atomic operations are particularly useful for implementing

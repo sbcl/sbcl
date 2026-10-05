@@ -47,24 +47,24 @@ and return the modified LIST."
 (declaim (type list *save-hooks* *init-hooks* *exit-hooks*))
 
 (define-load-time-global *save-hooks* nil
-  "A list of function designators which are called in an unspecified
+  "A list of function designators called in an unspecified
 order before creating a saved core image.
 
-Unused by SBCL itself: reserved for user and applications.")
+Unused by SBCL itself; reserved for the user and applications.")
 
 (define-load-time-global *init-hooks* nil
-  "A list of function designators which are called in an unspecified
+  "A list of function designators called in an unspecified
 order when a saved core image starts up, after the system itself has
 been initialized, but before non-user threads such as the finalizer
 thread have been started.
 
-Unused by SBCL itself: reserved for user and applications.")
+Unused by SBCL itself; reserved for the user and applications.")
 
 (define-load-time-global *exit-hooks* nil
-  "A list of function designators which are called in an unspecified
+  "A list of function designators called in an unspecified
 order when SBCL process exits.
 
-Unused by SBCL itself: reserved for user and applications.
+Unused by SBCL itself; reserved for the user and applications.
 
 Using (SB-EXT:EXIT :ABORT T), or calling `exit(3)` directly circumvents
 these hooks.")

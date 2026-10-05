@@ -51,19 +51,18 @@ directly.
 The SBCL project cannot verify the accuracy of the information or
 the competence of the people listed, and they have provided their
 own blurbs below: you must make your own judgement of suitability
-from the available information - refer to the links they provide,
-the CREDITS file, mailing list archives, CVS commit messages, and so
-on. Please feel free to ask for advice on the sbcl-help list.
+from the available information – refer to the links they provide,
+the CREDITS file, mailing list archives, commit messages, and so on.
+Please feel free to ask for advice through @ref{volunteer support}.
 
 (At present, no companies or consultants wish to advertise paid
-support or custom SBCL development in this manual).
+support or custom SBCL development in this manual.)
 
 @node reporting bugs
 @section Reporting Bugs
 
 @menu
 * How to Report Bugs Effectively: how to report bugs effectively.
-* How to Report Signal-related Bugs: how to report signal related bugs.
 @end menu
 
 SBCL uses Launchpad to track bugs. The bug database is available at
@@ -73,17 +72,20 @@ SBCL uses Launchpad to track bugs. The bug database is available at
 Reporting bugs there requires registering at Launchpad. However,
 bugs can also be reported on the mailing list @code{sbcl-bugs}, which is
 moderated but does @emph{not} require subscribing. Simply send email to
-@uref{mailto:sbcl-bugs@@lists.sourceforge.net, @code{sbcl-bugs@@lists.sourceforge.net}}
-and the bug will be checked and added to Launchpad by SBCL
-maintainers.
+@uref{mailto:sbcl-bugs@@lists.sourceforge.net, @code{sbcl-bugs@@lists.sourceforge.net}},
+to have the bug checked and added to Launchpad by SBCL maintainers.
 
 See the @code{HACKING} file on how to send patches.
 
 @node how to report bugs effectively
 @subsection How to Report Bugs Effectively
 
+@menu
+* Getting Backtraces for Low-level Errors: getting backtraces for low level errors.
+@end menu
+
 Please include enough information in a bug report that someone reading
-it can reproduce the problem, i.e. don't write
+it can reproduce the problem. That is, don't write
 
 @example
 Subject: apparent bug in PRINT-OBJECT (or *PRINT-LENGTH*?)
@@ -110,30 +112,30 @@ found at
 
 @url{http://www.chiark.greenend.org.uk/~sgtatham/bugs.html}.
 
-@node how to report signal related bugs
-@subsection How to Report Signal-related Bugs
+@node getting backtraces for low level errors
+@subsubsection Getting Backtraces for Low-level Errors
 
-If you run into a signal related bug, you are getting fatal errors
-such as @code{signal N is [un]blocked} or just hangs, and you want to
-send a useful bug report then:
+If you get a fatal errors such as @code{signal N is [un]blocked} or SBCL
+just hang and you want to send a useful bug report, then:
 
 @itemize
-@item Compile SBCL with @ref{ldb} enabled.
+@item Make sure SBCL is compiled and run with @ref{ldb} enabled.
 
 @item Isolate a smallish test case, run it.
 
-@item If it just hangs kill it with @code{sigabrt}: @code{kill -ABRT <pidof sbcl>}.
+@item If SBCL hangs, kill it with @code{sigabrt}: @code{kill -ABRT <pidof sbcl>},
+  which by default enters @code{ldb}.
 
-@item Print the backtrace from @ref{ldb} by typing @code{ba}.
+@item Print the backtrace from @code{ldb} by typing @code{ba}.
 
-@item Attach gdb: @code{gdb -p <pidof sbcl>} and get backtraces for all
-  threads: @code{thread apply all ba}.
+@item Next, attach gdb with @code{gdb -p <pidof sbcl>}, and get backtraces
+  for all threads with @code{thread apply all ba}.
 
-@item If multiple threads are in play then still in gdb, try to get Lisp
-  backtrace for all threads: @code{thread apply all call
-  backtrace_from_fp($ebp, 100, 0)}. Substitute @code{$ebp} with @code{$rbp} on
-  x86-64. The backtraces will appear in the stdout of the SBCL
-  process.
+@item If multiple threads are in play, then – still in gdb – try to get
+  Lisp backtrace for all threads: @code{thread apply all call
+  backtrace_from_fp($ebp, 100, 0)} on x86. Substitute @code{$ebp} with
+  @code{$rbp} on x86-64. The backtraces will appear in the stdout of the
+  SBCL process.
 
 @item Send a report with the backtraces and the output (both stdout and
   stderr) produced by SBCL.
@@ -141,6 +143,6 @@ send a useful bug report then:
 @item Don't forget to include OS and SBCL version.
 
 @item If available, include information on outcome of the same test with
-  other versions of SBCL, OS, ...
+  other versions of SBCL, OS, etc.
 @end itemize
 

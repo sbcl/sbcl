@@ -34,8 +34,8 @@
   Also see @COMMAND-LINE-OPTIONS and @STOPPING-SBCL.")
 
 (defsection @running-from-emacs (:title "Running from Emacs")
-  "To run SBCL as an `inferior-lisp` from Emacs, in your `.emacs` do
-  something like:
+  "To run SBCL as an `inferior-lisp` from Emacs, add something like this
+  to your `.emacs`:
 
       ;;; The SBCL binary and command-line arguments
       (setq inferior-lisp-program \"/usr/local/bin/sbcl --noinform\")
@@ -44,9 +44,9 @@
   @EDITOR-INTEGRATION.")
 
 (defsection @shebang-scripts (:title "Shebang Scripts")
-  "Standard Unix tools that are interpreters follow a common command line
+  "Standard Unix tools that are interpreters follow a common command-line
   protocol that is necessary to work with \"shebang scripts\". SBCL
-  supports this via the `--script` command line option (see
+  supports this via the `--script` command-line option (see
   @COMMAND-LINE-OPTIONS).
 
   Example file (`hello.lisp`):
@@ -78,9 +78,10 @@
   (sb-ext:exit function))
 
 (defsection @end-of-file (:title "End of File")
-  "By default SBCL also exits on end of input, caused either by user
-  pressing `Control-D` on an attached terminal, or end of input when
-  using SBCL as part of a shell pipeline.")
+  "By default, SBCL also exits upon reaching the end of input. This can
+  be caused either by the user pressing `Control-D` on an attached
+  terminal, or by the input stream ending when SBCL is used as part of
+  a shell pipeline.")
 
 (defsection @saving-a-core-image (:title "Saving a Core Image")
   "SBCL has the ability to save its state as a file for later
@@ -89,9 +90,10 @@
   (sb-ext:save-lisp-and-die function)
   ;; When Swank is loaded, it sets this variable.
   (sb-ext:*save-hooks* (variable nil))
-  "In cases where the standard initialization files have already been loaded
-  into the saved core, and alternative ones should be used (or none at
-  all), SBCL allows customizing the initfile pathname computation."
+  "In cases where the standard initialization files have already been
+  loaded into the saved core and alternative ones should be used (or
+  none at all), SBCL allows customizing the initfile pathname
+  computation."
   (sb-ext:*sysinit-pathname-function* variable)
   (sb-ext:*userinit-pathname-function* variable)
   "To facilitate distribution of SBCL applications using external
@@ -104,21 +106,19 @@
   which is mainly useful for acting as part of a shell pipeline; doing
   so under most other circumstances would mean giving up large parts
   of the flexibility and robustness of Common Lisp. See
-  @DEBUGGER-ENTRY and the command line option `--disable-debugger` in
+  @DEBUGGER-ENTRY and the command-line option `--disable-debugger` in
   @TOPLEVEL-OPTIONS.")
 
-(defsection @command-line-options (:title "Command Line Options")
-  "Command line options can be considered an advanced topic; for ordinary
-  interactive use, no command line arguments should be necessary.
+(defsection @command-line-options (:title "Command-line Options")
+  "Command-line options can be considered an advanced topic; for ordinary
+  interactive use, no command-line arguments should be necessary.
 
-  In order to understand the command line argument syntax for SBCL, it
+  In order to understand the command-line argument syntax for SBCL, it
   is helpful to understand that the SBCL system is implemented as two
-  components, a low-level runtime environment written in \\C and a
-  higher-level system written in Common Lisp itself. Some command line
-  arguments are processed during the initialization of the low-level
-  runtime environment, some command line arguments are processed
-  during the initialization of the Common Lisp system, and any
-  remaining command line arguments are made available to user code via
+  components, a low-level runtime environment written in C and a
+  higher-level system written in Common Lisp. Arguments are processed
+  during the respective initializations of the runtime and Lisp
+  system, with any remainder available to user code via
   SB-EXT:*POSIX-ARGV*.
 
   The full, unambiguous syntax for invoking SBCL at the command line
@@ -128,16 +128,13 @@
            <toplevel-option>* --end-toplevel-options \\
            <user-option>*
 
-  For convenience, `--end-runtime-options` and
-  `--end-toplevel-options` can be omitted, which can be convenient
-  when you are running the program interactively, and you can see that
-  no ambiguities are possible with the option values you are using.
-  Omitting these elements is probably a bad idea for any batch file
-  where any of the options are under user control, since it makes it
-  impossible for SBCL to detect erroneous command line input, so that
-  erroneous command line arguments will be passed on to the user
-  program even if they was intended for the runtime system or the Lisp
-  system."
+  The `--end-runtime-options` and `--end-toplevel-options` can be
+  omitted, provided that no ambiguities are possible with the option
+  values used. Omitting these elements is probably a bad idea for any
+  batch file where any of the options are under user control because
+  it makes it impossible for SBCL to detect erroneous command-line
+  arguments, which will then be passed on to the user program even if
+  they were intended for the runtime system or the Lisp system."
   (@runtime-options section)
   (@toplevel-options section))
 
@@ -146,7 +143,7 @@
 
       Run the specified Lisp core file instead of the default. Note
       that if the Lisp core file is a user-created core file, it may
-      run a nonstandard toplevel which does not recognize the standard
+      run a nonstandard toplevel that does not recognize the standard
       toplevel options.
 
   - `--dynamic-space-size <megabytes>`
@@ -161,8 +158,8 @@
 
   - `--tls-limit <positive integer>`
 
-      Maximum number of thread-local symbols in threaded builds.
-      Default value is 4096.
+      Maximum number of thread-local @SPECIAL-VARIABLES in threaded
+      builds. Default value is 4096.
 
   - `--noinform`
 
@@ -183,10 +180,10 @@
       There are some dangerous low-level errors (for instance, control
       stack exhausted, memory fault) that (or whose handlers) can
       corrupt the image. By default, SBCL prints a warning, then tries
-      to continue and handle the error in Lisp, but this will not
-      always work, and SBCL may malfunction or even hang. With this
-      option, upon encountering such an error, SBCL will exit instead
-      of invoking @LDB (if present and enabled).
+      to continue and handle the error in Lisp. However, this will not
+      always work, and SBCL may subsequently malfunction or even hang.
+      With this option, upon encountering such an error, SBCL will
+      exit instead of signalling a Lisp error.
 
   - `--script <filename>`
 
@@ -194,7 +191,7 @@
       `--disable-ldb` `--lose-on-corruption`
       `--end-runtime-options` `--script` `<filename>`. See
       the description of `--script` as a _toplevel_ option below.
-      If there are no other command line arguments following
+      If there are no other command-line arguments following
       `--script`, the filename argument can be omitted.
 
   - `--merge-core-pages`
@@ -233,7 +230,7 @@
 
   - `--sysinit <filename>`
 
-      Load `FILENAME` instead of the default system initialization
+      Load `<filename>` instead of the default system initialization
       file (see @INITIALIZATION-FILES).
 
   - `--no-sysinit`
@@ -243,8 +240,8 @@
 
   - `--userinit <filename>`
 
-      Load `FILENAME` instead of the default user initialization file
-      (see @INITIALIZATION-FILES.)
+      Load `<filename>` instead of the default user initialization
+      file (see @INITIALIZATION-FILES.)
 
   - `--no-userinit`
 
@@ -255,7 +252,7 @@
 
       After executing any initialization file, but before starting the
       read-eval-print loop on standard input, read and evaluate
-      `COMMAND`. More than one `--eval` option can be used, and all
+      `<command>`. More than one `--eval` option can be used, and all
       will be read and executed, in the order they appear on the
       command line.
 
@@ -270,17 +267,17 @@
       When ordinarily the toplevel \"read-eval-print loop\" would be
       executed, execute a \"read-eval loop\" instead, i.e. don't print
       a prompt and don't echo results. Combined with the `--noinform`
-      runtime option, this makes it easier to write Lisp \"scripts\"
-      which work cleanly in Unix pipelines.
+      runtime option, this makes it easier to write Lisp scripts that
+      work cleanly in Unix pipelines.
 
   - `--disable-debugger`
 
-      By default when SBCL encounters an error, it enters the builtin
+      By default, when SBCL encounters an error, it enters the builtin
       debugger, allowing interactive diagnosis and possible
       intercession. This option disables the debugger, causing errors
       to print a backtrace and exit with status 1 instead. When given,
-      this option takes effect before loading of initialization files
-      or processing `--eval` and `--load` options. See
+      this option takes effect before loading initialization files or
+      processing `--eval` and `--load` options. See
       SB-EXT:DISABLE-DEBUGGER and @DEBUGGER-ENTRY.
 
   - `--script <filename>`
@@ -292,16 +289,16 @@
       the read-eval-print-loop, and exit afterwards. If the file
       begins with a shebang line, it is ignored.
 
-      If there are no other command line arguments following, the
+      If there are no other command-line arguments following, the
       filename can be omitted: this causes the script to be loaded
-      from standard input instead. Shebang lines in standard input
-      script are currently _not_ ignored.
+      from standard input instead. In this case, shebang lines are
+      currently _not_ ignored.
 
-      In either case, if there is an unhandled error (e.g. end of
-      file, or a broken pipe) on either standard input, standard
+      In either case, if there is an unhandled error (such as an end
+      of file condition or a broken pipe) on standard input, standard
       output, or standard error, the script silently exits with code
-      0. This allows e.g. safely piping output from SBCL to `head -n1`
-      or similar.
+      0. This allows piping output from SBCL to another command
+      without unexpected errors.
 
       Additionally, the option sets *COMPILE-VERBOSE* and
       *LOAD-VERBOSE* to NIL while loading the file to avoid
@@ -316,7 +313,7 @@
 
   - __System Initialization File:__ Defaults to `$SBCL_HOME/sbclrc`,
     or if that doesn't exist to `/etc/sbclrc`. Can be overridden with
-    the command line option `--sysinit` or `--no-sysinit` (see
+    the command-line option `--sysinit` or `--no-sysinit` (see
     @TOPLEVEL-OPTIONS).
 
       The system initialization file is intended for system
@@ -324,7 +321,7 @@
       installed third party modules, etc.
 
   - __User Initialization File:__ Defaults to `$HOME/.sbclrc`. Can be
-    overridden with the command line option `--userinit` or
+    overridden with the command-line option `--userinit` or
     `--no-userinit` (see @TOPLEVEL-OPTIONS).
 
       The user initialization file is intended for personal

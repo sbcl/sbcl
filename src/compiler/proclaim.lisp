@@ -509,12 +509,12 @@
 (setf (documentation 'muffle-conditions 'declaration)
       "Syntax: `(SB-EXT:MUFFLE-CONDITIONS &REST TYPES)`.
 
-Muffle the diagnostic messages that would be caused by compile-time
-signals of TYPES.")
+Silence the diagnostic messages that would be printed when a condition
+matching any of TYPES is signalled at compile time.")
 
 #-sb-xc-host
 (setf (documentation 'unmuffle-conditions 'declaration)
-      "Syntax: `(SB-EXT:MUFFLE-CONDITIONS &REST TYPES)`.
+      "Syntax: `(SB-EXT:UNMUFFLE-CONDITIONS &REST TYPES)`.
 
 Cancel the effect of a previous SB-EXT:MUFFLE-CONDITIONS declaration.")
 

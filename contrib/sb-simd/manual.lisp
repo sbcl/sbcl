@@ -173,7 +173,7 @@
   For each function `X.Y-FOO` for loading SIMD packs from an array,
   there also exists a corresponding function `(SETF X.Y-FOO)` for
   storing a SIMD pack in the specified memory location. An exception
-  to this rule is that some instruction sets (e.g., SSE) only provide
+  to this rule is that some instruction sets (e.g. SSE) only provide
   functions for non-temporal stores but not for the corresponding
   non-temporal loads.
 

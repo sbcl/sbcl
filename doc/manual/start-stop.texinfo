@@ -6,7 +6,7 @@
 @menu
 * Starting SBCL: starting sbcl.
 * Stopping SBCL: stopping sbcl.
-* Command Line Options: command line options.
+* Command-line Options: command line options.
 * Initialization Files: initialization files.
 * Initialization and Exit Hooks: initialization and exit hooks.
 @end menu
@@ -48,8 +48,8 @@ Also see @ref{command line options} and @ref{stopping sbcl}.
 @node running from emacs
 @subsection Running from Emacs
 
-To run SBCL as an @code{inferior-lisp} from Emacs, in your @code{.emacs} do
-something like:
+To run SBCL as an @code{inferior-lisp} from Emacs, add something like this
+to your @code{.emacs}:
 
 @example
 ;;; The SBCL binary and command-line arguments
@@ -62,9 +62,9 @@ For more information on using SBCL with Emacs, see
 @node shebang scripts
 @subsection Shebang Scripts
 
-Standard Unix tools that are interpreters follow a common command line
+Standard Unix tools that are interpreters follow a common command-line
 protocol that is necessary to work with "shebang scripts". SBCL
-supports this via the @code{--script} command line option (see
+supports this via the @code{--script} command-line option (see
 @ref{command line options}).
 
 Example file (@code{hello.lisp}):
@@ -149,9 +149,10 @@ process to continue normally.
 @node end of file
 @subsection End of File
 
-By default SBCL also exits on end of input, caused either by user
-pressing @code{Control-D} on an attached terminal, or end of input when
-using SBCL as part of a shell pipeline.
+By default, SBCL also exits upon reaching the end of input. This can
+be caused either by the user pressing @code{Control-D} on an attached
+terminal, or by the input stream ending when SBCL is used as part of
+a shell pipeline.
 
 @node saving a core image
 @subsection Saving a Core Image
@@ -192,12 +193,13 @@ behave as if they were passed the @code{--noinform} runtime option.
 
 @item @code{:save-runtime-options}
 
-If true, values of runtime options @code{--dynamic-space-size} and
-@code{--control-stack-size} that were used to start SBCL are stored in
-the standalone executable, and restored when the executable is
-run. This also inhibits normal runtime option processing, causing
-all command line arguments to be passed to the toplevel. If
-@code{:accept-runtime-options} then @code{--dynamic-space-size} and
+If true, values of @ref{runtime options}
+@code{--dynamic-space-size} and @code{--control-stack-size} that were used
+to start SBCL are stored in the standalone executable, and
+restored when the executable is run. This also inhibits normal
+runtime option processing, causing all command line arguments to
+be passed to the toplevel. If
+@code{:accept-runtime-options}, then @code{--dynamic-space-size} and
 @code{--control-stack-size} are still processed by the runtime.
 Meaningless if @code{:executable} is @code{nil}.
 
@@ -222,14 +224,14 @@ such as symbol names.
 This should be a list of the main entry points in any newly loaded
 systems. This need not be supplied, but locality and/or @code{gc}
 performance may be better if they are. This has two different but
-related meanings: If @code{:purify} is true - and only for cheneygc - the
-root structures are those which anchor the set of objects moved
-into static space. On gencgc - and only on platforms supporting
-immobile code - these are the functions and/or function-names
-which commence a depth-first scan of code when reordering based on
-the statically observable call chain. The complete set of
-reachable objects is not affected per se. This argument is
-meaningless if neither enabling precondition holds.
+related meanings: If @code{:purify} is true -- and only for Cheney @code{gc} --
+the root structures are those which anchor the set of objects
+moved into static space. On gencgc -- and only on platforms
+supporting immobile code -- these are the functions and/or
+function-names which commence a depth-first scan of code when
+reordering based on the statically observable call chain. The
+complete set of reachable objects is not affected per se. This
+argument is meaningless if neither enabling precondition holds.
 
 @item @code{:environment-name}
 
@@ -246,7 +248,7 @@ equivalent to the default compression level, 9).
 
 @item @code{:application-type}
 
-Present only on Windows and is meaningful only with @code{:executable} @code{t}.
+Present only on Windows and meaningful only with @code{:executable} @code{t}.
 Specifies the subsystem of the executable, @code{:console} or @code{:gui}.
 The notable difference is that @code{:gui} doesn't automatically create
 a console window. The default is @code{:console}.
@@ -269,7 +271,7 @@ saved core is loaded.
 @code{save-lisp-and-die} interacts with @code{sb-alien:load-shared-object}: see its
 documentation for details.
 
-On threaded platforms only a single thread may remain running after
+On threaded platforms, only a single thread may remain running after
 @code{sb-ext:*save-hooks*} have run. Applications using multiple threads can
 be @code{save-lisp-and-die} friendly by registering a save-hook that quits
 any additional threads, and an init-hook that restarts them.
@@ -294,14 +296,15 @@ sufficiently motivated to do lengthy fixes.
 @anchor{Variable sb-ext *save-hooks*}
 @vvindex @sortas{save-hooks* sb-ext} *save-hooks* [sb-ext]
 @deffn{Variable} sb-ext:*save-hooks*
-A list of function designators which are called in an unspecified
+A list of function designators called in an unspecified
 order before creating a saved core image.
 
-Unused by SBCL itself: reserved for user and applications.
+Unused by SBCL itself; reserved for the user and applications.
 @end deffn
-In cases where the standard initialization files have already been loaded
-into the saved core, and alternative ones should be used (or none at
-all), SBCL allows customizing the initfile pathname computation.
+In cases where the standard initialization files have already been
+loaded into the saved core and alternative ones should be used (or
+none at all), SBCL allows customizing the initfile pathname
+computation.
 
 @anchor{Variable sb-ext *sysinit-pathname-function*}
 @vvindex @sortas{sysinit-pathname-function* sb-ext} *sysinit-pathname-function* [sb-ext]
@@ -309,7 +312,7 @@ all), SBCL allows customizing the initfile pathname computation.
 Designator for a function of zero arguments called to obtain a
 pathname designator for the default sysinit file, or @code{nil}. If the
 function returns @code{nil}, no sysinit file is used unless one has been
-specified on the command-line.
+specified on the command line.
 @end deffn
 @anchor{Variable sb-ext *userinit-pathname-function*}
 @vvindex @sortas{userinit-pathname-function* sb-ext} *userinit-pathname-function* [sb-ext]
@@ -317,7 +320,7 @@ specified on the command-line.
 Designator for a function of zero arguments called to obtain a
 pathname designator or a stream for the default userinit file, or @code{nil}.
 If the function returns @code{nil}, no userinit file is used unless one has
-been specified on the command-line.
+been specified on the command line.
 @end deffn
 To facilitate distribution of SBCL applications using external
 resources, the filesystem location of the SBCL core file being used
@@ -335,28 +338,26 @@ SBCL can also be configured to exit if an unhandled error occurs,
 which is mainly useful for acting as part of a shell pipeline; doing
 so under most other circumstances would mean giving up large parts
 of the flexibility and robustness of Common Lisp. See
-@ref{debugger entry} and the command line option @code{--disable-debugger} in
+@ref{debugger entry} and the command-line option @code{--disable-debugger} in
 @ref{toplevel options}.
 
 @node command line options
-@section Command Line Options
+@section Command-line Options
 
 @menu
 * Runtime Options: runtime options.
 * Toplevel Options: toplevel options.
 @end menu
 
-Command line options can be considered an advanced topic; for ordinary
-interactive use, no command line arguments should be necessary.
+Command-line options can be considered an advanced topic; for ordinary
+interactive use, no command-line arguments should be necessary.
 
-In order to understand the command line argument syntax for SBCL, it
+In order to understand the command-line argument syntax for SBCL, it
 is helpful to understand that the SBCL system is implemented as two
 components, a low-level runtime environment written in C and a
-higher-level system written in Common Lisp itself. Some command line
-arguments are processed during the initialization of the low-level
-runtime environment, some command line arguments are processed
-during the initialization of the Common Lisp system, and any
-remaining command line arguments are made available to user code via
+higher-level system written in Common Lisp. Arguments are processed
+during the respective initializations of the runtime and Lisp
+system, with any remainder available to user code via
 @code{sb-ext:*posix-argv*}.
 
 The full, unambiguous syntax for invoking SBCL at the command line
@@ -368,16 +369,13 @@ sbcl <runtime-option>* --end-runtime-options \
      <user-option>*
 @end example
 
-For convenience, @code{--end-runtime-options} and
-@code{--end-toplevel-options} can be omitted, which can be convenient
-when you are running the program interactively, and you can see that
-no ambiguities are possible with the option values you are using.
-Omitting these elements is probably a bad idea for any batch file
-where any of the options are under user control, since it makes it
-impossible for SBCL to detect erroneous command line input, so that
-erroneous command line arguments will be passed on to the user
-program even if they was intended for the runtime system or the Lisp
-system.
+The @code{--end-runtime-options} and @code{--end-toplevel-options} can be
+omitted, provided that no ambiguities are possible with the option
+values used. Omitting these elements is probably a bad idea for any
+batch file where any of the options are under user control because
+it makes it impossible for SBCL to detect erroneous command-line
+arguments, which will then be passed on to the user program even if
+they were intended for the runtime system or the Lisp system.
 
 @node runtime options
 @subsection Runtime Options
@@ -389,7 +387,7 @@ system.
 
 Run the specified Lisp core file instead of the default. Note
 that if the Lisp core file is a user-created core file, it may
-run a nonstandard toplevel which does not recognize the standard
+run a nonstandard toplevel that does not recognize the standard
 toplevel options.
 
 @item @code{--dynamic-space-size <megabytes>}
@@ -404,8 +402,8 @@ Default value is 2.
 
 @item @code{--tls-limit <positive integer>}
 
-Maximum number of thread-local symbols in threaded builds.
-Default value is 4096.
+Maximum number of thread-local @ref{special variables} in threaded
+builds. Default value is 4096.
 
 @item @code{--noinform}
 
@@ -426,10 +424,10 @@ enter LDB.
 There are some dangerous low-level errors (for instance, control
 stack exhausted, memory fault) that (or whose handlers) can
 corrupt the image. By default, SBCL prints a warning, then tries
-to continue and handle the error in Lisp, but this will not
-always work, and SBCL may malfunction or even hang. With this
-option, upon encountering such an error, SBCL will exit instead
-of invoking @ref{ldb} (if present and enabled).
+to continue and handle the error in Lisp. However, this will not
+always work, and SBCL may subsequently malfunction or even hang.
+With this option, upon encountering such an error, SBCL will
+exit instead of signalling a Lisp error.
 
 @item @code{--script <filename>}
 
@@ -437,7 +435,7 @@ As a @emph{runtime} option, this is equivalent to @code{--noinform}
 @code{--disable-ldb} @code{--lose-on-corruption}
 @code{--end-runtime-options} @code{--script} @code{<filename>}. See
 the description of @code{--script} as a @emph{toplevel} option below.
-If there are no other command line arguments following
+If there are no other command-line arguments following
 @code{--script}, the filename argument can be omitted.
 
 @item @code{--merge-core-pages}
@@ -480,7 +478,7 @@ toplevel (see @code{sb-ext:save-lisp-and-die}).
 @itemize
 @item @code{--sysinit <filename>}
 
-Load @code{filename} instead of the default system initialization
+Load @code{<filename>} instead of the default system initialization
 file (see @ref{initialization files}).
 
 @item @code{--no-sysinit}
@@ -490,8 +488,8 @@ given, the @code{--sysinit} option is ignored.
 
 @item @code{--userinit <filename>}
 
-Load @code{filename} instead of the default user initialization file
-(see @ref{initialization files}.)
+Load @code{<filename>} instead of the default user initialization
+file (see @ref{initialization files}.)
 
 @item @code{--no-userinit}
 
@@ -502,7 +500,7 @@ the @code{--userinit} option is ignored.
 
 After executing any initialization file, but before starting the
 read-eval-print loop on standard input, read and evaluate
-@code{command}. More than one @code{--eval} option can be used, and all
+@code{<command>}. More than one @code{--eval} option can be used, and all
 will be read and executed, in the order they appear on the
 command line.
 
@@ -517,17 +515,17 @@ invoking SBCL from shell scripts.
 When ordinarily the toplevel "read-eval-print loop" would be
 executed, execute a "read-eval loop" instead, i.e. don't print
 a prompt and don't echo results. Combined with the @code{--noinform}
-runtime option, this makes it easier to write Lisp "scripts"
-which work cleanly in Unix pipelines.
+runtime option, this makes it easier to write Lisp scripts that
+work cleanly in Unix pipelines.
 
 @item @code{--disable-debugger}
 
-By default when SBCL encounters an error, it enters the builtin
+By default, when SBCL encounters an error, it enters the builtin
 debugger, allowing interactive diagnosis and possible
 intercession. This option disables the debugger, causing errors
 to print a backtrace and exit with status 1 instead. When given,
-this option takes effect before loading of initialization files
-or processing @code{--eval} and @code{--load} options. See
+this option takes effect before loading initialization files or
+processing @code{--eval} and @code{--load} options. See
 @code{sb-ext:disable-debugger} and @ref{debugger entry}.
 
 @item @code{--script <filename>}
@@ -539,16 +537,16 @@ Causes the system to load the specified file instead of entering
 the read-eval-print-loop, and exit afterwards. If the file
 begins with a shebang line, it is ignored.
 
-If there are no other command line arguments following, the
+If there are no other command-line arguments following, the
 filename can be omitted: this causes the script to be loaded
-from standard input instead. Shebang lines in standard input
-script are currently @emph{not} ignored.
+from standard input instead. In this case, shebang lines are
+currently @emph{not} ignored.
 
-In either case, if there is an unhandled error (e.g. end of
-file, or a broken pipe) on either standard input, standard
+In either case, if there is an unhandled error (such as an end
+of file condition or a broken pipe) on standard input, standard
 output, or standard error, the script silently exits with code
-0. This allows e.g. safely piping output from SBCL to @code{head -n1}
-or similar.
+0. This allows piping output from SBCL to another command
+without unexpected errors.
 
 Additionally, the option sets @code{*compile-verbose*} and
 @code{*load-verbose*} to @code{nil} while loading the file to avoid
@@ -569,7 +567,7 @@ policy.
 @itemize
 @item @strong{System Initialization File:} Defaults to @code{$SBCL_HOME/sbclrc},
   or if that doesn't exist to @code{/etc/sbclrc}. Can be overridden with
-  the command line option @code{--sysinit} or @code{--no-sysinit} (see
+  the command-line option @code{--sysinit} or @code{--no-sysinit} (see
   @ref{toplevel options}).
 
 The system initialization file is intended for system
@@ -577,7 +575,7 @@ administrators and software packagers to configure locations of
 installed third party modules, etc.
 
 @item @strong{User Initialization File:} Defaults to @code{$HOME/.sbclrc}. Can be
-  overridden with the command line option @code{--userinit} or
+  overridden with the command-line option @code{--userinit} or
   @code{--no-userinit} (see @ref{toplevel options}).
 
 The user initialization file is intended for personal
@@ -597,20 +595,20 @@ SBCL provides hooks into the system initialization and exit.
 @anchor{Variable sb-ext *init-hooks*}
 @vvindex @sortas{init-hooks* sb-ext} *init-hooks* [sb-ext]
 @deffn{Variable} sb-ext:*init-hooks*
-A list of function designators which are called in an unspecified
+A list of function designators called in an unspecified
 order when a saved core image starts up, after the system itself has
 been initialized, but before non-user threads such as the finalizer
 thread have been started.
 
-Unused by SBCL itself: reserved for user and applications.
+Unused by SBCL itself; reserved for the user and applications.
 @end deffn
 @anchor{Variable sb-ext *exit-hooks*}
 @vvindex @sortas{exit-hooks* sb-ext} *exit-hooks* [sb-ext]
 @deffn{Variable} sb-ext:*exit-hooks*
-A list of function designators which are called in an unspecified
+A list of function designators called in an unspecified
 order when SBCL process exits.
 
-Unused by SBCL itself: reserved for user and applications.
+Unused by SBCL itself; reserved for the user and applications.
 
 Using (@code{sb-ext:exit} @code{:abort} @code{t}), or calling @code{exit(3)} directly circumvents
 these hooks.

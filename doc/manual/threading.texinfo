@@ -367,8 +367,8 @@ prints @code{0} and not @code{1}.
 
 Note, however, that there is a hard limit on the number of distinct
 symbols that can be bound dynamically in threaded builds (see
-@code{--tls-limit} in @ref{runtime options}). Exceeding this limit triggers
-the low-level error @code{Thread local storage exhausted.}
+@code{--tls-limit} in @ref{runtime options}). Exceeding this limit invokes
+@ref{ldb} with the error @code{Thread local storage exhausted.}
 
 @node atomic operations
 @section Atomic Operations

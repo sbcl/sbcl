@@ -20,7 +20,9 @@
 (defparameter *evaluator-mode* :compile
   "Toggle between different evaluator implementations. If set to :COMPILE,
 an implementation of EVAL that calls the compiler will be used. If set
-to :INTERPRET, an interpreter will be used.")
+to :INTERPRET, an interpreter will be used. :INTERPRET is a valid
+value only if SBCL has been compiled with either the `sb-eval` or the
+`sb-fasteval` feature.")
 (declaim (always-bound *evaluator-mode*))
 
 ;;; If this is bound before the debugger is invoked, it is used as the stack

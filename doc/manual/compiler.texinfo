@@ -13,13 +13,11 @@
 * Advanced Compiler Use and Efficiency Hints: advanced compiler use and efficiency hints.
 @end menu
 
-This chapter will discuss most compiler issues other than efficiency,
-including compiler error messages, the SBCL compiler's unusual
-approach to type safety in the presence of type declarations, the
-effects of various compiler optimization policies, and the way that
-inlining and open coding may cause optimized code to differ from a
-naive translation. Efficiency issues are sufficiently varied and
-separate that they have their own chapter, @ref{efficiency}.
+This chapter will discuss most compiler issues other than @ref{efficiency},
+including compiler messages, type safety in the presence of type
+declarations, the effects of various optimization policies, and the
+way that inlining and open coding may cause optimized code to differ
+from a naive translation.
 
 @node diagnostic messages
 @cindex compiler messsage
@@ -37,13 +35,13 @@ separate that they have their own chapter, @ref{efficiency}.
 @cindex verbosity of compiler messsages
 @subsection Controlling Verbosity
 
-The compiler can be quite verbose in its diagnostic reporting, rather
-more then some users would prefer -- the amount of noise emitted can
-be controlled, however.
+The compiler can be quite verbose in its diagnostic reporting – rather
+more than some users would prefer. However, the amount of noise
+emitted can be controlled.
 
-To control emission of compiler diagnostics (of any severity other
-than @code{error}: @ref{diagnostic severity}) use the @code{sb-ext:muffle-conditions}
-and @code{sb-ext:unmuffle-conditions} declarations, specifying the type of
+To control emission of compiler diagnostics (except those with
+@ref{diagnostic severity} error) use the @code{sb-ext:muffle-conditions} and
+@code{sb-ext:unmuffle-conditions} declarations, specifying the type of
 condition that is to be muffled (the muffling is done using an
 associated @code{muffle-warning} restart).
 
@@ -73,13 +71,13 @@ Local control:
 @deffn{Declaration} sb-ext:muffle-conditions
 Syntax: @code{(sb-ext:muffle-conditions &rest types)}.
 
-Muffle the diagnostic messages that would be caused by compile-time
-signals of @code{types}.
+Silence the diagnostic messages that would be printed when a condition
+matching any of @code{types} is signalled at compile time.
 @end deffn
 @anchor{Declaration sb-ext unmuffle-conditions}
 @ddindex @sortas{unmuffle-conditions sb-ext} unmuffle-conditions [sb-ext]
 @deffn{Declaration} sb-ext:unmuffle-conditions
-Syntax: @code{(sb-ext:muffle-conditions &rest types)}.
+Syntax: @code{(sb-ext:unmuffle-conditions &rest types)}.
 
 Cancel the effect of a previous @code{sb-ext:muffle-conditions} declaration.
 @end deffn
@@ -352,7 +350,7 @@ gives this error message
 @end example
 
 This message is not saying that there is a problem somewhere in this
-@code{let} -- it is saying that there is a problem with the @code{let} itself. In
+@code{let} – it is saying that there is a problem with the @code{let} itself. In
 this example, the problem is that @code{a}'s @code{nil} initial value is not a
 @code{fixnum}.
 
@@ -981,20 +979,27 @@ efficient calling convention that forbids redefinition.
 @cindex interpreter
 @section Interpreter
 
-By default SBCL implements @code{eval} by calling the native code
-compiler.
+By default, SBCL implements @code{eval} by calling the native-code
+compiler. There are two, mutually exclusive interpreter
+implementations: sb-eval (the default) and sb-fasteval. These are
+intended for when using the compiler is undesirable, for example due
+to compilation overhead.
 
-SBCL also includes an interpreter for use in special cases where
-using the compiler is undesirable, for example due to compilation
-overhead. Unlike in some other Lisp implementations, in SBCL
-interpreted code is not safer or more debuggable than compiled code.
+An interpreterless SBCL can be compiled by passing
+@code{--without-sb-eval} to @code{make.sh}, while sb-fasteval can be enabled
+with @code{--without-sb-eval --with-sb-fasteval.}
+
+Unlike in some other Lisp implementations, in SBCL interpreted code
+is not safer or more debuggable than compiled code.
 
 @anchor{Variable sb-ext *evaluator-mode*}
 @vvindex @sortas{evaluator-mode* sb-ext} *evaluator-mode* [sb-ext]
 @deffn{Variable} sb-ext:*evaluator-mode*
 Toggle between different evaluator implementations. If set to @code{:compile},
 an implementation of @code{eval} that calls the compiler will be used. If set
-to @code{:interpret}, an interpreter will be used.
+to @code{:interpret}, an interpreter will be used. @code{:interpret} is a valid
+value only if SBCL has been compiled with either the @code{sb-eval} or the
+@code{sb-fasteval} feature.
 @end deffn
 @node advanced compiler use and efficiency hints
 @section Advanced Compiler Use and Efficiency Hints

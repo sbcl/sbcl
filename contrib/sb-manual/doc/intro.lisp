@@ -171,11 +171,11 @@
 
 (defsection @compiler-only-implementation
     (:title "Compiler-only Implementation")
-  "SBCL is essentially a compiler-only implementation of Common Lisp.
+  "By default, SBCL is a compiler-only implementation of Common Lisp.
   That is, for all but a few special cases, EVAL creates a lambda
   expression, calls COMPILE on the lambda expression to create a
   compiled function, and then calls FUNCALL on the resulting function
-  object. A more traditional interpreter is also available on default
+  object. A more traditional @INTERPRETER is also available on default
   builds; it is usually only called internally. This is explicitly
   allowed by the ANSI standard but leads to some oddities; e.g. at
   default settings, FUNCTIONP and COMPILED-FUNCTION-P are equivalent,
@@ -202,9 +202,9 @@
 
   SBCL instead treats the undefined behavior as an error. Often such
   code can be rewritten in portable ANSI Common Lisp which has the
-  desired behavior. E.g., the code above can be given an exactly
-  defined meaning by replacing DEFCONSTANT either with DEFPARAMETER or
-  with a customized macro which does the right thing, e.g.
+  desired behavior. The code above can be given an exactly defined
+  meaning by replacing DEFCONSTANT either with DEFPARAMETER or with a
+  customized macro which does the right thing, e.g.
 
       (defmacro define-constant (name value &optional doc)
         `(defconstant ,name (if (boundp ',name) (symbol-value ',name) ,value)
@@ -233,10 +233,7 @@
   as well as you might like_. That is, unless the compiler warns about
   such conditions, there's no way for the compiler to warn about some
   programming errors which would otherwise be easy to
-  overlook. (Related bug: The warning about multiple DEFUNs is
-  pointlessly annoying when you compile and then load a function
-  containing DEFUN wrapped in EVAL-WHEN, and ideally should be
-  suppressed in that case, but still isn't as of SBCL 0.7.6.)")
+  overlook.")
 
 (defsection @development-tools (:title "Development Tools")
   (@editor-integration section)
@@ -252,15 +249,15 @@
 
   Currently _SLIME_ (Superior Lisp Interaction Mode for Emacs)
   together with Emacs is recommended for use with SBCL, though other
-  options exist as well. Historically, the ILISP package at
-  <http://ilisp.cons.org/> provided similar functionality, but it does
-  not support modern SBCL versions.
+  options exist as well. SLIME can be downloaded from
+  <https://slime.common-lisp.dev/>.
 
-  SLIME can be downloaded from <https://slime.common-lisp.dev/>.")
+  Historically, the ILISP package at <http://ilisp.cons.org/> provided
+  similar functionality, but it does not support modern SBCL versions.")
 
 (defsection @language-reference (:title "Language Reference")
   "_\\CLHS_ (Common Lisp HyperSpec) is a hypertext version of the ANSI
-  standard, made freely available by LispWorks -- an invaluable
+  standard, made freely available by LispWorks – an invaluable
   reference.
 
   See <https://www.lispworks.com/documentation/HyperSpec/Front/index.htm>.")
@@ -283,24 +280,24 @@
   information, plus links to mailing lists devoted to SBCL, and to
   archives of these mailing lists. Subscribing to the mailing lists
   `sbcl-help` and `sbcl-announce` is recommended: both are fairly
-  low-volume, and help you keep abreast with SBCL development.")
+  low-volume and help you keep abreast with SBCL development.")
 
 (defsection @online-documentation (:title "Online Documentation")
   "Documentation for non-ANSI extensions for various commands is
   available online from the SBCL executable itself. The extensions for
-  functions which have their own command prompts (e.g. the debugger,
+  functions that have their own command prompts (e.g. the debugger,
   and INSPECT) are documented in text available by typing `help` at
   their command prompts. The extensions for functions which don't have
   their own command prompt (such as TRACE) are described in their
-  documentation strings, unless your SBCL was compiled with an option
-  not to include documentation strings, in which case the
-  documentation strings are only readable in the source code.")
+  documentation strings, unless your SBCL was compiled with the
+  `--without-sb-doc` option to omit them, in which case they are only
+  readable in the source code.")
 
 (defsection @additional-documentation-files
     (:title "Additional Documentation Files")
-  "Besides this user manual both SBCL source and binary distributions
-  include some other SBCL-specific documentation files, which should
-  be installed along with this manual on your system, e.g. in
+  "Besides this user manual, some SBCL-specific documentation files are
+  include in both SBCL source and binary distributions. The latter are
+  often installed along with this manual, e.g. in
   `/usr/local/share/doc/sbcl/`.
 
   - `COPYING`: Licence and copyright summary.
@@ -319,10 +316,8 @@
   [sbcl-devel@lists.sourceforge.net](mailto:sbcl-devel@lists.sourceforge.net)
   is a good idea.
 
-  SBCL internals documentation -- besides comments in the source -- is
-  available in the Web Archive:
-
-  <https://web.archive.org/web/20120814000933/http://sbcl-internals.cliki.net/index>.
+  The Texinfo sources for the SBCL Internals Manual are available in
+  `doc/internals/`.
 
   Some low-level information describing the programming details of the
   conversion from CMUCL to SBCL is available in the
@@ -350,7 +345,7 @@
 
   Also, see <https://www.reddit.com/r/Common_Lisp/>, as well as
   <https://www.lisp.org> and <https://cliki.net>, which contain
-  numerous pointers places in the net where lispers talks shop.")
+  numerous pointers places in the net where lispers talk shop.")
 
 (defsection @third-party-libraries (:title "Third-party Libraries")
   "For a wealth of information about free Common Lisp libraries and tools
@@ -423,14 +418,8 @@
   the IBM RT, back in the 1980s. Some design decisions from that time are
   still reflected in the current implementation:
 
-  - The system expects to be loaded into a fixed-at-compile-time
-    location in virtual memory, and also expects the location of all
-    of its heap storage to be specified at compile time.
-
-  - The system overcommits memory, allocating large amounts of address
-    space from the system (often more than the amount of virtual
-    memory available) and then failing if it ends up using too much of
-    the allocated storage.
+  - Some parts of the system expect to be loaded into a
+    fixed-at-compile-time location in virtual memory.
 
   - The system is implemented as a C program which is responsible for
     supplying low-level services and loading a Lisp `.core` file.
@@ -463,7 +452,7 @@
   particularly well there. SBCL should be able to improve in these areas
   (and has already improved in some other areas), but it takes a while.
 
-  On the x86 SBCL -- like the x86 port of CMUCL -- uses a
+  On the x86 SBCL – like the x86 port of CMUCL – uses a
   _@CONSERVATIVE-GC_. This means that it doesn't maintain a strict
   separation between tagged and untagged data, instead treating some
   untagged data (e.g. raw floating point numbers) as possibly-tagged
@@ -471,7 +460,7 @@
   has some negative consequences for average time efficiency (though
   possibly no worse than the negative consequences of trying to
   implement an exact GC on a processor architecture as register-poor
-  as the X86) and also has potentially unlimited consequences for
+  as the x86) and also has potentially unlimited consequences for
   worst-case memory efficiency. In practice, @CONSERVATIVE-GCs work
   reasonably well, not getting anywhere near the worst case. But they
   can occasionally cause odd patterns of memory usage.
@@ -479,14 +468,16 @@
   The fork from CMUCL was based on a major rewrite of the system
   bootstrap process. CMUCL has for many years tolerated a very unusual
   \"build\" procedure which doesn't actually build the complete system
-  from scratch, but instead progressively overwrites parts of a
-  running system with new versions. This quasi-build procedure can
-  cause various bizarre bootstrapping hangups, especially when a major
+  from scratch but instead progressively overwrites parts of a running
+  system with new versions. This quasi-build procedure can cause
+  various bizarre bootstrapping hangups, especially when a major
   change is made to the system. It also makes the connection between
   the current source code and the current executable more tenuous than
-  in other software systems -- it's easy to accidentally build a CMUCL
+  in other software systems – it's easy to accidentally build a CMUCL
   system containing characteristics not reflected in the current
-  version of the source code.
+  version of the source code. See the paper _SBCL: A Sanely
+  Bootstrappable Common
+  Lisp_ (<https://research.gold.ac.uk/id/eprint/2336/>).
 
   Other major changes since the fork from CMUCL include:
 

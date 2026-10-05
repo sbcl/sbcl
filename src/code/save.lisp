@@ -131,12 +131,13 @@ The following &KEY arguments are defined:
 
 - :SAVE-RUNTIME-OPTIONS
 
-    If true, values of runtime options `--dynamic-space-size` and
-    `--control-stack-size` that were used to start SBCL are stored in
-    the standalone executable, and restored when the executable is
-    run. This also inhibits normal runtime option processing, causing
-    all command line arguments to be passed to the toplevel. If
-    :ACCEPT-RUNTIME-OPTIONS then `--dynamic-space-size` and
+    If true, values of SB-MANUAL:@RUNTIME-OPTIONS
+    `--dynamic-space-size` and `--control-stack-size` that were used
+    to start SBCL are stored in the standalone executable, and
+    restored when the executable is run. This also inhibits normal
+    runtime option processing, causing all command line arguments to
+    be passed to the toplevel. If
+    :ACCEPT-RUNTIME-OPTIONS, then `--dynamic-space-size` and
     `--control-stack-size` are still processed by the runtime.
     Meaningless if :EXECUTABLE is NIL.
 
@@ -161,14 +162,14 @@ The following &KEY arguments are defined:
     This should be a list of the main entry points in any newly loaded
     systems. This need not be supplied, but locality and/or GC
     performance may be better if they are. This has two different but
-    related meanings: If :PURIFY is true - and only for cheneygc - the
-    root structures are those which anchor the set of objects moved
-    into static space. On gencgc - and only on platforms supporting
-    immobile code - these are the functions and/or function-names
-    which commence a depth-first scan of code when reordering based on
-    the statically observable call chain. The complete set of
-    reachable objects is not affected per se. This argument is
-    meaningless if neither enabling precondition holds.
+    related meanings: If :PURIFY is true -- and only for Cheney GC --
+    the root structures are those which anchor the set of objects
+    moved into static space. On gencgc -- and only on platforms
+    supporting immobile code -- these are the functions and/or
+    function-names which commence a depth-first scan of code when
+    reordering based on the statically observable call chain. The
+    complete set of reachable objects is not affected per se. This
+    argument is meaningless if neither enabling precondition holds.
 
 - :ENVIRONMENT-NAME
 
@@ -185,7 +186,7 @@ The following &KEY arguments are defined:
 
 - `:APPLICATION-TYPE`
 
-    Present only on Windows and is meaningful only with :EXECUTABLE T.
+    Present only on Windows and meaningful only with :EXECUTABLE T.
     Specifies the subsystem of the executable, `:CONSOLE` or `:GUI`.
     The notable difference is that `:GUI` doesn't automatically create
     a console window. The default is `:CONSOLE`.
@@ -205,7 +206,7 @@ The save/load process changes the values of some global variables:
 SAVE-LISP-AND-DIE interacts with SB-ALIEN:LOAD-SHARED-OBJECT: see its
 documentation for details.
 
-On threaded platforms only a single thread may remain running after
+On threaded platforms, only a single thread may remain running after
 SB-EXT:*SAVE-HOOKS* have run. Applications using multiple threads can
 be SAVE-LISP-AND-DIE friendly by registering a save-hook that quits
 any additional threads, and an init-hook that restarts them.
