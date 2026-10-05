@@ -724,6 +724,25 @@
   (def :logior 0 (logior x d) (unsigned-byte 8))
   (def :ash 1 (ash x d) (integer 1)))
 
+(with-test (:name (:recursive-local-function-result-type :merged-tail-set :lp2169497))
+  (checked-compile-and-assert
+   (:allow-style-warnings t)
+   `(lambda (f)
+      (labels ((a (&rest r)
+                 (let ((x -33))
+                   x))
+               (b ()
+                 (a (a))))
+        (funcall f (apply #'a (b) nil))
+        (+ (let ((min (let ((arg 5))
+                        (let ((max (a)))
+                          (if (< max arg)
+                              max
+                              arg)))))
+             min)
+           (if t 8 0))))
+   ((#'identity) -25)))
+
 (with-test (:name (:recursive-local-function-result-type :parameter-from-own-result :oscillating))
   (assert-type
    (lambda ()
