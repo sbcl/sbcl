@@ -552,7 +552,9 @@
   ;; OR is the same as ADD if the matching bits are clear,
   ;; BTS can set one bit
   (when (and (integerp y)
-             (eq op 'add))
+             (eq op 'add)
+             (or (location= x result)
+                 (gpr-tn-p result)))
     (when (or (= y (ash 1 63))
               (= y (ash -1 63)))
       (move result x)
