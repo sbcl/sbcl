@@ -1499,7 +1499,7 @@ appear in an SBCL string. The line-breaking behavior of surrogates is undefined.
 (defun line-break-annotate (string)
   (let ((chars (line-prebreak string))
         zeroth first second (t0 :sot) t1 t2 tail (ret (list :cant))
-        state after-spaces nri)
+        state after-spaces nri lb25-state)
     (macrolet ((cmpush (thing)
                  (let ((gthing (gensym)))
                    `(let ((,gthing ,thing))
@@ -1560,6 +1560,15 @@ appear in an SBCL string. The line-breaking behavior of surrogates is undefined.
          (setf t1 (lb1-line-break-class first))
          (setf t2 (lb1-line-break-class second))
          (if (and (eql t1 :ri) (eql t2 :ri)) (incf nri) (setf nri 0))
+         (setf lb25-state
+               ;; For use in LB25:
+               ;; - NU (SY | IS)* -> :NU
+               ;; - NU (SY | IS)* (CL | CP) -> :CL
+               (case t1
+                 (:nu :nu)
+                 ((:sy :is) (if (eql lb25-state :nu) :nu nil))
+                 ((:cl :cp) (if (eql lb25-state :nu) :cl nil))
+                 (t nil)))
          (between :any :nil :must)      ; LB3
          (when (and (eql state :eat-spaces) (eql t2 :sp))
            (cmpush :cant) (cmpush second) (go tail))
@@ -1631,9 +1640,15 @@ appear in an SBCL string. The line-breaking behavior of surrogates is undefined.
          (between '(:id :eb :em) :po :cant)        ; LB23a
          (between '(:pr :po) '(:al :hl) :cant)     ; LB24
          (between '(:al :hl) '(:pr :po) :cant)     ; LB24
-         (between '(:cl :cp :nu) '(:po :pr) :cant) ; LB25, first six cases
-         (between '(:po :pr) :op :cant) ; LB25, two ? x OP cases
-         (between '(:po :pr :hy :is :sy :nu) :nu :cant) ; LB25, six ? x NU cases
+         (when (eql lb25-state :cl)
+           (between '(:cl :cp) '(:po :pr) :cant)) ; LB25, first four cases
+         (when (eql lb25-state :nu)
+           (between '(:nu :sy :is) '(:po :pr :nu) :cant)) ; LB25, three NU (SY | IS)* x ? cases
+         (when (or (eql (lb1-line-break-class (cadr tail)) :nu)
+                   (and (eql (lb1-line-break-class (cadr tail)) :is)
+                        (eql (lb1-line-break-class (caddr tail)) :nu)))
+           (between '(:po :pr) :op :cant)) ; LB25, four ? x OP (IS)? NU cases
+         (between '(:po :pr :hy :is) :nu :cant) ; LB25, four ? x NU cases
          (between :jl '(:jl :jv :h2 :h3) :cant)         ; LB26
          (between '(:jv :h2) '(:jv :jt) :cant)          ; LB26
          (between '(:jt :h3) :jt :cant)                 ; LB26

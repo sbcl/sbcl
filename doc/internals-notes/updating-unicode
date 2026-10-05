@@ -49,12 +49,6 @@ Updating Unicode versions (notes on the 10.0.0-16.0.0 updates):
         bring.  Grapheme- and word-breaking is in UAX 29;
         line-breaking is UAX 14.
 
-      - we implement the approximation to line-breaking rule LB25
-        ("don't break in numbers"), not the regular-expression form.
-        The test files assume the full implementation, so we override
-        the expected test answers for a small number of lines in
-        LineBreakTest; see tests/data/line-break-exceptions.lisp-expr
-
    c. failures in unicode-collation.pure.lisp
 
       - sometimes new scripts get implicit collation key weights, or

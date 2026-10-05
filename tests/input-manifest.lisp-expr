@@ -143,8 +143,7 @@
   "tests/data/GraphemeBreakTest.txt"
   "tests/data/WordBreakTest.txt"
   "tests/data/SentenceBreakTest.txt"
-  "tests/data/LineBreakTest.txt"
-  "tests/data/line-break-exceptions.lisp-expr")
+  "tests/data/LineBreakTest.txt")
  ("unicode-collation.pure.lisp" "tests/data/CollationTest_SHIFTED_SHORT.txt")
  ("unicode-normalization.pure.lisp" "tests/data/NormalizationTest.txt")
  ("unicode-properties.pure.lisp"

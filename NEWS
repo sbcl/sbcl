@@ -1,11 +1,15 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.6.9:
-  * enhancement: Unicode support has been updated to support version 15.1.0 of
-    the Unicode standard, including refinements to segmentation algorithms and
-    a number of fixes for bugs uncovered along the way:
+  * enhancement: Unicode support has been updated to support version 16.0.0 of
+    the Unicode standard, including support for new scripts and additional
+    characters, refinements to segmentation algorithms and a number of fixes
+    for bugs uncovered along the way:
     ** minor incompatible change: SB-UNICODE:LINE-BREAK-CLASS no longer
        accepts a :RESOLVE keyword argument.
+    ** enhancement: the implementation of line-breaking rules for numbers now
+       implements the full number-like state machine rather than the previous
+       table-based approximation.
     ** bug fix: the set of characters considered of type Close for sentence
        breaking no longer includes Other Punctuation.
     ** bug fix: in sentence breaking, do not attach a CR not followed by a LF
