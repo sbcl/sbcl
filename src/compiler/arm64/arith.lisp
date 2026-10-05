@@ -168,6 +168,23 @@
          (or (encode-logical-immediate f)
              (encode-logical-immediate (logior f fixnum-tag-mask))))))
 
+;;; OR is the same as ADD if the matching bits are clear
+(defun add-via-or (r x y x-ref &optional fixnum)
+  (cond ((or (= y (ash 1 63))
+             (= y (- (ash 1 63))))
+         (inst eor r x (ash 1 63))
+         t)
+        (t
+         (let ((width (sb-c::unsigned-type-width (tn-ref-type x-ref))))
+           (when width
+             (when fixnum
+               (incf width))
+             (let ((zeros (count-trailing-zeros y)))
+               (when (and (>= zeros width)
+                          (encode-logical-immediate y))
+                 (inst orr r x y)
+                 t)))))))
+
 (defmacro define-binop (translate untagged-penalty op
                         &key
                           (constant-test 'encode-logical-immediate)
@@ -176,65 +193,81 @@
                           (constant-transform 'identity)
                           (constant-fixnum-transform constant-transform)
                           negative-op)
-  `(progn
-     (define-vop (,(symbolicate translate '/fixnum=>fixnum)
-                  fixnum-binop)
-       (:args (x :scs (any-reg))
-              (y :scs (any-reg signed-reg unsigned-reg)))
-       (:translate ,translate)
-       ,@(when (member translate '(+ logior logxor))
-           `((:tag :commutative)))
-       (:generator 2
-         (inst ,op r x (if (sc-is y any-reg)
-                           y
-                           (lsl y n-fixnum-tag-bits)))))
-     (define-vop (,(symbolicate translate '-c/fixnum=>fixnum)
-                  fixnum-binop-c)
-       (:arg-types tagged-num
-                   (:constant ,(if (eq constant-fixnum-test 'fixnum)
-                                  'fixnum
-                                  `(satisfies ,constant-fixnum-test))))
-       (:translate ,translate)
-       (:generator 1
-         (cond ,@(and negative-op
-                      `(((minusp y)
-                         (let ((imm (,constant-fixnum-transform (fixnumize (- y)))))
-                          (inst ,negative-op r x imm)))))
-               (t
-                (let ((imm (,constant-fixnum-transform (fixnumize y))))
-                  (inst ,constant-op r x imm))))))
-     (define-vop (,(symbolicate translate '/signed=>signed)
-                  signed-binop)
-       (:translate ,translate)
-       (:generator ,(1+ untagged-penalty)
-         (inst ,op r x y)))
-     (define-vop (,(symbolicate translate '-c/signed=>signed)
-                  signed-binop-c)
-       (:translate ,translate)
-       (:arg-types signed-num
-                     (:constant (satisfies ,constant-test)))
-       (:generator ,untagged-penalty
-         (cond ,@(and negative-op
-                      `(((minusp (setf y (sb-c::mask-signed-field n-word-bits y)))
-                         (inst ,negative-op r x (,constant-transform (- y))))))
-               (t
-                (inst ,constant-op r x (,constant-transform y))))))
-     (define-vop (,(symbolicate translate '/unsigned=>unsigned)
-                  unsigned-binop)
-       (:translate ,translate)
-       (:generator ,(1+ untagged-penalty)
-         (inst ,op r x y)))
-     (define-vop (,(symbolicate translate '-c/unsigned=>unsigned)
-                  unsigned-binop-c)
-       (:translate ,translate)
-       (:arg-types unsigned-num
-                   (:constant (satisfies ,constant-test)))
-       (:generator ,untagged-penalty
-         (cond ,@(and negative-op
-                      `(((minusp (setf y (sb-c::mask-signed-field n-word-bits y)))
-                         (inst ,negative-op r x (,constant-transform (- y))))))
-               (t
-                (inst ,constant-op r x (,constant-transform y))))))))
+  (let ((untagged-c-body
+          `(:generator
+            ,untagged-penalty
+            (progn x-ref)
+            (cond ((not (,constant-test y))
+                   (or ,@(case op
+                           (add
+                            `((add-via-or r x y x-ref)))
+                           (sub
+                            `((and (typep (- y) '(unsigned-byte 64))
+                                   (add-via-or r x (- y) x-ref)))))
+                       (inst ,constant-op r x (load-immediate-word tmp-tn y))))
+                  ,@(and negative-op
+                         `(((minusp (setf y (sb-c::mask-signed-field n-word-bits y)))
+                            (inst ,negative-op r x (,constant-transform (- y))))))
+                  (t
+                   (inst ,constant-op r x (,constant-transform y)))))))
+    `(progn
+       (define-vop (,(symbolicate translate '-c/signed=>signed) signed-binop-c)
+         (:translate ,translate)
+         (:arg-types signed-num (:constant integer))
+         (:arg-refs x-ref)
+         ,untagged-c-body)
+
+       (define-vop (,(symbolicate translate '-c/unsigned=>unsigned) unsigned-binop-c)
+         (:translate ,translate)
+         (:arg-refs x-ref)
+         (:arg-types unsigned-num (:constant integer))
+         ,untagged-c-body)
+
+       (define-vop (,(symbolicate translate '-c/fixnum=>fixnum) fixnum-binop-c)
+         (:arg-types tagged-num (:constant fixnum))
+         (:arg-refs x-ref)
+         (:translate ,translate)
+         (:generator 1
+           (progn x-ref)
+           (cond ((not (,constant-fixnum-test y))
+                  (let ((fy (fixnumize y)))
+                    (or ,@(case op
+                            (add
+                             `((add-via-or r x fy x-ref t)))
+                            (sub
+                             `((cond
+                                 ((= fy (ash -1 63))
+                                  (inst eor r x (ash 1 63)))
+                                 ((add-via-or r x (fixnumize (- y)) x-ref t))))))
+                        (inst ,constant-op r x (load-immediate-word tmp-tn fy)))))
+                 ,@(and negative-op
+                        `(((minusp y)
+                           (let ((imm (,constant-fixnum-transform (fixnumize (- y)))))
+                             (inst ,negative-op r x imm)))))
+                 (t
+                  (let ((imm (,constant-fixnum-transform (fixnumize y))))
+                    (inst ,constant-op r x imm))))))
+
+       (define-vop (,(symbolicate translate '/fixnum=>fixnum) fixnum-binop)
+         (:args (x :scs (any-reg))
+                (y :scs (any-reg signed-reg unsigned-reg)))
+         (:translate ,translate)
+         ,@(when (member translate '(+ logior logxor))
+             `((:tag :commutative)))
+         (:generator 2
+           (inst ,op r x (if (sc-is y any-reg)
+                             y
+                             (lsl y n-fixnum-tag-bits)))))
+
+       (define-vop (,(symbolicate translate '/signed=>signed) signed-binop)
+         (:translate ,translate)
+         (:generator ,(1+ untagged-penalty)
+           (inst ,op r x y)))
+
+       (define-vop (,(symbolicate translate '/unsigned=>unsigned) unsigned-binop)
+         (:translate ,translate)
+         (:generator ,(1+ untagged-penalty)
+           (inst ,op r x y))))))
 
 (define-binop + 4 add :constant-test abs-add-sub-immediate-p :constant-fixnum-test fixnum-abs-add-sub-immediate-p
   :negative-op sub)

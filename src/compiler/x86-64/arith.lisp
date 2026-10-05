@@ -529,7 +529,7 @@
 ;;; is going.
 ;;; Non-commutative operations (notably SUB) need a little extra care.
 ;;; MUL is also a bit different due to asymmetry of the instruction.
-(defun emit-inline-add-sub (op x y result temp vop const-tn-xform)
+(defun emit-inline-add-sub (op x y result temp vop const-tn-xform &optional x-ref)
   (declare (type (member add sub) op))
   (multiple-value-setq (x y) (prepare-alu-operands x y vop const-tn-xform (eq op 'add)))
 
@@ -548,6 +548,32 @@
          (setq op 'add y (- y)))
         ((and (eq op 'add) (eql y (ash 1 31)))
          (setq op 'sub y (- y))))
+
+  ;; OR is the same as ADD if the matching bits are clear,
+  ;; BTS can set one bit
+  (when (and (integerp y)
+             (eq op 'add))
+    (when (or (= y (ash 1 63))
+              (= y (ash -1 63)))
+      (move result x)
+      (inst btc result 63)
+      (return-from emit-inline-add-sub))
+    (when (and (integerp y)
+               (not (imm32-p y))
+               (plusp y)
+               (= (logcount y) 1)
+               x-ref)
+      (let ((width (sb-c::unsigned-type-width (tn-ref-type x-ref))))
+        (when width
+          (ecase const-tn-xform
+            (fixnumize
+             (incf width))
+            (identity))
+          (let ((zeros (count-trailing-zeros y)))
+            (when (>= zeros width)
+              (move result x)
+              (inst bts result zeros)
+              (return-from emit-inline-add-sub)))))))
   (flet ((movabs (x y)
            (when (and (integerp x)
                       (not (imm32-p x))
@@ -573,7 +599,7 @@
             ((eql y +1) (inst inc x))
             ((or (gpr-tn-p x) y-is-reg-or-imm32)
              ;; At most one memory operand. Result could be memory or register.
-               (inst* op x y))
+             (inst* op x y))
             (t ; two memory operands: X is not a GPR, Y is neither GPR nor immm
              (inst mov temp y)
              (inst* op x temp)))
@@ -590,7 +616,7 @@
     (let ((reg (if (and (gpr-tn-p result)
                         ;; If Y aliases RESULT in SUB, then an initial (move reg x)
                         ;; could clobber Y.
-                          (or commutative (not (alias-p result y))))
+                        (or commutative (not (alias-p result y))))
                    result
                    temp)))
       (cond ((and (eq op 'add)          ; LEA can't do subtraction
@@ -600,10 +626,10 @@
              ;; If commutative, then neither X nor Y is an alias of RESULT.
              ;; If non-commutative, then RESULT could be Y, in which case REG is
              ;; TEMP so that we don't trash Y by moving X into it.
-               (inst mov reg x)
-               (cond ((and (eq op 'add) (eql y 1)) (inst inc reg))
-                     ((and (eq op 'add) (eql y -1)) (inst dec reg))
-                     (t (inst* op reg y)))))
+             (inst mov reg x)
+             (cond ((and (eq op 'add) (eql y 1)) (inst inc reg))
+                   ((and (eq op 'add) (eql y -1)) (inst dec reg))
+                   (t (inst* op reg y)))))
       (move result reg))))
 
 ;;; FIXME: we shouldn't need 12 variants, plus the modular variants, for what should
@@ -612,7 +638,7 @@
 ;;; consumed anyway. When I tried to do those simplifications, the modular vops went
 ;;; haywire because they inherit from vops of particular names.
 (macrolet ((def (fun-name name name/c scs primtype type cost
-                          &optional (val-xform 'identity) &rest extra
+                          &optional (val-xform 'identity) extra
                           &aux (note (format nil "inline ~(~a~) arithmetic" type))
                                (op (ecase fun-name (+ 'add) (- 'sub) (* 'mul)))
                                (emit (if (eq op 'mul) 'emit-inline-smul 'emit-inline-add-sub)))
@@ -629,10 +655,11 @@
                   (:vop-var vop)
                   (:note ,note)
                   (:generator ,(1+ cost)
-                   (,emit ',op x y r temp vop ',val-xform ,@extra)))
+                   (,emit ',op x y r temp vop ',val-xform ,extra)))
                 (define-vop (,name/c)
                   (:translate ,fun-name)
                   (:args (x :scs ,scs))
+                  (:arg-refs x-ref)
                   (:info y)
                   (:arg-types ,primtype (:constant ,type))
                   (:results (r :scs ,scs :load-if nil))
@@ -641,7 +668,8 @@
                   (:vop-var vop)
                   (:note ,note)
                   (:generator ,cost
-                   (,emit ',op x (,val-xform y) r temp vop ',val-xform ,@extra))))))
+                    (progn x-ref)
+                    (,emit ',op x (,val-xform y) r temp vop ',val-xform ,(or extra 'x-ref)))))))
   (def + +/fixnum=>fixnum +-c/fixnum=>fixnum
        (any-reg control-stack) tagged-num fixnum 1 fixnumize)
   (def + +/signed=>signed +-c/signed=>signed

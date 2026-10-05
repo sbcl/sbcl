@@ -1636,11 +1636,7 @@
       ,(let ((old (gethash (vop-parse-name parse) *backend-template-names*)))
          (when (and old
                     (vop-info-optimizer old))
-           (let ((optimizer (vop-info-optimizer old)))
-             (if (consp optimizer)
-                 `(cons (function ,(nth-value 2 (function-lambda-expression (car optimizer))))
-                        ',(cdr optimizer))
-                 `(function ,(nth-value 2 (function-lambda-expression optimizer))))))))))
+           `(vop-info-optimizer (gethash ',(vop-parse-name parse) *backend-template-names*)))))))
 
 ;;; Define the symbol NAME to be a Virtual OPeration in the compiler.
 ;;; If specified, INHERITS is the name of a VOP that we default
