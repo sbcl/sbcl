@@ -105,17 +105,19 @@
   with the semantics of adding the package package-local nicknames
   `<local-nickname>`s for the corresponding `<actual-package-name>`s.
 
-  Example:
+  In the following example, the local nickname `\"BAR\"` refers to the
+  package `\"FOO\"`, and the local nickname `\"B\"` is added to be
+  able to refer to the thus hidden `\"BAR\"` package:
 
       (defpackage :bar (:intern \"X\"))
       (defpackage :foo (:intern \"X\"))
-      (defpackage :quux (:use :cl) (:local-nicknames (:bar :foo) (:foo :bar)))
+      (defpackage :quux (:use :cl) (:local-nicknames (:bar :foo) (:b :bar)))
       (find-symbol \"X\" :foo) ; => FOO::X
       (find-symbol \"X\" :bar) ; => BAR::X
       (let ((*package* (find-package :quux)))
-        (find-symbol \"X\" :foo))               ; => BAR::X
+        (find-symbol \"X\" :bar))               ; => FOO::X
       (let ((*package* (find-package :quux)))
-        (find-symbol \"X\" :bar))               ; => FOO::X"
+        (find-symbol \"X\" :b))                 ; => BAR::X"
   (sb-ext:package-local-nicknames function)
   (sb-ext:package-locally-nicknamed-by-list function)
   (sb-ext:add-package-local-nickname function)
