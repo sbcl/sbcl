@@ -68,16 +68,16 @@
 (declaim (ftype (sfunction ((unsigned-byte 32) (array (unsigned-byte 8) 1)) (integer 0 5))
                 write-var-integer))
 (defun write-var-integer (value vector)
-  (loop
-     for v      :of-type (unsigned-byte 32) = value then (ash v -7)
-     for v-next :of-type (unsigned-byte 32) = (ash v -7)
-     for i                                  from 0
-     until (and (plusp i) (zerop v))
-     do (vector-push-extend (dpb (if (zerop v-next) 0 1) (byte 1 7)
-                                 (ldb (byte 7 0) v))
-                            vector)
-     finally (return i)))
-
+  (declare (optimize speed))
+  (let ((start (length vector)))
+    (loop for v = value then (ash v -7)
+          do
+          (let ((new (vector-push-extend (dpb (if (> v 127) 1 0)
+                                              (byte 1 7)
+                                              (ldb (byte 7 0) v))
+                                         vector)))
+            (when (< v 128)
+              (return (- new start)))))))
 
 ;;;; packed strings
 ;;;;
