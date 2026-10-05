@@ -1266,23 +1266,41 @@
                                   (inst lsl result result amount))))
                           (t
                            (inst lsl result number amount)))))
-                (define-vop (,name-c)
-                  (:note "inline ASH")
-                  (:translate ash)
-                  (:args (number :scs (,sc-type)))
-                  (:info amount)
-                  (:arg-types ,type (:constant unsigned-byte))
-                  (:results (result :scs (,result-type)))
-                  (:result-types ,type)
-                  (:generator ,(1- cost)
-                    (if (< amount 64)
-                        (inst lsl result number amount)
-                        (inst mov result 0)))))))
-  ;; FIXME: There's the opportunity for a sneaky optimization here, I
-  ;; think: a ash-LEFT-C/FIXNUM=>SIGNED vop.  -- CSR, 2003-09-03
-  (def ash-left/fixnum=>fixnum ash-left-c/fixnum=>fixnum any-reg tagged-num any-reg 2)
+                ,(when name-c
+                   `(define-vop (,name-c)
+                      (:note "inline ASH")
+                      (:translate ash)
+                      (:args (number :scs (,sc-type)))
+                      (:info amount)
+                      (:arg-types ,type (:constant unsigned-byte))
+                      (:results (result :scs (,result-type)))
+                      (:result-types ,type)
+                      (:generator ,(1- cost)
+                        (if (< amount 64)
+                            (inst lsl result number amount)
+                            (inst mov result 0))))))))
+  (def ash-left/fixnum=>fixnum nil any-reg tagged-num any-reg 2)
   (def ash-left/signed=>signed ash-left-c/signed=>signed signed-reg signed-num signed-reg 3)
   (def ash-left/unsigned=>unsigned ash-left-c/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
+
+(define-vop (ash-left-c/fixnum=>fixnum)
+  (:note "inline ash")
+  (:translate ash)
+  (:args (number :scs (any-reg)))
+  (:info amount)
+  (:arg-types tagged-num (:constant unsigned-byte))
+  (:results (result :scs (any-reg signed-reg)))
+  (:result-types signed-num)
+  (:generator 1
+    (if (< amount 64)
+        (sc-case result
+          (any-reg
+           (inst lsl result number amount))
+          (t
+           (if (= amount 1)
+               (move result number)
+               (inst lsl result number (1- amount)))))
+        (inst mov result 0))))
 
 (define-vop (ash-left-modfx/fixnum=>fixnum
              ash-left/fixnum=>fixnum)

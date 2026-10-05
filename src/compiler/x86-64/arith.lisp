@@ -2781,6 +2781,25 @@
                      (inst sar result 63)
                      (inst and result (lognot fixnum-tag-mask)))))))))
 
+(define-vop (ash-left-c/fixnum=>fixnum)
+  (:translate ash)
+  (:args (number :scs (any-reg) :target result))
+  (:info amount)
+  (:arg-types tagged-num (:constant (integer 1)))
+  (:results (result :scs (any-reg signed-reg)))
+  (:result-types signed-num)
+  (:generator 1
+    (unless (sc-is result any-reg)
+      (decf amount))
+    (cond ((>= amount 64)
+           (zeroize result))
+          ((zerop amount)
+           (move result number))
+          ((encodable-as-lea) (generate-lea))
+          (t
+           (move result number)
+           (inst shl result amount)))))
+
 (define-vop (ash-left/fixnum=>fixnum)
   (:translate ash)
   (:args (number :scs (any-reg control-stack) :target result)
