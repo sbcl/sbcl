@@ -31,6 +31,7 @@
 #endif
 
 static struct unbounded_queue work_queue;
+static int leaf_marked;
 
 static void gc_enqueue(lispobj object)
 {
@@ -140,7 +141,12 @@ static void __mark_obj(lispobj pointer)
             fullcgcmarks[funmark / N_WORD_BITS] |= (uword_t)1 << (funmark % N_WORD_BITS);
         })
     }
-    if (listp(pointer) || !leaf_obj_widetag_p(widetag_of(base))) gc_enqueue(pointer);
+    if (listp(pointer) || !leaf_obj_widetag_p(widetag_of(base)))
+        gc_enqueue(pointer);
+    else
+        /* An unboxed object might be a weak key, test_weak_triggers
+           needs to know if anything was marked. */
+        leaf_marked = 1;
 }
 
 inline void gc_mark_obj(lispobj thing) {
@@ -221,6 +227,21 @@ static void enqueue_static_like_range(lispobj* where, lispobj* end)
     }
 }
 
+static int test_all_weak_triggers() {
+    while (1)
+    {
+        leaf_marked = 0;
+        if (test_weak_triggers(pointer_survived_gc_yet, gc_mark_obj)) {
+            if (work_queue.head_block->count)
+                return 1;
+            if (leaf_marked) {
+                continue;
+            }
+        }
+        return 0;
+    }
+}
+
 void execute_full_mark_phase()
 {
 #ifdef HAVE_GETRUSAGE
@@ -248,9 +269,8 @@ void execute_full_mark_phase()
             trace_object(native_pointer(ptr));
         else
             mark_pair((lispobj*)(ptr - LIST_POINTER_LOWTAG));
-    } while (work_queue.head_block->count ||
-             (test_weak_triggers(pointer_survived_gc_yet, gc_mark_obj) &&
-              work_queue.head_block->count));
+
+    } while (work_queue.head_block->count || test_all_weak_triggers());
     stray_pointer_source_obj = 0;
     gc_queue_destroy(&work_queue);
 

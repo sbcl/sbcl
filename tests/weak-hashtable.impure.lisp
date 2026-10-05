@@ -64,9 +64,21 @@
                       collect (make-string 1))))
     (setf *root* (first values)
           *chain* (loop for (k v) on values
-                        while v
                         collect (let ((h (make-hash-table :test 'eq :weakness :key)))
                                   (setf (gethash k h) v)
                                   h))))
 
-  (sb-ext:gc :full t))
+  (sb-ext:gc :full t)
+  (setf *chain* nil
+        *root* nil))
+
+(with-test (:name :unboxed-weak-chain.2)
+  (let ((values (loop repeat 2000
+                      collect (make-string 1))))
+    (setf *root* (first values))
+    (loop for (k v) on values
+          do (let ((h (make-hash-table :test 'eq :weakness :key)))
+               (setf (gethash k h) v)
+               (push h *chain*))))
+
+  (sb-ext:gc :gen 7))
