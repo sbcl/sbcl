@@ -2327,9 +2327,10 @@
             ;; Immediately after a call returns, saved locations have
             ;; not been restored yet, so we access the debug var
             ;; directly from the save location.
-            (or (and (memq (code-location-kind (frame-code-location frame))
-                           '(:single-value-return :unknown-return :known-return))
-                     (compiled-debug-var-save-sc+offset debug-var))
+            (or (let ((loc (frame-code-location frame)))
+                  (and (not (code-location-unknown-p loc))
+                       (memq (code-location-kind loc) '(:single-value-return :unknown-return :known-return))
+                       (compiled-debug-var-save-sc+offset debug-var)))
                 (compiled-debug-var-sc+offset debug-var))
             escaped))
           (t
