@@ -42,7 +42,9 @@
      "Elymaic" "Nandinagari" "Nyiakeng_Puachue_Hmong" "Wancho"
      "Chorasmian" "Dives_Akuru" "Khitan_Small_Script" "Yezidi"
      "Cypro_Minoan" "Old_Uyghur" "Tangsa" "Toto" "Vithkuqi"
-     "Kawi" "Nag_Mundari"))
+     "Kawi" "Nag_Mundari"
+     "Garay" "Gurung_Khema" "Kirat_Rai" "Ol_Onal" "Sunuwar" "Todhri"
+     "Tulu_Tigalari"))
 
  (*line-break-classes*
     ("XX" "AI" "AK" "AL" "AP" "AS" "B2" "BA" "BB" "BK" "CB" "CJ" "CL" "CM" "CP"

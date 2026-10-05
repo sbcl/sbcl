@@ -804,7 +804,8 @@ Length should be adjusted when the standard changes.")
     (parse-property s :pattern-white-space)
     (parse-property s :pattern-syntax)
     (parse-property s :prepended-concatenation-mark)
-    (parse-property s :regional-indicator))
+    (parse-property s :regional-indicator)
+    (parse-property s :modifier-combining-mark))
 
   (with-input-utf8-file (s "DerivedNormalizationProps")
     (parse-property s) ;; Initial comments

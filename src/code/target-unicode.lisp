@@ -1052,7 +1052,7 @@ The result is not guaranteed to have the same length as the input."
       ((<= #x1F1E6 cp #x1F1FF) :regional-indicator)
       ((or
         ;; Consonant_Preceding_Repha
-        (= cp #x0D4E) (= cp #x11941) (= cp #x11D46) (= cp #x11F02)
+        (= cp #x0D4E) (= cp #x113D1) (= cp #x11941) (= cp #x11D46) (= cp #x11F02)
         ;; Consonant_Prefixed
         (<= #x111C2 cp #x111C3) (= cp #x1193F) (= cp #x11A3A) (<= #x11A84 cp #x11A89)
         (proplist-p character :prepended-concatenation-mark))
@@ -1060,6 +1060,8 @@ The result is not guaranteed to have the same length as the input."
       ((and (or (eql gc :Mc)
                 (eql cp #x0E33) (eql cp #x0EB3))
             (not (binary-search cp not-spacing-mark))) :spacing-mark)
+      ;; Kirat Rai vowels
+      ((or (= cp #x16D63) (<= #x16D67 cp #x16D6A)) :v)
       ((hangul-syllable-type character)))))
 
 (macrolet ((def (name extendedp)
@@ -1170,7 +1172,7 @@ grapheme breaking rules specified in UAX #29, returning a list of strings."
         (midnum
          ;; Grepping of Line_Break = IS adjusted per UAX #29
          #(#x002C #x003B #x037E #x0589 #x060C #x060D #x066C #x07F8 #x2044
-           #xFE10 #xFE14 #xFE50 #xFE54 #xFF0C #xFF1B))
+           #xFE50 #xFE54 #xFF0C #xFF1B))
         (zs-and-glue
          ;; Grepping of Line_Break = ";GL.*Zs"
          #(#x00A0 #x2007 #x202F)))
@@ -1297,9 +1299,9 @@ word breaking rules specified in UAX #29. Returns a list of strings"
         (gc (when character (general-category character)))
         (aterms #(#x002E #x2024 #xFE52 #xFF0E))
         (scontinues
-         #(#x002C #x002D #x003A #x055D #x060C #x060D #x07F8 #x1802 #x1808
-           #x2013 #x2014 #x3001 #xFE10 #xFE11 #xFE13 #xFE31 #xFE32 #xFE50
-           #xFE51 #xFE55 #xFE58 #xFE63 #xFF0C #xFF0D #xFF1A #xFF64)))
+         #(#x002C #x002D #x003A #x003B #x037E #x055D #x060C #x060D #x07F8 #x1802 #x1808
+           #x2013 #x2014 #x3001 #xFE10 #xFE11 #xFE13 #xFE14 #xFE31 #xFE32 #xFE50
+           #xFE51 #xFE54 #xFE55 #xFE58 #xFE63 #xFF0C #xFF0D #xFF1A #xFF1B #xFF64)))
     (cond
       ((not character) nil)
       ((= cp 10) :LF)
@@ -1481,6 +1483,19 @@ appear in an SBCL string. The line-breaking behavior of surrogates is undefined.
   (or (eql class :ak)
       (and c (eql (char-code (if (consp c) (car c) c)) #x25CC))))
 
+(defun lb10-east-asian-p (c)
+  ;; LB10 demands not only that unattached CM (and ZWJ) be considered
+  ;; to be of class AL for subsequent rules, but also that they be
+  ;; considered to have no East Asian Width property, even if the
+  ;; underlying character does have such a property.  This doesn't
+  ;; matter in practice for ZWJ, but there are CMs whose
+  ;; lb1-line-break-class is AL but which have an East Asian Width.
+  ;; Exclude them here.
+  (when c
+    (let ((ch (if (consp c) (car c) c)))
+      (and (not (eql (line-break-class ch) :cm))
+           (member (east-asian-width ch) '(:h :w :f))))))
+
 (defun line-break-annotate (string)
   (let ((chars (line-prebreak string))
         zeroth first second (t0 :sot) t1 t2 tail (ret (list :cant))
@@ -1565,7 +1580,7 @@ appear in an SBCL string. The line-breaking behavior of surrogates is undefined.
          (between :wj :any :cant)                    ; LB11
          (between :gl :any :cant)                    ; LB12
          (between (not '(:sp :ba :hy)) :gl :cant)    ; LB12a
-         (between :any '(:cl :cp :ex :is :sy) :cant) ; LB13
+         (between :any '(:cl :cp :ex :sy) :cant)     ; LB13
          (after-spaces :op :any :cant)               ; LB14
          (when (and (member t0 '(:sot :bk :cr :lf :nl :op :qu :gl :sp :zw))
                     (eql t1 :qu)
@@ -1579,12 +1594,32 @@ appear in an SBCL string. The line-breaking behavior of surrogates is undefined.
                     (member (lb1-line-break-class (cadr tail))
                             '(:sp :gl :wj :cl :qu :cp :ex :is :sy :bk :cr :lf :nl :zw :nil)))
            (between :any :qu :cant)) ; LB15b
+         (when (eql (lb1-line-break-class (cadr tail)) :nu)
+           (between :sp :is :can))   ; LB15c
+         (between :any :is :cant)    ; LB15d
          (between :sp :any :can)  ; LB18
-         (between :any :qu :cant) ; LB19
-         (between :qu :any :cant) ; LB19
+         (unless (eql (general-category (if (consp second) (car second) second)) :pi)
+           (between :any :qu :cant)) ; LB19
+         (unless (eql (general-category (if (consp first) (car first) first)) :pf)
+           (between :qu :any :cant)) ; LB19
+         (unless (lb10-east-asian-p first)
+           (between :any :qu :cant)) ; LB19a
+         (unless (lb10-east-asian-p (cadr tail))
+           (between :any :qu :cant)) ; LB19a
+         (unless (lb10-east-asian-p second)
+           (between :qu :any :cant)) ; LB19a
+         (unless (lb10-east-asian-p zeroth)
+           (between :qu :any :cant)) ; LB19a
          (between :any :cb :can)  ; LB20
          (between :cb :any :can)  ; LB20
-         (when (eql t0 :hl)
+         (when (and (member t0 '(:sot :bk :cr :lf :nl :sp :zw :cb :gl))
+                    (or (eql t1 :hy)
+                        (eql (char-code (if (consp first) (car first) first)) #x2010)))
+           (between :any :al :cant)) ; LB20a
+         (when (and (eql t0 :hl)
+                    (or (eql t1 :hy)
+                        (and (eql t1 :ba) (not (lb10-east-asian-p first))))
+                    (not (eql t2 :hl)))
            (between '(:hy :ba) :any :cant)) ; LB21a
          (between :any '(:ba :hy :ns) :cant)   ; LB21
          (between :bb :any :cant)              ; LB21
@@ -1616,9 +1651,9 @@ appear in an SBCL string. The line-breaking behavior of surrogates is undefined.
                     (aksara-p second t2)
                     (eql (lb1-line-break-class (cadr tail)) :vf))
            (between :any :any :cant))              ; LB28a
-         (unless (member (east-asian-width (if (consp second) (car second) second)) '(:h :w :f))
+         (unless (lb10-east-asian-p second)
            (between '(:al :hl :nu) :op :cant))        ; LB30
-         (unless (member (east-asian-width (if (consp first) (car first) first)) '(:h :w :f))
+         (unless (lb10-east-asian-p first)
            (between :cp '(:al :hl :nu) :cant))        ; LB30
          (between :ri :ri (if (oddp nri) :cant :can)) ; LB30a
          (between :eb :em :cant)                      ; LB30b

@@ -1,4 +1,4 @@
-Updating Unicode versions (notes on the 10.0.0-15.1.0 updates):
+Updating Unicode versions (notes on the 10.0.0-16.0.0 updates):
 
 1. Download ucd.zip for the version to update to, along with UCA's
    allkeys.txt and CollationTest.zip, and confusables.txt from
@@ -16,6 +16,10 @@ Updating Unicode versions (notes on the 10.0.0-15.1.0 updates):
    - ucd.lisp: new properties in PropList.txt or
      DerivedNormalizationProbs.txt will need to be added to
      slurp-proplist.
+
+   - unicode-phash.lisp: reset this file to be empty (0-length); the
+     build process will populate it with new perfect hash data for the
+     new Unicode databases.
 
 3. Try to build.
 
