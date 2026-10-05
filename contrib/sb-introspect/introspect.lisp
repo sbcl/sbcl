@@ -855,7 +855,7 @@ accepted."
 (sb-ext:defglobal *codeblob-cache* nil)
 (flet ((gather-code (stamp) ; = the value of sb-vm::*code-alloc-count*
          ;; Remove unreachable functions.
-         (sb-ext:gc :full t)
+         (sb-ext:gc :gen 7)
          (let ((arena (sb-vm:new-arena (* 2 1024 1024)))
                (result))
            ;; Can allocate inside an arena while holding without-gcing in sb-vm:map-code-objects
@@ -900,7 +900,13 @@ accepted."
              (lambda (xref-kind xref-name xref-form-number)
                (when (and (eq xref-kind wanted-kind)
                           (equal xref-name wanted-name))
-                 (push (cons fun xref-form-number) funs)))
+                 (let ((name (%fun-name fun)))
+                   (unless (and (legal-fun-name-p name)
+                                (fboundp name)
+                                ;; Omit redefined functions
+                                (not (eq (%fun-fun (sb-ext:unencapsulated-function (fdefinition name)))
+                                         fun)))
+                     (push (cons fun xref-form-number) funs)))))
              xrefs)))))
     (let (result)
       (loop for (fun . xref-form-number) in funs
