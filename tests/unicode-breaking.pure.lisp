@@ -142,7 +142,7 @@
                         (actual (substitute :can :must annotated)))
                    (assert (equal expected actual)
                            ()
-                           "~@<line ~D: ~S - expected: ~S, actual; ~S~:@>"
+                           "~@<line ~D: ~S - expected: ~S, actual: ~S~:@>"
                            n string expected actual)))))))
 
 (with-test (:name (:line-breaking :test1) :skipped-on (not :sb-unicode))

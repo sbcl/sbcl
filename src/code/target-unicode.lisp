@@ -1054,7 +1054,7 @@ The result is not guaranteed to have the same length as the input."
         ;; Consonant_Preceding_Repha
         (= cp #x0D4E) (= cp #x113D1) (= cp #x11941) (= cp #x11D46) (= cp #x11F02)
         ;; Consonant_Prefixed
-        (<= #x111C2 cp #x111C3) (= cp #x1193F) (= cp #x11A3A) (<= #x11A84 cp #x11A89)
+        (<= #x111C2 cp #x111C3) (= cp #x1193F) (<= #x11A84 cp #x11A89)
         (proplist-p character :prepended-concatenation-mark))
        :prepend)
       ((and (or (eql gc :Mc)
@@ -1157,7 +1157,8 @@ grapheme breaking rules specified in UAX #29, returning a list of strings."
             #x30A0 #x30A0 #x30FC #x30FC
             #xFF70 #xFF70)))
         (also-aletter
-         #(#x02C2 #x02C3 #x02C4 #x02C5 #x02D2 #x02D3 #x02D4 #x02D5 #x02D6 #x02D7
+         #(#x00B8
+           #x02C2 #x02C3 #x02C4 #x02C5 #x02D2 #x02D3 #x02D4 #x02D5 #x02D6 #x02D7
            #x02DE #x02DF
            #x02E5 #x02E6 #x02E7 #x02E8 #x02E9 #x02EA #x02EB
            #x02ED #x02EF #x02F0 #x02F1 #x02F2 #x02F3 #x02F4 #x02F5
@@ -1588,7 +1589,7 @@ appear in an SBCL string. The line-breaking behavior of surrogates is undefined.
          (between :any :wj :cant)                    ; LB11
          (between :wj :any :cant)                    ; LB11
          (between :gl :any :cant)                    ; LB12
-         (between (not '(:sp :ba :hy)) :gl :cant)    ; LB12a
+         (between (not '(:sp :ba :hy :hh)) :gl :cant) ; LB12a
          (between :any '(:cl :cp :ex :sy) :cant)     ; LB13
          (after-spaces :op :any :cant)               ; LB14
          (when (and (member t0 '(:sot :bk :cr :lf :nl :op :qu :gl :sp :zw))
@@ -1621,17 +1622,12 @@ appear in an SBCL string. The line-breaking behavior of surrogates is undefined.
            (between :qu :any :cant)) ; LB19a
          (between :any :cb :can)  ; LB20
          (between :cb :any :can)  ; LB20
-         (when (and (member t0 '(:sot :bk :cr :lf :nl :sp :zw :cb :gl))
-                    (or (eql t1 :hy)
-                        (eql (char-code (if (consp first) (car first) first)) #x2010)))
-           (between :any :al :cant)) ; LB20a
-         (when (and (eql t0 :hl)
-                    (or (eql t1 :hy)
-                        (and (eql t1 :ba) (not (lb10-east-asian-p first))))
-                    (not (eql t2 :hl)))
-           (between '(:hy :ba) :any :cant)) ; LB21a
-         (between :any '(:ba :hy :ns) :cant)   ; LB21
+         (when (member t0 '(:sot :bk :cr :lf :nl :sp :zw :cb :gl))
+           (between '(:hy :hh) '(:al :hl) :cant)) ; LB20a
+         (between :any '(:ba :hh :hy :ns) :cant) ; LB21
          (between :bb :any :cant)              ; LB21
+         (when (and (eql t0 :hl) (not (eql t2 :hl)))
+           (between '(:hy :hh) :any :cant)) ; LB21a
          (between :sy :hl :cant)               ; LB21b
          (between :any :in :cant) ; LB22
          (between '(:al :hl) :nu :cant)                         ; LB23
@@ -1831,10 +1827,13 @@ it defaults to 80 characters"
           (unpack-collation-key packed-key)
           (when (char= (code-char 0) char2 char3)
             (let* ((unified-ideograph-p (proplist-p char1 :unified-ideograph))
-                   (tangut-p (or (<= #x17000 code1 #x18AFF)
-                                 (<= #x18D00 code1 #x18D8F)))
+                   (tangut-p (or (<= #x17000 code1 #x187FF)
+                                 (<= #x18D00 code1 #x18D7F)))
+                   (tangut-components-p (or (<= #x18800 code1 #x18AFF)
+                                            (<= #x18D80 code1 #x18DFF)))
                    (nushu-p (<= #x1B170 code1 #x1B2FF))
                    (khitan-small-p (<= #x18B00 code1 #x18CFF))
+                   (siniform-p (or tangut-p tangut-components-p nushu-p khitan-small-p))
                    (boffset 0)
                    (base
                      (cond ((and unified-ideograph-p
@@ -1842,11 +1841,12 @@ it defaults to 80 characters"
                             #xFB40)
                            (unified-ideograph-p #xFB80)
                            (tangut-p (setq boffset #x17000) #xFB00)
-                           (nushu-p (setq boffset #x1B170) #xFB01)
-                           (khitan-small-p (setq boffset #x18B00) #xFB02)
+                           (tangut-components-p (setq boffset #x18800) #xFB01)
+                           (nushu-p (setq boffset #x1B170) #xFB02)
+                           (khitan-small-p (setq boffset #x18B00) #xFB03)
                            (t #xFBC0)))
-                   (a (+ base (if (or tangut-p nushu-p) 0 (ash code1 -15))))
-                   (b (logior #x8000 (if (or tangut-p nushu-p) (- code1 boffset) (logand code1 #x7FFF)))))
+                   (a (+ base (if siniform-p 0 (ash code1 -15))))
+                   (b (logior #x8000 (if siniform-p (- code1 boffset) (logand code1 #x7FFF)))))
               (list (list a #x20 #x2) (list b 0 0)))))))))
 
 (defun sort-key (string)
