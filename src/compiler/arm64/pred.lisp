@@ -173,26 +173,28 @@
 
 (define-vop (jump-table)
   (:args (index :scs (signed-reg unsigned-reg any-reg)
+                :sc-costs (any-reg 1)
                 :target offset))
   (:info targets otherwise min max)
-  (:temporary (:sc unsigned-reg) table)
-  (:temporary (:sc any-reg :from (:argument 0)) offset)
+  (:temporary (:sc any-reg :from (:argument 0)
+               :unused-if (zerop min)) offset)
+  (:tag (:untagged))
   (:generator 0
     (let ((fixnump (sc-is index any-reg)))
       (flet ((fix (x)
                (if fixnump
                    (fixnumize x)
                    x)))
-        (inst adr table (cdr (register-inline-constant :jump-table (coerce targets 'vector))))
         (unless (zerop min)
           (inst add-sub offset index (- (fix min)))
           (setf index offset))
         (when otherwise
           (inst cmp index (add-sub-immediate (fix (- max min))))
           (inst b :hi otherwise))
+        (inst adr tmp-tn (cdr (register-inline-constant :jump-table (coerce targets 'vector))))
         (cond (fixnump
-               (inst add table table (lsl index (- word-shift n-fixnum-tag-bits)))
-               (inst ldr table (@ table)))
+               (inst add tmp-tn tmp-tn (lsl index (- word-shift n-fixnum-tag-bits)))
+               (inst ldr tmp-tn (@ tmp-tn)))
               (t
-               (inst ldr table (@ table (extend index :lsl word-shift)))))
-        (inst br table)))))
+               (inst ldr tmp-tn (@ tmp-tn (extend index :lsl word-shift)))))
+        (inst br tmp-tn)))))

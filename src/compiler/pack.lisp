@@ -1175,7 +1175,8 @@
     (when target
       (let* ((tn (tn-ref-tn target))
              (loc (tn-offset tn)))
-        (if (and (eq (tn-sc tn) sc)
+        (if (and (not (eq (tn-kind tn) :unused))
+                 (eq (tn-sc tn) sc)
                  (sc-locations-member (the sb-vm:finite-sc-offset loc)
                                       (sc-locations sc))
                  (not (load-tn-conflicts-in-sc op sc loc nil)))
