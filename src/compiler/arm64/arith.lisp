@@ -1302,6 +1302,26 @@
                (inst lsl result number (1- amount)))))
         (inst mov result 0))))
 
+(define-vop (ash-right-c/signed=>fixnum)
+  (:translate ash)
+  (:args (number :scs (any-reg signed-reg)))
+  (:info amount)
+  (:arg-types signed-num (:constant (integer * -1)))
+  (:results (result :scs (any-reg)))
+  (:result-types tagged-num)
+  (:generator 1
+    (setf amount (min (- amount) 63))
+    (sc-case number
+      (signed-reg
+       (cond ((= amount 1)
+              (inst and result number -2))
+             (t
+              (inst asr tmp-tn number amount)
+              (inst lsl result tmp-tn 1))))
+      (t
+       (inst asr tmp-tn number amount)
+       (inst and result tmp-tn -2)))))
+
 (define-vop (ash-left-modfx/fixnum=>fixnum
              ash-left/fixnum=>fixnum)
   (:variant t)

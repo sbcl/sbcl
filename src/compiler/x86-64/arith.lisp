@@ -2830,30 +2830,51 @@
     (cond ((encodable-as-lea) (generate-lea))
           (t
            (with-shift-operands
-            (cond ((> amount 63)
-                   (zeroize result))
-                  ((plusp amount)
-                   (inst shl result amount))
-                  (t (inst sar result (min 63 (- amount))))))))))
+               (cond ((> amount 63)
+                      (zeroize result))
+                     ((plusp amount)
+                      (inst shl result amount))
+                     (t (inst sar result (min 63 (- amount))))))))))
 
-(define-vop (ash-c/unsigned=>unsigned)
-  (:translate ash)
-  (:args (number :scs (unsigned-reg unsigned-stack) :target result))
-  (:info amount)
-  (:arg-types unsigned-num (:constant integer))
-  (:results (result :scs (unsigned-reg unsigned-stack)))
-  (:result-types unsigned-num)
-  (:note "inline ASH")
-  (:temporary (:sc unsigned-reg) temp)
-  (:generator 3
-    (cond ((= amount 0) (bug "shifting by 0"))
-          ((not (< -64 amount 64)) (zeroize result))
-          ((encodable-as-lea) (generate-lea))
-          (t
-           (with-shift-operands
-             (if (plusp amount)
-                 (inst shl result amount)
-                 (inst shr result (- amount))))))))
+  (define-vop (ash-right-c/signed=>fixnum)
+    (:translate ash)
+    (:args (number :scs (any-reg signed-reg) :target result))
+    (:info amount)
+    (:arg-types signed-num (:constant (integer * -1)))
+    (:results (result :scs (any-reg)))
+    (:result-types tagged-num)
+    (:generator 1
+      (setf amount (min (- amount) 63))
+      (move result number)
+      (sc-case number
+        (signed-reg
+         (cond ((= amount 1)
+                (inst and result -2))
+               (t
+                (inst sar result amount)
+                (inst shl result 1))))
+        (t
+         (inst sar result amount)
+         (inst and result -2)))))
+
+  (define-vop (ash-c/unsigned=>unsigned)
+    (:translate ash)
+    (:args (number :scs (unsigned-reg unsigned-stack) :target result))
+    (:info amount)
+    (:arg-types unsigned-num (:constant integer))
+    (:results (result :scs (unsigned-reg unsigned-stack)))
+    (:result-types unsigned-num)
+    (:note "inline ASH")
+    (:temporary (:sc unsigned-reg) temp)
+    (:generator 3
+      (cond ((= amount 0) (bug "shifting by 0"))
+            ((not (< -64 amount 64)) (zeroize result))
+            ((encodable-as-lea) (generate-lea))
+            (t
+             (with-shift-operands
+                 (if (plusp amount)
+                     (inst shl result amount)
+                     (inst shr result (- amount))))))))
 
 (define-vop (ash-left/signed=>signed)
   (:translate ash)

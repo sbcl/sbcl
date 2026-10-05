@@ -123,7 +123,8 @@
     (aver costs)
     (cond ((not (eql (svref costs sb-vm:any-reg-sc-number) 0))
            (values 0 1))
-          ((not (eql (svref costs sb-vm:signed-reg-sc-number) 0))
+          ((not (or (eql (svref costs sb-vm:signed-reg-sc-number) 0)
+                    (eql (svref costs sb-vm:unsigned-reg-sc-number) 0)))
            (values (boxing-cost lvar) 0))
           (t
            (values 0 0)))))
@@ -151,9 +152,10 @@
                      (add-edge net lvar node 10)
                      (when both
                        (add-edge net node lvar 10)))
-                   (add-arg-lvar (lvar &optional (both t))
+                   (add-arg-lvar (i lvar &optional (both t))
                      (add-edge net lvar node 10)
-                     (when both
+                     (when (and both
+                                (> (tagged-template-arg-p lvar i tagged-template) 0))
                        (add-edge net node lvar (* 10 (boxing-cost lvar)))))
                    (read-costs (lvar node)
                      (cond ((combination-p node)
@@ -178,10 +180,11 @@
               (loop for related fixnum = (vop-info-related-args tagged-template)
                     then (ash related -1)
                     for arg in (combination-args node)
+                    for i from 0
                     do
                     (unless (or (constant-lvar-p arg)
                                 (not (logbitp 0 related)))
-                      (add-arg-lvar arg (not (eq (vop-info-tag tagged-template) :commutative)))
+                      (add-arg-lvar i arg (not (eq (vop-info-tag tagged-template) :commutative)))
                       (let ((tagged 0)
                             (untagged 0))
                         (declare (fixnum tagged untagged))
