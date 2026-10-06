@@ -3201,6 +3201,7 @@ static void pin_call_chain_and_boxed_registers(struct thread* th) {
 #endif
 
 #if !GENCGC_IS_PRECISE
+static void visit_thread_stack_ranges(struct thread*, void*);
 static void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 conservative_stack_scan(struct thread* th,
                         __attribute__((unused)) generation_index_t gen,
@@ -3295,32 +3296,7 @@ conservative_stack_scan(struct thread* th,
             esp, (int)(th->control_stack_end - (lispobj*)esp),
             (th == get_sb_vm_thread()) ? " CURRENT":""); */
 
-    // Words on the stack which point into the stack are likely
-    // frame pointers or alien or DX object pointers. In any case
-    // there's no need to call preserve_pointer on them since
-    // they definitely don't point to the heap.
-    // See the picture at alloc_thread_struct() as a reminder.
-#ifdef LISP_FEATURE_UNIX
-    lispobj exclude_from = (lispobj)th->control_stack_start;
-    lispobj exclude_to = (lispobj)th + dynamic_values_bytes;
-#define potential_heap_pointer(word) !(exclude_from <= word && word < exclude_to)
-#else
-    // We can't use the heuristic of excluding words that appear to point into
-    // 'struct thread' on win32 because ... I don't know why.
-    // See https://groups.google.com/g/sbcl-devel/c/8s7mrapq56s/m/UaAjYPqKBAAJ
-#define potential_heap_pointer(word) 1
-#endif
-
-    lispobj* ptr;
-    for (ptr = esp; ptr < th->control_stack_end; ptr++) {
-        lispobj word = *ptr;
-        // Also note that we can eliminate small fixnums from consideration
-        // since there is no memory on the 0th page.
-        // (most OSes don't let users map memory there, though they used to).
-        if (word >= BACKEND_PAGE_BYTES && potential_heap_pointer(word)) {
-            preserve_pointer(word, 0);
-        }
-    }
+    visit_thread_stack_ranges(th, esp);
 }
 #endif
 

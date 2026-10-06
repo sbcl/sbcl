@@ -25,6 +25,55 @@ static void trigger_gc(__attribute__((unused)) struct thread* thread)
         }
 }
 
+#if !GENCGC_IS_PRECISE
+static void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
+visit_thread_stack_ranges(struct thread* th, void* stackptr)
+{
+    /* Words on the stack which point into the stack are likely
+     * frame pointers or alien or DX object pointers. In any case
+     * there's no need to call preserve_pointer on them since
+     * they definitely don't point to the heap.
+     * There are two cases:
+     * - For natural born Lisp threads on #+unix, the control stack ends
+     *   where the binding stack starts. The exclusion range spans all
+     *   stacks (control, binding, alien) belonging to this thread, and its TLS.
+     * - For adopted threads or #+win32, the stack is somewhere random.
+     *   There are two distinct ranges to reject.
+     * Also note that we can eliminate small integers from consideration
+     * since there is no memory that low.
+     */
+
+    lispobj* ptr;
+
+    // See the picture at alloc_thread_struct() as a reminder.
+    lispobj low1  = (lispobj)th->control_stack_start;
+    lispobj high1 = (lispobj)th->control_stack_end;
+    lispobj low2  = (lispobj)th->binding_stack_start;
+    lispobj high2 = (lispobj)th + dynamic_values_bytes;
+
+    if (high1 == low2) {
+        // A single range and necessarily low1 < high2, we needn't assert that.
+#define points_at_self(word) (low1 <= word && word < high2)
+        for (ptr = stackptr; ptr < th->control_stack_end; ptr++) {
+            lispobj word = *ptr;
+            if (word >= BACKEND_PAGE_BYTES && !points_at_self(word))
+                preserve_pointer(word, 0);
+        }
+#undef points_at_self
+    } else {
+        // Discrete ranges, don't care about their relative placement.
+#define points_at_self(word) \
+ ((low1 <= word && word < high1) || (low2 <= word && word < high2))
+        for (ptr = stackptr; ptr < th->control_stack_end; ptr++) {
+            lispobj word = *ptr;
+            if (word >= BACKEND_PAGE_BYTES && !points_at_self(word))
+                preserve_pointer(word, 0);
+        }
+#undef points_at_self
+    }
+}
+#endif
+
 static bool card_markedp(void* addr)
 {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
