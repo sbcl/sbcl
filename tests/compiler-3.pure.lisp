@@ -978,3 +978,15 @@
               (return (- (ldb (byte 63 0) a) 4611686018427387905))))
           (- (ldb (byte 63 0) b) 4611686018427387904)))
     ((4611686018427387903 0) 4611686018427387902)))
+
+(with-test (:name :erase-lvar-type-optimistic-types)
+  (checked-compile-and-assert
+   ()
+   `(lambda (l)
+      (labels ((f (l)
+                 (loop for e in (cdr l)
+                       for i14 below 8
+                       sum -12)))
+        (f (cons 0 l))))
+   ((nil) 0)
+   (('(1)) -12)))

@@ -719,6 +719,9 @@
                                                      *universal-type*
                                                      type)))
                                        (setf (lambda-var-type var) type)
+                                       (when (lambda-var-optimistic-type var)
+                                         (setf (lambda-var-optimistic-type var) *empty-type*)
+                                         (note-optimistic-pending fun))
                                        (loop for ref in (leaf-refs var)
                                              do (derive-node-type ref type :from-scratch t)
                                                 (erase (node-lvar ref) 0)))))
