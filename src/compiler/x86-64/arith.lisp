@@ -6306,7 +6306,7 @@
 (define-vop (ash-right-two-words-variable)
   (:translate ash-right-two-words)
   (:args (a :scs (unsigned-reg) :to :save)
-         (b :scs (unsigned-reg) :target result)
+         (b :scs (unsigned-reg) :to :save)
          (count :scs (unsigned-reg) :target ecx))
   (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 2)) ecx)
   (:arg-types unsigned-num unsigned-num unsigned-num)
