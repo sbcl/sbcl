@@ -4283,7 +4283,7 @@
 ;;;; converting special case multiply/divide to shifts
 
 ;;; If arg is a constant power of two, turn * into a shift.
-(deftransform * ((x y) (integer (constant-arg unsigned-byte)) * :node node)
+(deftransform * ((x y) (integer (constant-arg (integer 2))) * :node node)
   "convert x*2^k to shift"
   ;; Delay to make sure the surrounding casts are apparent.
   (delay-ir1-transform node :ir1-phases)
