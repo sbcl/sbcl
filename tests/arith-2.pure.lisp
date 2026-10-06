@@ -2761,3 +2761,12 @@
            (t (not (> a b)))))
     ((5 0) t)
     ((-5 0) nil)))
+
+(with-test (:name :divisibility-test)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (declare (signed-word x))
+         (zerop (mod x 129)))
+    (((1+ (ash -1 (1- sb-vm:n-word-bits)))) nil)
+    ((129) t)))

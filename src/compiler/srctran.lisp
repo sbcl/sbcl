@@ -5227,7 +5227,8 @@
             (cond ((oddp y)
                    (let* ((max-x most-positive-word)
                           (inv (mulinv abs-y max-x))
-                          (cmp (truncate max-x abs-y)))
+                          (add (truncate (ash max-x -1) abs-y))
+                          (cmp (ash add 1)))
                      (erase-node-type node (values-specifier-type '(values integer boolean &optional)))
                      (transform-call rem
                                      `(lambda (x z)
@@ -5236,7 +5237,7 @@
                                      'truncate)
                      `(values 0 (not (> (logand most-positive-word
                                                 (+ (logand most-positive-word (* (logand most-positive-word x) ,inv))
-                                                   ,(ash cmp -1)))
+                                                   ,add))
                                         ,cmp)))))
                   ((when-vop-existsp (:translate rotate-right-word)
                      (let* ((max-x most-positive-word)
