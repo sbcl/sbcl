@@ -220,7 +220,7 @@
                    (setf (block-reoptimize (node-block node)) t)
                    (reoptimize-component (node-component node) :maybe))
                  t))
-             (cut-node (node)
+             (cut-node (node &optional (check-integer t))
                "Try to cut a node to width. The primary return value is
                 whether we managed to cut (cleverly), and the second whether
                 anything was changed.  The third return value tells whether
@@ -256,6 +256,10 @@
                                                               signedp width)))
                       (cond ((not modular-fun)
                              ;; don't know what to do here
+                             (values nil nil))
+                            ((and check-integer
+                                  (not (loop for arg in (basic-combination-args node)
+                                             always (lvar-subtypep arg integer))))
                              (values nil nil))
                             ((let ((dtype (single-value-type
                                            (node-derived-type node))))
@@ -323,7 +327,7 @@
                                   (not (lvar-intersectp a #1#))))
                                (almost-immediately-used-p (node-lvar combination) combination
                                                           :flushable t)
-                               (cut-node combination))
+                               (cut-node combination nil))
                           (setf did-something t)))
                       (when did-something
                         (replace-node-type node

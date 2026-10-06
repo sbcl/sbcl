@@ -2732,3 +2732,19 @@
     ((4611686018427387905) 4611686018427387905)
     ((2) 0)
     ((1) 1)))
+
+(with-test (:name :no-modarith-ratios)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (declare ((member 1/2 5/2) x))
+         (ldb (byte 15 0) (+ 1/2 x)))
+    ((1/2) 1)
+    ((5/2) 3))
+  (checked-compile-and-assert
+      ()
+      `(lambda (m)
+         (declare ((member 0 -4/29) m))
+         (ldb (byte 32 0) (* m 58)))
+    ((0) 0)
+    ((-4/29) 4294967288)))
