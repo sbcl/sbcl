@@ -1188,3 +1188,13 @@
     (assert (notes #2a((1 2) (a 4))))
     (assert (null (notes #2a((1 2) (5 4)))))
     (assert (null (notes #.(make-array 3 :fill-pointer 2 :displaced-to #(1 2 a)))))))
+
+(with-test (:name :array-dimension-wrong-axis)
+  (assert
+   (nth-value
+    1 (checked-compile
+       `(lambda (xs)
+          (declare (type (array * (* *)) xs))
+          (array-dimension xs 2))
+       :allow-warnings t))))
+

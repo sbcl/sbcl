@@ -2093,7 +2093,8 @@
             (when (eq dim '*)
               (return-from array-dimension-derive-type-optimizer))
             (push dim results))
-      (sb-kernel::member-rational results))))
+      (when results
+        (sb-kernel::member-rational results)))))
 
 (deftransform array-dimensions ((array))
   (let* ((type (lvar-conservative-type array))
