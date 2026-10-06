@@ -2594,22 +2594,28 @@
     (return-from converged-var-type))
   (flet ((derive (types)
            (let ((type (single-value-type (car types))))
-             (collect ((derived *empty-type* type-union))
-               (dolist (value values)
-                 (let ((value-type (numeric-hulls (lvar-type value))))
-                   (derived
-                    (let ((type
-                            (lvar-optimistic-type
-                             value *optimistic-solve-depth*
-                             (lambda (node)
-                               (and (ref-p node)
-                                    (eq (ref-leaf node) var)
-                                    type))
-                             (lvar-dest value))))
-                      (if type
-                          (type-intersection type value-type)
-                          value-type)))))
-               (list (make-single-value-type (derived)))))))
+             (flet ((assumed-type (node)
+                      (and (ref-p node)
+                           (eq (ref-leaf node) var)
+                           type)))
+               (declare (dynamic-extent #'assumed-type))
+               (collect ((derived *empty-type* type-union))
+                 (dolist (value values)
+                   (do-uses (use value)
+                     ;; Ignore the type from VAR itself so we don't
+                     ;; poison it with a more conservative type.
+                     (unless (and (ref-p use)
+                                  (eq (ref-leaf use) var))
+                       (let ((use-type (numeric-hulls
+                                        (single-value-type
+                                         (node-derived-type use))))
+                             (type (node-optimistic-type
+                                    use *optimistic-solve-depth*
+                                    #'assumed-type (lvar-dest value))))
+                         (derived (if type
+                                      (type-intersection type use-type)
+                                      use-type))))))
+                 (list (make-single-value-type (derived))))))))
     (let ((types (converged-types (list (make-single-value-type initial-type))
                                   #'derive)))
       (and types
