@@ -235,6 +235,8 @@
     (t
      (%simple-fun-arglist (%fun-fun function)))))
 
+#+nil ; why did this ever need to exist?
+; is it a thing where someone will complain if we remove?
 (defun (setf %fun-lambda-list) (new-value function)
   (typecase function
     (interpreted-function
