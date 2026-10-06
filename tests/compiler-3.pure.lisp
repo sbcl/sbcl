@@ -980,7 +980,7 @@
           (- (ldb (byte 63 0) b) 4611686018427387904)))
     ((4611686018427387903 0) 4611686018427387902)))
 
-(with-test (:name :erase-lvar-type-optimistic-types)
+(with-test (:name :erase-lvar-type-lambda-var-types)
   (checked-compile-and-assert
    ()
    `(lambda (l)
@@ -990,4 +990,20 @@
                        sum -12)))
         (f (cons 0 l))))
    ((nil) 0)
-   (('(1)) -12)))
+   (('(1)) -12))
+  (checked-compile-and-assert
+      ()
+      `(lambda (i)
+         (flet ((f1 (a &rest r)
+                  (declare (integer a)
+                           (ignore r))
+                  (if (plusp a)
+                      (progn
+                        (check-type a integer)
+                        -9))))
+           (f1
+            (mod
+             (multiple-value-call #'min 0 (lognot i))
+             6))))
+    ((4) -9)))
+

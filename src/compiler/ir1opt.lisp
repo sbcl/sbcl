@@ -2290,6 +2290,8 @@
        (multiple-value-bind (values win ignore) (careful-call (or folder
                                                            fun-name)
                                                        args)
+         (when *show-transforms-p*
+           (show-transform '%constant-fold-call fun-name values call))
          (cond ((not win)
                 ;; Ignore errors from dedicated folders, in lieu of adding fun-info-fold-p.
                 (unless (or folder

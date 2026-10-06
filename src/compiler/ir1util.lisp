@@ -718,7 +718,8 @@
                                      (let ((type (if (lambda-var-sets var)
                                                      *universal-type*
                                                      type)))
-                                       (setf (lambda-var-type var) type)
+                                       (setf (leaf-type var) type
+                                             (leaf-defined-type var) type)
                                        (when (lambda-var-optimistic-type var)
                                          (setf (lambda-var-optimistic-type var) *empty-type*)
                                          (note-optimistic-pending fun))
