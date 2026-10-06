@@ -914,3 +914,78 @@
            (ir-calls
             `(lambda (a)
                (aref (vector a) 0))))))
+
+;;; Return the loops that FORM is compiled to as a list of (kind
+;;; depth) from the outside in, without the outer loops of the
+;;; components.
+(defun ir-loops (form)
+  (let ((loops '()))
+    (inspect-ir
+     form
+     (lambda (component)
+       (labels ((walk (loop)
+                  (dolist (inner (sb-c::loop-inferiors loop))
+                    (assert (sb-c::loop-blocks inner))
+                    (assert (sb-c::loop-tail inner))
+                    (push (list (sb-c::loop-kind inner)
+                                (sb-c::loop-depth inner))
+                          loops)
+                    (walk inner))))
+         (walk (sb-c::component-outer-loop component)))))
+    (nreverse loops)))
+
+(with-test (:name (:loop-analyze :strange))
+  ;; a loop entered in the middle
+  (assert (equal (ir-loops `(lambda (x n)
+                              (let ((i 0) (acc nil))
+                                (tagbody
+                                   (when x (go middle))
+                                 top
+                                   (push i acc)
+                                 middle
+                                   (incf i)
+                                   (when (< i n) (go top)))
+                                acc)))
+                 '((:strange 1))))
+  ;; a natural loop in a strange loop
+  (assert (equal (ir-loops `(lambda (x n v)
+                              (declare (simple-vector v))
+                              (let ((i 0) (acc nil))
+                                (tagbody
+                                   (when x (go middle))
+                                 top
+                                   (dotimes (j (length v))
+                                     (push (svref v j) acc))
+                                 middle
+                                   (incf i)
+                                   (when (< i n) (go top)))
+                                acc)))
+                 '((:strange 1) (:natural 2))))
+  ;; a strange loop in a natural loop
+  (assert (equal (ir-loops `(lambda (x n)
+                              (let ((acc nil))
+                                (dotimes (k n acc)
+                                  (let ((i 0))
+                                    (tagbody
+                                       (when (funcall x k) (go middle))
+                                     top
+                                       (push i acc)
+                                     middle
+                                       (incf i)
+                                       (when (< i 10) (go top))))))))
+                 '((:natural 1) (:strange 2))))
+  ;; a strange loop in a natural loop which is also entered from an outside block
+  (assert (equal (ir-loops `(lambda (a b n)
+                              (let ((acc nil))
+                                (dotimes (k n acc)
+                                  (tagbody
+                                     (if (funcall a k) (go p) (go x))
+                                   p
+                                     (push 2 acc)
+                                     (go e)
+                                   x
+                                     (push 1 acc)
+                                   e
+                                     (push 3 acc)
+                                     (when (funcall b acc) (go x)))))))
+                 '((:natural 1) (:strange 2)))))

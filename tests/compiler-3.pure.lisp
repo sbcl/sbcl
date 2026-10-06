@@ -378,8 +378,8 @@
    ((0) 0)
    ((3) 5)))
 
-(with-test (:name (:recursive-local-function-result-type :stored-into-array
-                   :fails-on :sbcl))
+(with-test (:name (:recursive-local-function-result-type :stored-into-array)
+            :fails-on :sbcl)
   (checked-compile-and-assert
    ()
    `(lambda (n v)

@@ -444,6 +444,8 @@
   ;;
   ;;    :STRANGE
   ;;        A segment of a "strange loop" in a non-reducible flow graph.
+  ;;        This a loop with more than one entry.  Its head is the entry
+  ;;        that comes first in the DFO.
   (kind (missing-arg) :type (member :outer :natural :strange))
   ;; The first and last blocks in the loop.  There may be more than one tail,
   ;; since there may be multiple back branches to the same head.
