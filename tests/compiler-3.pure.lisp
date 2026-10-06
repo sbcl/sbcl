@@ -746,6 +746,39 @@
            (if t 8 0))))
    ((#'identity) -25)))
 
+(with-test (:name (:recursive-local-function-result-type :merged-into-bounded-tail-set :lp2169657))
+  (let ((fun (checked-compile
+              `(lambda (a f)
+                 (declare (optimize (speed 0)))
+                 (flet ((g (d)
+                          (the double-float
+                               (if d
+                                   (let ((e 864.0d0))
+                                     e)
+                                   (labels ((i (n x)
+                                              (declare (ignore x))
+                                              (if *
+                                                  (let ((r (j (1- n))))
+                                                    (x)
+                                                    r)
+                                                  (labels ((k (p)
+                                                             (l p 986567.0d0)
+                                                             -973.0d0)
+                                                           (l (u w)
+                                                             (declare (ignore u w))
+                                                             d))
+                                                    (k 0))))
+                                            (j (m)
+                                              (declare ((integer 0 5) m))
+                                              (if (plusp m)
+                                                  (let ((r (i (1- m) 1)))
+                                                    r)
+                                                  651222.0d0)))
+                                     (i 2 *))))))
+                   (funcall f (g a))))
+              :allow-style-warnings t)))
+    (assert (= (funcall fun 255 #'identity) 864.0d0))))
+
 (with-test (:name (:recursive-local-function-result-type :parameter-from-own-result :oscillating))
   (assert-type
    (lambda ()

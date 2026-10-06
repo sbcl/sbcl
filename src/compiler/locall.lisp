@@ -121,7 +121,8 @@
             (dolist (fun funs)
               (setf (lambda-tail-set fun) call-set))
             (setf (tail-set-funs call-set)
-                  (nconc (tail-set-funs call-set) funs)))
+                  (nconc (tail-set-funs call-set) funs)
+                  (tail-set-recursive-type call-set) nil))
           (reoptimize-lvar (return-result return))
           t)))))
 
