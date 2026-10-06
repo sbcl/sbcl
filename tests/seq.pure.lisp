@@ -1159,3 +1159,19 @@
       `(lambda (x y)
          (reverse (make-array 2 :initial-contents (list x y))))
     ((1 2) #(2 1) :test #'equalp)))
+
+(with-test (:name :32-position-byte-compare)
+  (checked-compile-and-assert
+   (:optimize :default)
+   `(lambda (x y)
+      (declare ((simple-array (signed-byte 32) (*)) y))
+      (position x y :from-end t))
+   ((2014994190 #a((1) (signed-byte 32) 14)) nil)
+   ((14 #a((1) (signed-byte 32) 14)) 0))
+  (checked-compile-and-assert
+   (:optimize :default)
+   `(lambda (x y)
+      (declare ((simple-array (signed-byte 32) (*)) y))
+      (position x y))
+   ((2014994190 #a((1) (signed-byte 32) 14)) nil)
+   ((14 #a((1) (signed-byte 32) 14)) 0)))

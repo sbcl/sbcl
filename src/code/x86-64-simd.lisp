@@ -2326,11 +2326,11 @@
 
 
       SCALAR
-      (loop repeat 15
+      (loop repeat 3
             do (inst cmp 32-bit-array start)
                (inst jmp :le DONE)
                (inst sub 32-bit-array 4)
-               (inst cmp :byte element (ea 32-bit-array))
+               (inst cmp :dword element (ea 32-bit-array))
                (inst jmp :e FOUND-SCALAR))
       (inst jmp DONE)
 
@@ -2402,11 +2402,11 @@
         (inst jmp :nz FOUND))
 
       SCALAR
-      (loop repeat 15
+      (loop repeat 3
             do (inst cmp 32-bit-array start)
                (inst jmp :le DONE)
                (inst sub 32-bit-array 4)
-               (inst cmp :byte element (ea 32-bit-array))
+               (inst cmp :dword element (ea 32-bit-array))
                (inst jmp :e FOUND-SCALAR))
       (inst jmp DONE)
 
