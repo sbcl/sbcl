@@ -150,6 +150,22 @@
 
 (defconstant-eqx +eq-ops+ '(eq eql =) #'equal)
 
+(declaim (inline equality-constraint-gaps))
+;;; Return the lower bounds of X - Y and Y - X for some relation OP
+;;; given AMOUNT.
+(defun equality-constraint-gaps (op not-p amount)
+  (when not-p
+    (unless (eql amount 0)
+      (return-from equality-constraint-gaps (values nil nil)))
+    (setf op (not-operator op)))
+  (case op
+    (< (values (max amount 1) nil))
+    (<= (values 0 nil))
+    (> (values nil (max amount 1)))
+    (>= (values nil 0))
+    (#.+eq-ops+ (values 0 0))
+    (t (values nil nil))))
+
 (defun inherit-equality-p (new from not-p &optional (min-amount 0) max-amount (from-amount 0))
   (unless min-amount
     (setf min-amount 0))
@@ -590,102 +606,52 @@
                                      (return t))))))
     :give-up))
 
-(defoptimizer (> equality-constraint) ((x y) node gen)
-  (block nil
-    (map-equality-constraints x y gen
-                              (lambda (op not-p)
-                                (case op
-                                  (>
-                                   (return (not not-p)))
-                                  (>=
-                                   (when not-p
-                                     (return nil)))
-                                  (<=
-                                   (return not-p))
-                                  ((< . #.+eq-ops+)
-                                   (unless not-p
-                                     (return nil))))))
-    :give-up))
+;;; Query CONSTRAINTS for lower bounds on X - Y and Y - X.
+(defun lvar-gaps (x y constraints)
+  (let ((below nil)
+        (above nil))
+    (map-equality-constraints
+     x y constraints
+     (lambda (op not-p)
+       (multiple-value-bind (op-below op-above)
+           (equality-constraint-gaps op not-p 0)
+         (when (and op-below
+                    (not (and below (>= below op-below))))
+           (setf below op-below))
+         (when (and op-above
+                    (not (and above (>= above op-above))))
+           (setf above op-above)))))
+    (values below above)))
 
-(defoptimizer (< equality-constraint) ((x y) node gen)
-  (block nil
-    (map-equality-constraints x y gen
-                              (lambda (op not-p)
-                                (case op
-                                  (<
-                                   (return (not not-p)))
-                                  (<=
-                                   (when not-p
-                                     (return nil)))
-                                  (>=
-                                   (return not-p))
-                                  ((> . #.+eq-ops+)
-                                   (unless not-p
-                                     (return nil))))))
-    :give-up))
-
-(defoptimizer (>= equality-constraint) ((x y)  node gen)
-  (block nil
-    (map-equality-constraints x y gen
-                              (lambda (op not-p)
-                                (case op
-                                  (>=
-                                   (return (not not-p)))
-                                  (<
-                                   (return not-p))
-                                  (<=
-                                   (when not-p
-                                    (return t)))
-                                  (>
-                                   (unless not-p
-                                     (return t)))
-                                  (#.+eq-ops+
-                                   (unless not-p
-                                     (return t))))))
-    :give-up))
-
-(defoptimizer (<= equality-constraint) ((x y) node gen)
-  (block nil
-    (map-equality-constraints x y gen
-                              (lambda (op not-p)
-                                (case op
-                                  (<=
-                                   (return (not not-p)))
-                                  (>
-                                   (return not-p))
-                                  (>=
-                                   (when not-p
-                                     (return t)))
-                                  (<
-                                   (unless not-p
-                                     (return t)))
-                                  (#.+eq-ops+
-                                   (unless not-p
-                                     (return t))))))
-    :give-up))
+(macrolet ((def (name true-above true-below)
+             ;; True if X is above Y by at least TRUE-ABOVE, or Y
+             ;; above X by at least TRUE-BELOW, and false if it's
+             ;; the other way around by more than that.
+             `(defoptimizer (,name equality-constraint) ((x y) node gen)
+                (multiple-value-bind (below above) (lvar-gaps x y gen)
+                  (cond ((if ,true-above
+                             (and above (>= above ,true-above))
+                             (and below (>= below ,true-below)))
+                         t)
+                        ((if ,true-above
+                             (and below (> below (- ,true-above)))
+                             (and above (> above (- ,true-below))))
+                         nil)
+                        (t
+                         :give-up))))))
+  (def > 1 nil)
+  (def >= 0 nil)
+  (def < nil 1)
+  (def <= nil 0))
 
 (defoptimizer (- equality-constraint) ((x y) node gen)
   (when (and (csubtypep (lvar-type x) (specifier-type 'integer))
              (csubtypep (lvar-type y) (specifier-type 'integer)))
-    (block nil
-      (macrolet ((derive (type)
-                   `(progn
-                      (derive-node-type node (specifier-type ',type))
-                      (return))))
-        (map-equality-constraints
-         x y gen
-         (lambda (op not-p)
-           (if not-p
-               (case op
-                 (< (derive (integer 0)))       ; >=
-                 (> (derive (integer * 0)))     ; <=
-                 (<= (derive (integer (0))))    ; >
-                 (>= (derive (integer * (0))))) ; <
-               (case op
-                 (>= (derive (integer 0)))
-                 (<= (derive (integer * 0)))
-                 (> (derive (integer (0))))
-                 (< (derive (integer * (0)))))))))))
+    (multiple-value-bind (below above) (lvar-gaps x y gen)
+      (when (or below above)
+        (derive-node-type node (make-numeric-type 'integer
+                                                  above
+                                                  (and below (- below)))))))
   :give-up)
 
 (defoptimizer (%check-bound constraint-propagate) ((array dimension index) node gen)
@@ -701,14 +667,9 @@
   (let ((array-var (ok-lvar-lambda-var array gen)))
     (when (and array-var
                (csubtypep (lvar-type array) (specifier-type 'simple-array))
-               (block nil
-                 (map-equality-constraints (make-vector-length-constraint array-var) index gen
-                                           (lambda (op not-p)
-                                             (when (or (and (eq op '>)
-                                                            (not not-p))
-                                                       (and (eq op '<=)
-                                                            not-p))
-                                               (return t))))))
+               (let ((above (nth-value 1 (lvar-gaps (make-vector-length-constraint array-var)
+                                                    index gen))))
+                 (and above (>= above 1))))
       (reoptimize-node node)
       (setf (combination-info node) 'array-in-bounds-p)))
   :give-up)
