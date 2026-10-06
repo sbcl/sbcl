@@ -2456,3 +2456,42 @@
          (incf lv4)
          (go next-loop)))
    ((#'funcall) nil)))
+
+(with-test (:name (:constraint-propagation :function-called-in-a-loop))
+  ;; lp#2052697, lp#2052907: these looped when the functions were
+  ;; propagated into before the calls to them.
+  (checked-compile-and-assert
+      (:allow-style-warnings t)
+      `(lambda (a b c)
+         (prog1
+             (case a
+               ((3188) c)
+               (t 132240))
+           (loop repeat 3
+                 sum (progn
+                       (tagbody
+                          (flet ((%f7 (&optional (f7-2 0) (f7-3 81) &key (key1 (go 5)))
+                                   (declare (ignore f7-2 f7-3 key1))
+                                   675155407991333))
+                            (declare (notinline %f7))
+                            (%f7 a 18354665292)
+                            228559833622833108)
+                        5)
+                       b))))
+    ((1 2 3) 132240)
+    ((3188 2 3) 3))
+  (checked-compile-and-assert
+      ()
+      `(lambda (c)
+         (declare (notinline identity funcall))
+         (loop repeat 2
+               do (tagbody
+                     (labels ((%f (x &key (y (go out)))
+                                (declare (ignore x y))
+                                0))
+                       (prog1
+                           (identity (%f (%f 0)))
+                         (funcall #'%f (go out))))
+                   out)
+               sum c))
+    ((5) 10)))

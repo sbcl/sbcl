@@ -122,15 +122,6 @@
     (dolist (succ (block-succ block))
       (find-dfo-aux succ head component mark-only))
     (unless mark-only
-      ;; Order local functions after a call to it for constraint propagation
-      (let ((last (block-last block))
-            fun)
-        (when (and (combination-p last)
-                   (eq (combination-kind last) :local)
-                   (functional-kind-eq (setf fun (combination-lambda last))
-                                       nil assignment optional cleanup))
-          (find-dfo-aux (lambda-block fun) head component)))
-
       (remove-from-dfo block)
       (add-to-dfo block head)))
   (values))

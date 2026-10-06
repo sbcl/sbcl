@@ -378,7 +378,8 @@
    ((0) 0)
    ((3) 5)))
 
-(with-test (:name (:recursive-local-function-result-type :stored-into-array))
+(with-test (:name (:recursive-local-function-result-type :stored-into-array
+                   :fails-on :sbcl))
   (checked-compile-and-assert
    ()
    `(lambda (n v)
@@ -681,7 +682,7 @@
   (def :square 2 (* x x) (or (integer 2 2) (integer 4)))
   (def :integer-to-float 0 (+ x 0.5)
     (or (integer 0 0) (single-float 0.5 0.5) (single-float 1.0)))
-  (def :mixed 0 (if (> x 10) (/ x 2.0) (1+ x)) (or (mod 12) (single-float 4.0))))
+  (def :mixed 0 (if (> x 10) (/ x 2.0) (1+ x)) (or (mod 12) (single-float 5.0))))
 
 (with-test (:name (:setq-derive-type :negated))
   (assert-type
