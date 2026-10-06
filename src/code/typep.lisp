@@ -464,7 +464,7 @@ Experimental."
       (cons
        (let ((car (car x))
              (cdr (cdr x)))
-         (make-cons-type (cond ((eq car x)
+         (make-cons-type (cond ((consp car)
                                 (specifier-type 'cons))
                                ;; Creates complicated unions
                                ((functionp car)
