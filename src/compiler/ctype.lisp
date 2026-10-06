@@ -369,8 +369,9 @@ and no value was provided for it." name)))))))))))
       (let (#-sb-xc-host
             (name (nth-value 1 (lvar-fun-type fun))))
         (cond #-sb-xc-host
-              ((or (eq (info :function :type name) :generic-function)
-                   (eq (info :function :where-from name) :defined-method))
+              ((and (valid-function-name-p name)
+                    (or (eq (info :function :type name) :generic-function)
+                        (eq (info :function :where-from name) :defined-method)))
                (note-key-arg-mismatch name lossages))
               ((cdr lossages)
                (note-lossage "~@<~{~S~^, ~} and ~S are not a known argument keywords.~:@>"
