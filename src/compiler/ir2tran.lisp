@@ -2333,9 +2333,7 @@
          (lvar (node-lvar node))
          (2info (nlx-info-info info))
          (target (ir2-nlx-info-target 2info))
-         (kind (cleanup-kind (nlx-info-cleanup info)))
-         #-unbind-in-unwind
-         (move-lvar-result))
+         (kind (cleanup-kind (nlx-info-cleanup info))))
 
     (ecase kind
       ((:catch :block :tagbody)
@@ -2356,24 +2354,20 @@
                       target))
                (t
                 (let ((locs (standard-result-tns lvar)))
-                  (if (and (= (length locs) 1)
-                           (memq kind '(:block :tagbody))
-                           lvar
-                           (lvar-single-value-p lvar))
-                      (vop* nlx-entry-single node block
-                            (top-loc start-loc nil)
-                            ((reference-tn-list locs t))
-                            target)
-                      (vop* nlx-entry node block
-                            (top-loc start-loc count-loc nil)
-                            ((reference-tn-list locs t))
-                            target
-                            (length locs)))
-                  (let ((move (lambda () (move-lvar-result node block locs lvar))))
-                    #+unbind-in-unwind
-                    (funcall move)
-                    #-unbind-in-unwind
-                    (setf move-lvar-result move)))))))
+               (if (and (= (length locs) 1)
+                        (memq kind '(:block :tagbody))
+                        lvar
+                        (lvar-single-value-p lvar))
+                   (vop* nlx-entry-single node block
+                         (top-loc start-loc nil)
+                         ((reference-tn-list locs t))
+                         target)
+                   (vop* nlx-entry node block
+                         (top-loc start-loc count-loc nil)
+                         ((reference-tn-list locs t))
+                         target
+                         (length locs)))
+               (move-lvar-result node block locs lvar))))))
       #-no-continue-unwind
       ((:unwind-protect)
        (let ((start-loc (make-nlx-entry-arg-start-location))
@@ -2395,18 +2389,17 @@
     (when *collect-dynamic-statistics*
       (vop count-me node block *dynamic-counts-tn*
            (block-number (ir2-block-block block))))
+    ;; Make sure this is done before NSP is reset, as that may leave
+    ;; *free-interrupt-context-index* unprotected below the stack
+    ;; pointer.
     #-unbind-in-unwind
-    (destructuring-bind (stack . state) (ir2-nlx-info-dynamic-state 2info)
-      ;; Make sure this is done before NSP is reset, as that may leave
-      ;; *free-interrupt-context-index* unprotected below the stack
-      ;; pointer.
-      (vop unbind-to-here node block stack)
-      (vop* restore-dynamic-state node block
-            ((reference-tn-list state nil))
-            (nil))
-      ;; Do this afer NSP is retored
-      (when move-lvar-result
-        (funcall move-lvar-result)))))
+    (vop unbind-to-here node block
+         (car (ir2-nlx-info-dynamic-state 2info)))
+
+    #-unbind-in-unwind
+    (vop* restore-dynamic-state node block
+          ((reference-tn-list (cdr (ir2-nlx-info-dynamic-state 2info)) nil))
+          (nil))))
 
 (defoptimizer (%unwind-protect-breakup ir2-convert) ((info-lvar) node block)
   (vop %unwind-protect-breakup node block (ir2-nlx-info-block-tn (nlx-info-info (lvar-value info-lvar)))))
