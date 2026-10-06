@@ -2748,3 +2748,16 @@
          (ldb (byte 32 0) (* m 58)))
     ((0) 0)
     ((-4/29) 4294967288)))
+
+(with-test (:name :range-transform-constrained-refs)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+     (setq b
+           (let ((c a))
+             (declare ((signed-byte 62) c))
+             c))
+     (cond ((minusp a) nil)
+           (t (not (> a b)))))
+    ((5 0) t)
+    ((-5 0) nil)))

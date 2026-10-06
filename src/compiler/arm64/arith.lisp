@@ -4556,7 +4556,6 @@
                           (:arg-types tagged-num
                                       (:or tagged-num signed-num unsigned-num)
                                       tagged-num)
-                          (:arg-refs lo-ref nil hi-ref)
                           (:conditional ,(if excl-high :lt :le))
                           (:vop-var vop)
                           (:generator 4
@@ -4598,6 +4597,8 @@
                                 ((sc-is lo immediate)
                                  (let ((lo (tn-value lo)))
                                    (cond
+                                     ;; range-transform leaves bad types for hi-ref
+                                     #+nil
                                      ((and (= lo ,(if excl-low
                                                       -1
                                                       0))
@@ -4743,7 +4744,6 @@
                     (:arg-types tagged-num ,(if check
                                                 t
                                                 `(:or integer bignum)) tagged-num)
-                    (:arg-refs lo-ref nil hi-ref)
                     (:conditional ,(if excl-high
                                        :lt
                                        :le))
@@ -4769,6 +4769,8 @@
                                   `(((and (sc-is lo immediate)
                                           (= (tn-value lo) most-negative-fixnum))
                                      (ccmp (imm hi) :eq #b10))))
+                              ;; range-transform leaves bad types for hi-ref
+                              #+nil
                               ((and (sc-is lo immediate)
                                     (csubtypep (tn-ref-type hi-ref)
                                                (specifier-type 'unsigned-byte))
