@@ -1669,10 +1669,6 @@
 ;;;
 ;;; Therefore users can not portably redefine VALUES as their own type or declaration,
 ;;; and also can't claim that its presence is a spec violation.
-;;; When set to T, you'll get a warning about an unrecognized declaration, if you want
-;;; to be pedantic.
-(defvar *suppress-values-declaration* nil
-  "If true, processing of the VALUES declaration is inhibited.")
 
 ;;; Process a single declaration spec, augmenting the specified LEXENV
 ;;; RES. Return RES and result type. VARS and FVARS are as described
@@ -1812,8 +1808,7 @@
                          (typep spec '(cons (eql lambda-list) (cons t null))))
                     (setq lambda-list (cadr spec) allow-lambda-list nil))
                    ((and allow-values-decl
-                         (typep spec '(cons (eql values)))
-                         (not *suppress-values-declaration*))
+                         (typep spec '(cons (eql values))))
                     ;; Why do we allow more than one VALUES decl? I don't know.
                     (setq result-type
                           (values-type-intersection

@@ -2628,7 +2628,6 @@ be submitted as a \\CDR")
            "*COMPILATION*"
            "*COMPILE-TO-MEMORY-SPACE*"
            "*LEXENV*"
-           "*SUPPRESS-VALUES-DECLARATION*"
 
            #+x86 "SET-FPU-WORD-FOR-C"
            #+x86 "SET-FPU-WORD-FOR-LISP"
