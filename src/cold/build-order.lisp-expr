@@ -201,6 +201,7 @@
  ("src/compiler/sset" :c-headers)
  #+adaptive-conset ("src/compiler/int-sset" :not-host)
  ;; for e.g. BLOCK-ANNOTATION, needed by "compiler/vop"
+ ("src/compiler/struct-flags" :c-headers)
  ("src/compiler/node" :c-headers :block-compile)
  ;; This has ASSEMBLY-UNIT-related stuff needed by core.lisp.
  ;; and LABEL, needed by IR2-NLX-INFO

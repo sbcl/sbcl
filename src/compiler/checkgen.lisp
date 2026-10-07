@@ -215,7 +215,7 @@
                                                         n)))))
             ((and (unsupplied-ok)
                   (mv-combination-p dest)
-                  (eq (mv-combination-kind dest) :local)
+                  (eq (basic-combination-kind dest) :local)
                   (lvar-uses (mv-combination-fun dest))
                   (singleton-p (mv-combination-args dest))
                   (let ((fun-ref (lvar-use (mv-combination-fun dest))))

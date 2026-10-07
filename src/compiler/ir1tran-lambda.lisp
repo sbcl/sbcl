@@ -667,8 +667,8 @@
                                        :arg-info (make-arg-info :more-count)
                                        :type (specifier-type 'index))))
           (setf (arg-info-default (lambda-var-arg-info rest)) (list context count)
-                (lambda-var-ever-used context) t
-                (lambda-var-ever-used count) t)
+                (leaf-ever-used context) t
+                (leaf-ever-used count) t)
           (setf more-context context
                 more-count count))))
     (when more-context

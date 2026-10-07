@@ -414,14 +414,18 @@ Please check that all strings which were not recognizable to the compiler
       (precious-internals
        ((lambda (list &aux (ht (make-hash-table)))
           (dolist (sym list ht) (setf (gethash sym ht) t)))
-        '(sb-alien::alien-callback-p sb-alien::alien-lambda ; the API uses internals, really?
+        `(sb-alien::alien-callback-p sb-alien::alien-lambda ; the API uses internals, really?
           sb-c::tab sb-c::scramble ; for perfecthash
           sb-c::make-transform ; cl-protobufs uses this
           sb-impl::%default-comma-constructor
           sb-kernel::%%make-random-state
           sb-lockless::+hash-nbits+ sb-lockless::%make-so-set-node ; for tests
           sb-loop::*loop-epilogue* sb-loop::add-loop-path ; internals to keep CLSQL working
-          sb-profile::make-counter)))) ; for a test
+          sb-profile::make-counter  ; for a test
+          ,@(loop for (class . options) in sb-c::*struct-flags*
+                  unless (eq class 'sb-c::clambda)
+                  append (loop for slot in (getf options :slots)
+                               collect (sb-int:package-symbolicate 'sb-c class '- (getf slot :name))))))))
   ;; Remove inline expansions
   (do-symbols (symbol #.(find-package "SB-C"))
     (when (equal (symbol-package symbol) #.(find-package "SB-C"))

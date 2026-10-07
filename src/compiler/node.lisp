@@ -323,15 +323,27 @@
       (setf (lvar-%derived-type lvar)
             (%lvar-derived-type lvar))))
 
-(defstruct (node (:constructor nil)
-                 (:include sset-element
-                           (number (when (boundp '*compilation*)
-                                     (incf (sset-counter *compilation*)))))
-                 (:copier nil))
+(def-struct-flags node
   ;; True if this node needs to be optimized. This is set to true
   ;; whenever something changes about the value of an lvar whose DEST
   ;; is this node.
-  (reoptimize t :type boolean)
+  (reoptimize t)
+  ;; If this node is in a tail-recursive position, then this is set to
+  ;; T. At the end of IR1 (in environment analysis) this is computed
+  ;; for all nodes (after cleanup code has been emitted).  Before
+  ;; then, a non-null value indicates that IR1 optimization has
+  ;; converted a tail local call to a direct transfer.
+  ;;
+  ;; If the back-end breaks tail-recursion for some reason, then it
+  ;; can null out this slot.
+  (tail-p))
+
+(defstruct (node (:constructor nil)
+                 (:include sset-element
+                  (number (when (boundp '*compilation*)
+                            (incf (sset-counter *compilation*)))))
+                 (:copier nil))
+  (flags (flags node) :type (unsigned-byte 32))
   ;; the ctran indicating what we do controlwise after evaluating this
   ;; node. This is null if the node is the last in its block.
   (next nil :type (or ctran null))
@@ -364,16 +376,9 @@
   ;; The last element in the list is the top level form number, which
   ;; is the ordinal number (in this call to the compiler) of the truly
   ;; top level form containing the original source.
-  (source-path *current-path* :type list)
-  ;; If this node is in a tail-recursive position, then this is set to
-  ;; T. At the end of IR1 (in environment analysis) this is computed
-  ;; for all nodes (after cleanup code has been emitted).  Before
-  ;; then, a non-null value indicates that IR1 optimization has
-  ;; converted a tail local call to a direct transfer.
-  ;;
-  ;; If the back-end breaks tail-recursion for some reason, then it
-  ;; can null out this slot.
-  (tail-p nil :type boolean))
+  (source-path *current-path* :type list))
+
+(def-struct-flag-accessors node)
 
 (declaim (inline node-block))
 (defun node-block (node)
@@ -813,16 +818,35 @@
 
 
 ;;;; LEAF structures
+(def-struct-flags leaf
+  ;; where the TYPE information came from (in order, from strongest to weakest):
+  ;;  :DECLARED, from a declaration.
+  ;;  :DECLARED-VERIFY
+  ;;  :DEFINED-HERE, from examination of the definition in the same file.
+  ;;  :DEFINED, from examination of the definition elsewhere.
+  ;;  :DEFINED-METHOD, implicit, piecemeal declarations from CLOS.
+  ;;  :ASSUMED, from uses of the object.
+  (where-from :assumed :type
+              (member :declared :declared-verify :assumed :defined-here :defined :defined-method))
+  ;; For tracking whether to warn about unused variables:
+  ;; NIL if there was never a REF or SET.
+  ;; SET if there was a set but no REF.
+  ;; T if there was a REF.
+  ;; This may be non-nil when REFS and SETS are null, since code can be deleted.
+  (ever-used nil :type (member nil set t initial-unused))
+  ;; True if declared dynamic-extent.
+  (dynamic-extent nil :type boolean))
 
 ;;; Variables, constants and functions are all represented by LEAF
 ;;; structures. A reference to a LEAF is indicated by a REF node. This
 ;;; allows us to easily substitute one for the other without actually
 ;;; hacking the flow graph.
 (defstruct (leaf (:include sset-element
-                           (number (when (boundp '*compilation*)
-                                     (incf (sset-counter *compilation*)))))
+                  (number (when (boundp '*compilation*)
+                            (incf (sset-counter *compilation*)))))
                  (:copier nil)
                  (:constructor nil))
+  (flags (flags leaf) :type (unsigned-byte 32))
   ;; (For public access to this slot, use LEAF-SOURCE-NAME.)
   ;;
   ;; the name of LEAF as it appears in the source, e.g. 'FOO or '(SETF
@@ -844,36 +868,22 @@
   ;; See also the LEAF-DEBUG-NAME function and the
   ;; FUNCTIONAL-%DEBUG-NAME slot.
   (%source-name (missing-arg)
-                ;; I guess we state the type this way to avoid calling
-                ;; LEGAL-FUN-NAME-P unless absolutely necessary,
-                ;; but this seems a bit of a premature optimization.
-                :type (or symbol (and cons #-host-quirks-cmu (satisfies legal-fun-name-p))))
+   ;; I guess we state the type this way to avoid calling
+   ;; LEGAL-FUN-NAME-P unless absolutely necessary,
+   ;; but this seems a bit of a premature optimization.
+   :type (or symbol (and cons #-host-quirks-cmu (satisfies legal-fun-name-p))))
   ;; the type which values of this leaf must have
   (type *universal-type* :type ctype)
   ;; the type which values of this leaf have last been defined to have
   ;; (but maybe won't have in future, in case of redefinition)
   (defined-type *universal-type* :type ctype)
-  ;; where the TYPE information came from (in order, from strongest to weakest):
-  ;;  :DECLARED, from a declaration.
-  ;;  :DECLARED-VERIFY
-  ;;  :DEFINED-HERE, from examination of the definition in the same file.
-  ;;  :DEFINED, from examination of the definition elsewhere.
-  ;;  :DEFINED-METHOD, implicit, piecemeal declarations from CLOS.
-  ;;  :ASSUMED, from uses of the object.
-  (where-from :assumed :type (member :declared :declared-verify :assumed :defined-here :defined :defined-method))
+
   ;; list of the REF nodes for this leaf
   (refs () :type list)
-  ;; For tracking whether to warn about unused variables:
-  ;; NIL if there was never a REF or SET.
-  ;; SET if there was a set but no REF.
-  ;; T if there was a REF.
-  ;; This may be non-nil when REFS and SETS are null, since code can be deleted.
-  (ever-used nil :type (member nil set t initial-unused))
-  ;; True if declared dynamic-extent.
-  (dynamic-extent nil :type boolean)
   ;; some kind of info used by the back end
   (info nil))
 (!set-load-form-method leaf (:xc :target) :ignore-it)
+(def-struct-flag-accessors leaf)
 
 ;;; LEAF name operations
 (defun leaf-has-source-name-p (leaf)
@@ -887,14 +897,13 @@
 ;;; If NAME is not null, then it is the name of the named constant
 ;;; which this leaf corresponds to, otherwise this is an anonymous
 ;;; constant.
-(defstruct (constant (:constructor make-constant (value
+(defstruct (constant (:include leaf
+                      (flags (flags leaf :where-from :defined)))
+                     (:constructor make-constant (value
                                                   &optional
-                                                  (type (ctype-of value))
-                                                  (%source-name '.anonymous.)
-                                                  &aux
-                                                  (where-from :defined)))
-                     (:copier nil)
-                     (:include leaf))
+                                                    (type (ctype-of value))
+                                                    (%source-name '.anonymous.)))
+                     (:copier nil))
   ;; the value of the constant
   (value (missing-arg) :type t))
 (defprinter (constant :identity t)
@@ -908,16 +917,22 @@
   ;; Lists of the set nodes for this variable.
   (sets () :type list))
 
+
+(def-struct-flags (global-var leaf)
+  ;; kind of variable described
+  (kind :unknown
+        :type (member :special :global-function :global :unknown)))
+
 ;;; The GLOBAL-VAR structure represents a value hung off of the symbol
 ;;; NAME.
 (defstruct (global-var (:include basic-var)
                        (:copier nil)
-                       (:constructor make-global-var (kind %source-name
-                                                      &optional where-from
-                                                                type defined-type)))
-  ;; kind of variable described
-  (kind (missing-arg)
-        :type (member :special :global-function :global :unknown)))
+                       (:constructor make-global-var
+                           (kind %source-name
+                            &optional (where-from :defined)
+                                      type defined-type
+                            &aux (flags (construct-flags global-var where-from kind))))))
+(def-struct-flag-accessors global-var)
 
 (defun pretty-print-global-var (var stream)
   (let ((name (leaf-source-name var)))
@@ -932,7 +947,7 @@
   %source-name
   (type :test (not (eq type *universal-type*)))
   (defined-type :test (not (eq defined-type *universal-type*)))
-  (where-from :test (not (eq where-from :assumed)))
+  ((where-from leaf-where-from) :test (not (eq where-from :assumed)))
   kind)
 
 (defun fun-locally-defined-p (name env)
@@ -945,31 +960,37 @@
      (let ((fun (cdr (assoc name (lexenv-funs env) :test #'equal))))
        (and fun (not (global-var-p fun)))))))
 
+(def-struct-flags (defined-fun global-var)
+  ;; ;; The values of INLINEP and INLINE-EXPANSION initialized from the
+  ;; ;; global environment.
+  (inlinep nil :type (member inline maybe-inline notinline nil)) ;; FIXME: use inlinep deftype
+  ;; Was the function defined in this compilation block?
+  (same-block-p nil :type boolean))
+
 ;;; A DEFINED-FUN represents a function that is defined in the same
 ;;; compilation block, or that has an inline expansion, or that has a
 ;;; non-NIL INLINEP value. Whenever we change the INLINEP state (i.e.
 ;;; an inline proclamation) we copy the structure so that former
 ;;; INLINEP values are preserved.
-(defstruct (defined-fun (:include global-var
-                         (where-from :defined)
-                         (kind :global-function))
+(defstruct (defined-fun (:include global-var)
                (:constructor make-defined-fun
                    (%source-name type where-from
-                    &key kind
+                    &key (kind :global-function)
                          inline-expansion inlinep
-                         same-block-p functional))
-               (:copier nil))
-  ;; The values of INLINEP and INLINE-EXPANSION initialized from the
-  ;; global environment.
-  (inlinep nil :type inlinep)
+                         same-block-p functional
+                    &aux (flags (construct-flags defined-fun
+                                                 inlinep same-block-p
+                                                 kind where-from))))
+             (:copier nil))
   (inline-expansion nil :type (or cons null))
-  ;; Was the function defined in this compilation block?
-  (same-block-p nil :type boolean)
   ;; The block-local definition of this function (either because it
   ;; was semi-inline, or because it was defined in this block). If
   ;; this function is not an entry point, then this may be deleted or
   ;; LET-converted. NULL if we haven't converted the expansion yet.
   (functional nil :type (or functional null)))
+
+(def-struct-flag-accessors defined-fun)
+
 (defprinter (defined-fun :identity t
              :pretty-ir-printer (pretty-print-global-var structure stream))
   %source-name
@@ -1018,12 +1039,22 @@
                              'logtest) ,kind (functional-kind-attributes ,@case))
                        ,@forms)))))))
 
+(def-struct-flags (functional leaf)
+  ;; the value of any inline/notinline declaration for a local
+  ;; function (or NIL in any case if no inline expansion is available)
+  (inlinep nil :type (member inline maybe-inline notinline nil)) ;; True if this functional was created from an inline expansion.
+  (inline-expanded nil :type boolean)
+  ;; Is it coming from a top-level NAMED-LAMBDA?
+  (top-level-defun-p nil)
+  (ignore nil)
+  (reanalyze nil))
+
 ;;; We default the WHERE-FROM and TYPE slots to :DEFINED and FUNCTION.
 ;;; We don't normally manipulate function types for defined functions,
 ;;; but if someone wants to know, an approximation is there.
 (defstruct (functional (:include leaf
                         (%source-name '.anonymous.)
-                        (where-from :defined)
+                        (flags (flags functional :where-from :defined))
                         (type (specifier-type 'function)))
                        (:constructor make-functional (&key kind info
                                                            %source-name %debug-name lexenv))
@@ -1122,7 +1153,7 @@
   ;;
   ;;    :ZOMBIE
   ;;    Effectless [MV-]LET; has no BIND node.
-  (kind #.(functional-kind-attributes nil) :type attributes)
+  (kind #.(functional-kind-attributes nil) :type attributes) ;; TODO: combin with flags
   ;; In a normal function, this is the external entry point (XEP)
   ;; lambda for this function, if any. Each function that is used
   ;; other than in a local call has an XEP, and all of the
@@ -1136,9 +1167,6 @@
   ;;
   ;; With all other kinds, this is null.
   (entry-fun nil :type (or functional null))
-  ;; the value of any inline/notinline declaration for a local
-  ;; function (or NIL in any case if no inline expansion is available)
-  (inlinep nil :type inlinep)
   ;; If we have a lambda that can be used as in inline expansion for
   ;; this function, then this is it. If there is no source-level
   ;; lambda corresponding to this function then this is null (but then
@@ -1158,13 +1186,9 @@
   (plist () :type list)
   ;; xref information for this functional (only used for functions with an
   ;; XEP)
-  (xref () :type list)
-  ;; True if this functional was created from an inline expansion.
-  (inline-expanded nil :type boolean)
-  ;; Is it coming from a top-level NAMED-LAMBDA?
-  (top-level-defun-p nil)
-  (ignore nil)
-  (reanalyze nil))
+  (xref () :type list))
+
+(def-struct-flag-accessors functional)
 
 (defun pretty-print-functional (functional stream)
   (let ((name (functional-debug-name functional)))
@@ -1220,6 +1244,12 @@
       ;; which seems bad, so we just require names for everything.
       (leaf-source-name functional)))
 
+(def-struct-flags (clambda functional)
+  ;; True if any of this lambdas variables are still in the process of
+  ;; having their optimistic types reach fixpoint.
+  (optimistic-pending nil :type boolean)
+  (allow-instrumenting nil :type boolean))
+
 ;;; The CLAMBDA only deals with required lexical arguments. Special,
 ;;; optional, keyword and rest arguments are handled by transforming
 ;;; into simpler stuff.
@@ -1228,7 +1258,8 @@
                     (:predicate lambda-p)
                     (:constructor make-clambda
                         (&key vars kind bind home %debug-name %source-name
-                              lexenv allow-instrumenting))
+                              lexenv (allow-instrumenting *allow-instrumenting*)
+                         &aux (flags (construct-flags clambda allow-instrumenting))))
                     (:copier nil))
   ;; list of LAMBDA-VAR descriptors for arguments
   (vars nil :type list)
@@ -1256,9 +1287,6 @@
   ;; all the lambdas that have been LET-substituted in this lambda.
   ;; This is only non-null in lambdas that aren't LETs.
   (lets nil :type list)
-  ;; True if any of this lambdas variables are still in the process of
-  ;; having their optimistic types reach fixpoint.
-  (optimistic-pending nil :type boolean)
   ;; all the ENTRY nodes in this function and its LETs, or null in a LET
   (entries nil :type list)
   ;; all the DYNAMIC-EXTENT nodes in this function and its LETs, or
@@ -1281,15 +1309,17 @@
   ;; retain it so that if the LET is deleted (due to a lack of vars),
   ;; we will still have caller's lexenv to figure out which cleanup is
   ;; in effect.
-  (call-lexenv nil :type (or lexenv null))
-  (allow-instrumenting *allow-instrumenting* :type boolean))
+  (call-lexenv nil :type (or lexenv null)))
+
+(def-struct-flag-accessors clambda :prefix lambda)
+
 (defprinter (clambda :conc-name lambda- :identity t
              :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
   %debug-name
   (kind :princ (decode-functional-kind-attributes kind))
   (type :test (not (eq type *universal-type*)))
-  (where-from :test (not (eq where-from :assumed)))
+  ((where-from leaf-where-from) :test (not (eq where-from :assumed)))
   (vars :prin1 (mapcar #'leaf-source-name vars)))
 
 ;;; The OPTIONAL-DISPATCH leaf is used to represent hairy lambdas. It
@@ -1315,17 +1345,20 @@
 ;;; arguments into a direct call to the appropriate entry-point
 ;;; function, so functions that are compiled together can avoid doing
 ;;; the dispatch.
-(defstruct (optional-dispatch
-            (:include functional) (:copier nil)
-            (:constructor make-optional-dispatch
-                (arglist allowp keyp %source-name %debug-name source-path)))
-  ;; the original parsed argument list, for anyone who cares
-  (arglist nil :type list)
+
+(def-struct-flags (optional-dispatch functional)
   ;; true if &ALLOW-OTHER-KEYS was supplied
   (allowp nil :type boolean)
   ;; true if &KEY was specified (which doesn't necessarily mean that
   ;; there are any &KEY arguments..)
-  (keyp nil :type boolean)
+  (keyp nil :type boolean))
+(defstruct (optional-dispatch
+            (:include functional) (:copier nil)
+            (:constructor make-optional-dispatch
+                (arglist allowp keyp %source-name %debug-name source-path
+                 &aux (flags (construct-flags optional-dispatch allowp keyp)))))
+  ;; the original parsed argument list, for anyone who cares
+  (arglist nil :type list)
   (source-path)
   ;; the number of required arguments. This is the smallest legal
   ;; number of arguments.
@@ -1349,14 +1382,17 @@
   ;; be used by callers that supply at least MAX-ARGS arguments and
   ;; know what they are doing.
   (main-entry nil :type (or clambda null)))
+
+(def-struct-flag-accessors optional-dispatch)
+
 (defprinter (optional-dispatch :identity t
              :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
   %debug-name
   (kind :test (> kind 1)
-        :princ (decode-functional-kind-attributes kind))
+  :princ (decode-functional-kind-attributes kind))
   (type :test (not (eq type *universal-type*)))
-  (where-from :test (not (eq where-from :assumed)))
+  ((where-from leaf-where-from) :test (not (eq where-from :assumed)))
   arglist
   allowp
   keyp
@@ -1366,25 +1402,31 @@
   (more-entry :test more-entry)
   main-entry)
 
+(def-struct-flags arg-info
+  ;; true if this arg is to be specially bound
+  (specialp nil :type boolean)
+  ;; the kind of argument being described. Required args only have arg
+  ;; info structures if they are special.
+  (kind :required                       ;(missing-arg)
+        :type (member :required :optional :keyword :rest
+                      :more-context :more-count))
+  ;; NIL if supplied-p is only used for directing evaluation of init forms
+  (supplied-used-p t :type boolean)
+  (default-p nil :type boolean))
+
 ;;; The ARG-INFO structure allows us to tack various information onto
 ;;; LAMBDA-VARs during IR1 conversion. If we use one of these things,
 ;;; then the var will have to be massaged a bit before it is simple
 ;;; and lexical.
 (defstruct (arg-info (:copier nil)
-                     (:constructor make-arg-info (kind)))
-  ;; true if this arg is to be specially bound
-  (specialp nil :type boolean)
-  ;; the kind of argument being described. Required args only have arg
-  ;; info structures if they are special.
-  (kind (missing-arg)
-        :type (member :required :optional :keyword :rest
-                      :more-context :more-count))
+                     (:constructor make-arg-info (kind
+                                                  &aux
+                                                    (flags (construct-flags arg-info kind)))))
+  (flags 0 :type (unsigned-byte 32))
   ;; If true, this is the VAR for SUPPLIED-P variable of a keyword or
   ;; optional arg. This is true for keywords with non-constant
   ;; defaults even when there is no user-specified supplied-p var.
   (supplied-p nil :type (or lambda-var null))
-  ;; NIL if supplied-p is only used for directing evaluation of init forms
-  (supplied-used-p t :type boolean)
   ;; the default for a keyword or optional, represented as the
   ;; original Lisp code. This is set to NIL in &KEY arguments that are
   ;; defaulted using the SUPPLIED-P arg.
@@ -1392,10 +1434,12 @@
   ;; For &REST arguments this may contain information about more context
   ;; the rest list comes from.
   (default nil :type t)
-  (default-p nil :type boolean)
   ;; the actual key for a &KEY argument. Note that in ANSI CL this is
   ;; not necessarily a keyword: (DEFUN FOO (&KEY ((BAR BAR))) ...).
   (key nil :type symbol))
+
+(def-struct-flag-accessors arg-info)
+
 (defprinter (arg-info :identity t)
   (specialp :test specialp)
   kind
@@ -1413,36 +1457,37 @@
 ;;; for and ignore unreferenced variables. Note that a deleted
 ;;; LAMBDA-VAR may have sets; in this case the back end is still
 ;;; responsible for propagating the SET-VALUE to the set's CONT.
-(!def-boolean-attribute lambda-var
+(def-struct-flags (lambda-var leaf)
   ;; true if this variable has been declared IGNORE
-  ignore
+  (ignorep)
   ;; This is set by environment analysis if it chooses an indirect
   ;; (value cell) representation for this variable because it is both
   ;; set and closed over.
-  indirect
+  (indirect)
   ;; true if the last reference has been deleted (and new references
   ;; should not be made)
-  deleted
+  (deleted)
   ;; This is set by environment analysis if, should it be an indirect
   ;; lambda-var, an actual value cell object must be allocated for
   ;; this variable because one or more of the closures that refer to
   ;; it are not dynamic-extent.  Note that both attributes must be set
   ;; for the value-cell object to be created.
-  explicit-value-cell
+  (explicit-value-cell)
   ;; Do not propagate constraints for this var
-  no-constraints
+  (no-constraints)
   ;; Does it hold a constant that shouldn't be destructively modified
-  constant
-  unused-initial-value
+  (constant)
+  (unused-initial-value)
   ;; Instruct constraint propagation to do some work.
-  compute-same-refs
-  no-debug)
+  (compute-same-refs)
+  (no-debug))
 
 (defstruct (lambda-var
-            (:include basic-var) (:copier nil)
+            (:include basic-var)
+            (:copier nil)
             (:constructor make-lambda-var
-              (%source-name &key type where-from specvar source-form arg-info)))
-  (flags #.(lambda-var-attributes) :type attributes)
+              (%source-name &key type (where-from :assumed) specvar source-form arg-info
+               &aux (flags (construct-flags lambda-var where-from)))))
   ;; the CLAMBDA that this var belongs to. This may be null when we are
   ;; building a lambda during IR1 conversion.
   (home nil :type (or null clambda))
@@ -1480,47 +1525,44 @@
   (optimistic-type nil :type (or null ctype))
   source-form)
 
+(def-struct-flag-accessors lambda-var)
+
 (defprinter (lambda-var :identity t)
   %source-name
   (type :test (not (eq type *universal-type*)))
-  (where-from :test (not (eq where-from :assumed)))
-  (flags :test (not (zerop flags))
-         :prin1 (decode-lambda-var-attributes flags))
+  ((where-from leaf-where-from) :test (not (eq where-from :assumed)))
+  #.
+  (let* ((slots (getf (get-flag-info 'lambda-var) :slots))
+         (start (getf (car slots) :offset))
+         (size (- (getf (car (last slots)) :offset)
+                  start)))
+    `(flags :test (not (zerop (ldb (byte ,size ,start) flags)))
+            :prin1
+            (decode-attribute-mask (ldb (byte ,size ,start) flags)
+                                   #(,@(loop for slot in slots
+                                             collect (getf slot :name))))))
   (arg-info :test arg-info)
   (specvar :test specvar))
-
-(defmacro lambda-var-ignorep (var)
-  `(lambda-var-attributep (lambda-var-flags ,var) ignore))
-(defmacro lambda-var-indirect (var)
-  `(lambda-var-attributep (lambda-var-flags ,var) indirect))
-(defmacro lambda-var-deleted (var)
-  `(lambda-var-attributep (lambda-var-flags ,var) deleted))
-(defmacro lambda-var-explicit-value-cell (var)
-  `(lambda-var-attributep (lambda-var-flags ,var) explicit-value-cell))
-(defmacro lambda-var-no-constraints (var)
-  `(lambda-var-attributep (lambda-var-flags ,var) no-constraints))
-(defmacro lambda-var-constant (var)
-  `(lambda-var-attributep (lambda-var-flags ,var) constant))
-(defmacro lambda-var-unused-initial-value (var)
-  `(lambda-var-attributep (lambda-var-flags ,var) unused-initial-value))
-(defmacro lambda-var-no-debug (var)
-  `(lambda-var-attributep (lambda-var-flags ,var) no-debug))
-(defmacro lambda-var-compute-same-refs (var)
-  `(lambda-var-attributep (lambda-var-flags ,var) compute-same-refs))
 
 
 ;;;; basic node types
 
+(def-struct-flags (ref node)
+  ;; True once constraint propagation has narrowed the derived type of
+  ;; this REF. Further narrowings are widened, see CONSTRAIN-REF-TYPE.
+  (constraint-narrowed-p))
+
 ;;; A REF represents a reference to a LEAF. REF-REOPTIMIZE is
 ;;; initially (and forever) NIL, since REFs don't receive any values
 ;;; and don't have any IR1 optimizer.
-(defstruct (ref (:include valued-node (reoptimize nil))
+(defstruct (ref (:include valued-node
+                 (flags (flags ref :reoptimize nil)))
                 (:constructor make-ref
-                              (leaf
-                               &optional (%source-name '.anonymous.)
-                               &aux (leaf-type (leaf-type leaf))
-                                    (derived-type
-                                     (make-single-value-type leaf-type))))
+                    (leaf
+                     &optional (%source-name '.anonymous.)
+                     &aux (leaf-type (leaf-type leaf))
+                          (derived-type
+                           (make-single-value-type leaf-type))))
                 (:copier nil))
   ;; The leaf referenced.
   (leaf nil :type leaf)
@@ -1528,10 +1570,10 @@
   (%source-name (missing-arg) :type symbol :read-only t)
   ;; An cons added by constraint-propagate to all REFs that have the
   ;; same value when referencing a lambda-var with sets.
-  (same-refs nil :type (or null cons))
-  ;; True once constraint propagation has narrowed the derived type of
-  ;; this REF. Further narrowings are widened, see CONSTRAIN-REF-TYPE.
-  (constraint-narrowed-p nil :type boolean))
+  (same-refs nil :type (or null cons)))
+
+(def-struct-flag-accessors ref)
+
 (defprinter (ref :identity t)
   (%source-name :test (neq %source-name '.anonymous.))
   (leaf :prin1 (if (and (constant-p leaf)
@@ -1601,19 +1643,7 @@
 (declaim (list *inline-expansions*)
          (always-bound *inline-expansions*))
 
-;;; The BASIC-COMBINATION structure is used to represent both normal
-;;; and multiple value combinations. In a let-like function call, this
-;;; node appears at the end of its block and the body of the called
-;;; function appears as the successor; the NODE-LVAR is null.
-(defstruct (basic-combination (:include valued-node)
-                              (:constructor nil)
-                              (:copier nil))
-  ;; LVAR for the function
-  (fun (missing-arg) :type lvar)
-  ;; list of LVARs for the args. In a local call, an argument lvar may
-  ;; be replaced with NIL to indicate that the corresponding variable
-  ;; is unreferenced, and thus no argument value need be passed.
-  (args nil :type list)
+(def-struct-flags (basic-combination node)
   ;; the kind of function call being made. :LOCAL means that this is a
   ;; local call to a function in the same component, and that argument
   ;; syntax checking has been done, etc.  Calls to known global
@@ -1623,8 +1653,22 @@
   ;; NOTINLINE. :ERROR is like :FULL, but means that we have
   ;; discovered that the call contains an error, and should not be
   ;; reconsidered for optimization.
-  (kind :full :type (member :local :full :error :known
-                            :unknown-keys))
+  (kind :full :type (member :full :local :error :known :unknown-keys)))
+
+;;; The BASIC-COMBINATION structure is used to represent both normal
+;;; and multiple value combinations. In a let-like function call, this
+;;; node appears at the end of its block and the body of the called
+;;; function appears as the successor; the NODE-LVAR is null.
+(defstruct (basic-combination (:include valued-node
+                               (flags (flags basic-combination)))
+                              (:constructor nil)
+                              (:copier nil))
+  ;; LVAR for the function
+  (fun (missing-arg) :type lvar)
+  ;; list of LVARs for the args. In a local call, an argument lvar may
+  ;; be replaced with NIL to indicate that the corresponding variable
+  ;; is unreferenced, and thus no argument value need be passed.
+  (args nil :type list)
   ;; if a call to a known global function, contains the FUN-INFO.
   (fun-info nil :type (or fun-info null))
   ;; Untrusted type we have asserted for this combination.
@@ -1640,14 +1684,22 @@
   (constraints-in)
   #+() (constraints-out))
 
+(def-struct-flag-accessors basic-combination)
+
+(def-struct-flags (combination basic-combination)
+  (pass-nargs t)
+  (or-chain-computed))
+
 ;;; The COMBINATION node represents all normal function calls,
 ;;; including FUNCALL. This is distinct from BASIC-COMBINATION so that
 ;;; an MV-COMBINATION isn't COMBINATION-P.
-(defstruct (combination (:include basic-combination)
+(defstruct (combination (:include basic-combination
+                         (flags (flags combination)))
                         (:constructor make-combination (fun))
-                        (:copier nil))
-  (pass-nargs t :type boolean)
-  (or-chain-computed nil :type boolean))
+                        (:copier nil)))
+
+(def-struct-flag-accessors combination :inherited t)
+
 (defprinter (combination :identity t)
   (fun :prin1 (let ((uses (lvar-uses fun)))
                 (or (and (ref-p uses)
@@ -1706,15 +1758,7 @@
   lambda
   result-type)
 
-;;; The CAST node represents type assertions. The check for
-;;; TYPE-TO-CHECK is performed and then the VALUE is declared to be of
-;;; type ASSERTED-TYPE.
-(defstruct (cast (:include valued-node)
-                 (:copier nil)
-                 (:constructor %make-cast
-                     (asserted-type type-to-check value derived-type context)))
-  (asserted-type (missing-arg) :type ctype)
-  (type-to-check (missing-arg) :type ctype)
+(def-struct-flags (cast node)
   ;; an indication of what we have proven about how this type
   ;; assertion is satisfied:
   ;;
@@ -1726,13 +1770,28 @@
   ;;
   ;; T
   ;;    A type check is needed.
-  (%type-check t :type (member t :external nil))
-  ;; the lvar which is checked
-  (value (missing-arg) :type lvar)
-  (context nil)
+  (%type-check t :type (member nil t :external))
   ;; Avoid compile time type conflict warnings.
   ;; Used by things that expand into ETYPECASE.
-  (silent-conflict nil :type (or boolean (eql :style-warning))))
+  (silent-conflict nil :type (member nil t :style-warning)))
+
+;;; The CAST node represents type assertions. The check for
+;;; TYPE-TO-CHECK is performed and then the VALUE is declared to be of
+;;; type ASSERTED-TYPE.
+(defstruct (cast (:include valued-node
+                  (flags (flags cast)))
+                 (:copier nil)
+                 (:constructor %make-cast
+                     (asserted-type type-to-check value derived-type context)))
+  (asserted-type (missing-arg) :type ctype)
+  (type-to-check (missing-arg) :type ctype)
+
+  ;; the lvar which is checked
+  (value (missing-arg) :type lvar)
+  (context nil))
+
+(def-struct-flag-accessors cast)
+
 (defprinter (cast :identity t)
   %type-check
   value
@@ -1744,7 +1803,7 @@
 ;;; do substitution of lvars without doing flow analysis to check the
 ;;; validity of the substitution in certain cases.
 (defstruct (delay (:include cast
-                   (%type-check nil)
+                   (flags (flags cast :%type-check nil))
                    (asserted-type *wild-type*)
                    (type-to-check *wild-type*))
                   (:constructor make-delay (value))

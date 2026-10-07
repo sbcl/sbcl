@@ -47,7 +47,7 @@
   (dolist (name '(condition warning error
                   pathname logical-pathname
                   sb-impl::string-output-stream
-                  structure-object sb-c::node
+                  structure-object #+64-bit sb-c::node
                   fundamental-stream))
     (let ((layout (sb-kernel:find-layout name)))
       (assert (logtest (sb-kernel:layout-flags layout)

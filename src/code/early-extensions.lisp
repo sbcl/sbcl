@@ -1067,7 +1067,7 @@ NOTE: This interface is experimental and subject to change."
                                                "-"))
                        identity
                        pretty-ir-printer)
-                      &rest slot-descs)
+                      &body slot-descs)
   (let ((first? t)
         maybe-print-space
         (reversed-prints nil))
@@ -1085,26 +1085,31 @@ NOTE: This interface is experimental and subject to change."
               (t
                (let ((sname (first slot-desc))
                      (test t))
-                 (collect ((stuff))
-                   (do ((option (rest slot-desc) (cddr option)))
-                       ((null option)
-                        (push `(let ((,sname ,(sref sname)))
-                                 (when ,test
-                                   ,maybe-print-space
-                                   ,@(or (stuff)
-                                         `((defprinter-prin1
-                                             ',sname ,sname stream)))))
-                              reversed-prints))
-                     (case (first option)
-                       (:prin1
-                        (stuff `(defprinter-prin1
-                                  ',sname ,(second option) stream)))
-                       (:princ
-                        (stuff `(defprinter-princ
-                                  ',sname ,(second option) stream)))
-                       (:test (setq test (second option)))
-                       (t
-                        (error "bad option: ~S" (first option)))))))))))
+                 (multiple-value-bind (sname sref)
+                     (if (consp sname)
+                         (values (first sname)
+                                 `(,(second sname) structure))
+                         (values sname (sref sname)))
+                  (collect ((stuff))
+                    (do ((option (rest slot-desc) (cddr option)))
+                        ((null option)
+                         (push `(let ((,sname ,sref))
+                                  (when ,test
+                                    ,maybe-print-space
+                                    ,@(or (stuff)
+                                          `((defprinter-prin1
+                                                ',sname ,sname stream)))))
+                               reversed-prints))
+                      (case (first option)
+                        (:prin1
+                         (stuff `(defprinter-prin1
+                                     ',sname ,(second option) stream)))
+                        (:princ
+                         (stuff `(defprinter-princ
+                                     ',sname ,(second option) stream)))
+                        (:test (setq test (second option)))
+                        (t
+                         (error "bad option: ~S" (first option))))))))))))
     (let ((normal-printer `(pprint-logical-block (stream nil)
                              (print-unreadable-object (structure
                                                        stream

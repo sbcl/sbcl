@@ -1757,7 +1757,7 @@
 
     #+unwind-to-frame-and-call-vop
     (when (and (lambda-allow-instrumenting fun)
-               (not (lambda-inline-expanded fun))
+               (not (functional-inline-expanded fun))
                (policy fun (>= insert-debug-catch 1)))
       (save-bsp node block env))
 

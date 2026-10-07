@@ -4066,7 +4066,7 @@
   (declare (type cast cast))
   (let ((check (cast-%type-check cast)))
     (if (and check
-             (cast-reoptimize cast)
+             (node-reoptimize cast)
              (values-subtypep (lvar-derived-type (cast-value cast))
                               (cast-type-to-check cast)))
         (setf (cast-%type-check cast) nil)

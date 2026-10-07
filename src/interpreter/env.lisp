@@ -913,7 +913,7 @@
                                     (compiler-vars (sb-c::lexenv-vars lexenv)))
   (flet ((harmless-defined-fun-p (thing)
            (and (typep thing 'sb-c::defined-fun)
-                (eq (sb-c::defined-fun-kind thing) :global-function)))
+                (eq (sb-c::global-var-kind thing) :global-function)))
          (macro-p (thing)
            (typep thing '(cons (eql sb-sys:macro)))))
     (if (or (sb-c::lexenv-blocks lexenv)
