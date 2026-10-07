@@ -235,8 +235,9 @@
     (t
      (%simple-fun-arglist (%fun-fun function)))))
 
-#+nil ; why did this ever need to exist?
-; is it a thing where someone will complain if we remove?
+;; Ok then,
+;; https://github.com/melisgl/autoload/blob/98e6958511f5cd7e0bb222e822adf46702b4b028/src/autoload.lisp#L313
+;; says "The SETF has been removed. Hopefully, it'll be reinstated."
 (defun (setf %fun-lambda-list) (new-value function)
   (typecase function
     (interpreted-function
@@ -245,7 +246,6 @@
            new-value)
      #+sb-eval
      (setf (sb-eval:interpreted-function-debug-lambda-list function) new-value))
-    ;; FIXME: Eliding general funcallable-instances for now.
     ((or simple-fun closure)
      (setf (%simple-fun-arglist (%fun-fun function)) new-value)))
   new-value)
