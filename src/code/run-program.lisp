@@ -718,10 +718,7 @@ should not be used."
 (defun run-program (program args
                     &key
                       (env nil env-p)
-                      (environment
-                       (when env-p
-                         (unix-environment-sbcl-from-cmucl env))
-                       environment-p)
+                      (environment nil environment-p)
                       (wait t)
                       search
                       #-win32 pty
@@ -776,8 +773,10 @@ The &KEY arguments have the following meanings:
 
 - :ENV
 
-    An alternative lossy representation of the new Unix environment,
-    for compatibility with CMU CL.
+    An old, lossy representation of the new Unix environment, for
+    compatibility with CMU CL. If given, :ENVIRONMENT defaults to
+    this (converted to the new format). It is an error to specify both
+    :ENV and :ENVIRONMENT.
 
 - :SEARCH
 
@@ -888,6 +887,8 @@ Windows specific options:
     > `:HIDE` option to consistently hide the console window."
   (when (and env-p environment-p)
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
+  (when (and (not environment-p) env-p)
+    (setq environment (unix-environment-sbcl-from-cmucl env)))
   (let* (;; Clear various specials used by GET-DESCRIPTOR-FOR to
          ;; communicate cleanup info.
          *close-fds-on-error*

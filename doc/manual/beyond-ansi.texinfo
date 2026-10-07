@@ -1405,7 +1405,7 @@ executables that system library routines do not.
 
 @anchor{Function sb-ext run-program}
 @ffindex @sortas{run-program sb-ext} run-program [sb-ext]
-@deffn{Function} sb-ext:run-program program args &key env (environment (when sb-impl::env-p (sb-impl::unix-environment-sbcl-from-cmucl sb-impl::env))) (wait t) search pty input if-input-does-not-exist output (if-output-exists :error) (error :output) (if-error-exists :error) status-hook (external-format :default) directory preserve-fds use-posix-spawn
+@deffn{Function} sb-ext:run-program program args &key env environment (wait t) search pty input if-input-does-not-exist output (if-output-exists :error) (error :output) (if-error-exists :error) status-hook (external-format :default) directory preserve-fds use-posix-spawn
 @code{run-program} creates a new process specified by @code{program}.
 @code{args} is a list of strings to be passed literally to the new program.
 In POSIX environments, this list becomes the array supplied as the second
@@ -1448,7 +1448,8 @@ the current process.
 @item @code{:env}
 
 An alternative lossy representation of the new Unix environment,
-for compatibility with CMU CL.
+for compatibility with CMU CL. If given, @code{:environment} defaults to
+this. It is an error to specify both @code{:env} and @code{:environment}.
 
 @item @code{:search}
 

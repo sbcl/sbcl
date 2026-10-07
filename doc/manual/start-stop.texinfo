@@ -163,7 +163,7 @@ process, and is also provided as an extension to the user.
 
 @anchor{Function sb-ext save-lisp-and-die}
 @ffindex @sortas{save-lisp-and-die sb-ext} save-lisp-and-die [sb-ext]
-@deffn{Function} sb-ext:save-lisp-and-die core-file-name &key (toplevel #'sb-impl::toplevel-init) executable save-runtime-options callable-exports (purify t) root-structures (environment-name "auxiliary") compression
+@deffn{Function} sb-ext:save-lisp-and-die core-file-name &key toplevel executable save-runtime-options callable-exports (purify t) root-structures (environment-name "auxiliary") compression
 Save a "core image", i.e. enough information to restart a Lisp
 process later in the same state, in the file of the specified name.
 Only global state is preserved: the stack is unwound in the process.

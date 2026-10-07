@@ -362,7 +362,7 @@ request an input stream and get an output stream in response\)."
 (defun condition-for-errno (err)
   (or (cdr (assoc err *conditions-for-errno* :test #'eql)) 'socket-error))
 
-(defun socket-error (where &optional (errno (socket-errno)))
+(defun socket-error (where &optional (errno nil errno-p))
   "Signal an appropriate error for syscall WHERE and ERRNO.
 
 WHERE should be a string naming the failed function.
@@ -370,6 +370,8 @@ WHERE should be a string naming the failed function.
 When supplied, ERRNO should be the UNIX error number associated to the
 failed call. The default behavior is to use the current value of the
 errno variable."
+  (unless errno-p
+    (setq errno (socket-errno)))
   (error (condition-for-errno errno) :errno errno :syscall where))
 
 ;;; This wants to refer to the BAD-FILE-DESCRIPTOR-ERROR condition class.

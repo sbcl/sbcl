@@ -94,7 +94,7 @@
           (funcall toplevel)))))
 
 (defun save-lisp-and-die (core-file-name &key
-                                         (toplevel #'toplevel-init toplevel-supplied)
+                                         (toplevel nil toplevel-supplied)
                                          (executable nil)
                                          (save-runtime-options nil)
                                          (callable-exports ())
@@ -231,6 +231,8 @@ sufficiently motivated to do lengthy fixes."
   #-elf "")
   (declare (ignore environment-name))
   (declare (ignorable root-structures))
+  (unless toplevel-supplied
+    (setq toplevel #'toplevel-init))
   (when (and callable-exports toplevel-supplied)
     (error ":TOPLEVEL cannot be supplied when there are callable exports."))
   ;; If the toplevel function is not defined, this will signal an
