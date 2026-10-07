@@ -1374,18 +1374,18 @@
                                       (:double 'ftintrne.l.d))))
               ,dst ,src))))
 
-(define-instruction-macro fcvt (to-format from-format dst src &optional (rm :rne))
+(define-instruction-macro fcvt (to-format from-format dst src &optional (rm :rne) temp)
   (case to-format
     (:word
      (ecase from-format
        (:single
         `(progn
-           (inst ftint :word :single ,dst ,src ,rm)
-           (inst movfr2gr.d ,dst ,dst)))
+           (inst ftint :word :single ,temp ,src ,rm)
+           (inst movfr2gr.d ,dst ,temp)))
        (:double
         `(progn
-           (inst ftint :word :double ,dst ,src ,rm)
-           (inst movfr2gr.d ,dst ,dst)))))
+           (inst ftint :word :double ,temp ,src ,rm)
+           (inst movfr2gr.d ,dst ,temp)))))
     (:single
       (ecase from-format
        (:word

@@ -130,7 +130,7 @@
       floating-point-overflow))
 
 (with-test (:name :bignum-double-float-overflow
-            :fails-on (or :no-float-traps :loongarch64))
+            :fails-on (or :no-float-traps))
   (loop for n from 1024 to 1030
         do (assert-error (coerce (opaque-identity (expt 2 n)) 'double-float) floating-point-overflow)
            (assert-error (coerce (opaque-identity (- (expt 2 n))) 'double-float) floating-point-overflow)))
@@ -743,8 +743,7 @@ fractional bits."
                           (opaque-identity 0))
              least-positive-single-float)))
 
-(with-test (:name :truncate-by-zero-error
-            :fails-on :loongarch64)
+(with-test (:name :truncate-by-zero-error)
   (assert-error (truncate 1 (opaque-identity 0d0)) division-by-zero)
   (assert-error (truncate 1f0 (opaque-identity 0f0)) division-by-zero)
   (sb-int:with-float-traps-masked (:divide-by-zero)
