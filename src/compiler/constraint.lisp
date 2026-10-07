@@ -1517,6 +1517,8 @@
                           conset)
                 constraint-propagate-in-block))
 (defun constraint-propagate-in-block (block gen preprocess-refs-p)
+  (when (eq gen :pending)
+    (return-from constraint-propagate-in-block gen))
   (do-nodes (node nil block)
     (typecase node
       (bind
@@ -1636,50 +1638,55 @@
 ;;; successors that may need to be recomputed.
 (defun find-block-type-constraints (block final-pass-p)
   (declare (type cblock block))
-  (let ((gen (constraint-propagate-in-block
-              block
-              (if final-pass-p
-                  (block-in block)
-                  (copy-conset (block-in block)))
-              final-pass-p)))
-    (multiple-value-bind (consequent-constraints alternative-constraints)
-        (constraint-propagate-if block gen)
-      (if consequent-constraints
-          (let* ((node (block-last block))
-                 (old-consequent-constraints (if-consequent-constraints node))
-                 (old-alternative-constraints (if-alternative-constraints node))
-                 (no-consequent (conset-empty consequent-constraints))
-                 (no-alternative (conset-empty alternative-constraints))
-                 (succ ()))
-            ;; Add the consequent and alternative constraints to GEN.
-            (cond ((and no-consequent no-alternative)
-                   (setf (if-consequent-constraints node) gen)
-                   (setf (if-alternative-constraints node) gen))
-                  (t
-                   (setf (if-consequent-constraints node) (copy-conset gen))
-                   (unless no-consequent
-                     (conset-union (if-consequent-constraints node)
-                                   consequent-constraints))
-                   (setf (if-alternative-constraints node) gen)
-                   (unless no-alternative
-                     (conset-union (if-alternative-constraints node)
-                                   alternative-constraints))))
-            ;; Has the consequent been changed?
-            (unless (and old-consequent-constraints
-                         (conset= (if-consequent-constraints node)
-                                  old-consequent-constraints))
-              (push (if-consequent node) succ))
-            ;; Has the alternative been changed?
-            (unless (and old-alternative-constraints
-                         (conset= (if-alternative-constraints node)
-                                  old-alternative-constraints))
-              (push (if-alternative node) succ))
-            succ)
-          ;; There is no IF.
-          (unless (and (block-out block)
-                       (conset= gen (block-out block)))
-            (setf (block-out block) gen)
-            (block-succ block))))))
+  (unless (eq (block-in block) :pending)
+    (let ((gen (constraint-propagate-in-block
+                block
+                (if (and final-pass-p
+                         #+sb-devel
+                         (not (and *compiler-trace-output*
+                                   (memq :constraints *compile-trace-targets*))))
+                    (block-in block)
+                    (copy-conset (block-in block)))
+                final-pass-p)))
+      (multiple-value-bind (consequent-constraints alternative-constraints)
+          (constraint-propagate-if block gen)
+        (if consequent-constraints
+            (let* ((node (block-last block))
+                   (old-consequent-constraints (if-consequent-constraints node))
+                   (old-alternative-constraints (if-alternative-constraints node))
+                   (no-consequent (conset-empty consequent-constraints))
+                   (no-alternative (conset-empty alternative-constraints))
+                   (succ ()))
+              ;; Add the consequent and alternative constraints to GEN.
+              (cond ((and no-consequent no-alternative)
+                     (setf (if-consequent-constraints node) gen)
+                     (setf (if-alternative-constraints node) gen))
+                    (t
+                     (setf (if-consequent-constraints node) (copy-conset gen))
+                     (unless no-consequent
+                       (conset-union (if-consequent-constraints node)
+                                     consequent-constraints))
+                     (setf (if-alternative-constraints node) gen)
+                     (unless no-alternative
+                       (conset-union (if-alternative-constraints node)
+                                     alternative-constraints))))
+              ;; Has the consequent been changed?
+              (unless (and old-consequent-constraints
+                           (conset= (if-consequent-constraints node)
+                                    old-consequent-constraints))
+                (push (if-consequent node) succ))
+              ;; Has the alternative been changed?
+              (unless (and old-alternative-constraints
+                           (conset= (if-alternative-constraints node)
+                                    old-alternative-constraints))
+                (push (if-alternative node) succ))
+              succ)
+            ;; There is no IF.
+            (unless (and (block-out block)
+                         (not (eq (block-out block) :pending))
+                         (conset= gen (block-out block)))
+              (setf (block-out block) gen)
+              (block-succ block)))))))
 
 ;;; Deliver the results of constraint propagation to REFs in BLOCK.
 ;;; During this pass, we also do local constraint propagation by
@@ -1797,26 +1804,47 @@
                              (setf in (copy-conset call-in)))
                          (push call-in outs))
                         (call
-                         (setf all-previous-outs-computed nil))))))
+                         (setf all-previous-outs-computed nil))))
+         ;; A local function for which a call hasn't yet been observed
+         ;; doesn't have any other predecessors but it may jump into
+         ;; the middle of some other block sequence, for which some
+         ;; constraints are already computed, an intersection of these
+         ;; consets will be empty and will never be fully recovered.
+         ;; Stop until at least one call has been seen.
+         (unless in
+           (return-from compute-block-in
+             (setf (block-out block) :pending)))))
       (t
-       (dolist (pred (block-pred block))
-         ;; If OUT has not been calculated, assume it to be the universal
-         ;; set.
-         (let ((out (block-out-for-successor pred block)))
-           (cond ((not out)
-                  (setf all-previous-outs-computed nil))
-                 (t
-                  (push out outs)
-                  (if in
-                      (conset-intersection in out)
-                      (setq in (copy-conset out)))))))))
+       (let (pending)
+         (dolist (pred (block-pred block))
+           ;; If OUT has not been calculated, assume it to be the universal
+           ;; set.
+           (let ((out (block-out-for-successor pred block)))
+             (cond ((not out)
+                    (setf all-previous-outs-computed nil))
+                   ((eq out :pending)
+                    (setf pending t))
+                   (t
+                    (push out outs)
+                    (if in
+                        (conset-intersection in out)
+                        (setq in (copy-conset out)))))))
+         (when (and pending
+                    (not in))
+           (return-from compute-block-in
+             (setf (block-out block) :pending))))))
     (when (rest outs)
       (join-type-constraints in block (nreverse outs) all-previous-outs-computed))
     (or in (make-conset))))
 
 (defun update-block-in (block)
-  (let ((in (compute-block-in block)))
-    (cond ((and (block-in block) (conset= in (block-in block)))
+  (let ((in (compute-block-in block))
+        (old-in (block-in block)))
+    (cond ((eq in :pending)
+           (setf (block-in block) in))
+          ((and old-in
+                (not (eq old-in :pending))
+                (conset= in old-in))
            nil)
           (t
            (setf (block-in block) in)))))
@@ -1937,7 +1965,15 @@
   ;; Previous results can confuse propagation and may loop forever
   (do-blocks (block component)
     (setf (block-out block) nil)
-    (let ((last (block-last block)))
+    (let ((last (block-last block))
+          (start (block-start-node block)))
+      (when (bind-p start)
+        (if (and (bind-p start)
+                 (functional-kind-eq (bind-lambda start) nil optional cleanup))
+            (dolist (ref (lambda-refs (bind-lambda start)))
+              (let ((call (node-dest ref)))
+                (when (combination-p call)
+                  (setf (combination-constraints-in call) nil))))))
       (when (if-p last)
         (setf (if-alternative-constraints last) nil)
         (setf (if-consequent-constraints last) nil))))
@@ -1949,8 +1985,7 @@
     #+sb-devel
     (when (and *compiler-trace-output*
                (memq :constraints *compile-trace-targets*))
-      (do-blocks (block component)
-        (print-constraints block)))
+      (print-all-constraints component))
     (loop for node in *blocks-to-terminate*
           do (maybe-terminate-block node nil))
     (mapc #'delete-set *sets-to-delete*))

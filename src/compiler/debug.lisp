@@ -1546,8 +1546,10 @@ is replaced with replacement."
                 (f (constraint-y constraint)))))))
 
 (defun print-conset (conset &optional kind)
-  (do-conset-elements (con conset)
-    (print-constraint con kind)))
+  (if (eq conset :pending)
+      (format t " PENDING")
+      (do-conset-elements (con conset)
+        (print-constraint con kind))))
 
 (defun print-conset-difference (set1 set2)
   (let ((diff1 (conset-difference (copy-conset set1) set2))
@@ -1561,6 +1563,7 @@ is replaced with replacement."
   (handler-case (progn
                   (terpri)
                   (terpri)
+                  (format t "IN~%")
                   (print-conset (block-in block) kind)
                   (print-nodes block)
                   (let ((last (block-last block)))
@@ -1573,3 +1576,7 @@ is replaced with replacement."
                            (print-conset (block-out block) kind)))))
     (error (condition)
       (format t "~&~A...~%" condition))))
+
+(defun print-all-constraints (&optional (component *component-being-compiled*))
+  (do-blocks (block component)
+    (print-constraints block)))

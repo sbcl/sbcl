@@ -444,7 +444,8 @@
                                       (min block-max previous)
                                       block-max))))))))
       (when (and all-previous-outs-computed
-                 (block-in block))
+                 (block-in block)
+                 (not (eq (block-in block) :pending)))
         ;; If the amount has changed from the previous computation then
         ;; it's probably being changed in a loop, remove that constraint
         (do-equality-constraints (y op not-p amount) var (block-in block)

@@ -2495,3 +2495,48 @@
                    out)
                sum c))
     ((5) 10)))
+
+(with-test (:name :local-call-without-callers)
+  (checked-compile
+   `(lambda (c)
+      (declare (integer c))
+      (loop for lv1 below 1
+            sum (progn
+                  (tagbody
+                     (labels ((f ()
+                                (and t (go n))))
+                       (when (progn (f) 0)
+                         (if (<= c 0)
+                             (f))))
+                   n)
+                  c))))
+  (assert (nth-value 1
+                     (checked-compile
+                      `(lambda (b)
+                         (the list b)
+                         (loop repeat 10
+                               do
+                               (block nil
+                                 (flet ((r ()
+                                          (return)))
+                                   (declare (notinline r))
+                                   (print (the integer b))
+                                   (r)))))
+                      :allow-warnings t)))
+  (checked-compile
+   `(lambda ()
+      (let ((i15 4))
+        (let (y16)
+          (tagbody
+           next-loop
+             (setq y16
+                   (let ((v29 i15))
+                     (tagbody
+                        (flet ((g30 ()
+                                 (go l31)))
+                          (if (>= y16 v29)
+                              (progn (setq v29 y16) (g30))))
+                      l31)
+                     v29))
+             (setq i15 (1+ i15))
+             (go next-loop)))))))
