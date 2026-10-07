@@ -134,7 +134,7 @@ two levels is only supported on x86 and x86-64.
 
 @anchor{Macro sb-sprof with-profiling}
 @ffindex @sortas{with-profiling sb-sprof} with-profiling [sb-sprof]
-@deffn{Macro} sb-sprof:with-profiling (&key (sample-interval 'sb-sprof:*sample-interval*) alloc-interval (max-samples 'sb-sprof:*max-samples*) reset (mode 'sb-sprof::*sampling-mode*) loop max-depth show-progress (threads :all) report) &body body
+@deffn{Macro} sb-sprof:with-profiling (&key (sample-interval 'sb-sprof:*sample-interval*) alloc-interval (max-samples 'sb-sprof:*max-samples*) reset (mode 'sb-sprof:*sampling-mode*) loop max-depth show-progress (threads :all) report) &body body
 Evaluate @code{body} with statistical profiling turned on. If @code{loop} is true,
 loop around the @code{body} until a sufficient number of samples has been collected.
 Returns the values from the last evaluation of @code{body}.
@@ -279,7 +279,7 @@ Reset the profiler.
 @end deffn
 @anchor{Function sb-sprof start-profiling}
 @ffindex @sortas{start-profiling sb-sprof} start-profiling [sb-sprof]
-@deffn{Function} sb-sprof:start-profiling &key (max-samples sb-sprof:*max-samples*) (mode sb-sprof::*sampling-mode*) (sample-interval sb-sprof:*sample-interval*) alloc-interval max-depth (threads :all)
+@deffn{Function} sb-sprof:start-profiling &key (max-samples sb-sprof:*max-samples*) (mode sb-sprof:*sampling-mode*) (sample-interval sb-sprof:*sample-interval*) alloc-interval max-depth (threads :all)
 Start profiling statistically in the current thread if not already profiling.
 The following keyword args are recognized:
 
