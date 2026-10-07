@@ -107,8 +107,6 @@ lispobj stray_pointer_source_obj;
 int (*stray_pointer_detector_fn)(lispobj); // return value is unused
 static void __mark_obj(lispobj pointer)
 {
-    lispobj* base;
-
     sword_t mark_index = ptr_to_bit_index(pointer);
     if (mark_index < 0) {
         if (stray_pointer_detector_fn) stray_pointer_detector_fn(pointer);
@@ -117,31 +115,34 @@ static void __mark_obj(lispobj pointer)
     uword_t wordindex = mark_index / N_WORD_BITS;
     uword_t bit = (uword_t)1 << (mark_index % N_WORD_BITS);
     if (fullcgcmarks[wordindex] & bit) return; // already marked
-    if (lowtag_of(pointer) == FUN_POINTER_LOWTAG
-        && embedded_obj_p(widetag_of((lispobj*)FUNCTION(pointer)))) {
-        lispobj* code = (void*)fun_code_header(FUNCTION(pointer));
-        mark_index -= ((char*)FUNCTION(pointer) - (char*)code) >> (1+WORD_SHIFT);
-        pointer = make_lispobj(code, OTHER_POINTER_LOWTAG);
-        base = code;
+    lispobj* base = native_pointer(pointer);
+    // We almost always always need the widetag. The only case where we don't
+    // is with LIST_POINTER_LOWTAG, so just go ahead and read it.
+    unsigned char widetag = widetag_of(base);
+    if (widetag == SIMPLE_FUN_WIDETAG) {
+        struct code* codeblob = fun_code_header(FUNCTION(pointer));
+        /* Rather than calling ptr_to_bit_index which would perform range checks again,
+         * we can subtract from the mark_index an amount that accounts for the backward
+         * displacement from this simple-fun to its containing codeblob. */
+        mark_index -= ((char*)base - (char*)codeblob) >> (1+WORD_SHIFT);
         wordindex = mark_index / N_WORD_BITS;
         bit = (uword_t)1 << (mark_index % N_WORD_BITS);
-        if (fullcgcmarks[wordindex] & bit) return; // already marked
-    } else
-        base = native_pointer(pointer);
+        base = (lispobj*)codeblob; // The codeblob gets enqueued, not the simple-fun
+        pointer = make_lispobj(base, OTHER_POINTER_LOWTAG);
+        widetag = CODE_HEADER_WIDETAG;
+    }
     fullcgcmarks[wordindex] |= bit;
-    // FIXME: restore the code for #ifdef LISP_FEATURE_UBSAN
-    if (widetag_of(base) == CODE_HEADER_WIDETAG) {
-        struct code* code = (void*)base;
+    if (widetag == CODE_HEADER_WIDETAG) {
         /* mark all simple-funs which speeds up pointer_survived_gc_yet.
          * Just add the offset in dwords from base to each fun to compute
          * the mark bit index (rather than calling ptr_to_bit_index) */
-        for_each_simple_fun(i, fun, code, 0, {
+        for_each_simple_fun(i, fun, (struct code*)base, 0, {
             unsigned int offset = ((char*)fun - (char*)base) >> (1+WORD_SHIFT);
             uword_t funmark = mark_index + offset;
             fullcgcmarks[funmark / N_WORD_BITS] |= (uword_t)1 << (funmark % N_WORD_BITS);
         })
     }
-    if (listp(pointer) || !leaf_obj_widetag_p(widetag_of(base)))
+    if (listp(pointer) || !leaf_obj_widetag_p(widetag))
         gc_enqueue(pointer);
     else
         /* An unboxed object might be a weak key, test_weak_triggers
