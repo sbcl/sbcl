@@ -35,7 +35,7 @@ from a naive translation.
 @cindex verbosity of compiler messsages
 @subsection Controlling Verbosity
 
-The compiler can be quite verbose in its diagnostic reporting – rather
+The compiler can be quite verbose in its diagnostic reporting -- rather
 more than some users would prefer. However, the amount of noise
 emitted can be controlled.
 
@@ -350,7 +350,7 @@ gives this error message
 @end example
 
 This message is not saying that there is a problem somewhere in this
-@code{let} – it is saying that there is a problem with the @code{let} itself. In
+@code{let} -- it is saying that there is a problem with the @code{let} itself. In
 this example, the problem is that @code{a}'s @code{nil} initial value is not a
 @code{fixnum}.
 

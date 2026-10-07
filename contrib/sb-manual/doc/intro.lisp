@@ -257,7 +257,7 @@
 
 (defsection @language-reference (:title "Language Reference")
   "_\\CLHS_ (Common Lisp HyperSpec) is a hypertext version of the ANSI
-  standard, made freely available by LispWorks – an invaluable
+  standard, made freely available by LispWorks -- an invaluable
   reference.
 
   See <https://www.lispworks.com/documentation/HyperSpec/Front/index.htm>.")
@@ -452,7 +452,7 @@
   particularly well there. SBCL should be able to improve in these areas
   (and has already improved in some other areas), but it takes a while.
 
-  On the x86 SBCL – like the x86 port of CMUCL – uses a
+  On the x86 SBCL -- like the x86 port of CMUCL -- uses a
   _@CONSERVATIVE-GC_. This means that it doesn't maintain a strict
   separation between tagged and untagged data, instead treating some
   untagged data (e.g. raw floating point numbers) as possibly-tagged
@@ -473,7 +473,7 @@
   various bizarre bootstrapping hangups, especially when a major
   change is made to the system. It also makes the connection between
   the current source code and the current executable more tenuous than
-  in other software systems – it's easy to accidentally build a CMUCL
+  in other software systems -- it's easy to accidentally build a CMUCL
   system containing characteristics not reflected in the current
   version of the source code. See the paper _SBCL: A Sanely
   Bootstrappable Common

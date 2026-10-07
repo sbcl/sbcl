@@ -1447,9 +1447,10 @@ the current process.
 
 @item @code{:env}
 
-An alternative lossy representation of the new Unix environment,
-for compatibility with CMU CL. If given, @code{:environment} defaults to
-this. It is an error to specify both @code{:env} and @code{:environment}.
+An old, lossy representation of the new Unix environment, for
+compatibility with CMU CL. If given, @code{:environment} defaults to
+this (converted to the new format). It is an error to specify both
+@code{:env} and @code{:environment}.
 
 @item @code{:search}
 

@@ -25,7 +25,7 @@
     (:title "Controlling Verbosity"
      :concepts (("compiler" "messsage" "verbosity")
                 ("verbosity" "of compiler messsages")))
-  "The compiler can be quite verbose in its diagnostic reporting – rather
+  "The compiler can be quite verbose in its diagnostic reporting -- rather
   more than some users would prefer. However, the amount of noise
   emitted can be controlled.
 
@@ -299,7 +299,7 @@
       ;   Asserted type FIXNUM conflicts with derived type (VALUES NULL &OPTIONAL).
 
   This message is not saying that there is a problem somewhere in this
-  LET – it is saying that there is a problem with the LET itself. In
+  LET -- it is saying that there is a problem with the LET itself. In
   this example, the problem is that `A`'s NIL initial value is not a
   FIXNUM.")
 

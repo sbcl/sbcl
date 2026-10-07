@@ -51,7 +51,7 @@ directly.
 The SBCL project cannot verify the accuracy of the information or
 the competence of the people listed, and they have provided their
 own blurbs below: you must make your own judgement of suitability
-from the available information – refer to the links they provide,
+from the available information -- refer to the links they provide,
 the CREDITS file, mailing list archives, commit messages, and so on.
 Please feel free to ask for advice through @ref{volunteer support}.
 
@@ -131,7 +131,7 @@ just hang and you want to send a useful bug report, then:
 @item Next, attach gdb with @code{gdb -p <pidof sbcl>}, and get backtraces
   for all threads with @code{thread apply all ba}.
 
-@item If multiple threads are in play, then – still in gdb – try to get
+@item If multiple threads are in play, then -- still in gdb -- try to get
   Lisp backtrace for all threads: @code{thread apply all call
   backtrace_from_fp($ebp, 100, 0)} on x86. Substitute @code{$ebp} with
   @code{$rbp} on x86-64. The backtraces will appear in the stdout of the

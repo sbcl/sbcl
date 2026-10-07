@@ -299,7 +299,7 @@ similar functionality, but it does not support modern SBCL versions.
 @subsection Language Reference
 
 @emph{CLHS} (Common Lisp HyperSpec) is a hypertext version of the ANSI
-standard, made freely available by LispWorks – an invaluable
+standard, made freely available by LispWorks -- an invaluable
 reference.
 
 See @url{https://www.lispworks.com/documentation/HyperSpec/Front/index.htm}.
@@ -529,7 +529,7 @@ particularly well there. SBCL should be able to improve in these areas
 
 @cindex garbage collector, conservative
 @cindex conservative garbage collector
-On the x86 SBCL – like the x86 port of CMUCL – uses a
+On the x86 SBCL -- like the x86 port of CMUCL -- uses a
 @emph{conservative GC}. This means that it doesn't maintain a strict
 separation between tagged and untagged data, instead treating some
 untagged data (e.g. raw floating point numbers) as possibly-tagged
@@ -550,7 +550,7 @@ system with new versions. This quasi-build procedure can cause
 various bizarre bootstrapping hangups, especially when a major
 change is made to the system. It also makes the connection between
 the current source code and the current executable more tenuous than
-in other software systems – it's easy to accidentally build a CMUCL
+in other software systems -- it's easy to accidentally build a CMUCL
 system containing characteristics not reflected in the current
 version of the source code. See the paper @emph{SBCL: A Sanely
 Bootstrappable Common

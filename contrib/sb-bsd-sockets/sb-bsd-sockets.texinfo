@@ -182,7 +182,7 @@ request an input stream and get an output stream in response).
 @end deffn
 @anchor{Function sb-bsd-sockets socket-error}
 @ffindex @sortas{socket-error sb-bsd-sockets} socket-error [sb-bsd-sockets]
-@deffn{Function} sb-bsd-sockets:socket-error where &optional (errno (sb-bsd-sockets::socket-errno))
+@deffn{Function} sb-bsd-sockets:socket-error where &optional errno
 Signal an appropriate error for syscall @code{where} and @code{errno}.
 
 @code{where} should be a string naming the failed function.
