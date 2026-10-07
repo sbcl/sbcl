@@ -422,36 +422,6 @@
       (print-unreadable-object (obj stream :type t)
         (prin1 (fun-name obj) stream))))
 
-;;; Return approximately a type specifier for LAMBDA-LIST.
-;;; e.g. after doing (DEFUN FOO (A B) ...), you want (FUNCTION (T T) *)
-;;; This is mainly to get accurate information from DESCRIBE
-;;; when properly hooked in.
-;;; FIXME: this returns T for all &OPTIONAL and &KEY args.
-(defun approximate-proto-fn-type (lambda-list bound-symbols)
-  (declare (notinline member cons))
-  (labels ((recurse (list var-index &aux (elt (car list)))
-             (unless (or (eq elt '&aux) (null list))
-               (let ((ll-keyword-p (member elt lambda-list-keywords))
-                     (rest (cdr list)))
-                 (cons (cond (ll-keyword-p elt)
-                             ((not var-index) 't)
-                             (t
-                              (acond ((cdr (svref bound-symbols var-index))
-                                      (type-specifier it))
-                                     (t t))))
-                       (if (eq elt '&key)
-                           (keys rest)
-                           (recurse rest
-                                    (and var-index
-                                         (not ll-keyword-p)
-                                         (1+ var-index))))))))
-           (keys (list &aux (elt (car list)))
-             (unless (or (eq elt '&aux) (null list))
-               (cons (cond ((member elt lambda-list-keywords) elt)
-                           (t `(,(parse-key-arg-spec elt) t)))
-                     (keys (cdr list))))))
-    `(function ,(recurse lambda-list 0) *)))
-
 (declaim (type boolean *hook-all-functions*))
 (defvar *hook-all-functions-p* nil)
 
@@ -493,15 +463,54 @@
       (values (proto-fn-%frame proto-fn) (proto-fn-cookie proto-fn))
       (digest-lambda env proto-fn)))
 
-(defun %fun-ftype (fun)
-  (let ((proto-fn (fun-proto-fn fun)))
-    (or (proto-fn-type proto-fn)
+;;; Return a function type specifier for FUN from its definition.
+;;; e.g. after doing (DEFUN FOO (A B) ...), you want at least as good information
+;;; as (FUNCTION (T T) *). Declarations in the body will refine the answer.
+(defun %fun-ftype (fun &aux (proto-fn (fun-proto-fn fun)))
+  (or (proto-fn-type proto-fn)
+      (let* ((frame-symbols
+              (frame-symbols
+               (proto-fn-frame proto-fn (interpreted-function-env fun))))
+             (ll-parts (proto-fn-ll-parts proto-fn))
+             (llks (svref ll-parts 0))
+             (values))
+        (dolist (decl (proto-fn-decls proto-fn)) ; Take only the first VALUES decl
+          (aver (eql (car decl) 'declare))
+          (dolist (expr (cdr decl))
+            (if (eq (car expr) 'values)
+                ;; ir1tran goes to the trouble of intersecting more than one
+                ;; VALUES decl, but questions the necessity to do so.
+                (if values
+                    (style-warn "Ignoring more than one VALUES declaration")
+                    (setq values expr)))))
         (setf (proto-fn-type proto-fn)
-              (approximate-proto-fn-type
-               (proto-fn-lambda-list proto-fn)
-               (frame-symbols
-                (proto-fn-frame (fun-proto-fn fun)
-                                (interpreted-function-env fun))))))))
+              `(function
+                ,(flet ((var-type (var)
+                          (dovector (x frame-symbols 't)
+                            (when (eq (car x) var)
+                              (return (if (cdr x) (type-specifier (cdr x)) 't))))))
+                   (make-lambda-list
+                    llks nil
+                    (mapcar #'var-type (svref ll-parts 1)) ; required
+                    (mapcar (lambda (x) (var-type (parse-optional-arg-spec x)))
+                            (svref ll-parts 2)) ; optional
+                    ;; Can't infer &REST type because a type decl on the local var,
+                    ;; if present, must be LIST whereas in a proclamation it is the
+                    ;; type of each additional argument.
+                    (when (ll-kwds-restp llks) '(t))
+                    (mapcar (lambda (x)
+                              (multiple-value-bind (key var) (parse-key-arg-spec x)
+                                (list key (var-type var))))
+                            (svref ll-parts 4))))
+                ,(cond ((not values) '*) ; don't know what it returns
+                       ((or (member '&optional values) (member '&rest values))
+                        values)
+                       (t
+                        ;; Make it strict in the mandatory return value count.
+                        ;; I claim that's the intent of using a VALUES decl.
+                        ;; Put a &REST T in if you must. I prefer less tedium to do
+                        ;; the common usage, and more to do the oddball usage.
+                        (append values '(&optional)))))))))
 
 ;; This is just a rename of DESTRUCTURING-BIND
 ;; Should it do anything magic?

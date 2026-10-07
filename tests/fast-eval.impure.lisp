@@ -362,3 +362,44 @@
   (assert (search "The function COMMON-LISP-USER::THIS-IS-NOT-DEFINED is undefined."
                   (handler-case (try-an-undefined-function 3)
                     (undefined-function (c) (write-to-string c :escape nil))))))
+
+(defun try-values-decl-1 (x y &optional z)
+  (declare (real x y) (values pathname cons &rest integer))
+  (apply #'values #p"file.txt" (list x) (loop repeat z collect y)))
+
+(defun try-values-decl-2 (x y &key mykwd1 ((:randomness-level haha) 0d0))
+  (declare (float haha)
+           (symbol mykwd1))
+  (declare (values list))
+  (list x y mykwd1 haha))
+
+(defun try-values-decl-3 (h &key &allow-other-keys)
+  (declare (values cons))
+  (declare (hash-table h))
+  (if (zerop (hash-table-count h)) '(nope) (sb-int:%hash-table-alist h)))
+
+(defun try-values-decl-4 (n &rest rest)
+  (declare (integer n))
+  (declare (values real))
+  (- n (reduce #'+ rest)))
+
+(test-util:with-test (:name :try-values-decls)
+  (assert (sb-kernel:type=
+           (sb-int:info :function :type 'try-values-decl-1)
+           (sb-kernel:specifier-type
+            '(function (real real &optional t)
+                       (values pathname cons &rest integer)))))
+  (assert (sb-kernel:type=
+           (sb-int:info :function :type 'try-values-decl-2)
+           (sb-kernel:specifier-type
+            '(function (t t &key (:mykwd1 symbol) (:randomness-level float))
+                       (values list &optional)))))
+  (assert (sb-kernel:type=
+           (sb-int:info :function :type 'try-values-decl-3)
+           (sb-kernel:specifier-type
+            '(function (hash-table &key &allow-other-keys)
+                       (values cons &optional)))))
+  (assert (sb-kernel:type=
+           (sb-int:info :function :type 'try-values-decl-4)
+           (sb-kernel:specifier-type
+            '(function (integer &rest t) (values real &optional))))))
