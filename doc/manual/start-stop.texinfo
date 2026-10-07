@@ -108,7 +108,7 @@ threads.
 
 @anchor{Function sb-ext exit}
 @ffindex @sortas{exit sb-ext} exit [sb-ext]
-@deffn{Function} sb-ext:exit &key code abort timeout
+@deffn{Function} sb-ext:exit &key code abort (timeout sb-ext:*exit-timeout*)
 Terminates the process, causing SBCL to exit with @code{code}. @code{code}
 defaults to 0 when @code{abort} is false, and 1 when it is true.
 
@@ -163,7 +163,7 @@ process, and is also provided as an extension to the user.
 
 @anchor{Function sb-ext save-lisp-and-die}
 @ffindex @sortas{save-lisp-and-die sb-ext} save-lisp-and-die [sb-ext]
-@deffn{Function} sb-ext:save-lisp-and-die core-file-name &key toplevel executable save-runtime-options callable-exports purify root-structures environment-name compression
+@deffn{Function} sb-ext:save-lisp-and-die core-file-name &key (toplevel #'sb-impl::toplevel-init) executable save-runtime-options callable-exports (purify t) root-structures (environment-name "auxiliary") compression
 Save a "core image", i.e. enough information to restart a Lisp
 process later in the same state, in the file of the specified name.
 Only global state is preserved: the stack is unwound in the process.

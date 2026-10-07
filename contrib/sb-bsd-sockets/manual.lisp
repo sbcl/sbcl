@@ -51,6 +51,7 @@
   (sb-bsd-sockets:socket-close function)
   (sb-bsd-sockets:socket-shutdown function)
   (sb-bsd-sockets:socket-make-stream function)
+  (sb-bsd-sockets:socket-make-stream (method (sb-bsd-sockets:socket)))
   (sb-bsd-sockets:socket-error function)
   (sb-bsd-sockets:non-blocking-mode function))
 

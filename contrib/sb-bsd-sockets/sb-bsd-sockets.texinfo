@@ -151,9 +151,38 @@ or both (it is an error to specify neither).
 
 @code{timeout} specifies a read timeout for the stream.
 @end deffn
+@anchor{Method sb-bsd-sockets socket-make-stream}
+@ffindex @sortas{socket-make-stream sb-bsd-sockets} socket-make-stream [sb-bsd-sockets]
+@deffn{Method} sb-bsd-sockets:socket-make-stream (socket sb-bsd-sockets:socket) &key input output (element-type 'character) (buffering :full) (external-format :default) timeout auto-close serve-events
+Default method for @code{socket} objects.
+
+@code{element-type} defaults to @code{character}, to construct a bivalent stream,
+capable of both binary and character IO use @code{:default}.
+
+Acceptable values for @code{buffering} are @code{:full}, @code{:line} and @code{:none}, default is
+@code{:full}, ie. output is buffered till it is explicitly flushed using
+@code{close} or @code{finish-output}. (@code{force-output} forces some output to be
+flushed: to ensure all buffered output is flushed use @code{finish-output}.)
+
+Streams have no @code{timeout} by default. If one is provided, it is the
+number of seconds the system will at most wait for input to appear on
+the socket stream when trying to read from it.
+
+If @code{auto-close} is true, the underlying OS socket is automatically
+closed after the stream and the socket have been garbage collected.
+Default is false.
+
+If @code{serve-events} is true, blocking IO on the socket will dispatch to
+the recursive event loop. Default is false.
+
+The stream for @code{socket} will be cached, and a second invocation of this
+method will return the same stream. This may lead to oddities if this
+function is invoked with inconsistent arguments (e.g. one might
+request an input stream and get an output stream in response).
+@end deffn
 @anchor{Function sb-bsd-sockets socket-error}
 @ffindex @sortas{socket-error sb-bsd-sockets} socket-error [sb-bsd-sockets]
-@deffn{Function} sb-bsd-sockets:socket-error where &optional errno
+@deffn{Function} sb-bsd-sockets:socket-error where &optional (errno (sb-bsd-sockets::socket-errno))
 Signal an appropriate error for syscall @code{where} and @code{errno}.
 
 @code{where} should be a string naming the failed function.

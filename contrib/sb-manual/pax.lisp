@@ -236,6 +236,9 @@
 
 (defun-dummy (xref-locative-type :dref) (xref)
   (first (sb-c::ensure-list (second xref))))
+
+(defun-dummy (xref-locative-args :dref) (xref)
+  (rest (sb-c::ensure-list (second xref))))
 
 
 ;;; DEFINE-CONCEPT names a set of index keys. When MARKDOWN-TO-TEXINFO

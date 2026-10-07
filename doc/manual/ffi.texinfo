@@ -478,7 +478,7 @@ Examples:
 @end deffn
 @anchor{Function sb-alien make-alien-string}
 @ffindex @sortas{make-alien-string sb-alien} make-alien-string [sb-alien]
-@deffn{Function} sb-alien:make-alien-string string &rest rest &key start end external-format null-terminate
+@deffn{Function} sb-alien:make-alien-string string &rest rest &key (start 0) end (external-format :default) (null-terminate t)
 Copy part of @code{string} delimited by @code{start} and @code{end} into freshly
 allocated foreign memory, freeable using @code{free(3)} or @code{free-alien}.
 Returns the allocated string as a (* @code{char}) alien, and the number of

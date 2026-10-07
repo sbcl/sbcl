@@ -134,7 +134,7 @@ two levels is only supported on x86 and x86-64.
 
 @anchor{Macro sb-sprof with-profiling}
 @ffindex @sortas{with-profiling sb-sprof} with-profiling [sb-sprof]
-@deffn{Macro} sb-sprof:with-profiling (&key sample-interval alloc-interval max-samples reset mode loop max-depth show-progress threads report) &body body
+@deffn{Macro} sb-sprof:with-profiling (&key (sample-interval 'sb-sprof:*sample-interval*) alloc-interval (max-samples 'sb-sprof:*max-samples*) reset (mode 'sb-sprof::*sampling-mode*) loop max-depth show-progress (threads :all) report) &body body
 Evaluate @code{body} with statistical profiling turned on. If @code{loop} is true,
 loop around the @code{body} until a sufficient number of samples has been collected.
 Returns the values from the last evaluation of @code{body}.
@@ -189,7 +189,7 @@ repeatedly evaluate @code{body}.
 @end deffn
 @anchor{Macro sb-sprof with-sampling}
 @ffindex @sortas{with-sampling sb-sprof} with-sampling [sb-sprof]
-@deffn{Macro} sb-sprof:with-sampling (&optional on) &body body
+@deffn{Macro} sb-sprof:with-sampling (&optional (on t)) &body body
 Evaluate body with statistical sampling turned on or off in the current thread.
 @end deffn
 @strong{Functions}
@@ -219,7 +219,7 @@ EXPERIMENTAL: Interface subject to change.
 @end deffn
 @anchor{Function sb-sprof report}
 @ffindex @sortas{report sb-sprof} report [sb-sprof]
-@deffn{Function} sb-sprof:report &key type max min-percent call-graph sort-by sort-order stream show-progress
+@deffn{Function} sb-sprof:report &key (type :graph) max min-percent call-graph (sort-by sb-sprof:*report-sort-by*) (sort-order sb-sprof:*report-sort-order*) (stream *standard-output*) show-progress
 Report statistical profiling results.  The following keyword
    args are recognized:
 
@@ -279,7 +279,7 @@ Reset the profiler.
 @end deffn
 @anchor{Function sb-sprof start-profiling}
 @ffindex @sortas{start-profiling sb-sprof} start-profiling [sb-sprof]
-@deffn{Function} sb-sprof:start-profiling &key max-samples mode sample-interval alloc-interval max-depth threads
+@deffn{Function} sb-sprof:start-profiling &key (max-samples sb-sprof:*max-samples*) (mode sb-sprof::*sampling-mode*) (sample-interval sb-sprof:*sample-interval*) alloc-interval max-depth (threads :all)
 Start profiling statistically in the current thread if not already profiling.
 The following keyword args are recognized:
 

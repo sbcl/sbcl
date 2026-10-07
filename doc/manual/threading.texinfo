@@ -82,7 +82,7 @@ a simple-string (not necessarily unique) or @code{nil}.
 @end deffn
 @anchor{Function sb-thread main-thread-p}
 @ffindex @sortas{main-thread-p sb-thread} main-thread-p [sb-thread]
-@deffn{Function} sb-thread:main-thread-p &optional thread
+@deffn{Function} sb-thread:main-thread-p &optional (thread sb-thread:*current-thread*)
 True if @code{thread}, defaulting to current thread, is the main thread of the process.
 @end deffn
 @anchor{Function sb-thread main-thread}
@@ -290,7 +290,7 @@ assume that unknown code can safely be terminated using @code{terminate-thread}.
 
 @anchor{Function sb-thread symbol-value-in-thread}
 @ffindex @sortas{symbol-value-in-thread sb-thread} symbol-value-in-thread [sb-thread]
-@deffn{Function} sb-thread:symbol-value-in-thread symbol thread &optional errorp
+@deffn{Function} sb-thread:symbol-value-in-thread symbol thread &optional (errorp t)
 Return the local value of @code{symbol} in @code{thread}, and a secondary value of @code{t}
 on success.
 
@@ -378,7 +378,7 @@ lockless algorithms.
 
 @anchor{Macro sb-ext atomic-decf}
 @ffindex @sortas{atomic-decf sb-ext} atomic-decf [sb-ext]
-@deffn{Macro} sb-ext:atomic-decf place &optional diff
+@deffn{Macro} sb-ext:atomic-decf place &optional (diff 1)
 Atomically decrements @code{place} by @code{diff}, and returns the value of @code{place} before
 the decrement.
 
@@ -416,7 +416,7 @@ EXPERIMENTAL: Interface subject to change.
 @end deffn
 @anchor{Macro sb-ext atomic-incf}
 @ffindex @sortas{atomic-incf sb-ext} atomic-incf [sb-ext]
-@deffn{Macro} sb-ext:atomic-incf place &optional diff
+@deffn{Macro} sb-ext:atomic-incf place &optional (diff 1)
 Atomically increments @code{place} by @code{diff}, and returns the value of @code{place} before
 the increment.
 
@@ -634,7 +634,7 @@ Mutex type.
 @end deffn
 @anchor{Macro sb-thread with-mutex}
 @ffindex @sortas{with-mutex sb-thread} with-mutex [sb-thread]
-@deffn{Macro} sb-thread:with-mutex (mutex &key wait-p timeout value) &body body
+@deffn{Macro} sb-thread:with-mutex (mutex &key (wait-p t) timeout value) &body body
 Acquire @code{mutex} for the dynamic scope of @code{body}. If @code{wait-p} is true (the default),
 and the @code{mutex} is not immediately available, sleep until it is available.
 
@@ -654,7 +654,7 @@ current thread.
 @end deffn
 @anchor{Macro sb-thread with-recursive-lock}
 @ffindex @sortas{with-recursive-lock sb-thread} with-recursive-lock [sb-thread]
-@deffn{Macro} sb-thread:with-recursive-lock (mutex &key wait-p timeout) &body body
+@deffn{Macro} sb-thread:with-recursive-lock (mutex &key (wait-p t) timeout) &body body
 Acquire @code{mutex} for the dynamic scope of @code{body}.
 
 If @code{wait-p} is true (the default), and the @code{mutex} is not immediately available or
@@ -699,7 +699,7 @@ stale value, use @code{mutex-owner} instead.
 @end deffn
 @anchor{Function sb-thread grab-mutex}
 @ffindex @sortas{grab-mutex sb-thread} grab-mutex [sb-thread]
-@deffn{Function} sb-thread:grab-mutex mutex &key waitp timeout
+@deffn{Function} sb-thread:grab-mutex mutex &key (waitp t) timeout
 Acquire @code{mutex} for the current thread. If @code{waitp} is true (the default) and
 the mutex is not immediately available, sleep until it is available.
 
@@ -740,7 +740,7 @@ Notes:
 @end deffn
 @anchor{Function sb-thread release-mutex}
 @ffindex @sortas{release-mutex sb-thread} release-mutex [sb-thread]
-@deffn{Function} sb-thread:release-mutex mutex &key if-not-owner
+@deffn{Function} sb-thread:release-mutex mutex &key (if-not-owner :punt)
 Release @code{mutex} and wake up any other thread waiting for it.
 
 @code{release-mutex} is not interrupt safe: interrupts should be disabled
@@ -766,18 +766,18 @@ future.
 @end deffn
 @anchor{Function sb-thread make-semaphore}
 @ffindex @sortas{make-semaphore sb-thread} make-semaphore [sb-thread]
-@deffn{Function} sb-thread:make-semaphore &key name count
+@deffn{Function} sb-thread:make-semaphore &key name (count 0)
 Create a semaphore with the supplied @code{count} and @code{name}.
 @end deffn
 @anchor{Function sb-thread signal-semaphore}
 @ffindex @sortas{signal-semaphore sb-thread} signal-semaphore [sb-thread]
-@deffn{Function} sb-thread:signal-semaphore semaphore &optional n
+@deffn{Function} sb-thread:signal-semaphore semaphore &optional (n 1)
 Increment the count of @code{semaphore} by @code{n}. If there are threads waiting
 on this semaphore, then @code{n} of them is woken up.
 @end deffn
 @anchor{Function sb-thread wait-on-semaphore}
 @ffindex @sortas{wait-on-semaphore sb-thread} wait-on-semaphore [sb-thread]
-@deffn{Function} sb-thread:wait-on-semaphore semaphore &key n timeout notification
+@deffn{Function} sb-thread:wait-on-semaphore semaphore &key (n 1) timeout notification
 Decrement the count of @code{semaphore} by @code{n} if the count would not be negative.
 
 Else blocks until the semaphore can be decremented. Returns the new count of
@@ -793,7 +793,7 @@ decrements the count, the status is set to @code{t}.
 @end deffn
 @anchor{Function sb-thread try-semaphore}
 @ffindex @sortas{try-semaphore sb-thread} try-semaphore [sb-thread]
-@deffn{Function} sb-thread:try-semaphore semaphore &optional n notification
+@deffn{Function} sb-thread:try-semaphore semaphore &optional (n 1) notification
 Try to decrement the count of @code{semaphore} by @code{n}. If the count were to
 become negative, punt and return @code{nil}, otherwise return the new count of
 @code{semaphore}.
@@ -967,7 +967,7 @@ associated data:
 @end deffn
 @anchor{Function sb-thread condition-notify}
 @ffindex @sortas{condition-notify sb-thread} condition-notify [sb-thread]
-@deffn{Function} sb-thread:condition-notify queue &optional n
+@deffn{Function} sb-thread:condition-notify queue &optional (n 1)
 Notify @code{n} threads waiting on @code{queue}.
 
 IMPORTANT: The same mutex that is used in the corresponding @code{condition-wait}

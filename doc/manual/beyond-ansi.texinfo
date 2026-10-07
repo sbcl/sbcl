@@ -180,7 +180,7 @@ Experimental: interface subject to change.
 @end deffn
 @anchor{Function sb-ext add-package-local-nickname}
 @ffindex @sortas{add-package-local-nickname sb-ext} add-package-local-nickname [sb-ext]
-@deffn{Function} sb-ext:add-package-local-nickname local-nickname actual-package &optional package-designator
+@deffn{Function} sb-ext:add-package-local-nickname local-nickname actual-package &optional (package-designator (sb-int:sane-package))
 Adds @code{local-nickname} for @code{actual-package} in the designated package, defaulting
 to current package. @code{local-nickname} must be a string designator, and
 @code{actual-package} must be a package designator.
@@ -206,7 +206,7 @@ Experimental: interface subject to change.
 @end deffn
 @anchor{Function sb-ext remove-package-local-nickname}
 @ffindex @sortas{remove-package-local-nickname sb-ext} remove-package-local-nickname [sb-ext]
-@deffn{Function} sb-ext:remove-package-local-nickname old-nickname &optional package-designator
+@deffn{Function} sb-ext:remove-package-local-nickname old-nickname &optional (package-designator (sb-int:sane-package))
 If the designated package had @code{old-nickname} as a local nickname for
 another package, it is removed. Returns true if the nickname existed and was
 removed, and @code{nil} otherwise.
@@ -272,7 +272,7 @@ specified by ANSI.
 
 @anchor{Function sb-ext gc}
 @ffindex @sortas{gc sb-ext} gc [sb-ext]
-@deffn{Function} sb-ext:gc &key full gen &allow-other-keys
+@deffn{Function} sb-ext:gc &key full (gen 0) &allow-other-keys
 Initiate a garbage collection.
 
 The default is to initiate a nursery collection, which may in turn
@@ -504,7 +504,7 @@ paths:
 
 @anchor{Function sb-ext search-roots}
 @ffindex @sortas{search-roots sb-ext} search-roots [sb-ext]
-@deffn{Function} sb-ext:search-roots weak-pointers &key criterion ignore print
+@deffn{Function} sb-ext:search-roots weak-pointers &key (criterion :oldest) (ignore '(* ** *** / // ///)) (print t)
 Find roots keeping the targets of @code{weak-pointers} alive.
 
 @code{weak-pointers} must be a single @code{sb-ext:weak-pointer} or a list of those,
@@ -1280,7 +1280,7 @@ iterators:
 
 @anchor{Macro sb-sequence with-sequence-iterator}
 @ffindex @sortas{with-sequence-iterator sb-sequence} with-sequence-iterator [sb-sequence]
-@deffn{Macro} sb-sequence:with-sequence-iterator (&optional iterator limit from-end-p step endp element set-element index copy) (sequence &key from-end start end) &body body
+@deffn{Macro} sb-sequence:with-sequence-iterator (&optional iterator limit from-end-p step endp element set-element index copy) (sequence &key from-end (start 0) end) &body body
 Executes @code{body} with the elements of @code{vars} bound to the iteration
 state returned by @code{sequence:make-sequence-iterator} for @code{sequence} and
 @code{args}. Elements of @code{vars} may be @code{nil} in which case the corresponding
@@ -1405,7 +1405,7 @@ executables that system library routines do not.
 
 @anchor{Function sb-ext run-program}
 @ffindex @sortas{run-program sb-ext} run-program [sb-ext]
-@deffn{Function} sb-ext:run-program program args &key env environment wait search pty input if-input-does-not-exist output if-output-exists error if-error-exists status-hook external-format directory preserve-fds use-posix-spawn
+@deffn{Function} sb-ext:run-program program args &key env (environment (when sb-impl::env-p (sb-impl::unix-environment-sbcl-from-cmucl sb-impl::env))) (wait t) search pty input if-input-does-not-exist output (if-output-exists :error) (error :output) (if-error-exists :error) status-hook (external-format :default) directory preserve-fds use-posix-spawn
 @code{run-program} creates a new process specified by @code{program}.
 @code{args} is a list of strings to be passed literally to the new program.
 In POSIX environments, this list becomes the array supplied as the second
@@ -1634,7 +1634,7 @@ should not be used.
 @end deffn
 @anchor{Function sb-ext process-kill}
 @ffindex @sortas{process-kill sb-ext} process-kill [sb-ext]
-@deffn{Function} sb-ext:process-kill process signal &optional whom
+@deffn{Function} sb-ext:process-kill process signal &optional (whom :pid)
 Hand @code{signal} to @code{process}. If @code{whom} is @code{:pid}, use the kill Unix system call. If
 @code{whom} is @code{:process-group}, use the @code{killpg(1)} Unix system call.
 Returns @code{t} if successful, otherwise returns @code{nil} and error
@@ -1886,7 +1886,7 @@ SBCL can normalize strings using:
 
 @anchor{Function sb-unicode normalize-string}
 @ffindex @sortas{normalize-string sb-unicode} normalize-string [sb-unicode]
-@deffn{Function} sb-unicode:normalize-string string &optional form filter
+@deffn{Function} sb-unicode:normalize-string string &optional (form :nfd) filter
 Normalize @code{string} to the Unicode normalization form @code{form}.
 Acceptable values for form are @code{:nfd}, @code{:nfc}, @code{:nfkd}, and @code{:nfkc}.
 If @code{filter} is a function it is called on each decomposed character and
@@ -1894,7 +1894,7 @@ only characters for which it returns @code{t} are collected.
 @end deffn
 @anchor{Function sb-unicode normalized-p}
 @ffindex @sortas{normalized-p sb-unicode} normalized-p [sb-unicode]
-@deffn{Function} sb-unicode:normalized-p string &optional form
+@deffn{Function} sb-unicode:normalized-p string &optional (form :nfd)
 Tests if @code{string} is normalized to @code{form}
 @end deffn
 SBCL implements the full range of Unicode case operations with the
@@ -1943,7 +1943,7 @@ Algorithm.
 
 @anchor{Function sb-unicode unicode<}
 @ffindex @sortas{unicode< sb-unicode} unicode< [sb-unicode]
-@deffn{Function} sb-unicode:unicode< string1 string2 &key start1 end1 start2 end2
+@deffn{Function} sb-unicode:unicode< string1 string2 &key (start1 0) end1 (start2 0) end2
 Determines whether @code{string1} sorts before @code{string2} using the Unicode Collation
 Algorithm. The function uses an untailored Default Unicode Collation Element Table
 to produce the sort keys. The function uses the Shifted method for dealing
@@ -1951,14 +1951,14 @@ with variable-weight characters, as described in UTS #10
 @end deffn
 @anchor{Function sb-unicode unicode=}
 @ffindex @sortas{unicode= sb-unicode} unicode= [sb-unicode]
-@deffn{Function} sb-unicode:unicode= string1 string2 &key start1 end1 start2 end2 strict
+@deffn{Function} sb-unicode:unicode= string1 string2 &key (start1 0) end1 (start2 0) end2 (strict t)
 Determines whether @code{string1} and @code{string2} are canonically equivalent according
 to Unicode. The @code{start} and @code{end} arguments behave like the arguments to @code{string=}.
 If @code{:strict} is @code{nil}, @code{unicode=} tests compatibility equivalence instead.
 @end deffn
 @anchor{Function sb-unicode unicode-equal}
 @ffindex @sortas{unicode-equal sb-unicode} unicode-equal [sb-unicode]
-@deffn{Function} sb-unicode:unicode-equal string1 string2 &key start1 end1 start2 end2 strict
+@deffn{Function} sb-unicode:unicode-equal string1 string2 &key (start1 0) end1 (start2 0) end2 (strict t)
 Determines whether @code{string1} and @code{string2} are canonically equivalent after
 casefolding (that is, ignoring case differences) according to Unicode. The
 @code{start} and @code{end} arguments behave like the arguments to @code{string=}. If @code{:strict} is
@@ -1966,17 +1966,17 @@ casefolding (that is, ignoring case differences) according to Unicode. The
 @end deffn
 @anchor{Function sb-unicode unicode<=}
 @ffindex @sortas{unicode<= sb-unicode} unicode<= [sb-unicode]
-@deffn{Function} sb-unicode:unicode<= string1 string2 &key start1 end1 start2 end2
+@deffn{Function} sb-unicode:unicode<= string1 string2 &key (start1 0) end1 (start2 0) end2
 Tests if @code{string1} and @code{string2} are either @code{unicode<} or @code{unicode=}
 @end deffn
 @anchor{Function sb-unicode unicode>}
 @ffindex @sortas{unicode> sb-unicode} unicode> [sb-unicode]
-@deffn{Function} sb-unicode:unicode> string1 string2 &key start1 end1 start2 end2
+@deffn{Function} sb-unicode:unicode> string1 string2 &key (start1 0) end1 (start2 0) end2
 Tests if @code{string2} is @code{unicode<} @code{string1}.
 @end deffn
 @anchor{Function sb-unicode unicode>=}
 @ffindex @sortas{unicode>= sb-unicode} unicode>= [sb-unicode]
-@deffn{Function} sb-unicode:unicode>= string1 string2 &key start1 end1 start2 end2
+@deffn{Function} sb-unicode:unicode>= string1 string2 &key (start1 0) end1 (start2 0) end2
 Tests if @code{string1} and @code{string2} are either @code{unicode=} or @code{unicode>}
 @end deffn
 The following functions are provided for detecting visually
@@ -1984,7 +1984,7 @@ confusable strings:
 
 @anchor{Function sb-unicode confusable-p}
 @ffindex @sortas{confusable-p sb-unicode} confusable-p [sb-unicode]
-@deffn{Function} sb-unicode:confusable-p string1 string2 &key start1 end1 start2 end2
+@deffn{Function} sb-unicode:confusable-p string1 string2 &key (start1 0) end1 (start2 0) end2
 Determines whether @code{string1} and @code{string2} could be visually confusable
 according to the IDNA confusableSummary.txt table
 @end deffn
@@ -2014,7 +2014,7 @@ sentence breaking rules specified in UAX #29
 @end deffn
 @anchor{Function sb-unicode lines}
 @ffindex @sortas{lines sb-unicode} lines [sb-unicode]
-@deffn{Function} sb-unicode:lines string &key margin
+@deffn{Function} sb-unicode:lines string &key (margin *print-right-margin*)
 Breaks @code{string} into lines that are no wider than @code{:margin} according to the
 line breaking rules outlined in UAX #14. Combining marks will always be kept
 together with their base characters, and spaces (but not other types of
@@ -2110,7 +2110,7 @@ arguments to @code{make-hash-table}.
 
 @anchor{Function common-lisp make-hash-table}
 @ffindex @sortas{make-hash-table common-lisp} make-hash-table [common-lisp]
-@deffn{Function} make-hash-table &key test size rehash-size rehash-threshold hash-function weakness synchronized
+@deffn{Function} make-hash-table &key (test 'eql) (size 7) (rehash-size 1.5) (rehash-threshold 1) hash-function weakness synchronized
 Create and return a new hash table. The keywords are as follows:
 
 @itemize

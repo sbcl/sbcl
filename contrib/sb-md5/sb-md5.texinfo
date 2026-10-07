@@ -13,7 +13,7 @@ Calculate the MD5 message-digest of the file specified by @code{pathname}.
 @end deffn
 @anchor{Function sb-md5 md5sum-sequence}
 @ffindex @sortas{md5sum-sequence sb-md5} md5sum-sequence [sb-md5]
-@deffn{Function} sb-md5:md5sum-sequence sequence &key start end
+@deffn{Function} sb-md5:md5sum-sequence sequence &key (start 0) end
 Calculate the MD5 message-digest of data in @code{sequence}, which should
 be a 1d @code{simple-array} with element type (@code{unsigned-byte} 8). On CMU CL
 and SBCL non-simple and non-1d arrays with this element-type are also
@@ -29,7 +29,7 @@ DEPRECATED, as this will not work correctly on implementations with
 @end deffn
 @anchor{Function sb-md5 md5sum-string}
 @ffindex @sortas{md5sum-string sb-md5} md5sum-string [sb-md5]
-@deffn{Function} sb-md5:md5sum-string string &key external-format start end
+@deffn{Function} sb-md5:md5sum-string string &key (external-format :default) (start 0) end
 Calculate the MD5 message-digest of the binary representation of
 @code{string} (as octets) in the external format specified by
 @code{external-format}. The boundaries @code{start} and @code{end} refer to character

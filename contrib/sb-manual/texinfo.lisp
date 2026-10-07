@@ -1,11 +1,19 @@
 (in-package :sb-manual)
 
+(defun lookup-method-xref (xref)
+  (let ((gf (ignore-errors (fdefinition (xref-name xref)))))
+    (when (typep gf 'generic-function)
+      (find-method gf (butlast (xref-locative-args xref))
+                   (first (last (xref-locative-args xref)))))))
+
 (defun xref-defined-p (xref)
   (let ((name (xref-name xref))
         (locative-type (xref-locative-type xref)))
     (case locative-type
       ((function generic-function)
        (ignore-errors (fdefinition name)))
+      ((method)
+       (lookup-method-xref xref))
       ((variable)
        (member (sb-int:info :variable :kind name)
                '(:global :special :constant)))
@@ -25,15 +33,111 @@
               (assert nil () "Unexpected locative type in ~S."
                       xref)))))))
 
-;;; We don't DEFINE-DUMMY DREF:ARGLIST and DREF:DOCSTRING because we
-;;; don't want USE-PAX to affect Texinfo output, which it would
-;;; because DREF:ARGLIST differs from the {incom,re}prehensible
-;;; LAMBDA-LIST*.
+;;; This is a partial reimplementation of DREF:ARGLIST. We don't
+;;; DEFINE-DUMMY DREF:ARGLIST because we don't want USE-PAX to affect
+;;; Texinfo output.
 (defun %arglist (xref)
-  (let ((name (xref-name xref))
-        (locative-type (xref-locative-type xref)))
-    (lambda-list* name locative-type)))
+  (case (xref-locative-type xref)
+    ((package constant variable type structure class condition declaration nil)
+     nil)
+    (method
+     ;; Add the specializers to method arglists. Cargo-culted from
+     ;; DREF::ARGLIST* (METHOD (DREF-EXT:METHOD-DREF)).
+     (let* ((arglist (sb-mop:method-lambda-list (lookup-method-xref xref)))
+            (specializers (first (last (xref-locative-args xref))))
+            (n-specializers (length specializers))
+            (seen-special-p nil))
+       (values (loop for arg in arglist
+                     for i upfrom 0
+                     do (when (member arg '(&key &optional &rest &aux
+                                            &allow-other-keys))
+                          (setq seen-special-p t))
+                     collect (let ((name (if (and (not seen-special-p)
+                                                  (listp arg)
+                                                  (= (length arg) 2))
+                                             (first arg)
+                                             arg)))
+                               (if (and (< i n-specializers)
+                                        ;; Do not clutter the arglist
+                                        ;; with the superfluous T
+                                        ;; specializer.
+                                        (not (eq (elt specializers i) t)))
+                                   (list name (elt specializers i))
+                                   name)))
+               :specialized)))
+    (t
+     (let ((name (xref-name xref)))
+       (when (symbolp name)
+         (multiple-value-bind (ll unknown)
+             (sb-introspect:function-lambda-list name)
+           (if unknown
+               nil
+               (values ll :ordinary))))))))
 
+;;; This is PAX::ARGLIST-TO-TREE repurposed for Texinfo.
+(defun print-arglist (arglist &optional kind)
+  (when kind
+    (let ((methodp (eq kind :specialized)))
+      (labels
+          ((princ-texinfo (&rest args)
+             (dolist (arg args)
+               (write-string (escape-texinfo (princ-to-string arg)))))
+           (prin1-texinfo (&rest args)
+             (dolist (arg args)
+               (write-string (escape-texinfo (prin1-to-string arg)))))
+           (add-arg (arg level)
+             (declare (special *nesting-possible-p*))
+             (cond ((member arg '(&key &optional &rest &body))
+                    (when (member arg '(&key &optional))
+                      (setq *nesting-possible-p* nil))
+                    (prin1-texinfo arg))
+                   ((symbolp arg)
+                    (if (keywordp arg)
+                        (prin1-texinfo arg)
+                        (princ-texinfo arg)))
+                   ((atom arg)
+                    (prin1-texinfo arg))
+                   (*nesting-possible-p*
+                    (add-arglist arg (1+ level)))
+                   ;; &KEY or &OPTIONAL default values
+                   ((<= (length arg) 3)
+                    (let ((name (if (consp (first arg))
+                                    ;; Find :X in ((:X *X*) 7).
+                                    (caar arg)
+                                    (first arg))))
+                      (cond ((second arg)
+                             ;; (X 7 XP) or (X 7) renders as (X 7)
+                             (princ "(")
+                             (princ-texinfo name)
+                             (princ " ")
+                             (prin1-texinfo (second arg))
+                             (princ ")"))
+                            (t
+                             ;; (X NIL XP), (X NIL), (X) renders as X
+                             (princ-texinfo name)))))
+                   (t
+                    (prin1-texinfo arg))))
+           (add-arglist (arglist level)
+             (let ((*nesting-possible-p* (not methodp)))
+               (declare (special *nesting-possible-p*))
+               (unless (= level 0)
+                 (princ "("))
+               (loop for i upfrom 0
+                     for rest on arglist
+                     do (when (eq (first rest) '&aux)
+                          (return))
+                        (unless (zerop i)
+                          (princ " "))
+                        (add-arg (car rest) level)
+                        ;; Handle (&WHOLE FORM NAME . ARGS) and similar.
+                        (unless (listp (cdr rest))
+                          (princ " . ")
+                          (add-arg (cdr rest) level)))
+               (unless (= level 0)
+                 (princ ")")))))
+        (add-arglist arglist 0)))))
+
+;;; A partial reimplemtation of DREF:DOCSTRING
 (defun %docstring (xref)
   (let ((sb-pcl::*normalize-sbcl-docstrings* nil))
     (values (let ((name (xref-name xref))
@@ -43,6 +147,8 @@
                  (documentation name locative-type))
                 ((generic-function)
                  (documentation name 'function))
+                ((method)
+                 (documentation (lookup-method-xref xref) t))
                 ((type class structure condition)
                  (documentation name 'type))
                 (t
@@ -58,46 +164,6 @@
             ;; To be compatible with PAX::@PACKAGE-AND-READTABLE, we
             ;; always return a non-NIL package.
             (docstring-package xref))))
-
-(defun lambda-list* (name kind)
-  (case kind
-    ((package constant variable type structure class condition method
-              declaration nil)
-     nil)
-    (t
-     ;; KLUDGE: Eugh.
-     ;;
-     ;; believe it or not, the above comment was written before CSR
-     ;; came along and obfuscated this.  (2005-07-04)
-     (when (symbolp name)
-       (labels ((clean (x &key optional key)
-                  (typecase x
-                    (atom x)
-                    ((cons (member &optional))
-                     (cons (car x) (clean (cdr x) :optional t)))
-                    ((cons (member &key))
-                     (cons (car x) (clean (cdr x) :key t)))
-                    ((cons (member &whole &environment))
-                     ;; Skip these
-                     (clean (cdr x) :optional optional :key key))
-                    ((cons cons)
-                     (cons
-                      (cond (key (if (consp (caar x))
-                                     (caaar x)
-                                     (caar x)))
-                            (optional (caar x))
-                            (t (clean (car x))))
-                      (clean (cdr x) :key key :optional optional)))
-                    (cons
-                     (cons
-                      (cond ((or key optional) (car x))
-                            (t (clean (car x))))
-                      (clean (cdr x) :key key :optional optional))))))
-         (multiple-value-bind (ll unknown)
-             (sb-introspect:function-lambda-list name)
-           (if unknown
-               (values nil t)
-               (clean ll))))))))
 
 
 (defun locative-type-to-texinfo (locative-type)
@@ -106,6 +172,8 @@
      (values "Function" "ffindex"))
     (generic-function
      (values "Generic function" "ffindex"))
+    (method
+     (values "Method" "ffindex"))
     (variable
      (values "Variable" "vvindex"))
     (class
@@ -231,14 +299,20 @@
             ;; Since we took indexing into our own hands, we just use
             ;; @deffn for all definitions. We could also use @defblock and
             ;; @defline.
-            (format t "@deffn{~A} ~A~{ ~A~}~%"
+            (format t "@deffn{~A} ~A"
                     ;; E.g. "Variable"
                     type
                     (let ((*package* (find-package :cl)))
-                      (prin1-to-string name))
-                    (%arglist xref))
-            (when docstring
-              (emit-texinfo-for-docstring docstring (%arglist xref)))
+                      (prin1-to-string name)))
+            (multiple-value-bind (arglist arglist-kind)
+                (%arglist xref)
+              (when arglist
+                (princ " ")
+                (let ((*package* (find-package :cl)))
+                  (print-arglist arglist arglist-kind)))
+              (terpri)
+              (when docstring
+                (emit-texinfo-for-docstring docstring arglist)))
             (format t "@end deffn~%"))))))
 
 ;;; Remove leading non-alphanumeric characters. They are not important

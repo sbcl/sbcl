@@ -37,7 +37,7 @@ How to use it:
 
 @anchor{Function sb-cover report}
 @ffindex @sortas{report sb-cover} report [sb-cover]
-@deffn{Function} sb-cover:report directory &key form-mode if-matches external-format
+@deffn{Function} sb-cover:report directory &key (form-mode :whole) (if-matches 'identity) (external-format :default)
 Print a code coverage report of all instrumented files into @code{directory}.
 If @code{directory} does not exist, it will be created. The main report will be
 printed to the file cover-index.html. The external format of the source

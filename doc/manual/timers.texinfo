@@ -47,7 +47,7 @@ future versions.
 @end deffn
 @anchor{Function sb-ext make-timer}
 @ffindex @sortas{make-timer sb-ext} make-timer [sb-ext]
-@deffn{Function} sb-ext:make-timer function &key name thread
+@deffn{Function} sb-ext:make-timer function &key name (thread sb-thread:*current-thread*)
 Create a timer that runs @code{function} when triggered.
 
 If a @code{thread} is supplied, @code{function} is run in that thread. If @code{thread} is
@@ -66,7 +66,7 @@ Return the name of @code{timer}.
 @end deffn
 @anchor{Function sb-ext timer-scheduled-p}
 @ffindex @sortas{timer-scheduled-p sb-ext} timer-scheduled-p [sb-ext]
-@deffn{Function} sb-ext:timer-scheduled-p timer &key delta
+@deffn{Function} sb-ext:timer-scheduled-p timer &key (delta 0)
 See if @code{timer} will still need to be triggered after @code{delta} seconds
 from now. For timers with a repeat interval it returns true.
 @end deffn

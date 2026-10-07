@@ -341,14 +341,14 @@ of. Signals an error if @code{package} is not a valid package designator.
 @end deffn
 @anchor{Function sb-ext add-implementation-package}
 @ffindex @sortas{add-implementation-package sb-ext} add-implementation-package [sb-ext]
-@deffn{Function} sb-ext:add-implementation-package packages-to-add &optional package
+@deffn{Function} sb-ext:add-implementation-package packages-to-add &optional (package *package*)
 Adds @code{packages-to-add} as implementation packages of @code{package}. Signals
 an error if @code{package} or any of the @code{packages-to-add} is not a valid
 package designator.
 @end deffn
 @anchor{Function sb-ext remove-implementation-package}
 @ffindex @sortas{remove-implementation-package sb-ext} remove-implementation-package [sb-ext]
-@deffn{Function} sb-ext:remove-implementation-package packages-to-remove &optional package
+@deffn{Function} sb-ext:remove-implementation-package packages-to-remove &optional (package *package*)
 Removes @code{packages-to-remove} from the implementation packages of
 @code{package}. Signals an error if @code{package} or any of the @code{packages-to-remove}
 is not a valid package designator.

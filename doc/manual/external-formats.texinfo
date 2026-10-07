@@ -149,7 +149,7 @@ Lisp strings, the following SBCL-specific functions can be used:
 
 @anchor{Function sb-ext string-to-octets}
 @ffindex @sortas{string-to-octets sb-ext} string-to-octets [sb-ext]
-@deffn{Function} sb-ext:string-to-octets string &key external-format start end null-terminate
+@deffn{Function} sb-ext:string-to-octets string &key (external-format :default) (start 0) end null-terminate
 Return an octet vector that is @code{string} encoded according to @code{external-format}.
 
 If @code{external-format} is given, it must designate an external format.
@@ -170,7 +170,7 @@ length of the returned vector may be different from the length of
 @end deffn
 @anchor{Function sb-ext octets-to-string}
 @ffindex @sortas{octets-to-string sb-ext} octets-to-string [sb-ext]
-@deffn{Function} sb-ext:octets-to-string vector &key external-format start end
+@deffn{Function} sb-ext:octets-to-string vector &key (external-format :default) (start 0) end
 Return a string obtained by decoding @code{vector} according to @code{external-format}.
 
 If @code{external-format} is given, it must designate an external format.

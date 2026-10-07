@@ -444,7 +444,7 @@ X#1  =  2
 
 @anchor{Function sb-debug var}
 @ffindex @sortas{var sb-debug} var [sb-debug]
-@deffn{Function} sb-debug:var name &optional id
+@deffn{Function} sb-debug:var name &optional (id 0)
 Return a variable's value if possible. @code{name} is a simple-string or symbol.
 If it is a simple-string, it is an initial substring of the
 variable's name. If name is a symbol, it has the same name and

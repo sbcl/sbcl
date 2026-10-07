@@ -213,7 +213,7 @@ constructs.
 @end deffn
 @anchor{Function sb-introspect find-function-callers}
 @ffindex @sortas{find-function-callers sb-introspect} find-function-callers [sb-introspect]
-@deffn{Function} sb-introspect:find-function-callers function &optional spaces
+@deffn{Function} sb-introspect:find-function-callers function &optional (spaces '(:all))
 List functions that call @code{function} by searching @code{spaces} for code objects.
 This can make previously garbage objects live.
 
@@ -340,7 +340,7 @@ Experimental: interface subject to change.
 @end deffn
 @anchor{Function sb-introspect map-root}
 @ffindex @sortas{map-root sb-introspect} map-root [sb-introspect]
-@deffn{Function} sb-introspect:map-root function object &key simple ext
+@deffn{Function} sb-introspect:map-root function object &key simple (ext t)
 Call @code{function} with all non-immediate objects pointed to by @code{object}.
 Returns @code{object}.
 

@@ -51,7 +51,7 @@ profiled functions.
 @end deffn
 @anchor{Function sb-profile report}
 @ffindex @sortas{report sb-profile} report [sb-profile]
-@deffn{Function} sb-profile:report &key limit print-no-call-list
+@deffn{Function} sb-profile:report &key limit (print-no-call-list t)
 Report results from profiling. The results are approximately
 adjusted for profiling overhead. The compensation may be rather
 inaccurate when bignums are involved in runtime calculation, as in a

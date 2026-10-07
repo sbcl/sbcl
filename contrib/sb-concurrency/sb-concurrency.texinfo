@@ -277,7 +277,7 @@ set, and returns that as multiple values.
 @end deffn
 @anchor{Macro sb-concurrency frlock-write}
 @ffindex @sortas{frlock-write sb-concurrency} frlock-write [sb-concurrency]
-@deffn{Macro} sb-concurrency:frlock-write (frlock &key wait-p timeout) &body body
+@deffn{Macro} sb-concurrency:frlock-write (frlock &key (wait-p t) timeout) &body body
 Executes @code{body} while holding @code{frlock} for writing.
 @end deffn
 @anchor{Function sb-concurrency make-frlock}
@@ -322,7 +322,7 @@ Example:
 @end deffn
 @anchor{Function sb-concurrency grab-frlock-write-lock}
 @ffindex @sortas{grab-frlock-write-lock sb-concurrency} grab-frlock-write-lock [sb-concurrency]
-@deffn{Function} sb-concurrency:grab-frlock-write-lock frlock &key wait-p timeout
+@deffn{Function} sb-concurrency:grab-frlock-write-lock frlock &key (wait-p t) timeout
 Acquires @code{frlock} for writing, invalidating existing and future read-tokens
 for the duration. Returns @code{t} on success, and @code{nil} if the lock wasn't acquired
 due to e.g. a timeout. Using @code{frlock-write} instead is recommended.

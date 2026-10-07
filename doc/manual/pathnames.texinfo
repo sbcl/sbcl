@@ -83,7 +83,7 @@ expected to preserve equivalence under @code{equal}.
 
 @anchor{Function sb-ext parse-native-namestring}
 @ffindex @sortas{parse-native-namestring sb-ext} parse-native-namestring [sb-ext]
-@deffn{Function} sb-ext:parse-native-namestring thing &optional host defaults &key start end junk-allowed as-directory
+@deffn{Function} sb-ext:parse-native-namestring thing &optional host (defaults *default-pathname-defaults*) &key (start 0) end junk-allowed as-directory
 Convert @code{thing} into a pathname, using the native conventions
 appropriate for the pathname host @code{host}, or if not specified the
 host of @code{defaults}.  If @code{thing} is a string, the parse is bounded by

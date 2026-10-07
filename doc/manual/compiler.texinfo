@@ -694,7 +694,7 @@ Print all global optimization settings, augmented by @code{spec}.
 @end deffn
 @anchor{Function sb-ext restrict-compiler-policy}
 @ffindex @sortas{restrict-compiler-policy sb-ext} restrict-compiler-policy [sb-ext]
-@deffn{Function} sb-ext:restrict-compiler-policy &optional quality min max
+@deffn{Function} sb-ext:restrict-compiler-policy &optional quality (min 0) (max 3)
 Assign a minimum value to an optimization quality. @code{quality} is the name of
 the optimization quality to restrict, @code{min} (defaulting to zero) is the
 minimum allowed value, and @code{max} (defaults to 3) is the maximum.
