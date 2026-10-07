@@ -1095,13 +1095,10 @@ The result is not guaranteed to have the same length as the input."
                             (t nil)))
                     (setf incb-state
                           (cond
-                            ((and (member incb-state '(:start :linker))
-                                  (proplist-p char1 :indic-conjunct-break=linker))
-                             :linker)
-                            ((and (member incb-state '(:start :linker))
+                            ((proplist-p char1 :indic-conjunct-break=linker) :linker)
+                            ((and (eql incb-state :linker)
                                   (proplist-p char1 :indic-conjunct-break=extend))
-                             incb-state)
-                            ((proplist-p char1 :indic-conjunct-break=consonant) :start)
+                             :linker)
                             (t nil)))
                     (cond
                       ((and (eql c1 :cr) (eql c2 :lf)))
@@ -1589,7 +1586,7 @@ appear in an SBCL string. The line-breaking behavior of surrogates is undefined.
          (between :any :wj :cant)                    ; LB11
          (between :wj :any :cant)                    ; LB11
          (between :gl :any :cant)                    ; LB12
-         (between (not '(:sp :ba :hy :hh)) :gl :cant) ; LB12a
+         (between (not '(:sp :hy :hh)) :gl :cant)    ; LB12a
          (between :any '(:cl :cp :ex :sy) :cant)     ; LB13
          (after-spaces :op :any :cant)               ; LB14
          (when (and (member t0 '(:sot :bk :cr :lf :nl :op :qu :gl :sp :zw))
@@ -1740,9 +1737,6 @@ it defaults to 80 characters"
 
 
 ;;; Collation
-(defconstant +maximum-variable-primary-element+
-  #.(read-lisp-expr-file "other-collation-info"))
-
 (defun unpack-collation-key (key)
   (flet ((unpack (value)
            (list (ldb (byte 16 16) value)
@@ -1754,7 +1748,8 @@ it defaults to 80 characters"
 
 (declaim (inline variable-p))
 (defun variable-p (x)
-  (<= 1 x +maximum-variable-primary-element+))
+  (symbol-macrolet ((inclusive-bounds '#.(read-lisp-expr-file "other-collation-info")))
+    (<= (car inclusive-bounds) x (cdr inclusive-bounds))))
 
 ;;; I wanted to check the the performance of a non-minimal perfect hash function.
 ;;; As expected, the simpler non-minimal formula is faster, but it uses 2^16
@@ -1833,7 +1828,10 @@ it defaults to 80 characters"
                                             (<= #x18D80 code1 #x18DFF)))
                    (nushu-p (<= #x1B170 code1 #x1B2FF))
                    (khitan-small-p (<= #x18B00 code1 #x18CFF))
-                   (siniform-p (or tangut-p tangut-components-p nushu-p khitan-small-p))
+                   (jurchen-p (<= #x18E00 code1 #x191DF))
+                   (seal-p (<= #x3D000 code1 #x3FC3F))
+                   (siniform-p (or tangut-p tangut-components-p nushu-p
+                                   khitan-small-p jurchen-p seal-p))
                    (boffset 0)
                    (base
                      (cond ((and unified-ideograph-p
@@ -1844,6 +1842,8 @@ it defaults to 80 characters"
                            (tangut-components-p (setq boffset #x18800) #xFB01)
                            (nushu-p (setq boffset #x1B170) #xFB02)
                            (khitan-small-p (setq boffset #x18B00) #xFB03)
+                           (jurchen-p (setq boffset #x18E00) #xFB04)
+                           (seal-p (setq boffset #x3D000) #xFB05)
                            (t #xFBC0)))
                    (a (+ base (if siniform-p 0 (ash code1 -15))))
                    (b (logior #x8000 (if siniform-p (- code1 boffset) (logand code1 #x7FFF)))))
@@ -1898,7 +1898,8 @@ it defaults to 80 characters"
                  (push k1 primary)
                  (push-non-zero k2 secondary)
                  (push-non-zero k3 tertiary)
-                 (push #xFFFF quatenary))
+                 ;; 1 is arbitrary but matches the UCA test files
+                 (push (if (= k1 #x0200) 1 #xFFFF) quatenary))
                 ((/= k3 0)
                  (unless after-variable
                    (push-non-zero k2 secondary)
@@ -1916,6 +1917,29 @@ it defaults to 80 characters"
               ((> i j) (return-from vector< nil))))
   ;; If there's no differences, shortest vector wins
   (< (length vector1) (length vector2)))
+
+;;; TODO: unify with VECTOR< if we can avoid paying costs for the generality
+(defun uts10-string< (string1 string2)
+  (flet ((uts10-code (char)
+           (let ((code (char-code char)))
+             ;; this is a little bit laconic in UTS#10, but here's
+             ;; what I understand: U+FFFE (a non-character) is treated
+             ;; as a "field separator" and as such should sort before
+             ;; all characters.  There is no analogous treatment of
+             ;; U+FFFF (another non-character) to make it sort after
+             ;; all characters because it is only defined at the very
+             ;; end of a string (as an upper bound) and therefore we
+             ;; will never get to this tiebreaker to compare a U+FFFF
+             ;; with a non-U+FFFF.  -- CSR, 2026-10-07
+             (if (= code #xfffe) -1 code))))
+    (loop for c1 across string1
+          for c2 across string2
+          for code1 = (uts10-code c1)
+          for code2 = (uts10-code c2)
+          do
+          (cond ((< code1 code2) (return-from uts10-string< t))
+                ((> code1 code2) (return-from uts10-string< nil))))
+    (< (length string1) (length string2))))
 
 (defun unicode= (string1 string2 &key (start1 0) end1 (start2 0) end2 (strict t))
   "Determines whether STRING1 and STRING2 are canonically equivalent according
@@ -1945,7 +1969,7 @@ with variable-weight characters, as described in UTS #10"
          (s2 (subseq string2 start2 end2))
          (k1 (sort-key s1)) (k2 (sort-key s2)))
     (if (equalp k1 k2)
-        (string< (normalize-string s1 :nfd) (normalize-string s2 :nfd))
+        (uts10-string< (normalize-string s1 :nfd) (normalize-string s2 :nfd))
         (vector< k1 k2))))
 
 (defun unicode<= (string1 string2 &key (start1 0) end1 (start2 0) end2)

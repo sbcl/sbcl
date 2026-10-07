@@ -19,17 +19,19 @@
      ,@body))
 
 (defmacro with-input-utf8-file
-    ((s name &key (eszets 0) (registereds 1) (copyrights 1)) &body body)
+    ((s name &key (eszets 0) (registereds 1) (copyrights 1) (ldquos 0) (rdquos 0)) &body body)
   ;; KLUDGE: Unicode data files in general have registered and
   ;; copyright marks (non-ASCII characters) in the header;
-  ;; additionally, CaseFolding.txt as distributed by Unicode contains
-  ;; a non-ASCII character, an eszet, within a comment to act as an
-  ;; example.  We can't in general assume that our host lisp will let
-  ;; us read those, and we can't portably write that we don't care
-  ;; about the text content of anything on a line after a hash because
-  ;; text decoding happens at a lower level.  So here we rewrite data
-  ;; files to exclude the UTF-8 sequences corresponding to those
-  ;; characters (and error if we see any other UTF-8 sequence).
+  ;; additionally, CaseFolding.txt and SpecialCasing.txt as
+  ;; distributed by Unicode contain non-ASCII characters (an eszet;
+  ;; and two eszets, one within curly double quotes respectively)
+  ;; within comments.  We can't in general assume that our host lisp
+  ;; will let us read those, and we can't portably write that we don't
+  ;; care about the text content of anything on a line after a hash
+  ;; because text decoding happens at a lower level.  So here we
+  ;; rewrite data files to exclude the UTF-8 sequences corresponding
+  ;; to those characters (and error if we see any other UTF-8
+  ;; sequence).
   (let ((in (gensym "IN"))
         (out (gensym "OUT")))
     `(let ((filename (format nil "~A.txt" ,name)))
@@ -50,7 +52,11 @@
                 (copyright (map '(vector (unsigned-byte 8)) 'char-code "<copyright>"))
                 (copyright-count 0)
                 (registered (map '(vector (unsigned-byte 8)) 'char-code "<registered>"))
-                (registered-count 0))
+                (registered-count 0)
+                (ldquo (map '(vector (unsigned-byte 8)) 'char-code "<ldquo>"))
+                (ldquo-count 0)
+                (rdquo (map '(vector (unsigned-byte 8)) 'char-code "<rdquo>"))
+                (rdquo-count 0))
                ((null inbyte)
                 (unless (= eszet-count ,eszets)
                   (error "Unexpected number of eszets in ~A: ~D (expected ~D)"
@@ -60,8 +66,26 @@
                          filename copyright-count ,copyrights))
                 (unless (= registered-count ,registereds)
                   (error "Unexpected number of registered symbols in ~A: ~D (expected ~D)"
-                         filename registered-count ,registereds)))
+                         filename registered-count ,registereds))
+                (unless (= ldquo-count ,ldquos)
+                  (error "Unexpected number of left double quotes in ~A: ~D (expected ~D)"
+                         filename ldquo-count ,ldquos))
+                (unless (= rdquo-count ,rdquos)
+                  (error "Unexpected number of right double quotes in ~A: ~D (expected ~D)"
+                         filename rdquo-count ,rdquos)))
              (cond
+               ((= inbyte #xe2)
+                (let ((second (read-byte ,in nil nil))
+                      (third (read-byte ,in nil nil)))
+                  (cond
+                    ((or (null second) (null third))
+                     (error "No continuation after #xe2 in ~A" filename))
+                    ((and (= second #x80) (= third #x9c))
+                     (incf ldquo-count) (write-sequence ldquo ,out))
+                    ((and (= second #x80) (= third #x9d))
+                     (incf rdquo-count) (write-sequence rdquo ,out))
+                    (t (error "Unexpected continuation after #xe2 in ~A: #x~X #x~X"
+                              filename second third)))))
                ((= inbyte #xc3)
                 (let ((second (read-byte ,in nil nil)))
                   (cond
@@ -230,7 +254,7 @@
 (defparameter *different-casefolds* nil)
 
 (defparameter *case-mapping*
-  (with-input-utf8-file (s "SpecialCasing")
+  (with-input-utf8-file (s "SpecialCasing" :eszets 2 :ldquos 1 :rdquos 1)
     (loop with hash = (make-hash-table)
        for line = (read-line s nil nil) while line
        unless (or (not (position #\# line)) (= 0 (position #\# line)))
@@ -870,6 +894,7 @@ Length should be adjusted when the standard changes.")
 
 
 ;;; Collation keys
+(defvar *minimum-variable-key* #xffff)
 (defvar *maximum-variable-key* 1)
 
 (defun bitpack-collation-key (primary secondary tertiary)
@@ -896,8 +921,9 @@ Length should be adjusted when the standard changes.")
                               (split-string (substitute #\. #\* key) #\.)))
                collect
                  (destructuring-bind (primary secondary tertiary) parsed
-                   (when variable-p (setf *maximum-variable-key*
-                                          (max primary *maximum-variable-key*)))
+                   (when variable-p
+                     (setf *maximum-variable-key* (max primary *maximum-variable-key*)
+                           *minimum-variable-key* (min primary *minimum-variable-key*)))
                    (bitpack-collation-key primary secondary tertiary)))))
     (values code-points ret))))
 
@@ -1087,9 +1113,8 @@ Used to look up block data.")
                        (setq sum (logior (ash sum 32) part))))))))
     (format output ")~%"))
   (with-output-lisp-expr-file (*standard-output* "other-collation-info")
-    (write-string ";;; The highest primary variable collation index")
-    (terpri)
-    (prin1 *maximum-variable-key*) (terpri)))
+    (write-string ";;; The primary variable collation index bounds")
+    (terpri) (prin1 (cons *minimum-variable-key* *maximum-variable-key*)) (terpri)))
 
 (defun output (&optional (*output-directory* *output-directory*))
   (ensure-directories-exist *output-directory*)
