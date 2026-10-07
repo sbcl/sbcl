@@ -15,15 +15,14 @@
              (:predicate proto-fn-p)
              (:conc-name proto-fn-)
              (:constructor %make-proto-fn
-                           (name lambda-list decls forms docstring
-                                 &optional (pretty-arglist lambda-list)))
+                           (name pretty-arglist ll-parts decls forms docstring))
              (:copier nil))
   (source-location
    (let ((s (sb-c::make-definition-source-location)))
      (if (sb-c::definition-source-location-namestring s) s)))
   (name        0 :read-only nil)
-  (lambda-list 0 :read-only nil)
   (pretty-arglist) ; same as what a generic-function terms it
+  (ll-parts    0 :read-only t) ; vector of the pieces of the lambda-list
   ;; BODY encompasses all three of the following slots.
   (decls       0 :read-only t)
   (forms       0 :read-only t)
@@ -57,6 +56,13 @@
 (declaim (inline fun-proto-fn))
 (defun fun-proto-fn (f)
   (truly-the interpreted-fun-prototype (interpreted-function-%proto-fn f)))
+
+(defun proto-fn-lambda-list (fun)
+  (let ((parts (proto-fn-ll-parts fun)))
+    ;; Convert PARTS back to a list. If you want the arbitrarily settable lambda list,
+    ;; just read PRETTY-ARGLIST directly.
+    (make-lambda-list (svref parts 0) #|whole=|# nil (svref parts 1) (svref parts 2)
+                      (svref parts 3) (svref parts 4) (svref parts 5))))
 
 (defun fun-lambda-expression (fun)
   (let* ((proto-fn (fun-proto-fn fun))

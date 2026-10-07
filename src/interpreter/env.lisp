@@ -614,6 +614,14 @@
                                    :key #'car))))
           (setf (logbitp i special-b) t))))))
 
+(defun lambda-list-to-parts (lambda-list silent)
+  (multiple-value-bind (llks req opt rest keys aux)
+      (parse-lambda-list lambda-list
+                         :accept (lambda-list-keyword-mask
+                                  '(&optional &rest &key &allow-other-keys &aux))
+                         :silent silent)
+    (vector llks req opt rest keys aux)))
+
 (defun make-proto-fn (lambda-expression &optional (silent t))
   (multiple-value-bind (name lambda-list body)
       (if (memq (car lambda-expression) '(named-lambda))
@@ -624,12 +632,13 @@
     ;; Choke now if the list can't be parsed.
     ;; If lexical environment is NIL, :silent will be passed as NIL,
     ;; and we can warn about "suspicious variables" and such.
-    (parse-lambda-list lambda-list :silent silent)
     (multiple-value-bind (forms decls docstring) (parse-body body t t)
-      (%make-proto-fn name lambda-list decls forms docstring
+      (%make-proto-fn name
                       (do-decl-spec (spec decls lambda-list)
                         (when (eq (car spec) 'sb-c::lambda-list)
-                          (return (cadr spec))))))))
+                          (return (cadr spec))))
+                      (lambda-list-to-parts lambda-list silent)
+                      decls forms docstring))))
 
 ;; Find function named by FNAME in ENV or an ancestor, returning three values:
 ;;  * KIND = {:MACRO,:FUNCTION}
@@ -929,6 +938,8 @@
                             expander
                             (make-function
                              (%make-proto-fn `(macrolet ,(car cell)) '(form env)
+                                             ;; llks, req, opt, rest, key, aux
+                                             #(0 (form env) nil nil nil nil)
                                              nil ; decls
                                              `((funcall ,expander form env)) nil)
                              nil)))) ; environment for the interpreted fun

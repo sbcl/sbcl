@@ -1065,8 +1065,9 @@
                         (forms (if (has-return-p `(progn ,@forms) env block)
                                    `((block ,block ,@forms))
                                    forms)))
-                   (%make-proto-fn `(,kind ,name) lambda-list decls forms
-                                   docstring)))))))
+                   (%make-proto-fn `(,kind ,name) lambda-list
+                                   (lambda-list-to-parts lambda-list t)
+                                   decls forms docstring)))))))
     (multiple-value-bind (forms decls) (parse-body body nil t)
       (make-local-fn-scope decls (map 'vector #'proto-functionize bindings)
                            forms env))))

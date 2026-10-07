@@ -335,13 +335,12 @@
 
 ;;; Compress LAMBDA-LIST into a representation that encodes which arguments
 ;;; have defaulting forms and/or supplied-p variables.
-(defun encode-lambda-bindings (lambda-list form-converter)
+(defun encode-lambda-bindings (ll-parts form-converter)
+  (declare (type (simple-vector 6) ll-parts))
   (let ((n-optional 0) (n-keys -1) fancy-vars decoder keys)
     (multiple-value-bind (llks required optional rest keyword-args aux)
-        (parse-lambda-list lambda-list
-                           :accept (lambda-list-keyword-mask
-                                    '(&optional &rest &key &allow-other-keys &aux))
-                           :silent t)
+        (values (svref ll-parts 0) (svref ll-parts 1) (svref ll-parts 2)
+                (svref ll-parts 3) (svref ll-parts 4) (svref ll-parts 5))
       ;; Do I need more syntax checking? PARSE-LAMBDA-LIST enforces syntactic
       ;; validity but not that the vars are bindable; however the specialness
       ;; check enforces the latter, so we're probably ok.
@@ -429,7 +428,7 @@
 (defun digest-lambda (env proto-fn)
   (binding*
       (((required-args other-args keyword-bits decoder n-opt)
-        (encode-lambda-bindings (proto-fn-lambda-list proto-fn)
+        (encode-lambda-bindings (proto-fn-ll-parts proto-fn)
                                 (lambda (x) (%sexpr (second x)))))
        (decls (proto-fn-decls proto-fn))
        (n-required (length required-args))
