@@ -381,7 +381,7 @@ is only included for backwards compatibility."
 (eval-when (:compile-toplevel :execute)
 (defmacro psxhash-to-name-hash (h str)
   (declare (ignorable str))
-  #+64-bit `(ldb (byte 32 32) (sb-impl::murmur3-fmix-word (sb-ext:truly-the fixnum ,h)))
+  #+64-bit `(ldb (byte 32 30) (sb-impl::murmur3-fmix-word (sb-ext:truly-the fixnum ,h)))
   #-64-bit `(word-mix (sb-impl::murmur3-fmix-word (sb-ext:truly-the fixnum ,h))
                       (let ((c (char-code (char ,str 0))))
                         (if (or (<= (char-code #\a) c (char-code #\z))
