@@ -1651,11 +1651,26 @@
       (when (policy *lexenv* (= speed 3))
         (compiler-notify "Ignoring DYNAMIC-EXTENT declarations: ~S" names))))
 
-;;; FIXME: This is non-ANSI, so the default should be T, or it should
-;;; go away, I think.
-;;; Or just rename the declaration to SB-C:RESULT-TYPE so that it's not
-;;; a symbol in the CL package, and then eliminate this switch.
-;;; It's permissible to have implementation-specific declarations.
+;;; The VALUES declaration is a syntactic convenience which is roughly equivalent to
+;;; putting an FTYPE on a function. (There are subtle distinctions, but it's similar)
+;;; It is permissible to use the symbol VALUES because:
+;;; - CLHS 3.3.3: "An implementation is free to support other (implementation-defined)
+;;;   declaration identifiers"
+;;; - 11.1.2.1.1 Constraints on the COMMON-LISP Package for Conforming Implementations
+;;;   says that functions, variables, and types are defined on CL symbols only as specified,
+;;;   and does * NOT * state that nonstandard declaration identifiers must not be
+;;;   associated with external symbols of the CL package.
+;;; - 11.1.2.1.2 Constraints on the COMMON-LISP Package for Conforming Programs
+;;;   says "consequences are undefined if ..." user code attempts altering aspects
+;;;   of the symbol VALUES by:
+;;;   item 4. Defining it as a type specifier - so (VALUES myvar) can't possibly
+;;;           be the [3.3.3.1] Shorthand notation for (TYPE VALUES myvar)
+;;;   item 6. Defining it as a declaration with a declaration proclamation.
+;;;
+;;; Therefore users can not portably redefine VALUES as their own type or declaration,
+;;; and also can't claim that its presence is a spec violation.
+;;; When set to T, you'll get a warning about an unrecognized declaration, if you want
+;;; to be pedantic.
 (defvar *suppress-values-declaration* nil
   "If true, processing of the VALUES declaration is inhibited.")
 
