@@ -1153,7 +1153,7 @@
              (dolist (sym (cdr spec))
                (let ((var (cdr (assoc sym vars))))
                  (when (sb-c::lambda-var-p var)
-                   (setf (sb-c::lambda-var-flags var) 1)))))
+                   (setf (sb-c::lambda-var-ignorep var) t)))))
             ((inline notinline)
              ;; This is just enough to get sb-cltl2 tests to pass.
              (let ((inlinep (car spec)))
