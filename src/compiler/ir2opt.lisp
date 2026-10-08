@@ -187,7 +187,7 @@
      (flet ((coerce-tn (tn move)
               (if (or (eq tn res)
                       (eq (vop-name move) 'move)
-                      (sc-is tn sb-vm::immediate sb-vm::fp-immediate)
+                      (sc-is tn sb-vm::immediate #+arm64 sb-vm::fp-immediate)
                       (compatible-move-p res tn))
                   tn
                   (let ((intermediate-tn (make-representation-tn (tn-primitive-type res)
@@ -197,7 +197,8 @@
                         (cond #+arm64
                               ((member (vop-name move) '(sb-vm::move-to-word/fixnum
                                                          sb-vm::move-from-character
-                                                         sb-vm::move-to-character))
+                                                         sb-vm::move-to-character
+                                                         sb-vm::move-to-single-reg))
                                ;; Doesn't affect the flags, can be
                                ;; issued after the test, potentially
                                ;; reusing a register.
