@@ -1813,11 +1813,9 @@
                     (setq result-type
                           (values-type-intersection
                            result-type
-                           (or (compiler-values-specifier-type
-                                (let ((types (cdr spec)))
-                                  (if (singleton-p types)
-                                      (car types)
-                                      `(values ,@types))))
+                           (or (if (singleton-p (cdr spec))
+                                   (compiler-specifier-type (cadr spec))
+                                   (compiler-values-specifier-type spec))
                                (return-from process-it)))))
                    ((and allow-explicit-check
                          (typep spec '(cons (eql explicit-check))))
