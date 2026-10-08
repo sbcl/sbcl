@@ -210,6 +210,19 @@
   (:result-types signed-num)
   (:note "inline (signed-byte 64) arithmetic"))
 
+;; Try filling the zeros in the mask with ones where the integer already has zeros,
+;; which might sign-extend the mask into a negative 32-bit immediate
+(defun sign-extend-log-mask (mask arg-ref &optional fixnum)
+  (when (integerp mask)
+    (let* ((width (sb-c::unsigned-type-width (tn-ref-type arg-ref)))
+           (extra-ones (and width
+                            (progn
+                              (when fixnum
+                                (incf width))
+                              (dpb -1 (byte (- 64 width) width) mask)))))
+      (when (imm32-p extra-ones)
+        extra-ones))))
+
 (macrolet ((define-binop (translate untagged-penalty op
                           &key fixnum=>fixnum c/fixnum=>fixnum
                                signed=>signed c/signed=>signed
@@ -220,61 +233,61 @@
                              fixnum-binop)
                   (:translate ,translate)
                   (:generator 2
-                   ,@(or fixnum=>fixnum `((move r x) (inst ,op r y)))))
+                    ,@(or fixnum=>fixnum `((move r x) (inst ,op r y)))))
                 (define-vop (,(symbolicate translate '-c/fixnum=>fixnum)
                              fixnum-binop-c)
                   (:arg-refs x-ref)
                   (:translate ,translate)
                   (:generator 1
-                   ,@(or c/fixnum=>fixnum
-                         `((let ((fy (fixnumize y)))
-                             (cond ((and (not (imm32-p fy))
-                                         (not (location= x r)))
-                                    (inst mov r fy)
-                                    (inst ,op r x))
-                                   (t
-                                    (move r x)
-                                    (inst ,op r (constantize fy)))))))))
+                    ,@(or c/fixnum=>fixnum
+                        `((let ((fy (fixnumize y)))
+                            (cond ((and (not (imm32-p fy))
+                                        (not (location= x r)))
+                                   (inst mov r fy)
+                                   (inst ,op r x))
+                                  (t
+                                   (move r x)
+                                   (inst ,op r (constantize fy)))))))))
                 (define-vop (,(symbolicate translate "/SIGNED=>SIGNED")
                              signed-binop)
                   (:translate ,translate)
                   (:generator ,(1+ untagged-penalty)
-                   ,@(or signed=>signed `((move r x) (inst ,op r y)))))
+                    ,@(or signed=>signed `((move r x) (inst ,op r y)))))
                 (define-vop (,(symbolicate translate '-c/signed=>signed)
                              signed-binop-c)
                   (:arg-refs x-ref)
                   (:translate ,translate)
                   (:generator ,untagged-penalty
-                   ,@(or c/signed=>signed
-                       `((cond ((and (not (imm32-p y))
-                                     (not (location= x r)))
-                                (inst mov r y)
-                                (inst ,op r x))
-                               (t
-                                (move r x)
-                                (inst ,op r (constantize y))))))))
+                    ,@(or c/signed=>signed
+                        `((cond ((and (not (imm32-p y))
+                                      (not (location= x r)))
+                                 (inst mov r y)
+                                 (inst ,op r x))
+                                (t
+                                 (move r x)
+                                 (inst ,op r (constantize y))))))))
                 (define-vop (,(symbolicate ""
                                            translate
                                            "/UNSIGNED=>UNSIGNED")
                              unsigned-binop)
                   (:translate ,translate)
                   (:generator ,(1+ untagged-penalty)
-                   ,@(or unsigned=>unsigned `((move r x) (inst ,op r y)))))
+                    ,@(or unsigned=>unsigned `((move r x) (inst ,op r y)))))
                 (define-vop (,(symbolicate
-                                           translate
-                                           '-c/unsigned=>unsigned)
+                               translate
+                               '-c/unsigned=>unsigned)
                              unsigned-binop-c)
                   (:arg-refs x-ref)
                   (:translate ,translate)
                   (:generator ,untagged-penalty
-                   ,@(or c/unsigned=>unsigned
-                       `((cond ((and (not (imm32-p y))
-                                     (not (location= x r)))
-                                (inst mov r y)
-                                (inst ,op r x))
-                               (t
-                                (move r x)
-                                (inst ,op r (constantize y)))))))))))
+                    ,@(or c/unsigned=>unsigned
+                        `((cond ((and (not (imm32-p y))
+                                      (not (location= x r)))
+                                 (inst mov r y)
+                                 (inst ,op r x))
+                                (t
+                                 (move r x)
+                                 (inst ,op r (constantize y)))))))))))
 
   ;; The following have microoptimizations for some special cases
   ;; not caught by the front end.
@@ -302,28 +315,23 @@
              ((imm32-p y)
               (move r x)
               (inst and r y))
-             ((let* ((width (sb-c::unsigned-type-width (tn-ref-type x-ref)))
-                     (extra-ones (and width
-                                      (dpb -1 (byte (- 64 (1+ width)) (1+ width)) y))))
-                ;; Try filling the zeros in the mask with ones where the integer already has zeros,
-                ;; which might sign-extend the mask into a negative 32-bit immediate
-                (cond ((imm32-p extra-ones)
-                       (move r x)
-                       (inst and r extra-ones)
-                       t)
-                      ((= y (fixnumize most-positive-fixnum))
-                       (move r x)
-                       (inst btr r 63)
-                       t)
-                      (t
-                       (let* ((int (sb-c::type-approximate-interval (tn-ref-type x-ref)))
-                              (mask (logandc1 (logior y fixnum-tag-mask)
-                                              (ldb (byte (+ (integer-length (sb-c::interval-high int)) n-fixnum-tag-bits) 0) -1))))
-                         (when (and (>= (sb-c::interval-low int) 0)
-                                    (= (logcount mask) 1))
-                           (move r x)
-                           (inst btr r (1- (integer-length mask)))
-                           t))))))
+             ((let ((extend (sign-extend-log-mask y x-ref t)))
+                (when extend
+                  (move r x)
+                  (inst and r extend)
+                  t)))
+             ((= y (fixnumize most-positive-fixnum))
+              (move r x)
+              (inst btr r 63)
+              t)
+             ((let* ((int (sb-c::type-approximate-interval (tn-ref-type x-ref)))
+                     (mask (logandc1 (logior y fixnum-tag-mask)
+                                     (ldb (byte (+ (integer-length (sb-c::interval-high int)) n-fixnum-tag-bits) 0) -1))))
+                (when (and (>= (sb-c::interval-low int) 0)
+                           (= (logcount mask) 1))
+                  (move r x)
+                  (inst btr r (1- (integer-length mask)))
+                  t)))
              ((location= x r)
               (inst and r (constantize y)))
              (t
@@ -345,14 +353,10 @@
              ((imm32-p y)
               (move r x)
               (inst and r y))
-             ((let* ((width (sb-c::unsigned-type-width (tn-ref-type x-ref)))
-                     (extra-ones (and width
-                                      (dpb -1 (byte (- 64 width) width) y))))
-                ;; Try filling the zeros in the mask with ones where the integer already has zeros,
-                ;; which might sign-extend the mask into a negative 32-bit immediate
-                (when (imm32-p extra-ones)
+             ((let ((extend (sign-extend-log-mask y x-ref)))
+                (when extend
                   (move r x)
-                  (inst and r extra-ones)
+                  (inst and r extend)
                   t)))
              ((= (logcount (logandc1 y most-positive-word)) 1)
               (move r x)
@@ -376,14 +380,10 @@
              ((imm32-p y)
               (move r x)
               (inst and r y))
-             ((let* ((width (sb-c::unsigned-type-width (tn-ref-type x-ref)))
-                     (extra-ones (and width
-                                      (dpb -1 (byte (- 64 width) width) y))))
-                ;; Try filling the zeros in the mask with ones where the integer already has zeros,
-                ;; which might sign-extend the mask into a negative 32-bit immediate
-                (when (imm32-p extra-ones)
+             ((let ((extend (sign-extend-log-mask y x-ref)))
+                (when extend
                   (move r x)
-                  (inst and r extra-ones)
+                  (inst and r extend)
                   t)))
              ((= (logcount (logandc1 y most-positive-word)) 1)
               (move r x)
@@ -3795,7 +3795,7 @@
 ;;; if doing so could affect whether the sign flag comes out the same.
 ;;; e.g. if EDX is #xff, "TEST EDX, #x80" indicates a non-negative result
 ;;; whereas "TEST DL, #x80" indicates a negative result.
-(defun emit-optimized-test-inst (x y temp sign-bit-matters)
+(defun emit-optimized-test-inst (x y temp sign-bit-matters x-ref fixnum)
   (let* ((bits (if (or (not (integerp y)) (minusp y))
                    64
                    (immediate-operand-smallest-nbits y)))
@@ -3831,10 +3831,17 @@
            (change-vop-flags sb-assem::*current-vop* '(:c))
            (inst bt x (1- (integer-length (ldb (byte n-word-bits 0) y)))))
           ((not size)
-           ;; Ensure that both operands are acceptable
-           ;; by possibly loading one into TEMP
-            (multiple-value-setq (x y) (ensure-not-mem+mem x y temp))
-            (inst test :qword x y))
+           (cond ((imm32-p y)
+                  (inst test :qword x y))
+                 ((let ((extend (sign-extend-log-mask y x-ref fixnum)))
+                    (when extend
+                      (inst test x extend)
+                      t)))
+                 (t
+                  ;; Ensure that both operands are acceptable
+                  ;; by possibly loading one into TEMP
+                  (multiple-value-setq (x y) (ensure-not-mem+mem x y temp))
+                  (inst test :qword x y))))
           (memory-p
            ;; Otherwise, when using an immediate operand smaller
            ;; than 64 bits, narrow the reg/mem operand to match.
@@ -3865,10 +3872,11 @@
                                       ,(symbolicate "CONDITIONAL" suffix))
                            (:translate logtest)
                            (:conditional :ne)
+                           (:arg-refs x-ref)
                            (:generator ,cost
                              (emit-optimized-test-inst x
                                ,(if (eq suffix '-c/fixnum) `(fixnumize y) 'y)
-                               temp nil)))))))
+                               temp nil x-ref ,(and (memq suffix '(/fixnum -c/fixnum)) t))))))))
   (define-logtest-vops))
 
 ;;; This works for tagged or untagged values, but the vop optimizer

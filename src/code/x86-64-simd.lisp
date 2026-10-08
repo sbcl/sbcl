@@ -1238,8 +1238,7 @@
   (with-pinned-objects (string)
     (let* ((head (sb-impl::buffer-head ibuf))
            (tail (sb-impl::buffer-tail ibuf))
-           (n (logand (min (- end start)
-                           (- tail head))
+           (n (logand (the unsigned-byte (min (- end start) (- tail head)))
                       -16))
            (copied
              (inline-vop (((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
@@ -1523,7 +1522,7 @@
     (let* ((tail (sb-impl::buffer-tail obuf))
            (buffer-left (- (sb-impl::buffer-length obuf) tail))
            (string-left (- end start))
-           (n (logand (min buffer-left string-left) -16))
+           (n (logand (the unsigned-byte (min buffer-left string-left)) -16))
            (string-start (truly-the fixnum (* start 4))))
       (multiple-value-bind (copied last-newline)
           (inline-vop (((byte-array* sap-reg t) (sb-impl::buffer-sap obuf))
