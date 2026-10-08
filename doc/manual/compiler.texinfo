@@ -13,7 +13,7 @@
 * Advanced Compiler Use and Efficiency Hints: advanced compiler use and efficiency hints.
 @end menu
 
-This chapter will discuss most compiler issues other than @ref{efficiency},
+This chapter discusses most compiler issues other than @ref{efficiency},
 including compiler messages, type safety in the presence of type
 declarations, the effects of various optimization policies, and the
 way that inlining and open coding may cause optimized code to differ
@@ -25,83 +25,10 @@ from a naive translation.
 @section Diagnostic Messages
 
 @menu
-* Controlling Verbosity: controlling verbosity.
 * Diagnostic Severity: diagnostic severity.
 * Understanding Compiler Diagnostics: understanding compiler diagnostics.
+* Controlling Verbosity: controlling verbosity.
 @end menu
-
-@node controlling verbosity
-@cindex compiler messsage verbosity
-@cindex verbosity of compiler messsages
-@subsection Controlling Verbosity
-
-The compiler can be quite verbose in its diagnostic reporting -- rather
-more than some users would prefer. However, the amount of noise
-emitted can be controlled.
-
-To control emission of compiler diagnostics (except those with
-@ref{diagnostic severity} error) use the @code{sb-ext:muffle-conditions} and
-@code{sb-ext:unmuffle-conditions} declarations, specifying the type of
-condition that is to be muffled (the muffling is done using an
-associated @code{muffle-warning} restart).
-
-Global control:
-
-@example
-;;; Muffle compiler-notes globally
-(declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
-@end example
-
-Local control:
-
-@example
-;;; Muffle compiler-notes based on lexical scope
-(defun foo (x)
-  (declare (optimize speed) (fixnum x)
-           (sb-ext:muffle-conditions sb-ext:compiler-note))
-  (values (* x 5) ; no compiler note from this
-    (locally
-      (declare (sb-ext:unmuffle-conditions sb-ext:compiler-note))
-      ;; this one gives a compiler note
-      (* x -5))))
-@end example
-
-@anchor{Declaration sb-ext muffle-conditions}
-@ddindex @sortas{muffle-conditions sb-ext} muffle-conditions [sb-ext]
-@deffn{Declaration} sb-ext:muffle-conditions
-Syntax: @code{(sb-ext:muffle-conditions &rest types)}.
-
-Silence the diagnostic messages that would be printed when a condition
-matching any of @code{types} is signalled at compile time.
-@end deffn
-@anchor{Declaration sb-ext unmuffle-conditions}
-@ddindex @sortas{unmuffle-conditions sb-ext} unmuffle-conditions [sb-ext]
-@deffn{Declaration} sb-ext:unmuffle-conditions
-Syntax: @code{(sb-ext:unmuffle-conditions &rest types)}.
-
-Cancel the effect of a previous @code{sb-ext:muffle-conditions} declaration.
-@end deffn
-Various details of @emph{how} the compiler messages are printed can be
-controlled via the alist @code{sb-ext:*compiler-print-variable-alist*}.
-
-@anchor{Variable sb-ext *compiler-print-variable-alist*}
-@vvindex @sortas{compiler-print-variable-alist* sb-ext} *compiler-print-variable-alist* [sb-ext]
-@deffn{Variable} sb-ext:*compiler-print-variable-alist*
-An association list describing new bindings for special variables
-to be used by the compiler for error-reporting, etc.
-E.g. ((@code{*print-length*} . 10) (@code{*print-level*} . 6) (@code{*print-pretty*} .
-@code{nil})).
-
-The variables in the @code{car} positions are bound to the values in the @code{cdr}
-during the execution of some debug commands. When evaluating arbitrary
-expressions in the debugger, the normal values of the printer control
-variables are in effect.
-
-Initially empty, @code{*compiler-print-variable-alist*} is typically used
-to specify bindings for printer control variables.
-@end deffn
-For information about muffling warnings signaled outside of the
-compiler, see @ref{customization hooks for users}.
 
 @node diagnostic severity
 @cindex compiler message severity
@@ -124,12 +51,12 @@ of compiler error severity occur when the compiler handles
 conditions of these classes.
 
 The fourth level of compiler error severity, @emph{note}, corresponds to
-the @code{sb-ext:compiler-note}, and is used for problems which are too
-mild for the standard condition classes, typically hints about how
-efficiency might be improved. The @code{sb-ext:code-deletion-note}, a
-subtype of @code{sb-ext:compiler-note}, is signalled when the compiler
-deletes user-supplied code after proving that the code in question
-is unreachable.
+the @code{sb-ext:compiler-note} condition and is used for problems too mild
+for the standard condition classes, typically hints about how
+efficiency might be improved. @code{sb-ext:code-deletion-note}, a subtype
+of @code{sb-ext:compiler-note}, is signalled when the compiler deletes
+user-supplied code after proving that the code in question is
+unreachable.
 
 Future work for SBCL includes expanding this hierarchy of types to
 allow more fine-grained control over emission of diagnostic
@@ -158,7 +85,7 @@ has written, having proved that it is unreachable.
 @end menu
 
 The messages emitted by the compiler contain a lot of detail in a
-terse format, so they may be confusing at first. The messages will be
+terse format, which may be confusing at first. The messages will be
 illustrated using this example program:
 
 @example
@@ -259,7 +186,7 @@ Note that each part of the message is distinctively marked:
 @item Each line of the processing path is prefixed with @code{-->}.
 
 @item The actual source form is indented like the original source, but
-  is marked by a preceding @code{==>} line. (FIXME: no it isn't.)
+  is marked by a preceding @code{==>} line.
 
 @item The explanation is prefixed with the diagnostic severity, which
   can be @code{caught ERROR:}, @code{caught WARNING:}, @code{caught
@@ -269,7 +196,7 @@ Note that each part of the message is distinctively marked:
 Each part of the message is more specific than the preceding one. If
 consecutive messages are for nearby locations, then the front part
 of the messages would be the same. In this case, the compiler omits
-as much of the second message as in common with the first. For
+as much of the second message as is in common with the first. For
 example:
 
 @example
@@ -407,14 +334,126 @@ In this example, the compiler descended into the @code{block}, @code{let}, @code
 and @code{return-from} to reach the @code{progn} printed as the actual source.
 This is a place where the "actual source appears in explanation"
 rule was applied. The innermost actual source form was the symbol
-@emph{undefined} itself, but that also appeared in the explanation, so
+@code{*undefined*} itself, but that also appeared in the explanation, so
 the compiler backed out one level.
 
+@node controlling verbosity
+@cindex compiler messsage verbosity
+@cindex verbosity of compiler messsages
+@subsection Controlling Verbosity
+
+The compiler can be quite verbose in its diagnostic reporting -- rather
+more than some users would prefer. However, the amount of noise
+emitted can be controlled.
+
+To control emission of compiler diagnostics (except those with
+@ref{diagnostic severity} error) use the @code{sb-ext:muffle-conditions} and
+@code{sb-ext:unmuffle-conditions} declarations, specifying the type of
+condition that is to be muffled (the muffling is done using an
+associated @code{muffle-warning} restart).
+
+Global control:
+
+@example
+;;; Muffle compiler-notes globally
+(declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
+@end example
+
+Local control:
+
+@example
+;;; Muffle compiler-notes based on lexical scope
+(defun foo (x)
+  (declare (optimize speed) (fixnum x)
+           (sb-ext:muffle-conditions sb-ext:compiler-note))
+  (values (* x 5) ; no compiler note from this
+    (locally
+      (declare (sb-ext:unmuffle-conditions sb-ext:compiler-note))
+      ;; this one gives a compiler note
+      (* x -5))))
+@end example
+
+@anchor{Declaration sb-ext muffle-conditions}
+@ddindex @sortas{muffle-conditions sb-ext} muffle-conditions [sb-ext]
+@deffn{Declaration} sb-ext:muffle-conditions
+Syntax: @code{(sb-ext:muffle-conditions &rest types)}.
+
+Silence the diagnostic messages that would be printed when a condition
+matching any of @code{types} is signalled at compile time.
+@end deffn
+@anchor{Declaration sb-ext unmuffle-conditions}
+@ddindex @sortas{unmuffle-conditions sb-ext} unmuffle-conditions [sb-ext]
+@deffn{Declaration} sb-ext:unmuffle-conditions
+Syntax: @code{(sb-ext:unmuffle-conditions &rest types)}.
+
+Cancel the effect of a previous @code{sb-ext:muffle-conditions} declaration.
+@end deffn
+For information about muffling warnings signaled outside of the
+compiler, see @ref{customization hooks for users}.
+
+The following variables and macros control @emph{how} the compiler
+messages are printed.
+
+@anchor{Variable sb-ext *compiler-print-variable-alist*}
+@vvindex @sortas{compiler-print-variable-alist* sb-ext} *compiler-print-variable-alist* [sb-ext]
+@deffn{Variable} sb-ext:*compiler-print-variable-alist*
+An association list describing new bindings for special variables
+to be used by the compiler for error-reporting, etc.
+E.g. ((@code{*print-length*} . 10) (@code{*print-level*} . 6) (@code{*print-pretty*} .
+@code{nil})).
+
+The variables in the @code{car} positions are bound to the values in the @code{cdr}
+during the execution of some debug commands. When evaluating arbitrary
+expressions in the debugger, the normal values of the printer control
+variables are in effect.
+
+Initially empty, @code{*compiler-print-variable-alist*} is typically used
+to specify bindings for printer control variables.
+@end deffn
+@anchor{Variable sb-ext *enclosing-source-cutoff*}
+@vvindex @sortas{enclosing-source-cutoff* sb-ext} *enclosing-source-cutoff* [sb-ext]
+@deffn{Variable} sb-ext:*enclosing-source-cutoff*
+The maximum number of enclosing actual source forms (i.e. from
+macroexpansion) that we print in full. For additional enclosing forms, we
+print only the @code{car}.
+@end deffn
+@anchor{Variable sb-ext *undefined-warning-limit*}
+@vvindex @sortas{undefined-warning-limit* sb-ext} *undefined-warning-limit* [sb-ext]
+@deffn{Variable} sb-ext:*undefined-warning-limit*
+If non-null, then an upper limit on the number of unknown function or type
+warnings that the compiler will print for any given name in a single
+compilation. This prevents excessive amounts of output when the real
+problem is a missing definition (as opposed to a typo in the use.)
+@end deffn
+@anchor{Variable sb-ext *efficiency-note-limit*}
+@vvindex @sortas{efficiency-note-limit* sb-ext} *efficiency-note-limit* [sb-ext]
+@deffn{Variable} sb-ext:*efficiency-note-limit*
+This is the maximum number of possible optimization alternatives will be
+mentioned in a particular efficiency note. @code{nil} means no limit.
+@end deffn
+@anchor{Variable sb-ext *efficiency-note-cost-threshold*}
+@vvindex @sortas{efficiency-note-cost-threshold* sb-ext} *efficiency-note-cost-threshold* [sb-ext]
+@deffn{Variable} sb-ext:*efficiency-note-cost-threshold*
+This is the minimum cost difference between the chosen implementation and
+the next alternative that justifies an efficiency note.
+@end deffn
+@anchor{Macro sb-ext define-source-context}
+@ffindex @sortas{define-source-context sb-ext} define-source-context [sb-ext]
+@deffn{Macro} sb-ext:define-source-context name lambda-list &body body
+Define how to abbreviate a source context form whose @code{car} is
+@code{name} when it appears in the compiler input. @code{lambda-list} is a
+@code{defmacro} style lambda-list used to parse the form.
+
+@code{body} should return a list of subforms that fit on one line when
+printed with the @code{"~@{~S ~@}"} format string. There are predefined
+extractors for @code{defstruct} and @code{function} forms. If there is no
+definition, then the first two subforms are returned.
+@end deffn
 @node handling of types
 @section Handling of Types
 
 @menu
-* Declarations as Assertions: declarations as assertions.
+* Type Declaration Checking: type declaration checking.
 * Precise Type Checking: precise type checking.
 * Getting Existing Programs to Run: getting existing programs to run.
 * Implementation Limitations: implementation limitations.
@@ -435,42 +474,37 @@ The SBCL compiler also has a greater knowledge of the Common Lisp
 type system than other compilers. Support is incomplete only for
 types involving the @code{satisfies} type specifier.
 
-@node declarations as assertions
-@subsection Declarations as Assertions
+@node type declaration checking
+@subsection Type Declaration Checking
 
 The SBCL compiler treats type declarations differently from most other
-Lisp compilers. Under default compilation policy the compiler doesn't
-blindly believe type declarations, but considers them assertions about
-the program that should be checked: all type declarations that have
-not been proven to always hold are asserted at runtime.
+Lisp compilers. Under the default @ref{compiler policy}, the compiler
+doesn't blindly believe type declarations but considers them
+assertions about the program that should be checked: all type
+declarations that have not been proven to always hold are asserted
+at runtime.
 
 @emph{Remaining bugs in the compiler's handling of types unfortunately
-provide some exceptions to this rule, see
+provide some exceptions to this rule. See
 @ref{implementation limitations}.}
-
-@cindex safety, optimization quality
-@cindex optimization quality safety
-CLOS slot types form a notable exception. Types declared using the
-@code{:type} slot option in @code{defclass} are asserted if and only if the class
-was defined in @emph{safe code}  and the slot access location is
-in @emph{safe code} as well. This laxness does not pose any internal
-consistency issues, as the CLOS slot types are not available for the
-type inferencer, nor do CLOS slot types provide any efficiency
-benefits.
 
 There are three type checking policies available in SBCL, selectable
 via @code{optimize} declarations.
 
+@cindex safety, optimization quality
+@cindex optimization quality safety
+@cindex speed, optimization quality
+@cindex optimization quality speed
 @itemize
-@item @strong{Full Type Checks}
+@item @strong{Full Type Checks} (safe code)
 
 All declarations are considered assertions to be checked at
 runtime, and all type checks are precise. The default
 compilation policy provides full type checks.
 
-Used when @code{(or (>= safety 2) (>= safety speed 1))}.
+Used when @code{(or (>= safety 2) (>= safety speed 1))}.  
 
-@item @strong{Weak Type Checks}
+@item @strong{Weak Type Checks} (unsafe code)
 
 Declared types may be simplified into faster to check
 supertypes: for example, @code{(or (integer -17 -7) (integer 7 17))}
@@ -483,7 +517,7 @@ weak type checks are used if the program contains type-errors.
 
 Used when @code{(and (< safety 2) (< safety speed))}.
 
-@item @strong{No Type Checks}
+@item @strong{No Type Checks} (unsafe code)
 
 All declarations are believed without assertions. Also disables
 argument count and array bounds checking.
@@ -532,7 +566,7 @@ if parts of the program have never been tested.
 @cindex optimization quality safety
 Some incorrect declarations can only be detected by run-time type
 checking. It is very important to initially compile a program with
-full type checks (high safety optimization) and then test this safe
+full type checks (high @code{safety} optimization) and then test this safe
 version. After the checking version has been tested, then you can
 consider weakening or eliminating type checks. @emph{This applies even to
 previously debugged programs} because the SBCL compiler does much
@@ -587,7 +621,7 @@ is converted into a macro. Consider this macro:
   `(the fixnum (1+ ,x)))
 @end example
 
-Although legal and well-defined Common Lisp code, this meaning of
+Although legal and well-defined Common Lisp code, the meaning of
 this definition is almost certainly not what the writer intended.
 For example, this call is illegal:
 
@@ -608,7 +642,8 @@ evaluating a macro argument, then put a @code{the} in the expansion:
 
 
 In this case, it would be stylistically preferable to change this
-macro back to a function and declare it inline.
+macro back to a function and declare it inline. See
+@ref{open coding and inline expansion}.
 
 Some more subtle problems are caused by incorrect declarations that
 can't be detected at compile time. Consider this code:
@@ -641,7 +676,7 @@ or @code{nil}.)
 
 Note that there is usually little performance penalty for weakening
 a declaration in this way. Any numeric operations in the body can
-still assume that the variable is a @code{fixnum}, since @code{nil} is not a legal
+still assume that the variable is a @code{fixnum} since @code{nil} is not a legal
 numeric argument. Another possible fix would be to say:
 
 @example
@@ -652,40 +687,128 @@ numeric argument. Another possible fix would be to say:
     ...))
 @end example
 
-This would be preferable in some circumstances, since it would allow
+This would be preferable in some circumstances since it would allow
 a non-standard representation to be used for the local @code{pos}
 variable in the loop body.
 
 @node implementation limitations
 @subsection Implementation Limitations
 
-If an @code{ftype} is placed after the function definition the function won't
-perform any type checks, and the calls to the function will blindly
-trust the declared types.
-(@code{optimize} (@code{debug} 3)) will not trust any @code{ftype} declarations.
+If an @code{ftype} is placed after the function definition, the function
+won't perform any type checks and the calls to the function will
+blindly trust the declared types. (@code{optimize} (@code{debug} 3)) will not
+trust any @code{ftype} declarations.
+
+CLOS slot types form a notable exception. Types declared using the
+@code{:type} slot option in @code{defclass} are asserted if and only if the class
+was defined in @emph{safe code} and the slot access location is in @emph{safe
+code} as well. This laxness does not pose any internal consistency
+issues, as the CLOS slot types are not available for the type
+inferencer, nor do CLOS slot types provide any efficiency benefits.
 
 @node compiler policy
 @section Compiler Policy
 
-Compiler policy is controlled by the @code{optimize} declaration,
-supporting all ANSI optimization qualities (@code{debug}, safety, space,
-and speed). (A deprecated extension @code{sb-ext:inhibit-warnings} is still
-supported but liable to go away at any time.)
+The compiler policy is what tells the compiler @emph{how} to
+compile a program. This is logically (and often textually) distinct
+from the program itself. Broad control of policy is provided by the
+@code{optimize} declaration; other declarations and variables control more
+specific aspects of compilation.
 
-For effects of various optimization qualities on type-safety and
-debuggability see @ref{declarations as assertions} and
-@ref{debugger policy control}.
+@cindex speed, optimization quality
+@cindex optimization quality speed
+@cindex safety, optimization quality
+@cindex optimization quality safety
+The @code{optimize} declaration recognizes six different @emph{qualities}. The
+qualities are conceptually independent aspects of program
+performance. In reality, increasing one quality tends to have
+adverse effects on other qualities. The compiler compares the
+relative values of qualities when it needs to make a trade-off; i.e.
+if @code{speed} is greater than @code{safety}, then improve speed at the cost of
+safety.
 
-Ordinarily, when the speed quality is high, the compiler emits notes
-to notify the programmer about its inability to apply various
-optimizations. For selective muffling of these notes, see
-@ref{controlling verbosity}.
+@cindex speed, optimization quality
+@cindex optimization quality speed
+@cindex compilation-speed, optimization quality
+@cindex optimization quality compilation-speed
+@cindex space, optimization quality
+@cindex optimization quality space
+@cindex safety, optimization quality
+@cindex optimization quality safety
+@cindex debug, optimization quality
+@cindex optimization quality debug
+All qualities take values of type @code{(integer 0 3)}. The default for
+all qualities is @code{1}. Whenever qualities are equal, ties are broken
+according to a broad idea of what a good default environment is
+supposed to be. Generally this downplays @code{speed}, @code{compilation-speed}
+and @code{space} in favour of @code{safety} and @code{debug}. Novice and casual users
+should stick to the default policy. Advanced users often want to
+improve speed and memory usage at the cost of safety and
+debuggability.
 
-The value of space mostly influences the compiler's decision whether
-to inline operations, which tend to increase the size of programs.
-Use the value @code{0} with caution, since it can cause the compiler to
-inline operations so indiscriminately that the net effect is to slow
-the program by causing cache misses or even swapping.
+If the value for a quality is @code{0} or @code{3}, then it may have a special
+interpretation. A value of @code{0} means totally unimportant, and a 3
+means ultimately important. These extreme optimization values enable
+"heroic" compilation strategies that are not always desirable and
+sometimes self-defeating. Specifying more than one quality as @code{3} is
+not desirable, since it doesn't tell the compiler which quality is
+most important.
+
+These are the optimization qualities:
+
+@cindex debug, optimization quality
+@cindex optimization quality debug
+@cindex space, optimization quality
+@cindex optimization quality space
+@cindex compilation-speed, optimization quality
+@cindex optimization quality compilation-speed
+@cindex safety, optimization quality
+@cindex optimization quality safety
+@cindex speed, optimization quality
+@cindex optimization quality speed
+@itemize
+@item @code{speed}: How fast the program should run. @code{speed 3} enables some
+  optimizations that may hurt debuggability. Ordinarily, when the
+  @code{speed} quality is high, the compiler emits notes to notify the
+  programmer about its inability to apply various optimizations. For
+  selective muffling of these notes, see @ref{controlling verbosity}.
+
+@item @code{compilation-speed}: How fast the compiler should run. If this is
+  high, then some expensive optimizations may be disabled.
+
+@item @code{space}: How much space the compiled code should take up. Inline
+  expansion is mostly inhibited when @code{space} is greater than @code{speed}.
+  A value of @code{0} enables indiscriminate inline expansion. Wide use
+  of a @code{0} value is not recommended, as it may waste so much space
+  that run time is slowed. See @ref{open coding and inline expansion}.
+
+@item @code{debug}: How debuggable the program should be. The quality is
+  treated differently from the other qualities: each value indicates
+  a particular level of debugger information; it is not compared
+  with the other qualities. See @ref{debugger policy control} for the
+  details.
+
+@item @code{safety}: How much error checking should be done. If @code{speed}, @code{space}
+  or @code{compilation-speed} is more important than @code{safety}, then
+  @ref{type declaration checking} is weakened. @code{safety} @code{0} also
+  suppresses argument count checking, unbound-symbol checking, array
+  bounds checks, and checking of tag existence in @code{return-from} and
+  @code{go}.
+
+@item @code{sb-ext:inhibit-warnings}: This is a deprecated extension that
+  determines how little (or how much) diagnostic output should be
+  printed during compilation. This quality is compared to other
+  qualities to determine whether to print style notes and warnings
+  concerning those qualities. If @code{speed} is greater than
+  @code{inhibit-warnings}, then notes about how to improve speed will be
+  printed, etc. The default value is @code{1}, so raising the value for
+  any standard quality above its default enables notes for that
+  quality. If it is @code{3}, then all notes and most non-serious
+  warnings are inhibited. This is useful with @code{declare} to suppress
+  warnings about unavoidable problems.
+@end itemize
+
+In the following, we discuss extensions related to compiler policies.
 
 @anchor{Function sb-ext describe-compiler-policy}
 @ffindex @sortas{describe-compiler-policy sb-ext} describe-compiler-policy [sb-ext]
@@ -695,18 +818,24 @@ Print all global optimization settings, augmented by @code{spec}.
 @anchor{Function sb-ext restrict-compiler-policy}
 @ffindex @sortas{restrict-compiler-policy sb-ext} restrict-compiler-policy [sb-ext]
 @deffn{Function} sb-ext:restrict-compiler-policy &optional quality (min 0) (max 3)
-Assign a minimum value to an optimization quality. @code{quality} is the name of
-the optimization quality to restrict, @code{min} (defaulting to zero) is the
-minimum allowed value, and @code{max} (defaults to 3) is the maximum.
+Restrict the range of values the optimization @code{quality} can take.
+The effect is that @code{optimize} declarations with @code{quality} are clamped to
+the restricted range. @code{quality} must be a valid optimization quality or
+@code{nil}. @code{min} is the minimum allowed value, and @code{max} is the maximum; both of
+type (@code{integer} 0 3).
 
-Returns the alist describing the current policy restrictions.
+Returns two alists describing the current minimum and maximum policy
+restrictions on all optimization qualities.
 
-If @code{quality} is @code{nil} or not given, nothing is done.
+If @code{quality} is @code{nil} or not given, nothing is done. Use this to query the
+current restrictions.
 
-Otherwise, if @code{min} is zero or @code{max} is 3 or neither are given, any
-existing restrictions of @code{quality} are removed.
+If @code{quality} is non-@code{nil}, @code{min} is 0 and @code{max} is 3, any existing
+restrictions on @code{quality} are removed. In general, restrictions can be
+loosened.
 
-See also @code{:policy} option in @code{with-compilation-unit}.
+See also @code{:policy} option in @code{with-compilation-unit}, which can impose
+dynamic scoping on restrictions.
 @end deffn
 @anchor{Macro common-lisp with-compilation-unit}
 @ffindex @sortas{with-compilation-unit common-lisp} with-compilation-unit [common-lisp]
@@ -734,26 +863,28 @@ qualities and restrictions, limiting effects of subsequent
 @code{sb-ext:restrict-compiler-policy} to the dynamic scope of @code{body}.
 
 If @code{:override} is false, the specified @code{:policy} is merged with
-current global policy. If @code{:override} is true, current global
+current global policy. If @code{:override} is true, the current global
 policy, including any restrictions, is discarded in favor of the
-specified
-@code{:policy}.
+specified @code{:policy}.
 
 Supplying @code{:policy} @code{nil} is equivalent to the option not being
 supplied at all, i.e. dynamic scoping of policy does not take
-place.
+place. If dynamic scoping without changing the current policy is
+desired, use @code{:policy '(optimize)} with @code{:override} @code{nil}.
 
 This option is an SBCL-specific experimental extension: Interface
 subject to change.
 
 @item @code{:source-namestring} @code{<namestring-form>}
 
-Attaches the value returned by the @code{<namestring-form>} to the
-internal debug-source information as the namestring of the source
-file. Normally the namestring of the input-file for @code{compile-file}
-is used: this option can be used to provide source-file
-information for functions compiled using @code{compile}, or to override
-the input-file of @code{compile-file}.
+Attaches the value returned by @code{<namestring-form>} to the internal
+debug-source information as the namestring of the source file.
+Normally the namestring of the @code{input-file} for @code{compile-file} is
+used: this option can be used to provide source-file information
+for functions compiled using @code{compile}, or to override the
+@code{input-file} argument of @code{compile-file}.
+
+Can be accessed using @code{sb-introspect:definition-source-pathname}.
 
 If both an outer and an inner @code{with-compilation-unit} provide a
 @code{:source-namestring}, the inner one takes precedence. Unaffected by
@@ -763,7 +894,7 @@ This is an SBCL-specific extension.
 
 @item @code{:source-plist} @code{<plist-form>}
 
-Attaches the value returned by the @code{<plist-form>} to internal
+Attaches the value returned by @code{<plist-form>} to internal
 debug-source information of functions compiled in within the
 dynamic extent of @code{body}.
 
@@ -901,7 +1032,7 @@ gives this error:
 @subsection Read Errors
 
 SBCL's compiler does not attempt to recover from read errors when
-reading a source file, but instead just reports the offending
+reading a source file but instead just reports the offending
 character position and gives up on the entire source file.
 
 @node open coding and inline expansion
@@ -917,7 +1048,7 @@ coding, inline expansion, source transformation), but the implications
 to the user are basically the same:
 
 @itemize
-@item Attempts to redefine standard functions may be frustrated, since
+@item Attempts to redefine standard functions may be frustrated since
   the function may never be called. Although it is technically
   illegal to redefine standard functions, users sometimes want to
   implicitly redefine these functions when they are debugging using
@@ -972,7 +1103,7 @@ In general, open coding sacrifices space for speed, but some functions
 (such as @code{car}) are so simple that they are always open-coded. Even
 when not open-coded, a call to a standard function may be
 transformed into a different function call (as in the last example)
-or compiled as @emph{static call}. Static function call uses a more
+or compiled as @emph{static call}. Static function calls use a more
 efficient calling convention that forbids redefinition.
 
 @node interpreter

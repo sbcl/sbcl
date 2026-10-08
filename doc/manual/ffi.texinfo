@@ -882,7 +882,7 @@ inline expanded, which can be done by preceding the
 @end example
 
 In addition to avoiding the Lisp call overhead, this allows
-pointers, word-integers and floats to be passed using non-descriptor
+pointers, word-integers and floats to be passed using unboxed
 representations, avoiding consing.
 @end quotation
 

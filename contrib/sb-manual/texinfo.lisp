@@ -320,8 +320,9 @@
 (defun sort-as-name (name)
   (subseq name (or (position-if #'alphanumericp name) 0)))
 
-(defun emit-texinfo-for-docstring (docstring &optional arglist)
-  (markdown-to-texinfo (reindent-docstring docstring) arglist))
+(defun emit-texinfo-for-docstring (docstring &optional lambda-list)
+  (markdown-to-texinfo (reindent-docstring docstring)
+                       :lambda-list lambda-list))
 
 
 ;;; Currently, we have the Texinfo file under version control to keep

@@ -17,7 +17,7 @@
 (declaim (special *current-path*))
 
 (defvar *enclosing-source-cutoff* 1
-  "The maximum number of enclosing non-original source forms (i.e. from
+  "The maximum number of enclosing actual source forms (i.e. from
   macroexpansion) that we print in full. For additional enclosing forms, we
   print only the CAR.")
 (declaim (type unsigned-byte *enclosing-source-cutoff*))
@@ -119,26 +119,19 @@
 ;;; function returns the source-context list for that form.
 (defglobal *source-context-methods* nil)
 
-;;; documentation originally from cmu-user.tex:
-;;;   This macro defines how to extract an abbreviated source context from
-;;;   the \var{name}d form when it appears in the compiler input.
-;;;   \var{lambda-list} is a \code{defmacro} style lambda-list used to
-;;;   parse the arguments. The \var{body} should return a list of
-;;;   subforms that can be printed on about one line. There are
-;;;   predefined methods for \code{defstruct}, \code{defmethod}, etc. If
-;;;   no method is defined, then the first two subforms are returned.
-;;;   Note that this facility implicitly determines the string name
-;;;   associated with anonymous functions.
-;;; So even though SBCL itself only uses this macro within this file,
+;;; Even though SBCL itself only uses this macro within this file,
 ;;; it's a reasonable thing to put in SB-EXT in case some dedicated
 ;;; user wants to do some heavy tweaking to make SBCL give more
-;;; informative output about his code.
+;;; informative output about their code.
 (defmacro define-source-context (name lambda-list &body body)
-  "DEFINE-SOURCE-CONTEXT Name Lambda-List Form*
-   This macro defines how to extract an abbreviated source context from the
-   Named form when it appears in the compiler input. Lambda-List is a DEFMACRO
-   style lambda-list used to parse the arguments. The Body should return a
-   list of subforms suitable for a \"~{~S ~}\" format string."
+  "Define how to abbreviate a source context form whose CAR is
+  NAME when it appears in the compiler input. LAMBDA-LIST is a
+  DEFMACRO style lambda-list used to parse the form.
+
+  BODY should return a list of subforms that fit on one line when
+  printed with the `\"~{~S ~}\"` format string. There are predefined
+  extractors for DEFSTRUCT and FUNCTION forms. If there is no
+  definition, then the first two subforms are returned."
   (with-unique-names (whole)
     `(setf (getf *source-context-methods* ',name)
            (lambda (,whole)

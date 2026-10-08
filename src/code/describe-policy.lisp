@@ -11,6 +11,7 @@
 
 (in-package "SB-C")
 
+;;; TODO: This should probably describe policy restrictions, too.
 (defun describe-compiler-policy (&optional spec)
   "Print all global optimization settings, augmented by SPEC."
   (let ((policy (process-optimize-decl (cons 'optimize spec) *policy*)))

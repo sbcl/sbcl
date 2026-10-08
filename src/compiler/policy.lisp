@@ -83,30 +83,36 @@
          (type (or policy null) *policy-min* *policy-max*))
 
 (defun restrict-compiler-policy (&optional quality (min 0) (max 3))
-  "Assign a minimum value to an optimization quality. QUALITY is the name of
-the optimization quality to restrict, MIN (defaulting to zero) is the
-minimum allowed value, and MAX (defaults to 3) is the maximum.
+  "Restrict the range of values the optimization QUALITY can take.
+The effect is that OPTIMIZE declarations with QUALITY are clamped to
+the restricted range. QUALITY must be a valid optimization quality or
+NIL. MIN is the minimum allowed value, and MAX is the maximum; both of
+type (INTEGER 0 3).
 
-Returns the alist describing the current policy restrictions.
+Returns two alists describing the current minimum and maximum policy
+restrictions on all optimization qualities.
 
-If QUALITY is NIL or not given, nothing is done.
+If QUALITY is NIL or not given, nothing is done. Use this to query the
+current restrictions.
 
-Otherwise, if MIN is zero or MAX is 3 or neither are given, any
-existing restrictions of QUALITY are removed.
+If QUALITY is non-NIL, MIN is 0 and MAX is 3, any existing
+restrictions on QUALITY are removed. In general, restrictions can be
+loosened.
 
-See also :POLICY option in WITH-COMPILATION-UNIT."
+See also :POLICY option in WITH-COMPILATION-UNIT, which can impose
+dynamic scoping on restrictions."
   (declare (type policy-quality min max))
   (when quality
     (let ((quality-id (policy-quality-name-p quality)))
       (unless quality-id
         (error "~S is not a policy quality" quality))
       (when (> min max)
-        (error "MIN ~s should be not be greater than MAX ~s." min max))
-      ;; The dynamic policy object is immutable, otherwise a construct like
-      ;;  (let ((*policy-min* *policy-max*)) ...)
-      ;; could allow alterations inside the LET to leak out.
-      ;; The structure itself does not declare slots its read-only, because
-      ;; OPTIMIZE declaration processing uses it as a scratchpad.
+        (error "MIN ~s must not be greater than MAX ~s." min max))
+      ;; The dynamic policy object is immutable, otherwise a construct
+      ;; like (LET ((*POLICY-MIN* *POLICY-MAX*)) ...) could allow
+      ;; alterations inside the LET to leak out. The structure itself
+      ;; does not declare its slots read-only because OPTIMIZE
+      ;; declaration processing uses it as a scratchpad.
       (setf *policy-min*
             (if *policy-min*
                 (copy-structure *policy-min*)

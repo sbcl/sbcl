@@ -1,7 +1,7 @@
 (in-package :sb-manual)
 
 (defsection @compiler (:title "Compiler")
-  "This chapter will discuss most compiler issues other than @EFFICIENCY,
+  "This chapter discusses most compiler issues other than @EFFICIENCY,
   including compiler messages, type safety in the presence of type
   declarations, the effects of various optimization policies, and the
   way that inlining and open coding may cause optimized code to differ
@@ -17,82 +17,9 @@
 (defsection @diagnostic-messages (:title "Diagnostic Messages"
                                   :concepts (("compiler" "messsage")
                                              ("messsage," "compiler")))
-  (@controlling-verbosity section)
   (@diagnostic-severity section)
-  (@understanding-compiler-diagnostics section))
-
-(defsection @controlling-verbosity
-    (:title "Controlling Verbosity"
-     :concepts (("compiler" "messsage" "verbosity")
-                ("verbosity" "of compiler messsages")))
-  "The compiler can be quite verbose in its diagnostic reporting -- rather
-  more than some users would prefer. However, the amount of noise
-  emitted can be controlled.
-
-  To control emission of compiler diagnostics (except those with
-  @DIAGNOSTIC-SEVERITY error) use the SB-EXT:MUFFLE-CONDITIONS and
-  SB-EXT:UNMUFFLE-CONDITIONS declarations, specifying the type of
-  condition that is to be muffled (the muffling is done using an
-  associated MUFFLE-WARNING restart).
-
-  Global control:
-
-      ;;; Muffle compiler-notes globally
-      (declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
-
-  Local control:
-
-      ;;; Muffle compiler-notes based on lexical scope
-      (defun foo (x)
-        (declare (optimize speed) (fixnum x)
-                 (sb-ext:muffle-conditions sb-ext:compiler-note))
-        (values (* x 5) ; no compiler note from this
-          (locally
-            (declare (sb-ext:unmuffle-conditions sb-ext:compiler-note))
-            ;; this one gives a compiler note
-            (* x -5))))"
-  (sb-ext:muffle-conditions declaration)
-  (sb-ext:unmuffle-conditions declaration)
-  "Various details of _how_ the compiler messages are printed can be
-  controlled via the alist SB-EXT:*COMPILER-PRINT-VARIABLE-ALIST*."
-  (sb-ext:*compiler-print-variable-alist* variable)
-  "For information about muffling warnings signaled outside of the
-  compiler, see @CUSTOMIZATION-HOOKS-FOR-USERS.")
-
-;; FIXME: How much control over error messages is in SBCL? How much
-;; should be? How much of this documentation should we save or adapt?
-;;
-;; %%\node Error Message Parameterization,  , Read Errors, Interpreting Error Messages
-;; \subsection{Error Message Parameterization}
-;; \cpsubindex{error messages}{verbosity}
-;; \cpsubindex{verbosity}{of error messages}
-;;
-;; There is some control over the verbosity of error messages.  See also
-;; \varref{undefined-warning-limit}, \code{*efficiency-note-limit*} and
-;; \varref{efficiency-note-cost-threshold}.
-;;
-;; \begin{defvar}{}{enclosing-source-cutoff}
-;;
-;;   This variable specifies the number of enclosing actual source forms
-;;   that are printed in full, rather than in the abbreviated processing
-;;   path format.  Increasing the value from its default of \code{1}
-;;   allows you to see more of the guts of the macroexpanded source,
-;;   which is useful when debugging macros.
-;; \end{defvar}
-;;
-;; \begin{defmac}{extensions:}{define-source-context}{%
-;;     \args{\var{name} \var{lambda-list} \mstar{form}}}
-;;
-;;   This macro defines how to extract an abbreviated source context from
-;;   the \var{name}d form when it appears in the compiler input.
-;;   \var{lambda-list} is a \code{defmacro} style lambda-list used to
-;;   parse the arguments.  The \var{body} should return a list of
-;;   subforms that can be printed on about one line.  There are
-;;   predefined methods for \code{defstruct}, \code{defmethod}, etc.  If
-;;   no method is defined, then the first two subforms are returned.
-;;   Note that this facility implicitly determines the string name
-;;   associated with anonymous functions.
-;; \end{defmac}
+  (@understanding-compiler-diagnostics section)
+  (@controlling-verbosity section))
 
 (defsection @diagnostic-severity
     (:title "Diagnostic Severity"
@@ -112,12 +39,12 @@
   conditions of these classes.
 
   The fourth level of compiler error severity, _note_, corresponds to
-  the SB-EXT:COMPILER-NOTE, and is used for problems which are too
-  mild for the standard condition classes, typically hints about how
-  efficiency might be improved. The SB-EXT:CODE-DELETION-NOTE, a
-  subtype of SB-EXT:COMPILER-NOTE, is signalled when the compiler
-  deletes user-supplied code after proving that the code in question
-  is unreachable.
+  the SB-EXT:COMPILER-NOTE condition and is used for problems too mild
+  for the standard condition classes, typically hints about how
+  efficiency might be improved. SB-EXT:CODE-DELETION-NOTE, a subtype
+  of SB-EXT:COMPILER-NOTE, is signalled when the compiler deletes
+  user-supplied code after proving that the code in question is
+  unreachable.
 
   Future work for SBCL includes expanding this hierarchy of types to
   allow more fine-grained control over emission of diagnostic
@@ -128,7 +55,7 @@
 (defsection @understanding-compiler-diagnostics
     (:title "Understanding Compiler Diagnostics")
   "The messages emitted by the compiler contain a lot of detail in a
-  terse format, so they may be confusing at first. The messages will be
+  terse format, which may be confusing at first. The messages will be
   illustrated using this example program:
 
       (defmacro zoq (x)
@@ -147,6 +74,8 @@
 
 (defsection @parts-of-a-compiler-diagnostic
     (:title "Parts of a Compiler Diagnostic")
+  ;; FIXME: This is not the current output at all although this looks
+  ;; much better.
   "When processing this program, the compiler will produce this warning:
 
       ; file: /tmp/foo.lisp
@@ -219,7 +148,7 @@
   - Each line of the processing path is prefixed with `-->`.
 
   - The actual source form is indented like the original source, but
-    is marked by a preceding `==>` line. (FIXME: no it isn't.)
+    is marked by a preceding `==>` line.
 
   - The explanation is prefixed with the diagnostic severity, which
     can be `caught ERROR:`, `caught WARNING:`, `caught
@@ -228,7 +157,7 @@
   Each part of the message is more specific than the preceding one. If
   consecutive messages are for nearby locations, then the front part
   of the messages would be the same. In this case, the compiler omits
-  as much of the second message as in common with the first. For
+  as much of the second message as is in common with the first. For
   example:
 
       ; file: /tmp/foo.lisp
@@ -344,8 +273,52 @@
   and RETURN-FROM to reach the PROGN printed as the actual source.
   This is a place where the \"actual source appears in explanation\"
   rule was applied. The innermost actual source form was the symbol
-  _undefined_ itself, but that also appeared in the explanation, so
+  `*UNDEFINED*` itself, but that also appeared in the explanation, so
   the compiler backed out one level.")
+
+(defsection @controlling-verbosity
+    (:title "Controlling Verbosity"
+     :concepts (("compiler" "messsage" "verbosity")
+                ("verbosity" "of compiler messsages")))
+  "The compiler can be quite verbose in its diagnostic reporting -- rather
+  more than some users would prefer. However, the amount of noise
+  emitted can be controlled.
+
+  To control emission of compiler diagnostics (except those with
+  @DIAGNOSTIC-SEVERITY error) use the SB-EXT:MUFFLE-CONDITIONS and
+  SB-EXT:UNMUFFLE-CONDITIONS declarations, specifying the type of
+  condition that is to be muffled (the muffling is done using an
+  associated MUFFLE-WARNING restart).
+
+  Global control:
+
+      ;;; Muffle compiler-notes globally
+      (declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
+
+  Local control:
+
+      ;;; Muffle compiler-notes based on lexical scope
+      (defun foo (x)
+        (declare (optimize speed) (fixnum x)
+                 (sb-ext:muffle-conditions sb-ext:compiler-note))
+        (values (* x 5) ; no compiler note from this
+          (locally
+            (declare (sb-ext:unmuffle-conditions sb-ext:compiler-note))
+            ;; this one gives a compiler note
+            (* x -5))))"
+  (sb-ext:muffle-conditions declaration)
+  (sb-ext:unmuffle-conditions declaration)
+  "For information about muffling warnings signaled outside of the
+  compiler, see @CUSTOMIZATION-HOOKS-FOR-USERS.
+
+  The following variables and macros control _how_ the compiler
+  messages are printed."
+  (sb-ext:*compiler-print-variable-alist* variable)
+  (sb-ext:*enclosing-source-cutoff* variable)
+  (sb-ext:*undefined-warning-limit* variable)
+  (sb-ext:*efficiency-note-limit* variable)
+  (sb-ext:*efficiency-note-cost-threshold* variable)
+  (sb-ext:define-source-context macro))
 
 (defsection @handling-of-types (:title "Handling of Types")
   "One of the most important features of the SBCL compiler (similar to
@@ -362,50 +335,37 @@
   The SBCL compiler also has a greater knowledge of the Common Lisp
   type system than other compilers. Support is incomplete only for
   types involving the SATISFIES type specifier."
-  (@declarations-as-assertions section)
+  (@type-declaration-checking section)
   (@precise-type-checking section)
   (@getting-existing-programs-to-run section)
   (@implementation-limitations section))
 
 ;; FIXME: See also sections \ref{advanced-type-stuff} and
 ;; \ref{type-inference}, once we snarf them from the CMU CL manual.
-;;
-;; Also see my paper on improving Baker, when I get round to it.
-;;
-;; Whose paper?
 
-(defsection @declarations-as-assertions (:title "Declarations as Assertions")
+(defsection @type-declaration-checking (:title "Type Declaration Checking")
   "The SBCL compiler treats type declarations differently from most other
-  Lisp compilers. Under default compilation policy the compiler doesn't
-  blindly believe type declarations, but considers them assertions about
-  the program that should be checked: all type declarations that have
-  not been proven to always hold are asserted at runtime.
+  Lisp compilers. Under the default @COMPILER-POLICY, the compiler
+  doesn't blindly believe type declarations but considers them
+  assertions about the program that should be checked: all type
+  declarations that have not been proven to always hold are asserted
+  at runtime.
 
   _Remaining bugs in the compiler's handling of types unfortunately
-  provide some exceptions to this rule, see
+  provide some exceptions to this rule. See
   @IMPLEMENTATION-LIMITATIONS._
-
-  CLOS slot types form a notable exception. Types declared using the
-  :TYPE slot option in DEFCLASS are asserted if and only if the class
-  was defined in _safe code_ ~SAFETY and the slot access location is
-  in _safe code_ as well. This laxness does not pose any internal
-  consistency issues, as the CLOS slot types are not available for the
-  type inferencer, nor do CLOS slot types provide any efficiency
-  benefits.
 
   There are three type checking policies available in SBCL, selectable
   via OPTIMIZE declarations."
-  ;; FIXME: This should be properly integrated with general policy
-  ;; stuff, once that gets cleaned up.
-  "- __Full Type Checks__
+  "- __Full Type Checks__ (safe code)
 
       All declarations are considered assertions to be checked at
       runtime, and all type checks are precise. The default
       compilation policy provides full type checks.
 
-      Used when `(OR (>= SAFETY 2) (>= SAFETY SPEED 1))`.
+      Used when `(OR (>= SAFETY 2) (>= SAFETY SPEED 1))`. ~SAFETY ~SPEED
 
-  - __Weak Type Checks__
+  - __Weak Type Checks__ (unsafe code)
 
       Declared types may be simplified into faster to check
       supertypes: for example, `(OR (INTEGER -17 -7) (INTEGER 7 17))`
@@ -416,7 +376,7 @@
 
       Used when `(AND (< SAFETY 2) (< SAFETY SPEED))`.
 
-  - __No Type Checks__
+  - __No Type Checks__ (unsafe code)
 
       All declarations are believed without assertions. Also disables
       argument count and array bounds checking.
@@ -504,7 +464,7 @@
         (declare (fixnum x))
         `(the fixnum (1+ ,x)))
 
-  Although legal and well-defined Common Lisp code, this meaning of
+  Although legal and well-defined Common Lisp code, the meaning of
   this definition is almost certainly not what the writer intended.
   For example, this call is illegal:
 
@@ -521,10 +481,10 @@
 
 
   In this case, it would be stylistically preferable to change this
-  macro back to a function and declare it inline."
-  ;; FIXME: <xref>inline-expansion, once we crib the relevant text
-  ;; from the CMU CL manual.
-  "Some more subtle problems are caused by incorrect declarations that
+  macro back to a function and declare it inline. See
+  @OPEN-CODING-AND-INLINE-EXPANSION.
+
+  Some more subtle problems are caused by incorrect declarations that
   can't be detected at compile time. Consider this code:
 
       (do ((pos 0 (position #\a string :start (1+ pos))))
@@ -553,7 +513,7 @@
 
   Note that there is usually little performance penalty for weakening
   a declaration in this way. Any numeric operations in the body can
-  still assume that the variable is a FIXNUM, since NIL is not a legal
+  still assume that the variable is a FIXNUM since NIL is not a legal
   numeric argument. Another possible fix would be to say:
 
       (do ((pos 0 (position #\a string :start (1+ pos))))
@@ -562,175 +522,105 @@
           (declare (fixnum pos))
           ...))
 
-  This would be preferable in some circumstances, since it would allow
+  This would be preferable in some circumstances since it would allow
   a non-standard representation to be used for the local `POS`
   variable in the loop body."
-  ;; FIXME: <xref>ND-variables, once we crib the text from the CMU CL
-  ;; manual.
+  ;; FIXME: <xref>ND-variables (non-descriptor, i.e. unboxed), once we
+  ;; crib the text from the CMU CL manual.
   )
 
 (defsection @implementation-limitations (:title "Implementation Limitations")
-  "If an FTYPE is placed after the function definition the function won't
-  perform any type checks, and the calls to the function will blindly
-  trust the declared types.
-  (OPTIMIZE (DEBUG 3)) will not trust any FTYPE declarations.")
+  "If an FTYPE is placed after the function definition, the function
+  won't perform any type checks and the calls to the function will
+  blindly trust the declared types. (OPTIMIZE (DEBUG 3)) will not
+  trust any FTYPE declarations.
 
+  CLOS slot types form a notable exception. Types declared using the
+  :TYPE slot option in DEFCLASS are asserted if and only if the class
+  was defined in _safe code_ and the slot access location is in _safe
+  code_ as well. This laxness does not pose any internal consistency
+  issues, as the CLOS slot types are not available for the type
+  inferencer, nor do CLOS slot types provide any efficiency benefits.")
+
+;;; FIXME: Mention non-ANSI quantities.
 (defsection @compiler-policy (:title "Compiler Policy")
-  "Compiler policy is controlled by the OPTIMIZE declaration,
-  supporting all ANSI optimization qualities (DEBUG, safety, space,
-  and speed). (A deprecated extension SB-EXT:INHIBIT-WARNINGS is still
-  supported but liable to go away at any time.)
+  "The compiler policy is what tells the compiler _how_ to
+  compile a program. This is logically (and often textually) distinct
+  from the program itself. Broad control of policy is provided by the
+  OPTIMIZE declaration; other declarations and variables control more
+  specific aspects of compilation.
 
-  For effects of various optimization qualities on type-safety and
-  debuggability see @DECLARATIONS-AS-ASSERTIONS and
-  @DEBUGGER-POLICY-CONTROL.
+  The OPTIMIZE declaration recognizes six different _qualities_. The
+  qualities are conceptually independent aspects of program
+  performance. In reality, increasing one quality tends to have
+  adverse effects on other qualities. The compiler compares the
+  relative values of qualities when it needs to make a trade-off; i.e.
+  if @SPEED is greater than @SAFETY, then improve speed at the cost of
+  safety.
 
-  Ordinarily, when the speed quality is high, the compiler emits notes
-  to notify the programmer about its inability to apply various
-  optimizations. For selective muffling of these notes, see
-  @CONTROLLING-VERBOSITY.
+  All qualities take values of type `(INTEGER 0 3)`. The default for
+  all qualities is `1`. Whenever qualities are equal, ties are broken
+  according to a broad idea of what a good default environment is
+  supposed to be. Generally this downplays @SPEED, @COMPILATION-SPEED
+  and @SPACE in favour of @SAFETY and @DEBUG. Novice and casual users
+  should stick to the default policy. Advanced users often want to
+  improve speed and memory usage at the cost of safety and
+  debuggability.
 
-  The value of space mostly influences the compiler's decision whether
-  to inline operations, which tend to increase the size of programs.
-  Use the value `0` with caution, since it can cause the compiler to
-  inline operations so indiscriminately that the net effect is to slow
-  the program by causing cache misses or even swapping."
+  If the value for a quality is `0` or `3`, then it may have a special
+  interpretation. A value of `0` means totally unimportant, and a 3
+  means ultimately important. These extreme optimization values enable
+  \"heroic\" compilation strategies that are not always desirable and
+  sometimes self-defeating. Specifying more than one quality as `3` is
+  not desirable, since it doesn't tell the compiler which quality is
+  most important.
+
+  These are the optimization qualities:
+
+  - @SPEED: How fast the program should run. `SPEED 3` enables some
+    optimizations that may hurt debuggability. Ordinarily, when the
+    @SPEED quality is high, the compiler emits notes to notify the
+    programmer about its inability to apply various optimizations. For
+    selective muffling of these notes, see @CONTROLLING-VERBOSITY.
+
+  - @COMPILATION-SPEED: How fast the compiler should run. If this is
+    high, then some expensive optimizations may be disabled.
+
+  - @SPACE: How much space the compiled code should take up. Inline
+    expansion is mostly inhibited when @SPACE is greater than @SPEED.
+    A value of `0` enables indiscriminate inline expansion. Wide use
+    of a `0` value is not recommended, as it may waste so much space
+    that run time is slowed. See @OPEN-CODING-AND-INLINE-EXPANSION.
+
+  - @DEBUG: How debuggable the program should be. The quality is
+    treated differently from the other qualities: each value indicates
+    a particular level of debugger information; it is not compared
+    with the other qualities. See @DEBUGGER-POLICY-CONTROL for the
+    details.
+
+  - @SAFETY: How much error checking should be done. If @SPEED, @SPACE
+    or @COMPILATION-SPEED is more important than @SAFETY, then
+    @TYPE-DECLARATION-CHECKING is weakened. @SAFETY `0` also
+    suppresses argument count checking, unbound-symbol checking, array
+    bounds checks, and checking of tag existence in RETURN-FROM and
+    GO.
+
+  - SB-EXT:INHIBIT-WARNINGS: This is a deprecated extension that
+    determines how little (or how much) diagnostic output should be
+    printed during compilation. This quality is compared to other
+    qualities to determine whether to print style notes and warnings
+    concerning those qualities. If @SPEED is greater than
+    `INHIBIT-WARNINGS`, then notes about how to improve speed will be
+    printed, etc. The default value is `1`, so raising the value for
+    any standard quality above its default enables notes for that
+    quality. If it is `3`, then all notes and most non-serious
+    warnings are inhibited. This is useful with DECLARE to suppress
+    warnings about unavoidable problems.
+
+  In the following, we discuss extensions related to compiler policies."
   (sb-ext:describe-compiler-policy function)
   (sb-ext:restrict-compiler-policy function)
   (with-compilation-unit macro))
-
-;; FIXME: old CMU CL compiler policy, should perhaps be adapted for
-;; SBCL. (Unfortunately, the CMU CL docs are out of sync with the CMU
-;; CL code, so adapting this requires not only reformatting the
-;; documentation, but rooting out code rot.)
-;;
-;; <sect2 id=\")compiler-policy\"><title>Compiler Policy</1000
-;;   INDEX {policy}{compiler}
-;;   INDEX compiler policy
-;;
-;; <para>The policy is what tells the compiler <emphasis>how</emphasis> to
-;; compile a program. This is logically (and often textually) distinct
-;; from the program itself. Broad control of policy is provided by the
-;; <parameter>optimize</parameter> declaration; other declarations and variables
-;; control more specific aspects of compilation.
-;;
-;; \begin{comment}
-;; * The Optimize Declaration::
-;; * The Optimize-Interface Declaration::
-;; \end{comment}
-;;
-;; %%\node The Optimize Declaration, The Optimize-Interface Declaration, Compiler Policy, Compiler Policy
-;; \subsection{The Optimize Declaration}
-;; \label{optimize-declaration}
-;; \cindex{optimize declaration}
-;; \cpsubindex{declarations}{\code{optimize}}
-;;
-;; The \code{optimize} declaration recognizes six different
-;; \var{qualities}.  The qualities are conceptually independent aspects
-;; of program performance.  In reality, increasing one quality tends to
-;; have adverse effects on other qualities.  The compiler compares the
-;; relative values of qualities when it needs to make a trade-off; i.e.,
-;; if \code{speed} is greater than \code{safety}, then improve speed at
-;; the cost of safety.
-;;
-;; The default for all qualities (except \code{debug}) is \code{1}.
-;; Whenever qualities are equal, ties are broken according to a broad
-;; idea of what a good default environment is supposed to be.  Generally
-;; this downplays \code{speed}, \code{compile-speed} and \code{space} in
-;; favor of \code{safety} and \code{debug}.  Novice and casual users
-;; should stick to the default policy.  Advanced users often want to
-;; improve speed and memory usage at the cost of safety and
-;; debuggability.
-;;
-;; If the value for a quality is \code{0} or \code{3}, then it may have a
-;; special interpretation.  A value of \code{0} means ``totally
-;; unimportant'', and a \code{3} means ``ultimately important.''  These
-;; extreme optimization values enable ``heroic'' compilation strategies
-;; that are not always desirable and sometimes self-defeating.
-;; Specifying more than one quality as \code{3} is not desirable, since
-;; it doesn't tell the compiler which quality is most important.
-;;
-;;
-;; These are the optimization qualities:
-;; \begin{Lentry}
-;;
-;; \item[\code{speed}] \cindex{speed optimization quality}How fast the
-;;   program should is run.  \code{speed 3} enables some optimizations
-;;   that hurt debuggability.
-;;
-;; \item[\code{compilation-speed}] \cindex{compilation-speed optimization
-;;     quality}How fast the compiler should run.  Note that increasing
-;;   this above \code{safety} weakens type checking.
-;;
-;; \item[\code{space}] \cindex{space optimization quality}How much space
-;;   the compiled code should take up.  Inline expansion is mostly
-;;   inhibited when \code{space} is greater than \code{speed}.  A value
-;;   of \code{0} enables indiscriminate inline expansion.  Wide use of a
-;;   \code{0} value is not recommended, as it may waste so much space
-;;   that run time is slowed.  \xlref{inline-expansion} for a discussion
-;;   of inline expansion.
-;;
-;; \item[\code{debug}] \cindex{debug optimization quality}How debuggable
-;;   the program should be.  The quality is treated differently from the
-;;   other qualities: each value indicates a particular level of debugger
-;;   information; it is not compared with the other qualities.
-;;   \xlref{debugger-policy} for more details.
-;;
-;; \item[\code{safety}] \cindex{safety optimization quality}How much
-;;   error checking should be done.  If \code{speed}, \code{space} or
-;;   \code{compilation-speed} is more important than \code{safety}, then
-;;   type checking is weakened (\pxlref{weakened-type-checks}).  If
-;;   \code{safety} if \code{0}, then no run time error checking is done.
-;;   In addition to suppressing type checks, \code{0} also suppresses
-;;   argument count checking, unbound-symbol checking and array bounds
-;;   checks.
-;;   ... and checking of tag existence in RETURN-FROM and GO.
-;;
-;; \item[\code{extensions:inhibit-warnings}] \cindex{inhibit-warnings
-;;     optimization quality}This is a CMU extension that determines how
-;;   little (or how much) diagnostic output should be printed during
-;;   compilation.  This quality is compared to other qualities to
-;;   determine whether to print style notes and warnings concerning those
-;;   qualities.  If \code{speed} is greater than \code{inhibit-warnings},
-;;   then notes about how to improve speed will be printed, etc.  The
-;;   default value is \code{1}, so raising the value for any standard
-;;   quality above its default enables notes for that quality.  If
-;;   \code{inhibit-warnings} is \code{3}, then all notes and most
-;;   non-serious warnings are inhibited.  This is useful with
-;;   \code{declare} to suppress warnings about unavoidable problems.
-;; \end{Lentry}
-;;
-;; %%\node The Optimize-Interface Declaration,  , The Optimize Declaration, Compiler Policy
-;; \subsection{The Optimize-Interface Declaration}
-;; \label{optimize-interface-declaration}
-;; \cindex{optimize-interface declaration}
-;; \cpsubindex{declarations}{\code{optimize-interface}}
-;;
-;; The \code{extensions:optimize-interface} declaration is identical in
-;; syntax to the \code{optimize} declaration, but it specifies the policy
-;; used during compilation of code the compiler automatically generates
-;; to check the number and type of arguments supplied to a function.  It
-;; is useful to specify this policy separately, since even thoroughly
-;; debugged functions are vulnerable to being passed the wrong arguments.
-;; The \code{optimize-interface} declaration can specify that arguments
-;; should be checked even when the general \code{optimize} policy is
-;; unsafe.
-;;
-;; Note that this argument checking is the checking of user-supplied
-;; arguments to any functions defined within the scope of the
-;; declaration, \code{not} the checking of arguments to \llisp{}
-;; primitives that appear in those definitions.
-;;
-;; The idea behind this declaration is that it allows the definition of
-;; functions that appear fully safe to other callers, but that do no
-;; internal error checking.  Of course, it is possible that arguments may
-;; be invalid in ways other than having incorrect type.  Functions
-;; compiled unsafely must still protect themselves against things like
-;; user-supplied array indices that are out of bounds and improper lists.
-;; See also the \kwd{context-declarations} option to
-;; \macref{with-compilation-unit}.
-;;
-;; (end of section on compiler policy)
 
 (defsection @compiler-errors (:title "Compiler Errors")
   (@type-errors-at-compile-time section)
@@ -813,7 +703,7 @@
                           :concepts (("compiler" "read error")
                                      ("read error," "compiler")))
   "SBCL's compiler does not attempt to recover from read errors when
-  reading a source file, but instead just reports the offending
+  reading a source file but instead just reports the offending
   character position and gives up on the entire source file.")
 
 (defsection @open-coding-and-inline-expansion
@@ -827,7 +717,7 @@
   coding, inline expansion, source transformation), but the implications
   to the user are basically the same:
 
-  - Attempts to redefine standard functions may be frustrated, since
+  - Attempts to redefine standard functions may be frustrated since
     the function may never be called. Although it is technically
     illegal to redefine standard functions, users sometimes want to
     implicitly redefine these functions when they are debugging using
@@ -871,7 +761,7 @@
   (such as CAR) are so simple that they are always open-coded. Even
   when not open-coded, a call to a standard function may be
   transformed into a different function call (as in the last example)
-  or compiled as _static call_. Static function call uses a more
+  or compiled as _static call_. Static function calls use a more
   efficient calling convention that forbids redefinition.")
 
 (defsection @interpreter (:title "Interpreter"

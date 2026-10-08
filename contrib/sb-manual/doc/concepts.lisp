@@ -38,16 +38,37 @@
                                  :keys ("macroexpansion")))
 
 (define-concept ~source-transform (:keys (("source" "transform"))))
+
 
-(define-concept ~safety (:keys (("safety," "optimization quality")
-                                ("optimization quality" "safety"))))
+;;;; Optimization qualities
 
-(define-concept @safety (:title "safety" :keys (~safety)))
+(define-concept @compilation-speed (:title "COMPILATION-SPEED"
+                                    :keys (~compilation-speed)))
+
+(define-concept ~compilation-speed
+    (:keys (("compilation-speed," "optimization quality")
+            ("optimization quality" "compilation-speed"))))
 
 (define-concept ~debug (:keys (("debug," "optimization quality")
                                ("optimization quality" "debug"))))
 
-(define-concept @debug (:title "debug" :keys (~debug)))
+(define-concept @debug (:title "DEBUG" :keys (~debug)))
+
+(define-concept ~safety (:keys (("safety," "optimization quality")
+                                ("optimization quality" "safety"))))
+
+(define-concept @safety (:title "SAFETY" :keys (~safety)))
+
+(define-concept ~space (:keys (("space," "optimization quality")
+                               ("optimization quality" "space"))))
+
+(define-concept @space (:title "SPACE" :keys (~space)))
+
+(define-concept ~speed (:keys (("speed," "optimization quality")
+                                ("optimization quality" "speed"))))
+
+(define-concept @speed (:title "SPEED" :keys (~speed)))
+
 
 (define-concept @tail-recursion (:title "tail recursion"
                                  :keys (("tail" "recursion")

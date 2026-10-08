@@ -93,26 +93,28 @@ Following options are defined:
     SB-EXT:RESTRICT-COMPILER-POLICY to the dynamic scope of BODY.
 
     If :OVERRIDE is false, the specified :POLICY is merged with
-    current global policy. If :OVERRIDE is true, current global
+    current global policy. If :OVERRIDE is true, the current global
     policy, including any restrictions, is discarded in favor of the
-    specified
-    :POLICY.
+    specified :POLICY.
 
     Supplying :POLICY NIL is equivalent to the option not being
     supplied at all, i.e. dynamic scoping of policy does not take
-    place.
+    place. If dynamic scoping without changing the current policy is
+    desired, use `:POLICY '(OPTIMIZE)` with :OVERRIDE NIL.
 
     This option is an SBCL-specific experimental extension: Interface
     subject to change.
 
 - :SOURCE-NAMESTRING `<namestring-form>`
 
-    Attaches the value returned by the `<namestring-form>` to the
-    internal debug-source information as the namestring of the source
-    file. Normally the namestring of the input-file for COMPILE-FILE
-    is used: this option can be used to provide source-file
-    information for functions compiled using COMPILE, or to override
-    the input-file of COMPILE-FILE.
+    Attaches the value returned by `<namestring-form>` to the internal
+    debug-source information as the namestring of the source file.
+    Normally the namestring of the INPUT-FILE for COMPILE-FILE is
+    used: this option can be used to provide source-file information
+    for functions compiled using COMPILE, or to override the
+    INPUT-FILE argument of COMPILE-FILE.
+
+    Can be accessed using SB-INTROSPECT:DEFINITION-SOURCE-PATHNAME.
 
     If both an outer and an inner WITH-COMPILATION-UNIT provide a
     :SOURCE-NAMESTRING, the inner one takes precedence. Unaffected by
@@ -122,7 +124,7 @@ Following options are defined:
 
 - :SOURCE-PLIST `<plist-form>`
 
-    Attaches the value returned by the `<plist-form>` to internal
+    Attaches the value returned by `<plist-form>` to internal
     debug-source information of functions compiled in within the
     dynamic extent of BODY.
 

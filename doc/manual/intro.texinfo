@@ -147,7 +147,7 @@ also supports allocation profiling.
 @section Idiosyncrasies
 
 @menu
-* Declarations: declarations.
+* Declarations as Assertions: declarations as assertions.
 * FASL format: fasl format.
 * Compiler-only Implementation: compiler only implementation.
 * Defining Constants: defining constants.
@@ -158,13 +158,13 @@ The information in this section describes some of the ways that SBCL
 deals with choices that the ANSI standard leaves to the
 implementation.
 
-@node declarations
-@subsection Declarations
+@node declarations as assertions
+@subsection Declarations as Assertions
 
 Declarations are generally treated as assertions. This general
 principle, and its implications, and the bugs which still keep the
 compiler from quite satisfying this principle, are discussed in
-@ref{declarations as assertions}.
+@ref{type declaration checking}.
 
 @node fasl format
 @subsection FASL format

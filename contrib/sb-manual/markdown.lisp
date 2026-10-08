@@ -14,7 +14,7 @@
 
 ;;; MARKDOWN-TO-TEXINFO converts a strict subset of Markdown to
 ;;; Texinfo. It also codifies (marks up as code) and downcases
-;;; uppercase symbols (those that actually exist in the image), and
+;;; uppercase symbols (those that actually exist in the image) and
 ;;; autolinks references to sections, attempting to approximate PAX
 ;;; semantics.
 ;;;
@@ -24,8 +24,8 @@
 ;;;   Markdown string passed to MARKDOWN-TO-TEXINFO.
 ;;;
 ;;; - See DOCSTRING-PACKAGE to understand what *PACKAGE* is when
-;;;   MARKDOWN-TO-TEXINFO is called. This is package in effect when
-;;;   the docstring was READ. If it's wrong, you will see missed
+;;;   MARKDOWN-TO-TEXINFO is called. This is the package in effect
+;;;   when the docstring was READ. If it's wrong, you will see missed
 ;;;   opportunities for codification and linking.
 ;;;
 ;;;
@@ -148,13 +148,13 @@
 ;;; Also, see SB-PCL::NORMALIZE-SBCL-DOCSTRING, an expedient docstring
 ;;; to plain text converter that supports the subset of this
 ;;; functionality necessary for the docstrings in SBCL core.
-(defun markdown-to-texinfo (string &optional lambda-list)
+(defun markdown-to-texinfo (string &key lambda-list (add-newline t))
   (let ((*texinfo-local-variables* (flatten lambda-list))
         (lines (string-lines string))
         (line-number 0)
         (current-paragraph nil))
     (declare (special *texinfo-local-variables*))
-    (flet ((flush-paragraph ()
+    (flet ((flush-paragraph (newlinep)
              (when current-paragraph
                (let* ((*concept-keys-to-prepend* ())
                       (string (process-inline-markdown
@@ -162,7 +162,8 @@
                                        (nreverse current-paragraph)))))
                  (write-concept-keys *concept-keys-to-prepend* t)
                  (write-string string))
-               (terpri)
+               (when newlinep
+                 (terpri))
                (setf current-paragraph nil))))
       (loop while (< line-number (length lines))
             for line = (svref lines line-number)
@@ -171,19 +172,19 @@
                      (parse-markdown-block lines line-number 0)
                    (cond
                      (count
-                      (flush-paragraph)
+                      (flush-paragraph t)
                       (write-concept-keys *concept-keys-to-prepend* t)
                       (dolist (c collected)
                         (write-line c))
                       (incf line-number count))
                      ((blankp line)
-                      (flush-paragraph)
+                      (flush-paragraph t)
                       (write-line line)
                       (incf line-number))
                      (t
                       (push line current-paragraph)
                       (incf line-number))))))
-      (flush-paragraph))))
+      (flush-paragraph add-newline))))
 
 
 ;;;; Utilities
@@ -444,7 +445,8 @@
                  (let* ((concept (symbol-value symbol))
                         (title (doctitle concept)))
                    (when title
-                     (format result "~A" (escape-texinfo title)))
+                     (let ((*standard-output* result))
+                       (markdown-to-texinfo title :add-newline nil)))
                    (setq *concept-keys-to-prepend*
                          (append *concept-keys-to-prepend*
                                  (multiplexing-concept-keys concept)))))
@@ -756,7 +758,7 @@
                     (with-output-to-string (*standard-output*)
                       (markdown-to-texinfo
                        (format nil "~{~A~^~%~}" (nreverse stripped-lines))
-                       *texinfo-local-variables*))))
+                       :lambda-list *texinfo-local-variables*))))
               (values n-lines
                       `("@quotation"
                         ,@(coerce (string-lines inner-texinfo) 'list)

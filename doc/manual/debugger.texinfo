@@ -11,7 +11,7 @@
 * Variable Access: variable access.
 * Source Location Printing: source location printing.
 * Debugger Policy Control: debugger policy control.
-* Exiting Commands: exiting commands.
+* Exiting the Debugger: exiting the debugger.
 * Information Commands: information commands.
 * Breakpoint Commands: breakpoint commands.
 * Function Tracing: function tracing.
@@ -60,7 +60,9 @@ if @code{sb-debug:*debug-beginner-help-p*} is true (default).
 Next comes a listing of the active restart names, along with their
 descriptions -- the ways we can restart execution after this error.
 In this case, both options return to top-level. Restarts can be
-selected by entering the corresponding number or name.
+selected by entering the corresponding number or name. If the name
+coincides with the name of a debugger command or that of another
+restart, use its number.
 
 The current frame appears right underneath the restarts, immediately
 followed by the debugger prompt.
@@ -275,7 +277,7 @@ for any of a number of reasons the value of the variable is
 unavailable or not known to be available (@ref{variable access}), then
 @code{#<unavailable-arg>} will be printed instead of the argument value.
 
-Note that inline expansion and open-coding affect what frames are
+Note that @ref{open coding and inline expansion} affect what frames are
 present in the debugger, see @ref{debugger policy control}.
 
 @node function names
@@ -351,6 +353,8 @@ is any doubt about how one function called another, it can usually
 be eliminated by finding the source location in the calling frame.
 See @ref{source location printing}.
 
+@cindex debug, optimization quality
+@cindex optimization quality debug
 The elimination of tail-recursive frames can be prevented by
 disabling tail-recursion optimization, which happens when the @code{debug}
 optimization quality is greater than 2. See
@@ -372,9 +376,13 @@ displayed.
 
 There are three reasons why a code location could be unknown:
 
+@cindex debug, optimization quality
+@cindex optimization quality debug
 @cindex interrupt
 @cindex run-time error
 @cindex error, run-time
+@cindex safety, optimization quality
+@cindex optimization quality safety
 @itemize
 @item There is inadequate debug information due to the value of the
   @code{debug} optimization quality. See @ref{debugger policy control}.
@@ -383,7 +391,7 @@ There are three reasons why a code location could be unknown:
 
 @item A hardware error  such as a bus error occurred in
   code that was compiled unsafely due to the value of the @code{safety}
-  optimization quality.
+  optimization quality. See @ref{compiler policy}.
 @end itemize
 
 In the last two cases, the values of argument variables are
@@ -476,10 +484,10 @@ incorrect values, the debugger tells you the value is unavailable.
 
 The one exception is this: if you interrupt (e.g. with @code{C-c}) or if
 there is an unexpected hardware error such as a bus error (which
-should only happen in unsafe code), then the values displayed for
-arguments to the interrupted frame might be incorrect. This
-exception applies only to the interrupted frame: any frame farther
-down the stack will be fine.
+should only happen in unsafe code; see @ref{type declaration checking}),
+then the values displayed for arguments to the interrupted frame
+might be incorrect. This exception applies only to the interrupted
+frame: any frame farther down the stack will be fine.
 
 @quotation
 @emph{Note}: Since the location of an interrupt or hardware error will
@@ -492,8 +500,10 @@ The value of a variable may be unavailable for these reasons:
 
 @cindex debug, optimization quality
 @cindex optimization quality debug
+@cindex compilation-speed, optimization quality
+@cindex optimization quality compilation-speed
 @itemize
-@item The value of the debug optimization quality may have omitted
+@item The value of the @code{debug} optimization quality may have omitted
   debug information needed to determine whether the variable is
   available. Unless a variable is an argument, its value will only
   be available when @code{debug} is at least 2.
@@ -534,13 +544,17 @@ In this case, @code{var1} is substituted with @code{var2}.
   value.
 @end itemize
 
+@cindex speed, optimization quality
+@cindex optimization quality speed
+@cindex debug, optimization quality
+@cindex optimization quality debug
 Since it is especially useful to be able to get the arguments to a
 function, argument variables are treated specially when the @code{speed}
 optimization quality is less than 3 and the @code{debug} quality is at
 least 1. With this compilation policy, the values of argument
 variables are almost always available everywhere in the function,
-even at unknown locations. For non-argument variables, @code{debug} must be
-at least 2 for values to be available, and even then, values are
+even at unknown locations. For non-argument variables, @code{debug} must
+be at least 2 for values to be available, and even then, values are
 only available at known locations.
 
 @node note on lexical variable access
@@ -696,7 +710,7 @@ same @code{eq} list twice. If you don't define read macros and don't use
 
 @cindex debug, optimization quality
 @cindex optimization quality debug
-Source location information is only available when the debug
+Source location information is only available when the @code{debug}
 optimization quality is at least 2. If source location information
 is unavailable, the source commands will give an error message.
 
@@ -747,11 +761,13 @@ have changed the program on you.)
 @cindex debug, optimization quality
 @cindex optimization quality debug
 The compilation policy specified by @code{optimize} declarations
-affects the behavior seen in the debugger. The debug quality
+affects the behavior seen in the debugger. The @code{debug} quality
 directly affects the debugger by controlling the amount of debugger
 information dumped. Other optimization qualities have indirect but
 observable effects due to changes in the way compilation is done.
 
+@cindex debug, optimization quality
+@cindex optimization quality debug
 Unlike the other optimization qualities (which are compared in
 relative value to evaluate tradeoffs), the @code{debug} optimization
 quality is directly translated to a level of debug information. This
@@ -761,6 +777,8 @@ the other qualities are changed during compilation. These are the
 levels of debug information that correspond to the values of the
 @code{debug} quality:
 
+@cindex speed, optimization quality
+@cindex optimization quality speed
 @itemize
 @item @code{0}: Only the function name and enough information to allow the
   stack to be parsed.
@@ -796,6 +814,14 @@ levels of debug information that correspond to the values of the
 
 Inlining of local functions is inhibited so that they may be @code{trace}d.
 
+@cindex debug, optimization quality
+@cindex optimization quality debug
+@cindex speed, optimization quality
+@cindex optimization quality speed
+@cindex space, optimization quality
+@cindex optimization quality space
+@cindex compilation-speed, optimization quality
+@cindex optimization quality compilation-speed
 @itemize
 @item @code{> (max speed space)}: If @code{debug} is greater than both @code{speed} and
   @code{space}, the command @code{return} can be used to continue execution by
@@ -806,12 +832,20 @@ Inlining of local functions is inhibited so that they may be @code{trace}d.
   steppable (see @ref{single stepping}).
 @end itemize
 
+@cindex speed, optimization quality
+@cindex optimization quality speed
+@cindex debug, optimization quality
+@cindex optimization quality debug
 As you can see, if the @code{speed} quality is 3, debugger performance is
 degraded. This effect comes from the elimination of argument
 variable special-casing (see @ref{variable value availability}). Some
 degree of speed/debuggability tradeoff is unavoidable, but the
 effect is not too drastic when @code{debug} is at least 2.
 
+@cindex speed, optimization quality
+@cindex optimization quality speed
+@cindex space, optimization quality
+@cindex optimization quality space
 @cindex inline, semi
 @cindex semi-inline
 In addition to @code{inline} and @code{notinline} declarations, the relative
@@ -823,11 +857,17 @@ will be treated like any other local variable. Functions may also be
 call, but the call is to an optimized local version of the function,
 not to the original function.
 
-@node exiting commands
-@section Exiting Commands
+@node exiting the debugger
+@section Exiting the Debugger
 
 These commands get you out of the debugger.
 
+@cindex debug, optimization quality
+@cindex optimization quality debug
+@cindex speed, optimization quality
+@cindex optimization quality speed
+@cindex space, optimization quality
+@cindex optimization quality space
 @itemize
 @item @code{toplevel}: Throw to top level.
 
@@ -835,13 +875,15 @@ These commands get you out of the debugger.
   the @code{error} command. If @code{<n>} is not specified, the available
   restart cases are reported.
 
-@item @code{continue}: Call @code{continue} on the condition given to @code{debug}. If
-  there is no restart case named @code{continue}, then an error is
-  signaled.
+@item @code{continue}: Call @code{continue} with the condition given that invoked
+  the debugger. If there is no restart case named @code{continue}, then an
+  error is signaled. This is not a debugger command, but the name of
+  a commonly available restart.
 
-@item @code{abort}: Call @code{abort} on the condition given to @code{debug}. This is
-  useful for popping debug command loop levels or aborting to top
-  level, as the case may be.
+@item @code{abort}: Call @code{abort} on the condition that invoked the debugger.
+  This is useful for popping debug command loop levels or aborting
+  to top level, as the case may be. This is not a debugger command,
+  but the name of a commonly available restart.
 
 @item @code{return <value>}: Return @code{value} from the current stack frame.
   This command is available when the @code{debug} optimization quality is
@@ -887,6 +929,8 @@ function, but a few show general information.
 * Breakpoint Example: breakpoint example.
 @end menu
 
+@cindex debug, optimization quality
+@cindex optimization quality debug
 SBCL supports setting of breakpoints inside compiled functions and
 stepping of compiled code. Breakpoints can only be set at known
 locations (see @ref{unknown locations and interrupts}), so these commands

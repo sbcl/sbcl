@@ -135,17 +135,17 @@
   "The information in this section describes some of the ways that SBCL
   deals with choices that the ANSI standard leaves to the
   implementation."
-  (@declarations section)
+  (@declarations-as-assertions section)
   (@fasl-format section)
   (@compiler-only-implementation section)
   (@defining-constants section)
   (@style-warnings section))
 
-(defsection @declarations (:title "Declarations")
+(defsection @declarations-as-assertions (:title "Declarations as Assertions")
   "Declarations are generally treated as assertions. This general
   principle, and its implications, and the bugs which still keep the
   compiler from quite satisfying this principle, are discussed in
-  @DECLARATIONS-AS-ASSERTIONS.")
+  @TYPE-DECLARATION-CHECKING.")
 
 (defsection @fasl-format (:title "FASL format")
   "SBCL fasl-format is binary compatible only with the exact SBCL version

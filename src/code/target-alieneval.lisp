@@ -974,7 +974,7 @@ documentation. `ARG-TYPE` is the C type of the argument.
 >     (declaim (inline lisp-name))
 >
 > In addition to avoiding the Lisp call overhead, this allows
-> pointers, word-integers and floats to be passed using non-descriptor
+> pointers, word-integers and floats to be passed using unboxed
 > representations, avoiding consing.
 
 Consider the C function `cfoo` with the following calling

@@ -115,7 +115,7 @@ of values when they are recognized as having dynamic extent:
 @cindex optimization quality safety
 @strong{Warning}: Stack space is limited, so allocation of a large
 vector may cause stack overflow. Stack overflow checks are
-done except in 0 safety policies.
+done except in 0 @code{safety} policies.
 @end quotation
 
 @item closures defined with @code{flet} or @code{labels} with a bound @code{dynamic-extent}

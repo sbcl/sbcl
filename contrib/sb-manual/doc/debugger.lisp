@@ -11,7 +11,7 @@
   (@variable-access section)
   (@source-location-printing section)
   (@debugger-policy-control section)
-  (@exiting-commands section)
+  (@exiting-the-debugger section)
   (@information-commands section)
   (@breakpoint-commands section)
   (@function-tracing section)
@@ -47,7 +47,9 @@
   Next comes a listing of the active restart names, along with their
   descriptions -- the ways we can restart execution after this error.
   In this case, both options return to top-level. Restarts can be
-  selected by entering the corresponding number or name.
+  selected by entering the corresponding number or name. If the name
+  coincides with the name of a debugger command or that of another
+  restart, use its number.
 
   The current frame appears right underneath the restarts, immediately
   followed by the debugger prompt.")
@@ -200,10 +202,8 @@
   unavailable or not known to be available (@VARIABLE-ACCESS), then
   `#<unavailable-arg>` will be printed instead of the argument value.
 
-  Note that inline expansion and open-coding affect what frames are
-  present in the debugger, see @DEBUGGER-POLICY-CONTROL."
-  ;; FIXME: Link here to section about open coding once it exists.
-  )
+  Note that @OPEN-CODING-AND-INLINE-EXPANSION affect what frames are
+  present in the debugger, see @DEBUGGER-POLICY-CONTROL.")
 
 (defsection @function-names (:title "Function Names")
   "If a function is defined by DEFUN it will appear in backtrace
@@ -265,7 +265,7 @@
   See @SOURCE-LOCATION-PRINTING.
 
   The elimination of tail-recursive frames can be prevented by
-  disabling tail-recursion optimization, which happens when the DEBUG
+  disabling tail-recursion optimization, which happens when the @DEBUG
   optimization quality is greater than 2. See
   @DEBUGGER-POLICY-CONTROL."
   ;; FIXME: reinstate this link once the chapter is in the manual. For
@@ -288,16 +288,15 @@
   There are three reasons why a code location could be unknown:
 
   - There is inadequate debug information due to the value of the
-    DEBUG optimization quality. See @DEBUGGER-POLICY-CONTROL.
+    @DEBUG optimization quality. See @DEBUGGER-POLICY-CONTROL.
 
   - The debugger was entered because of an @INTERRUPT such as `C-c`.
 
   - A hardware error ~RUN-TIME-ERROR such as a bus error occurred in
-    code that was compiled unsafely due to the value of the SAFETY
-    optimization quality."
-  ;; FIXME: reinstate link when section on optimize qualities exists.
-  ;; @OPTIMIZE-DECLARATION.
-  "In the last two cases, the values of argument variables are
+    code that was compiled unsafely due to the value of the @SAFETY
+    optimization quality. See @COMPILER-POLICY.
+
+  In the last two cases, the values of argument variables are
   accessible, but may be incorrect. For more details on when variable
   values are accessible, see @VARIABLE-VALUE-AVAILABILITY.
 
@@ -358,10 +357,10 @@
 
   The one exception is this: if you interrupt (e.g. with `C-c`) or if
   there is an unexpected hardware error such as a bus error (which
-  should only happen in unsafe code), then the values displayed for
-  arguments to the interrupted frame might be incorrect. This
-  exception applies only to the interrupted frame: any frame farther
-  down the stack will be fine.
+  should only happen in unsafe code; see @TYPE-DECLARATION-CHECKING),
+  then the values displayed for arguments to the interrupted frame
+  might be incorrect. This exception applies only to the interrupted
+  frame: any frame farther down the stack will be fine.
 
   > _Note_: Since the location of an interrupt or hardware error will
   > always be an unknown location, non-argument variable values will
@@ -373,16 +372,16 @@
   - The value of the @DEBUG optimization quality may have omitted
     debug information needed to determine whether the variable is
     available. Unless a variable is an argument, its value will only
-    be available when DEBUG is at least 2.
+    be available when @DEBUG is at least 2.
 
   - The compiler did lifetime analysis and determined that the value
     was no longer needed, even though its scope had not been exited.
-    Lifetime analysis is inhibited when the DEBUG optimization
+    Lifetime analysis is inhibited when the @DEBUG optimization
     quality is 3.
 
   - The variable's name is an uninterned symbol (gensym). To save
     space, the compiler only dumps debug information about uninterned
-    variables when the DEBUG optimization quality is 3.
+    variables when the @DEBUG optimization quality is 3.
 
   - The frame's location is unknown (see
     @UNKNOWN-LOCATIONS-AND-INTERRUPTS) because the debugger was
@@ -393,7 +392,7 @@
   - The variable (or the code referencing it) was optimized out of
     existence. Variables with no reads are always optimized away. The
     degree to which the compiler deletes variables will depend on the
-    value of the COMPILATION-SPEED optimization quality, but most
+    value of the @COMPILATION-SPEED optimization quality, but most
     source-level optimizations are done under all compilation
     policies.
 
@@ -409,12 +408,12 @@
     value.
 
   Since it is especially useful to be able to get the arguments to a
-  function, argument variables are treated specially when the SPEED
-  optimization quality is less than 3 and the DEBUG quality is at
+  function, argument variables are treated specially when the @SPEED
+  optimization quality is less than 3 and the @DEBUG quality is at
   least 1. With this compilation policy, the values of argument
   variables are almost always available everywhere in the function,
-  even at unknown locations. For non-argument variables, DEBUG must be
-  at least 2 for values to be available, and even then, values are
+  even at unknown locations. For non-argument variables, @DEBUG must
+  be at least 2 for values to be available, and even then, values are
   only available at known locations.")
 
 (defsection @note-on-lexical-variable-access
@@ -590,20 +589,20 @@
   observable effects due to changes in the way compilation is done.
 
   Unlike the other optimization qualities (which are compared in
-  relative value to evaluate tradeoffs), the DEBUG optimization
+  relative value to evaluate tradeoffs), the @DEBUG optimization
   quality is directly translated to a level of debug information. This
   absolute interpretation allows the user to count on a particular
   amount of debug information being available even when the values of
   the other qualities are changed during compilation. These are the
   levels of debug information that correspond to the values of the
-  DEBUG quality:
+  @DEBUG quality:
 
   - `0`: Only the function name and enough information to allow the
     stack to be parsed.
 
   - `> 0`: Any level greater than 0 gives level 0 plus all argument
     variables. Values will only be accessible if the argument variable
-    is never set and SPEED is not 3. SBCL allows any real value for
+    is never set and @SPEED is not 3. SBCL allows any real value for
     optimization qualities. It may be useful to specify 0.5 to get
     backtrace argument display without argument documentation.
 
@@ -615,7 +614,7 @@
 
   - `2`: Level 1 plus all interned local variables, source location
     information, and lifetime information that tells the debugger when
-    arguments are available (even when SPEED is 3 or the argument is
+    arguments are available (even when @SPEED is 3 or the argument is
     set).
 
   - `> 2`: Any level greater than 2 gives level 2 and in addition
@@ -624,29 +623,29 @@
     positions.
 
   - `3`: Level 2 plus all uninterned variables. In addition, lifetime
-    analysis is disabled (even when SPEED is 3), ensuring that all
+    analysis is disabled (even when @SPEED is 3), ensuring that all
     variable values are available at any known location within the
     scope of the binding. This has a speed penalty in addition to the
     obvious space penalty.
 
   Inlining of local functions is inhibited so that they may be TRACEd.
 
-  - `> (MAX SPEED SPACE)`: If DEBUG is greater than both SPEED and
-    SPACE, the command `return` can be used to continue execution by
+  - `> (MAX SPEED SPACE)`: If @DEBUG is greater than both @SPEED and
+    @SPACE, the command `return` can be used to continue execution by
     returning a value from the current stack frame.
 
-  - `> (MAX SPEED SPACE COMPILATION-SPEED)`: If DEBUG is greater than
-    all of SPEED, SPACE and COMPILATION-SPEED the code will be
+  - `> (MAX SPEED SPACE COMPILATION-SPEED)`: If @DEBUG is greater than
+    all of @SPEED, @SPACE and @COMPILATION-SPEED the code will be
     steppable (see @SINGLE-STEPPING).
 
-  As you can see, if the SPEED quality is 3, debugger performance is
+  As you can see, if the @SPEED quality is 3, debugger performance is
   degraded. This effect comes from the elimination of argument
   variable special-casing (see @VARIABLE-VALUE-AVAILABILITY). Some
   degree of speed/debuggability tradeoff is unavoidable, but the
-  effect is not too drastic when DEBUG is at least 2.
+  effect is not too drastic when @DEBUG is at least 2.
 
   In addition to INLINE and NOTINLINE declarations, the relative
-  values of the SPEED and SPACE qualities also change whether
+  values of the @SPEED and @SPACE qualities also change whether
   functions are inline expanded. If a function is inline expanded,
   then there will be no frame to represent the call, and the arguments
   will be treated like any other local variable. Functions may also be
@@ -657,7 +656,7 @@
   ;; (@INLINE-EXPANSION).
   )
 
-(defsection @exiting-commands (:title "Exiting Commands")
+(defsection @exiting-the-debugger (:title "Exiting the Debugger")
   "These commands get you out of the debugger.
 
   - `toplevel`: Throw to top level.
@@ -666,23 +665,25 @@
     the `error` command. If `<n>` is not specified, the available
     restart cases are reported.
 
-  - `\\continue`: Call CONTINUE on the condition given to DEBUG. If
-    there is no restart case named CONTINUE, then an error is
-    signaled.
+  - `\\continue`: Call CONTINUE with the condition given that invoked
+    the debugger. If there is no restart case named CONTINUE, then an
+    error is signaled. This is not a debugger command, but the name of
+    a commonly available restart.
 
-  - `\\abort`: Call ABORT on the condition given to DEBUG. This is
-    useful for popping debug command loop levels or aborting to top
-    level, as the case may be.
+  - `\\abort`: Call ABORT on the condition that invoked the debugger.
+    This is useful for popping debug command loop levels or aborting
+    to top level, as the case may be. This is not a debugger command,
+    but the name of a commonly available restart.
 
   - `return <value>`: Return `VALUE` from the current stack frame.
-    This command is available when the DEBUG optimization quality is
-    greater than both SPEED and SPACE. Care must be taken that the
+    This command is available when the @DEBUG optimization quality is
+    greater than both @SPEED and @SPACE. Care must be taken that the
     value is of the same type as SBCL expects the stack frame to
     return.
 
   - `restart-frame`: Restart execution of the current stack frame.
-    This command is available when the DEBUG optimization quality is
-    greater than both SPEED and SPACE and when the frame is for a
+    This command is available when the @DEBUG optimization quality is
+    greater than both @SPEED and @SPACE and when the frame is for a
     global function. If the function is redefined in the debugger
     before the frame is restarted, the new function will be used.")
 
@@ -710,7 +711,7 @@
   "SBCL supports setting of breakpoints inside compiled functions and
   stepping of compiled code. Breakpoints can only be set at known
   locations (see @UNKNOWN-LOCATIONS-AND-INTERRUPTS), so these commands
-  are largely useless unless the DEBUG optimize quality is at least
+  are largely useless unless the @DEBUG optimize quality is at least
   2 (see @DEBUGGER-POLICY-CONTROL). These commands manipulate
   breakpoints:
 
