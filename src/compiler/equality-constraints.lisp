@@ -774,7 +774,9 @@
                                                            (equality-constraint-not-p con)))))))
                        (let ((constraints1 (block-out (node-block ref1)))
                              (constraints2 (block-out (node-block ref2))))
-                         (when (and constraints1 constraints2)
+                         (when (and constraints1 constraints2
+                                    (not (eq constraints1 :pending))
+                                    (not (eq constraints2 :pending)))
                            (block nil
                              (do-conset-constraints-intersection (con (constraints1
                                                                        (lambda-var-equality-constraints var1)))
