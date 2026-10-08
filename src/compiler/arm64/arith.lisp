@@ -2066,7 +2066,8 @@
   (:info width)
   (:generator 4
     (loadw r x bignum-digits-offset other-pointer-lowtag)
-    (inst sbfm r r 0 (1- width))))
+    (unless (= width 64)
+      (inst sbfm r r 0 (1- width)))))
 
 (define-vop (mask-signed-field-fixnum)
   (:translate sb-c::mask-signed-field)

@@ -2778,3 +2778,12 @@
         (+ (sb-c::mask-signed-field 63 (ash in 23)) 64))
    ((0) 64)
    ((549756858368) -4611677256694104000)))
+
+(with-test (:name :mask-signed-field-64)
+ (checked-compile-and-assert
+     (:optimize :default)
+     `(lambda (a)
+        (declare (bignum a))
+        (sb-c::mask-signed-field 64 a))
+   (((ash 1 300)) 0)
+   (((ash 1 63)) (ash -1 63))))
