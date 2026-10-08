@@ -1517,8 +1517,6 @@
                           conset)
                 constraint-propagate-in-block))
 (defun constraint-propagate-in-block (block gen preprocess-refs-p)
-  (when (eq gen :pending)
-    (return-from constraint-propagate-in-block gen))
   (do-nodes (node nil block)
     (typecase node
       (bind
@@ -1694,7 +1692,8 @@
 ;;; block.
 (defun use-result-constraints (block)
   (declare (type cblock block))
-  (constraint-propagate-in-block block (block-in block) t))
+  (unless (eq (block-in block) :pending)
+    (constraint-propagate-in-block block (block-in block) t)))
 
 ;;; Give an empty constraints set to any var that doesn't have one and
 ;;; isn't a set closure var. Since a var that we previously rejected
@@ -1841,7 +1840,8 @@
   (let ((in (compute-block-in block))
         (old-in (block-in block)))
     (cond ((eq in :pending)
-           (setf (block-in block) in))
+           (setf (block-in block) in)
+           nil)
           ((and old-in
                 (not (eq old-in :pending))
                 (conset= in old-in))
