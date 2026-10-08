@@ -1329,10 +1329,14 @@
 
 (define-vop (ash-left-modfx-c/fixnum=>fixnum
              ash-left-c/fixnum=>fixnum)
+  (:result-types tagged-num)
+  (:results (result :scs (any-reg)))
   (:translate ash-left-modfx))
 
 (define-vop (ash-left-mod64-c/fixnum=>fixnum
              ash-left-c/fixnum=>fixnum)
+  (:result-types tagged-num)
+  (:results (result :scs (any-reg)))
   (:translate ash-left-mod64))
 
 (define-vop (ash-left-mod64/fixnum=>fixnum

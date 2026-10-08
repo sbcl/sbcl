@@ -2770,3 +2770,11 @@
          (zerop (mod x 129)))
     (((1+ (ash -1 (1- sb-vm:n-word-bits)))) nil)
     ((129) t)))
+
+(with-test (:name :modarith-shift-to-fixnum)
+ (checked-compile-and-assert
+     nil
+     `(lambda (in)
+        (+ (sb-c::mask-signed-field 63 (ash in 23)) 64))
+   ((0) 64)
+   ((549756858368) -4611677256694104064)))
