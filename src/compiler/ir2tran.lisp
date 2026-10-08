@@ -2457,7 +2457,7 @@
              (move-lvar-result node block results lvar)
              (return))))
         (#.sb-vm:n-word-bits
-         (when (lvar-subtypep x word)
+         (when (word-sized-lvar-p x)
            (let* ((lvar (node-lvar node))
                   (temp (make-normal-tn (primitive-type-of most-positive-word)))
                   (results (lvar-result-tns
