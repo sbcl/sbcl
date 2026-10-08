@@ -146,7 +146,7 @@
   (declare (type ir2-block block) (type local-tn-bit-vector live)
            (type hash-table var-locs) (type node node)
            (type (or vop null) vop)
-           #-sb-xc-host (values simple-bit-vector))
+           (values simple-bit-vector))
   (let ((res (make-array (align-up (hash-table-count var-locs) 8)
                          :element-type 'bit
                          :initial-element 0))

@@ -42,7 +42,7 @@
 ;;; Return the TN that holds the value of THING in the environment ENV.
 (defun find-in-environment (thing env)
   (declare (type (or nlx-info lambda-var clambda) thing) (type environment env)
-           #-sb-xc-host (values tn))
+           (values tn))
   (or (cdr (assoc thing (ir2-environment-closure (environment-info env))))
       (etypecase thing
         (lambda-var

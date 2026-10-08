@@ -1054,7 +1054,7 @@
            (type (or lvar null) result)
            (type list form)
            (type leaf fun)
-           #-sb-xc-host (values combination))
+           (values combination))
   (let ((ctran (make-ctran))
         (fun-lvar (make-lvar)))
     (reference-leaf start ctran fun-lvar fun)
@@ -1250,7 +1250,7 @@
 ;;; duplicated, and declarations always apply to the last.
 (defun find-in-bindings (vars name)
   (declare (list vars) (symbol name)
-           #-sb-xc-host (values (or lambda-var list)))
+           (values (or lambda-var list)))
   (let ((found nil))
     (dolist (var vars)
       (cond ((leaf-p var)

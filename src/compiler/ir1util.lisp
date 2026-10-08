@@ -57,7 +57,7 @@
 
 ;;; Return a list of all the nodes which use LVAR.
 (defun find-uses (lvar)
-  (declare (type lvar lvar) #-sb-xc-host (values list))
+  (declare (type lvar lvar) (values list))
   (ensure-list (lvar-uses lvar)))
 
 (defun principal-lvar (lvar)
@@ -1625,7 +1625,7 @@
 ;;; we walk the subforms of the top level source form.
 (defun source-path-form-number (path)
   (declare (type list path) (inline member)
-           #-sb-xc-host (values (or null index)))
+           (values (or null index)))
   (cadr (member 'original-source-start path :test #'eq)))
 
 ;;; Return a list of all the enclosing forms not in the original
@@ -3224,7 +3224,7 @@ is :ANY, the function name is not checked."
 ;;;; functional hackery
 
 (defun main-entry (functional)
-  (declare (type functional functional) #-sb-xc-host (values clambda))
+  (declare (type functional functional) (values clambda))
   (etypecase functional
     (clambda functional)
     (optional-dispatch
@@ -3236,7 +3236,7 @@ is :ANY, the function name is not checked."
 ;;; &REST arg with no references.
 (defun looks-like-an-mv-bind (functional)
   (declare (type functional functional)
-           #-sb-xc-host (values boolean))
+           (values boolean))
   (and (optional-dispatch-p functional)
        (do ((arg (optional-dispatch-arglist functional) (cdr arg)))
            ((null arg) nil)
@@ -3478,7 +3478,7 @@ is :ANY, the function name is not checked."
 ;;; verify that alternating lvars in ARGS are constant and that there
 ;;; is an even number of args.
 (defun check-key-args-constant (args)
-  (declare (type list args) #-sb-xc-host (values boolean))
+  (declare (type list args) (values boolean))
   (do ((arg args (cddr arg)))
       ((null arg) t)
     (unless (and (rest arg)
@@ -3489,7 +3489,7 @@ is :ANY, the function name is not checked."
 ;;; verify that the list of lvars ARGS is a well-formed &KEY arglist
 ;;; and that only keywords present in the list KEYS are supplied.
 (defun check-transform-keys (args keys)
-  (declare (list args keys) #-sb-xc-host (values boolean))
+  (declare (list args keys) (values boolean))
   (and (check-key-args-constant args)
        (do ((arg args (cddr arg)))
            ((null arg) t)

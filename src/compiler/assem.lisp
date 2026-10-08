@@ -1733,7 +1733,7 @@
 (defun label-position (label &optional if-after delta)
   "Return the current position for LABEL. Chooser maybe-shrink functions
    should supply IF-AFTER and DELTA in order to ensure correct results."
-  (declare #-sb-xc-host (values (or null index)))
+  (declare (values (or null index)))
   (let ((posn (label-posn label)))
     (if (and if-after (> posn if-after))
         (- posn delta)

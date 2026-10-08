@@ -263,6 +263,8 @@
     "UPGRADED-COMPLEX-PART-TYPE"
     "WITH-COMPILATION-UNIT"
 
+    ;; Remove VALUES declarations
+    "DEFUN"
     ;; Add eval-when to it
     "DEFCONSTANT"))
 
@@ -376,6 +378,23 @@
                                    string))))
   (load (find-bootstrap-file "^exports.lisp")))
 (unhide-host-format-funs)
+
+(defvar *host-defun-expander* (macro-function 'cl:defun))
+(setf (macro-function 'xc-strict-cl:defun)
+      (lambda (whole env)
+        (funcall
+         *host-defun-expander*
+         (if (fboundp 'sb-impl::parse-body)
+             (destructuring-bind (name ll . rest) (cdr whole)
+               (multiple-value-bind (forms decls) (sb-impl::parse-body rest t)
+                 (setq decls
+                       (mapcar (lambda (x)
+                                 (assert (eq (car x) 'declare))
+                                 (cons 'declare (remove 'values (cdr x) :key 'car)))
+                               decls))
+                 `(cl:defun ,name ,ll ,@decls ,@forms)))
+             `(cl:defun ,@(cdr whole)))
+         env)))
 
 (defun read-undefined-fun-allowlist ()
   (with-open-file (data (find-bootstrap-file "^undefined-fun-allowlist.lisp-expr"))
