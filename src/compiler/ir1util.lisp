@@ -2517,8 +2517,13 @@
       (cset
        (flush-dest (set-value node))
        (let ((var (set-var node)))
-         (setf (basic-var-sets var)
-               (delete node (basic-var-sets var)))))
+         (when (and (not (setf (basic-var-sets var)
+                               (delq1 node (basic-var-sets var))))
+                    (lambda-var-p var)
+                    ;; Constraints won't compute it for vars without sets
+                    (lambda-var-compute-same-refs var))
+           (loop for ref in (cdr (leaf-refs var)) ;; skip one ref (doesn't matter which)
+                 do (reoptimize-lvar (node-lvar ref))))))
       (cast
        (flush-dest (cast-value node)))
       (enclose)

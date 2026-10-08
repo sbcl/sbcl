@@ -1042,3 +1042,16 @@
              6))))
     ((4) -9)))
 
+(with-test (:name :same-ref-recompute-without-sets)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (a)
+                         (declare ((integer -3 3) a))
+                         (+
+                          (let (b)
+                            (if (eq a a)
+                                (setq b 1d0)
+                                (setq b a))
+                            (the integer b))
+                          (progn (check-type a integer) 0)))
+                      :allow-warnings t))))
