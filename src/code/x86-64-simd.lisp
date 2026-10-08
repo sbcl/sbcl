@@ -1611,7 +1611,7 @@
             (inst jmp :l LOOP)
 
             DONE
-
+            (inst sub byte-array byte-array*)
             ;; Find the max last-newline...
             (progn
               (inst movdqa  temp last-newlines)
@@ -1629,8 +1629,7 @@
               (inst pandn   temp temp1)
               (inst por     temp last-newlines)
               (inst movd    last-newline temp)
-              (inst movsx '(:dword :qword) last-newline last-newline))
-            (inst sub byte-array byte-array*))
+              (inst movsx '(:dword :qword) last-newline last-newline)))
         (setf (sb-impl::buffer-tail obuf) (+ tail copied))
         (values (+ start copied)
                 (if (>= last-newline 0)
