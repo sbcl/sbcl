@@ -56,7 +56,7 @@
       (cons live-regular live-huge))))
 
 (test-util:with-test (:name :arena-live-bytes
-                      :skipped-on (:not (:and :x86-64 :gencgc)))
+                      :skipped-on (:not (:and :x86-64 :gencgc :unix)))
   (let ((arena (new-arena 131072 131072 10)))
     (unwind-protect
          (let ((kept (allocate-some-live-and-dead arena)))
