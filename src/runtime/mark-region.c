@@ -288,7 +288,7 @@ page_index_t try_allocate_large(uword_t nbytes,
   uword_t largest_hole_seen = 0;
   while (1) {
     page_index_t chunk_start = find_free_page(where, end);
-    if (chunk_start == -1) return -1;
+    if (chunk_start == -1) break;
     /* TODO: this is suboptimal - the full extent of the free space is irrelevant
      * as long as it's at _least_ pages_needed. So find_used_page is a poor choice
      * of algorithm for this. It's not wrong, though I've seen it say (via added
@@ -317,13 +317,12 @@ page_index_t try_allocate_large(uword_t nbytes,
       return chunk_start;
     }
     if (hole_size > largest_hole_seen) largest_hole_seen = hole_size;
-    if (chunk_end == end) {
-      *largest_hole = largest_hole_seen * GENCGC_PAGE_BYTES;
-      return -1;
-    }
     where = chunk_end;
   }
-  /* Shouldn't end up here, really. */
+  /* Exhausted: either no free page was found or none was large enough.
+   * Report the largest free extent seen, or zero if there was none. The
+   * diagnostic is optional; the GC-private cons caller passes NULL. */
+  if (largest_hole) *largest_hole = largest_hole_seen * GENCGC_PAGE_BYTES;
   return -1;
 }
 
