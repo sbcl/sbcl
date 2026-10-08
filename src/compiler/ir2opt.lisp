@@ -82,7 +82,9 @@
                                         sb-vm::character-move
                                         sb-vm::move-from-character
                                         sb-vm::move-to-character
-                                        sb-vm::sap-move))
+                                        sb-vm::sap-move
+                                        #+64-bit
+                                        sb-vm::move-to-single-reg))
                (or (not second)
                    (eq (vop-name second) 'branch)))
       (values (tn-ref-tn (vop-args first))
@@ -141,13 +143,6 @@
                 (values (block-label a)
                         target target value nil move))))))))
 
-#-x86-64
-(progn
-  (declaim (inline sb-vm::computable-from-flags-p))
-  (defun sb-vm::computable-from-flags-p (res x y flags)
-    (declare (ignorable res x y flags))
-    nil))
-
 ;; To convert a branch to a conditional move:
 ;; 1. Convert both possible values to the chosen common representation
 ;; 2. Execute the conditional VOP
@@ -166,10 +161,11 @@
                (eq (vop-name last) 'branch))
       (delete-vop last)))
   (cond
-    ((and (constant-tn-p value-if)
-          (constant-tn-p value-else)
-          (sb-vm::computable-from-flags-p
-           res (tn-value value-if) (tn-value value-else) flags))
+    ((when-vop-existsp (:named sb-vm::compute-from-flags)
+       (and (constant-tn-p value-if)
+            (constant-tn-p value-else)
+            (sb-vm::computable-from-flags-p
+             res (tn-value value-if) (tn-value value-else) flags)))
      (emit-template node 2block (template-or-lose 'sb-vm::compute-from-flags)
                     (reference-tn-list (list value-if value-else) nil)
                     (reference-tn res t)
@@ -191,7 +187,7 @@
      (flet ((coerce-tn (tn move)
               (if (or (eq tn res)
                       (eq (vop-name move) 'move)
-                      (sc-is tn sb-vm::immediate)
+                      (sc-is tn sb-vm::immediate sb-vm::fp-immediate)
                       (compatible-move-p res tn))
                   tn
                   (let ((intermediate-tn (make-representation-tn (tn-primitive-type res)
