@@ -1353,19 +1353,13 @@
              ash-left-c/unsigned=>unsigned)
   (:translate ash-left-mod64))
 
-(define-vop (ash-modfx/signed=>signed
-             ash/signed=>signed)
-  (:translate ash-modfx))
-
-(define-vop (ash-modfx/unsigned=>signed ash/signed/unsigned)
-  (:args (number :scs (unsigned-reg) :to :save)
+(define-vop (ash-modfx ash/signed=>signed)
+  (:args (number :scs (any-reg) :to :save)
          (amount :scs (signed-reg) :to :save))
-  (:arg-types unsigned-num signed-num)
-  (:results (result :scs (signed-reg)))
-  (:result-types signed-num)
-  (:translate ash-modfx)
-  (:variant :unsigned)
-  (:variant-cost 6))
+  (:arg-types tagged-num signed-num)
+  (:results (result :scs (any-reg)))
+  (:result-types tagged-num)
+  (:translate ash-modfx))
 
 (define-vop (ash-mod64/signed=>unsigned
              ash/signed=>signed)

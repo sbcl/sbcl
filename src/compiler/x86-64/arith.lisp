@@ -3053,18 +3053,14 @@
   (:result-types signed-num)
   (:variant nil t))
 
-(define-vop (ash-modfx/signed=>signed
-             ash/signed=>signed)
+(define-vop (ash-modfx ash/signed=>signed)
+  (:args (number :scs (any-reg) :target result)
+         (amount :scs (signed-reg) :target ecx))
+  (:arg-types tagged-num signed-num)
+  (:results (result :scs (any-reg) :from (:argument 0)))
+  (:result-types tagged-num)
   (:variant t t)
   (:translate ash-modfx))
-
-(define-vop (ash-modfx/unsigned=>signed
-             ash/unsigned=>unsigned)
-  (:results (result :scs (signed-reg) :from (:argument 0)))
-  (:result-types signed-num)
-  (:variant t nil)
-  (:translate ash-modfx)
-  (:variant-cost 6))
 
 (define-vop (ash-mod64/unsigned=>unsigned
              ash/unsigned=>unsigned)

@@ -2771,19 +2771,27 @@
     (((1+ (ash -1 (1- sb-vm:n-word-bits)))) nil)
     ((129) t)))
 
-(with-test (:name :modarith-shift-to-fixnum)
- (checked-compile-and-assert
-     nil
-     `(lambda (in)
-        (+ (sb-c::mask-signed-field 63 (ash in 23)) 64))
-   ((0) 64)
-   ((549756858368) -4611677256694104000)))
+(with-test (:name :modarith-shift-fixnum)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (in)
+         (+ (sb-c::mask-signed-field 63 (ash in 23)) 64))
+    ((0) 64)
+    ((549756858368) -4611677256694104000))
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (x s)
+         (declare ((signed-byte 63) x)
+                  ((integer -5 58) s))
+         (minusp (sb-c::mask-signed-field 63 (ash x s))))
+    ((16 58) t)
+    ((16 57) nil)))
 
 (with-test (:name :mask-signed-field-64)
- (checked-compile-and-assert
-     (:optimize :default)
-     `(lambda (a)
-        (declare (bignum a))
-        (sb-c::mask-signed-field 64 a))
-   (((ash 1 300)) 0)
-   (((ash 1 63)) (ash -1 63))))
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (a)
+         (declare (bignum a))
+         (sb-c::mask-signed-field 64 a))
+    (((ash 1 300)) 0)
+    (((ash 1 63)) (ash -1 63))))
