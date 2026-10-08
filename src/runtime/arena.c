@@ -946,7 +946,7 @@ void compute_lisp_arena_liveness(struct arena* arena,
         blk->markbits = (void*)os_allocate(bitmap_size);
         if (gencgc_verbose)
             fprintf(stderr, "blk is %lx bytes, will use bitmap size %d @ %p\n",
-                    (char*)blk->limit - (char*)blk->allocator_base,
+                    (long)((char*)blk->limit - (char*)blk->allocator_base),
                     bitmap_size, blk->markbits);
         lispobj* where = (void*)blk->allocator_base;
         lispobj *limit = (void*)blk->freeptr;
@@ -968,7 +968,7 @@ void compute_lisp_arena_liveness(struct arena* arena,
         blk->freeptr = (void*)obj_end;
         if (gencgc_verbose)
             fprintf(stderr, " huge @ %p (%ld bytes wasted)\n",
-                    allocated_obj, (char*)blk->limit - (char*)obj_end);
+                    allocated_obj, (long)((char*)blk->limit - (char*)obj_end));
     }
     from_space = -1; // needed for conservative_root_p to ignore page generation
     struct hopscotch_table stack_roots;
