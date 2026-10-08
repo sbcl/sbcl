@@ -370,3 +370,36 @@ one or more times, not to exceed MAX-EXTENSIONS times"
                ;; switch_to_arena trying to unuse it.
                (switch-to-arena arena))))))) ; and we're out
 ) ; end PROGN
+
+(in-package sb-kernel)
+
+;;; Return (VALUES n-allocated-regular-objects n-allocated-reachable-objects
+;;                 allocated-bytes reachable-bytes
+;;                 n-allocated-huge-objects n-reachable-huge-objects)
+(export 'arena-live-bytes)
+#+(and x86-64 gencgc)
+(defun arena-live-bytes (arena)
+  (declare (type sb-vm::arena arena))
+  (dx-let ((result (make-array 6 :element-type 'fixnum)))
+    (with-alien ((compute-lisp-arena-liveness (function void word system-area-pointer
+                                                        system-area-pointer)
+                                              :extern)
+                 (acquire-lisp-arena-lock (function void word) :extern)
+                 (release-lisp-arena-lock (function void word) :extern))
+      (alien-funcall acquire-lisp-arena-lock
+                     (logandc2 (get-lisp-obj-address arena) sb-vm:lowtag-mask))
+      (without-interrupts ; World-stopping protocol as in SUB-GC
+        (loop
+         (without-gcing
+          (cond ((try-acquire-gc-lock
+                  (unsafe-clear-roots sb-vm:+pseudo-static-generation+)
+                  (gc-stop-the-world))
+                 (alien-funcall compute-lisp-arena-liveness
+                                (logandc2 (get-lisp-obj-address arena) sb-vm:lowtag-mask)
+                                (current-sp) (vector-sap result))
+                 (gc-start-the-world)
+                 (return))))))
+      (alien-funcall release-lisp-arena-lock
+                     (logandc2 (get-lisp-obj-address arena) sb-vm:lowtag-mask)))
+    (values (aref result 0) (aref result 1) (aref result 2)
+            (aref result 3) (aref result 4) (aref result 5))))

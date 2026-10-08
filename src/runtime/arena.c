@@ -12,6 +12,7 @@
 #include "genesis/gc-tables.h"
 #include "thread.h"
 #include "genesis/instance.h"
+#include "genesis/hash-table.h"
 #include "graphvisit.h"
 
 static __attribute__((unused)) inline void* arena_mutex(struct arena* a) {
@@ -41,6 +42,7 @@ struct arena_memblk {
     // and the arena_memblk itself. Other memblks only have the memblk.
     // Either way, Lisp objects commence at the 'allocator_base'.
     char* allocator_base;
+    uword_t* markbits; // object visited
 };
 
 #if 1
@@ -104,6 +106,7 @@ lispobj sbcl_new_arena(size_t size, int hidable)
     char *aligned_limit = PTR_ALIGN_DOWN(limit, alignment);
     block->limit = aligned_limit;
     block->next = NULL;
+    block->markbits = 0;
     arena->uw_original_size = size;
     arena->uw_length = size;
     arena->uw_current_block = arena->uw_first_block = (uword_t)block;
@@ -290,6 +293,7 @@ void* extend_lisp_arena(struct arena* a, long request, int oversized)
     char* limit = new_mem + alloc_size;
     char* aligned_limit = PTR_ALIGN_DOWN(limit, alignment);
     extension->limit = aligned_limit;
+    extension->markbits = 0;
     // tally up the total length
     // For huge objects, count only the directly requested space,
     // not the "bookends" (alignment chunks)
@@ -422,6 +426,9 @@ lispobj* handle_arena_alloc(struct thread* th, struct alloc_region* region,
 
 // When denying a request to grow the arena, it must be unlocked first
 // to unblock any othe threads trying to extend. They'll fail too of course.
+void acquire_lisp_arena_lock(__attribute__((unused)) struct arena* arena) {
+    ARENA_MUTEX_ACQUIRE(arena);
+}
 void release_lisp_arena_lock(__attribute__((unused)) struct arena* arena) {
     ARENA_MUTEX_RELEASE(arena);
 }
@@ -752,23 +759,356 @@ int diagnose_arena_fault(os_context_t* context, char *addr)
     return 1;
 }
 
+#if defined LISP_FEATURE_GENCGC && defined LISP_FEATURE_X86_64
 struct visitor {
     lispobj arena;
     long nwords;
 };
 
-static void visit(lispobj obj, void* arg) {
-    struct visitor* v = arg;
-    if (find_containing_arena(obj) == v->arena) v->nwords += object_size(native_pointer(obj));
+static long compute_bitmap_bytes(struct arena_memblk* blk)
+{
+    long nbytes = (char*)blk->limit - (char*)blk->allocator_base;
+    long nconses = nbytes / (2*N_WORD_BYTES);
+    long nmarkbits = ALIGN_UP(nconses, N_WORD_BITS);
+    long nmarkbytes = nmarkbits / 8;
+    return ALIGN_UP(nmarkbytes, 4096);
 }
-size_t count_arena_live_bytes(lispobj arena) {
-    struct hopscotch_table h;
-    struct visitor v;
-    v.arena = arena;
-    v.nwords = 0;
-    struct grvisit_context* c =
-        visit_heap_from_static_roots(&h, visit, &v);
-    hopscotch_destroy(&h);
-    free(c);
-    return v.nwords * N_WORD_BYTES;
+
+static inline sword_t dword_index(uword_t ptr, char* base) {
+    return ((char*)ptr - base) >> (1+WORD_SHIFT);
 }
+
+static inline void memblk_set_markbit(struct arena_memblk* blk, lispobj* obj)
+{
+    unsigned int offset = dword_index((uword_t)obj, blk->allocator_base);
+    blk->markbits[offset / N_WORD_BITS] |= (uword_t)1 << (offset % N_WORD_BITS);
+}
+static inline int memblk_get_markbit(struct arena_memblk* blk, lispobj* obj)
+{
+    unsigned int offset = dword_index((uword_t)obj, blk->allocator_base);
+    return (blk->markbits[offset / N_WORD_BITS] >> (offset % N_WORD_BITS)) & 1;
+}
+
+struct visitor_arg {
+  struct arena* arena;
+  struct hopscotch_table* roots;
+  int registerp;
+};
+
+lispobj find_potential_root(lispobj word, struct arena* arena)
+{
+    // Return the lispobj corresponding to 'word' if there is one.
+    // Check all the following ranges:
+    //  - dynamic space, code space, fixedobj space
+    //  - the arena under examination
+    extern lispobj dynamic_space_obj_from_ambiguous_ptr(void*,page_index_t);
+    extern lispobj immobile_space_obj_from_ambiguous_ptr(void*,int);
+    page_index_t page = find_page_index((void*)word);
+    if (page >= 0)
+        return dynamic_space_obj_from_ambiguous_ptr((void*)word, page);
+    if (immobile_space_p(word))
+        return immobile_space_obj_from_ambiguous_ptr((void*)word, -1);
+    struct arena_memblk* blk = (void*)arena->uw_first_block;
+    // Dynamic and immobile spaces have program counters pointing to them.
+    // Arenas can not, so rule out words that won't pass the filter.
+    if (!is_lisp_pointer(word)) return 0;
+    do {
+        if (word >= (lispobj)blk->allocator_base && word < (lispobj)blk->freeptr) {
+            lispobj* candidate = native_pointer(word);
+            if (memblk_get_markbit(blk, candidate) && word == compute_lispobj(candidate))
+                return word;
+            return 0;
+        }
+    } while ((blk = blk->next) != NULL);
+    for (blk = (void*)arena->uw_huge_objects ; blk ; blk = blk->next) {
+        lispobj* candidate = (lispobj*)blk->allocator_base;
+        if (widetag_of(candidate) != FILLER_WIDETAG && word == compute_lispobj(candidate))
+            return word;
+    }
+    return 0;
+}
+
+void consider_potential_root(os_context_register_t word, void* void_arg)
+{
+    struct visitor_arg* arg = void_arg;
+    lispobj taggedptr = find_potential_root(word, arg->arena);
+    __attribute__((unused)) int r = 0;
+    if (taggedptr) r = hopscotch_put(arg->roots, taggedptr, 1);
+}
+
+void determine_stack_roots(struct thread* th,
+                           lispobj* cur_thread_approx_stackptr,
+                           struct arena* arena,
+                           struct hopscotch_table* roots)
+{
+    struct visitor_arg arg = {arena, roots, 1};
+    bool is_cur_thread = (th == get_sb_vm_thread());
+    void* esp = is_cur_thread ? cur_thread_approx_stackptr : (void*)-1;
+
+    int n_contexts = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
+    for (int i = n_contexts-1; i>=0; i--) {
+        os_context_t *c = nth_interrupt_context(i, th);
+        visit_context_registers(consider_potential_root, c, (void*)&arg);
+        lispobj* esp1 = (lispobj*) *os_context_register_addr(c,reg_SP);
+        if (is_cur_thread) {
+            gc_assert((void*)esp1 >= esp);
+        } else if (esp1 >= th->control_stack_start && esp1 < th->control_stack_end
+                   && (void*)esp1 < esp) {
+            esp = esp1;
+        }
+    }
+    arg.registerp = 0;
+    lispobj* ptr;
+    for (ptr = esp; ptr < th->control_stack_end; ptr++) {
+        consider_potential_root(*ptr, &arg);
+    }
+}
+
+int in_arena_p(lispobj obj, struct arena* arena)
+{
+    struct arena_memblk* b = (void*)arena->uw_first_block;
+    do {
+        if (obj >= (lispobj)b->allocator_base && obj < (lispobj)b->freeptr) return 1;
+    } while ((b = b->next) != NULL);
+    for (b = (void*)arena->uw_huge_objects ; b ; b = b->next) {
+        if (obj >= (lispobj)b->allocator_base && obj < (lispobj)b->freeptr) return 1;
+    }
+    return 0;
+}
+
+// Return 1,0 for marked,unmarked; or -1 if not in this arena
+int markedp_in_arena(lispobj obj, struct arena* arena)
+{
+    struct arena_memblk* b = (void*)arena->uw_first_block;
+    do {
+        if (obj >= (lispobj)b->allocator_base && obj < (lispobj)b->freeptr) {
+            unsigned int mark_index = dword_index(obj, b->allocator_base);
+            return (b->markbits[mark_index / N_WORD_BITS] >> (mark_index % N_WORD_BITS)) & 1;
+        }
+    } while ((b = b->next) != NULL);
+    for (b = (void*)arena->uw_huge_objects ; b ; b = b->next) {
+        if (obj >= (lispobj)b->allocator_base && obj < (lispobj)b->limit) {
+            return b->markbits != (uword_t*)0;
+        }
+    }
+    return -1;
+}
+
+// Return 1,0 for old marked,unmarked; or -1 if not in this arena
+int arena_set_mark_bit(lispobj obj, struct arena* arena)
+{
+    struct arena_memblk* b = (void*)arena->uw_first_block;
+    do {
+        if (obj >= (lispobj)b->allocator_base && obj < (lispobj)b->freeptr) {
+            unsigned int mark_index = dword_index(obj, b->allocator_base);
+            unsigned int wordindex = mark_index / N_WORD_BITS;
+            unsigned int bit = mark_index % N_WORD_BITS;
+            int was_marked = (b->markbits[wordindex] >> bit) & 1;
+            if (!was_marked) b->markbits[wordindex] |= (uword_t)1 << bit;
+            return was_marked;
+        }
+    } while ((b = b->next) != NULL);
+    for (b  = (void*)arena->uw_huge_objects ; b ; b = b->next) {
+        if (obj >= (lispobj)b->allocator_base && obj < (lispobj)b->limit) {
+            int was_marked = b->markbits != (uword_t*)0;
+            if (!was_marked) b->markbits = (uword_t*)1;
+            return was_marked;
+        }
+    }
+    return -1;
+}
+
+void compute_lisp_arena_liveness(struct arena* arena,
+                                 lispobj* cur_thread_approx_stackptr,
+                                 lispobj output[6])
+{
+    ensure_region_closed(code_region, PAGE_TYPE_CODE);
+    struct thread* th;
+    for_each_thread(th) {
+        gc_close_thread_regions(th, 0);
+        if (th->mixed_tlab.free_pointer < th->mixed_tlab.end_addr
+            && in_arena_p((lispobj)th->mixed_tlab.free_pointer, arena)) {
+            /* If the mixed_tlab points to an arena, we MUST NOT set 'valid' bits
+             * for every apparent cons cell in the to-be-allocated frontier.
+             * If cons_tlab points the arena, we're already going to ignore the
+             * unused parts because the normal cons fill pattern is 0xFF */
+            memset(th->mixed_tlab.free_pointer, 0xFF,
+                   (char*)th->mixed_tlab.end_addr - (char*)th->mixed_tlab.free_pointer);
+        }
+    }
+
+    /* Allocate mark bits for every chunk of 'arena' but not other arenas.
+     * In each chunk, set the mark bit for each object. We will then use these bitmaps
+     * to accept/reject ambiguous pointers from the stack to the arena. */
+    struct arena_memblk* blk = (void*)arena->uw_first_block;
+    do {
+        int bitmap_size = compute_bitmap_bytes(blk);
+        blk->markbits = (void*)os_allocate(bitmap_size);
+        if (gencgc_verbose)
+            fprintf(stderr, "blk is %lx bytes, will use bitmap size %d @ %p\n",
+                    (char*)blk->limit - (char*)blk->allocator_base,
+                    bitmap_size, blk->markbits);
+        lispobj* where = (void*)blk->allocator_base;
+        lispobj *limit = (void*)blk->freeptr;
+        while (where < limit) {
+            if (*where == (uword_t)-1) { // filler
+                where += 2;
+            } else {
+                if (widetag_of(where) != FILLER_WIDETAG)
+                    memblk_set_markbit(blk, where);
+                where += object_size(where);
+            }
+        }
+
+    } while ((blk = blk->next) != NULL);
+    for (blk = (void*)arena->uw_huge_objects ; blk ; blk = blk->next) {
+        gc_assert(blk->markbits == 0);
+        lispobj* allocated_obj = (lispobj*)blk->allocator_base;
+        lispobj* obj_end = object_size(allocated_obj) + allocated_obj;
+        blk->freeptr = (void*)obj_end;
+        if (gencgc_verbose)
+            fprintf(stderr, " huge @ %p (%ld bytes wasted)\n",
+                    allocated_obj, (char*)blk->limit - (char*)obj_end);
+    }
+    from_space = -1; // needed for conservative_root_p to ignore page generation
+    struct hopscotch_table stack_roots;
+    hopscotch_create(&stack_roots, HOPSCOTCH_HASH_FUN_DEFAULT, 0, 32, 0);
+    if (is_lisp_pointer(arena->userdata)) hopscotch_put(&stack_roots, arena->userdata, 1);
+    for_each_thread(th) {
+        if (th->state_word.state == STATE_DEAD) continue;
+        determine_stack_roots(th, cur_thread_approx_stackptr, arena, &stack_roots);
+    }
+    // Reset all arena bitmaps
+    blk = (void*)arena->uw_first_block;
+    do {
+        long bitmap_size = compute_bitmap_bytes(blk);
+#ifdef LISP_FEATURE_LINUX
+        madvise(blk->markbits, bitmap_size, MADV_DONTNEED);
+#else
+        memset(blk->markbits, 0, bitmap_size);
+#endif
+    } while ((blk = blk->next) != NULL);
+    extern void gc_set_traced_arena(struct arena*);
+    gc_set_traced_arena(arena);
+    extern void gc_trace_from_specified_roots(struct hopscotch_table*);
+    gc_trace_from_specified_roots(&stack_roots);
+    gc_set_traced_arena(0);
+    // Count up number of reachable objects
+    int nobjects = 0, nhuge = 0, nreachable = 0, nhuge_reachable = 0;
+    long sum_nwords = 0, nwords_reachable = 0;
+    blk = (void*)arena->uw_first_block;
+    do {
+        lispobj* where = (void*)blk->allocator_base;
+        lispobj *limit = (void*)blk->freeptr;
+        while (where < limit) {
+            if (*where == (uword_t)-1) { // filler
+                where += 2;
+            } else {
+                ++nobjects;
+                sword_t size = object_size(where);
+                sum_nwords += size;
+                // fprintf(f," object @ %p\n", where);
+                if (memblk_get_markbit(blk, where)) {
+                    ++nreachable;
+                    nwords_reachable += size;
+                } else if (widetag_of(where) != FILLER_WIDETAG) {
+                    *where = make_filler_header(size);
+                    memset(where + 1, 0xFF, (size - 1) * N_WORD_BYTES);
+                }
+                where += size;
+            }
+        }
+        os_deallocate((void*)blk->markbits, compute_bitmap_bytes(blk));
+        blk->markbits = 0;
+    } while ((blk = blk->next) != NULL);
+    for (blk = (void*)arena->uw_huge_objects ; blk ; blk = blk->next) {
+        ++nhuge;
+        lispobj* allocated_obj = (lispobj*)blk->allocator_base;
+        sword_t size = (lispobj*)blk->freeptr - allocated_obj;
+        sum_nwords += size;
+        if (blk->markbits) {
+            ++nhuge_reachable;
+            nwords_reachable += size;
+        } else if (widetag_of(allocated_obj) != FILLER_WIDETAG) {
+            *allocated_obj = make_filler_header(size);
+            memset(allocated_obj + 1, 0xFF, (size - 1) * N_WORD_BYTES);
+        }
+        blk->markbits = 0;
+    }
+    /* Now we have to bring the allocatable frontier of any tlab that points
+     * to an arena back to a usable state.  It would have gotten stomped on
+     * by all the make_filler_header() calls in between its free pointer
+     * and its limit. Both mixed and cons tlab need to be made good for use */
+    for_each_thread(th) {
+        if (th->mixed_tlab.free_pointer < th->mixed_tlab.end_addr
+            && in_arena_p((lispobj)th->mixed_tlab.free_pointer, arena)) {
+            memset(th->mixed_tlab.free_pointer, 0,
+                   (char*)th->mixed_tlab.end_addr - (char*)th->mixed_tlab.free_pointer);
+        }
+        if (th->cons_tlab.free_pointer < th->cons_tlab.end_addr
+            && in_arena_p((lispobj)th->cons_tlab.free_pointer, arena)) {
+            memset(th->cons_tlab.free_pointer, 0xFF,
+                   (char*)th->cons_tlab.end_addr - (char*)th->cons_tlab.free_pointer);
+        }
+    }
+    extern void dispose_markbits(void);
+#if 0
+    printf("liveness:  %ld/%ld words, %d/%d regular objects, %d/%d oversized objects\n",
+           nwords_reachable, sum_nwords, nreachable, nobjects, nhuge_reachable, nhuge);
+#endif
+    output[0] = make_fixnum(nobjects);
+    output[1] = make_fixnum(nreachable);
+    output[2] = make_fixnum(sum_nwords)*N_WORD_BYTES;
+    output[3] = make_fixnum(nwords_reachable)*N_WORD_BYTES;
+    output[4] = make_fixnum(nhuge);
+    output[5] = make_fixnum(nhuge_reachable);
+
+    // Clean up weakness tracking
+    struct hash_table *table, *next;
+    for (table = weak_hash_tables; table != NULL; table = next) {
+        next = table->next_weak_hash_table;
+        NON_FAULTING_STORE(table->next_weak_hash_table = (void*)NIL,
+                           &table->next_weak_hash_table);
+    }
+    weak_hash_tables = NULL;
+
+    struct weak_pointer *wp, *next_wp;
+    for (wp = weak_pointer_chain; wp != WEAK_POINTER_CHAIN_END; wp = next_wp) {
+        gc_assert(widetag_of(&wp->header) == WEAK_POINTER_WIDETAG);
+        next_wp = get_weak_pointer_next(wp);
+        reset_weak_pointer_next(wp);
+    }
+    weak_pointer_chain = WEAK_POINTER_CHAIN_END;
+
+    struct cons* vectors = weak_vectors;
+    while (vectors) {
+        struct vector* vector = (struct vector*)vectors->car;
+        vectors = (struct cons*)vectors->cdr;
+        UNSET_WEAK_VECTOR_VISITED(vector);
+    }
+    weak_vectors = 0;
+
+    extern struct hopscotch_table weak_objects; // other than weak pointers
+    if (weak_objects.count)
+        hopscotch_reset(&weak_objects);
+
+    gc_dispose_private_pages();
+    dispose_markbits();
+}
+#else
+int in_arena_p(__attribute__((unused)) lispobj obj,
+               __attribute__((unused)) struct arena* arena)
+{
+  return 0;
+}
+int markedp_in_arena(__attribute__((unused)) lispobj obj,
+                     __attribute__((unused)) struct arena* arena)
+{
+  return -1;
+}
+int arena_set_mark_bit(__attribute__((unused)) lispobj obj,
+                       __attribute__((unused)) struct arena* arena)
+{
+  return -1;
+}
+#endif

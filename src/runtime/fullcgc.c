@@ -32,6 +32,12 @@
 
 static struct unbounded_queue work_queue;
 static int leaf_marked;
+static struct arena* arena;
+
+void gc_set_traced_arena(struct arena* a) { arena = a; }
+extern int in_arena_p(lispobj,struct arena*);
+extern int arena_set_mark_bit(lispobj,struct arena*);
+extern int markedp_in_arena(lispobj,struct arena*);
 
 static void gc_enqueue(lispobj object)
 {
@@ -64,13 +70,18 @@ static inline sword_t ptr_to_bit_index(lispobj pointer) {
 #endif
     return -1;
 }
-#define interesting_pointer_p(x) ptr_to_bit_index(x)>=0
+#define interesting_pointer_p(x) \
+  ((ptr_to_bit_index(x)>=0) || (arena && in_arena_p(x,arena)))
 
 /* Return true if OBJ has already survived the current GC. */
 static inline bool pointer_survived_gc_yet(lispobj pointer)
 {
     sword_t mark_index = ptr_to_bit_index(pointer);
-    if (mark_index < 0) return 1; // "uninteresting" objects always survive GC
+    if (mark_index < 0) {
+        // 1=in arena and is marked, 0=is not marked, -1=not in arena
+        if (arena) return markedp_in_arena(pointer, arena)!=0;
+        return 1; // all "uninteresting" objects always survive GC
+    }
     return (fullcgcmarks[mark_index / N_WORD_BITS] >> (mark_index % N_WORD_BITS)) & 1;
 }
 
@@ -107,18 +118,29 @@ lispobj stray_pointer_source_obj;
 int (*stray_pointer_detector_fn)(lispobj); // return value is unused
 static void __mark_obj(lispobj pointer)
 {
+    lispobj* base = native_pointer(pointer);
+    unsigned char widetag;
     sword_t mark_index = ptr_to_bit_index(pointer);
     if (mark_index < 0) {
+        if (arena) {
+            int result = arena_set_mark_bit(pointer, arena);
+            // 1=in arena and was marked, 0=was not marked, -1=not in arena
+            if (result == 0) {
+                widetag = widetag_of(base);
+                goto enqueue_if_needed;
+            }
+        }
+        // stray pointer detection is the older and less capable mechanism for
+        // tracing through an arena.
         if (stray_pointer_detector_fn) stray_pointer_detector_fn(pointer);
         return; // uninteresting pointer
     }
     uword_t wordindex = mark_index / N_WORD_BITS;
     uword_t bit = (uword_t)1 << (mark_index % N_WORD_BITS);
     if (fullcgcmarks[wordindex] & bit) return; // already marked
-    lispobj* base = native_pointer(pointer);
     // We almost always always need the widetag. The only case where we don't
     // is with LIST_POINTER_LOWTAG, so just go ahead and read it.
-    unsigned char widetag = widetag_of(base);
+    widetag = widetag_of(base);
     if (widetag == SIMPLE_FUN_WIDETAG) {
         struct code* codeblob = fun_code_header(FUNCTION(pointer));
         /* Rather than calling ptr_to_bit_index which would perform range checks again,
@@ -142,6 +164,7 @@ static void __mark_obj(lispobj pointer)
             fullcgcmarks[funmark / N_WORD_BITS] |= (uword_t)1 << (funmark % N_WORD_BITS);
         })
     }
+ enqueue_if_needed:
     if (listp(pointer) || !leaf_obj_widetag_p(widetag))
         gc_enqueue(pointer);
     else
@@ -466,4 +489,31 @@ void execute_full_sweep_phase()
     }
     dispose_markbits();
 #endif
+}
+
+void gc_trace_from_specified_roots(struct hopscotch_table* roots)
+{
+    prepare_for_full_mark_phase();
+    long ptr;
+    int index;
+    // Gray everything in 'roots'
+    for_each_hopscotch_key(index, ptr, (*roots)) { gc_mark_obj(ptr); }
+    hopscotch_destroy(roots);
+    // Everything in STARTING_THREADS is transitively reachable so there is nothing
+    // extra to do for them, unlike with gencgc which pins the startup info.
+    gc_mark_range(lisp_sig_handlers, NSIG);
+    struct thread* th;
+    for_each_thread(th) {
+        bindingstack_vals_visit(th->binding_stack_start, get_binding_stack_pointer(th),
+                                gc_mark_obj);
+        /* do the tls as well */
+        lispobj* from = &th->lisp_thread;
+        lispobj* to = (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th);
+        sword_t nwords = to - from;
+        gc_mark_range(from, nwords);
+#ifdef LISP_FEATURE_TLS_BASED_MV_RETURN
+        gc_mark_range(th->mv_return_values, thread_mv_cell_count(th));
+#endif
+    }
+    execute_full_mark_phase();
 }
