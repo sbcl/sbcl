@@ -37,9 +37,9 @@
 
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
   (let* ((lvar (node-lvar node))
-         (locs (lvar-result-tns lvar (list (if lvar
-                                               (lvar-type lvar)
-                                               *universal-type*))))
+         (locs (lvar-result-tns lvar (if lvar
+                                         (list (lvar-type lvar))
+                                         (load-time-value (list *universal-type*)))))
          (res (first locs)))
     (vop slot node block (lvar-tn node block object)
          name offset lowtag res)
@@ -63,7 +63,7 @@
 (defoptimizer ir2-convert-casser
     ((object old new) node block name offset lowtag)
   (let* ((lvar (node-lvar node))
-         (locs (lvar-result-tns lvar (list *universal-type*)))
+         (locs (lvar-result-tns lvar (load-time-value (list *universal-type*))))
          (res (first locs)))
     (vop compare-and-swap-slot node block
          (lvar-tn node block object)
@@ -166,7 +166,7 @@
 (defoptimizer ir2-convert-fixed-allocation
               ((&rest args) node block name words type lowtag inits)
   (let* ((lvar (the (not null) (node-lvar node)))
-         (locs (lvar-result-tns lvar (list *universal-type*)))
+         (locs (lvar-result-tns lvar (load-time-value (list *universal-type*))))
          (result (first locs)))
     (emit-fixed-alloc node block name words type lowtag result)
     (let ((allocator-vop (ir2-block-last-vop block))
@@ -177,7 +177,7 @@
 (defoptimizer ir2-convert-variable-allocation
               ((extra &rest args) node block name words type lowtag inits)
   (let* ((lvar (the (not null) (node-lvar node)))
-         (locs (lvar-result-tns lvar (list *universal-type*)))
+         (locs (lvar-result-tns lvar (load-time-value (list *universal-type*))))
          (result (first locs)))
     (if (constant-lvar-p extra)
         (let ((words (+ (lvar-value extra) words)))
@@ -192,7 +192,7 @@
 (defoptimizer ir2-convert-structure-allocation
     ((dd slot-specs &rest args) node block name words type lowtag)
   (let* ((lvar (the (not null) (node-lvar node)))
-         (locs (lvar-result-tns lvar (list *universal-type*)))
+         (locs (lvar-result-tns lvar (load-time-value (list *universal-type*))))
          (result (first locs)))
     (aver (and (constant-lvar-p dd) (constant-lvar-p slot-specs) (= words 1)))
     (aver (= type sb-vm:instance-widetag))

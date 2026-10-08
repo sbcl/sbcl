@@ -405,6 +405,23 @@
         first)
       more))
 
+(defun reference-two-tn-lists (tns1 tns2 write-p)
+  (declare (list tns1 tns2) (type boolean write-p))
+  (if tns1
+      (let* ((first (reference-tn (first tns1) write-p))
+             (prev first))
+        (dolist (tn (rest tns1))
+          (let ((res (reference-tn tn write-p)))
+            (setf (tn-ref-across prev) res)
+            (setq prev res)))
+        (dolist (tn tns2)
+          (let ((res (reference-tn tn write-p)))
+            (setf (tn-ref-across prev) res)
+            (setq prev res)))
+        (setf (tn-ref-across prev) nil)
+        first)
+      (reference-tn-list tns2 write-p)))
+
 ;;; Copy the tn-ref-type of the TNs.
 (defun reference-tn-ref-list (tn-refs write-p &optional more)
   (declare (list tn-refs) (type boolean write-p) (type (or tn-ref null) more))

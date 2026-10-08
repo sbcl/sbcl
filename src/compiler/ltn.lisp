@@ -432,14 +432,14 @@
                      ((not (lambda-var-refs var))
                       nil)
                      (t
-                      (primitive-type (basic-var-type var)))))
+                      (primitive-type (leaf-type var)))))
                  vars)
-         (mapcar #'basic-var-type vars))
+         (mapcar #'leaf-type vars))
         (let ((types (mapcar (lambda (var)
                                (cons (when (and #+(or x86-64 arm64)
                                                 (lambda-var-refs var))
-                                       (primitive-type (basic-var-type var)))
-                                     (basic-var-type var)))
+                                       (primitive-type (leaf-type var)))
+                                     (leaf-type var)))
                              vars)))
           (dolist (arg args)
             (collect ((lvar-types)
@@ -745,32 +745,34 @@
     (error "~S has :MORE results with :TRANSLATE." (template-name template)))
   (let ((types (template-result-types template)))
     (cond
-     ((values-type-p result-type)
-      (if (and single-value-p
-               (let ((optional (vop-info-optional-results template)))
-                 (and optional
-                      (not (eql (car optional) 0))
-                      (= (length optional)
-                         (1- (length types))))))
-          (operand-restriction-ok (car types)
-                                  (primitive-type (or (car (args-type-required result-type))
-                                                      (car (args-type-optional result-type)))))
-          (do ((ltypes (append (args-type-required result-type)
-                               (args-type-optional result-type))
-                       (rest ltypes))
-               (types types (rest types)))
-              ((null ltypes)
-               (dolist (type types t)
-                 (unless (eq type '*)
-                   (return nil))))
-            (when (null types) (return t))
-            (let ((type (first types)))
-              (unless (operand-restriction-ok type
-                                              (primitive-type (first ltypes)))
-                (return nil))))))
-     (types
-      (operand-restriction-ok (first types) (primitive-type result-type)))
-     (t t))))
+      ((values-type-p result-type)
+       (cond ((and single-value-p
+                   (let ((optional (vop-info-optional-results template)))
+                     (and optional
+                          (not (eql (car optional) 0))
+                          (= (length optional)
+                             (1- (length types))))))
+              (operand-restriction-ok (car types)
+                                      (primitive-type (or (car (args-type-required result-type))
+                                                          (car (args-type-optional result-type))))))
+             (t
+              (aver (not (or (args-type-optional result-type)
+                             (args-type-rest result-type))))
+              (do ((ltypes (args-type-required result-type)
+                           (rest ltypes))
+                   (types types (rest types)))
+                  ((null ltypes)
+                   (dolist (type types t)
+                     (unless (eq type '*)
+                       (return nil))))
+                (when (null types) (return t))
+                (let ((type (first types)))
+                  (unless (operand-restriction-ok type
+                                                  (primitive-type (first ltypes)))
+                    (return nil)))))))
+      (types
+       (operand-restriction-ok (first types) (primitive-type result-type)))
+      (t t))))
 
 ;;; Return true if CALL is an ok use of TEMPLATE
 ;;; -- If the template has a GUARD that isn't true, then we ignore the
@@ -808,25 +810,6 @@
            (values t nil))
           (t
            (values nil :result-types)))))
-
-;;; Use operand type information to choose a template from the list
-;;; TEMPLATES for a known CALL. We return three values:
-;;; 1. The template we found.
-;;; 2. Some template that we rejected due to unsatisfied type restrictions, or
-;;;    NIL if none.
-;;; 3. The tail of Templates for templates we haven't examined yet.
-;;;
-;;; We just call IS-OK-TEMPLATE-USE until it returns true.
-(defun find-template (templates call)
-  (declare (list templates) (type combination call))
-  (do ((templates templates (rest templates))
-       (rejected nil))
-      ((null templates)
-       (values nil rejected nil))
-    (let ((template (first templates)))
-      (when (is-ok-template-use template call)
-        (return (values template rejected (rest templates))))
-      (setq rejected template))))
 
 ;;; Given a partially annotated known call and a translation policy,
 ;;; return the appropriate template, or NIL if none can be found. We
@@ -927,7 +910,7 @@
 ;;;    when an operand is known to be an integer,
 ;;; -- be disallowed by the stricter operand subtype test (which
 ;;;    resembles, but is not identical to the test done by
-;;;    FIND-TEMPLATE.)
+;;;    FIND-TEMPLATE-FOR-LTN-POLICY)
 ;;;
 ;;; Note that there may not be any possibly applicable templates,
 ;;; since we are called whenever any template is rejected. That
