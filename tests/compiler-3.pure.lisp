@@ -1055,3 +1055,12 @@
                             (the integer b))
                           (progn (check-type a integer) 0)))
                       :allow-warnings t))))
+
+(with-test (:name :optional-type-check-supplied-p)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (&optional (a 1 p) (b 2) (c 3))
+         (declare (type (integer 0 5) b))
+         (values a b c p))
+    ((1 2 9) (values 1 2 9 t))
+    ((1 8 3) (condition 'type-error))))

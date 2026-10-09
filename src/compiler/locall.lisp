@@ -232,26 +232,30 @@
                              collect (cons main (1+ n)))))
             (optional-checked 0))
        (flet ((check-types (n)
-                (loop for i below n
-                      for temp in temps
-                      for var in vars
-                      for info = (lambda-var-arg-info var)
-                      for type = (and (>= i optional-checked)
-                                      (cond ((and info
-                                                  (eq (arg-info-kind info) :optional)
-                                                  (neq (leaf-defined-type var) *universal-type*))
-                                             ;; Don't delegate to propagate-to-args or
-                                             ;; it will check default values too, but
-                                             ;; FTYPEs are for calls and not definitions.
+                (let ((vars vars))
+                 (loop for i below n
+                       for temp in temps
+                       for var = (pop vars)
+                       for info = (lambda-var-arg-info var)
+                       for type = (and (>= i optional-checked)
+                                       (cond ((and info
+                                                   (eq (arg-info-kind info) :optional)
+                                                   (neq (leaf-defined-type var) *universal-type*))
+                                              ;; Don't delegate to propagate-to-args or
+                                              ;; it will check default values too, but
+                                              ;; FTYPEs are for calls and not definitions.
                                              (leaf-defined-type var))
-                                            ((neq (leaf-type var) *universal-type*)
-                                             (leaf-type var))))
-                      when type
-                      collect
-                      `(the* (,type
-                              :context ,(lambda-var-%source-name var))
-                             ,temp)
-                      finally (setf optional-checked n))))
+                                             ((neq (leaf-type var) *universal-type*)
+                                              (leaf-type var))))
+                       when type
+                       collect
+                       `(the* (,type
+                               :context ,(lambda-var-%source-name var))
+                              ,temp)
+                       when (and info
+                                 (arg-info-supplied-p info))
+                       do (pop vars)
+                       finally (setf optional-checked n)))))
          `(lambda (,n-supplied ,@temps)
             (declare (type index ,n-supplied)
                      (ignorable ,n-supplied))
