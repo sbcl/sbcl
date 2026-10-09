@@ -756,13 +756,23 @@ invoked. In that case it will store into PLACE and start over."
     (cond ((stringp type)
            `(the ,type ,place)) ;; bad type
           ((symbolp expanded)
-           `(let ((,value ,(wrap-if ctype `(the* (,type :use-annotations t)) place)))
-              (unless (typep ,value ',type)
-                (setf ,place
-                      ,(if type-string
-                           `(check-type-error-trap '(,place . ,type) ,value (the string ,type-string))
-                           `(check-type-error-trap ',place ,value ',type)))
-                nil)))
+           (let ((local-var-p (sb-c::lambda-var-p (and (sb-c::lexenv-p env)
+                                                       (sb-c:lexenv-find expanded vars :lexenv env)))))
+             ;; Use local vars directly, less work for constraint propagation
+             (if local-var-p
+                 `(unless (typep ,(wrap-if ctype `(the* (,type :use-annotations t)) expanded) ',type)
+                    (setf ,expanded
+                          ,(if type-string
+                               `(check-type-error-trap '(,place . ,type) ,expanded (the string ,type-string))
+                               `(check-type-error-trap ',place ,expanded ',type)))
+                    nil)
+                 `(let ((,value ,(wrap-if ctype `(the* (,type :use-annotations t)) place)))
+                    (unless (typep ,value ',type)
+                      (setf ,place
+                            ,(if type-string
+                                 `(check-type-error-trap '(,place . ,type) ,value (the string ,type-string))
+                                 `(check-type-error-trap ',place ,value ',type)))
+                      nil)))))
           (t
            `(do ((,value ,(wrap-if ctype `(the* (,type :use-annotations t)) place) ,place))
                 ((typep ,value ',type))

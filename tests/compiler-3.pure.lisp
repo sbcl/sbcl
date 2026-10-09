@@ -1064,3 +1064,11 @@
          (values a b c p))
     ((1 2 9) (values 1 2 9 t))
     ((1 8 3) (condition 'type-error))))
+
+(with-test (:name :check-type-faster-type-derivation)
+  (assert-type
+   (lambda (i)
+     (declare (optimize (speed 0)))
+     (check-type i cons)
+     i)
+   cons))
