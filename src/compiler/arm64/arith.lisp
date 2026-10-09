@@ -1094,66 +1094,74 @@
   (:note "inline ASH")
   (:args (number)
          (amount))
-  (:results (result))
-  (:temporary (:sc non-descriptor-reg) temp)
+  (:results (r))
+  (:temporary (:sc non-descriptor-reg
+                   :unused-if (not (sc-is r any-reg))) temp)
   (:arg-refs nil amount-ref)
   (:variant-vars variant)
   (:related-args number)
   (:generator 5
-    (let ((negative (csubtypep (tn-ref-type amount-ref)
-                               (specifier-type `(integer * 0)))))
-      (cond
-        ((csubtypep (tn-ref-type amount-ref)
-                    (specifier-type `(integer -63 63)))
-         (cond (negative
-                (inst neg temp amount)
-                (ecase variant
-                  (:signed (inst asr result number temp))
-                  (:unsigned (inst lsr result number temp))))
-               (t
-                (inst negs temp amount)
-                (ecase variant
-                  (:signed (inst asr temp number temp))
-                  (:unsigned (inst lsr temp number temp)))
-                (inst lsl result number amount)
-                (inst csel result result temp :mi))))
-        ((not negative)
-         (let ((right-fits (csubtypep (tn-ref-type amount-ref)
-                                      (specifier-type `(integer -63 *))))
-               (left-fits (csubtypep (tn-ref-type amount-ref)
-                                     (specifier-type `(integer * 63)))))
-           (inst cmp amount 0)
-           (inst csneg temp amount amount :ge)
-           (inst cmp temp n-word-bits)
-           (cond (left-fits
-                  (inst lsl result number temp))
+    (let* ((negative (csubtypep (tn-ref-type amount-ref)
+                                (specifier-type `(integer * 0))))
+           (fixnum (sc-is r any-reg))
+           (result (if fixnum
+                       temp
+                       r)))
+      (assemble ()
+        (cond
+          ((csubtypep (tn-ref-type amount-ref)
+                      (specifier-type `(integer -63 63)))
+           (cond (negative
+                  (inst neg tmp-tn amount)
+                  (ecase variant
+                    (:signed (inst asr result number tmp-tn))
+                    (:unsigned (inst lsr result number tmp-tn))))
                  (t
-                  (inst csel result number zr-tn :lo)
-                  (inst lsl result result temp)))
-           (inst tbz amount 63 done)
+                  (inst negs tmp-tn amount)
+                  (ecase variant
+                    (:signed (inst asr tmp-tn number tmp-tn))
+                    (:unsigned (inst lsr tmp-tn number tmp-tn)))
+                  (inst lsl result number amount)
+                  (inst csel result result tmp-tn :mi))))
+          ((not negative)
+           (let ((right-fits (csubtypep (tn-ref-type amount-ref)
+                                        (specifier-type `(integer -63 *))))
+                 (left-fits (csubtypep (tn-ref-type amount-ref)
+                                       (specifier-type `(integer * 63)))))
+             (inst cmp amount 0)
+             (inst csneg tmp-tn amount amount :ge)
+             (inst cmp tmp-tn n-word-bits)
+             (cond (left-fits
+                    (inst lsl result number tmp-tn))
+                   (t
+                    (inst csel result number zr-tn :lo)
+                    (inst lsl result result tmp-tn)))
+             (inst tbz amount 63 done)
+             (ecase variant
+               (:signed
+                ;; Only the first 6 bits count for shifts.
+                ;; This sets all bits to 1 if AMOUNT is larger than 63,
+                ;; cutting the amount to 63.
+                (unless right-fits
+                  (inst csinv tmp-tn tmp-tn zr-tn :lo))
+                (inst asr result number tmp-tn))
+               (:unsigned
+                (inst lsr result number tmp-tn)
+                (unless right-fits
+                  (inst csel result result zr-tn :lo))))))
+          (t
+           (inst neg tmp-tn amount)
+           (inst cmp tmp-tn n-word-bits)
            (ecase variant
              (:signed
-              ;; Only the first 6 bits count for shifts.
-              ;; This sets all bits to 1 if AMOUNT is larger than 63,
-              ;; cutting the amount to 63.
-              (unless right-fits
-                (inst csinv temp temp zr-tn :lo))
-              (inst asr result number temp))
+              (inst csinv tmp-tn tmp-tn zr-tn :lo)
+              (inst asr result number tmp-tn))
              (:unsigned
-              (inst lsr result number temp)
-              (unless right-fits
-                (inst csel result result zr-tn :lo))))))
-        (t
-         (inst neg temp amount)
-         (inst cmp temp n-word-bits)
-         (ecase variant
-           (:signed
-            (inst csinv temp temp zr-tn :lo)
-            (inst asr result number temp))
-           (:unsigned
-            (inst lsr result number temp)
-            (inst csel result result zr-tn :lo))))))
-    done))
+              (inst lsr result number tmp-tn)
+              (inst csel result result zr-tn :lo)))))
+        done
+        (when fixnum
+          (inst and r result (lognot n-fixnum-tag-bits)))))))
 
 (define-vop (ash-inverted/signed/unsigned)
   (:note "inline ASH")
@@ -1207,16 +1215,24 @@
   (:args (number :scs (signed-reg) :to :save)
          (amount :scs (signed-reg) :to :save))
   (:arg-types signed-num signed-num)
-  (:results (result :scs (signed-reg)))
+  (:results (r :scs (signed-reg)))
   (:result-types signed-num)
   (:translate ash)
   (:variant :signed))
+
+(define-vop (ash/fixnum=>fixnum ash/signed=>signed)
+  (:args (number :scs (any-reg))
+         (amount :scs (signed-reg)))
+  (:arg-types tagged-num signed-num)
+  (:results (r :scs (any-reg)))
+  (:result-types tagged-num)
+  (:variant-cost 4))
 
 (define-vop (ash/unsigned=>unsigned ash/signed/unsigned)
   (:args (number :scs (unsigned-reg) :to :save)
          (amount :scs (signed-reg) :to :save))
   (:arg-types unsigned-num signed-num)
-  (:results (result :scs (unsigned-reg)))
+  (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:translate ash)
   (:variant :unsigned))
@@ -1353,17 +1369,12 @@
              ash-left-c/unsigned=>unsigned)
   (:translate ash-left-mod64))
 
-(define-vop (ash-modfx ash/signed=>signed)
-  (:args (number :scs (any-reg) :to :save)
-         (amount :scs (signed-reg) :to :save))
-  (:arg-types tagged-num signed-num)
-  (:results (result :scs (any-reg)))
-  (:result-types tagged-num)
+(define-vop (ash-modfx ash/fixnum=>fixnum)
   (:translate ash-modfx))
 
 (define-vop (ash-mod64/signed=>unsigned
              ash/signed=>signed)
-  (:results (result :scs (unsigned-reg)))
+  (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:translate ash-mod64))
 

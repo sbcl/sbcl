@@ -3042,7 +3042,9 @@
         STILL-OKAY
         (inst shl result :cl)
 
-        DONE))))
+        DONE
+        (when (sc-is result any-reg)
+          (inst and result (lognot n-fixnum-tag-bits)))))))
 
 (define-vop (ash/signed=>signed
              ash/unsigned=>unsigned)
@@ -3053,12 +3055,16 @@
   (:result-types signed-num)
   (:variant nil t))
 
-(define-vop (ash-modfx ash/signed=>signed)
+(define-vop (ash/fixnum=>fixnum ash/signed=>signed)
   (:args (number :scs (any-reg) :target result)
          (amount :scs (signed-reg) :target ecx))
   (:arg-types tagged-num signed-num)
   (:results (result :scs (any-reg) :from (:argument 0)))
   (:result-types tagged-num)
+  (:variant nil t)
+  (:variant-cost 4))
+
+(define-vop (ash-modfx ash/fixnum=>fixnum)
   (:variant t t)
   (:translate ash-modfx))
 

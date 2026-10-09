@@ -2785,7 +2785,14 @@
                   ((integer -5 58) s))
          (minusp (sb-c::mask-signed-field 63 (ash x s))))
     ((16 58) t)
-    ((16 57) nil)))
+    ((16 57) nil))
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (x s)
+         (declare ((signed-byte 63) x s))
+         (ldb (byte 62 0)
+              (ash (ash x s) 62)))
+    ((1 -1) 0)))
 
 (with-test (:name :mask-signed-field-64)
   (checked-compile-and-assert
