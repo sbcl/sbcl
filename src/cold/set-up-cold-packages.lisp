@@ -386,7 +386,7 @@
          *host-defun-expander*
          (if (fboundp 'sb-impl::parse-body)
              (destructuring-bind (name ll . rest) (cdr whole)
-               (multiple-value-bind (forms decls) (sb-impl::parse-body rest t)
+               (multiple-value-bind (forms decls) (funcall (symbol-function 'sb-impl::parse-body) rest t)
                  (setq decls
                        (mapcar (lambda (x)
                                  (assert (eq (car x) 'declare))

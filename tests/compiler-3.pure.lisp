@@ -1003,8 +1003,7 @@
                       (g12 0 1)))))
        (f1)))))
 
-(with-test (:name :nlx-restore-nsp
-            :fails-on (and :ppc64 (not :unbind-in-unwind)))
+(with-test (:name :nlx-restore-nsp)
   (checked-compile-and-assert
       ()
       `(lambda (a b)

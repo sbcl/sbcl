@@ -83,6 +83,7 @@
   (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
+  (:vop-var vop)
   (:generator 22
     (inst addi block cfp-tn (tn-byte-offset tn))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
@@ -90,8 +91,17 @@
     (storew cfp-tn block unwind-block-cfp-slot)
     (storew code-tn block unwind-block-code-slot)
     (inst compute-lra-from-code temp code-tn entry-label ndescr)
-    (storew temp block catch-block-entry-pc-slot)))
-
+    (storew temp block catch-block-entry-pc-slot)
+    (storew bsp-tn block unwind-block-bsp-slot)
+    (load-tl-symbol-value temp *current-catch-block*)
+    (storew temp block unwind-block-current-catch-slot)
+    (move temp nsp-tn)
+    (let ((nfp (current-nfp-tn vop)))
+      (if nfp
+          (progn
+            (storew nfp block unwind-block-nfp-slot)
+            (storew temp block unwind-block-nsp-slot))
+          (storew temp block unwind-block-nsp-slot)))))
 
 ;;; Like Make-Unwind-Block, except that we also store in the specified tag, and
 ;;; link the block into the Current-Catch list.
@@ -104,6 +114,7 @@
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (descriptor-reg) :target block :to (:result 0)) result)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
+  (:vop-var vop)
   (:generator 44
     (inst addi result cfp-tn (tn-byte-offset tn))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
@@ -116,6 +127,14 @@
     (storew tag result catch-block-tag-slot)
     (load-tl-symbol-value temp *current-catch-block*)
     (storew temp result catch-block-previous-catch-slot)
+    (storew bsp-tn result catch-block-bsp-slot)
+    (move temp nsp-tn)
+    (let ((nfp (current-nfp-tn vop)))
+      (if nfp
+          (progn
+            (storew nfp result catch-block-nfp-slot)
+            (storew temp result catch-block-nsp-slot))
+          (storew temp result catch-block-nsp-slot)))
     (store-tl-symbol-value result *current-catch-block* temp)
 
     (move block result)))
@@ -153,7 +172,6 @@
 
 
 ;;;; NLX entry VOPs:
-
 
 (define-vop (nlx-entry)
   (:args (sp) ; Note: we can't list an sc-restriction, 'cause any load vops
@@ -273,10 +291,20 @@
 (define-vop (uwp-entry)
   (:info label)
   (:save-p :force-to-stack)
-  (:results (block) (start) (count))
-  (:ignore block start count)
   (:vop-var vop)
   (:generator 0
     (emit-alignment 3 :long-nop)
     (emit-label label)
     (note-this-location vop :non-local-entry)))
+
+(define-vop (uwp-entry-block)
+  (:info label)
+  (:save-p :force-to-stack)
+  (:results (block))
+  (:vop-var vop)
+  (:generator 0
+    (emit-alignment 3 :long-nop)
+    (emit-label label)
+    (note-this-location vop :non-local-entry)
+    ;; Get the block saved in UNWIND
+    (loadw block csp-tn -4)))

@@ -385,32 +385,35 @@
     (storew zero bsp-tn (- binding-value-slot binding-size))
     (inst subi bsp-tn bsp-tn (* binding-size n-word-bytes))))
 
+(defun unbind-to-here (where symbol value zero)
+  (assemble ()
+    (inst cmpd where bsp-tn)
+    (inst beq DONE)
+    (inst li zero 0)
+
+    LOOP
+    (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
+    (inst cmpdi symbol 0)
+    (inst beq SKIP)
+    (loadw value bsp-tn (- binding-value-slot binding-size))
+    (inst stdx value thread-base-tn symbol)
+    (storew zero bsp-tn (- binding-symbol-slot binding-size))
+
+    SKIP
+    (storew zero bsp-tn (- binding-value-slot binding-size))
+    (inst subi bsp-tn bsp-tn (* binding-size n-word-bytes))
+    (inst cmpd where bsp-tn)
+    (inst bne LOOP)
+
+    DONE))
+
 (define-vop (unbind-to-here)
   (:args (arg :scs (descriptor-reg any-reg) :target where))
   (:temporary (:scs (any-reg) :from (:argument 0)) where zero)
   (:temporary (:scs (descriptor-reg)) symbol value)
   (:generator 0
-      (move where arg)
-      (inst cmpd where bsp-tn)
-      (inst beq done)
-      (inst li zero 0)
-
-      LOOP
-      (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
-      (inst cmpdi symbol 0)
-      (inst beq skip)
-      (loadw value bsp-tn (- binding-value-slot binding-size))
-      (inst stdx value thread-base-tn symbol)
-      (storew zero bsp-tn (- binding-symbol-slot binding-size))
-
-      SKIP
-      (storew zero bsp-tn (- binding-value-slot binding-size))
-      (inst subi bsp-tn bsp-tn (* binding-size n-word-bytes))
-      (inst cmpd where bsp-tn)
-      (inst bne loop)
-
-      DONE))
-
+    (move where arg)
+    (unbind-to-here where symbol value zero)))
 
 
 ;;;; Closure indexing.

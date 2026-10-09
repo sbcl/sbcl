@@ -3,3 +3,4 @@
 :64-bit :linkage-space :sb-thread :soft-card-marks
 :gencgc
 :compare-and-swap-vops :alien-callbacks
+:no-continue-unwind :unbind-in-unwind
