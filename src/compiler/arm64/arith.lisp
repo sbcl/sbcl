@@ -168,6 +168,26 @@
          (or (encode-logical-immediate f)
              (encode-logical-immediate (logior f fixnum-tag-mask))))))
 
+(defun or-into-clear-bits (r x y x-ref &optional fixnum orr)
+  (let ((width (sb-c::unsigned-type-width (tn-ref-type x-ref))))
+    (when width
+      (when fixnum
+        (incf width))
+      (let* ((y (ldb (byte 64 0) y))
+             (zeros (count-trailing-zeros y)))
+        (when (>= zeros width)
+          (cond ((and orr
+                      (encode-logical-immediate y))
+                 (inst orr r x y)
+                 t)
+                ((location= r x)
+                 (let ((start (logand zeros (lognot 15))))
+                   (when (and (>= start width)
+                              (< start 64)
+                              (<= (integer-length y) (+ start 16)))
+                     (inst movk r (ash y (- start)) start)
+                     t)))))))))
+
 ;;; OR is the same as ADD if the matching bits are clear
 (defun add-via-or (r x y x-ref &optional fixnum)
   (cond ((or (= y (ash 1 63))
@@ -175,15 +195,7 @@
          (inst eor r x (ash 1 63))
          t)
         (t
-         (let ((width (sb-c::unsigned-type-width (tn-ref-type x-ref))))
-           (when width
-             (when fixnum
-               (incf width))
-             (let ((zeros (count-trailing-zeros y)))
-               (when (and (>= zeros width)
-                          (encode-logical-immediate y))
-                 (inst orr r x y)
-                 t)))))))
+         (or-into-clear-bits r x y x-ref fixnum t))))
 
 (defmacro define-binop (translate untagged-penalty op
                         &key
@@ -203,7 +215,9 @@
                             `((add-via-or r x y x-ref)))
                            (sub
                             `((and (typep (- y) '(unsigned-byte 64))
-                                   (add-via-or r x (- y) x-ref)))))
+                                   (add-via-or r x (- y) x-ref))))
+                           ((eor orr)
+                            `((or-into-clear-bits r x y x-ref))))
                        (inst ,constant-op r x (load-immediate-word tmp-tn y))))
                   ,@(and negative-op
                          `(((minusp (setf y (sb-c::mask-signed-field n-word-bits y)))
@@ -237,8 +251,11 @@
                             (sub
                              `((cond
                                  ((= fy (ash -1 63))
-                                  (inst eor r x (ash 1 63)))
-                                 ((add-via-or r x (fixnumize (- y)) x-ref t))))))
+                                  (inst eor r x (ash 1 63))
+                                  t)
+                                 ((add-via-or r x (fixnumize (- y)) x-ref t)))))
+                            ((eor orr)
+                            `((or-into-clear-bits r x fy x-ref t))))
                         (inst ,constant-op r x (load-immediate-word tmp-tn fy)))))
                  ,@(and negative-op
                         `(((minusp y)
