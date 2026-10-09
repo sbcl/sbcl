@@ -254,19 +254,23 @@
   (imm :fields (list (byte 10 0) (byte 16 10))))
 
 (defun emit-bl-inst (segment opcode imm)
-  (cond
-    ((typep imm '(signed-byte 26))
+  (etypecase imm
+    (label
+     (emit-back-patch segment 4
+                      (lambda (segment posn)
+                        (let* ((offset (relative-offset imm posn))
+                               (imm26 (ash offset -2)))
+                          (let ((imm-low  (ldb (byte 16 0) imm26))
+                                (imm-high (ldb (byte 10 16) imm26)))
+                            (%emit-bl-inst segment opcode imm-low imm-high))))))
+    ((signed-byte 26)
      (let ((imm26 (ash imm -2)))
        (let ((imm-low  (ldb (byte 16 0) imm26))
              (imm-high (ldb (byte 10 16) imm26)))
          (%emit-bl-inst segment opcode imm-low imm-high))))
-    ((typep imm 'fixup)
+    (fixup
      (note-fixup segment :i-type imm)
      (%emit-bl-inst segment opcode 0 0))))
-
-(define-instruction bl (segment offset)
-  (:emitter
-   (emit-bl-inst segment #b010101 offset)))
 
 (define-instruction b (segment offset)
   (:emitter
@@ -499,11 +503,8 @@
   (define-load-instruction fld.d #b0010101110))
 
 (defun emit-ll-inst (segment opcode rd rj imm)
-  (cond
-    ((and (integerp imm) (<= -2048 imm 2047))
-     (%emit-ato-inst segment opcode (ash imm -2) (reg-tn-encoding rj)
-                    (reg-tn-encoding rd)))
-    ((typep imm 'short-immediate)
+  (etypecase imm
+    ((signed-byte 12)
      (%emit-ato-inst segment opcode (ash imm -2) (reg-tn-encoding rj)
                     (reg-tn-encoding rd)))))
 
@@ -592,12 +593,12 @@
   (define-la-am-instruction clz.d   #b0000000000000000001001))
 
 (define-instruction-macro fstore (&optional format fd rj offset)
-  `(case ,format
+  `(ecase ,format
      (:double (inst fst.d ,fd ,rj ,offset))
      (:single (inst fst.s ,fd ,rj ,offset))))
 
 (define-instruction-macro fload (&optional format fd rj offset)
-  `(case ,format
+  `(ecase ,format
      (:double (inst fld.d ,fd ,rj ,offset))
      (:single (inst fld.s ,fd ,rj ,offset))))
 
@@ -651,13 +652,13 @@
   (byte 5 0))
 
 (defun emit-j-inst (segment opcode imm rj rd)
-  (cond
-    ((typep imm '(signed-byte 16))
+  (etypecase imm
+    ((signed-byte 16)
     (let ((imm16 (ash imm -2)))
      (%emit-j-inst segment opcode imm16
                    (reg-tn-encoding rj)
                    (reg-tn-encoding rd))))
-    ((typep imm 'fixup)
+    (fixup
      (note-fixup segment :i-type imm)
      (%emit-j-inst segment opcode 0
                    (reg-tn-encoding rj)
@@ -1305,37 +1306,37 @@
   (define-la-float1-instruction ffint.d.l #b0000000100011101001010))
 
 (define-instruction-macro fmove (&optional format fd fs)
-  `(case ,format
+  `(ecase ,format
      (:double (inst fmov.d ,fd ,fs))
      (:single (inst fmov.s ,fd ,fs))))
 
 (define-instruction-macro fadd (&optional format fd fj fk)
-  `(case ,format
+  `(ecase ,format
      (:double (inst fadd.d ,fd ,fj ,fk))
      (:single (inst fadd.s ,fd ,fj ,fk))))
 
 (define-instruction-macro fmul (&optional format fd fj fk)
-  `(case ,format
+  `(ecase ,format
      (:double (inst fmul.d ,fd ,fj ,fk))
      (:single (inst fmul.s ,fd ,fj ,fk))))
 
 (define-instruction-macro fsub (&optional format fd fj fk)
-  `(case ,format
+  `(ecase ,format
      (:double (inst fsub.d ,fd ,fj ,fk))
      (:single (inst fsub.s ,fd ,fj ,fk))))
 
 (define-instruction-macro fdiv (&optional format fd fj fk)
-  `(case ,format
+  `(ecase ,format
      (:double (inst fdiv.d ,fd ,fj ,fk))
      (:single (inst fdiv.s ,fd ,fj ,fk))))
 
 (define-instruction-macro fabs (&optional format fd fj)
-  `(case ,format
+  `(ecase ,format
      (:double (inst fabs.d ,fd ,fj))
      (:single (inst fabs.s ,fd ,fj))))
 
 (define-instruction-macro fneg (&optional format fd fj)
-  `(case ,format
+  `(ecase ,format
      (:double (inst fneg.d ,fd ,fj))
      (:single (inst fneg.s ,fd ,fj))))
 
@@ -1375,7 +1376,7 @@
               ,dst ,src))))
 
 (define-instruction-macro fcvt (to-format from-format dst src &optional (rm :rne) temp)
-  (case to-format
+  (ecase to-format
     (:word
      (ecase from-format
        (:single
@@ -1387,34 +1388,34 @@
            (inst ftint :word :double ,temp ,src ,rm)
            (inst movfr2gr.d ,dst ,temp)))))
     (:single
-      (ecase from-format
+     (ecase from-format
        (:word
         `(progn
-          (inst movgr2fr.d ,dst ,src)
-          (inst ffint.s.l ,dst ,dst)))
-    (:unsigned-word
-     `(progn
-        ;; if src < 0 then special handling
-        (let ((label-neg (gen-label))
-              (label-done (gen-label)))
-          (inst blt ,src zero-tn label-neg)
-          ;; fast path: fits in signed range
-          (inst movgr2fr.d ,dst ,src)
-          (inst ffint.s.l ,dst ,dst)
-          (inst j label-done)
-          (emit-label label-neg)
-          ;; emulate unsigned
-          ;; t0 = (src >> 1) | (src & 1)
-          (inst s_andi t8-tn ,src 1)
-          (inst srli.d ,src ,src 1)
-          (inst or t8-tn t8-tn ,src)
-          (inst movgr2fr.d ,dst t8-tn)
-          (inst ffint.s.l ,dst ,dst)
-          (inst fadd.s ,dst ,dst ,dst) ; x = x * 2
-          (emit-label label-done))))
-    (:double
-     `(progn
-        (inst fcvt.s.d ,dst ,src)))))
+           (inst movgr2fr.d ,dst ,src)
+           (inst ffint.s.l ,dst ,dst)))
+       (:unsigned-word
+        `(progn
+           ;; if src < 0 then special handling
+           (let ((label-neg (gen-label))
+                 (label-done (gen-label)))
+             (inst blt ,src zero-tn label-neg)
+             ;; fast path: fits in signed range
+             (inst movgr2fr.d ,dst ,src)
+             (inst ffint.s.l ,dst ,dst)
+             (inst j label-done)
+             (emit-label label-neg)
+             ;; emulate unsigned
+             ;; t0 = (src >> 1) | (src & 1)
+             (inst s_andi t8-tn ,src 1)
+             (inst srli.d ,src ,src 1)
+             (inst or t8-tn t8-tn ,src)
+             (inst movgr2fr.d ,dst t8-tn)
+             (inst ffint.s.l ,dst ,dst)
+             (inst fadd.s ,dst ,dst ,dst) ; x = x * 2
+             (emit-label label-done))))
+       (:double
+        `(progn
+           (inst fcvt.s.d ,dst ,src)))))
     (:double
      (ecase from-format
        (:word
@@ -1422,28 +1423,28 @@
            (inst movgr2fr.d ,dst ,src)
            (inst ffint.d.l ,dst ,dst)))
        (:unsigned-word
-     `(progn
-        ;; if src < 0 then special handling
-        (let ((label-neg (gen-label))
-              (label-done (gen-label)))
-          (inst blt ,src zero-tn label-neg)
-          ;; fast path: fits in signed range
-          (inst movgr2fr.d ,dst ,src)
-          (inst ffint.d.l ,dst ,dst)
-          (inst j label-done)
-          (emit-label label-neg)
-          ;; emulate unsigned
-          ;; t0 = (src >> 1) | (src & 1)
-          (inst s_andi t8-tn ,src 1)
-          (inst srli.d ,src ,src 1)
-          (inst or t8-tn t8-tn ,src)
-          (inst movgr2fr.d ,dst t8-tn)
-          (inst ffint.d.l ,dst ,dst)
-          (inst fadd.d ,dst ,dst ,dst) ; x = x * 2
-          (emit-label label-done))))
+        `(progn
+           ;; if src < 0 then special handling
+           (let ((label-neg (gen-label))
+                 (label-done (gen-label)))
+             (inst blt ,src zero-tn label-neg)
+             ;; fast path: fits in signed range
+             (inst movgr2fr.d ,dst ,src)
+             (inst ffint.d.l ,dst ,dst)
+             (inst j label-done)
+             (emit-label label-neg)
+             ;; emulate unsigned
+             ;; t0 = (src >> 1) | (src & 1)
+             (inst s_andi t8-tn ,src 1)
+             (inst srli.d ,src ,src 1)
+             (inst or t8-tn t8-tn ,src)
+             (inst movgr2fr.d ,dst t8-tn)
+             (inst ffint.d.l ,dst ,dst)
+             (inst fadd.d ,dst ,dst ,dst) ; x = x * 2
+             (emit-label label-done))))
        (:single
         `(progn
-            (inst fcvt.d.s ,dst ,src)))))))
+           (inst fcvt.d.s ,dst ,src)))))))
 
 (macrolet ((define-la-float2-instruction (name opcode)
             `(define-instruction ,name (segment fd rj)
@@ -1474,17 +1475,17 @@
    (emit-la-float5-inst segment #b0000000100010100110010 rd fcsr)))
 
 (define-instruction-macro movgr2fr (&optional format fd rj)
-  `(case ,format
+  `(ecase ,format
      (:double (inst movgr2fr.d ,fd ,rj))
      (:single (inst movgr2fr.w ,fd ,rj))))
 
 (define-instruction-macro fsqrt (&optional format fd fj)
-  `(case ,format
+  `(ecase ,format
      (:double (inst fsqrt.d ,fd ,fj))
      (:single (inst fsqrt.s ,fd ,fj))))
 
 (define-instruction-macro movfr2gr (&optional format rd fj)
-  `(case ,format
+  `(ecase ,format
      (:double (inst movfr2gr.d ,rd ,fj))
      (:single (inst movfr2gr.s ,rd ,fj))))
 
@@ -1688,13 +1689,13 @@
          (setf (ldb (byte 20 5) (sap-ref-32 sap offset)) u))
         (:i-type
          (let ((imm12 (ash i -2)))
-         (setf (ldb (byte 16 10) (sap-ref-32 sap offset)) imm12)))
+           (setf (ldb (byte 16 10) (sap-ref-32 sap offset)) imm12)))
         (:u+i-type
          (sb-vm:fixup-code-object code offset u :u-type flavor)
          (sb-vm:fixup-code-object code (+ offset 4) i :s-type flavor))
         (:s-type
          (setf (ldb (byte 12 10) (sap-ref-32 sap offset)) i)))))
-   nil)
+  nil)
 
 (define-instruction store-coverage-mark (segment mark-index)
   (:emitter

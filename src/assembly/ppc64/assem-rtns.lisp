@@ -169,10 +169,11 @@
   (inst cmpd cur-uwp target-uwp)
   (inst beq DO-EXIT)
 
-  (storew block csp-tn 0)
-  (storew start csp-tn 1)
-  (storew count csp-tn 2)
   (inst addi csp-tn csp-tn (* 4 n-word-bytes))
+  (storew block csp-tn -4)
+  (storew start csp-tn -3)
+  (storew count csp-tn -2)
+
 
   (inst bl GET-RET)
   RET
@@ -199,8 +200,7 @@
   (loadw next-uwp cur-uwp unwind-block-current-catch-slot)
   (store-tl-symbol-value next-uwp *current-catch-block* target-uwp)
   (loadw nfp cur-uwp unwind-block-nfp-slot)
-  (loadw next-uwp cur-uwp unwind-block-nsp-slot)
-  (move nsp-tn next-uwp)
+  (loadw nsp-tn cur-uwp unwind-block-nsp-slot)
 
   (inst mtctr lra)
   (inst bctr)
@@ -214,8 +214,7 @@
   (loadw next-uwp block unwind-block-current-catch-slot)
   (store-tl-symbol-value next-uwp *current-catch-block* target-uwp)
   (loadw nfp block unwind-block-nfp-slot)
-  (loadw next-uwp block unwind-block-nsp-slot)
-  (move nsp-tn next-uwp)
+  (loadw nsp-tn block unwind-block-nsp-slot)
 
   (inst mtctr lra)
   (inst bctr))

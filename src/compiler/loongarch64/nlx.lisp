@@ -16,41 +16,6 @@
 (defun make-nlx-entry-arg-start-location ()
   (make-wired-tn *fixnum-primitive-type* any-reg-sc-number ocfp-offset))
 
-;;; Save and restore dynamic environment.
-;;;
-;;; These VOPs are used in the reentered function to restore the appropriate
-;;; dynamic environment.  Currently we only save the Current-Catch and binding
-;;; stack pointer.  We don't need to save/restore the current unwind-protect,
-;;; since unwind-protects are implicitly processed during unwinding.  If there
-;;; were any additional stacks, then this would be the place to restore the top
-;;; pointers.
-
-;;; Save the current dynamic environment state
-(define-vop (save-dynamic-state)
-  (:results (catch :scs (descriptor-reg))
-            (nfp :scs (descriptor-reg))
-            (nsp :scs (descriptor-reg)))
-  (:vop-var vop)
-  (:generator 13
-    (load-current-catch-block catch)
-    (let ((cur-nfp (current-nfp-tn vop)))
-      (when cur-nfp
-        (move nfp cur-nfp)))
-    (move nsp nsp-tn)))
-
-;;; Restore previously saved dynamic environment state
-(define-vop (restore-dynamic-state)
-  (:args (catch :scs (descriptor-reg))
-         (nfp :scs (descriptor-reg))
-         (nsp :scs (descriptor-reg)))
-  (:vop-var vop)
-  (:generator 10
-    (store-current-catch-block catch)
-    (let ((cur-nfp (current-nfp-tn vop)))
-      (when cur-nfp
-        (move cur-nfp nfp)))
-    (move nsp-tn nsp)))
-
 (define-vop (current-stack-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 1
@@ -81,6 +46,7 @@
   (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (non-descriptor-reg)) lip)
+  (:vop-var vop)
   (:generator 22
     (add-imm block cfp-tn (tn-byte-offset tn) 'make-unwind-block temp)
     (load-current-unwind-protect-block temp)
@@ -88,36 +54,48 @@
     (storew cfp-tn block unwind-block-cfp-slot)
     (storew code-tn block unwind-block-code-slot)
     (inst compute-ra-from-code temp code-tn lip entry-label)
-    (storew temp block catch-block-entry-pc-slot)))
+    (storew temp block catch-block-entry-pc-slot)
+    (load-binding-stack-pointer temp)
+    (storew temp block unwind-block-bsp-slot)
+    (load-current-catch-block temp)
+    (storew temp block unwind-block-current-catch-slot)
+    (let ((nfp (current-nfp-tn vop)))
+      (when nfp
+        (storew nfp block unwind-block-nfp-slot))
+      (storew nsp-tn block unwind-block-nsp-slot))))
 
 (define-vop (make-catch-block)
-  (:args (tn) (tag :scs (any-reg descriptor-reg)))
+  (:args (tn) (tag :scs (any-reg descriptor-reg) :to :save))
   (:info entry-label)
   (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
-  (:temporary (:scs (descriptor-reg) :target block :to (:result 0)) result)
   (:temporary (:scs (non-descriptor-reg)) lip)
+  (:vop-var vop)
   (:generator 44
     (do ((src-operand cfp-tn)
          (imm (tn-byte-offset tn)))
         ((zerop imm))
       (let ((short-imm (min imm 2040)))
-        (inst addi.d result src-operand short-imm)
-        (setq src-operand result)
+        (inst addi.d block src-operand short-imm)
+        (setq src-operand block)
         (zerop (decf imm short-imm))))
     (load-current-unwind-protect-block temp)
-    (storew temp result catch-block-uwp-slot)
-    (storew cfp-tn result catch-block-cfp-slot)
-    (storew code-tn result catch-block-code-slot)
+    (storew temp block catch-block-uwp-slot)
+    (storew cfp-tn block catch-block-cfp-slot)
+    (storew code-tn block catch-block-code-slot)
     (inst compute-ra-from-code temp code-tn lip entry-label)
-    (storew temp result catch-block-entry-pc-slot)
+    (storew temp block catch-block-entry-pc-slot)
 
-    (storew tag result catch-block-tag-slot)
+    (storew tag block catch-block-tag-slot)
     (load-current-catch-block temp)
-    (storew temp result catch-block-previous-catch-slot)
-    (store-current-catch-block result)
-
-    (move block result)))
+    (storew temp block catch-block-previous-catch-slot)
+    (load-binding-stack-pointer temp)
+    (storew temp block catch-block-bsp-slot)
+    (let ((nfp (current-nfp-tn vop)))
+      (when nfp
+        (storew nfp block catch-block-nfp-slot))
+      (storew nsp-tn block catch-block-nsp-slot))
+    (store-current-catch-block block)))
 
 ;;; Just set the current unwind-protect to UWP.  This
 ;;; instantiates an unwind block as an unwind-protect.
@@ -245,9 +223,18 @@
 (define-vop (uwp-entry)
   (:info label)
   (:save-p :force-to-stack)
-  (:results (block) (start) (count))
-  (:ignore block start count)
   (:vop-var vop)
   (:generator 0
     (emit-label label)
     (note-this-location vop :non-local-entry)))
+
+(define-vop (uwp-entry-block)
+  (:info label)
+  (:save-p :force-to-stack)
+  (:results (block))
+  (:vop-var vop)
+  (:generator 0
+    (emit-label label)
+    (note-this-location vop :non-local-entry)
+    ;; Get the block saved in UNWIND
+    (loadw block csp-tn -4)))

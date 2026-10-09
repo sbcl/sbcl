@@ -3,3 +3,4 @@
 :64-bit
 :linux
 :compare-and-swap-vops :memory-barrier-vops
+:no-continue-unwind :unbind-in-unwind

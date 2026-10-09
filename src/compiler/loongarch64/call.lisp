@@ -631,7 +631,7 @@
                       (emit-alignment 2)
                       (emit-label step-done-label))))
              (declare (ignorable #'insert-step-instrumenting))
-             ,@(case named
+             ,@(ecase named
                  ((t)
                   `((sc-case name
                       (descriptor-reg (move name-pass name))

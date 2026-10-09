@@ -364,16 +364,9 @@
     (inst subi bsp-temp bsp-temp (* binding-size n-word-bytes))
     (store-binding-stack-pointer bsp-temp)))
 
-(define-vop (unbind-to-here)
-  (:args (arg :scs (descriptor-reg any-reg) :target where))
-  (:temporary (:scs (any-reg) :from (:argument 0)) where)
-  (:temporary (:scs (descriptor-reg)) symbol value)
-  (:temporary (:scs (any-reg)) bsp)
-  #+sb-thread
-  (:temporary (:scs (non-descriptor-reg)) lip)
-  (:generator 0
+(defun unbind-to-here (where symbol value bsp &optional lip)
+  (assemble ()
     (load-binding-stack-pointer bsp)
-    (move where arg)
     (inst beq where bsp DONE)
 
     LOOP
@@ -395,6 +388,17 @@
 
     DONE
     (store-binding-stack-pointer bsp)))
+
+(define-vop (unbind-to-here)
+  (:args (arg :scs (descriptor-reg any-reg) :target where))
+  (:temporary (:scs (any-reg) :from (:argument 0)) where)
+  (:temporary (:scs (descriptor-reg)) symbol value)
+  (:temporary (:scs (any-reg)) bsp)
+  #+sb-thread
+  (:temporary (:scs (non-descriptor-reg)) lip)
+  (:generator 0
+    (move where arg)
+    (unbind-to-here where symbol value bsp #+sb-thread lip)))
 
 (define-full-reffer closure-index-ref *
   closure-info-offset fun-pointer-lowtag

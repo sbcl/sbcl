@@ -105,10 +105,10 @@
     (inst mov-sp temp nsp-tn)
     (let ((nfp (current-nfp-tn vop)))
       (if nfp
-          (storew-pair nfp unwind-block-nfp-slot
-                       temp unwind-block-nsp-slot
+          (storew-pair nfp catch-block-nfp-slot
+                       temp catch-block-nsp-slot
                        block)
-          (storew temp block unwind-block-nsp-slot)))
+          (storew temp block catch-block-nsp-slot)))
     (store-tl-symbol-value block *current-catch-block*)))
 
 ;;; Just set the current unwind-protect to UWP.  This

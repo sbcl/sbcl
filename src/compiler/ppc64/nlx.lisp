@@ -17,40 +17,6 @@
 (defun make-nlx-entry-arg-start-location ()
   (make-wired-tn *fixnum-primitive-type* any-reg-sc-number ocfp-offset))
 
-
-;;; These VOPs are used in the reentered function to restore the
-;;; appropriate dynamic environment. Currently we only save the
-;;; CURRENT-CATCH and binding stack pointer. We don't need to
-;;; save/restore the current unwind-protect, since UNWIND-PROTECTs are
-;;; implicitly processed during unwinding. If there were any
-;;; additional stacks, then this would be the place to restore the top
-;;; pointers.
-
-(define-vop (save-dynamic-state)
-  (:results (catch :scs (descriptor-reg))
-            (nfp :scs (descriptor-reg))
-            (nsp :scs (descriptor-reg)))
-  (:vop-var vop)
-  (:generator 13
-    (load-tl-symbol-value catch *current-catch-block*)
-    (let ((cur-nfp (current-nfp-tn vop)))
-      (when cur-nfp
-        (move nfp cur-nfp)))
-    (move nsp nsp-tn)))
-
-(define-vop (restore-dynamic-state)
-  (:args (catch :scs (descriptor-reg))
-         (nfp :scs (descriptor-reg))
-         (nsp :scs (descriptor-reg)))
-  (:temporary (:scs (any-reg)) temp)
-  (:vop-var vop)
-  (:generator 10
-    (store-tl-symbol-value catch *current-catch-block* temp)
-    (let ((cur-nfp (current-nfp-tn vop)))
-      (when cur-nfp
-        (move cur-nfp nfp)))
-    (move nsp-tn nsp)))
-
 (define-vop (current-stack-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 1
@@ -95,49 +61,40 @@
     (storew bsp-tn block unwind-block-bsp-slot)
     (load-tl-symbol-value temp *current-catch-block*)
     (storew temp block unwind-block-current-catch-slot)
-    (move temp nsp-tn)
     (let ((nfp (current-nfp-tn vop)))
-      (if nfp
-          (progn
-            (storew nfp block unwind-block-nfp-slot)
-            (storew temp block unwind-block-nsp-slot))
-          (storew temp block unwind-block-nsp-slot)))))
+      (when nfp
+        (storew nfp block unwind-block-nfp-slot))
+      (storew nsp-tn block unwind-block-nsp-slot))))
 
 ;;; Like Make-Unwind-Block, except that we also store in the specified tag, and
 ;;; link the block into the Current-Catch list.
 ;;;
 (define-vop (make-catch-block)
   (:args (tn)
-         (tag :scs (any-reg descriptor-reg)))
+         (tag :scs (any-reg descriptor-reg) :to :save))
   (:info entry-label)
   (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
-  (:temporary (:scs (descriptor-reg) :target block :to (:result 0)) result)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:vop-var vop)
   (:generator 44
-    (inst addi result cfp-tn (tn-byte-offset tn))
+    (inst addi block cfp-tn (tn-byte-offset tn))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
-    (storew temp result catch-block-uwp-slot)
-    (storew cfp-tn result catch-block-cfp-slot)
-    (storew code-tn result catch-block-code-slot)
+    (storew temp block catch-block-uwp-slot)
+    (storew cfp-tn block catch-block-cfp-slot)
+    (storew code-tn block catch-block-code-slot)
     (inst compute-lra-from-code temp code-tn entry-label ndescr)
-    (storew temp result catch-block-entry-pc-slot)
+    (storew temp block catch-block-entry-pc-slot)
 
-    (storew tag result catch-block-tag-slot)
+    (storew tag block catch-block-tag-slot)
     (load-tl-symbol-value temp *current-catch-block*)
-    (storew temp result catch-block-previous-catch-slot)
-    (storew bsp-tn result catch-block-bsp-slot)
-    (move temp nsp-tn)
+    (storew temp block catch-block-previous-catch-slot)
+    (storew bsp-tn block catch-block-bsp-slot)
     (let ((nfp (current-nfp-tn vop)))
-      (if nfp
-          (progn
-            (storew nfp result catch-block-nfp-slot)
-            (storew temp result catch-block-nsp-slot))
-          (storew temp result catch-block-nsp-slot)))
-    (store-tl-symbol-value result *current-catch-block* temp)
-
-    (move block result)))
+      (when nfp
+        (storew nfp block catch-block-nfp-slot))
+      (storew nsp-tn block catch-block-nsp-slot))
+    (store-tl-symbol-value block *current-catch-block* temp)))
 
 
 ;;; Just set the current unwind-protect to UWP.  This instantiates an
