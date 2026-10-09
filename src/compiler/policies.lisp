@@ -21,8 +21,7 @@ modification. Defaults to SAFETY.")
     ;; FIXME: grepping the tree for "policy.*safety" yields some
     ;; places which might want to use this instead -- or
     ;; some other derived policy.
-    (cond ((= safety 0) 0)
-          (t 3))
+    (if (zerop safety) 0 3)
   ("no" "maybe" "weak" "full")
   "Control the way to perform runtime type checking:
 0: declared types are simply trusted; no runtime checks are performed;

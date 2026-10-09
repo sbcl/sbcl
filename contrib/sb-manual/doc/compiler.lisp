@@ -360,21 +360,10 @@
   "- __Full Type Checks__ (safe code)
 
       All declarations are considered assertions to be checked at
-      runtime, and all type checks are precise. The default
-      compilation policy provides full type checks.
+      compile or run time, and all type checks are precise. The
+      default compilation policy provides full type checks.
 
-      Used when `(OR (>= SAFETY 2) (>= SAFETY SPEED 1))`. ~SAFETY ~SPEED
-
-  - __Weak Type Checks__ (unsafe code)
-
-      Declared types may be simplified into faster to check
-      supertypes: for example, `(OR (INTEGER -17 -7) (INTEGER 7 17))`
-      is simplified into `(INTEGER -17 17)`.
-
-      > __Warning__: It is relatively easy to corrupt the heap when
-      > weak type checks are used if the program contains type-errors.
-
-      Used when `(AND (< SAFETY 2) (< SAFETY SPEED))`.
+      Used when `(>= SAFETY 1)`. ~SAFETY
 
   - __No Type Checks__ (unsafe code)
 
@@ -384,7 +373,13 @@
       > __Warning__: Any type errors in code where type checks are not
       > performed are liable to corrupt the heap.
 
-      Used when `(= SAFETY 0)`.")
+      Used when `(= SAFETY 0)`.
+
+  There is a third option called Weak Type Checking, where declared
+  types may be simplified into faster to check supertypes: for
+  example, `(OR (INTEGER -17 -7) (INTEGER 7 17))` is simplified
+  into `(INTEGER -17 17)`. This option is also unsafe and is no longer
+  available by any combination of the standard optimization qualities.")
 
 (defsection @precise-type-checking (:title "Precise Type Checking"
                                     :concepts (("type checking," "precise")

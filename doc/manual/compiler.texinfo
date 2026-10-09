@@ -493,29 +493,14 @@ via @code{optimize} declarations.
 
 @cindex safety, optimization quality
 @cindex optimization quality safety
-@cindex speed, optimization quality
-@cindex optimization quality speed
 @itemize
 @item @strong{Full Type Checks} (safe code)
 
 All declarations are considered assertions to be checked at
-runtime, and all type checks are precise. The default
-compilation policy provides full type checks.
+compile or run time, and all type checks are precise. The
+default compilation policy provides full type checks.
 
-Used when @code{(or (>= safety 2) (>= safety speed 1))}.  
-
-@item @strong{Weak Type Checks} (unsafe code)
-
-Declared types may be simplified into faster to check
-supertypes: for example, @code{(or (integer -17 -7) (integer 7 17))}
-is simplified into @code{(integer -17 17)}.
-
-@quotation
-@strong{Warning}: It is relatively easy to corrupt the heap when
-weak type checks are used if the program contains type-errors.
-@end quotation
-
-Used when @code{(and (< safety 2) (< safety speed))}.
+Used when @code{(>= safety 1)}. 
 
 @item @strong{No Type Checks} (unsafe code)
 
@@ -529,6 +514,12 @@ performed are liable to corrupt the heap.
 
 Used when @code{(= safety 0)}.
 @end itemize
+
+There is a third option called Weak Type Checking, where declared
+types may be simplified into faster to check supertypes: for
+example, @code{(or (integer -17 -7) (integer 7 17))} is simplified
+into @code{(integer -17 17)}. This option is also unsafe and is no longer
+available by any combination of the standard optimization qualities.
 
 @node precise type checking
 @cindex type checking, precise
