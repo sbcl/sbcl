@@ -71,6 +71,8 @@ extern bool try_allocate_small_from_pages(sword_t nbytes, struct alloc_region *r
                                           struct allocator_state *start, page_index_t end);
 extern bool try_allocate_small_after_region(sword_t nbytes,
                                             struct alloc_region *region);
+/* Writes the size of the largest hole on to largest_hole, if largest_hole is
+ * not NULL and we couldn't find a run of enough free pages. */
 extern page_index_t try_allocate_large(uword_t nbytes,
                                        int page_type, generation_index_t gen,
                                        struct allocator_state *start, page_index_t end,

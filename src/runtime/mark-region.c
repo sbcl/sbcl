@@ -319,9 +319,7 @@ page_index_t try_allocate_large(uword_t nbytes,
     if (hole_size > largest_hole_seen) largest_hole_seen = hole_size;
     where = chunk_end;
   }
-  /* Exhausted: either no free page was found or none was large enough.
-   * Report the largest free extent seen, or zero if there was none. The
-   * diagnostic is optional; the GC-private cons caller passes NULL. */
+  /* We didn't find a hole, bail out */
   if (largest_hole) *largest_hole = largest_hole_seen * GENCGC_PAGE_BYTES;
   return -1;
 }
