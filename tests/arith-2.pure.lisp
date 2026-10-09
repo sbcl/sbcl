@@ -2820,3 +2820,14 @@
          (dpb x (byte 1 63) y))
     ((2 2) 2)
     ((0 3) 3)))
+
+(with-test (:name :mask-field-type)
+  (assert-type
+   (lambda (a)
+     (declare ((integer 0 2147483647) a))
+     (mask-field (byte 13 60) a))
+   (eql 0))
+  (assert-type
+   (lambda (a)
+     (mask-field (byte 13 55) a))
+   (MOD 295111876382333861889)))

@@ -3680,12 +3680,28 @@
         computed)))
 
 (defoptimizer (%mask-field derive-type) ((size posn num))
-  (let ((size-high (nth-value 1 (integer-type-numeric-bounds (lvar-type size))))
-        (posn-high (nth-value 1 (integer-type-numeric-bounds (lvar-type posn)))))
-    (if (and size-high posn-high
-             (<= (+ size-high posn-high) sb-vm:n-word-bits))
-        (make-numeric-type 'unsigned-byte (+ size-high posn-high))
-        (specifier-type 'unsigned-byte))))
+  ;; (logand num (ash (lognot (ash -1 size)) posn))
+  (let ((computed
+          (let* ((minus-one (specifier-type '(eql -1)))
+                 (mask (two-arg-derive-type size posn
+                                            (lambda (size posn same)
+                                              (declare (ignore same))
+                                              (ash-derive-type-aux
+                                               (lognot-derive-type-aux
+                                                (ash-derive-type-aux minus-one size nil))
+                                               posn nil)))))
+            (when mask
+              (one-arg-derive-type num
+                                   (lambda (num)
+                                     (%two-arg-derive-type num mask #'logand-derive-type-aux))))))
+        ;; Handle (mask-field (byte y (- 64 y)) x)
+        (minuend (related-byte-spec size posn)))
+    (if (and minuend
+             (<= (interval-high minuend)
+                 +left-shift-derive-type-cutoff+))
+        (type-intersection (make-numeric-type 'unsigned-byte (interval-high minuend))
+                           (or computed *universal-type*))
+        computed)))
 
 (defun related-byte-spec (size posn)
   (let ((size-use (principal-lvar-use size))
@@ -3844,7 +3860,7 @@
 (deftransform %mask-field ((size posn int) * * :node node)
   (combination-match2 (node)
     :dest
-    (((:or eq > :name name) (%mask-field size posn int) 0)
+    (((:or eq = > :name name) (%mask-field size posn int) 0)
      `(,name (%ldb size posn int) 0))))
 
 (deftransform %mask-field ((size posn int) ((integer 0 #.sb-vm:n-word-bits) fixnum integer) word)
