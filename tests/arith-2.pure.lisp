@@ -2795,3 +2795,11 @@
          (sb-c::mask-signed-field 64 a))
     (((ash 1 300)) 0)
     (((ash 1 63)) (ash -1 63))))
+
+(with-test (:name :ash-modarith-integer)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (a b)
+         (declare ((integer 34078720 34078975) a))
+         (logand (ash (the (unsigned-byte 65) b) -49) a))
+    ((34078720 (ldb (byte 65 0) -1)) 0)))

@@ -783,6 +783,8 @@
                         ((not (word-sized-type-p integer-type))
                          (cond ((csubtypep count-type (make-numeric-type 'integer (- result-width width) most-positive-fixnum))
                                 ;; Uses the bits from the first word when shifting right
+                                ,(when signedp
+                                   `(cut-to-width integer :untagged width nil))
                                 (cut-to-width integer ,kind width ,signedp)
                                 ',name)
                                ((and (csubtypep count-type (specifier-type 'fixnum))

@@ -150,6 +150,9 @@
               ;;    ; Now the DEFTRANSFORM doesn't exist in the target Lisp.
               ;; However, it's continuable because it might be useful to do
               ;; it when testing new optimization stuff interactively.
+              #+sb-devel
+              (setf inherit t)
+              #-sb-devel
               (restart-case
                   (cerror "Go ahead, overwrite it."
                           "~@<overwriting old FUN-INFO ~2I~_~S ~I~_for ~S~:>"
