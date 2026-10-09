@@ -35,15 +35,18 @@
 ;;;           #:
 ;;;         exactly 2 expected, but 5 found
 (defvar *debug-print-variable-alist* nil
-  "an association list describing new bindings for special variables
-to be used within the debugger. E.g.
+  "An association list describing new bindings for special variables
+to be used within the debugger. For example,
 
  ((*PRINT-LENGTH* . 10) (*PRINT-LEVEL* . 6) (*PRINT-PRETTY* . NIL))
 
 The variables in the CAR positions are bound to the values in the CDR
-during the execution of some debug commands. When evaluating arbitrary
-expressions in the debugger, the normal values of the printer control
-variables are in effect.
+during the execution of some debug commands. When the same variable
+has multiple bindings specified, the earliest one takes precendence.
+
+Entering the debugger establishes these bindings, as does the
+`backtrace` debugger command (see SB-MANUAL:@INFORMATION-COMMANDS)
+among other things.
 
 Initially empty, *DEBUG-PRINT-VARIABLE-ALIST* is typically used to
 provide bindings for printer control variables.")
@@ -69,7 +72,7 @@ provide bindings for printer control variables.")
 ;;; get out of the system with Ctrl-C or (EXIT) or EXIT or whatever.
 ;;; But after memorizing them the wasted screen space gets annoying..
 (defvar *debug-beginner-help-p* t
-  "Should the debugger display beginner-oriented help messages?")
+  "Should entering the debugger print a beginner-oriented help message?")
 
 (defun debug-prompt (stream)
   (sb-thread:get-foreground)

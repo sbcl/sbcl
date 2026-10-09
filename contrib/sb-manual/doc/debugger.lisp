@@ -26,55 +26,61 @@
 (defsection @debugger-banner (:title "Debugger Banner")
   "When you enter the debugger, it looks something like this:
 
-      debugger invoked on a TYPE-ERROR in thread 11184:
-        The value 3 is not of type LIST.
+      * (symbol-value 'x)
 
-      You can type HELP for debugger help, or (SB-EXT:QUIT) to exit from SBCL.
+      debugger invoked on a UNBOUND-VARIABLE @B80027A0C1 in thread
+      #<THREAD tid=893088 \"main thread\" RUNNING {1200038003}>:
+        The variable X is unbound.
+
+      Type HELP for debugger help, or (SB-EXT:EXIT) to exit from SBCL.
 
       restarts (invokable by number or by possibly-abbreviated name):
-        0: [ABORT   ] Reduce debugger level (leaving debugger, returning to toplevel).
-        1: [TOPLEVEL] Restart at toplevel READ/EVAL/PRINT loop.
-      (CAR 1 3)
+        0: [CONTINUE   ] Retry using X.
+        1: [USE-VALUE  ] Use specified value.
+        2: [STORE-VALUE] Set specified value and use it.
+        3: [ABORT      ] Exit debugger, returning to top level.
+
+      (SYMBOL-VALUE X)
       0]
 
   The first group of lines describe what the error was that put us in
-  the debugger. In this case CAR was called on `3`, causing a
-  TYPE-ERROR.
-
-  This is followed by the \"beginner help line\", which appears only
-  if SB-DEBUG:*DEBUG-BEGINNER-HELP-P* is true (default).
+  the debugger. This is followed by the \"beginner help line\", which
+  appears only if SB-DEBUG:*DEBUG-BEGINNER-HELP-P* is true (default).
 
   Next comes a listing of the active restart names, along with their
   descriptions -- the ways we can restart execution after this error.
-  In this case, both options return to top-level. Restarts can be
-  selected by entering the corresponding number or name. If the name
-  coincides with the name of a debugger command or that of another
-  restart, use its number.
+  Restarts can be selected by entering the corresponding number or
+  name. If the name coincides with the name of a debugger command or
+  that of another restart, use its number.
 
   The current frame appears right underneath the restarts, immediately
-  followed by the debugger prompt.")
+  followed by the debugger prompt, where `0` is the index of the
+  current frame."
+  (sb-debug:*debug-beginner-help-p* variable))
 
 (defsection @debugger-invocation (:title "Debugger Invocation")
-  "The debugger is invoked when:
+  "The debugger is invoked when
 
-  - ERROR is called, and the condition it signals is not handled.
+  - ERROR is called and the condition it signals is not handled, or
 
-  - BREAK is called, or SIGNAL is called with a condition that matches
-    the current *BREAK-ON-SIGNALS*.
+  - BREAK is called, or
 
-  - The debugger is explicitly entered with the INVOKE-DEBUGGER
-    function.
+  - SIGNAL is called with a condition that matches the current
+    *BREAK-ON-SIGNALS*, or
 
-  When the debugger is invoked by a condition, ANSI mandates that the
-  value of *DEBUGGER-HOOK*, if any, be called with two arguments: the
-  condition that caused the debugger to be invoked and the previous
-  value of *DEBUGGER-HOOK*. When this happens, *DEBUGGER-HOOK* is
-  bound to NIL to prevent recursive errors. However, ANSI also
-  mandates that *DEBUGGER-HOOK* not be invoked when the debugger is to
-  be entered by the BREAK function. For users who wish to provide an
-  alternate debugger interface (and thus catch BREAK entries into the
-  debugger), SBCL provides SB-EXT:*INVOKE-DEBUGGER-HOOK*, which is
-  invoked during any entry into the debugger."
+  - INVOKE-DEBUGGER is called.
+
+  Unless the debugger is to be entered by BREAK, ANSI mandates that
+  the value of *DEBUGGER-HOOK*, if non-NIL, be called with two
+  arguments: the condition that caused the debugger to be invoked and
+  the previous value of *DEBUGGER-HOOK*. When this happens,
+  *DEBUGGER-HOOK* is bound to NIL to prevent recursive errors.
+  However, ANSI also mandates that *DEBUGGER-HOOK* not be invoked when
+  the debugger is to be entered by the BREAK function. For users who
+  wish to provide an alternate debugger interface (and thus catch
+  BREAK entries into the debugger), SBCL provides
+  SB-EXT:*INVOKE-DEBUGGER-HOOK*, which is invoked during any entry
+  into the debugger."
   ;; When Swank is loaded, it sets this variable.
   (sb-ext:*invoke-debugger-hook* (variable nil)))
 
@@ -97,6 +103,10 @@
   the current frame. Frames are numbered starting from zero at the
   top (most recent call), increasing down to the bottom. The current
   frame is the frame that commands refer to.
+
+  The debugger can be invoked again within a debugger session
+  following the normal rules (see @DEBUGGER-INVOCATION). In such
+  nested debugger sessions, the prompt is `<frame>[<nesting-level>]`.
 
   It is possible to override the normal printing behaviour in the
   debugger by using the SB-EXT:*DEBUG-PRINT-VARIABLE-ALIST*."
@@ -134,9 +144,6 @@
 
   - `down`: Move down to the next lower frame.
 
-  - `top`: Move to the highest frame, that is, the frame where the
-    debugger was entered.
-
   - `bottom`: Move to the lowest frame.
 
   - `frame [<n>]`: Move to the frame with the specified number.
@@ -144,7 +151,7 @@
     the frame where the debugger was entered.")
 
 (defsection @how-arguments-are-printed (:title "How Arguments are Printed")
-  "A frame is printed to look like a function call, but with the actual
+  "A frame is printed to look like a function call but with the actual
   argument values in the argument positions.  So the frame for this call
   in the source:
 
@@ -592,7 +599,7 @@
   relative value to evaluate tradeoffs), the @DEBUG optimization
   quality is directly translated to a level of debug information. This
   absolute interpretation allows the user to count on a particular
-  amount of debug information being available even when the values of
+  amount of debug information being available, even when the values of
   the other qualities are changed during compilation. These are the
   levels of debug information that correspond to the values of the
   @DEBUG quality:
@@ -651,28 +658,28 @@
   will be treated like any other local variable. Functions may also be
   _@SEMI-INLINE_, in which case there is a frame to represent the
   call, but the call is to an optimized local version of the function,
-  not to the original function."
-  ;; FIXME: link to section about inline expansion when it exists
-  ;; (@INLINE-EXPANSION).
-  )
+  not to the original function. See @OPEN-CODING-AND-INLINE-EXPANSION
+  for more.")
 
 (defsection @exiting-the-debugger (:title "Exiting the Debugger")
   "These commands get you out of the debugger.
 
   - `toplevel`: Throw to top level.
 
-  - `restart [<n>]`: Invoke the `<n>`th restart case as displayed by
-    the `error` command. If `<n>` is not specified, the available
-    restart cases are reported.
+  - `restart [<n>]` or `<n>`: Invoke the `<n>`th restart case as
+    displayed by the `error` command. If `<n>` is not specified, the
+    available restart cases are reported. When using the short
+    form (`<n>`), an integer for which there is no corresponding
+    restart is evaluated following normal REPL semantics.
 
   - `\\continue`: Call CONTINUE with the condition given that invoked
     the debugger. If there is no restart case named CONTINUE, then an
-    error is signaled. This is not a debugger command, but the name of
+    error is signaled. This is not a debugger command but the name of
     a commonly available restart.
 
   - `\\abort`: Call ABORT on the condition that invoked the debugger.
     This is useful for popping debug command loop levels or aborting
-    to top level, as the case may be. This is not a debugger command,
+    to top level, as the case may be. This is not a debugger command
     but the name of a commonly available restart.
 
   - `return <value>`: Return `VALUE` from the current stack frame.
@@ -693,8 +700,8 @@
 
   - `help` or `?`: Display a synopsis of debugger commands.
 
-  - `\\describe`: Call DESCRIBE on the current function and displays the
-    number of local variables.
+  - `\\describe`: Call DESCRIBE on the current function and display
+    the number of local variables.
 
   - `\\print`: Display the current function call as it would be
     displayed by moving to this frame.
@@ -821,8 +828,9 @@
   > commands in that it also functions in compiled code which has not
   > been compiled with stepping instrumentation. It simply steps to
   > the next compiled code location. In the future, this form of
-  > stepping may be improved enough to subsume the instrumentation
-  > based stepping commands, which have much higher overhead.")
+  > stepping may be improved enough to subsume the
+  > instrumentation-based stepping commands, which have much higher
+  > overhead.")
 
 (defsection @function-tracing (:title "Function Tracing"
                                :concepts ("tracing"
@@ -833,13 +841,12 @@
   function entry or exit.
 
   In SBCL, tracing can be done either by temporarily redefining the
-  function name (encapsulation), or using breakpoints. When
-  breakpoints are used, the function object itself is destructively
-  modified to cause the tracing action. The advantage of using
-  breakpoints is that tracing works even when the function is
-  anonymously called via FUNCALL, that function object identity is
-  preserved, and that anonymous and local functions can also be
-  traced."
+  function name (encapsulation) or using breakpoints. When breakpoints
+  are used, the function object itself is destructively modified to
+  cause the tracing action. The advantage of using breakpoints is that
+  tracing works even when the function is anonymously called via
+  FUNCALL, that function object identity is preserved, and that
+  anonymous and local functions can also be traced."
   (trace macro)
   "In the case of functions where the known return convention is used
   to optimize, encapsulation may be necessary in order to make tracing
@@ -858,9 +865,9 @@
 (defsection @single-stepping (:title "Single Stepping"
                               :concepts ("stepper"
                                          "single-stepping"))
-  "SBCL includes an instrumentation based single-stepper for compiled
-  code, that can be invoked via the STEP macro, or from within the
-  debugger. See @DEBUGGER-POLICY-CONTROL, for details on enabling
+  "SBCL includes an instrumentation-based single-stepper for compiled
+  code, which can be invoked via the STEP macro or from within the
+  debugger. See @DEBUGGER-POLICY-CONTROL for details on enabling
   stepping for compiled code.
 
   The following debugger commands are used for controlling single stepping.

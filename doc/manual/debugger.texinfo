@@ -38,60 +38,70 @@ debug)} declarations.
 When you enter the debugger, it looks something like this:
 
 @example
-debugger invoked on a TYPE-ERROR in thread 11184:
-  The value 3 is not of type LIST.
+* (symbol-value 'x)
 
-You can type HELP for debugger help, or (SB-EXT:QUIT) to exit from SBCL.
+debugger invoked on a UNBOUND-VARIABLE @@B80027A0C1 in thread
+#<THREAD tid=893088 "main thread" RUNNING @{1200038003@}>:
+  The variable X is unbound.
+
+Type HELP for debugger help, or (SB-EXT:EXIT) to exit from SBCL.
 
 restarts (invokable by number or by possibly-abbreviated name):
-  0: [ABORT   ] Reduce debugger level (leaving debugger, returning to toplevel).
-  1: [TOPLEVEL] Restart at toplevel READ/EVAL/PRINT loop.
-(CAR 1 3)
+  0: [CONTINUE   ] Retry using X.
+  1: [USE-VALUE  ] Use specified value.
+  2: [STORE-VALUE] Set specified value and use it.
+  3: [ABORT      ] Exit debugger, returning to top level.
+
+(SYMBOL-VALUE X)
 0]
 @end example
 
 The first group of lines describe what the error was that put us in
-the debugger. In this case @code{car} was called on @code{3}, causing a
-@code{type-error}.
-
-This is followed by the "beginner help line", which appears only
-if @code{sb-debug:*debug-beginner-help-p*} is true (default).
+the debugger. This is followed by the "beginner help line", which
+appears only if @code{sb-debug:*debug-beginner-help-p*} is true (default).
 
 Next comes a listing of the active restart names, along with their
 descriptions -- the ways we can restart execution after this error.
-In this case, both options return to top-level. Restarts can be
-selected by entering the corresponding number or name. If the name
-coincides with the name of a debugger command or that of another
-restart, use its number.
+Restarts can be selected by entering the corresponding number or
+name. If the name coincides with the name of a debugger command or
+that of another restart, use its number.
 
 The current frame appears right underneath the restarts, immediately
-followed by the debugger prompt.
+followed by the debugger prompt, where @code{0} is the index of the
+current frame.
 
+@anchor{Variable sb-debug *debug-beginner-help-p*}
+@vvindex @sortas{debug-beginner-help-p* sb-debug} *debug-beginner-help-p* [sb-debug]
+@deffn{Variable} sb-debug:*debug-beginner-help-p*
+Should entering the debugger print a beginner-oriented help message?
+@end deffn
 @node debugger invocation
 @subsection Debugger Invocation
 
-The debugger is invoked when:
+The debugger is invoked when
 
 @itemize
-@item @code{error} is called, and the condition it signals is not handled.
+@item @code{error} is called and the condition it signals is not handled, or
 
-@item @code{break} is called, or @code{signal} is called with a condition that matches
-  the current @code{*break-on-signals*}.
+@item @code{break} is called, or
 
-@item The debugger is explicitly entered with the @code{invoke-debugger}
-  function.
+@item @code{signal} is called with a condition that matches the current
+  @code{*break-on-signals*}, or
+
+@item @code{invoke-debugger} is called.
 @end itemize
 
-When the debugger is invoked by a condition, ANSI mandates that the
-value of @code{*debugger-hook*}, if any, be called with two arguments: the
-condition that caused the debugger to be invoked and the previous
-value of @code{*debugger-hook*}. When this happens, @code{*debugger-hook*} is
-bound to @code{nil} to prevent recursive errors. However, ANSI also
-mandates that @code{*debugger-hook*} not be invoked when the debugger is to
-be entered by the @code{break} function. For users who wish to provide an
-alternate debugger interface (and thus catch @code{break} entries into the
-debugger), SBCL provides @code{sb-ext:*invoke-debugger-hook*}, which is
-invoked during any entry into the debugger.
+Unless the debugger is to be entered by @code{break}, ANSI mandates that
+the value of @code{*debugger-hook*}, if non-@code{nil}, be called with two
+arguments: the condition that caused the debugger to be invoked and
+the previous value of @code{*debugger-hook*}. When this happens,
+@code{*debugger-hook*} is bound to @code{nil} to prevent recursive errors.
+However, ANSI also mandates that @code{*debugger-hook*} not be invoked when
+the debugger is to be entered by the @code{break} function. For users who
+wish to provide an alternate debugger interface (and thus catch
+@code{break} entries into the debugger), SBCL provides
+@code{sb-ext:*invoke-debugger-hook*}, which is invoked during any entry
+into the debugger.
 
 @anchor{Variable sb-ext *invoke-debugger-hook*}
 @vvindex @sortas{invoke-debugger-hook* sb-ext} *invoke-debugger-hook* [sb-ext]
@@ -129,21 +139,28 @@ the current frame. Frames are numbered starting from zero at the
 top (most recent call), increasing down to the bottom. The current
 frame is the frame that commands refer to.
 
+The debugger can be invoked again within a debugger session
+following the normal rules (see @ref{debugger invocation}). In such
+nested debugger sessions, the prompt is @code{<frame>[<nesting-level>]}.
+
 It is possible to override the normal printing behaviour in the
 debugger by using the @code{sb-ext:*debug-print-variable-alist*}.
 
 @anchor{Variable sb-ext *debug-print-variable-alist*}
 @vvindex @sortas{debug-print-variable-alist* sb-ext} *debug-print-variable-alist* [sb-ext]
 @deffn{Variable} sb-ext:*debug-print-variable-alist*
-an association list describing new bindings for special variables
-to be used within the debugger. Eg.
+An association list describing new bindings for special variables
+to be used within the debugger. For example,
 
  ((@code{*print-length*} . 10) (@code{*print-level*} . 6) (@code{*print-pretty*} . @code{nil}))
 
 The variables in the @code{car} positions are bound to the values in the @code{cdr}
-during the execution of some debug commands. When evaluating arbitrary
-expressions in the debugger, the normal values of the printer control
-variables are in effect.
+during the execution of some debug commands. When the same variable
+has multiple bindings specified, the earliest one takes precendence.
+
+Entering the debugger establishes these bindings, as does the
+@code{backtrace} debugger command (see @ref{information commands})
+among other things.
 
 Initially empty, @code{*debug-print-variable-alist*} is typically used to
 provide bindings for printer control variables.
@@ -190,9 +207,6 @@ function call:
 
 @item @code{down}: Move down to the next lower frame.
 
-@item @code{top}: Move to the highest frame, that is, the frame where the
-  debugger was entered.
-
 @item @code{bottom}: Move to the lowest frame.
 
 @item @code{frame [<n>]}: Move to the frame with the specified number.
@@ -203,7 +217,7 @@ function call:
 @node how arguments are printed
 @subsection How Arguments are Printed
 
-A frame is printed to look like a function call, but with the actual
+A frame is printed to look like a function call but with the actual
 argument values in the argument positions.  So the frame for this call
 in the source:
 
@@ -772,7 +786,7 @@ Unlike the other optimization qualities (which are compared in
 relative value to evaluate tradeoffs), the @code{debug} optimization
 quality is directly translated to a level of debug information. This
 absolute interpretation allows the user to count on a particular
-amount of debug information being available even when the values of
+amount of debug information being available, even when the values of
 the other qualities are changed during compilation. These are the
 levels of debug information that correspond to the values of the
 @code{debug} quality:
@@ -855,7 +869,8 @@ then there will be no frame to represent the call, and the arguments
 will be treated like any other local variable. Functions may also be
 @emph{semi inline}, in which case there is a frame to represent the
 call, but the call is to an optimized local version of the function,
-not to the original function.
+not to the original function. See @ref{open coding and inline expansion}
+for more.
 
 @node exiting the debugger
 @section Exiting the Debugger
@@ -871,18 +886,20 @@ These commands get you out of the debugger.
 @itemize
 @item @code{toplevel}: Throw to top level.
 
-@item @code{restart [<n>]}: Invoke the @code{<n>}th restart case as displayed by
-  the @code{error} command. If @code{<n>} is not specified, the available
-  restart cases are reported.
+@item @code{restart [<n>]} or @code{<n>}: Invoke the @code{<n>}th restart case as
+  displayed by the @code{error} command. If @code{<n>} is not specified, the
+  available restart cases are reported. When using the short
+  form (@code{<n>}), an integer for which there is no corresponding
+  restart is evaluated following normal REPL semantics.
 
 @item @code{continue}: Call @code{continue} with the condition given that invoked
   the debugger. If there is no restart case named @code{continue}, then an
-  error is signaled. This is not a debugger command, but the name of
+  error is signaled. This is not a debugger command but the name of
   a commonly available restart.
 
 @item @code{abort}: Call @code{abort} on the condition that invoked the debugger.
   This is useful for popping debug command loop levels or aborting
-  to top level, as the case may be. This is not a debugger command,
+  to top level, as the case may be. This is not a debugger command
   but the name of a commonly available restart.
 
 @item @code{return <value>}: Return @code{value} from the current stack frame.
@@ -907,8 +924,8 @@ function, but a few show general information.
 @itemize
 @item @code{help} or @code{?}: Display a synopsis of debugger commands.
 
-@item @code{describe}: Call @code{describe} on the current function and displays the
-  number of local variables.
+@item @code{describe}: Call @code{describe} on the current function and display
+  the number of local variables.
 
 @item @code{print}: Display the current function call as it would be
   displayed by moving to this frame.
@@ -1054,8 +1071,9 @@ Source: (* N (! (1- N)))
 commands in that it also functions in compiled code which has not
 been compiled with stepping instrumentation. It simply steps to
 the next compiled code location. In the future, this form of
-stepping may be improved enough to subsume the instrumentation
-based stepping commands, which have much higher overhead.
+stepping may be improved enough to subsume the
+instrumentation-based stepping commands, which have much higher
+overhead.
 @end quotation
 
 @node function tracing
@@ -1069,18 +1087,17 @@ printing of the trace information and conditional breakpoints on
 function entry or exit.
 
 In SBCL, tracing can be done either by temporarily redefining the
-function name (encapsulation), or using breakpoints. When
-breakpoints are used, the function object itself is destructively
-modified to cause the tracing action. The advantage of using
-breakpoints is that tracing works even when the function is
-anonymously called via @code{funcall}, that function object identity is
-preserved, and that anonymous and local functions can also be
-traced.
+function name (encapsulation) or using breakpoints. When breakpoints
+are used, the function object itself is destructively modified to
+cause the tracing action. The advantage of using breakpoints is that
+tracing works even when the function is anonymously called via
+@code{funcall}, that function object identity is preserved, and that
+anonymous and local functions can also be traced.
 
 @anchor{Macro common-lisp trace}
 @ffindex @sortas{trace common-lisp} trace [common-lisp]
 @deffn{Macro} trace &rest specs
-@code{trace} @code{@{Option Global-Value@}* @{Name @{Option Value@}*@}*}
+@code{trace} @code{@{<option> <global-value>@}* @{<name> @{<option> <local-value>@}*@}*}
 
 @code{trace} is a debugging tool that provides information when specified
 functions are called. In its simplest form:
@@ -1235,9 +1252,9 @@ The default value for the @code{:report} option to @code{trace}.
 @cindex single-stepping
 @section Single Stepping
 
-SBCL includes an instrumentation based single-stepper for compiled
-code, that can be invoked via the @code{step} macro, or from within the
-debugger. See @ref{debugger policy control}, for details on enabling
+SBCL includes an instrumentation-based single-stepper for compiled
+code, which can be invoked via the @code{step} macro or from within the
+debugger. See @ref{debugger policy control} for details on enabling
 stepping for compiled code.
 
 The following debugger commands are used for controlling single stepping.

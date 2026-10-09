@@ -678,7 +678,7 @@ at 0.")
         collect (trace-info-what x)))
 
 (defmacro trace (&rest specs)
-  "TRACE `{Option Global-Value}* {Name {Option Value}*}*`
+  "TRACE `{<option> <global-value>}* {<name> {<option> <local-value>}*}*`
 
 TRACE is a debugging tool that provides information when specified
 functions are called. In its simplest form:
