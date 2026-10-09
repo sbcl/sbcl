@@ -706,3 +706,37 @@
                        (read-from-string negative)))
                     `(nil ,negative-read-pos)))
      warning)))
+
+;;; TRUNCATE-EXPONENT used to scale numbers whose digits alone are out
+;;; of range back into range: 1000 digits with a zero exponent read as
+;;; about 1d-6 times their value instead of overflowing, and a tiny
+;;; number with a negative exponent read as a much larger one.
+(with-test (:name (read float :long-digits-out-of-range)
+            :fails-on :no-float-traps)
+  (let ((digits (make-string 1000 :initial-element #\9))
+        (zeros (make-string 1000 :initial-element #\0)))
+    (assert-error (read-from-string (concatenate 'string digits "d0"))
+                  sb-kernel:reader-impossible-number-error)
+    (assert-error (read-from-string (concatenate 'string digits "d5"))
+                  sb-kernel:reader-impossible-number-error)
+    (assert (eql (read-from-string (concatenate 'string "0." zeros "1d-1"))
+                 0d0))
+    (assert (eql (read-from-string (concatenate 'string "0." zeros "1d-5"))
+                 0d0))
+    ;; In range despite the long digit strings: unchanged.
+    (assert (= (read-from-string (concatenate 'string "1" (subseq zeros 0 400)
+                                              "d-100"))
+               1d300))
+    (assert (= (read-from-string (concatenate 'string "0." (subseq zeros 0 400)
+                                              "1d300"))
+               1d-101))))
+
+;;; The R exponent marker reads an exact rational, so its exponent must
+;;; not be limited to the range of floats.
+(with-test (:name (read float :rational-exponent-not-truncated))
+  (assert (eql (read-from-string "1r400") (expt 10 400)))
+  (assert (eql (read-from-string "1r-400") (expt 10 -400)))
+  (assert (eql (read-from-string "-2.5r-500") (/ -25 (expt 10 501))))
+  (let ((nines (make-string 500 :initial-element #\9)))
+    (assert (eql (read-from-string (concatenate 'string nines "r5"))
+                 (* (1- (expt 10 500)) (expt 10 5))))))

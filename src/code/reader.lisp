@@ -1720,11 +1720,15 @@ extended <package-name>::<form-in-package> syntax."
          (number-magnitude (integer-length number))
          (divisor-magnitude (1- (integer-length divisor)))
          (magnitude (- number-magnitude divisor-magnitude)))
+    ;; The bound must not cross zero: if the digits alone are already
+    ;; too large (or too small) for any float, keep the exponent at zero,
+    ;; so that the result still overflows (or underflows) instead of being
+    ;; scaled back into range.
     (if (minusp exponent)
-        (max exponent (ceiling (- (+ max-exponent magnitude))
-                               #.(cl:floor (cl:log 10 2))))
-        (min exponent (floor (- max-exponent magnitude)
-                             #.(cl:floor (cl:log 10 2)))))))
+        (max exponent (min 0 (ceiling (- (+ max-exponent magnitude))
+                                      #.(cl:floor (cl:log 10 2)))))
+        (min exponent (max 0 (floor (- max-exponent magnitude)
+                                    #.(cl:floor (cl:log 10 2))))))))
 
 (defun make-float (stream)
   ;; Assume that the contents of *read-buffer* are a legal float, with nothing
@@ -1774,7 +1778,12 @@ extended <package-name>::<form-in-package> syntax."
                                   (#\D 'double-float)
                                   (#\L 'long-float)
                                   (#\R 'rational)))
-                  (exponent (truncate-exponent exponent number divisor))
+                  ;; Limiting the exponent only avoids building huge
+                  ;; powers of ten for a result that cannot be a float
+                  ;; anyway; an exact rational needs the exponent as is.
+                  (exponent (if (eq float-format 'rational)
+                                exponent
+                                (truncate-exponent exponent number divisor)))
                   (result (make-float-aux (* (expt 10 exponent) number)
                                           divisor float-format stream)))
              (return-from make-float
