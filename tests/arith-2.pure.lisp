@@ -2810,3 +2810,13 @@
          (declare ((integer 34078720 34078975) a))
          (logand (ash (the (unsigned-byte 65) b) -49) a))
     ((34078720 (ldb (byte 65 0) -1)) 0)))
+
+(with-test (:name :dpb-fixnum-overflow)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (x y)
+         (declare (type (member 0 2) x)
+                  ((unsigned-byte 32) y))
+         (dpb x (byte 1 63) y))
+    ((2 2) 2)
+    ((0 3) 3)))

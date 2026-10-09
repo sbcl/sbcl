@@ -1602,10 +1602,12 @@
   (:related-args y)
   (:generator 2
     (move res y)
-    (inst bfm res x (- (1- n-word-bits) posn) (1- (if (>= (+ size posn)
-                                                          n-word-bits)
-                                                      (- (1- n-word-bits) posn)
-                                                      size)))))
+    (when (< posn (1- n-word-bits))
+      (let ((size (min size
+                       (- (1- n-word-bits) posn))))
+        (inst bfm res x
+              (- (1- n-word-bits) posn)
+              (1- size))))))
 
 (define-vop (dpb-c/signed-unsigned)
   (:translate %dpb)
