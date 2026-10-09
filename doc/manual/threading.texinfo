@@ -247,7 +247,7 @@ Terminate the thread identified by @code{thread}, by interrupting it and
 causing it to call @code{sb-thread:abort-thread} with @code{:allow-exit} @code{t}.
 
 The unwind caused by @code{terminate-thread} is asynchronous, meaning that
-eg. thread executing
+e.g. thread executing
 
 @example
 (let (foo)
@@ -263,7 +263,7 @@ eg. thread executing
 @end example
 
 might miss calling @code{release-foo} despite GET-FOO having returned true
-if the interrupt occurs inside the cleanup clause, eg. during
+if the interrupt occurs inside the cleanup clause, e.g. during
 execution of @code{release-foo}.
 
 Thus, in order to write an asynch unwind safe @code{unwind-protect} you need
@@ -322,7 +322,7 @@ Return the offending thread that the @code{thread-error} pertains to.
 @anchor{Condition sb-thread symbol-value-in-thread-error}
 @ttindex @sortas{symbol-value-in-thread-error sb-thread} symbol-value-in-thread-error [sb-thread]
 @deffn{Condition} sb-thread:symbol-value-in-thread-error
-Signalled when @code{symbol-value-in-thread} or its @code{setf} version fails due to eg.
+Signalled when @code{symbol-value-in-thread} or its @code{setf} version fails due to e.g.
 the symbol not having a thread-local value, or the target thread having
 exited. The offending symbol can be accessed using @code{cell-error-name}, and the
 offending thread using @code{thread-error-thread}.

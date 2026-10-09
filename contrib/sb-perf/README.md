@@ -11,7 +11,7 @@ The typical workflow is:
 1. Compile your application
 1. Load `sb-perf` via `(load #P"SYS:CONTRIB;sb-perf;export-syms.lisp")`
 1. Export symbols by running `(write-perfmap)`
-1. While the code to be profiled is active, use eg. `perf record -g -p <pid of SBCL>`
+1. While the code to be profiled is active, use e.g. `perf record -g -p <pid of SBCL>`
 1. Analyse the results (eg. as flamegraph, via `perf report`, etc.)
 
 ## Example

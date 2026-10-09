@@ -2419,7 +2419,7 @@ bootstrapping.
 
 (defun note-gf-signature (fun-name lambda-list-p lambda-list)
   (unless lambda-list-p
-    ;; Use the existing lambda-list, if any. It is reasonable to do eg.
+    ;; Use the existing lambda-list, if any. It is reasonable to do e.g.
     ;;
     ;;   (if (fboundp name)
     ;;       (ensure-generic-function name)

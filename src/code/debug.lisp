@@ -36,7 +36,7 @@
 ;;;         exactly 2 expected, but 5 found
 (defvar *debug-print-variable-alist* nil
   "an association list describing new bindings for special variables
-to be used within the debugger. Eg.
+to be used within the debugger. E.g.
 
  ((*PRINT-LENGTH* . 10) (*PRINT-LEVEL* . 6) (*PRINT-PRETTY* . NIL))
 

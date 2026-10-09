@@ -19,7 +19,7 @@ For branch master:
 
   release.commits-on-master-since-release.sha1
 
-  Eg. 1.0.48.20-152c97d
+  E.g. 1.0.48.20-152c97d
 
                           Last release: 1.0.48
        Commits on master after release: 20
@@ -32,7 +32,7 @@ For other branches:
 
   release.commits-on-branch-and-master-since-release.branch.commits-on-branch.sha1
 
-  Eg. 1.0.44.26.wip-pretty-backtraces.4-674f875
+  E.g. 1.0.44.26.wip-pretty-backtraces.4-674f875
 
                           Last release: 1.0.44
        Commits on master after release: 26

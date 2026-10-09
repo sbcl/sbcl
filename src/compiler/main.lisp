@@ -72,7 +72,8 @@
 
 (defmacro with-compilation-unit (options &body body)
   "Affects compilations that take place within its dynamic extent. It is
-intended to be eg. wrapped around the compilation of all files in the same system.
+intended to be e.g. wrapped around the compilation of all files in the
+same system.
 
 Following options are defined:
 
@@ -128,7 +129,7 @@ Following options are defined:
     debug-source information of functions compiled in within the
     dynamic extent of BODY.
 
-    Primarily for use by development environments, in order to eg.
+    Primarily for use by development environments, in order to e.g.
     associate function definitions with editor-buffers. Can be
     accessed using SB-INTROSPECT:DEFINITION-SOURCE-PLIST.
 
@@ -2028,7 +2029,7 @@ returning its filename.
     ;; CLHS says that the first value is NIL if the "file could not
     ;; be created". We interpret this to mean "a valid fasl could not
     ;; be created" -- which can happen if the compilation is aborted
-    ;; before the whole file has been processed, due to eg. a reader
+    ;; before the whole file has been processed, due to e.g. a reader
     ;; error.
     (values (when (and (not abort-p) output-file)
               ;; Again, more bogosity. Why do PROBE-FILE here

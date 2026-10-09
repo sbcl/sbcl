@@ -1,4 +1,4 @@
-Docstring Style Guide
+Writing Documentation
 ---------------------
 
 The Markdown-to-Texinfo converter is documented in `markdown.lisp`.
@@ -186,19 +186,6 @@ not semantic. Use it freely and visually.
 
 Footnotes are not supported.
 
-## Typographic Miscellanea
-
-The Markdown-to-Texinfo converter does not convert e.g. `--` to
-en-dash. This is to prevent messing up the output when something like
-`git <option>* -- <path>` is written without proper markup. The issue
-is similar but maybe more pronounced with literal strings and curly
-quotes: you don't want to copy the rendered version of
-
-    (print "Hello, world")
-
-to the REPL, only to find the double quotes have been replaced by some
-fancy characters.
-
 ## Inline Quotes and Emphasis
 
 Use strong emphasis (e.g. `__not__`) very sparingly. It usually gets
@@ -248,13 +235,32 @@ You may also indent all but the first line as long as you do it
 consistently within the docstring. Maybe one day we could even agree
 upon a universally accepted style ... just joking.
 
-## Locale Stuff
+## Typographic Miscellanea
 
-Currently the manual is a mix of American and British English.
+The Markdown-to-Texinfo converter does not convert e.g. `--` to
+en-dash. This is to prevent messing up the output when something like
+`git <option>* -- <path>` is written without proper markup. The issue
+is similar but maybe more pronounced with literal strings and curly
+quotes: you don't want to copy the rendered version of
 
-In the vast majority of the cases, the existing docstrings use `e.g.
-X` and `i.e. X` (the British version). For consistency, do not use
-other forms such as `eg. X` or `i.e., X`.
+    (print "Hello, world")
+
+to the REPL, only to find the double quotes have been replaced by some
+fancy characters.
+
+Additionally, to keep to manual buildable without sb-unicode, avoid en
+dashes and similar.
+
+## Spelling and Grammar
+
+Currently, the manual (as well as comments and all source files)
+predominantly follow U.S. spelling with a bit of British mixed in.
+Let's try to stick to U.S. spelling.
+
+Special rules:
+
+- Use `e.g. X` and `i.e. X`. For consistency, do not use other forms
+  such as `eg. X` or `i.e., X`.
 
 ## Paragraph Formatting
 

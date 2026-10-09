@@ -160,7 +160,7 @@ Default method for @code{socket} objects.
 capable of both binary and character IO use @code{:default}.
 
 Acceptable values for @code{buffering} are @code{:full}, @code{:line} and @code{:none}, default is
-@code{:full}, ie. output is buffered till it is explicitly flushed using
+@code{:full}, i.e. output is buffered till it is explicitly flushed using
 @code{close} or @code{finish-output}. (@code{force-output} forces some output to be
 flushed: to ensure all buffered output is flushed use @code{finish-output}.)
 

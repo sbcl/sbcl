@@ -84,7 +84,7 @@
 ;;; where What is either a functional (a local function) or a list
 ;;; (MACRO . <function>) (a local macro, with the specifier expander.)
 ;;; Note that Name may be a (SETF <name>) function. Accessors are
-;;; defined below, eg (ENV-WALK-FUNCTION ENV).
+;;; defined below, e.g. (ENV-WALK-FUNCTION ENV).
 ;;;
 ;;; If WITH-AUGMENTED-ENVIRONMENT is called from WALKER-ENVIRONMENT-BIND
 ;;; this code hides the WALKER version of an environment

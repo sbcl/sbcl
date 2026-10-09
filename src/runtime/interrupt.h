@@ -56,15 +56,16 @@ extern void maybe_save_gc_mask_and_block_deferrables(os_context_t *context);
  *   about arguments, and it needs to be able to pass a frobbable
  *   context to the callee...
  *
- *   There are cases when nesting handlers is exactly what we want:
- *   eg. SIGINT.
+ *   There are cases when nesting handlers is exactly what we want
+ *   (e.g. SIGINT).
  *
  *   There are cases when we probably want to drop duplicate signals
- *   on the floor if they arrive before the previous one has been handled.
- *   Eg. SIGPROF.
+ *   on the floor if they arrive before the previous one has been
+ *   handled (e.g. SIGPROF).
  *
  *   There are cases when we probably want to handle duplicate signals
- *   after the previous handler has returned, not before. Eg. SIGALARM.
+ *   after the previous handler has returned, not before (e.g.
+ *   SIGALARM).
  *
  * -- NS 2007-01-29
  */

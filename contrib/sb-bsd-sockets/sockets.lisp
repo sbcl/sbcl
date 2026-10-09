@@ -267,7 +267,7 @@ ELEMENT-TYPE defaults to CHARACTER, to construct a bivalent stream,
 capable of both binary and character IO use :DEFAULT.
 
 Acceptable values for BUFFERING are :FULL, :LINE and :NONE, default is
-:FULL, ie. output is buffered till it is explicitly flushed using
+:FULL, i.e. output is buffered till it is explicitly flushed using
 CLOSE or FINISH-OUTPUT. (FORCE-OUTPUT forces some output to be
 flushed: to ensure all buffered output is flushed use FINISH-OUTPUT.)
 

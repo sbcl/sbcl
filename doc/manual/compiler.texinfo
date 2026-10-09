@@ -841,7 +841,8 @@ dynamic scoping on restrictions.
 @ffindex @sortas{with-compilation-unit common-lisp} with-compilation-unit [common-lisp]
 @deffn{Macro} with-compilation-unit options &body body
 Affects compilations that take place within its dynamic extent. It is
-intended to be eg. wrapped around the compilation of all files in the same system.
+intended to be e.g. wrapped around the compilation of all files in the
+same system.
 
 Following options are defined:
 
@@ -898,7 +899,7 @@ Attaches the value returned by @code{<plist-form>} to internal
 debug-source information of functions compiled in within the
 dynamic extent of @code{body}.
 
-Primarily for use by development environments, in order to eg.
+Primarily for use by development environments, in order to e.g.
 associate function definitions with editor-buffers. Can be
 accessed using @code{sb-introspect:definition-source-plist}.
 

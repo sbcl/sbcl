@@ -155,7 +155,7 @@ read by the function THREAD-ERROR-THREAD."))
                  (:thread-dead "the thread has exited.")
                  (:invalid-tls-value "the thread-local value is not valid."))))))
   (:documentation
-   "Signalled when SYMBOL-VALUE-IN-THREAD or its SETF version fails due to eg.
+   "Signalled when SYMBOL-VALUE-IN-THREAD or its SETF version fails due to e.g.
 the symbol not having a thread-local value, or the target thread having
 exited. The offending symbol can be accessed using CELL-ERROR-NAME, and the
 offending thread using THREAD-ERROR-THREAD."))
@@ -2476,7 +2476,7 @@ Short version: be careful out there."
 causing it to call SB-THREAD:ABORT-THREAD with :ALLOW-EXIT T.
 
 The unwind caused by TERMINATE-THREAD is asynchronous, meaning that
-eg. thread executing
+e.g. thread executing
 
     (let (foo)
        (unwind-protect
@@ -2490,7 +2490,7 @@ eg. thread executing
            (release-foo foo))))
 
 might miss calling `RELEASE-FOO` despite GET-FOO having returned true
-if the interrupt occurs inside the cleanup clause, eg. during
+if the interrupt occurs inside the cleanup clause, e.g. during
 execution of `RELEASE-FOO`.
 
 Thus, in order to write an asynch unwind safe UNWIND-PROTECT you need

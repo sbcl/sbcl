@@ -518,7 +518,7 @@
           ;; no error is signalled. The dilemma here is "what is the
           ;; correct result when defaults is a _file_, not a
           ;; directory". Currently (0.8.10.73) we get #P"foo" here (as
-          ;; opposed to eg. #P"/path/to/current/foo"), which is
+          ;; opposed to e.g. #P"/path/to/current/foo"), which is
           ;; possibly mildly surprising but probably conformant.
           (assert (parse-namestring "foo" nil f)))))
 

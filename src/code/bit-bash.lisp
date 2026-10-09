@@ -685,7 +685,7 @@
 ;;;;
 ;;;; Similar search would work well for base-strings as well.
 ;;;; (Technically for all unboxed sequences of sub-word size elements,
-;;;; but somehow I doubt eg. octet vectors get POSITION or FIND used
+;;;; but somehow I doubt e.g. octet vectors get POSITION or FIND used
 ;;;; as much on them.)
 (defconstant +bit-position-base-mask+ (1- n-word-bits))
 (defconstant +bit-position-base-shift+ (integer-length +bit-position-base-mask+))

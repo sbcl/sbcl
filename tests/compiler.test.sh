@@ -323,7 +323,7 @@ cat > $tmpfilename <<EOF
 EOF
 expect_failed_compile $tmpfilename
 
-# This should fail, and fail nicely -- not eg. loop trying to dump
+# This should fail, and fail nicely -- not e.g. loop trying to dump
 # references to the unbound variable.
 cat > $tmpfilename <<EOF
 (defmacro macro-with-unbound-variables (foo)

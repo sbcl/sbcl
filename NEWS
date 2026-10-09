@@ -5049,8 +5049,8 @@ changes in sbcl-1.0.49 relative to sbcl-1.0.48:
   * enhancement: source locations are now available for files loaded as
     source, compile-time-too evaluation, and initialization files.
   * enhancement: WITH-COMPILATION-UNIT :SOURCE-NAMESTRING allows providing
-    virtual source-file information, eg. overriding input-file of COMPILE-FILE
-    when a temporary file is used for compilation.
+    virtual source-file information, e.g. overriding input-file
+    of COMPILE-FILE when a temporary file is used for compilation.
   * enhancement: ASDF has been updated to version 2.015.3.
   * enhancement: backtraces involving frames from the default evaluator are
     more readable.
@@ -5130,8 +5130,8 @@ changes in sbcl-1.0.48 relative to sbcl-1.0.47:
     engages the obsolete instance protocol. (lp#766271)
   * bug fix: constant improper lists could break source coverage recording.
     (lp#767959)
-  * bug fix: compiling calls to eg. MEMBER with massive constant list arguments
-    could exhaust stack.
+  * bug fix: compiling calls to e.g. MEMBER with massive constant list
+    arguments could exhaust stack.
 
 changes in sbcl-1.0.47 relative to sbcl-1.0.46:
   * bug fix: fix mach port rights leaks in mach exception handling code on
@@ -5280,7 +5280,7 @@ changes in sbcl-1.0.44 relative to sbcl-1.0.43:
   * bug fix: DEBUG>SPEED no longer degrades ALIEN-FUNCALL performance quite
     so badly. (lp#654485)
   * bug fix: SB-INTROSPECT:FIND-DEFINITION-SOURCES-BY-NAME no longer signals
-    an error for eg. STRUCTURE. (lp#458015)
+    an error for e.g. STRUCTURE. (lp#458015)
   * bug fix: LOOP WITH NIL = ... signalled an unused variable style-warning.
     (lp#613871, thanks to Roman Marynchak)
   * bug fix: more reliable &REST list type derivation. (lp#655203)
@@ -5542,7 +5542,7 @@ changes in sbcl-1.0.37 relative to sbcl-1.0.36:
     translations from SYS:SITE;<HOST>.TRANSLATIONS.NEWEST (thanks to Michael
     Weber)
   * optimization: SLOT-VALUE and (SETF SLOT-VALUE) take advantage of
-    constraint propgation, allowing better compilation eg. when used to
+    constraint propgation, allowing better compilation e.g. when used to
     access structures with WITH-SLOTS. (lp#520366)
   * optimization: the compiler is now more aware of the type of the underlying
     storage vector for multidimensional simple arrays resulting in better code
@@ -5983,7 +5983,7 @@ changes in sbcl-1.0.29 relative to 1.0.28:
     expressing intent.
   * new feature: UNC pathnames are now understood by the system on Windows.
   * optimization: the compiler uses a specialized version of FILL when the
-    element type is know in more cases, making eg. (UNSIGNED-BYTE 8) case
+    element type is know in more cases, making e.g. (UNSIGNED-BYTE 8) case
     almost 90% faster.
   * optimization: accesses to potentially non-simple arrays where element type
     is known are 50% faster.
@@ -6036,7 +6036,7 @@ changes in sbcl-1.0.29 relative to 1.0.28:
   * bug fix: Attempting to DEREF an (ALIEN (* T)) would produce a WARNING and
     generate incorrect code.
   * bug fix: #201; type inference for CONS and ARRAY types could derive
-    wrong results in the presence of eg. RPLACA or ADJUST-ARRAY.
+    wrong results in the presence of e.g. RPLACA or ADJUST-ARRAY.
   * bug fix: special variables with a proclaimed specific subtype of FUNCTION
     could not be assigned to or bound with PROGV. (reported by Lorenz
     Mösenlechner)
@@ -6281,7 +6281,7 @@ changes in sbcl-1.0.22 relative to 1.0.21:
     causing it to skip normal runtime option processing. See documentation
     for details. (thanks to Zach Beane)
   * enhancement: inoccous calls to EVAL or generic functions dispatching
-    on subclasses of eg. STREAM no longer cause compiler notes to appear.
+    on subclasses of e.g. STREAM no longer cause compiler notes to appear.
   * enhancement: the system no longer resignals errors from --load and
     --eval toplevel arguments as SIMPLE-ERRORS, which caused restarts
     associated with the original error to be lost. (thanks to Ariel
@@ -6802,7 +6802,7 @@ changes in sbcl-1.0.8 relative to sbcl-1.0.7:
   * performance bug fix: GETHASH and (SETF GETHASH) are once again
     non-consing.
   * optimization: slot definition lookup is now O(1). This speeds up
-    eg. SLOT-VALUE and (SETF SLOT-VALUE) with variable slot names.
+    e.g. SLOT-VALUE and (SETF SLOT-VALUE) with variable slot names.
   * optimization: STRING-TO-OCTETS is now up to 60% faster for UTF-8.
   * optimization: ASSOC and MEMBER can now be open-coded for all
     combinations of keyword arguments when second argument is constant
@@ -8346,7 +8346,7 @@ changes in sbcl-0.8.17 relative to sbcl-0.8.16:
   * fixed bug #351: better error-handlind and reporting for malformed
     LET and LET* forms.
   * fixed bug #350: bignum-printing is now more memory-efficient,
-    allowing printing of very large bignums, eg. (expt 2 10000000).
+    allowing printing of very large bignums, e.g. (expt 2 10000000).
     (reported by Bruno Haible)
   * fixed bug #302: better primitive-type selection for intersection
     types.

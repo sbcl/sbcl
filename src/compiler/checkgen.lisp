@@ -74,7 +74,7 @@
          type)
         ((csubtypep type (specifier-type 'integer))
          ;; Simple range checks are not that expensive, and we *don't*
-         ;; want to accidentally lose eg. array bounds checks due to
+         ;; want to accidentally lose e.g. array bounds checks due to
          ;; weakening, so for integer types we simply collapse all
          ;; ranges into one.
          (weaken-integer-type type))

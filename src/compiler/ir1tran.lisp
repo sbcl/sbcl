@@ -188,7 +188,7 @@
                ;; definedness at runtime, which is what matters.
                #-sb-xc-host (not (fboundp name))
                ;; LATEP is true when the user has indicated that
-               ;; late-late binding is desired by using eg. a quoted
+               ;; late-late binding is desired by using e.g. a quoted
                ;; symbol -- in which case it makes little sense to
                ;; complain about undefined functions.
                (not latep))

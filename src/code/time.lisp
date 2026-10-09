@@ -248,7 +248,7 @@ GET-INTERNAL-REAL-TIME.) Initialized to zero on startup.")
   "Total CPU time spent doing garbage collection (as reported by
 GET-INTERNAL-RUN-TIME.) Initialized to zero on startup. It is safe to bind
 this to zero in order to measure GC time inside a certain section of code, but
-doing so may interfere with results reported by eg. TIME.")
+doing so may interfere with results reported by e.g. TIME.")
 (declaim (type index *gc-run-time* *gc-real-time*))
 
 (defun print-time (&key real-time-ms user-run-time-us system-run-time-us

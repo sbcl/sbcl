@@ -415,7 +415,7 @@
          (best-cost       0))
     ;; TODO: sort vertices by spill cost, so that high-spill cost ones
     ;; are more likely to be compatible?  We're trying to find a
-    ;; maximal 1-colorable subgraph here, ie. a maximum independent
+    ;; maximal 1-colorable subgraph here, i.e. a maximum independent
     ;; set :\ Still, a heuristic like first attempting to pack in
     ;; max-cost vertices may be useful
     (do-sc-locations (color colors nil (vertex-element-size (first vertices)))

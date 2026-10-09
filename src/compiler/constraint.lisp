@@ -1099,7 +1099,7 @@
 (defun type-from-constraints (variable constraints initial-type &optional ref)
   ;; KLUDGE: The NOT-SET and NOT-FPZ here are so that we don't need to
   ;; cons up endless union types when propagating large number of EQL
-  ;; constraints -- eg. from large CASE forms -- instead we just
+  ;; constraints -- e.g. from large CASE forms -- instead we just
   ;; directly accumulate one XSET, and a set of fp zeroes, which we at
   ;; the end turn into a MEMBER-TYPE.
   ;;

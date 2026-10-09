@@ -123,12 +123,12 @@
   ;; legal name?
   (check-fun-name name)
 
-  ;; KLUDGE: This can happen when eg. compiling a NAMED-LAMBDA, and isn't
-  ;; guarded against elsewhere -- so we want to assert package locks here. The
-  ;; reason we do it only when stomping on existing stuff is because we want
-  ;; to keep
-  ;;   (WITHOUT-PACKAGE-LOCKS (DEFUN LOCKED:FOO ...))
-  ;; viable, which requires no compile-time violations in the harmless cases.
+  ;; KLUDGE: This can happen when e.g. compiling a NAMED-LAMBDA, and
+  ;; isn't guarded against elsewhere -- so we want to assert package
+  ;; locks here. The reason we do it only when stomping on existing
+  ;; stuff is because we want to keep (WITHOUT-PACKAGE-LOCKS (DEFUN
+  ;; LOCKED:FOO ...)) viable, which requires no compile-time
+  ;; violations in the harmless cases.
   (with-single-package-locked-error ()
     (flet ((assert-it ()
              (assert-symbol-home-package-unlocked name "proclaiming ~S as a function")))

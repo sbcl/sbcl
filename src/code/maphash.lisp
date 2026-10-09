@@ -96,7 +96,7 @@ Consequences are undefined if HASH-TABLE is mutated during the call to
 MAPHASH, except for changing or removing elements corresponding to the
 current key. The applies to all threads, not just the current one --
 even for synchronized hash-tables. If the table may be mutated by
-another thread during iteration, use eg. SB-EXT:WITH-LOCKED-HASH-TABLE
+another thread during iteration, use e.g. SB-EXT:WITH-LOCKED-HASH-TABLE
 to protect the MAPHASH call."
   (declare (dynamic-extent function-designator))
   (maphash function-designator hash-table)) ; via compiler-macro
@@ -114,7 +114,7 @@ Consequences are undefined if HASH-TABLE is mutated during execution of BODY,
 except for changing or removing elements corresponding to the current key. The
 applies to all threads, not just the current one -- even for synchronized
 hash-tables. If the table may be mutated by another thread during iteration,
-use eg. SB-EXT:WITH-LOCKED-HASH-TABLE to protect the WITH-HASH-TABLE-ITERATOR
+use e.g. SB-EXT:WITH-LOCKED-HASH-TABLE to protect the WITH-HASH-TABLE-ITERATOR
 for."
   ;; If within the BODY code the stepping function is used exactly once, then
   ;; it gets let-converted and so it should make no difference whether it returns

@@ -213,7 +213,7 @@ long-lived branches that are best merged in a few steps we can use
 
 to merge the changes upto a certain commit. Repeat a few times, and
 you have the whole branch merged. Other Git commands provide more
-advanced options. See eg. git-cherry-pick, which you will end up
+advanced options. See e.g. git-cherry-pick, which you will end up
 using sooner or later.
 
 Now, let's assume we have a private Git repository in ~/sbcl-git, and
@@ -267,7 +267,7 @@ To commit the the changes you have wrought on branch foo-hacks
  # of the current branch (so that the final commit introduces all
  # the changes.)
  #
- # In practice for small changes you may eg. just want to
+ # In practice for small changes you may e.g. just want to
  #
  #    git checkout -b wip-fix-bug-xxx master
  #    ...fix bug on the branch...

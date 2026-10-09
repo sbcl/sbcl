@@ -1734,7 +1734,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                  (when checker
                    (remove-methods checker))))
              ;; Save DFUN-STATE, so that COMPUTE-DISCRIMINATING-FUNCTION can
-             ;; access it, and so that it's there for eg. future cache updates.
+             ;; access it, and so that it's there for e.g. future cache updates.
              (set-dfun generic-function dfun cache info)
              (let ((dfun (if early-p
                              (or dfun (make-initial-dfun generic-function))
