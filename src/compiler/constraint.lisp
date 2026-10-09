@@ -1411,34 +1411,40 @@
                  ;; monotonically growing variables without a
                  ;; starting point which will propagate new
                  ;; constraints for each increment.
-                 (pushnew ref *blocks-to-terminate*))))
-        ;; Find unchanged eql refs to a set variable.
-        (when (lambda-var-sets leaf)
-          (let (mark
-                (old-mark (ref-same-refs ref))
-                (eq (lambda-var-eq-constraints leaf))
-                ;; It's cheap to compute but not cheap to reoptimize
-                ;; everything if it's not needed.
-                ;; Some transforms ask for same-leaf-ref-p after :ir1-phases.
-                (compute (lambda-var-compute-same-refs leaf))
-                reoptimize)
-            (when eq
-              (loop for other-ref in (leaf-refs leaf)
-                    unless (eq other-ref ref)
-                    do (let ((constraint (gethash (ref-lvar other-ref) eq)))
-                         (when (and constraint
-                                    (conset-member constraint in))
-                           (unless mark
-                             (setf mark (list 0))
-                             (setf (ref-same-refs ref) mark))
-                           (when (and compute
-                                       (not (and old-mark
-                                                 (eq old-mark (ref-same-refs other-ref)))))
-                             (setf reoptimize t)
-                             (reoptimize-lvar (node-lvar other-ref)))
-                           (setf (ref-same-refs other-ref) mark)))))
-            (when reoptimize
-              (reoptimize-lvar (node-lvar ref)))))))))
+                 (pushnew ref *blocks-to-terminate*)))))
+      ;; Find unchanged eql refs to a set variable.
+      (when (lambda-var-sets leaf)
+        (let (mark
+              (old-mark (ref-same-refs ref))
+              (eq (lambda-var-eq-constraints leaf))
+              ;; It's cheap to compute but not cheap to reoptimize
+              ;; everything if it's not needed.
+              ;; Some transforms ask for same-leaf-ref-p after :ir1-phases.
+              (compute (lambda-var-compute-same-refs leaf))
+              reoptimize)
+          (when eq
+            (loop for other-ref in (leaf-refs leaf)
+                  unless (eq other-ref ref)
+                  do (let ((constraint (gethash (ref-lvar other-ref) eq)))
+                       (when (and constraint
+                                  (conset-member constraint in))
+                         (unless mark
+                           (setf mark (list 0))
+                           (setf (ref-same-refs ref) mark))
+                         (when (and compute
+                                    (not (and old-mark
+                                              (eq old-mark (ref-same-refs other-ref)))))
+                           (setf reoptimize t)
+
+                           (reoptimize-lvar (node-lvar other-ref)))
+                         (setf (ref-same-refs other-ref) mark)))))
+          (when reoptimize
+            ;; Don't do reoptimize-lvar, the type hasn't changed and
+            ;; skip casts, they don't request same-refs and without
+            ;; new types they don't reoptimize their lvars.
+            (let ((dest (principal-lvar-end (node-lvar ref))))
+              (when dest
+                (reoptimize-node dest)))))))))
 
 (defun delete-redundant-set (set in)
   (let ((var (set-var set)))

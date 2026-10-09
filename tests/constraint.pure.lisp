@@ -2540,3 +2540,16 @@
                      v29))
              (setq i15 (1+ i15))
              (go next-loop)))))))
+
+(with-test (:name :sam-ref-reoptimization)
+  (assert (nth-value 1
+                     (checked-compile
+                      `(lambda (a)
+                         (values
+                          (let ((b *))
+                            (if (> a a)
+                                (setq b a)
+                                (setq b 5d0))
+                            (the integer b))
+                          (setf a 1)))
+                      :allow-warnings t))))
