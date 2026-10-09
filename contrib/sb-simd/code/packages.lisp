@@ -1947,6 +1947,7 @@
      #:u64.2-from-u64.4
      #:u64.4-insert-u64.2
      #:u64.4-permute128
+     #:u64.4-permute4x64
      #:u64.4-incf
      #:u64.4-decf
      ;; s8.32

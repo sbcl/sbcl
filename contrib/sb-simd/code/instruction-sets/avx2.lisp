@@ -216,6 +216,7 @@
    (u64.2-from-u64.4      #:vextracti128 (u64.2) (u64.4 imm1)  :cost 1)
    (u64.4-insert-u64.2    #:vinserti128  (u64.4) (u64.4 u64.2 imm1) :cost 1)
    (u64.4-permute128      #:vperm2i128   (u64.4) (u64.4 u64.4 imm8) :cost 1)
+   (u64.4-permute4x64     #:vpermq       (u64.4) (u64.4 imm8)       :cost 1)
    ;; s8.32
    (make-s8.32            nil            (s8.32) (s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8) :cost 1 :encoding :fake-vop)
    (s8.32-values          nil            (s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8 s8) (s8.32) :cost 1 :encoding :fake-vop)
