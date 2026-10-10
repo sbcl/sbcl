@@ -414,6 +414,11 @@
 
        (let ((vop (template-or-lose ',name)))
          (setf (vop-info-move-vop-p vop) ,kind)
+         (when (vop-info-temps vop)
+           (loop for temp across (vop-info-temps vop)
+                 for sc = (svref *backend-sc-numbers* (vop-temp-sc temp))
+                 when (and (eq (sb-kind (sc-sb sc)) :unbounded))
+                 do (error "Can't use stack temporaries in move VOPs ~a" ',name)))
          (do-sc-pairs (from-sc to-sc ',scs)
            (dolist (dest-sc (cons to-sc (sc-alternate-scs to-sc)))
              (let ((vec (,accessor dest-sc)))
@@ -521,6 +526,12 @@
          sub-phase))))
 
 ;;;; generation of emit functions
+
+(defun vop-temp-sc (bits)
+  (declare (fixnum bits))
+  (if (logbitp 0 bits)
+      (ldb (byte sb-vm:sc-number-bits 1) bits)
+      (ash bits -1)))
 
 (defun compute-temporaries-description (parse)
   #+sb-show (declare (optimize (debug 1))) ; workaround for something, I don't know what
