@@ -236,8 +236,11 @@ variable: an unreadable object representing the error is printed instead.")
                (- *print-base* 2))))
     (+ (if (minusp object) 1 0) ; leading sign
        (if *print-radix* 4 0) ; #rNN or trailing decimal
+       ;; N-FIXNUM-BITS, not N-POSITIVE-FIXNUM-BITS: the magnitude of
+       ;; MOST-NEGATIVE-FIXNUM takes one more bit than any positive fixnum,
+       ;; which in base 2 or 4 is one more character.
        (ceiling (if (fixnump object)
-                    sb-vm:n-positive-fixnum-bits
+                    sb-vm:n-fixnum-bits
                     (* (%bignum-length object) sb-bignum::digit-size))
                 bits-per-char))))
 

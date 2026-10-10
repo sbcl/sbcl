@@ -891,3 +891,20 @@ there"))))
     (assert (string= (funcall fun 1.0d0) "100.d-2"))
     (assert (string= (apply (car form) (append (cdr form) (list 1.0))) "100.e-2"))
     (assert (string= (apply (car form) (append (cdr form) (list 1.0d0))) "100.d-2"))))
+
+;;; PRIN1-TO-STRING sizes its string with APPROX-CHARS-IN-REPR, which
+;;; allowed one bit too few for MOST-NEGATIVE-FIXNUM: in base 2 and 4 it
+;;; signalled an internal error. Compare it with PRIN1 to a string stream,
+;;; which does not use the estimate, in every base, around the fixnum
+;;; limits.
+(with-test (:name (prin1-to-string :fixnum-limits :all-bases))
+  (dolist (n (list most-negative-fixnum (1+ most-negative-fixnum)
+                   (1- most-negative-fixnum)
+                   most-positive-fixnum (1- most-positive-fixnum)
+                   (1+ most-positive-fixnum)))
+    (loop for base from 2 to 36
+          do (dolist (radix '(nil t))
+               (let ((*print-base* base)
+                     (*print-radix* radix))
+                 (assert (string= (prin1-to-string n)
+                                  (with-output-to-string (s) (prin1 n s)))))))))
