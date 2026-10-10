@@ -930,3 +930,12 @@ fractional bits."
    `(lambda (c)
       (- 5 (the (complex double-float) c)))
    ((#c(1d0 3)) #C(4d0 -3))))
+
+(with-test (:name :fnmul)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (a)
+         (declare (double-float a))
+         (let ((a (- a)))
+           (* a a)))
+    ((2d0) 4d0)))
