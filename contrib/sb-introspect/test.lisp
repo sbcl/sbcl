@@ -85,6 +85,7 @@
 
 (sb-alien:define-alien-variable ("errno" test-alien-var) sb-alien:int)
 
+#+alien-callbacks
 (sb-alien:define-alien-callable alien-comparator sb-alien:int
   ((p1 (* t)) (p2 (* t)))
   (- (sb-alien:deref (sb-alien:cast p1 (* sb-alien:int)))

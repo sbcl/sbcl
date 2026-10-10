@@ -745,7 +745,7 @@
 (with-test (:name alien-variable :skipped-on :no-source-locs)
   (assert (matchp-name :variable 'cl-user::test-alien-var 32)))
 
-(with-test (:name alien-callable :skipped-on :no-source-locs)
+(with-test (:name alien-callable :skipped-on (:or (not :alien-callbacks) :no-source-locs))
   (assert (matchp-name :alien-callback 'cl-user::alien-comparator 33)))
 
 (with-test (:name condition-slot-reader :skipped-on :no-source-locs)

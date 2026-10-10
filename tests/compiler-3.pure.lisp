@@ -118,7 +118,9 @@
   (checked-compile `(lambda () (throw (the fixnum *) 1))
                    :allow-style-warnings t))
 
-(with-test (:name :local-call-compute-old-nfp)
+(with-test (:name :local-call-compute-old-nfp
+            :fails-on (and :c-stack-is-control-stack
+                           (not (or :arm :arm64 :ppc64))))
   (checked-compile-and-assert
    ()
    `(lambda (in)

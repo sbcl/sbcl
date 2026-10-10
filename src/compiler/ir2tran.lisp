@@ -2439,35 +2439,36 @@
 (defoptimizer (mask-signed-field ir2-convert) ((width x) node block)
   (block nil
     (when (constant-lvar-p width)
-      (case (lvar-value width)
-        (#.sb-vm:n-fixnum-bits
-         (when (word-sized-lvar-p x)
-           (let* ((lvar (node-lvar node))
-                  (temp (make-normal-tn
-                         (if (lvar-subtypep x word)
-                             (primitive-type-of most-positive-word)
-                             (primitive-type-of
-                              (- (ash most-positive-word -1))))))
-                  (results (lvar-result-tns
-                            lvar
-                            (load-time-value (list (specifier-type 'fixnum))))))
-             (emit-move node block (lvar-tn node block x) temp)
-             (vop sb-vm::move-from-word/fixnum node block
-                  temp (first results))
-             (move-lvar-result node block results lvar)
-             (return))))
-        (#.sb-vm:n-word-bits
-         (when (word-sized-lvar-p x)
-           (let* ((lvar (node-lvar node))
-                  (temp (make-normal-tn (primitive-type-of most-positive-word)))
-                  (results (lvar-result-tns
-                            lvar
-                            (load-time-value (list (specifier-type 'sb-vm:signed-word))))))
-             (emit-move node block (lvar-tn node block x) temp)
-             (vop sb-vm::word-move node block
-                  temp (first results))
-             (move-lvar-result node block results lvar)
-             (return))))))
+      (flet ((make-temp ()
+               (make-normal-tn
+                (if (lvar-subtypep x word)
+                    (load-time-value (primitive-type-of most-positive-word))
+                    (load-time-value (primitive-type-of (- (ash most-positive-word -1))))))))
+        (case (lvar-value width)
+          (#.sb-vm:n-fixnum-bits
+           (when (word-sized-lvar-p x)
+             (let* ((lvar (node-lvar node))
+                    (temp (make-temp))
+                    (results (lvar-result-tns
+                              lvar
+                              (load-time-value (list (specifier-type 'fixnum))))))
+               (emit-move node block (lvar-tn node block x) temp)
+               (vop sb-vm::move-from-word/fixnum node block
+                    temp (first results))
+               (move-lvar-result node block results lvar)
+               (return))))
+          (#.sb-vm:n-word-bits
+           (when (word-sized-lvar-p x)
+             (let* ((lvar (node-lvar node))
+                    (temp (make-temp))
+                    (results (lvar-result-tns
+                              lvar
+                              (load-time-value (list (specifier-type 'sb-vm:signed-word))))))
+               (emit-move node block (lvar-tn node block x) temp)
+               (vop sb-vm::word-move node block
+                    temp (first results))
+               (move-lvar-result node block results lvar)
+               (return)))))))
     (if (template-p (basic-combination-info node))
         (ir2-convert-template node block)
         (ir2-convert-full-call node block))))
