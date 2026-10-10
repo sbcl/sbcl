@@ -6494,3 +6494,23 @@
                                     (phi (1+ gindex)))))
                        (phi 0)))
                    :allow-notes nil))
+
+;;; SB-MANUAL:@UNDERSTANDING-COMPILER-DIAGNOSTICS
+(with-test (:name :processing-path-and-actual-source-form-in-warnings)
+  (let ((error-output
+          (let ((*compiler-print-variable-alist*
+                  `((cl:*package* . ,(symbol-package 'roq)))))
+            (with-output-to-string (*error-output*)
+              (compile nil
+                       '(lambda ()
+                         (macrolet ((zoq (x) `(roq (ploq (+ ,x 3)))))
+                           (declare (notinline ploq))
+                           (let ((y 'some-symbol))
+                             (declare (symbol y))
+                             (zoq y)))))))))
+    (assert (search (format nil "; in: LAMBDA ()~%;     (ZOQ Y)~%")
+                    error-output))
+    (assert (search (format nil "; --> ROQ PLOQ ~%")
+                    error-output))
+    (assert (search (format nil "; ==>~%;   (+ Y 3)~%")
+                    error-output))))

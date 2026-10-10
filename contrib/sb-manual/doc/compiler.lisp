@@ -74,8 +74,6 @@
 
 (defsection @parts-of-a-compiler-diagnostic
     (:title "Parts of a Compiler Diagnostic")
-  ;; FIXME: This is not the current output at all although this looks
-  ;; much better.
   "When processing this program, the compiler will produce this warning:
 
       ; file: /tmp/foo.lisp
@@ -86,7 +84,10 @@
       ;   (+ Y 3)
       ;
       ; caught WARNING:
-      ;   Asserted type NUMBER conflicts with derived type (VALUES SYMBOL &OPTIONAL).
+      ;   Derived type of COMMON-LISP-USER::Y is
+      ;     (VALUES SYMBOL &OPTIONAL),
+      ;   conflicting with its asserted type
+      ;     NUMBER.
 
   In this example we see each of the six possible parts of a compiler
   diagnostic:
@@ -249,7 +250,7 @@
       ;   (PROGN *UNDEFINED*)
       ;
       ; caught WARNING:
-      ;   undefined variable: *UNDEFINED*
+      ;   undefined variable: COMMON-LISP-USER::*UNDEFINED*
 
   Note that DO appears in the processing path. This is because
   DOTIMES expands into:

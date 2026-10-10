@@ -83,15 +83,18 @@
         (flet ((no-transforms (x)
                  (let ((pos (position 'transformed x :from-end t)))
                    (if pos
-                       (subseq x (1+ pos))
+                       ;; Skip 'TRANSFORMED and following
+                       ;; *TRANSFORMING* value that ENSURE-SOURCE-PATH
+                       ;; put there.
+                       (subseq x (+ pos 2))
                        x)))
                (hide-inlines (x)
-                 (loop for elt = (pop x)
-                       while x
-                       if (eq elt 'inlined)
-                       do (pop x)
+                 (loop while x
+                       if (eq (first x) 'inlined)
+                         ;; Similarly, skip the *INLINING* value.
+                         do (pop x) (pop x)
                        else
-                       collect elt)))
+                         collect (pop x))))
           (let* ((forms (source-path-forms path))
                  (n 0)
                  (forms (if (member (first forms) args)
