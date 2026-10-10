@@ -1071,3 +1071,34 @@
      (check-type i cons)
      i)
    cons))
+
+(with-test (:name :ppc64-environment-conflicts)
+  (checked-compile-and-assert
+      ()
+      `(lambda (i f)
+         (declare (fixnum i)
+                  (single-float f))
+         (+ (catch t (throw t 4))
+            (+ f i)))
+    ((1 1.0) 6.0)))
+
+(with-test (:name :reuse-move-coercion-loop)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (labels ((f0 (q)
+                    (let ((m -170141183460469231731687303715884105600))
+                      (loop for i from 0 below 7
+                            do (setq m
+                                     (let ((w
+                                             (if (>= m i)
+                                                 q
+                                                 m)))
+                                       (- (ldb (byte 128 0) (+ (ldb (byte 64 0) w)
+                                                               170141183460469231731687303715884105728))
+                                          170141183460469231731687303715884105728))))
+                      m)))
+           (declare (ftype (function ((signed-byte 128))) f0))
+           (f0 (logeqv a b))))
+    ((-170141183460469231731687303715884105728 170141183460469231731687303715884105727) 0)
+    ((1 2) 18446744073709551612)))

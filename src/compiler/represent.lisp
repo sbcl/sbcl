@@ -824,15 +824,10 @@
                          (eq (tn-primitive-type x) (tn-primitive-type new-y))
                          (setf move
                                (find-move-vop x nil (tn-sc new-y) (tn-primitive-type new-y) #'sc-move-vops)))
-                (let* ((temp-p (tn-ref-next (tn-reads new-y)))
-                       (temp (if temp-p
-                                 (make-representation-tn (tn-primitive-type new-y)
-                                                         (sc-number (tn-sc new-y)))
-                                 ;; Reuse if nothing else reads from it
-                                 new-y)))
-                  (when temp-p
-                    (emit-move-template (vop-node existing-vop) (vop-block existing-vop) move new-y temp existing-vop)
-                    (change-tn-ref-tn (vop-args existing-vop) temp))
+                (let ((temp (make-representation-tn (tn-primitive-type new-y)
+                                                    (sc-number (tn-sc new-y)))))
+                  (emit-move-template (vop-node existing-vop) (vop-block existing-vop) move new-y temp existing-vop)
+                  (change-tn-ref-tn (vop-args existing-vop) temp)
                   (setf (tn-ref-type (vop-args existing-vop))
                         (type-union (tn-ref-type (vop-args existing-vop))
                                     (tn-ref-type x-ref)))
