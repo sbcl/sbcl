@@ -1113,3 +1113,15 @@
            (setf (car l) 10)
            (values-list (the list x))))
     (((list 1 2 3)) (values 3 2 1))))
+
+(with-test (:name :node-fun-type-no-returns)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (labels ((f (a &optional b)
+                    (if (plusp a)
+                        (apply #'f *)
+                        (funcall x b))))
+           (values (funcall x 3)
+                   (f 0 6))))
+    (((lambda (x) (+ x 2))) (values 5 8))))

@@ -224,7 +224,10 @@
                                     (and (optional-dispatch-p entry-fun)
                                          (setf entry-fun (optional-dispatch-main-entry entry-fun))))
                                 (functional-kind-eq entry-fun nil optional)
-                                (lambda-tail-set entry-fun))
+                                (and (lambda-tail-set entry-fun)
+                                     ;; delete-return sets tail-set-type to nil
+                                     (find-if #'lambda-return
+                                              (tail-set-funs (lambda-tail-set entry-fun)))))
                            (make-fun-type :wild-args t
                                           :returns
                                           (tail-set-type (lambda-tail-set entry-fun))))
