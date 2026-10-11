@@ -13,6 +13,7 @@
  * files for more information.
  */
 
+#define _GNU_SOURCE // pthread_getname_np
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -95,10 +96,21 @@ void set_lossage_handler(void (*handler)(void))
     lossage_handler = handler ? handler : &default_lossage_handler;
 }
 
+void print_pthread_self_name() {
+#if defined LISP_FEATURE_LINUX || defined LISP_FEATURE_DARWIN
+    char name[64];
+    int r = pthread_getname_np(pthread_self(), name, sizeof name);
+    if (r == 0 && strlen(name)) {
+        fprintf(stderr, " \"%s\"", name);
+    }
+#endif
+}
+
 static
 void print_message(char *fmt, va_list ap)
 {
     fprintf(stderr, " in SBCL pid %d" THREAD_ID_LABEL, getpid(), THREAD_ID_VALUE);
+    print_pthread_self_name();
     if (fmt) {
         fprintf(stderr, ":\n");
         vfprintf(stderr, fmt, ap);
