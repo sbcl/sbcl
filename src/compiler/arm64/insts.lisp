@@ -811,8 +811,10 @@
 (defun encode-logical-immediate (integer &optional (width 64))
   (let ((integer (ldb (byte 64 0) integer)))
     (cond ((or (zerop integer)
-               (= integer (ldb (byte 64 0) -1)))
-           nil)
+               (= integer (ldb (byte 64 0) -1))
+               (and (= width 32)
+                    (= integer (ldb (byte 32 0) -1))))
+           (values nil nil nil))
           (t
            (multiple-value-bind (size pattern) (find-pattern integer width)
              (values (ldb (byte 1 6) size) ;; 64-bit patterns need to set the N bit to 1
@@ -823,7 +825,7 @@
                            ;; Invert the pattern and find consecutive ones there
                            ((not (sequence-of-ones-p (ldb (byte size 0)
                                                           (lognot pattern))))
-                            (return-from encode-logical-immediate))
+                            (return-from encode-logical-immediate (values nil nil nil)))
                            (t
                             ;; Rotate the bits on the left so that they are all consecutive
                             (- size (integer-length (ldb (byte size 0) (lognot pattern))))))
