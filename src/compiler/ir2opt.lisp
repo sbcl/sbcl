@@ -229,23 +229,24 @@
          (succ (block-succ (node-block node)))
          (a    (first succ))
          (b    (second succ)))
-    (destructuring-bind (jump-target not-p flags) (vop-codegen-info vop)
-      (multiple-value-bind (label target value-a value-b move-a move-b)
-          (cmovp jump-target a b)
-        (unless label
-          (return-from maybe-convert-one-cmov))
-        (multiple-value-bind (cmove-vop) (convert-conditional-move-p target)
-          (when cmove-vop
-            (when not-p
-              (rotatef value-a value-b)
-              (rotatef move-a move-b))
-            (convert-one-cmov cmove-vop
-                              value-a value-b
-                              move-a move-b
-                              target
-                              flags
-                              label vop node (vop-block vop))
-            t))))))
+    (when b
+      (destructuring-bind (jump-target not-p flags) (vop-codegen-info vop)
+        (multiple-value-bind (label target value-a value-b move-a move-b)
+            (cmovp jump-target a b)
+          (unless label
+            (return-from maybe-convert-one-cmov))
+          (multiple-value-bind (cmove-vop) (convert-conditional-move-p target)
+            (when cmove-vop
+              (when not-p
+                (rotatef value-a value-b)
+                (rotatef move-a move-b))
+              (convert-one-cmov cmove-vop
+                                value-a value-b
+                                move-a move-b
+                                target
+                                flags
+                                label vop node (vop-block vop))
+              t)))))))
 
 (defun delete-unused-ir2-blocks (component)
   (declare (type component component))
