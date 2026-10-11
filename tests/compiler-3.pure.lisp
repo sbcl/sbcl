@@ -1123,3 +1123,31 @@
            (values (funcall x 3)
                    (f 0 6))))
     (((lambda (x) (+ x 2))) (values 5 8))))
+
+(with-test (:name :constraint-pending-calls)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (n)
+        (flet ((f ()
+                 (flet ((g (&key (l (return-from f))) (declare (ignore l))))
+                   (declare (notinline g))
+                   (flet ((h (&key (k (g)))
+                            (error "~a" k)))
+                     (declare (notinline h))
+                     (h)))))
+          (let ((i 0))
+            (tagbody
+               (go a)
+             b
+               (go c)
+             d
+               (f)
+             c
+               (if n
+                   (go d))
+               (incf i)
+             a
+               (if (> i 0)
+                   (go b))))))
+    ((nil) nil)
+    ((t) nil)))

@@ -1546,10 +1546,13 @@ is replaced with replacement."
                 (f (constraint-y constraint)))))))
 
 (defun print-conset (conset &optional kind)
-  (if (eq conset :pending)
-      (format t " PENDING")
-      (do-conset-elements (con conset)
-        (print-constraint con kind))))
+  (cond ((eq conset :pending-call)
+         (format t " PENDING-CALL"))
+        (conset
+         (do-conset-elements (con conset)
+           (print-constraint con kind)))
+        (t
+         (format t " EMPTY"))))
 
 (defun print-conset-difference (set1 set2)
   (let ((diff1 (conset-difference (copy-conset set1) set2))
@@ -1563,10 +1566,21 @@ is replaced with replacement."
   (handler-case (progn
                   (terpri)
                   (terpri)
-                  (format t "IN~%")
-                  (print-conset (block-in block) kind)
-                  (print-nodes block)
-                  (let ((last (block-last block)))
+                  (let ((last (block-last block))
+                        (start (block-start-node block)))
+
+                    (format t "IN~%")
+                    (print-conset (block-in block) kind)
+                    (when (and (bind-p start)
+                               (functional-kind-eq (bind-lambda start) nil optional cleanup))
+                      (format t "~%Preceding calls:")
+                      (dolist (ref (lambda-refs (bind-lambda start)))
+                        (let ((call (node-dest ref)))
+                          (when (combination-p call)
+                            (format t " c~a" (cont-num (block-start (node-block call)))))))
+                      (fresh-line))
+                    (print-nodes block)
+
                     (cond ((if-p last)
                            (format t "  CONSEQ~%")
                            (print-conset (if-consequent-constraints last) kind)

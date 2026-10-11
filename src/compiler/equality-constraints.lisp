@@ -445,7 +445,7 @@
                                       block-max))))))))
       (when (and all-previous-outs-computed
                  (block-in block)
-                 (not (eq (block-in block) :pending)))
+                 (not (eq (block-in block) :pending-call)))
         ;; If the amount has changed from the previous computation then
         ;; it's probably being changed in a loop, remove that constraint
         (do-equality-constraints (y op not-p amount) var (block-in block)
@@ -775,8 +775,8 @@
                        (let ((constraints1 (block-out (node-block ref1)))
                              (constraints2 (block-out (node-block ref2))))
                          (when (and constraints1 constraints2
-                                    (not (eq constraints1 :pending))
-                                    (not (eq constraints2 :pending)))
+                                    (not (eq constraints1 :pending-call))
+                                    (not (eq constraints2 :pending-call)))
                            (block nil
                              (do-conset-constraints-intersection (con (constraints1
                                                                        (lambda-var-equality-constraints var1)))

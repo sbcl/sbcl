@@ -1642,7 +1642,7 @@
 ;;; successors that may need to be recomputed.
 (defun find-block-type-constraints (block final-pass-p)
   (declare (type cblock block))
-  (unless (eq (block-in block) :pending)
+  (unless (eq (block-in block) :pending-call)
     (let ((gen (constraint-propagate-in-block
                 block
                 (if (and final-pass-p
@@ -1687,7 +1687,7 @@
               succ)
             ;; There is no IF.
             (unless (and (block-out block)
-                         (not (eq (block-out block) :pending))
+                         (not (eq (block-out block) :pending-call))
                          (conset= gen (block-out block)))
               (setf (block-out block) gen)
               (block-succ block)))))))
@@ -1698,7 +1698,7 @@
 ;;; block.
 (defun use-result-constraints (block)
   (declare (type cblock block))
-  (unless (eq (block-in block) :pending)
+  (unless (eq (block-in block) :pending-call)
     (constraint-propagate-in-block block (block-in block) t)))
 
 ;;; Give an empty constraints set to any var that doesn't have one and
@@ -1818,7 +1818,7 @@
          ;; Stop until at least one call has been seen.
          (unless in
            (return-from compute-block-in
-             (setf (block-out block) :pending)))))
+             (setf (block-out block) :pending-call)))))
       (t
        (let (pending)
          (dolist (pred (block-pred block))
@@ -1827,7 +1827,7 @@
            (let ((out (block-out-for-successor pred block)))
              (cond ((not out)
                     (setf all-previous-outs-computed nil))
-                   ((eq out :pending)
+                   ((eq out :pending-call)
                     (setf pending t))
                    (t
                     (push out outs)
@@ -1837,7 +1837,7 @@
          (when (and pending
                     (not in))
            (return-from compute-block-in
-             (setf (block-out block) :pending))))))
+             (setf (block-out block) :pending-call))))))
     (when (rest outs)
       (join-type-constraints in block (nreverse outs) all-previous-outs-computed))
     (or in (make-conset))))
@@ -1845,11 +1845,11 @@
 (defun update-block-in (block)
   (let ((in (compute-block-in block))
         (old-in (block-in block)))
-    (cond ((eq in :pending)
+    (cond ((eq in :pending-call)
            (setf (block-in block) in)
            nil)
           ((and old-in
-                (not (eq old-in :pending))
+                (not (eq old-in :pending-call))
                 (conset= in old-in))
            nil)
           (t
@@ -1925,17 +1925,33 @@
   (dolist (block blocks)
     (setf (block-in block) nil)
     (setf (block-worklist-flag block) t))
-  (loop
-    (setq *constraint-blocks-pending* nil)
-    (dolist (block blocks)
-      (when (block-worklist-flag block)
-        (setf (block-worklist-flag block) nil)
-        (when (and (not (block-delete-p block))
-                   (update-block-in block))
-          (mapc #'enqueue-block-for-constraints
-                (find-block-type-constraints block nil)))))
-    (unless *constraint-blocks-pending*
-      (return)))
+  (let ((pending-calls 0))
+    (declare (fixnum pending-calls))
+    (loop
+     (setq *constraint-blocks-pending* nil)
+     (dolist (block blocks)
+       (when (block-worklist-flag block)
+         (setf (block-worklist-flag block) nil)
+         (cond ((and (not (block-delete-p block))
+                     (update-block-in block))
+                (mapc #'enqueue-block-for-constraints
+                      (find-block-type-constraints block nil)))
+               (t
+                (when (eq (block-in block) :pending-call)
+                  (incf pending-calls))))))
+     ;; Tend to pending calls before going again
+     (loop while (plusp pending-calls)
+           do (dolist (block blocks)
+                (when (and (block-worklist-flag block)
+                           (eq (block-in block) :pending-call))
+                  (setf (block-worklist-flag block) nil)
+                  (cond ((update-block-in block)
+                         (decf pending-calls)
+                         (mapc #'enqueue-block-for-constraints
+                               (find-block-type-constraints block nil)))))))
+
+     (unless *constraint-blocks-pending*
+       (return))))
   (dolist (block blocks)
     (unless (block-delete-p block)
       (use-result-constraints block))))
