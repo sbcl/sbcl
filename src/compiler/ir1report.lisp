@@ -448,10 +448,8 @@
         (*print-circle* t)
         #-sb-xc-host
         (*print-circle-not-shared* t))
-    (print-compiler-message
-     *error-output*
-     (format nil "caught ~S:~%~~@<  ~~@;~~A~~:>" what)
-     (list (princ-to-string condition)))))
+    (print-compiler-message *error-output* "caught ~S:~%~@<  ~@;~A~:>"
+                            (list what condition))))
 
 ;;; The act of signalling one of these beasts must not cause WARNINGSP
 ;;; (or FAILUREP) to be set from COMPILE or COMPILE-FILE, so we can't
