@@ -90,13 +90,16 @@ custom core.) Note that if the Lisp core file is a user-created core
 file, it may run a nonstandard toplevel which does not recognize the
 standard toplevel options.
 .TP 3
-.B \-\-dynamic-space-size <megabytes>
-Size of the dynamic space reserved on startup in megabytes. Default value
-is platform dependent.
+.B \-\-dynamic-space-size <size>
+Size of the dynamic space reserved on startup. The default value is
+platform-dependent. The units supported are 'kb' (or 'KiB'), 'MB' (or
+'MiB'), 'GB' (or 'GiB'), and 'TB' (or 'TiB'). The names are compared
+case-insensitively, and the default unit is megabytes. Thus, '8',
+'8mb', and '8mib' all mean 8 * 2^20 bytes.
 .TP 3
-.B \-\-control-stack-size <megabytes>
-Size of control stack reserved for each thread in megabytes. Default value
-is 2.
+.B \-\-control-stack-size <size>
+Size of control stack reserved for each thread. The '<size>' argument
+has the same format as in '--dynamic-space-size'. The default is 2MB.
 .TP 3
 .B \-\-tls-limit <positive integer>
 Maximum number of thread-local symbols in threaded builds. Default
@@ -439,7 +442,7 @@ a loader, used to read sbcl.core
 .TP
 .I sbcl.core
 dumped memory image containing most of SBCL, to be loaded by
-the `sbcl' executable.  Looked for in \fB$SBCL_HOME\fR,
+the 'sbcl' executable.  Looked for in \fB$SBCL_HOME\fR,
 unless overridden by the \f(CR\-\-core\fR option.
 .TP
 .I sbclrc

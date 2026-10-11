@@ -146,15 +146,19 @@
       run a nonstandard toplevel that does not recognize the standard
       toplevel options.
 
-  - `--dynamic-space-size <megabytes>`
+  - `--dynamic-space-size <size>`
 
-      Size of the dynamic space reserved on startup in megabytes.
-      Default value is platform dependent.
+      Size of the dynamic space reserved on startup. The default value
+      is platform-dependent. The units supported are `kb` (or `KiB`),
+      `MB` (or `MiB`), `GB` (or `GiB`), and `TB` (or `TiB`). The names
+      are compared case-insensitively, and the default unit is
+      megabytes. Thus, `8`, `8mb`, and `8mib` all mean 8 * 2^20 bytes.
 
-  - `--control-stack-size <megabytes>`
+  - `--control-stack-size <size>`
 
-      Size of control stack reserved for each thread in megabytes.
-      Default value is 2.
+      Size of control stack reserved for each thread. The `<size>`
+      argument has the same format as in `--dynamic-space-size`. The
+      default is 2MB.
 
   - `--tls-limit <positive integer>`
 

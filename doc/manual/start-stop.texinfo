@@ -390,15 +390,19 @@ that if the Lisp core file is a user-created core file, it may
 run a nonstandard toplevel that does not recognize the standard
 toplevel options.
 
-@item @code{--dynamic-space-size <megabytes>}
+@item @code{--dynamic-space-size <size>}
 
-Size of the dynamic space reserved on startup in megabytes.
-Default value is platform dependent.
+Size of the dynamic space reserved on startup. The default value
+is platform-dependent. The units supported are @code{kb} (or @code{KiB}),
+@code{mb} (or @code{MiB}), @code{gb} (or @code{GiB}), and @code{tb} (or @code{TiB}). The names
+are compared case-insensitively, and the default unit is
+megabytes. Thus, @code{8}, @code{8mb}, and @code{8mib} all mean 8 * 2^20 bytes.
 
-@item @code{--control-stack-size <megabytes>}
+@item @code{--control-stack-size <size>}
 
-Size of control stack reserved for each thread in megabytes.
-Default value is 2.
+Size of control stack reserved for each thread. The @code{<size>}
+argument has the same format as in @code{--dynamic-space-size}. The
+default is 2MB.
 
 @item @code{--tls-limit <positive integer>}
 
