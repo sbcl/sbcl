@@ -285,7 +285,7 @@ void* os_dlsym_default(char* name)
     }
     return result;
 }
-BOOL K32EnumProcessModules(HANDLE  hProcess, HMODULE *lphModule, DWORD cb, LPDWORD lpcbNeeded);
+BOOL WINAPI K32EnumProcessModules(HANDLE  hProcess, HMODULE *lphModule, DWORD cb, LPDWORD lpcbNeeded);
 
 void* sb_dlsym(char* name)
 {

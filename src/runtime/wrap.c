@@ -541,7 +541,6 @@ void sb_nanosleep_double(double seconds) {
 void sb_nanosleep_float(float seconds) {
     sb_nanosleep_double(seconds);
 }
-#endif
 
 /* 64-bit timeval */
 #if !defined(LISP_FEATURE_64_BIT) || defined (LISP_FEATURE_NETBSD)
@@ -590,6 +589,7 @@ int sb_sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
 }
 #endif
 #endif
+#endif /* LISP_FEATURE_UNIX */
 
 #ifdef LISP_FEATURE_WIN32
 
