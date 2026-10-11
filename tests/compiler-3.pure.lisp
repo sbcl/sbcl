@@ -1104,3 +1104,12 @@
            (f0 (logeqv a b))))
     ((-170141183460469231731687303715884105728 170141183460469231731687303715884105727) 0)
     ((1 2) 18446744073709551612)))
+
+(with-test (:name :reverse-values-list-immediately-used)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (l)
+         (let ((x (reverse l)))
+           (setf (car l) 10)
+           (values-list (the list x))))
+    (((list 1 2 3)) (values 3 2 1))))

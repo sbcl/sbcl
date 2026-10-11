@@ -3548,6 +3548,115 @@
 (defoptimizer (values derive-type) ((&rest values))
   (make-values-type (mapcar #'lvar-type values)))
 
+;;; If we see:
+;;;    (values-list (list x y z))
+;;;
+;;; Convert to:
+;;;    (values x y z)
+;;;
+;;; In implementation, this is somewhat similar to
+;;; CONVERT-MV-BIND-TO-LET. We grab the args of LIST and make them
+;;; args of the VALUES-LIST call, flushing the old argument lvar
+;;; (allowing the LIST to be flushed.)
+(defoptimizer (values-list optimizer) ((list) node)
+  (let ((use (lvar-uses list)))
+    (cond ((combination-p use)
+           (let ((name (lvar-fun-name (combination-fun use)))
+                 (args (combination-args use)))
+             ;; Recognizing LIST* seems completely ad-hoc, however, once upon a time
+             ;; (LIST x) was translated to (CONS x NIL), so in order for this optimizer to
+             ;; pick off (VALUES-LIST (LIST x)), it had to instead look for (CONS x NIL).
+             ;; Realistically nobody should hand-write (VALUES-LIST ({CONS | LIST*} x NIL))
+             ;; so it seems very questionable in utility to preserve both spellings.
+             (when (or (eq name 'list)
+                       (and (eq name 'list*)
+                            (let ((cdr (car (last args))))
+                              (and (lvar-value-is cdr nil)
+                                   (progn
+                                     (flush-dest cdr)
+                                     (setf args (butlast args))
+                                     t)))))
+
+               ;; FIXME: VALUES might not satisfy an assertion on NODE-LVAR.
+               (change-ref-leaf (lvar-uses (combination-fun node))
+                                (find-free-fun 'values "VALUES-LIST"))
+               (setf (combination-kind node) :full)
+               (dolist (arg args)
+                 (setf (lvar-dest arg) node))
+               (setf (combination-args use) nil)
+               (flush-dest list)
+               (flush-combination use)
+               (setf (combination-args node) args)
+               t)))
+          ;; Transform (values-list (if x (list 1 2 3)))
+          ;; to
+          ;; (if x (values 1 2 3) (values))
+          ((flet ((use-good-p (use)
+                    (and
+                     (typecase use
+                       (combination
+                        (lvar-fun-is (combination-fun use) '(list)))
+                       (ref
+                        (and (ref-leaf use)
+                             (constant-p (ref-leaf use))
+                             (proper-list-p (constant-value (ref-leaf use))))))
+                     (almost-immediately-used-p list use
+                                                ;; Nothing should be pushed onto the stack in between
+                                                :no-multiple-value-lvars t))))
+             (and (listp use)
+                  (every #'use-good-p use)))
+           (flet ((transform (use)
+                    (cond ((ref-p use)
+                           (delete-ref use)
+                           (replace-node use `(values ,@(loop for v in (constant-value (ref-leaf use))
+                                                              collect (list 'quote v)))))
+                          (t
+                           (change-ref-leaf (lvar-uses (combination-fun use))
+                                            (find-free-fun 'values "VALUES-LIST"))
+                           (setf (combination-kind use) :full)
+                           (setf (node-derived-type use) *wild-type*)))))
+             (mapc #'transform use)
+             (substitute-lvar-uses (node-lvar node) list nil)
+             (unlink-node node)
+             t)))))
+
+(deftransform values-list ((list) * * :node node)
+  (cond ((and (policy node (< safety 3))
+              (lvar-single-value-p (node-lvar node)))
+         `(car list))
+        (t
+         (if-vop-existsp (:named reverse-values-list)
+           (combination-match2 (node)
+             ((values-list ((:or reverse sb-impl::list-reverse) reverse-list))
+              (when (lvar-almost-immediately-used-p list)
+                `(reverse-values-list reverse-list (length (the list reverse-list))))))
+           (give-up-ir1-transform)))))
+
+;;; PCL uses apply %listify-rest-args, probably could be changed to
+;;; use m-v-call directly, but figuring the PCL indirections is harder
+;;; than adding this transform.
+(deftransform values-list ((list) (list))
+  (splice-fun-args list '%listify-rest-args 2)
+  `(lambda (more count)
+     (%more-arg-values more 0 count)))
+
+;;; If VALUES appears in a non-MV context, then effectively convert it
+;;; to a PROG1. This allows the computation of the additional values
+;;; to become dead code.
+(deftransform values ((&rest vals) * * :node node)
+  (unless (lvar-single-value-p (node-lvar node))
+    (give-up-ir1-transform))
+  (setf (node-derived-type node)
+        (make-short-values-type (list (single-value-type
+                                       (node-derived-type node)))))
+  (principal-lvar-single-valuify (node-lvar node))
+  (if vals
+      (let ((dummies (make-gensym-list (length (cdr vals)))))
+        `(lambda (val ,@dummies)
+           (declare (ignore ,@dummies))
+           val))
+      nil))
+
 (deftransform digit-char-p ((char &optional (radix 10))
                             ((or base-char
                                  #+(and (not sb-xc-host) sb-unicode) (character-set ((0 . 1632))))
