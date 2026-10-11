@@ -414,7 +414,6 @@ main(int argc, char __attribute__((unused)) *argv[])
 #ifdef LISP_FEATURE_GENERATIONAL
     printf(";;; GENCGC related\n");
     DEFTYPE("page-index-t", page_index_t);
-    DEFTYPE("generation-index-t", generation_index_t);
 #endif
 
     return 0;

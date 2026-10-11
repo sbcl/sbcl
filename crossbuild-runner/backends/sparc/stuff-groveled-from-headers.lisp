@@ -151,4 +151,3 @@
 
 ;;; GENCGC related
 (define-alien-type page-index-t (signed 32))
-(define-alien-type generation-index-t (signed 8))

@@ -387,6 +387,7 @@ statistics are appended to it."
     (array generation #.(1+ sb-vm:+pseudo-static-generation+)))
 
 ;;; Why is PAGE-INDEX-T in SB-KERNEL but PAGE and the page table are in SB-VM?
+(define-alien-type generation-index-t (signed 8))
 (define-alien-type nil
     (struct sb-vm::page
             ;; To cut down the size of the page table, the scan_start_offset
@@ -397,8 +398,8 @@ statistics are appended to it."
             (sb-vm::start #+64-bit (unsigned 32) #-64-bit signed)
             ;; Caution: The low bit of WORDS-USED* is a flag bit
             (sb-vm::words-used* (unsigned 16)) ; (* in the name is a memory aid)
-            (sb-vm::flags (unsigned 8)) ; this named 'type' in C
-            (sb-vm::gen (signed 8))))
+            (sb-vm::flags (unsigned 8)) ; this is named 'type' in C
+            (sb-vm::gen generation-index-t)))
 (define-alien-variable ("page_table" sb-vm:page-table) (* (struct sb-vm::page)))
 
 (declaim (ftype (sfunction (t) (integer -1 #.(floor most-positive-word sb-vm:gencgc-page-bytes)))
