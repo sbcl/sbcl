@@ -2453,7 +2453,7 @@
                               lvar
                               (load-time-value (list (specifier-type 'fixnum))))))
                (emit-move node block (lvar-tn node block x) temp)
-               (vop sb-vm::move-from-word/fixnum node block
+               (vop sb-vm::sign-extend-fixnum-move node block
                     temp (first results))
                (move-lvar-result node block results lvar)
                (return))))
@@ -2465,7 +2465,7 @@
                               lvar
                               (load-time-value (list (specifier-type 'sb-vm:signed-word))))))
                (emit-move node block (lvar-tn node block x) temp)
-               (vop sb-vm::word-move node block
+               (vop sb-vm::sign-extend-word-move node block
                     temp (first results))
                (move-lvar-result node block results lvar)
                (return)))))))

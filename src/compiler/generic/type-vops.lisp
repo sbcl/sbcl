@@ -202,3 +202,14 @@
                 (:generator 2 (loadw res x 0 ,lowtag)))))
   (def function-header-word fun-pointer-lowtag)
   (def instance-header-word instance-pointer-lowtag))
+
+(define-vop (sign-extend-word-move word-move)
+  (:args (x :target y
+            :scs (signed-reg unsigned-reg)
+            :load-if (not (location= x y))))
+  (:results (y :scs (signed-reg)
+               :load-if (not (location= x y)))))
+
+(define-vop (sign-extend-fixnum-move move-from-word/fixnum)
+  (:args (x :scs (signed-reg unsigned-reg)))
+  (:results (y :scs (any-reg descriptor-reg))))
