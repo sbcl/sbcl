@@ -164,8 +164,3 @@
 (defconstant hw-model 2) ; #x2
 (defconstant hw-pagesize 7) ; #x7
 (defconstant path-max 1024) ; #x400
-
-(in-package "SB-KERNEL")
-
-;;; GENCGC related
-(define-alien-type page-index-t (signed 64))

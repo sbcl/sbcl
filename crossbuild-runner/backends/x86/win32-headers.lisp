@@ -205,8 +205,3 @@
 
 (defconstant sizeof-timespec 8) ; #x8
 (defconstant sizeof-timeval 8) ; #x8
-
-(in-package "SB-KERNEL")
-
-;;; GENCGC related
-(define-alien-type page-index-t (signed 32))

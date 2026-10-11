@@ -64,7 +64,6 @@
 #endif
 
 #include "wrap.h"
-#include "gc-typedefs.h" // for page_index_t
 #include "os.h"
 
 #ifdef HAVE_LIBUNWIND
@@ -407,13 +406,6 @@ main(int argc, char __attribute__((unused)) *argv[])
     defconstant("hw-pagesize", HW_PAGESIZE);
 
     defconstant("path-max", PATH_MAX);
-    printf("\n");
-#endif
-
-    printf("(in-package \"SB-KERNEL\")\n\n");
-#ifdef LISP_FEATURE_GENERATIONAL
-    printf(";;; GENCGC related\n");
-    DEFTYPE("page-index-t", page_index_t);
 #endif
 
     return 0;

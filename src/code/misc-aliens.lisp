@@ -31,6 +31,7 @@
 (define-alien-variable ("static_space_free_pointer" sb-vm:*static-space-free-pointer*)
   system-area-pointer)
 
+(define-alien-type sb-kernel::page-index-t (signed 32))
 (define-alien-variable ("DYNAMIC_SPACE_START" sb-vm:dynamic-space-start) word)
 ;;; Dynamic doesn't really have a "free pointer" but it's the upper bound on space usage.
 (declaim (inline dynamic-space-free-pointer))

@@ -149,8 +149,3 @@
 
 (defconstant sizeof-timespec 16) ; #x10
 (defconstant sizeof-timeval 16) ; #x10
-
-(in-package "SB-KERNEL")
-
-;;; GENCGC related
-(define-alien-type page-index-t (signed 64))
