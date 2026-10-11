@@ -903,3 +903,53 @@ there"))))
                      (*print-radix* radix))
                  (assert (string= (prin1-to-string n)
                                   (with-output-to-string (s) (prin1 n s)))))))))
+
+;;; Subnormal floats print with their shortest digits, like normal ones.
+(with-test (:name (prin1 float :subnormal :known-outputs))
+  (loop for (x expected)
+          in `((,least-positive-single-float "1.0e-45")
+               (,(sb-kernel:make-single-float #x000F90FA) "1.42954e-39")
+               (,(sb-kernel:make-single-float #x007FFFFF) "1.1754942e-38")
+               (,least-positive-double-float "5.0d-324")
+               (,(sb-kernel:make-double-float #x00040000 0) "5.562684646268003d-309")
+               (,(sb-kernel:make-double-float #x000FFFFF #xFFFFFFFF) "2.225073858507201d-308"))
+        do (assert (string= (prin1-to-string x) expected) ()
+                   "~S printed as ~S" expected (prin1-to-string x))))
+
+;;; Random subnormals must read back, and be shortest: neither neighbouring
+;;; decimal with one digit fewer reads as the same float. Significands of
+;;; every length are equally likely, so that small subnormals are tested as
+;;; often as large ones. Failures are reported by bit pattern, as the seed
+;;; changes from run to run.
+(with-test (:name (prin1 float :subnormal :shortest))
+  (let ((*random-state* (make-random-state t))
+        (oops '()))
+    (flet ((shortest-p (x)
+             (multiple-value-bind (k digits) (sb-impl::flonum-to-digits x)
+               (let* ((n (length digits))
+                      (type (if (typep x 'single-float) 'single-float 'double-float))
+                      (unit (expt 10 (- k (1- n))))
+                      (below (* (floor (rational x) unit) unit)))
+                 (and (eql (read-from-string (prin1-to-string x)) x)
+                      (or (= n 1)
+                          (and (/= (coerce below type) x)
+                               (/= (coerce (+ below unit) type) x)))))))
+           (bits (x)
+             (if (typep x 'single-float)
+                 (sb-kernel:single-float-bits x)
+                 (sb-kernel:double-float-bits x)))
+           (random-significand (bits)
+             ;; 1 to BITS bits, each length equally likely.
+             (let ((n (1+ (random bits))))
+               (logior (ash 1 (1- n)) (random (ash 1 (1- n)))))))
+      (loop repeat 5000
+            do (dolist (x (list (sb-kernel:make-single-float (random-significand 23))
+                                (let ((f (random-significand 52)))
+                                  (sb-kernel:make-double-float (ash f -32)
+                                                               (ldb (byte 32 0) f)))))
+                 (unless (shortest-p x)
+                   (push (list (type-of x) (bits x) (prin1-to-string x)) oops)))))
+    (when oops
+      (error "Subnormals not printed shortest or not reading back:~%~
+              ~:{  ~S with bits #x~X printed as ~A~%~}"
+             oops))))
