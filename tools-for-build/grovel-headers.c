@@ -100,7 +100,6 @@ void defconstant_neg(char* lisp_name, long unix_number) {
     printf("(defconstant %s %ld)\n", lisp_name, unix_number);
 }
 
-#ifdef __HAIKU__
 // Haiku defines negative error numbers. I don't think that's allowed for any
 // of the Posix-specified numbers such as ENOENT, as per
 // https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/errno.h.html#tag_13_10
@@ -116,20 +115,14 @@ void defconstant_neg(char* lisp_name, long unix_number) {
 // The header correctly has errno as a signed int:
 //    extern int *_errnop(void);
 //    #define errno (*(_errnop()))
-// but printing those as though they were unsigned long causes them to get sign-extended
-// and show up as huge positive numbers.  So we have a platform-specific variant of
-// deferrno() which treats them as 'int' to preserve the negative sign, which has the right
-// behavior because the system calls do actually return 'int'.
+// Passing those to defconstant() - which takes 'unsigned long' - would cause them to get
+// sign-extended and show up as huge positive numbers.  So deferrno() takes 'int' and prints
+// with "%d" to preserve the negative sign on Haiku, which has the right behavior because
+// get_errno() returns 'int'.
 void deferrno(char* lisp_name, int unix_number)
 {
     printf("(defconstant %s %d)\n", lisp_name, unix_number);
 }
-#else
-void deferrno(char* lisp_name, unsigned long unix_number)
-{
-    defconstant(lisp_name, unix_number);
-}
-#endif
 
 void defsignal(char* lisp_name, unsigned long unix_number)
 {
