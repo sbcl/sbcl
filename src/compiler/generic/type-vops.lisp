@@ -191,25 +191,3 @@
 (progn
   (define-type-vop simd-pack-512-p (simd-pack-512-widetag))
   (define-type-vop simd-pack-512-mask-p (simd-pack-512-mask-widetag)))
-
-;;; Not type vops, but generic over all backends
-(macrolet ((def (name lowtag)
-             `(define-vop ()
-                (:translate ,name)
-                (:args (x :scs (descriptor-reg)))
-                (:results (res :scs (unsigned-reg)))
-                (:result-types unsigned-num)
-                (:generator 2 (loadw res x 0 ,lowtag)))))
-  (def function-header-word fun-pointer-lowtag)
-  (def instance-header-word instance-pointer-lowtag))
-
-(define-vop (sign-extend-word-move word-move)
-  (:args (x :target y
-            :scs (signed-reg unsigned-reg)
-            :load-if (not (location= x y))))
-  (:results (y :scs (signed-reg)
-               :load-if (not (location= x y)))))
-
-(define-vop (sign-extend-fixnum-move move-from-word/fixnum)
-  (:args (x :scs (signed-reg unsigned-reg)))
-  (:results (y :scs (any-reg descriptor-reg))))

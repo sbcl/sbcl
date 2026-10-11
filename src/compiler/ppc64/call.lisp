@@ -67,22 +67,6 @@
   (:generator 1
     (move val cfp-tn)))
 
-(defun ocfp-tn (vop)
-  (let ((block (ir2-block-block (vop-block vop))))
-    (sb-c::ir2-environment-old-fp (sb-c::environment-info
-                                   (sb-c::block-environment block)))))
-
-;;; Used for computing the caller's NFP for use in known-values return.  Only
-;;; works assuming there is no variable size stuff on the nstack.
-(define-vop (compute-old-nfp)
-  (:results (val :scs (any-reg)))
-  (:vop-var vop)
-  (:generator 1
-    (let ((nfp (current-nfp-tn vop)))
-      (when nfp
-        (maybe-load-stack-tn val (ocfp-tn vop))
-        (loadw val val nfp-save-offset)))))
-
 ;;; Accessing a slot from an earlier stack frame is definite hackery.
 (define-vop (ancestor-frame-ref)
   (:args (frame-pointer :scs (descriptor-reg))

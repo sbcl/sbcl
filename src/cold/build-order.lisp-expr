@@ -470,6 +470,9 @@
  ("src/compiler/stack")
  ("src/compiler/control")
  ("src/compiler/entry")
+
+ ("src/compiler/generic/generic-vops")
+
  ("src/compiler/ir2tran")
 
  ("src/compiler/generic/vm-ir2tran")

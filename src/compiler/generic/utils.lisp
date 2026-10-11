@@ -729,3 +729,9 @@
   (if (sc-is tn immediate)
       (fixnumize (tn-value tn))
       tn))
+
+#-fp-and-pc-standard-save
+(defun ocfp-tn (vop)
+  (let ((block (ir2-block-block (vop-block vop))))
+    (sb-c::ir2-environment-old-fp (sb-c::environment-info
+                                   (sb-c::block-environment block)))))
