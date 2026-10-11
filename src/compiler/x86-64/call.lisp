@@ -90,13 +90,6 @@
   (:generator 1
     (move val rbp-tn)))
 
-;;; We don't have a separate NFP, so we don't need to do anything here.
-(define-vop (compute-old-nfp)
-  (:results (val))
-  (:ignore val)
-  (:generator 1
-    nil))
-
 ;;; Accessing a slot from an earlier stack frame is definite hackery.
 (define-vop (ancestor-frame-ref)
   (:args (frame-pointer :scs (descriptor-reg))

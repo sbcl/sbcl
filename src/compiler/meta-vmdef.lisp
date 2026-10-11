@@ -128,29 +128,31 @@
        "It's meaningless to specify alternate or constant SCs in a ~S SB."
        (sb-kind sb))))
 
-  (let ((nstack-p
-         (if (or (eq sb-name 'non-descriptor-stack)
-                 (find 'non-descriptor-stack
-                       (mapcar #'sc-or-lose alternate-scs)
-                       :key (lambda (x)
-                              (sb-name (sc-sb x)))))
-             t nil)))
+  (let (#-c-stack-is-control-stack
+        (nstack-p
+          (if (or (eq sb-name 'non-descriptor-stack)
+                  (find 'non-descriptor-stack
+                        (mapcar #'sc-or-lose alternate-scs)
+                        :key (lambda (x)
+                               (sb-name (sc-sb x)))))
+              t nil)))
     `(progn
        (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
          (let ((res (make-storage-class
-                             :name ',name :number ',number
-                             :sb (sb-or-lose ',sb-name)
-                             :element-size ,element-size
-                             :operand-size ,operand-size
-                             :alignment ,alignment
-                             :locations (make-sc-locations ',locations)
-                             :reserve-locations (make-sc-locations ',reserve-locations)
-                             :save-p ',save-p
-                             :number-stack-p ,nstack-p
-                             :alternate-scs (mapcar #'sc-or-lose
-                                                    ',alternate-scs)
-                             :constant-scs (mapcar #'sc-or-lose
-                                                   ',constant-scs))))
+                     :name ',name :number ',number
+                     :sb (sb-or-lose ',sb-name)
+                     :element-size ,element-size
+                     :operand-size ,operand-size
+                     :alignment ,alignment
+                     :locations (make-sc-locations ',locations)
+                     :reserve-locations (make-sc-locations ',reserve-locations)
+                     :save-p ',save-p
+                     #-c-stack-is-control-stack
+                     :number-stack-p #-c-stack-is-control-stack ,nstack-p
+                     :alternate-scs (mapcar #'sc-or-lose
+                                            ',alternate-scs)
+                     :constant-scs (mapcar #'sc-or-lose
+                                           ',constant-scs))))
            (setf (gethash ',name *backend-sc-names*) res)
            (setf (svref (sc-load-costs res) ',number) 0)))
 

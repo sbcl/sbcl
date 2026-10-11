@@ -967,6 +967,7 @@
   ;; representation conversion with argument passing.
   (move-arg-vops (make-array sb-vm:sc-number-limit :initial-element nil)
                  :type sc-vector)
+  #-c-stack-is-control-stack
   ;; true if this SC or one of its alternates in in the NUMBER-STACK SB.
   (number-stack-p nil :type boolean)
   ;; alignment restriction. The offset must be an even multiple of this.
@@ -979,6 +980,13 @@
   (reserve-locations (missing-arg) :type sc-locations :read-only t))
 (defprinter (storage-class :conc-name "SC-")
   name)
+
+#+c-stack-is-control-stack
+(declaim (inline sc-number-stack-p))
+#+c-stack-is-control-stack
+(defun sc-number-stack-p (sc)
+  (the storage-class sc)
+  nil)
 
 ;;;; TNs
 

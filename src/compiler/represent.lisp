@@ -575,6 +575,7 @@
          (how (vop-info-move-args info))
          (args (vop-args vop))
          (fp-tn (tn-ref-tn args))
+         #-c-stack-is-control-stack
          (nfp-tn (if (eq how :local-call)
                      (tn-ref-tn (tn-ref-across args))
                      nil))
@@ -599,8 +600,14 @@
         (change-tn-ref-tn val pass-tn)
         (let* ((this-fp
                  (cond ((or (eq how :fixed)
-                            (not (sc-number-stack-p pass-sc))) fp-tn)
+                            (not (sc-number-stack-p pass-sc)))
+                        fp-tn)
+                       #+c-stack-is-control-stack
+                       (t
+                        (sb-impl::unreachable))
+                       #-c-stack-is-control-stack
                        (nfp-tn)
+                       #-c-stack-is-control-stack
                        (t
                         (aver (eq how :known-return))
                         (setq nfp-tn (make-number-stack-pointer-tn))
@@ -617,12 +624,12 @@
                (new (emit-move-arg-template node block res val-tn this-fp
                                             pass-tn vop))
                (after
-                (cond ((eq how :local-call)
-                       (aver (eq (vop-name prev) 'allocate-frame))
-                       prev)
-                      (prev (vop-next prev))
-                      (t
-                       (ir2-block-start-vop block)))))
+                 (cond ((eq how :local-call)
+                        (aver (eq (vop-name prev) 'allocate-frame))
+                        prev)
+                       (prev (vop-next prev))
+                       (t
+                        (ir2-block-start-vop block)))))
           (coerce-some-operands (vop-args new) pass-tn
                                 (vop-info-arg-load-scs res)
                                 after)
