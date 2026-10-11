@@ -785,17 +785,19 @@
   (declare (list vars ignores args) (type ref ref) (type combination call)
            (type clambda entry))
   (let ((new-fun
-         (with-ir1-environment-from-node call
-           (ir1-convert-lambda
-            `(lambda ,vars
-               (declare (ignorable ,@ignores))
-               (%funcall ,entry ,@args))
-            :debug-name (debug-name 'hairy-function-entry
-                                    (lvar-fun-debug-name
-                                     (basic-combination-fun call)))))))
+          (with-ir1-environment-from-node call
+            (ir1-convert-lambda
+             `(lambda ,vars
+                (declare (ignorable ,@ignores))
+                (%funcall ,entry ,@args))
+             :debug-name (debug-name 'hairy-function-entry
+                                     (lvar-fun-debug-name
+                                      (basic-combination-fun call)))))))
     (convert-call ref call new-fun)
     (dolist (ref (leaf-refs entry))
-      (convert-call-if-possible ref (lvar-dest (node-lvar ref))))))
+      (let ((lvar (node-lvar ref)))
+        (when lvar
+          (convert-call-if-possible ref (lvar-dest lvar)))))))
 
 ;;; Use CONVERT-HAIRY-FUN-ENTRY to convert a &MORE-arg call to a known
 ;;; function into a local call to the MAIN-ENTRY.
