@@ -629,46 +629,41 @@
                 ("type error," "compile-time")))
   "If the compiler can prove at compile time that some portion of the
   program cannot be executed without a type error, then it will give a
-  warning at compile time.
-
-  It is possible that the offending code would never actually be
-  executed at run-time due to some higher level consistency constraint
-  unknown to the compiler, so a type warning doesn't always indicate an
-  incorrect program.
+  STYLE-WARNING at compile time. This sort of type warning happens
+  moderately often in the expansion of complex macros and in inline
+  functions.
 
   For example, consider this code fragment:
 
       (defun raz (foo)
-        (let ((x (case foo
-                    (:this 13)
-                    (:that 9)
-                    (:the-other 42))))
+        (let ((x (if foo 13 \"str\")))
           (declare (fixnum x))
-          (foo x)))
+          (print x)))
 
   Compilation produces this warning:
 
       ; in: DEFUN RAZ
-      ;     (CASE FOO (:THIS 13) (:THAT 9) (:THE-OTHER 42))
-      ; --> LET COND IF COND IF COND IF
-      ; ==>
-      ;   (COND)
+      ;     (LET ((X (IF FOO 13 \"str\")))
+      ;       (DECLARE (FIXNUM X))
+      ;       (PRINT X))
       ;
-      ; caught WARNING:
-      ;   This is not a FIXNUM:
-      ;   NIL
+      ; caught STYLE-WARNING:
+      ;   Constant \"str\" conflicts with its asserted type FIXNUM.
 
-  In this case, the warning means that if `FOO` isn't any of `:THIS`,
-  `:THAT` or `:THE-OTHER`, then `x` will be initialized to NIL, which
-  the FIXNUM declaration makes illegal. The warning will go away if
-  ECASE is used instead of CASE, or if `:THE-OTHER` is changed to T.
+  The warning means that if `FOO` is NIL, then `X` will be initialized
+  to `\"str\"`, which the FIXNUM declaration makes illegal.
 
-  This sort of spurious type warning happens moderately often in the
-  expansion of complex macros and in inline functions. In such cases,
-  there may be dead code that is impossible to correctly execute. The
-  compiler can't always prove this code is dead (could never be
-  executed), so it compiles the erroneous code (which will always signal
-  an error if it is executed) and gives a warning.")
+  This warning doesn't always indicate an incorrect program because
+
+  - it is possible that the offending code would never actually be
+    executed at run-time due to some higher level consistency constraint
+    unknown to the compiler; and
+
+  - in rare cases, the type error is actually intended and part of the
+    normal control flow.
+
+  > _Note_: In the common situation where the value triggering the
+  > type error is NIL, this warning is suppressed.")
 
 (defsection @errors-during-macroexpansion
     (:title "Errors During Macroexpansion"

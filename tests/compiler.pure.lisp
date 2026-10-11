@@ -6514,3 +6514,24 @@
                     error-output))
     (assert (search (format nil "; ==>~%;   (+ Y 3)~%")
                     error-output))))
+
+;;; SB-MANUAL:@TYPE-ERRORS-AT-COMPILE-TIME
+(with-test (:name :compile-time-type-error)
+  (let ((style-warnings
+          (nth-value 3 (checked-compile
+                        '(lambda (foo)
+                          (let ((x (if foo 13 "str")))
+                            (declare (fixnum x))
+                            (print x)))
+                        :allow-style-warnings 'sb-c::type-style-warning
+                        :allow-notes nil))))
+    (assert (= (length style-warnings) 1))
+    (assert (search "Constant \"str\" conflicts with its asserted type FIXNUM."
+                    (princ-to-string (first style-warnings)))))
+  (checked-compile '(lambda (foo)
+                     (let ((x (if foo 13 nil)))
+                       (declare (fixnum x))
+                       (print x)))
+                   ;; This kind of warning about NIL is suppressed.
+                   :allow-style-warnings nil
+                   :allow-notes nil))
