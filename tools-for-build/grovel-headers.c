@@ -386,7 +386,6 @@ main(int argc, char __attribute__((unused)) *argv[])
     defconstant("kern-ostype", KERN_OSTYPE);
     defconstant("kern-osrelease", KERN_OSRELEASE);
     defconstant("hw-model", HW_MODEL);
-    defconstant("hw-pagesize", HW_PAGESIZE);
 
     defconstant("path-max", PATH_MAX);
 #endif

@@ -158,5 +158,4 @@
 (defconstant kern-ostype 1) ; #x1
 (defconstant kern-osrelease 2) ; #x2
 (defconstant hw-model 2) ; #x2
-(defconstant hw-pagesize 7) ; #x7
 (defconstant path-max 1024) ; #x400
