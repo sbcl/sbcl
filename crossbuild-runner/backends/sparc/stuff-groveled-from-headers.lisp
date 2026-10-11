@@ -47,7 +47,6 @@
 (defconstant o_rdonly 0) ; #x0
 (defconstant o_wronly 1) ; #x1
 (defconstant o_rdwr 2) ; #x2
-(defconstant o_accmode 6291459) ; #x600003
 (defconstant o_creat 256) ; #x100
 (defconstant o_excl 1024) ; #x400
 (defconstant o_noctty 2048) ; #x800

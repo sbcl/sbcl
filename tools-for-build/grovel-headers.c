@@ -202,7 +202,6 @@ main(int argc, char __attribute__((unused)) *argv[])
     defconstant("o_rdonly",  O_RDONLY);
     defconstant("o_wronly",  O_WRONLY);
     defconstant("o_rdwr",    O_RDWR);
-    defconstant("o_accmode", O_ACCMODE);
     defconstant("o_creat",   O_CREAT);
     defconstant("o_excl",    O_EXCL);
     defconstant("o_noctty",  O_NOCTTY);
