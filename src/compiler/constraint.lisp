@@ -1922,9 +1922,6 @@
 ;;; Propagate constraints through a cyclic strongly connected
 ;;; component to a fixpoint.
 (defun propagate-constraints-in-scc (blocks)
-  (dolist (block blocks)
-    (setf (block-in block) nil)
-    (setf (block-worklist-flag block) t))
   (let ((pending-calls 0))
     (declare (fixnum pending-calls))
     (loop
@@ -1986,7 +1983,9 @@
 
   ;; Previous results can confuse propagation and may loop forever
   (do-blocks (block component)
-    (setf (block-out block) nil)
+    (setf (block-out block) nil
+          (block-in block) nil
+          (block-worklist-flag block) t)
     (let ((last (block-last block))
           (start (block-start-node block)))
       (when (and (bind-p start)
