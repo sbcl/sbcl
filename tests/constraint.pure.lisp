@@ -2541,7 +2541,7 @@
              (setq i15 (1+ i15))
              (go next-loop)))))))
 
-(with-test (:name :sam-ref-reoptimization)
+(with-test (:name :same-ref-reoptimization)
   (assert (nth-value 1
                      (checked-compile
                       `(lambda (a)
@@ -2553,3 +2553,12 @@
                             (the integer b))
                           (setf a 1)))
                       :allow-warnings t))))
+
+(with-test (:name :join-equality-constraints-all-amounts)
+  (checked-compile
+   `(lambda (a b)
+      (declare ((unsigned-byte 16) a))
+      (labels ((f (j k)
+                 (if b
+                     (f k j))))
+        (f (truncate (+ a 2) 2) a)))))

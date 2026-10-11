@@ -3285,10 +3285,11 @@
 (with-test (:name :processing-path-and-actual-source-form-in-warnings)
   (let ((error-output
           (with-output-to-string (*error-output*)
-            (eval '(defun froq (y)
-                    (declare (symbol y))
-                    (macrolet ((zoq (x) `(roq (ploq (+ ,x 3)))))
-                      (zoq y)))))))
+            (let ((*evaluator-mode* :compile))
+              (eval '(defun froq (y)
+                      (declare (symbol y))
+                      (macrolet ((zoq (x) `(roq (ploq (+ ,x 3)))))
+                        (zoq y))))))))
     (assert (equal (delete-trailing-whitespace error-output)
                    "; in: DEFUN FROQ
 ;     (ZOQ Y)
@@ -3329,8 +3330,9 @@
 (with-test (:name :processing-paths)
   (let ((error-output
           (with-output-to-string (*error-output*)
-            (eval '(defun frox (n)
-                    (dotimes (i n *undefined*)))))))
+            (let ((*evaluator-mode* :compile))
+              (eval '(defun frox (n)
+                      (dotimes (i n *undefined*))))))))
     (assert (equal (delete-trailing-whitespace error-output)
                    "; in: DEFUN FROX
 ;     (DOTIMES (I N *UNDEFINED*))
