@@ -14,10 +14,10 @@
 
 #include "lispobj.h"
 
+#include <signal.h>
 #ifdef LISP_FEATURE_WIN32
 # include "pthreads_win32.h"
 #else
-# include <signal.h>
 # ifdef LISP_FEATURE_SB_THREAD
 #  include <pthread.h>
 # endif

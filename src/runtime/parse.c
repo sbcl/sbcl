@@ -16,11 +16,7 @@
 #include <ctype.h>
 
 #include "genesis/sbcl.h"
-#ifdef LISP_FEATURE_WIN32
-#include "pthreads_win32.h"
-#else
 #include <signal.h>
-#endif
 #include "runtime.h"
 
 #include "globals.h"

@@ -43,9 +43,7 @@
 #include <time.h>
 #include <sys/time.h> // for gettimeofday
 
-#ifndef LISP_FEATURE_WIN32
 #include <signal.h>
-#endif
 
 #include "runtime.h"
 #include "globals.h"
