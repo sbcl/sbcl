@@ -3262,3 +3262,87 @@
                   (defun f (y)
                     (when (member y (list nil 10 +f+))
                       t)))))))
+
+
+;;;; SB-MANUAL:@COMPILER
+
+(defmacro zoq (x)
+  `(roq (ploq (+ ,x 3))))
+
+(defun delete-trailing-whitespace (str)
+  (with-output-to-string (out)
+    (with-input-from-string (in str)
+      (loop
+        (multiple-value-bind (line missing-newline-p)
+            (read-line in nil nil)
+          (unless line
+            (return))
+          (write-string (string-right-trim " " line) out)
+          (unless missing-newline-p
+            (terpri out)))))))
+
+;;; SB-MANUAL:@UNDERSTANDING-COMPILER-DIAGNOSTICS
+(with-test (:name :processing-path-and-actual-source-form-in-warnings)
+  (let ((error-output
+          (with-output-to-string (*error-output*)
+            (eval '(defun froq (y)
+                    (declare (symbol y))
+                    (macrolet ((zoq (x) `(roq (ploq (+ ,x 3)))))
+                      (zoq y)))))))
+    (assert (equal (delete-trailing-whitespace error-output)
+                   "; in: DEFUN FROQ
+;     (ZOQ Y)
+; --> ROQ PLOQ
+; ==>
+;   (+ Y 3)
+;
+; caught WARNING:
+;   Derived type of Y is
+;     (VALUES SYMBOL &OPTIONAL),
+;   conflicting with its asserted type
+;     NUMBER.
+;   See also:
+;     The SBCL Manual, Node \"Handling of Types\"
+; in: DEFUN FROQ
+;     (ZOQ Y)
+; --> ROQ
+; ==>
+;   (PLOQ (+ Y 3))
+;
+; caught STYLE-WARNING:
+;   undefined function: COMMON-LISP-USER::PLOQ
+
+; ==>
+;   (ROQ (PLOQ (+ Y 3)))
+;
+; caught STYLE-WARNING:
+;   undefined function: COMMON-LISP-USER::ROQ
+;
+; compilation unit finished
+;   Undefined functions:
+;     PLOQ ROQ
+;   caught 1 WARNING condition
+;   caught 2 STYLE-WARNING conditions
+"))))
+
+;;; SB-MANUAL:@PROCESSING-PATHS
+(with-test (:name :processing-paths)
+  (let ((error-output
+          (with-output-to-string (*error-output*)
+            (eval '(defun frox (n)
+                    (dotimes (i n *undefined*)))))))
+    (assert (equal (delete-trailing-whitespace error-output)
+                   "; in: DEFUN FROX
+;     (DOTIMES (I N *UNDEFINED*))
+; --> DO BLOCK LET TAGBODY RETURN-FROM
+; ==>
+;   (PROGN *UNDEFINED*)
+;
+; caught WARNING:
+;   undefined variable: COMMON-LISP-USER::*UNDEFINED*
+;
+; compilation unit finished
+;   Undefined variable:
+;     *UNDEFINED*
+;   caught 1 WARNING condition
+"))))

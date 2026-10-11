@@ -61,7 +61,7 @@
       (defmacro zoq (x)
         `(roq (ploq (+ ,x 3))))
 
-      (defun foo (y)
+      (defun froq (y)
         (declare (symbol y))
         (zoq y))
 
@@ -74,37 +74,40 @@
 
 (defsection @parts-of-a-compiler-diagnostic
     (:title "Parts of a Compiler Diagnostic")
-  "When processing this program, the compiler will produce this warning:
+  "When processing the above program, the compiler will first output this
+  warning:
 
-      ; file: /tmp/foo.lisp
-      ; in: DEFUN FOO
+      ; file: /tmp/froq.lisp
+      ; in: DEFUN FROQ
       ;     (ZOQ Y)
       ; --> ROQ PLOQ
       ; ==>
       ;   (+ Y 3)
       ;
       ; caught WARNING:
-      ;   Derived type of COMMON-LISP-USER::Y is
+      ;   Derived type of Y is
       ;     (VALUES SYMBOL &OPTIONAL),
       ;   conflicting with its asserted type
       ;     NUMBER.
+      ;   See also:
+      ;     The SBCL Manual, Node \"Handling of Types\"
 
   In this example we see each of the six possible parts of a compiler
   diagnostic:
 
-  - `file: /tmp/foo.lisp` is the name of the file that the compiler
+  - `file: /tmp/froq.lisp` is the name of the file that the compiler
     read the relevant code from. The file name is displayed because it
     may not be immediately obvious when there is an error during
     compilation of a large system, especially when
     WITH-COMPILATION-UNIT is used to delay undefined warnings.
 
-  - `in: DEFUN FOO` is the definition top level form responsible for
+  - `in: DEFUN FROQ` is the definition top level form responsible for
     the diagnostic. It is obtained by taking the first two elements of
     the enclosing form whose first element is a symbol beginning with
     `DEF`. If there is no such enclosing `DEF` form, then the
     outermost form is used. If there are multiple `DEF` forms, then
     they are all printed from the outside in, separated by `=>`s. In
-    this example, the problem was in the DEFUN for `FOO`.
+    this example, the problem was in the DEFUN for `FROQ`.
 
   - `(ZOQ Y)` is the _@ORIGINAL-SOURCE_ form responsible for the
     diagnostic. Original source means that the form directly appeared
@@ -132,11 +135,11 @@
     the problem is with the evaluation of the reference to the
     variable `Y`.
 
-  - `caught WARNING: Asserted type NUMBER conflicts with derived type
-    (VALUES SYMBOL &OPTIONAL).` is the _explanation_ of the problem.
-    In this example, the problem is that, while the call to `+`
-    requires that its arguments are all of type NUMBER, the compiler
-    has derived that Y will evaluate to a SYMBOL. Note that
+  - The warning about the derived type SYMBOL conflicting with the
+    asserted type NUMBER is the _explanation_ of the problem. In this
+    example, the problem is that, while the call to `+` requires that
+    its arguments are all of type NUMBER, the compiler has derived
+    that Y will evaluate to a SYMBOL. Note that
     `(VALUES SYMBOL &OPTIONAL)` expresses that `Y` evaluates to
     precisely one value.
 
@@ -155,27 +158,27 @@
     can be `caught ERROR:`, `caught WARNING:`, `caught
     STYLE-WARNING:`, or `note:`.
 
-  Each part of the message is more specific than the preceding one. If
-  consecutive messages are for nearby locations, then the front part
-  of the messages would be the same. In this case, the compiler omits
-  as much of the second message as is in common with the first. For
-  example:
+  After the type warning, the compiler prints the two undefined
+  function warnings. Each part of the message is more specific than
+  the preceding one. If consecutive messages are for nearby locations,
+  then the front part of the messages would be the same. In this case,
+  the compiler omits as much of the second message as is in common
+  with the first. For example:
 
-      ; file: /tmp/foo.lisp
-      ; in: DEFUN FOO
+      ; in: DEFUN FROQ
       ;     (ZOQ Y)
       ; --> ROQ
       ; ==>
       ;   (PLOQ (+ Y 3))
       ;
       ; caught STYLE-WARNING:
-      ;   undefined function: PLOQ
+      ;   undefined function: COMMON-LISP-USER::PLOQ
 
       ; ==>
       ;   (ROQ (PLOQ (+ Y 3)))
       ;
       ; caught STYLE-WARNING:
-      ;   undefined function: ROQ
+      ;   undefined function: COMMON-LISP-USER::ROQ
 
   In this example, the file, definition and original source are
   identical for the two messages, so the compiler omits them in the
@@ -194,11 +197,11 @@
                                          :concepts (@original-source
                                                     @actual-source))
   "The _original source_ displayed will almost always be a list. If
-  the actual source for an message is a symbol, the original source will
-  be the immediately enclosing evaluated list form. So even if the
-  offending symbol does appear in the original source, the compiler will
-  print the enclosing list and then print the symbol as the actual
-  source (as though the symbol were introduced by a macro.)
+  the actual source for a message is a symbol, the original source
+  will be the immediately enclosing evaluated list form. So even if
+  the offending symbol does appear in the original source, the
+  compiler will print the enclosing list and then print the symbol as
+  the actual source (as though the symbol were introduced by a macro.)
 
   When the _actual source_ is displayed (and is not a symbol), it will
   always be code that resulted from the expansion of a macro or a
@@ -213,20 +216,21 @@
       (defun bar (x)
         (let (a)
           (declare (fixnum a))
-          (setq a (foo x))
+          (setq a x)
           a))
 
   gives this error message
 
-      ; file: /tmp/foo.lisp
       ; in: DEFUN BAR
       ;     (LET (A)
-      ;     (DECLARE (FIXNUM A))
-      ;     (SETQ A (FOO X))
-      ;     A)
+      ;       (DECLARE (FIXNUM A))
+      ;       (SETQ A X)
+      ;       A)
+      ;
+      ; note: deleting unreachable code
       ;
       ; caught WARNING:
-      ;   Asserted type FIXNUM conflicts with derived type (VALUES NULL &OPTIONAL).
+      ;   Constant NIL conflicts with its asserted type FIXNUM.
 
   This message is not saying that there is a problem somewhere in this
   LET -- it is saying that there is a problem with the LET itself. In
@@ -238,12 +242,12 @@
   "The processing path is mainly useful for debugging macros, so if you
   don't write macros, you can probably ignore it. Consider this example:
 
-      (defun foo (n)
+      (defun frox (n)
         (dotimes (i n *undefined*)))
 
   Compiling results in this error message:
 
-      ; in: DEFUN FOO
+      ; in: DEFUN FROX
       ;     (DOTIMES (I N *UNDEFINED*))
       ; --> DO BLOCK LET TAGBODY RETURN-FROM
       ; ==>

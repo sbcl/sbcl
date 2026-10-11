@@ -86,7 +86,7 @@
 
   - the result of simple forms of MAKE-ARRAY: stack allocation is
     possible only if the resulting array is known to be both simple
-    and one-dimensional, and has a constant :ELEMENT-TYPE;
+    and one-dimensional, and it has a constant :ELEMENT-TYPE;
 
       > __Warning__: Stack space is limited, so allocation of a large
       > vector may cause stack overflow. Stack overflow checks are

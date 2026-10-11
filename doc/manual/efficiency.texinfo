@@ -108,7 +108,7 @@ of values when they are recognized as having dynamic extent:
 
 @item the result of simple forms of @code{make-array}: stack allocation is
   possible only if the resulting array is known to be both simple
-  and one-dimensional, and has a constant @code{:element-type};
+  and one-dimensional, and it has a constant @code{:element-type};
 
 @quotation
 @cindex safety, optimization quality
@@ -363,12 +363,12 @@ is turned into hardware instructions on arm64 and x86-64. It returns
 @ffindex @sortas{defglobal sb-ext} defglobal [sb-ext]
 @deffn{Macro} sb-ext:defglobal name value &optional doc
 Defines @code{name} as a global variable that is always bound. @code{value} is evaluated
-and assigned to @code{name} both at compile- and load-time, but only if @code{name} is not
-already bound.
+and assigned to @code{name} both at compile- and load-time but only if @code{name}
+is not already bound.
 
-Global variables share their values between all threads, and cannot be
-locally bound, declared special, defined as constants, and neither bound
-nor defined as symbol macros.
+Global variables share their values between all threads. They cannot
+be locally bound, declared special, defined as constants, or defined
+as symbol macros.
 
 See also the declarations @code{sb-ext:global} and @code{sb-ext:always-bound}.
 @end deffn

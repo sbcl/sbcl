@@ -406,12 +406,12 @@ tree structure resulting from the evaluation of EXPRESSION."
 
 (sb-xc:defmacro defglobal (name value &optional (doc nil docp))
   "Defines NAME as a global variable that is always bound. VALUE is evaluated
-and assigned to NAME both at compile- and load-time, but only if NAME is not
-already bound.
+and assigned to NAME both at compile- and load-time but only if NAME
+is not already bound.
 
-Global variables share their values between all threads, and cannot be
-locally bound, declared special, defined as constants, and neither bound
-nor defined as symbol macros.
+Global variables share their values between all threads. They cannot
+be locally bound, declared special, defined as constants, or defined
+as symbol macros.
 
 See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
   (check-designator name 'defglobal)
