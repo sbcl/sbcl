@@ -217,8 +217,8 @@ Examples:
 @end example
 @end deffn
 @node diagnostic messages
-@cindex compiler messsage
-@cindex messsage, compiler
+@cindex compiler message
+@cindex message, compiler
 @section Diagnostic Messages
 
 @menu
@@ -542,8 +542,8 @@ rule was applied. The innermost actual source form was the symbol
 the compiler backed out one level.
 
 @node controlling verbosity
-@cindex compiler messsage verbosity
-@cindex verbosity of compiler messsages
+@cindex compiler message verbosity
+@cindex verbosity of compiler messages
 @subsection Controlling Verbosity
 
 The compiler can be quite verbose in its diagnostic reporting -- rather
@@ -733,8 +733,8 @@ into @code{(integer -17 17)}. This option is also unsafe and is no longer
 available by any combination of the standard optimization qualities.
 
 @node precise type checking
-@cindex type checking, precise
 @cindex precise type checking
+@cindex type checking, precise
 @subsection Precise Type Checking
 
 Precise checking means that the check is done as though @code{typep}

@@ -70,12 +70,52 @@
 (define-concept @speed (:title "SPEED" :keys (~speed)))
 
 
-(define-concept @tail-recursion (:title "tail recursion"
-                                 :keys (("tail" "recursion")
+;;;; Function calls
+
+;;; There is a @TAIL-CALL section. Not all mentions of @TAIL-CALL are
+;;; necessarily to be indexed; we use this untitled concept to mark
+;;; those that are.
+(define-concept ~tail-call (:keys (("tail call")
+                                   ("call," "tail")
+                                   ("function call," "tail"))))
+
+(define-concept ~tail-call-optimization
+    (:keys (("tail call" "optimization")
+            ("optimization," "tail call")
+            ("TCO"))))
+
+(define-concept ~tail-recursion (:keys (("tail recursion")
                                         ("recursion," "tail"))))
 
-(define-concept @tail-recursive (:title "tail recursive"
-                                 :keys (@tail-recursion)))
+(define-concept ~local-call (:keys (("local call")
+                                    ("call," "local")
+                                    ("function call," "local"))))
+
+(define-concept ~full-call (:keys (("full call")
+                                   ("call," "full")
+                                   ("function call," "full"))))
+
+(define-concept ~local-self-recursive-call
+    (:keys (("local call," "self-recursive")
+            ("call," "local" "self-recursive")
+            ("function call," "local" "self-recursive"))))
+
+(define-concept ~let-call
+    (:keys (("let call")
+            ("call," "let")
+            ("function call," "let"))))
+
+(define-concept ~local-tail-call
+    (:keys (("local call," "tail")
+            ("call," "local" "tail")
+            ("function call," "local" "tail"))))
+
+
+(define-concept @closure (:title "closure"
+                          :keys ("closure")))
+
+(define-concept @return-values (:title "return values"
+                                :keys (("return values"))))
 
 (define-concept @interrupt (:title "interrupt"
                             :keys ("interrupt")))

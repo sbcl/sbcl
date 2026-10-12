@@ -568,6 +568,7 @@ locations.
 @node note on lexical variable access
 @subsubsection Note On Lexical Variable Access
 
+@cindex closure
 When the debugger command loop establishes variable bindings for
 available variables, these variable bindings have lexical scope and
 dynamic extent. You can close over them, but such closures can't be

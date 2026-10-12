@@ -22,8 +22,8 @@
   (with-compilation-unit macro))
 
 (defsection @diagnostic-messages (:title "Diagnostic Messages"
-                                  :concepts (("compiler" "messsage")
-                                             ("messsage," "compiler")))
+                                  :concepts (("compiler" "message")
+                                             ("message," "compiler")))
   (@diagnostic-severity section)
   (@understanding-compiler-diagnostics section)
   (@controlling-verbosity section))
@@ -290,8 +290,8 @@
 
 (defsection @controlling-verbosity
     (:title "Controlling Verbosity"
-     :concepts (("compiler" "messsage" "verbosity")
-                ("verbosity" "of compiler messsages")))
+     :concepts (("compiler" "message" "verbosity")
+                ("verbosity" "of compiler messages")))
   "The compiler can be quite verbose in its diagnostic reporting -- rather
   more than some users would prefer. However, the amount of noise
   emitted can be controlled.
@@ -395,8 +395,8 @@
   available by any combination of the standard optimization qualities.")
 
 (defsection @precise-type-checking (:title "Precise Type Checking"
-                                    :concepts (("type checking," "precise")
-                                               ("precise" "type checking")))
+                                    :concepts (("precise" "type checking")
+                                               ("type checking," "precise")))
   "Precise checking means that the check is done as though TYPEP
   had been called with the exact type specifier that appeared in the
   declaration.

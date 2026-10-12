@@ -16,6 +16,9 @@
 @end menu
 
 @node tail call
+@cindex tail call
+@cindex call, tail
+@cindex function call, tail
 @section Tail Call
 
 @menu
@@ -34,6 +37,7 @@ Note that both @ref{local call}s and full calls can be tail calls.
 
 @node tail call optimization
 @cindex tail call optimization
+@cindex optimization, tail call
 @cindex TCO
 @subsection Tail Call Optimization
 
@@ -66,7 +70,6 @@ Thus, by default, all calls in tail position are compiled to tail
 calls. See @ref{debugging tail calls}.
 
 @node tail position
-@cindex tail position
 @subsection Tail Position
 
 A call is said to be in tail position unless it is enclosed by at
@@ -89,7 +92,7 @@ stack is unwound.
 
 @node tail recursion
 @cindex tail recursion
-@cindex tail recursive
+@cindex recursion, tail
 @subsection Tail Recursion
 
 Tail recursion is when a function makes a @ref{tail call} to itself.
@@ -147,10 +150,13 @@ functions instead of using a single huge @code{prog}.
 @cindex local call
 @cindex call, local
 @cindex function call, local
+@cindex full call
+@cindex call, full
+@cindex function call, full
 @section Local Call
 
 @menu
-* Self-recursive Local Call: self recursive local call.
+* Local Self-recursive Call: local self recursive call.
 * Let Call: let call.
 * Local Calls to Closures: local calls to closures.
 * Local Tail Call: local tail call.
@@ -174,8 +180,11 @@ a compilation technique that resolves function references at compile
 time. Block compilation speeds up function calls but increases
 compilation times and prevents function redefinition.
 
-@node self recursive local call
-@subsection Self-recursive Local Call
+@node local self recursive call
+@cindex local call, self-recursive
+@cindex call, local self-recursive
+@cindex function call, local self-recursive
+@subsection Local Self-recursive Call
 
 @ref{local call} is used when a function defined by @code{defun} calls
 itself and block compilation is used (see @code{compile-file}). For
@@ -195,6 +204,9 @@ jump to the start of the function and don't indirect through
 @code{symbol-function}. This is similar to @ref{debugging tail calls}.
 
 @node let call
+@cindex let call
+@cindex call, let
+@cindex function call, let
 @subsection Let Call
 
 Because @ref{local call} avoids unnecessary call overheads, the compiler
@@ -248,8 +260,11 @@ argument count checking and keyword argument parsing, and there are
 a number of other advantages that apply in many common situations.
 
 @node local calls to closures
+@cindex call closure
+@cindex closure, call
 @subsection Local Calls to Closures
 
+@cindex closure
 @ref{local call} allows for much more efficient use of closures, since the
 closure environment doesn't need to be allocated on the heap or even
 stored in memory at all. In this example, there is no penalty for
@@ -277,6 +292,9 @@ don't have to.
 @end quotation
 
 @node local tail call
+@cindex local call, tail
+@cindex call, local tail
+@cindex function call, local tail
 @subsection Local Tail Call
 
 Local tail calls are particularly efficient because they combine the
@@ -309,13 +327,19 @@ which is compiled to just as efficient code as
 @node local call return values
 @subsection Local Call Return Values
 
+@cindex local call
+@cindex call, local
+@cindex function call, local
+@cindex return values
+
 One of the more subtle costs of full call comes from allowing
 arbitrary numbers of return values. This overhead can be avoided in
-local calls to functions that always return the same number of
-values. For efficiency reasons (as well as stylistic ones), you
-should write functions so that they always return the same number of
-values. This may require passing extra @code{nil} arguments to @code{values} in
-some cases, but the result is more efficient, not less so.
+@ref{local call}s to functions that always return the same
+number of values. For efficiency reasons (as well as stylistic
+ones), you should write functions so that they always return the
+same number of values. This may require passing extra @code{nil} arguments
+to @code{values} in some cases, but the result is more efficient, not less
+so.
 
 @node slot access
 @cindex slot access
@@ -405,6 +429,7 @@ complex structures on the stack using iteration and @code{setq}.
 At present, SBCL implements stack allocation for the following kinds
 of values when they are recognized as having dynamic extent:
 
+@cindex closure
 @itemize
 @item @code{&rest} lists;
 

@@ -419,7 +419,7 @@
     (:title "Note On Lexical Variable Access")
   "When the debugger command loop establishes variable bindings for
   available variables, these variable bindings have lexical scope and
-  dynamic extent. You can close over them, but such closures can't be
+  dynamic extent. You can close over them, but such @CLOSUREs can't be
   used as upward function arguments.
 
   > _Note_: The variable bindings are actually created using the Lisp

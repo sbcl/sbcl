@@ -11,7 +11,8 @@
   (@global-and-always-bound-variables section)
   (@miscellaneous-efficiency-issues section))
 
-(defsection @tail-call (:title "Tail Call")
+(defsection @tail-call (:title "Tail Call"
+                        :concepts (~tail-call))
   "A call to a function is a tail call if nothing has to be done after
   the call returns. That is, when the call returns, the returned
   values are immediately returned from the calling function. Tail
@@ -24,8 +25,7 @@
   (@tail-recursion section))
 
 (defsection @tail-call-optimization (:title "Tail Call Optimization"
-                                     :concepts (("tail" "call" "optimization")
-                                                ("TCO")))
+                                     :concepts (~tail-call-optimization))
   "SBCL performs tail call optimization (TCO) although this is not
   required by the Common Lisp standard.
 
@@ -50,8 +50,7 @@
   Thus, by default, all calls in tail position are compiled to tail
   calls. See @DEBUGGING-TAIL-CALLS.")
 
-(defsection @tail-position (:title "Tail Position"
-                            :concepts (("tail" "position")))
+(defsection @tail-position (:title "Tail Position")
   "A call is said to be in tail position unless it is enclosed by at
   least one of the following:
 
@@ -69,8 +68,7 @@
   stack is unwound.")
 
 (defsection @tail-recursion (:title "Tail Recursion"
-                             :concepts (("tail" "recursion")
-                                        ("tail" "recursive")))
+                             :concepts (~tail-recursion))
   "Tail recursion is when a function makes a @TAIL-CALL to itself.
   In this example, the recursive call to `MYFUN` is tail-recursive:
 
@@ -117,9 +115,7 @@
   functions instead of using a single huge PROG.")
 
 (defsection @local-call (:title "Local Call"
-                         :concepts (("local" "call")
-                                    ("call," "local")
-                                    ("function call," "local")))
+                         :concepts (~local-call ~full-call))
 
   "The compiler supports two kinds of function call: full call and local
   call. Full call is the standard calling convention; its late binding
@@ -137,13 +133,14 @@
   a compilation technique that resolves function references at compile
   time. Block compilation speeds up function calls but increases
   compilation times and prevents function redefinition."
-  (@self-recursive-local-call section)
+  (@local-self-recursive-call section)
   (@let-call section)
   (@local-calls-to-closures section)
   (@local-tail-call section)
   (@local-call-return-values section))
 
-(defsection @self-recursive-local-call (:title "Self-recursive Local Call")
+(defsection @local-self-recursive-call (:title "Local Self-recursive Call"
+                                        :concepts (~local-self-recursive-call))
   "@LOCAL-CALL is used when a function defined by DEFUN calls
   itself and block compilation is used (see COMPILE-FILE). For
   example:
@@ -159,7 +156,8 @@
   jump to the start of the function and don't indirect through
   SYMBOL-FUNCTION. This is similar to @DEBUGGING-TAIL-CALLS.")
 
-(defsection @let-call (:title "Let Call")
+(defsection @let-call (:title "Let Call"
+                       :concepts (~let-call))
   "Because @LOCAL-CALL avoids unnecessary call overheads, the compiler
   internally uses local call to implement some macros and special
   forms that are not normally thought of as involving a function call.
@@ -207,8 +205,10 @@
   ;; optimizations done on let calls.
   )
 
-(defsection @local-calls-to-closures (:title "Local Calls to Closures")
-  "@LOCAL-CALL allows for much more efficient use of closures, since the
+(defsection @local-calls-to-closures (:title "Local Calls to Closures"
+                                      :concepts (("call" "closure" )
+                                                 ("closure," "call")))
+  "@LOCAL-CALL allows for much more efficient use of @CLOSUREs, since the
   closure environment doesn't need to be allocated on the heap or even
   stored in memory at all. In this example, there is no penalty for
   `LOCALFUN` referencing `A` and `B`:
@@ -230,7 +230,8 @@
   > or not. This is another reason to avoid setting variables when you
   > don't have to.")
 
-(defsection @local-tail-call (:title "Local Tail Call")
+(defsection @local-tail-call (:title "Local Tail Call"
+                              :concepts (~local-tail-call))
   "Local tail calls are particularly efficient because they combine the
   benefits of @LOCAL-CALLs (simplified calling convention) and
   @TAIL-CALLs (reusing the stack frame). Scheme programmers write
@@ -255,13 +256,15 @@
            r))")
 
 (defsection @local-call-return-values (:title "Local Call Return Values")
-  "One of the more subtle costs of full call comes from allowing
-  arbitrary numbers of return values. This overhead can be avoided in
-  local calls to functions that always return the same number of
-  values. For efficiency reasons (as well as stylistic ones), you
-  should write functions so that they always return the same number of
-  values. This may require passing extra NIL arguments to VALUES in
-  some cases, but the result is more efficient, not less so.")
+  "~LOCAL-CALL
+  One of the more subtle costs of full call comes from allowing
+  arbitrary numbers of @RETURN-VALUES. This overhead can be avoided in
+  @LOCAL-CALLs to functions that always return the same
+  number of values. For efficiency reasons (as well as stylistic
+  ones), you should write functions so that they always return the
+  same number of values. This may require passing extra NIL arguments
+  to VALUES in some cases, but the result is more efficient, not less
+  so.")
 
 (defsection @slot-access (:title "Slot Access"
                           :concepts (("slot" "access")))
@@ -346,10 +349,10 @@
       > vector may cause stack overflow. Stack overflow checks are
       > done except in 0 @SAFETY policies.
 
-  - closures defined with FLET or LABELS with a bound DYNAMIC-EXTENT
+  - @CLOSUREs defined with FLET or LABELS with a bound DYNAMIC-EXTENT
     declaration;
 
-  - anonymous closures defined with LAMBDA;
+  - anonymous @CLOSUREs defined with LAMBDA;
 
   - user-defined structures when the structure constructor defined using
     DEFSTRUCT has been declared INLINE;
@@ -366,7 +369,7 @@
     extent. The support for detecting when this applies is very
     sophisticated. The compiler can do this detection when any value
     form for a variable contains conditional allocations, function
-    calls, inlined functions, anonymous closures, or even other
+    calls, inlined functions, anonymous @CLOSUREs, or even other
     variables. This allows stack allocation of complex structures.
 
   Examples:
