@@ -365,6 +365,7 @@
     (store-binding-stack-pointer bsp-temp)))
 
 (defun unbind-to-here (where symbol value bsp &optional lip)
+  (declare (ignorable lip))
   (assemble ()
     (load-binding-stack-pointer bsp)
     (inst beq where bsp DONE)

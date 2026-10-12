@@ -285,7 +285,7 @@
    segment 12 2
    (lambda (segment chooser posn delta-if-after)
      (declare (ignore chooser))
-     (typecase (ash (relative-offset target posn delta-if-after) -1)
+     (etypecase (ash (relative-offset target posn delta-if-after) -1)
        (short-immediate
         (emit-back-patch
          segment 4

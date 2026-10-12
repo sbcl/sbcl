@@ -560,8 +560,8 @@
      (:temp value descriptor-reg r3-offset)
      #+sb-assembling
      (:temp nfp any-reg nfp-offset))
-  AGAIN
   (inst cbz block (generate-error-code nil 'invalid-unwind-error))
+  AGAIN
   (load-tl-symbol-value cur-uwp *current-unwind-protect-block*)
   (loadw ocfp block unwind-block-uwp-slot)
   (inst cmp cur-uwp ocfp)

@@ -94,27 +94,23 @@
 ;;; link the block into the Current-Catch list.
 ;;;
 (define-vop (make-catch-block)
-  (:args (tn) (tag :scs (any-reg descriptor-reg)))
+  (:args (tn) (tag :scs (any-reg descriptor-reg) :to :save))
   (:info entry-label)
-  (:results (block :scs (any-reg)))
+  (:blocks (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
-  (:temporary (:scs (descriptor-reg) :target block :to (:result 0)) result)
   (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 44
-    (composite-immediate-instruction
-     add result cfp-tn (tn-byte-offset tn))
+    (composite-immediate-instruction add block cfp-tn (tn-byte-offset tn))
     (load-symbol-value temp *current-unwind-protect-block*)
-    (storew temp result catch-block-uwp-slot)
-    (storew cfp-tn result catch-block-cfp-slot)
+    (storew temp block catch-block-uwp-slot)
+    (storew cfp-tn block catch-block-cfp-slot)
     (inst compute-lra lip lip entry-label)
-    (storew lip result catch-block-entry-pc-slot)
+    (storew lip block catch-block-entry-pc-slot)
 
-    (storew tag result catch-block-tag-slot)
+    (storew tag block catch-block-tag-slot)
     (load-symbol-value temp *current-catch-block*)
-    (storew temp result catch-block-previous-catch-slot)
-    (store-symbol-value result *current-catch-block*)
-
-    (move block result)))
+    (storew temp block catch-block-previous-catch-slot)
+    (store-symbol-value block *current-catch-block*)))
 
 ;;; Just set the current unwind-protect to UWP.  This
 ;;; instantiates an unwind block as an unwind-protect.
