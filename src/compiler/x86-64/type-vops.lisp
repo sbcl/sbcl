@@ -831,10 +831,6 @@
   (:info)
   (:conditional :z)
   (:generator 5
-    ;; If the VALUE were known to be an OTHER-POINTER, the IR1 lvar type
-    ;; can't intersect NULL. So the IR1 should have been transformed to NON-NULL-SYMBOL-P.
-    ;; Hence this must *not* be known to be an OTHER-POINTER.
-    (aver (not (other-pointer-tn-ref-p args)))
     (if (other-pointer-tn-ref-p args t) ; allow NIL
         (inst cmp :byte (ea (- other-pointer-lowtag) value) symbol-widetag)
         (assemble ()
