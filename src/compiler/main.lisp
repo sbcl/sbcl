@@ -37,7 +37,7 @@
 (defvar *compile-progress* nil
   "When this is true, the compiler prints to *STANDARD-OUTPUT* progress
   information about the phases of compilation of each function. (This
-  is useful mainly in large block compilations.)")
+  is useful mainly in large block-compilations.)")
 
 (defvar *compile-file-pathname* nil
   "The defaulted pathname of the file currently being compiled, or NIL if not
@@ -1837,24 +1837,27 @@ necessary, since type inference may take arbitrarily long to converge.")
                                                     (macro-function name))
                                                (fdefinition name))
                                            defp))
-  "Produce a compiled function from DEFINITION. If DEFINITION is a
-lambda-expression, it is coerced to a function. If DEFINITION is an
-interpreted function, it is compiled. If DEFINITION is already a compiled
-function, it is used as-is. (Future versions of SBCL might try to
-recompile the existing definition, but this is not currently supported.)
+  "Produce a compiled function from DEFINITION.
 
-If NAME is NIL, the compiled function is returned as the primary value.
-Otherwise the resulting compiled function replaces existing function
-definition of NAME, and NAME is returned as primary value; if NAME is a symbol
-that names a macro, its macro function is replaced and NAME is returned as
-primary value.
+- If DEFINITION is a lambda-expression, it is coerced to a function.
+
+- If DEFINITION is an interpreted function, it is compiled.
+
+- If DEFINITION is already a compiled function, it is returned
+  as-is. (Future versions of SBCL might try to recompile the existing
+  definition, but this is not currently supported.)
+
+If NAME is NIL, the compiled function is returned as the primary
+value. Otherwise, the resulting compiled function replaces existing
+function definition of NAME, and NAME is returned as primary value; if
+NAME is a symbol that names a macro, its MACRO-FUNCTION is replaced
+and NAME is returned as primary value.
 
 Also returns a secondary value which is true if any conditions of type
 WARNING occur during the compilation, and NIL otherwise.
 
-Tertiary value is true if any conditions of type ERROR, or WARNING that are
-not STYLE-WARNINGs occur during compilation, and NIL otherwise.
-"
+Tertiary value is true if any conditions of type ERROR or WARNING that
+are not STYLE-WARNINGs occur during compilation, and NIL otherwise."
   (binding*
       (((start-sec start-nsec) (get-thread-virtual-time))
        ((compiled-definition warnings-p failure-p)
@@ -1917,48 +1920,59 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
   "Compile INPUT-FILE, producing a corresponding fasl file and
 returning its filename.
 
-  :OUTPUT-FILE
-     The name of the FASL to output.  The returned pathname of the
-     output file may differ from the pathname of the :OUTPUT-FILE
-     parameter, e.g. when the latter is a designator for a directory.
+- :OUTPUT-FILE
 
-  :VERBOSE
-     If true, information indicating what file is being compiled is printed
-     to *STANDARD-OUTPUT*.
+    The name of the FASL to output. The returned pathname of the
+    output file may differ from the pathname of the :OUTPUT-FILE
+    parameter, e.g. when the latter is a designator for a directory.
 
-  :PRINT
+- :VERBOSE
+
+    If true, information indicating what file is being compiled is
+    printed to *STANDARD-OUTPUT*.
+
+- :PRINT
+
      If true, each top level form in the file is printed to *STANDARD-OUTPUT*.
 
-  :EXTERNAL-FORMAT
-     The external format to use when opening the source file.
-     The default is :DEFAULT which uses the SB-EXT:*DEFAULT-SOURCE-EXTERNAL-FORMAT*.
+- :EXTERNAL-FORMAT
 
-  :BLOCK-COMPILE {NIL | :SPECIFIED | T}
-     Determines whether multiple functions are compiled together as a unit,
-     resolving function references at compile time.  NIL means that global
-     function names are never resolved at compilation time.  :SPECIFIED means
-     that names are resolved at compile-time when convenient (as in a
-     self-recursive call), but the compiler doesn't combine top-level DEFUNs.
-     With :SPECIFIED, an explicit START-BLOCK declaration will enable block
-     compilation.  A value of T indicates that all forms in the file(s) should
-     be compiled as a unit.  The default is the value of
-     SB-EXT:*BLOCK-COMPILE-DEFAULT*, which is initially NIL.
+    The external format to use when opening the source file. The
+    default is :DEFAULT which uses the
+    SB-EXT:*DEFAULT-SOURCE-EXTERNAL-FORMAT*.
 
-  :ENTRY-POINTS
-     This specifies a list of function names for functions in the file(s) that
-     must be given global definitions.  This only applies to block
-     compilation, and is useful mainly when :BLOCK-COMPILE T is specified on a
-     file that lacks START-BLOCK declarations.  If the value is NIL (the
-     default) then all functions will be globally defined.
+- :BLOCK-COMPILE {NIL | :SPECIFIED | T}
 
-  :TRACE-FILE
-     If given, internal data structures are dumped to the specified
-     file, or if a value of T is given, to a file of *.trace type
-     derived from the input file name. (non-standard)
+    Determines whether multiple functions are compiled together as a
+    unit, resolving function references at compile time. NIL means
+    that global function names are never resolved at compilation time.
+    :SPECIFIED means that names are resolved at compile-time when
+    convenient (as in a self-recursive call), but the compiler doesn't
+    combine top-level DEFUNs. With :SPECIFIED, an explicit START-BLOCK
+    declaration will enable block compilation. A value of T indicates
+    that all forms in the file(s) should be compiled as a unit. The
+    default is the value of SB-EXT:*BLOCK-COMPILE-DEFAULT*, which is
+    initially NIL.
 
-  :EMIT-CFASL
-     (Experimental). If true, outputs the toplevel compile-time effects
-     of this file into a separate .cfasl file."
+- :ENTRY-POINTS
+
+    This specifies a list of function names for functions in the
+    file(s) that must be given global definitions. This only applies
+    to block compilation and is useful mainly when :BLOCK-COMPILE T is
+    specified on a file that lacks START-BLOCK declarations. If the
+    value is NIL (the default), then all functions will be globally
+    defined.
+
+- :TRACE-FILE
+
+    If given, internal data structures are dumped to the specified
+    file, or if a value of T is given, to a file of `.trace` type
+    derived from the input file name. (non-standard)
+
+- :EMIT-CFASL
+
+    (Experimental). If true, outputs the toplevel compile-time effects
+    of this file into a separate `.cfasl` file."
   (binding*
       ((input-file (pathname input-file))
        (output-file-pathname

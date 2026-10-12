@@ -46,7 +46,9 @@
 ;;; The package-wide docstring packages are almost correct, but there
 ;;; are a couple of definitions in random files.
 (defparameter *definition-to-docstring-package*
-  '(((with-compilation-unit macro) "SB-C")
+  '(((compile function) "SB-C")
+    ((compile-file function) "SB-C")
+    ((with-compilation-unit macro) "SB-C")
     ((sb-ext:restrict-compiler-policy function) "SB-C")
     ((trace macro) "SB-DEBUG")))
 

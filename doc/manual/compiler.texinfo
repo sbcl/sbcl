@@ -4,6 +4,7 @@
 @chapter Compiler
 
 @menu
+* Calling the Compiler: calling the compiler.
 * Diagnostic Messages: diagnostic messages.
 * Handling of Types: handling of types.
 * Compiler Policy: compiler policy.
@@ -19,6 +20,202 @@ declarations, the effects of various optimization policies, and the
 way that inlining and open coding may cause optimized code to differ
 from a naive translation.
 
+@node calling the compiler
+@section Calling the Compiler
+
+@anchor{Function common-lisp compile}
+@ffindex @sortas{compile common-lisp} compile [common-lisp]
+@deffn{Function} compile name &optional (definition (or (and (symbolp sb-c::name) (macro-function sb-c::name)) (fdefinition sb-c::name)))
+Produce a compiled function from @code{definition}.
+
+@itemize
+@item If @code{definition} is a lambda-expression, it is coerced to a function.
+
+@item If @code{definition} is an interpreted function, it is compiled.
+
+@item If @code{definition} is already a compiled function, it is returned
+  as-is. (Future versions of SBCL might try to recompile the existing
+  definition, but this is not currently supported.)
+@end itemize
+
+If @code{name} is @code{nil}, the compiled function is returned as the primary
+value. Otherwise, the resulting compiled function replaces existing
+function definition of @code{name}, and @code{name} is returned as primary value; if
+@code{name} is a symbol that names a macro, its @code{macro-function} is replaced
+and @code{name} is returned as primary value.
+
+Also returns a secondary value which is true if any conditions of type
+@code{warning} occur during the compilation, and @code{nil} otherwise.
+
+Tertiary value is true if any conditions of type @code{error} or @code{warning} that
+are not @code{style-warning}s occur during compilation, and @code{nil} otherwise.
+@end deffn
+@anchor{Function common-lisp compile-file}
+@ffindex @sortas{compile-file common-lisp} compile-file [common-lisp]
+@deffn{Function} compile-file input-file &key (output-file "") (verbose *compile-verbose*) (print *compile-print*) (external-format :default) (progress sb-ext:*compile-progress*) trace-file (block-compile sb-ext:*block-compile-default*) entry-points (emit-cfasl sb-c::*emit-cfasl*)
+Compile @code{input-file}, producing a corresponding fasl file and
+returning its filename.
+
+@itemize
+@item @code{:output-file}
+
+The name of the FASL to output. The returned pathname of the
+output file may differ from the pathname of the @code{:output-file}
+parameter, e.g. when the latter is a designator for a directory.
+
+@item @code{:verbose}
+
+If true, information indicating what file is being compiled is
+printed to @code{*standard-output*}.
+
+@item @code{:print}
+
+ If true, each top level form in the file is printed to @code{*standard-output*}.
+
+@item @code{:external-format}
+
+The external format to use when opening the source file. The
+default is @code{:default} which uses the
+@code{sb-ext:*default-source-external-format*}.
+
+@item @code{:block-compile} @{@code{nil} | @code{:specified} | @code{t}@}
+
+Determines whether multiple functions are compiled together as a
+unit, resolving function references at compile time. @code{nil} means
+that global function names are never resolved at compilation time.
+@code{:specified} means that names are resolved at compile-time when
+convenient (as in a self-recursive call), but the compiler doesn't
+combine top-level @code{defun}s. With @code{:specified}, an explicit @code{start-block}
+declaration will enable block compilation. A value of @code{t} indicates
+that all forms in the file(s) should be compiled as a unit. The
+default is the value of @code{sb-ext:*block-compile-default*}, which is
+initially @code{nil}.
+
+@item @code{:entry-points}
+
+This specifies a list of function names for functions in the
+file(s) that must be given global definitions. This only applies
+to block compilation and is useful mainly when @code{:block-compile} @code{t} is
+specified on a file that lacks @code{start-block} declarations. If the
+value is @code{nil} (the default), then all functions will be globally
+defined.
+
+@item @code{:trace-file}
+
+If given, internal data structures are dumped to the specified
+file, or if a value of @code{t} is given, to a file of @code{.trace} type
+derived from the input file name. (non-standard)
+
+@item @code{:emit-cfasl}
+
+(Experimental). If true, outputs the toplevel compile-time effects
+of this file into a separate @code{.cfasl} file.
+@end itemize
+@end deffn
+@anchor{Variable sb-ext *block-compile-default*}
+@vvindex @sortas{block-compile-default* sb-ext} *block-compile-default* [sb-ext]
+@deffn{Variable} sb-ext:*block-compile-default*
+The default value for the @code{:block-compile} argument to @code{compile-file}.
+@end deffn
+@anchor{Macro common-lisp with-compilation-unit}
+@ffindex @sortas{with-compilation-unit common-lisp} with-compilation-unit [common-lisp]
+@deffn{Macro} with-compilation-unit options &body body
+Affects compilations that take place within its dynamic extent. It is
+intended to be e.g. wrapped around the compilation of all files in the
+same system.
+
+Following options are defined:
+
+@itemize
+@item @code{:override} @code{<boolean-form>}
+
+One of the effects of this form is to delay undefined warnings
+until the end of the form, instead of giving them at the end of
+each compilation. If @code{override} is @code{nil} (the default), then the
+outermost @code{with-compilation-unit} form grabs the undefined warnings.
+Specifying @code{:override} true causes that form to grab any enclosed
+warnings, even if it is enclosed by another @code{with-compilation-unit}.
+
+@item @code{:policy} @code{<optimize-declaration-form>}
+
+Provides dynamic scoping for global compiler optimization
+qualities and restrictions, limiting effects of subsequent
+@code{optimize} proclamations and calls to
+@code{sb-ext:restrict-compiler-policy} to the dynamic scope of @code{body}.
+
+If @code{:override} is false, the specified @code{:policy} is merged with
+current global policy. If @code{:override} is true, the current global
+policy, including any restrictions, is discarded in favor of the
+specified @code{:policy}.
+
+Supplying @code{:policy} @code{nil} is equivalent to the option not being
+supplied at all, i.e. dynamic scoping of policy does not take
+place. If dynamic scoping without changing the current policy is
+desired, use @code{:policy '(optimize)} with @code{:override} @code{nil}.
+
+This option is an SBCL-specific experimental extension: Interface
+subject to change.
+
+@item @code{:source-namestring} @code{<namestring-form>}
+
+Attaches the value returned by @code{<namestring-form>} to the internal
+debug-source information as the namestring of the source file.
+Normally the namestring of the @code{input-file} for @code{compile-file} is
+used: this option can be used to provide source-file information
+for functions compiled using @code{compile}, or to override the
+@code{input-file} argument of @code{compile-file}.
+
+Can be accessed using @code{sb-introspect:definition-source-pathname}.
+
+If both an outer and an inner @code{with-compilation-unit} provide a
+@code{:source-namestring}, the inner one takes precedence. Unaffected by
+@code{:override}.
+
+This is an SBCL-specific extension.
+
+@item @code{:source-plist} @code{<plist-form>}
+
+Attaches the value returned by @code{<plist-form>} to internal
+debug-source information of functions compiled in within the
+dynamic extent of @code{body}.
+
+Primarily for use by development environments, in order to e.g.
+associate function definitions with editor-buffers. Can be
+accessed using @code{sb-introspect:definition-source-plist}.
+
+If an outer @code{with-compilation-unit} form also provide a
+@code{source-plist}, it is appended to the end of the provided
+@code{source-plist}. Unaffected by @code{:override}.
+
+This is an SBCL-specific extension.
+@end itemize
+
+Examples:
+
+@example
+;; Prevent proclamations from the file leaking, and restrict
+;; SAFETY to 3 -- otherwise uses the current global policy.
+(with-compilation-unit (:policy '(optimize))
+  (restrict-compiler-policy 'safety 3)
+  (load "foo.lisp"))
+@end example
+
+@example
+;; Using default policy instead of the current global one,
+;; except for DEBUG 3.
+(with-compilation-unit (:policy '(optimize debug)
+                        :override t)
+  (load "foo.lisp"))
+@end example
+
+@example
+;; Same as if :POLICY had not been specified at all: SAFETY 3
+;; proclamation leaks out from WITH-COMPILATION-UNIT.
+(with-compilation-unit (:policy nil)
+  (declaim (optimize safety))
+  (load "foo.lisp"))
+@end example
+@end deffn
 @node diagnostic messages
 @cindex compiler messsage
 @cindex messsage, compiler
@@ -444,6 +641,13 @@ mentioned in a particular efficiency note. @code{nil} means no limit.
 This is the minimum cost difference between the chosen implementation and
 the next alternative that justifies an efficiency note.
 @end deffn
+@anchor{Variable sb-ext *compile-progress*}
+@vvindex @sortas{compile-progress* sb-ext} *compile-progress* [sb-ext]
+@deffn{Variable} sb-ext:*compile-progress*
+When this is true, the compiler prints to @code{*standard-output*} progress
+information about the phases of compilation of each function. (This
+is useful mainly in large block-compilations.)
+@end deffn
 @anchor{Macro sb-ext define-source-context}
 @ffindex @sortas{define-source-context sb-ext} define-source-context [sb-ext]
 @deffn{Macro} sb-ext:define-source-context name lambda-list &body body
@@ -805,6 +1009,8 @@ These are the optimization qualities:
   warnings about unavoidable problems.
 @end itemize
 
+See also the @code{:policy} argument of @code{with-compilation-unit}.
+
 In the following, we discuss extensions related to compiler policies.
 
 @anchor{Function sb-ext describe-compiler-policy}
@@ -833,105 +1039,6 @@ loosened.
 
 See also @code{:policy} option in @code{with-compilation-unit}, which can impose
 dynamic scoping on restrictions.
-@end deffn
-@anchor{Macro common-lisp with-compilation-unit}
-@ffindex @sortas{with-compilation-unit common-lisp} with-compilation-unit [common-lisp]
-@deffn{Macro} with-compilation-unit options &body body
-Affects compilations that take place within its dynamic extent. It is
-intended to be e.g. wrapped around the compilation of all files in the
-same system.
-
-Following options are defined:
-
-@itemize
-@item @code{:override} @code{<boolean-form>}
-
-One of the effects of this form is to delay undefined warnings
-until the end of the form, instead of giving them at the end of
-each compilation. If @code{override} is @code{nil} (the default), then the
-outermost @code{with-compilation-unit} form grabs the undefined warnings.
-Specifying @code{:override} true causes that form to grab any enclosed
-warnings, even if it is enclosed by another @code{with-compilation-unit}.
-
-@item @code{:policy} @code{<optimize-declaration-form>}
-
-Provides dynamic scoping for global compiler optimization
-qualities and restrictions, limiting effects of subsequent
-@code{optimize} proclamations and calls to
-@code{sb-ext:restrict-compiler-policy} to the dynamic scope of @code{body}.
-
-If @code{:override} is false, the specified @code{:policy} is merged with
-current global policy. If @code{:override} is true, the current global
-policy, including any restrictions, is discarded in favor of the
-specified @code{:policy}.
-
-Supplying @code{:policy} @code{nil} is equivalent to the option not being
-supplied at all, i.e. dynamic scoping of policy does not take
-place. If dynamic scoping without changing the current policy is
-desired, use @code{:policy '(optimize)} with @code{:override} @code{nil}.
-
-This option is an SBCL-specific experimental extension: Interface
-subject to change.
-
-@item @code{:source-namestring} @code{<namestring-form>}
-
-Attaches the value returned by @code{<namestring-form>} to the internal
-debug-source information as the namestring of the source file.
-Normally the namestring of the @code{input-file} for @code{compile-file} is
-used: this option can be used to provide source-file information
-for functions compiled using @code{compile}, or to override the
-@code{input-file} argument of @code{compile-file}.
-
-Can be accessed using @code{sb-introspect:definition-source-pathname}.
-
-If both an outer and an inner @code{with-compilation-unit} provide a
-@code{:source-namestring}, the inner one takes precedence. Unaffected by
-@code{:override}.
-
-This is an SBCL-specific extension.
-
-@item @code{:source-plist} @code{<plist-form>}
-
-Attaches the value returned by @code{<plist-form>} to internal
-debug-source information of functions compiled in within the
-dynamic extent of @code{body}.
-
-Primarily for use by development environments, in order to e.g.
-associate function definitions with editor-buffers. Can be
-accessed using @code{sb-introspect:definition-source-plist}.
-
-If an outer @code{with-compilation-unit} form also provide a
-@code{source-plist}, it is appended to the end of the provided
-@code{source-plist}. Unaffected by @code{:override}.
-
-This is an SBCL-specific extension.
-@end itemize
-
-Examples:
-
-@example
-;; Prevent proclamations from the file leaking, and restrict
-;; SAFETY to 3 -- otherwise uses the current global policy.
-(with-compilation-unit (:policy '(optimize))
-  (restrict-compiler-policy 'safety 3)
-  (load "foo.lisp"))
-@end example
-
-@example
-;; Using default policy instead of the current global one,
-;; except for DEBUG 3.
-(with-compilation-unit (:policy '(optimize debug)
-                        :override t)
-  (load "foo.lisp"))
-@end example
-
-@example
-;; Same as if :POLICY had not been specified at all: SAFETY 3
-;; proclamation leaks out from WITH-COMPILATION-UNIT.
-(with-compilation-unit (:policy nil)
-  (declaim (optimize safety))
-  (load "foo.lisp"))
-@end example
 @end deffn
 @node compiler errors
 @section Compiler Errors

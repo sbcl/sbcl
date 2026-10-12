@@ -6,6 +6,7 @@
   declarations, the effects of various optimization policies, and the
   way that inlining and open coding may cause optimized code to differ
   from a naive translation."
+  (@calling-the-compiler section)
   (@diagnostic-messages section)
   (@handling-of-types section)
   (@compiler-policy section)
@@ -13,6 +14,12 @@
   (@open-coding-and-inline-expansion section)
   (@interpreter section)
   (@advanced-compiler-use-and-efficiency-hints section))
+
+(defsection @calling-the-compiler (:title "Calling the Compiler")
+  (compile function)
+  (compile-file function)
+  (sb-ext:*block-compile-default* variable)
+  (with-compilation-unit macro))
 
 (defsection @diagnostic-messages (:title "Diagnostic Messages"
                                   :concepts (("compiler" "messsage")
@@ -323,6 +330,7 @@
   (sb-ext:*undefined-warning-limit* variable)
   (sb-ext:*efficiency-note-limit* variable)
   (sb-ext:*efficiency-note-cost-threshold* variable)
+  (sb-ext:*compile-progress* variable)
   (sb-ext:define-source-context macro))
 
 (defsection @handling-of-types (:title "Handling of Types")
@@ -616,10 +624,11 @@
     warnings are inhibited. This is useful with DECLARE to suppress
     warnings about unavoidable problems.
 
+  See also the :POLICY argument of WITH-COMPILATION-UNIT.
+
   In the following, we discuss extensions related to compiler policies."
   (sb-ext:describe-compiler-policy function)
-  (sb-ext:restrict-compiler-policy function)
-  (with-compilation-unit macro))
+  (sb-ext:restrict-compiler-policy function))
 
 (defsection @compiler-errors (:title "Compiler Errors")
   (@type-errors-at-compile-time section)
