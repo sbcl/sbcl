@@ -5001,11 +5001,13 @@
           (t
            (give-up-ir1-transform)))))
 
-(deftransform ceiling ((number divisor) ((and unsigned-byte fixnum) (and unsigned-byte fixnum)) * :result result)
-  (if (and result
-           (lvar-single-value-p result))
-      `(values (truly-the fixnum (truncate (+ number (1- divisor)) divisor)) 0)
-      (give-up-ir1-transform)))
+(deftransform ceiling ((number divisor) ((and unsigned-byte fixnum) (and unsigned-byte fixnum)) * :node node :result result)
+  (cond ((and result
+              (lvar-single-value-p result))
+         (erase-node-type node t 1)
+         `(values (truly-the fixnum (truncate (+ number (1- divisor)) divisor)) 0))
+        (t
+         (give-up-ir1-transform))))
 
 (define-source-transform rem (number divisor)
   `(nth-value 1 (truncate ,number ,divisor)))
