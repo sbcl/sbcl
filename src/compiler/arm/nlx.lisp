@@ -96,7 +96,7 @@
 (define-vop (make-catch-block)
   (:args (tn) (tag :scs (any-reg descriptor-reg) :to :save))
   (:info entry-label)
-  (:blocks (block :scs (any-reg)))
+  (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 44
