@@ -360,7 +360,9 @@
   > never be available in the interrupted frame. See
   > @UNKNOWN-LOCATIONS-AND-INTERRUPTS.)
 
-  The value of a variable may be unavailable for these reasons:
+  If the necessary debug information was not recorded (see See
+  @DEBUGGER-POLICY-CONTROL), the value of a variable is unavailable.
+  This can happen for the following reasons:
 
   - The value of the @DEBUG optimization quality may have omitted
     debug information needed to determine whether the variable is
@@ -375,6 +377,8 @@
   - The variable's name is an uninterned symbol (gensym). To save
     space, the compiler only dumps debug information about uninterned
     variables when the @DEBUG optimization quality is 3.
+
+  The value of a variables may be unavailable also for other reasons:
 
   - The frame's location is unknown (see
     @UNKNOWN-LOCATIONS-AND-INTERRUPTS) because the debugger was
@@ -391,7 +395,7 @@
 
   - The variable is never set and its definition looks like
 
-          (LET ((var1 var2))
+          (let ((var1 var2))
              ...)
 
       In this case, `VAR1` is substituted with `VAR2`.
@@ -400,14 +404,13 @@
     case, the reference is substituted with the variable initial
     value.
 
-  Since it is especially useful to be able to get the arguments to a
-  function, argument variables are treated specially when the @SPEED
-  optimization quality is less than 3 and the @DEBUG quality is at
-  least 1. With this compilation policy, the values of argument
-  variables are almost always available everywhere in the function,
-  even at unknown locations. For non-argument variables, @DEBUG must
-  be at least 2 for values to be available, and even then, values are
-  only available at known locations.")
+  To summarize, since it is especially useful to be able to get the
+  arguments to a function, values of argument variables are
+  available (even at unknown locations) when the @SPEED optimization
+  quality is less than 3 and the @DEBUG quality is at least 1. For
+  non-argument variables, @DEBUG must be at least 2 for values to be
+  available, and even then, values are only available at known
+  locations.")
 
 (defsection @note-on-lexical-variable-access
     (:title "Note On Lexical Variable Access")
@@ -586,36 +589,32 @@
   quality is directly translated to a level of debug information. This
   absolute interpretation allows the user to count on a particular
   amount of debug information being available, even when the values of
-  the other qualities are changed during compilation. These are the
-  levels of debug information that correspond to the values of the
-  @DEBUG quality:
+  the other qualities are changed during compilation. We list what
+  debug information is available at different levels of the @DEBUG
+  quality:
 
-  - `0`: Only the function name and enough information to allow the
+  - `0<=`: Only the function name and enough information to allow the
     stack to be parsed.
 
-  - `> 0`: Any level greater than 0 gives level 0 plus all argument
-    variables. Values will only be accessible if the argument variable
-    is never set and @SPEED is not 3. SBCL allows any real value for
-    optimization qualities. It may be useful to specify 0.5 to get
-    backtrace argument display without argument documentation.
+  - `1<=`: Argument variables. The value will only be available if the
+    argument variable is never set and @SPEED is not 3.
 
-  - `1`: Level 1 provides argument documentation (printed argument
-    lists) and derived argument/result type information. This makes
-    DESCRIBE more informative and allows the compiler to do
-    compile-time argument count and type checking for any calls
-    compiled at run-time. This is the default.
+      Also, argument documentation (printed argument lists) and
+      derived argument/result type information. This makes DESCRIBE
+      more informative and allows the compiler to do compile-time
+      argument count and type checking for any calls compiled at
+      run-time.
 
-  - `2`: Level 1 plus all interned local variables, source location
-    information, and lifetime information that tells the debugger when
-    arguments are available (even when @SPEED is 3 or the argument is
-    set).
+  - `2<=`: Interned local variables, source location information, and
+    lifetime information that tells the debugger when arguments are
+    available (even when @SPEED is 3 or the argument is set).
 
-  - `3`: Level 2 plus all uninterned variables.
+  - `3`: Uninterned variables.
 
       - In addition, lifetime analysis is disabled (even when @SPEED
-       is 3), ensuring that all variable values are available at any
-       known location within the scope of the binding. This has a
-       speed penalty in addition to the obvious space penalty.
+        is 3), ensuring that all variable values are available at any
+        known location within the scope of the binding. This has a
+        speed penalty in addition to the obvious space penalty.
 
       - @TAIL-CALL-OPTIMIZATION is disabled. Thus, backtraces will
         contain frames for all invoked functions, even those in tail
