@@ -1347,7 +1347,7 @@
     (let ((cast (lvar-uses lvar)))
       (when (and (cast-p cast)
                  (csubtypep type
-                            (single-value-type (cast-type-to-check cast)))
+                            (single-value-type (cast-asserted-type cast)))
                  (almost-immediately-used-p lvar cast))
         (delete-cast cast nil)
         t))))
