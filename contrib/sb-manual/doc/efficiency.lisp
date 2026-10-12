@@ -2,12 +2,118 @@
 
 (defsection @efficiency (:title "Efficiency"
                          :concepts ("efficicency"))
+  (@tail-call section)
   (@slot-access section)
   (@stack-allocation section)
   (@modular-arithmetic section)
   (@recognized-idioms section)
   (@global-and-always-bound-variables section)
   (@miscellaneous-efficiency-issues section))
+
+(defsection @tail-call (:title "Tail Call"
+                        :concepts (("tail" "call")
+                                   ("call," "tail")))
+  "A call to a function is a tail call if nothing has to be done after
+  the call returns. That is, when the call returns, the returned
+  values are immediately returned from the calling function. Tail
+  calls can be compiled to much more efficient code than normal code.
+  See <https://en.wikipedia.org/wiki/Tail_call> for more."
+  (@tail-call-optimization section)
+  (@tail-position section)
+  (@tail-recursion section))
+
+(defsection @tail-call-optimization (:title "Tail Call Optimization"
+                                     :concepts (("tail" "call" "optimization")
+                                                ("TCO")))
+  "SBCL performs tail call optimization (TCO) although this is not
+  required by the Common Lisp standard.
+
+  In Lisp terms, you can think of TCO as converting a function call to
+  a PSETQ that assigns the argument values to the called function's
+  variables, followed by a GO to the start of the called function.
+  This makes clear an inherent efficiency advantage of tail calls: in
+  addition to not having to allocate a stack frame, there is no need
+  to prepare for the call to return (e.g. by computing a return PC).
+
+  Consider the following trivial example:
+
+      (defun fun1 (x)
+        (fun2 x x))
+
+  FUN1 is compiled to native code that modifies its frame
+  (to have the arguments of `FUN2` in the right places) and control is
+  transferred via a single jump instruction to `FUN2`.
+
+  In general, a call is compiled to a tail call if it is in
+  @TAIL-POSITION and the @DEBUG optimization quality is at most 2.
+  Thus, by default, all calls in tail position are compiled to tail
+  calls. See @DEBUGGING-TAIL-CALLS.")
+
+(defsection @tail-position (:title "Tail Position"
+                            :concepts (("tail" "position")))
+  "A call is said to be in tail position unless it is enclosed by at
+  least one of the following:
+
+  - a special binding (e.g. by LET, PROGV),
+
+  - a CATCH,
+
+  - an UNWIND-PROTECT,
+
+  - a BLOCK and the block name has been closed over,
+
+  - a TAGBODY and a GO tag has been closed over.
+
+  These inhibit tail calls because they require cleanups when the
+  stack is unwound.")
+
+(defsection @tail-recursion (:title "Tail Recursion"
+                             :concepts (("tail" "recursion")
+                                        ("tail" "recursive")))
+  "Tail recursion is when a function makes a @TAIL-CALL to itself.
+  In this example, the recursive call to `MYFUN` is tail-recursive:
+
+      (defun myfun (x)
+        (if (oddp (random x))
+            (isqrt x)
+            (myfun (1- x))))
+
+  Because it is a @TAIL-CALL, tail recursion can be compiled to much
+  more efficient code than general recursion. In fact, tail recursion
+  is equivalent to iteration both semantically and in efficiency.
+
+  Why would you want to write a program recursively when you can write
+  it using a loop? Well, the main answer is that recursion is a more
+  general mechanism, so it can express some solutions simply that are
+  awkward to write as a loop. Some programmers also feel that
+  recursion is a stylistically preferable way to write loops because
+  it avoids assigning variables. For example, instead of writing
+
+      (defun fun1 (x)
+        (something x))
+
+      (defun fun2 (y)
+        (other-thing y))
+
+      (do ((x 7 (fun2 (fun1 x))))
+          (nil))
+
+  ... you can write
+
+      (defun fun1 (x)
+        (fun2 (something x)))
+
+      (defun fun2 (y)
+        (fun1 (other-thing y)))
+
+      (fun1 7)
+
+  The tail-recursive definition is actually more efficient, in
+  addition to being (arguably) clearer. As the number of functions and
+  the complexity of their call graph increases, the simplicity of
+  using recursion becomes compelling. Consider the advantages of
+  writing a large finite-state machine with separate tail-recursive
+  functions instead of using a single huge PROG.")
 
 (defsection @slot-access (:title "Slot Access"
                           :concepts (("slot" "access")))
@@ -315,7 +421,6 @@
   - More About Types in Python
   - Type Inference
   - Source Optimization
-  - Tail Recursion
   - Local Call
   - Block Compilation
   - Inline Expansion

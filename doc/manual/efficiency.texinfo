@@ -5,6 +5,7 @@
 @chapter Efficiency
 
 @menu
+* Tail Call: tail call.
 * Slot Access: slot access.
 * Stack Allocation: stack allocation.
 * Modular Arithmetic: modular arithmetic.
@@ -12,6 +13,134 @@
 * Global and Always-bound Variables: global and always bound variables.
 * Miscellaneous Efficiency Issues: miscellaneous efficiency issues.
 @end menu
+
+@node tail call
+@cindex tail call
+@cindex call, tail
+@section Tail Call
+
+@menu
+* Tail Call Optimization: tail call optimization.
+* Tail Position: tail position.
+* Tail Recursion: tail recursion.
+@end menu
+
+A call to a function is a tail call if nothing has to be done after
+the call returns. That is, when the call returns, the returned
+values are immediately returned from the calling function. Tail
+calls can be compiled to much more efficient code than normal code.
+See @url{https://en.wikipedia.org/wiki/Tail_call} for more.
+
+@node tail call optimization
+@cindex tail call optimization
+@cindex TCO
+@subsection Tail Call Optimization
+
+SBCL performs tail call optimization (TCO) although this is not
+required by the Common Lisp standard.
+
+In Lisp terms, you can think of TCO as converting a function call to
+a @code{psetq} that assigns the argument values to the called function's
+variables, followed by a @code{go} to the start of the called function.
+This makes clear an inherent efficiency advantage of tail calls: in
+addition to not having to allocate a stack frame, there is no need
+to prepare for the call to return (e.g. by computing a return PC).
+
+Consider the following trivial example:
+
+@example
+(defun fun1 (x)
+  (fun2 x x))
+@end example
+
+FUN1 is compiled to native code that modifies its frame
+(to have the arguments of @code{fun2} in the right places) and control is
+transferred via a single jump instruction to @code{fun2}.
+
+@cindex debug, optimization quality
+@cindex optimization quality debug
+In general, a call is compiled to a tail call if it is in
+@ref{tail position} and the @code{debug} optimization quality is at most 2.
+Thus, by default, all calls in tail position are compiled to tail
+calls. See @ref{debugging tail calls}.
+
+@node tail position
+@cindex tail position
+@subsection Tail Position
+
+A call is said to be in tail position unless it is enclosed by at
+least one of the following:
+
+@itemize
+@item a special binding (e.g. by @code{let}, @code{progv}),
+
+@item a @code{catch},
+
+@item an @code{unwind-protect},
+
+@item a @code{block} and the block name has been closed over,
+
+@item a @code{tagbody} and a @code{go} tag has been closed over.
+@end itemize
+
+These inhibit tail calls because they require cleanups when the
+stack is unwound.
+
+@node tail recursion
+@cindex tail recursion
+@cindex tail recursive
+@subsection Tail Recursion
+
+Tail recursion is when a function makes a @ref{tail call} to itself.
+In this example, the recursive call to @code{myfun} is tail-recursive:
+
+@example
+(defun myfun (x)
+  (if (oddp (random x))
+      (isqrt x)
+      (myfun (1- x))))
+@end example
+
+Because it is a @ref{tail call}, tail recursion can be compiled to much
+more efficient code than general recursion. In fact, tail recursion
+is equivalent to iteration both semantically and in efficiency.
+
+Why would you want to write a program recursively when you can write
+it using a loop? Well, the main answer is that recursion is a more
+general mechanism, so it can express some solutions simply that are
+awkward to write as a loop. Some programmers also feel that
+recursion is a stylistically preferable way to write loops because
+it avoids assigning variables. For example, instead of writing
+
+@example
+(defun fun1 (x)
+  (something x))
+
+(defun fun2 (y)
+  (other-thing y))
+
+(do ((x 7 (fun2 (fun1 x))))
+    (nil))
+@end example
+
+... you can write
+
+@example
+(defun fun1 (x)
+  (fun2 (something x)))
+
+(defun fun2 (y)
+  (fun1 (other-thing y)))
+
+(fun1 7)
+@end example
+
+The tail-recursive definition is actually more efficient, in
+addition to being (arguably) clearer. As the number of functions and
+the complexity of their call graph increases, the simplicity of
+using recursion becomes compelling. Consider the advantages of
+writing a large finite-state machine with separate tail-recursive
+functions instead of using a single huge @code{prog}.
 
 @node slot access
 @cindex slot access
@@ -413,7 +542,6 @@ sections
 @item More About Types in Python
 @item Type Inference
 @item Source Optimization
-@item Tail Recursion
 @item Local Call
 @item Block Compilation
 @item Inline Expansion

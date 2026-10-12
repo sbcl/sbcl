@@ -173,7 +173,7 @@ provide bindings for printer control variables.
 * Stack Motion: stack motion.
 * How Arguments are Printed: how arguments are printed.
 * Function Names: function names.
-* Debug Tail Recursion: debug tail recursion.
+* Debugging Tail Calls: debugging tail calls.
 * Unknown Locations and Interrupts: unknown locations and interrupts.
 @end menu
 
@@ -327,25 +327,19 @@ your program. You may also see @code{cleanup} frames during the execution
 of @code{unwind-protect} cleanup code, and @code{optional} for variable argument
 entry points.
 
-@node debug tail recursion
-@subsection Debug Tail Recursion
+@node debugging tail calls
+@subsection Debugging Tail Calls
 
-@cindex tail recursion
-@cindex recursion, tail
-The compiler is @emph{properly tail recursive}. If a function call is
-in a tail recursive position, the stack frame will be deallocated
-@emph{at the time of the call}, rather than after the call returns.
-Consider this backtrace:
+@ref{tail call optimization} can eliminate frames. Consider this backtrace:
 
 @example
 (BAR ...)
 (FOO ...)
 @end example
 
-Because of tail recursion, it is not necessarily the case that @code{foo}
+Because of tail calls, it is not necessarily the case that @code{foo}
 directly called @code{bar}. It may be that @code{foo} called some other
-function @code{foo2}, which then called @code{bar} tail-recursively, as in
-this example:
+function @code{foo2}, which then tail-called @code{bar}, as in this example:
 
 @example
 (defun foo ()
@@ -361,18 +355,9 @@ this example:
   ...)
 @end example
 
-Usually the elimination of tail-recursive frames makes debugging
-more pleasant, since these frames are mostly uninformative. If there
-is any doubt about how one function called another, it can usually
-be eliminated by finding the source location in the calling frame.
-See @ref{source location printing}.
-
-@cindex debug, optimization quality
-@cindex optimization quality debug
-The elimination of tail-recursive frames can be prevented by
-disabling tail-recursion optimization, which happens when the @code{debug}
-optimization quality is greater than 2. See
-@ref{debugger policy control}.
+If there is any doubt about how one function called another, it can
+usually be eliminated by finding the source location in the calling
+frame. See @ref{source location printing}.
 
 @node unknown locations and interrupts
 @cindex unknown code location
@@ -814,16 +799,18 @@ levels of debug information that correspond to the values of the
   arguments are available (even when @code{speed} is 3 or the argument is
   set).
 
-@item @code{> 2}: Any level greater than 2 gives level 2 and in addition
-  disables tail-call optimization, so that the backtrace will
-  contain frames for all invoked functions, even those in tail
-  positions.
+@item @code{3}: Level 2 plus all uninterned variables.
 
-@item @code{3}: Level 2 plus all uninterned variables. In addition, lifetime
-  analysis is disabled (even when @code{speed} is 3), ensuring that all
-  variable values are available at any known location within the
-  scope of the binding. This has a speed penalty in addition to the
-  obvious space penalty.
+@itemize
+@item In addition, lifetime analysis is disabled (even when @code{speed}
+     is 3), ensuring that all variable values are available at any
+     known location within the scope of the binding. This has a
+     speed penalty in addition to the obvious space penalty.
+
+@item @ref{tail call optimization} is disabled. Thus, backtraces will
+      contain frames for all invoked functions, even those in tail
+      positions.
+@end itemize
 @end itemize
 
 Inlining of local functions is inhibited so that they may be @code{trace}d.

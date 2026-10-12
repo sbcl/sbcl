@@ -131,7 +131,7 @@
   (@stack-motion section)
   (@how-arguments-are-printed section)
   (@function-names section)
-  (@debug-tail-recursion section)
+  (@debugging-tail-calls section)
   (@unknown-locations-and-interrupts section))
 
 (defsection @stack-motion (:title "Stack Motion")
@@ -239,19 +239,15 @@
   of UNWIND-PROTECT cleanup code, and `optional` for variable argument
   entry points.")
 
-(defsection @debug-tail-recursion (:title "Debug Tail Recursion")
-  "The compiler is _properly tail recursive_. If a function call is
-  in a @TAIL-RECURSIVE position, the stack frame will be deallocated
-  _at the time of the call_, rather than after the call returns.
-  Consider this backtrace:
+(defsection @debugging-tail-calls (:title "Debugging Tail Calls")
+  "@TAIL-CALL-OPTIMIZATION can eliminate frames. Consider this backtrace:
 
       (BAR ...)
       (FOO ...)
 
-  Because of tail recursion, it is not necessarily the case that `FOO`
+  Because of tail calls, it is not necessarily the case that `FOO`
   directly called `BAR`. It may be that `FOO` called some other
-  function `FOO2`, which then called `BAR` tail-recursively, as in
-  this example:
+  function `FOO2`, which then tail-called `BAR`, as in this example:
 
       (defun foo ()
         ...
@@ -265,19 +261,9 @@
       (defun bar (...)
         ...)
 
-  Usually the elimination of tail-recursive frames makes debugging
-  more pleasant, since these frames are mostly uninformative. If there
-  is any doubt about how one function called another, it can usually
-  be eliminated by finding the source location in the calling frame.
-  See @SOURCE-LOCATION-PRINTING.
-
-  The elimination of tail-recursive frames can be prevented by
-  disabling tail-recursion optimization, which happens when the @DEBUG
-  optimization quality is greater than 2. See
-  @DEBUGGER-POLICY-CONTROL."
-  ;; FIXME: reinstate this link once the chapter is in the manual. For
-  ;; a more thorough discussion of tail recursion, see @TAIL-RECURSION.
-  )
+  If there is any doubt about how one function called another, it can
+  usually be eliminated by finding the source location in the calling
+  frame. See @SOURCE-LOCATION-PRINTING.")
 
 (defsection @unknown-locations-and-interrupts
     (:title "Unknown Locations and Interrupts"
@@ -624,16 +610,16 @@
     arguments are available (even when @SPEED is 3 or the argument is
     set).
 
-  - `> 2`: Any level greater than 2 gives level 2 and in addition
-    disables tail-call optimization, so that the backtrace will
-    contain frames for all invoked functions, even those in tail
-    positions.
+  - `3`: Level 2 plus all uninterned variables.
 
-  - `3`: Level 2 plus all uninterned variables. In addition, lifetime
-    analysis is disabled (even when @SPEED is 3), ensuring that all
-    variable values are available at any known location within the
-    scope of the binding. This has a speed penalty in addition to the
-    obvious space penalty.
+      - In addition, lifetime analysis is disabled (even when @SPEED
+       is 3), ensuring that all variable values are available at any
+       known location within the scope of the binding. This has a
+       speed penalty in addition to the obvious space penalty.
+
+      - @TAIL-CALL-OPTIMIZATION is disabled. Thus, backtraces will
+        contain frames for all invoked functions, even those in tail
+        positions.
 
   Inlining of local functions is inhibited so that they may be TRACEd.
 
