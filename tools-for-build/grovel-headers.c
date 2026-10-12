@@ -24,16 +24,12 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #ifdef _WIN32
-  /* KLUDGE: From src/runtime/runtime.h, avoid double definition of
-     boolean.  We really should clean up our act on this one. */
-  #define boolean rpcndr_boolean
   #define WIN32_LEAN_AND_MEAN
   #include <windows.h>
   #include <ntstatus.h>
   #include <shlobj.h>
   #include <wincrypt.h>
   #include <winsock2.h>
-  #undef boolean
 #else
   #include <poll.h>
   #include <sys/select.h>
