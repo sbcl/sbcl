@@ -759,7 +759,7 @@ have changed the program on you.)
 
 @cindex debug, optimization quality
 @cindex optimization quality debug
-The compilation policy specified by @code{optimize} declarations
+The @ref{compiler policy} specified by @code{optimize} declarations
 affects the behavior seen in the debugger. The @code{debug} quality
 directly affects the debugger by controlling the amount of debugger
 information dumped. Other optimization qualities have indirect but
@@ -790,7 +790,7 @@ levels of debug information that correspond to the values of the
 
 @item @code{1}: Level 1 provides argument documentation (printed argument
   lists) and derived argument/result type information. This makes
-  @code{describe} more informative, and allows the compiler to do
+  @code{describe} more informative and allows the compiler to do
   compile-time argument count and type checking for any calls
   compiled at run-time. This is the default.
 

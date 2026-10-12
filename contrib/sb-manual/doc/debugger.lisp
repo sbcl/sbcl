@@ -575,7 +575,7 @@
 (defsection @debugger-policy-control (:title "Debugger Policy Control"
                                       :concepts (("debugger" "policy")
                                                  ("policy," "debugger")))
-  "The compilation policy specified by OPTIMIZE declarations
+  "The @COMPILER-POLICY specified by OPTIMIZE declarations
   affects the behavior seen in the debugger. The @DEBUG quality
   directly affects the debugger by controlling the amount of debugger
   information dumped. Other optimization qualities have indirect but
@@ -601,7 +601,7 @@
 
   - `1`: Level 1 provides argument documentation (printed argument
     lists) and derived argument/result type information. This makes
-    DESCRIBE more informative, and allows the compiler to do
+    DESCRIBE more informative and allows the compiler to do
     compile-time argument count and type checking for any calls
     compiled at run-time. This is the default.
 

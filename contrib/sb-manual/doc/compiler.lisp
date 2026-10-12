@@ -787,5 +787,5 @@
   convention.
 
   Unlike CMUCL, SBCL is able to open-code forward-referenced type
-  tests while block compiling. This helps for mutually referential
+  tests while block compiling. This helps with mutually referential
   DEFSTRUCTs in particular.")

@@ -257,10 +257,18 @@ Currently, the manual (as well as comments and all source files)
 predominantly follow U.S. spelling with a bit of British mixed in.
 Let's try to stick to U.S. spelling.
 
-Special rules:
+Special rules and common mistakes:
 
 - Use `e.g. X` and `i.e. X`. For consistency, do not use other forms
   such as `eg. X` or `i.e., X`.
+
+-  `run-time`: noun  or adjective (as in "at run-time,  we do run-time
+   type checking")
+
+- `runtime`: the low-level component of SBCL written in C
+
+- `run time`: how long something runs (as in "the run time can be
+  measure with TIME")
 
 ## Paragraph Formatting
 

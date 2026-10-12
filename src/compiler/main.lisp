@@ -12,7 +12,7 @@
 (in-package "SB-C")
 
 (defvar *block-compile-default* nil
-  "The default value for the :Block-Compile argument to COMPILE-FILE.")
+  "The default value for the :BLOCK-COMPILE argument to COMPILE-FILE.")
 
 ;;; *BLOCK-COMPILE-ARGUMENT* holds the original value of the :BLOCK-COMPILE
 ;;; argument, which overrides any internal declarations.
@@ -1931,7 +1931,7 @@ returning its filename.
 
   :EXTERNAL-FORMAT
      The external format to use when opening the source file.
-      The default is :DEFAULT which uses the SB-EXT:*DEFAULT-SOURCE-EXTERNAL-FORMAT*.
+     The default is :DEFAULT which uses the SB-EXT:*DEFAULT-SOURCE-EXTERNAL-FORMAT*.
 
   :BLOCK-COMPILE {NIL | :SPECIFIED | T}
      Determines whether multiple functions are compiled together as a unit,
