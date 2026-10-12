@@ -4,6 +4,7 @@
                          :concepts ("efficicency"))
   (@tail-call section)
   (@local-call section)
+  (@block-compilation section)
   (@slot-access section)
   (@stack-allocation section)
   (@modular-arithmetic section)
@@ -265,6 +266,115 @@
   same number of values. This may require passing extra NIL arguments
   to VALUES in some cases, but the result is more efficient, not less
   so.")
+
+(defsection @block-compilation (:title "Block Compilation"
+                                :concepts (("block compilation")
+                                           ("compilation," "block")))
+  "Block compilation allows calls to global functions defined by
+  DEFUN to be compiled as @LOCAL-CALLs. The function call can be in a
+  different top-level form than the DEFUN or even in a different file.
+
+  In addition, block compilation allows the declaration of the _entry
+  points_ to the block-compiled portion. An entry point is a function
+  that may be called from outside the block-compiled unit. If a
+  function is not an entry point, then it can be compiled more
+  efficiently since all calls are known at compile time. In
+  particular, if a function is only called in one place, then it will
+  be let converted. This effectively inline expands the function but
+  without the code duplication that results from defining the function
+  normally and then declaring it inline.
+
+  The main advantage of block compilation is that it preserves
+  efficiency in programs even when (for readability and syntactic
+  convenience) they are broken up into many small functions. There is
+  absolutely no overhead for calling a non-entry point function that
+  is defined purely for modularity (i.e. called only in one place).
+
+  Block compilation also allows for more unboxed and non-descriptor
+  arguments and @RETURN-VALUES in non-trivial programs."
+  ;; FIXME: Link to @NUMBER-LOCAL-CALL.
+  (@block-compilation-semantics section)
+  (@block-compilation-declarations section)
+  (@block-compilation-difficulties section))
+
+(defsection @block-compilation-semantics (:title "Block Compilation Semantics")
+  "The effect of block compilation can be envisioned as the compiler
+  turning all the DEFUNs in the block-compiled unit into a single
+  LABELS form. For example,
+
+      (declaim (sb-ext:start-block fun1 fun3))
+
+      (defun fun1 ()
+        ...)
+
+      (defun fun2 ()
+        ...
+        (fun1)
+        ...)
+
+      (defun fun3 (x)
+        (if x
+            (fun1)
+            (fun2)))
+
+      (declaim (sb-ext:end-block))
+
+   becomes
+
+      (labels ((fun1 ()
+                 ...)
+               (fun2 ()
+                 ...
+                 (fun1)
+                 ...)
+               (fun3 (x)
+                 (if x
+                     (fun1)
+                     (fun2))))
+        (setf (fdefinition 'fun1) #'fun1)
+        (setf (fdefinition 'fun3) #'fun3))
+
+  Calls between the block-compiled functions are @LOCAL-CALLs, so
+  changing the global definition of `FUN1` will have no effect on what
+  `FUN2` does; `FUN2` will keep calling the old `FUN1`.
+
+  The entry points `FUN1` and `FUN3` are still installed in
+  SYMBOL-FUNCTION as the global definitions of the functions, so a
+  @FULL-CALL to an entry point works just as before. However, `FUN2`
+  is not an entry point, so it is not globally defined. In addition,
+  `FUN2` is only called in one place, so it will be let converted.")
+
+(defsection @block-compilation-declarations
+    (:title "Block Compilation Declarations"
+     :concepts (("block compilation" "declarations")))
+  "The following declarations allow fine-grained control of block
+  compilation. They are only legal as global declarations (DECLAIM or
+  PROCLAIM)."
+  (sb-ext:start-block declaration)
+  (sb-ext:end-block declaration))
+
+(defsection @block-compilation-difficulties
+    (:title "Block Compilation Difficulties")
+  "The main problem with block compilation is that the compiler uses
+  large amounts of memory when it is block compiling. This places an
+  upper limit on the amount of code that can be block compiled as a
+  unit. To make best use of block compilation, it is necessary to
+  locate the parts of the program containing many internal calls, and
+  then add the appropriate SB-EXT:START-BLOCK declarations. When
+  writing new code, it is a good idea to put in block compilation
+  declarations from the very beginning, since writing block
+  declarations correctly requires accurate knowledge of the program's
+  function call structure. If you want to initially develop code with
+  full incremental redefinition, you can compile with
+  SB-EXT:*BLOCK-COMPILE-DEFAULT* set to NIL (the default).
+
+  Note that if a DEFUN appears in a non-null lexical environment, then
+  calls to it cannot be block compiled.
+
+  Unless files are very small, it is probably impractical to block
+  compile multiple files as a unit by specifying a list of files to
+  COMPILE-FILE. @SEMI-INLINE expansion provides another way to extend
+  block compilation across file boundaries.")
 
 (defsection @slot-access (:title "Slot Access"
                           :concepts (("slot" "access")))
@@ -572,7 +682,6 @@
   - More About Types in Python
   - Type Inference
   - Source Optimization
-  - Block Compilation
   - Inline Expansion
   - Object Representation
   - Numbers

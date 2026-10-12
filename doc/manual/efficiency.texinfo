@@ -7,6 +7,7 @@
 @menu
 * Tail Call: tail call.
 * Local Call: local call.
+* Block Compilation: block compilation.
 * Slot Access: slot access.
 * Stack Allocation: stack allocation.
 * Modular Arithmetic: modular arithmetic.
@@ -340,6 +341,155 @@ ones), you should write functions so that they always return the
 same number of values. This may require passing extra @code{nil} arguments
 to @code{values} in some cases, but the result is more efficient, not less
 so.
+
+@node block compilation
+@cindex block compilation
+@cindex compilation, block
+@section Block Compilation
+
+@menu
+* Block Compilation Semantics: block compilation semantics.
+* Block Compilation Declarations: block compilation declarations.
+* Block Compilation Difficulties: block compilation difficulties.
+@end menu
+
+Block compilation allows calls to global functions defined by
+@code{defun} to be compiled as @ref{local call}s. The function call can be in a
+different top-level form than the @code{defun} or even in a different file.
+
+In addition, block compilation allows the declaration of the @emph{entry
+points} to the block-compiled portion. An entry point is a function
+that may be called from outside the block-compiled unit. If a
+function is not an entry point, then it can be compiled more
+efficiently since all calls are known at compile time. In
+particular, if a function is only called in one place, then it will
+be let converted. This effectively inline expands the function but
+without the code duplication that results from defining the function
+normally and then declaring it inline.
+
+The main advantage of block compilation is that it preserves
+efficiency in programs even when (for readability and syntactic
+convenience) they are broken up into many small functions. There is
+absolutely no overhead for calling a non-entry point function that
+is defined purely for modularity (i.e. called only in one place).
+
+@cindex return values
+Block compilation also allows for more unboxed and non-descriptor
+arguments and return values in non-trivial programs.
+
+@node block compilation semantics
+@subsection Block Compilation Semantics
+
+The effect of block compilation can be envisioned as the compiler
+turning all the @code{defun}s in the block-compiled unit into a single
+@code{labels} form. For example,
+
+@example
+(declaim (sb-ext:start-block fun1 fun3))
+
+(defun fun1 ()
+  ...)
+
+(defun fun2 ()
+  ...
+  (fun1)
+  ...)
+
+(defun fun3 (x)
+  (if x
+      (fun1)
+      (fun2)))
+
+(declaim (sb-ext:end-block))
+@end example
+
+ becomes
+
+@example
+(labels ((fun1 ()
+           ...)
+         (fun2 ()
+           ...
+           (fun1)
+           ...)
+         (fun3 (x)
+           (if x
+               (fun1)
+               (fun2))))
+  (setf (fdefinition 'fun1) #'fun1)
+  (setf (fdefinition 'fun3) #'fun3))
+@end example
+
+Calls between the block-compiled functions are @ref{local call}s, so
+changing the global definition of @code{fun1} will have no effect on what
+@code{fun2} does; @code{fun2} will keep calling the old @code{fun1}.
+
+@cindex full call
+@cindex call, full
+@cindex function call, full
+The entry points @code{fun1} and @code{fun3} are still installed in
+@code{symbol-function} as the global definitions of the functions, so a
+full call to an entry point works just as before. However, @code{fun2}
+is not an entry point, so it is not globally defined. In addition,
+@code{fun2} is only called in one place, so it will be let converted.
+
+@node block compilation declarations
+@cindex block compilation declarations
+@subsection Block Compilation Declarations
+
+The following declarations allow fine-grained control of block
+compilation. They are only legal as global declarations (@code{declaim} or
+@code{proclaim}).
+
+@anchor{Declaration sb-ext start-block}
+@ddindex @sortas{start-block sb-ext} start-block [sb-ext]
+@deffn{Declaration} sb-ext:start-block
+Syntax: @code{(sb-ext:start-block &rest entry-point-names)}
+
+Only valid as a global proclamation.
+
+When processed by the compiler, this declaration marks the start of
+@ref{block compilation} and specifies the entry points to that
+block. If no entry points are specified, then all functions are made
+into entry points. If already block compiling, then the compiler ends
+the current block and starts a new one.
+@end deffn
+@anchor{Declaration sb-ext end-block}
+@ddindex @sortas{end-block sb-ext} end-block [sb-ext]
+@deffn{Declaration} sb-ext:end-block
+Syntax: @code{(sb-ext:end-block &rest symbols)}
+
+Only valid as a global proclamation.
+
+The end-block declaration ends a @ref{block compilation} unit
+without starting a new one. This is useful mainly when only a portion
+of a file is worth block compiling.
+@end deffn
+@node block compilation difficulties
+@subsection Block Compilation Difficulties
+
+The main problem with block compilation is that the compiler uses
+large amounts of memory when it is block compiling. This places an
+upper limit on the amount of code that can be block compiled as a
+unit. To make best use of block compilation, it is necessary to
+locate the parts of the program containing many internal calls, and
+then add the appropriate @code{sb-ext:start-block} declarations. When
+writing new code, it is a good idea to put in block compilation
+declarations from the very beginning, since writing block
+declarations correctly requires accurate knowledge of the program's
+function call structure. If you want to initially develop code with
+full incremental redefinition, you can compile with
+@code{sb-ext:*block-compile-default*} set to @code{nil} (the default).
+
+Note that if a @code{defun} appears in a non-null lexical environment, then
+calls to it cannot be block compiled.
+
+@cindex inline, semi
+@cindex semi-inline
+Unless files are very small, it is probably impractical to block
+compile multiple files as a unit by specifying a list of files to
+@code{compile-file}. semi inline expansion provides another way to extend
+block compilation across file boundaries.
 
 @node slot access
 @cindex slot access
@@ -742,8 +892,6 @@ sections
 @item More About Types in Python
 @item Type Inference
 @item Source Optimization
-@item Local Call
-@item Block Compilation
 @item Inline Expansion
 @item Object Representation
 @item Numbers

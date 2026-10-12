@@ -95,6 +95,10 @@
                                    ("call," "full")
                                    ("function call," "full"))))
 
+;;; There is no such section.
+(define-concept @full-call (:title "full call"
+                            :keys (~full-call)))
+
 (define-concept ~local-self-recursive-call
     (:keys (("local call," "self-recursive")
             ("call," "local" "self-recursive")

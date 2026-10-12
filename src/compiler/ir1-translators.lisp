@@ -131,6 +131,29 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
           (when else-ctran
             (ir1-convert else-ctran next result else)))))))
 
+(declaim (declaration start-block end-block))
+#-sb-xc-host
+(setf (documentation 'start-block 'declaration)
+      "Syntax: `(SB-EXT:START-BLOCK &REST ENTRY-POINT-NAMES)`
+
+Only valid as a global proclamation.
+
+When processed by the compiler, this declaration marks the start of a
+SB-MANUAL:@BLOCK-COMPILATION unit and specifies the entry points to
+that block. If no entry points are specified, then all functions are
+made into entry points. If already block compiling, then the compiler
+ends the current block and starts a new one.")
+
+#-sb-xc-host
+(setf (documentation 'end-block 'declaration)
+      "Syntax: `(SB-EXT:END-BLOCK &REST SYMBOLS)`
+
+Only valid as a global proclamation.
+
+This declaration ends a SB-MANUAL:@BLOCK-COMPILATION unit without
+starting a new one. This is useful mainly when only a portion of a
+file is worth block compiling.")
+
 (def-ir1-translator to-lvar ((lvar block form) start next result)
   (ir1-convert start (block-start block) lvar form))
 
