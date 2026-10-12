@@ -3,6 +3,7 @@
 (defsection @efficiency (:title "Efficiency"
                          :concepts ("efficicency"))
   (@tail-call section)
+  (@local-call section)
   (@slot-access section)
   (@stack-allocation section)
   (@modular-arithmetic section)
@@ -10,14 +11,14 @@
   (@global-and-always-bound-variables section)
   (@miscellaneous-efficiency-issues section))
 
-(defsection @tail-call (:title "Tail Call"
-                        :concepts (("tail" "call")
-                                   ("call," "tail")))
+(defsection @tail-call (:title "Tail Call")
   "A call to a function is a tail call if nothing has to be done after
   the call returns. That is, when the call returns, the returned
   values are immediately returned from the calling function. Tail
   calls can be compiled to much more efficient code than normal code.
-  See <https://en.wikipedia.org/wiki/Tail_call> for more."
+  See <https://en.wikipedia.org/wiki/Tail_call> for more.
+
+  Note that both @LOCAL-CALLs and full calls can be tail calls."
   (@tail-call-optimization section)
   (@tail-position section)
   (@tail-recursion section))
@@ -115,6 +116,153 @@
   writing a large finite-state machine with separate tail-recursive
   functions instead of using a single huge PROG.")
 
+(defsection @local-call (:title "Local Call"
+                         :concepts (("local" "call")
+                                    ("call," "local")
+                                    ("function call," "local")))
+
+  "The compiler supports two kinds of function call: full call and local
+  call. Full call is the standard calling convention; its late binding
+  and generality make Lisp what it is but create unavoidable
+  overheads. When the compiler can compile the calling function and
+  the called function simultaneously, it can use local call to avoid
+  some of this overhead. Local call is really a collection of
+  compilation strategies that omit some aspect of full call. In some
+  cases, local call can be totally free.
+
+  Local call makes the use of the lexical function binding forms FLET
+  and LABELS much more efficient. A local call is always faster than a
+  full call, and in many cases it is much faster. Similarly, local
+  call is a natural approach to block compilation (see COMPILE-FILE),
+  a compilation technique that resolves function references at compile
+  time. Block compilation speeds up function calls but increases
+  compilation times and prevents function redefinition."
+  (@self-recursive-local-call section)
+  (@let-call section)
+  (@local-calls-to-closures section)
+  (@local-tail-call section)
+  (@local-call-return-values section))
+
+(defsection @self-recursive-local-call (:title "Self-recursive Local Call")
+  "@LOCAL-CALL is used when a function defined by DEFUN calls
+  itself and block compilation is used (see COMPILE-FILE). For
+  example:
+
+      (defun fact (n)
+        (if (zerop n)
+            1
+            (* n (fact (1- n)))))
+
+  This use of local call speeds recursion but can also complicate
+  debugging since TRACE will only show the first call to FACT and not
+  the recursive calls. This is because the recursive calls directly
+  jump to the start of the function and don't indirect through
+  SYMBOL-FUNCTION. This is similar to @DEBUGGING-TAIL-CALLS.")
+
+(defsection @let-call (:title "Let Call")
+  "Because @LOCAL-CALL avoids unnecessary call overheads, the compiler
+  internally uses local call to implement some macros and special
+  forms that are not normally thought of as involving a function call.
+  For example, this LET:
+
+      (let ((a (foo))
+            (b (bar)))
+        ...)
+
+  is internally represented as though it was macroexpanded into:
+
+      (funcall #'(lambda (a b)
+                   ...)
+               (foo)
+               (bar))
+
+  which results in just as good code as compiling LET directly, but it
+  also benefits local calls that are semantically the same as LET. For
+  example, these definitions are all the same as far as the compiler
+  is concerned:
+
+      (defun foo ()
+        ...some other stuff...
+        (let ((a something))
+          ...some stuff...))
+
+      (defun foo ()
+        (flet ((localfun (a)
+                 ...some stuff...))
+          ...some other stuff...
+          (localfun something)))
+
+      (defun foo ()
+        (let ((funvar #'(lambda (a)
+                          ...some stuff...)))
+          ...some other stuff...
+          (funcall funvar something)))
+
+  Although local call is most efficient when the function is called
+  only once, a call doesn't have to be equivalent to a LET to be more
+  efficient than full call. All local calls avoid the overhead of
+  argument count checking and keyword argument parsing, and there are
+  a number of other advantages that apply in many common situations."
+  ;; FIXME: See @LET-OPTIMIZATION} for a discussion of the
+  ;; optimizations done on let calls.
+  )
+
+(defsection @local-calls-to-closures (:title "Local Calls to Closures")
+  "@LOCAL-CALL allows for much more efficient use of closures, since the
+  closure environment doesn't need to be allocated on the heap or even
+  stored in memory at all. In this example, there is no penalty for
+  `LOCALFUN` referencing `A` and `B`:
+
+      (defun foo (a b)
+        (flet ((localfun (x)
+                 (1+ (* a b x))))
+          (if (= a b)
+              (localfun (- a))
+              (localfun a))))
+
+  In local call, the compiler effectively passes closed-over values as
+  extra arguments, so there is no need for you to \"optimize\"
+  `LOCALFUN` by explicitly passing in lexically visible values."
+  ;; FIXME: Closures may also be subject to @LET-OPTIMIZATION.
+  "> _Note_: indirect value cells are currently always allocated on the
+  > heap when a variable is both assigned to (with SETQ or SETF) and
+  > closed over, regardless of whether the closure is a local function
+  > or not. This is another reason to avoid setting variables when you
+  > don't have to.")
+
+(defsection @local-tail-call (:title "Local Tail Call")
+  "Local tail calls are particularly efficient because they combine the
+  benefits of @LOCAL-CALLs (simplified calling convention) and
+  @TAIL-CALLs (reusing the stack frame). Scheme programmers write
+  loops with tail-recursive local calls instead of using the
+  imperative GO and SETQ. This has not caught on in the Common Lisp
+  community for historical reasons and because the standard does not
+  require tail calls. In SBCL, users can choose to write loops such as
+
+      (defun recurse-fact (n)
+        (labels ((loop* (n total)
+                   (if (zerop n)
+                       total
+                       (loop* (1- n) (* n total)))))
+          (loop* n 1)))
+
+  which is compiled to just as efficient code as
+
+      (defun loop-fact (n)
+        (let ((r 1))
+          (loop for i downfrom n above 0
+                do (setq r (* i r)))
+           r))")
+
+(defsection @local-call-return-values (:title "Local Call Return Values")
+  "One of the more subtle costs of full call comes from allowing
+  arbitrary numbers of return values. This overhead can be avoided in
+  local calls to functions that always return the same number of
+  values. For efficiency reasons (as well as stylistic ones), you
+  should write functions so that they always return the same number of
+  values. This may require passing extra NIL arguments to VALUES in
+  some cases, but the result is more efficient, not less so.")
+
 (defsection @slot-access (:title "Slot Access"
                           :concepts (("slot" "access")))
   (@structure-object-slot-access section)
@@ -137,8 +285,8 @@
   cost is roughly 1.6 times that of an open coded structure slot
   accessor.
 
-  Second most efficient way is to use a CLOS slot accessor, or
-  SLOT-VALUE with a constant slot name argument, but in circumstances
+  Second most efficient way is to use a CLOS slot accessor or
+  SLOT-VALUE with a constant slot name argument but in circumstances
   other than specified above. This may be up to 3 times as slow as the
   method described above.
 
@@ -421,7 +569,6 @@
   - More About Types in Python
   - Type Inference
   - Source Optimization
-  - Local Call
   - Block Compilation
   - Inline Expansion
   - Object Representation

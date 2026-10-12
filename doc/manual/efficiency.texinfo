@@ -6,6 +6,7 @@
 
 @menu
 * Tail Call: tail call.
+* Local Call: local call.
 * Slot Access: slot access.
 * Stack Allocation: stack allocation.
 * Modular Arithmetic: modular arithmetic.
@@ -15,8 +16,6 @@
 @end menu
 
 @node tail call
-@cindex tail call
-@cindex call, tail
 @section Tail Call
 
 @menu
@@ -30,6 +29,8 @@ the call returns. That is, when the call returns, the returned
 values are immediately returned from the calling function. Tail
 calls can be compiled to much more efficient code than normal code.
 See @url{https://en.wikipedia.org/wiki/Tail_call} for more.
+
+Note that both @ref{local call}s and full calls can be tail calls.
 
 @node tail call optimization
 @cindex tail call optimization
@@ -142,6 +143,180 @@ using recursion becomes compelling. Consider the advantages of
 writing a large finite-state machine with separate tail-recursive
 functions instead of using a single huge @code{prog}.
 
+@node local call
+@cindex local call
+@cindex call, local
+@cindex function call, local
+@section Local Call
+
+@menu
+* Self-recursive Local Call: self recursive local call.
+* Let Call: let call.
+* Local Calls to Closures: local calls to closures.
+* Local Tail Call: local tail call.
+* Local Call Return Values: local call return values.
+@end menu
+
+The compiler supports two kinds of function call: full call and local
+call. Full call is the standard calling convention; its late binding
+and generality make Lisp what it is but create unavoidable
+overheads. When the compiler can compile the calling function and
+the called function simultaneously, it can use local call to avoid
+some of this overhead. Local call is really a collection of
+compilation strategies that omit some aspect of full call. In some
+cases, local call can be totally free.
+
+Local call makes the use of the lexical function binding forms @code{flet}
+and @code{labels} much more efficient. A local call is always faster than a
+full call, and in many cases it is much faster. Similarly, local
+call is a natural approach to block compilation (see @code{compile-file}),
+a compilation technique that resolves function references at compile
+time. Block compilation speeds up function calls but increases
+compilation times and prevents function redefinition.
+
+@node self recursive local call
+@subsection Self-recursive Local Call
+
+@ref{local call} is used when a function defined by @code{defun} calls
+itself and block compilation is used (see @code{compile-file}). For
+example:
+
+@example
+(defun fact (n)
+  (if (zerop n)
+      1
+      (* n (fact (1- n)))))
+@end example
+
+This use of local call speeds recursion but can also complicate
+debugging since @code{trace} will only show the first call to FACT and not
+the recursive calls. This is because the recursive calls directly
+jump to the start of the function and don't indirect through
+@code{symbol-function}. This is similar to @ref{debugging tail calls}.
+
+@node let call
+@subsection Let Call
+
+Because @ref{local call} avoids unnecessary call overheads, the compiler
+internally uses local call to implement some macros and special
+forms that are not normally thought of as involving a function call.
+For example, this @code{let}:
+
+@example
+(let ((a (foo))
+      (b (bar)))
+  ...)
+@end example
+
+is internally represented as though it was macroexpanded into:
+
+@example
+(funcall #'(lambda (a b)
+             ...)
+         (foo)
+         (bar))
+@end example
+
+which results in just as good code as compiling @code{let} directly, but it
+also benefits local calls that are semantically the same as @code{let}. For
+example, these definitions are all the same as far as the compiler
+is concerned:
+
+@example
+(defun foo ()
+  ...some other stuff...
+  (let ((a something))
+    ...some stuff...))
+
+(defun foo ()
+  (flet ((localfun (a)
+           ...some stuff...))
+    ...some other stuff...
+    (localfun something)))
+
+(defun foo ()
+  (let ((funvar #'(lambda (a)
+                    ...some stuff...)))
+    ...some other stuff...
+    (funcall funvar something)))
+@end example
+
+Although local call is most efficient when the function is called
+only once, a call doesn't have to be equivalent to a @code{let} to be more
+efficient than full call. All local calls avoid the overhead of
+argument count checking and keyword argument parsing, and there are
+a number of other advantages that apply in many common situations.
+
+@node local calls to closures
+@subsection Local Calls to Closures
+
+@ref{local call} allows for much more efficient use of closures, since the
+closure environment doesn't need to be allocated on the heap or even
+stored in memory at all. In this example, there is no penalty for
+@code{localfun} referencing @code{a} and @code{b}:
+
+@example
+(defun foo (a b)
+  (flet ((localfun (x)
+           (1+ (* a b x))))
+    (if (= a b)
+        (localfun (- a))
+        (localfun a))))
+@end example
+
+In local call, the compiler effectively passes closed-over values as
+extra arguments, so there is no need for you to "optimize"
+@code{localfun} by explicitly passing in lexically visible values.
+
+@quotation
+@emph{Note}: indirect value cells are currently always allocated on the
+heap when a variable is both assigned to (with @code{setq} or @code{setf}) and
+closed over, regardless of whether the closure is a local function
+or not. This is another reason to avoid setting variables when you
+don't have to.
+@end quotation
+
+@node local tail call
+@subsection Local Tail Call
+
+Local tail calls are particularly efficient because they combine the
+benefits of @ref{local call}s (simplified calling convention) and
+@ref{tail call}s (reusing the stack frame). Scheme programmers write
+loops with tail-recursive local calls instead of using the
+imperative @code{go} and @code{setq}. This has not caught on in the Common Lisp
+community for historical reasons and because the standard does not
+require tail calls. In SBCL, users can choose to write loops such as
+
+@example
+(defun recurse-fact (n)
+  (labels ((loop* (n total)
+             (if (zerop n)
+                 total
+                 (loop* (1- n) (* n total)))))
+    (loop* n 1)))
+@end example
+
+which is compiled to just as efficient code as
+
+@example
+(defun loop-fact (n)
+  (let ((r 1))
+    (loop for i downfrom n above 0
+          do (setq r (* i r)))
+     r))
+@end example
+
+@node local call return values
+@subsection Local Call Return Values
+
+One of the more subtle costs of full call comes from allowing
+arbitrary numbers of return values. This overhead can be avoided in
+local calls to functions that always return the same number of
+values. For efficiency reasons (as well as stylistic ones), you
+should write functions so that they always return the same number of
+values. This may require passing extra @code{nil} arguments to @code{values} in
+some cases, but the result is more efficient, not less so.
+
 @node slot access
 @cindex slot access
 @section Slot Access
@@ -170,8 +345,8 @@ specializer parameter of the method and is never assigned to. The
 cost is roughly 1.6 times that of an open coded structure slot
 accessor.
 
-Second most efficient way is to use a CLOS slot accessor, or
-@code{slot-value} with a constant slot name argument, but in circumstances
+Second most efficient way is to use a CLOS slot accessor or
+@code{slot-value} with a constant slot name argument but in circumstances
 other than specified above. This may be up to 3 times as slow as the
 method described above.
 
