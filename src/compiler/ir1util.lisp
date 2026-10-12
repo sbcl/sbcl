@@ -687,11 +687,13 @@
                                       (fun-type-returns fun-type)
                                       *wild-type*)))
                    (derive-node-type combination
-                                     (if derived
-                                         (let ((int (values-type-intersection derived declared)))
-                                           (aver (not (eq int *empty-type*)))
-                                           int)
-                                         declared)
+                                     (cond ((and derived
+                                                 (not (eq derived *empty-type*)))
+                                            (let ((int (values-type-intersection derived declared)))
+                                              (aver (not (eq int *empty-type*)))
+                                              int))
+                                           (t
+                                            declared))
                                      :from-scratch t)
                    (erase (node-lvar combination) nil))))
              (erase (lvar nth-value)

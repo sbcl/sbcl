@@ -1163,3 +1163,11 @@
            (values (f n)
                    (f (the integer (- b 77371252455336267181195265))))))
     ((-1 -3) (values 1021 1022))))
+
+(with-test (:name :erase-lvar-type-nil)
+  (checked-compile-and-assert
+      ()
+      `(lambda (n d)
+         (declare ((integer -5 -1) d))
+         (- (floor n (floor d 9))))
+    ((10 -2) 10)))
