@@ -293,7 +293,7 @@
 ;;; and should be checked externally -- that is, by the callee and not the caller.
 (defun cast-externally-checkable-p (cast)
   (declare (type cast cast))
-  (multiple-value-bind (dest lvar ref) (immediately-used-let-dest cast)
+  (multiple-value-bind (dest lvar ref) (immediately-used-let-dest cast :single-ref t)
     (let* ((context
              ;; Don't remove casts with a context
              (and

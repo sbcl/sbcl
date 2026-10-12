@@ -1151,3 +1151,15 @@
                    (go b))))))
     ((nil) nil)
     ((t) nil)))
+
+(with-test (:name :cast-externally-checkable-p-single-use)
+  (checked-compile-and-assert
+      ()
+      `(lambda (b n)
+         (declare ((rational (-1023) (1023)) b)
+                  (fixnum n))
+         (flet ((f (m)
+                  (logand m 1023)))
+           (values (f n)
+                   (f (the integer (- b 77371252455336267181195265))))))
+    ((-1 -3) (values 1021 1022))))

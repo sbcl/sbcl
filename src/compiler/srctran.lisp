@@ -4438,7 +4438,7 @@
 (defun cast-or-check-bound-type (node &optional type fixnum)
   (unless (and type
                (csubtypep (single-value-type (node-derived-type node)) type))
-    (multiple-value-bind (dest dest-lvar) (immediately-used-let-dest node t)
+    (multiple-value-bind (dest dest-lvar) (immediately-used-let-dest node :flushable t)
       (let ((cast-type (cond ((cast-p dest)
                               (and (cast-type-check dest)
                                    (single-value-type (cast-type-to-check dest))))

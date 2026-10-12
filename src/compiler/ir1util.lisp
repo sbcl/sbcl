@@ -347,22 +347,24 @@
 (defmacro lvar-intersection  (lvar type)
   `(type-intersection (lvar-type ,lvar) (specifier-type ',type)))
 
-(defun immediately-used-let-dest (node &optional flushable)
+(defun immediately-used-let-dest (node &key flushable single-ref)
   (let ((lvar (node-lvar node)))
     (when lvar
       (let ((dest (lvar-dest lvar)))
         (when (almost-immediately-used-p lvar node :flushable flushable)
           (if (and (combination-p dest)
                    (eq (combination-kind dest) :local))
-              (let* ((fun (combination-lambda dest))
-                     (n (position-or-lose lvar
-                                          (combination-args dest)))
-                     (var (nth n (lambda-vars fun)))
-                     (refs (leaf-refs var)))
-                (loop for ref in refs
-                      for lvar = (node-lvar ref)
-                      when (and lvar (almost-immediately-used-p lvar (lambda-bind fun) :flushable flushable))
-                      do (return (values (lvar-dest lvar) lvar ref))))
+              (let ((fun (combination-lambda dest)))
+                (unless (and single-ref
+                             (cdr (leaf-refs fun)))
+                  (let* ((n (position-or-lose lvar
+                                              (combination-args dest)))
+                         (var (nth n (lambda-vars fun)))
+                         (refs (leaf-refs var)))
+                    (loop for ref in refs
+                          for lvar = (node-lvar ref)
+                          when (and lvar (almost-immediately-used-p lvar (lambda-bind fun) :flushable flushable))
+                          do (return (values (lvar-dest lvar) lvar ref))))))
               (values dest lvar)))))))
 
 (defun mv-let-arg-vars (arg fun &optional (call (let-combination fun)))
