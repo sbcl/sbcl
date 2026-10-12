@@ -1171,3 +1171,22 @@
          (declare ((integer -5 -1) d))
          (- (floor n (floor d 9))))
     ((10 -2) 10)))
+
+(with-test (:name :ir1-finalize-delete-cast-update-tail-set-type)
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (LABELS ((F ()
+                 -15)
+               (G ()
+                 (the (INTEGER -32768) (F))))
+        (DECLARE (notinline f g))
+        (+
+         (FLET ((H ()
+                  (CASE -40562343327224770087344708517377
+                    (2 (f))
+                    (T -40562343327224770087344708517377))))
+           (DECLARE (notinline h))
+           (H))
+         (G))))
+   (() -40562343327224770087344708517392)))

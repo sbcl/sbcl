@@ -120,9 +120,13 @@
                       (note-optimistic-change dest))))))
             (dolist (fun funs)
               (setf (lambda-tail-set fun) call-set))
+
             (setf (tail-set-funs call-set)
                   (nconc (tail-set-funs call-set) funs)
-                  (tail-set-recursive-type call-set) nil))
+                  (tail-set-recursive-type call-set) nil
+                  (tail-set-type call-set)
+                  (values-type-union (tail-set-type call-set)
+                                     (tail-set-type fun-set))))
           (reoptimize-lvar (return-result return))
           t)))))
 
