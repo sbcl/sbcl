@@ -1243,24 +1243,6 @@
            ;; Interval with no bounds
            t))))
 
-;;; Determine whether two intervals X and Y intersect. Return T if so.
-;;; If CLOSED-INTERVALS-P is T, the treat the intervals as if they
-;;; were closed. Otherwise the intervals are treated as they are.
-;;;
-;;; Thus if X = [0, 1) and Y = (1, 2), then they do not intersect
-;;; because no element in X is in Y. However, if CLOSED-INTERVALS-P
-;;; is T, then they do intersect because we use the closure of X = [0,
-;;; 1] and Y = [1, 2] to determine intersection.
-(defun interval-intersect-p (x y &optional closed-intervals-p)
-  (declare (type interval x y))
-  (and (interval-intersection/difference (if closed-intervals-p
-                                             (interval-closure x)
-                                             x)
-                                         (if closed-intervals-p
-                                             (interval-closure y)
-                                             y))
-       t))
-
 ;;; Are the two intervals adjacent?  That is, is there a number
 ;;; between the two intervals that is not an element of either
 ;;; interval?  If so, they are not adjacent. For example [0, 1) and
@@ -1290,19 +1272,14 @@
 ;;;
 ;;; For example, let X = [1,5] and Y = [-1,3). Then I = [1,3) and D =
 ;;; [-1,1) union [3,5], which is returned as a list of two intervals.
-(defun interval-intersection/difference (x y)
+(defun %interval-intersection (x y)
   (declare (type interval x y))
   (let ((x-lo (interval-low x))
         (x-hi (interval-high x))
         (y-lo (interval-low y))
         (y-hi (interval-high y)))
     (labels
-        ((opposite-bound (p)
-           ;; If p is an open bound, make it closed. If p is a closed
-           ;; bound, make it open.
-           (if (listp p)
-               (first p)
-               (list p)))
+        (
          (test-number (p int bound)
            ;; Test whether P is in the interval.
            (let ((pn (type-bound-number p)))
@@ -1346,24 +1323,70 @@
             (x-hi-in-y (test-upper-bound x-hi y))
             (y-lo-in-x (test-lower-bound y-lo x))
             (y-hi-in-x (test-upper-bound y-hi x)))
-        (cond ((or x-lo-in-y x-hi-in-y y-lo-in-x y-hi-in-x)
-               ;; Intervals intersect. Let's compute the intersection
-               ;; and the difference.
-               (multiple-value-bind (lo left-lo left-hi)
-                   (cond (x-lo-in-y (values x-lo y-lo (opposite-bound x-lo)))
-                         (y-lo-in-x (values y-lo x-lo (opposite-bound y-lo))))
-                 (multiple-value-bind (hi right-lo right-hi)
-                     (cond (x-hi-in-y
-                            (values x-hi (opposite-bound x-hi) y-hi))
+        (values x-lo-in-y x-hi-in-y y-lo-in-x y-hi-in-x
+                x-lo y-lo x-hi y-hi)))))
+
+(defun interval-intersection/difference (x y)
+  (multiple-value-bind (x-lo-in-y x-hi-in-y y-lo-in-x y-hi-in-x
+                        x-lo y-lo x-hi y-hi)
+      (%interval-intersection x y)
+    (flet ((opposite-bound (p)
+             ;; If p is an open bound, make it closed. If p is a closed
+             ;; bound, make it open.
+             (if (listp p)
+                 (first p)
+                 (list p))))
+      (cond ((or x-lo-in-y x-hi-in-y y-lo-in-x y-hi-in-x)
+             ;; Intervals intersect. Let's compute the intersection
+             ;; and the difference.
+             (multiple-value-bind (lo left-lo left-hi)
+                 (cond (x-lo-in-y (values x-lo y-lo (opposite-bound x-lo)))
+                       (y-lo-in-x (values y-lo x-lo (opposite-bound y-lo))))
+               (multiple-value-bind (hi right-lo right-hi)
+                   (cond (x-hi-in-y
+                          (values x-hi (opposite-bound x-hi) y-hi))
+                         (y-hi-in-x
+                          (values y-hi (opposite-bound y-hi) x-hi)))
+                 (values (make-interval :low lo :high hi)
+                         (list (make-interval :low left-lo
+                                              :high left-hi)
+                               (make-interval :low right-lo
+                                              :high right-hi))))))
+            (t
+             (values nil (list x y)))))))
+
+(defun interval-intersection (x y)
+  (multiple-value-bind (x-lo-in-y x-hi-in-y y-lo-in-x y-hi-in-x
+                        x-lo y-lo x-hi y-hi)
+      (%interval-intersection x y)
+    (cond ((or x-lo-in-y x-hi-in-y y-lo-in-x y-hi-in-x)
+           (let ((lo (cond (x-lo-in-y x-lo)
+                           (y-lo-in-x y-lo)))
+                 (hi (cond (x-hi-in-y
+                            x-hi)
                            (y-hi-in-x
-                            (values y-hi (opposite-bound y-hi) x-hi)))
-                   (values (make-interval :low lo :high hi)
-                           (list (make-interval :low left-lo
-                                                :high left-hi)
-                                 (make-interval :low right-lo
-                                                :high right-hi))))))
-              (t
-               (values nil (list x y))))))))
+                            y-hi))))
+             (make-interval :low lo :high hi))))))
+
+;;; Determine whether two intervals X and Y intersect. Return T if so.
+;;; If CLOSED-INTERVALS-P is T, the treat the intervals as if they
+;;; were closed. Otherwise the intervals are treated as they are.
+;;;
+;;; Thus if X = [0, 1) and Y = (1, 2), then they do not intersect
+;;; because no element in X is in Y. However, if CLOSED-INTERVALS-P
+;;; is T, then they do intersect because we use the closure of X = [0,
+;;; 1] and Y = [1, 2] to determine intersection.
+(defun interval-intersect-p (x y &optional closed-intervals-p)
+  (declare (type interval x y))
+  (multiple-value-bind (x-lo-in-y x-hi-in-y y-lo-in-x y-hi-in-x)
+      (%interval-intersection (if closed-intervals-p
+                                  (interval-closure x)
+                                  x)
+                              (if closed-intervals-p
+                                  (interval-closure y)
+                                  y))
+    (and (or x-lo-in-y x-hi-in-y y-lo-in-x y-hi-in-x)
+         t)))
 
 ;;; If intervals X and Y intersect, return a new interval that is the
 ;;; union of the two. If they do not intersect, return NIL.
@@ -2527,11 +2550,11 @@
                                   (interval-high quot)
                                   nil)))))))
 
-(defun truncate-derive-type-rem (number-type divisor-type)
+(defun truncate-derive-type-rem (number-type divisor-type &optional quotient-type)
   (let* ((rem-type (rem-result-type number-type divisor-type))
          (number-interval (numeric-type->interval number-type))
          (divisor-interval (numeric-type->interval divisor-type))
-         (rem (truncate-rem-bound number-interval divisor-interval)))
+         (rem (truncate-rem-bound number-interval divisor-interval quotient-type)))
     (cond ((and (numberp (interval-low divisor-interval))
                 (numberp (interval-high divisor-interval))
                 (zerop (interval-low divisor-interval))
@@ -2564,7 +2587,7 @@
               (numeric-type-real-p div))
          (truncate-derive-type-quot num div))))
 
-(defun truncate-derive-type-rem-aux (num div same-arg &optional float)
+(defun truncate-derive-type-rem-aux (num div same-arg &optional float quotient-type)
   (cond (same-arg
          (type-intersection
           (numeric-contagion num div)
@@ -2582,15 +2605,16 @@
                   (memq (numeric-type-class div) '(integer rational)))
              (and (eq (numeric-type-class num) 'float)
                   (eq div (specifier-type '(eql 1)))))
-         (truncate-derive-type-rem num div))
+         (truncate-derive-type-rem num div quotient-type))
         (t
          (numeric-contagion num div))))
 
 (defoptimizer (truncate derive-type) ((number divisor) node)
-  (let ((quot (two-arg-derive-type number divisor
-                                   #'truncate-derive-type-quot-aux))
-        (rem (two-arg-derive-type number divisor
-                                  #'truncate-derive-type-rem-aux)))
+  (let* ((quot (two-arg-derive-type number divisor
+                                    #'truncate-derive-type-quot-aux))
+         (rem (two-arg-derive-type number divisor
+                                   (lambda (num div same-arg)
+                                     (truncate-derive-type-rem-aux num div same-arg nil quot)))))
     (if (eq quot *empty-type*)
         (progn
           (setf (combination-kind node) :error
@@ -2793,7 +2817,7 @@
                                (t
                                 (make-quot div))))))))
             ;; Compute type of remainder.
-            (defun ,r-aux (number-type divisor-type &optional same float)
+            (defun ,r-aux (number-type divisor-type &optional same float quotient-type)
               (cond ((and same
                           (or (not float)
                               (rational-type-p number-type)
@@ -2811,7 +2835,7 @@
                               (numeric-type->interval divisor-type))
                             (number-interval
                               (numeric-type->interval number-type))
-                            (rem (,r-name number-interval divisor-interval))
+                            (rem (,r-name number-interval divisor-interval quotient-type))
                             (result-type (rem-result-type number-type divisor-type)))
                        (when (member result-type '(float single-float double-float
                                                    #+long-float long-float))
@@ -2829,18 +2853,17 @@
               (flet ((derive-q (n d same)
                        (when (and (numeric-type-real-p n)
                                   (numeric-type-real-p d))
-                         (,q-aux n d same)))
-                     (derive-r (num div same)
-                       (declare (ignore same))
-                       (when (and (numeric-type-real-p num)
-                                  (numeric-type-real-p div))
-                         (,r-aux num div))))
+                         (,q-aux n d same))))
                 (let ((quot (two-arg-derive-type
-                             number divisor #'derive-q))
-                      (rem (two-arg-derive-type
-                            number divisor #'derive-r)))
-                  (when (and quot rem)
-                    (make-values-type (list quot rem))))))))))
+                             number divisor #'derive-q)))
+                  (flet ((derive-r (num div same)
+                           (when (and (numeric-type-real-p num)
+                                      (numeric-type-real-p div))
+                             (,r-aux num div same nil quot))))
+                    (let ((rem (two-arg-derive-type
+                                number divisor #'derive-r)))
+                      (when (and quot rem)
+                        (make-values-type (list quot rem))))))))))))
 
   (def floor floor-quotient-bound floor-rem-bound)
   (def ceiling ceiling-quotient-bound ceiling-rem-bound))
@@ -2933,7 +2956,7 @@
       (make-interval :low (coerce-for-bound new-lo 'float)
                      :high (coerce-for-bound new-hi 'float)))))
 
-(defun floor-rem-bound (num div)
+(defun floor-rem-bound2 (num div)
   (case (interval-range-info div)
     (+
      ;; The divisor is always positive.
@@ -2974,6 +2997,20 @@
                                (list (- limit))
                                limit)
                       :high (list limit))))))
+
+(defun floor-rem-bound (num div &optional quotient-type)
+  (setf (values num div) (interval-contagion num div))
+  (let ((bound (floor-rem-bound2 num div)))
+    (if (and quotient-type
+             (type-singleton-p quotient-type))
+        ;; If the quotient is constant then the remainder won't have the whole range
+        (let ((quotient (numeric-type->interval quotient-type)))
+          (or (interval-intersection
+               bound
+               (interval-sub num (interval-mul quotient div)))
+              bound))
+        bound)))
+
 #| Test cases
 (floor-quotient-bound (make-interval :low 0.3 :high 10.3))
 => #S(INTERVAL :LOW 0 :HIGH 10)
@@ -3082,7 +3119,7 @@
       (make-interval :low (coerce-for-bound new-lo 'float)
                      :high (coerce-for-bound new-hi 'float)))))
 
-(defun ceiling-rem-bound (num div)
+(defun ceiling-rem-bound2 (num div)
   (case (interval-range-info div)
     (+
      ;; Divisor is always positive. The remainder is negative.
@@ -3124,6 +3161,19 @@
                                (list (- limit))
                                limit)
                       :high (list limit))))))
+
+(defun ceiling-rem-bound (num div &optional quotient-type)
+  (setf (values num div) (interval-contagion num div))
+  (let ((bound (ceiling-rem-bound2 num div)))
+    (if (and quotient-type
+             (type-singleton-p quotient-type))
+        ;; If the quotient is constant then the remainder won't have the whole range
+        (let ((quotient (numeric-type->interval quotient-type)))
+          (or (interval-intersection
+               bound
+               (interval-sub num (interval-mul quotient div)))
+              bound))
+        bound)))
 
 #| Test cases
 (ceiling-quotient-bound (make-interval :low 0.3 :high 10.3))
@@ -3195,13 +3245,12 @@
        (interval-merge-pair (fceiling-quotient-bound neg number divisor)
                             (ffloor-quotient-bound pos number divisor))))))
 
-(defun truncate-rem-bound (num div)
+(defun truncate-rem-bound2 (num div)
   ;; This is significantly more complicated than FLOOR or CEILING. We
   ;; need both the number and the divisor to determine the range. The
   ;; basic idea is to split the ranges of NUM and DEN into positive
   ;; and negative pieces and deal with each of the four possibilities
   ;; in turn.
-  (setf (values num div) (interval-contagion num div))
   (let ((zero (intervals-zero num div)))
    (case (interval-range-info num zero)
      (+
@@ -3228,6 +3277,19 @@
       (multiple-value-bind (neg pos) (interval-split zero num t t)
         (interval-merge-pair (truncate-rem-bound neg div)
                              (truncate-rem-bound pos div)))))))
+
+(defun truncate-rem-bound (num div &optional quotient-type)
+  (setf (values num div) (interval-contagion num div))
+  (let ((bound (truncate-rem-bound2 num div)))
+    (if (and quotient-type
+             (type-singleton-p quotient-type))
+        ;; If the quotient is constant then the remainder won't have the whole range
+        (let ((quotient (numeric-type->interval quotient-type)))
+          (or (interval-intersection
+               bound
+               (interval-sub num (interval-mul quotient div)))
+              bound))
+        bound)))
 
 (defun random-derive-type-aux (type)
   (let ((class (numeric-type-class type))

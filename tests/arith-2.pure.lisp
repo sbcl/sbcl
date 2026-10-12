@@ -2831,3 +2831,11 @@
    (lambda (a)
      (mask-field (byte 13 55) a))
    (MOD 295111876382333861889)))
+
+(with-test (:name :rem-type)
+  (assert-type
+   (lambda (n d)
+     (declare ((integer 1000 1108) n)
+              ((integer 300 302) d))
+     (rem n d))
+   (integer 94 208)))
