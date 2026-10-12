@@ -84,7 +84,7 @@
 
 ;;;; SLOT-VALUE, (SETF SLOT-VALUE), SLOT-BOUNDP, SLOT-MAKUNBOUND
 
-;;; Structure-slot-value is usually faster than our litle chunks of code that are
+;;; Structure-slot-value is usually faster than our little chunks of code that are
 ;;; automatically cobbled together for SLOT-VALUE on an unknown type but constant slot name.
 ;;; While the global generic for a specific slot might only need to invoke a type-check,
 ;;; the dispatch function is not faster than this, if even as fast.

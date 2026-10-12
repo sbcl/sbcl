@@ -41,31 +41,31 @@
 (compile 'read-slot-way1)
 (compile 'read-slot-way2)
 
-;;; Collect up a bunch of instances that are subtypes of STRUCTURE-OBJECT
-;;; I've seen mismatch occur in the SLOT-VALUE calls, so I've inserted logic
-;;; to exclude expected faillures.
-;;; (I guess the finalizer thread manipulates hash-tables while this thread runs?)
+(defstruct fast-struct-slot-value
+  (a)
+  (b 0 :type (unsigned-byte 32)))
+
+(defstruct (fast-struct-slot-value.2
+            (:include fast-struct-slot-value))
+  (m)
+  (c 0d0 :type double-float)
+  (d t)
+  (n))
+
 (with-test (:name :fast-structure-slot-value)
   (let ((instances
-         (sb-vm:list-allocated-objects
-          :all :type sb-vm:instance-widetag
-          :test (lambda (x)
-                  (and (typep x 'structure-object)
-                       ;; want to ensure the instances under test are mostly immutable.
-                       ;; This is no guarantee, but it works.
-                       (eq (sb-kernel:generation-of x)
-                           sb-vm:+pseudo-static-generation+)))
-          :count 10000)))
+          (list (make-fast-struct-slot-value :a 'a
+                                             :b 30)
+                (make-fast-struct-slot-value.2 :a #(a)
+                                               :b (random (expt 2 31))
+                                               :c (random 10d0)))))
     (dolist (x instances)
       (let* ((layout (sb-kernel:%instance-layout x))
              (dd (sb-kernel:layout-dd layout)))
         (dolist (dsd (sb-kernel:dd-slots dd))
           (let ((slot-name (sb-kernel:dsd-name dsd)))
-            ;; some slots may be raw, don't worry about being EQ
-            (unless (eql (read-slot-way1 x slot-name)
-                         (read-slot-way2 x slot-name))
-              (unless (and (hash-table-p x) (eq slot-name 'sb-impl::cache))
-                (error "Failed on ~s ~s" x slot-name)))))))))
+            (assert (eql (read-slot-way1 x slot-name)
+                         (read-slot-way2 x slot-name)))))))))
 
 (defstruct a-struct x)
 (defstruct (another-struct (:include a-struct)) y)
