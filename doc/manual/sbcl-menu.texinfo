@@ -4,7 +4,7 @@
 * Introduction: introduction.
 * Starting and Stopping: starting and stopping.
 * Compiler: compiler.
-* Debugger: debugger.
+* Debugging: debugging.
 * Efficiency: efficiency.
 * Beyond the ANSI Standard: beyond the ansi standard.
 * External Formats: external formats.

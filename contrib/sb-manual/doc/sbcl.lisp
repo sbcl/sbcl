@@ -36,7 +36,7 @@
   (@introduction section)
   (@starting-and-stopping section)
   (@compiler section)
-  (@debugger section)
+  (@debugging section)
   (@efficiency section)
   (@beyond-the-ansi-standard section)
   (@external-formats section)

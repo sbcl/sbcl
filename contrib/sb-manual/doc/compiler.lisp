@@ -595,8 +595,7 @@
   - @DEBUG: How debuggable the program should be. The quality is
     treated differently from the other qualities: each value indicates
     a particular level of debugger information; it is not compared
-    with the other qualities. See @DEBUGGER-POLICY-CONTROL for the
-    details.
+    with the other qualities. See @DEBUG-INFORMATION for the details.
 
   - @SAFETY: How much error checking should be done. If @SPEED, @SPACE
     or @COMPILATION-SPEED is more important than @SAFETY, then

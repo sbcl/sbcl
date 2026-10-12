@@ -1,23 +1,27 @@
 (in-package :sb-manual)
 
-(defsection @debugger (:title "Debugger"
-                       :concepts ("debugger"))
+(defsection @debugging (:title "Debugging"
+                       :concepts (("debugging")))
   "This chapter documents the debugging facilities of SBCL, including
   the debugger, single-stepper and TRACE, and the effect of `(OPTIMIZE
   DEBUG)` declarations."
+  (@debugger section)
+  (@ldb section)
+  (@enabling-and-disabling-the-debugger section)
+  (@function-tracing section))
+
+(defsection @debugger (:title "Debugger"
+                       :concepts (("debugger")))
   (@debugger-entry section)
   (@debugger-command-loop section)
   (@stack-frames section)
   (@variable-access section)
   (@source-location-printing section)
-  (@debugger-policy-control section)
+  (@debug-information section)
   (@exiting-the-debugger section)
   (@information-commands section)
   (@breakpoint-commands section)
-  (@function-tracing section)
-  (@single-stepping section)
-  (@ldb section)
-  (@enabling-and-disabling-the-debugger section))
+  (@single-stepping section))
 
 (defsection @debugger-entry (:title "Debugger Entry")
   (@debugger-banner section)
@@ -131,6 +135,7 @@
   (@stack-motion section)
   (@how-arguments-are-printed section)
   (@function-names section)
+  (@entry-point-details section)
   (@debugging-tail-calls section)
   (@unknown-locations-and-interrupts section))
 
@@ -210,14 +215,13 @@
   `#<unavailable-arg>` will be printed instead of the argument value.
 
   Note that @OPEN-CODING-AND-INLINE-EXPANSION affect what frames are
-  present in the debugger, see @DEBUGGER-POLICY-CONTROL.")
+  present in the debugger, see @DEBUG-INFORMATION.")
 
 (defsection @function-names (:title "Function Names")
   "If a function is defined by DEFUN it will appear in backtrace
   by that name. Functions defined by LABELS and FLET will appear as
   `(FLET <NAME>)` and `(LABELS <NAME>)` respectively. Anonymous
-  lambdas will appear as `(LAMBDA <LAMBDA-LIST>)`."
-  (@entry-point-details section))
+  lambdas will appear as `(LAMBDA <LAMBDA-LIST>)`.")
 
 (defsection @entry-point-details
     (:title "Entry Point Details"
@@ -228,7 +232,7 @@
                 ("optional," "stack frame kind")
                 ("cleanup," "stack frame kind")))
   "Sometimes the compiler introduces new functions that are used to
-  implement a user function, but are not directly specified in the
+  implement a user function but are not directly specified in the
   source. This is mostly done for argument type and count checking.
 
   With recursive or block compiled functions, an additional `external`
@@ -280,8 +284,8 @@
 
   There are three reasons why a code location could be unknown:
 
-  - There is inadequate debug information due to the value of the
-    @DEBUG optimization quality. See @DEBUGGER-POLICY-CONTROL.
+  - There is inadequate @DEBUG-INFORMATION due to the value of the
+    @DEBUG optimization quality.
 
   - The debugger was entered because of an @INTERRUPT such as `C-c`.
 
@@ -360,9 +364,8 @@
   > never be available in the interrupted frame. See
   > @UNKNOWN-LOCATIONS-AND-INTERRUPTS.)
 
-  If the necessary debug information was not recorded (see See
-  @DEBUGGER-POLICY-CONTROL), the value of a variable is unavailable.
-  This can happen for the following reasons:
+  If the necessary @DEBUG-INFORMATION was not recorded, the value of a
+  variable is unavailable. This can happen for the following reasons:
 
   - The value of the @DEBUG optimization quality may have omitted
     debug information needed to determine whether the variable is
@@ -575,9 +578,9 @@
   and the next conditional (but watch out because the compiler may
   have changed the program on you.)")
 
-(defsection @debugger-policy-control (:title "Debugger Policy Control"
-                                      :concepts (("debugger" "policy")
-                                                 ("policy," "debugger")))
+(defsection @debug-information (:title "Debug Information"
+                                :concepts (("debugger" "policy")
+                                           ("policy," "debugger")))
   "The @COMPILER-POLICY specified by OPTIMIZE declarations
   affects the behavior seen in the debugger. The @DEBUG quality
   directly affects the debugger by controlling the amount of debugger
@@ -704,8 +707,7 @@
   stepping of compiled code. Breakpoints can only be set at known
   locations (see @UNKNOWN-LOCATIONS-AND-INTERRUPTS), so these commands
   are largely useless unless the @DEBUG optimize quality is at least
-  2 (see @DEBUGGER-POLICY-CONTROL). These commands manipulate
-  breakpoints:
+  2 (see @DEBUG-INFORMATION). These commands manipulate breakpoints:
 
   - `breakpoint <location> [<option> <value>]*`: Set a breakpoint in
     some function. `<location>` may be an integer code location
@@ -817,43 +819,13 @@
   > instrumentation-based stepping commands, which have much higher
   > overhead.")
 
-(defsection @function-tracing (:title "Function Tracing"
-                               :concepts ("tracing"
-                                          ("function," "tracing")))
-  "The tracer causes selected functions to print their arguments and
-  their results whenever they are called.  Options allow conditional
-  printing of the trace information and conditional breakpoints on
-  function entry or exit.
-
-  In SBCL, tracing can be done either by temporarily redefining the
-  function name (encapsulation) or using breakpoints. When breakpoints
-  are used, the function object itself is destructively modified to
-  cause the tracing action. The advantage of using breakpoints is that
-  tracing works even when the function is anonymously called via
-  FUNCALL, that function object identity is preserved, and that
-  anonymous and local functions can also be traced."
-  (trace macro)
-  "In the case of functions where the known return convention is used
-  to optimize, encapsulation may be necessary in order to make tracing
-  work at all. The symptom of this occurring is an error stating
-
-      Error in function FOO: :FUNCTION-END breakpoints are
-      currently unsupported for the known return convention.
-
-  in such cases we recommend using `(TRACE FOO :ENCAPSULATE t)`."
-  (untrace macro)
-  (sb-debug:*trace-indentation-step* variable)
-  (sb-debug:*max-trace-indentation* variable)
-  (sb-debug:*trace-encapsulate-default* variable)
-  (sb-debug:*trace-report-default* variable))
-
 (defsection @single-stepping (:title "Single Stepping"
                               :concepts ("stepper"
                                          "single-stepping"))
   "SBCL includes an instrumentation-based single-stepper for compiled
   code, which can be invoked via the STEP macro or from within the
-  debugger. See @DEBUGGER-POLICY-CONTROL for details on enabling
-  stepping for compiled code.
+  debugger. See @DEBUG-INFORMATION for details on enabling stepping
+  for compiled code.
 
   The following debugger commands are used for controlling single stepping.
 
@@ -908,3 +880,33 @@
   re-enable them)."
   (sb-ext:disable-debugger function)
   (sb-ext:enable-debugger function))
+
+(defsection @function-tracing (:title "Function Tracing"
+                               :concepts ("tracing"
+                                          ("function," "tracing")))
+  "The tracer causes selected functions to print their arguments and
+  their results whenever they are called.  Options allow conditional
+  printing of the trace information and conditional breakpoints on
+  function entry or exit.
+
+  In SBCL, tracing can be done either by temporarily redefining the
+  function name (encapsulation) or using breakpoints. When breakpoints
+  are used, the function object itself is destructively modified to
+  cause the tracing action. The advantage of using breakpoints is that
+  tracing works even when the function is anonymously called via
+  FUNCALL, that function object identity is preserved, and that
+  anonymous and local functions can also be traced."
+  (trace macro)
+  "In the case of functions where the known return convention is used
+  to optimize, encapsulation may be necessary in order to make tracing
+  work at all. The symptom of this occurring is an error stating
+
+      Error in function FOO: :FUNCTION-END breakpoints are
+      currently unsupported for the known return convention.
+
+  in such cases we recommend using `(TRACE FOO :ENCAPSULATE t)`."
+  (untrace macro)
+  (sb-debug:*trace-indentation-step* variable)
+  (sb-debug:*max-trace-indentation* variable)
+  (sb-debug:*trace-encapsulate-default* variable)
+  (sb-debug:*trace-report-default* variable))

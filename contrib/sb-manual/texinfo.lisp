@@ -229,7 +229,9 @@
               (1 "@chapter")
               (2 "@section")
               (3 "@subsection")
-              (4 "@subsubsection"))
+              (4 "@subsubsection")
+              (t (error "~S nested too deep for Texinfo."
+                        (section-name section))))
             title)
     ;; Generate the @menu
     (let ((child-sections
@@ -333,7 +335,7 @@
     (@introduction "intro.texinfo")
     (@starting-and-stopping "start-stop.texinfo")
     (@compiler "compiler.texinfo")
-    (@debugger "debugger.texinfo")
+    (@debugging "debugging.texinfo")
     (@efficiency "efficiency.texinfo")
     (@beyond-the-ansi-standard "beyond-ansi.texinfo")
     (@external-formats "external-formats.texinfo")

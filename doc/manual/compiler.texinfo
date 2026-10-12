@@ -783,8 +783,7 @@ These are the optimization qualities:
 @item @code{debug}: How debuggable the program should be. The quality is
   treated differently from the other qualities: each value indicates
   a particular level of debugger information; it is not compared
-  with the other qualities. See @ref{debugger policy control} for the
-  details.
+  with the other qualities. See @ref{debug information} for the details.
 
 @item @code{safety}: How much error checking should be done. If @code{speed}, @code{space}
   or @code{compilation-speed} is more important than @code{safety}, then
