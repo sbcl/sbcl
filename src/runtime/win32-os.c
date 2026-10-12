@@ -1945,6 +1945,7 @@ futex_wake(PVOID lock_word, int n)
 }
 #endif
 
+/* Signals */
 int sb_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
 {
   struct extra_thread_data* self = thread_extra_data(get_sb_vm_thread());
@@ -1966,7 +1967,16 @@ int sb_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
   return 0;
 }
 
-/* Signals */
+sigset_t deferrable_sigset = 1;
+sigset_t blockable_sigset = 1;
+sigset_t thread_start_sigset = 1;
+
+bool deferrables_blocked_p(sigset_t *sigset)
+{
+    if (sigset) return *sigset != 0;
+    return thread_extra_data(get_sb_vm_thread())->blocked_signal_set != 0;
+}
+
 int sched_yield()
 {
   /* http://stackoverflow.com/questions/1383943/switchtothread-vs-sleep1
@@ -1975,35 +1985,6 @@ int sched_yield()
   if(!SwitchToThread())
       Sleep(0);
   return 0;
-}
-
-int sigemptyset(sigset_t *set)
-{
-  *set = 0;
-  return 0;
-}
-
-int sigfillset(sigset_t *set)
-{
-  *set = 0xfffffffful;
-  return 0;
-}
-
-int sigaddset(sigset_t *set, int signum)
-{
-  *set |= 1 << signum;
-  return 0;
-}
-
-int sigdelset(sigset_t *set, int signum)
-{
-  *set &= ~(1 << signum);
-  return 0;
-}
-
-int sigismember(const sigset_t *set, int signum)
-{
-  return (*set & (1 << signum)) != 0;
 }
 
 /* EOF */

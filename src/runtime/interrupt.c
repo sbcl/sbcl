@@ -150,6 +150,7 @@ lispobj lisp_sig_handlers[NSIG];
  *    }
  *  ./sigismembertest => 40 65 -1
  */
+#ifdef LISP_FEATURE_UNIX
 #ifdef SIGRTMAX
 #  define MAX_SIGNUM SIGRTMAX
 #else
@@ -189,9 +190,6 @@ static void sigmask_logandc(sigset_t *dest, const sigset_t *source)
 pthread_key_t ignore_stop_for_gc;
 #endif
 
-#ifdef LISP_FEATURE_WIN32
-#define resignal_to_lisp_thread(dummy1,dummy2) {}
-#else
 static void
 resignal_to_lisp_thread(int signal, os_context_t *context)
 {
@@ -223,6 +221,8 @@ resignal_to_lisp_thread(int signal, os_context_t *context)
     sigmask_logior(os_context_sigmask_addr(context), &sigset);
     kill(getpid(), signal);
 }
+#else // not LISP_FEATURE_UNIX
+#define resignal_to_lisp_thread(dummy1,dummy2) {}
 #endif
 
 #if INSTALL_SIG_MEMORY_FAULT_HANDLER && defined(THREAD_SANITIZER)
@@ -291,6 +291,7 @@ static void record_signal(int sig, void* context)
         errno = _saved_errno;                                   \
     }
 
+#ifdef LISP_FEATURE_UNIX
 static void run_deferred_handler(struct interrupt_data *data,
                                  os_context_t *context);
 
@@ -471,6 +472,7 @@ bool deferrables_blocked_p(sigset_t *sigset)
     lose("deferrable signals partially blocked: {%s}", buf);
 #endif
 }
+#endif
 
 void
 check_deferrables_unblocked_or_lose(sigset_t *sigset)
@@ -571,6 +573,7 @@ unblock_deferrable_signals(sigset_t *where)
 {
     if (interrupt_handler_pending_p())
         lose("unblock_deferrable_signals: losing proposition");
+#ifdef LISP_FEATURE_UNIX
 #if HAVE_GC_STW_SIGNAL
     // If 'where' is null, check_gc_signals_unblocked_or_lose() will
     // fetch the current signal mask (from the OS) and check that.
@@ -591,6 +594,12 @@ unblock_deferrable_signals(sigset_t *where)
         sigmask_logandc(where, sigset);
     else
         thread_sigmask(SIG_UNBLOCK, sigset, 0);
+#else
+    if (where)
+        *where = 0;
+    else
+        thread_sigmask(SIG_UNBLOCK, &deferrable_sigset, 0);
+#endif
 }
 
 #if HAVE_GC_STW_SIGNAL
@@ -1112,6 +1121,7 @@ interrupt_handle_pending(os_context_t *context)
 }
 
 
+#ifdef LISP_FEATURE_UNIX
 void
 interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
 {
@@ -1185,7 +1195,6 @@ run_deferred_handler(struct interrupt_data *data, os_context_t *context)
     (*pending_handler)(data->pending_signal,&(data->pending_info), context);
 }
 
-#ifdef LISP_FEATURE_UNIX
 static void
 store_signal_data_for_later (struct interrupt_data *data, void *handler,
                              int signal,
@@ -1289,15 +1298,11 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
         interrupt_handle_now(signal, info, context);
     RESTORE_ERRNO;
 }
-#endif
-
-
 
 void
 interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 {
     SAVE_ERRNO(signal,context,void_context);
-#ifndef LISP_FEATURE_WIN32
     if ((signal == SIGILL) || (signal == SIGBUS)
 #if !(defined LISP_FEATURE_LINUX || defined LISP_FEATURE_ANDROID || defined LISP_FEATURE_HAIKU)
         || (signal == SIGEMT)
@@ -1309,10 +1314,10 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
         corruption_warning_and_maybe_lose("Signal %d received (PC: %p)", signal,
                                           os_context_pc(context));
     }
-#endif
     interrupt_handle_now(signal, info, context);
     RESTORE_ERRNO;
 }
+#endif
 
 /* manipulate the signal context and stack such that when the handler
  * returns, it will call function instead of whatever it was doing
@@ -1884,6 +1889,7 @@ interrupt_init(void)
     // which means the prefix, the format string, and the arguments.
     eventdata = calloc(EVENTBUFMAX+10, N_WORD_BYTES);
 #endif
+#ifdef LISP_FEATURE_UNIX
     int __attribute__((unused)) i;
     sigemptyset(&deferrable_sigset);
     sigemptyset(&blockable_sigset);
@@ -1898,6 +1904,7 @@ interrupt_init(void)
      and sigprof_handler will try to allocate it, but thread-local
      initialization is not guaranteed to be async safe. */
     sigaddset(&thread_start_sigset, SIGPROF);
+#endif
 
 
 #ifdef LISP_FEATURE_BACKTRACE_ON_SIGNAL
