@@ -79,7 +79,8 @@
 ;;; link the block into the Current-Catch list.
 ;;;
 (define-vop (make-catch-block)
-  (:args (tn) (tag :scs (any-reg descriptor-reg)))
+  (:args (tn)
+         (tag :scs (any-reg descriptor-reg immediate constant) :to :save))
   (:info entry-label)
   (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
@@ -100,8 +101,16 @@
     (progn
       (load-binding-stack-pointer temp)
       (load-tl-symbol-value tmp-tn *current-catch-block*))
-    (storew-pair tmp-tn catch-block-previous-catch-slot tag catch-block-tag-slot block)
     (storew temp block catch-block-bsp-slot)
+    (sc-case tag
+      (constant
+       (load-constant vop tag temp)
+       (setf tag temp))
+      (immediate
+       (load-immediate vop tag temp)
+       (setf tag temp))
+      (t))
+    (storew-pair tmp-tn catch-block-previous-catch-slot tag catch-block-tag-slot block)
     (inst mov-sp temp nsp-tn)
     (let ((nfp (current-nfp-tn vop)))
       (if nfp
