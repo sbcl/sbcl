@@ -701,39 +701,20 @@ GNAME(arch_scrub_control_stack):
 	 * [ESP] is our return address, [ESP-4] is the first
 	 * stack slot to scrub. */
 
-	/* We start by setting up our scrub pointer in EAX, our
-	 * guard page upper bound in ECX, and our hard guard
-	 * page upper bound in EDX. */
+	/* Select guard boundary based on page protection status */
+	mov	4(%esp), %ecx
+	mov	12(%esp), %edx
+	cmpb	$0, THREAD_STATE_WORD_OFFSET(%ecx)
+	je	1f
+	mov	8(%esp), %edx           // if protected, stop at soft guard
+1:
+	add	16(%esp), %edx          // EDX = guard page upper bound
 	lea	-4(%esp), %eax
-	mov	16(%esp),%edx
-	mov	%edx, %ecx
-	add	8(%esp), %ecx
-	add	12(%esp), %edx
-
-	/* We need to do a memory operation relative to the
-	 * thread pointer, so put it in %ecx and our guard
-	 * page upper bound in 4(%esp). */
-	xchg	4(%esp), %ecx
 
 	/* Now we begin our main scrub loop. */
 ascs_outer_loop:
-
-	/* If we're about to scrub the hard guard page, exit. */
 	cmp	%edx, %eax
-	jae	ascs_check_guard_page
-	cmp	12(%esp), %eax
-	ja	ascs_finished
-
-ascs_check_guard_page:
-	/* If we're about to scrub the guard page, and the guard
-	 * page is protected, exit. */
-	cmp	4(%esp), %eax
-	jae	ascs_clear_loop
-	cmp	8(%esp), %eax
-	jbe	ascs_clear_loop
-	/* test state_word.control_stack_guard_page_protected */
-	cmpb	$0, THREAD_STATE_WORD_OFFSET(%ecx)
-	jne	ascs_finished
+	jb	ascs_finished
 
 	/* Clear memory backwards to the start of the (4KiB) page */
 ascs_clear_loop:
@@ -742,15 +723,15 @@ ascs_clear_loop:
 	lea	-4(%eax), %eax
 	jnz	ascs_clear_loop
 
-	/* If we're about to hit the hard guard page, exit. */
+	/* If we're about to hit the guard page, exit. */
 	cmp	%edx, %eax
-	jae	ascs_finished
+	jb	ascs_finished
 
 	/* If the next (previous?) 4KiB page contains a non-zero
 	 * word, continue scrubbing. */
 ascs_check_loop:
 	testl	$-1, (%eax)
-	jnz	ascs_outer_loop
+	jnz	ascs_clear_loop
 	test	$0xfff, %eax
 	lea	-4(%eax), %eax
 	jnz	ascs_check_loop
