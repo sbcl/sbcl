@@ -552,6 +552,7 @@
   ;; OR is the same as ADD if the matching bits are clear,
   ;; BTS can set one bit
   (when (and (integerp y)
+             (not (integerp x))
              (eq op 'add)
              (or (location= x result)
                  (gpr-tn-p result)))
@@ -560,8 +561,7 @@
       (move result x)
       (inst btc result 63)
       (return-from emit-inline-add-sub))
-    (when (and (integerp y)
-               (not (imm32-p y))
+    (when (and (not (imm32-p y))
                (plusp y)
                (= (logcount y) 1)
                x-ref)
