@@ -5002,8 +5002,7 @@
            (give-up-ir1-transform)))))
 
 (deftransform ceiling ((number divisor) ((and unsigned-byte fixnum) (and unsigned-byte fixnum)) * :node node :result result)
-  (cond ((and result
-              (lvar-single-value-p result))
+  (cond ((mv-bind-unused-p result 1)
          (erase-node-type node t 1)
          `(values (truly-the fixnum (truncate (+ number (1- divisor)) divisor)) 0))
         (t
@@ -5067,10 +5066,11 @@
           (mask (1- y-abs))
           (delta (* (signum y) (1- y-abs))))
       (cond ((and (plusp y)
-                  (lvar-single-value-p result)
-                  (csubtypep (single-value-type (node-derived-type node)) (specifier-type 'word))
+                  (mv-bind-unused-p result 1)
+                  (csubtypep (single-value-result-type node) (specifier-type 'word))
                   (not (csubtypep (lvar-type x)
                                   (make-numeric-type 'integer 0 (- sb-ext:most-positive-word delta)))))
+             (erase-node-type node t 1)
              ;; Avoid overflowing word-sized arithmetic
              `(if (= x 0)
                   (values 0 0)
@@ -5185,14 +5185,14 @@
 
 (make-defs (($fun truncate floor ceiling))
   (deftransform $fun ((x y) (integer ratio) * :result result :node node :important nil)
-    (unless (lvar-single-value-p result)
+    (unless (mv-bind-unused-p result 1)
       (give-up-ir1-transform))
     (erase-node-type node t 1)
     `($fun (* x (%denominator y)) (%numerator y))))
 
 (make-defs (($fun truncate floor ceiling))
   (deftransform $fun ((x y) (number (eql 1)) * :node node :result result :important nil)
-    (or (and (lvar-single-value-p result)
+    (or (and (mv-bind-unused-p result 1)
              (combination-case (x :cast (specifier-type 'real))
                (/ (* *)
                 (destructuring-bind (a b) args
