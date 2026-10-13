@@ -108,8 +108,32 @@ bool allocate_hardwired_spaces(bool hard_failp)
     return 1;
 }
 
+/* Using madvise to define guard pages is better than using mprotect and PROT_NONE.
+ * With madvise, it does not split the VMA into pieces based on the protection.
+ * The kernel knows that a page fault occurring on a non-present page indicated
+ * as a guard page should cause delivery of SIGSEGV instead of bringing in a
+ * physical page. To illustrate how this creates fewer VMAs, notice what happens
+ * when ranges are broken up by different protections with mprotect -
+ *
+ * |      <-- control || bindings ->     ||         <- alien |
+ * |prot_none|   prot_rw        |     prot_none    | prot_rw |  = 4 VMAs
+ * | guards  | usable || usable | guards || guards |  usable |
+ *
+ * This picture is for downward control stack growth. If the growth direction is upward,
+ * the kernel can not merge the usable range of the control stack with the usable range
+ * of the binding stack, so there is actually 1 more VMA.
+ * With madvise() the entire thread memory area is backed by a single VMA.
+ * See https://github.com/torvalds/linux/commit/662df3e5c376
+ */
+
 static inline void
 protect_guard_page(void *page, int protect_p, os_vm_prot_t flags) {
+#ifdef MADV_GUARD_INSTALL
+    if (flags == OS_VM_PROT_NONE &&
+        !madvise(page, os_vm_page_size,
+                 protect_p ? MADV_GUARD_INSTALL : MADV_GUARD_REMOVE))
+        return;
+#endif
     os_protect(page, os_vm_page_size, protect_p ?
                flags : OS_VM_PROT_READ | OS_VM_PROT_WRITE);
 }
