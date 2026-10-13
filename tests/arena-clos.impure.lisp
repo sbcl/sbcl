@@ -55,20 +55,30 @@
       ;; 21st regular object:
       (cons live-regular live-huge))))
 
+(defun wrapped-use-arena (arena) (list (allocate-some-live-and-dead arena)))
+(defun check-not-trashed-p (arena-cons-holder)
+  (assert (heap-allocated-p arena-cons-holder))
+  (let ((car (car arena-cons-holder)))
+    (assert (not (heap-allocated-p car)))
+    (let ((caar (car car)))
+      (assert (not (heap-allocated-p car)))))
+  (sb-sys:scrub-control-stack))
+
 (test-util:with-test (:name :arena-live-bytes
                       :skipped-on (:not (:and :x86-64 :gencgc :unix)))
   (let ((arena (new-arena 131072 131072 10)))
     (unwind-protect
-         (let ((kept (allocate-some-live-and-dead arena)))
+         (let ((kept (wrapped-use-arena arena)))
            (multiple-value-bind (n-objs1 n-live1 bytes-alloc1 bytes-live1 n-huge1 n-huge-live1)
                (sb-kernel:arena-live-bytes arena)
-             (assert (consp (opaque-identity kept)))
+             (check-not-trashed-p kept)
              (assert (>= n-objs1 111))
              (assert (<= 21 n-live1 30))
              (assert (= n-huge1 4))
              (assert (<= 1 n-huge-live1 2))
              (assert (< 0 bytes-live1 (* bytes-alloc1 1/2)))
              ;; Now drop KEPT and re-run
+             (rplaca kept nil)
              (setq kept (opaque-identity nil))
              (multiple-value-bind (n-objs2 n-live2 bytes-alloc2 bytes-live2 n-huge2 n-huge-live2)
                  (sb-kernel:arena-live-bytes arena)
@@ -80,5 +90,6 @@
                (assert (< n-huge-live2 n-huge-live1)))
              ;; Assert that we didn't kill the usable frontier of the active arena tlab
              (with-arena (arena)
-               (assert (= (length (make-list 50)) 50)))))
+               (assert (= (length (make-list 50)) 50))))
+           kept)
       (destroy-arena arena))))
