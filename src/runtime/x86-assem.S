@@ -723,6 +723,13 @@ ascs_clear_loop:
 	lea	-4(%eax), %eax
 	jnz	ascs_clear_loop
 
+	/* Re-check protection status in case clearing the return guard page
+	 * just re-protected the soft guard page. */
+	cmpb	$0, THREAD_STATE_WORD_OFFSET(%ecx)
+	je	2f
+	mov	8(%esp), %edx
+	add	16(%esp), %edx
+2:
 	/* If we're about to hit the guard page, exit. */
 	cmp	%edx, %eax
 	jb	ascs_finished
