@@ -2838,4 +2838,14 @@
      (declare ((integer 1000 1108) n)
               ((integer 300 302) d))
      (rem n d))
-   (integer 94 208)))
+   (integer 94 208))
+  (assert-type
+   (lambda (n)
+     (declare ((member 121 256) n))
+     (nth-value 1 (truncate n 127)))
+   (or (eql 2) (eql 121)))
+  (assert-type
+   (lambda (n)
+     (DECLARE ((member -121 256) n))
+     (nth-value 1 (floor n 127)))
+   (or (eql 2) (eql 6))))

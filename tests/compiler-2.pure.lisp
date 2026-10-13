@@ -3474,9 +3474,9 @@
                               -913097464
                               5)))
            39)))))
-    '(values (or (integer -21 -21) (integer 0 0)) (integer #+(or arm64 x86-64) -21
-                                                   #-(or arm64 x86-64) -38 0)
-      &optional)))
+    '(values (or (integer -21 -21) (integer 0 0))
+             (or (integer -21 -21) (integer 0 0))
+             &optional)))
   (assert
    (type-specifiers-equal
     (caddr
@@ -3491,7 +3491,8 @@
                               913097464
                               5)))
            39)))))
-    '(values (or (integer 22 22) (integer 337 337)) (integer -38 -1) &optional))))
+    '(VALUES (OR (INTEGER 22 22) (INTEGER 337 337))
+      (OR (INTEGER -38 -38) (INTEGER -18 -18)) &OPTIONAL))))
 
 (with-test (:name :boundp-ir2-optimizer)
   (checked-compile-and-assert

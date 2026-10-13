@@ -1959,11 +1959,12 @@
 ;;; really represent the same lvar. This is useful for deriving the
 ;;; type of things like (* x x), which should always be positive. If
 ;;; we didn't do this, we wouldn't be able to tell.
-(defun two-arg-derive-type (arg1 arg2 derive-fun &optional split-number)
+(defun two-arg-derive-type (arg1 arg2 derive-fun &optional split-number values-type-result)
   (%two-arg-derive-type (lvar-type arg1) (lvar-type arg2)
-                        derive-fun (same-leaf-ref-p arg1 arg2) split-number))
+                        derive-fun (same-leaf-ref-p arg1 arg2) split-number values-type-result))
 
-(defun %two-arg-derive-type (arg1-type arg2-type derive-fun &optional same-leaf split-number)
+(defun %two-arg-derive-type (arg1-type arg2-type derive-fun &optional same-leaf split-number
+                                                                      values-type-result)
   (declare (type function derive-fun))
   (unless (and (not (and same-leaf split-number))
                (or (and (eq arg1-type (specifier-type 'number))
@@ -1974,32 +1975,61 @@
     (labels ((deriver (x y same-arg)
                (if (and (numeric-type-p x) (numeric-type-p y))
                    (funcall derive-fun x y same-arg)
-                   *universal-type*))
-             (derive (type1 type2 same-arg)
-               (let ((a1 (prepare-arg-for-derive-type type1))
-                     (a2 (prepare-arg-for-derive-type type2)))
-                 (when (and a1 a2)
-                   (let ((results nil))
-                     (if same-arg
-                         ;; Since the args are the same LVARs, just run down the
-                         ;; lists.
-                         (dolist (x a1)
-                           (let ((result (deriver x x same-arg)))
-                             (if (listp result)
-                                 (setf results (append results result))
-                                 (push result results))))
-                         ;; Try all pairwise combinations.
-                         (dolist (x a1)
-                           (dolist (y a2)
-                             (let ((result (or (deriver x y same-arg)
-                                               (numeric-contagion x y))))
-                               (if (listp result)
-                                   (setf results (append results result))
-                                   (push result results))))))
-                     (if (rest results)
-                         (make-derived-union-type results)
-                         (first results)))))))
-      (derive arg1-type arg2-type same-leaf))))
+                   *universal-type*)))
+      (let ((a1 (prepare-arg-for-derive-type arg1-type))
+            (a2 (prepare-arg-for-derive-type arg2-type)))
+        (when (and a1 a2)
+          (let ((results nil))
+            (cond (values-type-result
+                   (if same-leaf
+                       ;; Since the args are the same LVARs, just run down the
+                       ;; lists.
+                       (dolist (x a1)
+                         (let ((result (deriver x x same-leaf)))
+                           (when (eq result *universal-type*)
+                             (return-from %two-arg-derive-type))
+                           (when result
+                             (push result results))))
+                       ;; Try all pairwise combinations.
+                       (dolist (x a1)
+                         (dolist (y a2)
+                           (let ((result (deriver x y same-leaf)))
+                             (when (eq result *universal-type*)
+                               (return-from %two-arg-derive-type))
+                             (if result
+                                 (push result results)
+                                 (return-from %two-arg-derive-type))))))
+                   (let* ((first (first results))
+                          (length (length first)))
+                     (loop for r in (rest results)
+                           do (aver (= (length r) length)))
+                     (make-values-type
+                      (if (rest results)
+                          (loop for i below length
+                                collect
+                                (make-derived-union-type (loop for r in results
+                                                               collect (nth i r))))
+                          first))))
+                  (t
+                   (if same-leaf
+                       ;; Since the args are the same LVARs, just run down the
+                       ;; lists.
+                       (dolist (x a1)
+                         (let ((result (deriver x x same-leaf)))
+                           (if (listp result)
+                               (setf results (append results result))
+                               (push result results))))
+                       ;; Try all pairwise combinations.
+                     (dolist (x a1)
+                       (dolist (y a2)
+                         (let ((result (or (deriver x y same-leaf)
+                                           (numeric-contagion x y))))
+                           (if (listp result)
+                               (setf results (append results result))
+                               (push result results))))))
+                   (if (rest results)
+                       (make-derived-union-type results)
+                       (first results))))))))))
 
 (defun +-derive-type-aux (x y same-arg)
   (cond ((and (integer-type-p x)
@@ -2610,18 +2640,17 @@
          (numeric-contagion num div))))
 
 (defoptimizer (truncate derive-type) ((number divisor) node)
-  (let* ((quot (two-arg-derive-type number divisor
-                                    #'truncate-derive-type-quot-aux))
-         (rem (two-arg-derive-type number divisor
-                                   (lambda (num div same-arg)
-                                     (truncate-derive-type-rem-aux num div same-arg nil quot)))))
-    (if (eq quot *empty-type*)
-        (progn
-          (setf (combination-kind node) :error
-                (combination-info node) (list #'compiler-warn "division by zero"))
-          quot)
-        (when (and quot rem)
-          (make-values-type (list quot rem))))))
+  (let ((type (two-arg-derive-type number divisor
+                                   (lambda (num div same)
+                                     (let* ((quot (truncate-derive-type-quot-aux num div same))
+                                            (rem (truncate-derive-type-rem-aux num div same nil quot)))
+                                       (when (and quot rem)
+                                         (list quot rem))))
+                                   nil t)))
+    (when (eq type *empty-type*)
+      (setf (combination-kind node) :error
+            (combination-info node) (list #'compiler-warn "division by zero")))
+    type))
 
 (defun %unary-truncate-derive-type-aux (number)
   (truncate-derive-type-quot number (specifier-type '(integer 1 1))))
@@ -2639,14 +2668,13 @@
                        #'%unary-truncate-derive-type-aux))
 
 (defoptimizer (unary-truncate derive-type) ((number))
-  (let* ((one (specifier-type '(integer 1 1)))
-         (quot (one-arg-derive-type number
-                                    (lambda (x)
-                                      (truncate-derive-type-quot-aux x one nil))))
-         (rem (one-arg-derive-type number
-                                   (lambda (x) (truncate-derive-type-rem-aux x one nil)))))
-    (when (and quot rem)
-      (make-values-type (list quot rem)))))
+  (%two-arg-derive-type (lvar-type number) (specifier-type '(integer 1 1))
+                        (lambda (num div same)
+                          (let* ((quot (truncate-derive-type-quot-aux num div same))
+                                 (rem (truncate-derive-type-rem-aux num div same nil quot)))
+                            (when (and quot rem)
+                              (list quot rem))))
+                        nil nil t))
 
 (deftransform unary-truncate ((number) (integer))
   '(values number 0))
@@ -2666,18 +2694,17 @@
          (divisor (if divisor
                       (lvar-type divisor)
                       (specifier-type '(eql 1))))
-         (number (lvar-type number))
-         (quot (%two-arg-derive-type number divisor #'ftruncate-derive-type-quot-aux same))
-         (rem (%two-arg-derive-type number divisor (lambda (n d same)
-                                                     (truncate-derive-type-rem-aux n d same t))
-                                    same)))
-    (if (eq quot *empty-type*)
-        (progn
-          (setf (combination-kind node) :error
-                (combination-info node) (list #'compiler-warn "division by zero"))
-          quot)
-        (when (and quot rem)
-          (make-values-type (list quot rem))))))
+         (type (%two-arg-derive-type (lvar-type number) divisor
+                                     (lambda (num div same)
+                                       (let* ((quot (ftruncate-derive-type-quot-aux num div same))
+                                              (rem (truncate-derive-type-rem-aux num div same t)))
+                                         (when (and quot rem)
+                                           (list quot rem))))
+                                     same nil t)))
+    (when (eq type *empty-type*)
+      (setf (combination-kind node) :error
+            (combination-info node) (list #'compiler-warn "division by zero")))
+    type))
 
 (defun fceiling-derive-type-quot-aux (number-type divisor-type same)
   (when (and (numeric-type-real-p number-type)
@@ -2694,18 +2721,17 @@
          (divisor (if divisor
                       (lvar-type divisor)
                       (specifier-type '(eql 1))))
-         (number (lvar-type number))
-         (quot (%two-arg-derive-type number divisor #'fceiling-derive-type-quot-aux same))
-         (rem (%two-arg-derive-type number divisor (lambda (n d same)
-                                                     (ceiling-rem-bound-aux n d same t))
-                                    same)))
-    (if (eq quot *empty-type*)
-        (progn
-          (setf (combination-kind node) :error
-                (combination-info node) (list #'compiler-warn "division by zero"))
-          quot)
-        (when (and quot rem)
-          (make-values-type (list quot rem))))))
+         (type (%two-arg-derive-type (lvar-type number) divisor
+                                     (lambda (num div same)
+                                       (let* ((quot (fceiling-derive-type-quot-aux num div same))
+                                              (rem (ceiling-rem-bound-aux num div same t)))
+                                         (when (and quot rem)
+                                           (list quot rem))))
+                                     same nil t)))
+    (when (eq type *empty-type*)
+      (setf (combination-kind node) :error
+            (combination-info node) (list #'compiler-warn "division by zero")))
+    type))
 
 (defun ffloor-derive-type-quot-aux (number-type divisor-type same)
   (when (and (numeric-type-real-p number-type)
@@ -2722,19 +2748,17 @@
          (divisor (if divisor
                       (lvar-type divisor)
                       (specifier-type '(eql 1))))
-         (number (lvar-type number))
-         (quot (%two-arg-derive-type number divisor #'ffloor-derive-type-quot-aux
-                                     same))
-         (rem (%two-arg-derive-type number divisor (lambda (n d same)
-                                                     (floor-rem-bound-aux n d same t))
-                                    same)))
-    (if (eq quot *empty-type*)
-        (progn
-          (setf (combination-kind node) :error
-                (combination-info node) (list #'compiler-warn "division by zero"))
-          quot)
-        (when (and quot rem)
-          (make-values-type (list quot rem))))))
+         (type (%two-arg-derive-type (lvar-type number) divisor
+                                     (lambda (num div same)
+                                       (let* ((quot (ffloor-derive-type-quot-aux num div same))
+                                              (rem (floor-rem-bound-aux num div same t)))
+                                         (when (and quot rem)
+                                           (list quot rem))))
+                                     same nil t)))
+    (when (eq type *empty-type*)
+      (setf (combination-kind node) :error
+            (combination-info node) (list #'compiler-warn "division by zero")))
+    type))
 
 
 (macrolet ((derive (type)
@@ -2849,21 +2873,20 @@
                     (t
                      (numeric-contagion number-type divisor-type))))
             ;; the optimizer itself
-            (defoptimizer (,name derive-type) ((number divisor))
-              (flet ((derive-q (n d same)
-                       (when (and (numeric-type-real-p n)
-                                  (numeric-type-real-p d))
-                         (,q-aux n d same))))
-                (let ((quot (two-arg-derive-type
-                             number divisor #'derive-q)))
-                  (flet ((derive-r (num div same)
-                           (when (and (numeric-type-real-p num)
-                                      (numeric-type-real-p div))
-                             (,r-aux num div same nil quot))))
-                    (let ((rem (two-arg-derive-type
-                                number divisor #'derive-r)))
-                      (when (and quot rem)
-                        (make-values-type (list quot rem))))))))))))
+            (defoptimizer (,name derive-type) ((number divisor) node)
+              (let ((type (two-arg-derive-type number divisor
+                                               (lambda (num div same)
+                                                 (when (and (numeric-type-real-p num)
+                                                            (numeric-type-real-p div))
+                                                  (let* ((quot (,q-aux num div same))
+                                                         (rem (,r-aux num div same nil quot)))
+                                                    (when (and quot rem)
+                                                      (list quot rem)))))
+                                               nil t)))
+                (when (eq type *empty-type*)
+                  (setf (combination-kind node) :error
+                        (combination-info node) (list #'compiler-warn "division by zero")))
+                type))))))
 
   (def floor floor-quotient-bound floor-rem-bound)
   (def ceiling ceiling-quotient-bound ceiling-rem-bound))
