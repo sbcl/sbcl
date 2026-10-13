@@ -2539,7 +2539,21 @@
                       l31)
                      v29))
              (setq i15 (1+ i15))
-             (go next-loop)))))))
+             (go next-loop))))))
+  (checked-compile
+   `(lambda (n)
+      (flet ((f (m)
+               m
+               (labels ((b (v)
+                          (b *)))
+                 (b n))))
+        (declare (notinline f))
+        (f (labels ((d (v)
+                      (declare (optimize speed)
+                               (list v))
+                      (when n (d *))))
+             (d 0)))))
+   :allow-warnings t))
 
 (with-test (:name :same-ref-reoptimization)
   (assert (nth-value 1

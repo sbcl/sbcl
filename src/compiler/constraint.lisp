@@ -1817,7 +1817,8 @@
          ;; constraints are already computed, an intersection of these
          ;; consets will be empty and will never be fully recovered.
          ;; Stop until at least one call has been seen.
-         (unless in
+         (unless (or in
+                     all-previous-outs-computed) ;; dead function
            (return-from compute-block-in
              (setf (block-out block) :pending-call)))))
       (t
