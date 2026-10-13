@@ -916,3 +916,16 @@
       (assert (not (funcall f qnan-d qnan-d)))
       (assert (not (funcall g qnan-s 1.0)))
       (assert (not (funcall z qnan-d))))))
+
+;;; ppc64 had no case in MAKE-DOUBLE-FLOAT for BITS on the number stack
+;;; with the result in a float register.
+(with-test (:name (sb-kernel:%make-double-float :signed-stack-arg)
+            :skipped-on (not :64-bit))
+  (checked-compile-and-assert
+   ()
+   '(lambda (bits)
+     (declare (type (signed-byte 64) bits))
+     (sb-kernel:%make-double-float bits))
+   ((#x3FF0000000000000) 1d0)
+   ((#x400921FB54442D18) pi)
+   ((-4586634745500139520) -100d0)))
