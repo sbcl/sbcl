@@ -609,7 +609,7 @@
           (inst std bits (current-nfp-tn vop) (tn-byte-offset res)))))
       (signed-stack
        (sc-case res
-         (single-reg
+         (double-reg
           (inst lfd res (current-nfp-tn vop) (tn-byte-offset bits)))
          (double-stack
           (unless (location= bits res)
