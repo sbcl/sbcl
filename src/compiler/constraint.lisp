@@ -1424,7 +1424,10 @@
               reoptimize)
           (when eq
             (loop for other-ref in (leaf-refs leaf)
-                  unless (eq other-ref ref)
+                  unless (or (eq other-ref ref)
+                             (and (node-lvar other-ref)
+                                  ;; Can't tell refs apart if they share an LVAR
+                                  (listp (lvar-uses (node-lvar other-ref)))))
                   do (let ((constraint (gethash (ref-lvar other-ref) eq)))
                        (when (and constraint
                                   (conset-member constraint in))

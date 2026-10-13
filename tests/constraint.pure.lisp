@@ -2576,3 +2576,16 @@
                  (if b
                      (f k j))))
         (f (truncate (+ a 2) 2) a)))))
+
+(with-test (:name :same-ref-multiple-uses)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (let ((a 3))
+           (+ a
+              (if (< a 5)
+                  (progn
+                    (setq a (- a a))
+                    a)
+                  a))))
+    (() 3)))
