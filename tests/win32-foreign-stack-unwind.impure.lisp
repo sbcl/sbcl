@@ -75,21 +75,20 @@
               (setf sb-vm::*alien-stack-pointer* ,old-asp)
               (list* result extra-results))
           (error ()
-            :error))))))
+            '(:error)))))))
 
 
 ;;; Test cases.
 
-(with-test (:name #1=:base-case)
+(with-test (:name :base-case)
   ;; Tests that the unwind test machinery works.
   (let ((result
          (with-test-environment ()
            (establish-return-frame (lambda () (perform-test-unwind)))
            :success)))
-    (format t "~S result: ~S~%" #1# result)
     (assert (eql :success (car result)))))
 
-(with-test (:name #1=:special-binding)
+(with-test (:name :special-binding)
   ;; Tests that special bindings are undone properly during
   ;; unwind.
   (let ((result
@@ -101,10 +100,9 @@
                                          (declare (special foo))
                                          (perform-test-unwind))))
              foo))))
-    (format t "~S result: ~S~%" #1# result)
     (assert (eql :success (car result)))))
 
-(with-test (:name #1=:unwind-protect)
+(with-test (:name :unwind-protect)
   ;; Tests that unwind-protect forms are run during unwind.
   (let ((result
          (with-test-environment ()
@@ -114,10 +112,9 @@
                                             (perform-test-unwind)
                                          (setf result :success))))
              result))))
-    (format t "~S result: ~S~%" #1# result)
     (assert (eql :success (car result)))))
 
-(with-test (:name #1=:unwind-protect-nlx)
+(with-test (:name :unwind-protect-nlx)
   ;; Tests that unwind-protect forms that are run during unwind
   ;; can do a non-local exit to abort the unwind.
   (let ((result
@@ -130,19 +127,17 @@
                                            (return)))
                                        (setf result :success)))
              result))))
-    (format t "~S result: ~S~%" #1# result)
     (assert (eql :success (car result)))))
 
-(with-test (:name #1=:no-unwind)
+(with-test (:name :no-unwind)
   ;; Basic smoke test of establish-return-frame.
   (let ((result
          (with-test-environment ()
            (establish-return-frame (lambda ()))
            :success)))
-    (format t "~S result: ~S~%" #1# result)
     (assert (eql :success (car result)))))
 
-(with-test (:name #1=:no-unwind-error)
+(with-test (:name :no-unwind-error)
   ;; Tests that EXCEPTION_BREAKPOINT is caught and handled
   ;; correctly within callbacks.
   (let ((result
@@ -152,20 +147,18 @@
                                          (some-undefined-function)
                                        (undefined-function ()))))
            :success)))
-    (format t "~S result: ~S~%" #1# result)
     (assert (eql :success (car result)))))
 
-(with-test (:name #1=:unwind-foreign-frame)
+(with-test (:name :unwind-foreign-frame)
   ;; Tests that unwinding a foreign SEH frame isn't completely
   ;; broken.
   (let ((result
          (with-test-environment ()
            (block nil
              (establish-return-frame (lambda () (return :success)))))))
-    (format t "~S result: ~S~%" #1# result)
     (assert (eql :success (car result)))))
 
-(with-test (:name #1=:unwind-protect-unwind-foreign-frame)
+(with-test (:name :unwind-protect-unwind-foreign-frame)
   ;; Tests that an unwind-protect block is allowed to unwind
   ;; past the original unwind target.
   (let ((result
@@ -175,10 +168,9 @@
                                        (unwind-protect
                                             (perform-test-unwind)
                                          (return :success))))))))
-    (format t "~S result: ~S~%" #1# result)
     (assert (eql :success (car result)))))
 
-(with-test (:name #1=:unwind-error)
+(with-test (:name :unwind-error)
   ;; Another test for unwinding an SEH frame.
   (let ((result
          (with-test-environment ()
@@ -187,7 +179,4 @@
                                          (error "Foo!")))
              (error ()
                :success)))))
-    (format t "~S result: ~S~%" #1# result)
     (assert (eql :success (car result)))))
-
-;;;; success!

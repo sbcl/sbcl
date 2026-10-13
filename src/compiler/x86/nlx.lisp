@@ -26,30 +26,6 @@
            :disp (frame-byte-offset (+ -1 (tn-offset tn) unwind-block-size))))
 
 
-;;;; Save and restore dynamic environment.
-;;;;
-;;;; These VOPs are used in the reentered function to restore the
-;;;; appropriate dynamic environment. Currently we only save the
-;;;; Current-Catch. (Before sbcl-0.7.0,
-;;;; when there were IR1 and byte interpreters, we had to save
-;;;; the interpreter "eval stack" too.)
-;;;;
-;;;; We don't need to save/restore the current UNWIND-PROTECT, since
-;;;; UNWIND-PROTECTs are implicitly processed during unwinding.
-;;;;
-;;;; We don't need to save the BSP, because that is handled automatically.
-
-(define-vop (save-dynamic-state)
-  (:results (catch :scs (descriptor-reg)))
-  (:generator 13
-    (load-tl-symbol-value catch *current-catch-block*)))
-
-(define-vop (restore-dynamic-state)
-  (:args (catch :scs (descriptor-reg)))
-  #+sb-thread (:temporary (:sc unsigned-reg) temp)
-  (:generator 10
-    (store-tl-symbol-value catch *current-catch-block* temp)))
-
 (define-vop (current-stack-pointer)
   (:results (res :scs (any-reg control-stack)))
   (:generator 1
@@ -76,6 +52,11 @@
     (storew ebp-tn block unwind-block-cfp-slot)
     (storew (make-fixup nil :code-object entry-label)
             block catch-block-entry-pc-slot)
+    (load-binding-stack-pointer temp)
+    (storew temp block unwind-block-bsp-slot)
+    (load-tl-symbol-value temp *current-catch-block*)
+    (storew temp block unwind-block-current-catch-slot)
+
     #+win32
     (progn
       (inst mov temp (make-ea :dword :disp 0) :fs)
@@ -85,7 +66,7 @@
 ;;; tag, and link the block into the CURRENT-CATCH list
 (define-vop (make-catch-block)
   (:args (tn)
-         (tag :scs (any-reg descriptor-reg) :to (:result 1)))
+         (tag :scs (any-reg descriptor-reg) :to :save))
   (:info entry-label)
   (:results (block :scs (any-reg)))
   (:temporary (:sc descriptor-reg) temp)
@@ -103,7 +84,9 @@
     (storew tag block catch-block-tag-slot)
     (load-tl-symbol-value temp *current-catch-block*)
     (storew temp block catch-block-previous-catch-slot)
-    (store-tl-symbol-value block *current-catch-block* temp)))
+    (store-tl-symbol-value block *current-catch-block* temp)
+    (load-binding-stack-pointer temp)
+    (storew temp block unwind-block-bsp-slot)))
 
 ;;; Just set the current unwind-protect to UWP. This instantiates an
 ;;; unwind block as an unwind-protect.
@@ -263,18 +246,29 @@
 (define-vop (uwp-entry)
   (:info label)
   (:save-p :force-to-stack)
-  (:results (block) (start) (count))
-  (:ignore block start count)
   (:vop-var vop)
   (:generator 0
     (emit-label label)
     (note-this-location vop :non-local-entry)))
 
+(define-vop (uwp-entry-block)
+  (:info label)
+  (:save-p :force-to-stack)
+  (:results (block))
+  (:vop-var vop)
+  (:generator 0
+    (emit-label label)
+    (note-this-location vop :non-local-entry)
+    ;; Get the saved block in UNWIND
+    (inst mov block (make-ea :dword :base esp-tn :disp (* 3 n-word-bytes)))))
+
 (define-vop (unwind-to-frame-and-call)
     (:args (ofp :scs (descriptor-reg))
            (uwp :scs (descriptor-reg))
-           (function :scs (descriptor-reg) :to :load :target saved-function))
-  (:arg-types system-area-pointer system-area-pointer t)
+           (function :scs (descriptor-reg) :to :load :target saved-function)
+           (bsp :scs (control-stack))
+           (catch-block :scs (control-stack)))
+  (:arg-types system-area-pointer system-area-pointer t t t)
   (:temporary (:sc sap-reg) temp)
   (:temporary (:sc descriptor-reg :offset ebx-offset) saved-function)
   (:temporary (:sc unsigned-reg :offset eax-offset) block)
@@ -293,10 +287,14 @@
     (storew temp block unwind-block-uwp-slot)
     (loadw temp ofp sap-pointer-slot other-pointer-lowtag)
     (storew temp block unwind-block-cfp-slot)
+    (move temp bsp)
+    (storew temp block unwind-block-bsp-slot)
+    (move temp catch-block)
+    (storew temp block unwind-block-current-catch-slot)
 
     (storew (make-fixup nil :code-object entry-label)
-            block
-            catch-block-entry-pc-slot)
+        block
+        catch-block-entry-pc-slot)
 
     ;; Run any required UWPs.
     (inst jmp (make-fixup 'unwind :assembly-routine))

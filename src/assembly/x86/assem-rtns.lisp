@@ -250,19 +250,29 @@
 
 ;;;; non-local exit noise
 
+#-sb-assembling
+(define-vop ()
+  (:translate %continue-unwind)
+  (:generator 0
+    (inst ret)))
+
 #-win32
 (define-assembly-routine (unwind
                           (:return-style :none)
                           (:translate %unwind))
-                         ((:arg block (any-reg descriptor-reg) eax-offset)
-                          (:arg start (any-reg descriptor-reg) ebx-offset)
-                          (:arg count (any-reg descriptor-reg) ecx-offset)
-                          (:temp uwp unsigned-reg esi-offset))
-  (declare (ignore start count))
+    ((:arg block (any-reg descriptor-reg) eax-offset)
+     (:arg start (any-reg descriptor-reg) ebx-offset)
+     (:arg count (any-reg descriptor-reg) ecx-offset)
+     (:temp uwp unsigned-reg esi-offset)
+     ;; for unbind-to-here
+     (:temp value unsigned-reg edx-offset)
+     (:temp temp unsigned-reg edi-offset))
 
-  (let ((error (generate-error-code nil 'invalid-unwind-error)))
-    (inst test block block)             ; check for NULL pointer
-    (inst jmp :z error))
+
+  (inst test block block)               ; check for NULL pointer
+  (inst jmp :z (generate-error-code nil 'invalid-unwind-error))
+
+  AGAIN
 
   (load-tl-symbol-value uwp *current-unwind-protect-block*)
 
@@ -270,22 +280,44 @@
   ;; argument's CURRENT-UWP-SLOT?
   (inst cmp uwp
         (object-slot-ea block unwind-block-uwp-slot 0))
+
+  (inst push block)
+  (inst push start)
+  (inst push count)
+
   ;; If a match, return to context in arg block.
   (inst jmp :e DO-EXIT)
 
-  ;; Not a match - return to *CURRENT-UNWIND-PROTECT-BLOCK* context.
-  ;; Important! Must save (and return) the arg 'block' for later use!!
-  (move edx-tn block)
-  (move block uwp)
+  (loadw ebx-tn uwp unwind-block-bsp-slot)
+  (unbind-to-here ebx-tn ecx-tn value temp)
+
   ;; Set next unwind protect context.
-  (loadw uwp uwp unwind-block-uwp-slot)
-  ;; we're about to reload ebp anyway, so let's borrow it here as a
-  ;; temporary.  Hope this works
-  (store-tl-symbol-value uwp *current-unwind-protect-block* ebp-tn)
+  (loadw block uwp unwind-block-uwp-slot)
+  (store-tl-symbol-value block *current-unwind-protect-block* temp)
+
+  (loadw ebp-tn uwp unwind-block-cfp-slot)
+
+  (loadw block uwp unwind-block-current-catch-slot)
+  (store-tl-symbol-value block *current-catch-block* temp)
+
+  (inst call (object-slot-ea uwp unwind-block-entry-pc-slot 0))
+  (inst pop count)
+  (inst pop start)
+  (inst pop block)
+  (inst jmp AGAIN)
 
   DO-EXIT
+  (loadw ebx-tn block unwind-block-bsp-slot)
+  (unbind-to-here ebx-tn ecx-tn value temp)
+
+  (inst pop count)
+  (inst pop start)
+  (inst pop block)
 
   (loadw ebp-tn block unwind-block-cfp-slot)
+
+  (loadw value block unwind-block-current-catch-slot)
+  (store-tl-symbol-value value *current-catch-block* temp)
 
   ;; Uwp-entry expects some things in known locations so that they can
   ;; be saved on the stack: the block in edx-tn, start in ebx-tn, and
@@ -298,53 +330,72 @@
 
 #+win32
 (define-assembly-routine (unwind
-                          (:return-style :none))
+                          (:return-style :none)
+                          (:translate %unwind))
                          ((:arg block (any-reg descriptor-reg) eax-offset)
                           (:arg start (any-reg descriptor-reg) ebx-offset)
-                          (:arg count (any-reg descriptor-reg) ecx-offset))
-  (declare (ignore start count))
+                          (:arg count (any-reg descriptor-reg) ecx-offset)
+                          (:temp uwp unsigned-reg esi-offset)
+                          ;; for unbind-to-here
+                          (:temp value unsigned-reg edx-offset)
+                          (:temp temp unsigned-reg edi-offset))
 
   (let ((error (generate-error-code nil 'invalid-unwind-error)))
     (inst test block block)             ; check for NULL pointer
     (inst jmp :z error))
 
-  ;; Save all our registers, as we're about to clobber them.
-  (inst pusha)
+  AGAIN
 
-  ;; Find the SEH frame surrounding our target.
-  (loadw ecx-tn block unwind-block-next-seh-frame-slot)
+  (load-tl-symbol-value uwp *current-unwind-protect-block*)
 
-  ;; This section copied from VOP CALL-OUT.
-  ;; Setup the NPX for C; all the FP registers need to be
-  ;; empty; pop them all.
-  (dotimes (i 8)
-    (inst fstp fr0-tn))
+  ;; Does *CURRENT-UNWIND-PROTECT-BLOCK* match the value stored in
+  ;; argument's CURRENT-UWP-SLOT?
+  (inst cmp uwp
+        (object-slot-ea block unwind-block-uwp-slot 0))
 
-  ;; ABI requires this
-  (inst cld)
-  (inst push ebp-tn)
-  (inst mov ebp-tn esp-tn)
+  (inst push block)
+  (inst push start)
+  (inst push count)
 
-  ;; Actually call out for the unwind.
-  (inst push 0)
-  (inst push 0)
-  (inst push 0)
-  (inst push ecx-tn)
+  ;; If a match, return to context in arg block.
+  (inst jmp :e DO-EXIT)
 
-  (inst call (make-fixup "RtlUnwind" :foreign))
+  (loadw ebx-tn uwp unwind-block-bsp-slot)
+  (unbind-to-here ebx-tn ecx-tn value temp)
 
-  (inst pop ebp-tn)
-  ;; This section based on VOP CALL-OUT.
-  ;; Restore the NPX for lisp; ensure no regs are empty
-  (dotimes (i 8)
-    (inst fldz))
+  ;; Set next unwind protect context.
+  (loadw block uwp unwind-block-uwp-slot)
+  (store-tl-symbol-value block *current-unwind-protect-block* temp)
 
-  ;; Restore our regs.
-  (inst popa)
+  (loadw ebp-tn uwp unwind-block-cfp-slot)
 
-  ;; By now we've unwound all the UWP frames required, so we
-  ;; just jump to our target block.
+  (loadw block uwp unwind-block-current-catch-slot)
+  (store-tl-symbol-value block *current-catch-block* temp)
+
+  (loadw temp uwp unwind-block-next-seh-frame-slot)
+  (inst mov (make-ea :dword :disp 0) temp :fs)
+
+  (inst call (object-slot-ea uwp unwind-block-entry-pc-slot 0))
+  (inst pop count)
+  (inst pop start)
+  (inst pop block)
+  (inst jmp AGAIN)
+
+  DO-EXIT
+  (loadw ebx-tn block unwind-block-bsp-slot)
+  (unbind-to-here ebx-tn ecx-tn value temp)
+
+  (inst pop count)
+  (inst pop start)
+  (inst pop block)
+
   (loadw ebp-tn block unwind-block-cfp-slot)
+
+  (loadw value block unwind-block-current-catch-slot)
+  (store-tl-symbol-value value *current-catch-block* temp)
+
+  (loadw temp block unwind-block-next-seh-frame-slot)
+  (inst mov (make-ea :dword :disp 0) temp :fs)
 
   ;; Nlx-entry expects the arg start in ebx-tn and the arg count
   ;; in ecx-tn.  Fortunately, that's where they are already.
@@ -357,7 +408,10 @@
 #+(and sb-assembling win32)
 (define-assembly-routine
     (uwp-seh-handler (:return-style :none))
-    ((:temp block unsigned-reg eax-offset))
+    ((:temp block unsigned-reg eax-offset)
+     ;; for unbind-to-here
+     (:temp value unsigned-reg edx-offset)
+     (:temp temp unsigned-reg edi-offset))
 
   ;; We get called for any exception which happens within our
   ;; dynamic contour that isn't handled below us, and for
@@ -403,55 +457,29 @@
   ;; Save all registers (overkill)
   (inst pusha)
 
-  ;; Establish our stack frame.
-  (inst mov ebp-tn esp-tn)
-
   ;; This section based on VOP CALL-OUT.
   ;; Restore the NPX for lisp; ensure no regs are empty
   (dotimes (i 8)
     (inst fldz))
 
   ;; Find our unwind-block by way of our SEH frame.
-  (inst mov block (make-ea :dword :base ebp-tn :disp #x28))
+  (inst mov block (make-ea :dword :base esp-tn :disp #x28))
   (inst lea block (make-ea :dword :base block
                            :disp (- (* unwind-block-next-seh-frame-slot
                                        n-word-bytes))))
 
   ;; Update *CURRENT-UNWIND-PROTECT-BLOCK*.
-  (loadw ebx-tn block unwind-block-uwp-slot)
-  (store-tl-symbol-value ebx-tn *current-unwind-protect-block* ecx-tn)
+  (loadw value block unwind-block-uwp-slot)
+  (store-tl-symbol-value value *current-unwind-protect-block* temp)
 
-  ;; Uwp-entry expects some things in known locations so that they can
-  ;; be saved on the stack: the block in edx-tn, start in ebx-tn, and
-  ;; count in ecx-tn.  We don't actually have any of that here, but we
-  ;; do need to have access to our own stack frame, so we hijack the
-  ;; known locations to cover our own state.
+  (loadw ebx-tn block unwind-block-bsp-slot)
+  (unbind-to-here ebx-tn ecx-tn value temp)
 
-  (inst xor ebx-tn ebx-tn)
-  (inst xor ecx-tn ecx-tn)
-  (inst mov ebx-tn ebp-tn)
+  (loadw value block unwind-block-current-catch-slot)
+  (store-tl-symbol-value value *current-catch-block* temp)
+
   (loadw ebp-tn block unwind-block-cfp-slot)
-  (inst jmp (object-slot-ea block unwind-block-entry-pc-slot 0)))
-
-#+win32
-(define-assembly-routine (continue-unwind
-                          (:return-style :none)
-                          (:translate %unwind))
-                         ((:arg block (any-reg descriptor-reg) eax-offset)
-                          (:arg start (any-reg descriptor-reg) ebx-offset)
-                          (:arg count (any-reg descriptor-reg) ecx-offset))
-  (declare (ignore block count))
-  ;; The args here are mostly ignored because we're using the
-  ;; win32 unwind mechanism and keep all that elsewhere.  The
-  ;; exception is START, which we use to pass the saved EBP for
-  ;; our exception handler.
-
-  ;; "All" we have to do here is reload our EBP, reestablish a C
-  ;; environment, and return ExceptionContinueSearch.  The OS
-  ;; handles the rest.
-
-  ;; Restore our frame pointer.
-  (inst mov esp-tn start)
+  (inst call (object-slot-ea block unwind-block-entry-pc-slot 0))
 
   ;; This section copied from VOP CALL-OUT.
   ;; Setup the NPX for C; all the FP registers need to be
@@ -459,7 +487,7 @@
   (dotimes (i 8)
     (inst fstp fr0-tn))
 
-  ;; I'm unlikely to ever forget this again.
+  ;; ABI requires this
   (inst cld)
 
   ;; Restore our saved registers

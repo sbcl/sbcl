@@ -301,11 +301,12 @@
                           (:temp value unsigned-reg r10-offset)
                           (:temp bsp-temp unsigned-reg r11-offset)
                           (:temp zero complex-double-reg 0))
-  AGAIN
+
 
   (inst test block block)               ; check for NULL pointer
   (inst jmp :z (generate-error-code nil 'invalid-unwind-error))
 
+  AGAIN
   (load-tl-symbol-value uwp *current-unwind-protect-block*)
 
   ;; Does *CURRENT-UNWIND-PROTECT-BLOCK* match the value stored in
