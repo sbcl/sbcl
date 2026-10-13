@@ -319,15 +319,6 @@ void create_main_lisp_thread(lispobj function) {
     th->lisp_thread = cons_lisp_thread(th);
     SET_LISPTHREAD_TID(LISPTHREAD(th));
 
-#if !(defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-    protect_control_stack_hard_guard_page(1, th);
-    protect_control_stack_guard_page(1, th);
-#endif
-    protect_binding_stack_hard_guard_page(1, th);
-    protect_alien_stack_hard_guard_page(1, th);
-    protect_binding_stack_guard_page(1, th);
-    protect_alien_stack_guard_page(1, th);
-
 #if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86_64)
     set_thread_stack(th->control_stack_end);
 #endif
@@ -367,8 +358,7 @@ void sb_posix_after_fork() { // for use by sb-posix:fork
 /* Note: scribble must be stack-allocated */
 static void
 init_new_thread(struct thread *th,
-                init_thread_data __attribute__((unused)) *scribble,
-                int guardp)
+                init_thread_data __attribute__((unused)) *scribble)
 {
 
     ASSIGN_CURRENT_THREAD(th);
@@ -376,18 +366,6 @@ init_new_thread(struct thread *th,
         /* FIXME: handle error */
         lose("arch_os_thread_init failed");
     }
-#define GUARD_CONTROL_STACK 1
-#define GUARD_BINDING_STACK 2
-#define GUARD_ALIEN_STACK   4
-
-#if !(defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-    if (guardp & GUARD_CONTROL_STACK)
-        protect_control_stack_guard_page(1, th);
-#endif
-    if (guardp & GUARD_BINDING_STACK)
-        protect_binding_stack_guard_page(1, th);
-    if (guardp & GUARD_ALIEN_STACK)
-        protect_alien_stack_guard_page(1, th);
 
     /* Since GC can only know about this thread from the all_threads
      * list and we're just adding this thread to it, there is no
@@ -553,7 +531,7 @@ void* new_thread_trampoline(void* arg)
     && !defined LISP_FEATURE_SB_SAFEPOINT
     th->control_stack_end = (lispobj*)&arg + 1;
 #endif
-    init_new_thread(th, SCRIBBLE, 0);
+    init_new_thread(th, SCRIBBLE);
     /* On any platform using MMU-based protection to track dirty GC cards, assigning
      * a slot of 'lispthread' MUST NOT occur until after init_new_thread so that this
      * thread is considered to be "in lisp". Otherwise, if GC occurs just prior to
@@ -713,12 +691,7 @@ static void attach_os_thread(init_thread_data *scribble)
     th->control_stack_end = (void *) (((uintptr_t) stack_addr) + stack_size);
 #endif
 
-    /* We don't protect the control stack when adopting a foreign thread
-     * because we wouldn't know where to put the guard */
-    init_new_thread(th, scribble,
-                    /* recycled memory already had mprotect() done,
-                     * so avoid 2 syscalls when possible */
-                    recycled_memory ? 0 : GUARD_BINDING_STACK|GUARD_ALIEN_STACK);
+    init_new_thread(th, scribble);
 }
 
 static void detach_os_thread(init_thread_data *scribble)

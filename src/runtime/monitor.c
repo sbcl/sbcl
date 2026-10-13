@@ -1498,6 +1498,12 @@ int load_gc_crashdump(char* pathname)
     int i;
     for(i=0; i<(int)preamble.nthreads; ++i) {
         struct thread* th = alloc_thread_struct(0);
+#if !(defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
+        protect_control_stack_hard_guard_page(0, th);
+        protect_control_stack_guard_page(0, th);
+#endif
+        protect_binding_stack_hard_guard_page(0, th);
+        protect_binding_stack_guard_page(0, th);
         // Push it on the front
         th->prev = 0;
         th->next = threads;

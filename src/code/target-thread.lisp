@@ -1918,17 +1918,6 @@ session."
                                                    (function system-area-pointer
                                                              system-area-pointer))
                                      (or reuse (int-sap 0)))))
-      (when (and (not reuse) (/= (sap-int thread-sap) 0))
-        ;; these would have been done already if reusing the memory
-        ;; of a completed thread.
-        (macrolet ((prot (fun)
-                     `(alien-funcall (extern-alien ,fun (function void int
-                                                                  system-area-pointer))
-                                     1 thread-sap)))
-          #-(and win32 c-stack-is-control-stack)
-          (prot "protect_control_stack_guard_page")
-          (prot "protect_binding_stack_guard_page")
-          (prot "protect_alien_stack_guard_page")))
       (unless (= (sap-int thread-sap) 0) thread-sap))))
 
 ;;; Remove thread from its session, if it has one, and from *all-threads*.
