@@ -26,10 +26,24 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#ifndef _SIGSET_T
+typedef int sigset_t;
+#endif
+
+#define SIG_BLOCK 1
+#define SIG_UNBLOCK 2
+#define SIG_SETMASK 3
+
+int sched_yield();
+
+typedef struct { int bogus; } siginfo_t;
+
+// wrap CriticalSection operators in a function returning 1 to satisfy assertions
+static inline int cs_mutex_lock(void* l) { EnterCriticalSection(l); return 1; }
+static inline int cs_mutex_unlock(void* l) { LeaveCriticalSection(l); return 1; }
+
 #include "target-arch-os.h"
 #include "target-arch.h"
-
-#include "pthreads_win32.h"
 
 typedef char* os_vm_address_t;
 typedef uword_t os_vm_size_t;

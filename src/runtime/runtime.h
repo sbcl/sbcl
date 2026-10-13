@@ -15,12 +15,8 @@
 #include "lispobj.h"
 
 #include <signal.h>
-#ifdef LISP_FEATURE_WIN32
-# include "pthreads_win32.h"
-#else
-# ifdef LISP_FEATURE_SB_THREAD
-#  include <pthread.h>
-# endif
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_WIN32)
+# include <pthread.h>
 #endif
 
 #include <stdint.h>
@@ -30,9 +26,6 @@
 
 #ifdef LISP_FEATURE_WIN32
 #define thread_sigmask sb_pthread_sigmask
-// wrap CriticalSection operators in a function returning 1 to satisfy assertions
-static inline int cs_mutex_lock(void* l) { EnterCriticalSection(l); return 1; }
-static inline int cs_mutex_unlock(void* l) { LeaveCriticalSection(l); return 1; }
 #define mutex_acquire(l) cs_mutex_lock(l)
 #define mutex_release(l) cs_mutex_unlock(l)
 #define CONDITION_VAR_WAIT(x,y) SleepConditionVariableCS(x,y,INFINITE)

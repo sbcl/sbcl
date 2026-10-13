@@ -50,13 +50,9 @@
   #include <sys/sysctl.h>
 #endif
 
-#ifdef LISP_FEATURE_SB_THREAD
-# ifdef LISP_FEATURE_WIN32
-#  include "pthreads_win32.h"
-# elif defined LISP_FEATURE_OS_THREAD_STACK
+#if defined LISP_FEATURE_SB_THREAD && defined LISP_FEATURE_OS_THREAD_STACK
 #  include <limits.h> // PTHREAD_STACK_MIN is possibly in here
 #  include <pthread.h> // instead of in here
-# endif
 #endif
 
 #include "wrap.h"

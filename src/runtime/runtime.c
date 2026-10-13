@@ -30,10 +30,11 @@
 #include <sys/file.h>
 #include <sys/param.h>
 #include <sys/stat.h>
-#include "runtime.h"
 #ifndef LISP_FEATURE_WIN32
 #include <sched.h>
 #else
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #include <shellapi.h>
 #endif
 #include <errno.h>

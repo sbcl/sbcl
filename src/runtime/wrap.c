@@ -44,6 +44,7 @@
 
 #if defined(LISP_FEATURE_WIN32)
 #define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #include <errno.h>
 #include <math.h>
 #endif
@@ -391,7 +392,6 @@ uid_homedir(uid_t uid)
  */
 
 #ifdef LISP_FEATURE_WIN32
-#include <windows.h>
 #include <time.h>
 /*
  * faked-up implementation of select(). Right now just enough to get through
