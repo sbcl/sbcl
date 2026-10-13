@@ -594,11 +594,10 @@
   - @COMPILATION-SPEED: How fast the compiler should run. If this is
     high, then some expensive optimizations may be disabled.
 
-  - @SPACE: How much space the compiled code should take up. Inline
-    expansion is mostly inhibited when @SPACE is greater than @SPEED.
-    A value of `0` enables indiscriminate inline expansion. Wide use
-    of a `0` value is not recommended, as it may waste so much space
-    that run time is slowed. See @OPEN-CODING-AND-INLINE-EXPANSION.
+  - @SPACE: How much space the compiled code should take up. A high
+    value makes INLINE functions semi-inlined, and `0` enables
+    semi-inlining of SB-EXT:MAYBE-INLINE functions (see
+    @SEMI-INLINE-EXPANSION).
 
   - @DEBUG: How debuggable the program should be. The quality is
     treated differently from the other qualities: each value indicates
@@ -717,8 +716,8 @@
   "Since Common Lisp forbids the redefinition of standard functions, the
   compiler can have special knowledge of these standard functions
   embedded in it. This special knowledge is used in various ways (open
-  coding, inline expansion, source transformation), but the implications
-  to the user are basically the same:
+  coding, @INLINE-EXPANSION, source transformation), but the
+  implications to the user are basically the same:
 
   - Attempts to redefine standard functions may be frustrated since
     the function may never be called. Although it is technically

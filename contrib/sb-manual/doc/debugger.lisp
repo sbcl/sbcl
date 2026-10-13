@@ -644,10 +644,10 @@
   functions are inline expanded. If a function is inline expanded,
   then there will be no frame to represent the call, and the arguments
   will be treated like any other local variable. Functions may also be
-  _@SEMI-INLINE_, in which case there is a frame to represent the
-  call, but the call is to an optimized local version of the function,
-  not to the original function. See @OPEN-CODING-AND-INLINE-EXPANSION
-  for more.")
+  @SEMI-INLINE (see @SEMI-INLINE-EXPANSION), in which case there is a
+  frame to represent the call, but the call is to an optimized local
+  version of the function, not to the original function. See
+  @OPEN-CODING-AND-INLINE-EXPANSION for more.")
 
 (defsection @exiting-the-debugger (:title "Exiting the Debugger")
   "These commands get you out of the debugger.

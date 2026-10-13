@@ -113,13 +113,16 @@
     (:keys (("local call," "tail")
             ("call," "local" "tail")
             ("function call," "local" "tail"))))
-
 
+(define-concept @semi-inline (:title "semi inline"
+                              :keys (("inline," "semi")
+                                     ("semi-inline"))))
 (define-concept @closure (:title "closure"
                           :keys ("closure")))
 
 (define-concept @return-values (:title "return values"
                                 :keys (("return values"))))
+
 
 (define-concept @interrupt (:title "interrupt"
                             :keys ("interrupt")))
@@ -133,10 +136,6 @@
 
 (define-concept @block-start (:title "block start"
                               :keys (("block," "start location"))))
-
-(define-concept @semi-inline (:title "semi inline"
-                              :keys (("inline," "semi")
-                                     ("semi-inline"))))
 
 (define-concept @external-format (:title "external format"
                               :keys (("external" "format")

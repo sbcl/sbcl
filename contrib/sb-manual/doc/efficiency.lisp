@@ -5,6 +5,7 @@
   (@tail-call section)
   (@local-call section)
   (@block-compilation section)
+  (@inline-expansion section)
   (@slot-access section)
   (@stack-allocation section)
   (@modular-arithmetic section)
@@ -373,8 +374,209 @@
 
   Unless files are very small, it is probably impractical to block
   compile multiple files as a unit by specifying a list of files to
-  COMPILE-FILE. @SEMI-INLINE expansion provides another way to extend
+  COMPILE-FILE. @SEMI-INLINE-EXPANSION provides another way to extend
   block compilation across file boundaries.")
+
+(defsection @inline-expansion (:title "Inline Expansion"
+                               :concepts (("inline" "expansion")
+                                          ("inlining")
+                                          ("expansion," "inline")
+                                          ("call," "inline")
+                                          ("function call," "inline")
+                                          ("optimization," "inlining")))
+
+  "SBCL can expand almost any function inline, including functions
+  with keyword arguments. The only restrictions are that keyword
+  argument keywords in the call must be constant, and that global
+  function definitions (DEFUN) must be done in a null lexical
+  environment (not nested in a LET or other binding form.) Local
+  functions (e.g. FLET) can be inline expanded in any environment.
+  Combined with source-level optimization, inline expansion can be
+  used for things that would otherwise require macros for efficient
+  implementation. In SBCL, macros don't have any efficiency advantage,
+  so they need only be used where a macro's syntactic flexibility is
+  required.
+
+  Inline expansion is a compiler optimization technique that reduces
+  the overhead of a function call by simply not doing the call:
+  instead, the compiler effectively rewrites the program to appear as
+  though the definition of the called function was inserted at each
+  call site. In Lisp, this is straightforwardly expressed by inserting
+  the LAMBDA corresponding to the original definition. Consider
+
+      (declaim (inline my-1+))
+      (defun my-1+ (x)
+        (+ x 1))
+
+  With this definition, `(MY-1+ SOMEVAL)` is equivalent
+  to `((LAMBDA (X) (+ X 1)) SOMEVAL)`."
+  (sb-ext:*inline-expansion-limit* variable)
+  "Regardless of this limit, expanding a large function inline can
+  increase the size of a program considerably. If the program becomes
+  too large, inline expansion hurts speed rather than helping it,
+  since hardware resources such as physical memory and cache will be
+  exhausted. Inline expansion is called for:
+
+  - When profiling has shown that a relatively simple function is
+    called so often that a large amount of time is being wasted in the
+    calling of that function (as opposed to running in that function).
+    If a function is complex, it will take a long time to run relative
+    the time spent in call, so the speed advantage of inline expansion
+    is diminished at the same time the space cost of inline expansion
+    is increased. Of course, if a function is rarely called, then the
+    overhead of calling it is also insignificant.
+
+  - With functions so simple that they take less space to inline
+    expand than would be taken to call the function (such as `MY-1+`
+    above). It would require intimate knowledge of the compiler to be
+    certain when inline expansion would reduce space, but it is
+    generally safe to inline expand functions whose definition is a
+    single function call, or a few calls to simple functions.
+
+  In addition to this speed/space tradeoff from inline expansion's
+  avoidance of the call, inline expansion can also reveal
+  opportunities for optimization. SBCL's extensive source-level
+  optimization can make use of context information from the caller to
+  tremendously simplify the code resulting from the inline expansion
+  of a function.
+
+  The main form of caller context is local information about the
+  actual argument values: what the argument types are and whether the
+  arguments are constant. Knowledge about argument types can eliminate
+  run-time type tests (e.g. for generic arithmetic). Constant
+  arguments in a call provide opportunities for constant folding
+  optimization after inline expansion.
+
+  A hidden way that constant arguments are often supplied to functions
+  is through the defaulting of unsupplied optional or keyword arguments.
+  There can be a huge efficiency advantage to inline expanding functions
+  that have complex keyword-based interfaces, such as this definition of
+  the MEMBER function:
+
+      (declaim (inline member))
+      (defun member (item list &key
+                     (key #'identity)
+                     (test #'eql testp)
+                     (test-not nil notp))
+        (do ((list list (cdr list)))
+            ((null list) nil)
+          (let ((car (car list)))
+            (if (cond (testp
+                       (funcall test item (funcall key car)))
+                      (notp
+                       (not (funcall test-not item (funcall key car))))
+                      (t
+                       (funcall test item (funcall key car))))
+                (return list)))))
+
+  After inline expansion,
+
+      (member a l :key #'foo-a :test #'char=)
+
+  is simplified to the obvious code:
+
+      (do ((list list (cdr list)))
+          ((null list) nil)
+        (let ((car (car list)))
+          (if (char= item (foo-a car))
+              (return list))))
+
+  In this example, there could easily be more than an order of
+  magnitude improvement in speed. In addition to eliminating the
+  original call to MEMBER, inline expansion also allows the calls to
+  CHAR= and `FOO-A` to be open-coded. We go from a loop with three
+  tests and two calls to a loop with one test and no calls."
+  ;; FIXME: See @SOURCE-OPTIMIZATION for more discussion of
+  ;; source-level optimization.
+  (@inline-expansion-recording section)
+  (@semi-inline-expansion section))
+
+(defsection @inline-expansion-recording
+    (:title "Inline Expansion Recording"
+     :concepts (("inline expansion," "recording")))
+  "Inline expansion requires that the source for the inline expanded
+  function to be available when calls to the function are compiled.
+  The compiler doesn't remember the inline expansion of every
+  function, since that would take an excessive amount of space.
+  Instead, the programmer must tell the compiler to record the inline
+  expansion before the definition of the inline expanded function is
+  compiled. This is done by globally declaring the function inline
+  before the function is defined, by using the INLINE and
+  SB-EXT:MAYBE-INLINE declarations.
+
+  In addition to recording the inline expansion of inline functions at
+  the time the function is compiled, COMPILE-FILE also puts the inline
+  expansion in the output file. When the output file is loaded, the
+  inline expansion is made available for subsequent compilations;
+  there is no need to compile the definition again to record the
+  inline expansion.
+
+  If a function is declared inline, but no expansion is recorded, then
+  the compiler will give style warning like
+
+  ```
+  ; caught STYLE-WARNING:
+  ;   Call to MY-1+ could not be inlined because its source code
+  ;   was not saved. A global INLINE or SB-EXT:MAYBE-INLINE proclamation must be
+  ;   in effect to save function definitions for inlining.
+  ```
+
+  If you get this, check that the INLINE declaration appears before
+  the DEFUN, which in turn is before the calls that are to be inline
+  expanded. Alternatively, the style warning can be silenced by
+  declaring the function NOTINLINE at the call site.
+
+  This style warning will also be given if the inline expansion could
+  not be recorded because the DEFUN was in a non-null lexical
+  environment.")
+
+(defsection @semi-inline-expansion (:title "Semi-inline Expansion"
+                                    :concepts (@semi-inline))
+  "Semi-inline expansion shares a single copy of a function across all
+  the calls in a component by converting the inline expansion into a
+  @LOCAL-CALL. This takes up less space when there are multiple calls
+  but also provides less opportunity for context-dependent
+  optimization. When there is only one call, the result is identical
+  to normal @INLINE-EXPANSION.
+
+  The inlining decision takes into account the inlining declaration of
+  the function to be called and the optimization qualities in effect,
+  where both are taken at the call site.
+
+  - SB-EXT:MAYBE-INLINE: Semi-inlined if @SPACE is `0`; else, not
+    inlined at all.
+
+  - INLINE: Semi-inlined if (< @SPEED @SPACE) or (< @SPEED
+    @COMPILATION-SPEED); else, inlined normally."
+  (sb-ext:maybe-inline declaration)
+  "Note that the use of the SB-EXT:MAYBE-INLINE declaration followed by
+  the DEFUN is preferable to the standard idiom of
+
+      (declaim (inline myfun))
+      (defun myfun () ...)
+      (declaim (notinline myfun))
+
+      ;; Calls to MYFUN here are not inline expanded.
+
+      (defun somefun ()
+        (declare (inline myfun))
+        ;; Calls to MYFUN here are inline expanded.
+        ...)
+
+  The problem with using NOTINLINE in this way is that it does more
+  than just suppress inline expansion: it also forbids the compiler to
+  use any knowledge of `MYFUN` until a later INLINE declaration
+  overrides the NOTINLINE. This prevents compiler warnings about
+  incorrect calls to the function and also prevents
+  @BLOCK-COMPILATION.
+
+  When the goal is merely to control whether inline expansion is done
+  by default, it is preferable to use SB-EXT:MAYBE-INLINE rather than
+  NOTINLINE. The NOTINLINE declaration should be reserved for those
+  special occasions when a function may be redefined at run-time, so
+  the compiler must be told that the obvious definition of a function
+  is not necessarily the one that will be in effect at the time of the
+  call.")
 
 (defsection @slot-access (:title "Slot Access"
                           :concepts (("slot" "access")))
@@ -682,7 +884,6 @@
   - More About Types in Python
   - Type Inference
   - Source Optimization
-  - Inline Expansion
   - Object Representation
   - Numbers
   - General Efficiency Hints

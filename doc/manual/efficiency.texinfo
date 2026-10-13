@@ -8,6 +8,7 @@
 * Tail Call: tail call.
 * Local Call: local call.
 * Block Compilation: block compilation.
+* Inline Expansion: inline expansion.
 * Slot Access: slot access.
 * Stack Allocation: stack allocation.
 * Modular Arithmetic: modular arithmetic.
@@ -448,11 +449,11 @@ Syntax: @code{(sb-ext:start-block &rest entry-point-names)}
 
 Only valid as a global proclamation.
 
-When processed by the compiler, this declaration marks the start of
-@ref{block compilation} and specifies the entry points to that
-block. If no entry points are specified, then all functions are made
-into entry points. If already block compiling, then the compiler ends
-the current block and starts a new one.
+When processed by the compiler, this declaration marks the start of a
+@ref{block compilation} unit and specifies the entry points to
+that block. If no entry points are specified, then all functions are
+made into entry points. If already block compiling, then the compiler
+ends the current block and starts a new one.
 @end deffn
 @anchor{Declaration sb-ext end-block}
 @ddindex @sortas{end-block sb-ext} end-block [sb-ext]
@@ -461,9 +462,9 @@ Syntax: @code{(sb-ext:end-block &rest symbols)}
 
 Only valid as a global proclamation.
 
-The end-block declaration ends a @ref{block compilation} unit
-without starting a new one. This is useful mainly when only a portion
-of a file is worth block compiling.
+This declaration ends a @ref{block compilation} unit without
+starting a new one. This is useful mainly when only a portion of a
+file is worth block compiling.
 @end deffn
 @node block compilation difficulties
 @subsection Block Compilation Difficulties
@@ -484,12 +485,261 @@ full incremental redefinition, you can compile with
 Note that if a @code{defun} appears in a non-null lexical environment, then
 calls to it cannot be block compiled.
 
-@cindex inline, semi
-@cindex semi-inline
 Unless files are very small, it is probably impractical to block
 compile multiple files as a unit by specifying a list of files to
-@code{compile-file}. semi inline expansion provides another way to extend
+@code{compile-file}. @ref{semi inline expansion} provides another way to extend
 block compilation across file boundaries.
+
+@node inline expansion
+@cindex inline expansion
+@cindex inlining
+@cindex expansion, inline
+@cindex call, inline
+@cindex function call, inline
+@cindex optimization, inlining
+@section Inline Expansion
+
+@menu
+* Inline Expansion Recording: inline expansion recording.
+* Semi-inline Expansion: semi inline expansion.
+@end menu
+
+SBCL can expand almost any function inline, including functions
+with keyword arguments. The only restrictions are that keyword
+argument keywords in the call must be constant, and that global
+function definitions (@code{defun}) must be done in a null lexical
+environment (not nested in a @code{let} or other binding form.) Local
+functions (e.g. @code{flet}) can be inline expanded in any environment.
+Combined with source-level optimization, inline expansion can be
+used for things that would otherwise require macros for efficient
+implementation. In SBCL, macros don't have any efficiency advantage,
+so they need only be used where a macro's syntactic flexibility is
+required.
+
+Inline expansion is a compiler optimization technique that reduces
+the overhead of a function call by simply not doing the call:
+instead, the compiler effectively rewrites the program to appear as
+though the definition of the called function was inserted at each
+call site. In Lisp, this is straightforwardly expressed by inserting
+the @code{lambda} corresponding to the original definition. Consider
+
+@example
+(declaim (inline my-1+))
+(defun my-1+ (x)
+  (+ x 1))
+@end example
+
+With this definition, @code{(my-1+ someval)} is equivalent
+to @code{((lambda (x) (+ x 1)) someval)}.
+
+@anchor{Variable sb-ext *inline-expansion-limit*}
+@vvindex @sortas{inline-expansion-limit* sb-ext} *inline-expansion-limit* [sb-ext]
+@deffn{Variable} sb-ext:*inline-expansion-limit*
+An upper limit on the number of inline function calls that will be
+expanded in any given component (single function or block
+compilation unit).
+@end deffn
+Regardless of this limit, expanding a large function inline can
+increase the size of a program considerably. If the program becomes
+too large, inline expansion hurts speed rather than helping it,
+since hardware resources such as physical memory and cache will be
+exhausted. Inline expansion is called for:
+
+@itemize
+@item When profiling has shown that a relatively simple function is
+  called so often that a large amount of time is being wasted in the
+  calling of that function (as opposed to running in that function).
+  If a function is complex, it will take a long time to run relative
+  the time spent in call, so the speed advantage of inline expansion
+  is diminished at the same time the space cost of inline expansion
+  is increased. Of course, if a function is rarely called, then the
+  overhead of calling it is also insignificant.
+
+@item With functions so simple that they take less space to inline
+  expand than would be taken to call the function (such as @code{my-1+}
+  above). It would require intimate knowledge of the compiler to be
+  certain when inline expansion would reduce space, but it is
+  generally safe to inline expand functions whose definition is a
+  single function call, or a few calls to simple functions.
+@end itemize
+
+In addition to this speed/space tradeoff from inline expansion's
+avoidance of the call, inline expansion can also reveal
+opportunities for optimization. SBCL's extensive source-level
+optimization can make use of context information from the caller to
+tremendously simplify the code resulting from the inline expansion
+of a function.
+
+The main form of caller context is local information about the
+actual argument values: what the argument types are and whether the
+arguments are constant. Knowledge about argument types can eliminate
+run-time type tests (e.g. for generic arithmetic). Constant
+arguments in a call provide opportunities for constant folding
+optimization after inline expansion.
+
+A hidden way that constant arguments are often supplied to functions
+is through the defaulting of unsupplied optional or keyword arguments.
+There can be a huge efficiency advantage to inline expanding functions
+that have complex keyword-based interfaces, such as this definition of
+the @code{member} function:
+
+@example
+(declaim (inline member))
+(defun member (item list &key
+               (key #'identity)
+               (test #'eql testp)
+               (test-not nil notp))
+  (do ((list list (cdr list)))
+      ((null list) nil)
+    (let ((car (car list)))
+      (if (cond (testp
+                 (funcall test item (funcall key car)))
+                (notp
+                 (not (funcall test-not item (funcall key car))))
+                (t
+                 (funcall test item (funcall key car))))
+          (return list)))))
+@end example
+
+After inline expansion,
+
+@example
+(member a l :key #'foo-a :test #'char=)
+@end example
+
+is simplified to the obvious code:
+
+@example
+(do ((list list (cdr list)))
+    ((null list) nil)
+  (let ((car (car list)))
+    (if (char= item (foo-a car))
+        (return list))))
+@end example
+
+In this example, there could easily be more than an order of
+magnitude improvement in speed. In addition to eliminating the
+original call to @code{member}, inline expansion also allows the calls to
+@code{char=} and @code{foo-a} to be open-coded. We go from a loop with three
+tests and two calls to a loop with one test and no calls.
+
+@node inline expansion recording
+@cindex inline expansion, recording
+@subsection Inline Expansion Recording
+
+Inline expansion requires that the source for the inline expanded
+function to be available when calls to the function are compiled.
+The compiler doesn't remember the inline expansion of every
+function, since that would take an excessive amount of space.
+Instead, the programmer must tell the compiler to record the inline
+expansion before the definition of the inline expanded function is
+compiled. This is done by globally declaring the function inline
+before the function is defined, by using the @code{inline} and
+@code{sb-ext:maybe-inline} declarations.
+
+In addition to recording the inline expansion of inline functions at
+the time the function is compiled, @code{compile-file} also puts the inline
+expansion in the output file. When the output file is loaded, the
+inline expansion is made available for subsequent compilations;
+there is no need to compile the definition again to record the
+inline expansion.
+
+If a function is declared inline, but no expansion is recorded, then
+the compiler will give style warning like
+
+@example
+; caught STYLE-WARNING:
+;   Call to MY-1+ could not be inlined because its source code
+;   was not saved. A global INLINE or SB-EXT:MAYBE-INLINE proclamation must be
+;   in effect to save function definitions for inlining.
+@end example
+
+If you get this, check that the @code{inline} declaration appears before
+the @code{defun}, which in turn is before the calls that are to be inline
+expanded. Alternatively, the style warning can be silenced by
+declaring the function @code{notinline} at the call site.
+
+This style warning will also be given if the inline expansion could
+not be recorded because the @code{defun} was in a non-null lexical
+environment.
+
+@node semi inline expansion
+@cindex inline, semi
+@cindex semi-inline
+@subsection Semi-inline Expansion
+
+Semi-inline expansion shares a single copy of a function across all
+the calls in a component by converting the inline expansion into a
+@ref{local call}. This takes up less space when there are multiple calls
+but also provides less opportunity for context-dependent
+optimization. When there is only one call, the result is identical
+to normal @ref{inline expansion}.
+
+The inlining decision takes into account the inlining declaration of
+the function to be called and the optimization qualities in effect,
+where both are taken at the call site.
+
+@cindex space, optimization quality
+@cindex optimization quality space
+@cindex speed, optimization quality
+@cindex optimization quality speed
+@cindex compilation-speed, optimization quality
+@cindex optimization quality compilation-speed
+@itemize
+@item @code{sb-ext:maybe-inline}: Semi-inlined if @code{space} is @code{0}; else, not
+  inlined at all.
+
+@item @code{inline}: Semi-inlined if (< @code{speed} @code{space}) or (< @code{speed}
+  @code{compilation-speed}); else, inlined normally.
+@end itemize
+
+@anchor{Declaration sb-ext maybe-inline}
+@ddindex @sortas{maybe-inline sb-ext} maybe-inline [sb-ext]
+@deffn{Declaration} sb-ext:maybe-inline
+Syntax: @code{(sb-ext:maybe-inline &rest function-names)}
+
+The @code{maybe-inline} declaration is similar to @code{inline} but indicates that
+inline expansion may sometimes be desirable, rather than saying that
+inline expansion should almost always be done. When used in a global
+declaration, it causes the expansions for the named functions to be
+recorded by @code{defun}.
+
+When its expansion is recorded, a call to a function that is
+@code{maybe-inline} is semi-inlined if @code{space} is @code{0}, where both the
+@code{maybe-inline} declaration and the value of the @code{space} optimization
+quality is at the call site. If @code{space} is non-zero, then the call is
+not inlined.
+@end deffn
+Note that the use of the @code{sb-ext:maybe-inline} declaration followed by
+the @code{defun} is preferable to the standard idiom of
+
+@example
+(declaim (inline myfun))
+(defun myfun () ...)
+(declaim (notinline myfun))
+
+;; Calls to MYFUN here are not inline expanded.
+
+(defun somefun ()
+  (declare (inline myfun))
+  ;; Calls to MYFUN here are inline expanded.
+  ...)
+@end example
+
+The problem with using @code{notinline} in this way is that it does more
+than just suppress inline expansion: it also forbids the compiler to
+use any knowledge of @code{myfun} until a later @code{inline} declaration
+overrides the @code{notinline}. This prevents compiler warnings about
+incorrect calls to the function and also prevents
+@ref{block compilation}.
+
+When the goal is merely to control whether inline expansion is done
+by default, it is preferable to use @code{sb-ext:maybe-inline} rather than
+@code{notinline}. The @code{notinline} declaration should be reserved for those
+special occasions when a function may be redefined at run-time, so
+the compiler must be told that the obvious definition of a function
+is not necessarily the one that will be in effect at the time of the
+call.
 
 @node slot access
 @cindex slot access
@@ -892,7 +1142,6 @@ sections
 @item More About Types in Python
 @item Type Inference
 @item Source Optimization
-@item Inline Expansion
 @item Object Representation
 @item Numbers
 @item General Efficiency Hints

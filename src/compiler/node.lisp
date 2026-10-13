@@ -1636,8 +1636,9 @@
   (value :prin1 (lvar-uses value)))
 
 (defvar *inline-expansion-limit* 50
-  "an upper limit on the number of inline function calls that will be expanded
-   in any given code object (single function or block compilation)")
+  "An upper limit on the number of inline function calls that will be
+  expanded in any given component (single function or block
+  compilation unit).")
 
 (defvar *inline-expansions* nil)
 (declaim (list *inline-expansions*)

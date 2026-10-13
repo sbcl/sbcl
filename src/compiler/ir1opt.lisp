@@ -1738,6 +1738,23 @@
                            (basic-combination-fun-info call) info))
              (values leaf nil)))))))
 
+(declaim (declaration maybe-inline))
+#-sb-xc-host
+(setf (documentation 'maybe-inline 'declaration)
+      "Syntax: `(SB-EXT:MAYBE-INLINE &REST FUNCTION-NAMES)`
+
+The MAYBE-INLINE declaration is similar to INLINE but indicates that
+inline expansion may sometimes be desirable, rather than saying that
+inline expansion should almost always be done. When used in a global
+declaration, it causes the expansions for the named functions to be
+recorded by DEFUN.
+
+When its expansion is recorded, a call to a function that is
+MAYBE-INLINE is semi-inlined if SPACE is `0`, where both the
+MAYBE-INLINE declaration and the value of the SPACE optimization
+quality is at the call site. If SPACE is non-zero, then the call is
+not inlined.")
+
 ;;; Check whether CALL satisfies TYPE. If so, apply the type to the
 ;;; call, and do MAYBE-TERMINATE-BLOCK and return the values of
 ;;; RECOGNIZE-KNOWN-CALL. If an error, set the combination kind and

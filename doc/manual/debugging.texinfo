@@ -860,10 +860,10 @@ values of the @code{speed} and @code{space} qualities also change whether
 functions are inline expanded. If a function is inline expanded,
 then there will be no frame to represent the call, and the arguments
 will be treated like any other local variable. Functions may also be
-@emph{semi inline}, in which case there is a frame to represent the
-call, but the call is to an optimized local version of the function,
-not to the original function. See @ref{open coding and inline expansion}
-for more.
+semi inline (see @ref{semi inline expansion}), in which case there is a
+frame to represent the call, but the call is to an optimized local
+version of the function, not to the original function. See
+@ref{open coding and inline expansion} for more.
 
 @node exiting the debugger
 @subsection Exiting the Debugger
