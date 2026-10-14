@@ -20,7 +20,7 @@
 #include "genesis/sbcl.h"
 #include "runtime.h"
 #include "globals.h"
-#include "validate.h"
+#include "thread.h"
 
 #ifndef LISP_FEATURE_SB_THREAD
 // Access to this variable from Lisp is more confusing than it should be for the 64-bit

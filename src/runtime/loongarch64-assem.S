@@ -20,7 +20,6 @@
 
 #include "globals.h"
 #include "lispregs.h"
-#include "validate.h"
 #include "genesis/closure.h"
 #include "genesis/static-symbols.h"
 

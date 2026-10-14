@@ -32,7 +32,6 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include "validate.h"
 
 #ifdef LISP_FEATURE_SB_THREAD
 #error "Define threading support functions"

@@ -14,7 +14,6 @@
 #include "interr.h"
 #include "interrupt.h"
 #include "globals.h"
-#include "validate.h"
 #include "target-arch-os.h"
 
 #ifdef LISP_FEATURE_X86

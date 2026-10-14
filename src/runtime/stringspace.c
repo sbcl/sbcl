@@ -18,7 +18,6 @@
 #include "genesis/vector.h"
 #include "genesis/sap.h"
 #include "globals.h"
-#include "validate.h"
 #include <stdio.h>
 #include <stdlib.h>
 

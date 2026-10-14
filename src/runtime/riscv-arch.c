@@ -14,7 +14,6 @@
 #include "runtime.h"
 #include "arch.h"
 #include "globals.h"
-#include "validate.h"
 #include "os.h"
 #include "lispregs.h"
 #include <signal.h>

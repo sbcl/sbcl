@@ -32,7 +32,6 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include "validate.h"
 
 int arch_os_thread_init(struct thread *thread) {
     stack_t sigstack;

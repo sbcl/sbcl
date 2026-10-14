@@ -37,7 +37,6 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include "validate.h"
 
 #include <stdint.h>
 #include <stddef.h>

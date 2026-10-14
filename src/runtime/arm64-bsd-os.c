@@ -36,7 +36,6 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include "validate.h"
 
 int arch_os_thread_cleanup(struct thread *thread) {
     if (thread->breakpoint_misc)

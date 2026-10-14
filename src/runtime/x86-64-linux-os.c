@@ -44,7 +44,6 @@
 #include <linux/version.h>
 #include "thread.h"             /* dynamic_values_bytes */
 
-#include "validate.h"
 
 int arch_os_thread_init(struct thread *thread) {
 #ifdef MEMORY_SANITIZER

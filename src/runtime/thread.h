@@ -1,6 +1,15 @@
 #if !defined(_INCLUDE_THREAD_H_)
 #define _INCLUDE_THREAD_H_
 
+#define BINDING_STACK_SIZE (1024*1024)   /* chosen at random */
+#define ALIEN_STACK_SIZE (1024*1024)     /* chosen at random */
+
+/* eventually choosable per-thread: */
+#ifndef DEFAULT_CONTROL_STACK_SIZE // CFLAGS=-D... can set this
+#define DEFAULT_CONTROL_STACK_SIZE (2*1024*1024)
+#endif
+
+#if !defined(__ASSEMBLER__)
 #include <sys/types.h>
 #include <stdbool.h>
 #include <unistd.h>
@@ -14,7 +23,6 @@
 #include "genesis/thread.h"
 #include "genesis/vector.h"
 #include "interrupt.h"
-#include "validate.h"           /* for BINDING_STACK_SIZE etc */
 #include "gc-typedefs.h" // for page_index_t
 
 enum threadstate {STATE_RUNNING=1, STATE_STOPPED, STATE_DEAD};
@@ -368,5 +376,65 @@ extern int handle_tls_deref_trap(os_context_t*, os_vm_address_t);
 
 // Return N in-use words of thread's multiple-value return area
 extern int thread_mv_cell_count(struct thread*);
+
+#if defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+#define STACK_GUARD_SIZE (win32_page_size + win32_stack_guarantee)
+#else
+#define STACK_GUARD_SIZE os_vm_page_size
+#endif
+
+#ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
+
+#define CONTROL_STACK_HARD_GUARD_PAGE(th) \
+    ((os_vm_address_t)(th->control_stack_start))
+#define CONTROL_STACK_GUARD_PAGE(th) \
+    (CONTROL_STACK_HARD_GUARD_PAGE(th) + STACK_GUARD_SIZE)
+#define CONTROL_STACK_RETURN_GUARD_PAGE(th) \
+    (CONTROL_STACK_GUARD_PAGE(th) + STACK_GUARD_SIZE)
+#else
+
+#define CONTROL_STACK_HARD_GUARD_PAGE(th) \
+    (((os_vm_address_t)(th->control_stack_end)) - STACK_GUARD_SIZE)
+#define CONTROL_STACK_GUARD_PAGE(th) \
+    (CONTROL_STACK_HARD_GUARD_PAGE(th) - STACK_GUARD_SIZE)
+#define CONTROL_STACK_RETURN_GUARD_PAGE(th) \
+    (CONTROL_STACK_GUARD_PAGE(th) - STACK_GUARD_SIZE)
+
+#endif
+
+#define ALIEN_STACK_HARD_GUARD_PAGE(th)         \
+    ((os_vm_address_t)(th->alien_stack_start))
+#define ALIEN_STACK_GUARD_PAGE(th) \
+    (ALIEN_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size)
+#define ALIEN_STACK_RETURN_GUARD_PAGE(th) \
+    (ALIEN_STACK_GUARD_PAGE(th) + os_vm_page_size)
+
+#define BINDING_STACK_HARD_GUARD_PAGE(th)                              \
+    (((os_vm_address_t)th->binding_stack_start) + BINDING_STACK_SIZE - \
+     os_vm_page_size)
+#define BINDING_STACK_GUARD_PAGE(th) \
+    (BINDING_STACK_HARD_GUARD_PAGE(th) - os_vm_page_size)
+#define BINDING_STACK_RETURN_GUARD_PAGE(th) \
+    (BINDING_STACK_GUARD_PAGE(th) - os_vm_page_size)
+
+extern void
+protect_control_stack_hard_guard_page(int protect_p, struct thread *thread);
+extern void
+protect_control_stack_guard_page(int protect_p, struct thread *thread);
+extern void
+protect_control_stack_return_guard_page(int protect_p, struct thread *thread);
+extern void
+protect_binding_stack_hard_guard_page(int protect_p, struct thread *thread);
+extern void
+protect_binding_stack_guard_page(int protect_p, struct thread *thread);
+extern void
+protect_binding_stack_return_guard_page(int protect_p, struct thread *thread);
+extern void
+protect_alien_stack_hard_guard_page(int protect_p, struct thread *thread);
+extern void
+protect_alien_stack_guard_page(int protect_p, struct thread *thread);
+extern void
+protect_alien_stack_return_guard_page(int protect_p, struct thread *thread);
+#endif /* !__ASSEMBLER__ */
 
 #endif /* _INCLUDE_THREAD_H_ */

@@ -25,7 +25,6 @@
 #include "os.h"
 #include "interrupt.h"
 #include "lispregs.h"
-#include "validate.h"
 #include "arch.h"
 #include "search.h"
 #include "thread.h"

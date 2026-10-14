@@ -21,7 +21,6 @@
 #include <sys/sysi86.h>
 #endif
 
-#include "validate.h"
 
 #ifdef LISP_FEATURE_SB_THREAD
 pthread_mutex_t modify_ldt_lock = PTHREAD_MUTEX_INITIALIZER;

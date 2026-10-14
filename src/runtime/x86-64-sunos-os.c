@@ -17,7 +17,6 @@
 #include <unistd.h>
 
 
-#include "validate.h"
 
 
 int arch_os_thread_init(struct thread *thread) {

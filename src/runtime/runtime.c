@@ -53,7 +53,6 @@
 #include "interrupt.h"
 #include "arch.h"
 #include "gc.h"
-#include "validate.h"
 #include "core.h"
 #include "lispregs.h"
 #include "thread.h"

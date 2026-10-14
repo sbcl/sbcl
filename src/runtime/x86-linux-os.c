@@ -46,7 +46,6 @@ static inline int set_thread_area(struct user_desc *u_info)
     return syscall(SYS_set_thread_area, u_info);
 }
 
-#include "validate.h"
 
 int arch_os_thread_init(struct thread *thread) {
     stack_t sigstack;

@@ -30,7 +30,6 @@
 #endif
 
 #include "runtime.h"
-#include "validate.h"           /* for BINDING_STACK_SIZE etc */
 #include "thread.h"
 #include "genesis/thread.h"
 #include "arch.h"

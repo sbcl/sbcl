@@ -14,7 +14,7 @@
 #include "code.h"
 #include "genesis/symbol.h"
 #include "runtime.h"
-#include "validate.h"
+#include "thread.h"
 #include "gc-assert.h"
 #include "core.h"
 #include "interr.h"

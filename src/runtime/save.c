@@ -25,7 +25,6 @@
 #include "core.h"
 #include "globals.h"
 #include "lispregs.h"
-#include "validate.h"
 #include "gc.h"
 #include "thread.h"
 #include "arch.h"

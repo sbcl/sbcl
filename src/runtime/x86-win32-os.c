@@ -38,7 +38,6 @@
 #include "thread.h"             /* dynamic_values_bytes */
 #include "align.h"              /* PTR_ALIGN... */
 
-#include "validate.h"
 
 int arch_os_thread_init(struct thread *thread)
 {

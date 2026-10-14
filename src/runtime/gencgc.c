@@ -33,7 +33,6 @@
 #include "interr.h"
 #include "globals.h"
 #include "interrupt.h"
-#include "validate.h"
 #include "lispregs.h"
 #include "arch.h"
 #include "gc.h"

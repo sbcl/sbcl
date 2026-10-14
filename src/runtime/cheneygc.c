@@ -24,7 +24,6 @@
 #include "gc.h"
 #include "globals.h"
 #include "interrupt.h"
-#include "validate.h"
 #include "lispregs.h"
 #include "interr.h"
 #include "genesis/static-symbols.h"

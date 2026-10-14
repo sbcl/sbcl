@@ -5,7 +5,6 @@
 #endif
 
 #include "thread.h"
-#include "validate.h"
 #include "runtime.h"
 #include "interrupt.h"
 #include "x86-darwin-os.h"

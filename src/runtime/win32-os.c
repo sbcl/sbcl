@@ -53,7 +53,6 @@
 #include <excpt.h>
 #include <errno.h>
 
-#include "validate.h"
 #include "thread.h"
 #include "align.h"
 

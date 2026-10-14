@@ -33,7 +33,6 @@
 #include <unistd.h>
 #include <sys/prctl.h>
 
-#include "validate.h"
 
 int arch_os_thread_init(struct thread *thread) {
     /* For some reason, PPC Linux appears to default to not generating

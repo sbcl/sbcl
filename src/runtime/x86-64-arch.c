@@ -16,7 +16,6 @@
 #include "genesis/sbcl.h"
 #include "runtime.h"
 #include "globals.h"
-#include "validate.h"
 #include "os.h"
 #include "arch.h"
 #include "lispregs.h"

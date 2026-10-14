@@ -44,7 +44,6 @@
 #include <unistd.h>
 #include <linux/version.h>
 
-#include "validate.h"
 #include "thread.h"
 #include "gc.h"
 #include <fcntl.h>

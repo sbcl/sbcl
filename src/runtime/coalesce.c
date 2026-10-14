@@ -24,7 +24,6 @@
 #include "hopscotch.h"
 #include "code.h"
 #include "genesis/static-symbols.h"
-#include "validate.h"
 #include "var-io.h"
 
 static bool gcable_pointer_p(lispobj pointer)

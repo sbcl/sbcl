@@ -21,7 +21,7 @@
 #include "immobile-space.h"
 #include "queue.h"
 #include "os.h"
-#include "validate.h"
+#include "thread.h"
 #include "var-io.h"
 
 #include <stdio.h>

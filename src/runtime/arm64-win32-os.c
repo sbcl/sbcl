@@ -39,7 +39,6 @@
 #include "thread.h"             /* dynamic_values_bytes */
 #include "align.h"
 
-#include "validate.h"
 
 #include <windows.h> // For VirtualQuery, GetLastError, FlushInstructionCache
 

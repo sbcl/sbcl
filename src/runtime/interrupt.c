@@ -59,7 +59,6 @@
 #include "interrupt.h"
 #include "globals.h"
 #include "lispregs.h"
-#include "validate.h"
 #include "interr.h"
 #include "gc.h"
 #include "genesis/sap.h"

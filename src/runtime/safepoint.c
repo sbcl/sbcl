@@ -20,7 +20,6 @@
 #include <errno.h>
 #include <sys/types.h>
 #include "runtime.h"
-#include "validate.h"
 #include "thread.h"
 #include "arch.h"
 #include "target-arch-os.h"

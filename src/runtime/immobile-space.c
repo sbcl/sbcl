@@ -62,7 +62,6 @@
 #include "search.h"
 #include "align.h"
 #include "queue.h"
-#include "validate.h"
 #include "var-io.h"
 #include <stdlib.h>
 #include <stdio.h>

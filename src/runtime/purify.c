@@ -23,7 +23,6 @@
 #include "runtime.h"
 #include "os.h"
 #include "globals.h"
-#include "validate.h"
 #include "interrupt.h"
 #include "purify.h"
 #include "interr.h"
