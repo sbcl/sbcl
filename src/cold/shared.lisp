@@ -254,6 +254,28 @@
     (when (probe-file customizer-file-name)
       (copy-list (funcall (compile nil (read-from-file customizer-file-name)) nil)))))
 
+;;; features present in all builds
+(defvar *static-features*
+  '(;; our standard
+    :ansi-cl :common-lisp
+
+    ;; Should we add :X3J13 too?
+    ;;
+    ;; No. CLHS says ":x3j13 [...] A conforming implementation might
+    ;; or might not contain such a feature." -- CSR, 2002-02-21
+
+    ;; our dialect
+    :sbcl))
+
+(defun base-features ()
+  (let ((feature-defs (read-from-file "^base-target-features.lisp-expr")))
+    (union (loop for feature-def in feature-defs
+                 for feature-name = (first feature-def)
+                 for enabledp = (second feature-def)
+                 when enabledp
+                   collect feature-name)
+           *static-features*)))
+
 ;;; When cross-compiling, the *FEATURES* set for the target Lisp is
 ;;; not in general the same as the *FEATURES* set for the host Lisp.
 ;;; In order to refer to target features specifically, we refer to
@@ -268,11 +290,11 @@
 ;;; The compromise is to examine a variable specifying a path
 ;;; (and it can't go in SB-COLD because the package is not made soon enough)
 (setf sb-xc:*features*
-      (let* ((pathname (custom-or-default 'cl-user::*sbcl-local-target-features-file*
-                                          "local-target-features.lisp-expr"))
-             (default-features
-               (funcall (compile nil (read-from-file pathname))
-                        (read-from-file "^base-target-features.lisp-expr")))
+      (let* ((localizer-file-name
+               (custom-or-default 'cl-user::*sbcl-local-target-features-file*
+                                  "local-target-features.lisp-expr"))
+             (localizer (compile nil (read-from-file localizer-file-name)))
+             (local-features (funcall localizer (base-features)))
              (customizer-file-name
                (custom-or-default 'cl-user::*sbcl-customize-target-features-file*
                                   "customize-target-features.lisp"))
@@ -282,7 +304,7 @@
                              #'identity))
              ;; Bind temporarily so that TARGET-FEATUREP and TARGET-PLATFORM-KEYWORD
              ;; can see the tentative list.
-             (sb-xc:*features* (funcall customizer default-features))
+             (sb-xc:*features* (funcall customizer local-features))
              (gc (intersection '(:cheneygc :gencgc :mark-region-gc)
                                sb-xc:*features*))
              (arch (target-platform-keyword)))

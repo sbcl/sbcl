@@ -100,12 +100,10 @@
            ;; hence it makes no difference whether they're public or not.
            :SB-DEVEL :SB-DEVEL-LOCK-PACKAGES)")))
        #-sb-devel
-       (removable-features
-        (append non-target-features public-features)))
+       (non-internal-features (append non-target-features public-features)))
   (setq sb-impl:+internal-features+
-            (remove-if (lambda (x) (member x #+sb-devel public-features
-                                             #-sb-devel removable-features))
-                       *features*))
+        (set-difference *features* #+sb-devel public-features
+                                   #-sb-devel non-internal-features))
   (setf (sb-int:info :variable :kind 'sb-impl:+internal-features+) :constant)
   (setq *features* (remove-if-not (lambda (x) (member x public-features))
                                   *features*)))
