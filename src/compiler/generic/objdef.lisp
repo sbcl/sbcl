@@ -253,10 +253,6 @@ during backtrace.
 (defconstant simple-fun-source-slot  2) ; form and/or docstring
 (defconstant simple-fun-info-slot    3) ; type and possibly xref
 
-#-(or x86 x86-64 arm64 riscv loongarch64)
-(define-primitive-object (return-pc :lowtag other-pointer-lowtag :widetag t)
-  (return-point :c-type "unsigned char" :rest-p t))
-
 (define-primitive-object (closure :lowtag fun-pointer-lowtag
                                   :widetag closure-widetag
                                   ;; This allocator is used when renaming or cloning
