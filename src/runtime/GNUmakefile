@@ -77,7 +77,7 @@ COMMON_SRC = alloc.c arena.c backtrace.c breakpoint.c coalesce.c	\
 	print.c time.c                                                  \
 	regnames.c runtime.c safepoint.c save.c                         \
 	sc-offset.c search.c stringspace.c thread.c stop-the-world.c    \
-	validate.c var-io.c vars.c wrap.c
+	var-io.c vars.c wrap.c
 
 ifndef LISP_FEATURE_WIN32
 COMMON_SRC += run-program.c sprof.c
