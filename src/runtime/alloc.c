@@ -1,5 +1,11 @@
 /*
- * C half of code-component allocator for Lisp with gencgc.
+ * This file contains:
+ *  - System startup-time allocation of spaces.
+ *  - Thread structure allocator.
+ *  - C half of the fallback allocation paths for the Lisp bump allocator.
+ *  - Code-component allocator for Lisp with gencgc.
+ *  - Support routines for the precise consing profiler.
+ *  - And various and sundry other helper routines.
  */
 
 /*
@@ -22,6 +28,83 @@
 #include "arch.h" // why is this where funcall2 is declared???
 #include "genesis/symbol.h"
 #include "code.h"
+
+/* To the curious reader, I wanted to know the trajectory that development
+ * proceeded down such that SBCL ended up with a "validate.c" file
+ * containing a validate() function which is the indirect progenitor
+ * of the allocate_hardwired_spaces() function below.
+ * It goes something like this: SBCL took validate() from CMUCL which
+ * took it from SPICE Lisp which ran on the PERQ workstation under
+ * CMU's Accent OS.
+ *
+ * The Accent API to obtain memory was ValidateMemory, documented thusly in [1]:
+ *   "ValidateMemory marks a given part of a process address space as valid.
+ *    References to data in this area will succeed and initial reads will return zero."
+ * And it even has MAP_FIXED semantics!
+ *   "Note that ValidateMemory will still return success, even if you have
+ *    previously validated the same space. Using ValidateMemory to validate
+ *    existing addresses may cause the content of those addresses to be overwritten."
+ *
+ * When CMU designed Mach, they changed Validate/Invalidate into
+ * vm_allocate and vm_deallocate, however confusingly CMUCL kept the
+ * user-application names as os_validate and os_invalidate which were
+ * calls to the renamed kernel interfaces.
+ *
+ * More historical tidbits can be found in
+ *  [1] https://bitsavers.trailing-edge.com/pdf/perq/accent_S5/Accent_PgmrsManual_1984/08_AccentKernelInterface.pdf
+ *  [2] https://bitsavers.trailing-edge.com/pdf/perq/accent_lisp/Accent_LISP_System_Interface_198409.pdf
+ *  [3] http://reports-archive.adm.cs.cmu.edu/anon/itc/CMU-ITC-028.pdf
+ *
+ * Page 68 of [2] shows that Lisp could directly call the OS as in their example:
+ *   (defconstant memory-size 1024 "Amount of Memory (in bytes) we validate.")
+ *   (defun memory1 ()
+ *     (multiple-value-bind (gr addr) (validatememory kernelport 0 memory-size -1)
+ *       ...))
+ * and that "validate" was well-entrenched into their jargon.
+ *
+ * And citation [3] says in its paragraph 2.3:
+ *   "Malloc and free are used to allocate space. Lower level notions
+ *    like Unix's sbrk or Accent's ValidateMemory underly [sic] them"
+ */
+bool allocate_hardwired_spaces(bool hard_failp)
+{
+    struct {
+        uword_t start;
+        unsigned size;
+        int id;
+    } preinit_spaces[] = {
+#ifndef LISP_FEATURE_X86_64
+      // For x86-64, static space allocation request depends on dynamic space size,
+      // and linkage spaces (alien + lisp) are either placed at the start of
+      // text space if it exists, or below static space otherwise.
+        { READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE, READ_ONLY_CORE_SPACE_ID },
+        { ALIEN_LINKAGE_SPACE_START, ALIEN_LINKAGE_SPACE_SIZE, ALIEN_LINKAGE_TABLE_CORE_SPACE_ID },
+#endif
+#ifndef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
+        { STATIC_SPACE_START, STATIC_SPACE_SIZE, STATIC_CORE_SPACE_ID },
+#endif
+#ifdef LISP_FEATURE_DARWIN_JIT
+        { STATIC_CODE_SPACE_START, STATIC_CODE_SPACE_SIZE, STATIC_CODE_CORE_SPACE_ID },
+#endif
+    };
+    int i;
+    int n_spaces = sizeof preinit_spaces / sizeof preinit_spaces[0];
+    for (i = 0; i< n_spaces; ++i) {
+        if (!preinit_spaces[i].size) continue;
+        if (os_alloc_gc_space(preinit_spaces[i].id,
+                              NOT_MOVABLE,
+                              (os_vm_address_t)preinit_spaces[i].start,
+                              preinit_spaces[i].size)) continue;
+        if (!hard_failp) return 0; // soft fail. Try again after disabling ASLR
+        fprintf(stderr,
+                "failed to allocate %lu bytes at %p\n",
+                (long unsigned)preinit_spaces[i].size, (void*)preinit_spaces[i].start);
+        fprintf(stderr,
+                "(hint: Try \"ulimit -a\"; maybe you should increase memory limits.)\n");
+        exit(1);
+    }
+    return 1;
+}
 
 lispobj* atomic_bump_static_space_free_ptr(int nbytes)
 {

@@ -68,46 +68,6 @@ void ensure_undefined_alien(void) {
     }
 }
 
-bool allocate_hardwired_spaces(bool hard_failp)
-{
-    struct {
-        uword_t start;
-        unsigned size;
-        int id;
-    } preinit_spaces[] = {
-#ifndef LISP_FEATURE_X86_64
-      // For x86-64, static space allocation request depends on dynamic space size,
-      // and linkage spaces (alien + lisp) are either placed at the start of
-      // text space if it exists, or below static space otherwise.
-        { READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE, READ_ONLY_CORE_SPACE_ID },
-        { ALIEN_LINKAGE_SPACE_START, ALIEN_LINKAGE_SPACE_SIZE, ALIEN_LINKAGE_TABLE_CORE_SPACE_ID },
-#endif
-#ifndef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
-        { STATIC_SPACE_START, STATIC_SPACE_SIZE, STATIC_CORE_SPACE_ID },
-#endif
-#ifdef LISP_FEATURE_DARWIN_JIT
-        { STATIC_CODE_SPACE_START, STATIC_CODE_SPACE_SIZE, STATIC_CODE_CORE_SPACE_ID },
-#endif
-    };
-    int i;
-    int n_spaces = sizeof preinit_spaces / sizeof preinit_spaces[0];
-    for (i = 0; i< n_spaces; ++i) {
-        if (!preinit_spaces[i].size) continue;
-        if (os_alloc_gc_space(preinit_spaces[i].id,
-                              NOT_MOVABLE,
-                              (os_vm_address_t)preinit_spaces[i].start,
-                              preinit_spaces[i].size)) continue;
-        if (!hard_failp) return 0; // soft fail. Try again after disabling ASLR
-        fprintf(stderr,
-                "failed to allocate %lu bytes at %p\n",
-                (long unsigned)preinit_spaces[i].size, (void*)preinit_spaces[i].start);
-        fprintf(stderr,
-                "(hint: Try \"ulimit -a\"; maybe you should increase memory limits.)\n");
-        exit(1);
-    }
-    return 1;
-}
-
 /* Using madvise to define guard pages is better than using mprotect and PROT_NONE.
  * With madvise, it does not split the VMA into pieces based on the protection.
  * The kernel knows that a page fault occurring on a non-present page indicated
