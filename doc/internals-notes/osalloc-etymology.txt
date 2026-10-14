@@ -1,0 +1,422 @@
+The Evolution of validate / os_validate / os_allocate / vm_allocate
+===================================================================
+
+This note picks up where the historical comment above `allocate_hardwired_spaces()`
+in `src/runtime/alloc.c` leaves off. That comment documents the 1984 CMU Accent
+`ValidateMemory` kernel primitive and the Accent manuals ([1]-[3] in `alloc.c`);
+this file records the source-level and commit-by-commit evolution from 1984
+Spice Lisp through CMUCL to SBCL, showing every permutation of who called whom
+among `validate-memory`, `do-validate`, `os_validate`, `os_allocate`, and
+`vm_allocate`.
+
+Note: Unless marked `SBCL`, all git commit hashes below refer to the CMUCL git
+repository ([4], converted from CMU's RCS/CVS history via `cvs2git`).
+
+
+1. 1984 Spice Lisp on PERQ: `validate-memory` in `KERNEL.SLISP` (No C Runtime)
+------------------------------------------------------------------------------
+
+Spice Lisp on the Three Rivers PERQ workstation had no C runtime at all: Spice
+Lisp compiled to a custom bytecode instruction set executed directly by PERQ
+microcode, and the Accent OS itself was written in Pascal and microcode.
+
+In the 1984 Spice Lisp source preserved in Xerox PARC's `{ERIS}` archive [5],
+`.KERNEL.SLISP!1` defines `validate-memory` directly in Lisp. Because Accent
+was a message-passing microkernel, `ValidateMemory` was invoked by populating a
+pre-allocated request message record (`to-validate-memory`), sending it to
+`KernelPort`, and reading the reply record (`from-validate-memory`)---avoiding
+any Lisp consing while requesting memory:
+
+    ;;; Validate-memory marks a given part of our address space as valid.
+    ;;;
+    ;;; ADDRESS -- The address of the first page to validate.  If 0, accent will
+    ;;;            choose an address from our invalid pages.
+    ;;; COUNT   -- The number of 8 bit bytes to validate
+    ;;; MASK    -- If address = 0, then the address chosen by accent will be such
+    ;;;            that for each 0 bit in MASK, the corresponding bit in the
+    ;;;            chosen address will be zero.
+    ;;;
+    ;;; RETURNS the address actualy validated.
+
+    (defun validate-memory (address count mask)
+      (setf (to-validate-memory-address to-validate-memory) address)
+      (setf (to-validate-memory-count to-validate-memory) count)
+      (setf (to-validate-memory-mask to-validate-memory) mask)
+      (simple-send to-validate-memory)
+      (simple-receive from-validate-memory)
+      (let ((return-code (from-validate-memory-return-code from-validate-memory)))
+        (if (/= return-code rc-success)
+            (error "Validate-memory error ~s." return-code)))
+      (from-validate-memory-address from-validate-memory))
+
+
+2. 1986-1989 (Mach on IBM RT PC): Lisp `do-validate` -> `mach::vm_allocate`
+---------------------------------------------------------------------------
+
+When CMU moved Spice Lisp / early CMUCL off the PERQ onto Mach on the IBM RT PC
+(prior to the Python compiler and prior to any C runtime), Mach replaced
+Accent's `ValidateMemory` and `InvalidateMemory` IPC calls with `vm_allocate`
+and `vm_deallocate`.
+
+Lisp, however, retained both the Accent verb "validate" and Accent's 3-argument
+`(addr bytes mask)` calling convention. In commit 82c2e48ed9 (RCS log:
+`22-Oct-89 22:36:51, Edit by Wlott. Moved DO-VALIDATE from machio.lisp to here,
+cause machio.lisp is going away`), `code/alieneval.lisp` contains the exact
+Accent-to-Mach bridge:
+
+    ;;; DO-VALIDATE  --  Internal Interface.
+    ;;;
+    ;;; Do a ValidateMemory on our kernel port and flame out if error.
+    ;;;
+    ;;; Hemlock and other code files use this, even though it is not exported from
+    ;;; a more appropriate package.
+    ;;;
+    (defun do-validate (addr bytes mask)
+      (gr-call* mach::vm_allocate *task-self* addr bytes (if (eq mask -1) t NIL)))
+
+Note how all three layers are visible at once:
+- The docstring still says "Do a ValidateMemory on our kernel port" (Accent).
+- The signature is `(addr bytes mask)` where `mask = -1` meant "any address".
+- The body translates `(eq mask -1)` into Mach's boolean `anywhere` parameter
+  and calls `mach::vm_allocate`.
+
+In the earliest revision of the CMUCL tree (c3ad9ffd9a, Feb 6, 1990, ram),
+Lisp used `do-validate` in `make-alien`, `copy-alien`, and the old RT core
+builder (`compiler/old-rt/genesis.lisp`):
+
+    (defun get-valid-hunk (size)
+      (let ((addr (do-validate 0 size -1)))
+        (values addr addr)))
+
+while `code/gc.lisp` still described GC space zeroing in Accent terms even
+when calling `mach:vm_deallocate` / `mach:vm_allocate` directly:
+
+    ;;;  -- Invalidate & revalidate the old spaces to free up their memory.
+    ...
+    (let ((gr (mach:vm_deallocate *task-self* this-space (- #x2000000 8192))))
+      ...)
+    (let ((gr (mach:vm_allocate *task-self* this-space (- #x2000000 8192) nil)))
+      ...)
+
+
+3. Feb-Jun 1990: Birth of the C Runtime (`ldb/`) and `os_validate`
+------------------------------------------------------------------
+
+The C runtime (`ldb/`, later renamed `lisp/` in CMUCL and `src/runtime/` in
+SBCL) was created in February 1990 for the new Python compiler and MIPS port.
+
+(a) `CORE_VALIDATE` in `ldb/coreparse.c` (194141a876, Feb 24, 1990, wlott):
+    In the very first checkin of `ldb/`, `validate.c` did not yet exist.
+    Instead, core files contained a `CORE_VALIDATE` (3845) header entry, and
+    `coreparse.c` validated address ranges specified by the core file:
+
+    #define CORE_VALIDATE 3845
+
+    static void process_validate(ptr, count)
+    long *ptr;
+    {
+        long addr, len;
+
+        while (count-- > 0) {
+            addr = *ptr++ * CORE_PAGESIZE;
+            len = *ptr++ * CORE_PAGESIZE;
+            printf("validating %d bytes at 0x%x\n", len, addr);
+            os_validate(addr, len);
+        }
+    }
+
+(b) Creation of `ldb/validate.c` (80b047f78f & eac91e5ad7, Mar 28, 1990, ch):
+    On March 28, 1990, Christopher Hoover removed `process_validate` from
+    `ldb/coreparse.c` (80b047f78f: "Added new type of directory entry and
+    removed validation", replacing `case CORE_VALIDATE:` with
+    `fprintf(stderr, "Validation no longer supported; ignored.\n");`) and two
+    minutes later checked in `ldb/validate.c` (eac91e5ad7: "Incorporated GC"):
+
+    validate()
+    {
+        printf("Validating memory ...");
+        fflush(stdout);
+
+        /* Read only space */
+        read_only_space = (lispobj *) 0x20000000;
+        os_validate(read_only_space, 0x1000000);
+
+        /* Static Space */
+        static_space = (lispobj *) 0x30000000;
+        os_validate(static_space, 0x1000000);
+
+        /* Dynamic Spaces */
+        dynamic_0_space = (lispobj *) 0x40000000;
+        os_validate(dynamic_0_space, 0x2000000);
+        current_dynamic_space = dynamic_0_space;
+
+        dynamic_1_space = (lispobj *) 0x48000000;
+        os_validate(dynamic_1_space, 0x08000000);
+
+        /* Control Stack */
+        control_stack = (lispobj *) 0x50000000;
+        os_validate(control_stack, 0x08000000);
+
+        /* Binding Stack */
+        binding_stack = (lispobj *) 0x60000000;
+        os_validate(binding_stack, 0x2000000);
+
+        printf(" done.\n");
+    }
+
+(c) Lisp renames `do-validate` -> `allocate-system-memory` (5325d600e0,
+    May 25, 1990, wlott):
+    While C entrenched `validate()` and `os_validate()`, Lisp moved away from
+    the word "validate". In `code/alieneval.lisp` ("Replaced do-validate with
+    allocate-system-memory and added deallocate-system-memory"):
+
+    (defun allocate-system-memory (bytes)
+      (gr-call* mach:vm_allocate *task-self* (int-sap 0) bytes t))
+
+    (defun deallocate-system-memory (addr bytes)
+      (gr-call* mach:vm_deallocate *task-self* addr bytes))
+
+(d) `ldb/os.h` formalizes `os_validate` (7d9c735a5c, Jun 3, 1990, ch;
+    9f31ce5575, Jun 4, 1990, ch):
+    `ldb/os.h` ("OS-dependent header file. This is the Mach version.")
+    typedef'd `os_vm_address_t` to Mach's `vm_address_t` and declared
+    `extern void os_validate();` and `extern void os_invalidate();`.
+
+
+4. May 24, 1991 (SunOS Port): The Three-Way Circular Call Graph
+---------------------------------------------------------------
+
+When William Lott and Miles Bader added the first non-Mach port (SunOS 4 on
+SPARC, using `mmap`) in commits ba332b469b, cb6388bb3f, ebd84c6ff4,
+21c11c9d09, and 6d70976ee1, they split the OS layer into `os.h`, `os-common.c`,
+`mach-os.c`, `sunos-os.c`, and `fake-mach.c`.
+
+Instead of making `os_allocate` the low-level OS primitive, they kept
+`os_validate(addr, len)` at the bottom of the C OS layer (where `addr == NULL`
+meant movable allocation and `addr != NULL` meant fixed allocation) and built
+`os_allocate` on top of `os_validate`. Meanwhile, Lisp code still called
+`mach:vm_allocate` via FFI, so SunOS linked in `fake-mach.c`.
+
+This created all three call directions between `os_validate`, `os_allocate`,
+and `vm_allocate` simultaneously in the May 24, 1991 tree:
+
+  (1) `os_validate` -> `vm_allocate` (in `ldb/mach-os.c`, 6d70976ee1):
+
+      void os_validate(addr, len)
+      vm_address_t addr;
+      vm_size_t len;
+      {
+          kern_return_t res;
+
+      #if defined(EXT_PAGER)
+          res = pager_vm_allocate(task_self(), &addr, len, addr==NULL);
+      #else
+          res = vm_allocate(task_self(), &addr, len, addr==NULL);
+      #endif
+
+          if (res != KERN_SUCCESS)
+              mach_error("Could not vm_allocate memory: ", res);
+
+          segments = -1;
+      }
+
+      (Notice `void os_validate` didn't even return `addr` in 6d70976ee1 even
+      though ebd84c6ff4 changed `os.h` to `extern os_vm_address_t os_validate();`
+      and cb6388bb3f changed `ldb/save.c` from calling `vm_allocate` to
+      `start = os_validate(start, len);`! That mismatch was fixed 21 minutes
+      later in 9dae54fa6c, and error return `0` in c3ec466af9.)
+
+  (2) `os_allocate` -> `os_validate` (in `ldb/os-common.c`, 21c11c9d09):
+
+      os_vm_address_t os_allocate(len)
+      os_vm_size_t len;
+      {
+          return os_validate((os_vm_address_t)NULL,len);
+      }
+
+      void os_deallocate(addr,len)
+      os_vm_address_t addr;
+      os_vm_size_t len;
+      {
+          os_invalidate(addr,len);
+      }
+
+      (`os_zero` and `os_reallocate` in `os-common.c` likewise implemented
+      zeroing and resizing via `os_invalidate` + `os_validate`.)
+
+  (3) `vm_allocate` -> `os_validate` (in `ldb/fake-mach.c`, 21c11c9d09):
+
+      int vm_allocate(task,addr_p,len,free)
+      int task;
+      os_vm_address_t *addr_p;
+      os_vm_size_t len;
+      int free;
+      {
+          *addr_p=os_validate(free ? NULL : *addr_p,len);
+          return (*addr_p)==NULL ? KERN_FAILURE : KERN_SUCCESS;
+      }
+
+Thus, in May 1991:
+- On Mach:  `os_allocate(len)` -> `os_validate(NULL, len)` -> `vm_allocate(...)`
+- On SunOS: Lisp `allocate-system-memory` -> `fake-mach.c:vm_allocate(...)`
+            -> `os_validate(NULL, len)` -> `mmap(...)`
+
+
+5. Sep 1991 - Mar 1992: `ensure_space` and Lisp's Switch to `os_allocate(_at)`
+------------------------------------------------------------------------------
+
+On Sep 13, 1991 (dfa50cda0d, wlott / Miles Bader), `ldb/validate.c` wrapped
+its `os_validate` calls in `ensure_space(start, size)`:
+
+    static void ensure_space(start,size)
+    lispobj *start;
+    unsigned long size;
+    {
+        if(os_validate((os_vm_address_t)start,(os_vm_size_t)size)==NULL){
+            fprintf(stderr,
+                    "ensure_space: Failed to validate %ld bytes at 0x%08x\n",
+                    size,
+                    start);
+            exit(1);
+        }
+    }
+
+In Feb-Mar 1992, William Lott eliminated the direct `mach:vm_allocate` FFI
+calls from Lisp:
+
+- Commit 055c7ba48a (Feb 15, 1992, `code/sap.lisp`: "Replaces
+  {alloc,realloc,dealloc}ate-system-memory with versions that use the routines
+  exported by os.c instead of MACH specific vm_allocate"):
+
+    (alien:def-alien-routine ("os_allocate" allocate-system-memory)
+                             system-area-pointer
+      (bytes c-call:unsigned-long))
+
+- Commits 39fa923c53, 018005e473, and c15dce221b (Mar 2, 1992: "Don't use
+  MACH:VM-ALLOCATE, because we might not be running under mach. Use
+  ALLOCATE-SYSTEM-MEMORY-AT instead"):
+  To replace `(mach:gr-call* mach:vm_allocate *task-self* addr memory-needed nil)`
+  in `code/foreign.lisp`, Lott added `os_allocate_at` to `ldb/os-common.c`
+  (initially with a bug passing `&addr` in 018005e473, fixed in 352952e7fc on
+  Mar 22, 1992, "Removed a spurious &."):
+
+    os_vm_address_t os_allocate_at(addr,len)
+    os_vm_address_t addr;
+    os_vm_size_t len;
+    {
+        return os_validate(addr, len);
+    }
+
+At this point on Mach, a fixed-address foreign allocation in Lisp traversed:
+`allocate-system-memory-at` -> `os_allocate_at` -> `os_validate` -> `vm_allocate`.
+
+
+6. 1993-2004: `HOLES`, the HP-UX Lazy-Mapping Diversion, and WHN's `os.h` Note
+------------------------------------------------------------------------------
+
+(a) `HOLES` in `lisp/validate.c` (e61f0408d5, Jan 18, 1993, wlott):
+    Because `os_allocate(len)` called `os_validate(NULL, len)` which let the
+    OS pick any unmapped page, `os_allocate` on SPARC SunOS could accidentally
+    place foreign allocations in the page immediately following a Lisp space or
+    stack. Commit e61f0408d5 ("allocate, but protect against reading or
+    writing, the page following each of the heaps or stacks. This keeps
+    os_allocate from deciding to use one of those pages for something else")
+    added `make_holes()` to `lisp/validate.c`, calling `os_validate(holes[i],
+    HOLE_SIZE)` followed by `os_protect(holes[i], HOLE_SIZE, 0)`.
+
+(b) `lisp/hpux-os.c` (c159b7a71f, Jul 27, 1993, hallgren):
+    On HP-UX, `mmap` restrictions led to an OS backend where `os_validate` did
+    not allocate memory at all: it merely recorded `[addr, addr+len)` in a
+    `segments[]` array so a `SIGSEGV` handler could lazily `mmap` 64 KB chunks
+    on fault. Meanwhile, `hpux-os.c` defined its own `os_allocate` calling
+    `malloc(len)` and `os_allocate_at` calling `os_validate(addr, len)`:
+
+    /* Assumptions these routines are based on:
+    os_validate: Not called with NULL for an addr.
+    os_invalidate: Never called.
+    ...
+    os_allocate_at: Calls to here are disjoint from those around it (the others
+            in os-common.c) since it calls os_validate and the others (in
+            os-common.c) use malloc, etc.
+    Note that os_validate does not actually allocate memory until it has to map
+    the particular section in.
+    */
+
+(c) SBCL's initial commit (SBCL a530bbe337, Sep 18, 2000, William Harold Newman):
+    By 2000, when WHN forked SBCL from CMUCL (retaining only x86 Linux/BSD),
+    both Accent and Mach were gone from the tree, leaving `os_validate` as an
+    inscrutable name for an `mmap` wrapper. WHN documented `src/runtime/os.h`
+    "on 20000729, by WHN the impatient reverse engineer":
+
+    /* It looks as though this function allocates 'len' bytes at 'addr',
+     * or at an OS-chosen address if 'addr' is zero.
+     *
+     * FIXME: There was some documentation for these functions in
+     * "hp-ux.c" in the old CMU CL code. Perhaps move/merge it in here. */
+    extern os_vm_address_t os_validate(os_vm_address_t addr, os_vm_size_t len);
+
+(d) Darwin / Mac OS X (CMUCL eb44537aaf, Jul 13, 2004, pmai):
+    Ironically, when CMUCL was later ported back onto a Mach-based OS
+    (Darwin/OS X in `lisp/Darwin-os.c`), `os_validate` was implemented with
+    POSIX `mmap(addr, len, OS_VM_PROT_ALL, MAP_PRIVATE | MAP_ANONYMOUS | ..., -1, 0)`
+    rather than Mach's `vm_allocate`.
+
+
+7. 2011-2026: `validate.c` Calls `os_allocate` -> `os_validate`, and Retirement
+-------------------------------------------------------------------------------
+
+In the final twist of the naming inversion, `validate.c` itself was changed to
+call `os_allocate`---which in `os-common.c` called `os_validate`:
+
+- In CMUCL (CMUCL f7345b4a47, Oct 2, 2011; CMUCL cc34b6ac2b, Oct 4, 2011,
+  Raymond Toy), when `CONTROL_STACK_START` and `BINDING_STACK_START` were made
+  optional so the OS could place stacks anywhere, `lisp/validate.c` became:
+
+    #if defined(CONTROL_STACK_START)
+        control_stack = (lispobj *) CONTROL_STACK_START;
+        ensure_space(control_stack, control_stack_size);
+    #else
+        control_stack = (lispobj *) os_allocate(control_stack_size);
+    #endif
+
+  where `os_allocate(control_stack_size)` in `os-common.c` called
+  `os_validate(NULL, control_stack_size)`.
+
+- In SBCL (SBCL fc3b343588, Jul 11, 2017, dougk: "Use os_allocate(), not
+  os_validate(), for 'anywhere' allocation"), `ensure_undefined_alien()` in
+  `src/runtime/validate.c` was changed from `os_validate(NULL, os_vm_page_size)`
+  to `os_allocate(os_vm_page_size)`---whose body in `src/runtime/os-common.c`
+  at that commit was literally `return os_validate((os_vm_address_t)NULL, len);`.
+
+Gradual dismantling of the "validate" nomenclature in SBCL:
+- Nov 4, 2016 (SBCL c42988a48f): `validate()` in `src/runtime/validate.c` was
+  renamed to `allocate_spaces()`.
+- May 5, 2018 (SBCL 46b54a5dc7): Fixed-address startup allocation was split
+  into `allocate_hardwired_spaces()`.
+- Sep 16, 2022 (SBCL 5a2e639a0d): `os_validate` was renamed to `os_alloc_gc_space`
+  ("Nobody I surveyed guessed correctly that 'validate' meant 'give me memory'").
+- Oct 2026: `src/runtime/validate.c` and `src/runtime/validate.h` were deleted;
+  `allocate_hardwired_spaces()` now resides in `src/runtime/alloc.c`.
+
+
+8. Summary of Call-Graph Permutations
+-------------------------------------
+
+  Era / Platform       Caller                     Intermediate         OS Primitive
+  -------------------  -------------------------  -------------------  --------------------
+  1984 PERQ (Accent)   Lisp `validate-memory`     (Accent IPC msg)     `ValidateMemory`
+  1989 RT (Mach)       Lisp `do-validate`         ---                  `mach::vm_allocate`
+  1990 MIPS (Mach)     C `validate()`             `os_validate`        `vm_allocate`
+  1990 MIPS (Mach)     Lisp `allocate-system-..`  ---                  `mach:vm_allocate`
+  1991 Mach            C `os_allocate`            `os_validate`        `vm_allocate`
+  1991 SunOS           Lisp `allocate-system-..`  `fake-mach.c`:       `os_validate` -> `mmap`
+                                                  `vm_allocate`
+  1992 Mach            Lisp `allocate-system-..`  `os_allocate(_at)`   `os_validate` -> `vm_allocate`
+  1993 HP-UX           C `os_allocate`            ---                  `malloc`
+  1993 HP-UX           C `os_allocate_at`         `os_validate`        (lazy SIGSEGV `mmap`)
+  2011 CMUCL /         C `validate.c`             `os_allocate`        `os_validate` -> `mmap`
+  2017 SBCL
+
+References (continuing [1]-[3] from `src/runtime/alloc.c`):
+ [4] https://gitlab.common-lisp.net/cmucl/cmucl.git
+ [5] https://xeroxparcarchive.computerhistory.org/eris/commonlisp/old/.KERNEL.SLISP!1.html
