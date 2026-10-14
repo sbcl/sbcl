@@ -312,37 +312,37 @@
     (storew zero-tn bsp-tn (- binding-value-slot binding-size))
     (inst subi bsp-tn bsp-tn (* binding-size n-word-bytes))))
 
+(defun unbind-to-here (where symbol value)
+  (let ((loop (gen-label))
+        (skip (gen-label))
+        (done (gen-label)))
+    (inst cmpw where bsp-tn)
+    (inst beq done)
+
+    (emit-label loop)
+    (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
+    (inst cmpwi symbol 0)
+    (inst beq skip)
+    (loadw value bsp-tn (- binding-value-slot binding-size))
+    #+sb-thread
+    (inst stwx value thread-base-tn symbol)
+    #-sb-thread
+    (storew value symbol symbol-value-slot other-pointer-lowtag)
+    (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
+
+    (emit-label skip)
+    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
+    (inst subi bsp-tn bsp-tn (* binding-size n-word-bytes))
+    (inst cmpw where bsp-tn)
+    (inst bne loop)
+
+    (emit-label done)))
 
 (define-vop (unbind-to-here)
-  (:args (arg :scs (descriptor-reg any-reg) :target where))
-  (:temporary (:scs (any-reg) :from (:argument 0)) where)
+  (:args (where :scs (descriptor-reg any-reg)))
   (:temporary (:scs (descriptor-reg)) symbol value)
   (:generator 0
-    (let ((loop (gen-label))
-          (skip (gen-label))
-          (done (gen-label)))
-      (move where arg)
-      (inst cmpw where bsp-tn)
-      (inst beq done)
-
-      (emit-label loop)
-      (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
-      (inst cmpwi symbol 0)
-      (inst beq skip)
-      (loadw value bsp-tn (- binding-value-slot binding-size))
-      #+sb-thread
-      (inst stwx value thread-base-tn symbol)
-      #-sb-thread
-      (storew value symbol symbol-value-slot other-pointer-lowtag)
-      (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
-
-      (emit-label skip)
-      (storew zero-tn bsp-tn (- binding-value-slot binding-size))
-      (inst subi bsp-tn bsp-tn (* binding-size n-word-bytes))
-      (inst cmpw where bsp-tn)
-      (inst bne loop)
-
-      (emit-label done))))
+   (unbind-to-here where symbol value)))
 
 
 

@@ -18,39 +18,6 @@
   (make-wired-tn *fixnum-primitive-type* any-reg-sc-number ocfp-offset))
 
 
-;;; These VOPs are used in the reentered function to restore the
-;;; appropriate dynamic environment. Currently we only save the
-;;; CURRENT-CATCH and binding stack pointer. We don't need to
-;;; save/restore the current unwind-protect, since UNWIND-PROTECTs are
-;;; implicitly processed during unwinding. If there were any
-;;; additional stacks, then this would be the place to restore the top
-;;; pointers.
-
-(define-vop (save-dynamic-state)
-  (:results (catch :scs (descriptor-reg))
-            (nfp :scs (descriptor-reg))
-            (nsp :scs (descriptor-reg)))
-  (:vop-var vop)
-  (:generator 13
-    (load-tl-symbol-value catch *current-catch-block*)
-    (let ((cur-nfp (current-nfp-tn vop)))
-      (when cur-nfp
-        (move nfp cur-nfp)))
-    (move nsp nsp-tn)))
-
-(define-vop (restore-dynamic-state)
-  (:args (catch :scs (descriptor-reg))
-         (nfp :scs (descriptor-reg))
-         (nsp :scs (descriptor-reg)))
-  #+sb-thread (:temporary (:scs (any-reg)) temp)
-  (:vop-var vop)
-  (:generator 10
-    (store-tl-symbol-value catch *current-catch-block* temp)
-    (let ((cur-nfp (current-nfp-tn vop)))
-      (when cur-nfp
-        (move cur-nfp nfp)))
-    (move nsp-tn nsp)))
-
 (define-vop (current-stack-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 1
@@ -83,6 +50,7 @@
   (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
+  (:vop-var vop)
   (:generator 22
     (inst addi block cfp-tn (tn-byte-offset tn))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
@@ -90,7 +58,14 @@
     (storew cfp-tn block unwind-block-cfp-slot)
     (storew code-tn block unwind-block-code-slot)
     (inst compute-lra-from-code temp code-tn entry-label ndescr)
-    (storew temp block catch-block-entry-pc-slot)))
+    (storew temp block catch-block-entry-pc-slot)
+    (storew bsp-tn block unwind-block-bsp-slot)
+    (load-tl-symbol-value temp *current-catch-block*)
+    (storew temp block unwind-block-current-catch-slot)
+    (let ((nfp (current-nfp-tn vop)))
+      (when nfp
+        (storew nfp block unwind-block-nfp-slot))
+      (storew nsp-tn block unwind-block-nsp-slot))))
 
 
 ;;; Like Make-Unwind-Block, except that we also store in the specified tag, and
@@ -103,6 +78,7 @@
   (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
+  (:vop-var vop)
   (:generator 44
     (inst addi block cfp-tn (tn-byte-offset tn))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
@@ -115,6 +91,11 @@
     (storew tag block catch-block-tag-slot)
     (load-tl-symbol-value temp *current-catch-block*)
     (storew temp block catch-block-previous-catch-slot)
+    (storew bsp-tn block catch-block-bsp-slot)
+    (let ((nfp (current-nfp-tn vop)))
+      (when nfp
+        (storew nfp block catch-block-nfp-slot))
+      (storew nsp-tn block catch-block-nsp-slot))
     (store-tl-symbol-value block *current-catch-block* temp)))
 
 ;;; Just set the current unwind-protect to UWP.  This instantiates an
@@ -266,10 +247,19 @@
 (define-vop (uwp-entry)
   (:info label)
   (:save-p :force-to-stack)
-  (:results (block) (start) (count))
-  (:ignore block start count)
   (:vop-var vop)
   (:generator 0
     (emit-label label)
     (note-this-location vop :non-local-entry)))
+
+(define-vop (uwp-entry-block)
+  (:info label)
+  (:save-p :force-to-stack)
+  (:results (block))
+  (:vop-var vop)
+  (:generator 0
+    (emit-label label)
+    (note-this-location vop :non-local-entry)
+    ;; Get the block saved in UNWIND
+    (loadw block csp-tn -4)))
 

@@ -148,35 +148,83 @@
                           (:arg start (any-reg descriptor-reg) ocfp-offset)
                           (:arg count (any-reg descriptor-reg) nargs-offset)
                           (:temp lra descriptor-reg lra-offset)
-                          (:temp lip any-reg lip-offset)
                           (:temp cur-uwp any-reg nl0-offset)
                           (:temp next-uwp any-reg nl1-offset)
-                          (:temp target-uwp any-reg nl2-offset))
-  (declare (ignore start count))
-
+                          (:temp target-uwp any-reg nl2-offset)
+                          ;; for unbind-to-here
+                          (:temp where any-reg nl3-offset)
+                          (:temp symbol descriptor-reg a1-offset)
+                          (:temp value descriptor-reg a2-offset)
+                          #+sb-assembling
+                          (:temp nfp any-reg nfp-offset))
+  AGAIN
   (let ((error (generate-error-code nil 'invalid-unwind-error)))
-    (inst cmpwi block 0)
+    (inst cmpdi block 0)
     (inst beq error))
 
   (load-tl-symbol-value cur-uwp *current-unwind-protect-block*)
   (loadw target-uwp block unwind-block-uwp-slot)
-  (inst cmpw cur-uwp target-uwp)
-  (inst bne do-uwp)
+  (inst cmpd cur-uwp target-uwp)
+  (inst beq DO-EXIT)
 
-  (move cur-uwp block)
+  (inst addi csp-tn csp-tn (* 4 n-word-bytes))
+  (storew block csp-tn -4)
+  (storew start csp-tn -3)
+  (storew count csp-tn -2)
 
-  DO-EXIT
+
+  (inst bl GET-RET)
+  RET
+  (loadw count csp-tn -2)
+  (loadw start csp-tn -3)
+  (loadw block csp-tn -4)
+  (inst subi csp-tn csp-tn (* 4 n-word-bytes))
+  (inst b AGAIN)
+
+  GET-RET
+  (inst mflr next-uwp)
+  (storew next-uwp csp-tn -1)
+
+  (loadw where cur-uwp unwind-block-bsp-slot)
+  (unbind-to-here where symbol value)
+
+  ;; Set next unwind protect context.
+  (loadw next-uwp cur-uwp unwind-block-uwp-slot)
+  (store-tl-symbol-value next-uwp *current-unwind-protect-block* target-uwp)
 
   (loadw cfp-tn cur-uwp unwind-block-cfp-slot)
   (loadw code-tn cur-uwp unwind-block-code-slot)
   (loadw lra cur-uwp unwind-block-entry-pc-slot)
-  (lisp-return lra lip)
+  (loadw next-uwp cur-uwp unwind-block-current-catch-slot)
+  (store-tl-symbol-value next-uwp *current-catch-block* target-uwp)
+  (loadw nfp cur-uwp unwind-block-nfp-slot)
+  (loadw nsp-tn cur-uwp unwind-block-nsp-slot)
 
-  DO-UWP
+  (inst mtctr lra)
+  (inst bctr)
 
-  (loadw next-uwp cur-uwp unwind-block-uwp-slot)
-  (store-tl-symbol-value next-uwp *current-unwind-protect-block* cfp-tn)
-  (inst b do-exit))
+  DO-EXIT
+  (loadw where block unwind-block-bsp-slot)
+  (unbind-to-here where symbol value)
+  (loadw cfp-tn block unwind-block-cfp-slot)
+  (loadw code-tn block unwind-block-code-slot)
+  (loadw lra block unwind-block-entry-pc-slot)
+  (loadw next-uwp block unwind-block-current-catch-slot)
+  (store-tl-symbol-value next-uwp *current-catch-block* target-uwp)
+  (loadw nfp block unwind-block-nfp-slot)
+  (loadw nsp-tn block unwind-block-nsp-slot)
+
+  (inst mtctr lra)
+  (inst bctr))
+
+#-sb-assembling
+(define-vop ()
+  (:translate %continue-unwind)
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:generator 0
+    (loadw temp csp-tn -1)
+    (inst mtctr temp)
+    (inst bctr)))
 
 (define-assembly-routine (throw
                           (:return-style :none))
