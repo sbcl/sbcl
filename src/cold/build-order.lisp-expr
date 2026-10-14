@@ -452,7 +452,6 @@
  #+(and x86-64 sb-thread) ("src/compiler/{arch}/tls")
  ("src/compiler/{arch}/call")
  ("src/compiler/{arch}/nlx")
- ("src/compiler/generic/late-nlx")
  ("src/compiler/{arch}/show")
  ("src/compiler/{arch}/array")
  ("src/compiler/generic/type-error")

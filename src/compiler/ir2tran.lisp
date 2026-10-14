@@ -2259,13 +2259,6 @@
          (block-tn (ir2-nlx-info-block-tn 2info))
          (res (make-stack-pointer-tn))
          (target-label (ir2-nlx-info-target 2info)))
-    #-unbind-in-unwind
-    (vop current-binding-pointer node block
-         (car (ir2-nlx-info-dynamic-state 2info)))
-    #-unbind-in-unwind
-    (vop* save-dynamic-state node block
-          (nil)
-          ((reference-tn-list (cdr (ir2-nlx-info-dynamic-state 2info)) t)))
     (unless (eq kind :unwind-protect)
       (vop current-stack-pointer node block (ir2-nlx-info-save-sp 2info)))
 
@@ -2362,17 +2355,6 @@
                          target
                          (length locs)))
                (move-lvar-result node block locs lvar))))))
-      #-no-continue-unwind
-      ((:unwind-protect)
-       (let ((start-loc (make-nlx-entry-arg-start-location))
-             (count-loc (make-arg-count-location))
-             (block-loc (standard-arg-location 0)))
-         (vop uwp-entry node block target block-loc start-loc count-loc)
-         (move-lvar-result
-          node block
-          (list block-loc start-loc count-loc)
-          lvar)))
-      #+no-continue-unwind
       ((:unwind-protect)
        (if lvar
            (vop sb-vm::uwp-entry-block node block target
@@ -2382,18 +2364,7 @@
     #+sb-dyncount
     (when *collect-dynamic-statistics*
       (vop count-me node block *dynamic-counts-tn*
-           (block-number (ir2-block-block block))))
-    ;; Make sure this is done before NSP is reset, as that may leave
-    ;; *free-interrupt-context-index* unprotected below the stack
-    ;; pointer.
-    #-unbind-in-unwind
-    (vop unbind-to-here node block
-         (car (ir2-nlx-info-dynamic-state 2info)))
-
-    #-unbind-in-unwind
-    (vop* restore-dynamic-state node block
-          ((reference-tn-list (cdr (ir2-nlx-info-dynamic-state 2info)) nil))
-          (nil))))
+           (block-number (ir2-block-block block))))))
 
 (defoptimizer (%unwind-protect-breakup ir2-convert) ((info-lvar) node block)
   (vop %unwind-protect-breakup node block (ir2-nlx-info-block-tn (nlx-info-info (lvar-value info-lvar)))))

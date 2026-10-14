@@ -2387,19 +2387,7 @@ forms that explicitly control this kind of evaluation.")
       (sb-vm::%primitive sb-vm::unwind-to-frame-and-call
                          (sb-di::frame-pointer frame)
                          (find-enclosing-uwp frame)
-                         #-unbind-in-unwind
-                         (lambda ()
-                           ;; Before calling the user-specified
-                           ;; function, we need to restore the binding
-                           ;; stack and the catch block. The unwind block
-                           ;; is taken care of by the VOP.
-                           (sb-vm::%primitive sb-vm::unbind-to-here
-                                              unbind-to)
-                           (setf sb-vm:*current-catch-block* catch-block)
-                           (funcall thunk))
-                         #+unbind-in-unwind thunk
-                         #+unbind-in-unwind unbind-to
-                         #+unbind-in-unwind catch-block)))
+                          thunk unbind-to catch-block)))
   #-unwind-to-frame-and-call-vop
   (let ((tag (gensym)))
     (sb-di:replace-frame-catch-tag frame
