@@ -197,34 +197,34 @@
     (inst addu bsp-tn bsp-tn (* -2 n-word-bytes))))
 
 
+(defun unbind-to-here (where symbol value temp)
+  (assemble ()
+    (inst beq where bsp-tn done)
+    (inst nop)
+
+    LOOP
+    (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
+    (inst beq symbol skip)
+    (loadw value bsp-tn (- binding-value-slot binding-size))
+    (without-scheduling ()
+      (emit-gengc-barrier symbol nil temp)
+      (storew value symbol symbol-value-slot other-pointer-lowtag))
+    (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
+
+    SKIP
+    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
+    (inst addu bsp-tn bsp-tn (* -2 n-word-bytes))
+    (inst bne where bsp-tn loop)
+    (inst nop)
+
+    DONE))
+
 (define-vop (unbind-to-here)
-  (:args (arg :scs (descriptor-reg any-reg) :target where))
-  (:temporary (:scs (any-reg) :from (:argument 0)) where)
+  (:args (where :scs (descriptor-reg any-reg)))
   (:temporary (:scs (descriptor-reg)) symbol value)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 0
-      (move where arg)
-      (inst beq where bsp-tn done)
-      (inst nop)
-
-      LOOP
-      (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
-      (inst beq symbol skip)
-      (loadw value bsp-tn (- binding-value-slot binding-size))
-      (without-scheduling ()
-        (emit-gengc-barrier symbol nil temp)
-        (storew value symbol symbol-value-slot other-pointer-lowtag))
-      (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
-
-      SKIP
-      (storew zero-tn bsp-tn (- binding-value-slot binding-size))
-      (inst addu bsp-tn bsp-tn (* -2 n-word-bytes))
-      (inst bne where bsp-tn loop)
-      (inst nop)
-
-      DONE))
-
-
+    (unbind-to-here where symbol value temp)))
 
 ;;;; Closure indexing.
 
