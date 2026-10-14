@@ -171,35 +171,36 @@
     (storew zero-tn bsp-tn (- binding-value-slot binding-size))
     (inst sub bsp-tn bsp-tn (* 2 n-word-bytes))))
 
+(defun unbind-to-here (where symbol value)
+  (let ((loop (gen-label))
+        (skip (gen-label))
+        (done (gen-label)))
+    (inst cmp where bsp-tn)
+    (inst b :eq done)
+    (inst nop)
+
+    (emit-label loop)
+    (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
+    (inst cmp symbol)
+    (inst b :eq skip)
+    (loadw value bsp-tn (- binding-value-slot binding-size))
+    (storew value symbol symbol-value-slot other-pointer-lowtag)
+    (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
+
+    (emit-label skip)
+    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
+    (inst sub bsp-tn bsp-tn (* 2 n-word-bytes))
+    (inst cmp where bsp-tn)
+    (inst b :ne loop)
+    (inst nop)
+
+    (emit-label done)))
+
 (define-vop (unbind-to-here)
-  (:args (arg :scs (descriptor-reg any-reg) :target where))
-  (:temporary (:scs (any-reg) :from (:argument 0)) where)
+  (:args (where :scs (descriptor-reg any-reg)))
   (:temporary (:scs (descriptor-reg)) symbol value)
   (:generator 0
-    (let ((loop (gen-label))
-          (skip (gen-label))
-          (done (gen-label)))
-      (move where arg)
-      (inst cmp where bsp-tn)
-      (inst b :eq done)
-      (inst nop)
-
-      (emit-label loop)
-      (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
-      (inst cmp symbol)
-      (inst b :eq skip)
-      (loadw value bsp-tn (- binding-value-slot binding-size))
-      (storew value symbol symbol-value-slot other-pointer-lowtag)
-      (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
-
-      (emit-label skip)
-      (storew zero-tn bsp-tn (- binding-value-slot binding-size))
-      (inst sub bsp-tn bsp-tn (* 2 n-word-bytes))
-      (inst cmp where bsp-tn)
-      (inst b :ne loop)
-      (inst nop)
-
-      (emit-label done))))
+    (unbind-to-here where symbol value)))
 
 ;;;; closure indexing.
 
