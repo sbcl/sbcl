@@ -177,9 +177,8 @@
 
   LOOP
 
-  (let ((error (generate-error-code nil 'unseen-throw-tag-error target)))
-    (inst cmp catch 0)
-    (inst b :eq error))
+  (inst cmp catch 0)
+  (inst b :eq (generate-error-code nil 'unseen-throw-tag-error target))
 
   (loadw tag catch catch-block-tag-slot)
   (inst cmp tag target)
@@ -190,33 +189,80 @@
   ;; routines are emitted in order, with no padding, and that the body
   ;; of UNWIND follows to arrange for the stack to be unwound to our
   ;; chosen destination.
-  (move target catch) ;; TARGET coincides with UNWIND's BLOCK argument
-  )
+  (move target catch)) ;; TARGET coincides with UNWIND's BLOCK argument
 
 (define-assembly-routine (unwind
+                          (:translate %unwind)
                           (:return-style :none)
-                          (:translate %unwind))
-                         ((:arg block (any-reg descriptor-reg) r0-offset)
-                          (:arg start (any-reg descriptor-reg) r8-offset)
-                          (:arg count (any-reg descriptor-reg) nargs-offset)
-                          (:temp ocfp non-descriptor-reg ocfp-offset)
-                          (:temp lra any-reg lr-offset)
-                          (:temp cur-uwp any-reg nl2-offset))
-  (declare (ignore start count))
+                          (:save-p :compute-only))
+    ((:arg block (any-reg descriptor-reg) r0-offset)
+     (:arg start (any-reg descriptor-reg) r8-offset)
+     (:arg count (any-reg descriptor-reg) nargs-offset)
+     (:temp cur-uwp any-reg nl2-offset)
+     (:temp temp any-reg nl3-offset)
+     (:temp lr non-descriptor-reg lr-offset)
+     ;; for unbind-to-here
+     (:temp where any-reg lexenv-offset)
+     (:temp symbol descriptor-reg r1-offset)
+     (:temp value descriptor-reg r2-offset)
+     (:temp bsp descriptor-reg ocfp-offset)
+     #+sb-assembling
+     (:temp nfp any-reg nfp-offset))
 
-  (let ((error (generate-error-code nil 'invalid-unwind-error)))
-    (inst cmp block 0)
-    (inst b :eq error))
+  (inst cmp block 0)
+  (inst b :eq (generate-error-code nil 'invalid-unwind-error))
 
+  AGAIN
   (load-symbol-value cur-uwp *current-unwind-protect-block*)
-  (loadw ocfp block unwind-block-uwp-slot)
-  (inst cmp cur-uwp ocfp)
+  (loadw temp block unwind-block-uwp-slot)
+  (inst cmp cur-uwp temp)
+  (inst b :eq DO-EXIT)
 
-  (loadw ocfp cur-uwp unwind-block-uwp-slot 0 :ne)
-  (store-symbol-value ocfp *current-unwind-protect-block* :ne)
+  (inst adr temp RET)
+  (inst add csp-tn csp-tn 16)
+  (inst str block (@ csp-tn -16))
+  (inst str start (@ csp-tn -12))
+  (inst str count (@ csp-tn -8))
+  (inst str temp (@ csp-tn -4))
 
-  (move cur-uwp block :eq)
+  (loadw where cur-uwp unwind-block-bsp-slot)
+  (unbind-to-here where symbol value bsp temp)
+
+  (loadw temp cur-uwp unwind-block-uwp-slot)
+  (store-symbol-value temp *current-unwind-protect-block*)
+
 
   (loadw cfp-tn cur-uwp unwind-block-cfp-slot)
-  (loadw lra cur-uwp unwind-block-entry-pc-slot)
-  (lisp-return lra :known))
+  (loadw lr cur-uwp unwind-block-entry-pc-slot)
+  (loadw temp cur-uwp unwind-block-current-catch-slot)
+  (store-symbol-value temp *current-catch-block*)
+  (loadw nfp cur-uwp unwind-block-nfp-slot)
+  (loadw nsp-tn cur-uwp unwind-block-nsp-slot)
+
+  (inst blx lr)
+
+  RET
+  (inst ldr count (@ csp-tn -8))
+  (inst ldr start (@ csp-tn -12))
+  (inst ldr block (@ csp-tn -16))
+  (inst sub csp-tn csp-tn 16)
+  (inst b AGAIN)
+
+  DO-EXIT
+  (loadw where block unwind-block-bsp-slot)
+  (unbind-to-here where symbol value bsp temp)
+  (loadw cfp-tn block unwind-block-cfp-slot)
+  (loadw lr block unwind-block-entry-pc-slot)
+  (loadw temp block unwind-block-current-catch-slot)
+  (store-symbol-value temp *current-catch-block*)
+  (loadw nfp block unwind-block-nfp-slot)
+  (loadw nsp-tn block unwind-block-nsp-slot)
+
+  (inst blx lr))
+
+#-sb-assembling
+(define-vop ()
+  (:translate %continue-unwind)
+  (:generator 0
+    (inst ldr lr-tn (@ csp-tn -4))
+    (inst bx lr-tn)))

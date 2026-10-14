@@ -179,15 +179,10 @@
     (inst sub bsp-temp bsp-temp (* 2 n-word-bytes))
     (store-symbol-value bsp-temp *binding-stack-pointer*)))
 
-(define-vop (unbind-to-here)
-  (:args (arg :scs (descriptor-reg any-reg) :target where))
-  (:temporary (:scs (any-reg) :from (:argument 0)) where)
-  (:temporary (:scs (descriptor-reg)) symbol value)
-  (:temporary (:scs (any-reg)) bsp-temp zero-temp)
-  (:generator 0
+(defun unbind-to-here (where symbol value bsp-temp zero-temp)
+  (assemble ()
     (load-symbol-value bsp-temp *binding-stack-pointer*)
     (inst mov zero-temp 0)
-    (move where arg)
     (inst cmp where bsp-temp)
     (inst b :eq DONE)
 
@@ -205,6 +200,13 @@
 
     DONE
     (store-symbol-value bsp-temp *binding-stack-pointer*)))
+
+(define-vop (unbind-to-here)
+  (:args (where :scs (descriptor-reg any-reg)))
+  (:temporary (:scs (descriptor-reg)) symbol value)
+  (:temporary (:scs (any-reg)) bsp-temp zero-temp)
+  (:generator 0
+    (unbind-to-here where symbol value bsp-temp zero-temp)))
 
 ;;;; Closure indexing.
 

@@ -594,8 +594,8 @@
   ;; too, the branch predictor doesn't like unpaired BLR+RET.
   (inst blr lr)
   RET
-  (inst ldr count (@ csp-tn -8 :pre-index))
-  (inst ldp block start (@ csp-tn -16 :pre-index))
+  (inst ldr count (@ csp-tn -16))
+  (inst ldp block start (@ csp-tn -32 :pre-index))
   (inst b AGAIN)
 
   DO-EXIT
@@ -613,5 +613,5 @@
 (define-vop ()
   (:translate %continue-unwind)
   (:generator 0
-    (inst ldr lr-tn (@ csp-tn -8 :pre-index))
+    (inst ldr lr-tn (@ csp-tn -8))
     (inst ret)))

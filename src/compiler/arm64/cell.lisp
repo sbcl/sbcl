@@ -521,12 +521,10 @@
     (store-binding-stack-pointer bsp)))
 
 (define-vop (unbind-to-here)
-  (:args (arg :scs (descriptor-reg any-reg) :target where))
-  (:temporary (:scs (any-reg) :from (:argument 0)) where)
+  (:args (where :scs (descriptor-reg any-reg)))
   (:temporary (:scs (descriptor-reg)) symbol value)
   (:temporary (:scs (any-reg)) bsp)
   (:generator 0
-    (move where arg)
     (unbind-to-here where symbol value bsp)))
 
 #-sb-thread
