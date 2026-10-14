@@ -24,18 +24,6 @@
 #include "validate.h"
 #include "interr.h"                     /* for declaration of lose */
 
-#ifdef LISP_FEATURE_CHENEYGC
-uword_t DYNAMIC_0_SPACE_START, DYNAMIC_1_SPACE_START;
-#else
-uword_t DYNAMIC_SPACE_START;
-#endif
-uword_t READ_ONLY_SPACE_START, READ_ONLY_SPACE_END;
-#ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
-uword_t STATIC_SPACE_START;
-#endif
-
-uword_t asm_routines_start, asm_routines_end;
-
 os_vm_address_t undefined_alien_address = 0;
 /* As contrasted with the useless os_vm_page_size which is identical to
  * the constant BACKEND_PAGE_BYTES that we define for various other purposes

@@ -99,6 +99,17 @@ void globals_init(void)
 uword_t permgen_bounds[2];
 lispobj *permgen_space_free_pointer;
 
+#ifdef LISP_FEATURE_CHENEYGC
+uword_t DYNAMIC_0_SPACE_START, DYNAMIC_1_SPACE_START;
+#else
+uword_t DYNAMIC_SPACE_START;
+#endif
+uword_t READ_ONLY_SPACE_START, READ_ONLY_SPACE_END;
+#ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
+uword_t STATIC_SPACE_START;
+#endif
+uword_t asm_routines_start, asm_routines_end;
+
 uword_t FIXEDOBJ_SPACE_START, TEXT_SPACE_START;
 lispobj *text_space_highwatermark;
 #ifndef LISP_FEATURE_IMMOBILE_SPACE
