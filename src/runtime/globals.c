@@ -64,6 +64,7 @@ lispobj ALIEN_LINKAGE_SPACE_START;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 lispobj *fixedobj_free_pointer;
 #endif
+os_vm_address_t undefined_alien_address;
 os_vm_address_t anon_dynamic_space_start;
 // The end of immobile text mapped from disk, equivalently the starting address
 // of new objects handed out by the code allocator.

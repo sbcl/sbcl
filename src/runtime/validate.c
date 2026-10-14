@@ -22,39 +22,6 @@
 #include "globals.h"
 #include "interr.h"
 #include "validate.h"
-#include "interr.h"                     /* for declaration of lose */
-
-os_vm_address_t undefined_alien_address = 0;
-/* As contrasted with the useless os_vm_page_size which is identical to
- * the constant BACKEND_PAGE_BYTES that we define for various other purposes
- * such as core file loading and generational GC,
- * this is the number the OS tells us */
-int os_reported_page_size;
-
-#ifdef LISP_FEATURE_WIN32
-#include <sysinfoapi.h>
-#endif
-
-void sb_query_os_page_size() {
-#ifdef LISP_FEATURE_WIN32
-    SYSTEM_INFO info;
-    GetSystemInfo(&info);
-    os_reported_page_size = info.dwPageSize;
-#else
-    os_reported_page_size = getpagesize();
-#endif
-}
-
-void ensure_undefined_alien(void) {
-    // Address of undefined_alien is unimportant so leave it until last to allocate
-    os_vm_address_t start =
-        os_alloc_gc_space(0, MOVABLE|IS_GUARD_PAGE, NULL, os_reported_page_size);
-    if (start) {
-        undefined_alien_address = start;
-    } else {
-        lose("could not allocate guard page for undefined alien");
-    }
-}
 
 /* Using madvise to define guard pages is better than using mprotect and PROT_NONE.
  * With madvise, it does not split the VMA into pieces based on the protection.

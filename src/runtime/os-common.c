@@ -44,6 +44,21 @@
  * ramped up accordingly for efficiency reasons).
 */
 os_vm_size_t os_vm_page_size = BACKEND_PAGE_BYTES;
+/* As contrasted with the useless os_vm_page_size which is identical to
+ * the constant BACKEND_PAGE_BYTES that we define for various other purposes
+ * such as core file loading and generational GC,
+ * this is the number the OS tells us */
+int os_reported_page_size;
+
+void sb_query_os_page_size() {
+#ifdef LISP_FEATURE_WIN32
+    SYSTEM_INFO info;
+    GetSystemInfo(&info);
+    os_reported_page_size = info.dwPageSize;
+#else
+    os_reported_page_size = getpagesize();
+#endif
+}
 
 /* Expose to Lisp the value of the preprocessor define. Don't touch! */
 int install_sig_memory_fault_handler = INSTALL_SIG_MEMORY_FAULT_HANDLER;

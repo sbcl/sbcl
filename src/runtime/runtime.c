@@ -768,7 +768,12 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     if (!options.disable_lossage_handler_p)
         enable_lossage_handler();
 
-    ensure_undefined_alien();
+#ifdef LISP_FEATURE_OS_PROVIDES_DLOPEN
+    // Address of undefined_alien is unimportant so leave it until last to allocate
+    undefined_alien_address =
+        os_alloc_gc_space(0, MOVABLE|IS_GUARD_PAGE, NULL, os_reported_page_size);
+    if (!undefined_alien_address) lose("could not allocate guard page for undefined alien");
+#endif
     os_link_runtime(initfun.c_linkage_vector, initfun.c_linkage_count);
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE

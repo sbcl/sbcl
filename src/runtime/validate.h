@@ -78,11 +78,6 @@
 #define BINDING_STACK_RETURN_GUARD_PAGE(th) \
     (BINDING_STACK_GUARD_PAGE(th) - os_vm_page_size)
 
-#ifdef LISP_FEATURE_OS_PROVIDES_DLOPEN
-extern void ensure_undefined_alien(void);
-#else
-#define ensure_undefined_alien() {}
-#endif
 extern bool allocate_hardwired_spaces(bool);
 
 extern void
@@ -103,7 +98,6 @@ extern void
 protect_alien_stack_guard_page(int protect_p, struct thread *thread);
 extern void
 protect_alien_stack_return_guard_page(int protect_p, struct thread *thread);
-extern os_vm_address_t undefined_alien_address;
 #endif
 
 /* note for anyone trying to port an architecture's support files

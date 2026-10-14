@@ -140,6 +140,7 @@ extern lispobj *fixedobj_free_pointer;
 #define FIRST_USABLE_LINKAGE_ELT 1
 extern lispobj *linkage_space;
 extern int linkage_table_count;
+extern os_vm_address_t undefined_alien_address;
 extern os_vm_address_t anon_dynamic_space_start;
 extern lispobj* tlsf_mem_start; // meaningful only if immobile space
 
