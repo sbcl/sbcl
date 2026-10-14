@@ -1997,59 +1997,53 @@ variable: an unreadable object representing the error is printed instead.")
 
 #+sb-simd-pack
 (defun simd-pack-print (stream type tag pack multiplier)
-  (declare ((integer 0 8) tag multiplier))
-  (print-unreadable-object (pack stream)
-    (princ type stream)
-    (macrolet ((simd-pack-case (&body cases)
-                 (let ((vector (make-list (length +simd-pack-element-types+))))
-                   (loop for (type . rest) in cases
-                         do (setf (elt vector (position type +simd-pack-element-types+ :test #'equal))
-                                  `(list ,@rest)))
-                   `(load-time-value (vector ,@vector)))))
-      (let ((cases
-              (simd-pack-case
-               (double-float " ~,13E" 1 #'sb-vm::%simd-pack-ref-double)
-               (single-float " ~,7E" 2 #'sb-vm::%simd-pack-ref-single)
-               ((unsigned-byte 8) " ~3D" 8 #'sb-vm::%simd-pack-ref-8)
-               ((unsigned-byte 16) " ~5D" 4 #'sb-vm::%simd-pack-ref-16)
-               ((unsigned-byte 32) " ~10D" 2 #'sb-vm::%simd-pack-ref-32)
-               ((unsigned-byte 64) " ~20D" 1 #'sb-vm::%simd-pack-ref-64)
-               ((signed-byte 8) " ~4@D" 8 #'sb-vm::%simd-pack-signed-ref-8)
-               ((signed-byte 16) " ~6@D" 4 #'sb-vm::%simd-pack-signed-ref-16)
-               ((signed-byte 32) " ~11@D" 2 #'sb-vm::%simd-pack-signed-ref-32)
-               ((signed-byte 64) " ~20@D" 1 #'sb-vm::%simd-pack-signed-ref-64))))
-        (destructuring-bind (format count accessor)
-            (aref cases tag)
-          (loop for i below (* (truly-the (integer 0 8) count) multiplier)
-                do (format stream format (funcall (truly-the function accessor) pack i))))))))
+  (declare ((integer 0 8) multiplier)
+           ((integer 0 9) tag)
+           (notinline format))
+  (cond ((and *print-readably* *read-eval*)
+         (format stream "#.(~s-~a #b~3,'0b" 'sb-vm::%make type tag)
+         (loop for i below multiplier
+               do (format stream " #x~16,'0X" (sb-vm::%simd-pack-ref-64 pack i)))
+         (write-char #\) stream))
+        (t
+         (print-unreadable-object (pack stream)
+           (princ type stream)
+           (macrolet ((simd-pack-case (&body cases)
+                        (let ((vector (make-list (length +simd-pack-element-types+))))
+                          (loop for (type . rest) in cases
+                                do (setf (elt vector (position type +simd-pack-element-types+ :test #'equal))
+                                         rest))
+                          `(load-time-value (vector ,@(apply #'append vector))))))
+             (let ((cases
+                     (simd-pack-case
+                      (double-float " ~,13E" 1 #'sb-vm::%simd-pack-ref-double "f64")
+                      (single-float " ~,7E" 2 #'sb-vm::%simd-pack-ref-single "f32")
+                      ((unsigned-byte 8) "~4D" 8 #'sb-vm::%simd-pack-ref-8 "u8")
+                      ((unsigned-byte 16) "~6D" 4 #'sb-vm::%simd-pack-ref-16 "u16")
+                      ((unsigned-byte 32) "~11D" 2 #'sb-vm::%simd-pack-ref-32 "u32")
+                      ((unsigned-byte 64) "~21D" 1 #'sb-vm::%simd-pack-ref-64 "u64")
+                      ((signed-byte 8) "~5@D" 8 #'sb-vm::%simd-pack-signed-ref-8 "s8")
+                      ((signed-byte 16) "~7@D" 4 #'sb-vm::%simd-pack-signed-ref-16 "s16")
+                      ((signed-byte 32) "~12@D" 2 #'sb-vm::%simd-pack-signed-ref-32 "s32")
+                      ((signed-byte 64) "~21@D" 1 #'sb-vm::%simd-pack-signed-ref-64 "s64"))))
+               (let* ((start (* tag 4))
+                      (format (aref cases start))
+                      (count (aref cases (+ start 1)))
+                      (accessor (aref cases (+ start 2)))
+                      (type (aref cases (+ start 3)))
+                      (length (* (truly-the (integer 0 8) count) multiplier)))
+                 (declare (notinline format))
+                 (format stream " ~a.~d" type length)
+                 (loop for i below length
+                       do (format stream format (funcall (truly-the function accessor) pack i))))))))))
 
 #+sb-simd-pack
 (defmethod print-object ((pack simd-pack) stream)
-  (cond ((and *print-readably* *read-eval*)
-         (format stream "#.(~S #b~3,'0b #x~16,'0X #x~16,'0X)"
-                 '%make-simd-pack
-                 (%simd-pack-tag pack)
-                 (%simd-pack-low pack)
-                 (%simd-pack-high pack)))
-        (*print-readably*
-         (print-not-readable-error pack stream))
-        (t
-         (simd-pack-print stream 'simd-pack (%simd-pack-tag pack) pack 2))))
+  (simd-pack-print stream 'simd-pack (%simd-pack-tag pack) pack 2))
 
 #+sb-simd-pack-256
 (defmethod print-object ((pack simd-pack-256) stream)
-  (cond ((and *print-readably* *read-eval*)
-         (format stream "#.(~S #b~3,'0B #x~16,'0D #x~16,'0D #x~16,'0D #x~16,'0D)"
-                 '%make-simd-pack-256
-                 (%simd-pack-256-tag pack)
-                 (%simd-pack-256-0 pack)
-                 (%simd-pack-256-1 pack)
-                 (%simd-pack-256-2 pack)
-                 (%simd-pack-256-3 pack)))
-        (*print-readably*
-         (print-not-readable-error pack stream))
-        (t
-         (simd-pack-print stream 'simd-pack-256 (%simd-pack-256-tag pack) pack 4))))
+  (simd-pack-print stream 'simd-pack-256 (%simd-pack-256-tag pack) pack 4))
 
 #+sb-simd-pack-512
 (defmethod print-object ((mask simd-pack-512-mask) stream)
@@ -2064,22 +2058,7 @@ variable: an unreadable object representing the error is printed instead.")
 
 #+sb-simd-pack-512
 (defmethod print-object ((pack simd-pack-512) stream)
-  (cond ((and *print-readably* *read-eval*)
-         (format stream "#.(~S #b~3,'0B #x~16,'0D #x~16,'0D #x~16,'0D #x~16,'0D #x~16,'0D #x~16,'0D #x~16,'0D #x~16,'0D)"
-                 '%make-simd-pack-512
-                 (%simd-pack-512-tag pack)
-                 (%simd-pack-512-0 pack)
-                 (%simd-pack-512-1 pack)
-                 (%simd-pack-512-2 pack)
-                 (%simd-pack-512-3 pack)
-                 (%simd-pack-512-4 pack)
-                 (%simd-pack-512-5 pack)
-                 (%simd-pack-512-6 pack)
-                 (%simd-pack-512-7 pack)))
-        (*print-readably*
-         (print-not-readable-error pack stream))
-        (t
-         (simd-pack-print stream 'simd-pack-512 (%simd-pack-512-tag pack) pack 8))))
+  (simd-pack-print stream 'simd-pack-512 (%simd-pack-512-tag pack) pack 8))
 
 ;;;; functions
 
