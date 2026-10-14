@@ -2377,6 +2377,8 @@
                (when (loop for ref in (lvar-uses multi-use-lvar)
                            always (almost-immediately-used-p multi-use-lvar ref :flushable t
                                                                                 :no-multiple-value-lvars t))
+                 (when *show-transforms-p*
+                   (show-transform '%constant-fold-call-multiple-uses fun-name values call))
                  (loop for ref in (lvar-uses multi-use-lvar)
                        for (value) in values
                        do
@@ -2395,6 +2397,8 @@
                      (unlink-node call)))
                  t))
               (t
+               (when *show-transforms-p*
+                 (show-transform '%constant-fold-call-multiple-uses fun-name values call))
                (cond (mv-bind
                       (loop for use in mv-bind
                             for values-arg = (nth nth-value (combination-args use))

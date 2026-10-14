@@ -2527,7 +2527,10 @@
                     ;; Constraints won't compute it for vars without sets
                     (lambda-var-compute-same-refs var))
            (loop for ref in (cdr (leaf-refs var)) ;; skip one ref (doesn't matter which)
-                 do (reoptimize-lvar (node-lvar ref))))))
+                 do
+                 (let ((dest (principal-lvar-end (node-lvar ref))))
+                   (when dest
+                     (reoptimize-node dest)))))))
       (cast
        (flush-dest (cast-value node)))
       (enclose)

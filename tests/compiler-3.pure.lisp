@@ -1053,7 +1053,21 @@
                                 (setq b a))
                             (the integer b))
                           (progn (check-type a integer) 0)))
-                      :allow-warnings t))))
+                      :allow-warnings t)))
+  (assert-type
+   (lambda (x)
+     (flet ((f (a n)
+              n
+              a))
+       (f
+        (let ((u 2d0))
+          (if (> x x)
+            (setq u 15))
+          (typecase u
+            (integer u)
+            (double-float 10)))
+        (if nil (setf x 2)))))
+   (eql 10)))
 
 (with-test (:name :optional-type-check-supplied-p)
   (checked-compile-and-assert
