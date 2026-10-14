@@ -147,6 +147,7 @@ extern lispobj* tlsf_mem_start; // meaningful only if immobile space
 extern lispobj lisp_package_vector;
 
 extern void globals_init(void);
+extern bool allocate_hardwired_spaces(bool);
 
 #else /* __ASSEMBLER__ */
 
