@@ -2334,6 +2334,14 @@ scrub_thread_control_stack(struct thread *th)
     arch_scrub_control_stack(th, guard_page_address, hard_guard_page_address, STACK_GUARD_SIZE);
 #else
     os_vm_address_t sp = (os_vm_address_t)access_control_stack_pointer(th);
+    int reprotect = 0;
+    if (!th->state_word.control_stack_guard_page_protected &&
+        th != get_sb_vm_thread()) {
+        reprotect = 1;
+        protect_control_stack_return_guard_page(0, th);
+    }
+
+
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     os_vm_address_t start = guard_page_address + STACK_GUARD_SIZE;
     if (!th->state_word.control_stack_guard_page_protected) {
@@ -2365,6 +2373,9 @@ scrub_thread_control_stack(struct thread *th)
     gc_assert(sp <= end);
     memset(sp, 0, end - sp);
 #endif
+    if (reprotect) {
+        protect_control_stack_return_guard_page(1, th);
+    }
 #endif /* LISP_FEATURE_C_STACK_IS_CONTROL_STACK */
 }
 
