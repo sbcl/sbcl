@@ -96,7 +96,7 @@ void set_lossage_handler(void (*handler)(void))
     lossage_handler = handler ? handler : &default_lossage_handler;
 }
 
-static void print_pthread_self_name() {
+void print_pthread_self_name() {
 #if (defined LISP_FEATURE_LINUX || defined LISP_FEATURE_DARWIN) && defined LISP_FEATURE_SB_THREAD
     char name[64];
     int r = pthread_getname_np(pthread_self(), name, sizeof name);

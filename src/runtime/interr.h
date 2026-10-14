@@ -26,7 +26,7 @@ extern void enable_lossage_handler(void);
 extern void disable_lossage_handler(void);
 extern void describe_internal_error(os_context_t *context);
 extern void skip_internal_error (os_context_t *context);
-
+extern void print_pthread_self_name();
 #ifdef LISP_FEATURE_WIN32
 #define UNKNOWN_STACK_POINTER_ERROR(function_name, thread) \
     lose(function_name": no SP known for thread %p (handle %lx)", \

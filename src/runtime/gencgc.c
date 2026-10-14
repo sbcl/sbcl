@@ -3335,6 +3335,30 @@ __attribute__((unused)) static void check_contiguity()
       }
 }
 
+
+static void maybe_pin_csp_guard_page (__attribute__((unused)) struct thread* th) {
+    /* Normally the pages are unprotected in sig_stop_for_gc_handler,
+     * except if things weren't stopped. */
+#if defined LISP_FEATURE_NONSTOP_FOREIGN_CALL || defined LISP_FEATURE_SB_SAFEPOINT
+    if (th->state_word.control_stack_guard_page_protected)
+        return;
+    lispobj* guard_page = (lispobj *) CONTROL_STACK_GUARD_PAGE(th);
+    lispobj* return_page = (lispobj *) CONTROL_STACK_RETURN_GUARD_PAGE(th);
+    lispobj* addr;
+
+    /* Don't bother unprotecting/reprotecting the pages, just pin everything. */
+#ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
+    lispobj* return_page_end = (lispobj *)((os_vm_address_t)return_page + STACK_GUARD_SIZE);
+    for (addr = return_page; addr < return_page_end; addr++)
+        pin_exact_root(*addr);
+#else
+        for (addr = return_page; addr < guard_page; addr++)
+            pin_exact_root(*addr);
+#endif
+
+#endif
+}
+
 static void finish_code_metadata();
 int show_gc_generation_throughput = 0;
 /* Garbage collect a generation. If raise is 0 then the remains of the
@@ -3455,6 +3479,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
 #elif defined reg_LINK_RETURN
             pin_call_chain_and_boxed_registers(th);
 #endif
+            maybe_pin_csp_guard_page(th);
         }
     }
 

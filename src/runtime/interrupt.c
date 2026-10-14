@@ -1556,7 +1556,9 @@ void lower_thread_control_stack_guard_page(__attribute__((unused)) struct thread
     protect_control_stack_guard_page(0, th);
     protect_control_stack_return_guard_page(1, th);
     th->state_word.control_stack_guard_page_protected = 0;
-    fprintf(stderr, "INFO: Control stack guard page unprotected\n");
+    fprintf(stderr, "INFO: Control stack guard page unprotected");
+    print_pthread_self_name();
+    fprintf(stderr, "\n");
 #endif
 }
 
@@ -1567,7 +1569,9 @@ void reset_thread_control_stack_guard_page(__attribute__((unused)) struct thread
     protect_control_stack_guard_page(1, th);
     protect_control_stack_return_guard_page(0, th);
     th->state_word.control_stack_guard_page_protected = 1;
-    fprintf(stderr, "INFO: Control stack guard page reprotected\n");
+    fprintf(stderr, "INFO: Control stack guard page reprotected");
+    print_pthread_self_name();
+    fprintf(stderr, "\n");
 #endif
 }
 
@@ -1578,7 +1582,9 @@ void lower_thread_alien_stack_guard_page(struct thread *th)
     protect_alien_stack_return_guard_page(1, th);
 
     th->state_word.alien_stack_guard_page_protected = 0;
-    fprintf(stderr, "INFO: Alien stack guard page unprotected\n");
+    fprintf(stderr, "INFO: Alien stack guard page unprotected");
+    print_pthread_self_name();
+    fprintf(stderr, "\n");
 }
 
 void reset_thread_alien_stack_guard_page(struct thread *th)
@@ -1586,7 +1592,9 @@ void reset_thread_alien_stack_guard_page(struct thread *th)
     protect_alien_stack_guard_page(1, th);
     protect_alien_stack_return_guard_page(0, th);
     th->state_word.alien_stack_guard_page_protected = 1;
-    fprintf(stderr, "INFO: Alien stack guard page reprotected\n");
+    fprintf(stderr, "INFO: Alien stack guard page reprotected");
+    print_pthread_self_name();
+    fprintf(stderr, "\n");
 }
 
 void lower_thread_binding_stack_guard_page(struct thread *th)
@@ -1595,7 +1603,9 @@ void lower_thread_binding_stack_guard_page(struct thread *th)
     protect_binding_stack_return_guard_page(1, th);
 
     th->state_word.binding_stack_guard_page_protected = 0;
-    fprintf(stderr, "INFO: Binding stack guard page unprotected\n");
+    fprintf(stderr, "INFO: Binding stack guard page unprotected");
+    print_pthread_self_name();
+    fprintf(stderr, "\n");
 }
 
 void reset_thread_binding_stack_guard_page(struct thread *th)
@@ -1603,7 +1613,9 @@ void reset_thread_binding_stack_guard_page(struct thread *th)
     protect_binding_stack_guard_page(1, th);
     protect_binding_stack_return_guard_page(0, th);
     th->state_word.binding_stack_guard_page_protected = 1;
-    fprintf(stderr, "INFO: Binding stack guard page reprotected\n");
+    fprintf(stderr, "INFO: Binding stack guard page reprotected");
+    print_pthread_self_name();
+    fprintf(stderr, "\n");
 }
 
 bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
