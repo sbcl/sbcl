@@ -709,11 +709,12 @@ calling @code{load-shared-object}.
 Load a shared library / dynamic shared object file / similar foreign
 container specified by designated @code{pathname}, such as a .so on an ELF platform.
 
-Locating the shared object follows standard rules of the platform, consult the
-manual page for @code{dlopen(3)} for details. Typically paths specified by
-environment variables such as LD@emph{LIBRARY}PATH are searched if the @code{pathname} has
-no directory, but on some systems (e.g. Mac OS X) search may happen even if
-@code{pathname} is absolute. (On Windows LoadLibrary is used instead of @code{dlopen(3)}.)
+Locating the shared object follows standard rules of the platform,
+consult the manual page for @code{dlopen(3)} for details. Typically paths
+specified by environment variables such as @code{LD_LIBRARY_PATH} are
+searched if the @code{pathname} has no directory, but on some systems (e.g.
+Mac OS X) search may happen even if @code{pathname} is absolute. (On Windows
+LoadLibrary is used instead of @code{dlopen(3)}.)
 
 On non-Windows platforms calling @code{load-shared-object} again with a @code{pathname}
 @code{equal} to the designated pathname of a previous call will replace the old

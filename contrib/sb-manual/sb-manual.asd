@@ -14,6 +14,7 @@
                              (:file "sbcl")
                              (:file "support-and-bugs")
                              (:file "intro")
+                             (:file "getting-started")
                              (:file "start-stop")
                              (:file "compiler")
                              (:file "debugger")

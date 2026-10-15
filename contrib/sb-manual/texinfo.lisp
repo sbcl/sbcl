@@ -333,6 +333,7 @@
 (defparameter *pages*
   '((@support-and-bugs "support-and-bugs.texinfo")
     (@introduction "intro.texinfo")
+    (@getting-started "getting-started.texinfo")
     (@starting-and-stopping "start-stop.texinfo")
     (@compiler "compiler.texinfo")
     (@debugging "debugging.texinfo")

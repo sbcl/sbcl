@@ -148,7 +148,7 @@
   :public t
   :documentation
   "Enabled automatically by `make-config.sh` for platforms which
-  implement the %READ-CYCLE-COUNTER VOP. Can be disabled manually:
+  implement the `%READ-CYCLE-COUNTER` VOP. Can be disabled manually:
   affects TIME.")
 
  (:immobile-space nil
@@ -187,9 +187,9 @@
   :public t
   :documentation
   "Combine the layout pointer, instance-length, and widetag of
-  INSTANCE into a single machine word. This represents a space savings
-  of anywhere from 4% to 8% in typical applications. (Your mileage may
-  vary).")
+  an `INSTANCE` into a single machine word. This represents a space
+  savings of anywhere from 4% to 8% in typical applications. (Your
+  mileage may vary.)")
 
  ;; Peter Van Eynde's increase-bulletproofness code for CMU CL
  ;;
@@ -204,7 +204,7 @@
  (:sb-thread nil
   :public t
   :documentation
-  "Enable low-level thread primitives support. See SB-MANUAL:@SB-THREAD.
+  "Enable low-level thread primitives support. See SB-MANUAL:@THREADING.
 
   As of SBCL 2.6.9, threads are part of the default build on x86oid
   Linux, Darwin, and Windows. In fact, threads are mandatory on
@@ -219,29 +219,31 @@
   :public t
   :documentation
   "Enable detection of unportable code (when applied to the
-  COMMON-LISP package or SBCL-internal packages) or bad-neighbourly
+  `COMMON-LISP` package or SBCL-internal packages) or bad-neighbourly
   code (when applied to user-level packages), relating to material
-  alteration to packages or to bindings in symbols in packages.")
+  alteration to packages or to bindings in symbols in packages. See
+  SB-MANUAL:@PACKAGE-LOCKS.")
 
  (:sb-unicode t
   :public t
   :documentation
   "Support for the entirety of the 21-bit character space defined by
   the Unicode consortium, rather than the classical 8-bit ISO-8859-1
-  character set.")
+  character set. See SB-MANUAL:@UNICODE-SUPPORT.")
 
  (:sb-eval t
   :public t
   :documentation
   "Support for a full evaluator that can execute all the CL special
   forms, as opposed to the traditional SBCL evaluator, which called
-  COMPILE for everything complicated.")
+  COMPILE for everything complicated. See SB-MANUAL:@INTERPRETER.")
 
  (:sb-fasteval nil
   :public t
   :documentation
   "Support for a different evaluator (interpreter) with improved
-  performance. You can have only one of :SB-EVAL AND :SB-FASTEVAL.")
+  performance. You can have only one of :SB-EVAL AND :SB-FASTEVAL. See
+  SB-MANUAL:@INTERPRETER.")
 
  (:sb-source-locations t
   :public t
@@ -254,9 +256,9 @@
   :public t
   :documentation
   "Record xref data for SBCL internals. This can be rather useful for
-  people who want to develop on SBCL itself because it'll make
+  people who want to develop on SBCL itself because it will make
   `\\\\M-?` (`slime-edit-uses`) work which lists call/expansion/etc.
-  sites. It'll increase the core size by major 5-6MB, though.")
+  sites. It will increase the core size by major 5-6MB, though.")
 
  ;; We support package local nicknames. No :sb-prefix here, as we
  ;; vainly believe our API is worth copying to other implementations

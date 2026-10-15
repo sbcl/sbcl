@@ -34,6 +34,7 @@
             (documentation-generation-date-string :long t))
   (@support-and-bugs section)
   (@introduction section)
+  (@getting-started section)
   (@starting-and-stopping section)
   (@compiler section)
   (@debugging section)

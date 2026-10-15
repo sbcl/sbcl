@@ -4,8 +4,8 @@ INSTALLING SBCL
 
     1. BINARY DISTRIBUTION
     1.1. Quick start
-    1.2. Finding ancillary files
-    1.3. Anatomy of SBCL
+    1.2. Anatomy of SBCL
+    1.3. Finding ancillary files
 
     2. SOURCE DISTRIBUTION
     2.1. Quick start
@@ -33,68 +33,87 @@ INSTALLING SBCL
 
     $ INSTALL_ROOT=/home/me sh install.sh
 
-  In other words, "install.sh" installs SBCL under the directory named
-  by the environment variable INSTALL_ROOT.
+  That is, "install.sh" installs SBCL under the directory named by the
+  environment variable INSTALL_ROOT.
 
   If INSTALL_ROOT is not specified, SBCL is installed into location
   configured at build-time: for official binary distributions under
   "/usr/local" directory.
 
-1.2. Finding ancillary files
+1.2. Anatomy of SBCL
+
+  The two files that SBCL needs to run, at minimum, are
+
+    src/runtime/sbcl
+    output/sbcl.core
+
+  In addition, there are a number of modules that extend the basic
+  SBCL functionality, in
+
+    contrib/
+
+  The "src/runtime/sbcl" file is a standard executable, built by
+  compiling and linking an ordinary C program. It provides the runtime
+  environment for the running Lisp image, but it doesn't know much
+  about high-level Lisp stuff (like symbols and printing and objects)
+  so it's pretty useless by itself. The "output/sbcl.core" file is a
+  dump file written in a special SBCL format that only SBCL
+  understands, and it contains all the high-level Lisp stuff.
+
+  The standard installation procedure, outlined in section 1.1 "Quick
+  start", is to run "install.sh", which copies all the files to right
+  places, including documentation and contrib modules that have passed
+  their tests. If you need to install by hand, see "install.sh" for
+  details.
+
+  Documentation consists of a man page, the SBCL Manual (in info, pdf
+  and html formats), and a few additional text files.
+
+1.3. Finding ancillary files
 
   The SBCL runtime needs to be able to find the ancillary files
   associated with it: the "sbcl.core" file, and the contrib modules.
 
   Finding sbcl.core can happen in the following ways:
 
-    * By default, in a location configured when the system was built.
-       For binary distributions this is in "/usr/local/lib/sbcl".
+    If the --core runtime option is specified, then its value is used.
+    Example:
 
-    * In the directory ../lib/sbcl relative to the executable.
+        $ sbcl --core /foo/bar/sbcl.core
 
-    * In the current directory.
+    Else, the runtime looks for sbcl.core in the following directories
+    until the first match.
 
-    * By environment variable, in the directory named by the
-       environment variable "SBCL_HOME". Example:
+    - The directory denoted by the SBCL_HOME environment variable if
+      it is set
 
-         $ export SBCL_HOME=/foo/bar/lib/sbcl
-         $ sbcl
+    - The current directory
 
-       If your "INSTALL_ROOT" was FOO, then your "SBCL_HOME" is
-       "FOO/lib/sbcl".
+    - The directory of the sbcl binary
 
-    * By command line option:
+    - The ../lib/sbcl/ directory relative to the sbcl binary
 
-         $ sbcl --core /foo/bar/sbcl.core
+  Finding the contrib/ directory:
 
-1.3. Anatomy of SBCL
+  Once the runtime loads the core file, the Lisp looks for contrib/ in
+  the following directories until the first match.
 
-  The two files that SBCL needs to run, at minimum, are:
+  - The directory denoted by the SBCL_HOME environment variable if
+    it is set
 
-    src/runtime/sbcl
-    output/sbcl.core
+  - The directory of sbcl.core
 
-  In addition, there are a number of modules that extend the basic
-  sbcl functionality, in
+  - The directory ../lib/sbcl relative to sbcl.core
 
-    contrib/
+  - The current directory
 
-  The "src/runtime/sbcl" is a standard executable, built by compiling
-  and linking an ordinary C program. It provides the runtime
-  environment for the running Lisp image, but it doesn't know much
-  about high-level Lisp stuff (like symbols and printing and objects)
-  so it's pretty useless by itself. The "output/sbcl.core" is a dump
-  file written in a special SBCL format which only sbcl understands,
-  and it contains all the high-level Lisp stuff.
+  - The directory of the sbcl binary
 
-  The standard installation procedure, outlined in section 1.1 "Quick
-  start", is to run the "install.sh", which copies all the files to
-  right places, including documentation and contrib-modules that have
-  passed their tests. If you need to install by hand, see "install.sh"
-  for details.
+  - The directory ../lib/sbcl relative to the sbcl binary
 
-  Documentation consists of a man-page, the SBCL Manual (in info, pdf
-  and html formats), and a few additional text files.
+  The list of directories is the same as for finding the core file
+  except here we also try directories relative to sbcl.core.
+
 
 2. SOURCE DISTRIBUTION
 
@@ -162,7 +181,7 @@ INSTALLING SBCL
 
   The preferred way to do this is using commandline arguments to make.sh:
 
-    --fancy                    Enables all supported feature enhancements.
+    --fancy                    Enables a curated set of features.
     --with-<feature>           Enables a specific feature.
     --without-<feature>        Disables a specific feature.
 
@@ -193,7 +212,7 @@ INSTALLING SBCL
       limits characters to the 8-bit ISO-8859-1 set.
 
   A catalog of available features and their meaning can be found in
-  "base-target-features.lisp-expr".
+  "src/cold/base-target-features.lisp-expr".
 
   Please do NOT edit base-target-features.lisp-expr in order to enable
   or disable build features.
@@ -206,10 +225,15 @@ INSTALLING SBCL
     "gmake", or "gnumake", then define the environment variable
     GNUMAKE to a name where it can be found.
 
-  Segfaults on Fedora
+  Segfaults on Linux with ASLR
 
-    Try disabling exec-shield. The easiest way is to use
-    setarch: "setarch i386 -R sbcl".
+    If SBCL segfaults immediately upon startup due to Address Space
+    Layout Randomization (ASLR), you can bypass it by executing the
+    host compiler binary via setarch:
+
+    setarch x86_64 -R sbcl
+
+    See also :ASLR in build option.
 
   Build crashes mysteriously, machine becomes unstable, etc
 
@@ -236,15 +260,17 @@ INSTALLING SBCL
 
   If you want to be on the bleeding edge, you can update your sources
   to the latest development snapshot (or any previous development
-  snapshot, for that matter) by using anonymous CVS to
-  SourceForge. (This is not recommended if you're just using SBCL as a
-  tool for other work, but if you're interested in working on SBCL
-  itself, it's a good idea.) Follow the "CVS Repository" link on
-  <http://sourceforge.net/projects/sbcl> for instructions.
+  snapshot, for that matter) by using anonymous GIT to SourceForge.
+  (This is not recommended if you're just using SBCL as a tool for
+  other work, but if you're interested in working on SBCL itself, it's
+  a good idea.) See
+  <http://sourceforge.net/projects/sbcl/ci/master/tree> for
+  instructions.
+
+  Alternatively, use the official GitHub mirror at
+  <https://github.com/sbcl/sbcl>.
 
 2.5. Supported platforms
-
-  Last updated for SBCL 0.9.3.74 (2005-08-20).
 
   All of the following platforms are supported in the sense of "should
   work", but some things like loading foreign object files may lag
@@ -255,33 +281,26 @@ INSTALLING SBCL
     GNU toolchain
     Sun toolchain with GCC
 
-  Supported build hosts are:
+  SBCL can be compiled from source code using another ANSI-compliant
+  Common Lisp implementation such as
 
     SBCL
     CMUCL
     CCL (formerly known as OpenMCL)
-    ABCL (recent versions only)
     CLISP (only some versions: 2.44.1 is OK, 2.47 is not)
+    ECL
     XCL
-    
+    ABCL (recent versions only, very slow)
 
-    Note that every release isn't tested with every possible host
-    compiler.  You're most likely to get a clean build with SBCL itself
+    Note that not every release is tested with every possible host
+    compiler. You're most likely to get a clean build with SBCL itself
     as host, otherwise CCL on a PPC and CMUCL elsewhere.
 
-  Supported operating systems and architectures:
-
-                           x86 x86-64 PPC Sparc Alpha MIPS MIPSel
-    Linux 2.6               X     X    X    X     X     X     X
-    Darwin (Mac OS X)       X     X    X
-    Solaris                 X               X
-    FreeBSD                 X     X
-    NetBSD                  X          X
-    OpenBSD 3.4, 3.5        X
-    Windows                 X
+    See <https://sbcl.org/platform-table.html> for the list of
+    supported operating systems and architectures.
 
     Some operating systems are more equal than others: most of the
-    development and testing is done on x86/x86-64 Linux and x86/PPC
+    development and testing is done on x86-64 Linux and x86-64/arm64
     Mac OS X.
 
     If an underprivileged platform is important to you, you can help

@@ -2400,7 +2400,7 @@ correctly.
 
 With those caveats in mind, what you need to know when using it:
 
-* If calling FUNCTION causes a non-local transfer of control (ie. an
+* If calling FUNCTION causes a non-local transfer of control (i.e. an
   unwind), all normal cleanup forms will be executed.
 
     However, if the interrupt occurs during cleanup forms of an

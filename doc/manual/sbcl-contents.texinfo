@@ -2,6 +2,7 @@
 
 @include support-and-bugs.texinfo
 @include intro.texinfo
+@include getting-started.texinfo
 @include start-stop.texinfo
 @include compiler.texinfo
 @include debugging.texinfo

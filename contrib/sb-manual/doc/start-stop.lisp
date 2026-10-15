@@ -8,15 +8,10 @@
   (@initialization-and-exit-hooks section))
 
 (defsection @starting-sbcl (:title "Starting SBCL")
-  (@running-from-shell section)
-  (@running-from-emacs section)
-  (@shebang-scripts section))
-
-(defsection @running-from-shell (:title "Running from Shell")
-  "To run SBCL, type `sbcl` at the command line.
-
-  You should end up in the toplevel _REPL_ (read-eval-print loop),
-  where you can interact with SBCL by typing expressions.
+  "If SBCL is installed properly and it is in your `PATH`, you can simply
+  type `sbcl` at the command line. You should end up in the toplevel
+  _REPL_ (read-eval-print loop), where you can interact with SBCL by
+  typing expressions.
 
       $ sbcl
       This is SBCL 0.8.13.60, an implementation of ANSI Common Lisp.
@@ -31,7 +26,20 @@
       * (exit)
       $
 
-  Also see @COMMAND-LINE-OPTIONS and @STOPPING-SBCL.")
+  Also see @COMMAND-LINE-OPTIONS and @STOPPING-SBCL."
+  (@running-without-installation section)
+  (@running-from-emacs section)
+  (@shebang-scripts section)
+  (@parts-of-sbcl section)
+  (@finding-parts-of-sbcl section))
+
+(defsection @running-without-installation
+    (:title "Running without Installation")
+  "You can quickly run SBCL without installing it by invoking the
+  `run-sbcl.sh` script. This works both with an unpacked
+  @BINARY-DISTRIBUTION and after @BUILDING-SBCL yourself:
+
+      $ sh run-sbcl.sh")
 
 (defsection @running-from-emacs (:title "Running from Emacs")
   "To run SBCL as an `inferior-lisp` from Emacs, add something like this
@@ -63,6 +71,104 @@
 
       $ sbcl --script hello.lisp
       Hello, World!")
+
+(defsection @parts-of-sbcl (:title "Parts of SBCL")
+  "If you only ever use SBCL packaged for your operating system,
+  run it from an installation created with [`install.sh`][
+  @installing-sbcl], run it with [`run-sbcl.sh`][
+  @running-without-installation], there is no need to worry about the
+  files necessary at run-time. If you, for example, want to install
+  SBCL manually, package it in a way that deviates from the file
+  hierarchy created by `install.sh`, or run SBCL with your own core
+  file saved by SB-EXT:SAVE-LISP-AND-DIE, then read on.
+
+  The following files play a part in running SBCL.
+
+  - _The `sbcl` binary_
+
+      This is a standard executable built by compiling and linking an
+      ordinary C program. It provides the runtime environment for the
+      running Lisp image, but it doesn't know much about high-level
+      Lisp stuff (like symbols and printing and objects), so it's
+      pretty useless by itself.
+
+      The binary is `src/runtime/sbcl` in @BINARY-DISTRIBUTIONs and
+      @SOURCE-DISTRIBUTIONs; and it is [installed][@INSTALLING-SBCL]
+      to `/usr/local/bin/sbcl` by default.
+
+  - _The `sbcl.core` file_
+
+      This is an [image dump][sb-ext:save-lisp-and-die] written in a
+      special SBCL format that only SBCL understands, and it contains
+      all the high-level Lisp stuff.
+
+      The core file is `obj/sbcl-home/sbcl.core` in distributions;
+      installed to `/usr/local/lib/sbcl/sbcl.core` by default. In
+      addition, there are a number of @CONTRIBUTED-MODULES that extend
+      the basic SBCL functionality.
+
+  - _The `contrib/` directory_
+
+      This holds the compiled fasl files for the @CONTRIBUTED-MODULES,
+      to be loaded on demand.
+
+      The contrib fasl files are in `obj/sbcl-home/contrib/` in
+      distributions; installed to `/usr/local/lib/sbcl/contrib/` by
+      default.
+
+  > _Note_: Only the binary and the core file are absolutely necessary
+  > to start SBCL; the contrib fasls are optional.")
+
+(defsection @finding-parts-of-sbcl (:title "Finding Parts of SBCL")
+  "When you invoke the SBCL binary, it needs to be able to find the other
+  @PARTS-OF-SBCL, namely the `sbcl.core` file and the
+  @CONTRIBUTED-MODULES in the `contrib/` directory.
+
+  - Finding `sbcl.core`
+
+      If the `--core` [runtime option][@runtime-options] is specified,
+      then its value is used. Example:
+
+          $ sbcl --core /foo/bar/sbcl.core
+
+      Else, the runtime looks for `sbcl.core` in the following
+      directories until the first match.
+
+      - The directory denoted by the `\\\\SBCL_HOME` environment
+        variable if it is set
+
+      - The current directory
+
+      - The directory of the `sbcl` binary
+
+      - The `../lib/sbcl/` directory relative to the `sbcl` binary
+
+      If no core file was found by the above rules, then the runtime
+      exits with an error message.
+
+  - Finding `contrib/`
+
+      Once the runtime loads the core file, the Lisp looks for
+      `contrib/` in the following directories until the first match.
+
+      - The directory denoted by the `\\\\SBCL_HOME` environment
+        variable if it is set
+
+      - _The directory of `sbcl.core`_
+
+      - _The directory `../lib/sbcl` relative to `sbcl.core`_
+
+      - The current directory
+
+      - The directory of the `sbcl` binary
+
+      - The directory `../lib/sbcl` relative to the `sbcl` binary
+
+      The list of directories is the same as for finding the core file
+      except here we also try directories relative to `sbcl.core`.
+
+      If the `contrib/` directory is not found, then no error is
+      signalled immediately, but loading modules will fail.")
 
 (defsection @stopping-sbcl (:title "Stopping SBCL")
   (@exit section)
@@ -149,10 +255,10 @@
   - `--dynamic-space-size <size>`
 
       Size of the dynamic space reserved on startup. The default value
-      is platform-dependent. The units supported are `kb` (or `KiB`),
-      `MB` (or `MiB`), `GB` (or `GiB`), and `TB` (or `TiB`). The names
-      are compared case-insensitively, and the default unit is
-      megabytes. Thus, `8`, `8mb`, and `8mib` all mean 8 * 2^20 bytes.
+      is platform-dependent. The units supported are kB (or KiB),
+      MB (or MiB), GB (or GiB), and TB (or TiB). The names are
+      compared case-insensitively, and the default unit is megabytes.
+      Thus, `8`, `8mb`, and `8mib` all mean 8 * 2^20 bytes.
 
   - `--control-stack-size <size>`
 
@@ -315,9 +421,10 @@
   *PACKAGE* and *READTABLE*, and for proclaiming a global optimization
   policy.
 
-  - __System Initialization File:__ Defaults to `$SBCL_HOME/sbclrc`,
-    or if that doesn't exist to `/etc/sbclrc`. Can be overridden with
-    the command-line option `--sysinit` or `--no-sysinit` (see
+  - __System Initialization File:__ Defaults to `sbclrc` where the
+    `contrib/` directory is found (see @FINDING-PARTS-OF-SBCL), or if
+    that doesn't exist to `/etc/sbclrc`. Can be overridden with the
+    command-line option `--sysinit` or `--no-sysinit` (see
     @TOPLEVEL-OPTIONS).
 
       The system initialization file is intended for system

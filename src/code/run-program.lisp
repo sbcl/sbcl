@@ -780,8 +780,9 @@ The &KEY arguments have the following meanings:
 
 - :SEARCH
 
-    Look for PROGRAM in each of the directories in the child's $PATH
-    environment variable. Otherwise an absolute pathname is required.
+    Look for PROGRAM in each of the directories in the child's
+    `\\\\$PATH` environment variable. Otherwise an absolute pathname
+    is required.
 
 - :WAIT
 

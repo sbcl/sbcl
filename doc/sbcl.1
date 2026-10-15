@@ -83,12 +83,12 @@ program being accidentally processed by SBCL.
 Supported runtime options are
 .TP 3
 .B \-\-core <corefilename>
-Use the specified Lisp core file instead of the default. (See the FILES
-section for the standard core, or the system documentation for
-\f(CRSB\-EXT:SAVE\-LISP\-AND\-DIE\fR for information about how to create a 
-custom core.) Note that if the Lisp core file is a user-created core
-file, it may run a nonstandard toplevel which does not recognize the
-standard toplevel options.
+Use the specified Lisp core file instead of the default. (See the
+FILES section for the standard core or the system documentation for
+\f(CRSB\-EXT:SAVE\-LISP\-AND\-DIE\fR for information about how to
+create a custom core.) Note that if the Lisp core file is a
+user-created core file, it may run a nonstandard toplevel which does
+not recognize the standard toplevel options.
 .TP 3
 .B \-\-dynamic-space-size <size>
 Size of the dynamic space reserved on startup. The default value is
@@ -133,7 +133,7 @@ When platform support is present, provide hints to the operating
 system that identical pages may be shared between processes until they
 are written to. This can be useful to reduce the memory usage on
 systems with multiple SBCL processes started from similar but
-differently\-named core files, or from compressed cores. Without
+differently\-named core files or from compressed cores. Without
 platform support, do nothing. By default only compressed cores trigger
 hinting.
 .TP 3
@@ -424,13 +424,14 @@ years. See the CREDITS file in the distribution for more information.
 
 .SH ENVIRONMENT
 
-.TP 10n
-.BR SBCL_HOME
-This variable controls where files like "sbclrc", "sbcl.core", and the
-add-on "contrib" systems are searched for. If it is not set, then sbcl
-looks in \fB../lib/sbcl/\fR relative to the location of the executable,
-or in the current directory. If your executable is in the default
-location \fB/usr/local/bin/\fR then it will look in
+.TP
+.B SBCL_HOME
+This variable is the first stop where files like "sbclrc",
+"sbcl.core", and the add-on "contrib" systems are searched for. After
+this, SBCL looks in the current directory, the directory of the
+executable, and finally in \fB../lib/sbcl/\fR relative to the location
+of the executable. For example, if your executable is in the default
+location \fB/usr/local/bin/\fR, then this last rule will look in
 \fB/usr/local/lib/sbcl/\fR.
 
 .SH FILES
@@ -442,17 +443,23 @@ a loader, used to read sbcl.core
 .TP
 .I sbcl.core
 dumped memory image containing most of SBCL, to be loaded by
-the 'sbcl' executable.  Looked for in \fB$SBCL_HOME\fR,
-unless overridden by the \f(CR\-\-core\fR option.
+the 'sbcl' executable. Looked for according to the algorithm described
+in \fB$SBCL_HOME\fR and unless overridden by the \f(CR\-\-core\fR
+option.
+.TP
+.I contrib/
+directory contained the fasl files for contrib modules. Looked for
+similarly to the algorithm described in \fB$SBCL_HOME\fR. See "Finding
+Parts of SBCL" in the user manual for the details.
 .TP
 .I sbclrc
-optional system-wide startup script, looked for in \fB$SBCL_HOME\fR
-then \fB/etc\fR, unless overridden by the \f(CR\-\-sysinit\fR command line
-option.
+optional system-wide startup script. Looked for wherever
+the 'contrib/' was found, then in \fB/etc\fR, unless overridden by the
+\f(CR\-\-sysinit\fR) or \f(CR\-\-no\-sysinit\fR command line options.
 .TP
 .I .sbclrc
 optional per-user customizable startup script (in user's home
-directory, or as specified by  \f(CR\-\-userinit\fR)
+directory or as specified by \f(CR\-\-userinit\fR)
 
 .SH SEE ALSO
 

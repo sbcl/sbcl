@@ -181,9 +181,8 @@ distribution for more information.\n\
 ", SBCL_VERSION_STRING);
 }
 
-/* Look for a core file to load, first in the directory named by the
- * SBCL_HOME environment variable, then in a hardcoded default
- * location.  Returns a malloced copy of the core filename. */
+/* See SB-MANUAL:@FINDING-PARTS-OF-SBCL. Returns a malloced copy of
+ * the core filename. */
 static char *
 search_for_core ()
 {

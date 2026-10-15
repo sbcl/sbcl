@@ -32,11 +32,12 @@
   "Load a shared library / dynamic shared object file / similar foreign
 container specified by designated PATHNAME, such as a .so on an ELF platform.
 
-Locating the shared object follows standard rules of the platform, consult the
-manual page for `dlopen(3)` for details. Typically paths specified by
-environment variables such as LD_LIBRARY_PATH are searched if the PATHNAME has
-no directory, but on some systems (e.g. Mac OS X) search may happen even if
-PATHNAME is absolute. (On Windows LoadLibrary is used instead of `dlopen(3)`.)
+Locating the shared object follows standard rules of the platform,
+consult the manual page for `dlopen(3)` for details. Typically paths
+specified by environment variables such as `\\\\LD_LIBRARY_PATH` are
+searched if the PATHNAME has no directory, but on some systems (e.g.
+Mac OS X) search may happen even if PATHNAME is absolute. (On Windows
+LoadLibrary is used instead of `dlopen(3)`.)
 
 On non-Windows platforms calling LOAD-SHARED-OBJECT again with a PATHNAME
 EQUAL to the designated pathname of a previous call will replace the old

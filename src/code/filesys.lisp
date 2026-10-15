@@ -688,13 +688,18 @@ it does not exist or if it is a file or a symbolic link."
              (when (dir-existsp (merge-pathnames "contrib/" path))
                path))
            (try-runtime-home (path)
-             (or (probe path)
-                 (probe (merge-pathnames "../lib/sbcl/" path)))))
+             (or
+              ;; For when sbcl.core is in the usual place, sharing a
+              ;; directory with contrib/
+              (probe path)
+              ;; For when sbcl.core is in the same directory as the
+              ;; sbcl binary but contrib/ is in the usual place
+              (probe (merge-pathnames "../lib/sbcl/" path)))))
+    ;; SB-MANUAL:@FINDING-PARTS-OF-SBCL
     (let* ((env (posix-getenv "SBCL_HOME"))
            (env (and env (not (string= env ""))
                      (parse env))))
-      (or (and env
-               (probe env))
+      (or (and env (probe env))
           (try-runtime-home (parse (or (extern-alien "sbcl_runtime_home" c-string)
                                        "")))
           (probe (parse "."))

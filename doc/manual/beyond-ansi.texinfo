@@ -1454,8 +1454,9 @@ this (converted to the new format). It is an error to specify both
 
 @item @code{:search}
 
-Look for @code{program} in each of the directories in the child's $PATH
-environment variable. Otherwise an absolute pathname is required.
+Look for @code{program} in each of the directories in the child's
+@code{$PATH} environment variable. Otherwise an absolute pathname
+is required.
 
 @item @code{:wait}
 
