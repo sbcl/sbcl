@@ -1204,3 +1204,14 @@
            (H))
          (G))))
    (() -40562343327224770087344708517392)))
+
+(with-test (:name :find-result-type-deleted-nodes)
+ (assert (nth-value
+          2
+          (checked-compile
+           `(lambda ()
+              (declare (optimize debug))
+              ((lambda nil) 1)
+              (flet ((f (x)))
+                (f (handler-case * (error nil)))))
+           :allow-warnings t))))

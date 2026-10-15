@@ -726,10 +726,11 @@
                                   (type *empty-type*))
                               (pushnew node (lvar-dependent-nodes value) :test #'eq)
                               (do-uses (use value)
-                                (unless (and (basic-combination-p use)
-                                             (eq (basic-combination-kind use) :local)
-                                             (eq (lambda-tail-set (combination-lambda use))
-                                                 (lambda-tail-set use-home)))
+                                (unless (or (node-deleted use)
+                                            (and (basic-combination-p use)
+                                                 (eq (basic-combination-kind use) :local)
+                                                 (eq (lambda-tail-set (combination-lambda use))
+                                                     (lambda-tail-set use-home))))
                                   (setf type (values-type-union
                                               type
                                               (if (cast-p use)
