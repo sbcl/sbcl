@@ -2775,32 +2775,44 @@ expansion happened."
 
 ;;; Coerce a numeric type bound to the given type while handling
 ;;; exclusive bounds.
-(defun coerce-numeric-bound (bound type)
-  (flet ((c (thing)
-           (ecase type
-             (rational
-              (cond ((and (floatp thing) (float-infinity-p thing))
-                     (return-from coerce-numeric-bound nil))
-                    (t
-                     (rational thing))))
-             ((float single-float)
-              (cond ((sb-xc:<= most-negative-single-float thing most-positive-single-float)
-                     (coerce thing 'single-float))
-                    (t
-                     (return-from coerce-numeric-bound nil))))
-             (double-float
-              (cond ((sb-xc:<= most-negative-double-float thing most-positive-double-float)
-                     (coerce thing 'double-float))
-                    (t
-                     (return-from coerce-numeric-bound nil)))))))
-    (when bound
-      (handler-case
-          (if (consp bound)
-              (list (c (car bound)))
-              (c bound))
-        #+sb-xc-host
-        (error ()
-          (return-from coerce-numeric-bound nil))))))
+(defun coerce-numeric-bound (bound type upperp)
+  (when bound
+    (let ((thing (if (consp bound) (car bound) bound)))
+      (flet ((adjust (cbound)
+               ;; Coercing to floats can widen or narrow the range
+               (or (cond
+                     ((eq upperp :preserve) nil)
+                     ((if upperp
+                          (sb-xc:> cbound thing)
+                          (sb-xc:< cbound thing))
+                      (list cbound))
+                     ((if upperp
+                          (sb-xc:< cbound thing)
+                          (sb-xc:> cbound thing))
+                      cbound))
+                   (if (consp bound) (list cbound) cbound)))
+             (c ()
+               (ecase type
+                 (rational
+                  (cond ((and (floatp thing) (float-infinity-p thing))
+                         (return-from coerce-numeric-bound nil))
+                        (t
+                         (rational thing))))
+                 ((float single-float)
+                  (cond ((sb-xc:<= most-negative-single-float thing most-positive-single-float)
+                         (coerce thing 'single-float))
+                        (t
+                         (return-from coerce-numeric-bound nil))))
+                 (double-float
+                  (cond ((sb-xc:<= most-negative-double-float thing most-positive-double-float)
+                         (coerce thing 'double-float))
+                        (t
+                         (return-from coerce-numeric-bound nil)))))))
+        (handler-case
+            (adjust (c))
+          #+sb-xc-host
+          (error ()
+            (return-from coerce-numeric-bound nil)))))))
 
 (defun %make-union-numeric-type (class format complexp low high)
   (declare (type (member integer rational float nil) class))
@@ -2813,10 +2825,10 @@ expansion happened."
                                    :complexp complexp
                                    :low ,(if simple-coerce
                                              `(coerce low ',coerce)
-                                             `(coerce-numeric-bound low ',coerce))
+                                             `(coerce-numeric-bound low ',coerce nil))
                                    :high ,(if simple-coerce
                                               `(coerce high ',coerce)
-                                              `(coerce-numeric-bound high ',coerce)))))))
+                                              `(coerce-numeric-bound high ',coerce t)))))))
     (cond ((and (null class) (member complexp '(:real :complex)))
            (cond ((not (bounds-unbounded-p low high))
                   (cond ((and (floatp low) (float-infinity-p low)
@@ -3014,22 +3026,37 @@ expansion happened."
   (let ((nl most-negative-long-float)
         (pl most-positive-long-float))
     (let ((nbound (if (listp bound) (car bound) bound)))
-      (ecase type
-        (rational
-         (make-bound (rational nbound)))
-        (float
-         (cond
-           ((floatp nbound) bound)
-           (t
-            ;; Coerce to the widest float format available, to avoid
-            ;; unnecessary loss of precision, but don't coerce
-            ;; unrepresentable numbers.
-            (ecase upperp
-              ((nil)
-               (when (sb-xc:< nbound nl) (return-from inner-coerce-real-bound nl)))
-              ((t)
-               (when (sb-xc:> nbound pl) (return-from inner-coerce-real-bound pl))))
-            (make-bound (coerce nbound 'long-float)))))))))
+      (flet ((make-bound (cbound)
+               ;; Coercing to floats can widen or narrow the range
+               (cond
+                 ((if upperp
+                      (sb-xc:> cbound nbound)
+                      (sb-xc:< cbound nbound))
+                  (list cbound))
+                 ((if upperp
+                      (sb-xc:< cbound nbound)
+                      (sb-xc:> cbound nbound))
+                  cbound)
+                 (t
+                  (if (listp bound) (list cbound) cbound)))))
+        (ecase type
+          (rational
+           (make-bound (rational nbound)))
+          (float
+           (cond
+             ((floatp nbound) bound)
+             (t
+              ;; Coerce to the widest float format available, to avoid
+              ;; unnecessary loss of precision, but don't coerce
+              ;; unrepresentable numbers.
+              (if upperp
+                  (cond
+                    ((sb-xc:> nbound pl) (return-from inner-coerce-real-bound pl))
+                    ((sb-xc:< nbound nl) (return-from inner-coerce-real-bound (list nl))))
+                  (cond
+                    ((sb-xc:< nbound nl) (return-from inner-coerce-real-bound nl))
+                    ((sb-xc:> nbound pl) (return-from inner-coerce-real-bound (list pl)))))
+              (make-bound (coerce nbound 'long-float))))))))))
 
 (defun inner-coerce-float-bound (bound type upperp)
   (let ((nd most-negative-double-float)
@@ -3037,31 +3064,44 @@ expansion happened."
         (ns most-negative-single-float)
         (ps most-positive-single-float))
     (let ((nbound (if (listp bound) (car bound) bound)))
-      (ecase type
-        (single-float
-         (cond
-           ((cl:typep nbound 'single-float) bound)
-           (t
-            (if upperp
-                (cond
-                  ((sb-xc:> nbound ps) (return-from inner-coerce-float-bound ps))
-                  ((sb-xc:< nbound ns) (return-from inner-coerce-float-bound (list ns))))
-                (cond
-                  ((sb-xc:< nbound ns) (return-from inner-coerce-float-bound ns))
-                  ((sb-xc:> nbound ps) (return-from inner-coerce-float-bound (list ps)))))
-            (make-bound (coerce nbound 'single-float)))))
-        (double-float
-         (cond
-           ((cl:typep nbound 'double-float) bound)
-           (t
-            (if upperp
-                (cond
-                  ((sb-xc:> nbound pd) (return-from inner-coerce-float-bound pd))
-                  ((sb-xc:< nbound nd) (return-from inner-coerce-float-bound (list nd))))
-                (cond
-                  ((sb-xc:< nbound nd) (return-from inner-coerce-float-bound nd))
-                  ((sb-xc:> nbound pd) (return-from inner-coerce-float-bound (list pd)))))
-            (make-bound (coerce nbound 'double-float)))))))))
+      (flet ((make-bound (cbound)
+               ;; Coercing floats can widen or narrow the range
+               (cond
+                 ((if upperp
+                      (sb-xc:> cbound nbound)
+                      (sb-xc:< cbound nbound))
+                  (list cbound))
+                 ((if upperp
+                      (sb-xc:< cbound nbound)
+                      (sb-xc:> cbound nbound))
+                  cbound)
+                 (t
+                  (if (listp bound) (list cbound) cbound)))))
+        (ecase type
+          (single-float
+           (cond
+             ((cl:typep nbound 'single-float) bound)
+             (t
+              (if upperp
+                  (cond
+                    ((sb-xc:> nbound ps) (return-from inner-coerce-float-bound ps))
+                    ((sb-xc:< nbound ns) (return-from inner-coerce-float-bound (list ns))))
+                  (cond
+                    ((sb-xc:< nbound ns) (return-from inner-coerce-float-bound ns))
+                    ((sb-xc:> nbound ps) (return-from inner-coerce-float-bound (list ps)))))
+              (make-bound (coerce nbound 'single-float)))))
+          (double-float
+           (cond
+             ((cl:typep nbound 'double-float) bound)
+             (t
+              (if upperp
+                  (cond
+                    ((sb-xc:> nbound pd) (return-from inner-coerce-float-bound pd))
+                    ((sb-xc:< nbound nd) (return-from inner-coerce-float-bound (list nd))))
+                  (cond
+                    ((sb-xc:< nbound nd) (return-from inner-coerce-float-bound nd))
+                    ((sb-xc:> nbound pd) (return-from inner-coerce-float-bound (list pd)))))
+              (make-bound (coerce nbound 'double-float))))))))))
 ) ; end MACROLET
 
 (defun coerced-real-bound (bound type upperp)
@@ -5858,8 +5898,8 @@ expansion happened."
     ((single-float double-float)
      (make-numeric-union-type :class 'float
                               :format type
-                              :low (coerce-numeric-bound low type)
-                              :high (coerce-numeric-bound high type)
+                              :low (coerce-numeric-bound low type :preserve)
+                              :high (coerce-numeric-bound high type :preserve)
                               :normalize-zeros normalize-zeros))
     ((nil)
      (error "Bad numeric type: ~s" type))

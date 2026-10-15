@@ -1016,8 +1016,8 @@
               (aver format)
               (modified-numeric-type
                y-type
-               :low (coerce-numeric-bound (interval-low bnd) format)
-               :high (coerce-numeric-bound (interval-high bnd) format))))
+               :low (coerce-numeric-bound (interval-low bnd) format nil)
+               :high (coerce-numeric-bound (interval-high bnd) format t))))
            (t
             ;; A positive integer to a number is a number (for now).
             (specifier-type 'number))))
@@ -1045,8 +1045,8 @@
             (let ((format (numeric-type-format y-type)))
               (modified-numeric-type
                y-type
-               :low (coerce-numeric-bound (interval-low bnd) format)
-               :high (coerce-numeric-bound (interval-high bnd) format))))
+               :low (coerce-numeric-bound (interval-low bnd) format nil)
+               :high (coerce-numeric-bound (interval-high bnd) format t))))
            (t
             ;; A positive rational to a number is a number (for now).
             (specifier-type 'number))))

@@ -676,10 +676,10 @@
       (checked-compile-and-assert () '(lambda (x) (ctu:compiler-derived-type (* 3f0 x)))
         ((1) (values `(or single-float ,long (complex single-float) (complex ,long)) t)
          :test #'car-type-equal))
-      (checked-compile-and-assert () '(lambda (x y) (ctu:compiler-derived-type (atan x y)))
-        ((1 2) (values `(float ,(- pi) ,pi)
-                       t)
-         :test #'car-type-equal)))))
+      (assert-type
+       (lambda (x y) (atan x y))
+       (or (double-float #.(- pi) #.pi)
+           (single-float #.(- (float pi 1.0)) #.(float pi 1.0)))))))
 
 ;; figure out whether the floating-point environment is as expected
 (handler-case (eval '(* 1.0e30 1.0e30))

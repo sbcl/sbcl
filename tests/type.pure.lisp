@@ -679,7 +679,7 @@
   (assert (equal (type-specifier (make-numeric-union-type :low '(-79106810381456307)))
                  `(or (rational (-79106810381456307))
                       (single-float (-7.910681e16))
-                      (double-float (-7.91068103814563d16))))))
+                      (double-float -7.91068103814563d16)))))
 
 (with-test (:name (make-numeric-union-type :infinities))
   ;; Without class
@@ -1335,3 +1335,12 @@
                                        (specifier-type '(real -174405461149511774174041808601745792450680267 -130065457264652917778248017974577785845017674))
                                        (specifier-type 'single-float)))
                  '(nil t))))
+
+(with-test (:name :float-bound-exclusion)
+  (assert (typep (opaque-identity 0f0) (opaque-identity '(float * (1.0d-100)))))
+  (assert (not (typep (opaque-identity 0.4181737)
+                      (opaque-identity '(float * 0.4181736927491626d0)))))
+  (assert-type (lambda (f)
+                 (min 1.0d-100
+                      (the (float -1.0 1.0) f)))
+               (or (single-float -1.0 0.0) (double-float -1.0d0 1.0d-100))))
