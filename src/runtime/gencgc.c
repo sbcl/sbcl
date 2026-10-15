@@ -3341,7 +3341,6 @@ static void maybe_pin_csp_guard_page (__attribute__((unused)) struct thread* th)
 #if defined LISP_FEATURE_NONSTOP_FOREIGN_CALL || defined LISP_FEATURE_SB_SAFEPOINT
     if (th->state_word.control_stack_guard_page_protected)
         return;
-    lispobj* guard_page = (lispobj *) CONTROL_STACK_GUARD_PAGE(th);
     lispobj* return_page = (lispobj *) CONTROL_STACK_RETURN_GUARD_PAGE(th);
     lispobj* addr;
 
@@ -3351,8 +3350,9 @@ static void maybe_pin_csp_guard_page (__attribute__((unused)) struct thread* th)
     for (addr = return_page; addr < return_page_end; addr++)
         pin_exact_root(*addr);
 #else
-        for (addr = return_page; addr < guard_page; addr++)
-            pin_exact_root(*addr);
+    lispobj* guard_page = (lispobj *) CONTROL_STACK_GUARD_PAGE(th);
+    for (addr = return_page; addr < guard_page; addr++)
+        pin_exact_root(*addr);
 #endif
 
 #endif

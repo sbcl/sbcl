@@ -135,7 +135,8 @@
          (ref-leaf ref))))
 
 ;;; Look through casts and variables, m-v-bind+values
-(defun map-all-uses (function lvar &key (cast t) var-home)
+(defun map-all-uses (function lvar &key (cast t) var-home
+                                        sets)
   (declare (dynamic-extent function var-home))
   (let (seen)
     (labels ((recurse-lvar (lvar)
@@ -151,7 +152,8 @@
                         (cond (lvar
                                (recurse-lvar lvar))
                               ((when (and (lambda-var-p var)
-                                          (not (lambda-var-sets var)))
+                                          (or sets
+                                              (not (lambda-var-sets var))))
                                  (let* ((fun (lambda-var-home var))
                                         (vars (lambda-vars fun)))
                                    (cond ((functional-kind-eq fun mv-let)
