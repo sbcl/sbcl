@@ -1942,7 +1942,8 @@
                 (when (eq (block-in block) :pending-call)
                   (incf pending-calls))))))
      ;; Tend to pending calls before going again
-     (loop while (plusp pending-calls)
+     (loop for current = pending-calls
+           while (plusp pending-calls)
            do (dolist (block blocks)
                 (when (and (block-worklist-flag block)
                            (eq (block-in block) :pending-call))
@@ -1950,7 +1951,12 @@
                   (cond ((update-block-in block)
                          (decf pending-calls)
                          (mapc #'enqueue-block-for-constraints
-                               (find-block-type-constraints block nil)))))))
+                               (find-block-type-constraints block nil))))))
+           when (= current pending-calls)
+           do
+           ;; Nothing got resolved which means the lambdas are not connected to anything,
+           ;; don't propagate any constraints for them
+           (return-from propagate-constraints-in-scc))
 
      (unless *constraint-blocks-pending*
        (return))))

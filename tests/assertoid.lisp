@@ -88,7 +88,7 @@
          (caddr
           (sb-kernel:%simple-fun-type
            (test-util:checked-compile ',lambda ,@compile-args)))
-         ',(if (typep type '(cons (eql values)))
+         ',(if (typep type '(or null (cons (eql values))))
                type
                `(values ,type &optional))))))
 

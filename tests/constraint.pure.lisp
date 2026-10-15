@@ -2589,3 +2589,11 @@
                     a)
                   a))))
     (() 3)))
+
+(with-test (:name :unreachable-locals)
+  (assert-type
+   (lambda () (labels ((r (n) (r 1) 2))
+                (declare (notinline r))
+                (r (error ""))))
+   ;; Should be NIL, but it's not too important
+   (eql 2)))
