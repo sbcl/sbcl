@@ -965,3 +965,15 @@ fractional bits."
    (lambda (x)
      (log (truly-the (double-float 5d0 6d0) x) 10.0))
    (double-float #.(log 5d0 10d0) #.(log 6d0 10d0))))
+
+(with-test (:name :floor-constraints)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (x)
+        (< (mod x 0.544) 999/976))
+    ((58149737003040059690390169) nil))
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (x)
+        (< (mod x 68/125) 999/976))
+    ((5.8149736e25) nil)))

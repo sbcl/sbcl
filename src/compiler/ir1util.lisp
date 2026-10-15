@@ -347,6 +347,32 @@
 (defmacro lvar-intersection  (lvar type)
   `(type-intersection (lvar-type ,lvar) (specifier-type ',type)))
 
+(defmacro node-subtypep  (node type &key asserted single-value nth-value)
+  `(let ((node ,node))
+     ,(cond (single-value
+             `(csubtypep (single-value-result-type node ,asserted)
+                         (specifier-type ',type)))
+            (nth-value
+             (aver asserted)
+             `(csubtypep (mv-asserted-type node ,nth-value)
+                         (specifier-type ',type)))
+            (t
+             `(values-subtypep (if ,asserted
+                                   (node-asserted-type node)
+                                   (node-derived-type node))
+                               (values-specifier-type ',type))))))
+
+(defun mv-asserted-type (node nth-value)
+  (let* ((dtype (node-derived-type node))
+         (type (values-type-nth nth-value dtype)))
+    (or
+     (let ((asserted (mv-bind-asserted-type (node-lvar node) nth-value)))
+       (when asserted
+         (let ((int (type-intersection type asserted)))
+           (unless (eq int *empty-type*)
+             int))))
+     type)))
+
 (defun immediately-used-let-dest (node &key flushable single-ref)
   (let ((lvar (node-lvar node)))
     (when lvar
@@ -404,6 +430,22 @@
                    (not (cdr refs))
                    (not (lambda-var-sets var)))
           (let-lvar-dest (node-lvar (car refs)) single-use))))))
+
+(defun mv-bind-asserted-type (lvar nth-value)
+  (let ((vars (mv-bind-vars lvar))
+        type)
+    (when vars
+      (let ((var (nth nth-value vars)))
+        (unless (lambda-var-sets var)
+          (loop for ref in (leaf-refs var)
+                for cast = (cast-or-check-bound-type ref)
+                do (cond ((not cast)
+                          (return-from mv-bind-asserted-type))
+                         (type
+                          (setf type (type-union type cast)))
+                         (t
+                          (setf type cast)))))))
+    type))
 
 (declaim (inline lvar-single-value-p))
 (defun lvar-single-value-p (lvar)

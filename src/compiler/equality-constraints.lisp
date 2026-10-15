@@ -1062,7 +1062,10 @@
       (list (list '<= (make-vector-length-constraint var))))))
 
 (defoptimizer (floor constraint-propagate-result) ((x y) node)
-  (when (csubtypep (lvar-type y) (specifier-type '(real 0)))
+  (when (and (node-subtypep node rational
+                            :asserted t
+                            :nth-value 1)
+             (lvar-subtypep y (real 0)))
     (values nil
             (list (list 1 '< y)))))
 
