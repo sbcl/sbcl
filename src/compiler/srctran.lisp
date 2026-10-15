@@ -6586,12 +6586,25 @@
             (if (minusp (lvar-value y)) ',minus-result ',result))))
   (def * x (%negate x) number)
   (def / x (%negate x) number)
-  (def expt x (/ 1 x) (or exact-number real))  ;; (expt #c(2d0 2d0) 1) doesn't return #c(2d0 2d0)
   ;; These have to respect the float contagion rules
   (def * x (%negate x) double-float (member 1f0 -1f0 1d0 -1d0))
   (def / x (%negate x) double-float (member 1f0 -1f0 1d0 -1d0))
   (def * x (%negate x) float (member 1f0 -1f0))
   (def / x (%negate x) float (member 1f0 -1f0)))
+
+(deftransform expt ((x y) ((or exact-number ;; (expt #c(2d0 2d0) 1) returns #c(2.0000000000000004d0 2.0d0)
+                               real)
+                           (constant-arg (member 1 -1)))
+                    * :node node)
+  (cond ((minusp (lvar-value y))
+         (unless (or
+                  (policy node (= float-accuracy 0))
+                  (csubtypep (single-value-result-type node t)
+                             (specifier-type '(or rational (complex rational)))))
+           (give-up-ir1-transform))
+         '(/ 1 x))
+        (t
+         'x)))
 
 (deftransform + ((x y) (number number) * :node node)
   (let ((floats (or (policy node (zerop float-accuracy))
@@ -6734,12 +6747,12 @@
                     ;; both parts are float
                     `(1+ (* x ,val)))
                    (t (give-up-ir1-transform)))))
-          ((= val 2) '(* x x))
           ((not (or
                  (policy node (= float-accuracy 0))
                  (csubtypep (single-value-result-type node t)
                             (specifier-type '(or rational (complex rational))))))
            (give-up-ir1-transform))
+          ((= val 2) '(* x x))
           ((= val -2) '(/ (* x x)))
           ((= val 3) '(* x x x))
           ((= val 4) '(let ((m (* x x)))
