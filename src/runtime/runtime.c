@@ -190,38 +190,47 @@ search_for_core ()
     char *env_sbcl_home = getenv("SBCL_HOME");
     char *lookhere;
     char *stem = "/sbcl.core";
-    char *core;
+    char *core = NULL;
     struct stat filename_stat;
 
-    if (!(env_sbcl_home && *env_sbcl_home) ||
-        stat(env_sbcl_home, &filename_stat))
-        env_sbcl_home = sbcl_runtime_home;
-    lookhere = (char *) calloc(strlen(env_sbcl_home) +
-                               strlen(libpath) +
-                               strlen(stem) +
-                               1,
-                               sizeof(char));
-    sprintf(lookhere, "%s%s%s", env_sbcl_home, libpath, stem);
-    core = copied_existing_filename_or_null(lookhere);
+    /* Try $SBCL_HOME/sbcl.core */
+    if (env_sbcl_home && *env_sbcl_home &&
+        !stat(env_sbcl_home, &filename_stat)) {
+        lookhere = (char *) calloc(strlen(env_sbcl_home) +
+                                   strlen(stem) +
+                                   1,
+                                   sizeof(char));
+        sprintf(lookhere, "%s%s", env_sbcl_home, stem);
+        core = copied_existing_filename_or_null(lookhere);
+        free(lookhere);
+    }
 
-    if (core) {
+    /* Try ./sbcl.core */
+    if (!core) {
+        core = copied_existing_filename_or_null("sbcl.core");
+    }
+
+    /* Try <sbcl-bin-dir>/sbcl.core */
+    if (!core) {
+        lookhere = (char *) calloc(strlen(sbcl_runtime_home) +
+                                   strlen(stem) +
+                                   1,
+                                   sizeof(char));
+        sprintf(lookhere, "%s%s", sbcl_runtime_home, stem);
+        core = copied_existing_filename_or_null(lookhere);
         free(lookhere);
-    } else {
+    }
+
+    /* Try <sbcl-bin-dir>/../lib/sbcl/sbcl.core */
+    if (!core) {
+        lookhere = (char *) calloc(strlen(sbcl_runtime_home) +
+                                   strlen(libpath) +
+                                   strlen(stem) +
+                                   1,
+                                   sizeof(char));
+        sprintf(lookhere, "%s%s%s", sbcl_runtime_home, libpath, stem);
+        core = copied_existing_filename_or_null(lookhere);
         free(lookhere);
-        core = copied_existing_filename_or_null ("sbcl.core");
-        if (!core) {
-            lookhere = (char *) calloc(strlen(env_sbcl_home) +
-                                       strlen(stem) +
-                                       1,
-                                       sizeof(char));
-            sprintf(lookhere, "%s%s", env_sbcl_home, stem);
-            core = copied_existing_filename_or_null (lookhere);
-            if (core) {
-                free(lookhere);
-            } else {
-                return NULL;
-            }
-        }
     }
 
     return core;
@@ -685,9 +694,12 @@ initialize_lisp(int argc, char *argv[], char *envp[])
         }
     }
 
-    if (!(sbcl_runtime_home = dir_name(argv[0])))
-        if (!(sbcl_runtime_home = dir_name(sbcl_runtime)))
+    sbcl_runtime_home = dir_name(argv[0]);
+    if (!sbcl_runtime_home) {
+        sbcl_runtime_home = dir_name(sbcl_runtime);
+        if (!sbcl_runtime_home)
             sbcl_runtime_home = libpath;
+    }
 
     struct cmdline_options options = parse_argv(memsize_options, argc, argv, envp, core);
 
