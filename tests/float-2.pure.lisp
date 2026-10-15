@@ -939,3 +939,13 @@ fractional bits."
          (let ((a (- a)))
            (* a a)))
     ((2d0) 4d0)))
+
+(with-test (:name :log-derive-type-contagion)
+  (assert-type
+   (lambda (x)
+     (log (truly-the (single-float 5.0 6.0) x) 10.0d0))
+   (double-float #.(log 5d0 10d0) #.(log 6d0 10d0)))
+  (assert-type
+   (lambda (x)
+     (log (truly-the (double-float 5d0 6d0) x) 10.0))
+   (double-float #.(log 5d0 10d0) #.(log 6d0 10d0))))

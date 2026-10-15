@@ -1154,9 +1154,21 @@
                (multiple-value-bind (y x coerce) (rational-float y x)
                  (values x y coerce)))
               (t
-               (values (log-derive-type-aux-1 x)
-                       (log-derive-type-aux-1 y)
-                       nil))))
+               (let ((x-format (and (float-type-p x)
+                                    (numeric-type-format x)))
+                     (y-format (and (float-type-p y)
+                                    (numeric-type-format y))))
+                 (cond
+                   ((and (eq x-format 'double-float)
+                         (eq y-format 'single-float))
+                    (setf y (coerce-float-type y 'double-float)))
+                   ((and (eq x-format 'single-float)
+                         (eq y-format 'double-float))
+                    (setf x (coerce-float-type x 'double-float))))
+
+                 (values (log-derive-type-aux-1 x)
+                         (log-derive-type-aux-1 y)
+                         nil)))))
     (let ((accumulated-list nil))
       ;; LOG-X or LOG-Y might be union types. We need to run through
       ;; the union types ourselves because /-DERIVE-TYPE-AUX doesn't.
