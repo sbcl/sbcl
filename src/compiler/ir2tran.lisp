@@ -2406,44 +2406,6 @@
       (move-lvar-result node block res lvar))))
 (setf (fun-info-ir2-convert (fun-info-or-lose 'list*)) #'list-ir2-convert-optimizer)
 
-
-(defoptimizer (mask-signed-field ir2-convert) ((width x) node block)
-  (block nil
-    (when (constant-lvar-p width)
-      (flet ((make-temp ()
-               (make-normal-tn
-                (if (lvar-subtypep x word)
-                    (load-time-value (primitive-type-of most-positive-word))
-                    (load-time-value (primitive-type-of (- (ash most-positive-word -1))))))))
-        (case (lvar-value width)
-          (#.sb-vm:n-fixnum-bits
-           (when (word-sized-lvar-p x)
-             (let* ((lvar (node-lvar node))
-                    (temp (make-temp))
-                    (results (lvar-result-tns
-                              lvar
-                              (load-time-value (list (specifier-type 'fixnum))))))
-               (emit-move node block (lvar-tn node block x) temp)
-               (vop sb-vm::sign-extend-fixnum-move node block
-                    temp (first results))
-               (move-lvar-result node block results lvar)
-               (return))))
-          (#.sb-vm:n-word-bits
-           (when (word-sized-lvar-p x)
-             (let* ((lvar (node-lvar node))
-                    (temp (make-temp))
-                    (results (lvar-result-tns
-                              lvar
-                              (load-time-value (list (specifier-type 'sb-vm:signed-word))))))
-               (emit-move node block (lvar-tn node block x) temp)
-               (vop sb-vm::sign-extend-word-move node block
-                    temp (first results))
-               (move-lvar-result node block results lvar)
-               (return)))))))
-    (if (template-p (basic-combination-info node))
-        (ir2-convert-template node block)
-        (ir2-convert-full-call node block))))
-
 ;;; An identity to avoid complaints about constant modification
 (defoptimizer (ltv-wrapper ir2-convert) ((x) node block)
   (let* ((lvar (node-lvar node))
