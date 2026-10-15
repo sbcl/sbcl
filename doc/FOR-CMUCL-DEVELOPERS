@@ -1,7 +1,7 @@
 This document was motivated by a request from Paolo Amoroso for notes
 or other documentation on my work on SBCL. It's intended for
-developers who are familiar with the guts of CMU CL, as an overview of
-the changes made to CMU CL in order to produce SBCL. It was written
+developers who are familiar with the guts of CMUCL, as an overview of
+the changes made to CMUCL in order to produce SBCL. It was written
 for the initial release (sbcl-0.5.0) and has not been updated since
 then.
 
@@ -25,9 +25,9 @@ Many, many extensions have been removed.
 
 Packages have all been renamed; in the final system,
 the system packages have names which begin with "SB-".
-Mostly these correspond closely to CMU CL packages, 
-e.g. the "C" package of CMU CL has become the "SB-C" package,
-and the "EXTENSIONS" package of CMU CL has become the "SB-EXT" 
+Mostly these correspond closely to CMUCL packages, 
+e.g. the "C" package of CMUCL has become the "SB-C" package,
+and the "EXTENSIONS" package of CMUCL has become the "SB-EXT" 
 package.
 
 Some other definitions and declarations have been centralized, too.
@@ -83,7 +83,7 @@ There were a number of things which I changed in order to get the
 system to boot itself.
 
 The source files have been extensively reordered to fix broken forward
-references. In many cases, this required breaking one CMU CL source
+references. In many cases, this required breaking one CMUCL source
 file into more than one SBCL source file, and scattering the multiple
 SBCL source files into multiple places in the build order. (Some of
 the breakups were motivated by reasons which no longer exist, and

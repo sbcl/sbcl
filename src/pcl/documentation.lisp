@@ -170,7 +170,7 @@
 
 ;;; default if DOC-TYPE doesn't match one of the specified types
 (defmethod (setf documentation) (new-value object doc-type)
-  ;; CMU CL made this an error, but since ANSI says that even for supported
+  ;; CMUCL made this an error, but since ANSI says that even for supported
   ;; doc types an implementation is permitted to discard docs at any time
   ;; for any reason, this feels to me more like a warning. -- WHN 19991214
   (warn "discarding unsupported DOCUMENTATION: doc-type ~S for object of type ~S"

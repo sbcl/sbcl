@@ -2,7 +2,7 @@
  * This software is part of the SBCL system. See the README file for
  * more information.
  *
- * This software is derived from the CMU CL system, which was
+ * This software is derived from the CMUCL system, which was
  * written at Carnegie Mellon University and released into the
  * public domain. The software is in the public domain and is
  * provided with absolutely no warranty. See the COPYING and CREDITS
@@ -293,7 +293,7 @@ sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
 void
 arch_install_interrupt_handlers()
 {
-    /* Note: The old CMU CL code here used sigtrap_handler() to handle
+    /* Note: The old CMUCL code here used sigtrap_handler() to handle
      * SIGILL as well as SIGTRAP. I couldn't see any reason to do
      * things that way. So, I changed to separate handlers when
      * debugging a problem on OpenBSD, where SBCL wasn't catching

@@ -156,7 +156,7 @@ Lisp filename syntax idiosyncrasies)."
   "lotso calls to NEED-MATCH"
   ;; FIXME: As discussed on sbcl-devel ca. 2001-01-01, DIRECTORY should
   ;; report Unix directory files contained within its output as e.g.
-  ;; "/usr/bin" instead of the CMU-CL-style "/usr/bin/". In that case,
+  ;; "/usr/bin" instead of the CMUCL-style "/usr/bin/". In that case,
   ;; s:/":": in most or all the NEED-MATCHes here.
   (need-match "./*.*" '("animal/" "dirt" "plant/" "water"))
   (need-match "*.*" '("animal/" "dirt" "plant/" "water"))

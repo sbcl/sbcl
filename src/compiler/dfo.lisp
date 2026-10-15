@@ -4,7 +4,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -219,7 +219,7 @@
 ;;; that we find to be related. Return whatever COMPONENT we actually
 ;;; merged into.
 ;;;
-;;; (Note: The analogous CMU CL code only scavenged call-based
+;;; (Note: The analogous CMUCL code only scavenged call-based
 ;;; dependencies, not closure dependencies. That seems to've been by
 ;;; oversight, not by design, as per the bug reported by WHN on
 ;;; cmucl-imp ca. 2001-11-29 and explained by DTC shortly after.)

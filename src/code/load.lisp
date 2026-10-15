@@ -2,13 +2,13 @@
 ;;;; host (and which are useful in the host, because they're used by
 ;;;; GENESIS)
 ;;;;
-;;;; based on the CMU CL load.lisp code, written by Skef Wholey and
+;;;; based on the CMUCL load.lisp code, written by Skef Wholey and
 ;;;; Rob Maclachlan
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -26,9 +26,9 @@
 ;;; for declaring values which are constant under EQUAL but not EQL),
 ;;; obviously you shouldn't mess with it lightly. If you do set a new
 ;;; value for some reason, keep these things in mind:
-;;; * To avoid confusion with the similar but incompatible CMU CL
+;;; * To avoid confusion with the similar but incompatible CMUCL
 ;;;   fasl file format, the value should not be "FASL FILE", which
-;;;   is what CMU CL used for the same purpose.
+;;;   is what CMUCL used for the same purpose.
 ;;; * Since its presence at the head of a file is used by LOAD to
 ;;;   decide whether a file is to be fasloaded or just loaded
 ;;;   ordinarily (as source), the value should be something which
@@ -1002,9 +1002,9 @@
 
 ;;;; fops for loading functions
 
-;;; (In CMU CL there was a FOP-CODE-FORMAT (47) which was
+;;; (In CMUCL there was a FOP-CODE-FORMAT (47) which was
 ;;; conventionally placed at the beginning of each fasl file to test
-;;; for compatibility between the fasl file and the CMU CL which
+;;; for compatibility between the fasl file and the CMUCL which
 ;;; loaded it. In SBCL, this functionality has been replaced by
 ;;; putting the implementation and version in required fields in the
 ;;; fasl file header.)

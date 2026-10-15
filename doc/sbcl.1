@@ -253,7 +253,7 @@ chance to see it.
 
 .SH OVERVIEW
 
-SBCL is derived from the CMU CL. (The name is intended to acknowledge
+SBCL is derived from the CMUCL. (The name is intended to acknowledge
 the connection: steel and banking are the industries where Carnegie
 and Mellon made the big bucks.)
 
@@ -282,7 +282,7 @@ For more information, see the User Manual.
 
 .SH THE COMPILER
 
-SBCL inherits from CMU CL the "Python" native code compiler. (Though
+SBCL inherits from CMUCL the "Python" native code compiler. (Though
 we often avoid that name in order to avoid confusion with the
 scripting language also called Python.) This compiler is very clever
 about understanding the type system of Common Lisp and using it to
@@ -378,28 +378,28 @@ execute \f(CR(TAN LEAST\-NEGATIVE\-SINGLE\-FLOAT)\fR interactively on
 sbcl-1.2.3 on my Linux 4.5 X86 box, I get an \f(CRUNBOUND\-VARIABLE\fR
 error."
 
-.SH DIFFERENCES FROM CMU CL
+.SH DIFFERENCES FROM CMUCL
 
 SBCL can be built from scratch using a plain vanilla ANSI Common Lisp
 system and a C compiler, and all of its properties are specified by
 the version of the source code that it was created from. This clean
 bootstrappability was the immediate motivation for forking off of the
-CMU CL development tree. A variety of implementation differences are
+CMUCL development tree. A variety of implementation differences are
 motivated by this design goal.
 
 Maintenance work in SBCL since the fork has diverged somewhat from the
-maintenance work in CMU CL. Many but not all bug fixes and
+maintenance work in CMUCL. Many but not all bug fixes and
 improvements have been shared between the two projects, and sometimes
 the two projects disagree about what would be an improvement.
 
-Most extensions supported by CMU CL have been unbundled from SBCL,
+Most extensions supported by CMUCL have been unbundled from SBCL,
 including Motif support, the Hemlock editor, search paths, the WIRE
 protocol, various user-level macros and functions (\fIe.g.\fR
 \f(CRLETF\fR, \f(CRITERATE\fR, \f(CRMEMQ\fR, \f(CRREQUIRED\-ARGUMENT\fR),
 and many others.
 
 (Why doesn't SBCL support more extensions natively? Why drop all those
-nice extensions from CMU CL when the code already exists? This is a
+nice extensions from CMUCL when the code already exists? This is a
 frequently asked question on the mailing list. There are two principal
 reasons. First, it's a design philosophy issue: arguably SBCL has done
 its job by supplying a stable FFI, and the right design decision is to
@@ -419,7 +419,7 @@ place to look for support.
 .SH AUTHORS
 
 Dozens of people have made substantial contributions to SBCL and its
-subsystems, and to the CMU CL system on which it was based, over the
+subsystems, and to the CMUCL system on which it was based, over the
 years. See the CREDITS file in the distribution for more information.
 
 .SH ENVIRONMENT

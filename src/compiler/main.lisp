@@ -3,7 +3,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -902,7 +902,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;;
 ;;; FIXME: This is probably an unnecessarily roundabout way to do
 ;;; things now that we process a single file in COMPILE-FILE (unlike
-;;; the old CMU CL code, which accepted multiple files). Also, the old
+;;; the old CMUCL code, which accepted multiple files). Also, the old
 ;;; comment said
 ;;;   When we open a new file, we also reset *PACKAGE* and policy.
 ;;;   This gives the effect of rebinding around each file.

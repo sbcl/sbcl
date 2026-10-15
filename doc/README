@@ -16,8 +16,8 @@ or
 in SBCL.
 
 The user manual is incomplete, and some of its chapters are just notes
-that "this is similar to chapter such-and-such of the CMU CL user
-manual". The old CMU CL documentation can still be useful both for
+that "this is similar to chapter such-and-such of the CMUCL user
+manual". The old CMUCL documentation can still be useful both for
 missing chapters of the user manual and for documentation of the
 internals of the system. It can be downloaded from
 <ftp://sbcl.sourceforge.net/pub/sbcl/cmucl-docs.tar.bz2>.

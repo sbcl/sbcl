@@ -521,7 +521,7 @@ You can invoke it from the shell command-line as
 or you can @code{(load "tools/install-asdf.lisp")} from your Lisp REPL.
 
 This script works on
-Allegro CL, Clozure CL, CMU CL, ECL, GCL, GNU CLISP, LispWorks, MKCL, SBCL, SCL, XCL.
+Allegro CL, Clozure CL, CMUCL, ECL, GCL, GNU CLISP, LispWorks, MKCL, SBCL, SCL, XCL.
 It doesn't work on ABCL, Corman CL, Genera, MCL, MOCL.
 Happily, ABCL is usually pretty up to date and shouldn't need that script.
 GCL requires a very recent version, and hasn't been tested much.

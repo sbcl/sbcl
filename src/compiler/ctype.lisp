@@ -5,7 +5,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -44,7 +44,7 @@
 ;;; to the FAILURE-P and WARNINGS-P return values of CL:COMPILE and
 ;;; CL:COMPILE-FILE.) However...
 ;;;
-;;; KLUDGE: Common Lisp is a dynamic language, even if CMU CL was not.
+;;; KLUDGE: Common Lisp is a dynamic language, even if CMUCL was not.
 ;;; As far as I can see, none of the "definite incompatibilities"
 ;;; detected in this file are actually definite under the ANSI spec.
 ;;; They would be incompatibilites if the use were within the same

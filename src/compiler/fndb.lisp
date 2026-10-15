@@ -5,7 +5,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -53,7 +53,7 @@
   ;; definitions.
   ;;
   ;; FIXME: Is it OK to fold this when the types have already been
-  ;; defined? Does the code inherited from CMU CL already do this?
+  ;; defined? Does the code inherited from CMUCL already do this?
   (unsafely-flushable))
 
 (defknown (null symbolp atom consp listp numberp integerp rationalp floatp

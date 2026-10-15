@@ -104,7 +104,7 @@
 (defun (setf clos-slots-ref) (new-value slots index)
   (setf (svref slots index) new-value))
 
-;;; Note on implementation under CMU CL >=17 and SBCL: STD-INSTANCE-P
+;;; Note on implementation under CMUCL >=17 and SBCL: STD-INSTANCE-P
 ;;; is only used to discriminate between functions (including FINs)
 ;;; and normal instances, so we can return true on structures also. A
 ;;; few uses of (OR STD-INSTANCE-P FSC-INSTANCE-P) are changed to

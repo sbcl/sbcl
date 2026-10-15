@@ -1,13 +1,13 @@
-;;;; target-only stuff from CMU CL's src/compiler/x86/insts.lisp
+;;;; target-only stuff from CMUCL's src/compiler/x86/insts.lisp
 ;;;;
-;;;; i.e. stuff which was in CMU CL's insts.lisp file, but which in
+;;;; i.e. stuff which was in CMUCL's insts.lisp file, but which in
 ;;;; the SBCL build process can't be compiled into code for the
 ;;;; cross-compilation host
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS

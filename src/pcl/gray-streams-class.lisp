@@ -1,5 +1,5 @@
 ;;;; class definitions for the SBCL Gray streams implementation, based on the
-;;;; CMU CL Gray streams implementation, based on the stream-definition-by-user
+;;;; CMUCL Gray streams implementation, based on the stream-definition-by-user
 ;;;; proposal by David N. Gray
 
 ;;;; This software is part of the SBCL system. See the README file for

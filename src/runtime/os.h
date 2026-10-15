@@ -6,7 +6,7 @@
  * This software is part of the SBCL system. See the README file for
  * more information.
  *
- * This software is derived from the CMU CL system, which was
+ * This software is derived from the CMUCL system, which was
  * written at Carnegie Mellon University and released into the
  * public domain. The software is in the public domain and is
  * provided with absolutely no warranty. See the COPYING and CREDITS
@@ -137,7 +137,7 @@ extern void* load_core_bytes_jit(int fd,
 /* This presumably flushes the instruction cache, if that can be done
  * explicitly. (It doesn't seem to be an issue for the i386 port,
  * which is all that exists for SBCL. It might be important for some
- * other architecture which CMU CL has been ported to, though. */
+ * other architecture which CMUCL has been ported to, though. */
 extern void os_flush_icache(os_vm_address_t addr, os_vm_size_t len);
 
 /* This sets access rights for an area of memory, e.g.

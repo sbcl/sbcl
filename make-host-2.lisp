@@ -184,7 +184,7 @@ Sample output
 (load "tests/type.after-xc.lisp")
 
 ;;; If you're experimenting with the system under a cross-compilation
-;;; host which supports CMU-CL-style SAVE-LISP, this can be a good
+;;; host which supports CMUCL-style SAVE-LISP, this can be a good
 ;;; time to run it. The resulting core isn't used in the normal build,
 ;;; but can be handy for experimenting with the system. (See slam.sh
 ;;; for an example.)

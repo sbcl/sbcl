@@ -1421,7 +1421,7 @@ bootstrapping.
 (defvar *emf-call-trace* nil)
 (defvar *emf-call-trace-index* 0)
 
-;;; This function was in the CMU CL version of PCL (ca Debian 2.4.8)
+;;; This function was in the CMUCL version of PCL (ca Debian 2.4.8)
 ;;; without explanation. It appears to be intended for debugging, so
 ;;; it might be useful someday, so I haven't deleted it.
 ;;; But it isn't documented and isn't used for anything now, so

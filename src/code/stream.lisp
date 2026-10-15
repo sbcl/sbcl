@@ -3,7 +3,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -587,9 +587,9 @@
 ;;; Read NUMBYTES bytes into BUFFER beginning at START, and return the
 ;;; number of bytes read.
 ;;;
-;;; Note: CMU CL's version of this had a special interpretation of
+;;; Note: CMUCL's version of this had a special interpretation of
 ;;; EOF-ERROR-P which SBCL does not have. (In the EOF-ERROR-P=NIL
-;;; case, CMU CL's version would return as soon as any data became
+;;; case, CMUCL's version would return as soon as any data became
 ;;; available.) This could be useful behavior for things like pipes in
 ;;; some cases, but it wasn't being used in SBCL, so it was dropped.
 ;;; If we ever need it, it could be added later as a new variant N-BIN

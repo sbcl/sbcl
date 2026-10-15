@@ -5,7 +5,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -17,7 +17,7 @@
   "The source file types which LOAD looks for by default.")
 
 (defvar *load-verbose* nil
-  ;; Note that CMU CL's default for this was T, and ANSI says it's
+  ;; Note that CMUCL's default for this was T, and ANSI says it's
   ;; implementation-dependent. We choose NIL on the theory that it's
   ;; a nicer default behavior for Unix programs.
   "the default for the :VERBOSE argument to LOAD")
@@ -245,7 +245,7 @@
                    (*package* (sane-package))
                    ;; KLUDGE: I can't find in the ANSI spec where it says
                    ;; that DECLAIM/PROCLAIM of optimization policy should
-                   ;; have file scope. CMU CL did this, and it seems
+                   ;; have file scope. CMUCL did this, and it seems
                    ;; reasonable, but it might not be right; after all,
                    ;; things like (PROCLAIM '(TYPE ..)) don't have file
                    ;; scope, and I can't find anything under PROCLAIM or

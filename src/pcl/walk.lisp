@@ -77,7 +77,7 @@
 ;;; ENVIRONMENT-MACRO, which are used to access the bindings of
 ;;; existing environments
 
-;;; In SBCL, as in CMU CL before it, the environment is represented
+;;; In SBCL, as in CMUCL before it, the environment is represented
 ;;; with a structure that holds alists for the functional things,
 ;;; variables, blocks, etc. Except for SYMBOL-MACROLET, only the
 ;;; SB-C::LEXENV-FUNS slot is relevant. It holds: Alist (Name . What),

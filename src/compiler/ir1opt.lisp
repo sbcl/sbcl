@@ -8,7 +8,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -620,7 +620,7 @@
          ;; KLUDGE: We leave the NODE-OPTIMIZE flag set going into
          ;; IR1-OPTIMIZE-RETURN, since IR1-OPTIMIZE-RETURN wants to
          ;; clear the flag itself. -- WHN 2002-02-02, quoting original
-         ;; CMU CL comments
+         ;; CMUCL comments
          (setf (node-reoptimize node) t)
          (ir1-optimize-return node))
         (mv-combination

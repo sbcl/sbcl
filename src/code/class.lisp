@@ -5,7 +5,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -379,7 +379,7 @@ between the ~A definition and the ~A definition"
       ;; should know, I did it.) -- WHN 19990927
       (aver (not (undefined-classoid-p classoid)))
 
-      ;; This assertion dates from classic CMU CL. The rationale is
+      ;; This assertion dates from classic CMUCL. The rationale is
       ;; probably that calling REGISTER-LAYOUT more than once for the
       ;; same LAYOUT is almost certainly a programmer error.
       (aver (not (eq classoid-layout layout)))

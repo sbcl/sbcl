@@ -3,7 +3,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -13,7 +13,7 @@
 
 ;;; Limitation: no list might have more than INDEX conses.
 
-;;;; KLUDGE: comment from CMU CL, what does it mean?
+;;;; KLUDGE: comment from CMUCL, what does it mean?
 ;;;;   NSUBLIS, things at the beginning broken.
 ;;;; -- WHN 20000127
 

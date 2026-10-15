@@ -4,7 +4,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -576,7 +576,7 @@
 ;;; the flow graph. Most of the passes in the compiler operate on
 ;;; COMPONENTs rather than on the entire flow graph.
 ;;;
-;;; According to the CMU CL internals/front.tex, the reason for
+;;; According to the CMUCL internals/front.tex, the reason for
 ;;; separating compilation into COMPONENTs is
 ;;;   to increase the efficiency of large block compilations. In
 ;;;   addition to improving locality of reference and reducing the
@@ -1225,7 +1225,7 @@
 ;;;
 ;;; FIXME: I (WHN) don't understand this one well enough to give a good
 ;;; definition or even a good function name, it's just a literal copy
-;;; of a CMU CL idiom. Does anyone have a better name or explanation?
+;;; of a CMUCL idiom. Does anyone have a better name or explanation?
 (defmacro functional-somewhat-letlike-p (functional)
   `(functional-kind-eq ,functional let mv-let assignment))
 
@@ -1236,8 +1236,8 @@
   ;; DEFUN FOO and FLET FOO even though they have the same source name.
   (or (functional-%debug-name functional)
       ;; Note that this will cause an error if the function is
-      ;; anonymous. In SBCL (as opposed to CMU CL) we make all
-      ;; FUNCTIONALs have debug names. The CMU CL code didn't bother
+      ;; anonymous. In SBCL (as opposed to CMUCL) we make all
+      ;; FUNCTIONALs have debug names. The CMUCL code didn't bother
       ;; in many FUNCTIONALs, especially those which were likely to be
       ;; optimized away before the user saw them. However, getting
       ;; that right requires a global understanding of the code,

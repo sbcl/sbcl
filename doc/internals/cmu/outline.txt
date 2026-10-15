@@ -25,7 +25,7 @@ debugger.tex
 Needs much work.  Merge much info from debug-info and debug-int.  Duplicating a
 fair amount of stuff in the source may make sense where, since this is a part
 of the system that is generally interesting.  And also, a part that people
-building on CMU CL might want to understand.
+building on CMUCL might want to understand.
 
 glossary.tex
 Finish, integrate w/ main text?

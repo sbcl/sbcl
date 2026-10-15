@@ -9,7 +9,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -152,7 +152,7 @@
 ;;; the condition of COMPILE-FILE being unable to READ from the
 ;;; source file
 ;;;
-;;; (The old CMU CL code did try to recover from this condition, but
+;;; (The old CMUCL code did try to recover from this condition, but
 ;;; the code for doing that was messy and didn't always work right.
 ;;; Since in Common Lisp the simple act of reading and compiling code
 ;;; (even without ever loading the compiled result) can have side

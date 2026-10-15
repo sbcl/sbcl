@@ -8,7 +8,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -125,16 +125,16 @@
   ;; UNION-TYPE or INTERSECTION-TYPE object. They return NIL on
   ;; failure, or a CTYPE for success.
   ;;
-  ;; Note: These methods are similar to CMU CL's SIMPLE-UNION,
+  ;; Note: These methods are similar to CMUCL's SIMPLE-UNION,
   ;; COMPLEX-UNION, SIMPLE-INTERSECTION, and COMPLEX-UNION methods.
   ;; They were reworked in SBCL because SBCL has INTERSECTION-TYPE
-  ;; objects (where CMU CL just punted to HAIRY-TYPE) and because SBCL
+  ;; objects (where CMUCL just punted to HAIRY-TYPE) and because SBCL
   ;; wants to simplify unions and intersections by considering all
-  ;; possible pairwise simplifications (where the CMU CL code only
+  ;; possible pairwise simplifications (where the CMUCL code only
   ;; considered simplifications between types which happened to appear
   ;; next to each other the argument sequence).
   ;;
-  ;; Differences in detail from old CMU CL methods:
+  ;; Differences in detail from old CMUCL methods:
   ;;   * SBCL's methods are more parallel between union and
   ;;     intersection forms. Each returns one values, (OR NULL CTYPE).
   ;;   * SBCL doesn't use type methods to deal with unions or

@@ -11,7 +11,7 @@
 ;;;; supported all the environments implied by the reader conditionals
 ;;;; in the source code (e.g. #+CLOE-RUNTIME) before that
 ;;;; modification, it sure doesn't now. It might perhaps, by blind
-;;;; luck, be appropriate for some other CMU-CL-derived system, but
+;;;; luck, be appropriate for some other CMUCL-derived system, but
 ;;;; really it only attempts to be appropriate for SBCL.
 
 ;;;; This software is derived from software originally released by the

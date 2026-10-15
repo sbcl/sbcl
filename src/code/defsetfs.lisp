@@ -6,7 +6,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -253,7 +253,7 @@
     (values all-dummies all-vals newvals
             `(values ,@(nreverse setters)) `(values ,@(nreverse getters)))))
 
-;;; CMU CL had a comment here that:
+;;; CMUCL had a comment here that:
 ;;;   Evil hack invented by the gnomes of Vassar Street (though not as evil as
 ;;;   it used to be.)  The function arg must be constant, and is converted to
 ;;;   an APPLY of the SETF function, which ought to exist.

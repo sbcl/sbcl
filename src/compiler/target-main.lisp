@@ -1,11 +1,11 @@
-;;;; functions from classic CMU CL src/compiler/main.lisp which are
+;;;; functions from classic CMUCL src/compiler/main.lisp which are
 ;;;; needed only (and which may make sense only) on the
 ;;;; cross-compilation target, not the cross-compilation host
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS

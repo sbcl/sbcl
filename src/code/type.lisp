@@ -7,7 +7,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -193,11 +193,11 @@
         ((fun-designator-type-p type1)
          (values nil t))
         (t
-         ;; ordinary case expected by old CMU CL code, where the taxonomy
+         ;; ordinary case expected by old CMUCL code, where the taxonomy
          ;; of TYPE2's representation accurately reflects the taxonomy of
          ;; the underlying set
          (values
-          ;; FIXME: This old CMU CL code probably deserves a comment
+          ;; FIXME: This old CMUCL code probably deserves a comment
           ;; explaining to us mere mortals how it works...
           (and (sb-xc:typep type2 'classoid)
                (dolist (x info nil)
@@ -1462,7 +1462,7 @@
 ;;; the type method dispatch case of TYPE-INTERSECTION2
 (defun %type-intersection2 (type1 type2)
   ;; We want to give both argument orders a chance at
-  ;; COMPLEX-INTERSECTION2. Without that, the old CMU CL type
+  ;; COMPLEX-INTERSECTION2. Without that, the old CMUCL type
   ;; methods could give noncommutative results, e.g.
   ;;   (TYPE-INTERSECTION2 *EMPTY-TYPE* SOME-HAIRY-TYPE)
   ;;     => NIL, NIL
@@ -2990,7 +2990,7 @@ expansion happened."
 
 (!def-bounded-type rational rational nil)
 
-;;; Unlike CMU CL, we represent the types FLOAT and REAL as
+;;; Unlike CMUCL, we represent the types FLOAT and REAL as
 ;;; UNION-TYPEs of more primitive types, in order to make
 ;;; type representation more unique, avoiding problems in the
 ;;; simplification of things like
@@ -3004,7 +3004,7 @@ expansion happened."
 ;;; the first argument can't be seen to be a subtype of any of the
 ;;; terms in the second argument.
 ;;;
-;;; The old CMU CL way was:
+;;; The old CMUCL way was:
 ;;;   (!def-bounded-type float float nil)
 ;;;   (!def-bounded-type real nil nil)
 ;;;
@@ -4285,7 +4285,7 @@ expansion happened."
 
 ;;;; intersection types
 ;;;;
-;;;; Until version 0.6.10.6, SBCL followed the original CMU CL approach
+;;;; Until version 0.6.10.6, SBCL followed the original CMUCL approach
 ;;;; of punting on all AND types, not just the unreasonably complicated
 ;;;; ones. The change was motivated by trying to get the KEYWORD type
 ;;;; to behave sensibly:
@@ -4298,7 +4298,7 @@ expansion happened."
 ;;;; parallel reasons, (SUBTYPEP 'RATIO 'NUMBER)=>NIL,NIL. That's
 ;;;; not so good..)
 ;;;;
-;;;; We still follow the example of CMU CL to some extent, by punting
+;;;; We still follow the example of CMUCL to some extent, by punting
 ;;;; (to the opaque HAIRY-TYPE) on sufficiently complicated types
 ;;;; involving AND.
 

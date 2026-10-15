@@ -5,7 +5,7 @@ set -e
 # generated files but other things (e.g. customization files)
 # which shouldn't be in the distribution
 
-# It's not unheard of to copy the old CMU CL docs into their
+# It's not unheard of to copy the old CMUCL docs into their
 # traditional sbcl-0.6.x place. If so, it shouldn't end up in
 # the distribution.
 rm -rf doc/cmucl

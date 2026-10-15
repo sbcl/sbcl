@@ -4,7 +4,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -1146,7 +1146,7 @@ unless :NAMED is also specified.")))
       (let ((included-classoid (find-classoid included-name nil)))
         (when included-classoid
           ;; It's not particularly well-defined to :INCLUDE any of the
-          ;; CMU CL INSTANCE weirdosities like CONDITION or
+          ;; CMUCL INSTANCE weirdosities like CONDITION or
           ;; GENERIC-FUNCTION, and it's certainly not ANSI-compliant.
           (let* ((included-layout (classoid-layout included-classoid))
                  (included-dd (layout-dd included-layout)))
@@ -1634,7 +1634,7 @@ or they must be declared locally notinline at each call site.~@:>"
                           instances and allowing new accessors to use old ~
                           instances.~@:>"
                          name))
-       ;; classic CMU CL warning: "Any old ~S instances will be in a bad way.
+       ;; classic CMUCL warning: "Any old ~S instances will be in a bad way.
        ;; I hope you know what you're doing..."
        (register-layout new-layout
                         :invalidate nil
@@ -1873,7 +1873,7 @@ or they must be declared locally notinline at each call site.~@:>"
         (setf (layout-info old-layout) info)
         (values classoid old-layout nil))
        (;; This clause corresponds to an assertion in REDEFINE-LAYOUT-WARNING
-        ;; of classic CMU CL. I moved it out to here because it was only
+        ;; of classic CMUCL. I moved it out to here because it was only
         ;; exercised in this code path anyway. -- WHN 19990510
         (not (eq (layout-classoid new-layout) (layout-classoid old-layout)))
         (error "shouldn't happen: weird state of OLD-LAYOUT?"))
@@ -2206,11 +2206,11 @@ or they must be declared locally notinline at each call site.~@:>"
 
 ;;;; Instances with ALTERNATE-METACLASS
 ;;;;
-;;;; The CMU CL support for structures with ALTERNATE-METACLASS was a
+;;;; The CMUCL support for structures with ALTERNATE-METACLASS was a
 ;;;; fairly general extension embedded in the main DEFSTRUCT code, and
 ;;;; the result was an fairly impressive mess as ALTERNATE-METACLASS
 ;;;; extension mixed with ANSI CL generality (e.g. :TYPE and :INCLUDE)
-;;;; and CMU CL implementation hairiness (esp. raw slots). This SBCL
+;;;; and CMUCL implementation hairiness (esp. raw slots). This SBCL
 ;;;; version is much less ambitious, noticing that ALTERNATE-METACLASS
 ;;;; is only used to implement CONDITION, STANDARD-INSTANCE, and
 ;;;; GENERIC-FUNCTION, and defining a simple specialized

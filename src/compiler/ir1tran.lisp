@@ -4,7 +4,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -80,7 +80,7 @@
 ;;; if they turn out to be unreachable.
 ;;;
 ;;; FIXME: It's confusing having one variable named *CURRENT-COMPONENT*
-;;; and another named *COMPONENT-BEING-COMPILED*. (In CMU CL they
+;;; and another named *COMPONENT-BEING-COMPILED*. (In CMUCL they
 ;;; were called *CURRENT-COMPONENT* and *COMPILE-COMPONENT* respectively,
 ;;; which was also confusing.)
 (declaim (type (or component null) *current-component*))
@@ -106,7 +106,7 @@
   "Should the compiler assume that function types will never change,
   so that it can use type information inferred from current definitions
   to optimize code which uses those definitions? Setting this true
-  gives non-ANSI, early-CMU-CL behavior. It can be useful for improving
+  gives non-ANSI, early-CMUCL behavior. It can be useful for improving
   the efficiency of stable code.")
 
 ;;;; namespace management utilities

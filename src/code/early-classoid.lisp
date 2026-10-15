@@ -5,7 +5,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -250,7 +250,7 @@
   ;;      comparing deepness; it is generally useful to do a bare numeric
   ;;      comparison of these depthoid values, and we hardly ever need to
   ;;      test whether the values are negative or not.
-  ;;  (2) This was called INHERITANCE-DEPTH in classic CMU CL. It was
+  ;;  (2) This was called INHERITANCE-DEPTH in classic CMUCL. It was
   ;;      renamed because some of us find it confusing to call something
   ;;      a depth when it isn't quite.
   #-64-bit (depthoid -1 :type layout-depthoid)

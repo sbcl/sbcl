@@ -5,7 +5,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -9509,9 +9509,9 @@
              (give-up-ir1-transform))))))
 
 (define-source-transform sb-impl::sort-vector (vector start end predicate key)
-  ;; Like CMU CL, we use HEAPSORT. However, other than that, this code
-  ;; isn't really related to the CMU CL code, since instead of trying
-  ;; to generalize the CMU CL code to allow START and END values, this
+  ;; Like CMUCL, we use HEAPSORT. However, other than that, this code
+  ;; isn't really related to the CMUCL code, since instead of trying
+  ;; to generalize the CMUCL code to allow START and END values, this
   ;; code has been written from scratch following Chapter 7 of
   ;; _Introduction to Algorithms_ by Corman, Rivest, and Shamir.
   `(macrolet ((%index (x) `(truly-the index ,x))

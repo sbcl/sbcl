@@ -1,7 +1,7 @@
 ;;;; code to detect whether a package has changed
 ;;;;
 ;;;; This is really old code which was most useful when first
-;;;; bootstrapping SBCL when only CMU CL was available as an XC host.
+;;;; bootstrapping SBCL when only CMUCL was available as an XC host.
 ;;;; Its main purpose was to check that legacy code like DEFMACRO
 ;;;; DOLIST and DEFUN IR1-OPTIMIZE-UNTIL-DONE was all correctly
 ;;;; converted from code which mutated the XC host into code which
@@ -14,7 +14,7 @@
 ;;;; modifying the XC host's private packages. However, it's still
 ;;;; conceivable that something affecting the XC host's CL package
 ;;;; (maybe DEFMACRO DOLIST?) could be written in such a way that it
-;;;; would silently compile under SBCL, CMU CL, and even OpenMCL, and
+;;;; would silently compile under SBCL, CMUCL, and even OpenMCL, and
 ;;;; still be fundamentally wrong. Since it'd be good to prevent such
 ;;;; modifications of the XC host's CL package, this code is still
 ;;;; retained despite being a little strange.
@@ -22,7 +22,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -118,7 +118,7 @@
                       *compile-file-pathname*
                       *load-truename*
                       *load-pathname*
-                      ;; These change because CMU CL uses them as internal
+                      ;; These change because CMUCL uses them as internal
                       ;; variables:
                       ,@'
                       #-cmu nil

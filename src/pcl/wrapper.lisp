@@ -47,7 +47,7 @@
                     :bitmap bitmap
                     :invalid nil)))))
 
-;;; In SBCL, as in CMU CL, the layouts (a.k.a wrappers) for built-in
+;;; In SBCL, as in CMUCL, the layouts (a.k.a wrappers) for built-in
 ;;; and structure classes already exist when PCL is initialized, so we
 ;;; don't necessarily always make a wrapper. Also, we help maintain
 ;;; the mapping between CL:CLASS and SB-KERNEL:CLASSOID objects.

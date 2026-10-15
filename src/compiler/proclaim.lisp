@@ -1,12 +1,12 @@
 ;;;; This file contains load-time support for declaration processing.
-;;;; In CMU CL it was split off from the compiler so that the compiler
+;;;; In CMUCL it was split off from the compiler so that the compiler
 ;;;; doesn't have to be in the cold load, but in SBCL the compiler is
 ;;;; in the cold load again, so this might not be valuable.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS

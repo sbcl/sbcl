@@ -4,7 +4,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -1524,10 +1524,10 @@
 (defun block-home-lambda-or-null (block)
   #-sb-xc-host (declare (inline node-home-lambda))
   (if (node-p (block-last block))
-      ;; This is the old CMU CL way of doing it.
+      ;; This is the old CMUCL way of doing it.
       (node-home-lambda (block-last block))
       ;; Now that SBCL uses this operation more aggressively than CMU
-      ;; CL did, the old CMU CL way of doing it can fail in two ways.
+      ;; CL did, the old CMUCL way of doing it can fail in two ways.
       ;;   1. It can fail in a few cases even when a meaningful home
       ;;      lambda exists, e.g. in IR1-CONVERT of one of the legs of
       ;;      an IF.
@@ -1782,13 +1782,13 @@
 (declaim (ftype (sfunction (ctran) (or clambda null))
                 ctran-home-lambda-or-null))
 (defun ctran-home-lambda-or-null (ctran)
-  ;; KLUDGE: This function is a post-CMU-CL hack by WHN, and this
+  ;; KLUDGE: This function is a post-CMUCL hack by WHN, and this
   ;; implementation might not be quite right, or might be uglier than
   ;; necessary. It appears that the original Python never found a need
   ;; to do this operation. The obvious things based on
   ;; NODE-HOME-LAMBDA of CTRAN-USE usually work; then if that fails,
   ;; BLOCK-HOME-LAMBDA of CTRAN-BLOCK works, given that we
-  ;; generalize it enough to grovel harder when the simple CMU CL
+  ;; generalize it enough to grovel harder when the simple CMUCL
   ;; approach fails, and furthermore realize that in some exceptional
   ;; cases it might return NIL. -- WHN 2001-12-04
   (cond ((ctran-use ctran)

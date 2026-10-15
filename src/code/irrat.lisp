@@ -4,7 +4,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -758,7 +758,7 @@
 
 ;;;; not-OLD-SPECFUN stuff
 ;;;;
-;;;; (This was conditional on #-OLD-SPECFUN in the CMU CL sources,
+;;;; (This was conditional on #-OLD-SPECFUN in the CMUCL sources,
 ;;;; but OLD-SPECFUN was mentioned nowhere else, so it seems to be
 ;;;; the standard special function system.)
 ;;;;
@@ -805,7 +805,7 @@
 ;;;;   State of the Art in Numerical Analysis", pp. 165-211, Clarendon
 ;;;;   Press, 1987
 ;;;;
-;;;; The original CMU CL code requested:
+;;;; The original CMUCL code requested:
 ;;;;   Please send any bug reports, comments, or improvements to
 ;;;;   Raymond Toy at <email address deleted during 2002 spam avalanche>.
 
@@ -827,7 +827,7 @@
   (declare (double-float x))
   (* x x))
 
-;;; original CMU CL comment, apparently re. LOGB and
+;;; original CMUCL comment, apparently re. LOGB and
 ;;; perhaps CSSQS:
 ;;;   If you have these functions in libm, perhaps they should be used
 ;;;   instead of these Lisp versions. These versions are probably good

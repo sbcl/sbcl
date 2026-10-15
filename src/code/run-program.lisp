@@ -4,7 +4,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -14,7 +14,7 @@
 
 ;;;; hacking the Unix environment
 ;;;;
-;;;; In the original CMU CL code that LOAD-FOREIGN is derived from, the
+;;;; In the original CMUCL code that LOAD-FOREIGN is derived from, the
 ;;;; Unix environment (as in "man environ") was represented as an
 ;;;; alist from keywords to strings, so that e.g. the Unix environment
 ;;;;   "SHELL=/bin/bash" "HOME=/root" "PAGER=less"
@@ -34,7 +34,7 @@
 ;;;; to the C-level representation. I.e., in the example above,
 ;;;; the SBCL representation is
 ;;;;   '("SHELL=/bin/bash" "HOME=/root" "PAGER=less")
-;;;; CMU CL's implementation is currently supported to help with porting.
+;;;; CMUCL's implementation is currently supported to help with porting.
 ;;;;
 ;;;; It's not obvious that this code belongs here (instead of e.g. in
 ;;;; unix.lisp), since it has only a weak logical connection with
@@ -91,7 +91,7 @@
      (alien-funcall (extern-alien "GetEnvironmentStrings"
                                   (function system-area-pointer))))))
 
-;;; Convert from a CMU CL representation of a Unix environment to a
+;;; Convert from a CMUCL representation of a Unix environment to a
 ;;; SBCL representation.
 (defun unix-environment-sbcl-from-cmucl (cmucl)
   (mapcar
@@ -753,8 +753,8 @@ Users Manual for details about the PROCESS structure.
 Notes about Unix environments (as in the :ENVIRONMENT and :ENV args):
 
 - The SBCL implementation of RUN-PROGRAM, like Perl and many other
-  programs, but unlike the original CMU CL implementation, copies the
-  Unix environment by default.
+  programs, but unlike the original \\CMUCL implementation, copies
+  the Unix environment by default.
 
 - Running Unix programs from a setuid process, or in any other
   situation where the Unix environment is under the control of someone
@@ -774,7 +774,7 @@ The &KEY arguments have the following meanings:
 - :ENV
 
     An old, lossy representation of the new Unix environment, for
-    compatibility with CMU CL. If given, :ENVIRONMENT defaults to
+    compatibility with \\CMUCL. If given, :ENVIRONMENT defaults to
     this (converted to the new format). It is an error to specify both
     :ENV and :ENVIRONMENT.
 

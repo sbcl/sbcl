@@ -1,11 +1,11 @@
 ;;;; This file contains Unix support that SBCL needs to implement
 ;;;; itself. It's derived from Peter Van Eynde's unix-glibc2.lisp for
-;;;; CMU CL, which was derived from CMU CL unix.lisp 1.56. But those
+;;;; CMUCL, which was derived from CMUCL unix.lisp 1.56. But those
 ;;;; files aspired to be complete Unix interfaces exported to the end
 ;;;; user, while this file aims to be as simple as possible and is not
 ;;;; intended for the end user.
 ;;;;
-;;;; FIXME: The old CMU CL unix.lisp code was implemented as hand
+;;;; FIXME: The old CMUCL unix.lisp code was implemented as hand
 ;;;; transcriptions from Unix headers into Lisp. It appears that this was as
 ;;;; unmaintainable in practice as you'd expect in theory, so I really really
 ;;;; don't want to do that. It'd be good to implement the various system calls
@@ -17,7 +17,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -977,7 +977,7 @@ avoiding `atexit(3)` hooks, etc. Otherwise `exit(2)` is called."
 
 
 ;;; FIXME: Many Unix error code definitions were deleted from the old
-;;; CMU CL source code here, but not in the exports of SB-UNIX. I
+;;; CMUCL source code here, but not in the exports of SB-UNIX. I
 ;;; (WHN) hope that someday I'll figure out an automatic way to detect
 ;;; unused symbols in package exports, but if I don't, there are
 ;;; enough of them all in one place here that they should probably be

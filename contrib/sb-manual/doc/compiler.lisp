@@ -354,7 +354,7 @@
   (@implementation-limitations section))
 
 ;; FIXME: See also sections \ref{advanced-type-stuff} and
-;; \ref{type-inference}, once we snarf them from the CMU CL manual.
+;; \ref{type-inference}, once we snarf them from the CMUCL manual.
 
 (defsection @type-declaration-checking (:title "Type Declaration Checking")
   "The SBCL compiler treats type declarations differently from most other
@@ -534,7 +534,7 @@
   a non-standard representation to be used for the local `POS`
   variable in the loop body."
   ;; FIXME: <xref>ND-variables (non-descriptor, i.e. unboxed), once we
-  ;; crib the text from the CMU CL manual.
+  ;; crib the text from the CMUCL manual.
   )
 
 (defsection @implementation-limitations (:title "Implementation Limitations")

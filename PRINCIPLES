@@ -148,13 +148,13 @@ maintenance of SBCL:
       continuable errors, preferring functions which have simple behavior
       with no surprises (even surprises which are arguably pleasant).
 
-CMU CL maintenance has been conservative in ways that I would prefer to 
+CMUCL maintenance has been conservative in ways that I would prefer to 
 be flexible, and flexible in ways that I'd prefer to be conservative.
-CMU CL maintainers have been conservative about keeping old code and
+CMUCL maintainers have been conservative about keeping old code and
 maintaining the old structure, and flexible about allowing a bunch of 
 additional stuff to be tacked onto the old structure.
 
-There are some good things about the way that CMU CL has been
+There are some good things about the way that CMUCL has been
 maintained that I nonetheless propose to jettison. In particular,
 binary compatibility between releases. This is a very handy feature,
 but it's a pain to maintain. At least for a while, I intend to just
@@ -169,5 +169,5 @@ Aiming for that kind of stability would impair our ability to make
 changes like
   * cleaning up DEFUN and DEFMACRO to use EVAL-WHEN instead of IR1 magic;
   * reducing the separation between PCL classes and COMMON-LISP classes;
-  * fixing bad FOPs (e.g. the CMU CL fops which interact with the *PACKAGE*
+  * fixing bad FOPs (e.g. the CMUCL fops which interact with the *PACKAGE*
     variable)

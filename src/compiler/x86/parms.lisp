@@ -5,7 +5,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -96,9 +96,9 @@
 
 ;;; where to put the different spaces
 ;;;
-;;; Note: Mostly these values are magic, inherited from CMU CL
+;;; Note: Mostly these values are magic, inherited from CMUCL
 ;;; without any documentation. However, there were a few explanatory
-;;; comments in the CMU CL sources:
+;;; comments in the CMUCL sources:
 ;;;   * On Linux,
 ;;;     ** The space 0x08000000-0x10000000 is "C program and memory allocation".
 ;;;     ** The space 0x40000000-0x48000000 is reserved for shared libs.
@@ -106,7 +106,7 @@
 ;;;   * On FreeBSD,
 ;;;     ** The space 0x0E000000-0x10000000 is "Foreign segment".
 ;;;     ** The space 0x20000000-0x30000000 is reserved for shared libs.
-;;; And there have been some changes since the fork from CMU CL:
+;;; And there have been some changes since the fork from CMUCL:
 ;;;   * The OpenBSD port is new since the fork. We started with
 ;;;     the FreeBSD address map, which actually worked until the
 ;;;     Alpha port patches, for reasons which in retrospect are rather

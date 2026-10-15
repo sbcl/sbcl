@@ -26,7 +26,7 @@
 
 (defsection @introduction-to-the-foreign-function-interface
     (:title "Introduction to the Foreign Function Interface")
-  ;; AKA Introduction to Aliens in the CMU CL manual
+  ;; AKA Introduction to Aliens in the CMUCL manual
   "Because of Lisp's emphasis on dynamic memory allocation and garbage
   collection, Lisp implementations use non-C-like memory
   representations for objects. This representation mismatch creates
@@ -444,7 +444,7 @@
   (alien-funcall-into function)
   (define-alien-routine macro))
 
-;; <!-- FIXME: This is a \"changebar\" section from the CMU CL manual.
+;; <!-- FIXME: This is a \"changebar\" section from the CMUCL manual.
 ;;      I (WHN 2002-07-14) am not very familiar with this content, so
 ;;      I'm not immediately prepared to try to update it for SBCL, and
 ;;      I'm not feeling masochistic enough to work to encourage this

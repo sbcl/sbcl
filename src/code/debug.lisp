@@ -3,7 +3,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -482,7 +482,7 @@ Other commands:
   (funcall function))
 
 ;;; This is the entry point into the breakpoint stepping mechanism,
-;;; which used to be the original STEP macro in CMU CL.
+;;; which used to be the original STEP macro in CMUCL.
 (defmacro step* (form)
   "STEP implements a debugging paradigm wherein the programmer is allowed
    to step through the evaluation of a form.  We use the debugger's stepping
@@ -1573,7 +1573,7 @@ SB-MANUAL:@RUNTIME-OPTIONS)."
 
 ;;;; DEBUG-LOOP
 
-;;; Note: This defaulted to T in CMU CL. The changed default in SBCL
+;;; Note: This defaulted to T in CMUCL. The changed default in SBCL
 ;;; was motivated by desire to play nicely with ILISP.
 (defvar *flush-debug-errors* nil
   "When set, avoid calling INVOKE-DEBUGGER recursively when errors occur while
@@ -1764,7 +1764,7 @@ forms that explicitly control this kind of evaluation.")
 ) ; EVAL-WHEN
 
 ;;; FIXME: This doesn't work. It would be real nice we could make it
-;;; work! Alas, it doesn't seem to work in CMU CL X86 either..
+;;; work! Alas, it doesn't seem to work in CMUCL X86 either..
 (defun var (name &optional (id 0 id-supplied))
   "Return a variable's value if possible. NAME is a simple-string or symbol.
    If it is a simple-string, it is an initial substring of the

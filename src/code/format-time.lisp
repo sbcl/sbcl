@@ -3,7 +3,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -40,19 +40,19 @@
       (and (stringp destination)
            (array-has-fill-pointer-p destination))))
 
-;;; CMU CL made the default style :SHORT here. I've changed that to :LONG, on
+;;; CMUCL made the default style :SHORT here. I've changed that to :LONG, on
 ;;; the theory that since the 8/7/1999 style is hard to decode unambiguously,
 ;;; you should have to ask for it explicitly. (I prefer YYYYMMDD myself, since
 ;;; it sorts properly.:-) -- WHN 19990831
 ;;;
-;;; FIXME: On the CMU CL mailing list 30 Jan 2000, Pierre Mai suggested
+;;; FIXME: On the CMUCL mailing list 30 Jan 2000, Pierre Mai suggested
 ;;;   OTOH it probably wouldn't be a major problem to change compile-file to
 ;;;   use for example :long, so that the output would be Month DD, YYYY, or
 ;;;   even better to extend format-universal-time with a flag to output ISO
 ;;;   8601 formats (like e.g. :iso-8601 and :iso-8601-short) and migrate
 ;;;   slowly towards ISO dates in the user code...
 ;;; The :ISO-8601 and :ISO-8601-SHORT options sound sensible to me. Maybe
-;;; someone will do them for CMU CL and we can steal them for SBCL.
+;;; someone will do them for CMUCL and we can steal them for SBCL.
 (defun format-universal-time (destination universal-time
                                           &key
                                           (timezone nil)

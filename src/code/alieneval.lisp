@@ -4,7 +4,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -222,7 +222,7 @@
       ,(let ((*new-auxiliary-types* nil))
          ,@body)))
 
-;;; CMU CL used COMPILER-LET to bind *AUXILIARY-TYPE-DEFINITIONS*, and
+;;; CMUCL used COMPILER-LET to bind *AUXILIARY-TYPE-DEFINITIONS*, and
 ;;; COMPILER-LET is no longer supported by ANSI or SBCL. Instead, we
 ;;; follow the suggestion in CLTL2 of using SYMBOL-MACROLET to achieve
 ;;; a similar effect.
@@ -1238,7 +1238,7 @@
 
 ;;;; the FUNCTION and VALUES alien types
 
-;;; not documented in CMU CL:-(
+;;; not documented in CMUCL:-(
 ;;;
 ;;; reverse engineering observations:
 ;;;   * seems to be set when translating return values

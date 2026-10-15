@@ -1,6 +1,6 @@
 ;;;; This file contains backend-specific data. The original intent, in
-;;;; CMU CL, was to allow compilation using different backends, as a
-;;;; way of mutating a running CMU CL into a hybrid system which could
+;;;; CMUCL, was to allow compilation using different backends, as a
+;;;; way of mutating a running CMUCL into a hybrid system which could
 ;;;; emit code for a different architecture. In SBCL, this is not
 ;;;; needed, since we have a cross-compiler which runs as an ordinary
 ;;;; Lisp program under SBCL or other Lisps. However, it still seems
@@ -13,7 +13,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS

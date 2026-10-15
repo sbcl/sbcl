@@ -9838,7 +9838,7 @@ changes in sbcl-0.7.9 relative to sbcl-0.7.8:
   * fixed bug: VALUES-LIST is no longer optimized away.
   * fixed bug 142: The FFI conversion of C string values to Lisp
     string values no longer conses excessively. (thanks to Nathan
-    Froyd porting Raymond Toy's fix to CMU CL)
+    Froyd porting Raymond Toy's fix to CMUCL)
   * began to systematize and improve MOP conformance in PCL (thanks to
     Nathan Froyd, Gerd Moellman and Pierre Mai):
     ** SLOT-DEFINITION-ALLOCATION now returns :CLASS, not the class
@@ -9994,12 +9994,12 @@ changes in sbcl-0.7.6 relative to sbcl-0.7.5:
   * bug fix: Internal error arguments for undefined functions are now
     computed correctly on the PPC/Linux platform.
   * bug fix: Bad &REST syntax is now checked correctly. (thanks to
-    Raymond Toy's patch for CMU CL)
+    Raymond Toy's patch for CMUCL)
   * Support for the Solaris 9 operating environment has been included
     (thanks to Daniel Merritt)
   * A very ugly but hopefully complete draft of the missing FFI chapter
     of the manual has been created by reformatting the corresponding
-    CMU CL manual chapter into (currently very ugly and incoherent)
+    CMUCL manual chapter into (currently very ugly and incoherent)
     DocBook and bringing it up to date for SBCL behavior. Thus, the
     manual is now essentially complete, at least by my extreme
     once-and-only-once standards, whereby it's acceptable to refer to
@@ -10070,7 +10070,7 @@ changes in sbcl-0.7.4 relative to sbcl-0.7.3:
 
 changes in sbcl-0.7.3 relative to sbcl-0.7.2:
   * ANSI's DEFINE-SYMBOL-MACRO is now supported. (thanks to Nathan
-    Froyd porting CMU CL code originally by Douglas Thomas Crosher)
+    Froyd porting CMUCL code originally by Douglas Thomas Crosher)
   * SBCL now runs on the PPC archtiecture under Linux. It actually did
     this as of 0.7.1.45, but was left out of the previous news section
     (thanks to Dan Barlow)
@@ -10116,7 +10116,7 @@ changes in sbcl-0.7.2 relative to sbcl-0.7.1:
   * incompatible change: The compiler is now less aggressive about
     tail call optimization, doing it only when (> SPACE DEBUG) or
     (> SPEED DEBUG). (This is an incompatible change because there are
-    programs which relied on the old CMU-CL-style behavior to optimize
+    programs which relied on the old CMUCL-style behavior to optimize
     away their unbounded recursion which will now die of stack overflow.)
   * minor incompatible change: The default BYTES-CONSED-BETWEEN-GCS
     for non-GENCGC systems has been increased to 20M (since that
@@ -10125,7 +10125,7 @@ changes in sbcl-0.7.2 relative to sbcl-0.7.1:
   * minor incompatible change: new larger values for *DEBUG-PRINT-LENGTH*
     and *DEBUG-PRINT-LEVEL*
   * SBCL runs on SPARC systems now. (thanks to Christophe Rhodes' port
-    of CMU CL's support for SPARC, and various endianness and other
+    of CMUCL's support for SPARC, and various endianness and other
     SBCL portability fixes due to Christophe Rhodes and Dan Barlow)
   * new syntactic sugar for the Unix command line: --load foo.bar is now
     an alternate notation for --eval '(load "foo.bar")'.
@@ -10260,7 +10260,7 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
      *** The CHAR-NAME of unprintable ASCII characters which, unlike
          e.g. #\Newline and #\Tab, don't have names specified in the
          ANSI Common Lisp standard, is now based on their ASCII symbolic
-         names (#\Nul, #\Soh, #\Stx, etc.) The old CMU-CL-style names
+         names (#\Nul, #\Soh, #\Stx, etc.) The old CMUCL-style names
          (#\Null, #\^a, #\^b, etc.) are still accepted by NAME-CHAR, but
          are no longer used for output.
   ** changes in internal implementation constants:
@@ -10349,10 +10349,10 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
                (print (aref possiblybigthings i) stream)))))
      should now truncate the logical block only at 50 lines, instead of
      often truncating it at 8 lines, as it did before.
-* The doc/cmucl/ directory, containing old CMU CL documentation
+* The doc/cmucl/ directory, containing old CMUCL documentation
   from the time of the fork, is no longer part of the base system.
   SourceForge has shut down its anonymous FTP service, and with it
-  my original plan for distributing the old CMU CL documentation
+  my original plan for distributing the old CMUCL documentation
   there. For now, if you need these files you can download an old
   SBCL source release and extract them from it.
 * The fasl file version number changed again, for dozens of reasons,
@@ -10360,14 +10360,14 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
 
 changes in sbcl-0.6.13 relative to sbcl-0.6.12:
 * a port to the Compaq/DEC Alpha CPU, thanks to Dan Barlow
-* Martin Atzmueller ported Tim Moore's marvellous CMU CL DISASSEMBLE
+* Martin Atzmueller ported Tim Moore's marvellous CMUCL DISASSEMBLE
   patch, so that DISASSEMBLE output is much nicer.
 * The code in the SB-PROFILE package now seems reasonably stable.
   I still haven't decided what the final interface should look like
   (I'd like PROFILE to interact cleanly with TRACE, since both
   facilities use function encapsulation) but if you have a need
   for profiling now, you can probably use it successfully with
-  the current CMU-CL-style interface.
+  the current CMUCL-style interface.
 * Pathnames and *DEFAULT-DIRECTORY-DEFAULTS* are much more
   ANSI-compliant, thanks to various fixes and tests from Dan Barlow.
   Also, at Dan Barlow's suggestion, TRUENAME on a dangling symbolic
@@ -10384,10 +10384,10 @@ changes in sbcl-0.6.13 relative to sbcl-0.6.12:
   NIL, i.e. ANSI behavior, i.e. the compiler now recognizes
   that currently-defined functions might be redefined later with
   different return types.
-* Hash tables can be printed readably, as inspired by CMU CL code
+* Hash tables can be printed readably, as inspired by CMUCL code
   of Eric Marsden and SBCL code of Martin Atzmueller.
 * better error handling in CLOS method combination, thanks to
-  Martin Atzmueller porting Pierre Mai's CMU CL patches
+  Martin Atzmueller porting Pierre Mai's CMUCL patches
 * more overflow fixes for >16Mbyte I/O buffers
 * A bug in READ has been fixed, so that now a single Ctrl-D
   character suffices to cause end-of-file on character streams.
@@ -10395,22 +10395,22 @@ changes in sbcl-0.6.13 relative to sbcl-0.6.12:
   line (not two) to exit SBCL.
 * fixed bug 26: ARRAY-DISPLACEMENT now returns (VALUES NIL 0) for
   undisplaced arrays.
-* fixed bug 107 (reported as a CMU CL bug by Erik Naggum on
+* fixed bug 107 (reported as a CMUCL bug by Erik Naggum on
   comp.lang.lisp 2001-06-11): (WRITE #*101 :RADIX T :BASE 36) now
   does the right thing.
 * The implementation of some type tests, especially for CONDITION
-  types, is now tidier and maybe faster, due to CMU CL code
+  types, is now tidier and maybe faster, due to CMUCL code
   originally by Douglas Crosher, ported by Martin Atzmueller.
 * Some math functions have been fixed, and there are new
   optimizers for deriving the types of COERCE and ARRAY-ELEMENT-TYPE,
-  thanks to Raymond Toy's work on CMU CL, ported by Martin Atzmueller.
+  thanks to Raymond Toy's work on CMUCL, ported by Martin Atzmueller.
 * (There are also some new optimizers in contrib/*-extras.lisp. Those
   aren't built into sbcl-0.6.13, but are a sneak preview of what's
   likely to be built into sbcl-0.7.0.)
 * A bug in COPY-READTABLE was fixed. (Joao Cachopo's patch to CMU
   CL, ported to SBCL by Martin Atzmueller)
 * DESCRIBE now gives more information in some cases. (Pierre Mai's
-  patch to CMU CL, ported to SBCL by Martin Atzmueller)
+  patch to CMUCL, ported to SBCL by Martin Atzmueller)
 * Martin Atzmueller and Bill Newman fixed some bugs in INSPECT.
 * There's a new slam.sh hack to shorten the edit/compile/debug
   cycle for low-level changes to SBCL itself, and a new
@@ -10425,7 +10425,7 @@ changes in sbcl-0.6.13 relative to sbcl-0.6.12:
   rather than the number consed since the first time the function
   was called. (The new definition parallels ANSI functions like
   CL:GET-INTERNAL-RUN-TIME.)
-* minor incompatible change: The old CMU-CL-style DIRECTORY options,
+* minor incompatible change: The old CMUCL-style DIRECTORY options,
   i.e. :ALL, :FOLLOW-LINKS, and :CHECK-FOR-SUBDIRS, are no longer
   supported. Now DIRECTORY always does the abstract Common-Lisp-y
   thing, i.e. :ALL T :FOLLOW-LINKS T :CHECK-FOR-SUBDIRS T.
@@ -10442,12 +10442,12 @@ changes in sbcl-0.6.12 relative to sbcl-0.6.11:
   its existing behavior was poorly specified, as well as incorrectly
   specified, and it looked like too much of a mess to straighten it
   out. I have enough on my hands trying to get ANSI stuff to work..
-* many patches ported from CMU CL by Martin Atzmueller, with
+* many patches ported from CMUCL by Martin Atzmueller, with
   half a dozen bug fixes in pretty-printing and the debugger, and
   half a dozen others elsewhere
 * fixed bug 13: Floating point infinities are now supported again.
   They might still be a little bit flaky, but thanks to bug reports
-  from Nathan Froyd and CMU CL patches from Raymond Toy they're not
+  from Nathan Froyd and CMUCL patches from Raymond Toy they're not
   as flaky as they were.
 * The --noprogrammer command line option is now supported. (Its
   behavior is slightly different in detail from what the old man
@@ -10460,18 +10460,18 @@ changes in sbcl-0.6.12 relative to sbcl-0.6.11:
   without consing!)
 * The compiler now detects type mismatches between DECLAIM FTYPE
   and DEFUN better, and implements CHECK-TYPE more correctly, and
-  SBCL builds under CMU CL again despite its non-ANSI EVAL-WHEN,
+  SBCL builds under CMUCL again despite its non-ANSI EVAL-WHEN,
   thanks to patches from Martin Atzmueller.
 * various fixes to make the cross-compiler more portable to
   ANSI-conforming-but-different cross-compilation hosts (notably
   Lispworks for Windows, following bug reports from Arthur Lemmens)
 * A bug in READ-SEQUENCE for CONCATENATED-STREAM, and a gross
   ANSI noncompliance in DEFMACRO &KEY argument parsing, have been
-  fixed thanks to Pierre Mai's CMU CL patches.
+  fixed thanks to Pierre Mai's CMUCL patches.
 * fixes to keep the system from overflowing internal counters when
   it tries to use i/o buffers larger than 16M bytes
 * fixed bug 45a: Various internal functions required to support
-  complex special functions have been merged from CMU CL sources.
+  complex special functions have been merged from CMUCL sources.
   (When I was first setting up SBCL, I misunderstood a compile-time
   conditional #-OLD-SPECFUN, and so accidentally deleted them.)
 * improved support for type intersection and union, fixing bug 12
@@ -10518,13 +10518,13 @@ changes in sbcl-0.6.11 relative to sbcl-0.6.10:
   patch from Martin Atzmueller.
 * The full LOAD-FOREIGN extension (not just the primitive
   LOAD-FOREIGN-1) now works, thanks to a patch from Martin Atzmueller.
-* The default behavior of RUN-PROGRAM has changed. Now, unlike CMU CL
+* The default behavior of RUN-PROGRAM has changed. Now, unlike CMUCL
   but like most other programs, it defaults to copying the Unix
   environment from the original process instead of starting the
   new process in an empty environment.
 * Extensions which manipulate the Unix environment now support
   an :ENVIRONMENT keyword option which doesn't smash case or
-  do other bad things. The CMU-CL-style :ENV option is retained
+  do other bad things. The CMUCL-style :ENV option is retained
   for porting convenience.
 * LOAD-FOREIGN (and LOAD-1-FOREIGN) now support logical pathnames,
   as per Daniel Barlow's suggestion and Martin Atzmueller's patch
@@ -10550,10 +10550,10 @@ changes in sbcl-0.6.10 relative to sbcl-0.6.9:
 * Bug #17 (differing COMPILE-FILE behavior between logical and
   physical pathnames) has been fixed, and some related misbehavior too,
   thanks to a patch from Martin Atzmueller.
-* Bug #30 (reader problems) is gone, thanks to a CMU CL patch
+* Bug #30 (reader problems) is gone, thanks to a CMUCL patch
   by Tim Moore, ported to SBCL by Martin Atzmueller.
 * Martin Atzmueller fixed several filesystem-related problems,
-  including bug #36, in part by porting CMU CL patches, which were
+  including bug #36, in part by porting CMUCL patches, which were
   written in part by Paul Werkowski.
 * More compiler warnings in src/runtime/ are gone, thanks to
   more patches from Martin Atzmueller.
@@ -10608,9 +10608,9 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
 * The system now recovers better from non-PACKAGE values of the *PACKAGE*
   variable.
 * The system now understands compound CONS types (e.g. (CONS FIXNUM T))
-  as required by ANSI. (thanks to Douglas Crosher's CMU CL patches, with
+  as required by ANSI. (thanks to Douglas Crosher's CMUCL patches, with
   some porting work by Martin Atzmueller)
-* Martin Atzmueller reviewed the CMU CL mailing lists and came back
+* Martin Atzmueller reviewed the CMUCL mailing lists and came back
   with a boatload of patches which he ported to SBCL. Now that those
   have been applied,
   ** The system tries to make sure that its low-priority messages
@@ -10652,7 +10652,7 @@ changes in sbcl-0.6.8 relative to sbcl-0.6.7:
 * The system is now under CVS at SourceForge (instead of the
   CVS repository on my home machine).
 * The new signal handling code has been tweaked to treat register
-  contents as (UNSIGNED-BYTE 32), as the old CMU CL code did,
+  contents as (UNSIGNED-BYTE 32), as the old CMUCL code did,
   instead of (SIGNED-BYTE 32), as the C header files have it. (Code
   downstream, e.g. in debug-int.lisp, has implicit dependencies
   on the unsignedness of integer representation of machine words,
@@ -10672,7 +10672,7 @@ changes in sbcl-0.6.8 relative to sbcl-0.6.7:
   O(M*N*N) time when any of the sequence arguments were LISTs.)
 * The QUIT :UNIX-CODE keyword argument has been renamed to
   QUIT :UNIX-STATUS. (The old name still works, but is deprecated.)
-* Raymond Wiker's patches to port RUN-PROGRAM from CMU CL to SBCL
+* Raymond Wiker's patches to port RUN-PROGRAM from CMUCL to SBCL
   have been added.
 * Raymond Wiker's patches to port dynamic loading from Linux to
   FreeBSD have been added.
@@ -10739,7 +10739,7 @@ changes in sbcl-0.6.7 relative to sbcl-0.6.6:
   instead of (VALUES T T).
 * By following the instructions that Dan Barlow posted to sbcl-devel
   on 2 July 2000, I was able to enable primitive dynamic object
-  file loading code for Linux. The full-blown CMU CL LOAD-FOREIGN
+  file loading code for Linux. The full-blown CMUCL LOAD-FOREIGN
   functionality is not implemented (since it calls ld to resolve
   library references automatically, requiring RUN-PROGRAM for its
   implementation), but a simpler SB-EXT:LOAD-1-FOREIGN (which doesn't
@@ -10793,7 +10793,7 @@ changes in sbcl-0.6.7 relative to sbcl-0.6.6:
   the source file target-features.lisp-expr has been replaced with the
   source file base-target-features.lisp-expr and the machine-generated
   file local-target-features.lisp-expr.
-* fixed a stupid quoting error in make.sh so that using CMU CL
+* fixed a stupid quoting error in make.sh so that using CMUCL
   "lisp -batch" as cross-compilation host works again
 
 changes in sbcl-0.6.6 relative to sbcl-0.6.5:
@@ -10874,18 +10874,18 @@ changes in sbcl-0.6.5 relative to sbcl-0.6.4:
   on your system, you can change this default behavior by setting the
   GNUMAKE environment variable.
 * Replace #+SB-DOC with #!+SB-DOC in seq.lisp so that the system
-  can build without error under CMU CL.
+  can build without error under CMUCL.
 
 changes in sbcl-0.6.4 relative to sbcl-0.6.3:
 
 * There is now a partial SBCL user manual (with some new text and some
-  text cribbed from the CMU CL manual).
+  text cribbed from the CMUCL manual).
 * The beginnings of a profiler have been added (starting with the
-  CMU CL profiler and simplifying and cleaning up). Eventually the
+  CMUCL profiler and simplifying and cleaning up). Eventually the
   main interface should be through the TRACE macro, but for now,
-  it's still accessed through vaguely CMU-CL-style functions and macros
+  it's still accessed through vaguely CMUCL-style functions and macros
   exported from the package SB-PROFILE.
-* Some problems left over from porting CMU CL to the new
+* Some problems left over from porting CMUCL to the new
   cross-compilation bootstrap process have been cleaned up:
   ** DISASSEMBLE now works. (There was a problem in using DEFMACRO
      instead of SB!XC:DEFMACRO, compounded by an oversight on my
@@ -10916,7 +10916,7 @@ changes in sbcl-0.6.4 relative to sbcl-0.6.3:
   * The ILISP support patches have been removed from the distribution,
     because as of version 5.10.1, ILISP now supports SBCL without us
     having to maintain patches.
-* added a modified version of Raymond Toy's recent CMU CL patch for
+* added a modified version of Raymond Toy's recent CMUCL patch for
   EQUALP comparison of HASH-TABLE
 
 changes in sbcl-0.6.3 relative to sbcl-0.6.2:
@@ -11032,8 +11032,8 @@ changes in sbcl-0.6.2 relative to sbcl-0.6.1:
   into the target SBCL has been fixed.
 * The chill.lisp system for loading cold code into a running SBCL
   now works better.
-* Support for the CMU CL "scavenger hook" extension has been removed.
-  (It was undocumented and unused in the CMU CL sources that SBCL was
+* Support for the CMUCL "scavenger hook" extension has been removed.
+  (It was undocumented and unused in the CMUCL sources that SBCL was
   derived from, and stale in sbcl-0.6.1.)
 * Various errors in the cross-compiler type system were detected
   by running the cross-compiler with *TYPE-SYSTEM-INITIALIZED*
@@ -11095,7 +11095,7 @@ changes in sbcl-0.6.0 relative to sbcl-0.5.0:
   terminating SBCL on EOF
 * non-verbose GC by default
 * There is no more "sbcl" shell script; the sbcl file is now the C
-  runtime executable (just like CMU CL).
+  runtime executable (just like CMUCL).
 * removed some unused fops, e.g. FOP-UNIFORM-VECTOR, FOP-CHARACTER, and
   FOP-POP-FOR-EFFECT
 * tweaked debug-info.lisp and debug-int.lisp to make the debugger store
@@ -11141,7 +11141,7 @@ changes in sbcl-0.6.0 relative to sbcl-0.5.0:
 * made PROCLAIM and DECLAIM conform to ANSI. PROCLAIM is now an ordinary
   function. As a consequence, START-BLOCK and END-BLOCK declarations are
   no longer supported, since their implementation was deeply intertwingled
-  with the magical, non-ANSI treatment that PROCLAIM received in CMU CL.
+  with the magical, non-ANSI treatment that PROCLAIM received in CMUCL.
 * removed bogus "support" for compiler macros named (SETF FOO), and
   removed the compiler macro for SETF INFO (but only after making a fool
   of myself on the cmucl-imp mailing list by posting a bogus patch for

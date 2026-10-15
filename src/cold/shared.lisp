@@ -9,7 +9,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -150,7 +150,7 @@
 ;;; UNIX "mv foo bar/" will work, but the analogous
 ;;; (RENAME-FILE-A-LA-UNIX "foo" "bar/") should fail.)
 ;;;
-;;; (This is a workaround for the weird behavior of Debian CMU CL
+;;; (This is a workaround for the weird behavior of Debian CMUCL
 ;;; 2.4.6, where (RENAME-FILE "dir/x" "dir/y") tries to create a file
 ;;; called "dir/dir/y". If that behavior goes away, then we should be
 ;;; able to get rid of this function and use plain RENAME-FILE in the

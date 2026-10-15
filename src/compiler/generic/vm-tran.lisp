@@ -3,7 +3,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -605,7 +605,7 @@
 
 ;;;; %BYTE-BLT
 
-;;; FIXME: The old CMU CL code used various COPY-TO/FROM-SYSTEM-AREA
+;;; FIXME: The old CMUCL code used various COPY-TO/FROM-SYSTEM-AREA
 ;;; stuff (with all the associated bit-index cruft and overflow
 ;;; issues) even for byte moves. In SBCL, we're converting to byte
 ;;; moves as problems are discovered with the old code, and this is
@@ -618,7 +618,7 @@
                           (or (simple-unboxed-array (*)) system-area-pointer)
                           index
                           index))
-  ;; FIXME: CMU CL had a hairier implementation of this (back when it
+  ;; FIXME: CMUCL had a hairier implementation of this (back when it
   ;; was still called (%PRIMITIVE BYTE-BLT). It had the small problem
   ;; that it didn't work for large (>16M) values of SRC-START or
   ;; DST-START. However, it might have been more efficient. In

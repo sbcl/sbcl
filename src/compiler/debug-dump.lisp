@@ -4,7 +4,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -1121,7 +1121,7 @@
 (defun write-packed-bit-vector (bits byte-buffer)
   (declare (type simple-bit-vector bits) (type byte-buffer byte-buffer))
 
-  ;; Enforce constraint from CMU-CL-era comment.
+  ;; Enforce constraint from CMUCL-era comment.
   (aver (zerop (mod (length bits) 8)))
 
   (multiple-value-bind (initial step done)

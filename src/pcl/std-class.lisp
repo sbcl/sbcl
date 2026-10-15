@@ -1033,9 +1033,9 @@
                                      :key #'slot-definition-allocation)
                        (return nil)))))
 
-         ;; comment from the old CMU CL sources:
+         ;; comment from the old CMUCL sources:
          ;;   Need to have the cpl setup before %update-lisp-class-layout
-         ;;   is called on CMU CL.
+         ;;   is called on CMUCL.
          (setf (slot-value class '%class-precedence-list) cpl
                (slot-value class 'cpl-available-p) t)
          (%force-cache-flushes class)))

@@ -1,6 +1,6 @@
 ;;;; generic SEQUENCEs
 ;;;;
-;;;; KLUDGE: comment from original CMU CL source:
+;;;; KLUDGE: comment from original CMUCL source:
 ;;;;   Be careful when modifying code. A lot of the structure of the
 ;;;;   code is affected by the fact that compiler transforms use the
 ;;;;   lower level support functions. If transforms are written for
@@ -10,7 +10,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS

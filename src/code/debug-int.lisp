@@ -4,7 +4,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -1344,7 +1344,7 @@
       (cond (res
              (make-compiled-debug-fun res component))
             ((null local-name)
-             ;; KLUDGE: comment from CMU CL:
+             ;; KLUDGE: comment from CMUCL:
              ;;   This used to be the non-interpreted branch, but
              ;;   William wrote it to return the debug-fun of fun's XEP
              ;;   instead of fun's debug-fun. The above code does this

@@ -3,7 +3,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -49,7 +49,7 @@
 ;;; Reset the current set of masked signals (those being blocked from
 ;;; delivery).
 ;;;
-;;; (Note: CMU CL had a more general SIGSETMASK call and a SIGMASK
+;;; (Note: CMUCL had a more general SIGSETMASK call and a SIGMASK
 ;;; operator to create masks, but since we only ever reset to 0, we no
 ;;; longer support it. If you need it, you can pull it out of the CMU
 ;;; CL sources, or the old SBCL sources; but you might also consider

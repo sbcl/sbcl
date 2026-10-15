@@ -619,7 +619,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
       (let ((cdc  (caching-dfun-cost gf))) ; fast
         (> cdc (dispatch-dfun-cost gf cdc))))))
 
-;;; According to comments in the original CMU CL version of PCL,
+;;; According to comments in the original CMUCL version of PCL,
 ;;; the cost LIMIT is important to cut off exponential growth for
 ;;; large numbers of gf methods and argument lists.
 (defun dispatch-dfun-cost (gf &optional limit)

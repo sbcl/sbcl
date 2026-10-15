@@ -3,7 +3,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -114,7 +114,7 @@
   modify SBCL's own source code, as in `slam.sh`. Otherwise you don't
   need it.")
 
- ;; (This feature was called :DEBUG in the original CMU CL code.)
+ ;; (This feature was called :DEBUG in the original CMUCL code.)
  (:sb-show-assem nil
   :public t
   :documentation
@@ -191,7 +191,7 @@
   savings of anywhere from 4% to 8% in typical applications. (Your
   mileage may vary.)")
 
- ;; Peter Van Eynde's increase-bulletproofness code for CMU CL
+ ;; Peter Van Eynde's increase-bulletproofness code for CMUCL
  ;;
  ;; Some of the code which was #+high-security before the fork has now
  ;; been either made unconditional, deleted, or rewritten into
@@ -276,7 +276,7 @@
    Remove this feature if you want to ignore the technical requirement
    that *LOAD-TRUENAME* be a variable (as opposed to a symbol-macro).")
 
- ;; This is set in classic CMU CL, and presumably there it means that
+ ;; This is set in classic CMUCL, and presumably there it means that
  ;; the floating point arithmetic implementation conforms to IEEE's
  ;; standard. Here it definitely means that the floating point
  ;; arithmetic implementation conforms to IEEE's standard. I (WHN
@@ -285,12 +285,12 @@
  ;; hardware tries).
  (:ieee-floating-point t)
 
- ;; CMU CL had, and we inherited, code to support 80-bit LONG-FLOAT on
+ ;; CMUCL had, and we inherited, code to support 80-bit LONG-FLOAT on
  ;; the x86 architecture. Nothing has been done to actively destroy
  ;; the long float support, but it hasn't been thoroughly maintained,
  ;; and needs at least some maintenance before it will work. (E.g. the
  ;; LONG-FLOAT-only parts of genesis are still implemented in terms of
- ;; unportable CMU CL functions which are not longer available at
+ ;; unportable CMUCL functions which are not longer available at
  ;; genesis time in SBCL.) A deeper problem is SBCL's bootstrap
  ;; process implicitly assumes that the cross-compilation host will be
  ;; able to make the same distinctions between floating point types
@@ -380,9 +380,9 @@
 ;;;;      A RISC-V CPU.
 ;;;;   :loongarch64
 ;;;;      64-bit LoongArch CPU
-;;;; (CMU CL also had a :pentium feature, which affected the definition
+;;;; (CMUCL also had a :pentium feature, which affected the definition
 ;;;; of some floating point vops. It was present but not enabled or
-;;;; documented in the CMU CL code that SBCL is derived from, and has
+;;;; documented in the CMUCL code that SBCL is derived from, and has
 ;;;; now been moved to the *BACKEND-SUBFEATURES* mechanism.)
 ;;;;
 ;;;; properties derived from the machine architecture

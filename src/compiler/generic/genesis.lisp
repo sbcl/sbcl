@@ -3,7 +3,7 @@
 ;;;; file in the cross-compilation host, without the help of the
 ;;;; target Lisp system.
 ;;;;
-;;;; As explained by Rob MacLachlan on the CMU CL mailing list Wed, 06
+;;;; As explained by Rob MacLachlan on the CMUCL mailing list Wed, 06
 ;;;; Jan 1999 11:05:02 -0500, this cold load generator more or less
 ;;;; fakes up static function linking. I.e. it makes sure that all the
 ;;;; DEFUN-defined functions in the fasl files it reads are bound to the
@@ -14,13 +14,13 @@
 ;;;; initialized early before it transfers control to the ordinary
 ;;;; top level forms.
 ;;;;
-;;;; (In CMU CL, and in SBCL as of 0.6.9 anyway, functions not defined
+;;;; (In CMUCL, and in SBCL as of 0.6.9 anyway, functions not defined
 ;;;; by DEFUN aren't set up specially by GENESIS.)
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS

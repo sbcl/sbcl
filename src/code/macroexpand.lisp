@@ -3,7 +3,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -164,7 +164,7 @@ return NIL. Can be set with SETF when ENV is NIL."
   ;; not only creates a new local function or macro definition, but
   ;; also shadows[2] the compiler macro.
   (unless (sb-c::fun-locally-defined-p name env)
-    ;; Note: CMU CL used to return NIL here when a NOTINLINE
+    ;; Note: CMUCL used to return NIL here when a NOTINLINE
     ;; declaration was in force. That's fairly logical, given the
     ;; specified effect of NOTINLINE declarations on compiler-macro
     ;; expansion. However, (1) it doesn't seem to be consistent with

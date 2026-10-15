@@ -3,7 +3,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -90,11 +90,11 @@
                                #-sb-xc-host
                                (:pure t))
   ;; KLUDGE: Courtesy of more than a decade of, ah, organic growth in
-  ;; CMU CL, there are two distinct -- but coupled -- mechanisms to
+  ;; CMUCL, there are two distinct -- but coupled -- mechanisms to
   ;; finding the name of a function. The slot here is one mechanism
-  ;; (used in CMU CL to look up names in the debugger, e.g. in
+  ;; (used in CMUCL to look up names in the debugger, e.g. in
   ;; BACKTRACE). The other mechanism is the NAME slot in function
-  ;; primitive objects (used in CMU CL to look up names elsewhere,
+  ;; primitive objects (used in CMUCL to look up names elsewhere,
   ;; e.g. in CL:FUNCTION-LAMBDA-EXPRESSION and in CL:DESCRIBE).
   ;;
   ;; They're coupled by the way that DEBUG-FUN objects are looked up.

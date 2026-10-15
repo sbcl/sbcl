@@ -3,7 +3,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -17,7 +17,7 @@
 
 ;;;; low-level signal context access functions
 ;;;;
-;;;; Note: In CMU CL, similar functions were hardwired to access
+;;;; Note: In CMUCL, similar functions were hardwired to access
 ;;;; BSD-style sigcontext structures defined as alien objects. Our
 ;;;; approach is different in two ways:
 ;;;;   1. We use POSIX SA_SIGACTION-style signals, so our context is

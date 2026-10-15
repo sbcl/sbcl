@@ -1425,8 +1425,8 @@ Notes about Unix environments (as in the @code{:environment} and @code{:env} arg
 
 @itemize
 @item The SBCL implementation of @code{run-program}, like Perl and many other
-  programs, but unlike the original CMU CL implementation, copies the
-  Unix environment by default.
+  programs, but unlike the original CMUCL implementation, copies
+  the Unix environment by default.
 
 @item Running Unix programs from a setuid process, or in any other
   situation where the Unix environment is under the control of someone
@@ -1448,7 +1448,7 @@ the current process.
 @item @code{:env}
 
 An old, lossy representation of the new Unix environment, for
-compatibility with CMU CL. If given, @code{:environment} defaults to
+compatibility with CMUCL. If given, @code{:environment} defaults to
 this (converted to the new format). It is an error to specify both
 @code{:env} and @code{:environment}.
 

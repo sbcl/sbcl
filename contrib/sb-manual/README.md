@@ -270,6 +270,8 @@ Special rules and common mistakes:
 - `run time`: how long something runs (as in "the run time can be
   measure with TIME")
 
+- Write `CMUCL` and not `CMU CL`
+
 ## Paragraph Formatting
 
 Note that docstrings are also inconsistent about whether one or two

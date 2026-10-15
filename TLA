@@ -15,7 +15,7 @@ to impose standard abbreviations for some things. Ideally, you don't
 need to remember whether to abbreviate it, or what abbreviation to
 use, because it's always the same abbreviation.
 
-Some of these already were used pretty consistently in CMU CL.
+Some of these already were used pretty consistently in CMUCL.
 Others not so much, but in sbcl-0.7.0 I put some effort into
 making them more consistent.
 	ARG	argument

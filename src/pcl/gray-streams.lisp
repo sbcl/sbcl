@@ -1,5 +1,5 @@
 ;;;; Gray streams implementation for SBCL, based on the Gray streams
-;;;; implementation for CMU CL, based on the stream-definition-by-user
+;;;; implementation for CMUCL, based on the stream-definition-by-user
 ;;;; proposal by David N. Gray.
 
 ;;;; This software is part of the SBCL system. See the README file for
@@ -237,7 +237,7 @@
 (defmethod stream-line-column ((stream fundamental-character-output-stream))
    nil)
 
-;;; STREAM-LINE-LENGTH is a CMU CL extension to Gray streams.
+;;; STREAM-LINE-LENGTH is a CMUCL extension to Gray streams.
 ;;; FIXME: Should we support it? Probably not..
 (defgeneric stream-line-length (stream)
   (:documentation "Return the stream line length or NIL."))

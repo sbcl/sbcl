@@ -7,7 +7,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -631,7 +631,7 @@
 ;;; in an implicit MV-PROG1. We have to force local call analysis of
 ;;; new references to UNWIND-PROTECT cleanup functions. If we don't
 ;;; actually have to do anything, then we don't insert any cleanup
-;;; code. (FIXME: There's some confusion here, left over from CMU CL
+;;; code. (FIXME: There's some confusion here, left over from CMUCL
 ;;; comments. CLEANUP1 isn't mentioned in the code of this function.
 ;;; It is in code elsewhere, but if the comments for this function
 ;;; mention it they should explain the relationship to the other code.)

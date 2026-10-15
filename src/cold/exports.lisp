@@ -3,7 +3,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
-;;;; This software is derived from the CMU CL system, which was
+;;;; This software is derived from the CMUCL system, which was
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
@@ -445,7 +445,7 @@
 (defpackage "SB-INT"
   (:documentation
    "private: miscellaneous unsupported extensions to the ANSI spec. Much of
-the stuff in here originated in CMU CL's EXTENSIONS package and is retained,
+the stuff in here originated in CMUCL's EXTENSIONS package and is retained,
 possibly temporarily, because it might be used internally.")
   (:use "CL")
   (:export ;; lambda list keyword extensions
@@ -1208,15 +1208,15 @@ of `SB-KERNEL`) have been undone, but probably more remain.")
 
 (defpackage "SB-ALIEN"
   ;; FIXME: This nickname is a deprecated hack for backwards
-  ;; compatibility with code which assumed the CMU-CL-style
+  ;; compatibility with code which assumed the CMUCL-style
   ;; SB-ALIEN/SB-C-CALL split. That split went away and was deprecated
   ;; in 0.7.0, so we should get rid of this nickname after a while.
   (:nicknames "SB-C-CALL")
   (:documentation "public: the `ALIEN` foreign function interface (If you're
-porting CMU CL code, note that this package corresponds roughly to a union
+porting CMUCL code, note that this package corresponds roughly to a union
 of the packages `ALIEN` and `C-CALL` at the time of the SBCL fork. `SB-C-CALL`
 is a deprecated nickname to help ease the transition from older versions
-of SBCL which maintained the CMU-CL-style split into two packages.)")
+of SBCL which maintained the CMUCL-style split into two packages.)")
   (:use "CL" "SB-EXT" "SB-INT" "SB-SYS" "SB-ALIEN-INTERNALS")
   (:import-from "CL" "*" "ARRAY" "CHAR" "DOUBLE-FLOAT" "FLOAT" "FUNCTION"
                 "BOOLEAN" "INTEGER" "LONG-FLOAT" "SINGLE-FLOAT" "UNION" "VALUES")
@@ -1255,7 +1255,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)")
   (:documentation
    "private: a wrapper layer for SBCL itself to use when talking with
 an underlying Unix-y operating system.  This was a public package in
-CMU CL, but that was different.  CMU CL's UNIX package tried to
+CMUCL, but that was different.  CMUCL's UNIX package tried to
 provide a comprehensive, stable Unix interface suitable for the end
 user.  This package only tries to implement what happens to be needed
 by the current implementation of SBCL, and makes no guarantees of
@@ -1452,7 +1452,7 @@ SBCL itself")
 (defpackage "SB-KERNEL"
   (:documentation
    "private: Theoretically this 'hides state and types used for package
-integration' (said CMU CL architecture.tex) and that probably was and
+integration' (said CMUCL architecture.tex) and that probably was and
 is a good idea, but see SB-SYS re. blurring of boundaries.")
   (:use "CL" "SB-ALIEN" "SB-ALIEN-INTERNALS" "SB-BIGNUM"
         "SB-EXT" "SB-INT" "SB-SYS" "SB-GRAY")
@@ -2337,13 +2337,13 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "PROFILE-DEINIT"
 
            ;; Note: These are out of lexicographical order
-           ;; because in CMU CL they were defined as
+           ;; because in CMUCL they were defined as
            ;; internal symbols in package "CL" imported
            ;; into package "C", as opposed to what we're
            ;; doing here, defining them as external symbols
            ;; in a package which is used by both "SB-C" and
            ;; "SB-IMPL". (SBCL's "SB-C" is directly
-           ;; analogous to CMU CL's "C"; and for this
+           ;; analogous to CMUCL's "C"; and for this
            ;; purpose, SBCL's "SB-IMPL" is analogous to CMU
            ;; CL's "CL".) As far as I know there's nothing
            ;; special about them, so they could be merged
