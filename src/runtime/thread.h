@@ -411,17 +411,17 @@ extern int thread_mv_cell_count(struct thread*);
 #define ALIEN_STACK_HARD_GUARD_PAGE(th)         \
     ((os_vm_address_t)(th->alien_stack_start))
 #define ALIEN_STACK_GUARD_PAGE(th) \
-    (ALIEN_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size)
+    (ALIEN_STACK_HARD_GUARD_PAGE(th) + os_reported_page_size)
 #define ALIEN_STACK_RETURN_GUARD_PAGE(th) \
-    (ALIEN_STACK_GUARD_PAGE(th) + os_vm_page_size)
+    (ALIEN_STACK_GUARD_PAGE(th) + os_reported_page_size)
 
 #define BINDING_STACK_HARD_GUARD_PAGE(th)                              \
     (((os_vm_address_t)th->binding_stack_start) + BINDING_STACK_SIZE - \
-     os_vm_page_size)
+     os_reported_page_size)
 #define BINDING_STACK_GUARD_PAGE(th) \
-    (BINDING_STACK_HARD_GUARD_PAGE(th) - os_vm_page_size)
+    (BINDING_STACK_HARD_GUARD_PAGE(th) - os_reported_page_size)
 #define BINDING_STACK_RETURN_GUARD_PAGE(th) \
-    (BINDING_STACK_GUARD_PAGE(th) - os_vm_page_size)
+    (BINDING_STACK_GUARD_PAGE(th) - os_reported_page_size)
 
 extern void
 protect_control_stack_hard_guard_page(int protect_p, struct thread *thread);

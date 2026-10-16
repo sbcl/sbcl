@@ -503,22 +503,24 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
  */
 
 static inline void
-protect_guard_page(void *page, int protect_p, os_vm_prot_t flags) {
+protect_guard_page(void *page, int protect_p, os_vm_prot_t flags, size_t size) {
 #ifdef MADV_GUARD_INSTALL
     if (flags == OS_VM_PROT_NONE &&
-        !madvise(page, os_vm_page_size,
-                 protect_p ? MADV_GUARD_INSTALL : MADV_GUARD_REMOVE))
+        !madvise(page, size, protect_p ? MADV_GUARD_INSTALL : MADV_GUARD_REMOVE))
         return;
 #endif
-    os_protect(page, os_vm_page_size, protect_p ?
-               flags : OS_VM_PROT_READ | OS_VM_PROT_WRITE);
+    os_protect(page, size, protect_p ? flags : OS_VM_PROT_READ | OS_VM_PROT_WRITE);
 }
 
-#define DEF_PROTECT_PAGE(name,page_name,flags)                          \
-    void                                                                \
-    protect_##name(int protect_p, struct thread *thread) {              \
-        protect_guard_page(page_name(thread), protect_p, flags);        \
-    }
+/* The size of the control stack guard affects how large a dynamic-extent vector
+ * can be allocated safely without stack probing to see if we touch bottom.
+ * Users (on x86-64 anyway) have historically expected that they can make a 32KiB
+ * (minus 2 words for a header) vector, so we continue generously to allow it.
+ */
+#define DEF_PROTECT_PAGE(name,page_name,flags) \
+    void protect_##name(int protect_p, struct thread *thread) {  \
+        protect_guard_page(page_name(thread), protect_p, flags, \
+                           os_vm_page_size); }
 
 #if !(defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
 DEF_PROTECT_PAGE(control_stack_hard_guard_page,
@@ -533,6 +535,19 @@ void protect_control_stack_return_guard_page (__attribute__((unused)) int protec
                                               __attribute__((unused)) struct thread *thread) {
 }
 #endif
+
+/* Unlike for the control stack, the binding and alien stack guards can reasonably
+ * utilize the OS-reported granularity. The binding stack pointer is bumped by a couple
+ * words at a time; there is no chance that special var binding would overstep and miss
+ * the guard. As for alien stacks, I think people are not in the habit of blowing that.
+ * If this reduction does cause problems, either a #define or C global var could let
+ * users specify the guard range, depending on whether we think that such needs are
+ * esoteric (i.e. for those willing to rebuild the runtime), or widespread */
+#undef DEF_PROTECT_PAGE
+#define DEF_PROTECT_PAGE(name,page_name,flags) \
+    void protect_##name(int protect_p, struct thread *thread) {  \
+        protect_guard_page(page_name(thread), protect_p, flags, \
+                           os_reported_page_size); }
 
 DEF_PROTECT_PAGE(binding_stack_hard_guard_page,
                  BINDING_STACK_HARD_GUARD_PAGE,

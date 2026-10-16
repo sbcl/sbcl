@@ -1621,9 +1621,14 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
 {
     struct thread *th = get_sb_vm_thread();
 
+    unsigned int astk_guard_size = os_reported_page_size; // alien
+    unsigned int bstk_guard_size = os_reported_page_size; // binding
+    __attribute__((unused)) unsigned int
+                 cstk_guard_size = os_vm_page_size;       // control
+
 #if !(defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
     if(addr >= CONTROL_STACK_HARD_GUARD_PAGE(th) &&
-       addr < CONTROL_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size) {
+       addr < CONTROL_STACK_HARD_GUARD_PAGE(th) + cstk_guard_size) {
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         /* fake_foreign_function_call wants to write to the stack. */
         protect_control_stack_hard_guard_page(0, th);
@@ -1633,7 +1638,7 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
              addr, (void*)os_context_pc(context));
     }
     else if(addr >= CONTROL_STACK_GUARD_PAGE(th) &&
-            addr < CONTROL_STACK_GUARD_PAGE(th) + os_vm_page_size) {
+            addr < CONTROL_STACK_GUARD_PAGE(th) + cstk_guard_size) {
         /* We hit the end of the control stack: disable guard page
          * protection so the error handler has some headroom, protect the
          * previous page so that we can catch returns from the guard page
@@ -1670,7 +1675,7 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
         return 1;
     }
     else if(addr >= CONTROL_STACK_RETURN_GUARD_PAGE(th) &&
-            addr < CONTROL_STACK_RETURN_GUARD_PAGE(th) + os_vm_page_size) {
+            addr < CONTROL_STACK_RETURN_GUARD_PAGE(th) + cstk_guard_size) {
         /* We're returning from the guard page: reprotect it, and
          * unprotect this one. This works even if we somehow missed
          * the return-guard-page, and hit it on our way to new
@@ -1683,11 +1688,11 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
     else
 #endif // !LISP_FEATURE_WIN32
     if(addr >= BINDING_STACK_HARD_GUARD_PAGE(th) &&
-       addr < BINDING_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size) {
+       addr < BINDING_STACK_HARD_GUARD_PAGE(th) + bstk_guard_size) {
         lose("Binding stack exhausted");
     }
     else if(addr >= BINDING_STACK_GUARD_PAGE(th) &&
-            addr < BINDING_STACK_GUARD_PAGE(th) + os_vm_page_size) {
+            addr < BINDING_STACK_GUARD_PAGE(th) + bstk_guard_size) {
 
         lower_thread_binding_stack_guard_page(th);
 
@@ -1704,16 +1709,16 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
         return 1;
     }
     else if(addr >= BINDING_STACK_RETURN_GUARD_PAGE(th) &&
-            addr < BINDING_STACK_RETURN_GUARD_PAGE(th) + os_vm_page_size) {
+            addr < BINDING_STACK_RETURN_GUARD_PAGE(th) + bstk_guard_size) {
         reset_thread_binding_stack_guard_page(th);
         return 1;
     }
     else if(addr >= ALIEN_STACK_HARD_GUARD_PAGE(th) &&
-            addr < ALIEN_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size) {
+            addr < ALIEN_STACK_HARD_GUARD_PAGE(th) + astk_guard_size) {
         lose("Alien stack exhausted");
     }
     else if(addr >= ALIEN_STACK_GUARD_PAGE(th) &&
-            addr < ALIEN_STACK_GUARD_PAGE(th) + os_vm_page_size) {
+            addr < ALIEN_STACK_GUARD_PAGE(th) + astk_guard_size) {
         lower_thread_alien_stack_guard_page(th);
 
         /* For the unfortunate case, when the alien stack is
@@ -1724,7 +1729,7 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
         return 1;
     }
     else if(addr >= ALIEN_STACK_RETURN_GUARD_PAGE(th) &&
-            addr < ALIEN_STACK_RETURN_GUARD_PAGE(th) + os_vm_page_size) {
+            addr < ALIEN_STACK_RETURN_GUARD_PAGE(th) + astk_guard_size) {
         reset_thread_alien_stack_guard_page(th);
 
         return 1;
