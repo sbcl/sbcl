@@ -676,7 +676,7 @@
              1)))
 
 (with-test (:name :sign-extend
-            :fails-on (or :ppc :riscv :loongarch64 :sparc :mips))
+            :implemented-on (:vop-existsp "SB-VM:MASK-SIGNED-FIELD-WORD/C" :named))
   (assert (= (count 'sb-c::mask-signed-field
                     (ir-calls
                      `(lambda (a)

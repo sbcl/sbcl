@@ -319,6 +319,34 @@
          (y :scs (signed-reg signed-stack)))
   (:arg-types unsigned-num signed-num))
 
+(define-vop (mask-signed-field-word/c)
+  (:translate sb-c::mask-signed-field)
+  (:policy :fast-safe)
+  (:args (x :scs (signed-reg unsigned-reg) :target r))
+  (:arg-types (:constant (integer 0 32)) untagged-num)
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:info width)
+  (:generator 3
+    (cond ((zerop width)
+           (inst xor r r))
+          ((= width 32)
+           (move r x))
+          ((block nil
+             (inst movsx r
+                   (case width
+                     (16 (make-random-tn (load-time-value (sc-or-lose 'word-reg)) (tn-offset r)))
+                     (8 (if (member (tn-offset r) *byte-regs*)
+                            (make-random-tn (load-time-value (sc-or-lose 'byte-reg)) (tn-offset r))
+                            (return)))
+                     (t (return))))
+             t))
+          (t
+           (move r x)
+           (let ((delta (- n-word-bits width)))
+             (inst shl r delta)
+             (inst sar r delta))))))
+
 (define-vop (mask-signed-field-fixnum)
   (:translate sb-c::mask-signed-field)
   (:args (x :scs (descriptor-reg) :target r))
