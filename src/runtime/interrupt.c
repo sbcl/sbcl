@@ -1730,7 +1730,7 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
         return 1;
     }
     else if (addr >= undefined_alien_address &&
-             addr < undefined_alien_address + os_vm_page_size) {
+             addr < undefined_alien_address + os_reported_page_size) {
         arrange_return_to_lisp_function
             (context, StaticSymbolFunction(UNDEFINED_ALIEN_VARIABLE_ERROR));
         return 1;
