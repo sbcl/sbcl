@@ -36,15 +36,6 @@
        ,@(when source-uri-fn
            `(:source-uri-fn ,source-uri-fn))))))
 
-;;; Adjust the width of section numbers in the PDF table of contents, so
-;;; that e.g "17.10.13" doesn't protude from its box.
-(defparameter *pandoc-pdf-adjusted-table-of-contents
-  "\\makeatletter
-% \\@dottedtocline{level}{indent_before_number}{width_of_number_box}
-\\renewcommand*\\l@subsection{\\@dottedtocline{2}{1.5em}{2.8em}}
-\\renewcommand*\\l@subsubsection{\\@dottedtocline{3}{4.3em}{4.0em}}
-\\makeatother")
-
 (defun muffle-uninteresting-warnings (condition)
   (let ((string (princ-to-string condition)))
     ;; We know that there is no source location for declarations.
@@ -60,10 +51,6 @@
         (*output-dir* (merge-pathnames "output/" *directory*))
         (pax:*document-downcase-uppercase-code* t)
         (pax:*document-url-versions* '(1))
-        (pax:*document-pandoc-pdf-header-includes*
-          (format nil "~A~%~A~%"
-                  pax:*document-pandoc-pdf-header-includes*
-                  *pandoc-pdf-adjusted-table-of-contents))
         (pax:*document-pandoc-pdf-options*
           '(("-V" "papersize=a4")
             ("-V" "margin-left=0.8in")

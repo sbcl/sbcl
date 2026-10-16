@@ -19,7 +19,7 @@
   (@sb-grovel-structures section)
   (@sb-grovel-traps section))
 
-(defsection @using-sb-grovel (:title "Using sb-grovel in your own ASDF System")
+(defsection @using-sb-grovel (:title "Using sb-grovel in Your Own ASDF System")
   "- Create a Lisp package for the foreign constants/functions to go
   into.
 
@@ -162,7 +162,7 @@
                                             (argument2 alien-type)))")
 
 (defsection @sb-grovel-structures
-    (:title "Programming with sb-grovel's structure types")
+    (:title "Programming with sb-grovel's Structure Types")
   "Let us assume that you have a grovelled structure definition:
 
       (:structure mystruct (\"struct my_structure\"

@@ -83,7 +83,7 @@
   irrespective of the value of *READ-DEFAULT-FLOAT-FORMAT*.")
 
 (defsection @package-local-nicknames
-    (:title "Package-Local Nicknames"
+    (:title "Package-local Nicknames"
      :concepts (("package-local" "nicknames")
                 ("nicknames," "package-local")))
   "SBCL allows giving packages local nicknames: they allow short and
@@ -172,8 +172,8 @@
   (sb-ext:generation-bytes-allocated function)
   (sb-ext:generation-bytes-consed-between-gcs function)
   (sb-ext:generation-minimum-age-before-gc function)
-  (sb-ext:generation-number-of-gcs-before-promotion function)
-  (sb-ext:generation-number-of-gcs function))
+  (sb-ext:generation-number-of-gcs function)
+  (sb-ext:generation-number-of-gcs-before-promotion function))
 
 (defsection @tracing-live-objects-back-to-roots
     (:title "Tracing Live Objects Back to Roots")
@@ -1054,7 +1054,7 @@
   code and bring it up on the developers' mailing list.")
 
 (defsection @efficiency-hacks (:title "Efficiency Hacks")
-  "The SB-EXT:PURIFY function (available when `#+cheneygc`) causes
+  "The SB-EXT:PURIFY function (available with @CONSERVATIVE-GC) causes
   SBCL first to collect all garbage, then to mark all uncollected
   objects as permanent, never again attempting to collect them as
   garbage. This can cause a large increase in efficiency when using a

@@ -1922,7 +1922,7 @@ returning its filename.
 
 - :OUTPUT-FILE
 
-    The name of the FASL to output. The returned pathname of the
+    The name of the fasl to output. The returned pathname of the
     output file may differ from the pathname of the :OUTPUT-FILE
     parameter, e.g. when the latter is a designator for a directory.
 

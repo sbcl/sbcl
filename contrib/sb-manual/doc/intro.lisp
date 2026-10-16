@@ -147,7 +147,7 @@
   compiler from quite satisfying this principle, are discussed in
   @TYPE-DECLARATION-CHECKING.")
 
-(defsection @fasl-format (:title "FASL format")
+(defsection @fasl-format (:title "Fasl Format")
   "SBCL fasl-format is binary compatible only with the exact SBCL version
   it was generated with. While this is obviously suboptimal, it has
   proven more robust than trying to maintain fasl compatibility across
@@ -290,8 +290,8 @@
   their command prompts. The extensions for functions which don't have
   their own command prompt (such as TRACE) are described in their
   documentation strings, unless your SBCL was compiled with the
-  `--without-sb-doc` option to omit them, in which case they are only
-  readable in the source code.")
+  `--without-sb-doc` option to omit them (see @CUSTOMIZING-THE-BUILD),
+  in which case they are only readable in the source code.")
 
 (defsection @additional-documentation-files
     (:title "Additional Documentation Files")
@@ -300,15 +300,15 @@
   often installed along with this manual, e.g. in
   `/usr/local/share/doc/sbcl/`.
 
-  - `COPYING`: Licence and copyright summary.
+  - `\\\\COPYING`: Licence and copyright summary.
 
-  - `CREDITS`: Authorship information on various parts of SBCL.
+  - `\\\\CREDITS`: Authorship information on various parts of SBCL.
 
-  - `INSTALL`: Covers installing SBCL from both source and binary
+  - `\\\\INSTALL`: Covers installing SBCL from both source and binary
      distributions on your system, and also has some installation
      related troubleshooting information.
 
-  - `NEWS`: Summarizes changes between various SBCL versions.")
+  - `\\\\NEWS`: Summarizes changes between various SBCL versions.")
 
 (defsection @internals-documentation (:title "Internals Documentation")
   "If you're interested in the development of the SBCL system itself,
@@ -332,14 +332,14 @@
 (defsection @internet-community (:title "Internet Community")
   "IRC channels on <https://libera.chat/>:
 
-  - `#common-lisp`: \"Common Lisp, the #1=(programmable . #1#)
-    programming language\"
+  - `#common-lisp`: _Common Lisp, the #1=(programmable . #1#)
+    programming language_
 
-  - `#lispcafe`: \"The Lisp Café; sit down, have a drink, chat about
+  - `#lispcafe`: _The Lisp Café; sit down, have a drink, chat about
     anything, and enjoy your stay. | <https://www.cliki.net/lispcafe> |
-    Be insuperable to each other\".
+    Be insuperable to each other_
 
-  - `#sbcl`: \"Steel Bank Common Lisp Dev Hangout\"
+  - `#sbcl`: _Steel Bank Common Lisp Dev Hangout_
 
   You can use <https://web.libera.chat> or a normal IRC client.
 
@@ -362,20 +362,20 @@
   If you are an experienced programmer in other languages but need to
   learn about Common Lisp, some books stand out:
 
-  - Practical Common Lisp, by Peter Seibel
+  - _Practical Common Lisp_ by Peter Seibel
 
       An excellent introduction to the language, covering both the
       basics and \"advanced topics\" like macros, CLOS, and packages.
       Available both in print format and on the web:
       <https://gigamonkeys.com/book/>.
 
-  - Paradigms Of Artificial Intelligence Programming, by Peter Norvig
+  - _Paradigms Of Artificial Intelligence Programming_ by Peter Norvig
 
       Good information on general Common Lisp programming, and many
       nontrivial examples. Whether or not your work is AI, it's a very
       good book to look at.
 
-  - On Lisp, by Paul Graham
+  - _On Lisp_ by Paul Graham
 
       An in-depth treatment of macros, but not recommended as a first
       Common Lisp book, since it is slightly pre-ANSI so you need to
@@ -384,7 +384,7 @@
       focusing solely on macros. Downloadable from
       <https://www.paulgraham.com/onlisp.html>.
 
-  - Object-Oriented Programming In Common Lisp, by Sonya Keene
+  - _Object-Oriented Programming In Common Lisp_ by Sonya Keene
 
       With the exception of _Practical Common Lisp_, most introductory
       books don't emphasize CLOS. This one does. Even if you're very
@@ -395,7 +395,7 @@
       there are a number of lesser differences as well. This book
       tends to help with the culture shock.
 
-  - Art Of Metaobject Programming, by Gregor Kiczales et al.
+  - _Art Of Metaobject Programming_ by Gregor Kiczales et al.
 
       Currently the prime source of information on the Common Lisp
       Metaobject Protocol, which is supported by SBCL. Section

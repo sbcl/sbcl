@@ -143,7 +143,15 @@
 ;;;
 ;;; TODO:
 ;;;
-;;; - Maybe implement glossary-terms (for books, "safe type", etc).
+;;; - Maybe implement PAX:GLOSSARY-TERMs (for books, "safe type",
+;;;   etc). Unlike sections, glossary terms are cross-referenced by
+;;;   default, so we could benefit from turning @GENCGC from a CONCEPT
+;;;   to a GLOSSARY-TERM.
+;;;
+;;; - We fairly often want to escape not just downcasing of inline
+;;;   code: e.g. in `\\NEWS` (that's four backslashes in the source
+;;;   file). Is there a better way? Must keep compatibility with PAX,
+;;;   so this must be a general solution and implemented there, too.
 ;;;
 ;;; Also, see SB-PCL::NORMALIZE-SBCL-DOCSTRING, an expedient docstring
 ;;; to plain text converter that supports the subset of this

@@ -1166,8 +1166,9 @@ actually contained in the object but found in certain well-known
 indirect containers: FDEFINITIONs, EQL specializers, classes, and
 thread-local symbol values in other threads fall into this category.
 
-> _Note_: calling MAP-ROOT with a THREAD does not currently map over
-> conservative roots from the thread registers and interrupt contexts.
+> _Note_: calling MAP-ROOT with a SB-THREAD:THREAD does not currently
+> map over conservative roots from the thread registers and interrupt
+> contexts.
 
 Experimental: interface subject to change."
   (when (typep object '(or bignum float sb-sys:system-area-pointer

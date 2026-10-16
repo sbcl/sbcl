@@ -162,9 +162,9 @@ The following &KEY arguments are defined:
     This should be a list of the main entry points in any newly loaded
     systems. This need not be supplied, but locality and/or GC
     performance may be better if they are. This has two different but
-    related meanings: If :PURIFY is true -- and only for Cheney GC --
+    related meanings: If :PURIFY is true -- and only for CheneyGC --
     the root structures are those which anchor the set of objects
-    moved into static space. On gencgc -- and only on platforms
+    moved into static space. On GENCGC -- and only on platforms
     supporting immobile code -- these are the functions and/or
     function-names which commence a depth-first scan of code when
     reordering based on the statically observable call chain. The

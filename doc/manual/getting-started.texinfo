@@ -209,7 +209,7 @@ You can tweak the @code{*features*} set for the resulting Lisp system,
 enabling or disabling features like documentation strings, threads,
 or extra debugging code.
 
-The preferred way to do this is using commandline arguments to
+The preferred way to do this is using command-line arguments to
 @code{make.sh}:
 
 @example

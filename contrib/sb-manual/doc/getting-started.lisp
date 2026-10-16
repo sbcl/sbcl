@@ -190,7 +190,7 @@
   enabling or disabling features like documentation strings, threads,
   or extra debugging code.
 
-  The preferred way to do this is using commandline arguments to
+  The preferred way to do this is using command-line arguments to
   `make.sh`:
 
       --fancy                    Enables a curated set of features.

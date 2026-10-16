@@ -50,6 +50,12 @@
     ((compile-file function) "SB-C")
     ((with-compilation-unit macro) "SB-C")
     ((sb-ext:restrict-compiler-policy function) "SB-C")
+    ((sb-ext:generation-average-age function) "SB-KERNEL")
+    ((sb-ext:generation-bytes-allocated function) "SB-KERNEL")
+    ((sb-ext:generation-bytes-consed-between-gcs function) "SB-KERNEL")
+    ((sb-ext:generation-minimum-age-before-gc function) "SB-KERNEL")
+    ((sb-ext:generation-number-of-gcs function) "SB-KERNEL")
+    ((sb-ext:generation-number-of-gcs-before-promotion function) "SB-KERNEL")
     ((trace macro) "SB-DEBUG")))
 
 ;;; For when this file is recompiled in interactive development after

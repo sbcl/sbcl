@@ -334,10 +334,10 @@
   (sb-ext:define-source-context macro))
 
 (defsection @handling-of-types (:title "Handling of Types")
-  "One of the most important features of the SBCL compiler (similar to
-  the original CMUCL compiler, also known as _Python_) is its fairly
-  sophisticated understanding of the Common Lisp type system and its
-  conservative approach to the implementation of type declarations.
+  "The most important features of the SBCL compiler (similar
+  to the original CMUCL compiler) are its fairly sophisticated
+  understanding of the Common Lisp type system and its conservative
+  approach to the implementation of type declarations.
 
   These two features reward the use of type declarations throughout
   development, even when high performance is not a concern. Also, as
@@ -370,23 +370,21 @@
 
   There are three type checking policies available in SBCL, selectable
   via OPTIMIZE declarations."
-  "- __Full Type Checks__ (safe code)
+  "- __Safe code__ `(>= SAFETY 1)` ~SAFETY
 
-      All declarations are considered assertions to be checked at
-      compile or run time, and all type checks are precise. The
-      default compilation policy provides full type checks.
+      Full type checks. All declarations are considered assertions to
+      be checked at compile or run time, and all type checks are
+      precise. The default compilation policy provides full type
+      checks.
 
-      Used when `(>= SAFETY 1)`. ~SAFETY
+  - __Unsafe code__ `(= SAFETY 0)`
 
-  - __No Type Checks__ (unsafe code)
-
-      All declarations are believed without assertions. Also disables
-      argument count and array bounds checking.
+      No type checks. All declarations are believed without
+      assertions. Also disables argument count and array bounds
+      checking.
 
       > __Warning__: Any type errors in code where type checks are not
       > performed are liable to corrupt the heap.
-
-      Used when `(= SAFETY 0)`.
 
   There is a third option called Weak Type Checking, where declared
   types may be simplified into faster to check supertypes: for
@@ -776,9 +774,10 @@
 
   An interpreterless SBCL can be compiled by passing
   `--without-sb-eval` to `make.sh`, while sb-fasteval can be enabled
-  with `--without-sb-eval --with-sb-fasteval.`
+  with `--without-sb-eval --with-sb-fasteval` (see
+  @CUSTOMIZING-THE-BUILD).
 
-  Unlike in some other Lisp implementations, in SBCL interpreted code
+  Unlike in some other Lisp implementations, in SBCL, interpreted code
   is not safer or more debuggable than compiled code."
   (sb-ext:*evaluator-mode* variable))
 

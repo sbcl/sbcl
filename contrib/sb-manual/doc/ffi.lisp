@@ -640,7 +640,7 @@
   > undo Lisp initialization gracefully from C.")
 
 (defsection @step-by-step-example-of-the-foreign-function-interface
-    (:title "Step-By-Step Example of the Foreign Function Interface")
+    (:title "Step-by-step Example of the Foreign Function Interface")
   "This section presents a complete example of an interface to a somewhat
   complicated C function.
 

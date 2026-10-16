@@ -6,7 +6,7 @@
 
 @menu
 * Reader Extensions: reader extensions.
-* Package-Local Nicknames: package local nicknames.
+* Package-local Nicknames: package local nicknames.
 * Package Variance: package variance.
 * Garbage Collection: garbage collection.
 * Generic Function Dispatch: generic function dispatch.
@@ -114,7 +114,7 @@ irrespective of the value of @code{*read-default-float-format*}.
 @node package local nicknames
 @cindex package-local nicknames
 @cindex nicknames, package-local
-@section Package-Local Nicknames
+@section Package-local Nicknames
 
 SBCL allows giving packages local nicknames: they allow short and
 easy-to-use names to be used without fear of name conflict associated
@@ -435,7 +435,7 @@ statistics are appended to it.
 @anchor{Function sb-ext generation-average-age}
 @ffindex @sortas{generation-average-age sb-ext} generation-average-age [sb-ext]
 @deffn{Function} sb-ext:generation-average-age generation
-Average age of memory allocated to GENERATION: average number of times
+Average age of memory allocated to @code{generation}: average number of times
 objects allocated to the generation have seen younger objects promoted to it.
 Available on GENCGC platforms only.
 
@@ -444,7 +444,7 @@ Experimental: interface subject to change.
 @anchor{Function sb-ext generation-bytes-allocated}
 @ffindex @sortas{generation-bytes-allocated sb-ext} generation-bytes-allocated [sb-ext]
 @deffn{Function} sb-ext:generation-bytes-allocated generation
-Number of bytes allocated to GENERATION currently. Available on GENCGC
+Number of bytes allocated to @code{generation} currently. Available on GENCGC
 platforms only.
 
 Experimental: interface subject to change.
@@ -452,7 +452,7 @@ Experimental: interface subject to change.
 @anchor{Function sb-ext generation-bytes-consed-between-gcs}
 @ffindex @sortas{generation-bytes-consed-between-gcs sb-ext} generation-bytes-consed-between-gcs [sb-ext]
 @deffn{Function} sb-ext:generation-bytes-consed-between-gcs generation
-Number of bytes that can be allocated to GENERATION before that
+Number of bytes that can be allocated to @code{generation} before that
 generation is considered for garbage collection. This value is meaningless for
 generation 0 (the nursery): see @code{bytes-consed-between-gcs} instead. Default is
 5% of the dynamic space size divided by the number of non-nursery generations.
@@ -463,27 +463,27 @@ Experimental: interface subject to change.
 @anchor{Function sb-ext generation-minimum-age-before-gc}
 @ffindex @sortas{generation-minimum-age-before-gc sb-ext} generation-minimum-age-before-gc [sb-ext]
 @deffn{Function} sb-ext:generation-minimum-age-before-gc generation
-Minimum average age of objects allocated to GENERATION before that
+Minimum average age of objects allocated to @code{generation} before that
 generation is may be garbage collected. Default is 0.75. See also
 @code{generation-average-age}. Can be assigned to using @code{setf}. Available on GENCGC
 platforms only.
 
 Experimental: interface subject to change.
 @end deffn
-@anchor{Function sb-ext generation-number-of-gcs-before-promotion}
-@ffindex @sortas{generation-number-of-gcs-before-promotion sb-ext} generation-number-of-gcs-before-promotion [sb-ext]
-@deffn{Function} sb-ext:generation-number-of-gcs-before-promotion generation
-Number of times garbage collection is done on GENERATION before
-automatic promotion to the next generation is triggered. Default is 1. Can be
-assigned to using @code{setf}. Available on GENCGC platforms only.
-
-Experimental: interface subject to change.
-@end deffn
 @anchor{Function sb-ext generation-number-of-gcs}
 @ffindex @sortas{generation-number-of-gcs sb-ext} generation-number-of-gcs [sb-ext]
 @deffn{Function} sb-ext:generation-number-of-gcs generation
-Number of times garbage collection has been done on GENERATION without
+Number of times garbage collection has been done on @code{generation} without
 promotion. Available on GENCGC platforms only.
+
+Experimental: interface subject to change.
+@end deffn
+@anchor{Function sb-ext generation-number-of-gcs-before-promotion}
+@ffindex @sortas{generation-number-of-gcs-before-promotion sb-ext} generation-number-of-gcs-before-promotion [sb-ext]
+@deffn{Function} sb-ext:generation-number-of-gcs-before-promotion generation
+Number of times garbage collection is done on @code{generation} before
+automatic promotion to the next generation is triggered. Default is 1. Can be
+assigned to using @code{setf}. Available on GENCGC platforms only.
 
 Experimental: interface subject to change.
 @end deffn
@@ -2748,9 +2748,13 @@ code and bring it up on the developers' mailing list.
 @node efficiency hacks
 @section Efficiency Hacks
 
+@cindex garbage collector, conservative
+@cindex conservative garbage collector
+@cindex CheneyGC
 @cindex garbage collector, generational
 @cindex generational garbage collector
-The @code{sb-ext:purify} function (available when @code{#+cheneygc}) causes
+@cindex GENCGC
+The @code{sb-ext:purify} function (available with conservative GC) causes
 SBCL first to collect all garbage, then to mark all uncollected
 objects as permanent, never again attempting to collect them as
 garbage. This can cause a large increase in efficiency when using a

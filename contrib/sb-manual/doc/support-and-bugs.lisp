@@ -42,8 +42,9 @@
   the competence of the people listed, and they have provided their
   own blurbs below: you must make your own judgement of suitability
   from the available information -- refer to the links they provide,
-  the CREDITS file, mailing list archives, commit messages, and so on.
-  Please feel free to ask for advice through @VOLUNTEER-SUPPORT.
+  the `\\\\CREDITS` file, mailing list archives, commit messages, and
+  so on. Please feel free to ask for advice through
+  @VOLUNTEER-SUPPORT.
 
   (At present, no companies or consultants wish to advertise paid
   support or custom SBCL development in this manual.)")

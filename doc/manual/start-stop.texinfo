@@ -43,7 +43,7 @@ distribution for more information.
 $
 @end example
 
-Also see @ref{command line options} and @ref{stopping sbcl}.
+See also @ref{command line options} and @ref{stopping sbcl}.
 
 @node running without installation
 @subsection Running without Installation
@@ -541,7 +541,7 @@ installed third party modules, etc.
 The user initialization file is intended for personal
 customizations, such as loading certain modules at startup,
 defining convenience functions to use in the REPL, handling
-automatic recompilation of FASLs (see @ref{fasl format}), etc.
+automatic recompilation of fasls (see @ref{fasl format}), etc.
 @end itemize
 
 Neither initialization file is required.
@@ -684,9 +684,9 @@ such as symbol names.
 This should be a list of the main entry points in any newly loaded
 systems. This need not be supplied, but locality and/or @code{gc}
 performance may be better if they are. This has two different but
-related meanings: If @code{:purify} is true -- and only for Cheney @code{gc} --
+related meanings: If @code{:purify} is true -- and only for CheneyGC --
 the root structures are those which anchor the set of objects
-moved into static space. On gencgc -- and only on platforms
+moved into static space. On GENCGC -- and only on platforms
 supporting immobile code -- these are the functions and/or
 function-names which commence a depth-first scan of code when
 reordering based on the statically observable call chain. The

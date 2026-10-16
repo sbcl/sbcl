@@ -360,7 +360,7 @@ Deprecated as of 1.0.53.74 in November 2011. Expected to move
 into late deprecation in November 2012.
 
 This compiler policy was never functional: SBCL has always
-merged tail calls when it could, regardless of this policy
+merged @ref{tail call}s when it could, regardless of this policy
 setting. (It was also never officially supported, but several
 code-bases have historically used it.)
 

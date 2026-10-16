@@ -17,7 +17,7 @@
   #.(format nil "This is an unofficial rendering of the SBCL Manual
   using [MGL-PAX][pax::@pax-manual] with the same content as the
   official version at <https://www.sbcl.org/> but with heavy linking
-  internally, to the CLHS, and to the source code on
+  internally, to the HyperSpec, and to the source code on
   [GitHub](https://github.com/sbcl/sbcl).
 
   The output is for SBCL version `~A`, generated _~A_. See

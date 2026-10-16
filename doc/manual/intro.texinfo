@@ -148,7 +148,7 @@ also supports allocation profiling.
 
 @menu
 * Declarations as Assertions: declarations as assertions.
-* FASL format: fasl format.
+* Fasl Format: fasl format.
 * Compiler-only Implementation: compiler only implementation.
 * Defining Constants: defining constants.
 * Style Warnings: style warnings.
@@ -167,7 +167,7 @@ compiler from quite satisfying this principle, are discussed in
 @ref{type declaration checking}.
 
 @node fasl format
-@subsection FASL format
+@subsection Fasl Format
 
 SBCL fasl-format is binary compatible only with the exact SBCL version
 it was generated with. While this is obviously suboptimal, it has
@@ -342,8 +342,8 @@ and @code{inspect}) are documented in text available by typing @code{help} at
 their command prompts. The extensions for functions which don't have
 their own command prompt (such as @code{trace}) are described in their
 documentation strings, unless your SBCL was compiled with the
-@code{--without-sb-doc} option to omit them, in which case they are only
-readable in the source code.
+@code{--without-sb-doc} option to omit them (see @ref{customizing the build}),
+in which case they are only readable in the source code.
 
 @node additional documentation files
 @subsection Additional Documentation Files
@@ -354,15 +354,15 @@ often installed along with this manual, e.g. in
 @code{/usr/local/share/doc/sbcl/}.
 
 @itemize
-@item @code{copying}: Licence and copyright summary.
+@item @code{COPYING}: Licence and copyright summary.
 
-@item @code{credits}: Authorship information on various parts of SBCL.
+@item @code{CREDITS}: Authorship information on various parts of SBCL.
 
-@item @code{install}: Covers installing SBCL from both source and binary
+@item @code{INSTALL}: Covers installing SBCL from both source and binary
    distributions on your system, and also has some installation
    related troubleshooting information.
 
-@item @code{news}: Summarizes changes between various SBCL versions.
+@item @code{NEWS}: Summarizes changes between various SBCL versions.
 @end itemize
 
 @node internals documentation
@@ -395,14 +395,14 @@ conversion from CMUCL to SBCL is available in the
 IRC channels on @url{https://libera.chat/}:
 
 @itemize
-@item @code{#common-lisp}: "Common Lisp, the #1=(programmable . #1#)
-  programming language"
+@item @code{#common-lisp}: @emph{Common Lisp, the #1=(programmable . #1#)
+  programming language}
 
-@item @code{#lispcafe}: "The Lisp Café; sit down, have a drink, chat about
+@item @code{#lispcafe}: @emph{The Lisp Café; sit down, have a drink, chat about
   anything, and enjoy your stay. | @url{https://www.cliki.net/lispcafe} |
-  Be insuperable to each other".
+  Be insuperable to each other}
 
-@item @code{#sbcl}: "Steel Bank Common Lisp Dev Hangout"
+@item @code{#sbcl}: @emph{Steel Bank Common Lisp Dev Hangout}
 @end itemize
 
 You can use @url{https://web.libera.chat} or a normal IRC client.
@@ -431,20 +431,20 @@ If you are an experienced programmer in other languages but need to
 learn about Common Lisp, some books stand out:
 
 @itemize
-@item Practical Common Lisp, by Peter Seibel
+@item @emph{Practical Common Lisp} by Peter Seibel
 
 An excellent introduction to the language, covering both the
 basics and "advanced topics" like macros, CLOS, and packages.
 Available both in print format and on the web:
 @url{https://gigamonkeys.com/book/}.
 
-@item Paradigms Of Artificial Intelligence Programming, by Peter Norvig
+@item @emph{Paradigms Of Artificial Intelligence Programming} by Peter Norvig
 
 Good information on general Common Lisp programming, and many
 nontrivial examples. Whether or not your work is AI, it's a very
 good book to look at.
 
-@item On Lisp, by Paul Graham
+@item @emph{On Lisp} by Paul Graham
 
 An in-depth treatment of macros, but not recommended as a first
 Common Lisp book, since it is slightly pre-ANSI so you need to
@@ -453,7 +453,7 @@ doesn't really even try to cover the language as a whole,
 focusing solely on macros. Downloadable from
 @url{https://www.paulgraham.com/onlisp.html}.
 
-@item Object-Oriented Programming In Common Lisp, by Sonya Keene
+@item @emph{Object-Oriented Programming In Common Lisp} by Sonya Keene
 
 With the exception of @emph{Practical Common Lisp}, most introductory
 books don't emphasize CLOS. This one does. Even if you're very
@@ -464,7 +464,7 @@ dispatch) go beyond anything you'll see in most OO systems, and
 there are a number of lesser differences as well. This book
 tends to help with the culture shock.
 
-@item Art Of Metaobject Programming, by Gregor Kiczales et al.
+@item @emph{Art Of Metaobject Programming} by Gregor Kiczales et al.
 
 Currently the prime source of information on the Common Lisp
 Metaobject Protocol, which is supported by SBCL. Section
@@ -499,6 +499,7 @@ still reflected in the current implementation:
 
 @cindex garbage collector, generational
 @cindex generational garbage collector
+@cindex GENCGC
 SBCL also inherited some newer architectural features from CMUCL.
 The most important is that on some architectures it has a
 generational GC, which has various implications (mostly good) for
@@ -529,6 +530,7 @@ particularly well there. SBCL should be able to improve in these areas
 
 @cindex garbage collector, conservative
 @cindex conservative garbage collector
+@cindex CheneyGC
 On the x86 SBCL -- like the x86 port of CMUCL -- uses a
 @emph{conservative GC}. This means that it doesn't maintain a strict
 separation between tagged and untagged data, instead treating some

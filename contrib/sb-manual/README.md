@@ -251,7 +251,7 @@ fancy characters.
 Additionally, to keep to manual buildable without sb-unicode, avoid en
 dashes and similar.
 
-## Spelling and Grammar
+## Spelling and Conventions
 
 Currently, the manual (as well as comments and all source files)
 predominantly follow U.S. spelling with a bit of British mixed in.
@@ -262,8 +262,19 @@ Special rules and common mistakes:
 - Use `e.g. X` and `i.e. X`. For consistency, do not use other forms
   such as `eg. X` or `i.e., X`.
 
--  `run-time`: noun  or adjective (as in "at run-time,  we do run-time
-   type checking")
+- Use the illogical but entrenched `See also XYZ` form, not `Also see
+  XYZ`. `Also, see XYZ.` is also fine if slightly different.
+
+### Title case
+
+Use [title case](https://en.wikipedia.org/wiki/Title_case) in titles,
+in particular, the AMA style. It's `Compile-time Evaluation` not
+`Compile-Time Evaluation`.
+
+### Concrete Words and Phrases
+
+- `run-time`: noun  or adjective (as in "at run-time,  we do run-time
+  type checking")
 
 - `runtime`: the low-level component of SBCL written in C
 
@@ -271,6 +282,12 @@ Special rules and common mistakes:
   measure with TIME")
 
 - Write `CMUCL` and not `CMU CL`
+
+- Write `GENCGC` and `CheneyGC`. Better yet, use `@GENERATIONAL-GC`,
+  `@GENCGC`, `@CONSERVATIVE-GC`, or `@CHENEYGC` to get
+  cross-references.
+
+- Write `fasl` and not `FASL`
 
 ## Paragraph Formatting
 

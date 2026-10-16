@@ -4,9 +4,9 @@
 @section sb-grovel
 
 @menu
-* Using sb-grovel in your own ASDF System: using sb grovel.
+* Using sb-grovel in Your Own ASDF System: using sb grovel.
 * Contents of a grovel-constants-file: sb grovel constants file.
-* Programming with sb-grovel's structure types: sb grovel structures.
+* Programming with sb-grovel's Structure Types: sb grovel structures.
 * Traps and Pitfalls: sb grovel traps.
 @end menu
 
@@ -25,7 +25,7 @@ currently compatible only to SBCL. However, if you want to use it,
 here are a few directions.
 
 @node using sb grovel
-@subsection Using sb-grovel in your own ASDF System
+@subsection Using sb-grovel in Your Own ASDF System
 
 @itemize
 @item Create a Lisp package for the foreign constants/functions to go
@@ -198,7 +198,7 @@ structure member.
 @end itemize
 
 @node sb grovel structures
-@subsection Programming with sb-grovel's structure types
+@subsection Programming with sb-grovel's Structure Types
 
 Let us assume that you have a grovelled structure definition:
 

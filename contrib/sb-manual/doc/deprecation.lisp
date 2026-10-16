@@ -250,7 +250,7 @@
       into late deprecation in November 2012.
 
       This compiler policy was never functional: SBCL has always
-      merged tail calls when it could, regardless of this policy
+      merged @TAIL-CALLs when it could, regardless of this policy
       setting. (It was also never officially supported, but several
       code-bases have historically used it.)
 

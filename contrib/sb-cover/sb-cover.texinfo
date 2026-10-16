@@ -63,7 +63,7 @@ Reset all coverage data back to the @code{Not executed} state.
 @ffindex @sortas{clear-coverage sb-cover} clear-coverage [sb-cover]
 @deffn{Function} sb-cover:clear-coverage
 Clear all files from the coverage database. The files will be re-entered
-into the database when the FASL files (produced by compiling
+into the database when the fasl files (produced by compiling
 @code{store-coverage-data} optimization policy set to 3) are loaded again into the
 image.
 @end deffn

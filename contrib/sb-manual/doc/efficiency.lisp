@@ -66,13 +66,14 @@
 
   - a TAGBODY and a GO tag has been closed over.
 
-  These inhibit tail calls because they require cleanups when the
-  stack is unwound.")
+  These inhibit @TAIL-CALL-OPTIMIZATION because they require cleanups
+  when the stack is unwound. ~TAIL-CALL-OPTIMIZATION")
 
 (defsection @tail-recursion (:title "Tail Recursion"
                              :concepts (~tail-recursion))
-  "Tail recursion is when a function makes a @TAIL-CALL to itself.
-  In this example, the recursive call to `MYFUN` is tail-recursive:
+  "Tail recursion is when a function makes a @TAIL-CALL to
+  itself. In this example, the recursive call to `MYFUN` is
+  tail-recursive:
 
       (defun myfun (x)
         (if (oddp (random x))
@@ -236,8 +237,8 @@
                               :concepts (~local-tail-call))
   "Local tail calls are particularly efficient because they combine the
   benefits of @LOCAL-CALLs (simplified calling convention) and
-  @TAIL-CALLs (reusing the stack frame). Scheme programmers write
-  loops with tail-recursive local calls instead of using the
+  @TAIL-CALLs ~TAIL-CALL (reusing the stack frame). Scheme programmers
+  write loops with tail-recursive local calls instead of using the
   imperative GO and SETQ. This has not caught on in the Common Lisp
   community for historical reasons and because the standard does not
   require tail calls. In SBCL, users can choose to write loops such as
@@ -872,12 +873,10 @@
 
 (defsection @miscellaneous-efficiency-issues
     (:title "Miscellaneous Efficiency Issues")
-  "FIXME: The material in the CMUCL manual about getting good
-  performance from the compiler should be reviewed, reformatted in
-  Texinfo, lightly edited for SBCL, and substituted into this
-  manual. In the meantime, the original CMUCL manual is still 95+%
-  correct for the SBCL version of the Python compiler. See the
-  sections
+  "FIXME: The remaining material in the CMUCL manual about getting good
+  performance from the compiler should be reviewed, and added to this
+  section. In the meantime, the original CMUCL manual is still 95+%
+  correct for the SBCL's compiler. See the sections
 
   - Advanced Compiler Use and Efficiency Hints
   - Advanced Compiler Introduction
@@ -892,18 +891,19 @@
   Besides this information from the CMUCL manual, there are a few other
   points to keep in mind.
 
-  - The CMUCL manual doesn't seem to state it explicitly, but Python
-    has a mental block about type inference when assignment is
-    involved. Python is very aggressive and clever about inferring the
-    types of values bound with LET, LET*, inline function call, and so
-    forth. However, it's much more passive and dumb about inferring
-    the types of values assigned with SETQ, SETF, and friends. It
-    would be nice to fix this, but in the meantime don't expect that
-    just because it's very smart about types in most respects it will
-    be smart about types involved in assignments. (This doesn't affect
-    its ability to benefit from explicit type declarations involving
-    the assigned variables, only its ability to get by without
-    explicit type declarations.)"
+  - The CMUCL manual doesn't seem to state it explicitly, but
+    Python (the CMUCL compiler, not the language) has a mental block
+    about type inference when assignment is involved. Python is very
+    aggressive and clever about inferring the types of values bound
+    with LET, LET*, inline function call, and so forth. However, it's
+    much more passive and dumb about inferring the types of values
+    assigned with SETQ, SETF, and friends. It would be nice to fix
+    this, but in the meantime don't expect that just because it's very
+    smart about types in most respects it will be smart about types
+    involved in assignments. (This doesn't affect its ability to
+    benefit from explicit type declarations involving the assigned
+    variables, only its ability to get by without explicit type
+    declarations.)"
   ;; FIXME: Python dislikes assignments but not in type inference. The
   ;; real problems are loop induction, closed over variables and
   ;; aliases.

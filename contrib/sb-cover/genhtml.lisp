@@ -5,7 +5,7 @@
 
 (defun clear-coverage ()
   "Clear all files from the coverage database. The files will be re-entered
-into the database when the FASL files (produced by compiling
+into the database when the fasl files (produced by compiling
 STORE-COVERAGE-DATA optimization policy set to 3) are loaded again into the
 image."
   (clrhash (code-coverage-hashtable))

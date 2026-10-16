@@ -245,6 +245,7 @@
 
 (defsection @debugging-tail-calls (:title "Debugging Tail Calls")
   "@TAIL-CALL-OPTIMIZATION can eliminate frames. Consider this backtrace:
+  ~TAIL-CALL ~TAIL-CALL-OPTIMIZATION
 
       (BAR ...)
       (FOO ...)
@@ -498,7 +499,7 @@
 
 (defsection @how-the-source-is-found (:title "How the Source is Found")
   "If the code was defined from Lisp by COMPILE or EVAL, then the source
-  can always be reliably located. If the code was defined from a FASL
+  can always be reliably located. If the code was defined from a fasl
   file created by COMPILE-FILE, then the debugger gets the source
   forms it prints by reading them from the original source file. This
   is a potential problem, since the source file might have moved or
@@ -621,7 +622,7 @@
 
       - @TAIL-CALL-OPTIMIZATION is disabled. Thus, backtraces will
         contain frames for all invoked functions, even those in tail
-        positions.
+        positions. ~TAIL-CALL-OPTIMIZATION
 
   Inlining of local functions is inhibited so that they may be TRACEd.
 
@@ -853,7 +854,8 @@
   exhaustion. Failed assertions in the low-level runtime (see
   @COMMAND-LINE-OPTIONS) trigger entering \\LDB if it's
 
-  - available (if SBCL was not compiled with `--without-sb-ldb`) and
+  - available (if SBCL was not compiled with `--without-sb-ldb`; see
+    @CUSTOMIZING-THE-BUILD) and
 
   - not disabled (see `--disable-ldb` in @RUNTIME-OPTIONS and
     SB-EXT:DISABLE-DEBUGGER).
@@ -864,8 +866,7 @@
   The commands supported can be explored at the \\LDB prompt by typing
   `help` followed by an enter.
 
-  Also see the related `--lose-on-corruption` option in
-  @RUNTIME-OPTIONS.")
+  See the related `--lose-on-corruption` option in @RUNTIME-OPTIONS.")
 
 (defsection @enabling-and-disabling-the-debugger
     (:title "Enabling and Disabling the Debugger"

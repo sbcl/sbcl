@@ -355,8 +355,9 @@ indirect containers: @code{fdefinition}s, @code{eql} specializers, classes, and
 thread-local symbol values in other threads fall into this category.
 
 @quotation
-@emph{Note}: calling @code{map-root} with a THREAD does not currently map over
-conservative roots from the thread registers and interrupt contexts.
+@emph{Note}: calling @code{map-root} with a @code{sb-thread:thread} does not currently
+map over conservative roots from the thread registers and interrupt
+contexts.
 @end quotation
 
 Experimental: interface subject to change.

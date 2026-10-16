@@ -140,16 +140,27 @@
 (define-concept @external-format (:title "external format"
                               :keys (("external" "format")
                                      ("format," "external"))))
-
+
 (define-concept @generational-gc
     (:title "generational GC"
      :keys (("garbage collector," "generational")
-            ("generational" "garbage collector"))))
+            ("generational" "garbage collector")
+            ("GENCGC"))))
+
+(define-concept @gencgc
+    (:title "GENCGC"
+     :keys (@generational-gc)))
 
 (define-concept @conservative-gc
     (:title "conservative GC"
      :keys (("garbage collector," "conservative")
-            ("conservative" "garbage collector"))))
+            ("conservative" "garbage collector")
+            ("CheneyGC"))))
+
+(define-concept @cheneygc
+    (:title "CheneyGC"
+     :keys (@conservative-gc)))
+
 
 (define-concept @declaration (:title "declaration"
                               :keys ("declaration")))

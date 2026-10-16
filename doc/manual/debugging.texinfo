@@ -335,7 +335,14 @@ entry points.
 @node debugging tail calls
 @subsubsection Debugging Tail Calls
 
+@cindex tail call
+@cindex call, tail
+@cindex function call, tail
+@cindex tail call optimization
+@cindex optimization, tail call
+@cindex TCO
 @ref{tail call optimization} can eliminate frames. Consider this backtrace:
+ 
 
 @example
 (BAR ...)
@@ -668,7 +675,7 @@ list whose first element is @code{#:***here***}. In the previous example,
 @subsubsection How the Source is Found
 
 If the code was defined from Lisp by @code{compile} or @code{eval}, then the source
-can always be reliably located. If the code was defined from a FASL
+can always be reliably located. If the code was defined from a fasl
 file created by @code{compile-file}, then the debugger gets the source
 forms it prints by reading them from the original source file. This
 is a potential problem, since the source file might have moved or
@@ -788,6 +795,9 @@ quality:
 
 @cindex speed, optimization quality
 @cindex optimization quality speed
+@cindex tail call optimization
+@cindex optimization, tail call
+@cindex TCO
 @itemize
 @item @code{0<=}: Only the function name and enough information to allow the
   stack to be parsed.
@@ -815,7 +825,7 @@ run-time.
 
 @item @ref{tail call optimization} is disabled. Thus, backtraces will
       contain frames for all invoked functions, even those in tail
-      positions.
+      positions. 
 @end itemize
 @end itemize
 
@@ -1116,7 +1126,8 @@ exhaustion. Failed assertions in the low-level runtime (see
 @ref{command line options}) trigger entering LDB if it's
 
 @itemize
-@item available (if SBCL was not compiled with @code{--without-sb-ldb}) and
+@item available (if SBCL was not compiled with @code{--without-sb-ldb}; see
+  @ref{customizing the build}) and
 
 @item not disabled (see @code{--disable-ldb} in @ref{runtime options} and
   @code{sb-ext:disable-debugger}).
@@ -1128,8 +1139,7 @@ exits with a non-zero exit code.
 The commands supported can be explored at the LDB prompt by typing
 @code{help} followed by an enter.
 
-Also see the related @code{--lose-on-corruption} option in
-@ref{runtime options}.
+See the related @code{--lose-on-corruption} option in @ref{runtime options}.
 
 @node enabling and disabling the debugger
 @cindex debugger, enabling

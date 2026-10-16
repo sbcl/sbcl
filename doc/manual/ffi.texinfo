@@ -12,7 +12,7 @@
 * Loading Shared Object Files: loading shared object files.
 * Foreign Function Calls: foreign function calls.
 * Calling Lisp From C: calling lisp from c.
-* Step-By-Step Example of the Foreign Function Interface: step by step example of the foreign function interface.
+* Step-by-step Example of the Foreign Function Interface: step by step example of the foreign function interface.
 @end menu
 
 This chapter describes SBCL's interface to C programs and
@@ -979,6 +979,7 @@ coping with this:
 
 @cindex garbage collector, generational
 @cindex generational garbage collector
+@cindex GENCGC
 @itemize
 @item @code{sb-ext:purify} moves all live Lisp data into static or read-only
   areas such that it will never be moved (or freed) again in the
@@ -1015,7 +1016,7 @@ undo Lisp initialization gracefully from C.
 @end quotation
 
 @node step by step example of the foreign function interface
-@section Step-By-Step Example of the Foreign Function Interface
+@section Step-by-step Example of the Foreign Function Interface
 
 This section presents a complete example of an interface to a somewhat
 complicated C function.

@@ -27,7 +27,7 @@
       * (exit)
       $
 
-  Also see @COMMAND-LINE-OPTIONS and @STOPPING-SBCL."
+  See also @COMMAND-LINE-OPTIONS and @STOPPING-SBCL."
   (@running-without-installation section)
   (@running-from-emacs section)
   (@shebang-scripts section)
@@ -430,7 +430,7 @@
       The user initialization file is intended for personal
       customizations, such as loading certain modules at startup,
       defining convenience functions to use in the @REPL, handling
-      automatic recompilation of FASLs (see @FASL-FORMAT), etc.
+      automatic recompilation of fasls (see @FASL-FORMAT), etc.
 
   Neither initialization file is required."
   (sb-ext:*sysinit-pathname-function* variable)
