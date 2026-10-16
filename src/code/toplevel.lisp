@@ -30,17 +30,31 @@
 (defun userinit-pathname ()
   (merge-pathnames ".sbclrc" (user-homedir-pathname)))
 
-(define-load-time-global *sysinit-pathname-function* #'sysinit-pathname
-  "Designator for a function of zero arguments called to obtain a
-pathname designator for the default sysinit file, or NIL. If the
-function returns NIL, no sysinit file is used unless one has been
-specified on the command line.")
+(define-load-time-global *sysinit-pathname-function* nil
+    "Controls the sysinit file defaulting of the
+SB-MANUAL:@DEFAULT-TOPLEVEL. This is NIL or a designator for a
+function of zero arguments.
 
-(define-load-time-global *userinit-pathname-function* #'userinit-pathname
-  "Designator for a function of zero arguments called to obtain a
-pathname designator or a stream for the default userinit file, or NIL.
-If the function returns NIL, no userinit file is used unless one has
-been specified on the command line.")
+- If NIL, the default behavior described in
+  SB-MANUAL:@INITIALIZATION-FILES is in effect.
+
+- If a function, it is called by the default toplevel to obtain a
+  pathname designator for the default sysinit file or NIL. If the
+  function returns NIL, no sysinit file is used unless one has been
+  specified on the command line.")
+
+(define-load-time-global *userinit-pathname-function* nil
+    "Controls the userinit file defaulting of the
+SB-MANUAL:@DEFAULT-TOPLEVEL. This is NIL or a designator for a
+function of zero arguments.
+
+- If NIL, the default behavior described in
+  SB-MANUAL:@INITIALIZATION-FILES is in effect.
+
+- If a function, it is called by the default toplevel to obtain a
+  pathname designator for the default userinit file or NIL. If the
+  function returns NIL, no sysinit file is used unless one has been
+  specified on the command line.")
 
 
 ;;;; miscellaneous utilities for working with with TOPLEVEL
@@ -584,9 +598,13 @@ any non-negative real number."
                                       "The specified ~A file ~A was not found."
                                       kind specified-pathname)))))))
             (unless no-sysinit
-              (process-init-file "sysinit" sysinit *sysinit-pathname-function*))
+              (process-init-file "sysinit" sysinit
+                                 (or *sysinit-pathname-function*
+                                     #'sysinit-pathname)))
             (unless no-userinit
-              (process-init-file "userinit" userinit *userinit-pathname-function*))
+              (process-init-file "userinit" userinit
+                                 (or *userinit-pathname-function*
+                                     #'userinit-pathname)))
             (when finally-quit
               (push (list :quit) reversed-options))
             (process-eval/load-options (nreverse reversed-options))
