@@ -96,8 +96,8 @@ MAKE-SHORT-VALUES-TYPE:
    BOOLEAN, SYMBOL, (OR NULL FIXNUM), or T) from :REQUIRED into :OPTIONAL.
 
 
-3. The Absurd Consequences of MAKE-SHORT-VALUES-TYPE
-----------------------------------------------------
+3. The Consequences of MAKE-SHORT-VALUES-TYPE
+---------------------------------------------
 Baking MAKE-SHORT-VALUES-TYPE into the VALUES type translator created four
 anomalies:
 
@@ -142,8 +142,8 @@ anomalies:
     non-strict for users.
 
 
-4. Restoring Sanity
--------------------
+4. Restoring Exactness
+----------------------
 Step 1 (implemented):
   (DECLARE (VALUES ...)) in a function body is an SBCL/CMUCL extension (not
   part of ANSI Common Lisp). Controlled by

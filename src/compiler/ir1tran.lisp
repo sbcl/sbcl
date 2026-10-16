@@ -1783,16 +1783,15 @@
 ;;; you can insert &REST T explicitly.
 ;;; While THE allows extra values and assumes NILs for missing values, SBCL
 ;;; (or rather, CMUCL) invented the treatment of VALUES as a return declaration,
-;;; and could have done anything reasonable.
-;;; My stance is that the legacy treatment was not reasonable, and while some
-;;; may consider it written in stone (or dried mud!), any debate about what it
-;;; "should" do comes down to a question of backward compatibility more than
-;;; spec conformance.
+;;; and could have chosen strict semantics. The legacy non-strict semantics have
+;;; counterintuitive aspects, and while some may consider it written in stone
+;;; (or dried mud!), any debate about what it "should" do comes down to a question
+;;; of backward compatibility more than spec conformance.
 ;;;
 ;;; Evidence in favor of strictness:
 ;;; (1) See define-external-format in sb-simple-streams/internal.lisp where the
 ;;;     author believed he was declaring exactly 1 value of type T.
-;;;     Otherwise the mere existence of that declaration is absurd.
+;;;     Otherwise the declaration is a no-op.
 ;;; (2) Adding &OPTIONAL INTEGER to (VALUES INTEGER) undeniably widens the allowed
 ;;;     value count from {1} to {1,2}. Under the legacy treatment, the addition of
 ;;;     &OPTIONAL paradoxically _shrank_ the upper bound on the number of values
@@ -1801,7 +1800,7 @@
 ;;;     strictness.
 ;;; (4) When SBCL made VALUES non-strict, it had to invent SB-INT:SFUNCTION,
 ;;;     in recognition of the fact that types "for declaration" should behave
-;;;     as stated, thereby restoring sanity to 'fndb' while leaving FUNCTION
+;;;     as stated, thereby restoring strictness to 'fndb' while leaving FUNCTION
 ;;;     (and users of it) with weakened semantics.
 ;;;
 ;;; But those among us who believe that users prefer sloppy declarations
