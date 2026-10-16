@@ -4520,27 +4520,6 @@
                              (make-numeric-type 'unsigned-byte shift)))
          `(ash-left-add int ,shift add))))))
 
-(defun cast-or-check-bound-type (node &optional type fixnum)
-  (unless (and type
-               (csubtypep (single-value-type (node-derived-type node)) type))
-    (multiple-value-bind (dest dest-lvar) (immediately-used-let-dest node :flushable t)
-      (let ((cast-type (cond ((cast-p dest)
-                              (and (cast-type-check dest)
-                                   (single-value-type (cast-type-to-check dest))))
-                             ((and (combination-p dest)
-                                   (member (combination-fun-debug-name dest) '((transform-for check-bound) %check-bound)
-                                           :test #'equal)
-                                   (eq (third (combination-args dest)) dest-lvar))
-                              (if fixnum
-                                  (specifier-type 'index)
-                                  (specifier-type 'sb-vm:signed-word))))))
-        (when cast-type
-          (let ((result-type (type-intersection cast-type (single-value-type (node-derived-type node)))))
-            (when (and (not (eq result-type *empty-type*))
-                       (or (not type)
-                           (csubtypep result-type type)))
-              (values cast-type result-type))))))))
-
 ;;; (the fixnum (+ x fixnum)) can use inline arithmetic because X can only be a singed word.
 (when-vop-existsp (:translate overflow+)
   (macrolet ((def (name types word-var args vop)
@@ -6732,8 +6711,8 @@
                    (t (give-up-ir1-transform)))))
           ((not (or
                  (policy node (= float-accuracy 0))
-                 (csubtypep (single-value-result-type node t)
-                            (specifier-type '(or rational (complex rational))))))
+                 (node-subtypep node (or rational (complex rational)) :asserted t)))
+           (delay-ir1-transform node :constraint)
            (give-up-ir1-transform))
           ((= val 2) '(* x x))
           ((= val -2) '(/ (* x x)))

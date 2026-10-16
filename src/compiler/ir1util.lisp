@@ -349,20 +349,22 @@
 (defmacro lvar-intersection  (lvar type)
   `(type-intersection (lvar-type ,lvar) (specifier-type ',type)))
 
-(defmacro node-subtypep  (node type &key asserted single-value nth-value)
-  `(let ((node ,node))
-     ,(cond (single-value
-             `(csubtypep (single-value-result-type node ,asserted)
-                         (specifier-type ',type)))
-            (nth-value
-             (aver asserted)
-             `(csubtypep (mv-asserted-type node ,nth-value)
-                         (specifier-type ',type)))
-            (t
-             `(values-subtypep (if ,asserted
-                                   (node-asserted-type node)
-                                   (node-derived-type node))
-                               (values-specifier-type ',type))))))
+(defmacro node-subtypep  (node type &key asserted nth-value)
+  (let ((single-value (not (typep type '(cons (eql values))))))
+    `(let ((node ,node))
+       ,(cond (single-value
+               `(csubtypep (single-value-type
+                            ,(if asserted
+                                 `(or (node-checked-type node)
+                                      (node-derived-type node))
+                                 `(node-derived-type node)))
+                           (specifier-type ',type)))
+              (nth-value
+               (aver asserted)
+               `(csubtypep (mv-asserted-type node ,nth-value)
+                           (specifier-type ',type)))
+              (t
+               (bug "Implement"))))))
 
 (defun mv-asserted-type (node nth-value)
   (let* ((dtype (node-derived-type node))
@@ -433,6 +435,30 @@
                    (not (lambda-var-sets var)))
           (let-lvar-dest (node-lvar (car refs)) single-use))))))
 
+(defun %cast-or-check-bound (node lvar &optional fixnum)
+  (cond ((cast-p node)
+         (and (cast-type-check node)
+              (single-value-type (cast-type-to-check node))))
+        ((and (combination-p node)
+              (member (combination-fun-debug-name node) '((transform-for check-bound) %check-bound)
+                      :test #'equal)
+              (eq (third (combination-args node)) lvar))
+         (if fixnum
+             (specifier-type 'index)
+             (specifier-type 'sb-vm:signed-word)))))
+
+(defun cast-or-check-bound-type (node &optional type fixnum)
+  (unless (and type
+               (csubtypep (single-value-type (node-derived-type node)) type))
+    (multiple-value-bind (dest dest-lvar) (immediately-used-let-dest node :flushable t)
+      (let ((cast-type (%cast-or-check-bound dest dest-lvar fixnum)))
+        (when cast-type
+          (let ((result-type (type-intersection cast-type (single-value-type (node-derived-type node)))))
+            (when (and (not (eq result-type *empty-type*))
+                       (or (not type)
+                           (csubtypep result-type type)))
+              (values cast-type result-type))))))))
+
 (defun mv-bind-asserted-type (lvar nth-value)
   (let ((vars (mv-bind-vars lvar))
         type)
@@ -440,13 +466,28 @@
       (let ((var (nth nth-value vars)))
         (unless (lambda-var-sets var)
           (loop for ref in (leaf-refs var)
-                for cast = (cast-or-check-bound-type ref)
-                do (cond ((not cast)
-                          (return-from mv-bind-asserted-type))
-                         (type
+                for cast = (or (cast-or-check-bound-type ref)
+                               (single-value-type (node-derived-type ref)))
+                do (cond (type
                           (setf type (type-union type cast)))
                          (t
                           (setf type cast)))))))
+    type))
+
+(defun node-checked-type (node)
+  (let (type)
+    (map-all-dests (lambda (node lvar nth-value)
+                     (declare (ignore nth-value))
+                     (let ((cast (or (%cast-or-check-bound node lvar)
+                                     (lvar-type lvar))))
+                       (cond ((not cast)
+                              (return-from node-checked-type))
+                             (type
+                              (setf type (type-union type cast)))
+                             (t
+                              (setf type cast))))
+                     nil)
+                   node)
     type))
 
 (declaim (inline lvar-single-value-p))

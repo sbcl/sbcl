@@ -2849,3 +2849,16 @@
      (DECLARE ((member -121 256) n))
      (nth-value 1 (floor n 127)))
    (or (eql 2) (eql 6))))
+
+(with-test (:name :expt-to-*-asserted)
+  (assert (not (find 'expt
+                     (ctu:ir1-named-calls '(lambda (b)
+                                            (let ((n (expt b 2)))
+                                              (+ (the integer n)
+                                                 n)))))))
+  (assert (find 'expt
+                (ctu:ir1-named-calls '(lambda (b m)
+                                       (let ((n (expt b 2)))
+                                         (if m
+                                             (the real n)
+                                             (the integer n))))))))
