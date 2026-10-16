@@ -203,10 +203,9 @@
         cdr-min cdr-max cdr-symbols)
     (if (if (listp sequence)
             (or (null sequence)
-                (unless (proper-or-dotted-list-p sequence)
-                  (return-from constant-sequence-element-type *universal-type*)))
+                (not (proper-or-dotted-list-p sequence)))
             (= (array-total-size sequence) 0))
-        *empty-type*
+        nil
         (let ()
           #-sb-xc-host
           (unless key

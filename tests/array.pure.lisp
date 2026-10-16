@@ -1204,3 +1204,11 @@
      (declare ((integer 2 5) i))
      (aref #(0 0 1 2 3 4) i))
    (integer 1 4)))
+
+(with-test (:name :elt-empty-array)
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda (n)
+                  (elt #() n))
+               :allow-warnings t))))
