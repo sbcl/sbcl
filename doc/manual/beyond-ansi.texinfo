@@ -1370,8 +1370,8 @@ functions described in @ref{exseq simple iterator protocol}.
 A list of strings related to the UNIX command line (@code{argv} in C).
 
 @ref{runtime options} are processed and removed by the runtime.
-The default toplevel (see @code{sb-ext:save-lisp-and-die}) also removes the
-@ref{toplevel options} that it processes.
+The default toplevel also removes @ref{toplevel options} that it
+processes.
 @end deffn
 @anchor{Function sb-ext posix-getenv}
 @ffindex @sortas{posix-getenv sb-ext} posix-getenv [sb-ext]

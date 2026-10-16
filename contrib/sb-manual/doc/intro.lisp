@@ -155,7 +155,7 @@
   to hard to diagnose bugs.
 
   The following snippet handles fasl recompilation automatically for
-  ASDF-based systems, and makes a good candidate for inclusion in the
+  ASDF-based systems and makes a good candidate for inclusion in the
   user or system initialization file (see @INITIALIZATION-FILES).
 
       (require :asdf)

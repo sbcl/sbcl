@@ -437,8 +437,8 @@ any non-negative real number."
  "A list of strings related to the UNIX command line (`argv` in \\C).
 
  SB-MANUAL:@RUNTIME-OPTIONS are processed and removed by the runtime.
- The default toplevel (see SB-EXT:SAVE-LISP-AND-DIE) also removes the
- SB-MANUAL:@TOPLEVEL-OPTIONS that it processes.")
+ The default toplevel also removes SB-MANUAL:@TOPLEVEL-OPTIONS that it
+ processes.")
 
 ;;; the default system top level function
 (defun toplevel-init ()

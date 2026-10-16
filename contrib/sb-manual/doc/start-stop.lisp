@@ -5,7 +5,8 @@
   (@stopping-sbcl section)
   (@command-line-options section)
   (@initialization-files section)
-  (@initialization-and-exit-hooks section))
+  (@initialization-and-exit-hooks section)
+  (@core-images section))
 
 (defsection @starting-sbcl (:title "Starting SBCL")
   "If SBCL is installed properly and it is in your `PATH`, you can simply
@@ -173,7 +174,6 @@
 (defsection @stopping-sbcl (:title "Stopping SBCL")
   (@exit section)
   (@end-of-file section)
-  (@saving-a-core-image section)
   (@exit-on-errors section))
 
 (defsection @exit (:title "Exit")
@@ -188,24 +188,6 @@
   be caused either by the user pressing `Control-D` on an attached
   terminal, or by the input stream ending when SBCL is used as part of
   a shell pipeline.")
-
-(defsection @saving-a-core-image (:title "Saving a Core Image")
-  "SBCL has the ability to save its state as a file for later
-  execution. This functionality is important for its bootstrapping
-  process, and is also provided as an extension to the user."
-  (sb-ext:save-lisp-and-die function)
-  ;; When Swank is loaded, it sets this variable.
-  (sb-ext:*save-hooks* (variable nil))
-  "In cases where the standard initialization files have already been
-  loaded into the saved core and alternative ones should be used (or
-  none at all), SBCL allows customizing the initfile pathname
-  computation."
-  (sb-ext:*sysinit-pathname-function* variable)
-  (sb-ext:*userinit-pathname-function* variable)
-  "To facilitate distribution of SBCL applications using external
-  resources, the filesystem location of the SBCL core file being used
-  is available from Lisp."
-  (sb-ext:*core-pathname* (variable "<site-specific>")))
 
 (defsection @exit-on-errors (:title "Exit on Errors")
   "SBCL can also be configured to exit if an unhandled error occurs,
@@ -327,16 +309,18 @@
 
       Print SBCL's version information, then exit.
 
-  In the future, runtime options may be added to control behaviour
-  such as lazy allocation of memory.
+  - `--end-runtime-options`
 
-  Runtime options, including any `--end-runtime-options` option, are
-  stripped out of the command line before the Lisp toplevel logic gets
-  a chance to see it.")
+      End processing of runtime options and pass the rest of the
+      command-line arguments to the toplevel function.
+
+  In the future, runtime options may be added to control behaviour
+  such as lazy allocation of memory.")
 
 (defsection @toplevel-options (:title "Toplevel Options")
-  "The following options are processed and removed by the default
-  toplevel (see SB-EXT:SAVE-LISP-AND-DIE).
+  "The following options are supported by the @DEFAULT-TOPLEVEL. If the
+  toplevel function was overriden with SB-EXT:SAVE-LISP-AND-DIE, the
+  set of available toplevel options is likely very different.
 
   - `--sysinit <filename>`
 
@@ -413,19 +397,25 @@
       Additionally, the option sets *COMPILE-VERBOSE* and
       *LOAD-VERBOSE* to NIL while loading the file to avoid
       potentially verbose diagnostic messages printed on the standard
-      output.")
+      output.
+
+  - `--end-toplevel-options`
+
+      End processing of toplevel options, leaving the rest of the
+      command-line arguments in SB-EXT:*POSIX-ARGV*.")
 
 (defsection @initialization-files (:title "Initialization Files")
-  "SBCL processes initialization files with READ and EVAL,
-  not LOAD; hence initialization files can be used to set startup
-  *PACKAGE* and *READTABLE*, and for proclaiming a global optimization
-  policy.
+  "The @DEFAULT-TOPLEVEL supports customization via the system and user
+  initialization files. These files with READ and EVAL, not LOAD;
+  hence initialization files can be used to set startup *PACKAGE* and
+  *READTABLE*, and for proclaiming a global optimization policy.
 
-  - __System Initialization File:__ Defaults to `sbclrc` where the
-    `contrib/` directory is found (see @FINDING-PARTS-OF-SBCL), or if
-    that doesn't exist to `/etc/sbclrc`. Can be overridden with the
-    command-line option `--sysinit` or `--no-sysinit` (see
-    @TOPLEVEL-OPTIONS).
+  - __System Initialization File:__ Defaults to `sbclrc` in the
+    directory where `contrib/` is found (see @FINDING-PARTS-OF-SBCL),
+    or if that doesn't exist to `/etc/sbclrc`. Can be overridden with
+    the command-line option `--sysinit` or `--no-sysinit` (see
+    @TOPLEVEL-OPTIONS). Set SB-EXT:*SYSINIT-PATHNAME-FUNCTION* to
+    override the above defaulting behavior.
 
       The system initialization file is intended for system
       administrators and software packagers to configure locations of
@@ -433,18 +423,45 @@
 
   - __User Initialization File:__ Defaults to `$HOME/.sbclrc`. Can be
     overridden with the command-line option `--userinit` or
-    `--no-userinit` (see @TOPLEVEL-OPTIONS).
+    `--no-userinit` (see @TOPLEVEL-OPTIONS). Set
+    SB-EXT:*USERINIT-PATHNAME-FUNCTION* to override the above
+    defaulting behavior.
 
       The user initialization file is intended for personal
       customizations, such as loading certain modules at startup,
-      defining convenience functions to use in the @REPL,
-      handling automatic recompilation of FASLs (see @FASL-FORMAT),
-      etc.
+      defining convenience functions to use in the @REPL, handling
+      automatic recompilation of FASLs (see @FASL-FORMAT), etc.
 
-  Neither initialization file is required.")
+  Neither initialization file is required."
+  (sb-ext:*sysinit-pathname-function* variable)
+  (sb-ext:*userinit-pathname-function* variable))
 
 (defsection @initialization-and-exit-hooks
     (:title "Initialization and Exit Hooks")
   "SBCL provides hooks into the system initialization and exit."
-  (sb-ext:*init-hooks* variable)
+  ;; With the NIL, hide tha actual value, which some contribs do change.
+  (sb-ext:*init-hooks* (variable nil))
   (sb-ext:*exit-hooks* variable))
+
+(defsection @core-images (:title "Core Images")
+  (@saving-a-core-image section)
+  (@default-toplevel section))
+
+(defsection @saving-a-core-image (:title "Saving a Core Image")
+  "SBCL has the ability to save its state as a file for later
+  execution. This functionality is important for its bootstrapping
+  process and is also provided as an extension to the user."
+  (sb-ext:save-lisp-and-die function)
+  ;; When Swank is loaded, it sets this variable.
+  (sb-ext:*save-hooks* (variable nil))
+  "To facilitate distribution of SBCL applications using external
+  resources, the filesystem location of the SBCL core file being used
+  is available from Lisp."
+  (sb-ext:*core-pathname* (variable "<varies>")))
+
+(defsection @default-toplevel (:title "Default Toplevel")
+  "SBCL's default toplevel function processes @TOPLEVEL-OPTIONS,
+  runs @INITIALIZATION-FILES, and provides a @REPL.
+
+  The toplevel function of @CORE-IMAGES can be specified with the
+  :TOPLEVEL argument of SB-EXT:SAVE-LISP-AND-DIE.")

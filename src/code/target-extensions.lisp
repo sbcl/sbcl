@@ -58,13 +58,13 @@ order when a saved core image starts up, after the system itself has
 been initialized, but before non-user threads such as the finalizer
 thread have been started.
 
-Unused by SBCL itself; reserved for the user and applications.")
+Unused by SBCL itself; reserved for the user, contribs and applications.")
 
 (define-load-time-global *exit-hooks* nil
   "A list of function designators called in an unspecified
 order when SBCL process exits.
 
-Unused by SBCL itself; reserved for the user and applications.
+Unused by SBCL itself; reserved for the user, contribs and applications.
 
 Using (SB-EXT:EXIT :ABORT T), or calling `exit(3)` directly circumvents
 these hooks.")
