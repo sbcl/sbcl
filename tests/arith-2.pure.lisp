@@ -2861,7 +2861,13 @@
                                        (let ((n (expt b 2)))
                                          (if m
                                              (the real n)
-                                             (the integer n))))))))
+                                             (the integer n)))))))
+  (assert (find 'expt
+                (ctu:ir1-named-calls '(lambda (x)
+                                       (values 1 (expt x 2))))))
+  (assert (find 'expt
+                (ctu:ir1-named-calls '(lambda (x)
+                                       (the integer (values * (expt x 2))))))))
 
 
 (with-test (:name :truncate-transform-self-match)

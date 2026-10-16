@@ -441,10 +441,12 @@
                    (not (lambda-var-sets var)))
           (let-lvar-dest (node-lvar (car refs)) single-use))))))
 
-(defun %cast-or-check-bound (node lvar &optional fixnum)
+(defun %cast-or-check-bound (node lvar &optional fixnum (single-value t))
   (cond ((cast-p node)
          (and (cast-type-check node)
-              (single-value-type (cast-type-to-check node))))
+              (if single-value
+                  (single-value-type (cast-type-to-check node))
+                  (cast-type-to-check node))))
         ((and (combination-p node)
               (member (combination-fun-debug-name node) '((transform-for check-bound) %check-bound)
                       :test #'equal)
@@ -483,12 +485,12 @@
 (defun node-checked-type (node)
   (let (type)
     (map-all-dests (lambda (node lvar nth-value)
-                     (declare (ignore nth-value))
-                     (let ((cast (or (%cast-or-check-bound node lvar)
-                                     (lvar-type lvar))))
-                       (cond ((not cast)
-                              (return-from node-checked-type))
-                             (type
+                     (let* ((cast (or (%cast-or-check-bound node lvar nil nil)
+                                      (lvar-derived-type lvar)))
+                            (cast (if (/= nth-value 0)
+                                      (values-type-nth nth-value cast)
+                                      (single-value-type cast))))
+                       (cond (type
                               (setf type (type-union type cast)))
                              (t
                               (setf type cast))))
