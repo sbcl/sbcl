@@ -688,7 +688,7 @@
                                     (typep x 'index))
                                   dims)))
             (fail "Bad array dimensions: ~s" dims)))
-        (combination-match2 ((lvar-uses dims) :transform nil)
+        (cmatch ((lvar-uses dims) :transform nil)
           ((list &rest args)
            (loop for arg in args
                  unless (lvar-intersectp arg index)
@@ -730,7 +730,7 @@
                                             (specifier-type 'integer))
                                  (supplied-and-true fill-pointer))
                              '(*))
-                            ((combination-match2 (dims :transform nil)
+                            ((cmatch (dims :transform nil)
                                ((list &rest args)
                                 (make-list (length args) :initial-element '*))
                                ((list* (:+ args) (:type null))
@@ -1865,7 +1865,7 @@
                                         n-bits))
 
 (deftransform sb-vm::%make-simple-array ((dims widetag n-bits) * * :node node)
-  (combination-match2 (node)
+  (cmatch (node)
     ((sb-vm::%make-simple-array (array-dimensions array) widetag n-bits)
      (when (or (lvar-subtypep array simple-array)
                (almost-immediately-used-p dims nil :flushable t))

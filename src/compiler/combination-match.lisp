@@ -203,7 +203,7 @@
     (let ((raw-combs (expand-aliases (ensure-or spec))))
       (mapcar #'parse-combination raw-combs))))
 
-(defmacro combination-match2 ((node &key (transform t) (unravel-casts t)) &body clauses)
+(defmacro cmatch ((node &key (transform t) (unravel-casts t)) &body clauses)
   (let (bound-vars)
     (labels ((collect-cm-pattern-vars (combinations)
                (let (vars)
@@ -589,7 +589,7 @@
                        (declare (ignorable ,@vars))
                        ,(unless (eq form :nil)
                           form))
-                    'combination-match2))
+                    'cmatch))
   (throw 'give-up-ir1-transform :none))
 
 

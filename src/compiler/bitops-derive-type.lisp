@@ -366,7 +366,7 @@
 (defoptimizer (logxor derive-type) ((x y) node)
   (add-type-intersection
    (two-arg-derive-type x y #'logxor-derive-type-aux)
-   (combination-match2 (node :transform nil)
+   (cmatch (node :transform nil)
      ;; If it's (logxor x (1- x)) then it will be a positive number,
      ;; except for 0 => -1. This is used to count unset bits.
      ((logxor x (- x 1))
@@ -414,7 +414,7 @@
 (defoptimizer (logior derive-type) ((x y) node)
   (add-type-intersection
    (two-arg-derive-type x y #'logior-derive-type-aux)
-   (combination-match2 (node :transform nil)
+   (cmatch (node :transform nil)
      ;; (logior x (- x)) has the same width as X and is <= 0
      ((logior x (- x))
       (multiple-value-bind (len pos neg low high) (integer-type-length (lvar-type x))
@@ -438,7 +438,7 @@
 (defoptimizer (logand derive-type) ((x y) node)
   (add-type-intersection
    (two-arg-derive-type x y #'logand-derive-type-aux)
-   (combination-match2 (node :transform nil)
+   (cmatch (node :transform nil)
      ;; (logand x (- x)) has the same width as (abs most-negative-X) and is >= 0
      ((logand x (- x))
       (multiple-value-bind (len pos neg low high) (integer-type-length (lvar-type y))

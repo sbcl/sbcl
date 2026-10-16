@@ -199,13 +199,13 @@
                 other argument), do nothing. Otherwise, splice LOGAND/M-S-F in."
                (unless (cond ((and (vop-existsp :named sb-vm::logand-word-mask)
                                    ;; logand-word-mask works without inserting additional cuts
-                                   (combination-match2 ((lvar-dest lvar) :transform nil)
+                                   (cmatch ((lvar-dest lvar) :transform nil)
                                      ((logand (:type unsigned-byte a) b)
                                       (when (lvar-from-lvar-p b lvar)
                                         (csubtypep (lvar-type a) type))))))
 
                              (t
-                              (combination-match2 ((lvar-dest lvar) :transform nil)
+                              (cmatch ((lvar-dest lvar) :transform nil)
                                 ((logand * (:constant c unsigned-byte))
                                  (ctypep c type))
                                 ((mask-signed-field (:constant c) *)
@@ -319,7 +319,7 @@
                     (let (did-something)
                       (do-uses (combination (cast-value node))
                         (when (and
-                               (combination-match2 (combination :transform nil)
+                               (cmatch (combination :transform nil)
                                  (((:or + -) a b)
                                   (or (not (lvar-intersectp a #1=(or ratio (complex rational))))
                                       (not (lvar-intersectp b #1#))))
@@ -493,7 +493,7 @@
 ;;; Remove the second logand or reduce its constant in
 ;;; (logand m (logand n #xFFFF))
 (deftransform logand ((a b) (t t) * :important nil :node node)
-  (combination-match2 (node)
+  (cmatch (node)
     ((logand a a)
      'a)
     ((logand (logior a *) a)
@@ -554,14 +554,14 @@
                   (truly-the ,(lvar-type b) b)))))))
 
 (deftransform logior ((a b) (t t) * :important nil :node node)
-  (combination-match2 (node)
+  (cmatch (node)
     ((logior a a)
      'a)
     ((logior (logand a *) a)
      'a)))
 
 (deftransform logxor ((a b) (t t) * :important nil :node node)
-  (combination-match2 (node)
+  (cmatch (node)
     ((logxor (logxor a b) b)
      'a)))
 

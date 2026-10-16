@@ -333,7 +333,7 @@
   ((array index #+(or x86 x86-64) offset)
    (vector (constant-arg t) #+(or x86 x86-64) (constant-arg t)) * :node node)
   (let ((index (+ (lvar-value index) #+(or x86 x86-64) (lvar-value offset))))
-    (combination-match2 (node)
+    (cmatch (node)
       ((:* (initialize-vector * &rest args) &rest)
        (when (< index (length args))
          (elt args index))))))

@@ -319,7 +319,7 @@
                 (args (loop for arg in args
                             for transform =
                             (when subseq
-                              (combination-match2 ((lvar-uses arg) :transform nil :unravel-casts nil)
+                              (cmatch ((lvar-uses arg) :transform nil :unravel-casts nil)
                                 (((:or list vector) &rest args)
                                  (splice-fun-args arg :any nil)
                                  (list* ''sb-impl::%splice
@@ -613,7 +613,7 @@
   (deffrob ceiling))
 
 (deftransform logtest ((x y) (t (constant-arg t)) * :node node :before-vop t)
-  (combination-match2 (node)
+  (cmatch (node)
     ((logtest (lognot x) (:constant c (integer 1)))
      (when (= (logcount c) 1)
        `(not (logtest x ,c))))
@@ -667,7 +667,7 @@
 
 ;;; (zerop (logand x y)) to (not (logtest x y)) if logtest has a VOP
 (deftransform eq ((x y) (integer (eql 0)) * :node node :important nil)
-  (combination-match2 (node)
+  (cmatch (node)
     ((eq (logand x y) 0)
      (cond ((vop-transform-applicable-p 'logtest combination)
             `(not (logtest x y)))
@@ -3365,7 +3365,7 @@
 (when-vop-existsp (:translate count-trailing-zeros)
   (deftransform integer-length ((x) (word) * :important nil :node node)
     (delay-ir1-transform node :ir1-phases)
-    (combination-match2 (node)
+    (cmatch (node)
       ((integer-length
         (sb-vm::lognot-mod64 (:or
                               (logior n (:or (sb-vm::%negate-mod64 n)
@@ -3379,7 +3379,7 @@
          `(count-trailing-zeros n))))))
 
 (deftransform integer-length ((x) (integer) * :node node :important nil)
-  (combination-match2 (node)
+  (cmatch (node)
     ((integer-length (lognot x))
      `(integer-length x))
     :dest
@@ -3495,7 +3495,7 @@
                 (specifier-type '(integer 1)))))))))
 
 (deftransform logcount ((x) (integer) * :node node :important nil)
-  (combination-match2 (node)
+  (cmatch (node)
     ((logcount (lognot x))
      `(logcount x))
     ((logcount (ash (:type unsigned-byte x) (:type unsigned-byte *)))
@@ -3518,14 +3518,14 @@
        '(or (eq x 0) (eq x -1))))))
 
 (deftransform logcount ((x) (unsigned-byte) * :node node :important nil)
-  (combination-match2 (node)
+  (cmatch (node)
     :dest
     ((eq (logcount x) 0)
      '(eq x 0))))
 
 (deftransform logcount ((x) (signed-word) * :node node :important nil)
   (delay-ir1-transform node :ir1-phases) ;; unsigned transforms are better
-  (combination-match2 (node)
+  (cmatch (node)
     :dest
     ((eq (logcount x) (integer-length x))
      `(let ((x (logxor x (ash x ,(- 1 sb-vm:n-word-bits)))))
@@ -3547,7 +3547,7 @@
         (logtest x (- x 1))))))
 
 (deftransform logcount ((x) (word) * :node node :important nil)
-  (combination-match2 (node)
+  (cmatch (node)
     :dest
     (((:or eq eql =) (logcount x) (integer-length x))
      `(not (logtest x (+ x 1))))
@@ -3711,7 +3711,7 @@
          `(car list))
         (t
          (if-vop-existsp (:named reverse-values-list)
-           (combination-match2 (node)
+           (cmatch (node)
              ((values-list ((:or reverse sb-impl::list-reverse) reverse-list))
               (when (lvar-almost-immediately-used-p list)
                 `(reverse-values-list reverse-list (length (the list reverse-list))))))
@@ -4043,7 +4043,7 @@
          (posn (lvar-value posn))
          (mask (mask-field (byte size posn) -1)))
     (cond ((<= mask most-positive-word)
-           (combination-match2 (node)
+           (cmatch (node)
              :dest
              (((:or eq > :name name) (%ldb posn integer) 0)
               `(,name (logand integer ,mask) 0))))
@@ -4052,7 +4052,7 @@
 
 ;;; Avoid creating bignums
 (deftransform %mask-field ((size posn int) * * :node node)
-  (combination-match2 (node)
+  (cmatch (node)
     :dest
     (((:or eq = > :name name) (%mask-field size posn int) 0)
      `(,name (%ldb size posn int) 0))))
@@ -4508,7 +4508,7 @@
   (when (double-word-sized-result-p node t)
     (give-up-ir1-transform))
   (delay-ir1-transform node :ir1-phases)
-  (combination-match2 (node)
+  (cmatch (node)
     ((+ ((:or ash * :name name) int (:constant m (integer 1))) add)
      (let ((shift (if (eq name 'ash)
                       m
@@ -4817,7 +4817,7 @@
                (erase-node-type node t 1)))
     ($if (member '$fun '(floor ceiling ffloor fceiling))
          (give-up-ir1-transform)
-         (combination-match2 (node)
+         (cmatch (node)
            (($fun (abs (:type real x)) (abs (:type real y)))
             `(values (abs ($fun x y))
                      ($unless (member '$fun '(* /))
@@ -6100,7 +6100,7 @@
 ;;; to (mask-signed-field n a)
 (when-vop-existsp (:named sb-vm::mask-signed-field-word/c)
   (deftransform logior ((a b) (integer integer) * :node node)
-    (combination-match2 (node)
+    (cmatch (node)
       ((logior a (- (logand a (:constant c word))))
        (let ((size (integer-length c)))
          (when (and (= (logcount c) 1)
@@ -8133,7 +8133,7 @@
 
 (make-defs (($fun = eq eql))
   (deftransform $fun ((x y) (real (constant-arg real)) * :node node :important nil)
-    (combination-match2 (node)
+    (cmatch (node)
       (($fun (abs (:type real x)) (:constant y))
        (cond (($if (eq '$fun '=)
                    (= y 0)
@@ -8151,7 +8151,7 @@
   (when (and (policy node (plusp float-accuracy))
              (lvar-intersectp x float))
     (give-up-ir1-transform))
-  (combination-match2 (node)
+  (cmatch (node)
     ((> (abs x) (:constant c))
      `(not (= x ,c)))))
 

@@ -3152,7 +3152,7 @@ is :ANY, the function name is not checked."
               (and (constant-p leaf)
                    (or
                     ;; Don't move constants to type errors
-                    (combination-match2 ((node-dest ref) :transform nil)
+                    (cmatch ((node-dest ref) :transform nil)
                       (((:or %type-check-error %type-check-error/c) x &rest)
                        (lvar-from-lvar-p x (node-lvar ref))))
                     ;; Or if there's a conflict with an lvar-type-annotation
@@ -4113,7 +4113,7 @@ is :ANY, the function name is not checked."
            t)
           #-sb-xc-host
           (t
-           (combination-match2 ((lvar-uses lvar) :transform nil)
+           (cmatch ((lvar-uses lvar) :transform nil)
              ((list* (:+ args) last)
               (unless (lvar-intersectp last list)
                 (warn 'type-warning
