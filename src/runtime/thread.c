@@ -59,7 +59,8 @@
 #endif
 
 // exposed to lisp for pthread_create if not C_STACK_IS_CONTROL_STACK
-os_vm_size_t thread_alien_stack_size = ALIEN_STACK_SIZE;
+unsigned int thread_alien_stack_size = ALIEN_STACK_SIZE;
+unsigned int thread_binding_stack_size = BINDING_STACK_SIZE;
 
 #ifdef LISP_FEATURE_SB_THREAD
 

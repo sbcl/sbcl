@@ -1,8 +1,14 @@
 #if !defined(_INCLUDE_THREAD_H_)
 #define _INCLUDE_THREAD_H_
 
-#define BINDING_STACK_SIZE (1024*1024)   /* chosen at random */
-#define ALIEN_STACK_SIZE (1024*1024)     /* chosen at random */
+#define DEFAULT_BINDING_STACK_SIZE (1024*1024)   /* chosen at random */
+#define DEFAULT_ALIEN_STACK_SIZE (1024*1024)     /* chosen at random */
+#ifndef BINDING_STACK_SIZE
+#define BINDING_STACK_SIZE DEFAULT_BINDING_STACK_SIZE
+#endif
+#ifndef ALIEN_STACK_SIZE
+#define ALIEN_STACK_SIZE   DEFAULT_ALIEN_STACK_SIZE
+#endif
 
 /* eventually choosable per-thread: */
 #ifndef DEFAULT_CONTROL_STACK_SIZE // CFLAGS=-D... can set this

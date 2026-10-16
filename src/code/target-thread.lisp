@@ -1829,7 +1829,7 @@ session."
                 (alien-funcall setstack attr
                                (sap-ref-sap thread-sap (ash sb-vm::thread-alien-stack-start-slot
                                                             sb-vm:word-shift))
-                               (extern-alien "thread_alien_stack_size" unsigned))))
+                               (extern-alien "thread_alien_stack_size" unsigned-int))))
          ;; From "Workaround a problem ... on NetBSD" (git rev af8c4a2933)
          ;; If I had to guess, it wrongly assumed existence of memory outside of
          ;; the exactly provided stack bounds.
