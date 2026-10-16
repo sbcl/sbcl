@@ -327,7 +327,10 @@
 (defknown isqrt (unsigned-byte) unsigned-byte
   (movable foldable flushable))
 
-(defknown (abs phase signum) (number) number
+(defknown abs (number) (and (real 0) (not (member -0f0 -0d0)))
+  (movable foldable flushable))
+
+(defknown (phase signum) (number) number
   (movable foldable flushable))
 (defknown cis (real) (complex float)
   (movable foldable flushable))

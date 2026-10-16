@@ -2871,3 +2871,14 @@
          (= (truncate x) (mod (the (member -24 6) n) 6)))
     ((0 -24) t)
     ((1 6) nil)))
+
+(with-test (:name :abs-real-abs)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (x)
+         (abs (the real (abs x))))
+    ((#c(1 1)) 1.4142135))
+  (assert-type
+   (lambda (x)
+     (abs x))
+   (and (real 0) (not (member -0f0 -0d0)))))

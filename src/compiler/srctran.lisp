@@ -2397,9 +2397,6 @@
 (defun abs-derive-type-aux (type)
   (cond ((ratio-type-p type)
          (specifier-type '(and ratio (rational 0))))
-        ((eq type (specifier-type 'number))
-         (specifier-type '(and (real 0)
-                           (not (member -0f0 -0d0)))))
         ((eq (numeric-type-complexp type) :complex)
          ;; The absolute value of a complex number is always a
          ;; non-negative float.
@@ -2440,9 +2437,9 @@
                (abs (*)
                 (when (or top-level ;; (abs (abs complex))
                           (csubtypep (lvar-type (first args)) (specifier-type 'real)))
-                 (erase-node-type combination *wild-type* nil outer-node)
-                 (transform-call combination `(lambda (x) x) 'remove-abs)
-                 t))
+                  (erase-node-type combination *wild-type* nil outer-node)
+                  (transform-call combination `(lambda (x) x) 'remove-abs)
+                  t))
                ((* / %unary-truncate truncate ftruncate round fround
                    cos sin tan) (* *)
                 (let (did-something)
@@ -2452,7 +2449,7 @@
                   did-something))
                (ash (* (type unsigned-byte))
                 (abs-lvar (first args) (specifier-type 'integer))))))
-    (abs-lvar x top-level)))
+    (abs-lvar x top-level (specifier-type 'number))))
 
 (defoptimizer (abs optimizer) ((x) node)
   (negate-lvar x node :test '%negate :minus-zero-ignored t
