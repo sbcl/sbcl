@@ -2862,3 +2862,12 @@
                                          (if m
                                              (the real n)
                                              (the integer n))))))))
+
+
+(with-test (:name :truncate-transform-self-match)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x n)
+         (= (truncate x) (mod (the (member -24 6) n) 6)))
+    ((0 -24) t)
+    ((1 6) nil)))

@@ -4994,19 +4994,15 @@
         (give-up-ir1-transform))))
 
 ;;; (zerop (mod x y)) => (zerop (rem x y))
-(deftransforms (floor ceiling) ((number divisor) (rational rational) * :result result :node node)
-  (let ((rem (and (mv-bind-unused-p result 0)
-                  (mv-bind-dest result 1 t))))
-    (cond ((combination-matches 'eq '(* 0) rem)
-           (erase-node-type node (values-specifier-type '(values integer rational &optional)))
-           `(truncate number divisor))
-          (t
-           (give-up-ir1-transform)))))
+(deftransforms (floor ceiling) ((number divisor) (rational rational) * :node node)
+  (cmatch (node)
+    (((:or eq eql =) (nth-value 1 (:this x y)) 0)
+     `(eq (nth-value 1 (truncate x y)) 0))))
 
 (deftransform ceiling ((number divisor) ((and unsigned-byte fixnum) (and unsigned-byte fixnum)) * :node node :result result)
   (cond ((mv-bind-unused-p result 1)
          (erase-node-type node t 1)
-         `(values (truly-the fixnum (truncate (+ number (1- divisor)) divisor)) 0))
+         `(values (truly-the fixnum (values (truncate (+ number (1- divisor)) divisor))) 0))
         (t
          (give-up-ir1-transform))))
 
@@ -5099,8 +5095,7 @@
 (deftransform truncate ((x y)
                         (:or ((sb-vm:signed-word (constant-arg integer)) sb-vm:signed-word)
                              ((unsigned-byte (constant-arg integer)) *))
-                        *  :result result :node node
-                           :important nil)
+                        * :node node :important nil)
   "convert division by 2^k to shift"
   (let* ((y (lvar-value y))
          (y-abs (abs y))
@@ -5108,29 +5103,25 @@
     (unless (and (> y-abs 0) (= y-abs (ash 1 len)))
       (give-up-ir1-transform))
     (delay-ir1-transform node :ir1-phases)
-    (let* ((rem (mv-bind-dest result 1))
-           (zerop (combination-matches 'eq '(* 0) rem)))
-      (let ((shift (- len))
-            (mask (1- y-abs)))
-        (cond (zerop
-               (erase-node-type node (values-specifier-type '(values integer unsigned-byte &optional)) 1)
-               `(values
-                 (values (truncate x y))
-                 (logand x ,mask)))
-              ((when-vop-existsp (:named sb-vm::truncate/signed-power-of-two)
-                 (and (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word))
-                      (not (csubtypep (lvar-type x) (specifier-type 'word)))))
-               (give-up-ir1-transform))
-              (t
-               `(if (minusp x)
-                    (values ,(if (minusp y)
-                                 `(ash (- x) ,shift)
-                                 `(- (ash (- x) ,shift)))
-                            (- (logand (- x) ,mask)))
-                    (values ,(if (minusp y)
-                                 `(- (ash x ,shift))
-                                 `(ash x ,shift))
-                            (logand x ,mask)))))))))
+    (let ((shift (- len))
+          (mask (1- y-abs)))
+      (cmatch (node)
+        (((:or eq eql =) (nth-value 1 (:this x *)) 0)
+         `(not (logtest x ,mask)))
+        (t
+         (when-vop-existsp (:named sb-vm::truncate/signed-power-of-two)
+           (when (and (lvar-subtypep  x signed-word)
+                      (not (lvar-subtypep x word)))
+             (give-up-ir1-transform)))
+         `(if (minusp x)
+              (values ,(if (minusp y)
+                           `(ash (- x) ,shift)
+                           `(- (ash (- x) ,shift)))
+                      (- (logand (- x) ,mask)))
+              (values ,(if (minusp y)
+                           `(- (ash x ,shift))
+                           `(ash x ,shift))
+                      (logand x ,mask))))))))
 
 ;;; Floats could be transformed if we had some declaration to ignore NaNs
 (deftransform truncate ((x y) (rational (or (rational (0) *)
@@ -5384,7 +5375,6 @@
                          *
                          :policy (and (> speed compilation-speed)
                                       (> speed space))
-                         :result result
                          :node node
                          :important nil)
    "convert integer division to multiplication"
@@ -5411,44 +5401,32 @@
                                                         '(and sb-vm:signed-word
                                                           (not unsigned-byte)))))))
            (give-up-ir1-transform))
-       (let ((rem (and (mv-bind-unused-p result 0)
-                       (mv-bind-dest result 1 t))))
-         (or
-          (when (combination-matches 'eq '(* 0) rem)
-            (cond ((oddp y)
+       (cmatch (node)
+         (((:or eq = eql) (nth-value 1 (:this x *)) 0)
+          (cond ((oddp y)
+                 (let* ((max-x most-positive-word)
+                        (inv (mulinv abs-y max-x))
+                        (add (truncate (ash max-x -1) abs-y))
+                        (cmp (ash add 1)))
+                   `(not (> (logand most-positive-word
+                                    (+ (logand most-positive-word (* (logand most-positive-word x) ,inv))
+                                       ,add))
+                            ,cmp))))
+                ((when-vop-existsp (:translate rotate-right-word)
                    (let* ((max-x most-positive-word)
-                          (inv (mulinv abs-y max-x))
-                          (add (truncate (ash max-x -1) abs-y))
-                          (cmp (ash add 1)))
-                     (erase-node-type node (values-specifier-type '(values integer boolean &optional)))
-                     (transform-call rem
-                                     `(lambda (x z)
-                                        (declare (ignore z))
-                                        x)
-                                     'truncate)
-                     `(values 0 (not (> (logand most-positive-word
-                                                (+ (logand most-positive-word (* (logand most-positive-word x) ,inv))
-                                                   ,add))
-                                        ,cmp)))))
-                  ((when-vop-existsp (:translate rotate-right-word)
-                     (let* ((max-x most-positive-word)
-                            (zeros (count-trailing-zeros (the word abs-y)))
-                            (odd (ash abs-y (- zeros)))
-                            (inv (mulinv odd max-x))
-                            (add (dpb 0 (byte zeros 0)
-                                      (truncate (ash max-x -1) odd)))
-                            (cmp (ash add (- 1 zeros))))
-                       (erase-node-type node (values-specifier-type '(values integer boolean &optional)))
-                       (transform-call rem
-                                       `(lambda (x z)
-                                          (declare (ignore z))
-                                          x)
-                                       'truncate)
-                       `(values 0 (not (> (rotate-right-word (logand most-positive-word
-                                                                     (+ (logand most-positive-word (* (logand most-positive-word x) ,inv))
-                                                                        ,add))
-                                                             ,zeros)
-                                          ,cmp))))))))
+                          (zeros (count-trailing-zeros (the word abs-y)))
+                          (odd (ash abs-y (- zeros)))
+                          (inv (mulinv odd max-x))
+                          (add (dpb 0 (byte zeros 0)
+                                    (truncate (ash max-x -1) odd)))
+                          (cmp (ash add (- 1 zeros))))
+                     `(not (> (rotate-right-word (logand most-positive-word
+                                                         (+ (logand most-positive-word (* (logand most-positive-word x) ,inv))
+                                                            ,add))
+                                                 ,zeros)
+                              ,cmp)))))))
+         (t
+          (delay-ir1-transform node :constraint)
           `(let* ((quot (truly-the
                          (integer ,(- (truncate max-x abs-y)) ,(truncate max-x abs-y))
                          ,(gen-signed-truncate-by-constant-expr y precision)))
@@ -5511,7 +5489,6 @@
                         *
                         :policy (and (> speed compilation-speed)
                                      (> speed space))
-                        :result result
                         :node node
                         :important nil)
   "convert integer division to multiplication"
@@ -5524,58 +5501,44 @@
     ;; Division by zero, one or powers of two is handled elsewhere.
     (when (zerop (logand y (1- y)))
       (give-up-ir1-transform))
-    (let ((rem (and (mv-bind-unused-p result 0)
-                    (mv-bind-dest result 1 t)))
-          plusp)
-      ;; When only a remainder is needed, there are two ways of going about it:
-      ;; * Using the well-entrenched divide-by-multiplying technique, compute the quotient and
-      ;;   then subtract the product of (quotient x divisor) from the original input.
-      ;; * The Lemire et. al. technique avoids subtracting.  It also offers a way to determine
-      ;;   divisibility (0 remainder) with 1 fewer step, though our way is fairly good too.
-      ;; Therefore, if just getting a remainder and neither COMBINATION-MATCHES-P is true,
-      ;; we try the Lemire transform before falling back to the traditional way.
-      (or
-       ;; Choice 1
-       (when (and rem
-                  (or (combination-matches 'eq '(* 0) rem)
-                      (and (combination-matches '> '(* 0) rem)
-                           (setf plusp t))))
+
+    ;; When only a remainder is needed, there are two ways of going about it:
+    ;; * Using the well-entrenched divide-by-multiplying technique, compute the quotient and
+    ;;   then subtract the product of (quotient x divisor) from the original input.
+    ;; * The Lemire et. al. technique avoids subtracting.  It also offers a way to determine
+    ;;   divisibility (0 remainder) with 1 fewer step, though our way is fairly good too.
+    ;; Therefore, if just getting a remainder and neither combination matches,
+    ;; we try the Lemire transform before falling back to the traditional way.
+    (cmatch (node)
+      (((:or eq = eql > :name name) (nth-value 1 (:this x *)) 0)
+       (let ((plusp (eq name '>)))
+         ;; Choice 1
          (cond ((oddp y)
                 (let* ((max-x (1- (ash 1 (integer-length max-x))))
                        (inv (mulinv y max-x)))
-                  (erase-node-type node (values-specifier-type '(values integer boolean &optional)))
-                  (transform-call rem
-                                  `(lambda (x z)
-                                     (declare (ignore z))
-                                     x)
-                                  'truncate)
-                  `(values 0 ,(wrap-if (not plusp) '(not)
-                                       `(> (truly-the word (logand (* x ,inv) ,max-x))
-                                           ,(truncate max-x y))))))
+                  (wrap-if (not plusp) '(not)
+                           `(> (truly-the word (logand (* x ,inv) ,max-x))
+                               ,(truncate max-x y)))))
                ((when-vop-existsp (:translate rotate-right-word)
                   (let* ((max-x most-positive-word)
                          (zeros (count-trailing-zeros (the word y)))
                          (inv (mulinv (ash y (- zeros)) max-x)))
-                    (erase-node-type node (values-specifier-type '(values integer boolean &optional)))
-                    (transform-call rem
-                                    `(lambda (x z)
-                                       (declare (ignore z))
-                                       x)
-                                    'truncate)
-                    `(values 0 ,(wrap-if (not plusp) '(not)
-                                         `(> (rotate-right-word (truly-the word (logand (* x ,inv) ,max-x))
-                                                                ,zeros)
-                                             ,(truncate max-x y)))))))))
-       ;; Choice 2
-       (and rem (binding* ((form (try-fastrem-algorithm (integer-length max-x) y) :exit-if-null))
+                    (wrap-if (not plusp) '(not)
+                             `(> (rotate-right-word (truly-the word (logand (* x ,inv) ,max-x))
+                                                    ,zeros)
+                                 ,(truncate max-x y)))))))))
+      (t
+       (or (and (mv-bind-unused-p (node-lvar node) 0)
+                ;; Choice 2
+                (binding* ((form (try-fastrem-algorithm (integer-length max-x) y) :exit-if-null))
                   (erase-node-type node t 0)
                   form))
-       ;; Choice 3
-       `(let* ((quot (truly-the (integer 0 ,(truncate max-x y))
-                                ,(gen-unsigned-div-by-constant-expr y max-x)))
-               (rem (truly-the (mod ,y)
-                               (- x (* quot ,y)))))
-          (values quot rem))))))
+           ;; Choice 3
+           `(let* ((quot (truly-the (integer 0 ,(truncate max-x y))
+                                    ,(gen-unsigned-div-by-constant-expr y max-x)))
+                   (rem (truly-the (mod ,y)
+                                   (- x (* quot ,y)))))
+              (values quot rem)))))))
 
 (deftransform truncate ((x y) (word (and sb-vm:signed-word (integer * 0))) * :node node :important nil)
   (when (or (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word))
