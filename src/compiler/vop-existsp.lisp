@@ -65,7 +65,8 @@
 #-sb-xc
 (defun check-vop-existence-correctness ()
   (dolist (entry *vop-not-existsp*)
-    (assert (not (%vop-existsp (car entry) (cdr entry))))))
+    (when (%vop-existsp (car entry) (cdr entry))
+      (error "vop-existsp used before ~a was defined" entry))))
 
 (defmacro vop-existsp (query name)
   #+sb-xc-host
