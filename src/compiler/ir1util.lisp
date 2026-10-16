@@ -429,8 +429,13 @@
 (defun mv-bind-dest (lvar nth-value &optional single-use)
   (let ((vars (mv-bind-vars lvar single-use)))
     (when vars
-      (let* ((var (nth nth-value vars))
-             (refs (leaf-refs var)))
+      (let* ((var (if nth-value
+                      (nth nth-value vars)
+                      (loop for var in vars
+                            when (leaf-refs var)
+                            return var)))
+             (refs (and var
+                        (leaf-refs var))))
         (when (and refs
                    (not (cdr refs))
                    (not (lambda-var-sets var)))

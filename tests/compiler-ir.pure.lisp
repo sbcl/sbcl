@@ -9,7 +9,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-;(enable-test-parallelism)
+(enable-test-parallelism)
 
 
 (import '(sb-c::combination-fun-debug-name

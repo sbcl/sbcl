@@ -50,161 +50,175 @@
   (variable nil :type (or null fixnum))
   (plus nil :type (or null fixnum))
   (rest-var nil :type symbol)
-  (casts nil :type t))
+  (casts nil :type t)
+  (nth-value nil :type (or null index)))
 
 (defun parse-cm-spec (spec unravel-casts)
-  (labels ((clean-name-spec (list)
-             (loop for tail = list then (cdr tail)
-                   while tail
-                   if (eq (car tail) :name)
-                   do (setf tail (cdr tail))
-                   else collect (car tail)))
-           (extract-name-var (op)
-             (and (consp op)
-                  (second (member :name op))))
-           (invert-relation (op)
-             (case op
-               (< '>)
-               (> '<)
-               (<= '>=)
-               (>= '<=)))
-           (equal-spec (a b)
-             (cond ((eq a b))
-                   ((symbolp a)
-                    (and (symbolp b) (eq a b)))
-                   ((typep a '(cons (member :type :constant)))
-                    (equal a b))
-                   ((and (consp a) (consp b))
-                    (and (equal (car a) (car b))
-                         (= (length a) (length b))
-                         (every #'equal-spec a b)))))
-           (invertible-p (s)
-             (and (consp s)
-                  (symbolp (car s))
-                  (invert-relation (car s))
-                  (= (length (cdr s)) 2)
-                  (not (equal-spec (first (cdr s)) (second (cdr s))))))
-           (invert-spec (s)
-             (list (invert-relation (car s))
-                   (second (cdr s))
-                   (first (cdr s))))
-           (ensure-or (x)
-             (let ((specs (if (typep x '(cons (eql :or)))
-                              (clean-name-spec (cdr x))
-                              (list x))))
-               (loop for s in specs
-                     collect s
-                     when (invertible-p s)
-                     collect (invert-spec s))))
-           (expand-aliases (specs &optional exclude)
-             (loop for spec in specs
-                   when (when (listp spec)
-                          (destructuring-bind (names . rest) spec
-                            (let (name-aliases
-                                  full-aliases
-                                  (name-var (extract-name-var names))
-                                  (names (ensure-or names))
-                                  (excluded exclude))
-                              (loop for name in names
-                                    do (let ((aliases (gethash name *combination-match-aliases*)))
-                                         (loop for alias in aliases
-                                               do (if (typep alias '(cons integer))
-                                                      (when (= (first alias) (length rest))
-                                                        (push (second alias) name-aliases))
-                                                      (multiple-value-bind (new exclude)
-                                                          (funcall (eval alias) rest)
-                                                        (when new
-                                                          (if exclude (setf excluded t))
-                                                          (setf full-aliases
-                                                                (append (expand-aliases new) full-aliases))))))))
-                              (let ((spec (if name-aliases
-                                              `((:or ,@names ,@name-aliases ,@(when name-var `(:name ,name-var))) . ,rest)
-                                              spec)))
-                                (append full-aliases
-                                        (unless excluded
-                                          (list spec)))))))
-                   append it
-                   else collect spec))
-           (parse-operand (s expected-type)
-             (cond ((typep s '(cons (eql :type)))
-                    (make-cm-operand :kind :type
-                                     :type (second s)
-                                     :name (third s)))
-                   ((typep s '(cons (eql :constant)))
-                    (make-cm-operand :kind :constant
-                                     :name (second s)
-                                     :type (or (third s) expected-type)))
-                   ((typep s '(cons (eql :+)))
-                    (make-cm-operand :kind :plus
-                                     :name (second s)))
-                   ((eq s '*)
-                    (make-cm-operand :kind :wildcard))
-                   ((symbolp s)
-                    (make-cm-operand :kind :var
-                                     :name s))
-                   ((atom s)
-                    (make-cm-operand :kind :literal
-                                     :value s))
-                   ((consp s)
-                    (make-cm-operand :kind :combination
-                                     :sub-combinations (parse-cm-spec s unravel-casts)))))
-           (parse-combination (raw)
-             (destructuring-bind (name-spec . args) raw
-               (let* ((plus (position-if (lambda (x) (typep x '(cons (eql :+)))) args))
-                      (variable (or plus (position '&rest args)))
-                      (rest-var (and (not plus) (second (member '&rest args))))
-                      (arg-count (if plus (length args) (or variable (length args))))
-                      (name-var (extract-name-var name-spec))
-                      (names (ensure-or name-spec))
-                      (arg-types
-                        (when (singleton-p names)
-                          (let ((fun-type (info :function :type (car names))))
-                            (and (fun-type-p fun-type)
-                                 (fun-type-n-arg-types arg-count fun-type)))))
-                      (commutative
-                        (and (not plus)
-                             (or (find :commutative names)
-                                 (loop for name in names
-                                       always (unless (eq name :*)
-                                                (ir1-attributep (fun-info-attributes (fun-info-or-lose name))
-                                                                commutative))))
-                             (not (or (integerp (car (last args)))
-                                      (typep (car (last args)) '(cons (eql :constant)))
-                                      (equal-spec (first args) (second args))))))
-                      (casts (and unravel-casts
-                                  arg-types
-                                  (find *universal-type* arg-types :test-not #'eq)
-                                  `(load-time-value
-                                    (list ,@(loop for type in arg-types
-                                                  collect `(specifier-type ',(type-specifier type)))))))
-                      (arg-type-specifiers
-                        (loop for type in arg-types
-                              collect (and type
-                                           (not (eq type *universal-type*))
-                                           (type-specifier type))))
-                      (names (loop for name in names
-                                   collect (if (typep name '(cons (eql :commutative)))
-                                               (second name)
-                                               name)))
-                      (op (make-cm-operator :names names
-                                            :name-var name-var
-                                            :commutative commutative))
-                      (positional-args (subseq args 0 arg-count))
-                      (operands (loop for arg in positional-args
-                                      for expected-type = (pop arg-type-specifiers)
-                                      collect (parse-operand arg expected-type))))
-                 (make-cm-combination :operator op
-                                      :operands operands
-                                      :arg-count arg-count
-                                      :variable variable
-                                      :plus plus
-                                      :rest-var rest-var
-                                      :casts casts)))))
-    (let ((raw-combs (expand-aliases (ensure-or spec))))
-      (mapcar #'parse-combination raw-combs))))
+  (let ((this-level nil))
+    (labels ((clean-name-spec (list)
+               (loop for tail = list then (cdr tail)
+                     while tail
+                     if (eq (car tail) :name)
+                     do (setf tail (cdr tail))
+                     else collect (car tail)))
+             (extract-name-var (op)
+               (and (consp op)
+                    (second (member :name op))))
+             (invert-relation (op)
+               (case op
+                 (< '>)
+                 (> '<)
+                 (<= '>=)
+                 (>= '<=)))
+             (equal-spec (a b)
+               (cond ((eq a b))
+                     ((symbolp a)
+                      (and (symbolp b) (eq a b)))
+                     ((typep a '(cons (member :type :constant)))
+                      (equal a b))
+                     ((and (consp a) (consp b))
+                      (and (equal (car a) (car b))
+                           (= (length a) (length b))
+                           (every #'equal-spec a b)))))
+             (invertible-p (s)
+               (and (consp s)
+                    (symbolp (car s))
+                    (invert-relation (car s))
+                    (= (length (cdr s)) 2)
+                    (not (equal-spec (first (cdr s)) (second (cdr s))))))
+             (invert-spec (s)
+               (list (invert-relation (car s))
+                     (second (cdr s))
+                     (first (cdr s))))
+             (ensure-or (x)
+               (let ((specs (if (typep x '(cons (eql :or)))
+                                (clean-name-spec (cdr x))
+                                (list x))))
+                 (loop for s in specs
+                       collect s
+                       when (invertible-p s)
+                       collect (invert-spec s))))
+             (expand-aliases (specs &optional exclude)
+               (loop for spec in specs
+                     when (when (listp spec)
+                            (destructuring-bind (names . rest) spec
+                              (let (name-aliases
+                                    full-aliases
+                                    (name-var (extract-name-var names))
+                                    (names (ensure-or names))
+                                    (excluded exclude))
+                                (loop for name in names
+                                      do (let ((aliases (gethash name *combination-match-aliases*)))
+                                           (loop for alias in aliases
+                                                 do (if (typep alias '(cons integer))
+                                                        (when (= (first alias) (length rest))
+                                                          (push (second alias) name-aliases))
+                                                        (multiple-value-bind (new exclude)
+                                                            (funcall (eval alias) rest)
+                                                          (when new
+                                                            (if exclude (setf excluded t))
+                                                            (setf full-aliases
+                                                                  (append (expand-aliases new) full-aliases))))))))
+                                (let ((spec (if name-aliases
+                                                `((:or ,@names ,@name-aliases ,@(when name-var `(:name ,name-var))) . ,rest)
+                                                spec)))
+                                  (append full-aliases
+                                          (unless excluded
+                                            (list spec)))))))
+                     append it
+                     else collect spec))
+             (parse-operand (s expected-type level)
+               (cond ((typep s '(cons (eql :type)))
+                      (make-cm-operand :kind :type
+                                       :type (second s)
+                                       :name (third s)))
+                     ((typep s '(cons (eql :constant)))
+                      (make-cm-operand :kind :constant
+                                       :name (second s)
+                                       :type (or (third s) expected-type)))
+                     ((typep s '(cons (eql :+)))
+                      (make-cm-operand :kind :plus
+                                       :name (second s)))
+                     ((eq s '*)
+                      (make-cm-operand :kind :wildcard))
+                     ((symbolp s)
+                      (make-cm-operand :kind :var
+                                       :name s))
+                     ((atom s)
+                      (make-cm-operand :kind :literal
+                                       :value s))
+                     ((consp s)
+                      (make-cm-operand :kind :combination
+                                       :sub-combinations (recurse s level)))))
+             (parse-combination (raw level)
+               (destructuring-bind (name-spec . args) raw
+                 (when (eq name-spec :this)
+                   (aver (or (not this-level)
+                             (eq level this-level)))
+                   (setf this-level level))
+                 (if (eq name-spec 'nth-value)
+                     (let ((nth (the unsigned-byte (first args)))
+                           (parse (parse-combination (second args) level)))
+                       (setf (cm-combination-nth-value parse) nth)
+                       parse)
+                     (let* ((plus (position-if (lambda (x) (typep x '(cons (eql :+)))) args))
+                            (variable (or plus (position '&rest args)))
+                            (rest-var (and (not plus) (second (member '&rest args))))
+                            (arg-count (if plus (length args) (or variable (length args))))
+                            (name-var (extract-name-var name-spec))
+                            (names (ensure-or name-spec))
+                            (arg-types
+                              (when (singleton-p names)
+                                (let ((fun-type (info :function :type (car names))))
+                                  (and (fun-type-p fun-type)
+                                       (fun-type-n-arg-types arg-count fun-type)))))
+                            (commutative
+                              (and (not plus)
+                                   (or (find :commutative names)
+                                       (loop for name in names
+                                             always (unless (memq name '(:* :this))
+                                                      (ir1-attributep (fun-info-attributes (fun-info-or-lose name))
+                                                                      commutative))))
+                                   (not (or (integerp (car (last args)))
+                                            (typep (car (last args)) '(cons (eql :constant)))
+                                            (equal-spec (first args) (second args))))))
+                            (casts (and unravel-casts
+                                        arg-types
+                                        (find *universal-type* arg-types :test-not #'eq)
+                                        `(load-time-value
+                                          (list ,@(loop for type in arg-types
+                                                        collect `(specifier-type ',(type-specifier type)))))))
+                            (arg-type-specifiers
+                              (loop for type in arg-types
+                                    collect (and type
+                                                 (not (eq type *universal-type*))
+                                                 (type-specifier type))))
+                            (names (loop for name in names
+                                         collect (if (typep name '(cons (eql :commutative)))
+                                                     (second name)
+                                                     name)))
+                            (op (make-cm-operator :names names
+                                                  :name-var name-var
+                                                  :commutative commutative))
+                            (positional-args (subseq args 0 arg-count))
+                            (operands (loop for arg in positional-args
+                                            for expected-type = (pop arg-type-specifiers)
+                                            collect (parse-operand arg expected-type level))))
+                       (make-cm-combination :operator op
+                                            :operands operands
+                                            :arg-count arg-count
+                                            :variable variable
+                                            :plus plus
+                                            :rest-var rest-var
+                                            :casts casts)))))
+             (recurse (spec level)
+               (loop for spec in (expand-aliases (ensure-or spec))
+                     collect (parse-combination spec (1+ level)))))
+      (values (recurse spec -1) this-level))))
 
 (defmacro cmatch ((node &key (transform t) (unravel-casts t)) &body clauses)
-  (let (bound-vars)
+  (let (bound-vars
+        otherwise)
     (labels ((collect-cm-pattern-vars (combinations)
                (let (vars)
                  (labels ((add (s)
@@ -295,10 +309,21 @@
                                                                  (subsetp (cm-operator-names (cm-combination-operator (car combs)))
                                                                           op-names))
                                                       collect
-                                                      `(case .name.
-                                                         ,(gen t)))))))
+                                                      `(cond
+                                                         ,@(cases-to-cond (list (gen t)))))))))
                                 `(,op-names ,branch-form)))))
                    (loop while combs collect (gen)))))
+             (cases-to-cond (cases)
+               (loop for (names . body) in cases
+                     collect
+                     `((or ,@(loop for name in names
+                                  collect (case name
+                                            (:this
+                                             `(eq combination .node.))
+                                            (:* '.name.)
+                                            (t
+                                             `(eq .name. ',name)))))
+                       ,@body)))
 
              (expand-operands (lvars operands body)
                (if lvars
@@ -338,91 +363,96 @@
                           `(when (lvar-value-is ,lvar ',(cm-operand-value op))
                              ,(expand-operands (cdr lvars) (cdr operands) body)))
                          (:combination
-                          `(multiple-value-bind (.name. combination .args.) (lvar-combination/cast-name-args ,lvar)
-                             (declare (notinline lvar-value-is))
+                          `(multiple-value-bind (.name. combination .args.)
+                               ,(let ((nth-value (cm-combination-nth-value (car (cm-operand-sub-combinations op)))))
+                                  (if (and nth-value
+                                           (loop for op in (cdr (cm-operand-sub-combinations op))
+                                                 always (eql (cm-combination-nth-value op) nth-value)))
+                                      `(mv-combination/cast-name-args ,lvar ,nth-value)
+                                      `(lvar-combination/cast-name-args ,lvar)))
+                             (declare (ignorable .name.)
+                                      (notinline lvar-value-is))
                              (when combination
-                               (case .name.
-                                 ,@(expand-combinations (cdr lvars) (cdr operands)
-                                                        (cm-operand-sub-combinations op)
-                                                        body))))))))
+                               (cond
+                                 ,@(cases-to-cond
+                                    (expand-combinations (cdr lvars) (cdr operands)
+                                                         (cm-operand-sub-combinations op)
+                                                         body)))))))))
                    (funcall body)))
 
              (gen-1 (clauses node)
-               (let ((flets nil)
-                     (name-forms (make-hash-table :test 'eq))
-                     name-order
-                     form-groups)
+               (let (flets
+                     by-level)
                  (dolist (clause clauses)
                    (destructuring-bind (spec &body body) clause
-                     (setf bound-vars nil)
-                     (let* ((parsed-combs (parse-cm-spec spec unravel-casts))
-                            (top-name-var (cm-operator-name-var (cm-combination-operator (first parsed-combs))))
-                            (pattern-vars (collect-cm-pattern-vars parsed-combs))
-                            (restp (member '&rest pattern-vars))
-                            (body-fun (gensym "MATCH-BODY"))
-                            (var-names (if restp
-                                           (remove '&rest pattern-vars)
-                                           pattern-vars))
-                            (matched (lambda ()
-                                       `(,@(if restp
-                                               `(apply #',body-fun)
-                                               `(,body-fun))
-                                         combination .args. ,@var-names)))
-                            (branches (expand-combinations nil nil parsed-combs matched)))
-                       (push `(,body-fun (combination .args. ,@pattern-vars)
-                                         (declare (ignorable combination .args. ,@var-names))
-                                         (let (,@(when (and top-name-var (not (member top-name-var pattern-vars)))
-                                                   `((,top-name-var .name.)))
-                                               (new (progn ,@body)))
-                                           (when new
-                                             ,(if transform
-                                                  `(,@(if restp
-                                                          '(apply #'combination-match-transform)
-                                                          '(combination-match-transform))
-                                                    .node.
-                                                    ',(if restp
-                                                          (butlast pattern-vars)
-                                                          pattern-vars)
-                                                    new ,@var-names)
-                                                  `(return-from .combination-match. new)))))
-                             flets)
-                       (dolist (branch branches)
-                         (destructuring-bind (names form) branch
-                           (when (listp names)
-                             (dolist (name names)
-                               (unless (gethash name name-forms)
-                                 (push name name-order))
-                               (push form (gethash name name-forms)))))))))
-                 (setf name-order (nreverse name-order))
-                 (dolist (name name-order)
-                   (let* ((forms (nreverse (gethash name name-forms)))
-                          (entry (assoc forms form-groups :test #'equal)))
-                     (if entry
-                         (push name (cdr entry))
-                         (push (cons forms (list name)) form-groups))))
-                 (let ((case-branches
-                         (loop for (forms . names) in (nreverse form-groups)
-                               collect `(,(if (member :* names)
-                                              t
-                                              (nreverse names))
-                                         ,(if (cdr forms)
-                                              `(or ,@forms)
-                                              (car forms))))))
-                   `(let ((.node. ,node))
-                      (flet ,flets
-                        (multiple-value-bind (.name. combination .args.) (combination/cast-name-args .node.)
-                          (declare (ignorable combination .args.))
-                          (case .name.
-                            ,@case-branches))))))))
+                     (cond ((eq spec t)
+                            (setf otherwise body))
+                           (t
+                            (setf bound-vars nil)
+                            (multiple-value-bind (parsed-combs this-level) (parse-cm-spec spec unravel-casts)
+                              (let* ((top-name-var (cm-operator-name-var (cm-combination-operator (first parsed-combs))))
+                                     (pattern-vars (collect-cm-pattern-vars parsed-combs))
+                                     (restp (member '&rest pattern-vars))
+                                     (body-fun (gensym "MATCH-BODY"))
+                                     (var-names (if restp
+                                                    (remove '&rest pattern-vars)
+                                                    pattern-vars))
+                                     (matched (lambda ()
+                                                `(,@(if restp
+                                                        `(apply #',body-fun)
+                                                        `(,body-fun))
+                                                  combination .args. ,@var-names)))
+                                     (branches (expand-combinations nil nil parsed-combs matched)))
+                                (push `(,body-fun (combination .args. ,@pattern-vars)
+                                                  (declare (ignorable combination .args. ,@var-names))
+                                                  (let (,@(when (and top-name-var (not (member top-name-var pattern-vars)))
+                                                            `((,top-name-var .name.)))
+                                                        (new (progn ,@body)))
+                                                    (when new
+                                                      ,(if transform
+                                                           `(,@(if restp
+                                                                   '(apply #'combination-match-transform)
+                                                                   '(combination-match-transform))
+                                                             .top-node.
+                                                             ',(if restp
+                                                                   (butlast pattern-vars)
+                                                                   pattern-vars)
+                                                             new ,@var-names)
+                                                           `(return-from .combination-match. new)))))
+                                      flets)
+                                (let* ((existing (getf by-level this-level)))
+                                  (loop for branch in branches
+                                        for intersect = (find (car branch) existing :key #'car :test #'intersection)
+                                        do (if intersect
+                                               (setf (cdr (last (cadr intersect)))
+                                                     (if (equal (car branch) (car intersect))
+                                                         (cdr branch)
+                                                         `((cond ,@(cases-to-cond (list branch))))))
+                                               (setf existing (append existing (list branch)))))
+                                  (setf (getf by-level this-level) existing))))))))
+                 `(let* ((.node. ,node)
+                         (.top-node. .node.))
+                    (declare (ignorable .top-node.))
+                    (flet ,flets
+                      ,@(loop for (level branches) on by-level  by #'cddr
+                              collect
+                              `(multiple-value-bind (.name. combination .args.)
+                                   (combination/cast-name-args  ,(if level
+                                                                     `(setf .top-node. (up-n-dests ,level .node.))
+                                                                     `.node.))
+                                 (declare (ignorable combination .args.))
+                                 (cond
+                                   ,@(cases-to-cond branches)))))))))
       (let ((dest (member :dest clauses)))
         `(progn
            (block .combination-match.
              ,(gen-1 (ldiff clauses dest) node)
-             ,(when dest
-                (gen-1 (cdr dest) `(node-dest ,node))))
-           ,@(when transform
-               `((delay-ir1-transform node :ir1-phases)
-                 (give-up-ir1-transform))))))))
+             ,@(when dest
+                `(,(gen-1 (cdr dest) `(node-dest ,node)))))
+           ,@(or otherwise
+                 (and transform
+                   `((delay-ir1-transform node :ir1-phases)
+                     (give-up-ir1-transform)))))))))
 
 (defun combination/cast-name (node &optional cast-type)
   (typecase node
@@ -437,6 +467,16 @@
                       (funcall cast-type type)
                       (eq type cast-type))))
        (combination/cast-name (lvar-uses (cast-value node)))))))
+
+(defun up-n-dests (n node)
+  (loop repeat n
+        while node
+        do (let ((dest (node-dest node)))
+             (setf node
+                   (if (mv-combination-p dest)
+                       (mv-bind-dest (node-lvar node) nil t)
+                       dest))))
+  node)
 
 (defun generate-combination-tree (lvar)
   (let ((vars '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
@@ -483,6 +523,35 @@
         (if name
             (values name combination (combination-args combination))
             (values nil nil nil)))))
+
+(defun mv-combination/cast-name-args (lvar nth-value &optional cast-type)
+  (labels ((recurse (lvar)
+             (let ((use (lvar-uses lvar)))
+               (typecase use
+                 (ref
+                  (let ((var (ref-leaf use)))
+                    (when (and (lambda-var-p var)
+                               (not (cdr (leaf-refs var)))
+                               (null (lambda-var-sets var)))
+                      (let ((fun (lambda-var-home var)))
+                        (functional-kind-case fun
+                          (mv-let
+                           (when (loop for i from 0
+                                       for v in (lambda-vars fun)
+                                       always (if (= i nth-value)
+                                                  (eq v var)
+                                                  (not (leaf-refs v))))
+                             (let ((dest (node-dest (car (leaf-refs fun)))))
+                               (when (mv-combination-p dest)
+                                 (let ((args (basic-combination-args dest)))
+                                   (when (null (cdr args))
+                                     (lvar-combination/cast-name-args (car args))))))))
+                          (let
+                              (recurse (lambda-var-ref-lvar use))))))))
+                 (cast
+                  (when cast-type
+                    (recurse (cast-value use))))))))
+    (recurse lvar)))
 
 (defun check-args (args n-args)
   (when (= (length args) n-args)
@@ -592,21 +661,57 @@
                     'cmatch))
   (throw 'give-up-ir1-transform :none))
 
-
 (defun steal-lvar (lvar final-node all-lvars)
   (let ((dest (lvar-dest lvar)))
     (unless (eq final-node dest)
-      (let ((next-lvar (node-lvar dest)))
-        (when next-lvar
-          (%delete-lvar-use dest)
-          (cond ((cast-p dest)
-                 (unlink-node dest))
-                (t
-                 (setf (combination-args dest)
-                       (remove-if (lambda (l) (memq l all-lvars))
-                                  (combination-args dest)))
-                 (flush-combination dest)))
-          (steal-lvar next-lvar final-node all-lvars))))))
+      (cond ((mv-combination-p dest)
+             (let ((lambda (combination-lambda dest)))
+               (let (var)
+                 (loop for v in (lambda-vars lambda)
+                       do
+                       (cond ((not (leaf-refs v)))
+                             (t
+                              (aver (not var))
+                              (setf var v))))
+                 (let* ((refs (leaf-refs var))
+                        (ref (car refs))
+                        (next-lvar (node-lvar ref)))
+                   (aver (not (cdr refs)))
+                   (%delete-lvar-use dest)
+                   (%delete-lvar-use ref)
+                   (delete-ref ref)
+                   (unlink-node dest)
+                   (unlink-node ref)
+                   (steal-lvar next-lvar final-node all-lvars)))))
+            ((and (combination-p dest)
+                  (eq (combination-kind  dest) :local))
+             (let* ((lambda (combination-lambda dest))
+                    (var (nth (position-or-lose lvar (combination-args dest))
+                              (lambda-vars lambda))))
+               (aver (functional-kind-eq lambda let))
+               (setf (combination-args dest)
+                     (subst nil lvar (combination-args dest)))
+               (let* ((refs (leaf-refs var))
+                      (ref (car refs))
+                      (next-lvar (node-lvar ref)))
+                 (aver (not (cdr refs)))
+                 (%delete-lvar-use dest)
+                 (%delete-lvar-use ref)
+                 (delete-ref ref)
+                 (unlink-node ref)
+                 (steal-lvar next-lvar final-node all-lvars))))
+            (t
+             (let ((next-lvar (node-lvar dest)))
+               (when next-lvar
+                 (%delete-lvar-use dest)
+                 (cond ((cast-p dest)
+                        (unlink-node dest))
+                       (t
+                        (setf (combination-args dest)
+                              (remove-if (lambda (l) (memq l all-lvars))
+                                         (combination-args dest)))
+                        (flush-combination dest)))
+                 (steal-lvar next-lvar final-node all-lvars))))))))
 
 ;;; Are two lvars the same or one is coming from a cast?
 (defun lvar-from-lvar-p (lvar casted-lvar)
