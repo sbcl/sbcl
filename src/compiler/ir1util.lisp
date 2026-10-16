@@ -350,7 +350,8 @@
   `(type-intersection (lvar-type ,lvar) (specifier-type ',type)))
 
 (defmacro node-subtypep  (node type &key asserted nth-value)
-  (let ((single-value (not (typep type '(cons (eql values))))))
+  (let ((single-value (and (not nth-value)
+                           (not (typep type '(cons (eql values)))))))
     `(let ((node ,node))
        ,(cond (single-value
                `(csubtypep (single-value-type

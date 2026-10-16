@@ -966,8 +966,7 @@ fractional bits."
      (log (truly-the (double-float 5d0 6d0) x) 10.0))
    (double-float #.(log 5d0 10d0) #.(log 6d0 10d0))))
 
-(with-test (:name :floor-constraints
-            :skipped-on :x86) ;; x87
+(with-test (:name :floor-constraints)
   (checked-compile-and-assert
       (:optimize :default)
       `(lambda (x)
