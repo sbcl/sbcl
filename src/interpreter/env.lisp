@@ -503,7 +503,8 @@
                                 (list key (var-type var))))
                             (svref ll-parts 4))))
                 ,(cond ((not values) '*) ; don't know what it returns
-                       ((or (member '&optional values) (member '&rest values))
+                       ((or (not sb-ext:*strict-return-values-declaration*)
+                            (member '&optional values) (member '&rest values))
                         values)
                        (t
                         ;; Make it strict in the mandatory return value count.

@@ -1,0 +1,161 @@
+The History and Semantics of the VALUES Type Specifier in CMUCL and SBCL
+========================================================================
+
+1. What the ANSI Common Lisp Specification Says
+-----------------------------------------------
+The VALUES type specifier is permitted in only two places in ANSI Common Lisp:
+as the value-type in a FUNCTION type specifier, or in a THE special form.
+
+CLHS "Type Specifier VALUES" (t_values.htm) defines the meaning of &OPTIONAL
+and &REST in a VALUES list:
+
+  "The &optional and &rest markers can appear in the value-type list; they
+   indicate the parameter list of a function that, when given to
+   multiple-value-call along with the values, would correctly receive those
+   values."
+
+By this definition:
+- (VALUES INTEGER SYMBOL) corresponds to a receiving function with parameter
+  list (X Y). Passed to MULTIPLE-VALUE-CALL, that function requires *exactly*
+  two arguments: one INTEGER and one SYMBOL. It cannot receive 1 value, nor
+  can it receive 3 values.
+- Adding &OPTIONAL widens the set of acceptable value counts:
+  (VALUES INTEGER &OPTIONAL INTEGER) accepts 1 or 2 integers.
+- Adding &REST T widens the upper bound to MULTIPLE-VALUES-LIMIT:
+  (VALUES INTEGER &REST T) accepts 1 integer followed by any number of values.
+
+Why, then, does (THE (VALUES INTEGER SYMBOL) (VALUES 1 'FOO 13)) allow a third
+value and ignore it, and why does (THE (VALUES INTEGER SYMBOL) 1) treat the
+missing second value as NIL?
+
+Because CLHS "Special Operator THE" (s_the.htm, amended by X3J13 Issue
+THE-VALUES:RETURN-NUMBER-RECEIVED) specifies an operational rule for values
+in flight across a THE form:
+
+  "It is permissible for form to yield a different number of values than are
+   specified by value-type, provided that the values for which types are
+   declared are indeed of those types. Missing values are treated as nil for
+   the purpose of checking their types."
+
+Notice that:
+(a) In s_the.htm's grammar, the syntax of THE's value-type is simply
+    `(values type-specifier*)` - without &optional or &rest - because THE is
+    a cast on values in flight, where Common Lisp's normal multiple-value
+    defaulting rules (discarding excess values, defaulting missing values to
+    NIL) apply.
+(b) Nowhere does t_values.htm say that (VALUES T1 T2) without &REST implicitly
+    means (VALUES T1 T2 &REST T).
+
+The only place where the ANSI specification muddies the waters is a passage
+in CLHS "Type Specifier FUNCTION" (t_fn.htm) and "Declaration FTYPE"
+(d_ftype.htm) stating that within the scope of:
+  (ftype (function (arg0-type arg1-type ...) val-type) f)
+a call `(f arg0 arg1 ...)` is equivalent to:
+  (the val-type (f (the arg0-type arg0) (the arg1-type arg1) ...))
+When X3J13 passed THE-VALUES:RETURN-NUMBER-RECEIVED to relax THE, it did not
+reconcile that relaxation with t_values.htm's MULTIPLE-VALUE-CALL definition.
+
+
+2. CMUCL Got (VALUES ...) Right; SBCL 0.8.0.6 Broke It
+------------------------------------------------------
+In CMUCL (and in SBCL prior to May 26, 2003), the VALUES type translator in
+src/code/late-type.lisp was simply:
+
+  (!def-type-translator function (&optional (args '*) (result '*))
+    (make-fun-type :args args :returns (values-specifier-type result)))
+
+  (!def-type-translator values (&rest values)
+    (make-values-type :args values))
+
+In CMUCL:
+- (VALUES INTEGER) parsed to #S(VALUES-TYPE :REQUIRED (INTEGER)
+                                            :OPTIONAL NIL :REST NIL).
+- (FUNCTION (INTEGER) (VALUES INTEGER)) meant a function returning *exactly*
+  one integer.
+- Only a *bare* non-VALUES return type in (FUNCTION (INTEGER) INTEGER) or
+  (THE INTEGER ...) was coerced by COERCE-TO-VALUES into
+  (VALUES INTEGER &REST T).
+
+In May 2003, commits 05525d3a59 (0.8.0.3, "Merged CAST branch") and 9489abab7
+(0.8.0.6, "implemented short form of VALUES type specifier") changed how SBCL
+parsed (VALUES ...). Instead of confining THE's lax value-count semantics to
+IR1 translation of THE, commit 9489abab7 baked MAKE-SHORT-VALUES-TYPE directly
+into DEF-TYPE-TRANSLATOR VALUES:
+
+  (def-type-translator values :list ((:context context) &rest values)
+    (multiple-value-bind (llks required optional rest)
+        (parse-args-types context values :values-type)
+      (if (plusp llks)
+          (make-values-type required optional rest)
+          (make-short-values-type required))))
+
+Whenever neither &OPTIONAL nor &REST was present in (VALUES ...),
+MAKE-SHORT-VALUES-TYPE:
+1. Appended :REST *UNIVERSAL-TYPE* (&REST T).
+2. Demoted any trailing types of which NULL is a subtype (such as LIST,
+   BOOLEAN, SYMBOL, (OR NULL FIXNUM), or T) from :REQUIRED into :OPTIONAL.
+
+
+3. The Absurd Consequences of MAKE-SHORT-VALUES-TYPE
+----------------------------------------------------
+Baking MAKE-SHORT-VALUES-TYPE into the VALUES type translator created four
+anomalies:
+
+(1) Non-monotonicity of &OPTIONAL:
+    Adding &OPTIONAL INTEGER to (VALUES INTEGER) is supposed to *widen* the
+    allowed number of values from {1} to {1, 2}. Under MAKE-SHORT-VALUES-TYPE,
+    (VALUES INTEGER) meant [1, MULTIPLE-VALUES-LIMIT) values (because &REST T
+    was injected), whereas (VALUES INTEGER &OPTIONAL INTEGER) meant [1, 2]
+    values (because `llks` was non-zero, suppressing MAKE-SHORT-VALUES-TYPE).
+    Adding &OPTIONAL paradoxically *shrank* the upper bound on the number of
+    values!
+
+(2) (VALUES T) collapsed to *WILD-TYPE* (*):
+    Because NULL is a subtype of T, MAKE-SHORT-VALUES-TYPE turned (VALUES T)
+    into (VALUES &OPTIONAL T &REST T), which CANONICALIZE-ARGS-TYPE-ARGS
+    collapsed to *WILD-TYPE*. Consequently, (DECLARE (VALUES T)) in a function
+    body (such as in contrib/sb-simple-streams/internal.lisp) was completely
+    discarded by IR1-CONVERT-LAMBDA as a no-op, and trailing T elements in
+    multi-value declarations like (DECLARE (VALUES CHARACTER SB-INT:INDEX T))
+    were silently erased from REQUIRED.
+
+(3) Awkwardness of (VALUES <type> &OPTIONAL):
+    To declare a function returning a single value (or an exact number of
+    values), users were forced to write a dangling &OPTIONAL with no optional
+    types after it:
+      (values fixnum &optional)
+
+(4) Immediate invention of SB-INT:SFUNCTION as an internal workaround:
+    Making (VALUES ...) non-strict immediately broke DEFKNOWN and SBCL's own
+    internal FTYPE proclamations. In the very same commit (05525d3a59) that
+    introduced MAKE-SHORT-VALUES-TYPE, the author had to invent the internal
+    type specifier SB-INT:SFUNCTION ("strict function"):
+
+      ;;; Similar to FUNCTION, but the result type is "exactly" specified:
+      ;;; if it is an object type, then the function returns exactly one
+      ;;; value, if it is a short form of VALUES, then this short form
+      ;;; specifies the exact number of values.
+      (def!type sfunction (args &optional result) ...)
+
+    SBCL used SFUNCTION everywhere internally (in DEFKNOWN and ~100 FTYPE
+    declaims) while leaving standard FUNCTION and (DECLARE (VALUES ...))
+    non-strict for users.
+
+
+4. Restoring Sanity
+-------------------
+Step 1 (implemented):
+  (DECLARE (VALUES ...)) in a function body is an SBCL/CMUCL extension (not
+  part of ANSI Common Lisp). Controlled by
+  SB-EXT:*STRICT-RETURN-VALUES-DECLARATION* (default T), (DECLARE (VALUES ...))
+  without &OPTIONAL or &REST now appends &OPTIONAL prior to parsing so that
+  it specifies the exact number of return values, matching every existing use
+  in SBCL's own codebase and contrib modules.
+
+Step 2 (future direction):
+  Ideally, MAKE-SHORT-VALUES-TYPE should apply *only* to the value-type of a
+  THE special form (where X3J13 Issue THE-VALUES:RETURN-NUMBER-RECEIVED
+  actually applies), rather than corrupting (VALUES ...) inside FUNCTION type
+  specifiers and FTYPE declarations. If (FUNCTION (...) (VALUES ...)) is made
+  strict when VALUES is written explicitly, SB-INT:SFUNCTION becomes largely
+  unnecessary and user FTYPE declarations gain the same exactness as DEFKNOWN.

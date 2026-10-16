@@ -1651,25 +1651,6 @@
       (when (policy *lexenv* (= speed 3))
         (compiler-notify "Ignoring DYNAMIC-EXTENT declarations: ~S" names))))
 
-;;; The VALUES declaration is a syntactic convenience which is roughly equivalent to
-;;; putting an FTYPE on a function. (There are subtle distinctions, but it's similar)
-;;; It is permissible to use the symbol VALUES because:
-;;; - CLHS 3.3.3: "An implementation is free to support other (implementation-defined)
-;;;   declaration identifiers"
-;;; - 11.1.2.1.1 Constraints on the COMMON-LISP Package for Conforming Implementations
-;;;   says that functions, variables, and types are defined on CL symbols only as specified,
-;;;   and does * NOT * state that nonstandard declaration identifiers must not be
-;;;   associated with external symbols of the CL package.
-;;; - 11.1.2.1.2 Constraints on the COMMON-LISP Package for Conforming Programs
-;;;   says "consequences are undefined if ..." user code attempts altering aspects
-;;;   of the symbol VALUES by:
-;;;   item 4. Defining it as a type specifier - so (VALUES myvar) can't possibly
-;;;           be the [3.3.3.1] Shorthand notation for (TYPE VALUES myvar)
-;;;   item 6. Defining it as a declaration with a declaration proclamation.
-;;;
-;;; Therefore users can not portably redefine VALUES as their own type or declaration,
-;;; and also can't claim that its presence is a spec violation.
-
 ;;; Process a single declaration spec, augmenting the specified LEXENV
 ;;; RES. Return RES and result type. VARS and FVARS are as described
 ;;; PROCESS-DECLS.
@@ -1776,6 +1757,58 @@
          (process-it spec))))
     (values lexenv source-form)))
 
+;;; The VALUES declaration is a syntactic convenience which is roughly equivalent to
+;;; putting an FTYPE on a function. (There are subtle distinctions, but it's similar)
+;;; It is permissible to use the symbol VALUES because:
+;;; - CLHS 3.3.3: "An implementation is free to support other (implementation-defined)
+;;;   declaration identifiers"
+;;; - 11.1.2.1.1 Constraints on the COMMON-LISP Package for Conforming Implementations
+;;;   says that functions, variables, and types are defined on CL symbols only as specified,
+;;;   and does * NOT * state that nonstandard declaration identifiers must not be
+;;;   associated with external symbols of the CL package.
+;;; - 11.1.2.1.2 Constraints on the COMMON-LISP Package for Conforming Programs
+;;;   says "consequences are undefined if ..." user code attempts altering aspects
+;;;   of the symbol VALUES by:
+;;;   item 4. Defining it as a type specifier - so (VALUES myvar) can't possibly
+;;;           be the [3.3.3.1] Shorthand notation for (TYPE VALUES myvar)
+;;;   item 6. Defining it as a declaration with a declaration proclamation.
+;;;
+;;; Therefore users can not portably redefine VALUES as their own type or declaration,
+;;; and also can't claim that its presence is a spec violation.
+
+;;; And just what everybody wants: yet another global flag affecting how to treat
+;;; VALUES as a function return type declaration. I posit that nobody expects
+;;; (DECLARE (VALUES FIXNUM FIXNUM)) to specify a result of at least two fixnums
+;;; plus zero or more objects of any type. If you indeed require the latter,
+;;; you can insert &REST T explicitly.
+;;; While THE allows extra values and assumes NILs for missing values, SBCL
+;;; (or rather, CMUCL) invented the treatment of VALUES as a return declaration,
+;;; and could have done anything reasonable.
+;;; My stance is that the legacy treatment was not reasonable, and while some
+;;; may consider it written in stone (or dried mud!), any debate about what it
+;;; "should" do comes down to a question of backward compatibility more than
+;;; spec conformance.
+;;;
+;;; Evidence in favor of strictness:
+;;; (1) See define-external-format in sb-simple-streams/internal.lisp where the
+;;;     author believed he was declaring exactly 1 value of type T.
+;;;     Otherwise the mere existence of that declaration is absurd.
+;;; (2) Adding &OPTIONAL INTEGER to (VALUES INTEGER) undeniably widens the allowed
+;;;     value count from {1} to {1,2}. Under the legacy treatment, the addition of
+;;;     &OPTIONAL paradoxically _shrank_ the upper bound on the number of values
+;;;     from infinity - realistically MULTIPLE-VALUES-LIMIT - down to 2.
+;;; (3) Every use of (DECLARE (VALUES ...)) in SBCL's own source code assumes
+;;;     strictness.
+;;; (4) When SBCL made VALUES non-strict, it had to invent SB-INT:SFUNCTION,
+;;;     in recognition of the fact that types "for declaration" should behave
+;;;     as stated, thereby restoring sanity to 'fndb' while leaving FUNCTION
+;;;     (and users of it) with weakened semantics.
+;;;
+;;; But those among us who believe that users prefer sloppy declarations
+;;; can flip this setting back to NIL. Users who value (no pun intended)
+;;; better static checkability of their code should leave it alone.
+(sb-ext:defglobal *strict-return-values-declaration* t)
+
 ;;; Use a list of DECLARE forms to annotate the lists of LAMBDA-VAR
 ;;; and FUNCTIONAL structures which are being bound. In addition to
 ;;; filling in slots in the leaf structures, we return a new LEXENV,
@@ -1809,14 +1842,17 @@
                     (setq lambda-list (cadr spec) allow-lambda-list nil))
                    ((and allow-values-decl
                          (typep spec '(cons (eql values))))
-                    ;; Why do we allow more than one VALUES decl? I don't know.
-                    (setq result-type
-                          (values-type-intersection
-                           result-type
-                           (or (if (singleton-p (cdr spec))
-                                   (compiler-specifier-type (cadr spec))
-                                   (compiler-values-specifier-type spec))
-                               (return-from process-it)))))
+                    (let ((parse
+                           (or (compiler-values-specifier-type
+                                (if (and *strict-return-values-declaration*
+                                         (proper-list-p (cdr spec))
+                                         (not (intersection '(&optional &rest) (cdr spec))))
+                                    (append spec '(&optional))
+                                    spec))
+                               (return-from process-it))))
+                      ;; Why do we allow more than one VALUES decl? I don't know.
+                      (setq result-type
+                            (values-type-intersection result-type parse))))
                    ((and allow-explicit-check
                          (typep spec '(cons (eql explicit-check))))
                     ;; EXPLICIT-CHECK by itself specifies that all argument and

@@ -383,6 +383,11 @@
   (declare (values real))
   (- n (reduce #'+ rest)))
 
+;;; This flag affects the * preceding * function definitions !
+;;; The interpreter has stored the lambda expressions with their declarations intact,
+;;; but has not internalized their type declarations because we have neither called
+;;; the functions nor queried their FTYPE.  Now we're about to do the latter.
+(setq sb-ext:*strict-return-values-declaration* t)
 (test-util:with-test (:name :try-values-decls)
   (assert (sb-kernel:type=
            (sb-int:info :function :type 'try-values-decl-1)

@@ -30,6 +30,10 @@ changes relative to sbcl-2.6.9:
        line-breaking.
     ** bug fix: combining marks attached to otherwise unattached zero-width
        joiners no longer inhibit line breaks.
+  * minor incompatible change: when a (VALUES ...) declaration is used to
+    specify a function's return type, it no longer implicitly conveys
+    "&REST T". The legacy behavior can be restored by setting
+    SB-EXT:*STRICT-RETURN-VALUES-DECLARATION* to NIL.
 
 changes in sbcl-2.6.9 relative to sbcl-2.6.8:
   * minor incompatible change: structure slots defined as :READ-ONLY can be
