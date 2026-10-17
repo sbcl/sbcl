@@ -5,6 +5,7 @@
 @chapter Efficiency
 
 @menu
+* Source Optimization: source optimization.
 * Tail Call: tail call.
 * Local Call: local call.
 * Block Compilation: block compilation.
@@ -16,6 +17,490 @@
 * Global and Always-bound Variables: global and always bound variables.
 * Miscellaneous Efficiency Issues: miscellaneous efficiency issues.
 @end menu
+
+@node source optimization
+@cindex source optimization
+@section Source Optimization
+
+@menu
+* Let Optimization: let optimization.
+* Constant Folding: constant folding.
+* Unused Expression Elimination: unused expression elimination.
+* Control Optimization: control optimization.
+* Dead Code Elimination: unreachable code deletion.
+* Multiple Values Optimization: multiple values optimization.
+* Source-to-source Transformation: source to source transformation.
+* Style Recommendations: style recommendations.
+@end menu
+
+This section describes source-level transformations that the SBCL
+compiler does on programs in an attempt to make them more efficient.
+Although source-level optimizations can make existing programs more
+efficient, the biggest advantage of this sort of optimization is
+that it makes it easier to write efficient programs. If a clean,
+straightforward implementation can be transformed into an efficient
+one, then there is no need for tricky and dangerous hand
+optimization.
+
+@node let optimization
+@cindex let optimization
+@cindex optimization, let
+@subsection Let Optimization
+
+The primary optimization of let variables is to delete them when they
+are unnecessary. Whenever the value of a let variable is a constant,
+a constant variable or a constant (local or non-notinline) function,
+the variable is deleted, and references to the variable are replaced
+with references to the constant expression. This is useful primarily
+in the expansion of macros or inline functions, where argument
+values are often constant in any given call but are, in general,
+non-constant expressions that must be bound to preserve order of
+evaluation. Let variable optimization eliminates the need for macros
+to carefully avoid spurious bindings and also makes inline functions
+just as efficient as macros.
+
+A particularly interesting class of constant is a local function.
+Substituting for lexical variables that are bound to a function can
+substantially improve the efficiency of functional programming
+styles. For example,
+
+@example
+(let ((a #'(lambda (x) (zow x))))
+  (funcall a 3))
+@end example
+
+effectively transforms to
+
+@example
+(zow 3)
+@end example
+
+This transformation is done even when the function is a closure, as in
+
+@example
+(let ((a (let ((y (zug)))
+           #'(lambda (x) (zow x y)))))
+  (funcall a 3))
+@end example
+
+becoming
+
+@example
+(zow 3 (zug))
+@end example
+
+A constant variable is a lexical variable that is never assigned to,
+always keeping its initial value. Whenever possible, avoid setting
+lexical variables -- instead bind a new variable to the new value.
+Except for loop variables, it is almost always possible to avoid
+setting lexical variables. This form:
+
+@example
+(let ((x (f x)))
+  ...)
+@end example
+
+is more efficient than
+
+@example
+(setq x (f x))
+...
+@end example
+
+Setting variables makes the program more difficult to understand,
+both to the compiler and to the programmer. SBCL compiles
+assignments very efficiently, but most let optimizations are only
+done on constant variables.
+
+Constant variables with only a single use are also optimized away,
+even when the initial value is not constant (modulo side effects).
+For example, this expansion of @code{incf}:
+
+@example
+(let ((#:g3 (+ x 1)))
+  (setq x #:g3))
+@end example
+
+becomes
+
+@example
+(setq x (+ x 1))
+@end example
+
+The type semantics of this transformation are more important than
+the elimination of the variable itself. Consider what happens when
+@code{x} is declared to be a @code{fixnum}. After the transformation, the
+compiler can infer that a non-fixnum result would be a type error.
+This allows it to completely eliminate the code path for @code{bignum}s,
+restricting the math exclusively to fast, register-level
+operations (though an overflow check may still be retained depending
+on @ref{type declaration checking}).
+
+Another variable optimization deletes any variable that is never
+read. This causes the initial value and any assigned values to be
+unused, allowing those expressions to be deleted if they have no
+side-effects.
+
+Note that a @code{let} is actually a degenerate case of @ref{local call}, and
+that let optimization can be done on calls that weren't created by a
+@code{let}. Also, local call allows an applicative style of iteration that
+is totally assignment-free.
+
+@node constant folding
+@cindex constant folding
+@cindex optimization, constant folding
+@subsection Constant Folding
+
+Constant folding is an optimization that replaces a call of constant
+arguments with the constant result of that call. Constant folding is
+done on all standard functions for which it is legal. Inline
+expansion allows folding of any constant parts of the definition and
+can be done even on functions that have side-effects.
+
+It is convenient to rely on constant folding when programming, as in
+this example:
+
+@example
+(defconstant limit 42)
+
+(defun foo ()
+  (... (1- limit) ...))
+@end example
+
+Constant folding is also helpful when writing macros or inline
+functions, since it usually eliminates the need to write a macro
+that special-cases constant arguments.
+
+@node unused expression elimination
+@cindex unused expression elimination
+@cindex dead code elimination
+@cindex optimization, unused expression elimination
+@cindex optimization, dead code elimination
+@subsection Unused Expression Elimination
+
+If the value of any expression is not used, and the expression has no
+side-effects, then it is deleted. As with @ref{constant folding}, this
+optimization applies most often when cleaning up after inline
+expansion and other optimizations.
+
+Note that the compiler will eliminate parts of unused expressions
+known to be side-effect free, even if there are other unknown parts.
+For example, @code{list} has no side-effects, so
+
+@example
+(let ((a (list (foo) (bar))))
+  (if t
+      (zow)
+      (raz a)))
+@end example
+
+becomes
+
+@example
+(progn (foo) (bar))
+(zow)
+@end example
+
+@node control optimization
+@cindex control optimization
+@cindex optimization, control
+@subsection Control Optimization
+
+The most important optimization of control is recognizing when an
+@code{if} test is known at compile time, then deleting the @code{if}, the test
+expression, and the unreachable branch. This can be considered a
+special case of constant folding, although the test doesn't have to
+be truly constant as long as it is definitely false or definitely
+not false. Note also, that type inference propagates the result of
+an @code{if} test to the true and false branches.
+
+A related @code{if} optimization transforming
+
+@example
+(if (if a b c) x y)
+@end example
+
+into
+
+@example
+(if a
+    (if b x y)
+    (if c x y))
+@end example
+
+The opportunity for this sort of optimization usually results from a
+conditional macro. For example,
+
+@example
+(if (not a) x y)
+@end example
+
+is actually implemented as
+
+@example
+(if (if a nil t) x y)
+@end example
+
+which is transformed to
+
+@example
+(if a
+    (if nil x y)
+    (if t x y))
+@end example
+
+which is then optimized to
+
+@example
+(if a y x)
+@end example
+
+Note that due to the compiler's internal representations, the IF-IF
+situation will be recognized even if other forms are wrapped around
+the inner @code{if} as in
+
+@example
+(if (let ((g ...))
+      (loop
+        ...
+        (return (not g))
+        ...))
+    x y)
+@end example
+
+In SBCL, all the Common Lisp macros really are macros written in
+terms of @code{if}, @code{block} and @code{tagbody}, so user-defined control macros can
+be just as efficient as the standard ones. The compiler emits basic
+blocks using a heuristic that minimizes the number of unconditional
+branches. The code in a @code{tagbody} will not be emitted in the order it
+appeared in the source, so there is no point in arranging the code
+to make control drop through to the target.
+
+@node unreachable code deletion
+@cindex unreachable code deletion
+@cindex dead code elimination
+@cindex optimization, unreachable code deletion
+@cindex optimization, dead code elimination
+@subsection Dead Code Elimination
+
+The compiler will delete code whenever it can prove that the code can
+never be executed. Code becomes unreachable when
+
+@itemize
+@item an @code{if} is optimized away, or
+
+@item there is an explicit unconditional control transfer such as @code{go} or
+  @code{return-from}, or
+
+@item the last reference to a local function is deleted (or there never
+  was any reference).
+@end itemize
+
+When code that appeared in the original source is deleted, the
+compiler prints a note to indicate a possible problem (or at least
+unnecessary code.) For example:
+
+@example
+(defun foo ()
+  (if t
+      (write-line "True.")
+      (write-line "False.")))
+@end example
+
+will result in this note:
+
+@example
+; in: DEFUN FOO
+;    (WRITE-LINE "False.")
+;
+; note: deleting unreachable code
+@end example
+
+It is important to pay attention to unreachable code notes, since
+they often indicate a subtle type error. For example,
+
+@example
+(defstruct foo a b)
+
+(defun lose (x)
+  (let ((a (foo-a x))
+        (b (if x (foo-b x) "never")))
+    (values a b)))
+@end example
+
+results in this note:
+
+@example
+; in: DEFUN LOSE
+;     (IF X
+;         (FOO-B X)
+;         "never")
+; ==>
+;   "never"
+;
+; note: deleting unreachable code
+@end example
+
+The @code{"never"} branch is unreachable because type inference knows
+that the argument to @code{foo-a} must be a @code{foo} and thus can't be @code{nil}.
+Presumably the programmer forgot that @code{x} could be @code{nil} when writing
+the binding for @code{a}.
+
+Here is an example with an incorrect declaration:
+
+@example
+(defun count-a (string)
+  (do ((pos 0 (position #\a string :start (1+ pos)))
+       (count 0 (1+ count)))
+      ((null pos) count)
+    (declare (fixnum pos))))
+@end example
+
+This time our note is:
+
+@example
+; in: DEFUN COUNT-A
+;     (DO ((POS 0 (POSITION #\a STRING :START (1+ POS)))
+;          (COUNT 0 (1+ COUNT)))
+;         ((NULL POS) COUNT)
+;       (DECLARE (FIXNUM POS)))
+; --> BLOCK LET TAGBODY RETURN-FROM PROGN
+; ==>
+;   COUNT
+;
+; note: deleting unreachable code
+@end example
+
+The problem here is that @code{pos} can never be null since it is
+declared a @code{fixnum}.
+
+It takes some experience with unreachable code notes to be able to
+tell what they are trying to say. In non-obvious cases, the best
+thing to do is to call the function in a way that should cause the
+unreachable code to be executed. Either you will get a type error,
+or you will find that there truly is no way for the code to be
+executed.
+
+Not all unreachable code results in a note:
+
+@itemize
+@item A note is only given when the unreachable code textually appears
+  in the original source. This prevents spurious notes due to the
+  optimization of macros and inline functions but sometimes also
+  foregoes a note that would have been useful.
+
+@item Since accurate source information is not available for non-list
+  forms, there is an element of heuristic in determining whether or
+  not to give a note about an atom. Spurious notes may be given when
+  a macro or inline function defines a variable that is also present
+  in the calling function. Notes about easily introduced constants
+  are never given since it is too easy to confuse them in expanded
+  code with ones in the original source. These constants are @code{nil}, @code{t},
+  keywords and unboxed values such as @code{fixnum}s, @code{character}s, and
+  @code{single-float}s on 64-bit platforms.
+
+@item Notes are only given about code unreachable due to control flow.
+  There is no note when an expression is deleted because its value
+  is unused, since this is a common consequence of other
+  optimizations.
+@end itemize
+
+@node multiple values optimization
+@cindex multiple values optimization
+@cindex optimization, multiple values
+@subsection Multiple Values Optimization
+
+Within a function, the compiler implements uses of multiple values
+particularly efficiently. Multiple values can be kept in arbitrary
+registers, so using multiple values doesn't imply stack manipulation
+and representation conversion. For example,
+
+@example
+(let ((a (if x (foo x) u))
+      (b (if x (bar x) v)))
+  ...)
+@end example
+
+is actually more efficient when written as
+
+@example
+(multiple-value-bind (a b)
+    (if x
+        (values (foo x) (bar x))
+        (values u v))
+  ...)
+@end example
+
+Also, see @ref{local call return values} for information on how local
+call provides efficient support for multiple function return values.
+
+@node source to source transformation
+@cindex source-to-source transformation
+@subsection Source-to-source Transformation
+
+The compiler implements a number of operation-specific optimizations
+as source-to-source transformations. You will often see unfamiliar
+code in error messages. For example,
+
+@example
+(defun plus-3 (x y z)
+  (declare (optimize speed)
+           (type fixnum x y))
+  (+ x y z))
+@end example
+
+gives this note:
+
+@example
+; in: DEFUN PLUS-3
+;     (+ X Y Z)
+; ==>
+;   (+ (+ X Y) Z)
+;
+; note: unable to
+;   optimize
+; due to type uncertainty:
+;   The second argument is a NUMBER, not a RATIONAL.
+@end example
+
+@cindex actual source
+@cindex source, actual
+Here, the original @code{(+ x y z)} has been transformed into @code{(+ (+ x y)
+z)}. This transformation is indicated with the same @code{==>} used to
+mark macro and function inline expansion (see
+@ref{original and actual source}). Although the actual source may
+sometimes be confusing, displaying it is important since it is the
+context in which notes and warnings can be understood.
+
+@node style recommendations
+@subsection Style Recommendations
+
+Source level optimization makes possible a clearer and more relaxed
+programming style:
+
+@itemize
+@item Don't use macros purely to avoid function call. If you want an
+  inline function, write it as a function and declare it @code{inline}.
+  It's clearer, less error-prone, and works just as well.
+
+@item Don't write macros that try to "optimize" their expansion in
+  trivial ways such as avoiding binding variables for simple
+  expressions. The compiler does these optimizations too and is less
+  likely to make a mistake.
+
+@item Make use of local functions (i.e. @code{labels} and @code{flet}) and @ref{tail call}s
+  in places where it is clearer. @ref{local call} is faster than full
+  call.
+
+@item Avoid setting local variables when possible. Binding a new @code{let}
+  variable is at least as efficient as setting an existing variable
+  and is easier to understand, both for the compiler and the
+  programmer.
+
+@item Instead of writing similar code over and over again so that it can
+  be hand customized for each use, define a macro or inline
+  function, and let the compiler do the work.
+@end itemize
 
 @node tail call
 @cindex tail call
@@ -264,6 +749,8 @@ only once, a call doesn't have to be equivalent to a @code{let} to be more
 efficient than full call. All local calls avoid the overhead of
 argument count checking and keyword argument parsing, and there are
 a number of other advantages that apply in many common situations.
+See @ref{let optimization} for a discussion of the optimizations done on
+let calls.
 
 @node local calls to closures
 @cindex call closure
@@ -288,6 +775,7 @@ stored in memory at all. In this example, there is no penalty for
 In local call, the compiler effectively passes closed-over values as
 extra arguments, so there is no need for you to "optimize"
 @code{localfun} by explicitly passing in lexically visible values.
+Closures may also be subject to @ref{let optimization}.
 
 @quotation
 @emph{Note}: indirect value cells are currently always allocated on the
@@ -629,6 +1117,8 @@ magnitude improvement in speed. In addition to eliminating the
 original call to @code{member}, inline expansion also allows the calls to
 @code{char=} and @code{foo-a} to be open-coded. We go from a loop with three
 tests and two calls to a loop with one test and no calls.
+
+See also @ref{source optimization}.
 
 @node inline expansion recording
 @cindex inline expansion, recording
@@ -1172,7 +1662,6 @@ correct for the SBCL's compiler. See the sections
 @item Advanced Compiler Introduction
 @item More About Types in Python
 @item Type Inference
-@item Source Optimization
 @item Object Representation
 @item Numbers
 @item General Efficiency Hints

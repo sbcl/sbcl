@@ -2,6 +2,7 @@
 
 (defsection @efficiency (:title "Efficiency"
                          :concepts ("efficicency"))
+  (@source-optimization section)
   (@tail-call section)
   (@local-call section)
   (@block-compilation section)
@@ -12,6 +13,409 @@
   (@recognized-idioms section)
   (@global-and-always-bound-variables section)
   (@miscellaneous-efficiency-issues section))
+
+(defsection @source-optimization (:title "Source Optimization"
+                                  :concepts (("source optimization")))
+  "This section describes source-level transformations that the SBCL
+  compiler does on programs in an attempt to make them more efficient.
+  Although source-level optimizations can make existing programs more
+  efficient, the biggest advantage of this sort of optimization is
+  that it makes it easier to write efficient programs. If a clean,
+  straightforward implementation can be transformed into an efficient
+  one, then there is no need for tricky and dangerous hand
+  optimization."
+  (@let-optimization section)
+  (@constant-folding section)
+  (@unused-expression-elimination section)
+  (@control-optimization section)
+  (@unreachable-code-deletion section)
+  (@multiple-values-optimization section)
+  (@source-to-source-transformation section)
+  (@style-recommendations section))
+
+(defsection @let-optimization (:title "Let Optimization"
+                               :concepts (("let" "optimization")
+                                          ("optimization," "let")))
+  "The primary optimization of let variables is to delete them when they
+  are unnecessary. Whenever the value of a let variable is a constant,
+  a constant variable or a constant (local or non-notinline) function,
+  the variable is deleted, and references to the variable are replaced
+  with references to the constant expression. This is useful primarily
+  in the expansion of macros or inline functions, where argument
+  values are often constant in any given call but are, in general,
+  non-constant expressions that must be bound to preserve order of
+  evaluation. Let variable optimization eliminates the need for macros
+  to carefully avoid spurious bindings and also makes inline functions
+  just as efficient as macros.
+
+  A particularly interesting class of constant is a local function.
+  Substituting for lexical variables that are bound to a function can
+  substantially improve the efficiency of functional programming
+  styles. For example,
+
+      (let ((a #'(lambda (x) (zow x))))
+        (funcall a 3))
+
+  effectively transforms to
+
+      (zow 3)
+
+  This transformation is done even when the function is a closure, as in
+
+      (let ((a (let ((y (zug)))
+                 #'(lambda (x) (zow x y)))))
+        (funcall a 3))
+
+  becoming
+
+      (zow 3 (zug))
+
+  A constant variable is a lexical variable that is never assigned to,
+  always keeping its initial value. Whenever possible, avoid setting
+  lexical variables -- instead bind a new variable to the new value.
+  Except for loop variables, it is almost always possible to avoid
+  setting lexical variables. This form:
+
+      (let ((x (f x)))
+        ...)
+
+  is more efficient than
+
+      (setq x (f x))
+      ...
+
+  Setting variables makes the program more difficult to understand,
+  both to the compiler and to the programmer. SBCL compiles
+  assignments very efficiently, but most let optimizations are only
+  done on constant variables.
+
+  Constant variables with only a single use are also optimized away,
+  even when the initial value is not constant (modulo side effects).
+  For example, this expansion of INCF:
+
+      (let ((#:g3 (+ x 1)))
+        (setq x #:g3))
+
+  becomes
+
+      (setq x (+ x 1))
+
+  The type semantics of this transformation are more important than
+  the elimination of the variable itself. Consider what happens when
+  `X` is declared to be a FIXNUM. After the transformation, the
+  compiler can infer that a non-fixnum result would be a type error.
+  This allows it to completely eliminate the code path for BIGNUMs,
+  restricting the math exclusively to fast, register-level
+  operations (though an overflow check may still be retained depending
+  on @TYPE-DECLARATION-CHECKING).
+
+  Another variable optimization deletes any variable that is never
+  read. This causes the initial value and any assigned values to be
+  unused, allowing those expressions to be deleted if they have no
+  side-effects.
+
+  Note that a LET is actually a degenerate case of @LOCAL-CALL, and
+  that let optimization can be done on calls that weren't created by a
+  LET. Also, local call allows an applicative style of iteration that
+  is totally assignment-free.")
+
+(defsection @constant-folding (:title "Constant Folding"
+                               :concepts (("constant folding")
+                                          ("optimization," "constant folding")))
+  "Constant folding is an optimization that replaces a call of constant
+  arguments with the constant result of that call. Constant folding is
+  done on all standard functions for which it is legal. Inline
+  expansion allows folding of any constant parts of the definition and
+  can be done even on functions that have side-effects.
+
+  It is convenient to rely on constant folding when programming, as in
+  this example:
+
+      (defconstant limit 42)
+
+      (defun foo ()
+        (... (1- limit) ...))
+
+  Constant folding is also helpful when writing macros or inline
+  functions, since it usually eliminates the need to write a macro
+  that special-cases constant arguments.")
+
+(defsection @unused-expression-elimination
+    (:title "Unused Expression Elimination"
+     :concepts (("unused expression elimination")
+                ("dead code elimination")
+                ("optimization," "unused expression elimination")
+                ("optimization," "dead code elimination")))
+  "If the value of any expression is not used, and the expression has no
+  side-effects, then it is deleted. As with @CONSTANT-FOLDING, this
+  optimization applies most often when cleaning up after inline
+  expansion and other optimizations.
+
+  Note that the compiler will eliminate parts of unused expressions
+  known to be side-effect free, even if there are other unknown parts.
+  For example, LIST has no side-effects, so
+
+      (let ((a (list (foo) (bar))))
+        (if t
+            (zow)
+            (raz a)))
+
+  becomes
+
+      (progn (foo) (bar))
+      (zow)")
+
+(defsection @control-optimization (:title "Control Optimization"
+                                   :concepts (("control optimization")
+                                              ("optimization," "control")))
+  "The most important optimization of control is recognizing when an
+  IF test is known at compile time, then deleting the IF, the test
+  expression, and the unreachable branch. This can be considered a
+  special case of constant folding, although the test doesn't have to
+  be truly constant as long as it is definitely false or definitely
+  not false. Note also, that type inference propagates the result of
+  an IF test to the true and false branches."
+  ;; FIXME: add "(see @CONSTRAINT-PROPAGATION)" once that exists
+  "A related IF optimization transforming
+
+      (if (if a b c) x y)
+
+  into
+
+      (if a
+          (if b x y)
+          (if c x y))
+
+  The opportunity for this sort of optimization usually results from a
+  conditional macro. For example,
+
+      (if (not a) x y)
+
+  is actually implemented as
+
+      (if (if a nil t) x y)
+
+  which is transformed to
+
+      (if a
+          (if nil x y)
+          (if t x y))
+
+  which is then optimized to
+
+      (if a y x)
+
+  Note that due to the compiler's internal representations, the IF-IF
+  situation will be recognized even if other forms are wrapped around
+  the inner IF as in
+
+      (if (let ((g ...))
+            (loop
+              ...
+              (return (not g))
+              ...))
+          x y)
+
+  In SBCL, all the Common Lisp macros really are macros written in
+  terms of IF, BLOCK and TAGBODY, so user-defined control macros can
+  be just as efficient as the standard ones. The compiler emits basic
+  blocks using a heuristic that minimizes the number of unconditional
+  branches. The code in a TAGBODY will not be emitted in the order it
+  appeared in the source, so there is no point in arranging the code
+  to make control drop through to the target.")
+
+(defsection @unreachable-code-deletion
+    (:title "Dead Code Elimination"
+     :concepts (("unreachable code deletion")
+                ("dead code elimination")
+                ("optimization," "unreachable code deletion")
+                ("optimization," "dead code elimination")))
+  "The compiler will delete code whenever it can prove that the code can
+  never be executed. Code becomes unreachable when
+
+  - an IF is optimized away, or
+
+  - there is an explicit unconditional control transfer such as GO or
+    RETURN-FROM, or
+
+  - the last reference to a local function is deleted (or there never
+    was any reference).
+
+  When code that appeared in the original source is deleted, the
+  compiler prints a note to indicate a possible problem (or at least
+  unnecessary code.) For example:
+
+      (defun foo ()
+        (if t
+            (write-line \"True.\")
+            (write-line \"False.\")))
+
+  will result in this note:
+
+      ; in: DEFUN FOO
+      ;    (WRITE-LINE \"False.\")
+      ;
+      ; note: deleting unreachable code
+
+  It is important to pay attention to unreachable code notes, since
+  they often indicate a subtle type error. For example,
+
+      (defstruct foo a b)
+
+      (defun lose (x)
+        (let ((a (foo-a x))
+              (b (if x (foo-b x) \"never\")))
+          (values a b)))
+
+  results in this note:
+
+      ; in: DEFUN LOSE
+      ;     (IF X
+      ;         (FOO-B X)
+      ;         \"never\")
+      ; ==>
+      ;   \"never\"
+      ;
+      ; note: deleting unreachable code
+
+  The `\"never\"` branch is unreachable because type inference knows
+  that the argument to `FOO-A` must be a `FOO` and thus can't be NIL.
+  Presumably the programmer forgot that `X` could be NIL when writing
+  the binding for `A`.
+
+  Here is an example with an incorrect declaration:
+
+      (defun count-a (string)
+        (do ((pos 0 (position #\\a string :start (1+ pos)))
+             (count 0 (1+ count)))
+            ((null pos) count)
+          (declare (fixnum pos))))
+
+  This time our note is:
+
+      ; in: DEFUN COUNT-A
+      ;     (DO ((POS 0 (POSITION #\\a STRING :START (1+ POS)))
+      ;          (COUNT 0 (1+ COUNT)))
+      ;         ((NULL POS) COUNT)
+      ;       (DECLARE (FIXNUM POS)))
+      ; --> BLOCK LET TAGBODY RETURN-FROM PROGN
+      ; ==>
+      ;   COUNT
+      ;
+      ; note: deleting unreachable code
+
+  The problem here is that `POS` can never be null since it is
+  declared a FIXNUM.
+
+  It takes some experience with unreachable code notes to be able to
+  tell what they are trying to say. In non-obvious cases, the best
+  thing to do is to call the function in a way that should cause the
+  unreachable code to be executed. Either you will get a type error,
+  or you will find that there truly is no way for the code to be
+  executed.
+
+  Not all unreachable code results in a note:
+
+  - A note is only given when the unreachable code textually appears
+    in the original source. This prevents spurious notes due to the
+    optimization of macros and inline functions but sometimes also
+    foregoes a note that would have been useful.
+
+  - Since accurate source information is not available for non-list
+    forms, there is an element of heuristic in determining whether or
+    not to give a note about an atom. Spurious notes may be given when
+    a macro or inline function defines a variable that is also present
+    in the calling function. Notes about easily introduced constants
+    are never given since it is too easy to confuse them in expanded
+    code with ones in the original source. These constants are NIL, T,
+    keywords and unboxed values such as FIXNUMs, CHARACTERs, and
+    SINGLE-FLOATs on 64-bit platforms.
+
+  - Notes are only given about code unreachable due to control flow.
+    There is no note when an expression is deleted because its value
+    is unused, since this is a common consequence of other
+    optimizations.")
+
+(defsection @multiple-values-optimization
+    (:title "Multiple Values Optimization"
+     :concepts (("multiple values optimization")
+                ("optimization," "multiple values")))
+  "Within a function, the compiler implements uses of multiple values
+  particularly efficiently. Multiple values can be kept in arbitrary
+  registers, so using multiple values doesn't imply stack manipulation
+  and representation conversion. For example,
+
+      (let ((a (if x (foo x) u))
+            (b (if x (bar x) v)))
+        ...)
+
+  is actually more efficient when written as
+
+      (multiple-value-bind (a b)
+          (if x
+              (values (foo x) (bar x))
+              (values u v))
+        ...)
+
+  Also, see @LOCAL-CALL-RETURN-VALUES for information on how local
+  call provides efficient support for multiple function return values.")
+
+(defsection @source-to-source-transformation
+    (:title "Source-to-source Transformation"
+     :concepts (("source-to-source transformation")))
+  "The compiler implements a number of operation-specific optimizations
+  as source-to-source transformations. You will often see unfamiliar
+  code in error messages. For example,
+
+      (defun plus-3 (x y z)
+        (declare (optimize speed)
+                 (type fixnum x y))
+        (+ x y z))
+
+  gives this note:
+
+      ; in: DEFUN PLUS-3
+      ;     (+ X Y Z)
+      ; ==>
+      ;   (+ (+ X Y) Z)
+      ;
+      ; note: unable to
+      ;   optimize
+      ; due to type uncertainty:
+      ;   The second argument is a NUMBER, not a RATIONAL.
+
+  Here, the original `(+ X Y Z)` has been transformed into `(+ (+ X Y)
+  Z)`. This transformation is indicated with the same `==>` used to
+  mark macro and function inline expansion (see
+  @ORIGINAL-AND-ACTUAL-SOURCE). Although the @ACTUAL-SOURCE may
+  sometimes be confusing, displaying it is important since it is the
+  context in which notes and warnings can be understood.")
+
+(defsection @style-recommendations (:title "Style Recommendations")
+  "Source level optimization makes possible a clearer and more relaxed
+  programming style:
+
+  - Don't use macros purely to avoid function call. If you want an
+    inline function, write it as a function and declare it INLINE.
+    It's clearer, less error-prone, and works just as well.
+
+  - Don't write macros that try to \"optimize\" their expansion in
+    trivial ways such as avoiding binding variables for simple
+    expressions. The compiler does these optimizations too and is less
+    likely to make a mistake.
+
+  - Make use of local functions (i.e. LABELS and FLET) and @TAIL-CALLs
+    in places where it is clearer. @LOCAL-CALL is faster than full
+    call.
+
+  - Avoid setting local variables when possible. Binding a new LET
+    variable is at least as efficient as setting an existing variable
+    and is easier to understand, both for the compiler and the
+    programmer.
+
+  - Instead of writing similar code over and over again so that it can
+    be hand customized for each use, define a macro or inline
+    function, and let the compiler do the work.")
 
 (defsection @tail-call (:title "Tail Call"
                         :concepts (~tail-call))
@@ -203,10 +607,9 @@
   only once, a call doesn't have to be equivalent to a LET to be more
   efficient than full call. All local calls avoid the overhead of
   argument count checking and keyword argument parsing, and there are
-  a number of other advantages that apply in many common situations."
-  ;; FIXME: See @LET-OPTIMIZATION} for a discussion of the
-  ;; optimizations done on let calls.
-  )
+  a number of other advantages that apply in many common situations.
+  See @LET-OPTIMIZATION for a discussion of the optimizations done on
+  let calls.")
 
 (defsection @local-calls-to-closures (:title "Local Calls to Closures"
                                       :concepts (("call" "closure" )
@@ -225,9 +628,10 @@
 
   In local call, the compiler effectively passes closed-over values as
   extra arguments, so there is no need for you to \"optimize\"
-  `LOCALFUN` by explicitly passing in lexically visible values."
-  ;; FIXME: Closures may also be subject to @LET-OPTIMIZATION.
-  "> _Note_: indirect value cells are currently always allocated on the
+  `LOCALFUN` by explicitly passing in lexically visible values.
+  Closures may also be subject to @LET-OPTIMIZATION.
+
+  > _Note_: indirect value cells are currently always allocated on the
   > heap when a variable is both assigned to (with SETQ or SETF) and
   > closed over, regardless of whether the closure is a local function
   > or not. This is another reason to avoid setting variables when you
@@ -486,9 +890,9 @@
   magnitude improvement in speed. In addition to eliminating the
   original call to MEMBER, inline expansion also allows the calls to
   CHAR= and `FOO-A` to be open-coded. We go from a loop with three
-  tests and two calls to a loop with one test and no calls."
-  ;; FIXME: See @SOURCE-OPTIMIZATION for more discussion of
-  ;; source-level optimization.
+  tests and two calls to a loop with one test and no calls.
+
+  See also @SOURCE-OPTIMIZATION."
   (@inline-expansion-recording section)
   (@semi-inline-expansion section))
 
@@ -904,7 +1308,6 @@
   - Advanced Compiler Introduction
   - More About Types in Python
   - Type Inference
-  - Source Optimization
   - Object Representation
   - Numbers
   - General Efficiency Hints

@@ -6512,7 +6512,7 @@
                    :allow-notes nil))
 
 ;;; SB-MANUAL:@TYPE-ERRORS-AT-COMPILE-TIME
-(with-test (:name :compile-time-type-error)
+(with-test (:name :compile-time-type-error-example)
   (let ((style-warnings
           (nth-value 3 (checked-compile
                         '(lambda (foo)
@@ -6533,7 +6533,7 @@
                    :allow-notes nil))
 
 ;;; SB-MANUAL:@ORIGINAL-AND-ACTUAL-SOURCE
-(with-test (:name :original-and-actual-source)
+(with-test (:name :original-and-actual-source-example)
   (checked-compile '(lambda (x)
                      (let (a)
                        (declare (fixnum a))

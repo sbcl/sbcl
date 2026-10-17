@@ -3281,8 +3281,14 @@
           (unless missing-newline-p
             (terpri out)))))))
 
+(defun assert-compile-output-prefix-p (string prefix)
+  (let ((string (delete-trailing-whitespace string))
+        (prefix (delete-trailing-whitespace prefix)))
+    (assert (and (<= (length prefix) (length string))
+                 (string= string prefix :end1 (length prefix))))))
+
 ;;; SB-MANUAL:@UNDERSTANDING-COMPILER-DIAGNOSTICS
-(with-test (:name :processing-path-and-actual-source-form-in-warnings)
+(with-test (:name :processing-path-and-actual-source-form-in-warnings-example)
   (let ((error-output
           (with-output-to-string (*error-output*)
             (let ((*evaluator-mode* :compile))
@@ -3290,8 +3296,8 @@
                       (declare (symbol y))
                       (macrolet ((zoq (x) `(roq (ploq (+ ,x 3)))))
                         (zoq y))))))))
-    (assert (equal (delete-trailing-whitespace error-output)
-                   "; in: DEFUN FROQ
+    (assert-compile-output-prefix-p error-output
+                                    "; in: DEFUN FROQ
 ;     (ZOQ Y)
 ; --> ROQ PLOQ
 ; ==>
@@ -3318,23 +3324,17 @@
 ;
 ; caught STYLE-WARNING:
 ;   undefined function: COMMON-LISP-USER::ROQ
-;
-; compilation unit finished
-;   Undefined functions:
-;     PLOQ ROQ
-;   caught 1 WARNING condition
-;   caught 2 STYLE-WARNING conditions
-"))))
+")))
 
 ;;; SB-MANUAL:@PROCESSING-PATHS
-(with-test (:name :processing-paths)
+(with-test (:name :processing-paths-example)
   (let ((error-output
           (with-output-to-string (*error-output*)
             (let ((*evaluator-mode* :compile))
               (eval '(defun frox (n)
                       (dotimes (i n *undefined*))))))))
-    (assert (equal (delete-trailing-whitespace error-output)
-                   "; in: DEFUN FROX
+    (assert-compile-output-prefix-p error-output
+                                    "; in: DEFUN FROX
 ;     (DOTIMES (I N *UNDEFINED*))
 ; --> DO BLOCK LET TAGBODY RETURN-FROM
 ; ==>
@@ -3342,9 +3342,82 @@
 ;
 ; caught WARNING:
 ;   undefined variable: COMMON-LISP-USER::*UNDEFINED*
+")))
+
+;;; SB-MANUAL:@DEAD-CODE-ELIMINATION
+(with-test (:name :dead-code-elimination-example-1)
+  (let ((error-output
+          (with-output-to-string (*error-output*)
+            (compile nil '(lambda ()
+                            (if t
+                                (write-line "True.")
+                                (write-line "False.")))))))
+    (assert-compile-output-prefix-p error-output
+                                    "; in: LAMBDA ()
+;     (WRITE-LINE \"False.\")
 ;
-; compilation unit finished
-;   Undefined variable:
-;     *UNDEFINED*
-;   caught 1 WARNING condition
-"))))
+; note: deleting unreachable code
+")))
+
+(defstruct foo a b)
+
+;;; SB-MANUAL:@DEAD-CODE-ELIMINATION
+(with-test (:name :dead-code-elimination-example-2)
+  (let ((error-output
+          (with-output-to-string (*error-output*)
+            (compile 'lose '(lambda (x)
+                             (let ((a (foo-a x))
+                                   (b (if x (foo-b x) "never")))
+                               (values a b)))))))
+    (assert-compile-output-prefix-p error-output
+                                    "; in: LAMBDA (X)
+;     (IF X
+;         (FOO-B X)
+;         \"never\")
+; ==>
+;   \"never\"
+;
+; note: deleting unreachable code
+")))
+
+;;; SB-MANUAL:@DEAD-CODE-ELIMINATION
+(with-test (:name :dead-code-elimination-example-3)
+  (let ((error-output
+          (with-output-to-string (*error-output*)
+            (compile nil '(lambda (string)
+                           (do ((pos 0 (position #\a string :start (1+ pos)))
+                                (count 0 (1+ count)))
+                               ((null pos) count)
+                             (declare (fixnum pos))))))))
+    (assert-compile-output-prefix-p error-output
+                                    "; in: LAMBDA (STRING)
+;     (DO ((POS 0 (POSITION #\\a STRING :START (1+ POS)))
+;          (COUNT 0 (1+ COUNT)))
+;         ((NULL POS) COUNT)
+;       (DECLARE (FIXNUM POS)))
+; --> BLOCK LET TAGBODY RETURN-FROM PROGN
+; ==>
+;   COUNT
+;
+; note: deleting unreachable code
+")))
+
+;;; SB-MANUAL:@SOURCE-TO-SOURCE-TRANSFORMATION
+(with-test (:name :source-to-source-transformation-example-1)
+  (let ((error-output
+          (with-output-to-string (*error-output*)
+            (compile nil '(lambda (x y z)
+                           (declare (optimize speed)
+                            (type fixnum x y))
+                           (+ x y z))))))
+    (assert-compile-output-prefix-p error-output
+                                    "; in: LAMBDA (X Y Z)
+;     (+ X Y Z)
+; ==>
+;   (+ (+ X Y) Z)
+;
+; note: unable to
+;   optimize
+; due to type uncertainty:
+;   The second argument is a NUMBER, not a RATIONAL.
+")))

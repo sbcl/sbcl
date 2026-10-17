@@ -2553,10 +2553,11 @@
 ;;;
 ;;; If the actual source is an atom, then we use a bunch of heuristics
 ;;; to guess whether this reference really appeared in the original
-;;; source:
+;;; source (SB-MANUAL:@UNREACHABLE-CODE-DELETION):
 ;;; -- If a symbol, it must be interned and not a keyword.
-;;; -- It must not be an easily introduced constant (T or NIL, a fixnum
-;;;    or a character.)
+;;; -- It must not be an easily introduced constant (T or NIL, or an
+;;;    unboxed value like a fixnum, a character, or single-floats on
+;;;    64-bit platforms.)
 ;;; -- The atom must be "present" in the original source form, and
 ;;;    present in all intervening actual source forms.
 (defun note-block-deletion (block)
