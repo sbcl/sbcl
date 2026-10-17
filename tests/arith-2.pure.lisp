@@ -1159,7 +1159,14 @@
          (typep a '(signed-byte 128)))
     (((1- (expt 2 127))) t)
     (((- (expt 2 127))) t)
-    (((expt 2 127)) nil)))
+    (((expt 2 127)) nil))
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (declare (unsigned-byte a))
+         (typep a '(signed-byte 1025)))
+    (((1- (expt 2 1024))) t)
+    (((expt 2 1024)) nil)))
 
 (with-test (:name :%bignum-length-type)
   (assert-type

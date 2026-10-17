@@ -2115,7 +2115,9 @@
                              (t
                               (let ((digit (sb-bignum:%bignum-ref (truly-the bignum object) ,digits)))
                                 ,(if unsigned
-                                     `(typep digit '(unsigned-byte ,left))
+                                     (if (zerop left)
+                                         `(eq digit 0)
+                                         `(typep digit '(unsigned-byte ,left)))
                                      `(typep (mask-signed-field sb-vm:n-word-bits digit)
                                              '(signed-byte ,(1+ left))))))))))))))))
 
