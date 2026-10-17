@@ -477,7 +477,7 @@
                 `(,(gen-1 (cdr dest) `(node-dest ,node)))))
            ,@(or otherwise
                  (and transform
-                   `((delay-ir1-transform node :ir1-phases)
+                   `((delay-ir1-transform ,node :ir1-phases)
                      (give-up-ir1-transform)))))))))
 
 (defun combination/cast-name (node &optional cast-type)
@@ -600,7 +600,7 @@
              (let ((use (lvar-uses lvar)))
                (if (and (cast-p use)
                         (cast-type-check use)
-                        (csubtypep (single-value-type (cast-type-to-check use)) type))
+                        (csubtypep type (single-value-type (cast-type-to-check use))))
                    (rec (cast-value use))
                    lvar))))
     (rec lvar)))

@@ -2906,3 +2906,11 @@
    (lambda (x)
      (abs x))
    (and (real 0) (not (member -0f0 -0d0)))))
+
+(with-test (:name :constant-association-casts)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (x)
+         (declare (rational x))
+         (+ (the integer (+ x 1/2)) 1/2))
+    ((1/2) 3/2)))
