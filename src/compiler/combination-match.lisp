@@ -222,6 +222,11 @@
                      collect (parse-combination spec (1+ level)))))
       (values (recurse spec -1) this-level))))
 
+(defun ordered-set-difference (set1 set2)
+  (loop for v in set1
+        unless (member v set2)
+        collect v))
+
 (defmacro cmatch ((node &key (transform t) (unravel-casts t)) &body clauses)
   (let (bound-vars
         otherwise)
@@ -335,14 +340,13 @@
                (loop for (names . body) in cases
                      collect
                      `((or ,@(loop for name in names
-                                  collect (case name
-                                            (:this
-                                             `(eq combination .node.))
-                                            (:* '.name.)
-                                            (t
-                                             `(eq .name. ',name)))))
+                                   collect (case name
+                                             (:this
+                                              `(eq combination .node.))
+                                             (:* '.name.)
+                                             (t
+                                              `(eq .name. ',name)))))
                        ,@body)))
-
              (expand-operands (lvars operands body)
                (if lvars
                    (let ((lvar (car lvars))
@@ -439,11 +443,11 @@
                                                                      '(apply #'combination-match-transform)
                                                                      '(combination-match-transform))
                                                                .top-node.
-                                                               ',(set-difference (if restp
-                                                                                     (butlast without-plus)
-                                                                                     without-plus)
-                                                                                 excluded)
-                                                               new ,@(set-difference var-names excluded))
+                                                               ',(ordered-set-difference (if restp
+                                                                                             (butlast without-plus)
+                                                                                             without-plus)
+                                                                                         excluded)
+                                                               new ,@(ordered-set-difference var-names excluded))
                                                              `(return-from .combination-match. new)))))
                                         flets)
                                   (let* ((existing (getf by-level this-level)))
@@ -474,11 +478,11 @@
            (block .combination-match.
              ,(gen-1 (ldiff clauses dest) node)
              ,@(when dest
-                `(,(gen-1 (cdr dest) `(node-dest ,node)))))
+                 `(,(gen-1 (cdr dest) `(node-dest ,node)))))
            ,@(or otherwise
                  (and transform
-                   `((delay-ir1-transform ,node :ir1-phases)
-                     (give-up-ir1-transform)))))))))
+                      `((delay-ir1-transform ,node :ir1-phases)
+                        (give-up-ir1-transform)))))))))
 
 (defun combination/cast-name (node &optional cast-type)
   (typecase node
