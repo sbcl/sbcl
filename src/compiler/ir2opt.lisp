@@ -187,7 +187,15 @@
      (flet ((coerce-tn (tn move)
               (if (or (eq tn res)
                       (eq (vop-name move) 'move)
-                      (sc-is tn sb-vm::immediate #+arm64 sb-vm::fp-immediate)
+                      (sc-case tn
+                        (sb-vm::immediate
+                         (and #+arm64
+                              (not (sc-is res sb-vm::single-reg)))) ;; immediate 0.0
+                        #+arm64
+                        (sb-vm::fp-immediate
+                         t)
+                        (t nil))
+
                       (compatible-move-p res tn))
                   tn
                   (let ((intermediate-tn (make-representation-tn (tn-primitive-type res)
