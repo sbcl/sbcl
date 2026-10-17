@@ -534,13 +534,6 @@
                                   (and (typep arg-m '(cons (eql constant)))
                                        (csubtypep (lvar-type arg) (second arg-m))))))))))
 
-(defun combination-matches (name args combination)
-  (and (combination-p combination)
-       (let ((fun (combination-fun combination)))
-         (when (and (eq (lvar-fun-name fun) name)
-                    (combination-matches-args (combination-args combination) args))
-           name))))
-
 ;;; Will bind NAME, COMBINATION, ARGS
 (defmacro combination-case (lvar &body cases)
   (multiple-value-bind (node cast)
