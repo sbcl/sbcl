@@ -2296,7 +2296,18 @@
         (:optimize :safe)
         `(lambda (n)
            (* (the integer (* n 0)) 3))
-      ((#c(1 -2)) 0))))
+      ((#c(1 -2)) 0))
+    (checked-compile-and-assert
+        (:optimize :default)
+        `(lambda (x)
+           (* (- (ash 1 (mod x 5)) 6) 7/3))
+      ((8) 14/3))
+    (checked-compile-and-assert
+        (:optimize :default)
+        `(lambda (x)
+           (declare (rational x))
+           (* (- (the integer (* 2 x)) 6) 7/3))
+      ((4) 14/3))))
 
 (with-test (:name :logtest-vop
             :implemented-on (and (:vop-existsp logtest) (not :ppc64)))

@@ -5666,6 +5666,17 @@
     (union-type
      (every #'numeric-type-without-bounds-p (union-type-types type)))))
 
+
+(defun rational-type-without-bounds-p (type)
+  (typecase type
+    (numeric-type type
+     (and (not (eq (numeric-type-class type) 'integer))
+          (not (eq type (specifier-type 'ratio)))
+          (not (numeric-type-low type))
+          (not (numeric-type-high type))))
+    (union-type
+     (every #'numeric-type-without-bounds-p (union-type-types type)))))
+
 ;;; Pick off easy association opportunities for constant folding.
 ;;; More complicated stuff that also depends on commutativity
 ;;; (e.g. (f (f x k1) (f y k2)) => (f (f x y) (f k1 k2))) should
@@ -5948,56 +5959,63 @@
 (defun multiply-lvar-constants (lvar constant outer-node &key test)
   (let (*amc-abs*
         abs)
-   (labels ((multiply-lvar (lvar &key test)
-              (unless (eql (abs constant) 1)
-                (let ((uses (lvar-uses lvar)))
-                  (if (listp uses)
-                      (progn)
-                      (multiply-node uses :test test)))))
-            (multiply-node (node &key test)
-              (flet ((multiply-all-args (args)
-                       (when (loop for arg in args
-                                   always (multiply-lvar arg :test t))
+    (labels ((multiply-lvar (lvar &key test)
+               (unless (eql (abs constant) 1)
+                 (let ((uses (lvar-uses lvar)))
+                   (if (listp uses)
+                       (progn)
+                       (multiply-node uses :test test)))))
+             (multiply-node (node &key test)
+               (flet ((multiply-all-args (args)
+                        (when (loop for arg in args
+                                    always (multiply-lvar arg :test t))
+                          (unless test
+                            (loop for arg in args
+                                  do (aver (multiply-lvar arg))))
+                          t))
+                      (multiply-some-args (args)
+                        (loop for arg in args
+                              thereis (multiply-lvar arg :test test))))
+                 (multiple-value-bind (constantp value) (constant-node-p node)
+                   (if constantp
+                       (progn
+                         (when *amc-abs*
+                           (unless abs
+                             (setf abs t
+                                   constant (abs constant))))
                          (unless test
-                           (loop for arg in args
-                                 do (aver (multiply-lvar arg))))
-                         t))
-                     (multiply-some-args (args)
-                       (loop for arg in args
-                             thereis (multiply-lvar arg :test test))))
-                (multiple-value-bind (constantp value) (constant-node-p node)
-                  (if constantp
-                      (progn
-                        (when *amc-abs*
-                          (unless abs
-                            (setf abs t
-                                  constant (abs constant))))
-                        (unless test
-                          (replace-node-with-constant node (* constant value))
-                          (erase-lvar-type (node-lvar node) nil outer-node))
-                        t)
-                      (combination-case (lvar :cast #'numeric-type-without-bounds-p :node node)
-                        ((+ -) *
-                         (multiply-all-args args))
-                        (* *
-                         (multiply-some-args args))
-                        (ash (* constant)
-                         (let ((shift (lvar-value (second args))))
-                           (when (typep shift '(mod 4096))
-                             (unless test
-                               (erase-node-type combination *wild-type* nil outer-node)
-                               (transform-call combination
-                                               `(lambda (x y) (declare (ignore y))
-                                                  (* x ,(* constant (ash 1 shift))))
-                                               'multiply-lvar-constants))
-                             t)))
-                        (ash (* (type unsigned-byte))
-                         (multiply-lvar (first args) :test test))
-                        (abs *
-                         (let ((*amc-abs* t))
-                           (multiply-lvar (first args) :test test)))))))))
-     (values (multiply-lvar lvar :test test)
-             abs))))
+                           (replace-node-with-constant node (* constant value))
+                           (erase-lvar-type (node-lvar node) nil outer-node))
+                         t)
+                       (combination-case (lvar :cast
+                                               (if (integerp constant)
+                                                   #'numeric-type-without-bounds-p
+                                                   ;; could also check if the result is integer
+                                                   #'rational-type-without-bounds-p)
+                                               :node node)
+                         ((+ -) *
+                          (multiply-all-args args))
+                         (* *
+                          (multiply-some-args args))
+                         (ash (* constant)
+                          (when (integerp constant)
+                            (let ((shift (lvar-value (second args))))
+                              (when (typep shift '(mod 4096))
+                                (unless test
+                                  (erase-node-type combination *wild-type* nil outer-node)
+                                  (transform-call combination
+                                                  `(lambda (x y) (declare (ignore y))
+                                                     (* x ,(* constant (ash 1 shift))))
+                                                  'multiply-lvar-constants))
+                                t))))
+                         (ash (* (type unsigned-byte))
+                          (when (integerp constant)
+                            (multiply-lvar (first args) :test test)))
+                         (abs *
+                          (let ((*amc-abs* t))
+                            (multiply-lvar (first args) :test test)))))))))
+      (values (multiply-lvar lvar :test test)
+              abs))))
 
 (deftransform * ((x y) (rational rational) * :important nil :node node)
   "associate * of constants"
