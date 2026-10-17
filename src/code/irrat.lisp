@@ -1049,52 +1049,47 @@
                             (- (* beta nu))
                              z))))
 
-#|
-(format t "~x~%" (double-float-bits (/ (+ (log 2l0) (log most-positive-long-float)) 4l0)))
-=> 406633CE8FB9F87D
-
-and:
-#include <math.h>
-#include <string.h>
-#include <stdio.h>
-void main() {
-    double most_pos_dbl = 1.7976931348623157e308;
-    double thing = (log(most_pos_dbl) + log(2.0e0)) / 4.0e0;
-    unsigned long word;
-    memcpy(&word, &thing, 8);
-    printf("%lX = %20.15lf\n", word, thing);
-}
-prints: 406633CE8FB9F87D =  177.618965018485966
-|#
-
 ;;; Compute tanh z = sinh z / cosh z.
+;;; NaN/infinity logic copied from FreeBSD's ctanh
 (defun complex-tanh (z)
   (declare (muffle-conditions compiler-note))
-  (declare (type (or rational complex) z))
+  (declare (type complex z))
   (let ((x (float (realpart z) 1.0d0))
         (y (float (imagpart z) 1.0d0)))
     (locally
-      ;; space 0 to get maybe-inline functions inlined
-      (declare (optimize (speed 3) (space 0)))
-    (cond ((> (abs x)
-              #-long-float (make-double-float #x406633ce #x8fb9f87d)
-              #+long-float (error "(/ (+ (log 2l0) (log most-positive-long-float)) 4l0)"))
-           (coerce-to-complex-type (float-sign x)
-                                   (float-sign y) z))
-          (t
-           (let* ((tv (%tan y))
-                  (beta (+ 1.0d0 (* tv tv)))
-                  (s (sinh x))
-                  (rho (sqrt (+ 1.0d0 (* s s)))))
-             (if (float-infinity-p tv)
-                 (coerce-to-complex-type (/ rho s)
-                                         (/ tv)
-                                         z)
-                 (let ((den (+ 1.0d0 (* beta s s))))
-                   (coerce-to-complex-type (/ (* beta rho s)
-                                              den)
-                                           (/ tv den)
-                                            z)))))))))
+        (declare (optimize (speed 3) (space 0)))
+      (cond
+        ((float-nan-p x)
+         (let ((nan (+ x y)))
+           (coerce-to-complex-type nan (if (zerop y) y nan) z)))
+        ((float-infinity-p x)
+         (let ((sign (if (or (float-infinity-p y) (float-nan-p y))
+                         y
+                         (* (sin y) (cos y)))))
+           (coerce-to-complex-type (float-sign x 1.0d0)
+                                   (float-sign sign 0.0d0)
+                                   z)))
+        ((or (float-infinity-p y) (float-nan-p y))
+         (let ((nan (- y y)))
+           (coerce-to-complex-type (if (zerop x) x nan)
+                                   nan
+                                   z)))
+        ((>= (abs x) 22.0d0)
+         (let ((exp-mx (exp (- (abs x)))))
+           (coerce-to-complex-type
+            (float-sign x 1.0d0)
+            (* 4.0d0 (sin y) (cos y) exp-mx exp-mx)
+            z)))
+        ;; Kahan's algorithm
+        (t
+         (let* ((tv (%tan y))
+                (beta (+ 1.0d0 (* tv tv)))
+                (s (sinh x))
+                (rho (sqrt (+ 1.0d0 (* s s))))
+                (den (+ 1.0d0 (* beta s s))))
+           (coerce-to-complex-type (/ (* beta rho s) den)
+                                   (/ tv den)
+                                   z)))))))
 
 ;;; Compute acos z = pi/2 - asin z.
 ;;;

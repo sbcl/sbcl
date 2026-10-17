@@ -1006,3 +1006,61 @@ fractional bits."
 (with-test (:name :log-small)
   (assert (= (log (opaque-identity (+ 1 (expt 2 -100))) 2d0)
              (opaque-identity 1.1380857159135323d-30))))
+
+(with-test (:name :large-complex-tanh)
+  (let ((+inf sb-ext:double-float-positive-infinity)
+        (-inf sb-ext:double-float-negative-infinity)
+        (nan (sb-kernel:make-double-float #x7ff80000 0)))
+    (flet ((same-float-p (actual expected)
+             (if (sb-ext:float-nan-p expected)
+                 (sb-ext:float-nan-p actual)
+                 (and (not (sb-ext:float-nan-p actual))
+                      (eql actual expected)))))
+      (sb-int:with-float-traps-masked (:invalid)
+       (macrolet ((test (input expected-real expected-imag)
+                    `(let ((res (tanh (opaque-identity ,input))))
+                       (assert (eql (realpart res) ,expected-real))
+                       (assert (eql (imagpart res) ,expected-imag)))))
+
+         (test #c(0.0d0 0.0d0) 0.0d0 0.0d0)
+         (test #c(0.0d0 -0.0d0) 0.0d0 -0.0d0)
+         (test #c(-0.0d0 0.0d0) -0.0d0 0.0d0)
+         (test #c(-0.0d0 -0.0d0) -0.0d0 -0.0d0)
+
+         (test (complex 0.0d0 +inf) 0.0d0 nan)
+         (test (complex -0.0d0 +inf) -0.0d0 nan)
+         (test (complex 0.0d0 -inf) 0.0d0 nan)
+
+         (test (complex 1.0d0 +inf) nan nan)
+         (test (complex -1.0d0 +inf) nan nan)
+         (test (complex 1.0d0 -inf) nan nan)
+
+         (test (complex 0.0d0 nan) 0.0d0 nan)
+         (test (complex -0.0d0 nan) -0.0d0 nan)
+
+         (test (complex 1.0d0 nan) nan nan)
+         (test (complex -5.0d0 nan) nan nan)
+
+         (test (complex +inf 0.5d0) 1.0d0 0.0d0)
+         (test (complex -inf 0.5d0) -1.0d0 0.0d0)
+         (test (complex +inf 2.0d0) 1.0d0 -0.0d0)
+         (test (complex -inf 2.0d0) -1.0d0 -0.0d0)
+         (test (complex +inf 0.0d0) 1.0d0 0.0d0)
+         (test (complex +inf -0.0d0) 1.0d0 -0.0d0)
+
+         (test (complex +inf +inf) 1.0d0 0d0)
+         (test (complex -inf +inf) -1.0d0 0d0)
+         (test (complex +inf nan) 1.0d0 0d0)
+
+         (test (complex nan 0.0d0) nan 0.0d0)
+         (test (complex nan -0.0d0) nan -0.0d0)
+
+         (test (complex nan 1.0d0) nan nan)
+         (test (complex nan -2.5d0) nan nan)
+
+         (test (complex nan nan) nan nan)
+
+         (test #c(800.0d0 0.1d0) 1.0d0 0.0d0)
+         (test #c(800.0d0 2.0d0) 1.0d0 -0.0d0)
+         (test #c(-800.0d0 0.1d0) -1.0d0 0.0d0)
+         (test #c(-800.0d0 2.0d0) -1.0d0 -0.0d0))))))

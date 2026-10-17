@@ -388,12 +388,18 @@
   (def cis (number))
   (def conjugate (number))
   (def cos (number))
-  (def exp (number))
   (def phase (number))
   (def sin (number))
   (def sinh (number))
   (def tan (number))
   (def tanh (number)))
+
+#-c-headers-only
+(defun exp (number)
+  (case number
+    (-0d0 1d0)
+    (t
+     (error "Unimplemented."))))
 
 #-c-headers-only
 (defun asin (number)
