@@ -4333,27 +4333,24 @@
              (give-up-ir1-transform))))))
 
 ;;; (ash #b1 (+ n 2)) -> (ash #b100 n)
-(deftransform ash ((integer amount) ((constant-arg integer) integer))
-  (or (combination-case (amount :cast (specifier-type 'integer))
-        ((+ -) (* constant)
-         (let ((shift (funcall name (lvar-value (second args)))))
-           (when (and (plusp shift)
-                      (fixnump shift)
-                      (not (and (word-sized-lvar-p amount)
-                                (let ((int-add (type-approximate-interval (lvar-type (first args))))
-                                      (int-amount (type-approximate-interval (lvar-type amount))))
-                                  (and int-add
-                                       ;; Don't won't to transform if
-                                       ;; the shift will go from
-                                       ;; having a known sign to an
-                                       ;; unknown sign.
-                                       (not (interval-range-info int-add))
-                                       (interval-range-info int-amount))))))
-             (let ((shifted (ash (lvar-value integer) shift)))
-               (when (fixnump shifted)
-                 (splice-fun-args amount :any #'first t (specifier-type 'integer))
-                 `(ash ,shifted amount)))))))
-      (give-up-ir1-transform)))
+(deftransform ash ((integer amount) ((constant-arg integer) integer) * :node node)
+  (cmatch (node)
+    ((ash (:constant integer) ((:or + - :name fun) m (:constant c)))
+     (let ((shift (funcall fun c)))
+       (when (and (typep shift '(mod 4096))
+                  (not (and (word-sized-lvar-p amount)
+                            (let ((int-add (type-approximate-interval (lvar-type m)))
+                                  (int-amount (type-approximate-interval (lvar-type amount))))
+                              (and int-add
+                                   ;; Don't want to transform if
+                                   ;; the shift will go from
+                                   ;; having a known sign to an
+                                   ;; unknown sign.
+                                   (not (interval-range-info int-add))
+                                   (interval-range-info int-amount))))))
+         (let ((shifted (ash integer shift)))
+           (when (fixnump shifted)
+             `(ash ,shifted m))))))))
 
 (defoptimizer (ash fold-p) ((integer amount))
   (or (eql integer 0)
@@ -5184,22 +5181,17 @@
     (erase-node-type node t 1)
     `($fun (* x (%denominator y)) (%numerator y))))
 
+;;; (values (floor (/ n d))) => (values (floor n d))
 (make-defs (($fun truncate floor ceiling))
   (deftransform $fun ((x y) (number (eql 1)) * :node node :result result :important nil)
     (or (and (mv-bind-unused-p result 1)
-             (combination-case (x :cast (specifier-type 'real))
-               (/ (* *)
-                (destructuring-bind (a b) args
-                  ;; truncate wants real numbers, but / can turn some complex numbers into rationals
-                  (when (or (not (types-equal-or-intersect (lvar-type b) (specifier-type '(complex rational))))
-                            (csubtypep (lvar-type a)
-                                       (specifier-type `(or (complex float)
-                                                            (and rational (not (eql 0)))))))
-                   (splice-fun-args x '/ nil t (specifier-type 'real) t)
-                   (erase-node-type node t 1)
-                   `(lambda (a b y)
-                      (declare (ignore y))
-                      ($fun a b)))))))
+             (cmatch (node)
+               (($fun (/ a b) 1)
+                ;; truncate wants real numbers, but / can turn some complex numbers into rationals
+                (when (or (not (lvar-intersectp b (complex rational)))
+                          (lvar-subtypep a (or (complex float) (and rational (not (eql 0))))))
+                  (erase-node-type node t 1)
+                  `($fun a b)))))
         (give-up-ir1-transform))))
 
 (flet ((single-value-fun (combination name)
