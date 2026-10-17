@@ -1824,7 +1824,7 @@ session."
                 (alien-funcall setstack attr
                                (sap-ref-sap thread-sap (ash sb-vm::thread-control-stack-start-slot
                                                             sb-vm:word-shift))
-                               (extern-alien "thread_control_stack_size" unsigned))
+                               (extern-alien "thread_control_stack_size" unsigned-int))
                 #-c-stack-is-control-stack
                 (alien-funcall setstack attr
                                (sap-ref-sap thread-sap (ash sb-vm::thread-alien-stack-start-slot

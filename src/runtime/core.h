@@ -39,6 +39,8 @@ struct ndir_entry {
 
 struct memsize_options {
     size_t dynamic_space_size;
+    // The global var for thread control stack size is unsigned-int, but this field
+    // mirrors the core file, which uses uword_t for everything.
     os_vm_size_t thread_control_stack_size;
     os_vm_size_t thread_tls_bytes;
     int present_in_core;

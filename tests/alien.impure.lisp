@@ -22,8 +22,8 @@
 ;;; was messed up so badly that trying to execute expressions like
 ;;; this signalled an error.
 (with-test (:name (setf extern-alien))
-  (setf (sb-alien:extern-alien "thread_control_stack_size" sb-alien:unsigned)
-        (sb-alien:extern-alien "thread_control_stack_size" sb-alien:unsigned)))
+  (setf (sb-alien:extern-alien "thread_control_stack_size" sb-alien:unsigned-int)
+        (sb-alien:extern-alien "thread_control_stack_size" sb-alien:unsigned-int)))
 
 ;;; bug 133, fixed in 0.7.0.5: Somewhere in 0.pre7.*, C void returns
 ;;; were broken ("unable to use values types here") when

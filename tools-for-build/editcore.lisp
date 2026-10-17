@@ -567,7 +567,7 @@
       ;; All words have to be stored since we're creating it from nothing.
       (setf (%vector-raw-bits new 1) runtime-options-magic
             (%vector-raw-bits new 2) 5 ; number of words in this entry
-            (%vector-raw-bits new 4) (extern-alien "thread_control_stack_size" unsigned)
+            (%vector-raw-bits new 4) (extern-alien "thread_control_stack_size" unsigned-int)
             (%vector-raw-bits new 5) (extern-alien "dynamic_values_bytes" (unsigned 32))))
     (setf (%vector-raw-bits new 3) (* new-size 1024 1024))
     new))

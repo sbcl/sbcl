@@ -14,7 +14,7 @@ EOF
 chmod u+x "$tmpcore"
 echo "::: INFO: prepared test core"
 ./"$tmpcore" --no-userinit --no-sysinit --noprint <<EOF
-  (assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 384 1024)))
+  (assert (eql (extern-alien "thread_control_stack_size" unsigned-int) (* 384 1024)))
   ; allow slight shrinkage if heap relocation has to adjust for alignment
   (assert (<= 0 (- (* 260 1048576) (dynamic-space-size)) 65536))
 EOF
@@ -35,7 +35,7 @@ echo "::: Running :ACCEPT-MEMORY-SIZES"
 # of dynamic space size for the OS/arch.
 # Test that we find the arg in the midst of the command-line args as well.
 ./"$tmpcore" --no-userinit --control-stack-size 3MB --no-sysinit --noprint <<EOF
-(assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 3 1048576)))
+(assert (eql (extern-alien "thread_control_stack_size" unsigned-int) (* 3 1048576)))
 EOF
 if [ $? -ne 0 ]; then
   exit 1
@@ -64,7 +64,7 @@ run_sbcl_with_core "$tmpcore" --noinform --control-stack-size 640KB \
   (defconstant tls-element-size
     (* (if (find :tls-load-indirect sb-impl:+internal-features+) 2 1)
        sb-vm:n-word-bytes))
-  (assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 640 1024)))
+  (assert (eql (extern-alien "thread_control_stack_size" unsigned-int) (* 640 1024)))
   (assert (eql (extern-alien "dynamic_values_bytes" (unsigned 32))
                (* 5000 tls-element-size)))
   ; allow slight shrinkage if heap relocation has to adjust for alignment
@@ -79,7 +79,7 @@ echo "::: INFO: prepared test core"
   (defconstant tls-element-size
     (* (if (find :tls-load-indirect sb-impl:+internal-features+) 2 1)
        sb-vm:n-word-bytes))
-  (when (and (eql (extern-alien "thread_control_stack_size" unsigned) (* 640 1024))
+  (when (and (eql (extern-alien "thread_control_stack_size" unsigned-int) (* 640 1024))
              (eql (extern-alien "dynamic_values_bytes" (unsigned 32))
                   (* 5000 tls-element-size))
              (dynamic-space-size-good-p))

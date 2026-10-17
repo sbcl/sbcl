@@ -50,6 +50,11 @@ os_vm_size_t os_vm_page_size = BACKEND_PAGE_BYTES;
  * this is the number the OS tells us */
 int os_reported_page_size;
 
+unsigned int thread_control_stack_size = DEFAULT_CONTROL_STACK_SIZE;
+unsigned int thread_binding_stack_size = BINDING_STACK_SIZE;
+// exposed to lisp for pthread_create if not C_STACK_IS_CONTROL_STACK
+unsigned int thread_alien_stack_size = ALIEN_STACK_SIZE;
+
 void sb_query_os_page_size() {
 #ifdef LISP_FEATURE_WIN32
     SYSTEM_INFO info;

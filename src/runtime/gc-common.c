@@ -51,7 +51,6 @@
 #include "incremental-compact.h"
 
 size_t dynamic_space_size = DEFAULT_DYNAMIC_SPACE_SIZE;
-os_vm_size_t thread_control_stack_size = DEFAULT_CONTROL_STACK_SIZE;
 
 sword_t (*const scavtab[256])(lispobj *where, lispobj object);
 uword_t gc_copied_nwords, gc_in_situ_live_nwords;
