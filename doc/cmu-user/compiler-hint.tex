@@ -1582,241 +1582,247 @@ style:
 \end{itemize}
 
 
-\section{Byte Coded Compilation}
-\label{byte-compile}
-\cindex{byte coded compilation}
-\cindex{space optimization}
+%%%% SBCL doesn't have a byte code interpreter. It's not to be ported
+%%%% to the SBCL user manual. Commented out. -- MG
 
-\python{} supports byte compilation to reduce the size of Lisp
-programs by allowing functions to be compiled more compactly.  Byte
-compilation provides an extreme speed/space tradeoff: byte code is
-typically six times more compact than native code, but runs fifty
-times (or more) slower.  This is about ten times faster than the
-standard interpreter, which is itself considered fast in comparison to
-other \clisp{} interpreters.
-
-Large Lisp systems (such as \cmucl{} itself) often have large amounts
-of user-interface code, compile-time (macro) code, debugging code, or
-rarely executed special-case code.  This code is a good target for
-byte compilation: very little time is spent running in it, but it can
-take up quite a bit of space.  Straight-line code with many function
-calls is much more suitable than inner loops.
-
-When byte-compiling, the compiler compiles about twice as fast, and
-can produce a hardware independent object file (\file{.bytef} type.)
-This file can be loaded like a normal fasl file on any implementation
-of \cmucl{} with the same byte-ordering.
-
-The decision to byte compile or native compile can be done on a
-per-file or per-code-object basis.  The \kwd{byte-compile} argument to
-\funref{compile-file} has these possible values:
-
-\begin{Lentry}
-\item[\false{}] Don't byte compile anything in this file.
-  
-\item[\true{}] Byte compile everything in this file and produce a
-  processor-independent \file{.bytef} file.
-  
-\item[\kwd{maybe}] Produce a normal fasl file, but byte compile any
-  functions for which the \code{speed} optimization quality is
-  \code{0} and the \code{debug} quality is not greater than \code{1}.
-\end{Lentry}
-
-\begin{defvar}{extensions:}{byte-compile-top-level}
-  
-  If this variable is true (the default) and the \kwd{byte-compile}
-  argument to \code{compile-file} is \kwd{maybe}, then byte compile
-  top-level code (code outside of any \code{defun}, \code{defmethod},
-  etc.)
-\end{defvar}
-
-\begin{defvar}{extensions:}{byte-compile-default}
-  
-  This variable determines the default value for the
-  \kwd{byte-compile} argument to \code{compile-file}, initially
-  \kwd{maybe}.
-\end{defvar}
-
-
-\section{Object Representation}
-\label{object-representation}
-\cindex{object representation}
-\cpsubindex{representation}{object}
-\cpsubindex{efficiency}{of objects}
-
-A somewhat subtle aspect of writing efficient \clisp{} programs is
-choosing the correct data structures so that the underlying objects
-can be implemented efficiently.  This is partly because of the need
-for multiple representations for a given value
-(\pxlref{non-descriptor}), but is also due to the sheer number of
-object types that \clisp{} has built in.  The number of possible
-representations complicates the choice of a good representation
-because semantically similar objects may vary in their efficiency
-depending on how the program operates on them.
+%% \section{Byte Coded Compilation}
+%% \label{byte-compile}
+%% \cindex{byte coded compilation}
+%% \cindex{space optimization}
+%% 
+%% \python{} supports byte compilation to reduce the size of Lisp
+%% programs by allowing functions to be compiled more compactly.  Byte
+%% compilation provides an extreme speed/space tradeoff: byte code is
+%% typically six times more compact than native code, but runs fifty
+%% times (or more) slower.  This is about ten times faster than the
+%% standard interpreter, which is itself considered fast in comparison to
+%% other \clisp{} interpreters.
+%% 
+%% Large Lisp systems (such as \cmucl{} itself) often have large amounts
+%% of user-interface code, compile-time (macro) code, debugging code, or
+%% rarely executed special-case code.  This code is a good target for
+%% byte compilation: very little time is spent running in it, but it can
+%% take up quite a bit of space.  Straight-line code with many function
+%% calls is much more suitable than inner loops.
+%% 
+%% When byte-compiling, the compiler compiles about twice as fast, and
+%% can produce a hardware independent object file (\file{.bytef} type.)
+%% This file can be loaded like a normal fasl file on any implementation
+%% of \cmucl{} with the same byte-ordering.
+%% 
+%% The decision to byte compile or native compile can be done on a
+%% per-file or per-code-object basis.  The \kwd{byte-compile} argument to
+%% \funref{compile-file} has these possible values:
+%% 
+%% \begin{Lentry}
+%% \item[\false{}] Don't byte compile anything in this file.
+%%   
+%% \item[\true{}] Byte compile everything in this file and produce a
+%%   processor-independent \file{.bytef} file.
+%%   
+%% \item[\kwd{maybe}] Produce a normal fasl file, but byte compile any
+%%   functions for which the \code{speed} optimization quality is
+%%   \code{0} and the \code{debug} quality is not greater than \code{1}.
+%% \end{Lentry}
+%% 
+%% \begin{defvar}{extensions:}{byte-compile-top-level}
+%%   
+%%   If this variable is true (the default) and the \kwd{byte-compile}
+%%   argument to \code{compile-file} is \kwd{maybe}, then byte compile
+%%   top-level code (code outside of any \code{defun}, \code{defmethod},
+%%   etc.)
+%% \end{defvar}
+%% 
+%% \begin{defvar}{extensions:}{byte-compile-default}
+%%   
+%%   This variable determines the default value for the
+%%   \kwd{byte-compile} argument to \code{compile-file}, initially
+%%   \kwd{maybe}.
+%% \end{defvar}
 
 
-\subsection{Think Before You Use a List}
-\cpsubindex{lists}{efficiency of}
+%%%% This section is more like a Common Lisp tutorial. It's not to be
+%%%% ported to the SBCL user manual. Commented out. -- MG
 
-Although Lisp's creator seemed to think that it was for LISt
-Processing, the astute observer may have noticed that the chapter on
-list manipulation makes up less that three percent of \cltltwo{}. The
-language has grown since Lisp 1.5\dash{}new data types supersede lists
-for many purposes.
-
-
-\subsection{Structure Representation}
-\cpsubindex{structure types}{efficiency of} One of the best ways of
-building complex data structures is to define appropriate structure
-types using \findexed{defstruct}.  In \python, access of structure
-slots is always at least as fast as list or vector access, and is
-usually faster.  In comparison to a list representation of a tuple,
-structures also have a space advantage.
-
-Even if structures weren't more efficient than other representations, structure
-use would still be attractive because programs that use structures in
-appropriate ways are much more maintainable and robust than programs written
-using only lists.  For example:
-\begin{lisp}
-(rplaca (caddr (cadddr x)) (caddr y))
-\end{lisp}
-could have been written using structures in this way:
-\begin{lisp}
-(setf (beverage-flavor (astronaut-beverage x)) (beverage-flavor y))
-\end{lisp}
-The second version is more maintainable because it is easier to
-understand what it is doing.  It is more robust because structures
-accesses are type checked.  An \code{astronaut} will never be confused
-with a \code{beverage}, and the result of \code{beverage-flavor} is
-always a flavor.  See sections \ref{structure-types} and
-\ref{freeze-type} for more information about structure types.
-\xlref{type-inference} for a number of examples that make clear the
-advantages of structure typing.
-
-Note that the structure definition should be compiled before any uses
-of its accessors or type predicate so that these function calls can be
-efficiently open-coded.
-
-
-\subsection{Arrays}
-\label{array-types}
-\cpsubindex{arrays}{efficiency of}
-
-Arrays are often the most efficient representation for collections of objects
-because:
-\begin{itemize}
-  
-\item Array representations are often the most compact.  An array is
-  always more compact than a list containing the same number of
-  elements.
-  
-\item Arrays allow fast constant-time access.
-  
-\item Arrays are easily destructively modified, which can reduce
-  consing.
-  
-\item Array element types can be specialized, which reduces both
-  overall size and consing (\pxlref{specialized-array-types}.)
-\end{itemize}
-
-
-Access of arrays that are not of type \code{simple-array} is less
-efficient, so declarations are appropriate when an array is of a
-simple type like \code{simple-string} or \code{simple-bit-vector}.
-Arrays are almost always simple, but the compiler may not be able to
-prove simpleness at every use.  The only way to get a non-simple array
-is to use the \kwd{displaced-to}, \kwd{fill-pointer} or
-\code{adjustable} arguments to \code{make-array}.  If you don't use
-these hairy options, then arrays can always be declared to be simple.
-
-Because of the many specialized array types and the possibility of
-non-simple arrays, array access is much like generic arithmetic
-(\pxlref{generic-arithmetic}).  In order for array accesses to be
-efficiently compiled, the element type and simpleness of the array
-must be known at compile time.  If there is inadequate information,
-the compiler is forced to call a generic array access routine.  You
-can detect inefficient array accesses by enabling efficiency notes,
-\pxlref{efficiency-notes}.
-
-
-\subsection{Vectors}
-\cpsubindex{vectors}{efficiency of}
-
-Vectors (one dimensional arrays) are particularly useful, since in
-addition to their obvious array-like applications, they are also well
-suited to representing sequences.  In comparison to a list
-representation, vectors are faster to access and take up between two
-and sixty-four times less space (depending on the element type.)  As
-with arbitrary arrays, the compiler needs to know that vectors are not
-complex, so you should use \code{simple-string} in preference to
-\code{string}, etc.
-
-The only advantage that lists have over vectors for representing
-sequences is that it is easy to change the length of a list, add to it
-and remove items from it.  Likely signs of archaic, slow lisp code are
-\code{nth} and \code{nthcdr}.  If you are using these functions you
-should probably be using a vector.
-
-
-\subsection{Bit-Vectors}
-\cpsubindex{bit-vectors}{efficiency of}
-
-Another thing that lists have been used for is set manipulation.  In
-applications where there is a known, reasonably small universe of
-items bit-vectors can be used to improve performance.  This is much
-less convenient than using lists, because instead of symbols, each
-element in the universe must be assigned a numeric index into the bit
-vector.  Using a bit-vector will nearly always be faster, and can be
-tremendously faster if the number of elements in the set is not small.
-The logical operations on \code{simple-bit-vector}s are efficient,
-since they operate on a word at a time.
-
-
-\subsection{Hashtables}
-\cpsubindex{hash-tables}{efficiency of}
-
-Hashtables are an efficient and general mechanism for maintaining associations
-such as the association between an object and its name.  Although hashtables
-are usually the best way to maintain associations, efficiency and style
-considerations sometimes favor the use of an association list (a-list).
-
-\code{assoc} is fairly fast when the \var{test} argument is \code{eq}
-or \code{eql} and there are only a few elements, but the time goes up
-in proportion with the number of elements.  In contrast, the
-hash-table lookup has a somewhat higher overhead, but the speed is
-largely unaffected by the number of entries in the table.  For an
-\code{equal} hash-table or alist, hash-tables have an even greater
-advantage, since the test is more expensive.  Whatever you do, be sure
-to use the most restrictive test function possible.
-
-The style argument observes that although hash-tables and alists
-overlap in function, they do not do all things equally well.
-\begin{itemize}
-  
-\item Alists are good for maintaining scoped environments.  They were
-  originally invented to implement scoping in the Lisp interpreter,
-  and are still used for this in \python.  With an alist one can
-  non-destructively change an association simply by consing a new
-  element on the front.  This is something that cannot be done with
-  hash-tables.
-  
-\item Hashtables are good for maintaining a global association.  The
-  value associated with an entry can easily be changed with
-  \code{setf}.  With an alist, one has to go through contortions,
-  either \code{rplacd}'ing the cons if the entry exists, or pushing a
-  new one if it doesn't.  The side-effecting nature of hash-table
-  operations is an advantage here.
-\end{itemize}
-
-
-Historically, symbol property lists were often used for global name
-associations.  Property lists provide an awkward and error-prone
-combination of name association and record structure.  If you must use
-the property list, please store all the related values in a single
-structure under a single property, rather than using many properties.
-This makes access more efficient, and also adds a modicum of typing
-and abstraction.  \xlref{advanced-type-stuff} for information on types
-in \cmucl.
+%% \section{Object Representation}
+%% \label{object-representation}
+%% \cindex{object representation}
+%% \cpsubindex{representation}{object}
+%% \cpsubindex{efficiency}{of objects}
+%% 
+%% A somewhat subtle aspect of writing efficient \clisp{} programs is
+%% choosing the correct data structures so that the underlying objects
+%% can be implemented efficiently.  This is partly because of the need
+%% for multiple representations for a given value
+%% (\pxlref{non-descriptor}), but is also due to the sheer number of
+%% object types that \clisp{} has built in.  The number of possible
+%% representations complicates the choice of a good representation
+%% because semantically similar objects may vary in their efficiency
+%% depending on how the program operates on them.
+%% 
+%% 
+%% \subsection{Think Before You Use a List}
+%% \cpsubindex{lists}{efficiency of}
+%% 
+%% Although Lisp's creator seemed to think that it was for LISt
+%% Processing, the astute observer may have noticed that the chapter on
+%% list manipulation makes up less that three percent of \cltltwo{}. The
+%% language has grown since Lisp 1.5\dash{}new data types supersede lists
+%% for many purposes.
+%% 
+%% 
+%% \subsection{Structure Representation}
+%% \cpsubindex{structure types}{efficiency of} One of the best ways of
+%% building complex data structures is to define appropriate structure
+%% types using \findexed{defstruct}.  In \python, access of structure
+%% slots is always at least as fast as list or vector access, and is
+%% usually faster.  In comparison to a list representation of a tuple,
+%% structures also have a space advantage.
+%% 
+%% Even if structures weren't more efficient than other representations, structure
+%% use would still be attractive because programs that use structures in
+%% appropriate ways are much more maintainable and robust than programs written
+%% using only lists.  For example:
+%% \begin{lisp}
+%% (rplaca (caddr (cadddr x)) (caddr y))
+%% \end{lisp}
+%% could have been written using structures in this way:
+%% \begin{lisp}
+%% (setf (beverage-flavor (astronaut-beverage x)) (beverage-flavor y))
+%% \end{lisp}
+%% The second version is more maintainable because it is easier to
+%% understand what it is doing.  It is more robust because structures
+%% accesses are type checked.  An \code{astronaut} will never be confused
+%% with a \code{beverage}, and the result of \code{beverage-flavor} is
+%% always a flavor.  See sections \ref{structure-types} and
+%% \ref{freeze-type} for more information about structure types.
+%% \xlref{type-inference} for a number of examples that make clear the
+%% advantages of structure typing.
+%% 
+%% Note that the structure definition should be compiled before any uses
+%% of its accessors or type predicate so that these function calls can be
+%% efficiently open-coded.
+%% 
+%% 
+%% \subsection{Arrays}
+%% \label{array-types}
+%% \cpsubindex{arrays}{efficiency of}
+%% 
+%% Arrays are often the most efficient representation for collections of objects
+%% because:
+%% \begin{itemize}
+%%   
+%% \item Array representations are often the most compact.  An array is
+%%   always more compact than a list containing the same number of
+%%   elements.
+%%   
+%% \item Arrays allow fast constant-time access.
+%%   
+%% \item Arrays are easily destructively modified, which can reduce
+%%   consing.
+%%   
+%% \item Array element types can be specialized, which reduces both
+%%   overall size and consing (\pxlref{specialized-array-types}.)
+%% \end{itemize}
+%% 
+%% 
+%% Access of arrays that are not of type \code{simple-array} is less
+%% efficient, so declarations are appropriate when an array is of a
+%% simple type like \code{simple-string} or \code{simple-bit-vector}.
+%% Arrays are almost always simple, but the compiler may not be able to
+%% prove simpleness at every use.  The only way to get a non-simple array
+%% is to use the \kwd{displaced-to}, \kwd{fill-pointer} or
+%% \code{adjustable} arguments to \code{make-array}.  If you don't use
+%% these hairy options, then arrays can always be declared to be simple.
+%% 
+%% Because of the many specialized array types and the possibility of
+%% non-simple arrays, array access is much like generic arithmetic
+%% (\pxlref{generic-arithmetic}).  In order for array accesses to be
+%% efficiently compiled, the element type and simpleness of the array
+%% must be known at compile time.  If there is inadequate information,
+%% the compiler is forced to call a generic array access routine.  You
+%% can detect inefficient array accesses by enabling efficiency notes,
+%% \pxlref{efficiency-notes}.
+%% 
+%% 
+%% \subsection{Vectors}
+%% \cpsubindex{vectors}{efficiency of}
+%% 
+%% Vectors (one dimensional arrays) are particularly useful, since in
+%% addition to their obvious array-like applications, they are also well
+%% suited to representing sequences.  In comparison to a list
+%% representation, vectors are faster to access and take up between two
+%% and sixty-four times less space (depending on the element type.)  As
+%% with arbitrary arrays, the compiler needs to know that vectors are not
+%% complex, so you should use \code{simple-string} in preference to
+%% \code{string}, etc.
+%% 
+%% The only advantage that lists have over vectors for representing
+%% sequences is that it is easy to change the length of a list, add to it
+%% and remove items from it.  Likely signs of archaic, slow lisp code are
+%% \code{nth} and \code{nthcdr}.  If you are using these functions you
+%% should probably be using a vector.
+%% 
+%% 
+%% \subsection{Bit-Vectors}
+%% \cpsubindex{bit-vectors}{efficiency of}
+%% 
+%% Another thing that lists have been used for is set manipulation.  In
+%% applications where there is a known, reasonably small universe of
+%% items bit-vectors can be used to improve performance.  This is much
+%% less convenient than using lists, because instead of symbols, each
+%% element in the universe must be assigned a numeric index into the bit
+%% vector.  Using a bit-vector will nearly always be faster, and can be
+%% tremendously faster if the number of elements in the set is not small.
+%% The logical operations on \code{simple-bit-vector}s are efficient,
+%% since they operate on a word at a time.
+%% 
+%% 
+%% \subsection{Hashtables}
+%% \cpsubindex{hash-tables}{efficiency of}
+%% 
+%% Hashtables are an efficient and general mechanism for maintaining associations
+%% such as the association between an object and its name.  Although hashtables
+%% are usually the best way to maintain associations, efficiency and style
+%% considerations sometimes favor the use of an association list (a-list).
+%% 
+%% \code{assoc} is fairly fast when the \var{test} argument is \code{eq}
+%% or \code{eql} and there are only a few elements, but the time goes up
+%% in proportion with the number of elements.  In contrast, the
+%% hash-table lookup has a somewhat higher overhead, but the speed is
+%% largely unaffected by the number of entries in the table.  For an
+%% \code{equal} hash-table or alist, hash-tables have an even greater
+%% advantage, since the test is more expensive.  Whatever you do, be sure
+%% to use the most restrictive test function possible.
+%% 
+%% The style argument observes that although hash-tables and alists
+%% overlap in function, they do not do all things equally well.
+%% \begin{itemize}
+%%   
+%% \item Alists are good for maintaining scoped environments.  They were
+%%   originally invented to implement scoping in the Lisp interpreter,
+%%   and are still used for this in \python.  With an alist one can
+%%   non-destructively change an association simply by consing a new
+%%   element on the front.  This is something that cannot be done with
+%%   hash-tables.
+%%   
+%% \item Hashtables are good for maintaining a global association.  The
+%%   value associated with an entry can easily be changed with
+%%   \code{setf}.  With an alist, one has to go through contortions,
+%%   either \code{rplacd}'ing the cons if the entry exists, or pushing a
+%%   new one if it doesn't.  The side-effecting nature of hash-table
+%%   operations is an advantage here.
+%% \end{itemize}
+%% 
+%% 
+%% Historically, symbol property lists were often used for global name
+%% associations.  Property lists provide an awkward and error-prone
+%% combination of name association and record structure.  If you must use
+%% the property list, please store all the related values in a single
+%% structure under a single property, rather than using many properties.
+%% This makes access more efficient, and also adds a modicum of typing
+%% and abstraction.  \xlref{advanced-type-stuff} for information on types
+%% in \cmucl.
 
 
 \section{Numbers}

@@ -138,6 +138,6 @@ Streams API proposed by Franz Inc.
 @item @strong{System Definition Tool:}
   @uref{https://www.sbcl.org/manual/asdf.html, ASDF} is a flexible and
   popular protocol-oriented system definition tool by Daniel Barlow.
-  It is bundled with SBCL. Load it with @code{(require 'asdf)}.
+  It is bundled with SBCL. Load it with @code{(require :asdf)}.
 @end itemize
 

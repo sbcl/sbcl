@@ -49,6 +49,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 
 @end titlepage
 
+@shortcontents
 @contents
 
 @macro urlline{text}
@@ -77,7 +78,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 
 @node Top
 @comment  node-name,  next,  previous,  up
-@top sbcl
+@top SBCL
 
 @insertcopying
 
