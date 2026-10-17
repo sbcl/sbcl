@@ -1466,10 +1466,12 @@
              (check-proper-sequences node info)
              (if (eq kind :unknown-keys)
                  (when (ir1-attributep (fun-info-attributes info) mv-deriver)
-                   (let* ((known-types
-                            (loop repeat (combination-info node)
-                                  for arg in args
-                                  collect (lvar-derived-type arg))))
+                   (let* ((count (combination-info node))
+                          (known-types
+                            (when (fixnump count)
+                              (loop repeat count
+                                    for arg in args
+                                    collect (lvar-derived-type arg)))))
                      (when known-types
                        (let ((type (combination-derive-type-for-arg-types node known-types t)))
                          (when type
