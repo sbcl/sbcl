@@ -873,7 +873,29 @@
 
 (defsection @miscellaneous-efficiency-issues
     (:title "Miscellaneous Efficiency Issues")
-  "FIXME: The remaining material in the CMUCL manual about getting good
+  "The SB-EXT:PURIFY function (available with @CONSERVATIVE-GC) causes
+  SBCL first to collect all garbage, then to mark all uncollected
+  objects as permanent, never again attempting to collect them as
+  garbage. This can cause a large increase in efficiency when using a
+  primitive garbage collector, or a more moderate increase in
+  efficiency when using a more sophisticated garbage collector which
+  is well suited to the program's memory usage pattern. It also allows
+  permanent code to be frozen at fixed addresses, a precondition for
+  using copy-on-write to share code between multiple Lisp processes.
+  This is less important with modern @GENERATIONAL-GC, but not all
+  SBCL platforms use such a garbage collector.
+
+  The SB-EXT:TRULY-THE special form declares the type of the result of
+  the operations, producing its argument; the declaration is not
+  checked. In short: don't use it."
+  ;; FIXME: It's not a macro.
+  #+nil
+  (sb-ext:truly-the macro)
+  "The SB-EXT:FREEZE-TYPE declaration declares that a type will never
+  change, which can make type testing (e.g. with TYPEP) more efficient
+  for structure types.
+
+  FIXME: The remaining material in the CMUCL manual about getting good
   performance from the compiler should be reviewed, and added to this
   section. In the meantime, the original CMUCL manual is still 95+%
   correct for the SBCL's compiler. See the sections

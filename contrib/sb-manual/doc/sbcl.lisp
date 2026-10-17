@@ -32,7 +32,6 @@
   `\\\\CREDITS` files for more information."
             (lisp-implementation-version)
             (documentation-generation-date-string :long t))
-  (@support-and-bugs section)
   (@introduction section)
   (@getting-started section)
   (@starting-and-stopping section)
@@ -51,4 +50,5 @@
   (@networking section)
   (@profiling section)
   (@contributed-modules section)
-  (@deprecation section))
+  (@deprecation section)
+  (@further-resources section))

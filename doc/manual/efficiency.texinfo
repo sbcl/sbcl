@@ -1136,6 +1136,32 @@ boundness checks from value lookups.
 @node miscellaneous efficiency issues
 @section Miscellaneous Efficiency Issues
 
+@cindex garbage collector, conservative
+@cindex conservative garbage collector
+@cindex CheneyGC
+@cindex garbage collector, generational
+@cindex generational garbage collector
+@cindex GENCGC
+The @code{sb-ext:purify} function (available with conservative GC) causes
+SBCL first to collect all garbage, then to mark all uncollected
+objects as permanent, never again attempting to collect them as
+garbage. This can cause a large increase in efficiency when using a
+primitive garbage collector, or a more moderate increase in
+efficiency when using a more sophisticated garbage collector which
+is well suited to the program's memory usage pattern. It also allows
+permanent code to be frozen at fixed addresses, a precondition for
+using copy-on-write to share code between multiple Lisp processes.
+This is less important with modern generational GC, but not all
+SBCL platforms use such a garbage collector.
+
+The @code{sb-ext:truly-the} special form declares the type of the result of
+the operations, producing its argument; the declaration is not
+checked. In short: don't use it.
+
+The @code{sb-ext:freeze-type} declaration declares that a type will never
+change, which can make type testing (e.g. with @code{typep}) more efficient
+for structure types.
+
 FIXME: The remaining material in the CMUCL manual about getting good
 performance from the compiler should be reviewed, and added to this
 section. In the meantime, the original CMUCL manual is still 95+%

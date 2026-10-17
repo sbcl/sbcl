@@ -331,8 +331,7 @@
 ;;; a closer eye on the Markdown-to-Texinfo converter, which is young.
 ;;; When that's no longer the case, this is no longer needed.
 (defparameter *pages*
-  '((@support-and-bugs "support-and-bugs.texinfo")
-    (@introduction "intro.texinfo")
+  '((@introduction "intro.texinfo")
     (@getting-started "getting-started.texinfo")
     (@starting-and-stopping "start-stop.texinfo")
     (@compiler "compiler.texinfo")
@@ -363,7 +362,8 @@
     (@sb-sb-simd "../../contrib/sb-simd/sb-simd.texinfo")
     (@sb-simple-streams
      "../../contrib/sb-simple-streams/sb-simple-streams.texinfo")
-    (@deprecation "deprecation.texinfo")))
+    (@deprecation "deprecation.texinfo")
+    (@further-resources "further-resources.texinfo")))
 
 (defun generate-texinfo ()
   (let ((*default-pathname-defaults*

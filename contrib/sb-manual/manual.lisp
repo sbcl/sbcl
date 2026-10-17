@@ -79,4 +79,8 @@
 
   Also, you can generate documentation yourself with e.g.
 
-      (pax:document sb-manual:@sbcl-manual :format :markdown)")
+      (pax:document sb-manual:@sbcl-manual :format :markdown)
+
+  There is seldom a need to generate these manually, as
+  <https://fixnum.com> generates them for the master branch of SBCL
+  every few hours.")

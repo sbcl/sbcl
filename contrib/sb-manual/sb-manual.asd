@@ -12,7 +12,6 @@
                 :serial t
                 :components ((:file "concepts")
                              (:file "sbcl")
-                             (:file "support-and-bugs")
                              (:file "intro")
                              (:file "getting-started")
                              (:file "start-stop")
@@ -41,5 +40,6 @@
                              (:file "../../sb-rotate-byte/manual")
                              (:file "../../sb-simd/manual")
                              (:file "../../sb-simple-streams/manual")
-                             (:file "deprecation")))
+                             (:file "deprecation")
+                             (:file "further-resources")))
                (:file "late")))

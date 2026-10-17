@@ -4,7 +4,7 @@
 @section sb-posix
 
 @menu
-* Lisp names for C names: sb posix lisp names.
+* Lisp Names for C Names: sb posix lisp names.
 * Types: sb posix types.
 * Function Parameters: sb posix function parameters.
 * Function Return Values: sb posix function return values.
@@ -44,7 +44,7 @@ reentrant unless the underlying libc happens to make them so (but
 see @ref{sb posix extensions to posix}).
 
 @node sb posix lisp names
-@subsection Lisp names for C names
+@subsection Lisp Names for C Names
 
 All symbols are in the @code{sb-posix} package. This package contains a
 Lisp function for each supported Unix system call or function, a

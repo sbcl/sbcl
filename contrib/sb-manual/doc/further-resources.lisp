@@ -1,0 +1,333 @@
+(in-package :sb-manual)
+
+(defsection @further-resources (:title "Further Resources")
+  (@the-sbcl-project section)
+  (@common-lisp-resources section))
+
+
+(defsection @common-lisp-resources (:title "Common Lisp Resources")
+  (@language-reference section)
+  (@internet-community section)
+  (@third-party-libraries section)
+  (@common-lisp-books section))
+
+(defsection @language-reference (:title "Language Reference")
+  "_\\CLHS_ (Common Lisp HyperSpec) is a hypertext version of the ANSI
+  standard, made freely available by LispWorks -- an invaluable
+  reference.
+
+  See <https://www.lispworks.com/documentation/HyperSpec/Front/index.htm>.")
+
+(defsection @internet-community (:title "Internet Community")
+  "IRC channels on <https://libera.chat/>:
+
+  - `#common-lisp`: _Common Lisp, the #1=(programmable . #1#)
+    programming language_
+
+  - `#lispcafe`: _The Lisp Café; sit down, have a drink, chat about
+    anything, and enjoy your stay. | <https://www.cliki.net/lispcafe> |
+    Be insuperable to each other_
+
+  - `#sbcl`: _Steel Bank Common Lisp Dev Hangout_
+
+  You can use <https://web.libera.chat> or a normal IRC client.
+
+  Also, see <https://www.reddit.com/r/Common_Lisp/>, as well as
+  <https://www.lisp.org> and <https://cliki.net>, which contain
+  numerous pointers places in the net where lispers talk shop.")
+
+(defsection @third-party-libraries (:title "Third-party Libraries")
+  "For a wealth of information about free Common Lisp libraries and tools
+  we recommend checking out _CLiki_: <https://cliki.net/>.
+
+  The most popular library manager is Quicklisp:
+  <https://www.quicklisp.org/beta/>.")
+
+(defsection @common-lisp-books (:title "Common Lisp Books")
+  "If you're not a programmer and you're trying to learn, many
+  introductory Lisp books are available. However, we don't have any
+  standout favorites.
+
+  If you are an experienced programmer in other languages but need to
+  learn about Common Lisp, some books stand out:
+
+  - _Practical Common Lisp_ by Peter Seibel
+
+      An excellent introduction to the language, covering both the
+      basics and \"advanced topics\" like macros, CLOS, and packages.
+      Available both in print format and on the web:
+      <https://gigamonkeys.com/book/>.
+
+  - _Paradigms Of Artificial Intelligence Programming_ by Peter Norvig
+
+      Good information on general Common Lisp programming, and many
+      nontrivial examples. Whether or not your work is AI, it's a very
+      good book to look at.
+
+  - _On Lisp_ by Paul Graham
+
+      An in-depth treatment of macros, but not recommended as a first
+      Common Lisp book, since it is slightly pre-ANSI so you need to
+      be on your guard against non-standard usages, and since it
+      doesn't really even try to cover the language as a whole,
+      focusing solely on macros. Downloadable from
+      <https://www.paulgraham.com/onlisp.html>.
+
+  - _Object-Oriented Programming In Common Lisp_ by Sonya Keene
+
+      With the exception of _Practical Common Lisp_, most introductory
+      books don't emphasize CLOS. This one does. Even if you're very
+      knowledgeable about object oriented programming in the abstract,
+      it's worth looking at this book if you want to do any OO in
+      Common Lisp. Some abstractions in CLOS (especially multiple
+      dispatch) go beyond anything you'll see in most OO systems, and
+      there are a number of lesser differences as well. This book
+      tends to help with the culture shock.
+
+  - _Art Of Metaobject Programming_ by Gregor Kiczales et al.
+
+      Currently the prime source of information on the Common Lisp
+      Metaobject Protocol, which is supported by SBCL. Section
+      2 (Chapters 5 and 6) are freely available at
+      <http://mop.lisp.se/www.alu.org/mop/>.")
+
+
+(defsection @the-sbcl-project (:title "The SBCL Project")
+  (@volunteer-support section)
+  (@commercial-support section)
+  (@reporting-bugs section)
+  (@editor-integration section)
+  (@internals-documentation section)
+  (@history-and-implementation-of-sbcl section))
+
+(defsection @volunteer-support (:title "Volunteer Support")
+  "Your primary source of SBCL support should probably be the mailing
+  list `sbcl-help`: in addition to other users, SBCL developers
+  monitor this list and are available for advice. As an anti-spam
+  measure subscription is required for posting:
+
+  <https://lists.sourceforge.net/lists/listinfo/sbcl-help>
+
+  Remember that the people answering your question are volunteers, so
+  you stand a much better chance of getting a good answer if you ask a
+  good question.
+
+  Before sending mail, check the list archives at either
+
+  - <http://sourceforge.net/mailarchive/forum.php?forum_name=sbcl-help> or
+
+  - the `gmane.lisp.steel-bank.general` news group on `news.gmane.io`
+
+  to see if your question has been answered already. Checking the bug
+  database is also worth it (see @REPORTING-BUGS), to see if the issue
+  is already known.
+
+  For general advice on asking good questions, see
+
+  <http://www.catb.org/~esr/faqs/smart-questions.html>.")
+
+(defsection @commercial-support (:title "Commercial Support")
+  "There is no formal organization developing SBCL, but if you need a
+  paid support arrangement or custom SBCL development, we maintain the
+  list of companies and consultants below. Use it to identify service
+  providers with appropriate skills and interests, and contact them
+  directly.
+
+  The SBCL project cannot verify the accuracy of the information or
+  the competence of the people listed, and they have provided their
+  own blurbs below: you must make your own judgement of suitability
+  from the available information -- refer to the links they provide,
+  the `\\\\CREDITS` file, mailing list archives, commit messages, and
+  so on. Please feel free to ask for advice through
+  @VOLUNTEER-SUPPORT.
+
+  (At present, no companies or consultants wish to advertise paid
+  support or custom SBCL development in this manual.)")
+
+(defsection @reporting-bugs (:title "Reporting Bugs")
+  "SBCL uses Launchpad to track bugs. The bug database is available at
+
+  <https://bugs.launchpad.net/sbcl>
+
+  Reporting bugs there requires registering at Launchpad. However,
+  bugs can also be reported on the mailing list `sbcl-bugs`, which is
+  moderated but does _not_ require subscribing. Simply send email to
+  [`sbcl-bugs@lists.sourceforge.net`](mailto:sbcl-bugs@lists.sourceforge.net)
+  to have the bug checked and added to Launchpad by SBCL maintainers.
+
+  See the `\\\\HACKING` file on how to send patches."
+  (@how-to-report-bugs-effectively section)
+  (@getting-backtraces-for-low-level-errors section))
+
+(defsection @how-to-report-bugs-effectively
+    (:title "How to Report Bugs Effectively")
+  "Please include enough information in a bug report that someone reading
+  it can reproduce the problem. That is, don't write
+
+      Subject: apparent bug in PRINT-OBJECT (or *PRINT-LENGTH*?)
+      PRINT-OBJECT doesn't seem to work with *PRINT-LENGTH*. Is this a bug?
+
+  but instead
+
+      Subject: apparent bug in PRINT-OBJECT (or *PRINT-LENGTH*?)
+      In sbcl-1.2.3 running under OpenBSD 4.5 on my Alpha box, when
+      I compile and load the file
+         (DEFSTRUCT (FOO (:PRINT-OBJECT (LAMBDA (X Y)
+                                          (LET ((*PRINT-LENGTH* 4))
+                                            (PRINT X Y)))))
+           X Y)
+      then at the command line type
+         (MAKE-FOO)
+      the program loops endlessly instead of printing the object.
+
+  A more in-depth discussion on reporting bugs effectively can be
+  found at
+
+  <http://www.chiark.greenend.org.uk/~sgtatham/bugs.html>.")
+
+(defsection @getting-backtraces-for-low-level-errors
+    (:title "Getting Backtraces for Low-level Errors")
+  "If you get a fatal errors such as `signal N is [un]blocked` or SBCL
+  just hang and you want to send a useful bug report, then:
+
+  - Make sure SBCL is compiled and run with @LDB enabled.
+
+  - Isolate a smallish test case, run it.
+
+  - If SBCL hangs, kill it with `SIGABRT`: `kill -ABRT <pidof sbcl>`,
+    which by default enters LDB.
+
+  - Print the backtrace from LDB by typing `ba`.
+
+  - Next, attach gdb with `gdb -p <pidof sbcl>`, and get backtraces
+    for all threads with `thread apply all ba`.
+
+  - If multiple threads are in play, then -- still in gdb -- try to get
+    Lisp backtrace for all threads: `thread apply all call
+    backtrace_from_fp($ebp, 100, 0)` on x86. Substitute `$ebp` with
+    `$rbp` on x86-64. The backtraces will appear in the stdout of the
+    SBCL process.
+
+  - Send a report with the backtraces and the output (both stdout and
+    stderr) produced by SBCL.
+
+  - Don't forget to include OS and SBCL version.
+
+  - If available, include information on outcome of the same test with
+    other versions of SBCL, OS, etc.")
+
+  (defsection @editor-integration (:title "Editor Integration")
+  "Though SBCL can be used running \"bare\", the recommended mode of
+  development is with an editor connected to SBCL, supporting not only
+  basic Lisp editing (paren-matching, etc) but providing among other
+  features an integrated debugger, interactive compilation, and
+  automated documentation lookup.
+
+  Currently _SLIME_ (Superior Lisp Interaction Mode for Emacs)
+  together with Emacs is recommended for use with SBCL, though other
+  options exist as well. SLIME can be downloaded from
+  <https://slime.common-lisp.dev/>.")
+
+;;; FIXME
+(defsection @internals-documentation (:title "Internals Documentation")
+  "If you're interested in the development of the SBCL system itself,
+  then subscribing to
+  [sbcl-devel@lists.sourceforge.net](mailto:sbcl-devel@lists.sourceforge.net)
+  is a good idea.
+
+  The Texinfo sources for the SBCL Internals Manual are available in
+  `doc/internals/`.
+
+  Some low-level information describing the programming details of the
+  conversion from CMUCL to SBCL is available in the
+  `doc/FOR-CMUCL-DEVELOPERS` file.")
+
+(defsection @history-and-implementation-of-sbcl
+    (:title "History and Implementation of SBCL")
+  "You can work productively with SBCL without knowing or understanding
+  anything about where it came from, how it is implemented, or how it
+  extends the ANSI Common Lisp standard. However, a little knowledge
+  can be helpful in order to understand error messages, to
+  troubleshoot problems, to understand why some parts of the system
+  are better debugged than others, and to anticipate which known bugs,
+  known performance problems, and missing extensions are likely to be
+  fixed, tuned, or added.
+
+  SBCL is descended from CMUCL, which is itself descended from Spice
+  Lisp, including early implementations for the Mach operating system on
+  the IBM RT, back in the 1980s. Some design decisions from that time are
+  still reflected in the current implementation:
+
+  - Some parts of the system expect to be loaded into a
+    fixed-at-compile-time location in virtual memory.
+
+  - The system is implemented as a C program which is responsible for
+    supplying low-level services and loading a Lisp `.core` file.
+
+  SBCL also inherited some newer architectural features from CMUCL.
+  The most important is that on some architectures it has a
+  @GENERATIONAL-GC, which has various implications (mostly good) for
+  performance. These are discussed in another chapter, @EFFICIENCY.
+
+  SBCL has diverged from CMUCL in that SBCL is now essentially a
+  compiler-only implementation of Common Lisp. This is a change in
+  implementation strategy, taking advantage of the freedom \"any of
+  these facilities might share the same execution strategy\"
+  guaranteed in CLHS `3.1` (Evaluation). It does not mean SBCL can't
+  be used interactively, and in fact the change is largely invisible
+  to the casual user, since SBCL still can and does execute code
+  interactively by compiling it on the fly. (It is visible if you know
+  how to look, like using COMPILED-FUNCTION-P; and it is visible in
+  the way that SBCL doesn't have many bugs which behave differently in
+  interpreted code than in compiled code.) What it means is that in
+  SBCL, the EVAL function only truly \"interprets\" a few easy kinds
+  of forms, such as symbols which are BOUNDP. More complicated forms
+  are evaluated by calling COMPILE and then calling FUNCALL on the
+  returned result.
+
+  The direct ancestor of SBCL is the x86 port of CMUCL. This port was in
+  some ways the most cobbled-together of all the CMUCL ports, since a
+  number of strange changes had to be made to support the register-poor
+  x86 architecture. Some things (like tracing and debugging) do not work
+  particularly well there. SBCL should be able to improve in these areas
+  (and has already improved in some other areas), but it takes a while.
+
+  On the x86 SBCL -- like the x86 port of CMUCL -- uses a
+  _@CONSERVATIVE-GC_. This means that it doesn't maintain a strict
+  separation between tagged and untagged data, instead treating some
+  untagged data (e.g. raw floating point numbers) as possibly-tagged
+  data and so not collecting any Lisp objects that they point to. This
+  has some negative consequences for average time efficiency (though
+  possibly no worse than the negative consequences of trying to
+  implement an exact GC on a processor architecture as register-poor
+  as the x86) and also has potentially unlimited consequences for
+  worst-case memory efficiency. In practice, @CONSERVATIVE-GCs work
+  reasonably well, not getting anywhere near the worst case. But they
+  can occasionally cause odd patterns of memory usage.
+
+  The fork from CMUCL was based on a major rewrite of the system
+  bootstrap process. CMUCL has for many years tolerated a very unusual
+  \"build\" procedure which doesn't actually build the complete system
+  from scratch but instead progressively overwrites parts of a running
+  system with new versions. This quasi-build procedure can cause
+  various bizarre bootstrapping hangups, especially when a major
+  change is made to the system. It also makes the connection between
+  the current source code and the current executable more tenuous than
+  in other software systems -- it's easy to accidentally build a CMUCL
+  system containing characteristics not reflected in the current
+  version of the source code. See the paper _SBCL: A Sanely
+  Bootstrappable Common
+  Lisp_ (<https://research.gold.ac.uk/id/eprint/2336/>).
+
+  Other major changes since the fork from CMUCL include:
+
+  - SBCL has removed many CMUCL extensions, (e.g. IP networking,
+    remote procedure call, Unix system interface, and X11 interface)
+    from the core system. Most of these are available as contributed
+    modules (distributed with SBCL) or third-party modules instead.
+
+  - SBCL has deleted or deprecated some nonstandard features and code
+    complexity which helped efficiency at the price of
+    maintainability. For example, the SBCL compiler no longer
+    implements memory pooling internally (and so is simpler and more
+    maintainable, but generates more garbage and runs more slowly).")

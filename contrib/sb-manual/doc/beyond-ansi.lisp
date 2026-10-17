@@ -1,10 +1,30 @@
 (in-package :sb-manual)
 
-(defsection @beyond-the-ansi-standard (:title "Beyond the ANSI Standard"
-                                       :concepts (("reader" "extensions")))
-  "SBCL is derived from CMUCL, which implements many extensions to the
-  ANSI standard. SBCL doesn't support as many extensions as CMUCL, but
-  it still has quite a few. See @CONTRIBUTED-MODULES."
+(defsection @beyond-the-ansi-standard (:title "Beyond the ANSI Standard")
+  "SBCL is a mostly-conforming implementation of the ANSI Common Lisp
+  standard. Essentially every type of non-conformance is considered a
+  bug (see @REPORTING-BUGS). The exceptions involve the following
+  internal inconsistencies in the standard:
+
+  - PROG2 returns the primary value of its second form, as
+    specified in the _Arguments and Values_ section of the
+    specification for that operator, not that of its first form, as
+    specified in the _Description_.
+
+  - The STRING type is considered to be the union of all types
+    `(ARRAY C (SIZE))` for all non-`NIL` subtypes `C` of
+    [CHARACTER][type], excluding arrays specialized to the empty type.
+
+  - The `:ORDER` long form option in DEFINE-METHOD-COMBINATION method
+    group specifiers accepts the value NIL as well as
+    :MOST-SPECIFIC-FIRST and :MOST-SPECIFIC-LAST, in order to allow
+    programmers to declare that the order of methods playing that role
+    in the method combination does not matter.
+
+  This section covers smaller extensions to standard Common Lisp
+  functionality and how SBCL operates in the white patches of
+  undefined behavior."
+  (@idiosyncrasies section)
   (@reader-extensions section)
   (@package-local-nicknames section)
   (@package-variance section)
@@ -13,7 +33,7 @@
   (@extended-slot-access section)
   (@metaobject-protocol section)
   (@extensible-sequences section)
-  (@support-for-unix section)
+  (@unix-support section)
   (@unicode-support section)
   (@customization-hooks-for-users section)
   (@tools-to-help-developers section)
@@ -22,10 +42,113 @@
   (@random-number-generation section)
   (@timeouts-and-deadlines section)
   (@miscellaneous-extensions section)
-  (@stale-extensions section)
-  (@efficiency-hacks section))
+  (@stale-extensions section))
 
-(defsection @reader-extensions (:title "Reader Extensions")
+(defsection @idiosyncrasies (:title "Idiosyncrasies")
+  "The information in this section describes some of the ways that SBCL
+  deals with choices the ANSI standard leaves to the implementation."
+  (@declarations-as-assertions section)
+  (@fasl-format section)
+  (@compiler-only-implementation section)
+  (@defining-constants section)
+  (@style-warnings section))
+
+(defsection @declarations-as-assertions (:title "Declarations as Assertions")
+  "Declarations are generally treated as assertions. This general
+  principle, its implications, and the bugs which still keep the
+  compiler from quite satisfying this principle, are discussed in
+  @TYPE-DECLARATION-CHECKING.")
+
+(defsection @fasl-format (:title "Fasl Format")
+  "SBCL fasl-format is binary compatible only with the exact SBCL version
+  it was generated with. While this is obviously suboptimal, it has
+  proven more robust than trying to maintain fasl compatibility across
+  versions: accidentally breaking things is far too easy and can lead
+  to hard to diagnose bugs.
+
+  The following snippet handles fasl recompilation automatically for
+  ASDF-based systems and makes a good candidate for inclusion in the
+  user or system initialization file (see @INITIALIZATION-FILES).
+
+      (require :asdf)
+
+      ;;; If a fasl was stale, try to recompile and load (once).
+      (defmethod asdf:perform :around ((o asdf:load-op)
+                                       (c asdf:cl-source-file))
+         (handler-case (call-next-method o c)
+            ;; If a fasl was stale, try to recompile and load (once).
+            (sb-ext:invalid-fasl ()
+               (asdf:perform (make-instance 'asdf:compile-op) c)
+               (call-next-method))))")
+
+(defsection @compiler-only-implementation
+    (:title "Compiler-only Implementation")
+  "By default, SBCL is a compiler-only implementation of Common Lisp.
+  That is, for all but a few special cases, EVAL creates a lambda
+  expression, calls COMPILE on the lambda expression to create a
+  compiled function, and then calls FUNCALL on the resulting function
+  object. A more traditional @INTERPRETER is also available on default
+  builds; it is usually only called internally. This is explicitly
+  allowed by the ANSI standard but leads to some oddities; e.g. at
+  default settings, FUNCTIONP and COMPILED-FUNCTION-P are equivalent,
+  and they collapse into the same function when SBCL is built without
+  the interpreter.")
+
+(defsection @defining-constants (:title "Defining Constants")
+  "SBCL is quite strict about ANSI's definition of DEFCONSTANT.
+  ANSI says that doing DEFCONSTANT of the same symbol more than once
+  is undefined unless the new value is EQL to the old value.
+  Conforming to this specification is a nuisance when the \"constant\"
+  value is only constant under some weaker test like STRING= or EQUAL.
+
+  It's especially annoying because, in SBCL, DEFCONSTANT takes effect
+  not only at load time but also at compile time, so that just
+  compiling and loading reasonable code like
+
+      (defconstant +foobyte+ '(1 4))
+
+  runs into this undefined behavior. Many implementations of Common
+  Lisp try to help the programmer around this annoyance by silently
+  accepting the undefined code and trying to do what the programmer
+  probably meant.
+
+  SBCL instead treats the undefined behavior as an error. Often such
+  code can be rewritten in portable ANSI Common Lisp which has the
+  desired behavior. The code above can be given an exactly defined
+  meaning by replacing DEFCONSTANT either with DEFPARAMETER or with a
+  customized macro which does the right thing, e.g.
+
+      (defmacro define-constant (name value &optional doc)
+        `(defconstant ,name (if (boundp ',name) (symbol-value ',name) ,value)
+                            ,@(when doc (list doc))))
+
+  or possibly along the lines of the SB-INT:DEFCONSTANT-EQX macro used
+  internally in the implementation of SBCL itself. In circumstances
+  where this is not appropriate, the programmer can handle the
+  condition type SB-EXT:DEFCONSTANT-UNEQL and choose either the
+  CONTINUE restart or ABORT restart as appropriate.")
+
+(defsection @style-warnings (:title "Style Warnings")
+  "SBCL gives style warnings about various kinds of perfectly legal code,
+  e.g.
+
+  - multiple DEFUNs of the same symbol in different units;
+
+  - special variables not named in the conventional `*foo*` style, and
+    lexical variables unconventionally named in the `*FOO*` style.
+
+  This causes friction with people who point out that other ways of
+  organizing code (especially avoiding the use of DEFGENERIC) are just
+  as aesthetically stylish. However, these warnings should be read not
+  as _warning, bad aesthetics detected, you have no style_ but as
+  _warning, this style keeps the compiler from understanding the code
+  as well as you might like_. That is, unless the compiler warns about
+  such conditions, there's no way for the compiler to warn about some
+  programming errors which would otherwise be easy to
+  overlook.")
+
+(defsection @reader-extensions (:title "Reader Extensions"
+                                :concepts (("reader" "extensions")))
   (@extended-package-prefix-syntax section)
   (@symbol-name-normalization section)
   (@decimal-syntax-for-rationals section))
@@ -613,10 +736,11 @@
   created by calling the following generic function:"
   (sb-sequence:make-simple-sequence-iterator generic-function))
 
-(defsection @support-for-unix (:title "Support For Unix")
+(defsection @unix-support (:title "Unix Support")
   (sb-ext:*posix-argv* (variable "<varies>"))
   (sb-ext:posix-getenv function)
   (sb-ext:posix-environ function)
+  (sb-ext:exit function)
   (@running-external-programs section))
 
 (defsection @running-external-programs (:title "Running external programs")
@@ -778,7 +902,7 @@
   SBCL provides a variable SB-EXT:*MUFFLED-WARNINGS*:"
   (sb-ext:*muffled-warnings* variable))
 
-(defsection @tools-to-help-developers (:title "Tools To Help Developers")
+(defsection @tools-to-help-developers (:title "Tools to Help Developers")
   "SBCL provides a profiler and other extensions to the TRACE
   facility.
 
@@ -1052,26 +1176,3 @@
   (because it wasn't in the ANSI spec and it didn't occur to me that
   it was in the IEEE spec). If you need this stuff, take a look at the
   code and bring it up on the developers' mailing list.")
-
-(defsection @efficiency-hacks (:title "Efficiency Hacks")
-  "The SB-EXT:PURIFY function (available with @CONSERVATIVE-GC) causes
-  SBCL first to collect all garbage, then to mark all uncollected
-  objects as permanent, never again attempting to collect them as
-  garbage. This can cause a large increase in efficiency when using a
-  primitive garbage collector, or a more moderate increase in
-  efficiency when using a more sophisticated garbage collector which
-  is well suited to the program's memory usage pattern. It also allows
-  permanent code to be frozen at fixed addresses, a precondition for
-  using copy-on-write to share code between multiple Lisp processes.
-  This is less important with modern @GENERATIONAL-GC, but not all
-  SBCL platforms use such a garbage collector.
-
-  The SB-EXT:TRULY-THE special form declares the type of the result of
-  the operations, producing its argument; the declaration is not
-  checked. In short: don't use it."
-  ;; FIXME: It's not a macro.
-  #+nil
-  (sb-ext:truly-the macro)
-  "The SB-EXT:FREEZE-TYPE declaration declares that a type will never
-  change, which can make type testing (e.g. with TYPEP) more efficient
-  for structure types.")

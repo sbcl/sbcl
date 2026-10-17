@@ -36,7 +36,7 @@
   (@sb-posix-idiosyncracies section)
   (@sb-posix-extensions-to-posix section))
 
-(defsection @sb-posix-lisp-names (:title "Lisp names for C names")
+(defsection @sb-posix-lisp-names (:title "Lisp Names for C Names")
   "All symbols are in the `SB-POSIX` package. This package contains a
   Lisp function for each supported Unix system call or function, a
   variable or constant for each supported Unix constant, an object

@@ -180,8 +180,7 @@
   "SBCL can be stopped at any time by calling SB-EXT:EXIT,
   optionally returning a specified numeric value to the calling
   process. See @THREADING for information about terminating individual
-  threads."
-  (sb-ext:exit function))
+  threads.")
 
 (defsection @end-of-file (:title "End of File")
   "By default, SBCL also exits upon reaching the end of input. This can

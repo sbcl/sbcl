@@ -848,7 +848,7 @@
   - `stop`: Stop the single stepper and resumes normal execution."
   (step macro))
 
-(defsection @ldb (:title "LDB")
+(defsection @ldb (:title "\\LDB")
   "\\LDB, the low-level debugger, is implemented in C and can work
   even when the Lisp @DEBUGGER cannot due to e.g. heap or stack
   exhaustion. Failed assertions in the low-level runtime (see

@@ -19,7 +19,7 @@
 
   If an underprivileged platform is important to you, you can help by
   e.g. testing during the monthly freeze periods and, most
-  importantly, by reporting any problems. See @SUPPORT-AND-BUGS.")
+  importantly, by @REPORTING-BUGS.")
 
 (defsection @obtaining-sbcl (:title "Obtaining SBCL")
   "Your package manager may provide prepackaged binaries. On Debian, for
@@ -234,7 +234,7 @@
         files under `src/runtime`, down- or upgrading GCC may help.
 
       * Ask for help on the mailing lists referenced in
-        @SUPPORT-AND-BUGS.")
+        @VOLUNTEER-SUPPORT.")
 
 (defsection @build-prerequisites (:title "Build Prerequisites")
   "All of the following platforms are supported in the sense of
