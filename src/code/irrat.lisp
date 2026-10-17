@@ -371,47 +371,47 @@
               (quiet< number 0))
           (/ (log number) (log base))
           (truly-the single-float (log number base)))))
-
 (declaim (start-block log log2/rational log2/double-float))
+
+;;; CMUCL comment:
+;;;
+;;;   Write x = 2^n*f where 1/2 <= f < 1.  Then log2(x) = n +
+;;;   log2(f).  So we grab the top few bits of x and scale that
+;;;   appropriately, take the log of it and add it to n.
+;;;
+;;; Motivated by an attempt to get LOG to work better on bignums.
+
+;;; Approximate LOG2 using integer-length and then adjust the float result
+(declaim (inline log2/nonnegative-rational))
+(defun log2/nonnegative-rational (x)
+  (declare (type (rational 0) x))
+  (cond
+    ((typep x 'sb-vm:signed-word)
+     (%log2 (coerce x 'double-float)))
+    ((< 1/2 x 2)
+     (/ (%log1p (%double-float (- x 1)))
+        #.(log 2d0)))
+    (t
+     (let* ((p (numerator x))
+            (q (denominator x))
+            (e (- (integer-length p) (integer-length q))))
+       (if (<= -1020 e 1020)
+           (%log2 (%double-float x))
+           (let* ((scaled-x (if (plusp e)
+                                (/ p (ash q e))
+                                (/ (ash p (- e)) q)))
+                  (f (%double-float scaled-x)))
+             (+ (coerce e 'double-float) (%log2 f))))))))
+
 (defun log2/nonnegative-integer (x)
   (declare (type (integer 0) x))
-  ;; CMUCL comment:
-  ;;
-  ;;   Write x = 2^n*f where 1/2 <= f < 1.  Then log2(x) = n +
-  ;;   log2(f).  So we grab the top few bits of x and scale that
-  ;;   appropriately, take the log of it and add it to n.
-  ;;
-  ;; Motivated by an attempt to get LOG to work better on bignums.
-  (cond ((typep x 'sb-vm:signed-word)
-         (%log2 (coerce x 'double-float)))
-        (t
-         (let ((n (integer-length x)))
-           (cond ((< n sb-vm:double-float-digits)
-                  (%log2 (coerce x 'double-float)))
-                 (t
-                  (let ((f (ldb (byte sb-vm:double-float-digits
-                                      (- n sb-vm:double-float-digits))
-                                x)))
-                    (+ n (%log2 (scale-float (coerce f 'double-float)
-                                             (- sb-vm:double-float-digits)))))))))))
+  (log2/nonnegative-rational x))
 
 (defun log2/double-float (x)
   (declare (type double-float x))
   (if (minusp x)
       (complex (%log2 (- x)) (sb-xc:/ pi (log 2d0)))
       (%log2 x)))
-
-(defun log2/nonnegative-ratio (x)
-  (declare (type (and (rational 0) (not integer)) x))
-  (truly-the double-float
-             (- (truly-the double-float (log2/nonnegative-integer (numerator x)))
-                (truly-the double-float (log2/nonnegative-integer (denominator x))))))
-
-(defun log2/nonnegative-rational (x)
-  (declare (type (rational 0) x))
-  (if (typep x 'integer)
-      (log2/nonnegative-integer x)
-      (log2/nonnegative-ratio x)))
 
 (defun log2/rational (x)
   (declare (type rational x))

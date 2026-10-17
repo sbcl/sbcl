@@ -977,3 +977,32 @@ fractional bits."
       `(lambda (x)
         (< (mod x 68/125) 999/976))
     ((5.8149736e25) nil)))
+
+(with-test (:name :log-bignum-rational-monotonic)
+  (dotimes (i 500)
+    (let* ((p (random (ash 1 (+ 60 (random 60)))))
+           (q (+ 2 (random 1000)))
+           (ratio (/ p q)))
+      (when (typep ratio 'ratio)
+        (dolist (int (list (floor ratio) (1- (floor ratio))))
+          (when (and (> int 0) (< int ratio))
+            (let ((l-int (log int 2d0))
+                  (l-rat (log ratio 2d0)))
+              (when (> l-int l-rat)
+                (error "(log ~a 2d0) = ~a > (log ~a 2d0) = ~a" int l-int ratio l-rat))))))))
+  (let* ((d (/ (- (* 5 (expt 2 1021)) 1) 3))
+         (c (expt 2 1022))
+         (s (expt 2 969)))
+    (loop for (a b) on (loop for i from -64 to 64
+                             collect (/ (+ c (* i s)) d))
+          while b
+          when (< a b)
+          do
+          (let ((la (log a 2d0))
+                (lb (log b 2d0)))
+            (when (> la lb)
+              (error "(log ~a 2d0) = ~a > (log ~a 2d0) = ~a" a la b lb))))))
+
+(with-test (:name :log-small)
+  (assert (= (log (opaque-identity (+ 1 (expt 2 -100))) 2d0)
+             (opaque-identity 1.1380857159135323d-30))))
