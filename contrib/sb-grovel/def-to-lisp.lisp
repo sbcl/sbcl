@@ -303,12 +303,25 @@ int main(int argc, char *argv[]) {
       (let ((code (run-c-compiler tmp-c-source tmp-a-dot-out)))
         (unless (= code 0)
           (apply 'error 'c-compile-failed condition-arguments)))
-      (let ((code (sb-ext:process-exit-code
-                   (sb-ext:run-program (namestring tmp-a-dot-out)
-                                       (list (namestring tmp-constants))
-                                       :search nil
-                                       :input nil
-                                       :output *trace-output*))))
+      ;; The groveler is a target binary.  Under qemu-user emulation
+      ;; the lisp cannot execve it directly (guest-to-guest exec is
+      ;; not emulated without binfmt_misc), so when SBCL_RUNNER is
+      ;; set, run it through that emulator — the same convention the
+      ;; make-target-*.sh scripts use.  Not wanted on win32: there
+      ;; the target lisp runs target executables natively (both on
+      ;; Windows proper and under Wine).
+      (let* ((runner #+win32 nil
+                     #-win32 (split-cflags
+                              (or (sb-ext:posix-getenv "SBCL_RUNNER") "")))
+             (code (sb-ext:process-exit-code
+                    (sb-ext:run-program
+                     (or (first runner) (namestring tmp-a-dot-out))
+                     (append (rest runner)
+                             (when runner (list (namestring tmp-a-dot-out)))
+                             (list (namestring tmp-constants)))
+                     :search (if runner t nil)
+                     :input nil
+                     :output *trace-output*))))
         (unless (= code 0)
           (apply 'error 'a-dot-out-failed condition-arguments)))
     (multiple-value-bind (output warnings-p failure-p)
