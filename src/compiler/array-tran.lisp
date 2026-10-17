@@ -2129,14 +2129,82 @@
       (when results
         (sb-kernel::member-rational results)))))
 
-(deftransform array-dimensions ((array))
+(deftransform array-dimensions ((array) * * :node node)
   (let* ((type (lvar-conservative-type array))
          (dims (array-type-dimensions-or-give-up type)))
-    (if (listp dims)
-       (if (find '* dims)
-           (give-up-ir1-transform)
-           `',dims)
-       (give-up-ir1-transform))))
+    (if (and (listp dims)
+             (not (find '* dims)))
+        `',dims
+        (cmatch (node)
+          (((:or equal equalp) (:lvar la (:this a)) (:lvar lb (array-dimensions b)))
+           (when (and (or (lvar-subtypep a simple-array)
+                          (lvar-almost-immediately-used-p la :flushable t))
+                      (or (lvar-subtypep b simple-array)
+                          (lvar-almost-immediately-used-p lb :flushable t)))
+             `(array-dimensions-equal a b)))
+          ((equalp (:lvar la (:this a)) (:constant b))
+           (when (and (proper-list-p b)
+                      (every #'integerp b)
+                      (or (lvar-subtypep a simple-array)
+                          (lvar-almost-immediately-used-p la :flushable t)))
+             `(array-dimensions-equal-list a ',b)))
+          ((equal (:lvar la (:this a)) b)
+           (when (or (lvar-subtypep a simple-array)
+                     (lvar-almost-immediately-used-p la :flushable t))
+             `(array-dimensions-equal-list a b)))))))
+
+(deftransform array-dimensions-equal ((array1 array2) (vector vector))
+  `(= (array-total-size array1) (array-total-size array2)))
+
+(deftransform array-dimensions-equal-list ((array list) * * :node node)
+  (cmatch (node)
+    ((array-dimensions-equal-list a (:lvar lb (array-dimensions b)))
+     (when (or (lvar-subtypep b simple-array)
+               (lvar-almost-immediately-used-p lb :flushable t))
+       `(array-dimensions-equal a b)))
+    ((array-dimensions-equal-list array (:constant c (cons integer null)))
+     `(and (vectorp array)
+           (= (array-total-size array) ,(car c))))
+    ((array-dimensions-equal-list array (list &rest dims))
+     (let ((rank (length dims)))
+       `(and (eql (array-rank array) ,rank)
+             ,@(loop for i from 0
+                     for dim in dims
+                     collect `(eql (array-dimension array ,i) ,dim)))))))
+
+(defun array-dimensions-equal-deriver (dims1 dims2)
+  (when (and (listp dims1)
+             (listp dims2))
+    (if (= (length dims1)
+           (length dims2))
+        (let ((no* t))
+          (or (loop for dim1 in dims1
+                    for dim2 in dims2
+                    do
+                    (cond ((or (eq dim1 '*)
+                               (eq dim2 '*))
+                           (setf no* nil))
+                          ((/= dim1 dim2)
+                           (return (specifier-type 'null)))))
+              (and no*
+                   (specifier-type 't))))
+        (specifier-type 'null))))
+
+(defoptimizer (array-dimensions-equal derive-type) ((array1 array2) node)
+  (let* ((array1-type (lvar-conservative-type array1))
+         (array2-type (lvar-conservative-type array2))
+         (dims1 (array-type-dimensions-or-give-up array1-type nil))
+         (dims2 (array-type-dimensions-or-give-up array2-type nil)))
+    (array-dimensions-equal-deriver dims1 dims2)))
+
+(defoptimizer (array-dimensions-equal-list derive-type) ((array list) node)
+  (when (constant-lvar-p list)
+    (let ((dims2 (lvar-value list)))
+      (when (and (proper-list-p dims2)
+                 (every #'integerp dims2))
+        (let* ((array-type (lvar-conservative-type array))
+               (dims1 (array-type-dimensions-or-give-up array-type nil)))
+          (array-dimensions-equal-deriver dims1 dims2))))))
 
 ;;; All vectors can get their length by using VECTOR-LENGTH. If it's
 ;;; simple, it will extract the length slot from the vector. It it's

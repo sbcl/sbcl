@@ -48,35 +48,33 @@
 (deftransform %double-float ((n) (ratio) * :important nil)
   '(sb-kernel::double-float-ratio n))
 
+;;; Avoid ratios for (float (/ small-integer small-integer))
 (make-defs (($type double-float single-float))
-  (deftransform %$type ((n) (rational) * :important nil)
-    (cond ((combination-match n (/ #1=(:type (integer ($value most-negative-exactly-$type-integer)
-                                                      ($value most-positive-exactly-$type-integer)))
-                                   #1#)
-             t)
-           (splice-fun-args n '/ 2)
-           `(lambda (n d)
-              (/ (%$type n)
-                 (%$type d))))
-          (t
-           (give-up-ir1-transform)))))
+  (deftransform %$type ((n) (rational) * :node node :important nil)
+    (cmatch (node)
+      ((:* (/ (:type #1=(integer ($value most-negative-exactly-$type-integer)
+                                 ($value most-positive-exactly-$type-integer))
+                     n)
+              (:type #1# d)))
+       `(/ (%$type n)
+           (%$type d))))))
 
 ;;; (%double-float (%single-float x)) => (%double-float x) if it doesn't lose precision
-(deftransform %double-float ((n) (single-float) * :important nil)
-  (combination-match n
-      (%single-float (:type (or single-float
-                                (integer #.most-negative-exactly-single-float-integer
-                                         #.most-positive-exactly-single-float-integer))))
-    (splice-fun-args n '%single-float 1))
-  (give-up-ir1-transform))
+(deftransform %double-float ((n) (single-float) * :node node :important nil)
+  (cmatch (node)
+    ((%double-float (%single-float (:type (or single-float
+                                              (integer #.most-negative-exactly-single-float-integer
+                                                       #.most-positive-exactly-single-float-integer))
+                                          x)))
+     `(%double-float x))))
 
-(deftransform %single-float ((n) (double-float) * :important nil)
-  (combination-match n
-      (%double-float (:type (or float
-                                (integer #.most-negative-exactly-single-float-integer
-                                         #.most-positive-exactly-single-float-integer))))
-    (splice-fun-args n '%double-float 1))
-  (give-up-ir1-transform))
+(deftransform %single-float ((n) (double-float) * :node node :important nil)
+  (cmatch (node)
+    ((%single-float (%double-float (:type (or float
+                                              (integer #.most-negative-exactly-single-float-integer
+                                                       #.most-positive-exactly-single-float-integer))
+                                          x)))
+     `(%single-float x))))
 
 (macrolet ((def (type from-type)
              `(deftransform ,(symbolicate "%" type) ((n) ((or ,type ,from-type)) * :important nil)

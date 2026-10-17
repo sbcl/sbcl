@@ -41,6 +41,7 @@
   (name nil :type symbol)
   (type nil :type t)
   (value nil :type t)
+  (lvar-var nil)
   (sub-combinations nil :type list))
 
 (defstruct cm-combination
@@ -139,6 +140,11 @@
                      ((typep s '(cons (eql :+)))
                       (make-cm-operand :kind :plus
                                        :name (second s)))
+                     ((typep s '(cons (eql :lvar)))
+                      (destructuring-bind (lvar-name s) (cdr s)
+                        (let ((op (parse-operand s expected-type level)))
+                          (setf (cm-operand-lvar-var op) lvar-name)
+                          op)))
                      ((eq s '*)
                       (make-cm-operand :kind :wildcard))
                      ((symbolp s)
@@ -220,15 +226,23 @@
   (let (bound-vars
         otherwise)
     (labels ((collect-cm-pattern-vars (combinations)
-               (let (vars)
-                 (labels ((add (s)
-                            (when (and s
-                                       (symbolp s)
-                                       (not (keywordp s))
-                                       (not (eq s '*))
-                                       (not (eq s '&rest)))
+               (let (vars
+                     excluded)
+                 (labels ((var-p (s)
+                            (and s
+                                 (symbolp s)
+                                 (not (keywordp s))
+                                 (not (eq s '*))
+                                 (not (eq s '&rest))))
+                          (add (s)
+                            (when (var-p s)
+                              (pushnew s vars)))
+                          (excluded (s)
+                            (when (var-p s)
+                              (pushnew s excluded)
                               (pushnew s vars)))
                           (walk-operand (op)
+                            (excluded (cm-operand-lvar-var op))
                             (case (cm-operand-kind op)
                               ((:var :constant :type)
                                (add (cm-operand-name op)))
@@ -239,14 +253,13 @@
                                (mapc #'walk-combination (cm-operand-sub-combinations op)))))
                           (walk-combination (comb)
                             (let ((op (cm-combination-operator comb)))
-                              (when (cm-operator-name-var op)
-                                (add (cm-operator-name-var op))))
+                              (excluded (cm-operator-name-var op)))
                             (mapc #'walk-operand (cm-combination-operands comb))
                             (when (cm-combination-rest-var comb)
                               (push '&rest vars)
                               (add (cm-combination-rest-var comb)))))
                    (mapc #'walk-combination combinations)
-                   (nreverse vars))))
+                   (values (nreverse vars) excluded))))
 
              (expand-combinations (lvars operands combs body)
                (let ((old-bound-vars bound-vars))
@@ -262,7 +275,9 @@
                                    (plus (cm-combination-plus comb))
                                    (rest-var (cm-combination-rest-var comb))
                                    (casts (cm-combination-casts comb))
-                                   (vars (make-gensym-list arg-count "ARG"))
+                                   (vars (loop for op in arg-operands
+                                               collect (or (cm-operand-lvar-var op)
+                                                           (gensym "ARG"))))
                                    (bind-vars (if rest-var
                                                   (append vars (list rest-var))
                                                   vars)))
@@ -393,52 +408,54 @@
                            (t
                             (setf bound-vars nil)
                             (multiple-value-bind (parsed-combs this-level) (parse-cm-spec spec unravel-casts)
-                              (let* ((top-name-var (cm-operator-name-var (cm-combination-operator (first parsed-combs))))
-                                     (pattern-vars* (collect-cm-pattern-vars parsed-combs))
-                                     (pattern-vars (remove :plus pattern-vars*))
-                                     (without-plus (loop for prev = a
-                                                         for a in pattern-vars*
-                                                         unless (or (eq a :plus)
-                                                                    (eq prev :plus))
-                                                         collect a))
-                                     (restp (member '&rest pattern-vars))
-                                     (body-fun (gensym "MATCH-BODY"))
-                                     (var-names (if restp
-                                                    (remove '&rest pattern-vars)
-                                                    pattern-vars))
-                                     (matched (lambda ()
-                                                `(,@(if restp
-                                                        `(apply #',body-fun)
-                                                        `(,body-fun))
-                                                  combination .args. ,@var-names)))
-                                     (branches (expand-combinations nil nil parsed-combs matched)))
-                                (push `(,body-fun (combination .args. ,@pattern-vars)
-                                                  (declare (ignorable combination .args. ,@var-names))
-                                                  (let (,@(when (and top-name-var (not (member top-name-var pattern-vars)))
-                                                            `((,top-name-var .name.)))
-                                                        (new (progn ,@body)))
-                                                    (when new
-                                                      ,(if transform
-                                                           `(,@(if restp
-                                                                   '(apply #'combination-match-transform)
-                                                                   '(combination-match-transform))
-                                                             .top-node.
-                                                             ',(if restp
-                                                                   (butlast without-plus)
-                                                                   without-plus)
-                                                             new ,@var-names)
-                                                           `(return-from .combination-match. new)))))
-                                      flets)
-                                (let* ((existing (getf by-level this-level)))
-                                  (loop for branch in branches
-                                        for intersect = (find (car branch) existing :key #'car :test #'intersection)
-                                        do (if intersect
-                                               (setf (cdr (last (cadr intersect)))
-                                                     (if (equal (car branch) (car intersect))
-                                                         (cdr branch)
-                                                         `((cond ,@(cases-to-cond (list branch))))))
-                                               (setf existing (append existing (list branch)))))
-                                  (setf (getf by-level this-level) existing))))))))
+                              (multiple-value-bind (pattern-vars* excluded)
+                                  (collect-cm-pattern-vars parsed-combs)
+                                (let* ((top-name-var (cm-operator-name-var (cm-combination-operator (first parsed-combs))))
+                                       (pattern-vars (remove :plus pattern-vars*))
+                                       (without-plus (loop for prev = a
+                                                           for a in pattern-vars*
+                                                           unless (or (eq a :plus)
+                                                                      (eq prev :plus))
+                                                           collect a))
+                                       (restp (member '&rest pattern-vars))
+                                       (body-fun (gensym "MATCH-BODY"))
+                                       (var-names (if restp
+                                                      (remove '&rest pattern-vars)
+                                                      pattern-vars))
+                                       (matched (lambda ()
+                                                  `(,@(if restp
+                                                          `(apply #',body-fun)
+                                                          `(,body-fun))
+                                                    combination .args. ,@var-names)))
+                                       (branches (expand-combinations nil nil parsed-combs matched)))
+                                  (push `(,body-fun (combination .args. ,@pattern-vars)
+                                                    (declare (ignorable combination .args. ,@var-names))
+                                                    (let (,@(when (and top-name-var (not (member top-name-var pattern-vars)))
+                                                              `((,top-name-var .name.)))
+                                                          (new (progn ,@body)))
+                                                      (when new
+                                                        ,(if transform
+                                                             `(,@(if restp
+                                                                     '(apply #'combination-match-transform)
+                                                                     '(combination-match-transform))
+                                                               .top-node.
+                                                               ',(set-difference (if restp
+                                                                                     (butlast without-plus)
+                                                                                     without-plus)
+                                                                                 excluded)
+                                                               new ,@(set-difference var-names excluded))
+                                                             `(return-from .combination-match. new)))))
+                                        flets)
+                                  (let* ((existing (getf by-level this-level)))
+                                    (loop for branch in branches
+                                          for intersect = (find (car branch) existing :key #'car :test #'intersection)
+                                          do (if intersect
+                                                 (setf (cdr (last (cadr intersect)))
+                                                       (if (equal (car branch) (car intersect))
+                                                           (cdr branch)
+                                                           `((cond ,@(cases-to-cond (list branch))))))
+                                                 (setf existing (append existing (list branch)))))
+                                    (setf (getf by-level this-level) existing)))))))))
                  `(let* ((.node. ,node)
                          (.top-node. .node.))
                     (declare (ignorable .top-node.))
