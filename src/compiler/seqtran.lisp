@@ -157,7 +157,10 @@
                                    (setf nil-p t)
                                    'null)))
                           'consed-sequence))
-         (result-ctype (ir1-transform-specifier-type result-type)))
+         (result-ctype (ir1-transform-specifier-type result-type))
+         (result-ctype (if (eq result-ctype *empty-type*)
+                          *universal-type*
+                          result-ctype)))
     `(lambda (result-type-arg fun seq ,@seq-names)
        (the* (,result-type :context map)
              (truly-the
