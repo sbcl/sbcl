@@ -273,13 +273,20 @@ in particular, the AMA style. It's `Compile-time Evaluation` not
 
 ### Concrete Words and Phrases
 
-- `run-time`: noun  or adjective (as in "at run-time,  we do run-time
-  type checking")
+- `run-time`: noun or adjective (as in `at run-time, we do run-time
+  type checking`)
 
 - `runtime`: the low-level component of SBCL written in C
 
-- `run time`: how long something runs (as in "the run time can be
-  measure with TIME")
+- `run time`: how long something runs (as in `the run time can be
+  measured with TIME`)
+
+- `top-level`: adjective (as in `top-level form`)
+
+- `toplevel`: the top-level function (e.g. `the default toplevel`; the
+  `:toplevel` argument of `sb-ext:save-lisp-and-die`)
+
+- `top level`: noun phrase, the level at the very top of something
 
 - Write `CMUCL` and not `CMU CL`
 

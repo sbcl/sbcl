@@ -205,9 +205,8 @@ distribution, the next thing is @ref{installing sbcl}.
 @node customizing the build
 @subsection Customizing the Build
 
-You can tweak the @code{*features*} set for the resulting Lisp system,
-enabling or disabling features like documentation strings, threads,
-or extra debugging code.
+You can tweak the build options, enabling or disabling things like
+documentation strings, thread support, or extra debugging code.
 
 The preferred way to do this is using command-line arguments to
 @code{make.sh}:
@@ -217,6 +216,32 @@ The preferred way to do this is using command-line arguments to
 --with-<feature>           Enables a specific feature.
 --without-<feature>        Disables a specific feature.
 @end example
+
+When tracking the @ref{sbcl repository}, it may be annoying having to
+supply the same arguments to @code{make.sh} over and over again. You can
+avoid this by creating a file named @code{customize-target-features.lisp}
+in the base directory of the SBCL tree and putting a single lambda
+expression like this in it:
+
+@example
+(lambda (list)
+  (flet ((enable (x) (pushnew x list))
+         (disable (x) (setf list (remove x list))))
+    #+nil (enable :sb-show)
+    (enable :sb-after-xc-core)
+    #+nil (disable :sb-doc)
+    list))
+@end example
+
+This function gets a list of features from @code{make.sh} and returns the
+transformed list to be used for the build.
+
+@quotation
+@emph{Note}: There is no direct correspondance between @ref{build options}
+and @code{*features*} in the compiled SBCL. Some build options do make it
+to @code{*features*}, while others are dropped, and there are features
+such as @code{:ansi-cl} and @code{:sbcl} with no corresponding build option.
+@end quotation
 
 @node build options
 @subsection Build Options

@@ -186,16 +186,37 @@
   (@build-prerequisites section))
 
 (defsection @customizing-the-build (:title "Customizing the Build")
-  "You can tweak the *FEATURES* set for the resulting Lisp system,
-  enabling or disabling features like documentation strings, threads,
-  or extra debugging code.
+  "You can tweak the build options, enabling or disabling things like
+  documentation strings, thread support, or extra debugging code.
 
   The preferred way to do this is using command-line arguments to
   `make.sh`:
 
       --fancy                    Enables a curated set of features.
       --with-<feature>           Enables a specific feature.
-      --without-<feature>        Disables a specific feature.")
+      --without-<feature>        Disables a specific feature.
+
+  When tracking the @SBCL-REPOSITORY, it may be annoying having to
+  supply the same arguments to `make.sh` over and over again. You can
+  avoid this by creating a file named `customize-target-features.lisp`
+  in the base directory of the SBCL tree and putting a single lambda
+  expression like this in it:
+
+      (lambda (list)
+        (flet ((enable (x) (pushnew x list))
+               (disable (x) (setf list (remove x list))))
+          #+nil (enable :sb-show)
+          (enable :sb-after-xc-core)
+          #+nil (disable :sb-doc)
+          list))
+
+  This function gets a list of features from `make.sh` and returns the
+  transformed list to be used for the build.
+
+  > _Note_: There is no direct correspondance between @BUILD-OPTIONS
+  > and *FEATURES* in the compiled SBCL. Some build options do make it
+  > to *FEATURES*, while others are dropped, and there are features
+  > such as :ANSI-CL and :SBCL with no corresponding build option.")
 
 (defsection @troubleshooting-the-build (:title "Troubleshooting the Build")
   "- \"GNU Make not found\"
