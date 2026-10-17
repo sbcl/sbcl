@@ -652,8 +652,7 @@ void gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
 /* As a helpful reminder of how this calculation arises, the summands should
  * correspond, in the correct order, to the picture below */
 #define THREAD_STRUCT_SIZE \
-  (THREAD_ALIGNMENT_BYTES + \
-   thread_control_stack_size + BINDING_STACK_SIZE + ALIEN_STACK_SIZE + \
+  (thread_control_stack_size + BINDING_STACK_SIZE + ALIEN_STACK_SIZE + \
    THREAD_CSP_PAGE_SIZE + dynamic_values_bytes + \
    sizeof (struct extra_thread_data) + ALT_STACK_SIZE)
 
@@ -664,13 +663,10 @@ void gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
  * The allocated memory will be laid out as depicted below.
  * Left-to-right is in order of lowest to highest address:
  *
- *      ______ spaces as obtained from OS
- *     /   ___ aligned_spaces
- *    /   /
- *  (0) (1)       (2)       (3)       (4)    (5)          (6)
- *   |   | CONTROL | BINDING |  ALIEN  | Trap | thread     |          |
- *   |   |  STACK  |  STACK  |  STACK  | page | structure  | altstack |
- *   |...|------------------------------------------------------------|
+ *      (1)       (2)       (3)       (4)    (5)          (6)
+ *       | CONTROL | BINDING |  ALIEN  | Trap | thread     |          |
+ *       |  STACK  |  STACK  |  STACK  | page | structure  | altstack |
+ *       |------------------------------------------------------------|
  *          2MiB       1MiB     1MiB               (*)         (**)
  *
  *  |              Lisp TLS             |   (**) altstack         |
@@ -688,7 +684,7 @@ void gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
  *   (5) = per_thread_data.     size = TLS_SIZE words
  *   (6) = arbitrarily-sized "extra" data and signal stack.
  *
- *   (0) and (1) may coincide; (4) and (5) may coincide
+ *   (4) and (5) may coincide
  *
  *   - Lisp TLS overlaps 'struct thread' so that the first N (~30) words
  *     have preassigned TLS indices.
@@ -703,9 +699,10 @@ void gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
 struct thread *
 alloc_thread_struct(void* spaces) {
     /* Allocate the thread structure in one fell swoop as there is no way to recover
-     * from failing to obtain contiguous memory. Note that the OS may have a smaller
-     * alignment granularity than BACKEND_PAGE_BYTES so we may have to adjust the
-     * result to make it conform to our guard page alignment requirement. */
+     * from failing to obtain contiguous memory. */
+    gc_assert(IS_ALIGNED(thread_control_stack_size, os_reported_page_size));
+    gc_assert(IS_ALIGNED(BINDING_STACK_SIZE, os_reported_page_size));
+    gc_assert(IS_ALIGNED(ALIEN_STACK_SIZE, os_reported_page_size));
     bool is_recycled = 0;
     if (spaces) {
         // If reusing memory from a previously exited thread, start by removing
@@ -719,10 +716,7 @@ alloc_thread_struct(void* spaces) {
                                    NULL, THREAD_STRUCT_SIZE);
         if (!spaces) return NULL;
     }
-    /* Aligning up is safe as THREAD_STRUCT_SIZE has
-     * THREAD_ALIGNMENT_BYTES padding. */
-    char *aligned_spaces = PTR_ALIGN_UP(spaces, THREAD_ALIGNMENT_BYTES);
-    char* csp_page = aligned_spaces + thread_control_stack_size +
+    char* csp_page = (char*)spaces + thread_control_stack_size +
                      BINDING_STACK_SIZE + ALIEN_STACK_SIZE;
 
     // Refer to the ASCII art in the block comment above
@@ -745,7 +739,7 @@ alloc_thread_struct(void* spaces) {
     __attribute((unused)) lispobj* tls = (lispobj*)th;
 
     th->os_address = spaces;
-    th->control_stack_start = (lispobj*)aligned_spaces;
+    th->control_stack_start = (lispobj*)spaces;
     th->binding_stack_start=
         (lispobj*)((char*)th->control_stack_start+thread_control_stack_size);
     th->control_stack_end = th->binding_stack_start;
@@ -759,7 +753,7 @@ alloc_thread_struct(void* spaces) {
      * whether this is recycled memory. See also os_alloc_gc_space where we advised
      * NOHUGEPAGE - that advice survives across this call because the flag bits
      * on the VMA remain, while this only discards pages */
-        if (madvise(aligned_spaces, csp_page - aligned_spaces, MADV_DONTNEED) != 0)
+        if (madvise(spaces, csp_page - (char*)spaces, MADV_DONTNEED) != 0)
             lose("madvise failed");
 #elif GENCGC_IS_PRECISE
     /* Clear the entire control stack. Without this I was able to induce a GC failure
@@ -883,7 +877,7 @@ alloc_thread_struct(void* spaces) {
 #if defined LISP_FEATURE_PPC64
     /* Storing a 0 into code coverage mark bytes or GC card mark bytes
      * can be done from the low byte of the thread base register.
-     * The thread alignment is BACKEND_PAGE_BYTES (from thread.h), but seeing as this is
+     * The thread alignment is os_reported_page_size, but seeing as this is
      * a similar-but-different requirement, it pays to double-check */
     if ((lispobj)th & 0xFF) lose("Thread struct not at least 256-byte-aligned");
 #endif

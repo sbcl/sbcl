@@ -123,8 +123,7 @@ struct extra_thread_data
 
 extern int dynamic_values_bytes;
 
-#define THREAD_ALIGNMENT_BYTES BACKEND_PAGE_BYTES
-#define CONTROL_STACK_ALIGNMENT_BYTES BACKEND_PAGE_BYTES
+#define CONTROL_STACK_ALIGNMENT_BYTES os_reported_page_size
 
 #ifdef LISP_FEATURE_SB_THREAD
 #define for_each_thread(th) for(th=all_threads;th;th=th->next)
@@ -201,10 +200,6 @@ static inline void* calc_altstack_base(struct thread* thread) {
 }
 extern void* calc_altstack_end(struct thread* thread);
 static inline int calc_altstack_size(struct thread* thread) {
-    // 'end' is calculated as exactly the end address we got from the OS.
-    // The usually ends up making the stack slightly larger than ALT_STACK_SIZE
-    // bytes due to the addition of THREAD_ALIGNMENT_BYTES of padding.
-    // If the memory was as aligned as we'd like, the padding is ours to keep.
     return (char*)calc_altstack_end(thread) - (char*)calc_altstack_base(thread);
 }
 
