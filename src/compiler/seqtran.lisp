@@ -157,10 +157,8 @@
                                    (setf nil-p t)
                                    'null)))
                           'consed-sequence))
-         (result-ctype (ir1-transform-specifier-type result-type))
-         (result-ctype (if (eq result-ctype *empty-type*)
-                          *universal-type*
-                          result-ctype)))
+         (result-ctype (ir1-transform-specifier-type result-type)))
+    (check-sequence-result-type result-ctype node)
     `(lambda (result-type-arg fun seq ,@seq-names)
        (the* (,result-type :context map)
              (truly-the
@@ -1970,8 +1968,11 @@
 (defun check-concatenate (type sequences node &optional (description "concatenate"))
   (let ((result-element-type (if (ctype-p type)
                                  type
-                                 (type-array-element-type (or (careful-specifier-type type)
-                                                              (return-from check-concatenate))))))
+                                 (let ((ctype (careful-specifier-type type)))
+                                   (when (or (not ctype)
+                                             (check-sequence-result-type ctype node nil))
+                                     (return-from check-concatenate))
+                                   (type-array-element-type ctype)))))
     (unless (or (eq result-element-type *wild-type*)
                 (eq result-element-type *universal-type*))
       (loop for sequence in sequences
@@ -2108,15 +2109,27 @@
                   (type (integer 0 #.array-dimension-limit) j i))
          (setf (aref ,dst (1- j)) (aref ,src (1- i))))))
 
+(defun check-sequence-result-type (result-type node &optional (give-up t))
+  (unless (and (not (eql result-type *empty-type*))
+               (types-equal-or-intersect result-type (specifier-type 'sequence)))
+    (let ((*compiler-error-context* node))
+      (compiler-warn "Bad type for a sequence: ~s"
+                     (type-specifier result-type)))
+    (setf (combination-kind node) :error)
+    (if give-up
+        (give-up-ir1-transform)
+        t)))
+
 ;;; MAKE-SEQUENCE, SUBSEQ, COPY-SEQ
 
-(deftransform make-sequence ((result-type size &key initial-element) * *)
+(deftransform make-sequence ((result-type size &key initial-element) * * :node node)
   (multiple-value-bind (spec type)
       (and (constant-lvar-p result-type)
            (let ((spec (lvar-value result-type)))
              (values spec (ir1-transform-specifier-type spec))))
     (unless type
       (give-up-ir1-transform))
+    (check-sequence-result-type type node)
     (if (type= type (specifier-type 'list))
         `(%make-list size initial-element)
         (multiple-value-bind (elt-type dim complexp)
@@ -3036,6 +3049,7 @@
                            * :node node)
   (let* ((type (ir1-transform-specifier-type (lvar-value result-type)))
          (vector-widetag (vector-specifier-widetag type)))
+    (check-sequence-result-type type node)
     (flet ((coerce-constants (vars type)
              ;; Lists are faster to iterate over than vectors of
              ;; unknown type.

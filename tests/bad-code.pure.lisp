@@ -1214,3 +1214,45 @@
                       `(lambda (f)
                          (car (funcall (the (or null (function * float)) f))))
                       :allow-warnings t))))
+
+(with-test (:name :ftype-or-null)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda ()
+                         (make-sequence '(not t) 10))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (a)
+                         (concatenate '(not t) a))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (a b)
+                         (map '(not t) a b))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (a b)
+                         (merge '(not t) a b c))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda ()
+                         (make-sequence '(not t) 10))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (a)
+                         (concatenate '(not t) a))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (a b)
+                         (map '(not t) a b))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (a b)
+                         (merge '(not t) a b c))
+                      :allow-warnings t))))
