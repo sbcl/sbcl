@@ -684,7 +684,7 @@ void gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
  *   (1) = control stack start. default size shown
  *   (2) = binding stack start. size = BINDING_STACK_SIZE
  *   (3) = alien stack start.   size = ALIEN_STACK_SIZE
- *   (4) = C safepoint page.    size = BACKEND_PAGE_BYTES or 0
+ *   (4) = C safepoint page.    size = THREAD_CSP_PAGE_SIZE (0 or 1 page)
  *   (5) = per_thread_data.     size = TLS_SIZE words
  *   (6) = arbitrarily-sized "extra" data and signal stack.
  *
