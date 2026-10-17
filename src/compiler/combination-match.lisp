@@ -230,7 +230,10 @@
                               (pushnew s vars)))
                           (walk-operand (op)
                             (case (cm-operand-kind op)
-                              ((:var :constant :plus :type)
+                              ((:var :constant :type)
+                               (add (cm-operand-name op)))
+                              (:plus
+                               (push :plus vars)
                                (add (cm-operand-name op)))
                               (:combination
                                (mapc #'walk-combination (cm-operand-sub-combinations op)))))
@@ -391,7 +394,13 @@
                             (setf bound-vars nil)
                             (multiple-value-bind (parsed-combs this-level) (parse-cm-spec spec unravel-casts)
                               (let* ((top-name-var (cm-operator-name-var (cm-combination-operator (first parsed-combs))))
-                                     (pattern-vars (collect-cm-pattern-vars parsed-combs))
+                                     (pattern-vars* (collect-cm-pattern-vars parsed-combs))
+                                     (pattern-vars (remove :plus pattern-vars*))
+                                     (without-plus (loop for prev = a
+                                                         for a in pattern-vars*
+                                                         unless (or (eq a :plus)
+                                                                    (eq prev :plus))
+                                                         collect a))
                                      (restp (member '&rest pattern-vars))
                                      (body-fun (gensym "MATCH-BODY"))
                                      (var-names (if restp
@@ -415,8 +424,8 @@
                                                                    '(combination-match-transform))
                                                              .top-node.
                                                              ',(if restp
-                                                                   (butlast pattern-vars)
-                                                                   pattern-vars)
+                                                                   (butlast without-plus)
+                                                                   without-plus)
                                                              new ,@var-names)
                                                            `(return-from .combination-match. new)))))
                                       flets)
@@ -610,19 +619,31 @@
 (defun combination-match-transform (combination vars form &rest lvars)
   (when *show-transforms-p*
     (show-transform :combination-match (generate-combination-tree (node-lvar combination)) form combination))
-  ;; Handle &rest by finding literal LVARs and replacing them with variables
-  (let ((restp (position '&rest vars)))
-    (when restp
-      (let ((rest-args (nthcdr restp lvars))
+  ;; Handle &rest/:plus by finding literal LVARs and replacing them with variables
+  (let ((restp (position '&rest vars))
+        (plus))
+    (setf lvars
+          (loop for lvar in lvars
+                if (listp lvar)
+                append lvar into lists
+                else
+                collect lvar
+                finally (setf plus lists)))
+    (when (or restp plus)
+      (let ((lists (append
+                    plus
+                    (and restp
+                         (nthcdr restp lvars))))
             (added-vars))
-        (setf vars (subseq vars 0 restp))
+        (when restp
+          (setf vars (subseq vars 0 restp)))
         (labels ((walk (form)
                    (cond ((listp form)
                           (mapcar #'walk form))
                          ((lvar-p form)
                           (or (getf added-vars form)
                               (let ((var (gensym)))
-                                (aver (member form rest-args))
+                                (aver (member form lists))
                                 (setf (getf added-vars form) var)
                                 (push var vars)
                                 (push form lvars)

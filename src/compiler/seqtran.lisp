@@ -2240,18 +2240,18 @@
   '(sb-sequence:copy-seq seq))
 
 (deftransforms (copy-seq) ((seq) * * :node node)
-  (or (combination-case seq
-        (remove *
-         ;; Vectors are always copied anyway.
-         (unless (csubtypep (lvar-type seq) (specifier-type 'vector))
+  (or (cmatch (node :transform nil)
+        ((copy-seq (remove &rest args))
+         (unless (lvar-subtypep seq vector)
+           ;; Vectors are always copied anyway.
            (change-full-call combination 'copy-remove))
          'seq)
-        (remove-if *
-         (unless (csubtypep (lvar-type seq) (specifier-type 'vector))
+        ((copy-seq (remove-if &rest args))
+         (unless (lvar-subtypep seq vector)
            (change-full-call combination 'copy-remove-if))
          'seq)
-        (remove-if-not *
-         (unless (csubtypep (lvar-type seq) (specifier-type 'vector))
+        ((copy-seq (remove-if-not &rest args))
+         (unless (lvar-subtypep seq vector)
            (change-full-call combination 'copy-remove-if-not))
          'seq))
       (give-up-ir1-transform)))
@@ -2263,34 +2263,34 @@
 (make-defs ((($fun $proper)
              (copy-list nil)
              (list-copy-seq t)))
- (deftransform $fun ((seq) * * :node node)
-   (or (combination-case (seq :cast (specifier-type 'list))
-         (remove *
-          (change-full-call combination 'copy-remove)
-          'seq)
-         (remove-if *
-          (change-full-call combination 'copy-remove-if)
-          'seq)
-         (remove-if-not *
-          (change-full-call combination 'copy-remove-if-not)
-          'seq))
-       (and (constant-lvar-p seq)
-            (let ((list (lvar-value seq)))
-              (when (proper-or-dotted-list-p list)
-                (multiple-value-bind (length dotted) (dotted-list-length list)
-                  (when (<= length 10)
-                    (if dotted
-                        (let ((last (last list)))
-                          `(list* ,@(quote-list (butlast list))
-                                  ',(car last)
-                                  ',(cdr last)))
-                        `(list ,@(quote-list list))))))))
-       (when (policy node (or (> speed space) (> instrument-consing 1)))
-         ;; If speed is more important than space, or cons profiling is wanted,
-         ;; then inline the whole copy loop.
-         (delay-ir1-transform node :constraint)
-         `(copy-list-macro seq :check-proper-list $proper))
-       (give-up-ir1-transform))))
+  (deftransform $fun ((seq) * * :node node)
+    (or (cmatch (node :transform nil)
+          (($fun (remove &rest args))
+           (change-full-call combination 'copy-remove)
+           'seq)
+          (($fun (remove-if &rest args))
+           (change-full-call combination 'copy-remove-if)
+           'seq)
+          (($fun (remove-if-not &rest args))
+           (change-full-call combination 'copy-remove-if-not)
+           'seq))
+        (and (constant-lvar-p seq)
+             (let ((list (lvar-value seq)))
+               (when (proper-or-dotted-list-p list)
+                 (multiple-value-bind (length dotted) (dotted-list-length list)
+                   (when (<= length 10)
+                     (if dotted
+                         (let ((last (last list)))
+                           `(list* ,@(quote-list (butlast list))
+                                   ',(car last)
+                                   ',(cdr last)))
+                         `(list ,@(quote-list list))))))))
+        (when (policy node (or (> speed space) (> instrument-consing 1)))
+          ;; If speed is more important than space, or cons profiling is wanted,
+          ;; then inline the whole copy loop.
+          (delay-ir1-transform node :constraint)
+          `(copy-list-macro seq :check-proper-list $proper))
+        (give-up-ir1-transform))))
 
 ;; Vectors are always copied
 (make-defs ((($fun $with)
@@ -2298,7 +2298,7 @@
              (copy-remove-if remove-if)
              (copy-remove-if-not remove-if-not)))
   (defoptimizer ($fun rewrite-full-call) ((x seq &rest args) node)
-    (when (csubtypep (lvar-type seq) (specifier-type 'vector))
+    (when (lvar-subtypep seq vector)
       '$with)))
 
 (deftransform search ((pattern text &key start1 start2 end1 end2 test test-not
@@ -3222,38 +3222,29 @@
                             (flush-combination cdr))))))))
     nil))
 
-(deftransform car ((cons))
-  (or (combination-case cons
-        ((list list*) *
-         (when (> (length args)
-                  (if (eq name 'list*)
-                      1
-                      0))
-           (splice-fun-args cons :any #'first)
-           'cons)))
-      (fold-list-accessors cons)
-      (give-up-ir1-transform)))
+(deftransform car ((cons) * * :node node)
+  (cmatch (node)
+    ((car (list arg &rest args))
+     'arg)
+    ((car (list* arg &rest args))
+     (when args
+       'arg))
+    (t
+     (fold-list-accessors cons)
+     (give-up-ir1-transform))))
 
-(deftransform cdr ((cons))
-  (block nil
-   (or (combination-case cons
-         ((list) *
-          (cond ((cdr args)
-                 (setf (combination-args combination) (cdr args))
-                 (flush-dest (car args))
-                 'cons)
-                (t
-                 (return nil))))
-         ((list*) *
-          (cond ((cddr args)
-                 (setf (combination-args combination) (cdr args))
-                 (flush-dest (car args))
-                 'cons)
-                ((cdr args)
-                 (splice-fun-args cons :any #'second)
-                 'cons))))
-       (fold-list-accessors cons)
-       (give-up-ir1-transform))))
+(deftransform cdr ((cons) * * :node node)
+  (cmatch (node)
+    ((cdr (list arg &rest args))
+     `(list ,@args))
+    ((cdr (list* arg &rest args))
+     (cond ((cdr args)
+            `(list* ,@args))
+           (args
+            (car args))))
+    (t
+     (fold-list-accessors cons)
+     (give-up-ir1-transform))))
 
 
 ;;;; FIND, POSITION, and their -IF and -IF-NOT variants
@@ -4211,33 +4202,25 @@
          'sb-impl::vector-nreverse)))
 
 (deftransforms (reverse nreverse) ((sequence) ((or vector list)) * :node node :important nil)
-  (or (combination-case sequence
-        (list *
-         (setf (combination-args combination) (reverse args))
-         (remove-lvar-dx sequence)
-         'sequence)
-        (list* *
-         (let ((last (last args)))
-           (cond ((lvar-subtypep (car last) null)
-                  (setf (combination-args combination)
-                        (append (cdr (reverse args)) last))
-                  (remove-lvar-dx sequence)
-                  'sequence)
-                 (t
-                  (splice-fun-args sequence 'list* nil)
-                  (remove-lvar-dx sequence)
-                  (let ((vars (make-gensym-list (length args))))
-                    `(lambda ,vars
-                       (,(case (combination-name node)
-                           (reverse 'revappend)
-                           (nreverse 'nreconc))
-                        ,(car (last vars))
-                        (list ,@(reverse (butlast vars))))))))))
-        (initialize-vector *
-         (setf (combination-args combination) (list* (car args) (reverse (cdr args))))
-         (remove-lvar-dx sequence)
-         'sequence))
-      (give-up-ir1-transform)))
+  (cmatch (node)
+    (((:or reverse nreverse) (list &rest args))
+     (remove-lvar-dx sequence)
+     `(list ,@(reverse args)))
+    (((:or reverse nreverse :name name) (list* (:+ args) last))
+     (cond ((lvar-subtypep last null)
+            (remove-lvar-dx sequence)
+            `(list ,@(reverse args)))
+           (t
+            (remove-lvar-dx sequence)
+            `(,(case name
+                 (reverse 'revappend)
+                 (nreverse 'nreconc))
+              last
+              (list ,@(reverse args))))))
+    (((:or reverse nreverse)
+      (initialize-vector a &rest args))
+     (remove-lvar-dx sequence)
+     `(initialize-vector a ,@(reverse args)))))
 
 (deftransforms (intersection nintersection)
     ((list1 list2 &key key test test-not))

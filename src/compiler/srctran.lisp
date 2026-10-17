@@ -7957,21 +7957,14 @@
 (make-defs ((($fun $offset-x $offset-y)
              (< -1 1)
              (> 1 -1)))
-  (deftransform $fun ((x y) (integer integer) * :important nil)
-    (or
-     (combination-case x
-       ((- +) (* constant)
-        (let ((c (funcall name (lvar-value (second args)))))
-          (when (= c $offset-x)
-            (splice-fun-args x name #'first)
-            `($fun= x y)))))
-     (combination-case y
-       ((- +) (* constant)
-        (let ((c (funcall name (lvar-value (second args)))))
-          (when (= c $offset-y)
-            (splice-fun-args y name #'first)
-            `($fun= x y)))))
-     (give-up-ir1-transform))))
+  (deftransform $fun ((x y) (integer integer) * :node node :important nil)
+    (cmatch (node)
+      ((:* ((:or + - :name fun) x (:constant c)) y)
+       (when (= (funcall fun c) $offset-x)
+         `($fun= x y)))
+      ((:* x ((:or + - :name fun) y (:constant c)))
+       (when (= (funcall fun c) $offset-y)
+         `($fun= x y))))))
 
 ;;; (< (+/- x cosntant1) constant2)
 (make-defs (($fun < > eql))
@@ -9300,20 +9293,26 @@
                        (constant-cons-type (lvar-type type)))
                  (when constant
                    (handle-constant type)))
-               (combination-match type (list* (:constant type) * (:constant dimensions))
-                 (case type
-                   ((array simple-array vector)
-                    (when (typep dimensions '(cons cons null))
-                      (let ((dimensions (car dimensions)))
-                        (when (array-dimensions-specifier-p dimensions)
-                          (make-array-type dimensions
-                                           :element-type *wild-type*
-                                           :complexp (unless (eq type 'simple-array)
-                                                       :maybe))))))))
-               (combination-match type ((:or list list*) (:constant type) &rest *)
-                 (case type
-                   ((array simple-array vector)
-                    (specifier-type type))))
+               (cmatch (type :transform nil)
+                 (((:or list list* :name name)
+                   (:constant type (member array simple-array vector)) * (:constant dims))
+                  (let* ((dims (if (eq name 'list*)
+                                   (when (consp dims)
+                                     (car dims))
+                                   dims))
+                         (dims (if (eq type 'vector)
+                                   (list dims)
+                                   dims)))
+                    (if (and dims
+                             (array-dimensions-specifier-p dims))
+                        (make-array-type dims
+                                         :element-type *wild-type*
+                                         :complexp (unless (eq type 'simple-array)
+                                                     :maybe))
+                        (specifier-type type))))
+                 (((:or list list*)
+                   (:constant type (member array simple-array vector)) &rest)
+                  (specifier-type type)))
                (and (member-type-p (lvar-type type))
                     (let ((types (mapcar #'handle-constant (member-type-members (lvar-type type)))))
                       (unless (member nil types)

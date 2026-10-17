@@ -4421,10 +4421,9 @@ is :ANY, the function name is not checked."
              (unless (member nil types)
                (sb-kernel::%type-union types))))
           (t
-           (combination-match lvar ((:or list list*) (:constant type) &rest *)
-             (case type
-               ((array simple-array vector)
-                (specifier-type 'simple-array))))))))
+           (cmatch (lvar :transform nil)
+             (((:or list list*) (:constant type (member array simple-array vector)) &rest)
+              (specifier-type 'simple-array)))))))
 
 (defun make-transform-lambda (fun args)
   (when args
