@@ -20,7 +20,8 @@
 
 (setf sb-unix::*on-dangerous-wait* :error)
 
-(with-test (:name :custom-stack-size :skipped-on (:not :sb-thread))
+(with-test (:name :custom-stack-size :skipped-on (:not :sb-thread)
+            :broken-on (not :c-stack-is-control-stack))
   (let ((old-size (extern-alien "thread_control_stack_size" unsigned-int))
         (new-size 131072))
     (setf (extern-alien "thread_control_stack_size" unsigned-int) new-size)
