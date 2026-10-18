@@ -937,7 +937,11 @@ there"))))
            (bits (x)
              (if (typep x 'single-float)
                  (sb-kernel:single-float-bits x)
-                 (sb-kernel:double-float-bits x)))
+                 #+64-bit
+                 (sb-kernel:double-float-bits x)
+                 #-64-bit
+                 (logior (ash (sb-kernel:double-float-high-bits x) 32)
+                         (sb-kernel:double-float-low-bits x))))
            (random-significand (bits)
              ;; 1 to BITS bits, each length equally likely.
              (let ((n (1+ (random bits))))
