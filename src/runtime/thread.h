@@ -199,9 +199,6 @@ static inline void* calc_altstack_base(struct thread* thread) {
         + ALIGN_UP(sizeof (struct extra_thread_data), N_WORD_BYTES);
 }
 extern void* calc_altstack_end(struct thread* thread);
-static inline int calc_altstack_size(struct thread* thread) {
-    return (char*)calc_altstack_end(thread) - (char*)calc_altstack_base(thread);
-}
 
 /* This is clearly per-arch and possibly even per-OS code, but we can't
  * put it somewhere sensible like x86-linux-os.c because it needs too

@@ -325,7 +325,7 @@ static int os_thread_init(struct thread *thread)
     stack_t sigstack;
     sigstack.ss_sp    = calc_altstack_base(thread);
     sigstack.ss_flags = 0;
-    sigstack.ss_size  = calc_altstack_size(thread);
+    sigstack.ss_size  = (char*)calc_altstack_end(thread) - (char*)sigstack.ss_sp;
     if (sigaltstack(&sigstack, 0) < 0)
         lose("Cannot sigaltstack: %s", strerror(errno));
 #endif

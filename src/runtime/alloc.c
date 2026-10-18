@@ -905,11 +905,17 @@ alloc_thread_struct(void* spaces) {
     return th;
 }
 
+void* calc_altstack_end(struct thread* thread) {
+    return (char*)thread + dynamic_values_bytes
+        + sizeof (struct extra_thread_data) + ALT_STACK_SIZE;
+}
+
 void free_thread_struct(struct thread *th)
 {
     struct extra_thread_data *extra_data = thread_extra_data(th);
     if (extra_data->arena_savearea) free(extra_data->arena_savearea);
-    os_deallocate((os_vm_address_t) th->os_address, THREAD_STRUCT_SIZE);
+    os_deallocate((os_vm_address_t) th->os_address,
+                  (char*)calc_altstack_end(th) - (char*)th->os_address);
 }
 
 #ifdef LISP_FEATURE_UNIX
@@ -925,6 +931,3 @@ on_altstack_p(struct thread *th, void *esp)
     return start <= esp && esp < end;
 }
 #endif
-void* calc_altstack_end(struct thread* thread) {
-    return (char*)thread->os_address + THREAD_STRUCT_SIZE;
-}
