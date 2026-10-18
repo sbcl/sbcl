@@ -1796,7 +1796,9 @@ session."
 
 ;;;; The beef
 #+sb-thread
-(progn
+(macrolet ((thread-ref (sap slot)
+             `(sap-ref-sap ,sap (ash ,(package-symbolicate "SB-VM" "THREAD-" slot "-SLOT")
+                                     sb-vm:word-shift))))
 ;;; Return T if the thread was created
 (defun os-thread-create (thread thread-sap)
   (aver (memq thread *starting-threads*))
@@ -1805,8 +1807,7 @@ session."
   until they do linkage tables like everyone else, or until all those
   things can deal with either way of doing linkage.")
   ;; New thread's arena starts out as this thread's arena.
-  (setf (sap-ref-sap thread-sap (ash sb-vm::thread-arena-slot sb-vm:word-shift))
-        (sb-vm::current-thread-offset-sap sb-vm::thread-arena-slot))
+  (setf (thread-ref thread-sap :arena) (thread-ref (current-thread-sap) :arena))
   #+win32
   (/= 0 (alien-funcall (extern-alien "create_lisp_thread"
                                      (function unsigned system-area-pointer))
@@ -1822,13 +1823,11 @@ session."
                                                unsigned) :extern "pthread_attr_setstack"))
                 #+c-stack-is-control-stack
                 (alien-funcall setstack attr
-                               (sap-ref-sap thread-sap (ash sb-vm::thread-control-stack-start-slot
-                                                            sb-vm:word-shift))
+                               (thread-ref thread-sap :control-stack-start)
                                (extern-alien "thread_control_stack_size" unsigned-int))
                 #-c-stack-is-control-stack
                 (alien-funcall setstack attr
-                               (sap-ref-sap thread-sap (ash sb-vm::thread-alien-stack-start-slot
-                                                            sb-vm:word-shift))
+                               (thread-ref thread-sap :alien-stack-start)
                                (extern-alien "thread_alien_stack_size" unsigned-int))))
          ;; From "Workaround a problem ... on NetBSD" (git rev af8c4a2933)
          ;; If I had to guess, it wrongly assumed existence of memory outside of
@@ -1869,8 +1868,7 @@ session."
     #+win32
     (with-alien ((wait (function unsigned unsigned unsigned) :extern "WaitForSingleObject")
                  (close (function int unsigned) :extern "CloseHandle"))
-      (let ((os-thread (sap-ref-word c-thread
-                                     (ash sb-vm::thread-os-thread-slot sb-vm::word-shift))))
+      (let ((os-thread (sap-int (thread-ref c-thread :os-thread))))
         (alien-funcall wait os-thread #xffffffff)
         (alien-funcall close os-thread)))
     #-win32
@@ -1881,7 +1879,7 @@ session."
            (free-thread-struct c-thread)
            nil)
           (t ; Return the originally mapped address
-           (sap-ref-sap c-thread (ash sb-vm::thread-os-address-slot sb-vm:word-shift))))))
+           (thread-ref c-thread :os-address)))))
 
 ;;; Helper for SB-POSIX:FORK so that the child starts with no joinable threads.
 ;;; It might work to just set *JOINABLE-THREADS* to NIL in the child, but it's better to prune
