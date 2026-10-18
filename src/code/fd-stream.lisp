@@ -2226,7 +2226,9 @@
       (if ibuf
           (let ((head (buffer-head ibuf))
                 (tail (buffer-tail ibuf)))
-            (values (reset-buffer ibuf) (- (+ unread tail) head)))
+            ;; Don't reset to 0, leave a place for unread-char
+            (setf (buffer-tail ibuf) head)
+            (values ibuf (- (+ unread tail) head)))
           (values nil unread)))))
 
 (defun fd-stream-clear-input (stream)
