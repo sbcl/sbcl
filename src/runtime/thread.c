@@ -631,6 +631,7 @@ void* new_thread_trampoline_switch_stack(void* th) {
 }
 #endif
 
+extern void free_thread_struct(struct thread *);
 static struct thread* recyclebin_threads;
 static struct thread* get_recyclebin_item()
 {
@@ -642,6 +643,10 @@ static struct thread* get_recyclebin_item()
         recyclebin_threads = result->next;
     }
     ignore_value(mutex_release(&recyclebin_lock));
+    if (result && THREAD_CONTROL_STACK_SIZE(result) != thread_control_stack_size) {
+        free_thread_struct(result);
+        return 0;
+    }
     return result ? result->os_address : 0;
 }
 static void put_recyclebin_item(struct thread* th)
@@ -652,7 +657,6 @@ static void put_recyclebin_item(struct thread* th)
     recyclebin_threads = th;
     ignore_value(mutex_release(&recyclebin_lock));
 }
-extern void free_thread_struct(struct thread *);
 void empty_thread_recyclebin()
 {
     if (!recyclebin_threads) return;
@@ -848,7 +852,7 @@ uword_t create_lisp_thread(struct thread* th)
     // Don't use STACK_SIZE_PARAM_IS_A_RESERVATION because
     // dx-allocation accesses the stack non-linearly.
     th->os_thread =
-      _beginthreadex(NULL, thread_control_stack_size, new_thread_trampoline, th,
+      _beginthreadex(NULL, THREAD_CONTROL_STACK_SIZE(th), new_thread_trampoline, th,
                      CREATE_SUSPENDED, &tid);
     bool success = th->os_thread != 0;
     if (success) {

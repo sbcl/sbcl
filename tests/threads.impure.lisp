@@ -20,6 +20,19 @@
 
 (setf sb-unix::*on-dangerous-wait* :error)
 
+(with-test (:name :custom-stack-size :skipped-on (:not :sb-thread))
+  (let ((old-size (extern-alien "thread_control_stack_size" unsigned-int))
+        (new-size 131072))
+    (setf (extern-alien "thread_control_stack_size" unsigned-int) new-size)
+    (let* ((thr
+            (make-thread
+             (lambda ()
+               (list (sb-vm::current-thread-offset-sap sb-vm::thread-control-stack-start-slot)
+                     (sb-vm::current-thread-offset-sap sb-vm::thread-control-stack-end-slot))))))
+      (setf (extern-alien "thread_control_stack_size" unsigned-int) old-size)
+      (let ((result (join-thread thr)))
+        (assert (<= (sap- (cadr result) (car result)) new-size))))))
+
 (with-test (:name (:threads :trivia))
   (assert (eq *current-thread*
               (find (thread-name *current-thread*) (list-all-threads)

@@ -124,6 +124,8 @@ struct extra_thread_data
 extern int dynamic_values_bytes;
 
 #define CONTROL_STACK_ALIGNMENT_BYTES os_reported_page_size
+#define THREAD_CONTROL_STACK_SIZE(th) \
+  ((unsigned int)((char*)(th)->binding_stack_start - (char*)(th)->os_address))
 
 #ifdef LISP_FEATURE_SB_THREAD
 #define for_each_thread(th) for(th=all_threads;th;th=th->next)

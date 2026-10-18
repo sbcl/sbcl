@@ -1822,9 +1822,9 @@ session."
               (with-alien ((setstack (function int system-area-pointer system-area-pointer
                                                unsigned) :extern "pthread_attr_setstack"))
                 #+c-stack-is-control-stack
-                (alien-funcall setstack attr
-                               (thread-ref thread-sap :control-stack-start)
-                               (extern-alien "thread_control_stack_size" unsigned-int))
+                (let* ((addr (thread-ref thread-sap :control-stack-start))
+                       (size (sap- (thread-ref thread-sap :control-stack-end) addr)))
+                  (alien-funcall setstack attr addr size))
                 #-c-stack-is-control-stack
                 (alien-funcall setstack attr
                                (thread-ref thread-sap :alien-stack-start)
@@ -1857,6 +1857,10 @@ session."
         (when (eq old (setq old (sb-ext:cas *all-threads* old new)))
           (return))))))
 
+;; We're going to join one finished thread if it exists, and reuse its memory,
+;; if that memory is the size we want right now. The way to know if it's the right size
+;; is that control_stack_size + OS-allocated address = binding stack address stored
+;; in the thread. Refer to alloc_thread_struct() for a helpful picture.
 (defun primitive-join (thread dispose)
   ;; It's safe to read from the other thread's memory, because the current thread
   ;; has ownership of that memory now. And we can't call this on a FOREIGN-THREAD.
@@ -1875,11 +1879,13 @@ session."
     (with-alien ((join (function int unsigned unsigned) :extern "pthread_join"))
       (alien-funcall join (thread-os-thread thread) 0) ; no result pointer
       (setf (thread-os-thread thread) 0))
-    (cond (dispose
-           (free-thread-struct c-thread)
-           nil)
-          (t ; Return the originally mapped address
-           (thread-ref c-thread :os-address)))))
+    (let ((os-address (thread-ref c-thread :os-address)))
+      (cond ((or dispose (/= (sap- (thread-ref c-thread :binding-stack-start) os-address)
+                             (extern-alien "thread_control_stack_size" unsigned-int)))
+             (free-thread-struct c-thread)
+             nil)
+            (t ; Return the originally mapped address
+             os-address)))))
 
 ;;; Helper for SB-POSIX:FORK so that the child starts with no joinable threads.
 ;;; It might work to just set *JOINABLE-THREADS* to NIL in the child, but it's better to prune

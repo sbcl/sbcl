@@ -50,6 +50,8 @@ os_vm_size_t os_vm_page_size = BACKEND_PAGE_BYTES;
  * this is the number the OS tells us */
 int os_reported_page_size;
 
+/* May be changed at runtime (to a multiple of os_reported_page_size),
+ * but not concurrently with MAKE-THREAD or foreign callback entry. */
 unsigned int thread_control_stack_size = DEFAULT_CONTROL_STACK_SIZE;
 unsigned int thread_binding_stack_size = BINDING_STACK_SIZE;
 // exposed to lisp for pthread_create if not C_STACK_IS_CONTROL_STACK
