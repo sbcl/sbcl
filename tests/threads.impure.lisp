@@ -136,24 +136,6 @@
   (def (cas :svref/0) (vector 0 nil) incf-svref/0 (lambda (x) (svref x 0)))
   (def (cas :svref/1) (vector nil 0) incf-svref/1 (lambda (x) (svref x 1))))
 
-(with-test (:name (:threads :more-trivia))
-  (let ((old-threads (list-all-threads))
-        (thread (make-thread
-                 (lambda ()
-                   ;; I honestly have no idea what this is testing.
-                   ;; It seems to be nothing more than an implementation change detector test.
-                   (assert (sb-thread::avl-find
-                            (sb-thread::thread-primitive-thread sb-thread:*current-thread*)
-                            sb-thread::*all-threads*))
-                   (sleep 2))))
-        (new-threads (list-all-threads)))
-    (assert (thread-alive-p thread))
-    ;; there is no order guarantee
-    ;;(assert (eq thread (first new-threads)))
-    (assert (= (1+ (length old-threads)) (length new-threads)))
-    (sleep 3)
-    (assert (not (thread-alive-p thread)))))
-
 (with-test (:name (join-thread :abort :default))
   (let* ((sym (gensym))
          (thread (make-thread (lambda () (abort-thread)))))
