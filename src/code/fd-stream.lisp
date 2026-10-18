@@ -903,7 +903,8 @@
   (write-c-string-fun (missing-arg) :type function)
   (octets-to-string-fun (missing-arg) :type function)
   (string-to-octets-fun (missing-arg) :type function)
-  (count-chars nil :type (or fixnum function)))
+  (count-chars nil :type (or fixnum function))
+  (count-one-char nil :type (or function null)))
 (declaim (freeze-type external-format))
 
 (defun sb-alien::string-to-c-string (string external-format)
@@ -1116,9 +1117,12 @@
                 (unless (zerop head)
                   (cond ((eql head tail)
                          ;; Buffer is empty, but not at yet reset -- make it so.
+                         ;; Don't set buffer-tail right away,
+                         ;; if read returns 0 leave it as is, that way
+                         ;; unread-char can find the needed bytes to
+                         ;; calculate previous file-position
                          (setf head 0
-                               tail 0)
-                         (reset-buffer ibuf))
+                               tail 0))
                         (t
                          ;; Buffer has things in it, but they are not at the
                          ;; head -- move them there.
@@ -1143,7 +1147,8 @@
                        (throw 'eof-input-catcher nil))
                       (t
                        ;; Success! (Do not use INCF, for sake of other threads.)
-                       (setf (buffer-tail ibuf) (+ count tail))))))))))
+                       (setf (buffer-head ibuf) head
+                             (buffer-tail ibuf) (+ count tail))))))))))
     count))
 
 ;;; Make sure there are at least BYTES number of bytes in the input
@@ -1582,6 +1587,10 @@
                                        (symbolicate "OUTPUT-TO-C-STRING/" suffix)))
          (count-chars-function (or count-chars
                                    (symbolicate "COUNT-CHARS/" suffix)))
+         (count-one-char (ecase newline-variant
+                           ((:lf :cr) nil)
+                           (:crlf
+                            (symbolicate "COUNT-ONE-CHAR/" suffix))))
          (n-buffer (gensym "BUFFER")))
     `(progn
        (defun ,size-function (|ch|)
@@ -1934,6 +1943,26 @@
                                  (cadr in-size-expr)
                                  in-size-expr)))
                     (incf codepoint)))))))
+       ,@(when count-one-char
+           `((defun ,count-one-char (position stream)
+               (declare (index position))
+               (let* ((ibuf (fd-stream-ibuf stream))
+                      (sap (buffer-sap ibuf))
+                      (tail (buffer-tail ibuf))
+                      (head position))
+                 (declare (ignorable tail))
+                 (block good
+                   (block decode-break-reason
+                     (return-from good
+                       (let (,@(if (member 1 (ensure-list
+                                              (if (consp in-size-expr)
+                                                  (car in-size-expr)
+                                                  in-size-expr)))
+                                   `((byte (sap-ref-8 sap head)))))
+                         ,(if (consp in-size-expr)
+                              (cadr in-size-expr)
+                              in-size-expr))))
+                   nil)))))
        (register-external-format
         ',external-format
         :newline-variant ,newline-variant
@@ -1957,7 +1986,9 @@
                                 (apply ',string-to-octets-sym rest))
         :count-chars ,(if (integerp in-size-expr)
                           in-size-expr
-                          `#',count-chars-function)))))
+                          `#',count-chars-function)
+        ,@ (when count-one-char
+            `(:count-one-char #',count-one-char))))))
 
 
 ;;;; utility functions (misc routines, etc)

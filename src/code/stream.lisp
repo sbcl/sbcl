@@ -222,8 +222,8 @@
               (- res
                  (buffer-head (fd-stream-ibuf stream)))
 
-              (cond ((<= (ansi-stream-in-index stream)
-                         (ansi-stream-char-buffer-start stream))
+              (cond ((and (<= (ansi-stream-in-index stream)
+                              (ansi-stream-char-buffer-start stream)))
                      ;; reading from "instead"
                      (ansi-stream-char-buffer-byte-position-start stream))
                     (t
@@ -234,18 +234,58 @@
                                  (ansi-stream-char-buffer-start stream))
                               (truly-the (unsigned-byte 8) char-size))))
                        (function
-                        (let ((codepoint (ansi-stream-char-buffer-byte-position-at stream))
-                              (target-codepoint (ansi-stream-in-index stream)))
-                          (when (< target-codepoint codepoint) ;; unread-char happened
-                            ;; start from scratch
-                            (setf (ansi-stream-char-buffer-byte-position stream)
-                                  (ansi-stream-char-buffer-byte-position-start stream)
-                                  (ansi-stream-char-buffer-byte-position-at stream)
-                                  (ansi-stream-char-buffer-start stream)))
-                          (let ((byte (funcall char-size stream)))
-                            (setf (ansi-stream-char-buffer-byte-position-at stream) (ansi-stream-in-index stream)
-                                  (ansi-stream-char-buffer-byte-position stream) byte)
-                            byte))))))))))))
+                        (if (<= (ansi-stream-in-index stream)
+                                (ansi-stream-char-buffer-byte-position-at stream))
+                                ;; unread-char on an empty char buffer,
+                                ;; go backwards N characters (technically,
+                                ;; can only do one unread-char, but why
+                                ;; not count more)
+                            (let* ((ibuf (fd-stream-ibuf stream))
+
+                                   (cb (ansi-stream-cin-buffer stream))
+                                   (ef (get-external-format (stream-external-format stream)))
+                                   (crlf (ecase (ef-newline-variant ef)
+                                           ((:lf :cr))
+                                           (:crlf t)))
+                                   (sizer (ef-bytes-for-char-fun ef))
+                                   (count-char (ef-count-one-char ef))
+                                   (head  (buffer-head ibuf)))
+                              (loop for i from (1- +ansi-stream-in-buffer-length+) downto (ansi-stream-in-index stream)
+                                    for char = (char cb i)
+                                    do (let ((width
+                                               (cond
+                                                 ;; Count bytes in the buffer backwards
+                                                 ;; while they reach the end.
+                                                 ;; That way LF can be told from CRLF
+                                                 ((and crlf
+                                                       (char= char #\Newline)
+                                                       (loop with start = (1- head)
+                                                             for pos from (1- head) downto 0
+                                                             for count = (funcall count-char pos stream)
+                                                             when (cond ((not count) nil)
+                                                                        ((/= (+ pos count) head))
+                                                                        (t
+                                                                         (setf start pos)
+                                                                         nil))
+                                                             return (- head start))))
+                                                 (t
+                                                  (funcall sizer char)))))
+                                         (when (> width head)
+                                           (return))
+                                         (decf head width)))
+                              head)
+                            (let ((codepoint (ansi-stream-char-buffer-byte-position-at stream))
+                                  (target-codepoint (ansi-stream-in-index stream)))
+                              (when (< target-codepoint codepoint) ;; unread-char happened
+                                ;; start from scratch
+                                (setf (ansi-stream-char-buffer-byte-position stream)
+                                      (ansi-stream-char-buffer-byte-position-start stream)
+                                      (ansi-stream-char-buffer-byte-position-at stream)
+                                      (ansi-stream-char-buffer-start stream)))
+                              (let ((byte (funcall char-size stream)))
+                                (setf (ansi-stream-char-buffer-byte-position-at stream) (ansi-stream-in-index stream)
+                                      (ansi-stream-char-buffer-byte-position stream) byte)
+                                byte)))))))))))))
 
 ;;; You're not allowed to specify NIL for the position but we were permitting
 ;;; it, which made it impossible to test for a bad call that tries to assign
@@ -485,12 +525,15 @@
 
 (declaim (inline ansi-stream-unread-char))
 (defun ansi-stream-unread-char (character stream)
-  (let ((index (1- (ansi-stream-in-index stream)))
-        (buffer (ansi-stream-cin-buffer stream)))
+  (let* ((start-index (ansi-stream-in-index stream))
+         (index (1- start-index))
+         (buffer (ansi-stream-cin-buffer stream)))
     (declare (fixnum index))
     (when (minusp index) (error "nothing to unread"))
     (cond (buffer
            (setf (aref buffer index) character)
+           (when (= start-index +ansi-stream-in-buffer-length+)
+             (setf (ansi-stream-char-buffer-byte-position-at stream) +ansi-stream-in-buffer-length+))
            (setf (ansi-stream-in-index stream) index))
           (t
            (call-ansi-stream-misc stream :unread character)))))
@@ -2416,9 +2459,9 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                      (replace seq %frc-buffer%
                               :start1 start
                               :start2 %frc-index%)
-                     (setf (ansi-stream-in-index %frc-stream%)
-                           +ansi-stream-in-buffer-length+)
-                     (incf start buffered))))
+                     (setf (ansi-stream-in-index %frc-stream%) +ansi-stream-in-buffer-length+)
+                     (incf start buffered))
+                   (setf (ansi-stream-char-buffer-start %frc-stream%) +ansi-stream-in-buffer-extra+)))
           (declare (inline refill-buffer copy))
           (cond
             ;; Read directly into the string when possible
