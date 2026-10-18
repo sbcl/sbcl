@@ -1,0 +1,25 @@
+
+#-(and (or arm64 x86-64) (not interpreter)) (invoke-restart 'run-tests::skip-file)
+
+(defun test64 (s i)
+  (sb-vm::%signed-sap-ref-64-indexed (the system-area-pointer s) (the fixnum i)))
+(defun test32 (s i)
+  (sb-vm::%signed-sap-ref-32-indexed (the system-area-pointer s) (the fixnum i)))
+(defun test16 (s i)
+  (sb-vm::%signed-sap-ref-16-indexed (the system-area-pointer s) (the fixnum i)))
+
+(with-test (:name :sap-ref-scaled)
+  (let* ((word #xffeeddccbbaa998)
+         (array (make-array 1 :initial-contents `(,word) :element-type 'sb-vm:word)))
+    (flet ((sext (bits len) (sb-disassem::sign-extend bits len)))
+      (sb-sys:with-pinned-objects (array)
+        ;; Rather than testing indices starting from 0, bias up a little
+        ;; (because 0 * any scale is 0, so it could still be broken)
+        (let ((sap (sb-sys:sap+ (sb-sys:vector-sap array) -8)))
+          (assert (= (test64 sap 1) (sext word 64)))
+          (dotimes (i 2)
+            (assert (= (test32 sap (+ i 2))
+                       (sext (ldb (byte 32 (* i 32)) word) 32))))
+          (dotimes (i 4)
+            (assert (= (test16 sap (+ i 4))
+                       (sext (ldb (byte 16 (* i 16)) word) 16)))))))))

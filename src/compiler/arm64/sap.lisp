@@ -318,7 +318,7 @@
     (ecase (sb-c::combination-fun-source-name node)
       (%signed-sap-ref-16-indexed (inst ldrsh result (@ sap (extend index :lsl 1))))
       (%signed-sap-ref-32-indexed (inst ldrsw result (@ sap (extend index :lsl 2))))
-      (%signed-sap-ref-64-indexed (inst ldr result (@ sap (extend index :lsl 2)))))))
+      (%signed-sap-ref-64-indexed (inst ldr result (@ sap (extend index :lsl 3)))))))
 
 ;;; Noise to convert normal lisp data objects into SAPs.
 (define-vop (vector-sap)
