@@ -87,7 +87,7 @@
 (defun maybe-reparse-specifier (type)
   (if (contains-unknown-type-p type)
       (handler-case (specifier-type (type-specifier type))
-        (parse-unknown-type ()
+        ((or error parse-unknown-type) ()
           type))
       type))
 

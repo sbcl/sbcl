@@ -306,16 +306,19 @@
        ;; (warn "ftype-from-fdefn called on macro ~s" name)
        (specifier-type '(function (t t) t)))
       (t
-        ;; Never signal the PARSE-UNKNOWN-TYPE condition.
-        ;; This affects 2 regression tests, both very contrived:
-        ;;  - in defstruct.impure ASSERT-ERROR (BUG127--FOO (MAKE-BUG127-E :FOO 3))
-        ;;  - in compiler.impure at :IDENTIFY-SUSPECT-VOPS
-        (let* ((ftype (%fun-ftype function))
-               (context
+       ;; Never signal the PARSE-UNKNOWN-TYPE condition.
+       ;; This affects 2 regression tests, both very contrived:
+       ;;  - in defstruct.impure ASSERT-ERROR (BUG127--FOO (MAKE-BUG127-E :FOO 3))
+       ;;  - in compiler.impure at :IDENTIFY-SUSPECT-VOPS
+       (let* ((ftype (%fun-ftype function))
+              (context
                 (sb-kernel::make-type-context
                  ftype nil sb-kernel::+type-parse-signal-inhibit+)))
-          (declare (dynamic-extent context))
-          (values (sb-kernel::basic-parse-typespec ftype context)))))))
+         (declare (dynamic-extent context))
+         (handler-case
+             (values (sb-kernel::basic-parse-typespec ftype context))
+           ((or sb-c:compiler-error error) ()
+             (specifier-type 'function))))))))
 
 ;;; Return the lambda expression for SIMPLE-FUN if compiled to memory
 ;;; and rentention of forms was enabled via the EVAL-STORE-SOURCE-FORM policy
