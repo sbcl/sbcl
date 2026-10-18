@@ -47,8 +47,7 @@ static inline int set_thread_area(struct user_desc *u_info)
 }
 
 
-int arch_os_thread_init(struct thread *thread) {
-    stack_t sigstack;
+int arch_os_thread_init(struct thread __attribute__((unused)) *thread) {
 #ifdef LISP_FEATURE_SB_THREAD
     struct user_desc desc = {
         0, (unsigned long) thread,
@@ -71,17 +70,6 @@ int arch_os_thread_init(struct thread *thread) {
 
     if(entry_number < 0) return 0;
 #endif
-
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    /* Signal handlers are run on the control stack, so if it is exhausted
-     * we had better use an alternate stack for whatever signal tells us
-     * we've exhausted it */
-    sigstack.ss_sp    = calc_altstack_base(thread);
-    sigstack.ss_flags = 0;
-    sigstack.ss_size  = calc_altstack_size(thread);
-    if(sigaltstack(&sigstack,0)<0)
-        lose("Cannot sigaltstack: %s",strerror(errno));
-#endif
     return 1;
 }
 
@@ -95,7 +83,7 @@ struct thread *debug_get_fs() {
  * defunct.  Not called on live threads
  */
 
-int arch_os_thread_cleanup(struct thread *thread) {
+int arch_os_thread_cleanup(struct thread __attribute__((unused)) *thread) {
     return 1;
 }
 

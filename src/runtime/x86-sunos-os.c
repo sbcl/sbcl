@@ -88,9 +88,7 @@ install_segment (unsigned long start, unsigned long size) {
 }
 #endif
 
-int arch_os_thread_init(struct thread *thread) {
-  stack_t sigstack;
-
+int arch_os_thread_init(struct thread __attribute__((unused)) *thread) {
 #ifdef LISP_FEATURE_SB_THREAD
   int sel = install_segment((unsigned long) thread, dynamic_values_bytes);
 
@@ -98,21 +96,10 @@ int arch_os_thread_init(struct thread *thread) {
 
   thread->tls_cookie = sel;
 #endif
-
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    /* Signal handlers are run on the control stack, so if it is exhausted
-     * we had better use an alternate stack for whatever signal tells us
-     * we've exhausted it */
-    sigstack.ss_sp    = calc_altstack_base(thread);
-    sigstack.ss_flags = 0;
-    sigstack.ss_size  = calc_altstack_size(thread);
-    if (sigaltstack(&sigstack,0)<0)
-        lose("Cannot sigaltstack: %s",strerror(errno));
-#endif
      return 1;                   /* success */
 }
 
-int arch_os_thread_cleanup(struct thread *thread) {
+int arch_os_thread_cleanup(struct thread __attribute__((unused)) *thread) {
 #if defined(LISP_FEATURE_SB_THREAD)
     int n = thread->tls_cookie;
     struct ssd delete = { n, 0, 0, 0, 0};

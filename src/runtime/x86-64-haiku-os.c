@@ -5,17 +5,7 @@
 #include <string.h>
 #include <errno.h>
 
-int arch_os_thread_init(struct thread *thread) {
-    /* Signal handlers are run on the control stack, so if it is exhausted
-     * we had better use an alternate stack for whatever signal tells us
-     * we've exhausted it */
-    stack_t sigstack;
-    sigstack.ss_sp    = calc_altstack_base(thread);
-    sigstack.ss_flags = 0;
-    sigstack.ss_size  = calc_altstack_size(thread);
-    if (sigaltstack(&sigstack, 0) < 0) {
-        lose("Cannot sigaltstack: %s", strerror(errno));
-    }
+int arch_os_thread_init(struct thread __attribute__((unused)) *thread) {
     return 1;
 }
 

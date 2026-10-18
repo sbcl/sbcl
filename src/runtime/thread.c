@@ -287,6 +287,51 @@ static lispobj cons_lisp_thread(struct thread* thread)
 #  define SET_LISPTHREAD_TID(x) x->uw_os_tid = sb_get_os_thread_id()
 #endif
 
+static int os_thread_init(struct thread *thread)
+{
+    if (!arch_os_thread_init(thread)) return 0;
+    /* Signal handlers are run on the control stack, so if it is exhausted
+     * we had better use an alternate stack for whatever signal tells us
+     * we've exhausted it */
+    /* Asan seems to think it should call munmap() on the alternate signal stack because
+     * it believes that it - and only it - called sigaltstack to begin with, due to:
+     *   COMMON_FLAG(bool, use_sigaltstack, true,
+     *               "If set, uses alternate stack for signal handling.")
+     * in llvm-project/compiler-rt/lib/sanitizer_common/sanitizer_flags.inc
+     * and
+     *   if (common_flags()->use_sigaltstack) SetAlternateSignalStack();
+     * which picks a kernel-assigned address. This ocurs before we get here.
+     *
+     * I suppose when running SBCL, you're supposed to pass a sanitizer flag,
+     * but how would users know? Our choices are either to avoid using our own altstack,
+     * or undo our altstack and put it back to the ASan-specified stack just before the
+     * thread is joined. The consequence of doing otherwise is to see the sanitizer
+     * trip over its own shoelaces after we've freed a thread struct, then it queries
+     * the OS for the altstack and frees that, which is a double-free, leading to:
+#0  __sanitizer::ReportMunmapFailureAndDie () at third_party/llvm/llvm-project/compiler-rt/lib/sanitizer_common/sanitizer_common.cpp:67
+#1  0x0000000000364b3d in __sanitizer::UnmapOrDie () at third_party/llvm/llvm-project/compiler-rt/lib/sanitizer_common/sanitizer_posix.cpp:62
+#2  0x00000000003662df in __sanitizer::UnsetAlternateSignalStack () at third_party/llvm/llvm-project/compiler-rt/lib/sanitizer_common/sanitizer_posix_libcdep.cpp:210
+#3  0x000000000034aceb in __asan::AsanThread::Destroy () at third_party/llvm/llvm-project/compiler-rt/lib/asan/asan_thread.cpp:135
+#4  0x00007f33072f0271 in __GI___nptl_deallocate_tsd () at ./nptl/nptl_deallocate_tsd.c:73
+#5  __GI___nptl_deallocate_tsd () at ./nptl/nptl_deallocate_tsd.c:22
+#6  0x00007f33072f2a4e in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:456
+#7  0x00007f33073707b8 in __GI___clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+     *
+     * In trying to track this down, I did first attempt to completely disable signal stacks,
+     * and then due to another bug I caused (in trying to use FORMAT after streams were closed)
+     * I got a stack overflow, and the sanitizer didn't help.*/
+#if !defined LISP_FEATURE_WIN32 && \
+     defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK && !defined ADDRESS_SANITIZER
+    stack_t sigstack;
+    sigstack.ss_sp    = calc_altstack_base(thread);
+    sigstack.ss_flags = 0;
+    sigstack.ss_size  = calc_altstack_size(thread);
+    if (sigaltstack(&sigstack, 0) < 0)
+        lose("Cannot sigaltstack: %s", strerror(errno));
+#endif
+    return 1;
+}
+
 void create_main_lisp_thread(lispobj function) {
 #ifdef LISP_FEATURE_WIN32
     InitializeCriticalSection(&all_threads_lock);
@@ -294,7 +339,7 @@ void create_main_lisp_thread(lispobj function) {
     InitializeCriticalSection(&in_gc_lock);
 #endif
     struct thread *th = alloc_thread_struct(0);
-    if (!th || arch_os_thread_init(th)==0 || !init_shared_attr_object())
+    if (!th || !os_thread_init(th) || !init_shared_attr_object())
         lose("can't create initial thread");
     th->sprof_enable = make_fixnum(1);
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_GCC_TLS && !defined LISP_FEATURE_WIN32
@@ -358,9 +403,9 @@ init_new_thread(struct thread *th,
 {
 
     ASSIGN_CURRENT_THREAD(th);
-    if(arch_os_thread_init(th)==0) {
+    if (!os_thread_init(th)) {
         /* FIXME: handle error */
-        lose("arch_os_thread_init failed");
+        lose("os_thread_init failed");
     }
 
     /* Since GC can only know about this thread from the all_threads
