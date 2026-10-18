@@ -1267,7 +1267,8 @@
                        ((chars-high complex-double-reg t :offset 6))
                        ((tag-clear complex-double-reg))
                        ((s1 complex-double-reg t :offset 8))
-                       ((s2 complex-double-reg t :offset 9)))
+                       ((s2 complex-double-reg t :offset 9))
+                       ((original-cont complex-double-reg)))
               ((byte-array unsigned-reg positive-fixnum :from :load)
                (string any-reg positive-fixnum :from (:argument 0)))
 
@@ -1381,7 +1382,7 @@
             (inst movi c-c0 #xc0 :16b)
             (inst movi c-ff #xFF :8h)
             (inst movi c-4 4 :4s)
-            (inst mov suffix 0)
+            (inst movi original-cont 0 :16b)
 
             (load-inline-constant tag-clear :oword #x070F1F1F3F3F3F3F7F7F7F7F7F7F7F7F)
             (load-inline-constant full-table (coerce (loop for index below (ash 1 10)
@@ -1449,8 +1450,8 @@
                        VALIDATED))
                    (remove-crlf ()
                      ;; Count leading bytes before more are dragged in after removing CR
-                     (inst cmge temp1 bytes c-c0 :8b)
-                     (inst addv temp2 temp1 :8b)
+                     (inst cmge original-cont bytes c-c0 :16b)
+                     (inst addv temp2 original-cont :8b)
                      ;; A negated number of produced characters
                      (inst smov char-count temp2 0 :b)
 
@@ -1552,8 +1553,13 @@
 
             ERROR
             FULL-DONE
+            ;; strip any consumed continuations bytes
+            (inst umov suffix original-cont 2 :s)
+            (inst rbit suffix suffix)
+            (inst clz suffix suffix)
+            (inst and suffix suffix (ash #b11 3))
+            (inst add byte-array byte-array (lsr suffix 3))
 
-            (inst add byte-array byte-array suffix) ;; strip any consumed continuations bytes
             DONE
             (inst sub byte-array byte-array byte-array*)
             (inst sub string string string*)
