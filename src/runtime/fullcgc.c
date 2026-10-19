@@ -508,7 +508,7 @@ void gc_trace_from_specified_roots(struct hopscotch_table* roots)
                                 gc_mark_obj);
         /* do the tls as well */
         lispobj* from = &th->lisp_thread;
-        lispobj* to = (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th);
+        lispobj* to = (lispobj*)(SYMBOL(FREE_TLS_INDEX)->value + (char*)th);
         sword_t nwords = to - from;
         gc_mark_range(from, nwords);
 #ifdef LISP_FEATURE_TLS_BASED_MV_RETURN

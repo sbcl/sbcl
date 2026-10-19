@@ -191,7 +191,7 @@ int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
         if (verbose)
             fprintf(stderr, " [thread TLS]");
         if (verify((lispobj)&th->lisp_thread,
-                   (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th), &state,
+                   (lispobj*)(SYMBOL(FREE_TLS_INDEX)->value + (char*)th), &state,
                    VERIFYING_UNFORMATTED))
             goto out;
     }

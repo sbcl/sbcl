@@ -1579,8 +1579,8 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
             free(header);
             close(fd);
 #ifdef LISP_FEATURE_SB_THREAD
-            if ((int)SymbolValue(FREE_TLS_INDEX,0) >= dynamic_values_bytes) {
-                dynamic_values_bytes = (int)SymbolValue(FREE_TLS_INDEX,0) * 2;
+            if ((int)SYMBOL(FREE_TLS_INDEX)->value >= dynamic_values_bytes) {
+                dynamic_values_bytes = SYMBOL(FREE_TLS_INDEX)->value * 2;
                 // fprintf(stderr, "NOTE: TLS size increased to %x\n", dynamic_values_bytes);
             }
             construct_tls_map(initfun.tls_map_starting_offset);

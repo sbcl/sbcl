@@ -141,7 +141,7 @@ void save_gc_crashdump(char *pathname,
     if (verbose) fprintf(stderr, "save: %d threads\n", nthreads);
     struct crash_preamble preamble;
     unsigned long nbytes_heap = next_free_page * GENCGC_PAGE_BYTES;
-    int nbytes_tls = SymbolValue(FREE_TLS_INDEX,0);
+    int nbytes_tls = SYMBOL(FREE_TLS_INDEX)->value;
     preamble.signature = CRASH_PREAMBLE_SIGNATURE;
 #ifdef LISP_FEATURE_LINKAGE_SPACE
     preamble.linkage_start = (uword_t)linkage_space;

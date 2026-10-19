@@ -950,7 +950,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
                                     mr_preserve_object);
             /* do the tls as well */
             lispobj* from = &th->lisp_thread;
-            lispobj* to = (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th);
+            lispobj* to = (lispobj*)(SYMBOL(FREE_TLS_INDEX)->value + (char*)th);
             sword_t nwords = to - from;
             /* FIXME: why is this "preserving" pointers in the TLS range
              * instead of just marking them as live when it's OK to move them?

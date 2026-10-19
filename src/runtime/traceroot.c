@@ -353,7 +353,7 @@ static lispobj examine_threads(struct hopscotch_table* targets,
         // Examine thread-local storage
         *root_kind = TLS;
         where = &th->lisp_thread;
-        end   = (lispobj*)((char*)th + SymbolValue(FREE_TLS_INDEX,0));
+        end   = (lispobj*)((char*)th + SYMBOL(FREE_TLS_INDEX)->value);
         for ( ; where < end ; ++where)
             if (interestingp(*where, targets)
                 && tls_index_ok((char*)where - (char*)th, ignored_objects)) {

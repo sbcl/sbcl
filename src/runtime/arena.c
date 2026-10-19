@@ -631,7 +631,7 @@ int find_dynspace_to_arena_ptrs(lispobj arena, lispobj result_buffer)
 #endif
         scan_thread_words(th->binding_stack_start, get_binding_stack_pointer(th));
         lispobj* from = &th->lisp_thread;
-        lispobj* to = (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th);
+        lispobj* to = (lispobj*)(SYMBOL(FREE_TLS_INDEX)->value + (char*)th);
         scan_thread_words(from, to);
     }
     fprintf(stderr, "Checking dynamic space...\n");
