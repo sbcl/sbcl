@@ -1175,3 +1175,23 @@
       (position x y))
    ((2014994190 #a((1) (signed-byte 32) 14)) nil)
    ((14 #a((1) (signed-byte 32) 14)) 0)))
+
+(with-test (:name :count-key-nil)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (s n)
+         (declare ((vector double-float) s))
+         (count 1d0 s :key n))
+    (((make-array 3 :element-type 'double-float
+                    :initial-element 2d0) nil) 0)
+    (((make-array 3 :element-type 'double-float
+                    :initial-element 2d0) #'1-) 3))
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (s)
+         (declare ((vector double-float) s))
+         (count 1d0 s :key nil))
+    (((make-array 3 :element-type 'double-float
+                    :initial-element 1d0)) 3)
+    (((make-array 3 :element-type 'double-float
+                    :initial-element 2d0)) 0)))

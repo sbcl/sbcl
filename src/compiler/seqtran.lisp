@@ -2772,9 +2772,14 @@
     ;; When array cannot store the thing we are searching for, punt, user gets an
     ;; Item of type X can't be found in a sequence of type Y message in later count transforms
     (give-up-ir1-transform))
+  (when (and key
+             (lvar-type= key null))
+    (setf key nil))
   `(let ((count 0)
          ,@(and key
-                `((key (%coerce-callable-to-fun key)))))
+                `((key (if key
+                           (%coerce-callable-to-fun key)
+                           #'identity)))))
      (declare (index count))
      (map nil
           (lambda (x)
