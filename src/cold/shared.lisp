@@ -337,7 +337,19 @@
           (pushnew :sb-devel sb-xc:*features*))
         (when (target-featurep :immobile-space)
           (pushnew :immobile-code sb-xc:*features*))
-        (when (target-featurep '(:and :sb-thread (:or (:and :darwin (:not (:or :ppc :x86))) :openbsd)))
+        ;; Per POSIX 2.9.8 (Application-Managed Thread Stacks), specifying a stack range
+        ;; via pthread_attr_setstack grants the pthreads implementation permanent ownership:
+        ;; "the region of memory cannot be freed, nor can it be later specified as the stack
+        ;; for another thread."  Linux pthread_join does what everyone expects- the joiner
+        ;; is wakened from the kernel via CLONE_CHILD_CLEARTID only _after_ a dying thread
+        ;; has completely left user space - so freeing/reusing stack memory is perfectly OK.
+        ;; On macOS and OpenBSD, however, libpthread stores internal state on your custom stack
+        ;; and/or wakes pthread_join while the dying thread is still executing its exit path
+        ;; using your stack, which must not be freed.
+        ;; :OS-THREAD-STACK avoids this by letting pthread_create use its own stack of size
+        ;; PTHREAD_STACK_MIN for startup/exit, but immediately switches to our stack.
+        (when (target-featurep '(:and (:or (:and :darwin (:not (:or :ppc :x86))) :openbsd)
+                                      :sb-thread))
           (push :os-thread-stack sb-xc:*features*))
         (when (target-featurep '(:and :sb-thread :x86-64))
           (push :tls-load-indirect sb-xc:*features*))
