@@ -30,7 +30,6 @@
   (@control-optimization section)
   (@unreachable-code-deletion section)
   (@multiple-values-optimization section)
-  (@source-to-source-transformation section)
   (@style-recommendations section))
 
 (defsection @let-optimization (:title "Let Optimization"
@@ -359,37 +358,6 @@
 
   Also, see @LOCAL-CALL-RETURN-VALUES for information on how local
   call provides efficient support for multiple function return values.")
-
-(defsection @source-to-source-transformation
-    (:title "Source-to-source Transformation"
-     :concepts (("source-to-source transformation")))
-  "The compiler implements a number of operation-specific optimizations
-  as source-to-source transformations. You will often see unfamiliar
-  code in error messages. For example,
-
-      (defun plus-3 (x y z)
-        (declare (optimize speed)
-                 (type fixnum x y))
-        (+ x y z))
-
-  gives this note:
-
-      ; in: DEFUN PLUS-3
-      ;     (+ X Y Z)
-      ; ==>
-      ;   (+ (+ X Y) Z)
-      ;
-      ; note: unable to
-      ;   optimize
-      ; due to type uncertainty:
-      ;   The second argument is a NUMBER, not a RATIONAL.
-
-  Here, the original `(+ X Y Z)` has been transformed into `(+ (+ X Y)
-  Z)`. This transformation is indicated with the same `==>` used to
-  mark macro and function inline expansion (see
-  @ORIGINAL-AND-ACTUAL-SOURCE). Although the @ACTUAL-SOURCE may
-  sometimes be confusing, displaying it is important since it is the
-  context in which notes and warnings can be understood.")
 
 (defsection @style-recommendations (:title "Style Recommendations")
   "Source level optimization makes possible a clearer and more relaxed

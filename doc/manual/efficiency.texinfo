@@ -29,7 +29,6 @@
 * Control Optimization: control optimization.
 * Dead Code Elimination: unreachable code deletion.
 * Multiple Values Optimization: multiple values optimization.
-* Source-to-source Transformation: source to source transformation.
 * Style Recommendations: style recommendations.
 @end menu
 
@@ -433,44 +432,6 @@ is actually more efficient when written as
 
 Also, see @ref{local call return values} for information on how local
 call provides efficient support for multiple function return values.
-
-@node source to source transformation
-@cindex source-to-source transformation
-@subsection Source-to-source Transformation
-
-The compiler implements a number of operation-specific optimizations
-as source-to-source transformations. You will often see unfamiliar
-code in error messages. For example,
-
-@example
-(defun plus-3 (x y z)
-  (declare (optimize speed)
-           (type fixnum x y))
-  (+ x y z))
-@end example
-
-gives this note:
-
-@example
-; in: DEFUN PLUS-3
-;     (+ X Y Z)
-; ==>
-;   (+ (+ X Y) Z)
-;
-; note: unable to
-;   optimize
-; due to type uncertainty:
-;   The second argument is a NUMBER, not a RATIONAL.
-@end example
-
-@cindex actual source
-@cindex source, actual
-Here, the original @code{(+ x y z)} has been transformed into @code{(+ (+ x y)
-z)}. This transformation is indicated with the same @code{==>} used to
-mark macro and function inline expansion (see
-@ref{original and actual source}). Although the actual source may
-sometimes be confusing, displaying it is important since it is the
-context in which notes and warnings can be understood.
 
 @node style recommendations
 @subsection Style Recommendations

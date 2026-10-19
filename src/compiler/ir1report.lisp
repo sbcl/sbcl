@@ -82,9 +82,13 @@
                 (short nil cons))
         (flet ((no-transforms (x)
                  ;; Skip 'TRANSFORMED and following *TRANSFORMING*
-                 ;; value that ENSURE-SOURCE-PATH put there, but keep
-                 ;; the final form because it might help to understand
-                 ;; the note.
+                 ;; value that ENSURE-SOURCE-PATH put there. This is
+                 ;; the right solution because without the context of
+                 ;; tranformations, the compiler messages can be
+                 ;; challenging to understand, but even
+                 ;; DEFINE-SOURCE-TRANSFORMs introduce so much noise
+                 ;; into the actual form that they obscure more than
+                 ;; enlighten.
                  (let ((pos (position 'transformed x :from-end t)))
                    (if pos
                        (subseq x (+ pos 2))
