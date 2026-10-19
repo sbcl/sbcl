@@ -802,21 +802,16 @@ information."
                 sb-thread:*current-thread*)
                (all-threads
                 ;; There aren't many reasons to inquire whether a random object is on any stack.
-                ;; And if performance isn't important, this loop could be changed to
-                ;; a C function that scans all threads while holding the all_threads lock.
+                ;; Not much can be done other than examining every thread. We do not maintain
+                ;; a searchable data structure with threads ordered by stack address.
                 (macrolet ((in-stack-range-p ()
                              `(and (>= a (sb-thread::thread-control-stack-start thread))
                                    (< a (sb-thread::thread-control-stack-end thread)))))
-                  #+win32 ; exhaustive search
-                  (dolist (thread (sb-thread:list-all-threads)) ; conses, but I don't care
-                    (when (in-stack-range-p)
-                      (return thread)))
-                  #-win32
-                  ;; find a stack whose primitive-thread is nearest and above A.
-                  (awhen (sb-thread::avl-find>= a sb-thread::*all-threads*)
-                    (let ((thread (sb-thread::avlnode-data it)))
-                      (when (in-stack-range-p)
-                        thread)))))))))
+                  (sb-thread::avltree-filter
+                   (lambda (node &aux (thread (sb-thread::avlnode-data node)))
+                     (when (in-stack-range-p)
+                       (return-from stack-allocated-p thread)))
+                   sb-thread::*all-threads*)))))))
 
 ;;;; frame printing
 
