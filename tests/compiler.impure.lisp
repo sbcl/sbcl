@@ -3421,3 +3421,20 @@
 ; due to type uncertainty:
 ;   The second argument is a NUMBER, not a RATIONAL.
 ")))
+
+(with-test (:name :source-to-source-transform-2)
+  (let ((error-output
+          (with-output-to-string (*error-output*)
+            (compile nil '(lambda (x)
+                           (declare (optimize speed))
+                           (evenp x))))))
+    ;; Check that the actual source takes DEFINE-SOURCE-TRANSFORM into
+    ;; account but no DEFOPTIMIZERs and DEFTRANSFORMs.
+    (assert-compile-output-prefix-p error-output
+                                    "; in: LAMBDA (X)
+;     (EVENP X)
+; --> NOT IF
+; ==>
+;   (LOGTEST X 1)
+;
+")))

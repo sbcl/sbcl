@@ -86,12 +86,9 @@
                  ;; the final form because it might help to understand
                  ;; the note.
                  (let ((pos (position 'transformed x :from-end t)))
-                   (cond ((null pos)
-                          x)
-                         ((member (first x) '(inlined transformed))
-                          (subseq x (+ pos 2)))
-                         (t
-                          (cons (first x) (subseq x (+ pos 2)))))))
+                   (if pos
+                       (subseq x (+ pos 2))
+                       x)))
                (hide-inlines (x)
                  (loop while x
                        if (eq (first x) 'inlined)
