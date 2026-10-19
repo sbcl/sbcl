@@ -54,19 +54,6 @@ SymbolValue(lispobj tagged_symbol_pointer, void *thread)
     return sym->value;
 }
 
-static inline void
-SetSymbolValue(lispobj tagged_symbol_pointer,lispobj val, void *thread)
-{
-    struct symbol *sym = SYMBOL(tagged_symbol_pointer);
-    if (thread && tls_index_of(sym)) {
-        if (per_thread_value(sym, thread) != NO_TLS_VALUE_MARKER) {
-            per_thread_value(sym, thread) = val;
-            return;
-        }
-    }
-    sym->value = val;
-}
-
 #ifdef LISP_FEATURE_SB_THREAD
 /* write_TLS assigns directly into TLS causing the symbol to
  * be thread-local without saving a prior value on the binding stack. */

@@ -429,6 +429,7 @@ gc_trigger_hit(void *addr)
     }
 }
 
+#if 0 // Most of this file is broken beyond repair
 boolean
 cheneygc_handle_wp_violation(os_context_t *context, void *addr)
 {
@@ -458,6 +459,7 @@ cheneygc_handle_wp_violation(os_context_t *context, void *addr)
     }
     return 0;
 }
+#endif
 
 void gc_show_pte(lispobj obj)
 {

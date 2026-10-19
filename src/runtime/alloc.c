@@ -862,11 +862,11 @@ alloc_thread_struct(void* spaces, unsigned int control_stack_size) {
      * we use the appropriate SymbolValue macros to access any of the
      * variable quantities from the C runtime.  It's not quite OAOOM,
      * it just feels like it */
-    SetSymbolValue(BINDING_STACK_START,(lispobj)th->binding_stack_start,th);
-    SetSymbolValue(CONTROL_STACK_START,(lispobj)th->control_stack_start,th);
-    SetSymbolValue(CONTROL_STACK_END,(lispobj)th->control_stack_end,th);
+    SYMBOL(BINDING_STACK_START)->value = (lispobj)th->binding_stack_start;
+    SYMBOL(CONTROL_STACK_START)->value = (lispobj)th->control_stack_start;
+    SYMBOL(CONTROL_STACK_END)->value = (lispobj)th->control_stack_end;
 #if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64)
-    SetSymbolValue(ALIEN_STACK_POINTER,(lispobj)th->alien_stack_pointer,th);
+    SYMBOL(ALIEN_STACK_POINTER)->value = (lispobj)th->alien_stack_pointer;
 #endif
 #endif
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK

@@ -40,12 +40,12 @@ bool arch_pseudo_atomic_atomic(struct thread *thread) {
 void arch_set_pseudo_atomic_interrupted(struct thread *thread)
 {
     extern void do_pending_interrupt();
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, (lispobj)do_pending_interrupt, 0);
+    SYMBOL(PSEUDO_ATOMIC_INTERRUPTED)->value = (lispobj)do_pending_interrupt;
 }
 
 void arch_clear_pseudo_atomic_interrupted(struct thread *thread)
 {
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, 0, 0);
+    SYMBOL(PSEUDO_ATOMIC_INTERRUPTED)->value = 0;
 }
 
 unsigned int arch_install_breakpoint(void *pc)

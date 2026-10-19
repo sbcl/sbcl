@@ -70,9 +70,9 @@ get_pseudo_atomic_atomic(struct thread *thread)
 }
 
 static inline void
-clear_pseudo_atomic_atomic(struct thread *thread)
+clear_pseudo_atomic_atomic(struct thread __attribute__((unused)) *thread)
 {
-    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, NIL, thread);
+    SYMBOL(PSEUDO_ATOMIC_ATOMIC)->value = NIL;
 }
 
 static inline int
@@ -82,20 +82,20 @@ get_pseudo_atomic_interrupted(struct thread *thread)
 }
 
 static inline void
-set_pseudo_atomic_interrupted(struct thread *thread)
+set_pseudo_atomic_interrupted(struct thread __attribute__((unused)) *thread)
 {
     #ifndef DO_PENDING_INTERRUPT
     // RISCV defines do_pending_interrupt as a lisp asm routine the address of which
     // is stored in a static lisp symbol and which in C is obtained via #define.
     extern void do_pending_interrupt();
     #endif
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, (lispobj)do_pending_interrupt, thread);
+    SYMBOL(PSEUDO_ATOMIC_INTERRUPTED)->value = (lispobj)do_pending_interrupt;
 }
 
 static inline void
-clear_pseudo_atomic_interrupted(struct thread *thread)
+clear_pseudo_atomic_interrupted(struct thread __attribute__((unused)) *thread)
 {
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, 0, 0);
+    SYMBOL(PSEUDO_ATOMIC_INTERRUPTED)->value = 0;
 }
 #endif // LISP_FEATURE_SB_THREAD
 
