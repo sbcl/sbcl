@@ -2605,7 +2605,8 @@
                                     (and dest
                                          (or (not (node-prev dest))
                                              (node-to-be-deleted-p dest))
-                                         (node-source-inside-p node dest)))))
+                                         (node-source-inside-p node dest)
+                                         (visible-p (node-source-path dest))))))
                         (visible-p path))
                    (push (cons path (node-lexenv node))
                          (deleted-source-paths *compilation*))

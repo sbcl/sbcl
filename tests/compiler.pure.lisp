@@ -2260,6 +2260,22 @@
             (error "This is unreachable"))
           (setq y nil))))))
 
+(with-test (:name (:compiler :unreachable-code-detection-1))
+  (assert-code-deletion-note
+   '(lambda ()
+     (let ((protos '()))
+       (mapcar (lambda (x)
+                 (print x))
+               protos)))))
+
+(with-test (:name (:compiler :unreachable-code-detection-2))
+  (assert-code-deletion-note
+   '(lambda (string)
+     (do ((pos 0 (position #\a string :start (1+ pos)))
+          (count 0 (1+ count)))
+         ((null pos) count)
+       (declare (fixnum pos))))))
+
 ;; Reported by John Wiseman, sbcl-devel
 ;; Subject: [Sbcl-devel] float type derivation bug?
 ;; Date: Tue, 4 Apr 2006 15:28:15 -0700
