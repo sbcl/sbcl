@@ -1031,7 +1031,7 @@ void gc_init_immobile()
     // The conservative value for 'touched' is 1.
     memset(text_page_touched_bits, 0xff, n_bitmap_elts * sizeof (int));
     text_page_genmask = calloc(n_text_pages, 1);
-    tlsf_control = malloc(tlsf_size());
+    tlsf_control = checked_malloc(tlsf_size());
     tlsf_create(tlsf_control);
     gc_queue_init(&worklist);
 }
@@ -1123,7 +1123,7 @@ void immobile_space_coreparse(uword_t fixedobj_len,
     int tlsf_memory_size = tlsf_memory_end - (char*)tlsf_mem_start;
     tlsf_add_pool(tlsf_control, tlsf_mem_start, tlsf_memory_size);
     int n_tlsf_pages = tlsf_memory_size / IMMOBILE_CARD_BYTES;
-    tlsf_page_sso = malloc(n_tlsf_pages * sizeof *tlsf_page_sso);
+    tlsf_page_sso = checked_malloc(n_tlsf_pages * sizeof *tlsf_page_sso);
     memset(tlsf_page_sso, 0xff, n_tlsf_pages * sizeof *tlsf_page_sso);
 
     // Set the WP bits for pages occupied by the core file.
@@ -1143,7 +1143,7 @@ void deport_codeblob_offsets_from_heap()
      * during that GC.
      * So replicate it off-heap; it'll get made anew after defrag. */
     int nbytes = sizeof (uint32_t) * loaded_codeblob_offsets_len;
-    lispobj* vector_copy = malloc(nbytes);
+    lispobj* vector_copy = checked_malloc(nbytes);
     loaded_codeblob_offsets = memcpy(vector_copy, loaded_codeblob_offsets, nbytes);
     SYMBOL(IMMOBILE_CODEBLOB_VECTOR)->value = NIL;
     int page = 0, limit = calc_max_used_fixedobj_page();

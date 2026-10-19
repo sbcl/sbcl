@@ -451,7 +451,7 @@ char *copied_string(char *string)
 lispobj* duplicate_codeblob_offheap(lispobj code)
 {
     int nwords = code_total_nwords((struct code*)(code-OTHER_POINTER_LOWTAG));
-    lispobj* mem = malloc((nwords+1) * N_WORD_BYTES);
+    lispobj* mem = checked_malloc((nwords+1) * N_WORD_BYTES);
     if ((uword_t)mem & LOWTAG_MASK) lose("this is unexpected\n");
     // add 1 word if not dualword aligned
     lispobj* copy = (lispobj*)((uword_t)mem + ((uword_t)mem & N_WORD_BYTES));
@@ -655,13 +655,13 @@ off_t search_for_elf_core(int fd)
 
     // Slurp in all the section headers
     int nbytes = ehdr.e_shentsize * ehdr.e_shnum;
-    if ((shdrs = malloc(nbytes)) == NULL ||
+    if ((shdrs = checked_malloc(nbytes)) == NULL ||
         lseek(fd, ehdr.e_shoff, SEEK_SET) != (Elf64_Sxword)ehdr.e_shoff ||
         read(fd, shdrs, nbytes) != nbytes)
         goto done;
     Elf64_Shdr* shdr = (Elf64_Shdr*)(shdrs + ehdr.e_shentsize * ehdr.e_shstrndx);
     // Slurp the string table
-    if ((shstrtab_strbuf = malloc(shdr->sh_size)) == NULL ||
+    if ((shstrtab_strbuf = checked_malloc(shdr->sh_size)) == NULL ||
         lseek(fd, shdr->sh_offset, SEEK_SET) != (Elf64_Sxword)shdr->sh_offset ||
         read(fd, shstrtab_strbuf, shdr->sh_size) != (Elf64_Sxword)shdr->sh_size)
         goto done;
@@ -699,7 +699,7 @@ int apply_pie_relocs(long code_space_translation,
     // Otherwise, we're going to make it appear that code space was supposed
     // to have been mapped where it actually was.
     int n_relocs = lisp_rel_section_size / sizeof (long);
-    unsigned long **ptrs = malloc(n_relocs * sizeof (long));
+    unsigned long **ptrs = checked_malloc(n_relocs * sizeof (long));
     if (!ptrs) return 0;
     int success = 0;
     if (lseek(fd, lisp_rel_section_offset, SEEK_SET) == lisp_rel_section_offset &&
@@ -767,7 +767,7 @@ void generate_elfcore_obj(const char *filename,
     const char anchor[] = "alien_linkage_values";
     uint32_t strtab_size = 1 + sizeof anchor;
     for (int i = 0; i < symbol_count; i++) strtab_size += strlen(symbol_names[i]) + 1;
-    char* strtab = malloc(strtab_size);
+    char* strtab = checked_malloc(strtab_size);
     uint32_t str_ct = 0; // how many chars are written into strtab
     add_string(strtab, &str_ct, "");
     uint32_t anchor_strname = add_string(strtab, &str_ct, anchor);
