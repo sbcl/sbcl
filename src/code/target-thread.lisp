@@ -1918,11 +1918,11 @@ session."
     ;; Two threads could both find > 1 thread to join, and both do
     ;; a join, leaving 0 to join. That's ok.
     (%dispose-thread-structs :retain 1)
-    (let ((thread-sap (alien-funcall (extern-alien "alloc_thread_struct"
-                                                   (function system-area-pointer
-                                                             system-area-pointer))
-                                     (or reuse (int-sap 0)))))
-      (unless (= (sap-int thread-sap) 0) thread-sap))))
+    (with-alien ((size unsigned-int :extern "thread_control_stack_size")
+                 (alloc (function system-area-pointer system-area-pointer unsigned-int)
+                        :extern "alloc_thread_struct"))
+      (let ((thread-sap (alien-funcall alloc (or reuse (int-sap 0)) size)))
+        (unless (= (sap-int thread-sap) 0) thread-sap)))))
 
 ;;; Remove thread from its session, if it has one, and from *all-threads*.
 ;;; Also clobber the pointer to the primitive thread

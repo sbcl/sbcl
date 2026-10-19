@@ -1336,7 +1336,6 @@ char *pagetypedesc(int type)
 extern void gc_allocate_ptes();
 extern void recompute_gen_bytes_allocated();
 extern void print_generation_stats();
-extern struct thread *alloc_thread_struct(void*);
 
 /* For the time being at least, the standalone monitor requires that all spaces in
  * a dump file map exactly as requested. I'd prefer if that were not so, but I don't
@@ -1497,7 +1496,7 @@ int load_gc_crashdump(char* pathname)
     fprintf(stderr, "%d threads:\n", (int)preamble.nthreads);
     int i;
     for(i=0; i<(int)preamble.nthreads; ++i) {
-        struct thread* th = alloc_thread_struct(0);
+        struct thread* th = alloc_thread_struct(0, thread_control_stack_size);
 #if !(defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
         protect_control_stack_hard_guard_page(0, th);
         protect_control_stack_guard_page(0, th);

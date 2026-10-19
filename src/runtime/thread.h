@@ -360,6 +360,8 @@ extern int sb_GetTID();
 #define THREAD_JIT_WP(x)
 #endif
 
+extern struct thread *alloc_thread_struct(void*, unsigned int);
+extern void free_thread_struct(struct thread *);
 extern bool is_in_stack_space(lispobj);
 extern void scrub_control_stack(void);
 extern void scrub_control_stacks(void);

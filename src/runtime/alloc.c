@@ -651,8 +651,8 @@ void gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
 
 /* As a helpful reminder of how this calculation arises, the summands should
  * correspond, in the correct order, to the picture below */
-#define THREAD_STRUCT_SIZE \
-  (thread_control_stack_size + BINDING_STACK_SIZE + ALIEN_STACK_SIZE + \
+#define THREAD_STRUCT_SIZE(control_stack_size) \
+  (control_stack_size + BINDING_STACK_SIZE + ALIEN_STACK_SIZE + \
    THREAD_CSP_PAGE_SIZE + dynamic_values_bytes + \
    sizeof (struct extra_thread_data) + ALT_STACK_SIZE)
 
@@ -697,10 +697,10 @@ void gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
  */
 
 struct thread *
-alloc_thread_struct(void* spaces) {
+alloc_thread_struct(void* spaces, unsigned int control_stack_size) {
     /* Allocate the thread structure in one fell swoop as there is no way to recover
      * from failing to obtain contiguous memory. */
-    gc_assert(IS_ALIGNED(thread_control_stack_size, os_reported_page_size));
+    gc_assert(IS_ALIGNED(control_stack_size, os_reported_page_size));
     gc_assert(IS_ALIGNED(BINDING_STACK_SIZE, os_reported_page_size));
     gc_assert(IS_ALIGNED(ALIEN_STACK_SIZE, os_reported_page_size));
     bool is_recycled = 0;
@@ -713,10 +713,10 @@ alloc_thread_struct(void* spaces) {
         is_recycled = 1;
     } else {
         spaces = os_alloc_gc_space(THREAD_STRUCT_CORE_SPACE_ID, MOVABLE,
-                                   NULL, THREAD_STRUCT_SIZE);
+                                   NULL, THREAD_STRUCT_SIZE(control_stack_size));
         if (!spaces) return NULL;
     }
-    char* csp_page = (char*)spaces + thread_control_stack_size +
+    char* csp_page = (char*)spaces + control_stack_size +
                      BINDING_STACK_SIZE + ALIEN_STACK_SIZE;
 
     // Refer to the ASCII art in the block comment above
@@ -741,7 +741,7 @@ alloc_thread_struct(void* spaces) {
     th->os_address = spaces;
     th->control_stack_start = (lispobj*)spaces;
     th->binding_stack_start=
-        (lispobj*)((char*)th->control_stack_start+thread_control_stack_size);
+        (lispobj*)((char*)th->control_stack_start+control_stack_size);
     th->control_stack_end = th->binding_stack_start;
 
     if (is_recycled) {

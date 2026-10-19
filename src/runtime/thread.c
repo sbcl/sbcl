@@ -146,7 +146,6 @@ pthread_attr_t new_lisp_thread_attr;
 #else
 #define init_shared_attr_object() (1)
 #endif
-struct thread *alloc_thread_struct(void*);
 
 #ifndef LISP_FEATURE_SB_THREAD
 #define ASSOCIATE_OS_THREAD(thread) { /*do nothing */ }
@@ -338,7 +337,7 @@ void create_main_lisp_thread(lispobj function) {
     InitializeCriticalSection(&recyclebin_lock);
     InitializeCriticalSection(&in_gc_lock);
 #endif
-    struct thread *th = alloc_thread_struct(0);
+    struct thread *th = alloc_thread_struct(0, thread_control_stack_size);
     if (!th || !os_thread_init(th) || !init_shared_attr_object())
         lose("can't create initial thread");
     th->sprof_enable = make_fixnum(1);
@@ -631,7 +630,6 @@ void* new_thread_trampoline_switch_stack(void* th) {
 }
 #endif
 
-extern void free_thread_struct(struct thread *);
 static struct thread* recyclebin_threads;
 static struct thread* get_recyclebin_item()
 {
@@ -682,7 +680,7 @@ static void attach_os_thread(init_thread_data *scribble)
     block_deferrable_signals(&scribble->oldset);
 #endif
     void* recycled_memory = get_recyclebin_item();
-    struct thread *th = alloc_thread_struct(recycled_memory);
+    struct thread *th = alloc_thread_struct(recycled_memory, thread_control_stack_size);
 
 #if HAVE_GC_STW_SIGNAL
     /* new-lisp-thread-trampoline doesn't like when the GC signal is blocked */
