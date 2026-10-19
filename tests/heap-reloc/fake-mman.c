@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include "../../src/runtime/os.h"
 
 static int verbose=1;
