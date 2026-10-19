@@ -1215,3 +1215,14 @@
               (flet ((f (x)))
                 (f (handler-case * (error nil)))))
            :allow-warnings t))))
+
+(with-test (:name :publish-optimistic-types-reoptimize)
+  (assert-type
+   (lambda ()
+     (declare (optimize (debug 2)))
+     (flet ((g (b)
+              b))
+       (g (flet ((f (l m)
+                   (min l m)))
+            (f 0 (mod 28d0 4))))))
+   (eql 0)))

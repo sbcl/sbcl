@@ -400,6 +400,8 @@ Examples:
   "The upper limit on the number of times that we will consecutively do IR1
 optimization that doesn't introduce any new code. A finite limit is
 necessary, since type inference may take arbitrarily long to converge.")
+(declaim (type (unsigned-byte 16) *max-optimize-iterations*)
+         (always-bound *max-optimize-iterations*))
 
 (defevent ir1-optimize-until-done "IR1-OPTIMIZE-UNTIL-DONE called")
 (defevent ir1-optimize-maxed-out "hit *MAX-OPTIMIZE-ITERATIONS* limit")
@@ -414,14 +416,17 @@ necessary, since type inference may take arbitrarily long to converge.")
   (declare (type component component))
   (maybe-mumble "Opt")
   (event ir1-optimize-until-done)
-  (let ((count 0)
+  (let ((max-iterations *max-optimize-iterations*)
+        (count 0)
         (cleared-reanalyze nil)
         (fastp nil)
         reoptimized
-        optimistic-once)
+        (optimistic-count 0))
+    (declare (fixnum count))
     (loop
       (when (component-reanalyze component)
         (setf count 0
+              optimistic-count 0
               fastp nil
               cleared-reanalyze t
               (component-reanalyze component) nil))
@@ -432,12 +437,13 @@ necessary, since type inference may take arbitrarily long to converge.")
          (publish-optimistic-types component fastp))
        (cond ((not (component-reoptimize component))
               (return))
-             ;; Go again, but once
-             ((and (not optimistic-once)
+             ;; Go again
+             ((and (<= optimistic-count max-iterations)
                    (not walk-reoptimized))
+              (incf optimistic-count)
               (setf reoptimized t
-                    optimistic-once t
-                    count 0))
+                    count 0
+                    fastp nil))
              (t
               (setf reoptimized t)
               ;; Don't count optimistic type publishing towards the
@@ -445,14 +451,14 @@ necessary, since type inference may take arbitrarily long to converge.")
               ;; ir1 optimization.
                (when walk-reoptimized
                  (incf count))
-               (when (and (>= count *max-optimize-iterations*)
+               (when (and (>= count max-iterations)
                           (not (component-reanalyze component))
                           (eq (component-reoptimize component) :maybe))
                  (maybe-mumble "*")
                  (event ir1-optimize-maxed-out)
                  (ir1-optimize-last-effort component)
                  (return)))))
-      (when (setq fastp (>= count *max-optimize-iterations*))
+      (when (setq fastp (>= count max-iterations))
         (ir1-optimize-last-effort component))
       (maybe-mumble (if fastp "-" ".")))
     (when cleared-reanalyze
