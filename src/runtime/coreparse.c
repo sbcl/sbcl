@@ -1380,7 +1380,7 @@ init_coreparse_spaces(int n, struct coreparse_space* input)
 
 lispobj* tlsindex_to_symbol_map;
 int tls_map_starting_offset;
-static void construct_tls_map(int starting_tlsoffset)
+static void __attribute__((unused)) construct_tls_map(int starting_tlsoffset)
 {
     int map_nbytes = N_WORD_BYTES * (dynamic_values_bytes / bytes_per_tls_symbol);
     tlsindex_to_symbol_map = checked_malloc(map_nbytes);
