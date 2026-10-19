@@ -4139,7 +4139,7 @@
                   sb-vm::*-c/unsigned=>unsigned))
     (sb-c::set-vop-optimizer (template-or-lose name) #'optimizer)))
 
-(defun emit-optimized-cmp (x y temp &optional x-ctype)
+(defun emit-optimized-cmp (op x y temp &optional x-ctype)
   ;; Shorten the encoding by eliding a REX prefix where the upper bits
   ;; can not possibly matter.
   ;; Be sure to account for N-FIXNUM-TAG-BITS in determining how many bits
@@ -4153,16 +4153,23 @@
                                               (specifier-type '(signed-byte 32)))))
                           :dword
                           :qword)))
-    (if (and (gpr-tn-p x) (eql y 0))
-      ;; Amazingly (to me), use of TEST in lieu of CMP produces all the correct
-      ;; flag bits for inequality comparison as well as EQL comparison.
-      ;; You'd think that the Jxx instruction should examine _only_ the S flag,
-      ;; but in fact the other flags are right too. Nonetheless this is
-      ;; quite confusing, and I would prefer that we alter the branch test
-      ;; when emitting TEST in place of CMP.
-        (inst test operand-size x x) ; smaller instruction
-        (progn (multiple-value-setq (x y) (ensure-not-mem+mem x y temp))
-               (inst cmp operand-size x y)))))
+    (cond ((and (gpr-tn-p x) (eql y 0))
+           ;; Amazingly (to me), use of TEST in lieu of CMP produces all the correct
+           ;; flag bits for inequality comparison as well as EQL comparison.
+           ;; You'd think that the Jxx instruction should examine _only_ the S flag,
+           ;; but in fact the other flags are right too. Nonetheless this is
+           ;; quite confusing, and I would prefer that we alter the branch test
+           ;; when emitting TEST in place of CMP.
+           (inst test operand-size x x)) ; smaller instruction
+          ((and (eq op '=)
+                (integerp y)
+                (eql (ldb (byte 64 0) y) (ash 1 63)))
+           (zeroize temp)
+           (inst cmp temp x)
+           (change-vop-flags sb-assem::*current-vop* '(:o)))
+          (t
+           (multiple-value-bind (x y) (ensure-not-mem+mem x y temp)
+             (inst cmp operand-size x y))))))
 
 
 (macrolet
@@ -4264,7 +4271,7 @@
                                  ',(if signed
                                        (list addend-signed)
                                        (list addend-unsigned))))))
-                         (emit-optimized-cmp x ,(fix 'y) temp (tn-ref-type x-ref)))))))))
+                         (emit-optimized-cmp ',tran x ,(fix 'y) temp (tn-ref-type x-ref)))))))))
   (define-cmp-vop < :l :b -1 :le :be :s)
   (define-cmp-vop > :g :a 1 :ge :ae))
 
@@ -4342,19 +4349,19 @@
 
 (define-vop (if-eql/signed conditional/signed)
   (:translate eql)
-  (:generator 6 (emit-optimized-cmp x y temp)))
+  (:generator 6 (emit-optimized-cmp '= x y temp)))
 
 (define-vop (if-eql-c/signed conditional-c/signed)
   (:translate eql)
-  (:generator 5 (emit-optimized-cmp x y temp)))
+  (:generator 5 (emit-optimized-cmp '= x y temp)))
 
 (define-vop (if-eql/unsigned conditional/unsigned)
   (:translate eql)
-  (:generator 6 (emit-optimized-cmp x y temp)))
+  (:generator 6 (emit-optimized-cmp '= x y temp)))
 
 (define-vop (if-eql-c/unsigned conditional-c/unsigned)
   (:translate eql)
-  (:generator 5 (emit-optimized-cmp x y temp)))
+  (:generator 5 (emit-optimized-cmp '= x y temp)))
 
 (define-vop (if-eql/s128)
   (:translate eql)

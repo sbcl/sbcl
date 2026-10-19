@@ -308,6 +308,7 @@
   (:translate eq)
   (:arg-refs x-tn-ref)
   (:temporary (:sc unsigned-reg) temp) ; TODO: add :unused-if
+  (:vop-var vop)
   (:generator 2
     (cond
       ((sc-is y constant)
@@ -316,8 +317,7 @@
       ((and (sc-is y immediate) (nil-relative-p (immediate-tn-repr y)))
        (inst cmp x (move-immediate temp (immediate-tn-repr y))))
       ((sc-is y immediate)
-       (let* ((value (encode-value-if-immediate y))
-              (immediate (imm32-p value)))
+       (let* ((value (encode-value-if-immediate y)))
          (when (and (null (tn-value y)) (tn-ref-type x-tn-ref))
            ;; if the complement of X's type with respect to type NULL can't
            ;; be a cons, then we don't need a 4-byte comparison against NIL.
@@ -335,15 +335,8 @@
              (return-from if-eq)))
          (cond ((or (fixup-p value) (tn-p value)) ; immobile object or NIL
                 (inst cmp x value))
-               ((and (zerop value) (sc-is x any-reg descriptor-reg))
-                (inst test x x))
-               (immediate
-                (emit-optimized-cmp x value temp (tn-ref-type x-tn-ref)))
-               ((not (sc-is x control-stack))
-                (inst cmp x (constantize value)))
                (t
-                (inst mov temp value)
-                (inst cmp x temp)))))
+                (emit-optimized-cmp '= x value temp (tn-ref-type x-tn-ref))))))
       ((and (sc-is x control-stack) (sc-is y control-stack))
        (inst mov temp x)
        (inst cmp temp y))

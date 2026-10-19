@@ -115,15 +115,13 @@
 
 (define-vop (if-eq)
   (:args (x :scs (any-reg descriptor-reg))
-         (y :scs (any-reg descriptor-reg)
-            :load-if (sc-case y
-                       ((any-reg descriptor-reg))
-                       (immediate
-                        (not (or
-                              (eql (tn-value y) 0f0)
-                              (and (integerp (tn-value y))
-                                   (abs-add-sub-immediate-p (fixnumize (tn-value y)))))))
-                       (t t))))
+         (y :scs (any-reg descriptor-reg (immediate
+                                          (or
+                                           (eql (tn-value tn) 0f0)
+                                           (and (integerp (tn-value tn))
+                                                (let ((f (fixnumize (tn-value tn))))
+                                                  (or (abs-add-sub-immediate-p f)
+                                                      (= f (ash -1 63))))))))))
   (:arg-refs x-ref)
   (:vop-var vop)
   (:conditional :eq)
@@ -132,9 +130,9 @@
     (let ((value (sc-case y
                    (immediate
                     (let ((value (tn-value y)))
-                     (if (eql value 0f0)
-                         single-float-widetag
-                         (fixnumize (tn-value y)))))
+                      (if (eql value 0f0)
+                          single-float-widetag
+                          (fixnumize (tn-value y)))))
                    (t y))))
       (cond ((and
               (location= y null-tn)
@@ -149,6 +147,9 @@
                   (0
                    (inst tst x (ash 1 bit))
                    t)))))
+            ((eql value (ash -1 63))
+             (inst cmp zr-tn x)
+             (change-vop-flags vop '(:vs)))
             ((or (not (integerp value))
                  (add-sub-immediate-p value))
              (inst cmp x value))
