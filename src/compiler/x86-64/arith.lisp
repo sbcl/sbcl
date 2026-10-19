@@ -3219,7 +3219,7 @@
 
            (inst neg rcx)
            (inst cmp rcx 64)
-           (inst jmp :ge right-64)
+           (inst jmp :ae right-64)
            (move lo-r lo-x)
            (move hi-r hi-x)
            (inst shrd lo-r hi-r :cl)
@@ -3230,7 +3230,7 @@
            (inst sub rcx 64)
            (inst mov tmp 63)
            (inst cmp rcx 63)
-           (inst cmov :g rcx tmp)
+           (inst cmov :a rcx tmp)
            (move lo-r hi-x)
            (inst sar lo-r :cl)
            (move hi-r hi-x)
@@ -3241,7 +3241,7 @@
            (unless negative
              (assemble ()
                (inst cmp rcx 64)
-               (inst jmp :ge left-64)
+               (inst jmp :ae left-64)
                (move lo-r lo-x)
                (move hi-r hi-x)
                (inst shld hi-r lo-r :cl)
@@ -3255,7 +3255,7 @@
                (unless medium
                  (zeroize tmp)
                  (inst cmp amount 128)
-                 (inst cmov :ge hi-r tmp))
+                 (inst cmov :ae hi-r tmp))
                (zeroize lo-r)))))
 
         (negative
@@ -3307,7 +3307,7 @@
 
            (inst neg rcx)
            (inst cmp rcx 64)
-           (inst jmp :ge right-64)
+           (inst jmp :ae right-64)
            (move r lo-x)
            (inst shrd r hi-x :cl)
            (inst jmp done)
@@ -3316,7 +3316,7 @@
            (inst sub rcx 64)
            (inst mov tmp 63)
            (inst cmp rcx 63)
-           (inst cmov :g rcx tmp)
+           (inst cmov :a rcx tmp)
            (move r hi-x)
            (inst sar r :cl)
            (inst jmp done)
@@ -3327,7 +3327,7 @@
              (inst shl r :cl)
              (zeroize tmp)
              (inst cmp rcx 64)
-             (inst cmov :ge r tmp))))
+             (inst cmov :ae r tmp))))
 
         (negative
          (inst neg :dword rcx)
@@ -3389,7 +3389,7 @@
     (inst neg rcx)
     (inst mov tmp 63)
     (inst cmp rcx 63)
-    (inst cmov :g rcx tmp)
+    (inst cmov :a rcx tmp)
     (move lo x)
     (move hi x)
     (inst sar lo :cl)
@@ -3434,7 +3434,7 @@
     (inst shr lo :cl)
     (zeroize hi)
     (inst cmp rcx 64)
-    (inst cmov :ge lo hi)
+    (inst cmov :ae lo hi)
     done))
 
 ;;; Given an unsigned 32-bit dividend and magic numbers, compute the truncated quotient.

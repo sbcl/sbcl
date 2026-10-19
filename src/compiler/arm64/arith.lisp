@@ -911,7 +911,7 @@
 
            (inst neg count amount)
            (inst cmp count 64)
-           (inst b :ge right-64)
+           (inst b :hs right-64)
            (inst mvn tmp count)
            (inst lslv tmp hi-x tmp)
            (inst lsrv lo-r lo-x count)
@@ -931,7 +931,7 @@
            (unless negative
              (assemble ()
                (inst cmp amount 64)
-               (inst b :ge left-64)
+               (inst b :hs left-64)
                (inst mvn tmp amount)
                (inst lsrv tmp lo-x tmp)
                (inst lslv lo-r lo-x amount)
@@ -944,7 +944,7 @@
                (inst lslv hi-r lo-x tmp)
                (unless medium
                  (inst cmp amount 128)
-                 (inst csel hi-r zr-tn hi-r :ge))
+                 (inst csel hi-r zr-tn hi-r :hs))
                (inst mov lo-r 0)))))
         (negative
          (inst neg count amount)
@@ -992,7 +992,7 @@
 
            (inst neg count amount)
            (inst cmp count 64)
-           (inst b :ge right-64)
+           (inst b :hs right-64)
            (inst mvn tmp count)
            (inst lslv tmp hi-x tmp)
            (inst lsrv r lo-x count)
@@ -1010,7 +1010,7 @@
            (unless negative
              (inst lslv r lo-x amount)
              (inst cmp amount 64)
-             (inst csel r zr-tn r :ge))))
+             (inst csel r zr-tn r :hs))))
 
         (negative
          (inst neg count amount)
@@ -1049,7 +1049,7 @@
     (inst tbnz amount 63 right)
 
     (inst cmp amount 64)
-    (inst b :ge left-64)
+    (inst b :hs left-64)
     (inst mvn tmp amount)
     (inst asrv hi x tmp)
     (inst asr hi hi 1)
@@ -1060,7 +1060,7 @@
     (inst sub tmp amount 64)
     (inst lslv hi x tmp)
     (inst cmp amount 128)
-    (inst csel hi zr-tn hi :ge)
+    (inst csel hi zr-tn hi :hs)
     (inst mov lo 0)
     (inst b done)
 
@@ -1084,7 +1084,7 @@
     (inst tbnz amount 63 right)
 
     (inst cmp amount 64)
-    (inst b :ge left-64)
+    (inst b :hs left-64)
     (inst mvn tmp amount)
     (inst lsrv hi x tmp)
     (inst lsr hi hi 1)
@@ -1095,7 +1095,7 @@
     (inst sub tmp amount 64)
     (inst lslv hi x tmp)
     (inst cmp amount 128)
-    (inst csel hi zr-tn hi :ge)
+    (inst csel hi zr-tn hi :hs)
     (inst mov lo 0)
     (inst b done)
 
@@ -1103,7 +1103,7 @@
     (inst neg count amount)
     (inst lsrv lo x count)
     (inst cmp count 64)
-    (inst csel lo zr-tn lo :ge)
+    (inst csel lo zr-tn lo :hs)
     (inst mov hi 0)
     done))
 
