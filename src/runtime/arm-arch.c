@@ -33,17 +33,17 @@ unsigned char *arch_internal_error_arguments(os_context_t *context)
     return (unsigned char *)(OS_CONTEXT_PC(context) + 5);
 }
 
-bool arch_pseudo_atomic_atomic(struct thread *thread) {
-    return SymbolValue(PSEUDO_ATOMIC_ATOMIC, 0) != NIL;
+bool arch_pseudo_atomic_atomic(struct thread __attribute__((unused)) *thread) {
+    return SYMBOL(PSEUDO_ATOMIC_ATOMIC)->value != NIL;
 }
 
-void arch_set_pseudo_atomic_interrupted(struct thread *thread)
+void arch_set_pseudo_atomic_interrupted(struct thread __attribute__((unused)) *thread)
 {
     extern void do_pending_interrupt();
     SYMBOL(PSEUDO_ATOMIC_INTERRUPTED)->value = (lispobj)do_pending_interrupt;
 }
 
-void arch_clear_pseudo_atomic_interrupted(struct thread *thread)
+void arch_clear_pseudo_atomic_interrupted(struct thread __attribute__((unused)) *thread)
 {
     SYMBOL(PSEUDO_ATOMIC_INTERRUPTED)->value = 0;
 }

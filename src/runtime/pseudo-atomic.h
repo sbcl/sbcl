@@ -41,7 +41,7 @@
 #elif defined LISP_FEATURE_ARM || defined LISP_FEATURE_ARM64 \
   || defined LISP_FEATURE_MIPS || defined LISP_FEATURE_RISCV \
   || defined LISP_FEATURE_LOONGARCH64
-#include "thread.h" // for SymbolValue
+#include "thread.h"
 
 /* These architectures use a thread slot if #+sb-thread,
  * or else two static symbols if #-sb-thread.
@@ -64,9 +64,9 @@
 #else
 
 static inline int
-get_pseudo_atomic_atomic(struct thread *thread)
+get_pseudo_atomic_atomic(struct thread __attribute__((unused)) *thread)
 {
-    return SymbolValue(PSEUDO_ATOMIC_ATOMIC, thread) != NIL;
+    return SYMBOL(PSEUDO_ATOMIC_ATOMIC)->value != NIL;
 }
 
 static inline void
@@ -76,9 +76,9 @@ clear_pseudo_atomic_atomic(struct thread __attribute__((unused)) *thread)
 }
 
 static inline int
-get_pseudo_atomic_interrupted(struct thread *thread)
+get_pseudo_atomic_interrupted(struct thread __attribute__((unused)) *thread)
 {
-    return SymbolValue(PSEUDO_ATOMIC_INTERRUPTED, thread) != 0;
+    return SYMBOL(PSEUDO_ATOMIC_INTERRUPTED)->value != 0;
 }
 
 static inline void

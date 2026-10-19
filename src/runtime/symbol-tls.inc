@@ -23,7 +23,6 @@ static inline uint16_t symbol_package_id(struct symbol* s) {
 #ifndef LISP_FEATURE_SB_THREAD
 /* no threads: every symbol's tls_index is statically zero */
 #  define tls_index_of(x) 0
-#  define per_thread_value(sym, thread) sym->value
 #else
 #ifdef LISP_FEATURE_64_BIT
 static inline unsigned int
@@ -38,21 +37,9 @@ tls_index_of(struct symbol *symbol) // untagged pointer
 #else
 #  define tls_index_of(x) (x)->tls_index
 #endif
-#  define per_thread_value(sym,th) *(lispobj*)(tls_index_of(sym) + (char*)th)
 #endif
 
 #define NO_TLS_VALUE_MARKER (~(uword_t)0)
-
-static inline lispobj
-SymbolValue(lispobj tagged_symbol_pointer, void *thread)
-{
-    struct symbol *sym = SYMBOL(tagged_symbol_pointer);
-    if (thread && tls_index_of(sym)) {
-        lispobj r = per_thread_value(sym, thread);
-        if (r != NO_TLS_VALUE_MARKER) return r;
-    }
-    return sym->value;
-}
 
 #ifdef LISP_FEATURE_SB_THREAD
 /* write_TLS assigns directly into TLS causing the symbol to
