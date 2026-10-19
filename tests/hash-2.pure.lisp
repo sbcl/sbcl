@@ -343,9 +343,9 @@
           (let* ((ht (make-hash-table :weakness weakness))
                  (n (alloc (loop repeat 1000
                                  count (let ((key (random-number)))
-                                         (if (gethash key ht)
-                                             (setf (gethash key ht)
-                                                   (random-number))))))))
+                                         (unless (gethash key ht)
+                                           (setf (gethash key ht)
+                                                 (random-number))))))))
             (gc :full t)
             (gc :full t)
             (assert (= n (hash-table-count ht)))))))
