@@ -81,13 +81,17 @@
       (collect ((full nil cons)
                 (short nil cons))
         (flet ((no-transforms (x)
+                 ;; Skip 'TRANSFORMED and following *TRANSFORMING*
+                 ;; value that ENSURE-SOURCE-PATH put there, but keep
+                 ;; the final form because it might help to understand
+                 ;; the note.
                  (let ((pos (position 'transformed x :from-end t)))
-                   (if pos
-                       ;; Skip 'TRANSFORMED and following
-                       ;; *TRANSFORMING* value that ENSURE-SOURCE-PATH
-                       ;; put there.
-                       (subseq x (+ pos 2))
-                       x)))
+                   (cond ((null pos)
+                          x)
+                         ((member (first x) '(inlined transformed))
+                          (subseq x (+ pos 2)))
+                         (t
+                          (cons (first x) (subseq x (+ pos 2)))))))
                (hide-inlines (x)
                  (loop while x
                        if (eq (first x) 'inlined)
