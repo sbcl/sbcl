@@ -1319,7 +1319,7 @@
   (:translate ash)
   (:args (number :scs (any-reg)))
   (:info amount)
-  (:arg-types tagged-num (:constant unsigned-byte))
+  (:arg-types tagged-num (:constant (integer 1)))
   (:results (result :scs (any-reg signed-reg)))
   (:result-types signed-num)
   (:generator 1
