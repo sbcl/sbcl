@@ -4889,7 +4889,7 @@
   (:generator 1
     (inst rbit res arg)))
 
-(deftransform abs ((x) ((signed-word) signed-word) * :vop t)
+(deftransform abs ((x) (signed-word) signed-word :vop t)
   t)
 
 (define-vop (abs)
