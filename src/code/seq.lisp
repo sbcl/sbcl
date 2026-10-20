@@ -3819,3 +3819,9 @@ many elements are copied."
               (frob 0 initial-contents)
               (frob (1+ axis) content))))
     array))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (dolist (s '(array-underlying-widetag))
+    (clear-info :function :inlining-data s)
+    (clear-info :function :inlinep s)
+    (clear-info :source-location :declaration s)))

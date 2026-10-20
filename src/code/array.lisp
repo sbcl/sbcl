@@ -407,8 +407,7 @@
                       (allocate-vector nil widetag length nwords))
     #-ubsan (allocate-vector widetag length nwords)))
 
-(declaim (ftype (sfunction (array) (integer 128 255)) array-underlying-widetag)
-         (inline array-underlying-widetag))
+(declaim (inline array-underlying-widetag))
 (defun array-underlying-widetag (array)
   (macrolet ((generate-table ()
                (macrolet ((to-index (x) `(ash ,x -2)))

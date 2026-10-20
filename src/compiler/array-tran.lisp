@@ -2896,24 +2896,34 @@
 (defoptimizer (allocate-vector derive-type) ((widetag length words) node)
   (%make-array-derive-type widetag length nil nil nil node))
 
-(defoptimizer (sb-vm::array-underlying-widetag-and-shift derive-type) ((array))
-  (block nil
-    (let ((saetps))
-      (flet ((try (type)
-               (unless (array-type-p type)
-                 (return))
-               (let ((spec (array-type-specialized-element-type type)))
-                 (when (eq spec *wild-type*)
-                   (return))
-                 (push (find-saetp-by-ctype spec) saetps))))
-        (if (union-type-p (lvar-type array))
-            (mapc #'try (union-type-types (lvar-type array)))
-            (try (lvar-type array))))
-      (loop for saetp in saetps
-            collect (sb-vm:saetp-typecode saetp) into tags
-            collect (sb-vm:saetp-n-bits-shift saetp) into shifts
-            finally (return (values-specifier-type `(values (member ,@tags)
-                                                            (member ,@shifts))))))))
+(flet ((derive (array)
+         (block nil
+           (let ((saetps))
+             (flet ((try (type)
+                      (unless (array-type-p type)
+                        (return))
+                      (let ((spec (array-type-specialized-element-type type)))
+                        (when (eq spec *wild-type*)
+                          (return))
+                        (push (find-saetp-by-ctype spec) saetps))))
+               (if (union-type-p (lvar-type array))
+                   (mapc #'try (union-type-types (lvar-type array)))
+                   (try (lvar-type array))))
+             (loop for saetp in saetps
+                   collect (sb-vm:saetp-typecode saetp) into tags
+                   collect (sb-vm:saetp-n-bits-shift saetp) into shifts
+                   finally (return (values tags shifts)))))))
+
+  (defoptimizer (sb-vm::array-underlying-widetag-and-shift derive-type) ((array))
+    (multiple-value-bind (tags shifts) (derive array)
+      (when tags
+        (make-values-type (list (sb-kernel::member-rational tags)
+                                (sb-kernel::member-rational shifts))))))
+
+  (defoptimizer (array-underlying-widetag derive-type) ((array))
+    (let ((tags (derive array)))
+      (when tags
+        (sb-kernel::member-rational tags)))))
 
 (deftransform sb-vm::array-underlying-widetag-and-shift ((array) (simple-array))
   `(let ((widetag (if (vectorp array)

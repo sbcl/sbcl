@@ -1434,7 +1434,9 @@
 
 (defknown sb-vm::array-underlying-widetag-and-shift (array)
     (values (integer 128 255) (integer 0 7))
-    (flushable foldable))
+    (flushable foldable no-verify-arg-count))
+(defknown array-underlying-widetag (array) (integer 128 255)
+    (flushable foldable no-verify-arg-count))
 
 (defknown sb-vm::%vector-widetag-and-n-bits-shift ((read-only type-specifier))
     (values (integer 128 255) (integer 0 7))

@@ -1222,3 +1222,11 @@
     (((make-array 3 :element-type '(unsigned-byte 3))
       (make-array 3 :element-type '(unsigned-byte 3)))
      #() :test #'equalp)))
+
+(with-test (:name :array-underlying-widetag-derive)
+  (assert-type
+   (lambda (a b)
+     (declare ((vector (unsigned-byte 64)) a b))
+     (eq (sb-kernel:array-underlying-widetag a)
+         (sb-kernel:array-underlying-widetag b)))
+   (eql t)))
