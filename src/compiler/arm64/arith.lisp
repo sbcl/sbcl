@@ -225,45 +225,46 @@
                   (t
                    (inst ,constant-op r x (,constant-transform y)))))))
     `(progn
-       (define-vop (,(symbolicate translate '-c/signed=>signed) signed-binop-c)
-         (:translate ,translate)
-         (:arg-types signed-num (:constant integer))
-         (:arg-refs x-ref)
-         ,untagged-c-body)
+       ,@(when constant-op
+           `((define-vop (,(symbolicate translate '-c/signed=>signed) signed-binop-c)
+               (:translate ,translate)
+               (:arg-types signed-num (:constant integer))
+               (:arg-refs x-ref)
+               ,untagged-c-body)
 
-       (define-vop (,(symbolicate translate '-c/unsigned=>unsigned) unsigned-binop-c)
-         (:translate ,translate)
-         (:arg-refs x-ref)
-         (:arg-types unsigned-num (:constant integer))
-         ,untagged-c-body)
+             (define-vop (,(symbolicate translate '-c/unsigned=>unsigned) unsigned-binop-c)
+               (:translate ,translate)
+               (:arg-refs x-ref)
+               (:arg-types unsigned-num (:constant integer))
+               ,untagged-c-body)
 
-       (define-vop (,(symbolicate translate '-c/fixnum=>fixnum) fixnum-binop-c)
-         (:arg-types tagged-num (:constant fixnum))
-         (:arg-refs x-ref)
-         (:translate ,translate)
-         (:generator 1
-           (progn x-ref)
-           (cond ((not (,constant-fixnum-test y))
-                  (let ((fy (fixnumize y)))
-                    (or ,@(case op
-                            (add
-                             `((add-via-or r x fy x-ref t)))
-                            (sub
-                             `((cond
-                                 ((= fy (ash -1 63))
-                                  (inst eor r x (ash 1 63))
-                                  t)
-                                 ((add-via-or r x (fixnumize (- y)) x-ref t)))))
-                            ((eor orr)
-                            `((or-into-clear-bits r x fy x-ref t))))
-                        (inst ,constant-op r x (load-immediate-word tmp-tn fy)))))
-                 ,@(and negative-op
-                        `(((minusp y)
-                           (let ((imm (,constant-fixnum-transform (fixnumize (- y)))))
-                             (inst ,negative-op r x imm)))))
-                 (t
-                  (let ((imm (,constant-fixnum-transform (fixnumize y))))
-                    (inst ,constant-op r x imm))))))
+             (define-vop (,(symbolicate translate '-c/fixnum=>fixnum) fixnum-binop-c)
+               (:arg-types tagged-num (:constant fixnum))
+               (:arg-refs x-ref)
+               (:translate ,translate)
+               (:generator 1
+                 (progn x-ref)
+                 (cond ((not (,constant-fixnum-test y))
+                        (let ((fy (fixnumize y)))
+                          (or ,@(case op
+                                  (add
+                                   `((add-via-or r x fy x-ref t)))
+                                  (sub
+                                   `((cond
+                                       ((= fy (ash -1 63))
+                                        (inst eor r x (ash 1 63))
+                                        t)
+                                       ((add-via-or r x (fixnumize (- y)) x-ref t)))))
+                                  ((eor orr)
+                                   `((or-into-clear-bits r x fy x-ref t))))
+                              (inst ,constant-op r x (load-immediate-word tmp-tn fy)))))
+                       ,@(and negative-op
+                              `(((minusp y)
+                                 (let ((imm (,constant-fixnum-transform (fixnumize (- y)))))
+                                   (inst ,negative-op r x imm)))))
+                       (t
+                        (let ((imm (,constant-fixnum-transform (fixnumize y))))
+                          (inst ,constant-op r x imm))))))))
 
        (define-vop (,(symbolicate translate '/fixnum=>fixnum) fixnum-binop)
          (:args (x :scs (any-reg))
@@ -441,10 +442,7 @@
         (inst add r x y))))
 
 (define-binop logandc2 2 bic
-  :constant-test bic-encode-immediate
-  :constant-fixnum-test bic-fixnum-encode-immediate
-  :constant-op and
-  :constant-transform bic-mask)
+  :constant-op nil)
 
 (define-vop (logandc2/unsigned-signed=>unsigned logandc2/unsigned=>unsigned)
   (:args (x :scs (unsigned-reg))
@@ -2465,7 +2463,7 @@
          (la :scs (unsigned-reg))
          (lb :scs (unsigned-reg))
          (r* :scs (descriptor-reg)))
-  (:arg-types bignum bignum unsigned-num bignum unsigned-num)
+  (:arg-types bignum bignum unsigned-num unsigned-num bignum)
   (:temporary (:sc unsigned-reg) length)
   (:temporary (:sc unsigned-reg) n index digit-a digit-b a b r)
   (:generator 10
