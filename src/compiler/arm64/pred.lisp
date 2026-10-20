@@ -115,13 +115,16 @@
 
 (define-vop (if-eq)
   (:args (x :scs (any-reg descriptor-reg))
-         (y :scs (any-reg descriptor-reg (immediate
-                                          (or
-                                           (eql (tn-value tn) 0f0)
-                                           (and (integerp (tn-value tn))
-                                                (let ((f (fixnumize (tn-value tn))))
-                                                  (or (abs-add-sub-immediate-p f)
-                                                      (= f (ash -1 63))))))))))
+         (y :scs (any-reg descriptor-reg
+                          (immediate
+                           (let ((v (tn-value tn)))
+                             (or (eql v 0f0)
+                                 (and (fixnump v)
+                                      (or (= v most-negative-fixnum)
+                                          (abs-add-sub-immediate-p (fixnumize v))
+                                          (and (sb-c::type-not-other-pointer-p
+                                                (tn-ref-type (vop-args sb-assem::*current-vop*)))
+                                               (= v most-positive-fixnum))))))))))
   (:arg-refs x-ref)
   (:vop-var vop)
   (:conditional :eq)
@@ -147,8 +150,12 @@
                   (0
                    (inst tst x (ash 1 bit))
                    t)))))
+            ;; Find some extreme values by detecting overflow
             ((eql value (ash -1 63))
              (inst cmp zr-tn x)
+             (change-vop-flags vop '(:vs)))
+            ((eql value (fixnumize most-positive-fixnum))
+             (inst cmn x (fixnumize 1))
              (change-vop-flags vop '(:vs)))
             ((or (not (integerp value))
                  (add-sub-immediate-p value))

@@ -1753,9 +1753,10 @@
        (:vop-var vop)
        (:conditional ,signed)
        (:generator 2
-         (let ((tagged-y (if (sc-is x any-reg)
-                             (fixnumize y)
-                             y)))
+         (let* ((fixnump (sc-is x any-reg))
+                (tagged-y (if fixnump
+                              (fixnumize y)
+                              y)))
            (cond
              ,@(when (member tran '(< >))
                  `(((and (plusp tagged-y)
@@ -1776,13 +1777,21 @@
                                 (change-vop-flags vop '(:ne))
                                 t)))))))
              ,@(when (member tran '(eql))
+                 ;; Find some extreme values by detecting overflow
                  `(((= (ldb (byte 64 0) tagged-y) (ash 1 63))
                     (inst cmp zr-tn x)
+                    (change-vop-flags vop '(:vs)))
+                   ((and fixnump
+                         (= y most-positive-fixnum))
+                    (inst cmn x (fixnumize 1))
+                    (change-vop-flags vop '(:vs)))
+                   ((= tagged-y (1- (ash 1 63)))
+                    (inst cmn x 1)
                     (change-vop-flags vop '(:vs)))))
              (t
               ,(unless (eq tran 'eql)
                  `(flet ((try (y)
-                           (let ((y (if (sc-is x any-reg)
+                           (let ((y (if fixnump
                                         (fixnumize y)
                                         y)))
                              (flet ((try (constant)
@@ -1803,7 +1812,7 @@
                                 '(,unsigned)
                                 '(,signed)))))))
 
-              (let ((y (if (sc-is x any-reg)
+              (let ((y (if fixnump
                            (fixnumize y)
                            y)))
                 (flet ((try (constant negate)

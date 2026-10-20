@@ -4161,11 +4161,25 @@
            ;; quite confusing, and I would prefer that we alter the branch test
            ;; when emitting TEST in place of CMP.
            (inst test operand-size x x)) ; smaller instruction
-          ((and (eq op '=)
-                (integerp y)
-                (eql (ldb (byte 64 0) y) (ash 1 63)))
-           (zeroize temp)
-           (inst cmp temp x)
+          ((when (and (eq op '=)
+                      (integerp y))
+             ;; Find some extreme values by detecting overflow
+             (cond ((eql (ldb (byte 64 0) y) (ash 1 63))
+                    (zeroize temp)
+                    (inst cmp temp x)
+                    t)
+                   ((eql y (1- (ash 1 63)))
+                    (move temp x)
+                    (inst inc temp)
+                    t)
+                   ((and (or (sc-is x any-reg)
+                             (and (sc-is x descriptor-reg)
+                                  x-ctype
+                                  (sb-c::type-not-other-pointer-p x-ctype)))
+                         (= y (fixnumize most-positive-fixnum)))
+                    (move temp x)
+                    (inst add temp 2)
+                    t)))
            (change-vop-flags sb-assem::*current-vop* '(:o)))
           (t
            (multiple-value-bind (x y) (ensure-not-mem+mem x y temp)

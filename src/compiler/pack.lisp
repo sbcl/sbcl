@@ -1331,7 +1331,7 @@
 ;;; If a load-tn has already been allocated, we can assume that the
 ;;; restriction is satisfied.
 (declaim (inline check-operand-restrictions))
-(defun check-operand-restrictions (scs ops)
+(defun check-operand-restrictions (vop scs ops)
   (declare (list scs) (type (or tn-ref null) ops))
 
   ;; Check the targeted operands first.
@@ -1352,7 +1352,8 @@
                 (t
                  ;; conditional sc
                  (when (functionp load-scs)
-                   (setf load-scs (funcall load-scs tn)))
+                   (let ((sb-assem::*current-vop* vop))
+                     (setf load-scs (funcall load-scs tn))))
                  (unless (eq load-scs t)
                    (setf (tn-ref-load-tn op)
                          (pack-load-tn load-scs op)))))))))
@@ -1374,7 +1375,8 @@
                 (t
                  ;; conditional sc
                  (when (functionp load-scs)
-                   (setf load-scs (funcall load-scs tn)))
+                   (let ((sb-assem::*current-vop* vop))
+                     (setf load-scs (funcall load-scs tn))))
                  (unless (eq load-scs t)
                    (setf (tn-ref-load-tn op)
                          (pack-load-tn load-scs op)))))))))
@@ -1391,9 +1393,9 @@
       (do ((vop (ir2-block-last-vop block) (vop-prev vop)))
           ((null vop))
         (let ((info (vop-info vop)))
-          (check-operand-restrictions (vop-info-result-load-scs info)
+          (check-operand-restrictions vop (vop-info-result-load-scs info)
                                       (vop-results vop))
-          (check-operand-restrictions (vop-info-arg-load-scs info)
+          (check-operand-restrictions vop (vop-info-arg-load-scs info)
                                       (vop-args vop))))))
   (values))
 

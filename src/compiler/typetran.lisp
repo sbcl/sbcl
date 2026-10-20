@@ -101,6 +101,9 @@
     (and number (not (or fixnum #+64-bit single-float)))
     fdefn (and symbol (not null))
     weak-pointer system-area-pointer code-component
+    #+sb-simd-pack simd-pack
+    #+sb-simd-pack-256 simd-pack-256
+    #+sb-simd-pack-512 simd-pack-512
     #+sb-simd-pack-512 simd-pack-512-mask))
 
 (defun type-other-pointer-p (type)
