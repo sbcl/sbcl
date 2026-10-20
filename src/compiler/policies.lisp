@@ -161,3 +161,8 @@ compiled with this declaration in effect.")
 (define-optimization-quality jump-table
   1
   ("no" "auto" "yes" "without-hashing"))
+
+#+debug-stack-stores
+(define-optimization-quality debug-stack-stores
+  0
+  ("no" "no" "no" "yes"))

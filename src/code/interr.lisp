@@ -654,6 +654,11 @@
             (t
              (format t "~7a = ~v,'0x ~a~%" tn-name (* size 2)
                      value context))))))
+
+#+debug-stack-stores
+(deferr bad-stack-store-error ()
+  (error 'simple-storage-condition
+         :format-control "Bad stack store"))
 
 ;;;; INTERNAL-ERROR signal handler
 
