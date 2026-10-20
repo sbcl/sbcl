@@ -624,7 +624,7 @@
          ,@(when vector-t
              `((unless (typep vector '(vector t))
                  (%type-check-error/c vector 'sb-kernel::object-not-vector-t-error nil))))
-         (multiple-value-bind (data index)
+         (multiple-value-bind (data index old-fp)
              (%data-vector-push vector)
            (when index
              (locally (declare (optimize (insert-array-bounds-checks 0)))
@@ -634,7 +634,7 @@
                                       data)
                            index)
                      element))
-             index))))))
+             old-fp))))))
 
 (defoptimizers derive-type
     (hairy-data-vector-set

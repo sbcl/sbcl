@@ -700,7 +700,7 @@
 
 (defknown %data-vector-push
     (complex-vector)
-    (values (simple-array * (*)) (or null index)))
+    (values (simple-array * (*)) (or null index) index))
 
 (defknown restart-point (t) t ())
 (defknown jump-target (t) t ())

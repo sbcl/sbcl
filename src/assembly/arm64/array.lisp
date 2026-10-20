@@ -208,41 +208,40 @@
 (define-assembly-routine (%data-vector-push
                           (:translate %data-vector-push)
                           (:arg-types t)
-                          (:result-types t t)
+                          (:result-types t t positive-fixnum)
                           (:save-p :compute-only)
                           (:check-type t))
     ((:arg array descriptor-reg r0-offset)
      (:res result descriptor-reg r0-offset)
-     (:res offset descriptor-reg r1-offset))
+     (:res offset descriptor-reg r1-offset)
+     (:res old-fp any-reg r2-offset))
   (declare (ignore result))
-  (let ((error (generate-error-code nil 'fill-pointer-error array)))
-    (assemble ()
+  (inst ldr tmp-tn (@ array (- other-pointer-lowtag)))
+  (inst tbz tmp-tn (1- (integer-length (ash +array-fill-pointer-p+ array-flags-position)))
+        (generate-error-code nil 'fill-pointer-error array))
 
-      (inst ldr tmp-tn (@ array (- other-pointer-lowtag)))
-      (inst tbz tmp-tn (1- (integer-length (ash +array-fill-pointer-p+ array-flags-position)))
-            error)
+  (loadw offset array array-fill-pointer-slot other-pointer-lowtag)
+  (move old-fp offset)
+  (loadw tmp-tn array array-elements-slot other-pointer-lowtag)
+  (inst cmp tmp-tn offset)
+  (inst b :ne SKIP)
+  (inst mov offset null-tn)
+  (inst ret)
 
-      (loadw offset array array-fill-pointer-slot other-pointer-lowtag)
-      (loadw tmp-tn array array-elements-slot other-pointer-lowtag)
-      (inst cmp tmp-tn offset)
-      (inst b :ne SKIP)
-      (inst mov offset null-tn)
-      (inst ret)
+  SKIP
+  (inst add tmp-tn offset (fixnumize 1))
+  (storew tmp-tn array array-fill-pointer-slot other-pointer-lowtag)
 
-      SKIP
-      (inst add tmp-tn offset (fixnumize 1))
-      (storew tmp-tn array array-fill-pointer-slot other-pointer-lowtag)
-
-      LOOP
-      (loadw tmp-tn array array-displacement-slot other-pointer-lowtag)
-      (inst add offset offset tmp-tn)
-      (loadw array array array-data-slot other-pointer-lowtag)
+  LOOP
+  (loadw tmp-tn array array-displacement-slot other-pointer-lowtag)
+  (inst add offset offset tmp-tn)
+  (loadw array array array-data-slot other-pointer-lowtag)
 
 
-      (inst ldrb tmp-tn (@ array (- other-pointer-lowtag)))
-      (inst cmp tmp-tn simple-array-widetag)
-      (inst b :eq LOOP)
-      (inst cmp tmp-tn complex-base-string-widetag)
-      (inst b :ge LOOP)
+  (inst ldrb tmp-tn (@ array (- other-pointer-lowtag)))
+  (inst cmp tmp-tn simple-array-widetag)
+  (inst b :eq LOOP)
+  (inst cmp tmp-tn complex-base-string-widetag)
+  (inst b :ge LOOP)
 
-      DONE)))
+  DONE)

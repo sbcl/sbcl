@@ -73,3 +73,16 @@
 (with-test (:name :concatenate-to-vector)
   (assert (sb-kernel:%concatenate-to-vector sb-vm:simple-bit-vector-widetag
                                            '(1 1) '(1 0))))
+
+(with-test (:name :%data-vector-push-displaced-index-offset)
+  (let* ((d (copy-seq #(1 2 3 4 5 6)))
+         (v (make-array 3 :displaced-to d :displaced-index-offset 3 :fill-pointer 0))
+         (f (checked-compile `(lambda (s)
+                                (declare ((vector t) s))
+                                (vector-push -1 s)))))
+    (assert (eql (funcall f v) 0))
+    (assert (equalp d #(1 2 3 -1 5 6)))
+    (assert (equalp v #(-1)))
+    (assert (eql (funcall f v) 1))
+    (assert (equalp d #(1 2 3 -1 -1 6)))
+    (assert (equalp v #(-1 -1)))))
