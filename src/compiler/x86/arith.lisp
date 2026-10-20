@@ -1921,7 +1921,7 @@
 
 (defun *-transformer (class width y &optional (fun '%lea))
   (cond
-    ((= y (ash 1 (integer-length y)))
+    ((= (logcount y) 1)
      ;; there's a generic transform for y = 2^k
      (give-up-ir1-transform))
     ((member y '(3 5 9))

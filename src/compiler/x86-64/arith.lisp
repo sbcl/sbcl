@@ -5831,9 +5831,6 @@
 
 (defun *-transformer (y node fun)
   (cond
-    ((= y (ash 1 (integer-length y)))
-     ;; there's a generic transform for y = 2^k
-     (give-up-ir1-transform))
     ((member y '(3 5 9))
      ;; we can do these multiplications directly using LEA
      (delay-ir1-transform node :constraint)
