@@ -2938,10 +2938,9 @@ expansion happened."
       (t
        (specifier-type 'real)))))
 
-(defmacro new-numeric-union-type (aspects ranges)
-  `(let ((ranges ,ranges))
-     ;; rebinding staves off dynamic-extent imposed by NEW-CTYPE
-     (new-ctype numeric-union-type 0 ,aspects ranges)))
+;; Done like this to avoid stack-allocating RANGES due to declarations in NEW-CTYPE
+(defun new-numeric-union-type (aspects ranges)
+  (new-ctype numeric-union-type 0 aspects ranges))
 
 (def-type-translator complex ((:context context) &optional (typespec '*))
   (declare (inline !compute-numtype-aspect-id))
@@ -5972,7 +5971,8 @@ expansion happened."
                (t x))))
       (let ((low (normalize-low-zero low))
             (high (normalize-high-zero high)))
-        (new-numeric-union-type (get-numtype-aspects complexp class format)
+        (new-ctype numeric-union-type 0
+                   (get-numtype-aspects complexp class format)
                    (case class
                      (integer
                       (vector range-integer-run low high))
@@ -6915,59 +6915,72 @@ expansion happened."
 (defun member-rational (members)
   (declare (inline !compute-numtype-aspect-id))
   (if members
-      (let ((result)
-            (mask 0))
-        (flet ((store (run low high)
-                 (setf (values result mask)
-                       (store-rational-range low high run mask result))))
-          (loop for member in (sort (copy-list members) #'<)
-                do (store (if (integerp member)
-                              range-integer-run
-                              range-ratio-run)
-                          member member))
-          (new-numeric-union-type
-           (get-numtype-aspects :real
-                                (case mask
-                                  (#.range-integer-run 'integer)
-                                  (t 'rational))
-                                nil)
-           (coerce (reverse result) 'vector))))
+      (if (cdr members)
+          (let ((result)
+                (mask 0))
+            (flet ((store (run low high)
+                     (setf (values result mask)
+                           (store-rational-range low high run mask result))))
+              (loop for member in (sort (copy-list members) #'<)
+                    do (store (if (integerp member)
+                                  range-integer-run
+                                  range-ratio-run)
+                              member member))
+              (new-numeric-union-type
+               (get-numtype-aspects :real
+                                    (case mask
+                                      (#.range-integer-run 'integer)
+                                      (t 'rational))
+                                    nil)
+               (coerce (reverse result) 'vector))))
+          (let ((member (car members)))
+            (multiple-value-bind (run type)
+                (if (integerp member)
+                    (values range-integer-run 'integer)
+                    (values range-ratio-run  'rational))
+              ;; Avoids allocation
+              (new-ctype numeric-union-type 0
+                         (get-numtype-aspects :real type nil)
+                         (vector run member member)))))
       *empty-type*))
 
 (defun member-float (type members)
   (declare (inline !compute-numtype-aspect-id))
   (if members
-      (let ((result))
-        (labels ((join-p (left-high right-low)
-                   (cond ((not right-low)
-                          t)
-                         ((not left-high)
-                          t)
-                         ((let ((open-left-high (if (consp left-high)
-                                                    (car left-high)
-                                                    left-high))
-                                (open-right-low (if (consp right-low)
-                                                    (car right-low)
-                                                    right-low)))
-                            (if (and (consp left-high)
-                                     (consp right-low))
-                                (sb-xc:< open-right-low open-left-high)
-                                (sb-xc:<= open-right-low open-left-high))))))
-                 (store (low high)
-                   (let ((last-high (car result)))
-                     (cond ((and result
-                                 (fp-high-ge-high-p last-high high)))
-                           ((and result
-                                 (join-p last-high low))
-                            (setf (car result) high))
-                           (t
-                            (push low result)
-                            (push high result))))))
-          (loop for member in (sort (copy-list members) #'fp<)
-                do (store member member))
-          (new-numeric-union-type
-           (get-numtype-aspects :real 'float type)
-           (coerce (reverse result) 'vector))))
+      (let ((aspects (get-numtype-aspects :real 'float type)))
+        (if (not (cdr members))
+            ;; Avoids allocation
+            (let ((element (car members)))
+              (new-ctype numeric-union-type 0 aspects (vector element element)))
+            (let ((result))
+              (labels ((join-p (left-high right-low)
+                         (cond ((not right-low)
+                                t)
+                               ((not left-high)
+                                t)
+                               ((let ((open-left-high (if (consp left-high)
+                                                          (car left-high)
+                                                          left-high))
+                                      (open-right-low (if (consp right-low)
+                                                          (car right-low)
+                                                          right-low)))
+                                  (if (and (consp left-high)
+                                           (consp right-low))
+                                      (sb-xc:< open-right-low open-left-high)
+                                      (sb-xc:<= open-right-low open-left-high))))))
+                       (store (low high)
+                         (let ((last-high (car result)))
+                           (cond ((and result
+                                       (fp-high-ge-high-p last-high high)))
+                                 ((and result
+                                       (join-p last-high low))
+                                  (setf (car result) high))
+                                 (t
+                                  (push low result)
+                                  (push high result))))))
+                (loop for member in (sort (copy-list members) #'fp<)
+                      do (store member member))
+                (new-numeric-union-type aspects (coerce (reverse result) 'vector))))))
       *empty-type*))
 
 (define-type-method (numeric-union :simple-union2) (type1 type2)
@@ -7171,18 +7184,18 @@ expansion happened."
               for low = (aref ranges (+ i 1))
               for high = (aref ranges (+ i 2))
               collect
-              (new-numeric-union-type
-               (get-numtype-aspects (numtype-aspects-complexp aspects)
-                                    (case run
-                                      (#.range-integer-run 'integer)
-                                      (t 'rational))
-                                    nil)
-               (vector run low high)))
+              (new-ctype numeric-union-type 0
+                         (get-numtype-aspects (numtype-aspects-complexp aspects)
+                                              (case run
+                                                (#.range-integer-run 'integer)
+                                                (t 'rational))
+                                              nil)
+                         (vector run low high)))
         (loop for i below (length ranges) by 2
               for low = (aref ranges i)
               for high = (aref ranges (1+ i))
               collect
-              (new-numeric-union-type aspects (vector low high))))))
+              (new-ctype numeric-union-type 0 aspects (vector low high))))))
 
 (defun numeric-union-bounds (type)
   (let ((ranges (numeric-union-type-ranges type))
@@ -7257,14 +7270,14 @@ expansion happened."
   (let ((ranges (numeric-union-type-ranges type))
         (aspects (numeric-union-type-aspects type)))
     (if (memq (numtype-aspects-class aspects) '(integer rational))
-        (new-numeric-union-type
+        (new-ctype numeric-union-type 0
          aspects
          (vector (ecase (numtype-aspects-class aspects)
                    (rational range-rational-run)
                    (integer range-integer-run))
                  (aref ranges 1)
                  (aref ranges (1- (length ranges)))))
-        (new-numeric-union-type
+        (new-ctype numeric-union-type 0
          aspects
          (vector (aref ranges 0)
                  (aref ranges (1- (length ranges))))))))
