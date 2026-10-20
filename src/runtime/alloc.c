@@ -787,8 +787,11 @@ alloc_thread_struct(void* spaces, unsigned int control_stack_size) {
         (lispobj*)((char*)th->binding_stack_start+BINDING_STACK_SIZE);
     if (!is_recycled) {
 #if !(defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-        protect_control_stack_hard_guard_page(1, th);
-        protect_control_stack_guard_page(1, th);
+        // A thread with no control stack here will run on some other stack
+        if (control_stack_size) {
+            protect_control_stack_hard_guard_page(1, th);
+            protect_control_stack_guard_page(1, th);
+        }
 #endif
         protect_binding_stack_hard_guard_page(1, th);
         protect_alien_stack_hard_guard_page(1, th);

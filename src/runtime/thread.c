@@ -76,6 +76,15 @@ static pthread_mutex_t in_gc_lock = PTHREAD_MUTEX_INITIALIZER;
 extern lispobj call_into_lisp_first_time(lispobj fun, lispobj *args, int nargs);
 #endif
 
+#if defined LISP_FEATURE_DARWIN && defined LISP_FEATURE_X86_64
+/* Run the initial thread on the control stack the OS gave us, rather than
+ * a stack made by alloc_thread_struct. There is no interface to inform the
+ * OS of a custom stack for the main thread, and without such interface,
+ * various system APIs are less than happy if you do change your stack */
+#define RUN_MAIN_THREAD_ON_OS_STACK
+#include <pthread.h> // for pthread_get_stackaddr_np() even if #-sb-thread
+#endif
+
 #ifdef ZSTD_STATIC_LINKING_ONLY
 static bool asan_cleanup_called;
 #endif
@@ -331,13 +340,40 @@ static int os_thread_init(struct thread *thread)
     return 1;
 }
 
+#ifdef RUN_MAIN_THREAD_ON_OS_STACK
+static void determine_native_stack_range(struct thread* th, void *stack_end)
+{
+    pthread_t self = pthread_self();
+    size_t stack_size = pthread_get_stacksize_np(self);
+    // The initial thread can't have a larger stack than the OS gave it.
+    // Fail if we have to, rather than do something other than requested.
+    if (thread_control_stack_size >= stack_size)
+        lose("Specified control stack size (%u bytes) must not exceed"
+             " initial thread's stack size (%lu bytes)",
+             thread_control_stack_size, (unsigned long)stack_size);
+    th->control_stack_start =
+        (lispobj*)((char*)pthread_get_stackaddr_np(self) - thread_control_stack_size);
+    th->control_stack_end = stack_end;
+#ifndef LISP_FEATURE_SB_THREAD
+    SYMBOL(CONTROL_STACK_START)->value = (lispobj)th->control_stack_start;
+    SYMBOL(CONTROL_STACK_END)->value = (lispobj)th->control_stack_end;
+#endif
+    protect_control_stack_hard_guard_page(1, th);
+    protect_control_stack_guard_page(1, th);
+}
+#endif
+
 void create_main_lisp_thread(lispobj function) {
 #ifdef LISP_FEATURE_WIN32
     InitializeCriticalSection(&all_threads_lock);
     InitializeCriticalSection(&recyclebin_lock);
     InitializeCriticalSection(&in_gc_lock);
 #endif
+#ifdef RUN_MAIN_THREAD_ON_OS_STACK
+    struct thread *th = alloc_thread_struct(0, 0);
+#else
     struct thread *th = alloc_thread_struct(0, thread_control_stack_size);
+#endif
     if (!th || !os_thread_init(th) || !init_shared_attr_object())
         lose("can't create initial thread");
     th->sprof_enable = make_fixnum(1);
@@ -356,12 +392,13 @@ void create_main_lisp_thread(lispobj function) {
     unblock_gc_stop_signal();
 #endif
     link_thread(th);
+#ifdef RUN_MAIN_THREAD_ON_OS_STACK
+    // cons_lisp_thread copies the stack range to the SB-THREAD:THREAD so we need
+    // the values to be valid now.
+    determine_native_stack_range(th, __builtin_frame_address(0));
+#endif
     th->lisp_thread = cons_lisp_thread(th);
     SET_LISPTHREAD_TID(LISPTHREAD(th));
-
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86_64)
-    set_thread_stack(th->control_stack_end);
-#endif
 
 #ifdef COLLECT_GC_STATS
     atexit(summarize_gc_stats);
@@ -370,7 +407,7 @@ void create_main_lisp_thread(lispobj function) {
      * call_into_lisp_first_time will put the new stack in the middle
      * of the current stack */
 #if (defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64) \
-    && !defined LISP_FEATURE_WIN32
+    && !defined LISP_FEATURE_WIN32 && !defined RUN_MAIN_THREAD_ON_OS_STACK
     call_into_lisp_first_time(function, NULL, 0);
 #else
     funcall0(function);
