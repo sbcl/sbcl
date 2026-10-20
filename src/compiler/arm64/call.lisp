@@ -248,22 +248,12 @@
                    (inst csel (tn-ref-tn val) null-tn (tn-ref-tn val) :ne))))))
 
           ;; If we're not expecting values on the stack, all that
-          ;; remains is to clear the stack frame (for the multiple-
-          ;; value return case).
+          ;; remains is to check-nargs
           (unless (or expecting-values-on-stack
-                      (and trust
-                           (type-single-value-p type)))
-            (cond ((or (not trust)
-                       (values-type-may-be-single-value-p type))
-                   #-tls-based-mv-return (inst csel csp-tn ocfp-tn csp-tn :eq)
-                   (unless trust
-                     (inst mov tmp-tn (fixnumize 1))
-                     (inst csel nargs-tn tmp-tn nargs-tn :ne)
-                     (check-nargs)))
-                  ((eq type *empty-type*))
-                  (t
-                   #-tls-based-mv-return
-                   (inst mov csp-tn ocfp-tn))))
+                      trust)
+            (inst mov tmp-tn (fixnumize 1))
+            (inst csel nargs-tn tmp-tn nargs-tn :ne)
+            (check-nargs))
           (macrolet ((map-stack-values (&body body)
                        `(do ((i register-arg-count (1+ i))
                              (val (do ((i 0 (1+ i))
