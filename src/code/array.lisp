@@ -519,10 +519,12 @@
 
 (declaim (inline widetag->element-type))
 (defun widetag->element-type (widetag)
-  (svref #.(let ((a (make-array 32 :initial-element 0)))
-             (dovector (saetp *specialized-array-element-type-properties* a)
-               (let ((tag (saetp-typecode saetp)))
-                 (setf (aref a (ash (- tag #x80) -2)) (saetp-specifier saetp)))))
+  (svref (load-time-value
+          (let ((a (make-array 32 :initial-element 0)))
+            (dovector (saetp *specialized-array-element-type-properties* a)
+              (let ((tag (saetp-typecode saetp)))
+                (setf (aref a (ash (- tag #x80) -2)) (saetp-specifier saetp)))))
+          t)
          (- (ash widetag -2) 32)))
 
 (defun initial-contents-error (content-length length)

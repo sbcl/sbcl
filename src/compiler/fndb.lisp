@@ -1557,6 +1557,9 @@
   ;; necessary to use the result if the array is adjustable.
   array (important-result))
 ;  :derive-type 'result-type-arg1) Not even close...
+
+(defknown adjust-array-et-error (array array) nil (no-verify-arg-count))
+(defknown invalid-array-error (array) nil (no-verify-arg-count))
 
 ;;;; from the "Strings" chapter:
 

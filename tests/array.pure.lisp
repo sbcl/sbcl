@@ -1212,3 +1212,13 @@
                `(lambda (n)
                   (elt #() n))
                :allow-warnings t))))
+
+(with-test (:name :adjust-array-transform)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (a b)
+         (declare ((vector (unsigned-byte 3)) a b))
+         (adjust-array a 0 :displaced-to b))
+    (((make-array 3 :element-type '(unsigned-byte 3))
+      (make-array 3 :element-type '(unsigned-byte 3)))
+     #() :test #'equalp)))

@@ -1883,6 +1883,11 @@
         (give-up-ir1-transform))))
 
 
+
+(defun adjust-array-et-error (array1 array2)
+  (error "Can't displace an array of type ~S to another of type ~S"
+         (array-element-type array1) (array-element-type array2)))
+
 ;;;; ADJUST-ARRAY
 (deftransform adjust-array ((array dims &key displaced-to displaced-index-offset)
                             (array integer &key
@@ -1895,9 +1900,9 @@
        (invalid-array-error array))
      (unless (= 1 (array-rank array))
        (error "The number of dimensions is not equal to the rank of the array"))
-     (unless (eql (array-element-type array) (array-element-type displaced-to))
-       (error "Can't displace an array of type ~S to another of type ~S"
-              (array-element-type array) (array-element-type displaced-to)))
+     (unless (eql (array-underlying-widetag array)
+                  (array-underlying-widetag displaced-to))
+       (adjust-array-et-error array displaced-to))
      (let ((displacement (or displaced-index-offset 0)))
        (when (< (array-total-size displaced-to) (+ displacement dims))
          (error "The :DISPLACED-TO array is too small"))

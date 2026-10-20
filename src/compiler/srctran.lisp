@@ -9308,28 +9308,30 @@
     (flet ((element-type (type)
              (and (array-type-p type)
                   (neq (array-type-specialized-element-type type) *wild-type*)
-                  (type-specifier (array-type-specialized-element-type type)))))
-      (cond ((let ((type (element-type type)))
-               (and type
-                    `',type)))
-            ((union-type-p type)
-             (let (result)
-               (loop for type in (union-type-types type)
-                     for et = (element-type type)
-                     unless (and et
-                                 (if result
-                                     (equal result et)
-                                     (setf result et)))
-                     do (give-up-ir1-transform))
-               `',result))
-            ((intersection-type-p type)
-             (loop for type in (intersection-type-types type)
-                   for et = (element-type type)
-                   when et
-                   return `',et
-                   finally (give-up-ir1-transform)))
-            (t
-             (give-up-ir1-transform))))))
+                  (array-type-specialized-element-type type))))
+      (let* ((et
+               (cond ((let ((type (element-type type)))
+                        type))
+                     ((union-type-p type)
+                      (let (result)
+                        (loop for type in (union-type-types type)
+                              for et = (element-type type)
+                              unless (and et
+                                          (if result
+                                              (equal result et)
+                                              (setf result et)))
+                              do (give-up-ir1-transform))
+                        result))
+                     ((intersection-type-p type)
+                      (loop for type in (intersection-type-types type)
+                            for et = (element-type type)
+                            when et
+                            return et
+                            finally (give-up-ir1-transform)))
+                     (t
+                      (give-up-ir1-transform))))
+             (saetp (find-saetp-by-ctype et)))
+        `',(sb-vm:saetp-specifier saetp)))))
 
 (define-source-transform sb-impl::sort-vector (vector start end predicate key)
   ;; Like CMUCL, we use HEAPSORT. However, other than that, this code
