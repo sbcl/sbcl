@@ -261,7 +261,6 @@
 
    "*INLINE-EXPANSION-LIMIT*"
    "*DERIVE-FUNCTION-TYPES*"
-   "*STRICT-RETURN-VALUES-DECLARATION*"
 
    ;; ..and inspector of compiler policy
 
