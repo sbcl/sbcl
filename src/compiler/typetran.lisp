@@ -2042,30 +2042,39 @@
            ;; specifier, NOT the dimension of the input. This is a rational choice
            ;; because one could not argue that incorrect code should have taken the
            ;; bad input's length when COERCE was asked for an exact type of output.
-           `(truly-the ,result
-               (if ,already-type-p
-                   x
-                   ,(cond ((eq dimension '*)
-                           (cond ((and (lvar-matches x :fun-names '(reverse nreverse))
-                                       (almost-immediately-used-p x (lvar-use x) :flushable t))
-                                  (splice-fun-args x :any 1)
+           (or
+            (and (eq dimension '*)
+                 (cmatch (node)
+                   ((coerce (:lvar lvar (reverse x)) *)
+                    (when (lvar-almost-immediately-used-p lvar :flushable t)
+                      `(truly-the ,result
                                   ;; The make-array transform can handle this
-                                  `(make-array (length x) ,@specialization :initial-contents (reverse x)))
-                                 (t
-                                  #+ubsan
-                                  ;; Passing :INITIAL-CONTENTS avoids allocating ubsan shadow bits,
-                                  ;; but redundantly checks the length of the input in MAKE-ARRAY's
-                                  ;; transform because we don't or can't infer that LENGTH gives the
-                                  ;; same answer each time it is called on X. There may be a way to
-                                  ;; extract more efficiency - at least eliminate the unreachable
-                                  ;; error-signaling code on mismatch - but I don't care to try.
-                                  `(make-array (length x) ,@specialization :initial-contents x)
-                                  #-ubsan ; better: do not generate a redundant LENGTH check
-                                  `(replace (make-array (length x) ,@specialization) x))))
-                          ((policy node (= safety 0)) ; Disregard the input length
-                           `(replace (make-array ,dimension ,@specialization) x))
-                          (t
-                           `(make-array ,dimension ,@specialization :initial-contents x))))))))
+                                  (make-array (length x) ,@specialization :initial-contents (reverse x)))))
+                   ((coerce (nreverse x) *)
+                    `(truly-the ,result
+                                (if ,already-type-p
+                                    (nreverse x)
+                                    (make-array (length x) ,@specialization :initial-contents (reverse x)))))
+                   (t
+                    nil)))
+            `(truly-the ,result
+                        (if ,already-type-p
+                            x
+                            ,(cond ((eq dimension '*)
+                                    #+ubsan
+                                    ;; Passing :INITIAL-CONTENTS avoids allocating ubsan shadow bits,
+                                    ;; but redundantly checks the length of the input in MAKE-ARRAY's
+                                    ;; transform because we don't or can't infer that LENGTH gives the
+                                    ;; same answer each time it is called on X. There may be a way to
+                                    ;; extract more efficiency - at least eliminate the unreachable
+                                    ;; error-signaling code on mismatch - but I don't care to try.
+                                    `(make-array (length x) ,@specialization :initial-contents x)
+                                    #-ubsan ; better: do not generate a redundant LENGTH check
+                                    `(replace (make-array (length x) ,@specialization) x))
+                                   ((policy node (= safety 0)) ; Disregard the input length
+                                    `(replace (make-array ,dimension ,@specialization) x))
+                                   (t
+                                    `(make-array ,dimension ,@specialization :initial-contents x)))))))))
       ((type= tspec (specifier-type 'list))
        `(coerce-to-list x))
       ((csubtypep tspec (specifier-type 'extended-sequence))

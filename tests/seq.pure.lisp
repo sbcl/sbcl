@@ -1174,3 +1174,29 @@
                     :initial-element 1d0)) 3)
     (((make-array 3 :element-type 'double-float
                     :initial-element 2d0)) 0)))
+
+(with-test (:name :coerce-reverse)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (s)
+         (coerce (reverse s) 'vector))
+    ((#(1 2 3)) #(3 2 1) :test #'equalp)
+    (('(1 2 3)) #(3 2 1) :test #'equalp))
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (s)
+         (coerce (nreverse s) 'vector))
+    (((vector 1 2 3)) #(3 2 1) :test #'equalp)
+    (((list 1 2 3)) #(3 2 1) :test #'equalp))
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (s)
+         (coerce (reverse s) 'list))
+    ((#(1 2 3)) '(3 2 1) :test #'equal)
+    (('(1 2 3)) '(3 2 1) :test #'equalp))
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (s)
+         (coerce (nreverse s) 'list))
+    (((vector 1 2 3)) '(3 2 1) :test #'equal)
+    (((list 1 2 3)) '(3 2 1) :test #'equal)))
