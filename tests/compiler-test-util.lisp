@@ -112,7 +112,7 @@
        ((null ,block-var) ,result)
      ,@forms))
 
-(defun ir2-vops (form)
+(defun ir2-vops (form &optional (name t))
   (let (vops)
     (inspect-ir
      form
@@ -121,7 +121,9 @@
          (do ((vop (sb-c::ir2-block-start-vop block)
                    (sb-c:vop-next vop)))
              ((null vop))
-           (push (sb-c:vop-name vop) vops)))))
+           (push (if name
+                     (sb-c:vop-name vop)
+                     vop) vops)))))
     vops))
 
 (defun ir1-named-calls (lambda-expression &optional (full t))

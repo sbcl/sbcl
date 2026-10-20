@@ -172,6 +172,8 @@
                                                                 t)))
                                                     (setf all-processed nil)))
                                                 all-processed))))
+                                         ((functional-kind-eq fun external)
+                                          (funcall function use))
                                          ((not (memq fun seen))
                                           (push fun seen)
                                           (dolist (ref (leaf-refs fun))

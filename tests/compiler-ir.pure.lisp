@@ -989,3 +989,15 @@
                                      (push 3 acc)
                                      (when (funcall b acc) (go x)))))))
                  '((:natural 1) (:strange 2)))))
+
+#+sb-devel
+(with-test (:name :select-tagging)
+  (let* ((vops (ctu:ir2-vops `(lambda (n)
+                                (declare (fixnum n)
+                                         (optimize speed (safety 0)))
+                                (loop repeat n
+                                      do (print 1)))
+                             nil))
+         (sub (find '- vops :key (lambda (vop)
+                                   (car (sb-c::vop-info-translate (sb-c::vop-info vop)))))))
+    (assert (eq (sb-c::vop-info-tag (sb-c::vop-info sub)) :tagged))))
