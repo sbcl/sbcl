@@ -30,6 +30,9 @@ changes relative to sbcl-2.6.9:
        line-breaking.
     ** bug fix: combining marks attached to otherwise unattached zero-width
        joiners no longer inhibit line breaks.
+  * bug fix: subnormal floating point numbers print with the least number of
+    digits required to discriminate between adjacent floats, just as normal
+    floating point numbers do.  (thanks to Arthur Miller)
 
 changes in sbcl-2.6.9 relative to sbcl-2.6.8:
   * minor incompatible change: structure slots defined as :READ-ONLY can be
