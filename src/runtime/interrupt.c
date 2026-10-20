@@ -1824,7 +1824,13 @@ ll_install_handler (int signal, interrupt_handler_t handler)
     sa.sa_mask = blockable_sigset;
     sa.sa_flags = SA_SIGINFO | SA_RESTART | OS_SA_NODEFER;
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    if (signal==SIG_MEMORY_FAULT) sa.sa_flags |= SA_ONSTACK;
+    /* darwin-os.h defines SIG_MEMORY_FAULT as SIGBUS, which is delivered for
+     * most protection faults, whereas SIGSEGV is delivered for some faults
+     * inside the initial process stack range. Without SA_ONSTACK, SIGSEGV is fatal
+     * despite that there is an installed handler!
+     * See handle_ux_exception for the heuristics the OS applies -
+     * https://github.com/apple-oss-distributions/xnu/blob/main/bsd/uxkern/ux_exception.c */
+    if (signal == SIG_MEMORY_FAULT || signal == SIGSEGV) sa.sa_flags |= SA_ONSTACK;
 #endif
 
     sigaction(signal, &sa, &old_ll_sigactions[signal]);
