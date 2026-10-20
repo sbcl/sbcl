@@ -383,17 +383,7 @@
   (labels ((arg-type (arg)
              (if (lvar-p arg)
                  (lvar-type arg)
-                 (leaf-type arg)))
-           (sequence-element-type (type)
-             (cond ((array-type-p type)
-                    (let ((elt-type (array-type-element-type type)))
-                      (if (eq elt-type *wild-type*)
-                          *universal-type*
-                          elt-type)))
-                   ((csubtypep type (specifier-type 'string))
-                    (specifier-type 'character))
-                   (t
-                    *universal-type*))))
+                 (leaf-type arg))))
     (let ((deps (lvar-function-designator-annotation-deps annotation))
           (arg-specs (lvar-function-designator-annotation-arg-specs annotation))
           (result-specs (lvar-function-designator-annotation-result-specs annotation)))
@@ -421,11 +411,16 @@
                                                          (single-value-type (fun-type-returns type)))
                                                         (t
                                                          *universal-type*)))))
-                          (type (cond (key-return-type)
-                                      ((getf options :sequence)
-                                       (sequence-element-type (arg-type arg)))
-                                      ((getf options :sequence-type)
-                                       (or (let* ((value (cond ((constant-p arg)
+                          (type (or (cond (key-return-type)
+                                          ((getf options :sequence)
+                                           (cond ((constant-p arg)
+                                                  (constant-array-element-type arg nil nil))
+                                                 ((lvar-p arg)
+                                                  (sequence-element-type arg nil))
+                                                 (t
+                                                  (unwild (type-array-element-type (arg-type arg))))))
+                                          ((getf options :sequence-type)
+                                           (let* ((value (cond ((constant-p arg)
                                                                 (constant-value arg))
                                                                ((and (lvar-p arg)
                                                                      (constant-lvar-p arg))
@@ -433,10 +428,10 @@
                                                   (type (and value
                                                              (careful-specifier-type value))))
                                              (and type
-                                                  (sequence-element-type type)))
-                                           *universal-type*))
-                                      (t
-                                       (arg-type arg)))))
+                                                  (unwild (type-array-element-type type)))))
+                                          (t
+                                           (arg-type arg)))
+                                    *universal-type*)))
                      (cond (value-nth
                             (if (consp value-nth)
                                 (let* ((option (nth (second value-nth) deps))

@@ -1256,3 +1256,25 @@
                       `(lambda (a b)
                          (merge '(not t) a b c))
                       :allow-warnings t))))
+
+(with-test (:name :sequence-key-mismatch)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x)
+                         (position x '(1 2) :key #'car))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x)
+                         (declare ((or (array double-float) (array single-float)) x))
+                         (remove 10 x :key #'car))
+                      :allow-warnings t))))
+
+(with-test (:name :handler-bind-args)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x y)
+                         (handler-case (/ x y)
+                           (arithmetic-error (c)
+                             (1+ c))))
+                      :allow-warnings t))))
