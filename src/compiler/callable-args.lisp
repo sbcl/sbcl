@@ -414,7 +414,8 @@
                           (type (or (cond (key-return-type)
                                           ((getf options :sequence)
                                            (cond ((constant-p arg)
-                                                  (constant-array-element-type arg nil nil))
+                                                  (or (constant-array-element-type arg nil nil)
+                                                      (unwild (type-array-element-type (leaf-type arg)))))
                                                  ((lvar-p arg)
                                                   (sequence-element-type arg nil))
                                                  (t
