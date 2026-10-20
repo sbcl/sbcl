@@ -646,13 +646,9 @@
 (with-test (:name :reduce-type-derive)
   (macrolet
       ((check (fun expected)
-         `(assert
-           (equal (second
-                   (third
-                    (sb-kernel:%simple-fun-type
-                     (checked-compile '(lambda (x)
-                                        ,fun)))))
-                  ',expected))))
+         `(assert-type
+           (lambda (x) ,fun)
+           ,expected)))
     (check (reduce '+ x)
            t)
     (check (reduce '+ x :end 10)
@@ -689,15 +685,11 @@
 (with-test (:name :find-type-derive)
   (macrolet
       ((check (fun expected)
-         `(assert
-           (type-specifiers-equal
-            (second
-                   (third
-                    (sb-kernel:%simple-fun-type
-                     (checked-compile '(lambda (x y)
-                                        (declare (ignorable x y))
-                                        ,fun)))))
-                  ',expected))))
+         `(assert-type
+           (lambda (x y)
+             (declare (ignorable x y))
+             ,fun)
+           ,expected)))
     (check (find x y) t)
     (check (find 1 y) (or (integer 1 1) null))
     (check (find x y :key #'car) list)
@@ -714,14 +706,11 @@
 (with-test (:name :position-type-derive)
   (macrolet
       ((check (fun expected)
-         `(assert
-           (ctype= (second
-                    (third
-                     (sb-kernel:%simple-fun-type
-                      (checked-compile '(lambda (x y)
-                                         (declare (ignorable x y))
-                                         ,fun)))))
-                   ',expected))))
+         `(assert-type
+           (lambda (x y)
+             (declare (ignorable x y))
+             ,fun)
+           ,expected)))
     (check (position x y) (or (integer 0 (#.(1- array-dimension-limit))) null))
     (check (position x (the (simple-string 10) y)) (or (mod 10) null))
     (check (position x y :end 10) (or (mod 10) null))
@@ -731,18 +720,8 @@
     (check (position x (the (or null (simple-vector 5)) y)) (or null (mod 5)))))
 
 (with-test (:name :string-cmp)
-  (macrolet
-      ((check (fun expected)
-         `(assert
-           (ctype= (second
-                    (third
-                     (sb-kernel:%simple-fun-type
-                      (checked-compile '(lambda (x y)
-                                         (declare (ignorable x y))
-                                         ,fun)))))
-                   ',expected))))
-    (check (string/= (the simple-string x) (the simple-string y) :end2 0)
-           (or (integer 0 0) null))))
+  (assert-type (lambda (x y) (string/= (the simple-string x) (the simple-string y) :end2 0))
+               (or (integer 0 0) null)))
 
 (with-test (:name :reverse-specialized-arrays)
   (loop for saetp across sb-vm:*specialized-array-element-type-properties*
