@@ -3483,8 +3483,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
 #define ALLOC_HISTOGRAM_WORDS ~D
 
 struct thread_state_word {
-  // - control_stack_guard_page_protected is referenced from
-  //   hand-written assembly code. (grep 'THREAD_STATE_WORD_OFFSET')
   char control_stack_guard_page_protected;
   unsigned char ~:[unused~;mv_count~];
   char state;

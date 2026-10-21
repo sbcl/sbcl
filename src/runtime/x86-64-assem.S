@@ -400,19 +400,12 @@ GNAME(post_signal_tramp):
 	.globl GNAME(arch_scrub_control_stack)
 	TYPE(GNAME(arch_scrub_control_stack))
 GNAME(arch_scrub_control_stack):
-	/* We are passed three parameters:
-	 * A (struct thread *) in RDI,
-	 * the address of the guard page in RSI, and
-	 * the address of the hard guard page in RDX.
-         * guard size is in RCX
-	 * We may trash RAX, and R8-R11 with impunity.
+	/* We are passed the guard page upper bound in RDI.
+	 * We may trash RAX, RCX, and R9 with impunity.
 	 * [RSP] is our return address, [RSP-8] is the first
 	 * stack slot to scrub. */
 
-	/* Select guard boundary based on page protection status */
-	cmpb	$0, THREAD_STATE_WORD_OFFSET(%rdi) // see genesis/thread.h
-	cmovne	%rsi, %rdx              // if protected, stop at soft guard
-	lea	64(%rdx, %rcx), %r9       // R9 = guard page upper bound, 64 byte safety margin
+	lea	64(%rdi), %r9           // R9 = guard page upper bound, 64 byte safety margin
 
 	LOAD_PIC_UINT(aggressive_scrub_control_stack, ax)
 	test	%eax, %eax

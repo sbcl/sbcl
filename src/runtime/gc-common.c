@@ -2319,18 +2319,22 @@ scrub_control_stack()
 void
 scrub_thread_control_stack(struct thread *th)
 {
-    os_vm_address_t guard_page_address = CONTROL_STACK_GUARD_PAGE(th);
-    os_vm_address_t hard_guard_page_address = CONTROL_STACK_HARD_GUARD_PAGE(th);
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     /* On these targets scrubbing from C is a bad idea, so we punt to
      * a routine in $ARCH-assem.S. */
-    extern void arch_scrub_control_stack(struct thread *, os_vm_address_t, os_vm_address_t, unsigned)
+    extern void arch_scrub_control_stack(os_vm_address_t)
 #ifdef LISP_FEATURE_X86_64
         __attribute__((sysv_abi))
 #endif
         ;
-    arch_scrub_control_stack(th, guard_page_address, hard_guard_page_address, STACK_GUARD_SIZE);
+    os_vm_address_t guard_upper_bound =
+        th->state_word.control_stack_guard_page_protected
+        ? CONTROL_STACK_RETURN_GUARD_PAGE(th)
+        : CONTROL_STACK_RETURN_GUARD_PAGE(th) + STACK_GUARD_SIZE;
+    arch_scrub_control_stack(guard_upper_bound);
 #else
+    os_vm_address_t guard_page_address = CONTROL_STACK_GUARD_PAGE(th);
+    os_vm_address_t hard_guard_page_address = CONTROL_STACK_HARD_GUARD_PAGE(th);
     os_vm_address_t sp = (os_vm_address_t)access_control_stack_pointer(th);
     int reprotect = 0;
     if (!th->state_word.control_stack_guard_page_protected &&

@@ -692,23 +692,12 @@ GNAME(post_signal_tramp):
 	.globl GNAME(arch_scrub_control_stack)
 	TYPE(GNAME(arch_scrub_control_stack))
 GNAME(arch_scrub_control_stack):
-	/* We are passed four parameters:
-	 * A (struct thread *) at [ESP+4],
-	 * the address of the guard page at [ESP+8], and
-	 * the address of the hard guard page at [ESP+12].
-         * guard size in [ESP+16]
-	 * We may trash EAX, ECX, and EDX with impunity.
+	/* We are passed the guard page upper bound at [ESP+4].
+	 * We may trash EAX and EDX with impunity.
 	 * [ESP] is our return address, [ESP-4] is the first
 	 * stack slot to scrub. */
 
-	/* Select guard boundary based on page protection status */
-	mov	4(%esp), %ecx
-	mov	12(%esp), %edx
-	cmpb	$0, THREAD_STATE_WORD_OFFSET(%ecx)
-	je	1f
-	mov	8(%esp), %edx           // if protected, stop at soft guard
-1:
-	add	16(%esp), %edx          // EDX = guard page upper bound
+	mov	4(%esp), %edx           // EDX = guard page upper bound
 	lea	-4(%esp), %eax
 
 	/* Now we begin our main scrub loop. */
@@ -723,13 +712,6 @@ ascs_clear_loop:
 	lea	-4(%eax), %eax
 	jnz	ascs_clear_loop
 
-	/* Re-check protection status in case clearing the return guard page
-	 * just re-protected the soft guard page. */
-	cmpb	$0, THREAD_STATE_WORD_OFFSET(%ecx)
-	je	2f
-	mov	8(%esp), %edx
-	add	16(%esp), %edx
-2:
 	/* If we're about to hit the guard page, exit. */
 	cmp	%edx, %eax
 	jb	ascs_finished
