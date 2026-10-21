@@ -33,6 +33,37 @@ changes relative to sbcl-2.6.9:
   * bug fix: subnormal floating point numbers print with the least number of
     digits required to discriminate between adjacent floats, just as normal
     floating point numbers do.  (thanks to Arthur Miller)
+  * bug fix: inconsistency and heap corruption in :weakness :key hash tables
+    in some circumstances.  (lp#2169495, reported by Igor Santos)
+  * bug fix: miscompilation of DPB and (SETF LDB) causing the wrong bit to be
+    set in some circumstances.  (lp#2168668, reported by Willem Broekema)
+  * bug fix: compiler crash from parsing REAL types with large integer bounds.
+    (lp#2168680)
+  * bug fix: fix miscompilation involving constants of size between 64 and
+    128 bits on backends with a register pair implementation.  (lp#2168763,
+    #lp#2168767)
+  * bug fix: an infinite loop in the compiler's type solver.  (lp#2168790)
+  * bug fix: non-convergent behaviour in constraint propagation.  (lp#2168862)
+  * bug fix: SB-GMP could be caused to return malformed ratios.  (lp#2168973,
+    reported by David Scherfgen)
+  * bug fix: SB-GMP returned the wrong value for GCD with an argument of the
+    form -2^(64k-1).  (lp#2168975, reported by David Scherfgen)
+  * bug fix: better compiler reasoning for funcalling values derived as
+    mixtures of non-function and function-types, in particular excluding NULL
+    from being successfully funcalled.  (lp#2168999, thanks to Vasily
+    Postnicov)
+  * bug fix: various compiler errors.  (lp#2169379, lp#2171292, lp#2171329)
+  * bug fix: emit a compiler warning when ARRAY-DIMENSION is called with an
+    axis argument known to be out of bounds for its array argument.
+    (lp#2169659, thanks to Vasily Postnicov)
+  * bug fix: fix a test to actually test weak hash tables with EQL keys, which
+    had been failing to test anything since 2006.  (lp#2171410, reported by
+    Igor Santos)
+  * optimization: some calls to EQUALP with a constant array argument can be
+    constant-folded if enough is known about the type of the other argument.
+    (lp#2169625, thanks to Vasily Postnicov)
+  * optimization: some type information was lost in (SAFETY 0) code leading
+    to slower generated code.  (reported by Qiantan Hong)
 
 changes in sbcl-2.6.9 relative to sbcl-2.6.8:
   * minor incompatible change: structure slots defined as :READ-ONLY can be
