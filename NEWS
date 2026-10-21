@@ -59,11 +59,20 @@ changes relative to sbcl-2.6.9:
   * bug fix: fix a test to actually test weak hash tables with EQL keys, which
     had been failing to test anything since 2006.  (lp#2171410, reported by
     Igor Santos)
+  * bug fix: some compiler notes about deleted code were silenced.
+  * bug fix: in compiler messages, the outermost element of the processing
+    path was always missing, and the actual source form also got corrupted
+    sometimes.
   * optimization: some calls to EQUALP with a constant array argument can be
     constant-folded if enough is known about the type of the other argument.
     (lp#2169625, thanks to Vasily Postnicov)
   * optimization: some type information was lost in (SAFETY 0) code leading
     to slower generated code.  (reported by Qiantan Hong)
+  * documentation: SB-MANUAL has several new sections: @GETTING-SBCL,
+    @RUNNING-WITHOUT-INSTALLATION, @PARTS-OF-SBCL, @FINDING-PARTS-OF-SBCL, any
+    more under @EFFICIENCY.
+  * documentation: SB-MANUAL now includes variable initforms and argument
+    default values in the Texinfo output.
 
 changes in sbcl-2.6.9 relative to sbcl-2.6.8:
   * minor incompatible change: structure slots defined as :READ-ONLY can be
