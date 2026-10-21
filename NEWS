@@ -63,11 +63,15 @@ changes relative to sbcl-2.6.9:
   * bug fix: in compiler messages, the outermost element of the processing
     path was always missing, and the actual source form also got corrupted
     sometimes.
+  * bug fix: a large number of issues found through extended random testing.
   * optimization: some calls to EQUALP with a constant array argument can be
     constant-folded if enough is known about the type of the other argument.
     (lp#2169625, thanks to Vasily Postnicov)
   * optimization: some type information was lost in (SAFETY 0) code leading
     to slower generated code.  (reported by Qiantan Hong)
+  * optimization: complete unboxed signed 128-bit arithmetic on arm64 and
+    x86-64, except for division.
+  * optimization: improved type derivation for local functions.
   * documentation: SB-MANUAL has several new sections: @GETTING-SBCL,
     @RUNNING-WITHOUT-INSTALLATION, @PARTS-OF-SBCL, @FINDING-PARTS-OF-SBCL, any
     more under @EFFICIENCY.
