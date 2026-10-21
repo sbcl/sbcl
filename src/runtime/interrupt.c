@@ -1817,10 +1817,13 @@ ll_install_handler (int signal, interrupt_handler_t handler)
 #else
         || sigismember(&deferrable_sigset,signal)
 #endif
-        || (void*)handler == (void*)SIG_DFL)
+        )
         lose("ll_install_handler: bad args: sig=%d, fn=%p", signal, handler);
 
-    sa.sa_sigaction = low_level_handle_now_handler;
+    if (ARE_SAME_HANDLER(handler, SIG_DFL))
+        sa.sa_handler = SIG_DFL;
+    else
+        sa.sa_sigaction = low_level_handle_now_handler;
     sa.sa_mask = blockable_sigset;
     sa.sa_flags = SA_SIGINFO | SA_RESTART | OS_SA_NODEFER;
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
