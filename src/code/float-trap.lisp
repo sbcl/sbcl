@@ -203,6 +203,8 @@ sets the floating point modes to their current values (and thus is a no-op)."
 (defun sigfpe-handler (signal info context)
   (declare (ignore signal))
   (declare (type system-area-pointer info))
+  #+loongarch64
+  (setf (floating-point-modes) (logand (floating-point-modes) #x001f031f))
   (let ((code (sb-unix::siginfo-code info)))
     (multiple-value-bind (op operands) (sb-di::decode-arithmetic-error-operands context)
       (with-interrupts
@@ -248,8 +250,9 @@ sets the floating point modes to their current values (and thus is a no-op)."
         ;; actually used to cause the exception to be delivered, and
         ;; which can be set from user code.  Compute the mask here,
         ;; and clear them below.
-        #+mips (cause-mask (dpb (lognot (float-trap-mask traps))
-                                float-exceptions-byte #xffffffff))
+        #+(or mips loongarch64)
+        (cause-mask (dpb (lognot (float-trap-mask traps))
+                         float-exceptions-byte #xffffffff))
         (orig-modes (gensym)))
     #+ppc64
     (unless (logbitp float-invalid-trap-bit (ldb float-sticky-bits exception-mask))
@@ -267,4 +270,4 @@ sets the floating point modes to their current values (and thus is a no-op)."
                (logior (logand ,orig-modes ,(logior traps exceptions))
                        (logand (floating-point-modes)
                                ,(logand trap-mask exception-mask
-                                        #+mips cause-mask))))))))
+                                        #+(or mips loongarch64) cause-mask))))))))
