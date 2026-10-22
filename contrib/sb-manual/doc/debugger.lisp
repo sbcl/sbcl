@@ -624,7 +624,8 @@
         contain frames for all invoked functions, even those in tail
         positions. ~TAIL-CALL-OPTIMIZATION
 
-  Inlining of local functions is inhibited so that they may be TRACEd.
+      - Inlining of local functions is inhibited so that they may be
+        TRACEd.
 
   - `> (MAX SPEED SPACE)`: If @DEBUG is greater than both @SPEED and
     @SPACE, the command `return` can be used to continue execution by

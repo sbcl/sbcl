@@ -1158,6 +1158,8 @@
   (sb-ext:get-time-of-day function)
   (sb-ext:assert-version->= function)
   (sb-ext:unencapsulated-function function)
+  (sb-ext:compile-file-position macro)
+  (sb-ext:compile-file-line macro)
   (documentation generic-function))
 
 (defsection @stale-extensions (:title "Stale Extensions")

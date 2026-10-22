@@ -16,9 +16,10 @@ compiler and in generating sb-alien structure and union types,
 @ref{defining foreign types}.
 
 The ASDF (@url{http://www.cliki.net/ASDF}) component type
-GROVEL-CONSTANTS-FILE has its @code{asdf:perform} operation defined to
-write out a C source file, compile it, and run it. The output from
-this program is Lisp, which is then itself compiled and loaded.
+@code{sb-grovel:grovel-constants-file} has its @code{asdf:perform} operation
+defined to write out a C source file, compile it, and run it. The
+output from this program is Lisp, which is then itself compiled and
+loaded.
 
 @code{sb-grovel} is used in a few contributed modules, and it is
 currently compatible only to SBCL. However, if you want to use it,

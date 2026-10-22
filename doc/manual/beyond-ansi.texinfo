@@ -2867,6 +2867,16 @@ Note that the unencapsulated function may be @code{eq} to the designated
 function even in the presence of encapsulations. For generic
 functions, this is currently always the case.
 @end deffn
+@anchor{Macro sb-ext compile-file-position}
+@ffindex @sortas{compile-file-position sb-ext} compile-file-position [sb-ext]
+@deffn{Macro} sb-ext:compile-file-position
+Return character position of this macro invocation or @code{nil} if unavailable.
+@end deffn
+@anchor{Macro sb-ext compile-file-line}
+@ffindex @sortas{compile-file-line sb-ext} compile-file-line [sb-ext]
+@deffn{Macro} sb-ext:compile-file-line
+Return line# and column# of this macro invocation as multiple values.
+@end deffn
 @anchor{Generic function common-lisp documentation}
 @ffindex @sortas{documentation common-lisp} documentation [common-lisp]
 @deffn{Generic function} documentation object doc-type

@@ -793,11 +793,17 @@ the other qualities are changed during compilation. We list what
 debug information is available at different levels of the @code{debug}
 quality:
 
-@cindex speed, optimization quality
-@cindex optimization quality speed
 @cindex tail call optimization
 @cindex optimization, tail call
 @cindex TCO
+@cindex debug, optimization quality
+@cindex optimization quality debug
+@cindex speed, optimization quality
+@cindex optimization quality speed
+@cindex space, optimization quality
+@cindex optimization quality space
+@cindex compilation-speed, optimization quality
+@cindex optimization quality compilation-speed
 @itemize
 @item @code{0<=}: Only the function name and enough information to allow the
   stack to be parsed.
@@ -826,20 +832,11 @@ run-time.
 @item @ref{tail call optimization} is disabled. Thus, backtraces will
       contain frames for all invoked functions, even those in tail
       positions. 
-@end itemize
+
+@item Inlining of local functions is inhibited so that they may be
+      @code{trace}d.
 @end itemize
 
-Inlining of local functions is inhibited so that they may be @code{trace}d.
-
-@cindex debug, optimization quality
-@cindex optimization quality debug
-@cindex speed, optimization quality
-@cindex optimization quality speed
-@cindex space, optimization quality
-@cindex optimization quality space
-@cindex compilation-speed, optimization quality
-@cindex optimization quality compilation-speed
-@itemize
 @item @code{> (max speed space)}: If @code{debug} is greater than both @code{speed} and
   @code{space}, the command @code{return} can be used to continue execution by
   returning a value from the current stack frame.

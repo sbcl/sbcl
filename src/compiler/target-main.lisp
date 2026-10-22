@@ -237,7 +237,9 @@
 ;;
 (let ()
 (defmacro compile-file-position (&whole this-form)
-  "Return character position of this macro invocation or NIL if unavailable."
+  "Return the character position of this macro invocation. This is in the
+  context of the file being compiled with COMPILE-FILE. Outside this
+  context or if the position cannot be determined, NIL is returned."
   ;; Counting characters is intuitive because the transfer element size is 1
   ;; measurement unit. The standard allows counting in something other than
   ;; characters (namely bytes) for character streams, which is basically
@@ -245,7 +247,11 @@
   (values (compute-compile-file-position this-form)))
 
 (defmacro compile-file-line (&whole this-form)
-  "Return line# and column# of this macro invocation as multiple values."
+  "Return the line number (starting from 1) and and column
+  number (starting from 0) of this macro invocation as multiple
+  values. This is in the context of the file being compiled with
+  COMPILE-FILE. Outside this context or if the line and column cannot
+  be determined, the values 0, -1 are returned."
   (let ((start (form-source-bounds this-form)))
     `(values ,(or (car start) 0) ,(or (cdr start) -1))))
 )

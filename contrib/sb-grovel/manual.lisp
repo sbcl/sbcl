@@ -7,9 +7,10 @@
   @DEFINING-FOREIGN-TYPES.
 
   The ASDF (<http://www.cliki.net/ASDF>) component type
-  GROVEL-CONSTANTS-FILE has its ASDF:PERFORM operation defined to
-  write out a C source file, compile it, and run it. The output from
-  this program is Lisp, which is then itself compiled and loaded.
+  SB-GROVEL:GROVEL-CONSTANTS-FILE has its ASDF:PERFORM operation
+  defined to write out a C source file, compile it, and run it. The
+  output from this program is Lisp, which is then itself compiled and
+  loaded.
 
   `SB-GROVEL` is used in a few contributed modules, and it is
   currently compatible only to SBCL. However, if you want to use it,
