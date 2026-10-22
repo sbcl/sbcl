@@ -73,8 +73,8 @@ changes relative to sbcl-2.6.9:
     x86-64, except for division.
   * optimization: improved type derivation for local functions.
   * documentation: SB-MANUAL has several new sections: @GETTING-SBCL,
-    @RUNNING-WITHOUT-INSTALLATION, @PARTS-OF-SBCL, @FINDING-PARTS-OF-SBCL, any
-    more under @EFFICIENCY.
+    @RUNNING-WITHOUT-INSTALLATION, @PARTS-OF-SBCL, @FINDING-PARTS-OF-SBCL, and
+    many more under @EFFICIENCY.
   * documentation: SB-MANUAL now includes variable initforms and argument
     default values in the Texinfo output.
 
