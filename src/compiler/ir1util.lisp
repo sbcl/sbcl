@@ -300,7 +300,7 @@
                       (pld (cast-lvar dest)))))))
     (pld lvar)))
 
-(defun let-lvar-dest (lvar &optional single-use)
+(defun let-lvar-dest (lvar &key single-use (closure t))
   (let (seen)
     (labels ((rec (lvar)
                (when (and lvar
@@ -321,7 +321,9 @@
                                   (refs (leaf-refs var)))
                              (when (and refs
                                         (not (cdr refs))
-                                        (not (lambda-var-sets var)))
+                                        (not (lambda-var-sets var))
+                                        (or closure
+                                            (not (closure-var-p var))))
                                (let ((ref (car refs)))
                                  (unless (memq ref seen)
                                    (push ref seen)
@@ -430,7 +432,7 @@
           (when (functional-kind-eq fun mv-let)
             (mv-let-arg-vars lvar fun dest)))))))
 
-(defun mv-bind-dest (lvar nth-value &optional single-use)
+(defun mv-bind-dest (lvar nth-value &key single-use (closure t))
   (let ((vars (mv-bind-vars lvar single-use)))
     (when vars
       (let* ((var (if nth-value
@@ -442,8 +444,12 @@
                         (leaf-refs var))))
         (when (and refs
                    (not (cdr refs))
-                   (not (lambda-var-sets var)))
-          (let-lvar-dest (node-lvar (car refs)) single-use))))))
+                   (not (lambda-var-sets var))
+                   (or closure
+                       (not (closure-var-p var))))
+          (let-lvar-dest (node-lvar (car refs))
+                         :single-use single-use
+                         :closure closure))))))
 
 (defun %cast-or-check-bound (node lvar &optional fixnum (single-value t))
   (cond ((cast-p node)

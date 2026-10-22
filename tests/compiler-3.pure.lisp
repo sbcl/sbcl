@@ -1226,3 +1226,17 @@
                    (min l m)))
             (f 0 (mod 28d0 4))))))
    (eql 0)))
+
+(with-test (:name :erase-lvar-type-nil)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (declare (fixnum x))
+         (multiple-value-bind (q r) (truncate (abs x) 100)
+           (declare (ignore q))
+           (opaque-identity (flet ((f ()
+                                     (zerop r)))
+                              (declare (notinline f))
+                              (f)))))
+    ((100) t)
+    ((101) nil)))

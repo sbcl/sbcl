@@ -504,7 +504,9 @@
         do (let ((dest (node-dest node)))
              (setf node
                    (if (mv-combination-p dest)
-                       (mv-bind-dest (node-lvar node) nil t)
+                       (mv-bind-dest (node-lvar node) nil
+                                     :single-use t
+                                     :closure nil)
                        dest))))
   node)
 
