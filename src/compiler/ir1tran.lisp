@@ -104,10 +104,14 @@
 
 (defvar *derive-function-types* nil
   "Should the compiler assume that function types will never change,
-  so that it can use type information inferred from current definitions
-  to optimize code which uses those definitions? Setting this true
-  gives non-ANSI, early-CMUCL behavior. It can be useful for improving
-  the efficiency of stable code.")
+  so that it can use type information inferred from current
+  definitions to optimize code which uses those definitions? Setting
+  this true gives non-ANSI, early-CMUCL behavior. It can be useful for
+  improving the efficiency of stable code at the cost of safety in
+  face of changing FTYPEs.
+
+  > _Warning_: Enabling this is _unsafe_. See
+  > SB-MANUAL:@GLOBAL-FUNCTION-TYPE-INFERENCE.")
 
 ;;;; namespace management utilities
 

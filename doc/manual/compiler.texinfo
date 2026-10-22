@@ -692,7 +692,9 @@ Lisp compilers. Under the default @ref{compiler policy}, the compiler
 doesn't blindly believe type declarations but considers them
 assertions about the program that should be checked: all type
 declarations that have not been proven to always hold are asserted
-at runtime.
+at runtime. This behavior allows @ref{type inference} to trust declared
+types and from them derive the types of other expressions, opening
+up lots of optimization possibilities.
 
 There are three type checking policies available in SBCL, selectable
 via @code{optimize} declarations.
@@ -717,7 +719,7 @@ definition, the function won't perform any type checks and the
 caller's trust in the type checking will be misplaced and
 render the caller unsafe. Adding or changing a @code{ftype}
 declaration necessitates recompiling the function definition
-and all its callers.
+and all its callers. See also @ref{global function type inference}.
 @end quotation
 
 @item @strong{Unsafe code} @code{(= safety 0)}
@@ -739,7 +741,7 @@ Note that CLOS slots with types declared using the @code{:type} slot option
 in @code{defclass} are asserted if and only if the class was defined in
 @emph{safe code} and the slot access location is in @emph{safe code} as well.
 This laxness does not pose any safety issues, as the CLOS slot types
-are not available for @@TYPE-INFERENCE, nor do CLOS slot types
+are not available for @ref{type inference}, nor do CLOS slot types
 provide any efficiency benefits.
 
 @node precise type checking

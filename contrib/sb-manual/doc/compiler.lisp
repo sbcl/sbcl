@@ -352,8 +352,8 @@
   (@precise-type-checking section)
   (@getting-existing-programs-to-run section))
 
-;; FIXME: See also sections \ref{advanced-type-stuff} and
-;; \ref{type-inference}, once we snarf them from the CMUCL manual.
+;; FIXME: See also sections \ref{advanced-type-stuff},, once we snarf
+;; it from the CMUCL manual.
 
 (defsection @type-declaration-checking (:title "Type Declaration Checking")
   "The SBCL compiler treats type declarations differently from most other
@@ -361,7 +361,9 @@
   doesn't blindly believe type declarations but considers them
   assertions about the program that should be checked: all type
   declarations that have not been proven to always hold are asserted
-  at runtime.
+  at runtime. This behavior allows @TYPE-INFERENCE to trust declared
+  types and from them derive the types of other expressions, opening
+  up lots of optimization possibilities.
 
   There are three type checking policies available in SBCL, selectable
   via OPTIMIZE declarations."
@@ -383,7 +385,7 @@
       > caller's trust in the type checking will be misplaced and
       > render the caller unsafe. Adding or changing a FTYPE
       > declaration necessitates recompiling the function definition
-      > and all its callers.
+      > and all its callers. See also @GLOBAL-FUNCTION-TYPE-INFERENCE.
 
   - __Unsafe code__ `(= SAFETY 0)`
 

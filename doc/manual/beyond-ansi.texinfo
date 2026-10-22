@@ -2870,12 +2870,18 @@ functions, this is currently always the case.
 @anchor{Macro sb-ext compile-file-position}
 @ffindex @sortas{compile-file-position sb-ext} compile-file-position [sb-ext]
 @deffn{Macro} sb-ext:compile-file-position
-Return character position of this macro invocation or @code{nil} if unavailable.
+Return the character position of this macro invocation. This is in the
+context of the file being compiled with @code{compile-file}. Outside this
+context or if the position cannot be determined, @code{nil} is returned.
 @end deffn
 @anchor{Macro sb-ext compile-file-line}
 @ffindex @sortas{compile-file-line sb-ext} compile-file-line [sb-ext]
 @deffn{Macro} sb-ext:compile-file-line
-Return line# and column# of this macro invocation as multiple values.
+Return the line number (starting from 1) and and column
+number (starting from 0) of this macro invocation as multiple
+values. This is in the context of the file being compiled with
+@code{compile-file}. Outside this context or if the line and column cannot
+be determined, the values 0, -1 are returned.
 @end deffn
 @anchor{Generic function common-lisp documentation}
 @ffindex @sortas{documentation common-lisp} documentation [common-lisp]

@@ -2,6 +2,7 @@
 
 (defsection @efficiency (:title "Efficiency"
                          :concepts ("efficicency"))
+  (@type-inference section)
   (@source-optimization section)
   (@tail-call section)
   (@local-call section)
@@ -13,6 +14,347 @@
   (@recognized-idioms section)
   (@global-and-always-bound-variables section)
   (@miscellaneous-efficiency-issues section))
+
+(defsection @type-inference (:title "Type Inference"
+                             :concepts (("type inference")
+                                        ("derivation of types")))
+  "Type inference is the process by which the compiler tries to figure
+  out the types of expressions and variables, given an inevitable lack
+  of complete type information. Although SBCL does more type inference
+  than most Common Lisp compilers, remember that the more precise and
+  comprehensive type declarations are, the more type inference will be
+  able to do."
+  (@variable-type-inference section)
+  (@local-function-type-inference section)
+  (@global-function-type-inference section)
+  (@operation-specific-type-inference section)
+  (@dynamic-type-inference section)
+  (@type-check-optimization section))
+
+(defsection @variable-type-inference
+    (:title "Variable Type Inference"
+     :concepts (("variable type inference")
+                ("type inference," "variable")))
+  "The type of a variable is the union of the types of all the
+  definitions. In the degenerate case of a LET, the type of the
+  variable is the type of the initial value. This inferred type is
+  intersected with any declared type and is then propagated to all the
+  variable's references. The types of MULTIPLE-VALUE-BIND variables
+  are similarly inferred from the types of the individual values of
+  the values form.
+
+  If multiple type declarations apply to a single variable, then all
+  the declarations must be correct; it is as though all the types were
+  intersected producing a single [AND][(clhs type)] type specifier. In
+  this example
+
+      (defmacro my-dotimes ((var count) &body body)
+        `(do ((,var 0 (1+ ,var)))
+             ((>= ,var ,count))
+           (declare (type (integer 0 *) ,var))
+           ,@body))
+
+      (my-dotimes (i ...)
+        (declare (fixnum i))
+        ...)
+
+  the two declarations for `I` are intersected, which yields that it
+  must be a non-negative fixnum.
+
+  In practice, this type inference is limited to
+  @LOCAL-CALLs (including @LET-CALLs), since the compiler can't
+  analyze all the calls to a global function. But type inference works
+  well enough on local variables so that it is often unnecessary to
+  declare the type of local variables. This is especially likely when
+  function result types and structure slot types are declared. The
+  main areas where type inference breaks down are:
+
+  - When the initial value of a variable is an untyped expression,
+    such as `(CAR X)`, and
+
+  - When the type of one of the variable's definitions is a function
+    of the variable's current value, as in `(SETQ X (1+ X))`.")
+
+(defsection @local-function-type-inference
+    (:title "Local Function Type Inference"
+     :concepts (("local call" "type inference")))
+  "The types of arguments to local functions are inferred in the same way
+  as any other local variable; the type is the union of the argument
+  types across all the calls to the function, intersected with the
+  declared type. If there are any assignments to the argument
+  variables, the type of the assigned value is unioned in as well.
+
+  The result type of a local function is computed in a special way
+  that takes @TAIL-RECURSION into consideration. The result type is
+  the union of all possible return values that aren't tail recursive.
+  For example, the compiler will infer that the result type of this
+  function is INTEGER:
+
+      (defun ! (n res)
+        (declare (integer n res))
+        (if (zerop n)
+            res
+            (! (1- n) (* n res))))
+
+  Although this is a rather obvious result, it becomes somewhat less
+  trivial in the presence of mutual tail recursion of multiple
+  functions. Local function result type inference interacts with the
+  mechanisms for ensuring proper tail calls mentioned in
+  @LOCAL-CALL-RETURN-VALUES.")
+
+(defsection @global-function-type-inference
+    (:title "Global Function Type Inference"
+     :concepts (("function," "type inference")))
+  "As described in @FUNCTION-TYPES, global function type (FTYPE)
+  declarations are trusted by the compiler at call sites unless the
+  @DEBUG optimization quality is 3. This can result in unsafe
+  propagation of the type constraints in the callee based on the
+  declared types of its arguments and return values.
+
+  For example, if we compile this:
+
+      (declaim (ftype (function () cons) foo))
+      (defun foo ()
+        (cons 1 2))
+
+      (defun bar ()
+        (car (foo)))
+
+  and subsequently redefine `FOO` as
+
+      (declaim (ftype (function () t) foo))
+      (defun foo ()
+        1)
+
+  we get a somewhat innocent looking style warning:
+
+      ; caught STYLE-WARNING:
+      ;   The new FTYPE proclamation for COMMON-LISP-USER::FOO
+      ;     (FUNCTION NIL T)
+      ;   does not match the old FTYPE proclamation
+      ;     (FUNCTION NIL (VALUES CONS &REST T))
+
+  However, here the consequences are on the harsher side of undefined
+  behavior:
+
+      CL-USER> (bar)
+      Unhandled memory fault at #xFFFFFFFFFFFFFFFB.
+
+  This happens because when compiling `BAR`, the compiler applied type
+  arithmetic to the active FTYPE of `FOO` (`cons`). Because a `cons`
+  satisfies `car`'s type requirement with 100% certainty, the compiler
+  completely eliminated the runtime type check. Upon redefinition, `BAR`
+  executes a raw memory pointer dereference on the integer `1`, triggering
+  an immediate hardware-level segmentation fault.
+
+  This happens because when compiling `BAR`, the compiler trusted the
+  then active FTYPE of `FOO`, with return value type CONS, and thus
+  omitted the type check for CONS from the inlined call to CAR.
+
+  > _Note_: A similar example can be constructed based on declared
+  > argument types.
+
+  > _Note_: Without explicit FTYPE declarations and with
+  > SB-EXT:*DERIVE-FUNCTION-TYPES* NIL, COMPILE-FILE itself does not
+  > trust the derived function types, which does a lot to mitigate the
+  > safety issue."
+  (sb-ext:*derive-function-types* variable))
+
+(defsection @operation-specific-type-inference
+    (:title "Operation-specific Type Inference"
+     :concepts (("operation-specific type inference")
+            ("arithmetic type inference")
+            ("numeric" "type inference")))
+  "Many of the standard Common Lisp functions have special type inference
+  procedures that determine the result type as a function of the
+  argument types. For example, the result type of AREF is the array
+  element type. Here are some other examples of type inferences:
+
+      (logand x #xFF) => (unsigned-byte 8)
+
+      (+ (the (integer 0 12) x) (the (integer 0 1) y)) => (integer 0 13)
+
+      (ash (the (unsigned-byte 16) x) -8) => (unsigned-byte 8)")
+
+(defsection @dynamic-type-inference (:title "Dynamic Type Inference"
+                                     :concepts (("dynamic type inference")
+                                                ("conditional type inference")
+                                                ("type inference," "dynamic")))
+  "SBCL uses flow analysis to infer types in dynamically typed
+  programs. For example:
+
+      (ecase x
+        (list (length x))
+        ...)
+
+  Here, the compiler knows the type of the argument to LENGTH because
+  LENGTH is called when X is a LIST. The most significant efficiency
+  effect of inference from assertions is usually in type check
+  optimization.
+
+  A similar optimization is possible for
+
+      (+ (car x) (length x))
+
+  Dynamic type inference has two inputs: explicit conditionals and
+  implicit or explicit type assertions. Flow analysis propagates these
+  constraints on variable type to any code that can be executed only
+  after passing through the constraint. Explicit type constraints come
+  from IFs where the test is either a lexical variable or a function
+  of lexical variables and constants, where the function is either a
+  type predicate, a numeric comparison or EQ. (FIXME: more?)
+
+  If there is an EQ or EQL test, then the compiler will actually
+  substitute one argument for the other in the true branch. For
+  example,
+
+      (when (eq x :yow!)
+        (return x))
+
+  becomes
+
+      (when (eq x :yow!)
+        (return :yow!))
+
+  This substitution is done when one argument is a constant or one
+  argument has better type information than the other. This
+  transformation reveals opportunities for constant folding or
+  type-specific optimizations. If the test is against a constant, then
+  the compiler can prove that the variable is not that constant value
+  in the false branch or `(NOT (MEMBER :YOW!))` in the example above.
+  This can eliminate redundant tests. For example,
+
+      (if (eq x nil)
+          ...
+          (if x a b))
+
+  is transformed to
+
+      (if (eq x nil)
+          ...
+          a)
+
+  Variables appearing as IF tests are interpreted as
+  `(NOT (EQ VAR NIL))` tests. The compiler also converts `=` into EQL
+  where possible. It is difficult to do inference directly on = since
+  it does implicit coercions.
+
+  When there is an explicit `<` or `>` test on numeric variables, the
+  compiler makes inferences about the ranges the variables can assume
+  in the true and false branches. This is mainly useful when it proves
+  that the values are small enough in magnitude to allow open-coding
+  of arithmetic operations. For example, in many uses of DOTIMES with
+  a FIXNUM repeat count, the compiler proves that fixnum arithmetic
+  can be used.
+
+  Implicit type assertions are quite common, especially if you declare
+  function argument types. Dynamic inference from implicit type
+  assertions sometimes helps to disambiguate programs to a useful
+  degree but is most noticeable when it detects a dynamic type error.
+  For example,
+
+      (defun foo (x)
+        (+ (car x) x))
+
+  results in this warning:
+
+      ; in: DEFUN FOO
+      ;     (+ (CAR X) X)
+      ;
+      ; note: deleting unreachable code
+      ;
+      ; caught WARNING:
+      ;   Derived type of X is
+      ;     (VALUES LIST &OPTIONAL),
+      ;   conflicting with its asserted type
+      ;     NUMBER.")
+
+(defsection @type-check-optimization
+    (:title "Type Check Optimization"
+     :concepts (("type checking" "optimization")
+                ("optimization," "type checking")
+                ("complemented type check")
+                ("optimization," "complemented type check")))
+  "SBCL backs up its support for @PRECISE-TYPE-CHECKING by minimizing
+  the cost of run-time type checking. This is done both through
+  @TYPE-INFERENCE and through optimizations of type checking itself.
+
+  Type inference often allows the compiler to prove that a value is of
+  the correct type, and thus no type check is necessary. For example:
+
+      (defstruct foo a b c)
+      (defstruct link
+        (foo (required-argument) :type foo)
+        (next nil :type (or link null)))
+
+      (foo-a (link-foo x))
+
+  Here, there is no need to check that the result of `LINK-FOO` is a
+  `FOO` since it always is. Even when some type checks are necessary,
+  type inference can often reduce the number:
+
+      (defun test (x)
+        (let ((a (foo-a x))
+              (b (foo-b x))
+              (c (foo-c x)))
+          ...))
+
+  In this above example, only one `(FOO-P X)` check is needed. This
+  applies to a lesser degree in list operations, such as
+
+      (if (eql (car x) 3)
+          (cdr x)
+          y)
+
+  where we only have to check that `X` is a list once.
+
+  Since the compiler recognizes explicit type tests, code that
+  explicitly protects itself against type errors has little introduced
+  overhead due to implicit type checking. For example, this loop
+  compiles with no type checks for CAR and CDR due to the termination
+  condition involving ATOM:
+
+      (defun memq (e l)
+        (do ((current l (cdr current)))
+            ((atom current) nil)
+          (when (eq (car current) e) (return current))))
+
+  The compiler reduces the cost of checks that must be done through an
+  optimization called _complementing_. A complemented check for
+  `\\TYPE` is simply a check that the value is not of the type
+  `(NOT TYPE)`. This is only interesting when something is known about
+  the actual type, in which case we can test for the complement of
+  `(AND KNOWN-TYPE (NOT TYPE))` or the difference between the known
+  type and the assertion. An example:
+
+      (link-foo (link-next x))
+
+  Here, we change the type check for `LINK-FOO` from a test for `FOO`
+  to a test for:
+
+      (not (and (or foo null)
+                (not foo)))
+
+  or more simply `(NOT NULL)`. This is probably the most important use
+  of complementing, since the situation is fairly common and a NULL
+  test is much cheaper than a structure type test.
+
+  Here is a more complicated example that illustrates the combination of
+  complementing with dynamic type inference:
+
+      (defun find-a (a x)
+        (declare (type (or link null) x))
+        (do ((current x (link-next current)))
+            ((null current) nil)
+          (let ((foo (link-foo current)))
+            (when (eq (foo-a foo) a) (return foo)))))
+
+  This loop can be compiled with no type checks. The `LINK` test for
+  `LINK-FOO` and `LINK-NEXT` is complemented to `(NOT NULL)` and then
+  deleted because of the explicit NULL test. As before, no check is
+  necessary for `FOO-A`, since `LINK-FOO` is always a `FOO`. This sort
+  of situation shows how @PRECISE-TYPE-CHECKING combined with precise
+  declarations can actually result in reduced type checking.")
 
 (defsection @source-optimization (:title "Source Optimization"
                                   :concepts (("source optimization")))
@@ -172,7 +514,7 @@
   expression, and the unreachable branch. This can be considered a
   special case of constant folding, although the test doesn't have to
   be truly constant as long as it is definitely false or definitely
-  not false. Note also, that type inference propagates the result of
+  not false. Note also, that @TYPE-INFERENCE propagates the result of
   an IF test to the true and false branches."
   ;; FIXME: add "(see @CONSTRAINT-PROPAGATION)" once that exists
   "A related IF optimization transforming
@@ -224,7 +566,7 @@
   to make control drop through to the target.")
 
 (defsection @unreachable-code-deletion
-    (:title "Dead Code Elimination"
+    (:title "Unreachable Code Elimination"
      :concepts (("unreachable code deletion")
                 ("dead code elimination")
                 ("optimization," "unreachable code deletion")
@@ -1275,7 +1617,6 @@
   - Advanced Compiler Use and Efficiency Hints
   - Advanced Compiler Introduction
   - More About Types in Python
-  - Type Inference
   - Object Representation
   - Numbers
   - General Efficiency Hints
