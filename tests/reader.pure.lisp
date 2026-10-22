@@ -413,9 +413,16 @@
 ;;; Lacking either, we acquire a string buffer from a global buffer pool.
 ;;; Pushing a buffer back onto the global pool creates one cons cell,
 ;;; in which case this test makes 1 cons per iteration.
+(defglobal *callcount* 0)
 (with-test (:name :name-char-does-not-cons
             :skipped-on (not (or :c-stack-is-control-stack :simulated-dx-strings)))
-  (test-reader-consing "#\\-"))
+  (sb-int:encapsulate 'sb-impl::name-char 'callcount
+    (compile nil '(lambda (f name) (incf *callcount*) (funcall f name))))
+  (unwind-protect
+       (progn (test-reader-consing "#\\Hyphen-Minus")
+              (test-reader-consing "#\\-"))
+    (sb-int:unencapsulate 'sb-impl::name-char 'callcount))
+  (assert (plusp *callcount*)))
 
 (with-test (:name :sharp-left-paren-empty-list)
   (assert (read-from-string "#0()")) ; edge case that works
