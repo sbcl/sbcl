@@ -1523,6 +1523,10 @@
   ;; do we publish the type. Null if there is no need to do a fixpoint
   ;; analysis.
   (optimistic-type nil :type (or null ctype))
+  ;; The leaf that VAR is assumed to be bound to by its function, if
+  ;; unique. Null initially, and :MANY when proven that the VAR is
+  ;; bound to many values.
+  (optimistic-leaf nil :type (or null leaf (eql :many)))
   source-form)
 
 (def-struct-flag-accessors lambda-var)

@@ -2808,17 +2808,18 @@ not inlined.")
 ;;; flush the FUN lvar.
 (defun delete-let (fun)
   (declare (type clambda fun))
-  (aver (functional-letlike-p fun))
+  (aver (functional-somewhat-letlike-p fun))
   (note-unreferenced-fun-vars fun)
-  (let ((call (let-combination fun))
-        (bind (lambda-bind fun)))
-    (flush-dest (basic-combination-fun call))
+  (let ((bind (lambda-bind fun)))
     (when (eq (car (node-source-path bind)) 'original-source-start)
       (setf (ctran-source-path (node-prev (car (leaf-refs fun))))
             (node-source-path bind)))
-    (unlink-node call)
     (unlink-node bind)
     (setf (lambda-bind fun) nil))
+  (dolist (ref (leaf-refs fun))
+    (let ((call (node-dest ref)))
+      (flush-dest (basic-combination-fun call))
+      (unlink-node call)))
   (setf (functional-kind fun) (functional-kind-attributes zombie))
   (let ((home (lambda-home fun)))
     (setf (lambda-lets home) (delq1 fun (lambda-lets home))))
@@ -2905,6 +2906,8 @@ not inlined.")
 ;;; If the function has an XEP, then we don't do anything, since we
 ;;; won't discover anything.
 ;;;
+;;; If the function is an ASSIGNMENT whose variables have all been
+;;; deleted, it binds nothing, so we delete it like a LET.
 
 ;;; We can clear the LVAR-REOPTIMIZE flags for arguments in all calls
 ;;; corresponding to changed arguments in CALL, since the only use in
@@ -2912,6 +2915,11 @@ not inlined.")
 ;;; right here.
 (defun propagate-local-call-args (call fun)
   (declare (type combination call) (type clambda fun))
+  (when (and (functional-kind-eq fun assignment)
+             (lambda-vars fun)
+             (every #'lambda-var-deleted (lambda-vars fun)))
+    (delete-let fun)
+    (return-from propagate-local-call-args))
   (unless (or (functional-entry-fun fun)
               (let ((optional (lambda-optional-dispatch fun)))
                 (and optional
@@ -3131,6 +3139,39 @@ not inlined.")
               (init-variable-optimistic-type leaf)
               leaf))))
 
+;;; Return VAR if it is bound to several leafs and never set, or
+;;; otherwise return the unique leaf it is bound to.
+(defun optimistic-var-leaf (var)
+  (let ((leaf (lambda-var-optimistic-leaf var)))
+    (if (and (eq leaf :many)
+             (not (lambda-var-sets var)))
+        var
+        leaf)))
+
+;;; The leaf whose value ARG delivers to VAR, following the leaves of
+;;; optimistic variables. NIL if ARG only passes VAR's own value along
+;;; or that of a variable nothing reaches yet.
+(defun lvar-optimistic-leaf (arg var)
+  (let ((use (and arg (lvar-uses arg))))
+    (if (ref-p use)
+        (let ((optimistic-var (optimistic-var use)))
+          (cond (optimistic-var
+                 (let ((leaf (optimistic-var-leaf optimistic-var)))
+                   (unless (eq leaf var)
+                     leaf)))
+                ((and (typep (ref-leaf use) '(or constant lambda-var))
+                      (constant-reference-p use))
+                 (ref-leaf use))
+                (t
+                 :many)))
+        :many)))
+
+;;; Join two optimistic leaves.
+(defun join-optimistic-leaves (leaf1 leaf2)
+  (cond ((null leaf1) leaf2)
+        ((or (null leaf2) (eq leaf1 leaf2)) leaf1)
+        (t :many)))
+
 ;;; Arbitrary. The number of times the type assumed to be returned by
 ;;; recursive functions can change before it stops following changes.
 (defparameter *optimistic-result-change-limit* 8)
@@ -3281,9 +3322,10 @@ not inlined.")
 
 ;;; Compute the union of the optimistic types of every variable of FUN
 ;;; across all calls and update those types whenever there is a reason
-;;; to do so. If any types ended up growing, we note that things have
-;;; changed. Set variables are handled similarly by treating their set
-;;; values like call arguments.
+;;; to do so, along with the leaves the values come from. If any types
+;;; or leaves changed, we note that things have changed. Set variables
+;;; are handled similarly by treating their set values like call
+;;; arguments.
 (defun accumulate-optimistic-arg-types (call fun)
   (declare (type basic-combination call) (type clambda fun))
   (let* ((vars (lambda-vars fun))
@@ -3297,13 +3339,18 @@ not inlined.")
       (dolist (var vars)
         (init-variable-optimistic-type var))
       (let ((accum-types (make-array (length vars) :initial-element *empty-type*))
-            (steps (make-array (length vars) :initial-element nil)))
-        (declare (dynamic-extent accum-types steps))
+            (steps (make-array (length vars) :initial-element nil))
+            (leaves (make-array (length vars) :initial-element nil)))
+        (declare (dynamic-extent accum-types steps leaves))
 
         (flet ((accumulate (arg var i)
                  (cond ((optimistic-step-p arg var)
+                        (setf (aref leaves i) :many)
                         (push arg (aref steps i)))
                        (t
+                        (setf (aref leaves i)
+                              (join-optimistic-leaves (aref leaves i)
+                                                      (lvar-optimistic-leaf arg var)))
                         (setf (aref accum-types i)
                               (type-union (aref accum-types i)
                                           (cond ((null arg) *universal-type*)
@@ -3327,11 +3374,48 @@ not inlined.")
               for i from 0
               when (lambda-var-optimistic-type var)
                 do (let ((new (optimistic-assumed-type var (aref accum-types i)
-                                                       (aref steps i))))
-                     (unless (type= new (lambda-var-optimistic-type var))
-                       (setf (lambda-var-optimistic-type var) new)
+                                                       (aref steps i)))
+                         (leaf (aref leaves i)))
+                     (unless (and (type= new (lambda-var-optimistic-type var))
+                                  (eq leaf (lambda-var-optimistic-leaf var)))
+                       (setf (lambda-var-optimistic-type var) new
+                             (lambda-var-optimistic-leaf var) leaf)
                        (mapc #'note-optimistic-change (leaf-refs var))))))))
   (values))
+
+;;; If optimistic propagation discovers that VAR is bound to only one
+;;; LEAF, then substitute it for VAR on suitable policy. LET variables
+;;; are left to PROPAGATE-LET-ARGS.
+(defun substitute-optimistic-leaf (var)
+  (declare (type lambda-var var))
+  (let ((leaf (lambda-var-optimistic-leaf var))
+        (home (lambda-var-home var)))
+    (when (and (leaf-p leaf)
+               (leaf-refs var)
+               (not (lambda-var-sets var))
+               (not (and (lambda-var-p leaf)
+                         (lambda-var-deleted leaf)))
+               (csubtypep (leaf-type leaf) (leaf-type var))
+               (let ((bind (lambda-bind home)))
+                 (functional-kind-case home
+                   ((let mv-let) nil)
+                   (assignment (not (preserve-single-use-debug-var-p bind var)))
+                   (t (policy bind (> speed debug)))))
+               ;; As in PROPAGATE-LET-ARGS, don't substitute lvars
+               ;; with annotations or dynamic extent.
+               (let ((n (position var (lambda-vars home))))
+                 (dolist (ref (leaf-refs home) t)
+                   (let* ((dest (node-dest ref))
+                          (arg (and (combination-p dest)
+                                    (nth n (combination-args dest)))))
+                     (when (or (not arg)
+                               (lvar-annotations arg)
+                               (lvar-dynamic-extent arg))
+                       (return nil))))))
+      (let ((component (lambda-component home)))
+        (substitute-leaf-if (lambda (ref)
+                              (eq (node-component ref) component))
+                            leaf var)))))
 
 ;;; Solve for the result types of recursive functions in COMPONENT,
 ;;; and check whether any functions in COMPONENT are still waiting for
@@ -3342,7 +3426,8 @@ not inlined.")
 ;;; component).
 ;;;
 ;;; If the optimistic type of a variable is empty, its function must
-;;; be unreachable and will be cleaned up later.
+;;; be unreachable and will be cleaned up later. If the variable is
+;;; only bound to one leaf, we substitute it for the variable.
 (defun publish-optimistic-types (component fastp)
   (declare (type component component))
   (flet ((check (fun)
@@ -3361,7 +3446,8 @@ not inlined.")
                    ;; XEP once we've decided its parameters are
                    ;; eligible for optimistic type propagation.
                    (aver (not (functional-entry-fun fun)))
-                   (propagate-to-refs var type)))))))
+                   (propagate-to-refs var type)
+                   (substitute-optimistic-leaf var)))))))
     (solve-optimistic-result-types component)
     (dolist (fun (component-lambdas component))
       (check fun)

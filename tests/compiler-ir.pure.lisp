@@ -1001,3 +1001,271 @@
          (sub (find '- vops :key (lambda (vop)
                                    (car (sb-c::vop-info-translate (sb-c::vop-info vop)))))))
     (assert (eq (sb-c::vop-info-tag (sb-c::vop-info sub)) :tagged))))
+
+#+sb-devel
+(with-test (:name (:assignment-lambda :substitute-and-delete))
+  ;; Test that we can substitute variables in assignment lambdas
+  ;; correctly and also delete them.
+  (let ((fun (inspect-ir
+              '(lambda (n z)
+                (labels ((id (n)
+                           n))
+                  (case n
+                    ((a b c d e f g)
+                     (id z))
+                    ((h i j k l m n)
+                     (id z))
+                    ((o p q r s t u)
+                     (id z))
+                    ((v w x y z)
+                     (id z)))))
+              (lambda (component)
+                (dolist (lambda (sb-c::component-lambdas component))
+                  (dolist (let (sb-c::lambda-lets lambda))
+                    (assert (not (sb-c::functional-kind-eq let sb-c::assignment))))
+                  ;; Make sure the local function is gone as well.
+                  (assert (not (and (sb-c::leaf-has-source-name-p lambda)
+                                    (eq (sb-c::leaf-source-name lambda) 'id)))))))))
+    (assert (= (funcall fun 'a 3) 3))
+    (assert (= (funcall fun 'l 3) 3))
+    (assert (= (funcall fun 's 3) 3))
+    (assert (= (funcall fun 'w 3) 3))))
+
+#+sb-devel
+(with-test (:name (:assignment-lambda :substitute :loop))
+  ;; Test that we can substitute variables in assignment lambdas
+  ;; correctly when one of the parameters is self-referential.
+  (let ((converted nil))
+    (let ((fun (inspect-ir
+                '(lambda (b x y)
+                  (labels ((f (n x)
+                             (if (zerop n)
+                                 x
+                                 (f (1- n) x))))
+                    (+ 2 (if (= b 5)
+                             (f x y)
+                             (f b y)))))
+                (lambda (component)
+                  (dolist (lambda (sb-c::component-lambdas component))
+                    (dolist (let (sb-c::lambda-lets lambda))
+                      (when (sb-c::functional-kind-eq let sb-c::assignment)
+                        ;; Let's verify that the variable X has been
+                        ;; deleted and substituted by Y.
+                        (assert (= (count-if-not (lambda (var)
+                                                   (sb-c::lambda-var-deleted var))
+                                                 (sb-c::lambda-vars let))
+                                   1))
+                        (setq converted t))))))))
+      (assert (= (funcall fun 5 3 4) 6))
+      (assert (= (funcall fun 6 3 4) 6))
+      (assert converted))))
+
+#+sb-devel
+(with-test (:name (:local-call :substitute :non-assignment))
+  ;; Test that we can eliminate parameters in standard non-assignment local functions
+  ;; when the parameter just cycles its own value.
+  (let ((local nil))
+    (let ((fun (inspect-ir
+                '(lambda (x val)
+                   (declare (optimize speed))
+                   (labels ((f (n invar)
+                              (if (plusp n)
+                                  (list (f (1- n) invar) (f (1- n) invar))
+                                  invar)))
+                     (list (f x val)
+                           (f x val))))
+                (lambda (component)
+                  (dolist (lambda (sb-c::component-lambdas component))
+                    (when (and (sb-c::leaf-has-source-name-p lambda)
+                               (eq (sb-c::leaf-source-name lambda) 'f))
+                      (setq local t)
+                      ;; Verify it wasn't assignment converted
+                      (assert (not (sb-c::functional-kind-eq lambda sb-c::assignment)))
+                      (let ((vars (sb-c::lambda-vars lambda)))
+                        (assert (= (length vars) 2))
+                        ;; 'n' is modified/used, should be alive
+                        (assert (not (sb-c::lambda-var-deleted (first vars))))
+                        ;; 'invar' is a pass-through loop invariant, should be deleted
+                        (assert (sb-c::lambda-var-deleted (second vars))))))))))
+      (assert (equal (funcall fun 1 42) '((42 42) (42 42))))
+      (assert local))))
+
+#+sb-devel
+(with-test (:name (:local-call :substitute :non-trivial-scc-non-assignment))
+  ;; Test we eliminiate invariant parameters on mutually recursive
+  ;; non-assignment lambdas.
+  (let ((f1-checked nil)
+        (f2-checked nil))
+    (let ((fun (inspect-ir
+                '(lambda (x val)
+                   (declare (optimize speed))
+                   (labels ((f1 (n a)
+                              (if (plusp n)
+                                  (list (f2 (1- n) a) (f2 (1- n) a))
+                                  a))
+                            (f2 (n b)
+                              (if (plusp n)
+                                  (list (f1 (1- n) b) (f1 (1- n) b))
+                                  b)))
+                     (list (f1 x val)
+                           (f2 x val))))
+                (lambda (component)
+                  (dolist (lambda (sb-c::component-lambdas component))
+                    (when (sb-c::leaf-has-source-name-p lambda)
+                      (let ((name (sb-c::leaf-source-name lambda)))
+                        (case name
+                          (f1
+                           (setq f1-checked t)
+                           (assert (not (sb-c::functional-kind-eq lambda sb-c::assignment)))
+                           (assert (sb-c::lambda-var-deleted (second (sb-c::lambda-vars lambda)))))
+                          (f2
+                           (setq f2-checked t)
+                           (assert (not (sb-c::functional-kind-eq lambda sb-c::assignment)))
+                           (assert (sb-c::lambda-var-deleted (second (sb-c::lambda-vars lambda)))))))))))))
+      (assert (equal (funcall fun 2 42) '(((42 42) (42 42)) ((42 42) (42 42)))))
+      (assert (and f1-checked f2-checked)))))
+
+#+sb-devel
+(with-test (:name (:local-call :substitute :dead-cycle-0-operands))
+  ;; Test that a dead cycle (0 outer operands) is collapsed without
+  ;; overflowing the stack or crashing. This happens when a function's
+  ;; entry block is deleted, leaving only internal recursive calls that
+  ;; pass parameters to each other.
+  (inspect-ir
+   '(lambda (x)
+      (block nil
+        (labels ((f (n a)
+                   (if (plusp n)
+                       ;; Non-tail calls
+                       (list (f (1- n) a) (f (1- n) a))
+                       a)))
+          (return-from nil x)
+          ;; This call is unreachable. IR1 will delete this block, removing
+          ;; the only external feed to 'a'. 'f' becomes a dead cycle.
+          (f 10 'unreachable))))
+   (lambda (component)
+     (dolist (lambda (sb-c::component-lambdas component))
+       ;; F should get deleted.
+       (assert (not (and (sb-c::leaf-has-source-name-p lambda)
+                         (eq (sb-c::leaf-source-name lambda) 'f))))))))
+
+#+sb-devel
+(with-test (:name (:local-call :substitute :multiple-large-sccs))
+  ;; Test that we can independently resolve multiple distinct,
+  ;; non-trivial SCCs (a 3-node cycle and a 4-node cycle) within the same
+  ;; component, none of which are assignment-converted.
+  (let ((f-checked 0)
+        (g-checked 0))
+    (let ((fun (inspect-ir
+                '(lambda (x val1 val2)
+                   (declare (optimize speed))
+                   (labels (;; SCC 1: f1 -> f2 -> f3 -> f1 (3 nodes)
+                            (f1 (n a)
+                              (if (plusp n)
+                                  (list (f2 (1- n) a) (f2 (1- n) a))
+                                  (if (zerop n)
+                                      ;; Link to SCC 2
+                                      (g1 x val2)
+                                      a)))
+                            (f2 (n b)
+                              (if (plusp n)
+                                  (list (f3 (1- n) b) (f3 (1- n) b))
+                                  b))
+                            (f3 (n c)
+                              (if (plusp n)
+                                  (list (f1 (1- n) c) (f1 (1- n) c))
+                                  c))
+
+                            ;; SCC 2: g1 -> g2 -> g3 -> g4 -> g1 (4 nodes)
+                            (g1 (n u)
+                              (if (plusp n)
+                                  (cons (g2 (1- n) u) (g2 (1- n) u))
+                                  u))
+                            (g2 (n v)
+                              (if (plusp n)
+                                  (cons (g3 (1- n) v) (g3 (1- n) v))
+                                  v))
+                            (g3 (n w)
+                              (if (plusp n)
+                                  (cons (g4 (1- n) w) (g4 (1- n) w))
+                                  w))
+                            (g4 (n z)
+                              (if (plusp n)
+                                  (cons (g1 (1- n) z) (g1 (1- n) z))
+                                  z)))
+                     (f1 x val1)))
+                (lambda (component)
+                  (dolist (lambda (sb-c::component-lambdas component))
+                    (when (sb-c::leaf-has-source-name-p lambda)
+                      (let ((name (sb-c::leaf-source-name lambda)))
+                        (case name
+                          ((f1 f2 f3)
+                           (incf f-checked)
+                           (assert (not (sb-c::functional-kind-eq lambda sb-c::assignment)))
+                           (assert (sb-c::lambda-var-deleted (second (sb-c::lambda-vars lambda)))))
+                          ((g1 g2 g3 g4)
+                           (incf g-checked)
+                           (assert (not (sb-c::functional-kind-eq lambda sb-c::assignment)))
+                           (assert (sb-c::lambda-var-deleted (second (sb-c::lambda-vars lambda)))))))))))))
+      ;; Test execution paths
+      (assert (equal (funcall fun 0 :foo :bar) :bar))
+      (assert (equal (funcall fun 1 :foo :bar) '(:foo :foo)))
+      ;; Verify all 7 local functions were processed correctly
+      (assert (= f-checked 3))
+      (assert (= g-checked 4)))))
+
+#+sb-devel
+(with-test (:name (:local-call :substitute :complex-topology-scc))
+  ;; Test that we correctly resolve a highly interconnected,
+  ;; multi-path SCC (7 nodes forming a figure-8 structure).
+  (let ((h-checked 0))
+    (let ((fun (inspect-ir
+                '(lambda (x val)
+                   (declare (optimize speed))
+                   (labels (;; h1 splits to h2 and h3
+                            (h1 (n a)
+                              (if (plusp n)
+                                  (list (h2 (1- n) a)
+                                        (h2 (1- n) a)
+                                        (h3 (1- n) a)
+                                        (h3 (1- n) a))
+                                  a))
+                            ;; h2 splits to h4 and h5
+                            (h2 (n b)
+                              (if (plusp n)
+                                  (list (h4 (1- n) b)
+                                        (h4 (1- n) b)
+                                        (h5 (1- n) b))
+                                  b))
+                            ;; h3 splits to h5 and h6
+                            (h3 (n c)
+                              (if (plusp n)
+                                  (list (h5 (1- n) c)
+                                        (h6 (1- n) c)
+                                        (h6 (1- n) c))
+                                  c))
+                            ;; h4, h5 converge to h7
+                            (h4 (n d)
+                              (if (plusp n) (list (h7 (1- n) d)) d))
+                            (h5 (n e)
+                              (if (plusp n) (list (h7 (1- n) e)) e))
+                            ;; h6 and h7 loop back to h1
+                            (h6 (n f)
+                              (if (plusp n) (list (h1 (1- n) f)) f))
+                            (h7 (n g)
+                              (if (plusp n) (list (h1 (1- n) g)) g)))
+                     (h1 x val)))
+                (lambda (component)
+                  (dolist (lambda (sb-c::component-lambdas component))
+                    (when (sb-c::leaf-has-source-name-p lambda)
+                      (let ((name (sb-c::leaf-source-name lambda)))
+                        (case name
+                          ((h1 h2 h3 h4 h5 h6 h7)
+                           (incf h-checked)
+                           (assert (not (sb-c::functional-kind-eq lambda sb-c::assignment)))
+                           (assert (sb-c::lambda-var-deleted (second (sb-c::lambda-vars lambda)))))))))))))
+      ;; Test execution: n=1 goes h1 -> (h2, h3).
+      ;; Both hit n=0 and return the invariant '42.
+      (assert (equal (funcall fun 1 42) '(42 42 42 42)))
+      ;; Verify all 7 interconnected functions were processed
+      (assert (= h-checked 7)))))
