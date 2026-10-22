@@ -587,7 +587,7 @@
               '(simple-array character (9))
               '(simple-array character (9))))))
 
-(with-test (:name :sharp-colon-base-char-preference :skipped-on (not sb-unicode))
+(with-test (:name :sharp-colon-base-char-preference :skipped-on (not :sb-unicode))
   (let ((syms (sb-vm:list-allocated-objects :all :type sb-vm:symbol-widetag)))
     (dolist (x syms)
       (when (eql (sb-kernel:generation-of x) sb-vm:+pseudo-static-generation+)

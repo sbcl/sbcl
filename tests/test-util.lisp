@@ -364,6 +364,27 @@
              (sb-c::fun-info-templates info))))))))
 
 (defun skipped-p (x)
+  ;; Precheck that the expression makes sense. Otherwise you have things like
+  ;; ":skipped-on (not some-nonexistent-feature)" and silently skip a test forever.
+  ;; The failure mode here isn't great - it should probably count as a failing test
+  ;; if the test's conditions themselves are bogus. But it's somewhat justifiable
+  ;; because validity of the expression is statically checkable, and you should not
+  ;; commit tests that have not made it through a run for syntactic validation.
+  ;; Anyway the pre-check does not change that in fact- the ERROR calls in SKIPPED-P
+  ;; were present but harder to reach, and would never fail for the subtle syntax
+  ;; problems like the wrong symbol "myfeature" vs correct ":myfeature" symbol.
+  (when x
+    (sb-int:named-let recurse ((x x))
+      (etypecase x
+        (keyword)
+        (cons
+         (ecase (car x)
+           (:vop-existsp)
+           ((:not not) (destructuring-bind (x) (cdr x) (recurse x)))
+           ((:and and :or or) (mapc #'recurse (cdr x))))))))
+  (%skipped-p x))
+
+(defun %skipped-p (x)
   (typecase x
     (cons
      (case (car x)
@@ -376,9 +397,9 @@
            (error "too many subexpressions in feature expression: ~S" x))
           ((null (cdr x))
            (error "too few subexpressions in feature expression: ~S" x))
-          (t (not (skipped-p (cadr x))))))
-       ((:and and) (every #'skipped-p (cdr x)))
-       ((:or or) (some #'skipped-p (cdr x)))
+          (t (not (%skipped-p (cadr x))))))
+       ((:and and) (every #'%skipped-p (cdr x)))
+       ((:or or) (some #'%skipped-p (cdr x)))
        (t
         (error "unknown operator in feature expression: ~S." x))))
     (symbol

@@ -1537,7 +1537,7 @@
          (write-sequence nil (the standard-object x) y nil))))
 
 (with-test (:name :or-bignum-single-float-no-notes
-            :skipped-on (not (or :arm64 ppc :x86 :x86-64)))
+            :skipped-on (not (or :arm64 :ppc :x86 :x86-64)))
   (checked-compile
    '(lambda (x) (declare (optimize speed)) (typep x '(or bignum single-float)))
    :allow-notes nil))
