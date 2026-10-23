@@ -334,7 +334,7 @@
          :format-control "List is circular:~%  ~S"
          :format-arguments (list list)
          :datum list
-         :type '(and list (satisfies list-length))))
+         :expected-type '(and list (satisfies list-length))))
 
 
 
