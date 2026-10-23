@@ -4796,6 +4796,30 @@
        0))
    (eql 0)))
 
+(with-test (:name (:cons-var-type :local-functions))
+  ;; A constant list walked by local functions, as by a variable set
+  ;; to its CDR.
+  (assert-type
+   (lambda (n)
+     (labels ((walk (l)
+                (when l
+                  (if (eql (car l) n)
+                      (car l)
+                      (walk (cdr l))))))
+       (walk '(a b c))))
+   (member a b c nil))
+  (assert-type
+   (lambda (n)
+     (labels ((walk (l)
+                (when l
+                  (if (eql (car l) n)
+                      (car l)
+                      (next (cdr l)))))
+              (next (l)
+                (walk l)))
+       (walk '(a b c))))
+   (member a b c nil)))
+
 (with-test (:name :test-headers-lowtag-only)
   (checked-compile-and-assert
    ()

@@ -3086,40 +3086,40 @@
 
 ;;;; CONS accessor DERIVE-TYPE optimizers
 
-;;; Find a possible CAR type a variable bound to a constant list with
-;;; all sets in the form of (setf x (cdr x))
-
+;;; Find a possible CAR type a variable bound to a constant list.
 (defun cons-var-type (lvar)
-  (let ((ref (principal-lvar-use lvar))
-        constant-lvar
-        value)
-    (when (and (ref-p ref)
-               (let ((leaf (ref-leaf ref)))
-                 (and
-                  (lambda-var-p leaf)
-                  (let ((lvar (lambda-var-ref-lvar ref t)))
-                    (flet ((good-lvar-p (lvar)
-                             (and lvar
-                                  (setf value (lvar-constant (setf constant-lvar lvar)))
-                                  (proper-or-dotted-list-p (setf value (constant-value value))))))
-                      (cond ((and (lambda-var-sets leaf)
-                                  (good-lvar-p lvar)))
-                            ;; (pop x) goes through a variable
-                            ((let* ((next-ref (principal-lvar-ref lvar))
-                                    (next-leaf (and (ref-p next-ref)
-                                                    (ref-leaf next-ref))))
-                               (when (and (lambda-var-p next-leaf)
-                                          (lambda-var-sets next-leaf))
-                                 (let ((lvar (lambda-var-ref-lvar next-ref t)))
-                                   (when (good-lvar-p lvar)
-                                     (setf leaf next-leaf)))))))))
-                  (loop for set in (lambda-var-sets leaf)
-                        for combination = (principal-lvar-ref-use (set-value set) t)
-                        always (and (combination-is combination '(cdr))
-                                    (let ((ref (principal-lvar-ref (car (combination-args combination)) t)))
-                                      (when ref
-                                        (eq (ref-leaf ref) leaf))))))))
-      (values constant-lvar value))))
+  (let* ((ref (principal-lvar-use lvar))
+         (var (and (ref-p ref) (ref-leaf ref))))
+    (when (and (lambda-var-p var)
+               (lambda-var-values-known-p var))
+      (let ((seen (list var))
+            (lvars '())
+            (walked nil)
+            constant-lvar
+            value)
+        (map-lambda-var-values
+         (lambda (lvar)
+           (setf seen (map-lambda-var-values* (lambda (lvar) (push lvar lvars))
+                                              lvar var seen)))
+         var)
+        (dolist (lvar lvars)
+          (let ((constant (and lvar (lvar-constant lvar))))
+            (cond ((and constant
+                        (proper-or-dotted-list-p (constant-value constant))
+                        (or (null constant-lvar)
+                            (eq (constant-value constant) value)))
+                   (setf constant-lvar lvar
+                         value (constant-value constant)))
+                  ((let ((combination (and lvar (principal-lvar-ref-use lvar t))))
+                     (and (combination-is combination '(cdr))
+                          (let ((ref (principal-lvar-ref (car (combination-args combination)) t)))
+                            (and ref
+                                 (memq (ref-leaf ref) seen)))))
+                   (setf walked t))
+                  (t
+                   (return-from cons-var-type nil)))))
+        (when (and constant-lvar walked)
+          (values constant-lvar value))))))
 
 (defun cons-var-car-type (lvar)
   (multiple-value-bind (constant-lvar value) (cons-var-type lvar)
