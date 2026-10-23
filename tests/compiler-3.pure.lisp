@@ -726,6 +726,36 @@
   (def :logior 0 (logior x d) (unsigned-byte 8))
   (def :ash 1 (ash x d) (integer 1)))
 
+(with-test (:name (:optimistic-type :copies-between-local-functions))
+  (assert-type
+   (lambda (l)
+     (labels ((head (l c)
+                (declare (fixnum c))
+                (if l
+                    (if (car l)
+                        (join (cdr l) (1+ c))
+                        (join (cdr l) c))
+                    c))
+              (join (l c)
+                (declare (fixnum c))
+                (head l c)))
+       (head l 0)))
+   (and unsigned-byte fixnum))
+  (assert-type
+   (lambda (l)
+     (labels ((head (l c)
+                (declare (fixnum c))
+                (if l
+                    (if (car l)
+                        (list (join (cdr l) (1+ c)))
+                        (list (join (cdr l) c)))
+                    c))
+              (join (l c)
+                (declare (fixnum c))
+                (list (head l c))))
+       (head l 0)))
+   (or cons (and unsigned-byte fixnum))))
+
 (with-test (:name (:recursive-local-function-result-type :merged-tail-set :lp2169497))
   (checked-compile-and-assert
    (:allow-style-warnings t)

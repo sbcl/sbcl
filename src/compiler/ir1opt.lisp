@@ -343,13 +343,18 @@
                 (reoptimize-node dest))))
           (setf (block-reoptimize block) t)
           (reoptimize-component component :maybe))
-        (loop for node in (lvar-dependent-nodes lvar)
-              unless (or (not (node-p node))
-                         (node-deleted node))
-              do
-              (setf (node-reoptimize node) t)
-              (setf (block-reoptimize (node-block node)) t)
-              (reoptimize-component (node-component node) :maybe)))))
+        (dolist (node (lvar-dependent-nodes lvar))
+          (cond ((lambda-p node)
+                 ;; The optimistic types of its variables depend
+                 ;; on LVAR.
+                 (unless (functional-kind-eq node deleted zombie)
+                   (note-optimistic-pending node)))
+                ((or (not (node-p node))
+                     (node-deleted node)))
+                (t
+                 (setf (node-reoptimize node) t)
+                 (setf (block-reoptimize (node-block node)) t)
+                 (reoptimize-component (node-component node) :maybe)))))))
   (values))
 
 (defun reoptimize-node (node)
@@ -2611,17 +2616,21 @@ not inlined.")
 ;;; Return the type VAR converges to starting from INITIAL-TYPE given
 ;;; that VAR takes on VALUES. The type of each value may itself depend
 ;;; on the type of VAR, so this computation is optimistic in
-;;; nature. Return NIL if computing the type this way does not
+;;; nature. We reoptimize DEPENDENTS if some intermediate type
+;;; computation changed. SAME is a list of variables which are aliased
+;;; to VAR. Return NIL if computing the type this way does not
 ;;; converge, or the initial type is empty.
-(defun converged-var-type (var initial-type values)
+(defun converged-var-type (var initial-type values &optional dependent same)
   (when (eq initial-type *empty-type*)
     (return-from converged-var-type))
   (flet ((derive (types)
            (let ((type (single-value-type (car types))))
-             (flet ((assumed-type (node)
-                      (and (ref-p node)
-                           (eq (ref-leaf node) var)
-                           type)))
+             (labels ((same-p (leaf)
+                        (or (eq leaf var) (memq leaf same)))
+                      (assumed-type (node)
+                        (and (ref-p node)
+                             (same-p (ref-leaf node))
+                             type)))
                (declare (dynamic-extent #'assumed-type))
                (collect ((derived *empty-type* type-union))
                  (dolist (value values)
@@ -2629,13 +2638,14 @@ not inlined.")
                      ;; Ignore the type from VAR itself so we don't
                      ;; poison it with a more conservative type.
                      (unless (and (ref-p use)
-                                  (eq (ref-leaf use) var))
+                                  (same-p (ref-leaf use)))
                        (let ((use-type (numeric-hulls
                                         (single-value-type
                                          (node-derived-type use))))
                              (type (node-optimistic-type
                                     use *optimistic-solve-depth*
-                                    #'assumed-type (lvar-dest value))))
+                                    #'assumed-type
+                                    (or dependent (lvar-dest value)))))
                          (derived (if type
                                       (type-intersection type use-type)
                                       use-type))))))
@@ -3278,12 +3288,59 @@ not inlined.")
             (type-intersection type
                                (single-value-type (cast-asserted-type node))))))))
 
+;;; True if all the values VAR can take on are known, either by
+;;; binding or assignment.
+(defun lambda-var-values-known-p (var)
+  (declare (type lambda-var var))
+  (let ((home (lambda-var-home var)))
+    (and home
+         (not (lambda-var-deleted var))
+         (or (functional-kind-eq home let)
+             (optimistic-type-propagatable-fun-p home)))))
+
+;;; Call FUN on each lvar that VAR can take on, either by binding or
+;;; assignment.
+(defun map-lambda-var-values (fun var)
+  (declare (function fun)
+           (dynamic-extent fun)
+           (type lambda-var var))
+  (let ((home (lambda-var-home var)))
+    (if (functional-kind-eq home let)
+        (funcall fun (let-var-initial-value var))
+        (let ((n (position var (lambda-vars home))))
+          (dolist (ref (leaf-refs home))
+            (funcall fun (nth n (combination-args (node-dest ref)))))))
+    (dolist (set (lambda-var-sets var))
+      (funcall fun (set-value set)))))
+
+;;; Like MAP-LAMBDA-VAR-VALUES, but recursive on the lambda vars.
+(defun map-lambda-var-values* (fun value var seen)
+  (declare (function fun)
+           (dynamic-extent fun)
+           (type (or null lvar) value)
+           (type lambda-var var))
+  (let* ((use (and value (lvar-uses value)))
+         (other (and (ref-p use) (ref-leaf use))))
+    (cond ((memq other seen))
+          ((and (lambda-var-p other)
+                (lambda-var-values-known-p other))
+           (push other seen)
+           (map-lambda-var-values
+            (lambda (value)
+              (setf seen (map-lambda-var-values* fun value var seen)))
+            other))
+          (t
+           (funcall fun value))))
+  seen)
+
 ;;; Return true if ARG carries VAR forward from its own previous value
-;;; rather than delivering an unrelated one.
-(defun optimistic-step-p (arg var)
+;;; rather than delivering an unrelated one. SAME is a list of
+;;; variables which are aliased to VAR.
+(defun optimistic-step-p (arg var &optional same)
   (flet ((assumed-type (node)
            (and (ref-p node)
-                (eq (ref-leaf node) var)
+                (let ((leaf (ref-leaf node)))
+                  (or (eq leaf var) (memq leaf same)))
                 *universal-type*)))
     (declare (dynamic-extent #'assumed-type))
     (and arg
@@ -3294,9 +3351,12 @@ not inlined.")
 ;;; Return the optimistic type of VAR, given BASE, the union of what
 ;;; its arguments contribute outright, and STEPS, the lvars of the
 ;;; arguments that step it from its own previous value.
-(defun optimistic-assumed-type (var base steps)
+(defun optimistic-assumed-type (var base steps &optional same)
   (or (and steps
-           (converged-var-type var base steps))
+           ;; The steps may be values of variables VAR is a copy of,
+           ;; so it is VAR's function which has to be solved again
+           ;; when they change.
+           (converged-var-type var base steps (lambda-var-home var) same))
       (let ((type base))
         (dolist (step steps type)
           (setf type (type-union type (lvar-type step)))))))
@@ -3340,22 +3400,21 @@ not inlined.")
         (init-variable-optimistic-type var))
       (let ((accum-types (make-array (length vars) :initial-element *empty-type*))
             (steps (make-array (length vars) :initial-element nil))
-            (leaves (make-array (length vars) :initial-element nil)))
-        (declare (dynamic-extent accum-types steps leaves))
+            (leaves (make-array (length vars) :initial-element nil))
+            (arg-values (make-array (length vars) :initial-element nil))
+            (seen (make-array (length vars) :initial-element nil)))
+        (declare (dynamic-extent accum-types steps leaves arg-values seen))
 
         (flet ((accumulate (arg var i)
-                 (cond ((optimistic-step-p arg var)
-                        (setf (aref leaves i) :many)
-                        (push arg (aref steps i)))
-                       (t
-                        (setf (aref leaves i)
-                              (join-optimistic-leaves (aref leaves i)
-                                                      (lvar-optimistic-leaf arg var)))
-                        (setf (aref accum-types i)
-                              (type-union (aref accum-types i)
-                                          (cond ((null arg) *universal-type*)
-                                                ((lvar-optimistic-type arg))
-                                                (t (lvar-type arg)))))))))
+                 (setf (aref leaves i)
+                       (join-optimistic-leaves (aref leaves i)
+                                               (lvar-optimistic-leaf arg var)))
+                 ;; Look through copies of other variables to their
+                 ;; values.
+                 (setf (aref seen i)
+                       (map-lambda-var-values*
+                        (lambda (value) (push value (aref arg-values i)))
+                        arg var (or (aref seen i) (list var))))))
           (dolist (ref (leaf-refs fun))
             (let ((dest (node-dest ref)))
               (when dest
@@ -3373,8 +3432,21 @@ not inlined.")
         (loop for var in vars
               for i from 0
               when (lambda-var-optimistic-type var)
+                do (dolist (value (aref arg-values i))
+                     (if (optimistic-step-p value var (aref seen i))
+                         (push value (aref steps i))
+                         (setf (aref accum-types i)
+                               (type-union (aref accum-types i)
+                                           (cond ((null value) *universal-type*)
+                                                 ((lvar-optimistic-type value))
+                                                 (t (lvar-type value))))))))
+
+        (loop for var in vars
+              for i from 0
+              when (lambda-var-optimistic-type var)
                 do (let ((new (optimistic-assumed-type var (aref accum-types i)
-                                                       (aref steps i)))
+                                                       (aref steps i)
+                                                       (aref seen i)))
                          (leaf (aref leaves i)))
                      (unless (and (type= new (lambda-var-optimistic-type var))
                                   (eq leaf (lambda-var-optimistic-leaf var)))
