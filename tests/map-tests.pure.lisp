@@ -250,4 +250,11 @@
       (:optimize :default)
       `(lambda (x)
          (map '(cons integer) #'1+ x))
-    (('(1.0)) (condition 'type-error))))
+    (('(1.0)) (condition 'type-error)))
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (p x)
+         (map (if p
+                  'vector
+                  'cons) #'1+ x))
+    ((nil nil) (condition 'type-error))))

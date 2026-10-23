@@ -142,21 +142,16 @@
 ;;; MAP is %MAP plus a check to make sure that any length specified in
 ;;; the result type matches the actual result. We also wrap it in a
 ;;; TRULY-THE for the most specific type we can determine.
-(deftransform map ((result-type-arg fun seq &rest seqs) * * :node node)
+(deftransform map ((result-type-arg fun seq &rest seqs) ((constant-arg t) &rest t) * :node node)
   (let* ((seq-names (make-gensym-list (length seqs)))
-         (constant-result-type-arg-p (constant-lvar-p result-type-arg))
          (nil-p)
          ;; what we know about the type of the result. (Note that the
          ;; "result type" argument is not necessarily the type of the
          ;; result, since NIL means the result has NULL type.)
-         (result-type (if constant-result-type-arg-p
-                          (let ((result-type-arg-value
-                                  (lvar-value result-type-arg)))
-                            (cond (result-type-arg-value)
-                                  (t
-                                   (setf nil-p t)
-                                   'null)))
-                          'consed-sequence))
+         (result-type (cond ((lvar-value result-type-arg))
+                            (t
+                             (setf nil-p t)
+                             'null)))
          (result-ctype (ir1-transform-specifier-type result-type)))
     (check-sequence-result-type result-ctype node)
     `(lambda (result-type-arg fun seq ,@seq-names)
