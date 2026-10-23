@@ -4219,7 +4219,7 @@ is :ANY, the function name is not checked."
   (setf (node-derived-type node) type
         (lvar-%derived-type (node-lvar node)) nil))
 
-(defun creation-result-type-specifier (lvar &optional nil-nil)
+(defun creation-result-type-specifier (lvar &optional nil-nil strip-list-dimensions)
   (flet ((handle-constant (specifier)
            (let ((lspecifier (if (atom specifier) (list specifier) specifier)))
              (cond
@@ -4240,7 +4240,10 @@ is :ANY, the function name is not checked."
                 (specifier-type 'null))
                (t
                 (let ((ctype (careful-specifier-type specifier)))
-                  (cond ((not (array-type-p ctype))
+                  (cond ((and strip-list-dimensions
+                              (csubtypep ctype (specifier-type 'list)))
+                         (specifier-type 'list))
+                        ((not (array-type-p ctype))
                          ctype)
                         ((unknown-type-p (array-type-element-type ctype))
                          (make-array-type (array-type-dimensions ctype)

@@ -461,11 +461,11 @@
       (when (and lvar (constant-lvar-p lvar))
         (careful-specifier-type (lvar-value lvar))))))
 
-(defun creation-result-type-specifier-nth-arg (n &optional nil-nil)
+(defun creation-result-type-specifier-nth-arg (n &optional nil-nil strip-list-dimensions)
   (lambda (call)
     (let ((lvar (nth n (basic-combination-args call))))
       (when lvar
-        (creation-result-type-specifier lvar nil-nil)))))
+        (creation-result-type-specifier lvar nil-nil strip-list-dimensions)))))
 
 (defun read-elt-type-deriver (skip-arg-p element-type-spec no-hang)
   (lambda (call)

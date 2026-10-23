@@ -239,3 +239,15 @@
    (lambda (n f x)
      (map (if n 'list 'vector) f x))
    (or list simple-vector)))
+
+(with-test (:name :map-type-check)
+  (checked-compile-and-assert
+    (:optimize :default)
+    `(lambda (x)
+       (map 'cons #'identity x))
+    ((nil) (condition 'type-error)))
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (x)
+         (map '(cons integer) #'1+ x))
+    (('(1.0)) (condition 'type-error))))

@@ -721,7 +721,7 @@
                                                     (nth-arg 0 :sequence-type t))
                                &rest sequence) consed-sequence
   (call no-verify-arg-count foldable-read-only)
-  :derive-type (creation-result-type-specifier-nth-arg 0 t))
+  :derive-type (creation-result-type-specifier-nth-arg 0 t t))
 (defknown %map-for-effect-arity-1 (function-designator sequence) null
   (call no-verify-arg-count))
 (defknown %map-to-list-arity-1 ((function-designator ((nth-arg 1 :sequence t))) sequence) list
