@@ -2776,8 +2776,7 @@ many elements are copied."
                                         (declare (ignore key))
                                         (funcall (truly-the function test) x y))))))
             (do ((tail (and (not whole)
-                            (nthcdr end list)))
-                 (copied current))
+                            (nthcdr end list))))
                 ((eq current tail))
               (let ((elt (pop current)))
                 (when (cond (whole
