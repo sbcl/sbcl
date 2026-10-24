@@ -61,5 +61,5 @@ else
   echo "Triggered DONT-SAVE finalizer: FAIL"
   exit 1
 fi
-rm "$tmpcore"
+rm "$tmpcore" || true
 exit $EXIT_TEST_WIN
