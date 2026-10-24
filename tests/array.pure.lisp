@@ -1203,7 +1203,13 @@
    (lambda (i)
      (declare ((integer 2 5) i))
      (aref #(0 0 1 2 3 4) i))
-   (integer 1 4)))
+   (integer 1 4))
+  (assert-type
+   (lambda (i)
+     (declare ((integer 1 4) i))
+     (aref #.(make-array 6 :fill-pointer 2 :adjustable t
+                           :initial-contents '(1 2 3 4 5 10)) i))
+   (integer 2 5)))
 
 (with-test (:name :elt-empty-array)
   (assert

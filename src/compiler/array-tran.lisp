@@ -390,7 +390,9 @@
                              (when (and low high)
                                (let* ((seq (constant-value constant))
                                       (seq-high (and (proper-sequence-p seq)
-                                                     (1- (length seq)))))
+                                                     (1- (if (arrayp seq)
+                                                             (array-total-size seq)
+                                                             (length seq))))))
                                  (when (and seq-high
                                             (or (plusp low)
                                                 (< high seq-high)))
