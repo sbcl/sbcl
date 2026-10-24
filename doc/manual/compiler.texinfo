@@ -667,7 +667,6 @@ definition, then the first two subforms are returned.
 * Type Declaration Checking: type declaration checking.
 * Precise Type Checking: precise type checking.
 * Getting Existing Programs to Run: getting existing programs to run.
-* Implementation Limitations: implementation limitations.
 @end menu
 
 The most important features of the SBCL compiler (similar
@@ -695,10 +694,6 @@ assertions about the program that should be checked: all type
 declarations that have not been proven to always hold are asserted
 at runtime.
 
-@emph{Remaining bugs in the compiler's handling of types unfortunately
-provide some exceptions to this rule. See
-@ref{implementation limitations}.}
-
 There are three type checking policies available in SBCL, selectable
 via @code{optimize} declarations.
 
@@ -712,23 +707,40 @@ be checked at compile or run time, and all type checks are
 precise. The default compilation policy provides full type
 checks.
 
+@quotation
+@cindex debug, optimization quality
+@cindex optimization quality debug
+@strong{Warning}: The callee's @code{ftype} declaration is trusted when
+compiling the caller unless the @code{debug} (!) optimization
+quality is 3. Thus, if an @code{ftype} is placed after the function
+definition, the function won't perform any type checks and the
+caller's trust in the type checking will be misplaced and
+render the caller unsafe. Adding or changing a @code{ftype}
+declaration necessitates recompiling the function definition
+and all its callers.
+@end quotation
+
 @item @strong{Unsafe code} @code{(= safety 0)}
 
 No type checks. All declarations are believed without
 assertions. Also disables argument count and array bounds
-checking.
-
-@quotation
-@strong{Warning}: Any type errors in code where type checks are not
+checking. Any type errors in code where type checks are not
 performed are liable to corrupt the heap.
-@end quotation
 @end itemize
 
-There is a third option called Weak Type Checking, where declared
-types may be simplified into faster to check supertypes: for
-example, @code{(or (integer -17 -7) (integer 7 17))} is simplified
-into @code{(integer -17 17)}. This option is also unsafe and is no longer
-available by any combination of the standard optimization qualities.
+There is a third option of mostly historical interest called Weak
+Type Checking, where declared types may be simplified into faster to
+check supertypes: for example, @code{(or (integer -17 -7) (integer 7
+17))} is simplified into @code{(integer -17 17)}. This option is also
+unsafe and is no longer available by any combination of the standard
+optimization qualities.
+
+Note that CLOS slots with types declared using the @code{:type} slot option
+in @code{defclass} are asserted if and only if the class was defined in
+@emph{safe code} and the slot access location is in @emph{safe code} as well.
+This laxness does not pose any safety issues, as the CLOS slot types
+are not available for @@TYPE-INFERENCE, nor do CLOS slot types
+provide any efficiency benefits.
 
 @node precise type checking
 @cindex precise type checking
@@ -890,21 +902,6 @@ numeric argument. Another possible fix would be to say:
 This would be preferable in some circumstances since it would allow
 a non-standard representation to be used for the local @code{pos}
 variable in the loop body.
-
-@node implementation limitations
-@subsection Implementation Limitations
-
-If an @code{ftype} is placed after the function definition, the function
-won't perform any type checks and the calls to the function will
-blindly trust the declared types. (@code{optimize} (@code{debug} 3)) will not
-trust any @code{ftype} declarations.
-
-CLOS slot types form a notable exception. Types declared using the
-@code{:type} slot option in @code{defclass} are asserted if and only if the class
-was defined in @emph{safe code} and the slot access location is in @emph{safe
-code} as well. This laxness does not pose any internal consistency
-issues, as the CLOS slot types are not available for the type
-inferencer, nor do CLOS slot types provide any efficiency benefits.
 
 @node compiler policy
 @section Compiler Policy

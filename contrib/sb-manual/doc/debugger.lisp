@@ -627,6 +627,8 @@
       - Inlining of local functions is inhibited so that they may be
         TRACEd.
 
+      - @TYPE-DECLARATION-CHECKING does not trust FTYPE declarations.
+
   - `> (MAX SPEED SPACE)`: If @DEBUG is greater than both @SPEED and
     @SPACE, the command `return` can be used to continue execution by
     returning a value from the current stack frame.

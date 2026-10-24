@@ -350,8 +350,7 @@
   types involving the SATISFIES type specifier."
   (@type-declaration-checking section)
   (@precise-type-checking section)
-  (@getting-existing-programs-to-run section)
-  (@implementation-limitations section))
+  (@getting-existing-programs-to-run section))
 
 ;; FIXME: See also sections \ref{advanced-type-stuff} and
 ;; \ref{type-inference}, once we snarf them from the CMUCL manual.
@@ -364,12 +363,12 @@
   declarations that have not been proven to always hold are asserted
   at runtime.
 
-  _Remaining bugs in the compiler's handling of types unfortunately
-  provide some exceptions to this rule. See
-  @IMPLEMENTATION-LIMITATIONS._
-
   There are three type checking policies available in SBCL, selectable
   via OPTIMIZE declarations."
+  ;; Whether DEBUG 3 is an odd way to control safety is in the eye of
+  ;; the beholder. See parts of the email thread "Make (DECLARE
+  ;; (VALUES ...)) significantly more helpful" on sbcl-devel. -- MG,
+  ;; 2026-10-24
   "- __Safe code__ `(>= SAFETY 1)` ~SAFETY
 
       Full type checks. All declarations are considered assertions to
@@ -377,20 +376,35 @@
       precise. The default compilation policy provides full type
       checks.
 
+      > __Warning__: The callee's FTYPE declaration is trusted when
+      > compiling the caller unless the @DEBUG (!) optimization
+      > quality is 3. Thus, if an FTYPE is placed after the function
+      > definition, the function won't perform any type checks and the
+      > caller's trust in the type checking will be misplaced and
+      > render the caller unsafe. Adding or changing a FTYPE
+      > declaration necessitates recompiling the function definition
+      > and all its callers.
+
   - __Unsafe code__ `(= SAFETY 0)`
 
       No type checks. All declarations are believed without
       assertions. Also disables argument count and array bounds
-      checking.
+      checking. Any type errors in code where type checks are not
+      performed are liable to corrupt the heap.
 
-      > __Warning__: Any type errors in code where type checks are not
-      > performed are liable to corrupt the heap.
+  There is a third option of mostly historical interest called Weak
+  Type Checking, where declared types may be simplified into faster to
+  check supertypes: for example, `(OR (INTEGER -17 -7) (INTEGER 7
+  17))` is simplified into `(INTEGER -17 17)`. This option is also
+  unsafe and is no longer available by any combination of the standard
+  optimization qualities.
 
-  There is a third option called Weak Type Checking, where declared
-  types may be simplified into faster to check supertypes: for
-  example, `(OR (INTEGER -17 -7) (INTEGER 7 17))` is simplified
-  into `(INTEGER -17 17)`. This option is also unsafe and is no longer
-  available by any combination of the standard optimization qualities.")
+  Note that CLOS slots with types declared using the :TYPE slot option
+  in DEFCLASS are asserted if and only if the class was defined in
+  _safe code_ and the slot access location is in _safe code_ as well.
+  This laxness does not pose any safety issues, as the CLOS slot types
+  are not available for @TYPE-INFERENCE, nor do CLOS slot types
+  provide any efficiency benefits.")
 
 (defsection @precise-type-checking (:title "Precise Type Checking"
                                     :concepts (("precise" "type checking")
@@ -534,19 +548,6 @@
   ;; FIXME: <xref>ND-variables (non-descriptor, i.e. unboxed), once we
   ;; crib the text from the CMUCL manual.
   )
-
-(defsection @implementation-limitations (:title "Implementation Limitations")
-  "If an FTYPE is placed after the function definition, the function
-  won't perform any type checks and the calls to the function will
-  blindly trust the declared types. (OPTIMIZE (DEBUG 3)) will not
-  trust any FTYPE declarations.
-
-  CLOS slot types form a notable exception. Types declared using the
-  :TYPE slot option in DEFCLASS are asserted if and only if the class
-  was defined in _safe code_ and the slot access location is in _safe
-  code_ as well. This laxness does not pose any internal consistency
-  issues, as the CLOS slot types are not available for the type
-  inferencer, nor do CLOS slot types provide any efficiency benefits.")
 
 ;;; FIXME: Mention non-ANSI quantities.
 (defsection @compiler-policy (:title "Compiler Policy")

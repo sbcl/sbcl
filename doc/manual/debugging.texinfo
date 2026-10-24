@@ -835,6 +835,8 @@ run-time.
 
 @item Inlining of local functions is inhibited so that they may be
       @code{trace}d.
+
+@item @ref{type declaration checking} does not trust @code{ftype} declarations.
 @end itemize
 
 @item @code{> (max speed space)}: If @code{debug} is greater than both @code{speed} and
