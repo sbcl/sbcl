@@ -1200,3 +1200,21 @@
          (coerce (nreverse s) 'list))
     (((vector 1 2 3)) '(3 2 1) :test #'equal)
     (((list 1 2 3)) '(3 2 1) :test #'equal)))
+
+(with-test (:name :assoc-test-type)
+  (checked-compile
+   `(lambda (x)
+      (declare (notinline assoc))
+      (assoc x '(("o" . 1)) :test 'string=)))
+  (checked-compile
+   `(lambda (x)
+      (declare (notinline rassoc))
+      (rassoc x '((1 . "o")) :test #'string=)))
+  (checked-compile
+   `(lambda (x)
+      (declare (notinline rassoc))
+      (rassoc x '(("o" . 1)) :key #'1+)))
+  (checked-compile
+   `(lambda (x)
+      (declare (notinline assoc))
+      (assoc x '((1 . "o")) :key #'1+))))

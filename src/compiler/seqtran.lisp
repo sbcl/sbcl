@@ -3378,16 +3378,18 @@
 (defun sequence-element-type (sequence key)
   (let ((key-return-type *universal-type*))
     (when key
-      (multiple-value-bind (type name) (lvar-fun-type key)
-        (cond ((eq name 'identity)
-               (setf key nil))
-              (t
-               (setf key-return-type (if (fun-type-p type)
-                                         (single-value-type (fun-type-returns type))
-                                         *universal-type*))
-               (if (constant-fold-arg-p name)
-                   (setf key name)
-                   (return-from sequence-element-type key-return-type))))))
+      (if (symbolp key)
+          key
+          (multiple-value-bind (type name) (lvar-fun-type key)
+            (cond ((eq name 'identity)
+                   (setf key nil))
+                  (t
+                   (setf key-return-type (if (fun-type-p type)
+                                             (single-value-type (fun-type-returns type))
+                                             *universal-type*))
+                   (if (constant-fold-arg-p name)
+                       (setf key name)
+                       (return-from sequence-element-type key-return-type)))))))
     (let ((type (sequence-elements-type sequence nil key)))
       (if (or (eq type *universal-type*)
               (eq type *wild-type*))
