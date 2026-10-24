@@ -599,8 +599,8 @@
     (handle-reals %tan number)
     (handle-complex
      ;; tan z = -i * tanh(i*z)
-     (let* ((result (complex-tanh (complex (- (imagpart number))
-                                           (realpart number)))))
+     (let* ((result (tanh (complex (- (imagpart number))
+                                   (realpart number)))))
        (complex (imagpart result)
                 (- (realpart result)))))))
 

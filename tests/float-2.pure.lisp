@@ -1064,3 +1064,7 @@ fractional bits."
           (test #c(800.0d0 2.0d0) 1.0d0 -0.0d0)
           (test #c(-800.0d0 0.1d0) -1.0d0 0.0d0)
           (test #c(-800.0d0 2.0d0) -1.0d0 -0.0d0))))))
+
+(with-test (:name :tan-complex-to-rational-tanh)
+  (assert (= (opaque-identity (tan (opaque-identity (complex 0 1/2))))
+             (complex 0 (tanh (opaque-identity 1/2))))))
