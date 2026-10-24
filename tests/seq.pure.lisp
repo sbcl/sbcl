@@ -1218,3 +1218,11 @@
    `(lambda (x)
       (declare (notinline assoc))
       (assoc x '((1 . "o")) :key #'1+))))
+
+(with-test (:name :length-remove-duplicates-out-of-range-key)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (s e)
+         (length
+          (remove-duplicates s :end e :key (lambda (x) (assert (< x e)) x))))
+    (((loop for i below 300 collect i) 200) 300)))

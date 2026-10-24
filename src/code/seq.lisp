@@ -2750,9 +2750,9 @@ many elements are copied."
                   do (if (gethash elt hash)
                          (decf count)
                          (setf (gethash elt hash) t)))
-            (loop for e in current
+            (loop for i from start below end
+                  for e in current
                   for elt = (apply-key key e)
-                  for i from start below end
                   do (if (gethash elt hash)
                          (decf count)
                          (setf (gethash elt hash) t))))
