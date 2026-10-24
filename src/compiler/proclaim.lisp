@@ -504,7 +504,7 @@
 ;;; 'DECLARATION) returns them. We could add internal ones, too.
 (declaim (declaration muffle-conditions unmuffle-conditions
                       enable-package-locks disable-package-locks
-                      global always-bound deprecated))
+                      global always-bound deprecated freeze-type))
 #-sb-xc-host
 (setf (documentation 'muffle-conditions 'declaration)
       "Syntax: `(SB-EXT:MUFFLE-CONDITIONS &REST TYPES)`.
@@ -598,6 +598,19 @@ Specifies that the named symbols are always bound. Inhibits MAKUNBOUND
 of the named symbols. Proclaiming an unbound symbol as
 SB-EXT:ALWAYS-BOUND signals an error. Allows the compiler to elide
 boundness checks from value lookups.")
+
+#-sb-xc-host
+(setf (documentation 'sb-ext:freeze-type 'declaration)
+      "Syntax: `(SB-EXT:FREEZE-TYPE &REST SYMBOLS)`
+
+Only valid as a global proclamation.
+
+Specifies that the types named by SYMBOLS and their subtypes are not
+going to change. This allows more efficient type testing, since the
+compiler can open-code a test for all possible subtypes, rather than
+having to examine the type hierarchy at run-time.
+
+Currently, this has an effect only for structure types.")
 
 (defun %proclaim (raw-form location)
   (destructuring-bind (&whole form &optional kind &rest args)

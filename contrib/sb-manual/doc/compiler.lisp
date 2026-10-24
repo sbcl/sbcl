@@ -352,9 +352,6 @@
   (@precise-type-checking section)
   (@getting-existing-programs-to-run section))
 
-;; FIXME: See also sections \ref{advanced-type-stuff},, once we snarf
-;; it from the CMUCL manual.
-
 (defsection @type-declaration-checking (:title "Type Declaration Checking")
   "The SBCL compiler treats type declarations differently from most other
   Lisp compilers. Under the default @COMPILER-POLICY, the compiler

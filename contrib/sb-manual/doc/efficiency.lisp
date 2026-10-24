@@ -2,6 +2,7 @@
 
 (defsection @efficiency (:title "Efficiency"
                          :concepts ("efficicency"))
+  (@more-about-types section)
   (@type-inference section)
   (@source-optimization section)
   (@tail-call section)
@@ -14,6 +15,441 @@
   (@recognized-idioms section)
   (@global-and-always-bound-variables section)
   (@miscellaneous-efficiency-issues section))
+
+(defsection @more-about-types (:title "More About Types"
+                               :concepts (("types")))
+  "This section goes into more detail describing what types and
+  declarations are recognized by SBCL. Some of the most important
+  features of SBCL are related to types:
+
+  - @PRECISE-TYPE-CHECKING helps to find bugs at run time.
+
+  - Compile-time type checking helps to find bugs at compile time (see
+    @DYNAMIC-TYPE-INFERENCE for an example).
+
+  - @TYPE-INFERENCE minimizes the need for generic operations and also
+    increases the efficiency of run-time type checking and the
+    effectiveness of compile-time type checking.
+
+  - Support for detailed types provides a wealth of opportunity for
+    operation-specific type inference and optimization."
+  (@more-types-meaningful section)
+  (@type-canonicalization section)
+  (@member-types section)
+  (@union-types section)
+  (@the-empty-type section)
+  (@function-types section)
+  (@the-values-declaration section)
+  (@structure-types section)
+  (@type-restrictions section)
+  (@type-style-recommendations section))
+
+(defsection @more-types-meaningful (:title "More Types Meaningful")
+  "Common Lisp has a very powerful type system, but conventional
+  implementations typically only recognize the small set of types
+  special in that implementation. In these systems, there is an
+  unfortunate paradox: a declaration for a relatively general type
+  like FIXNUM will be recognized by the compiler, but a highly
+  specific declaration such as `(INTEGER 3 17)` may be totally
+  ignored.
+
+  This is obviously a problem, since the user has to know how to
+  specify the type of an object in the way the compiler wants it. A
+  very minimal (but rarely satisfied) criterion for type system
+  support is that it be no worse to make a specific declaration than
+  to make a general one. SBCL goes beyond this by exploiting a number
+  of advantages obtained from detailed type information.
+
+  Using more restrictive types in declarations allows the compiler to
+  do better type inference and more compile-time type checking. Also,
+  when type declarations are considered to be consistency assertions
+  that should be verified (conditional on policy), then complex types
+  are useful for making more detailed assertions.
+
+  SBCL \"understands\" the list-style OR, MEMBER, FUNCTION, ARRAY and
+  number type specifiers. Understanding means that:
+
+  - If the type contains more information than is used in a particular
+    context, then the extra information is simply ignored, rather than
+    derailing type inference.
+
+  - In many contexts, the extra information from these type specifier
+    is used to good effect. In particular, with SBCL's
+    @PRECISE-TYPE-CHECKING, these complex types can be used in
+    declarations to make interesting assertions about functions and
+    data structures. More specific declarations also aid type
+    inference and reduce the cost for type checking (see
+    @TYPE-CHECK-OPTIMIZATION)."
+  ;; FIXME: once we have these sections: "For related information, see
+  ;; @NUMERIC-TYPES and @ARRAY-TYPES."
+  )
+
+(defsection @type-canonicalization (:title "Type Canonicalization"
+                                    :concepts (("types," "equivalence")
+                                               ("canonicalization" "of types")
+                                               ("equivalence" "of types")))
+  "When given a type specifier, SBCL will often rewrite it into a
+  different (but equivalent) type. This is the mechanism that the
+  compiler uses for detecting type equivalence. For example, in
+  its canonical representation,
+
+      (or list (member :end))
+
+  is equivalent to
+
+      (or cons (member nil :end))
+
+  This has two implications for the user:
+
+  - The standard symbol type specifiers (e.g. NULL and LIST) are
+    in no way magical. The NULL type is actually defined as
+    `(MEMBER NIL)` and LIST as `(OR CONS NULL)`.
+
+  - When the compiler prints out a type, it may not look like the type
+    specifier that originally appeared in the program. This is
+    generally not a problem, but it must be taken into consideration
+    when reading compiler error messages.")
+
+(defsection @member-types (:title "MEMBER Types"
+                           :concepts (("member types")
+                                      ("types," "member")))
+  "The MEMBER type specifier can be used to represent
+  \"symbolic\" values, analogous to the enumerated types of Pascal.
+  For example, the second value of FIND-SYMBOL has type
+
+      (member :internal :external :inherited nil)
+
+  Member types are very useful for expressing consistency constraints on data
+  structures, for example:
+
+      (defstruct ice-cream
+        (flavor :vanilla :type (member :vanilla :chocolate :strawberry)))
+
+  Member types are also useful in @TYPE-INFERENCE, as the number of
+  members can sometimes be pared down to one, in which case the value
+  is a known constant.")
+
+(defsection @union-types (:title "Union Types"
+                          :concepts (("union types")
+                                     ("or types")
+                                     ("types," "union")
+                                     ("types," "or")))
+  "The OR (union) type specifier is understood and is
+  meaningfully applied in many contexts. The use of OR allows
+  assertions to be made about types in dynamically typed programs. For
+  example:
+
+      (defstruct box
+        (next nil :type (or box null))
+        (top :removed :type (or box-top (member :removed))))
+
+  The type assertion on the `TOP` slot ensures that an error will be
+  signaled when there is an attempt to store an illegal value (such as
+  `:RMVD`.) Although somewhat weak, these union type assertions
+  provide a useful input into type inference, allowing the cost of
+  type checking to be reduced. For example, this loop is safely
+  compiled with no type checks:
+
+      (defun find-box-with-top (box)
+        (declare (type (or box null) box))
+        (do ((current box (box-next current)))
+            ((null current))
+          (unless (eq (box-top current) :removed)
+            (return current))))
+
+  Union types are also useful in type inference for representing types
+  that are partially constrained. For example, the result of
+
+      (if foo
+          (logior x y)
+          (list x y))
+
+  can be expressed as `(OR INTEGER CONS)`.")
+
+;;; FIXME: Should this be in (DOCUMENTATION NIL 'TYPE)?
+(defsection @the-empty-type (:title "The Empty Type"
+                             :concepts (("empty type")
+                                        ("type," "empty")
+                                        ("NIL type")
+                                        ("type," "NIL")))
+  "The type NIL is also called the empty type, since no object is of that
+  type. The union of no types, `(OR)`, is also empty. The compiler's
+  interpretation of an expression whose type is NIL is that the
+  expression never yields any value but rather fails to terminate or
+  exits non-locally. For example, the type of a call to ERROR or a use
+  of RETURN is NIL. When the type of an expression is empty,
+  compile-time type warnings about its value are suppressed;
+  presumably somebody else is signaling an error. If a function is
+  declared to have return type NIL but does in fact return, then (in
+  [safe code][ @type-declaration-checking]) an error will be signaled.")
+
+;;; FIXME: Should this be in (DOCUMENTATION 'FTYPE 'DECLARATION)?
+(defsection @function-types (:title "Function Types"
+                             :concepts (("function" "types")
+                                        ("types," "function")))
+  "Function types (FTYPE declarations) are understood in the restrictive
+  sense, specifying:
+
+  - _The argument syntax that the function must be called with_
+
+      This is information about what argument counts are acceptable,
+      and which keyword arguments are recognized. In SBCL, warnings
+      about argument syntax are a consequence of function type
+      checking.
+
+  - _The types of the argument values that the caller must pass_
+
+      If the compiler can prove that some argument to a call is of a
+      type disallowed by the called function's type, then it will give
+      a compile-time type warning. In addition to being used for
+      compile-time type checking, these type assertions are also used
+      as output type assertions in code generation. For example, if
+      `FOO` is declared to have a FIXNUM argument, then the 1+
+      in `(FOO (1+ X))` is compiled with knowledge that the result
+      must be a FIXNUM.
+
+  - _The types the values that will be bound to argument variables in
+    the function's definition_
+
+      Declaring a function's type with FTYPE implicitly declares the
+      types of the arguments in the definition. The compiler checks
+      for consistency between the definition and the FTYPE
+      declaration. Because of @PRECISE-TYPE-CHECKING, an error will be
+      signaled when a function is called with an argument of the wrong
+      type.
+
+  - _The type of return value(s) that the caller can expect_
+
+      This information is a useful input to type inference. For
+      example, if a function is declared to return a FIXNUM, then when
+      a call to that function appears in an expression, the expression
+      will be compiled with knowledge that the call will return a
+      FIXNUM.
+
+  - _The type of return value(s) that the definition must return_
+
+      The result type in an FTYPE declaration is treated like an
+      implicit THE wrapped around the body of the definition. If the
+      definition returns a value of the wrong type, an error will be
+      signaled. If the compiler can prove that the function returns
+      the wrong type, then it will give a compile-time warning.
+
+  This is consistent with the new interpretation of function types and
+  the FTYPE declaration in the [proposed X3J13
+  function-type-argument-type-semantics cleanup][
+  issue:function-type-argument-type-semantics clhs].
+
+  See also @GLOBAL-FUNCTION-TYPE-INFERENCE.")
+
+;;; FIXME: Should this be in (DOCUMENTATION 'VALUES 'DECLARATION)?
+(defsection @the-values-declaration (:title "The VALUES declaration"
+                                     :concepts (("values declaration")))
+  "SBCL supports the VALUES declaration as an extension to Common Lisp.
+
+  Syntax: `(VALUES &REST TYPE-NAMES)`
+
+  This declaration is semantically equivalent to a THE form wrapped
+  around the body of the special form in which the VALUES declaration
+  appears. The advantage of VALUES over THE is purely syntactic: it
+  doesn't introduce more indentation. For example,
+
+      (defun foo (x)
+        (declare (values single-float))
+        (ecase x
+          (:this ...)
+          (:that ...)
+          (:the-other ...)))
+
+  is equivalent to
+
+      (defun foo (x)
+        (the single-float
+             (ecase x
+               (:this ...)
+               (:that ...)
+               (:the-other ...))))
+
+  and
+
+      (defun floor (number &optional (divisor 1))
+        (declare (values integer real))
+        ...)
+
+  is equivalent to
+
+      (defun floor (number &optional (divisor 1))
+        (the (values integer real)
+             ...))
+
+  In addition to being recognized by LAMBDA (and hence by DEFUN), the
+  VALUES declaration is recognized by all the other special forms with
+  bodies and declarations: LET, LET*, LABELS and FLET. Macros with
+  declarations usually splice the declarations into one of the above
+  forms, so they will accept this declaration too, but the exact
+  effect of a VALUES declaration will depend on the macro.
+
+  If you declare the types of all arguments to a function and also
+  declare the return value types with VALUES, you have described the
+  type of the function. The compiler will use this argument and result
+  type information to derive a function type that will then be applied
+  to calls of the function (see @FUNCTION-TYPES). This provides a way
+  to declare the types of functions that is much less syntactically
+  awkward than using the FTYPE declaration with a FUNCTION type
+  specifier.
+
+  Although the VALUES declaration is non-standard, it is relatively
+  harmless to use it in otherwise portable code, since any warning in
+  non-SBCL implementations can be suppressed with the standard
+  DECLARATION proclamation:
+
+      (declaim (declaration values))")
+
+(defsection @structure-types (:title "Structure Types"
+                              :concepts (("structure types")
+                                         ("defstruct types")
+                                         ("types," "structure")))
+  "Structure accessors have @PRECISE-TYPE-CHECKING:
+
+  - The structure argument to structure accessors is precisely checked
+    -- if you call `FOO-A` on a `BAR`, an error will be signaled.
+
+  - The types of slot values are precisely checked -- if you pass
+    the wrong type argument to a constructor or a slot setter, then an
+    error will be signaled.
+
+  An additional advantage of checking structure types and enforcing
+  slot types is that the compiler can [safely][
+  @type-declaration-checking] trust slot type declarations. The
+  compiler effectively moves the type checking from the slot access to
+  the slot setter or constructor call. This is more efficient since
+  caller of the setter or constructor often knows the type of the
+  value, entirely eliminating the need to check the value's type.
+  Consider this example:
+
+      (defstruct coordinate
+        (x nil :type single-float)
+        (y nil :type single-float))
+
+      (defun make-it ()
+        (make-coordinate :x 1.0 :y 1.0))
+
+      (defun use-it (it)
+        (declare (type coordinate it))
+        (sqrt (expt (coordinate-x it) 2) (expt (coordinate-y it) 2)))
+
+  `MAKE-IT` and `USE-IT` are compiled with no checking on the types of
+  the float slots, yet `USE-IT` can use SINGLE-FLOAT arithmetic with
+  perfect safety. Note that `MAKE-COORDINATE` must still check the
+  values of `X` and `Y` unless the call is in @BLOCK-COMPILATION or
+  undergoes @INLINE-EXPANSION. But even without this advantage, it is
+  almost always more efficient to check slot values on structure
+  initialization, since slots are usually written once and read many
+  times.
+
+  When redefining a structure, one can choose to whether to invalidate
+  previously compiled code (the CONTINUE restart) or not (the
+  `RECKLESSLY-CONTINUE` restart). With CONTINUE, previously compiled
+  calls to accessors will signal an error in [safe code][
+  @type-declaration-checking]. With `RECKLESSLY-CONTINUE`, safety is
+  compromised."
+  ;; Note that RECKLESSLY-CONTINUE is not exported. It's purely for
+  ;; interactive purposes apparently.
+  )
+
+;;; FIXME: This section is misnamed and myopic: types that the
+;;; compiler have trouble with are still useful for run-time time
+;;; checking and communicating intent.
+(defsection @type-restrictions (:title "Type Restrictions"
+                                :concepts (("types," "restrictions on")))
+  "Avoid use of the AND, NOT and SATISFIES types in declarations, since
+  type inference has problems with them. When these types do appear in
+  a declaration, they are still checked precisely, but the type
+  information is of limited use to the compiler. AND types are
+  effective as long as the intersection can be canonicalized to a type
+  that doesn't use AND. For example,
+
+      (and fixnum unsigned-byte)
+
+  is fine, since it is the same as
+
+      (integer 0 most-positive-fixnum)
+
+  but this type:
+
+      (and symbol (not (member :end)))
+
+  will not be fully understood by type interference since the AND
+  can't be removed by canonicalization.
+
+  Using any of these type specifiers in a type test with TYPEP or
+  TYPECASE is fine, since as tests, these types can be translated into
+  the AND macro, the NOT function or a call to the satisfies
+  predicate.")
+
+(defsection @type-style-recommendations (:title "Type Style Recommendations"
+                                         :concepts (("style recommendations")))
+  "With SBCL it is desirable to make declarations as precise as possible,
+  but @TYPE-INFERENCE also makes some declarations unnecessary. Here
+  are some general guidelines for maximum robustness and efficiency:
+
+  - Declare the types of all function arguments and structure slots as
+    precisely as possible (while avoiding NOT, AND and SATISFIES). Put
+    these declarations in during initial coding so that type
+    assertions can find bugs for you during debugging.
+
+  - Durining development, prefer declaring function argument types
+    with with DECLARE within the function to avoid having to redefine
+    FTYPEs, which can lead to safety problems (see
+    @TYPE-DECLARATION-CHECKING).
+
+  - Use the MEMBER type specifier where there are a small number of
+    possible symbol values, for example, `(MEMBER :RED :BLUE :GREEN)`.
+
+  - Use the OR type specifier in situations where the type is not
+    certain, but there are only a few possibilities, for example,
+    `(OR LIST VECTOR)`.
+
+  - Declare integer types with the tightest bounds that you can, such
+    as `(INTEGER 3 7)`.
+
+  - Put DEFTYPE or DEFSTRUCT definitions before they are used.
+    Definition after use is legal (producing no undefined type
+    warnings), but type tests and structure operations will be
+    compiled much less efficiently.
+
+  - Use the SB-EXT:FREEZE-TYPE declaration to speed up type testing
+    for structure types that won't have new subtypes added later.
+
+  - In addition to declaring the array element type and simpleness,
+    also declare the dimensions if they are fixed. For example,
+
+        (simple-array single-float (1024 1024))
+
+    The bounds information allows array indexing for multi-dimensional
+    arrays to be compiled much more efficiently and may also allow
+    array bounds checking to be done at compile time.
+
+  - Avoid use of the THE declaration within expressions. Not only does
+    it clutter the code, but it is often unnecesary under [safe
+    policies][ @type-declaration-checking]. If the need for a return
+    type assertion is revealed by efficiency notes during tuning, then
+    you can consider THE, but it is preferable to constrain the
+    argument types more, allowing the compiler to prove the desired
+    result type.
+
+  - Don't bother declaring the type of LET or other non-argument
+    variables unless the type is non-obvious. If you declare function
+    return types and structure slot types, then the type of a variable
+    is often obvious both to the programmer and to the compiler. An
+    important case where the type isn't obvious, and a declaration is
+    appropriate, is when the value for a variable is pulled out of
+    untyped structure (e.g. the result of CAR), from a CLASS, or comes
+    from some weakly typed function, such as READ.
+
+  - Declarations are sometimes necessary for integer loop variables,
+    since the compiler can't always prove that the value is of a good
+    integer type. These declarations are best added during tuning,
+    when an efficiency note indicates the need.")
 
 (defsection @type-inference (:title "Type Inference"
                              :concepts (("type inference")
@@ -1616,7 +2052,6 @@
 
   - Advanced Compiler Use and Efficiency Hints
   - Advanced Compiler Introduction
-  - More About Types in Python
   - Object Representation
   - Numbers
   - General Efficiency Hints

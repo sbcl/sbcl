@@ -5,6 +5,7 @@
 @chapter Efficiency
 
 @menu
+* More About Types: more about types.
 * Type Inference: type inference.
 * Source Optimization: source optimization.
 * Tail Call: tail call.
@@ -18,6 +19,495 @@
 * Global and Always-bound Variables: global and always bound variables.
 * Miscellaneous Efficiency Issues: miscellaneous efficiency issues.
 @end menu
+
+@node more about types
+@cindex types
+@section More About Types
+
+@menu
+* More Types Meaningful: more types meaningful.
+* Type Canonicalization: type canonicalization.
+* MEMBER Types: member types.
+* Union Types: union types.
+* The Empty Type: the empty type.
+* Function Types: function types.
+* The VALUES declaration: the values declaration.
+* Structure Types: structure types.
+* Type Restrictions: type restrictions.
+* Type Style Recommendations: type style recommendations.
+@end menu
+
+This section goes into more detail describing what types and
+declarations are recognized by SBCL. Some of the most important
+features of SBCL are related to types:
+
+@itemize
+@item @ref{precise type checking} helps to find bugs at run time.
+
+@item Compile-time type checking helps to find bugs at compile time (see
+  @ref{dynamic type inference} for an example).
+
+@item @ref{type inference} minimizes the need for generic operations and also
+  increases the efficiency of run-time type checking and the
+  effectiveness of compile-time type checking.
+
+@item Support for detailed types provides a wealth of opportunity for
+  operation-specific type inference and optimization.
+@end itemize
+
+@node more types meaningful
+@subsection More Types Meaningful
+
+Common Lisp has a very powerful type system, but conventional
+implementations typically only recognize the small set of types
+special in that implementation. In these systems, there is an
+unfortunate paradox: a declaration for a relatively general type
+like @code{fixnum} will be recognized by the compiler, but a highly
+specific declaration such as @code{(integer 3 17)} may be totally
+ignored.
+
+This is obviously a problem, since the user has to know how to
+specify the type of an object in the way the compiler wants it. A
+very minimal (but rarely satisfied) criterion for type system
+support is that it be no worse to make a specific declaration than
+to make a general one. SBCL goes beyond this by exploiting a number
+of advantages obtained from detailed type information.
+
+Using more restrictive types in declarations allows the compiler to
+do better type inference and more compile-time type checking. Also,
+when type declarations are considered to be consistency assertions
+that should be verified (conditional on policy), then complex types
+are useful for making more detailed assertions.
+
+SBCL "understands" the list-style @code{or}, @code{member}, @code{function}, @code{array} and
+number type specifiers. Understanding means that:
+
+@itemize
+@item If the type contains more information than is used in a particular
+  context, then the extra information is simply ignored, rather than
+  derailing type inference.
+
+@item In many contexts, the extra information from these type specifier
+  is used to good effect. In particular, with SBCL's
+  @ref{precise type checking}, these complex types can be used in
+  declarations to make interesting assertions about functions and
+  data structures. More specific declarations also aid type
+  inference and reduce the cost for type checking (see
+  @ref{type check optimization}).
+@end itemize
+
+@node type canonicalization
+@cindex types, equivalence
+@cindex canonicalization of types
+@cindex equivalence of types
+@subsection Type Canonicalization
+
+When given a type specifier, SBCL will often rewrite it into a
+different (but equivalent) type. This is the mechanism that the
+compiler uses for detecting type equivalence. For example, in
+its canonical representation,
+
+@example
+(or list (member :end))
+@end example
+
+is equivalent to
+
+@example
+(or cons (member nil :end))
+@end example
+
+This has two implications for the user:
+
+@itemize
+@item The standard symbol type specifiers (e.g. @code{null} and @code{list}) are
+  in no way magical. The @code{null} type is actually defined as
+  @code{(member nil)} and @code{list} as @code{(or cons null)}.
+
+@item When the compiler prints out a type, it may not look like the type
+  specifier that originally appeared in the program. This is
+  generally not a problem, but it must be taken into consideration
+  when reading compiler error messages.
+@end itemize
+
+@node member types
+@cindex member types
+@cindex types, member
+@subsection MEMBER Types
+
+The @code{member} type specifier can be used to represent
+"symbolic" values, analogous to the enumerated types of Pascal.
+For example, the second value of @code{find-symbol} has type
+
+@example
+(member :internal :external :inherited nil)
+@end example
+
+Member types are very useful for expressing consistency constraints on data
+structures, for example:
+
+@example
+(defstruct ice-cream
+  (flavor :vanilla :type (member :vanilla :chocolate :strawberry)))
+@end example
+
+Member types are also useful in @ref{type inference}, as the number of
+members can sometimes be pared down to one, in which case the value
+is a known constant.
+
+@node union types
+@cindex union types
+@cindex or types
+@cindex types, union
+@cindex types, or
+@subsection Union Types
+
+The @code{or} (union) type specifier is understood and is
+meaningfully applied in many contexts. The use of @code{or} allows
+assertions to be made about types in dynamically typed programs. For
+example:
+
+@example
+(defstruct box
+  (next nil :type (or box null))
+  (top :removed :type (or box-top (member :removed))))
+@end example
+
+The type assertion on the @code{top} slot ensures that an error will be
+signaled when there is an attempt to store an illegal value (such as
+@code{:rmvd}.) Although somewhat weak, these union type assertions
+provide a useful input into type inference, allowing the cost of
+type checking to be reduced. For example, this loop is safely
+compiled with no type checks:
+
+@example
+(defun find-box-with-top (box)
+  (declare (type (or box null) box))
+  (do ((current box (box-next current)))
+      ((null current))
+    (unless (eq (box-top current) :removed)
+      (return current))))
+@end example
+
+Union types are also useful in type inference for representing types
+that are partially constrained. For example, the result of
+
+@example
+(if foo
+    (logior x y)
+    (list x y))
+@end example
+
+can be expressed as @code{(or integer cons)}.
+
+@node the empty type
+@cindex empty type
+@cindex type, empty
+@cindex NIL type
+@cindex type, NIL
+@subsection The Empty Type
+
+The type @code{nil} is also called the empty type, since no object is of that
+type. The union of no types, @code{(or)}, is also empty. The compiler's
+interpretation of an expression whose type is @code{nil} is that the
+expression never yields any value but rather fails to terminate or
+exits non-locally. For example, the type of a call to @code{error} or a use
+of @code{return} is @code{nil}. When the type of an expression is empty,
+compile-time type warnings about its value are suppressed;
+presumably somebody else is signaling an error. If a function is
+declared to have return type @code{nil} but does in fact return, then (in
+safe code) an error will be signaled.
+
+@node function types
+@cindex function types
+@cindex types, function
+@subsection Function Types
+
+Function types (@code{ftype} declarations) are understood in the restrictive
+sense, specifying:
+
+@itemize
+@item @emph{The argument syntax that the function must be called with}
+
+This is information about what argument counts are acceptable,
+and which keyword arguments are recognized. In SBCL, warnings
+about argument syntax are a consequence of function type
+checking.
+
+@item @emph{The types of the argument values that the caller must pass}
+
+If the compiler can prove that some argument to a call is of a
+type disallowed by the called function's type, then it will give
+a compile-time type warning. In addition to being used for
+compile-time type checking, these type assertions are also used
+as output type assertions in code generation. For example, if
+@code{foo} is declared to have a @code{fixnum} argument, then the 1+
+in @code{(foo (1+ x))} is compiled with knowledge that the result
+must be a @code{fixnum}.
+
+@item @emph{The types the values that will be bound to argument variables in
+  the function's definition}
+
+Declaring a function's type with @code{ftype} implicitly declares the
+types of the arguments in the definition. The compiler checks
+for consistency between the definition and the @code{ftype}
+declaration. Because of @ref{precise type checking}, an error will be
+signaled when a function is called with an argument of the wrong
+type.
+
+@item @emph{The type of return value(s) that the caller can expect}
+
+This information is a useful input to type inference. For
+example, if a function is declared to return a @code{fixnum}, then when
+a call to that function appears in an expression, the expression
+will be compiled with knowledge that the call will return a
+@code{fixnum}.
+
+@item @emph{The type of return value(s) that the definition must return}
+
+The result type in an @code{ftype} declaration is treated like an
+implicit @code{the} wrapped around the body of the definition. If the
+definition returns a value of the wrong type, an error will be
+signaled. If the compiler can prove that the function returns
+the wrong type, then it will give a compile-time warning.
+@end itemize
+
+This is consistent with the new interpretation of function types and
+the @code{ftype} declaration in the proposed X3J13
+function-type-argument-type-semantics cleanup.
+
+See also @ref{global function type inference}.
+
+@node the values declaration
+@cindex values declaration
+@subsection The VALUES declaration
+
+SBCL supports the @code{values} declaration as an extension to Common Lisp.
+
+Syntax: @code{(values &rest type-names)}
+
+This declaration is semantically equivalent to a @code{the} form wrapped
+around the body of the special form in which the @code{values} declaration
+appears. The advantage of @code{values} over @code{the} is purely syntactic: it
+doesn't introduce more indentation. For example,
+
+@example
+(defun foo (x)
+  (declare (values single-float))
+  (ecase x
+    (:this ...)
+    (:that ...)
+    (:the-other ...)))
+@end example
+
+is equivalent to
+
+@example
+(defun foo (x)
+  (the single-float
+       (ecase x
+         (:this ...)
+         (:that ...)
+         (:the-other ...))))
+@end example
+
+and
+
+@example
+(defun floor (number &optional (divisor 1))
+  (declare (values integer real))
+  ...)
+@end example
+
+is equivalent to
+
+@example
+(defun floor (number &optional (divisor 1))
+  (the (values integer real)
+       ...))
+@end example
+
+In addition to being recognized by @code{lambda} (and hence by @code{defun}), the
+@code{values} declaration is recognized by all the other special forms with
+bodies and declarations: @code{let}, @code{let*}, @code{labels} and @code{flet}. Macros with
+declarations usually splice the declarations into one of the above
+forms, so they will accept this declaration too, but the exact
+effect of a @code{values} declaration will depend on the macro.
+
+If you declare the types of all arguments to a function and also
+declare the return value types with @code{values}, you have described the
+type of the function. The compiler will use this argument and result
+type information to derive a function type that will then be applied
+to calls of the function (see @ref{function types}). This provides a way
+to declare the types of functions that is much less syntactically
+awkward than using the @code{ftype} declaration with a @code{function} type
+specifier.
+
+Although the @code{values} declaration is non-standard, it is relatively
+harmless to use it in otherwise portable code, since any warning in
+non-SBCL implementations can be suppressed with the standard
+@code{declaration} proclamation:
+
+@example
+(declaim (declaration values))
+@end example
+
+@node structure types
+@cindex structure types
+@cindex defstruct types
+@cindex types, structure
+@subsection Structure Types
+
+Structure accessors have @ref{precise type checking}:
+
+@itemize
+@item The structure argument to structure accessors is precisely checked
+  -- if you call @code{foo-a} on a @code{bar}, an error will be signaled.
+
+@item The types of slot values are precisely checked -- if you pass
+  the wrong type argument to a constructor or a slot setter, then an
+  error will be signaled.
+@end itemize
+
+An additional advantage of checking structure types and enforcing
+slot types is that the compiler can safely trust slot type declarations. The
+compiler effectively moves the type checking from the slot access to
+the slot setter or constructor call. This is more efficient since
+caller of the setter or constructor often knows the type of the
+value, entirely eliminating the need to check the value's type.
+Consider this example:
+
+@example
+(defstruct coordinate
+  (x nil :type single-float)
+  (y nil :type single-float))
+
+(defun make-it ()
+  (make-coordinate :x 1.0 :y 1.0))
+
+(defun use-it (it)
+  (declare (type coordinate it))
+  (sqrt (expt (coordinate-x it) 2) (expt (coordinate-y it) 2)))
+@end example
+
+@code{make-it} and @code{use-it} are compiled with no checking on the types of
+the float slots, yet @code{use-it} can use @code{single-float} arithmetic with
+perfect safety. Note that @code{make-coordinate} must still check the
+values of @code{x} and @code{y} unless the call is in @ref{block compilation} or
+undergoes @ref{inline expansion}. But even without this advantage, it is
+almost always more efficient to check slot values on structure
+initialization, since slots are usually written once and read many
+times.
+
+When redefining a structure, one can choose to whether to invalidate
+previously compiled code (the @code{continue} restart) or not (the
+@code{recklessly-continue} restart). With @code{continue}, previously compiled
+calls to accessors will signal an error in safe code. With @code{recklessly-continue}, safety is
+compromised.
+
+@node type restrictions
+@cindex types, restrictions on
+@subsection Type Restrictions
+
+Avoid use of the @code{and}, @code{not} and @code{satisfies} types in declarations, since
+type inference has problems with them. When these types do appear in
+a declaration, they are still checked precisely, but the type
+information is of limited use to the compiler. @code{and} types are
+effective as long as the intersection can be canonicalized to a type
+that doesn't use @code{and}. For example,
+
+@example
+(and fixnum unsigned-byte)
+@end example
+
+is fine, since it is the same as
+
+@example
+(integer 0 most-positive-fixnum)
+@end example
+
+but this type:
+
+@example
+(and symbol (not (member :end)))
+@end example
+
+will not be fully understood by type interference since the @code{and}
+can't be removed by canonicalization.
+
+Using any of these type specifiers in a type test with @code{typep} or
+@code{typecase} is fine, since as tests, these types can be translated into
+the @code{and} macro, the @code{not} function or a call to the satisfies
+predicate.
+
+@node type style recommendations
+@cindex style recommendations
+@subsection Type Style Recommendations
+
+With SBCL it is desirable to make declarations as precise as possible,
+but @ref{type inference} also makes some declarations unnecessary. Here
+are some general guidelines for maximum robustness and efficiency:
+
+@itemize
+@item Declare the types of all function arguments and structure slots as
+  precisely as possible (while avoiding @code{not}, @code{and} and @code{satisfies}). Put
+  these declarations in during initial coding so that type
+  assertions can find bugs for you during debugging.
+
+@item Durining development, prefer declaring function argument types
+  with with @code{declare} within the function to avoid having to redefine
+  @code{ftype}s, which can lead to safety problems (see
+  @ref{type declaration checking}).
+
+@item Use the @code{member} type specifier where there are a small number of
+  possible symbol values, for example, @code{(member :red :blue :green)}.
+
+@item Use the @code{or} type specifier in situations where the type is not
+  certain, but there are only a few possibilities, for example,
+  @code{(or list vector)}.
+
+@item Declare integer types with the tightest bounds that you can, such
+  as @code{(integer 3 7)}.
+
+@item Put @code{deftype} or @code{defstruct} definitions before they are used.
+  Definition after use is legal (producing no undefined type
+  warnings), but type tests and structure operations will be
+  compiled much less efficiently.
+
+@item Use the @code{sb-ext:freeze-type} declaration to speed up type testing
+  for structure types that won't have new subtypes added later.
+
+@item In addition to declaring the array element type and simpleness,
+  also declare the dimensions if they are fixed. For example,
+
+  (simple-array single-float (1024 1024))
+
+  The bounds information allows array indexing for multi-dimensional
+  arrays to be compiled much more efficiently and may also allow
+  array bounds checking to be done at compile time.
+
+@item Avoid use of the @code{the} declaration within expressions. Not only does
+  it clutter the code, but it is often unnecesary under safe
+  policies. If the need for a return
+  type assertion is revealed by efficiency notes during tuning, then
+  you can consider @code{the}, but it is preferable to constrain the
+  argument types more, allowing the compiler to prove the desired
+  result type.
+
+@item Don't bother declaring the type of @code{let} or other non-argument
+  variables unless the type is non-obvious. If you declare function
+  return types and structure slot types, then the type of a variable
+  is often obvious both to the programmer and to the compiler. An
+  important case where the type isn't obvious, and a declaration is
+  appropriate, is when the value for a variable is pulled out of
+  untyped structure (e.g. the result of @code{car}), from a @code{class}, or comes
+  from some weakly typed function, such as @code{read}.
+
+@item Declarations are sometimes necessary for integer loop variables,
+  since the compiler can't always prove that the value is of a good
+  integer type. These declarations are best added during tuning,
+  when an efficiency note indicates the need.
+@end itemize
 
 @node type inference
 @cindex type inference
@@ -125,7 +615,7 @@ mechanisms for ensuring proper tail calls mentioned in
 
 @cindex debug, optimization quality
 @cindex optimization quality debug
-As described in @@FUNCTION-TYPES, global function type (@code{ftype})
+As described in @ref{function types}, global function type (@code{ftype})
 declarations are trusted by the compiler at call sites unless the
 @code{debug} optimization quality is 3. This can result in unsafe
 propagation of the type constraints in the callee based on the
@@ -2041,7 +2531,6 @@ correct for the SBCL's compiler. See the sections
 @itemize
 @item Advanced Compiler Use and Efficiency Hints
 @item Advanced Compiler Introduction
-@item More About Types in Python
 @item Object Representation
 @item Numbers
 @item General Efficiency Hints
