@@ -1766,6 +1766,19 @@
               res))))
      optimize-qualities)))
 
+;;; Declare extensions so that (SB-CLTL2:DECLARATION-INFORMATION
+;;; 'DECLARATION) returns them. Declare only the non-global only
+;;; declarations, the rest are in proclaim.lisp.
+#-sb-xc-host
+(dolist (decl '(type ignore ignorable special ftype
+                inline notinline maybe-inline
+                no-compiler-macro optimize dynamic-extent
+                flushable current-defmethod no-constraints constant-value
+                no-debug values))
+  ;; This is equivalent to (DECLARE (DECLARATION ...)) but avoid some
+  ;; bootstrapping issues.
+  (setf (info :declaration :known decl) t))
+
 (defun process-muffle-decls (decls lexenv)
   (let (source-form)
    (flet ((process-it (spec)

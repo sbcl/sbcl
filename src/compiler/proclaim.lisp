@@ -500,7 +500,7 @@
 
 ;;;; Declarations
 
-;;; Declare extensions, so that (SB-CLTL2:DECLARATION-INFORMATION
+;;; Declare extensions so that (SB-CLTL2:DECLARATION-INFORMATION
 ;;; 'DECLARATION) returns them. We could add internal ones, too.
 (declaim (declaration muffle-conditions unmuffle-conditions
                       enable-package-locks disable-package-locks
