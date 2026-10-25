@@ -2376,8 +2376,7 @@ many elements are copied."
                                  sequence remaining)))
                        splice)))
             (declare (dynamic-extent splice))
-            (do ((this-element)
-                 (number-zapped 0))
+            (do ((number-zapped 0))
                 ((cond ((eq tail sequence)
                         (rplacd splice tail)
                         t)
@@ -2386,10 +2385,12 @@ many elements are copied."
                         t))
                  (nreverse (the list (cdr results))))
               (declare (index number-zapped))
-              (setf this-element (pop sequence))
-              (if ,pred
-                  (incf number-zapped)
-                  (setf splice (cdr (rplacd splice (list this-element))))))))
+              (let* ((cons sequence)
+                     (this-element (pop sequence)))
+                (if ,pred
+                    (incf number-zapped)
+                    (setf (cdr splice) cons
+                          splice cons))))))
         (always-copy
          `(let ((list sequence))
             (collect (((result)))
