@@ -204,9 +204,16 @@ search_for_core ()
         free(lookhere);
     }
 
-    /* Try ./sbcl.core */
+    /* Try <sbcl-bin-dir>/../lib/sbcl/sbcl.core */
     if (!core) {
-        core = copied_existing_filename_or_null("sbcl.core");
+        lookhere = (char *) calloc(strlen(sbcl_runtime_home) +
+                                   strlen(libpath) +
+                                   strlen(stem) +
+                                   1,
+                                   sizeof(char));
+        sprintf(lookhere, "%s%s%s", sbcl_runtime_home, libpath, stem);
+        core = copied_existing_filename_or_null(lookhere);
+        free(lookhere);
     }
 
     /* Try <sbcl-bin-dir>/sbcl.core */
@@ -220,16 +227,9 @@ search_for_core ()
         free(lookhere);
     }
 
-    /* Try <sbcl-bin-dir>/../lib/sbcl/sbcl.core */
+    /* Try ./sbcl.core */
     if (!core) {
-        lookhere = (char *) calloc(strlen(sbcl_runtime_home) +
-                                   strlen(libpath) +
-                                   strlen(stem) +
-                                   1,
-                                   sizeof(char));
-        sprintf(lookhere, "%s%s%s", sbcl_runtime_home, libpath, stem);
-        core = copied_existing_filename_or_null(lookhere);
-        free(lookhere);
+        core = copied_existing_filename_or_null("sbcl.core");
     }
 
     return core;

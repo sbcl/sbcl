@@ -702,7 +702,6 @@ it does not exist or if it is a file or a symbolic link."
       (or (and env (probe env))
           (try-runtime-home (parse (or (extern-alien "sbcl_runtime_home" c-string)
                                        "")))
-          (probe (parse "."))
           ;; Handle a symlink
           (let* ((runtime (extern-alien "sbcl_runtime" c-string))
                  (pn (and runtime (parse runtime nil))))
@@ -718,7 +717,8 @@ it does not exist or if it is a file or a symbolic link."
                    ;; calling realpath on the executable in a filesystem where that takes many round-trips
                    ;; to a file server. I'm optimistically hoping that the install-test case added
                    ;; in git rev 71f7507fc1 is still testing what it intended to.
-                   (when pn (truename pn)))))))))
+                   (when pn (truename pn)))))
+          (probe (parse "."))))))
 
 (defun user-homedir-namestring (&optional username)
   (flet ((not-empty (x)

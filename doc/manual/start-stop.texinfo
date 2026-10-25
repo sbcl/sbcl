@@ -174,11 +174,11 @@ directories until the first match.
 @item The directory denoted by the @code{SBCL_HOME} environment
       variable if it is set
 
-@item The current directory
+@item The @code{../lib/sbcl/} directory relative to the @code{sbcl} binary
 
 @item The directory of the @code{sbcl} binary
 
-@item The @code{../lib/sbcl/} directory relative to the @code{sbcl} binary
+@item The current directory
 @end itemize
 
 If no core file was found by the above rules, then the runtime
@@ -197,11 +197,11 @@ Once the runtime loads the core file, the Lisp looks for
 
 @item @emph{The directory @code{../lib/sbcl} relative to @code{sbcl.core}}
 
-@item The current directory
+@item The directory @code{../lib/sbcl} relative to the @code{sbcl} binary
 
 @item The directory of the @code{sbcl} binary
 
-@item The directory @code{../lib/sbcl} relative to the @code{sbcl} binary
+@item The current directory
 @end itemize
 
 The list of directories is the same as for finding the core file

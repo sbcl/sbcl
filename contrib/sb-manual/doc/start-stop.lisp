@@ -138,11 +138,11 @@
       - The directory denoted by the `\\\\SBCL_HOME` environment
         variable if it is set
 
-      - The current directory
+      - The `../lib/sbcl/` directory relative to the `sbcl` binary
 
       - The directory of the `sbcl` binary
 
-      - The `../lib/sbcl/` directory relative to the `sbcl` binary
+      - The current directory
 
       If no core file was found by the above rules, then the runtime
       exits with an error message.
@@ -159,11 +159,11 @@
 
       - _The directory `../lib/sbcl` relative to `sbcl.core`_
 
-      - The current directory
+      - The directory `../lib/sbcl` relative to the `sbcl` binary
 
       - The directory of the `sbcl` binary
 
-      - The directory `../lib/sbcl` relative to the `sbcl` binary
+      - The current directory
 
       The list of directories is the same as for finding the core file
       except here we also try directories relative to `sbcl.core`.
