@@ -133,9 +133,9 @@ just hang and you want to send a useful bug report, then:
 @item Isolate a smallish test case, run it.
 
 @item If SBCL hangs, kill it with @code{sigabrt}: @code{kill -ABRT <pidof sbcl>},
-  which by default enters @code{ldb}.
+  which by default enters LDB.
 
-@item Print the backtrace from @code{ldb} by typing @code{ba}.
+@item Print the backtrace from LDB by typing @code{ba}.
 
 @item Next, attach gdb with @code{gdb -p <pidof sbcl>}, and get backtraces
   for all threads with @code{thread apply all ba}.

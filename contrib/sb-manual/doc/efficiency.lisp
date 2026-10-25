@@ -1336,10 +1336,10 @@
     type checking, e.g. `(LOCALLY (DECLARE (SAFETY 1)) (ASSOC ITEM LIST))`
     (which currently performs safe ENDP checking internal to ASSOC).
 
-  If your system's performance is suffering because of some construct
-  which could in principle be compiled efficiently, but which the SBCL
-  compiler can't in practice compile efficiently, consider writing a
-  patch to the compiler and submitting it for inclusion in the main
-  sources. Such code is often reasonably straightforward to write;
-  search the sources for the string `deftransform` to find many
-  examples (some straightforward, some less so).")
+  If your system's performance is suffering due to some construct that
+  SBCL fails to compile efficiently, even though it could be in
+  principle, consider writing a patch to the compiler and submitting
+  it for inclusion in the main sources. Such code is often reasonably
+  straightforward to write; search the sources for the string
+  `deftransform` to find many examples (some straightforward, some
+  less so).")

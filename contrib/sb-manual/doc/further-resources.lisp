@@ -195,9 +195,9 @@
   - Isolate a smallish test case, run it.
 
   - If SBCL hangs, kill it with `SIGABRT`: `kill -ABRT <pidof sbcl>`,
-    which by default enters LDB.
+    which by default enters \\LDB.
 
-  - Print the backtrace from LDB by typing `ba`.
+  - Print the backtrace from \\LDB by typing `ba`.
 
   - Next, attach gdb with `gdb -p <pidof sbcl>`, and get backtraces
     for all threads with `thread apply all ba`.
@@ -322,7 +322,7 @@
   Other major changes since the fork from CMUCL include:
 
   - SBCL has removed many CMUCL extensions, (e.g. IP networking,
-    remote procedure call, Unix system interface, and X11 interface)
+    remote procedure call, Unix system interface, and \\X11 interface)
     from the core system. Most of these are available as contributed
     modules (distributed with SBCL) or third-party modules instead.
 
