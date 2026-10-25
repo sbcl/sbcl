@@ -20,6 +20,149 @@
 * Miscellaneous Efficiency Issues: miscellaneous efficiency issues.
 @end menu
 
+In SBCL as with any language on any computer, the path to efficient
+code starts with good algorithms and sensible programming
+techniques, but to avoid inefficiency pitfalls, you need to know
+some of this implementation's quirks and features. This chapter is
+mostly a fairly long and detailed overview of what optimizations the
+compiler does. Although there are the usual negative suggestions of
+inefficient features to avoid, the main emphasis is on describing
+the things that programmers can count on being efficient.
+
+The optimizations described here can have the effect of speeding up
+existing programs written in conventional styles, but the potential
+for new programming styles that are clearer and less error-prone is
+at least as significant. For this reason, several sections end with
+a discussion of the implications of these optimizations for
+programming style.
+
+In this section, we discuss SBCL's support for @strong{types}, which is
+unusual in three major ways:
+
+@itemize
+@item @ref{precise type checking} encourages the specific use of type
+  declarations as a form of run-time consistency checking. This
+  speeds development by localizing type errors and giving more
+  meaningful error messages. The compiler produces completely safe
+  code; @ref{type check optimization} maintains reasonable efficiency.
+
+@item Comprehensive support for the Common Lisp type system makes
+  complex type specifiers useful. Using type specifiers such as @code{or}
+  and @code{member} has both efficiency and robustness advantages (see
+  @ref{more about types}).
+
+@item @ref{type inference} eliminates the need for some declarations and also
+  aids compile-time detection of type errors. Given detailed type
+  declarations, type inference can often eliminate type checks and
+  enable more efficient object representations and code sequences.
+  Checking all types results in fewer type checks.
+@end itemize
+
+Then, we move on to the topic of @strong{optimization}. The main barrier
+to writing efficient Lisp programs is that it's hard to find to the
+most efficient solution among the many semantically equivalent
+"reasonable" ways to code a given problem.
+@strong{@ref{source optimization}} greatly reduces the variance in performance
+across equivalent solutions, freeing the programmer from a class of
+low-level considerations.
+
+The next important topic is @strong{function call} efficiency. This is
+especially important in Lisp due local functions and recursion. For
+this reason, Lisp implementations strive to make the general (or
+full) function call as inexpensive as possible. SBCL goes beyond
+this by providing two good alternatives to full call:
+
+@itemize
+@item @strong{@ref{local call}} resolves function references at compile time,
+  allowing better calling sequences and optimization across function
+  calls.
+
+@itemize
+@item Control transfer is a direct jump.
+
+@item The closure environment is passed in registers rather than
+      heap allocated.
+
+@item Keyword arguments and multiple values are implemented more
+      efficiently.
+@end itemize
+
+@item @strong{@ref{inline expansion}} totally eliminates call overhead and allows
+  many context-dependent optimizations. This provides a safe and
+  efficient implementation of operations with function semantics,
+  eliminating the need for error-prone macro definitions or manual
+  case analysis.
+@end itemize
+
+Generally, the compiler provides simple implementations for simple
+uses of function call, rather than having only a single calling
+convention. These features allow a more natural programming style:
+
+@itemize
+@item Proper @strong{@ref{tail call}}s
+
+@item Relatively efficient closures
+
+@item A @code{funcall} that is as efficient as normal named call
+@end itemize
+
+Finally, we can only touch upon some of the most important concepts
+discussed later before this introduction gets too long, so let's
+focus on the big picture. Writing efficient code that works is a
+complex and prolonged process. It is important not to get so
+involved in the pursuit of efficiency that you lose sight of what
+the original problem demands. Remember that:
+
+@itemize
+@item The program should be correct: it doesn't matter how quickly you
+  get the wrong answer.
+
+@item Both the programmer and the user will make errors, so the program
+  must be robust: it must detect errors in a way that allows easy
+  correction.
+
+@item A small portion of the program will consume most of the resources,
+  with the bulk of the code being virtually irrelevant to efficiency
+  considerations. Even experienced programmers familiar with the
+  problem area cannot reliably predict where these hot spots will
+  be.
+@end itemize
+
+The best way to get efficient code that is still worth using, is to
+separate coding from tuning. During coding, you should:
+
+@itemize
+@item Use a coding style that aids correctness and robustness without
+  being incompatible with efficiency.
+
+@item Choose appropriate data structures that allow efficient algorithms
+  and object representations. Try to make interfaces abstract enough
+  so that you can change to a different representation if @ref{profiling}
+  reveals a need.
+@end itemize
+
+@itemize
+@item Whenever you make an assumption about a function argument or
+  global data structure, add consistency assertions, either with
+  type declarations or explicit uses of @code{assert}, @code{ecase}, etc.
+@end itemize
+
+During tuning, you should:
+
+@itemize
+@item Identify the hot spots in the program through @ref{profiling}.
+
+@item Identify inefficient constructs in the hot spot with efficiency
+  notes, more profiling, or manual inspection of the source and with
+  judicious use of @code{disassemble}.
+
+@item Add declarations and consider the application of discussed in the
+  section.
+
+@item If all else fails, consider algorithm or data structure changes.
+  If you did a good job coding, changes will be easy to introduce.
+@end itemize
+
 @node more about types
 @cindex types
 @section More About Types
@@ -202,9 +345,9 @@ can be expressed as @code{(or integer cons)}.
 
 @node the empty type
 @cindex empty type
-@cindex type, empty
+@cindex types, empty
 @cindex NIL type
-@cindex type, NIL
+@cindex types, NIL
 @subsection The Empty Type
 
 The type @code{nil} is also called the empty type, since no object is of that
@@ -432,21 +575,22 @@ Currently, this has an effect only for structure types.
 @cindex types, restrictions on
 @subsection Type Restrictions
 
-Avoid use of the @code{and}, @code{not} and @code{satisfies} types in declarations, since
-type inference has problems with them. When these types do appear in
-a declaration, they are still checked precisely, but the type
-information is of limited use to the compiler. @code{and} types are
-effective as long as the intersection can be canonicalized to a type
-that doesn't use @code{and}. For example,
+Be careful with @code{and}, @code{not} and @code{satisfies} types in declarations, since
+@ref{type inference} has problems with them. When these types do appear
+in a declaration, they are still checked precisely, but the type
+information may be of limited use to the compiler.
+
+@code{and} types are effective as long as the intersection can be
+canonicalized to a type that doesn't use @code{and}. For example,
 
 @example
-(and fixnum unsigned-byte)
+(and fixnum unsigned-byte (not (member 7)))
 @end example
 
 is fine, since it is the same as
 
 @example
-(integer 0 most-positive-fixnum)
+(or (integer 0 6) (integer 8 most-positive-fixnum))
 @end example
 
 but this type:
@@ -973,6 +1117,10 @@ that it makes it easier to write efficient programs. If a clean,
 straightforward implementation can be transformed into an efficient
 one, then there is no need for tricky and dangerous hand
 optimization.
+
+Source-level optimization eliminates the need for macros to optimize
+their expansion, and also increases the effectiveness of
+@ref{inline expansion}.
 
 @node let optimization
 @cindex let optimization
@@ -2550,7 +2698,6 @@ correct for the SBCL's compiler. See the sections
 @itemize
 @item Advanced Compiler Use and Efficiency Hints
 @itemize
-@item Advanced Compiler Introduction
 @item Object Representation
 @item Numbers
 @item General Efficiency Hints

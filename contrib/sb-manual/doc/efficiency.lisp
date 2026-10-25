@@ -2,6 +2,152 @@
 
 (defsection @efficiency (:title "Efficiency"
                          :concepts ("efficicency"))
+  "In SBCL as with any language on any computer, the path to efficient
+  code starts with good algorithms and sensible programming
+  techniques, but to avoid inefficiency pitfalls, you need to know
+  some of this implementation's quirks and features. This chapter is
+  mostly a fairly long and detailed overview of what optimizations the
+  compiler does. Although there are the usual negative suggestions of
+  inefficient features to avoid, the main emphasis is on describing
+  the things that programmers can count on being efficient.
+
+  The optimizations described here can have the effect of speeding up
+  existing programs written in conventional styles, but the potential
+  for new programming styles that are clearer and less error-prone is
+  at least as significant. For this reason, several sections end with
+  a discussion of the implications of these optimizations for
+  programming style.
+
+  In this section, we discuss SBCL's support for __types__, which is
+  unusual in three major ways:
+
+  - @PRECISE-TYPE-CHECKING encourages the specific use of type
+    declarations as a form of run-time consistency checking. This
+    speeds development by localizing type errors and giving more
+    meaningful error messages. The compiler produces completely safe
+    code; @TYPE-CHECK-OPTIMIZATION maintains reasonable efficiency.
+
+  - Comprehensive support for the Common Lisp type system makes
+    complex type specifiers useful. Using type specifiers such as OR
+    and MEMBER has both efficiency and robustness advantages (see
+    @MORE-ABOUT-TYPES).
+
+  - @TYPE-INFERENCE eliminates the need for some declarations and also
+    aids compile-time detection of type errors. Given detailed type
+    declarations, type inference can often eliminate type checks and
+    enable more efficient object representations and code sequences.
+    Checking all types results in fewer type checks.
+
+  Then, we move on to the topic of __optimization__. The main barrier
+  to writing efficient Lisp programs is that it's hard to find to the
+  most efficient solution among the many semantically equivalent
+  \"reasonable\" ways to code a given problem.
+  __@SOURCE-OPTIMIZATION__ greatly reduces the variance in performance
+  across equivalent solutions, freeing the programmer from a class of
+  low-level considerations.
+
+  The next important topic is __function call__ efficiency. This is
+  especially important in Lisp due local functions and recursion. For
+  this reason, Lisp implementations strive to make the general (or
+  full) function call as inexpensive as possible. SBCL goes beyond
+  this by providing two good alternatives to full call:
+
+  - __@LOCAL-CALL__ resolves function references at compile time,
+    allowing better calling sequences and optimization across function
+    calls.
+
+      - Control transfer is a direct jump.
+
+      - The closure environment is passed in registers rather than
+        heap allocated.
+
+      - Keyword arguments and multiple values are implemented more
+        efficiently.
+
+  - __@INLINE-EXPANSION__ totally eliminates call overhead and allows
+    many context-dependent optimizations. This provides a safe and
+    efficient implementation of operations with function semantics,
+    eliminating the need for error-prone macro definitions or manual
+    case analysis.
+
+  Generally, the compiler provides simple implementations for simple
+  uses of function call, rather than having only a single calling
+  convention. These features allow a more natural programming style:
+
+  - Proper __@TAIL-CALL__s
+
+  - Relatively efficient closures
+
+  - A FUNCALL that is as efficient as normal named call"
+  ;; FIXME: Revive this when the "Representation of Objects" section
+  ;; gets ported.
+  ;;
+  ;; Sometimes traditional \llisp{} implementation techniques compare so
+  ;; poorly to the techniques used in other languages that \llisp{} can
+  ;; become an impractical language choice.  Terrible inefficiencies appear
+  ;; in number-crunching programs, since \llisp{} numeric operations often
+  ;; involve number-consing and generic arithmetic.  \python{} supports
+  ;; efficient natural representations for numbers (and some other types),
+  ;; and allows these efficient representations to be used in more
+  ;; contexts.  \python{} also provides good efficiency notes that warn
+  ;; when a crucial declaration is missing.
+  ;;
+  ;; See section \ref{non-descriptor} for more about object representations and
+  ;; numeric types.  Also \pxlref{efficiency-notes} about efficiency notes.
+  ;;
+  ;; I'm not sure the SBCL user manual is the place for the following
+  ;; soap box. -- MG, 2026-10-25
+  "Finally, we can only touch upon some of the most important concepts
+  discussed later before this introduction gets too long, so let's
+  focus on the big picture. Writing efficient code that works is a
+  complex and prolonged process. It is important not to get so
+  involved in the pursuit of efficiency that you lose sight of what
+  the original problem demands. Remember that:
+
+  - The program should be correct: it doesn't matter how quickly you
+    get the wrong answer.
+
+  - Both the programmer and the user will make errors, so the program
+    must be robust: it must detect errors in a way that allows easy
+    correction.
+
+  - A small portion of the program will consume most of the resources,
+    with the bulk of the code being virtually irrelevant to efficiency
+    considerations. Even experienced programmers familiar with the
+    problem area cannot reliably predict where these hot spots will
+    be.
+
+  The best way to get efficient code that is still worth using, is to
+  separate coding from tuning. During coding, you should:
+
+  - Use a coding style that aids correctness and robustness without
+    being incompatible with efficiency.
+
+  - Choose appropriate data structures that allow efficient algorithms
+    and object representations. Try to make interfaces abstract enough
+    so that you can change to a different representation if @PROFILING
+    reveals a need."
+  ;; FIXME: Link "object representations" to its section.
+  ;;
+  ;; FIXME: Somewhere link to @GENERAL-EFFICIENCY and
+  ;; @EFFICIENCY-NOTES.
+  "- Whenever you make an assumption about a function argument or
+    global data structure, add consistency assertions, either with
+    type declarations or explicit uses of ASSERT, ECASE, etc.
+
+  During tuning, you should:
+
+  - Identify the hot spots in the program through @PROFILING.
+
+  - Identify inefficient constructs in the hot spot with efficiency
+    notes, more profiling, or manual inspection of the source and with
+    judicious use of DISASSEMBLE.
+
+  - Add declarations and consider the application of discussed in the
+    section.
+
+  - If all else fails, consider algorithm or data structure changes.
+    If you did a good job coding, changes will be easy to introduce."
   (@more-about-types section)
   (@type-inference section)
   (@source-optimization section)
@@ -801,7 +947,11 @@
   that it makes it easier to write efficient programs. If a clean,
   straightforward implementation can be transformed into an efficient
   one, then there is no need for tricky and dangerous hand
-  optimization."
+  optimization.
+
+  Source-level optimization eliminates the need for macros to optimize
+  their expansion, and also increases the effectiveness of
+  @INLINE-EXPANSION."
   (@let-optimization section)
   (@constant-folding section)
   (@unused-expression-elimination section)
@@ -2047,7 +2197,6 @@
   correct for the SBCL's compiler. See the sections
 
   - Advanced Compiler Use and Efficiency Hints
-      - Advanced Compiler Introduction
       - Object Representation
       - Numbers
       - General Efficiency Hints
