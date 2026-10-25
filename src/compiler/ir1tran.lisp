@@ -1655,9 +1655,11 @@
       (when (policy *lexenv* (= speed 3))
         (compiler-notify "Ignoring DYNAMIC-EXTENT declarations: ~S" names))))
 
-;;; The VALUES declaration is a syntactic convenience which is roughly equivalent to
-;;; putting an FTYPE on a function. (There are subtle distinctions, but it's similar)
+;;; The VALUES declaration is a syntactic convenience which is roughly
+;;; equivalent to wrapping the function body in a THE.
+;;;
 ;;; It is permissible to use the symbol VALUES because:
+;;;
 ;;; - CLHS 3.3.3: "An implementation is free to support other (implementation-defined)
 ;;;   declaration identifiers"
 ;;; - 11.1.2.1.1 Constraints on the COMMON-LISP Package for Conforming Implementations
@@ -1778,6 +1780,16 @@
   ;; This is equivalent to (DECLARE (DECLARATION ...)) but avoid some
   ;; bootstrapping issues.
   (setf (info :declaration :known decl) t))
+
+#-sb-xc-host
+(setf (documentation 'values 'declaration)
+      "Syntax: `(VALUES &REST TYPES)`
+
+Only valid as a local declaration.
+
+Specifies the return TYPES of the enclosing special form.
+
+See SB-MANUAL:@THE-VALUES-DECLARATION for more.")
 
 (defun process-muffle-decls (decls lexenv)
   (let (source-form)

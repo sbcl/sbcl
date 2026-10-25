@@ -166,12 +166,11 @@
 
   can be expressed as `(OR INTEGER CONS)`.")
 
-;;; FIXME: Should this be in (DOCUMENTATION NIL 'TYPE)?
 (defsection @the-empty-type (:title "The Empty Type"
                              :concepts (("empty type")
-                                        ("type," "empty")
+                                        ("types," "empty")
                                         ("NIL type")
-                                        ("type," "NIL")))
+                                        ("types," "NIL")))
   "The type NIL is also called the empty type, since no object is of that
   type. The union of no types, `(OR)`, is also empty. The compiler's
   interpretation of an expression whose type is NIL is that the
@@ -183,7 +182,6 @@
   declared to have return type NIL but does in fact return, then (in
   [safe code][ @type-declaration-checking]) an error will be signaled.")
 
-;;; FIXME: Should this be in (DOCUMENTATION 'FTYPE 'DECLARATION)?
 (defsection @function-types (:title "Function Types"
                              :concepts (("function" "types")
                                         ("types," "function")))
@@ -220,11 +218,11 @@
 
   - _The type of return value(s) that the caller can expect_
 
-      This information is a useful input to type inference. For
-      example, if a function is declared to return a FIXNUM, then when
-      a call to that function appears in an expression, the expression
-      will be compiled with knowledge that the call will return a
-      FIXNUM.
+      This information is a useful input to @TYPE-INFERENCE at call
+      sites. For example, if a function is declared to return a
+      FIXNUM, then when a call to that function appears in an
+      expression, the expression will be compiled with knowledge that
+      the call will return a FIXNUM (see @TYPE-DECLARATION-CHECKING).
 
   - _The type of return value(s) that the definition must return_
 
@@ -241,14 +239,11 @@
 
   See also @GLOBAL-FUNCTION-TYPE-INFERENCE.")
 
-;;; FIXME: Should this be in (DOCUMENTATION 'VALUES 'DECLARATION)?
 (defsection @the-values-declaration (:title "The VALUES declaration"
                                      :concepts (("values declaration")))
-  "SBCL supports the VALUES declaration as an extension to Common Lisp.
-
-  Syntax: `(VALUES &REST TYPE-NAMES)`
-
-  This declaration is semantically equivalent to a THE form wrapped
+  "SBCL supports the VALUES declaration as an extension to Common Lisp."
+  (values declaration)
+  "This declaration is semantically equivalent to a THE form wrapped
   around the body of the special form in which the VALUES declaration
   appears. The advantage of VALUES over THE is purely syntactic: it
   doesn't introduce more indentation. For example,
@@ -354,25 +349,30 @@
   compromised."
   ;; Note that RECKLESSLY-CONTINUE is not exported. It's purely for
   ;; interactive purposes apparently.
-  )
+  (sb-ext:freeze-type declaration))
 
-;;; FIXME: This section is misnamed and myopic: types that the
-;;; compiler have trouble with are still useful for run-time time
-;;; checking and communicating intent.
+;;; FIXME: This section is misnamed. Also, it's not very precise, as
+;;; this clearly works:
+;;;
+;;; (defun foo (x)
+;;;   (declare (type (and fixnum (satisfies evenp)) x)
+;;;            (optimize speed))
+;;;   (1+ x))
 (defsection @type-restrictions (:title "Type Restrictions"
                                 :concepts (("types," "restrictions on")))
-  "Avoid use of the AND, NOT and SATISFIES types in declarations, since
-  type inference has problems with them. When these types do appear in
-  a declaration, they are still checked precisely, but the type
-  information is of limited use to the compiler. AND types are
-  effective as long as the intersection can be canonicalized to a type
-  that doesn't use AND. For example,
+  "Be careful with AND, NOT and SATISFIES types in declarations, since
+  @TYPE-INFERENCE has problems with them. When these types do appear
+  in a declaration, they are still checked precisely, but the type
+  information may be of limited use to the compiler.
 
-      (and fixnum unsigned-byte)
+  AND types are effective as long as the intersection can be
+  canonicalized to a type that doesn't use AND. For example,
+
+      (and fixnum unsigned-byte (not (member 7)))
 
   is fine, since it is the same as
 
-      (integer 0 most-positive-fixnum)
+      (or (integer 0 6) (integer 8 most-positive-fixnum))
 
   but this type:
 
@@ -541,11 +541,11 @@
 (defsection @global-function-type-inference
     (:title "Global Function Type Inference"
      :concepts (("function," "type inference")))
-  "As described in @FUNCTION-TYPES, global function type (FTYPE)
-  declarations are trusted by the compiler at call sites unless the
-  @DEBUG optimization quality is 3. This can result in unsafe
-  propagation of the type constraints in the callee based on the
-  declared types of its arguments and return values.
+  "As described in @TYPE-DECLARATION-CHECKING, global function
+  type (FTYPE) declarations are trusted by the compiler at call sites
+  unless the @DEBUG optimization quality is 3. This can result in
+  unsafe propagation of the type constraints in the callee based on
+  the declared types of its arguments and return values.
 
   For example, if we compile this:
 
@@ -638,7 +638,7 @@
   after passing through the constraint. Explicit type constraints come
   from IFs where the test is either a lexical variable or a function
   of lexical variables and constants, where the function is either a
-  type predicate, a numeric comparison or EQ. (FIXME: more?)
+  type predicate, a numeric comparison or EQ.
 
   If there is an EQ or EQL test, then the compiler will actually
   substitute one argument for the other in the true branch. For
@@ -2041,21 +2041,17 @@
   ;; FIXME: It's not a macro.
   #+nil
   (sb-ext:truly-the macro)
-  "The SB-EXT:FREEZE-TYPE declaration declares that a type will never
-  change, which can make type testing (e.g. with TYPEP) more efficient
-  for structure types.
-
-  FIXME: The remaining material in the CMUCL manual about getting good
+  "FIXME: The remaining material in the CMUCL manual about getting good
   performance from the compiler should be reviewed, and added to this
   section. In the meantime, the original CMUCL manual is still 95+%
   correct for the SBCL's compiler. See the sections
 
   - Advanced Compiler Use and Efficiency Hints
-  - Advanced Compiler Introduction
-  - Object Representation
-  - Numbers
-  - General Efficiency Hints
-  - Efficiency Notes
+      - Advanced Compiler Introduction
+      - Object Representation
+      - Numbers
+      - General Efficiency Hints
+      - Efficiency Notes
 
   Besides this information from the CMUCL manual, there are a few other
   points to keep in mind.

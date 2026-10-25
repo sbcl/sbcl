@@ -58,6 +58,9 @@
   (frob extended-sequence *extended-sequence-type*))
 
 #-sb-xc-host
+(setf (documentation nil 'type) "See SB-MANUAL:@THE-EMPTY-TYPE.")
+
+#-sb-xc-host
 (progn
 ;;; a vector that maps widetags to layouts, used for quickly finding
 ;;; the layouts of built-in classes

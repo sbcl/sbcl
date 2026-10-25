@@ -257,11 +257,11 @@ type.
 
 @item @emph{The type of return value(s) that the caller can expect}
 
-This information is a useful input to type inference. For
-example, if a function is declared to return a @code{fixnum}, then when
-a call to that function appears in an expression, the expression
-will be compiled with knowledge that the call will return a
-@code{fixnum}.
+This information is a useful input to @ref{type inference} at call
+sites. For example, if a function is declared to return a
+@code{fixnum}, then when a call to that function appears in an
+expression, the expression will be compiled with knowledge that
+the call will return a @code{fixnum} (see @ref{type declaration checking}).
 
 @item @emph{The type of return value(s) that the definition must return}
 
@@ -284,8 +284,17 @@ See also @ref{global function type inference}.
 
 SBCL supports the @code{values} declaration as an extension to Common Lisp.
 
-Syntax: @code{(values &rest type-names)}
+@anchor{Declaration common-lisp values}
+@ddindex @sortas{values common-lisp} values [common-lisp]
+@deffn{Declaration} values
+Syntax: @code{(values &rest types)}
 
+Only valid as a local declaration.
+
+Specifies the return @code{types} of the enclosing special form.
+
+See @ref{the values declaration} for more.
+@end deffn
 This declaration is semantically equivalent to a @code{the} form wrapped
 around the body of the special form in which the @code{values} declaration
 appears. The advantage of @code{values} over @code{the} is purely syntactic: it
@@ -405,6 +414,20 @@ previously compiled code (the @code{continue} restart) or not (the
 calls to accessors will signal an error in safe code. With @code{recklessly-continue}, safety is
 compromised.
 
+@anchor{Declaration sb-ext freeze-type}
+@ddindex @sortas{freeze-type sb-ext} freeze-type [sb-ext]
+@deffn{Declaration} sb-ext:freeze-type
+Syntax: @code{(sb-ext:freeze-type &rest symbols)}
+
+Only valid as a global proclamation.
+
+Specifies that the types named by @code{symbols} and their subtypes are not
+going to change. This allows more efficient type testing, since the
+compiler can open-code a test for all possible subtypes, rather than
+having to examine the type hierarchy at run-time.
+
+Currently, this has an effect only for structure types.
+@end deffn
 @node type restrictions
 @cindex types, restrictions on
 @subsection Type Restrictions
@@ -615,11 +638,11 @@ mechanisms for ensuring proper tail calls mentioned in
 
 @cindex debug, optimization quality
 @cindex optimization quality debug
-As described in @ref{function types}, global function type (@code{ftype})
-declarations are trusted by the compiler at call sites unless the
-@code{debug} optimization quality is 3. This can result in unsafe
-propagation of the type constraints in the callee based on the
-declared types of its arguments and return values.
+As described in @ref{type declaration checking}, global function
+type (@code{ftype}) declarations are trusted by the compiler at call sites
+unless the @code{debug} optimization quality is 3. This can result in
+unsafe propagation of the type constraints in the callee based on
+the declared types of its arguments and return values.
 
 For example, if we compile this:
 
@@ -747,7 +770,7 @@ constraints on variable type to any code that can be executed only
 after passing through the constraint. Explicit type constraints come
 from @code{if}s where the test is either a lexical variable or a function
 of lexical variables and constants, where the function is either a
-type predicate, a numeric comparison or @code{eq}. (FIXME: more?)
+type predicate, a numeric comparison or @code{eq}.
 
 If there is an @code{eq} or @code{eql} test, then the compiler will actually
 substitute one argument for the other in the true branch. For
@@ -2519,10 +2542,6 @@ The @code{sb-ext:truly-the} special form declares the type of the result of
 the operations, producing its argument; the declaration is not
 checked. In short: don't use it.
 
-The @code{sb-ext:freeze-type} declaration declares that a type will never
-change, which can make type testing (e.g. with @code{typep}) more efficient
-for structure types.
-
 FIXME: The remaining material in the CMUCL manual about getting good
 performance from the compiler should be reviewed, and added to this
 section. In the meantime, the original CMUCL manual is still 95+%
@@ -2530,11 +2549,13 @@ correct for the SBCL's compiler. See the sections
 
 @itemize
 @item Advanced Compiler Use and Efficiency Hints
+@itemize
 @item Advanced Compiler Introduction
 @item Object Representation
 @item Numbers
 @item General Efficiency Hints
 @item Efficiency Notes
+@end itemize
 @end itemize
 
 Besides this information from the CMUCL manual, there are a few other

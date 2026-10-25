@@ -500,11 +500,15 @@
 
 ;;;; Declarations
 
+#-sb-xc-host
+(setf (documentation 'ftype 'declaration) "See SB-MANUAL:@FUNCTION-TYPES.")
+
 ;;; Declare extensions so that (SB-CLTL2:DECLARATION-INFORMATION
 ;;; 'DECLARATION) returns them. We could add internal ones, too.
 (declaim (declaration muffle-conditions unmuffle-conditions
                       enable-package-locks disable-package-locks
                       global always-bound deprecated freeze-type))
+
 #-sb-xc-host
 (setf (documentation 'muffle-conditions 'declaration)
       "Syntax: `(SB-EXT:MUFFLE-CONDITIONS &REST TYPES)`.
