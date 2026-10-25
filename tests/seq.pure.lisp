@@ -1226,3 +1226,14 @@
          (length
           (remove-duplicates s :end e :key (lambda (x) (assert (< x e)) x))))
     (((loop for i below 300 collect i) 200) 300)))
+
+(with-test (:name :concatenate-subseq-dx)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (s n)
+         (concatenate 'list
+                      (let ((v (vector n 2 3 4)))
+                        (declare (dynamic-extent v))
+                        (subseq v n))
+                      s))
+    (('(a b c) 2) '(3 4 a b c) :test #'equal)))

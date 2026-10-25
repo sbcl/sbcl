@@ -340,13 +340,14 @@
                                  ;; Nothing should be modifying the original sequence
                                  (when (almost-immediately-used-p arg (lvar-use arg) :flushable t)
                                    (destructuring-bind (sequence start &optional end) args
-                                     (declare (ignorable sequence start))
-                                     (splice-fun-args arg :any (if end 3 2))
-                                     (list ''sb-impl::%subseq
-                                           (car (push (gensym) vars))
-                                           (car (push (gensym) vars))
-                                           (when end
-                                             (car (push (gensym) vars)))))))
+                                     (declare (ignore start))
+                                     (unless (lvar-dx-uses-p sequence)
+                                       (splice-fun-args arg :any (if end 3 2))
+                                       (list ''sb-impl::%subseq
+                                             (car (push (gensym) vars))
+                                             (car (push (gensym) vars))
+                                             (when end
+                                               (car (push (gensym) vars))))))))
                                 ((make-array &rest args)
                                  (multiple-value-bind (args unknown) (resolve-key-args args (info :function :type 'make-array))
                                    (unless unknown

@@ -1016,6 +1016,16 @@
                (push new (dynamic-extent-values dynamic-extent)))))))
       t)))
 
+(defun lvar-dx-uses-p (lvar)
+  (or (lvar-dynamic-extent lvar)
+      (map-all-uses (lambda (use)
+                      (when (lvar-dynamic-extent (node-lvar use))
+                        (return-from lvar-dx-uses-p t)))
+                    lvar
+                    :var-home (lambda (var)
+                                (when (leaf-dynamic-extent var)
+                                  (return-from lvar-dx-uses-p t))))))
+
 (defun node-dominates-p (node1 node2)
   (let ((block1 (node-block node1))
         (block2 (node-block node2)))
