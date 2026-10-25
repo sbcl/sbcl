@@ -373,6 +373,17 @@
   (setf (documentation 'bug-643958-test 'function) "bar")
   (assert (equal "bar" (documentation 'bug-643958-test 'function))))
 
+(with-test (:name :nil-type-documentation)
+  (assert-no-signal (setf (documentation nil 'type) "this")
+                    warning)
+  (assert (equal (documentation nil 'type) "this")))
+
+(with-test (:name :nil-non-type-documentation)
+  (dolist (doc-type '(function variable constant t))
+    (assert-signal (setf (documentation nil doc-type) "this")
+                   style-warning)
+    (assert (null (documentation nil doc-type)))))
+
 (with-test (:name (:endianness :in *features*))
   (assert
    (or (member :big-endian *features*)

@@ -159,7 +159,9 @@
   (:argument-precedence-order doc-type object new-value))
 
 (defmethod (setf documentation) :around (new-value (x (eql nil)) doc-type)
-  (style-warn "Ignoring doc-type ~a for ~a." doc-type nil)
+  (if (eq doc-type 'type)
+      (call-next-method)
+      (style-warn "Ignoring doc-type ~a for ~a." doc-type nil))
   new-value)
 
 ;;; default if DOC-TYPE doesn't match one of the specified types
