@@ -1381,13 +1381,13 @@
   (let ((vars (ambiguous-debug-vars debug-fun (symbol-name symbol)))
         (package (and (sb-xc:symbol-package symbol)
                       (sb-xc:package-name (sb-xc:symbol-package symbol)))))
-    (delete-if (if (stringp package)
-                   (lambda (var)
-                     (let ((p (sb-xc:package-name (debug-var-package var))))
+    (delete-if (lambda (var)
+                 (let* ((var-package (debug-var-package var))
+                        (p (and var-package (sb-xc:package-name var-package))))
+                   (if (stringp package)
                        (or (not (stringp p))
-                           (string/= p package))))
-                   (lambda (var)
-                     (stringp (sb-xc:package-name (debug-var-package var)))))
+                           (string/= p package))
+                       (stringp p))))
                vars)))
 
 ;;; Return a list of DEBUG-VARs in DEBUG-FUN whose names contain
@@ -1405,19 +1405,20 @@
                (pos (find-var name-prefix-string variables len))
                (res nil))
           (when pos
-            ;; Find names from pos to variable's len that contain prefix.
+            ;; Find names from pos to variable's len that contain
+            ;; prefix. The variables are sorted by package before
+            ;; name, so these needn't be next to each other.
             (do ((i pos (1+ i)))
                 ((= i len))
               (let* ((var (svref variables i))
                      (name (debug-var-name var))
                      (name-len (length name)))
                 (declare (simple-string name))
-                (when (/= (or (string/= name-prefix-string name
-                                        :end1 prefix-len :end2 name-len)
-                              prefix-len)
-                          prefix-len)
-                  (return))
-                (push var res)))
+                (when (= (or (string/= name-prefix-string name
+                                       :end1 prefix-len :end2 name-len)
+                             prefix-len)
+                         prefix-len)
+                  (push var res))))
             (setq res (nreverse res)))
           res))))
 
@@ -1769,8 +1770,9 @@
                                 ;; packaged & uninterned means it's
                                 ;; writen as an integer package-id
                                 (uninterned
-                                 (aref sb-impl::*id->package*
-                                       (prog1 (aref packed-vars i) (incf i))))
+                                 (setf previously-read-package
+                                       (aref sb-impl::*id->package*
+                                             (prog1 (aref packed-vars i) (incf i)))))
                                 (t
                                  (setf previously-read-package
                                        (find-package (sb-c::read-var-string packed-vars i))))))

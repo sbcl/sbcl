@@ -1577,6 +1577,17 @@
     (assert (equal (run-stops '(5) '(((x 5) (y 5))))
                    '((5 5))))))
 
+(with-test (:name (:debugger :variables :packages))
+  (with-variables-test ()
+      (sb-int:named-lambda variables-test (s)
+        (declare (optimize (debug :debug)))
+        (let ((string (princ-to-string s))
+              (vector (list s)))
+          (signal 'variables-stop)
+          (list s string vector)))
+    (assert (equal (run-stops '(1) '(((s 1) (string "1") (vector (1)))))
+                   '((1 "1" (1)))))))
+
 (with-test (:name (:debugger :variables :optional))
   (with-variables-test ()
       (sb-int:named-lambda variables-test (a &optional (b 10 b-p) &rest r)
