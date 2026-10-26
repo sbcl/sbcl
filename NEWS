@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.6.9:
+  * minor incompatible change: testing for float equality using `=` is now a
+    quiet operation, not signalling when given NaNs as input.
   * enhancement: Unicode support has been updated to support version 18.0.0 of
     the Unicode standard, including support for new scripts and additional
     characters, refinements to segmentation algorithms and a number of fixes
@@ -63,6 +65,25 @@ changes relative to sbcl-2.6.9:
   * bug fix: in compiler messages, the outermost element of the processing
     path was always missing, and the actual source form also got corrupted
     sometimes.
+  * bug fix: evaluator errors from the simple evaluator now inherit from
+    PROGRAM-ERROR.
+  * bug fix: some bug fixes to the mark-region garbage collector (thanks to
+    iska and Hayley Patton)
+  * bug fix: address bugs in the reader regarding float syntax with large
+    (resp. small) decimal fraction and very large negative (resp. positive)
+    exponent.  (thanks to Arthur Miller)
+  * bug fix: allow usage of SB-ASSEM:INST when *PRINT-CASE* is not :UPCASE.
+    (thanks to digikar99)
+  * bug fix: PRIN1-TO-STRING of MOST-NEGATIVE-FIXNUM failed with an internal
+    error when *PRINT-BASE* was 2 or 4.  (thanks to Arthur Miller)
+  * bug fix: address a compiler failure related to MAKE-DOUBLE-FLOAT on PPC64.
+    (thanks to Piotr Kubaj)
+  * bug fix: types expressed as REAL and FLOAT ranges handle type conversion
+    of their bounds more carefully.
+  * bug fix: type checking for :KEY and :TEST arguments to ASSOC and RASSOC
+    uses the right data.  (reported by Tito Latini)
+  * bug fix: miscompilation of conversions from (SIMPLE-ARRAY CHARACTER (*))
+    to UTF-8.  (reported by Tom Gillespie)
   * bug fix: a large number of issues found through extended random testing.
   * optimization: some calls to EQUALP with a constant array argument can be
     constant-folded if enough is known about the type of the other argument.
@@ -72,11 +93,21 @@ changes relative to sbcl-2.6.9:
   * optimization: complete unboxed signed 128-bit arithmetic on arm64 and
     x86-64, except for division.
   * optimization: improved type derivation for local functions.
+  * optimization: loops with iteration variables tested for termination by
+    equality (rather than inequality) have better type inference.
+  * optimization: the compiler's handling of constraints has been optimized to
+    do less work somewhat faster.
+  * optimization: provide support for a four-way 64-bit permutation
+    instruction in SB-SIMD for AVX2.  (thanks to Willem Broekema)
+  * optimization: the compiler is more aware of the return type of LOG in the
+    presence of mixed floating point formats.
   * documentation: SB-MANUAL has several new sections: @GETTING-SBCL,
     @RUNNING-WITHOUT-INSTALLATION, @PARTS-OF-SBCL, @FINDING-PARTS-OF-SBCL, and
     many more under @EFFICIENCY.
   * documentation: SB-MANUAL now includes variable initforms and argument
     default values in the Texinfo output.
+  * documentation: provide an improved example of package-local nicknames.
+    (reported by Jacek Podkanski)
 
 changes in sbcl-2.6.9 relative to sbcl-2.6.8:
   * minor incompatible change: structure slots defined as :READ-ONLY can be
