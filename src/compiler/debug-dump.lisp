@@ -137,6 +137,46 @@
              t)))
       (t t))))
 
+(defun map-live-vars (function live node block vop)
+  (declare (type function function) (type local-tn-bit-vector live)
+           (type node node) (type ir2-block block)
+           (type (or vop null) vop))
+  (let ((spilled (gethash vop
+                          (ir2-component-spilled-vops
+                           (component-info *component-being-compiled*))))
+        (closure (ir2-environment-closure
+                  (environment-info (ir2-block-environment block)))))
+    (do-live-tns (tn live block)
+      (let ((leaf (or (tn-leaf tn)
+                      ;; Closure variables have TNs of their own.
+                      (let ((var (car (rassoc tn closure))))
+                        (and (lambda-var-p var)
+                             (not (lambda-var-indirect var))
+                             var)))))
+        (when (and (lambda-var-p leaf)
+                   (or (null spilled)
+                       (not (member tn spilled)))
+                   (optional-processed leaf))
+          (when (and (not (lambda-var-no-debug leaf))
+                     (or (not (member (tn-kind tn)
+                                      '(:environment :debug-environment)))
+                         (leaf-visible-to-debugger-p leaf node)))
+            (funcall function leaf tn))
+          (unless (cl:symbol-package (leaf-debug-name leaf))
+            (dolist (copy (lambda-var-copies leaf))
+              (when (and (null (leaf-refs copy))
+                         (cl:symbol-package (leaf-debug-name copy))
+                         (leaf-visible-to-debugger-p copy node))
+                (funcall function copy tn))))))))
+  (values))
+
+(defstruct (dumped-var (:constructor make-dumped-var (var tn))
+                       (:copier nil)
+                       (:predicate nil))
+  (var nil :type lambda-var :read-only t)
+  (tn nil :type tn :read-only t)
+  (name nil :type symbol))
+
 ;;; Given a local conflicts vector and an IR2 block to represent the
 ;;; set of live TNs, and the VAR-LOCS hash-table representing the
 ;;; variables dumped, compute a bit-vector representing the set of
@@ -149,24 +189,13 @@
            (values simple-bit-vector))
   (let ((res (make-array (align-up (hash-table-count var-locs) 8)
                          :element-type 'bit
-                         :initial-element 0))
-        (spilled (gethash vop
-                          (ir2-component-spilled-vops
-                           (component-info *component-being-compiled*)))))
-    (do-live-tns (tn live block)
-      (let ((leaf (tn-leaf tn)))
-        (when (and (lambda-var-p leaf)
-                   (not (lambda-var-no-debug leaf))
-                   (or (not (member (tn-kind tn)
-                                    '(:environment :debug-environment)))
-                       (leaf-visible-to-debugger-p leaf node))
-                   (or (null spilled)
-                       (not (member tn spilled)))
-                   (optional-processed leaf))
-          (let ((num (gethash leaf var-locs)))
-            (when num
-
-              (setf (sbit res num) 1))))))
+                         :initial-element 0)))
+    (flet ((note (var tn)
+             (declare (ignore tn))
+             (let ((num (gethash var var-locs)))
+               (when num
+                 (setf (sbit res num) 1)))))
+      (map-live-vars #'note live node block vop))
     res))
 
 ;;; The PC for the location most recently dumped.
@@ -551,7 +580,7 @@
 ;;; guaranteed to be live everywhere in that case.
 ;;;
 ;;; This is read by sb-di::parse-compiled-debug-vars
-(defun dump-1-var (fun var tn minimal buffer &optional name same-name-p)
+(defun dump-1-var (fun var tn minimal buffer &optional name same-name-p copy-p)
   (declare (type lambda-var var) (type (or tn null) tn)
            (type clambda fun))
   (let* ((package (sb-xc:symbol-package name))
@@ -589,7 +618,8 @@
                   (let ((id (sb-impl::package-id package)))
                     (when (< id sb-impl::+last-stable-package-id+) ;; exclude contribs
                       (setf package-p id)))))))
-    (when (and (or (eq kind :environment)
+    (when (and (not copy-p)
+               (or (eq kind :environment)
                    (and (eq kind :debug-environment)
                         (null (basic-var-sets var))))
                (not (gethash tn (ir2-component-spilled-tns
@@ -630,18 +660,6 @@
              (write-var-integer (tn-sc+offset save-tn) buffer)))))
   (values))
 
-(defun leaf-principal-name (leaf)
-  ;; If all the references are from the same substituted variable
-  ;; use its name.
-  ;; Helps with &key processing variables.
-  (let ((refs (leaf-refs leaf)))
-    (loop for ref in refs
-          for name = (ref-%source-name ref)
-          for first-name = name then first-name
-          unless (eq name first-name)
-          return (leaf-debug-name leaf)
-          finally (return name))))
-
 ;;; Return a vector suitable for use as the DEBUG-FUN-VARS
 ;;; of FUN. LEVEL is the current DEBUG-INFO quality. VAR-LOCS is a
 ;;; hash table in which we enter the translation from LAMBDA-VARS to
@@ -649,15 +667,54 @@
 ;;; vector.
 (defun compute-vars (fun level var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
-  (collect ((vars))
-    (labels ((frob-leaf (leaf tn gensym-p)
-               (let ((name (leaf-principal-name leaf)))
-                 (when (and name (leaf-refs leaf) (tn-offset tn)
-                            (or gensym-p (cl:symbol-package name)))
-                   (vars (list* name leaf tn)))))
+  (collect ((vars) (found))
+    (labels ((frob-live (live node block vop context)
+               (when live
+                 (let ((*local-call-context*
+                         (if (local-call-context-p context)
+                             (local-call-context-fun context))))
+                   (map-live-vars
+                    (lambda (var tn)
+                      (unless (gethash var var-locs)
+                        (found (setf (gethash var var-locs)
+                                     (make-dumped-var var tn)))))
+                    live node block vop))))
+             (frob-dumped (dumped gensym-p)
+               (let* ((leaf (dumped-var-var dumped))
+                      (name (leaf-debug-name leaf)))
+                 (when (and name (tn-offset (dumped-var-tn dumped))
+                            (or gensym-p (cl:symbol-package name))
+                            (not (dumped-var-name dumped)))
+                   (unless (cl:symbol-package name)
+                     (let ((copy (find-if (lambda (copy)
+                                            (let ((other (gethash copy var-locs)))
+                                              (and other
+                                                   (not (dumped-var-name other)))))
+                                          (lambda-var-copies leaf))))
+                       (when copy
+                         (setq name (leaf-debug-name copy))
+                         (setf (dumped-var-name (gethash copy var-locs)) name))))
+                   (setf (dumped-var-name dumped) name)
+                   (vars dumped))))
+             (frob-leaf (leaf tn gensym-p)
+               (let ((dumped (or (gethash leaf var-locs)
+                                 (and tn (leaf-refs leaf)
+                                      (make-dumped-var leaf tn)))))
+                 (when dumped
+                   (frob-dumped dumped gensym-p))))
              (frob-lambda (x gensym-p)
                (dolist (leaf (lambda-vars x))
                  (frob-leaf leaf (leaf-info leaf) gensym-p))))
+      (when (>= level 1)
+        (do-environment-ir2-blocks (2block (lambda-environment fun))
+          (let ((block (ir2-block-block 2block)))
+            (when (eq (block-info block) 2block)
+              (frob-live (ir2-block-live-out 2block) (block-start-node block)
+                         2block nil nil)))
+          (dolist (loc (ir2-block-locations 2block))
+            (let ((vop (location-info-vop loc)))
+              (frob-live (vop-save-set vop) (vop-node vop) (vop-block vop)
+                         vop (location-info-context loc))))))
       (frob-lambda fun t)
       (when (>= level 1)
         (dolist (x (ir2-environment-closure (environment-info (lambda-environment fun))))
@@ -665,17 +722,19 @@
             (when (lambda-var-p thing)
               (frob-leaf thing (cdr x) (>= level 2)))))
 
-        (dolist (let (lambda-lets fun))
-          (frob-lambda let (>= level 2)))))
+        (unless (functional-kind-eq fun external)
+          (dolist (dumped (found))
+            (frob-dumped dumped (>= level 2))))))
 
+    (clrhash var-locs)
     (setf (fill-pointer *byte-buffer*) 0)
     (let ((sorted (stable-sort
                    (sort (vars) #'string<
                          :key (lambda (x)
-                                (symbol-name (car x))))
+                                (symbol-name (dumped-var-name x))))
                    #'string<
                    :key (lambda (x)
-                          (let ((package (sb-xc:symbol-package (car x))))
+                          (let ((package (sb-xc:symbol-package (dumped-var-name x))))
                             (when package
                               (sb-xc:package-name package))))))
           (prev-name nil)
@@ -684,14 +743,17 @@
           (minimal (functional-kind-eq fun external))
           *previous-package*)
       (declare (type index i))
-      (loop for (name var . tn) in sorted
-            do
-            (dump-1-var fun var tn minimal *byte-buffer*
-                        name
-                        (and prev-name (eq prev-name name)))
-            (setf prev-name name)
-            (setf (gethash var var-locs) i)
-            (incf i))
+      (dolist (x sorted)
+        (let ((var (dumped-var-var x))
+              (name (dumped-var-name x))
+              (tn (dumped-var-tn x)))
+          (dump-1-var fun var tn minimal *byte-buffer*
+                      name
+                      (and prev-name (eq prev-name name))
+                      (neq var (or (tn-leaf tn) var)))
+          (setf prev-name name)
+          (setf (gethash var var-locs) i)
+          (incf i)))
       (copy-seq *byte-buffer*))))
 
 ;;; Return a vector suitable for use as the DEBUG-FUN-VARS of

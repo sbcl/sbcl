@@ -3040,6 +3040,15 @@ is :ANY, the function name is not checked."
     (change-ref-leaf ref new-leaf))
   (values))
 
+;;; Note that the references to VAR are being replaced by references
+;;; to LEAF.
+(defun note-var-copy (var leaf)
+  (declare (type lambda-var var) (type leaf leaf))
+  (when (lambda-var-p leaf)
+    (pushnew var (lambda-var-copies leaf))
+    (dolist (copy (lambda-var-copies var))
+      (pushnew copy (lambda-var-copies leaf)))))
+
 ;;; like SUBSITUTE-LEAF, only there is a predicate on the REF to tell
 ;;; whether to substitute
 (defun substitute-leaf-if (test new-leaf old-leaf)

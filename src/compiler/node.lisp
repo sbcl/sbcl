@@ -1527,6 +1527,8 @@
   ;; unique. Null initially, and :MANY when proven that the VAR is
   ;; bound to many values.
   (optimistic-leaf nil :type (or null leaf (eql :many)))
+  ;; The variables which this variable has substituted for.
+  (copies nil :type list)
   source-form)
 
 (def-struct-flag-accessors lambda-var)
@@ -1563,15 +1565,12 @@
                  (flags (flags ref :reoptimize nil)))
                 (:constructor make-ref
                     (leaf
-                     &optional (%source-name '.anonymous.)
                      &aux (leaf-type (leaf-type leaf))
                           (derived-type
                            (make-single-value-type leaf-type))))
                 (:copier nil))
   ;; The leaf referenced.
   (leaf nil :type leaf)
-  ;; KLUDGE: This is supposed to help with keyword debug messages somehow.
-  (%source-name (missing-arg) :type symbol :read-only t)
   ;; An cons added by constraint-propagate to all REFs that have the
   ;; same value when referencing a lambda-var with sets.
   (same-refs nil :type (or null cons)))
@@ -1579,7 +1578,6 @@
 (def-struct-flag-accessors ref)
 
 (defprinter (ref :identity t)
-  (%source-name :test (neq %source-name '.anonymous.))
   (leaf :prin1 (if (and (constant-p leaf)
                         (not (symbolp (constant-value leaf))))
                    (constant-value leaf)
