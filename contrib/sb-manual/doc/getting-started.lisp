@@ -320,8 +320,11 @@
                   "No documentation for public build feature ~S."
                   feature-def)
           (format out "- ~S~%~%~A~&~%" feature
-                  (prefix-lines "    " (reindent-docstring
-                                        documentation))))))))
+                  (prefix-lines "    "
+                                #+sb-doc
+                                (reindent-docstring documentation)
+                                #-sb-doc
+                                documentation)))))))
 
 (eval
  `(defsection @build-options (:title "Build Options")
