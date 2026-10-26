@@ -174,18 +174,24 @@
 (defun integer-sxhash (x)
   (if (fixnump x) (sxhash (truly-the fixnum x)) (sb-bignum:sxhash-bignum x)))
 
+(declaim (inline ratio-sxhash %ratio-sxhash))
+(defun %ratio-sxhash (num den)
+  (let ((result 127810327))
+    (declare (type fixnum result))
+    (mixf result (integer-sxhash num))
+    (mixf result (integer-sxhash den))
+    result))
+
+(defun ratio-sxhash (x)
+  (sb-kernel::dispatch-ratio (x num den)
+    (%ratio-sxhash num den)))
+
 (defun number-sxhash (x)
   (declare (optimize (sb-c:verify-arg-count 0) speed))
   (declare (explicit-check))
-  (labels ((hash-ratio (x)
-             (let ((result 127810327))
-               (declare (type fixnum result))
-               (mixf result (integer-sxhash (numerator x)))
-               (mixf result (integer-sxhash (denominator x)))
-               result))
-           (hash-rational (x)
+  (labels ((hash-rational (x)
              (if (ratiop x)
-                 (hash-ratio x)
+                 (ratio-sxhash x)
                  (integer-sxhash x))))
     (macrolet ((hash-complex-float (type)
                  `(let ((result 535698211))
@@ -199,7 +205,7 @@
         (single-float (sxhash x)) ; through DEFTRANSFORM
         (double-float (sxhash x)) ; through DEFTRANSFORM
         #+long-float (long-float (error "stub: no LONG-FLOAT"))
-        (ratio (hash-ratio x))
+        (ratio (ratio-sxhash x))
         #+long-float
         ((complex long-float) (hash-complex-float long-float))
         ((complex double-float) (hash-complex-float double-float))
@@ -570,15 +576,18 @@
              (integer (sxhash key))
              (single-float (sfloat-psxhash key))
              (double-float (dfloat-psxhash key))
-             (rational (if (and (<= most-negative-double-float
-                                    key
-                                    most-positive-double-float)
-                                (= (coerce key 'double-float) key))
-                           (sxhash (coerce key 'double-float))
-                           ;; a rational for which '=' does not return T when compared
-                           ;; to itself cast as double-float need to have the same hash
-                           ;; as any float. That's why this case is legitimate.
-                           (sxhash key)))
+             (rational
+              (locally (declare (inline scale-double-float))
+                (sb-kernel::dispatch-ratio (key num den)
+                  ;; Is it = to a double float?
+                  (if (and (<= (integer-length num) 53)
+                           (<= (integer-length den) 1075)
+                           (= (logcount den) 1)) ; power of two?
+                      (let ((float (scale-double-float (coerce num 'double-float)
+                                                       (- 1 (integer-length den)))))
+
+                        (sxhash float))
+                      (%ratio-sxhash num den)))))
              ((complex double-float) (hash-complex dfloat-psxhash))
              ((complex single-float) (hash-complex sfloat-psxhash))
              ((complex rational)     (hash-complex number-psxhash)))))
