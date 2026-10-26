@@ -19,6 +19,11 @@
   are in a subset of Markdown and use very little markup in general,
   so they are easy to read directly in the source.
 
+  The final, rendered documentation in plain text format is available
+  for any section via CL:DOCUMENTATION:
+
+      (documentation sb-manual:@sbcl-manual t)
+
   The official manual in Info, HTML and PDF formats is generated via
   Texinfo generated from these definitions."
   (@using-pax section)

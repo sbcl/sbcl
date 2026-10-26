@@ -7,6 +7,7 @@
                (:file "docstring")
                (:file "markdown" :if-feature :sb-doc)
                (:file "texinfo" :if-feature :sb-doc)
+               (:file "plain-text" :if-feature :sb-doc)
                (:file "manual")
                (:module "doc/"
                 :serial t

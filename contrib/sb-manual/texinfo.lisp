@@ -1,3 +1,5 @@
+;;;; GENERATE-TEXINFO from @SBCL-MANUAL
+
 (in-package :sb-manual)
 
 (defun lookup-method-xref (xref)

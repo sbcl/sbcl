@@ -1,4 +1,4 @@
-;;;; A Markdown-to-Texinfo converter for the SBCL manual.
+;;;; A Markdown-to-Texinfo converter for the SBCL manual
 
 ;;;; This software is part of the SBCL software system. SBCL is in the
 ;;;; public domain and is provided with absolutely no warranty. See
@@ -138,8 +138,8 @@
 ;;;
 ;;; - CONCEPT references (see DEFINE-CONCEPT):
 ;;;
-;;;     - pure concept: @CONCEPT-NAME -> "" (no output)
-;;;     - titled concept: @CONCEPT-NAME -> <title>
+;;;     - pure concept: ~SOME-CONCEPT -> "" (no output)
+;;;     - titled concept: @OTHER-CONCEPT -> <title>
 ;;;
 ;;; TODO:
 ;;;
@@ -153,9 +153,12 @@
 ;;;   file). Is there a better way? Must keep compatibility with PAX,
 ;;;   so this must be a general solution and implemented there, too.
 ;;;
-;;; Also, see SB-PCL::NORMALIZE-SBCL-DOCSTRING, an expedient docstring
-;;; to plain text converter that supports the subset of this
+;;; - Maybe implement PAX::@CL-TRANSCRIPT-EXPECT.
+;;;
+;;; Also, see SB-PCL::NORMALIZE-SBCL-DOCSTRING, an expedient
+;;; docstring-to-plain-text converter that supports the subset of this
 ;;; functionality necessary for the docstrings in SBCL core.
+;;; SB-MANUAL's own EMIT-PLAIN-FOR-SECTION is built on top of it.
 (defun markdown-to-texinfo (string &key lambda-list (add-newline t))
   (let ((*texinfo-local-variables* (flatten lambda-list))
         (lines (string-lines string))
@@ -263,13 +266,13 @@
                    (read-symbol-without-interning name)
                  (when (and foundp (interesting-name-p word symbol))
                    (return-from codifiable-bounds (values start end)))))))
-      ;; 1. Trim the lower-case characters
+      ;; Trim the lower-case characters
       (let* ((name (string-left-trim *lower-case-chars* word))
              (name-start (- (length word) (length name)))
              (name (string-right-trim *lower-case-chars* name))
              (name-end (+ name-start (length name))))
         (try-name name-start name-end))
-      ;; 2. Find the upper-case core
+      ;; Find the upper-case core
       (multiple-value-bind (name-start name-end) (uppercase-core-bounds word)
         (when name-start
           (try-name name-start name-end))))))
