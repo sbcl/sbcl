@@ -357,7 +357,11 @@
              (if setter
                  (funcall setter node block tn val (leaf-info leaf))
                  (vop ancestor-frame-set node block tn val (leaf-info leaf)))))
-            (t (emit-move node block val tn))))))
+            (t
+             (when (and (eq (tn-kind tn) :debug-environment)
+                        (policy node (= debug 3)))
+               (vop keep-live node block tn))
+             (emit-move node block val tn))))))
       (global-var
        (aver (symbolp (leaf-source-name leaf)))
        (ecase (global-var-kind leaf)

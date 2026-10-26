@@ -1667,8 +1667,7 @@
                                      ((x 7) (y 7))))
                    '(7)))))
 
-(with-test (:name (:debugger :variables :setq :dead-value)
-            :fails-on :sbcl)
+(with-test (:name (:debugger :variables :setq :dead-value))
   ;; The initial value of X is never used.
   (with-variables-test (:strict (3) :lax (1 2))
       (sb-int:named-lambda variables-test (n)

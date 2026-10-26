@@ -32,6 +32,12 @@
   (:generator 0
     (funcall (symbol-function name) vop x y)))
 
+;;; Read X so that its value stays live for the debugger.
+(define-vop (keep-live)
+  (:args (x))
+  (:ignore x)
+  (:generator 0))
+
 ;;; Emit a label for sub-block (or sub-node) reference.
 (define-vop (emit-label)
   (:info the-label)
