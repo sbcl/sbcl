@@ -93,7 +93,8 @@
                  ;; :DEBUG-ENVIRONMENT TNs might be spilled before they are initialized,
                  ;; putting unboxed values onto the stack.
                  #-c-stack-is-control-stack
-                 (when (member sb-vm:any-reg-sc-number (primitive-type-scs type))
+                 (when (and let-p
+                            (member sb-vm:any-reg-sc-number (primitive-type-scs type)))
                    (setf (tn-sc res) (sc-or-lose 'sb-vm::control-stack)))
                  ;; If it's a constant it may end up being never read,
                  ;; replaced by COERCE-FROM-CONSTANT.
