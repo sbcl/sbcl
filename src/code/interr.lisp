@@ -656,9 +656,10 @@
                      value context))))))
 
 #+debug-stack-stores
-(deferr bad-stack-store-error ()
+(deferr bad-stack-store-error (x)
   (error 'simple-storage-condition
-         :format-control "Bad stack store"))
+         :format-control "Bad stack store at #x~x #x~x"
+         :format-arguments (list x (sap-int (sb-vm:context-pc *current-internal-error-context*)))))
 
 ;;;; INTERNAL-ERROR signal handler
 

@@ -140,7 +140,7 @@
    ("Operation not of type" op-not-type2 2)
    ("Operation not of type" op-not-type1 1)
    #+debug-stack-stores
-   ("Bad stack store" bad-stack-store 0))
+   ("Bad stack store" bad-stack-store 1))
   ;; (II) All the type specifiers X for which there is a unique internal
   ;;      error code corresponding to a primitive object-not-X-error.
   function

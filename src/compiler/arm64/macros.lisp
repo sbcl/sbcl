@@ -133,14 +133,17 @@
       (assemble nil
         (inst tbz reg 0 ok)
         (inst cmp (32-bit-reg reg) single-float-widetag)
-        (inst str tmp-tn (@ nsp-tn -8 :pre-index))
+        (inst b :eq ok)
+        (inst str tmp-tn (@ nsp-tn -16 :pre-index))
         (inst and tmp-tn reg widetag-mask)
         (inst cmp tmp-tn character-widetag)
         (inst b :eq ok2)
         (inst cmp tmp-tn unbound-marker-widetag)
-        (inst b :ne (generate-error-code nil 'sb-kernel::bad-stack-store-error))
+        (inst b :ne (generate-error-code nil 'sb-kernel::bad-stack-store-error
+                                         (make-random-tn (sc-or-lose 'unsigned-reg)
+                                                         (tn-offset reg))))
         ok2
-        (inst ldr tmp-tn (@ nsp-tn 8 :post-index))
+        (inst ldr tmp-tn (@ nsp-tn 16 :post-index))
         ok))
     (inst str reg (@ stack (load-store-offset offset)))))
 
