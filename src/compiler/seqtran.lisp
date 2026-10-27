@@ -418,9 +418,6 @@
              (or end length)
              (sequence-bounding-indices-bad-error vector start end)))))
 
-(sb-xc:deftype eq-comparable-type ()
-  '(or fixnum #+64-bit single-float (not number)))
-
 ;;; True if EQL comparisons involving type can be simplified to EQ.
 (defun eq-comparable-type-p (type)
   (csubtypep type (specifier-type 'eq-comparable-type)))

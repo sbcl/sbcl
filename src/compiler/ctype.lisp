@@ -20,6 +20,9 @@
 
 (declaim (type (or function null) *lossage-fun* *unwinnage-fun* *ctype-test-fun*))
 
+(sb-xc:deftype eq-comparable-type ()
+  '(or fixnum #+64-bit single-float (not number)))
+
 ;;; These are the functions that are to be called when a problem is
 ;;; detected. They are passed format arguments. If null, we don't do
 ;;; anything. The LOSSAGE function is called when something is

@@ -2612,3 +2612,11 @@
            ((= a 255) 1)
            (t a)))
    (integer 1 254)))
+
+(with-test (:name :not-eq)
+  (assert-type
+   (lambda (a)
+     (declare (integer a))
+     (cond ((eq a (expt 2 68)) 1)
+           (t a)))
+   integer))

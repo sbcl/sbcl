@@ -821,6 +821,13 @@
                                              alternative-constraints)
                  (when lvar
                    (constraint-propagate-back lvar fun y constraints consequent-constraints alternative-constraints)))
+               (add-no-complement (fun x y not-p &optional lvar)
+                 (add-test-constraint quick-p
+                                      fun x y not-p
+                                      constraints
+                                      consequent-constraints)
+                 (when lvar
+                   (constraint-propagate-back lvar fun y constraints consequent-constraints nil)))
                (process-node (node)
                  (typecase node
                    (ref
@@ -877,22 +884,20 @@
                              ;; unnatural asymmetry of the tests.
                              (cond ((not var1)
                                     (when var2
-                                      (add-test-constraint quick-p
-                                                           'typep var2 (lvar-type arg1)
-                                                           nil constraints
-                                                           consequent-constraints)))
+                                      (add-no-complement 'typep var2 (lvar-type arg1) nil)))
                                    (var2
-                                    (add 'eql var1 var2 nil))
+                                    (if (or (eq name 'eql)
+                                            (eq-comparable-type-p (lvar-type arg2)))
+                                        (add 'eql var1 var2 nil)
+                                        (add-no-complement 'eql var1 var2 nil)))
                                    ((constant-lvar-p arg2)
-                                    (add 'eql var1
-                                         (nth-value 1 (lvar-value arg2))
-                                         nil
-                                         arg1))
+                                    (multiple-value-bind (value constant) (lvar-value arg2)
+                                      (if (or (eq name 'eql)
+                                              (ctypep value (specifier-type 'eq-comparable-type)))
+                                          (add 'eql var1 constant nil arg1)
+                                          (add-no-complement 'eql var1 constant nil arg1))))
                                    (t
-                                    (add-test-constraint quick-p
-                                                         'typep var1 (lvar-type arg2)
-                                                         nil constraints
-                                                         consequent-constraints)))))
+                                    (add-no-complement 'typep var1 (lvar-type arg2) nil)))))
                           ((< >)
                            (when (= (length args) 2)
                              (let* ((arg1 (first args))
