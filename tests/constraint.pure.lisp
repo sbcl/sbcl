@@ -2603,3 +2603,12 @@
                 `(lambda (x)
                    (setf x (truncate x 3))
                    2)))))
+
+(with-test (:name :not-type-unions)
+  (assert-type
+   (lambda (a)
+     (declare ((unsigned-byte 8) a))
+     (cond ((= a 0) 1)
+           ((= a 255) 1)
+           (t a)))
+   (integer 1 254)))

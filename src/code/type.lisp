@@ -6911,6 +6911,23 @@ expansion happened."
                             (return))
                           (incf i1 2)))))))))
 
+(defun numeric-type-from-xset (xset)
+  (if (xset-empty-p xset)
+      *empty-type*
+      (let (rationals
+            double-floats
+            single-floats)
+        (map-xset (lambda (m)
+                    (typecase m
+                      (double-float (push m double-floats))
+                      (single-float (push m single-floats))
+                      (rational     (push m rationals))))
+                  xset)
+        (type-union
+         (member-rational rationals)
+         (member-float 'double-float double-floats)
+         (member-float 'single-float single-floats)))))
+
 (defun member-rational (members)
   (declare (inline !compute-numtype-aspect-id))
   (if members

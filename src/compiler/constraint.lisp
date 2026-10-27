@@ -1070,30 +1070,6 @@
                 (make-numeric-union-type :low bound)
                 (make-numeric-union-type :high bound))))))))
 
-(defun contiguous-numeric-set-type (xset)
-  (cond ((xset-empty-p xset)
-         nil)
-        ;; Is XSET a contiguous integer range?
-        ((block nil
-           (let ((count 0)
-                 (min nil)
-                 (max nil))
-             (declare (type fixnum count))
-             (map-xset (lambda (value)
-                         (unless (integerp value)
-                           (return))
-                         (incf count)
-                         (when (or (null min) (< value min))
-                           (setf min value))
-                         (when (or (null max) (> value max))
-                           (setf max value)))
-                       xset)
-             (when (= (- max min) (1- count))
-               (make-numeric-type 'integer min max)))))
-        ;; It's useful to know when something is not zero
-        ((xset-member-p 0 xset)
-         (specifier-type '(eql 0)))))
-
 ;;; Compute the tightest type possible for a variable given a set of
 ;;; CONSTRAINTS.
 (defun type-from-constraints (variable constraints initial-type &optional ref)
@@ -1182,10 +1158,10 @@
                                  (type-union not-union (make-member-type not-xset))
                                  not-union))
                   (numeric (when not-numeric
-                             (contiguous-numeric-set-type not-numeric)))
+                             (sb-kernel::numeric-type-from-xset not-numeric)))
                   (not-union (if numeric
-                               (type-union not-union numeric)
-                               not-union))
+                                 (type-union not-union numeric)
+                                 not-union))
                   (not-union (if not-characters
                                  (type-union not-union
                                              (sb-kernel::character-set-type-from-characters not-characters))
