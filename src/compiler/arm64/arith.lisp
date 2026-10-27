@@ -4758,10 +4758,16 @@
                                         (inst tst temp (lognot diff)))
                                        (t
                                         (unless (add-sub-immediate-p diff)
-                                          (if (load-immediate-word tmp-tn (+ diff (fixnumize 1)) t)
-                                              (change-vop-flags vop '(:lo))
-                                              (load-immediate-word tmp-tn diff))
-                                          (setf loaded tmp-tn))
+                                          (let ((diff+1 (+ diff (fixnumize 1))))
+                                            (cond ((add-sub-immediate-p diff+1)
+                                                   (change-vop-flags vop '(:lo))
+                                                   (setf loaded diff+1))
+                                                  ((load-immediate-word tmp-tn diff+1 t)
+                                                   (change-vop-flags vop '(:lo))
+                                                   (setf loaded tmp-tn))
+                                                  (t
+                                                   (load-immediate-word tmp-tn diff)
+                                                   (setf loaded tmp-tn)))))
                                         (cond
                                           ((and (< -1 lo lowest-bignum-address)
                                                 (< -1 hi lowest-bignum-address))
