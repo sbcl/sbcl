@@ -1755,12 +1755,12 @@
        (no-debug
         (process-no-debug-decl spec vars)
         res)
-       ;; We may want to detect LAMBDA-LIST and VALUES decls here,
-       ;; and report them as "Misplaced" rather than "Unrecognized".
        (t
         (let ((info (info :declaration :known (first spec))))
-          (unless info
-            (compiler-warn "unrecognized declaration ~S" raw-spec))
+          (cond ((member (first spec) '(lambda-list values))
+                 (compiler-warn "misplaced declaration ~S" raw-spec))
+                ((null info)
+                 (compiler-warn "unrecognized declaration ~S" raw-spec)))
           (if (functionp info)
               (funcall info res spec vars fvars)
               res))))
@@ -1813,7 +1813,8 @@
                     (setq lambda-list (cadr spec) allow-lambda-list nil))
                    ((and allow-values-decl
                          (typep spec '(cons (eql values))))
-                    ;; Why do we allow more than one VALUES decl? I don't know.
+                    ;; We allow more than one VALUES declaration for
+                    ;; e.g. when one is coming from a macro expansion.
                     (setq result-type
                           (values-type-intersection
                            result-type
