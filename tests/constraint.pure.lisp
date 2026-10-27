@@ -2597,3 +2597,9 @@
                 (r (error ""))))
    ;; Should be NIL, but it's not too important
    (eql 2)))
+
+(with-test (:name :set-elimination)
+  (assert (not (ctu:ir1-named-calls
+                `(lambda (x)
+                   (setf x (truncate x 3))
+                   2)))))

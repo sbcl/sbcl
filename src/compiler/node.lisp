@@ -1621,8 +1621,13 @@
                        (:copier nil))
   (default nil))
 
+(def-struct-flags (cset node)
+  ;; During constraint propagation, there's a ref after this set
+  (reached t))
+
 (defstruct (cset (:include valued-node
-                           (derived-type (make-single-value-type *universal-type*)))
+                  (derived-type (make-single-value-type *universal-type*))
+                  (flags (flags cset)))
                  (:conc-name set-)
                  (:predicate set-p)
                  (:constructor make-set (var value))
@@ -1631,6 +1636,9 @@
   (var (missing-arg) :type basic-var)
   ;; LVAR for the value form
   (value (missing-arg) :type lvar))
+
+(def-struct-flag-accessors cset :prefix set)
+
 (defprinter (cset :conc-name set- :identity t)
   var
   (value :prin1 (lvar-uses value)))

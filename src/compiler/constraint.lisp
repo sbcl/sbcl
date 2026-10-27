@@ -43,7 +43,7 @@
             (var :prin1 (lambda-var-%source-name var)))
 
 (deftype constraint-y () '(or ctype lvar lambda-var constant
-                           vector-length-constraint))
+                           vector-length-constraint cset))
 
 (defstruct (constraint
             (:include sset-element)
@@ -347,7 +347,7 @@
                       (eq (constraint-not-p con) not-p))
              (return-from find-constraint con)))
          nil))
-    (lvar
+    ((or lvar cset)
        (awhen (lambda-var-eq-constraints x)
          (gethash y it)))
     ((or constant lambda-var)
@@ -387,7 +387,7 @@
              (vec   (ensure-vec  (lambda-var-inheritable-constraints x))))
          (push con (gethash y index))
          (vector-push-extend con vec)))
-      (lvar
+      ((or lvar cset)
        (let ((index (ensure-hash (lambda-var-eq-constraints x))))
          (setf (gethash y index) con)))
       ((or constant lambda-var)
@@ -1388,6 +1388,10 @@
   (declare (type ref ref) (type conset in))
   (let* ((leaf (ref-leaf ref))
          (old-type (single-value-type (node-derived-type ref))))
+    (dolist (set (lambda-var-sets leaf))
+      (let ((con (find-constraint 'set leaf set t)))
+        (unless (and con (conset-member con in))
+          (setf (set-reached set) t))))
     (multiple-value-bind (type set)
         (type-from-constraints leaf in old-type ref)
       (when type
@@ -1494,6 +1498,7 @@
         when (and val (lambda-var-constraints var))
           do (let ((new (add-set-constraints var val constraints)))
                (conset-clear-lambda-var target var)
+               (clear-var-sets var target nil)
                (when new
                  (conset-union target new))
 
@@ -1517,6 +1522,11 @@
                  (add-eq-constraint var val target)
                  (add-var-result-constraints var val target target)))))
 
+(defun clear-var-sets (var conset except)
+  (dolist (s (lambda-var-sets var))
+    (unless (eq s except)
+      (conset-adjoin (find-or-create-constraint 'set var s t) conset))))
+
 ;;; Local propagation
 ;;; -- [TODO: For any LAMBDA-VAR ref with a type check, add that
 ;;;    constraint.]
@@ -1530,6 +1540,10 @@
     (typecase node
       (bind
        (let ((fun (bind-lambda node)))
+         (dolist (var (lambda-vars fun))
+           (when (and (lambda-var-constraints var)
+                      (lambda-var-sets var))
+             (clear-var-sets var gen nil)))
          (when (functional-kind-eq fun nil optional)
            (dolist (var (lambda-vars fun))
              (let ((type (leaf-defined-type var)))
@@ -1577,6 +1591,7 @@
              (maybe-add-eql-var-var-constraint var (set-value node) gen))
            (add-eq-constraint var (set-value node) gen)
            (conset-add-constraint gen 'set var var nil)
+           (clear-var-sets var gen node)
            (when (node-lvar node)
              (conset-add-lvar-lambda-var-eql gen (node-lvar node) var)))))
       (basic-combination
@@ -1723,7 +1738,9 @@
                  (when (block-type-check (lambda-block fun))
                    ;; This is optimistic, make sure it's going to be
                    ;; processed.
-                   (setf (lambda-var-unused-initial-value var) t))))))
+                   (setf (lambda-var-unused-initial-value var) t)
+                   (loop for set in (lambda-var-sets var)
+                         do (setf (set-reached set) nil)))))))
       (frob fun)
       (dolist (let (lambda-lets fun))
         (frob let)))))
@@ -2017,7 +2034,19 @@
     (when (and *compiler-trace-output*
                (memq :constraints *compile-trace-targets*))
       (print-all-constraints component))
+
+    (flet ((find-dead-sets (x)
+             (dolist (var (lambda-vars x))
+               (when (lambda-var-constraints var)
+                 (dolist (set (lambda-var-sets var))
+                   (unless (or (set-reached set)
+                               (member set *sets-to-delete*))
+                     (delete-set set)))))))
+      (dolist (fun (component-lambdas component))
+        (find-dead-sets fun)
+        (dolist (let (lambda-lets fun))
+          (find-dead-sets let))))
+    (mapc #'delete-set *sets-to-delete*)
     (loop for node in *blocks-to-terminate*
-          do (maybe-terminate-block node nil))
-    (mapc #'delete-set *sets-to-delete*))
+          do (maybe-terminate-block node nil)))
   (values))
