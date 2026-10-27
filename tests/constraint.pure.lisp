@@ -309,18 +309,17 @@
           '(values (not integer) &optional))))
 
 (with-test (:name (:type-constraint-joining :infinities 1))
-  (assert
-   (ctype= (caddr
-            (sb-kernel:%simple-fun-type
-             (checked-compile
-              `(lambda (number)
-                 (declare (type (or number null) number))
-                 (cond ((null number) nil)
-                       ((sb-ext:float-nan-p number) :nan)
-                       ((= number sb-ext:double-float-positive-infinity) :inf)
-                       ((= number sb-ext:double-float-negative-infinity) :-inf)
-                       (number))))))
-           '(values (or (member nil :nan :inf :-inf) float) &optional))))
+  (assert-type
+   (lambda (number)
+     (declare (type (or number null) number))
+     (cond ((null number) nil)
+           ((sb-ext:float-nan-p number) :nan)
+           ((= number sb-ext:double-float-positive-infinity) :inf)
+           ((= number sb-ext:double-float-negative-infinity) :-inf)
+           (number)))
+   (or (member nil :nan :inf :-inf)
+       (and float (not (float #.single-float-negative-infinity #.single-float-negative-infinity))
+            (not (float #.single-float-positive-infinity #.single-float-positive-infinity))))))
 
 (with-test (:name (:type-constraint-joining :infinities 2))
   (assert
@@ -2611,7 +2610,13 @@
      (cond ((= a 0) 1)
            ((= a 255) 1)
            (t a)))
-   (integer 1 254)))
+   (integer 1 254))
+  (assert-type
+   (lambda (a)
+     (declare (real a))
+     (cond ((= a 32.0) 1)
+           (t a)))
+   (and real (not (real 32 32)))))
 
 (with-test (:name :not-eq)
   (assert-type

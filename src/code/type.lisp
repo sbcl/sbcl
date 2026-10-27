@@ -2799,12 +2799,18 @@ expansion happened."
                         (t
                          (rational thing))))
                  ((float single-float)
-                  (cond ((sb-xc:<= most-negative-single-float thing most-positive-single-float)
+                  (cond ((or (sb-xc:<= most-negative-single-float thing most-positive-single-float)
+                             (and (listp bound)
+                                  (floatp thing)
+                                  (float-infinity-p thing)))
                          (coerce thing 'single-float))
                         (t
                          (return-from coerce-numeric-bound nil))))
                  (double-float
-                  (cond ((sb-xc:<= most-negative-double-float thing most-positive-double-float)
+                  (cond ((or (sb-xc:<= most-negative-double-float thing most-positive-double-float)
+                             (and (listp bound)
+                                  (floatp thing)
+                                  (float-infinity-p thing)))
                          (coerce thing 'double-float))
                         (t
                          (return-from coerce-numeric-bound nil)))))))
@@ -2814,21 +2820,29 @@ expansion happened."
           (error ()
             (return-from coerce-numeric-bound nil)))))))
 
-(defun %make-union-numeric-type (class format complexp low high)
+(defun %make-union-numeric-type (class format complexp low high exclude-unbounded)
   (declare (type (member integer rational float nil) class))
   (macrolet ((unionize (&rest specs)
-               `(type-union
-                 ,@(loop for (class format coerce simple-coerce) in specs
-                         collect `(make-numeric-union-type
-                                   :class ',class
-                                   :format ',format
-                                   :complexp complexp
-                                   :low ,(if simple-coerce
-                                             `(coerce low ',coerce)
-                                             `(coerce-numeric-bound low ',coerce nil))
-                                   :high ,(if simple-coerce
-                                              `(coerce high ',coerce)
-                                              `(coerce-numeric-bound high ',coerce t)))))))
+               `(let ((parts (list ,@(loop for (class format coerce simple-coerce) in specs
+                                           collect `(let ((lo ,(if simple-coerce
+                                                                   `(coerce low ',coerce)
+                                                                   `(coerce-numeric-bound low ',coerce nil)))
+                                                          (hi ,(if simple-coerce
+                                                                   `(coerce high ',coerce)
+                                                                   `(coerce-numeric-bound high ',coerce t))))
+                                                      (unless (or
+                                                               ,(when (and (not simple-coerce)
+                                                                           format)
+                                                                  `(and exclude-unbounded
+                                                                        (not (or lo hi)))))
+                                                        (make-numeric-union-type
+                                                         :class ',class
+                                                         :format ',format
+                                                         :complexp complexp
+                                                         :low lo
+                                                         :high hi)))))))
+                  (declare (dynamic-extent parts))
+                  (%type-union (delete nil parts)))))
     (cond ((and (null class) (member complexp '(:real :complex)))
            (cond ((not (bounds-unbounded-p low high))
                   (cond ((and (floatp low) (float-infinity-p low)
@@ -2866,9 +2880,9 @@ expansion happened."
           ((and (null complexp)
                 (or class format low high))
            (type-union (make-numeric-union-type :class class :format format :complexp :complex
-                                          :low low :high high)
+                                                :low low :high high)
                        (make-numeric-union-type :class class :format format :complexp :real
-                                          :low low :high high))))))
+                                                :low low :high high))))))
 
 (defun modified-numeric-type (base
                               &key
@@ -3081,25 +3095,29 @@ expansion happened."
            (cond
              ((cl:typep nbound 'single-float) bound)
              (t
-              (if upperp
-                  (cond
-                    ((sb-xc:> nbound ps) (return-from inner-coerce-float-bound ps))
-                    ((sb-xc:< nbound ns) (return-from inner-coerce-float-bound (list ns))))
-                  (cond
-                    ((sb-xc:< nbound ns) (return-from inner-coerce-float-bound ns))
-                    ((sb-xc:> nbound ps) (return-from inner-coerce-float-bound (list ps)))))
+              (unless (and (floatp nbound)
+                           (float-infinity-p nbound))
+                (if upperp
+                    (cond
+                      ((sb-xc:> nbound ps) (return-from inner-coerce-float-bound ps))
+                      ((sb-xc:< nbound ns) (return-from inner-coerce-float-bound (list ns))))
+                    (cond
+                      ((sb-xc:< nbound ns) (return-from inner-coerce-float-bound ns))
+                      ((sb-xc:> nbound ps) (return-from inner-coerce-float-bound (list ps))))))
               (make-bound (coerce nbound 'single-float)))))
           (double-float
            (cond
              ((cl:typep nbound 'double-float) bound)
              (t
-              (if upperp
-                  (cond
-                    ((sb-xc:> nbound pd) (return-from inner-coerce-float-bound pd))
-                    ((sb-xc:< nbound nd) (return-from inner-coerce-float-bound (list nd))))
-                  (cond
-                    ((sb-xc:< nbound nd) (return-from inner-coerce-float-bound nd))
-                    ((sb-xc:> nbound pd) (return-from inner-coerce-float-bound (list pd)))))
+              (unless (and (floatp nbound)
+                           (float-infinity-p nbound))
+                (if upperp
+                    (cond
+                      ((sb-xc:> nbound pd) (return-from inner-coerce-float-bound pd))
+                      ((sb-xc:< nbound nd) (return-from inner-coerce-float-bound (list nd))))
+                    (cond
+                      ((sb-xc:< nbound nd) (return-from inner-coerce-float-bound nd))
+                      ((sb-xc:> nbound pd) (return-from inner-coerce-float-bound (list pd))))))
               (make-bound (coerce nbound 'double-float))))))))))
 ) ; end MACROLET
 
@@ -5928,11 +5946,12 @@ expansion happened."
                               :high high
                               :normalize-zeros normalize-zeros))))
 
-(defun make-numeric-union-type (&key class format (complexp :real) low high (normalize-zeros t))
+(defun make-numeric-union-type (&key class format (complexp :real) low high (normalize-zeros t)
+                                     exclude-unbounded)
   (declare (type (member integer rational float nil) class))
   (declare (inline !compute-numtype-aspect-id))
   (let ((union-type (%make-union-numeric-type
-                     class format complexp low high)))
+                     class format complexp low high exclude-unbounded)))
     (when union-type (return-from make-numeric-union-type union-type)))
   (multiple-value-bind (low high)
       (case class

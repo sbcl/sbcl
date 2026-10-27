@@ -1190,24 +1190,21 @@
                      (interval-low int)
                      (interval-high int)))))
        (if not-p
-           (when (and (csubtypep current-type (specifier-type 'integer))
-                      (integerp hi)
-                      (eql lo hi))
-             ;; Cut off an adjacent bound if it's not EQ
-             (multiple-value-bind (c-lo)
-                 (let ((int (type-approximate-interval current-type)))
-                   (and int
-                        (values
-                         (interval-low int)
-                         (interval-high int))))
-               (when (and c-lo
-                          (= hi c-lo))
-                 (type-intersection current-type
-                                    (make-numeric-union-type :low (1+ lo))))))
+           (when (and (realp lo)
+                      (realp hi)
+                      (sb-xc:= lo hi))
+             (type-difference current-type
+                              (make-numeric-union-type :low lo
+                                                       :high hi
+                                                       ;; Don't exclude the whole single-float
+                                                       ;; if the bounds do not fit
+                                                       :exclude-unbounded t)))
            (when (or lo hi)
              (type-intersection current-type
                                 (type-union (make-numeric-union-type :low lo
-                                                                     :high hi)
+                                                                     :high hi
+                                                                     ;; Don't include the whole single-float
+                                                                     :exclude-unbounded t)
                                             (specifier-type 'complex)))))))
     (t
      (multiple-value-bind (greater equal)
@@ -1257,16 +1254,48 @@
         (when (and (ref-p node)
                    (constant-p (ref-leaf node)))
           (let ((value (constant-value (ref-leaf node))))
-            (cond ((integerp value)
-                   (push (1- value) thresholds)
-                   (push value thresholds)
-                   (push (1+ value) thresholds)
-                   (push value constants))
-                  ((floatp value)
-                   (unless (float-nan-p value)
-                     (push value thresholds)))
-                  ((ratiop value)
-                   (push value thresholds)))))))
+            (flet ((process (value)
+                     (cond ((integerp value)
+                            (push (1- value) thresholds)
+                            (push value thresholds)
+                            (push (1+ value) thresholds)
+                            (push value constants))
+                           ((floatp value)
+                            (unless (float-nan-p value)
+                              (push value thresholds)
+                              (push value constants)))
+                           ((ratiop value)
+                            (push value thresholds)
+                            (push value constants)))))
+              (process value)
+              (cond ((rationalp value)
+                     (process (coerce-for-bound value 'double-float))
+                     (process (coerce-for-bound value 'single-float))
+                     (when (zerop value)
+                       (process -0f0)
+                       (process -0d0)))
+                    ((single-float-p value)
+                     (unless (float-nan-p value)
+                       (process (coerce value 'double-float))
+                       (unless (float-infinity-p value)
+                         (process (rational value)))
+                       (cond ((eql value -0f0)
+                              (process 0f0)
+                              (process 0d0))
+                             ((eql value 0f0)
+                              (process -0f0)
+                              (process -0d0)))))
+                    ((double-float-p value)
+                     (unless (float-nan-p value)
+                       (process (coerce-for-bound value 'single-float))
+                       (unless (float-infinity-p value)
+                         (process (rational value))
+                         (cond ((eql value -0d0)
+                                (process 0d0)
+                                (process 0f0))
+                               ((eql value 0d0)
+                                (process -0d0)
+                                (process -0f0))))))))))))
     (flet ((sorted-set (numbers)
              (let ((sorted (sort numbers #'sb-xc:<)))
                (loop for tail on sorted do
@@ -1351,8 +1380,14 @@
           (dolist (x (cdr *widening-thresholds*) result)
             (when (and (ctypep x result)
                        (not (ctypep x new)))
-              (setf result (type-difference result
-                                            (make-numeric-type 'integer x x))))))))))
+              (let ((type (etypecase x
+                            (rational
+                             (make-numeric-type 'rational x x))
+                            (single-float
+                             (make-numeric-type 'single-float x x nil))
+                            (double-float
+                             (make-numeric-type 'double-float x x nil)))))
+                (setf result (type-difference result type))))))))))
 
 
 ;;; Given the set of CONSTRAINTS for a variable and the current set of

@@ -158,20 +158,21 @@
   (define fround cl:round)
   (define ftruncate cl:truncate))
 
-(defun xfloat-expt (base power)
-  (when (sb-kernel::integer-float-p power)
-    (setf power (truncate power)))
-  (cond ((not (integerp power))
-         (error "Unimplemented: EXPT with non-integer power ~a" power))
-        (t
-         (with-memoized-math-op (expt (list base power))
-           (if (zerop power)
-               (if (integerp base)
-                   1
-                   (coerce 1 (type-of base)))
-               (flonum-from-rational
-                (cl:expt (rational base) power)
-                (pick-result-format base power)))))))
+(defun xfloat-expt (base power*)
+  (let ((power (if (sb-kernel::integer-float-p power*)
+                   (truncate power*)
+                   power*)))
+   (cond ((not (integerp power))
+          (error "Unimplemented: EXPT with non-integer power ~a" power))
+         (t
+          (with-memoized-math-op (expt (list base power*))
+            (if (zerop power)
+                (if (integerp base)
+                    1
+                    (coerce 1 (type-of base)))
+                (flonum-from-rational
+                 (cl:expt (rational base) power)
+                 (pick-result-format base power*))))))))
 
 ;;; Four possible return values.  NIL if the numbers (rationals or
 ;;; flonums) are incomparable (either is a NaN).  Otherwise: -1, 0, 1
