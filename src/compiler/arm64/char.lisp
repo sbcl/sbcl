@@ -69,24 +69,58 @@
 (define-move-vop move-arg :move-arg
   (character-reg) (any-reg descriptor-reg))
 
+;;; Exploit the fact that the MSB of character-widetag is 0 and that n-fixnum-tag-bits is 1
+(eval-when (:compile-toplevel)
+  (assert (not (logbitp 7 character-widetag))))
+
 ;;;; Other operations:
 (define-vop (char-code)
   (:translate char-code)
-  (:args (ch :scs (character-reg)))
+  (:args (ch :scs (character-reg any-reg)
+             :sc-costs (any-reg 1)))
   (:arg-types character)
-  (:results (res :scs (any-reg)))
+  (:results (res :scs (any-reg unsigned-reg signed-reg)
+                 :sc-costs (any-reg 1)))
   (:result-types positive-fixnum)
   (:generator 1
-    (inst lsl res ch n-fixnum-tag-bits)))
+    (sc-case ch
+      (any-reg
+       (sc-case res
+         (any-reg
+          (inst lsr res ch (- n-widetag-bits n-fixnum-tag-bits)))
+         (t
+          (inst lsr res ch n-widetag-bits))))
+      (t
+       (sc-case res
+         (any-reg
+          (inst lsl res ch n-fixnum-tag-bits))
+         (t
+          (move res ch)))))))
 
 (define-vop (code-char)
   (:translate code-char)
-  (:args (code :scs (any-reg)))
+  (:args (code :scs (any-reg signed-reg unsigned-reg)
+               :sc-costs (any-reg 1)))
   (:arg-types positive-fixnum)
-  (:results (res :scs (character-reg)))
+  (:results (res :scs (character-reg any-reg)
+                 :sc-costs (any-reg 1)))
   (:result-types character)
   (:generator 1
-    (inst lsr res code n-fixnum-tag-bits)))
+    (sc-case code
+      (any-reg
+       (sc-case res
+         (any-reg
+          (inst lsl res code (- n-widetag-bits n-fixnum-tag-bits))
+          (inst add res res character-widetag))
+         (t
+          (inst lsr res code n-fixnum-tag-bits))))
+      (t
+       (sc-case res
+         (any-reg
+          (inst lsl res code n-widetag-bits)
+          (inst add res res character-widetag))
+         (t
+          (move res code)))))))
 
 (define-vop (character-compare)
   (:args (x :scs (character-reg any-reg))
@@ -178,29 +212,3 @@
   (:conditional :lt)
   (:generator 2
     (inst cmp value base-char-code-limit)))
-
-(defoptimizer (sb-c::vop-optimize move-to-character) (vop)
-  (when (sb-c:next-vop-is vop 'char-code)
-    (sb-c:replace-vops 2 vop 'tagged-char-code)))
-
-;;; Exploit the fact that the MSB of character-widetag is 0 and that n-fixnum-tag-bits is 1.
-(eval-when (:compile-toplevel)
-  (assert (not (logbitp 7 character-widetag))))
-(define-vop (tagged-char-code)
-  (:args (x :scs (any-reg descriptor-reg)))
-  (:results (y :scs (any-reg descriptor-reg)))
-  (:note "character untagging")
-  (:generator 1
-    (inst lsr y x (- n-widetag-bits n-fixnum-tag-bits))))
-
-(defoptimizer (sb-c::vop-optimize code-char) (vop)
-  (when (sb-c:next-vop-is vop 'move-from-character)
-    (sb-c:replace-vops 2 vop 'tagged-code-char)))
-
-(define-vop (tagged-code-char)
-  (:args (x :scs (any-reg descriptor-reg)))
-  (:results (y :scs (any-reg descriptor-reg)))
-  (:note "character tagging")
-  (:generator 1
-    (inst lsl y x (- n-widetag-bits n-fixnum-tag-bits))
-    (inst add y y character-widetag)))
