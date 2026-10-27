@@ -96,6 +96,7 @@
       (setf (ir2-lvar-kind info) :delayed))
      (t (let ((tn (make-normal-tn (ir2-lvar-primitive-type info))))
           (setf (tn-type tn) (lvar-type lvar))
+          (setf (tn-leaf tn) (lvar-substituted-var lvar))
           (setf (ir2-lvar-locs info) (list tn))))))
   (ltn-annotate-casts lvar)
   (values))

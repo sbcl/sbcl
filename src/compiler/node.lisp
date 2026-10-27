@@ -227,7 +227,10 @@
   ;; Nodes to reoptimize together with the lvar
   (dependent-nodes nil)
   (annotations nil)
-  (dependent-annotations nil))
+  (dependent-annotations nil)
+  ;; If a single use variable is substituted away, it is kept here so
+  ;; that the debugger can still find it.
+  (substituted-var nil :type (or null lambda-var)))
 (!set-load-form-method lvar (:xc :target) :ignore-it)
 
 ;;; These are used for annotating a LVAR with information that can't

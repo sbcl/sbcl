@@ -2802,6 +2802,12 @@ not inlined.")
                  (substitute-lvar-uses value arg t)
                  (%delete-lvar-use ref)
                  (add-lvar-use cast lvar)))))
+      (let ((substituted (lvar-substituted-var arg)))
+        (cond (substituted
+               (note-var-copy var substituted)
+               (setf (lvar-substituted-var lvar) substituted))
+              (t
+               (setf (lvar-substituted-var lvar) var))))
       (delete-ref ref)
       (unlink-node ref)
       (when (return-p dest)
