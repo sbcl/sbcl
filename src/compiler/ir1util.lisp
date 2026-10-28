@@ -351,7 +351,7 @@
 (defmacro lvar-subtypep  (lvar type)
   `(csubtypep (lvar-type ,lvar) (specifier-type ',type)))
 (defmacro lvar-type=  (lvar type)
-  `(eql (lvar-type ,lvar) (specifier-type ',type)))
+  `(eq (lvar-type ,lvar) (specifier-type ',type)))
 (defmacro lvar-intersection  (lvar type)
   `(type-intersection (lvar-type ,lvar) (specifier-type ',type)))
 

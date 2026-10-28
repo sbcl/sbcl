@@ -1939,7 +1939,7 @@
       (let ((null (specifier-type 'null)))
         (flet ((simple (lvar)
                  (when lvar
-                   (cond ((not (type= (lvar-type lvar) null))
+                   (cond ((not (lvar-type= lvar null))
                           (setf simple nil))
                          ((not (types-equal-or-intersect (lvar-type lvar) null))
                           (setf simple nil
@@ -2615,10 +2615,10 @@
               (bare-form
                 `(data-vector-ref array ,index))
               (cast (node-dest node)))
-         (if (or (type= declared-element-ctype element-ctype)
+         (if (or (eq declared-element-ctype element-ctype)
                  ;; Don't check if there's a TRULY-THE around the aref.
                  (and (cast-p cast)
-                      (type= (cast-asserted-type cast) declared-element-ctype)))
+                      (eq (cast-asserted-type cast) declared-element-ctype)))
              bare-form
              `(the ,declared-element-ctype ,bare-form))))
       ((policy node (zerop insert-array-bounds-checks))
@@ -2644,7 +2644,7 @@
                          (check-bound-code 'array '(vector-length array) 'index index))))
           `(locally
                (declare (type ,element-type-specifier new-value))
-             ,(if (type= element-ctype declared-element-ctype)
+             ,(if (eq element-ctype declared-element-ctype)
                   `(progn (data-vector-set array ,index new-value)
                           new-value)
                   `(progn (data-vector-set array ,index
