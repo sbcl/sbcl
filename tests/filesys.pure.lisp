@@ -36,18 +36,21 @@
 (with-test (:name (directory :character-set :pattern))
   ;; In addition to potential truename randomization,
   ;; do not assume that the current directory is the place to look.
-  (let* ((pattern (if (truename-as-expected-p)
-                      "[f]*.*"
-                      (format nil "~a[~a]*~:[~;.*~]"
-                              (namestring
-                               (make-pathname :directory (pathname-directory *load-truename*)))
-                              (char (pathname-name *load-truename*) 0)
-                              (pathname-type *load-truename*))))
-         (string-to-find (if (truename-as-expected-p)
-                             "filesys.pure.lisp"
-                             (pathname-name *load-truename*)))
-         (dir (directory pattern)))
-    (assert (find string-to-find dir :test #'search :key #'namestring))))
+  ;; And don't derive the pattern from *LOAD-TRUENAME* either - its directory
+  ;; need not be listable.
+  (with-test-directory ()
+    (dolist (file '("bar.lisp" "bat.lisp" "baz.lisp" "foo.lisp" "foo.txt"
+                    "qux.lisp" "sub1/a.lisp" "sub2/b.lisp" "sub3/c.lisp"))
+      (close (open (ensure-directories-exist file) :direction :output)))
+    (flet ((names (pattern)
+             (mapcar #'file-namestring (directory pattern))))
+      (assert (equal (names "[f]*.*") '("foo.lisp" "foo.txt")))
+      (assert (equal (names "[bq]*.lisp")
+                     '("bar.lisp" "bat.lisp" "baz.lisp" "qux.lisp")))
+      (assert (equal (names "ba[rz].lisp") '("bar.lisp" "baz.lisp")))
+      (assert (equal (names "foo.[t]*") '("foo.txt")))
+      (assert (equal (names "sub[13]/*.lisp") '("a.lisp" "c.lisp")))
+      (assert (null (names "[xyz]*.*"))))))
 
 ;;; Canonicalization of pathnames for DIRECTORY
 (with-test (:name (directory :/.))
