@@ -1136,8 +1136,8 @@ and no value was provided for it." name)))))))))))
                 :datum (car values)
                 :expected-type atype
                 :format-control
-                "~@<Values ~2I~_[~{~S~^ ~}] ~I~_from ~S in~_~A ~
-                   ~I~_is not of the declared return type of the function ~
+                "~@<Values ~2I~_[~{~S~^ ~}] ~I~_from ~S in function~2I~_~A ~
+                   ~I~_is not of the function's declared return type ~
                    ~2I~_~/sb-impl:print-type-specifier/.~:>"
                 :format-arguments (list values
                                         (first detail) code-context

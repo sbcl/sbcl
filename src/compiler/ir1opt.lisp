@@ -3943,7 +3943,21 @@ not inlined.")
 
 (defun compile-time-type-error-context (context)
   #+sb-xc-host context
-  #-sb-xc-host (source-to-string context))
+  #-sb-xc-host
+  (source-to-string
+   (or
+    ;; #'(NAMED-LAMBDA FOO ...) = > FOO. This loses a bit of context
+    ;; if FOO was redefined but the error is much easier to
+    ;; comprehend. We should do something similar for local functions
+    ;; once their source form is something more informative than (NAME
+    ;; LAMBDA-LIST BODY).
+    (and (proper-list-of-length-p context 2)
+         (eq (first context) 'function)
+         (let ((inner (second context)))
+           (and (cddr inner)
+                (eq (first inner) 'named-lambda)
+                (second inner))))
+    context)))
 
 ;;; Delete or move around casts when possible
 (defun maybe-delete-cast (cast)
