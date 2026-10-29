@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.6.9:
+changes in sbcl-2.6.10 relative to sbcl-2.6.9:
   * minor incompatible change: testing for float equality using `=` is now a
     quiet operation, not signalling when given NaNs as input.
   * enhancement: Unicode support has been updated to support version 18.0.0 of
