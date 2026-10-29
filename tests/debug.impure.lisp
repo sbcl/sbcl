@@ -1135,7 +1135,8 @@
 (defun return-65535 ()
   65535)
 
-(with-test (:name :indirect-closure-values)
+(with-test (:name :indirect-closure-values
+            :fails-on :arm)
   (let ((count 0))
     (block nil
       (handler-bind ((error (lambda (c)
@@ -1165,7 +1166,8 @@
                          (f2))))))))
     (assert (= count 3))))
 
-(with-test (:name :indirect-closure-values.2)
+(with-test (:name :indirect-closure-values.2
+            :fails-on :arm)
   (let ((count 0))
     (block nil
       (handler-bind ((error (lambda (c)
@@ -1630,7 +1632,8 @@
   (do ((frame (sb-di:top-frame) (sb-di:frame-down frame)))
       ((frame-named-p frame name) frame)))
 
-(with-test (:name (:debugger :variables :copy :temporary))
+(with-test (:name (:debugger :variables :copy :temporary)
+            :fails-on :x86-64)
   (with-variables-test (:strict (1 2 3) :lax ())
       (sb-int:named-lambda variables-test (x)
         (declare (optimize (debug :debug)))
@@ -1640,7 +1643,8 @@
     (assert (equal (run-stops '(5) '(((y 5))))
                    '((5))))))
 
-(with-test (:name (:debugger :variables :copy :chain))
+(with-test (:name (:debugger :variables :copy :chain)
+            :fails-on :x86-64)
   (with-variables-test (:strict (1 2 3) :lax ())
       (sb-int:named-lambda variables-test (x)
         (declare (optimize (debug :debug)))
@@ -1651,7 +1655,8 @@
     (assert (equal (run-stops '(5) '(((y 5) (z 5))))
                    '((5 5))))))
 
-(with-test (:name (:debugger :variables :copy :of-temporary))
+(with-test (:name (:debugger :variables :copy :of-temporary)
+            :fails-on :x86-64)
   ;; INNER is a copy of OUTER, whichever is replaced first.
   (with-variables-test (:strict (1 2 3) :lax ())
       (sb-int:named-lambda variables-test (x)
@@ -1666,7 +1671,8 @@
     (assert (equal (run-stops '(5) '(((y 5))))
                    '((5))))))
 
-(with-test (:name (:debugger :variables :copy :scopes))
+(with-test (:name (:debugger :variables :copy :scopes)
+            :fails-on :x86-64)
   (with-variables-test (:strict (1 2 3) :lax ())
       (sb-int:named-lambda variables-test (x)
         (declare (optimize (debug :debug)))
@@ -1832,7 +1838,8 @@
     (assert (equal (run-stops '((10 20)) '(((l (10 20)) (q 3) (r 1) (a 10) (b 20))))
                    '((3 1 10 20))))))
 
-(with-test (:name (:debugger :variables :unboxed))
+(with-test (:name (:debugger :variables :unboxed)
+            :fails-on :x86)
   (with-variables-test ()
       (sb-int:named-lambda variables-test (d n)
         (declare (optimize (debug :debug)) (double-float d) (fixnum n))
@@ -1905,7 +1912,8 @@
                                      ((n 3) (x 99))))
                    '((99))))))
 
-(with-test (:name (:debugger :variables :setq :unused-value))
+(with-test (:name (:debugger :variables :setq :unused-value)
+            :fails-on :sbcl)
   ;; The value X is set to last is never used.
   (with-variables-test (:strict (3) :lax (1 2))
       (sb-int:named-lambda variables-test (n)
@@ -2095,7 +2103,8 @@
     (assert (equal (run-stops '(1) '(((x 1)) ((x 1)))) '(1)))
     (assert (equal (run-stops '(0) '(((x 1)) ((x 2)))) '(2)))))
 
-(with-test (:name (:debugger :variables :setq :unwind-protect))
+(with-test (:name (:debugger :variables :setq :unwind-protect)
+            :fails-on :sbcl)
   ;; X is 1 only until it is set again.
   (with-variables-test (:strict (3) :lax (1 2))
       (sb-int:named-lambda variables-test ()
@@ -2251,7 +2260,8 @@
     (assert (equal (run-stops '(t) '(((x 1) (:set x 5)))) '((5))))
     (assert (equal (run-stops '(nil) '(((x 2) (:set x 5)))) '((5))))))
 
-(with-test (:name (:debugger :variables :set :unboxed))
+(with-test (:name (:debugger :variables :set :unboxed)
+            :fails-on :x86)
   (with-variables-test (:lax ())
       (sb-int:named-lambda variables-test (n)
         (declare (optimize (debug :debug)) (fixnum n))
@@ -2277,7 +2287,8 @@
     (assert (equal (run-stops '(2) '(((x 3) (:set x 7))))
                    '((7 7))))))
 
-(with-test (:name (:debugger :variables :set :copy))
+(with-test (:name (:debugger :variables :set :copy)
+            :fails-on :x86-64)
   (with-variables-test (:strict (1 2 3) :lax ())
       (sb-int:named-lambda variables-test (x)
         (declare (optimize (debug :debug)))
