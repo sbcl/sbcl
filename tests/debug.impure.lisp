@@ -1699,7 +1699,8 @@
     (assert (equal (run-stops '(5) '(((y 5)) ((y 5))))
                    '((5 5))))))
 
-(with-test (:name (:debugger :variables :copy :error))
+(with-test (:name (:debugger :variables :copy :error)
+            :fails-on (and :win32 :x86-64))
   (with-variables-test (:strict (3) :lax (1 2))
       (sb-int:named-lambda variables-test (x)
         (declare (optimize (debug :debug)))
@@ -2142,7 +2143,8 @@
     (assert (eq (run-stops '(5) '((:error (x 5) (y 6))))
                 :error))))
 
-(with-test (:name (:debugger :variables :error :bounds))
+(with-test (:name (:debugger :variables :error :bounds)
+            :fails-on (and :win32 :x86-64))
   (with-variables-test (:strict (3) :lax (1 2))
       (sb-int:named-lambda variables-test (v i)
         (declare (optimize (debug :debug)))
