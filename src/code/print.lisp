@@ -1339,23 +1339,29 @@ variable: an unreadable object representing the error is printed instead.")
 ;;;  if n-word-bytes = 4 then 8 * 4 = 32 characters
 ;;;  if n-word-bytes = 8 then 8 * 8 = 64 characters
 ;;; This allows for output in base 2 worst case.
-;;; We don't need a trailing null.
 (defmacro with-lisp-string-on-alien-stack ((string size-in-chars) &body body)
-  (let ((size-in-lispwords ; +2 words for lisp string header
-          (+ 2 (align-up (ceiling (symbol-value size-in-chars) sb-vm:n-word-bytes)
-                         2)))
-        (alien '#:a)
-        (sap '#:sap))
-    ;; +1 is for alignment if needed
+  (let* ((nchars (constant-form-value size-in-chars))
+         (size-in-lispwords
+          ;; 1+ is for the null. We don't _technically_ need it, but if somebody calls
+          ;; primitive-object-size, it's probably a bad idea for it to give a fictitious
+          ;; answer by over-reporting the size the string occupies in memory.
+          (+ (align-up (ceiling (1+ nchars) sb-vm:n-word-bytes) 2) sb-vm:vector-data-offset))
+         (alien '#:a)
+         (sap '#:sap))
+    ;; +1 is for alignment if needed. However, I think it is -never- needed.
+    ;; On all backends where we cons the array on the alien (C native) stack, the ABI requires
+    ;; that the stack be aligned to at *least* twice the machine's word size at all times.
+    ;; I don't feel like digging into authoritative sources - I'd rather leave the
+    ;; overalignment in place, it's only one word.
     `(with-alien ((,alien (array unsigned ,(1+ size-in-lispwords))))
        (let ((,sap (alien-sap ,alien)))
          (when (logtest (sap-int ,sap) sb-vm:lowtag-mask)
            (setq ,sap (sap+ ,sap sb-vm:n-word-bytes)))
          (setf (sap-ref-word ,sap 0) sb-vm:simple-base-string-widetag
-               (sap-ref-word ,sap sb-vm:n-word-bytes) (ash sb-vm:n-word-bits
-                                                           sb-vm:n-fixnum-tag-bits))
+               (sap-ref-word ,sap sb-vm:n-word-bytes) ,(ash nchars sb-vm:n-fixnum-tag-bits))
+         (setf (sap-ref-8 ,sap ,(+ (ash sb-vm:vector-data-offset sb-vm:word-shift) nchars)) 0)
          (let ((,string
-                (truly-the simple-base-string
+                (truly-the (simple-base-string ,nchars)
                            (%make-lisp-obj (logior (sap-int ,sap)
                                                    sb-vm:other-pointer-lowtag)))))
            ,@body)))))
