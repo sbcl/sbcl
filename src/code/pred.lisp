@@ -60,7 +60,8 @@
 (macrolet ((def-type-predicate-wrapper (pred)
              `(defun ,pred (object)
                 ;; Document the standardized predicates and not the internal ones.
-                ,@(when (eq (sb-xc:symbol-package pred) *cl-package*)
+                ,@(when (or (eq (sb-xc:symbol-package pred) *cl-package*)
+                            (member pred '(weak-pointer-p)))
                     (let* ((name (symbol-name pred))
                            (stem (string-left-trim "%" (string-right-trim "P-" name)))
                            (article (if (position (schar name 0) "AEIOU") "an" "a")))

@@ -516,6 +516,15 @@ among other things.
 Hash tables can also have weak keys and values. See
 @ref{hash table extensions}.
 
+@anchor{Class sb-ext weak-pointer}
+@ttindex @sortas{weak-pointer sb-ext} weak-pointer [sb-ext]
+@deffn{Class} sb-ext:weak-pointer
+@end deffn
+@anchor{Function sb-ext weak-pointer-p}
+@ffindex @sortas{weak-pointer-p sb-ext} weak-pointer-p [sb-ext]
+@deffn{Function} sb-ext:weak-pointer-p object
+Return true if @code{object} is a @code{weak-pointer}, and @code{nil} otherwise.
+@end deffn
 @anchor{Function sb-ext make-weak-pointer}
 @ffindex @sortas{make-weak-pointer sb-ext} make-weak-pointer [sb-ext]
 @deffn{Function} sb-ext:make-weak-pointer object
@@ -527,6 +536,26 @@ Allocate and return a weak pointer which points to @code{object}.
 If @code{weak-pointer} is valid, return the value of @code{weak-pointer} and @code{t}.
 If the referent of @code{weak-pointer} has been garbage collected,
 returns the values @code{nil} and @code{nil}.
+@end deffn
+@anchor{Function sb-ext weak-vector-p}
+@ffindex @sortas{weak-vector-p sb-ext} weak-vector-p [sb-ext]
+@deffn{Function} sb-ext:weak-vector-p object
+See if @code{object} is a weak vector. This implies @code{simple-vector-p}.
+@end deffn
+@anchor{Function sb-ext make-weak-vector}
+@ffindex @sortas{make-weak-vector sb-ext} make-weak-vector [sb-ext]
+@deffn{Function} sb-ext:make-weak-vector length &key initial-contents initial-element
+Allocate a weak vector of @code{length} elements. See @code{make-array} for a
+description of @code{initial-contents} and @code{initial-element}. Note that unlike
+in @code{make-array}, here @code{initial-element} always defaults to @code{nil}.
+
+A weak vector is similar to a general @code{vector} whose elements are
+@code{weak-pointer}s, but in weak vectors the weak pointers are implicit.
+Hence, there is no need for @code{make-weak-pointer} and @code{weak-pointer-value}
+when writing or reading its elements.
+
+If an element is garbage collected, it is replaced by @code{nil} in the
+vector.
 @end deffn
 @node introspection and tuning
 @subsection Introspection and Tuning

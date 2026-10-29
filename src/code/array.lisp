@@ -526,10 +526,10 @@
           t)
          (- (ash widetag -2) 32)))
 
-(defun initial-contents-error (content-length length)
-  (error "There are ~W elements in the :INITIAL-CONTENTS, but ~
-                                the vector length is ~W."
-         content-length length))
+(defun initial-element-error (initial-element element-type)
+  (error ":INITIAL-ELEMENT ~S is not of :ELEMENT-TYPE ~
+         ~/sb-impl:print-type-specifier/."
+         initial-element element-type))
 
 (defun initial-contents-list-error (list length)
   (if (proper-list-p list)

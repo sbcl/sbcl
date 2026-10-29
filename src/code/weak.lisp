@@ -44,17 +44,34 @@
 
 #-weak-vector-readbarrier
 ;; legacy implementation of weak vector is basically SIMPLE-VECTOR
-(defun weak-vector-p (x)
-  (and (simple-vector-p x)
-       (test-header-data-bit x (ash sb-vm:vector-weak-flag sb-vm:array-flags-data-position))))
+(defun weak-vector-p (object)
+  "See if OBJECT is a weak vector. This implies SIMPLE-VECTOR-P."
+  (and (simple-vector-p object)
+       (test-header-data-bit object (ash sb-vm:vector-weak-flag sb-vm:array-flags-data-position))))
+
+(defun initial-contents-error (content-length length)
+  (error "There are ~W elements in the :INITIAL-CONTENTS, but ~
+         the vector length is ~W."
+         content-length length))
 
 (defun make-weak-vector (length &key (initial-contents nil contents-p)
                                      (initial-element nil element-p))
+  "Allocate a weak vector of LENGTH elements. See MAKE-ARRAY for a
+description of INITIAL-CONTENTS and INITIAL-ELEMENT. Note that unlike
+in MAKE-ARRAY, here INITIAL-ELEMENT always defaults to NIL.
+
+A weak vector is similar to a general VECTOR whose elements are
+WEAK-POINTERs, but in weak vectors the weak pointers are implicit.
+Hence, there is no need for MAKE-WEAK-POINTER and WEAK-POINTER-VALUE
+when writing or reading its elements.
+
+If an element is garbage collected, it is replaced by NIL in the
+vector."
   (declare (index length))
   (when (and element-p contents-p)
     (error "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS"))
   ;; Since weak vectors are not in theory merely arrays any more, but potentially
-  ;; some kind of weak pointers with a varing enumber of slots, this isn't badly
+  ;; some kind of weak pointers with a varing number of slots, this isn't badly
   ;; OAOO-violating in regard to make-array transforms.
   (when contents-p
     (let ((contents-length (length initial-contents)))
@@ -62,15 +79,16 @@
         (error "~S has ~D elements, vector length is ~D."
                :initial-contents contents-length length))))
   (let ((v (sb-c::allocate-weak-vector length)))
-    (if initial-contents
-        (dotimes (i length)
-          (setf (weak-vector-ref v i) (elt initial-contents i)))
-          ;; 0 is the usual default initial element for arrays, but all weak objects use NIL
-        (dotimes (i length)
-          (setf (weak-vector-ref v i) initial-element)))
+    (cond (initial-contents
+           (unless (= length (length initial-contents))
+             (initial-contents-error length (length initial-contents)))
+           (replace v initial-contents))
+          (t
+           (fill v initial-element)))
     v))
+
 (defun make-weak-pointer (object)
-  "Allocate and return a weak pointer which points to OBJECT."
+  "Allocate and return a WEAK-POINTER that points to OBJECT."
   (make-weak-pointer object))
 
 (declaim (inline weak-pointer-value))

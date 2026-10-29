@@ -281,8 +281,12 @@
 
   Hash tables can also have weak keys and values. See
   @HASH-TABLE-EXTENSIONS."
+  (sb-ext:weak-pointer class)
+  (sb-ext:weak-pointer-p function)
   (sb-ext:make-weak-pointer function)
-  (sb-ext:weak-pointer-value function))
+  (sb-ext:weak-pointer-value function)
+  (sb-ext:weak-vector-p function)
+  (sb-ext:make-weak-vector function))
 
 (defsection @introspection-and-tuning (:title "Introspection and Tuning")
   (sb-ext:*gc-run-time* (variable 0))
