@@ -139,6 +139,29 @@
     (inst sub res ptr1 ptr2)))
 
 ;;;; mumble-SYSTEM-REF and mumble-SYSTEM-SET
+#+linux
+(defun msan-clear-shadow (size sap offset)
+  (when (sb-c:msan-unpoison sb-c:*compilation*)
+    ;; A slight hack: #xB00000000000 (MSAN-MEM-TO-SHADOW-XOR-CONST) is not
+    ;; encodable, but cutting it into parts works, and EOR comes out the same.
+    (cond ((tn-p offset)
+           (inst add tmp-tn sap offset)
+           (inst eor tmp-tn tmp-tn #x800000000000)
+           (setq offset 0))
+          (t
+           ;; The constant offset case has a minor flaw that is not really
+           ;; a concern in practice. The calculation here is (SAP ^ K) + offs,
+           ;; instead of (SAP + offs) ^ K. They differ if SAP+offs crosses
+           ;; a multiple of 2^44
+           (inst eor tmp-tn sap #x800000000000)))
+    (inst eor tmp-tn tmp-tn #x300000000000)
+    (let ((ea (@ tmp-tn offset)))
+      (ecase size
+        (:byte (inst strb zr-tn ea))
+        (:short (inst strh zr-tn ea))
+        ((:word :single) (inst str (32-bit-reg zr-tn) ea))
+        ((:long :double) (inst str zr-tn ea))))))
+
 (macrolet ((def-system-ref-and-set
                (ref-name set-name sc type size offset-test &key signed)
              `(progn
@@ -225,6 +248,7 @@
                          (offset :scs (signed-reg)))
                   (:arg-types ,type system-area-pointer signed-num)
                   (:generator 5
+                    #+linux (msan-clear-shadow ,size sap offset)
                     (inst ,(case size
                              (:byte 'strb)
                              (:short 'strh)
@@ -258,6 +282,7 @@
                   (:info offset)
                   (:arg-types ,type system-area-pointer (:constant (satisfies ,offset-test)))
                   (:generator 4
+                    #+linux (msan-clear-shadow ,size sap offset)
                     (inst ,(case size
                              (:byte 'strb)
                              (:short 'strh)

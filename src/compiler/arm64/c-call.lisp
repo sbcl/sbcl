@@ -530,10 +530,18 @@
   (loop for i from 0 to 18 collect i)
   #'equal)
 
-(defun emit-c-call (vop nfp-save temp temp2 cfunc function)
+(defun emit-c-call (vop nfp-save temp temp2 cfunc function args)
   (let ((cur-nfp (current-nfp-tn vop)))
     (when cur-nfp
       (store-stack-tn nfp-save cur-nfp))
+    (when (sb-c:msan-unpoison sb-c:*compilation*)
+      (loadw temp thread-tn thread-msan-param-tls-slot)
+      ;; Unpoison parameters
+      (do ((n 0 (+ n n-word-bytes))
+           (arg args (tn-ref-across arg)))
+          ((null arg))
+        ;; KLUDGE: assume all parameters are 8 bytes or less
+        (inst str zr-tn (@ temp n))))
     (assemble ()
       #+sb-thread
       (progn
@@ -600,7 +608,7 @@
   (:args (function :scs (sap-reg sap-stack))
          (args :more t))
   (:results (results :more t))
-  (:ignore args results lr)
+  (:ignore results lr)
   (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
   (:temporary (:sc any-reg :offset r9-offset
                :from (:argument 0) :to (:result 0)) cfunc)
@@ -609,7 +617,7 @@
   (:temporary (:sc any-reg :offset lexenv-offset) temp2)
   (:vop-var vop)
   (:generator 0
-    (emit-c-call vop nfp-save temp temp2 cfunc function))
+    (emit-c-call vop nfp-save temp temp2 cfunc function args))
   .
   #. (destroyed-c-registers))
 
@@ -618,7 +626,7 @@
 (define-vop (call-out-named call-out)
   (:args (args :more t))
   (:info function variadic)
-  (:ignore args results variadic lr))
+  (:ignore results variadic lr))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)

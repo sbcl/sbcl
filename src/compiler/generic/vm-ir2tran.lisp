@@ -339,7 +339,9 @@
 (defoptimizer (allocate-vector ltn-annotate)
     ((#+ubsan poisoned type length words) call)
   (vectorish-ltn-annotate-helper call
-                                 (if (sb-c:msan-unpoison sb-c:*compilation*)
+                                 (if #+c-stack-is-control-stack
+                                     (sb-c:msan-unpoison sb-c:*compilation*)
+                                     #-c-stack-is-control-stack nil
                                      'sb-vm::allocate-vector-on-stack+msan-unpoison
                                      'sb-vm::allocate-vector-on-stack)
                                  (cond #-x86-64
