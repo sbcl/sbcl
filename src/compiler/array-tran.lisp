@@ -1346,14 +1346,11 @@
              ;; Also pick off (at least 2) other common cases for SPLAT: NIL and
              ;; unbound-marker. The latter helps PCL ctors not to call FILL.
              (let ((splat (splat-value-p elt-ctype initial-element
-                                         default-initial-element))
-                   (init (if (constant-lvar-p initial-element)
-                             (list 'quote (lvar-value initial-element))
-                             'initial-element)))
+                                         default-initial-element)))
                (wrap (cond ((not splat)
                             `(quickfill ,data-alloc-form
-                                        ,(if (eq elt-spec t) init
-                                             `(the ,elt-spec ,init))))
+                                        ,(wrap-if (neq elt-spec t) `(the ,elt-spec)
+                                                  'initial-element)))
                            ((or (eq splat :unbound)
                                 (and (constant-lvar-p initial-element)
                                      (testable-type-p elt-ctype)
@@ -1362,7 +1359,7 @@
                             `(sb-vm::splat ,data-alloc-form nwords ,splat))
                            (t
                             ;; uncertain if initial-element is type-correct
-                            `(progn (the ,elt-spec ,init) ; check en passant
+                            `(progn (the ,elt-spec initial-element) ; check en passant
                                     (sb-vm::splat ,data-alloc-form nwords
                                                   ,splat)))))))
 

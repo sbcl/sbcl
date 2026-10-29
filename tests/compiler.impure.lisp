@@ -3262,6 +3262,12 @@
                   (defun f (y)
                     (when (member y (list nil 10 +f+))
                       t)))))))
+
+(with-test (:name :make-array-dump-constants)
+  (assert (not (ctu:file-compile
+                `((defconstant +f+ (lambda ()))
+                  (defun f ()
+                    (make-array 10 :initial-element +f+)))))))
 
 
 ;;;; SB-MANUAL:@COMPILER
