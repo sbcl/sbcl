@@ -222,6 +222,9 @@
 (defun-dummy (section-entries :pax) (section)
   (nthcdr 3 (second section)))
 
+(defun-dummy (xref :dref) (name locative)
+  (list name locative))
+
 (defun-dummy (xref-name :dref) (xref)
   (first xref))
 
@@ -239,6 +242,22 @@
 
 (defun-dummy (xref-locative-args :dref) (xref)
   (rest (sb-c::ensure-list (second xref))))
+
+(defun-dummy (home-section :pax) (xref)
+  (do-external-symbols (sym (find-package :sb-manual))
+    (when (lazy-doc-name-p sym :section)
+      (let ((section (symbol-value sym)))
+        (dolist (entry (section-entries section))
+          (when (and (listp entry)
+                     (equal entry xref))
+            (return-from home-section section)))))))
+
+;;; For DESCRIBE
+(defun describe-home-section (name locative stream)
+  (let ((home-section (ignore-errors (home-section (xref name locative)))))
+    (when home-section
+      (format stream "~@:_User manual section: ~S"
+              (section-name home-section)))))
 
 
 ;;; DEFINE-CONCEPT names a set of index keys. When MARKDOWN-TO-TEXINFO

@@ -162,3 +162,70 @@
              (opaque-identity
               (make-array 256 :element-type 'character :fill-pointer 0)))
    type-error))
+
+#+sb-doc
+(progn
+  (require 'sb-manual)
+
+  (with-test (:name (describe sb-manual variable))
+    (assert (search "User manual section: SB-MANUAL:@PACKAGE-VARIANCE"
+                    (with-output-to-string (stream)
+                      (describe 'sb-ext:*on-package-variance* stream)))))
+
+  (with-test (:name (describe sb-manual macro name))
+    (assert (search "User manual section: SB-MANUAL:@ATOMIC-OPERATIONS"
+                    (with-output-to-string (stream)
+                      (describe 'sb-ext:cas stream)))))
+
+  (with-test (:name (describe sb-manual macro object))
+    (assert (search "User manual section: SB-MANUAL:@ATOMIC-OPERATIONS"
+                    (with-output-to-string (stream)
+                      (describe (macro-function 'sb-ext:cas) stream)))))
+
+  (with-test (:name (describe sb-manual function name))
+    (assert (search "User manual section: SB-MANUAL:@WEAK-POINTERS"
+                    (with-output-to-string (stream)
+                      (describe 'sb-ext:make-weak-pointer stream)))))
+
+  (with-test (:name (describe sb-manual function object))
+    (assert (search "User manual section: SB-MANUAL:@WEAK-POINTERS"
+                    (with-output-to-string (stream)
+                      (describe #'sb-ext:make-weak-pointer stream)))))
+
+  (with-test (:name (describe sb-manual generic-function name))
+    (assert (search "User manual section: SB-MANUAL:@MISCELLANEOUS-EXTENSIONS"
+                    (with-output-to-string (stream)
+                      (describe 'documentation stream)))))
+
+  (with-test (:name (describe sb-manual generic-function object))
+    (assert (search "User manual section: SB-MANUAL:@MISCELLANEOUS-EXTENSIONS"
+                    (with-output-to-string (stream)
+                      (describe #'documentation stream)))))
+
+  (with-test (:name (describe sb-manual structure name))
+    (assert (search "User manual section: SB-MANUAL:@TIMERS"
+                    (with-output-to-string (stream)
+                      (describe 'sb-ext:timer stream)))))
+
+  (with-test (:name (describe sb-manual structure object))
+    (assert (search "User manual section: SB-MANUAL:@TIMERS"
+                    (with-output-to-string (stream)
+                      (describe (find-class 'sb-ext:timer) stream)))))
+
+  (with-test (:name (describe sb-manual class name))
+    (assert (search "User manual section: SB-MANUAL:@WEAK-POINTERS"
+                    (with-output-to-string (stream)
+                      (describe 'sb-ext:weak-pointer stream)))))
+
+  (with-test (:name (describe sb-manual class object))
+    (assert (search "User manual section: SB-MANUAL:@WEAK-POINTERS"
+                    (with-output-to-string (stream)
+                      (describe (find-class 'sb-ext:weak-pointer) stream)))))
+
+  (with-test (:name (describe sb-manual type))
+    (let ((package (find-package 'sb-posix)))
+      (when package
+        (assert (search "User manual section: SB-MANUAL:@SB-POSIX-FILENAMES"
+                        (with-output-to-string (stream)
+                          (describe (find-symbol "FILENAME" package)
+                                    stream))))))))

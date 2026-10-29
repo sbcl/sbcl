@@ -19,10 +19,24 @@
   are in a subset of Markdown and use very little markup in general,
   so they are easy to read directly in the source.
 
-  The final, rendered documentation in plain text format is available
-  for any section via CL:DOCUMENTATION:
+  - The final, rendered documentation in plain text format is available
+    for any section via CL:DOCUMENTATION:
 
-      (documentation sb-manual:@sbcl-manual t)
+          (documentation sb-manual:@sbcl-manual t)
+
+  - When SB-MANUAL is loaded, DESCRIBE output includes the name of the
+    containing section if any. For example, `(DESCRIBE
+    'SB-EXT:*ON-PACKAGE-VARIANCE*)` points to @PACKAGE-VARIANCE:
+
+          SB-EXT:*ON-PACKAGE-VARIANCE*
+            [symbol]
+
+          *ON-PACKAGE-VARIANCE* names a special variable:
+            Declared type: LIST
+            Value: (:WARN T)
+            User manual section: SB-MANUAL:@PACKAGE-VARIANCE
+            Documentation:
+              ...
 
   The official manual in Info, HTML and PDF formats is generated via
   Texinfo generated from these definitions."

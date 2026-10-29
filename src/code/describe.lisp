@@ -344,6 +344,7 @@
 (defmethod describe-object ((object package) stream)
   (print-standard-describe-header object stream)
   (describe-block (stream)
+    (describe-home-section (package-name object) 'package stream)
     (describe-documentation object t stream)
     (flet ((humanize (list)
              (sort (mapcar (lambda (x)
@@ -395,6 +396,8 @@
         (describe-block (stream (when by-name "~A names the ~(~A~) ~S:")
                                 name metaclass-name class)
           (describe-deprecation 'type name stream)
+          (describe-home-section name 'class stream)
+          (describe-home-section name 'structure stream)
           (describe-documentation class t stream)
           (when (sb-mop:class-finalized-p class)
             (describe-stuff "Class precedence-list"
@@ -537,6 +540,7 @@
           (format stream "~:@_Value: ~S" (symbol-value name))))
         ((not (eq kind :unknown))
          (format stream "~:@_Currently unbound.")))
+      (describe-home-section name 'variable stream)
       (describe-documentation name 'variable stream))))
 
 (defun describe-lambda-list (lambda-list stream)
@@ -580,8 +584,17 @@
            (when namestring
              (format stream "~@:_Source file: ~A" namestring))))))))
 
+(defun cleaned-up-fun-name (function)
+  (let ((name (%fun-name function)))
+    (if (and (consp name)
+             (eq (car name) 'macro-function)
+             (consp (cdr name)))
+        ;; (MACRO-FUNCTION CAS) -> CAS
+        (second name)
+        name)))
+
 (defun describe-function (name function stream)
-  (let* ((name (if function (%fun-name function) name))
+  (let* ((name (if function (cleaned-up-fun-name function) name))
          (dd (info :function :source-transform name)))
     (flet ((structures (stream)
              (when (typep dd '(cons defstruct-description))
@@ -683,6 +696,9 @@
                (format stream "~@:_Derived type: ~
                               ~/sb-impl:print-type-specifier/"
                        derived-type))
+             (describe-home-section name 'function stream)
+             (describe-home-section name 'generic-function stream)
+             (describe-home-section name :macro stream)
              (describe-documentation name 'function stream)
              (when (car inline)
                (format stream "~@:_Inline proclamation: ~
@@ -716,6 +732,7 @@
   (unless function
     (awhen (and (legal-fun-name-p name) (compiler-macro-function name))
       (describe-block (stream "~A has a compiler-macro:" name)
+        (describe-documentation it 'compiler-macro stream)
         (describe-documentation it t stream)
         (describe-function-source it stream)))
     ;; It seems entirely bogus to claim that, for example (SETF CAR)
@@ -726,6 +743,7 @@
         (cond ((typep expander '(cons symbol))
                (describe-block (stream "~A has setf-expansion: ~S"
                                        name (car expander))
+                 (describe-documentation name2 'setf stream)
                  (describe-documentation name2 'setf stream)))
               (expander
                (when (listp expander)
@@ -733,6 +751,7 @@
                (describe-block (stream "~A has a complex setf-expansion:"
                                        name)
                  (describe-lambda-list (%fun-lambda-list expander) stream)
+                 (describe-documentation name2 'setf stream)
                  (describe-documentation name2 'setf stream t)
                  (describe-function-source expander stream))))))
     (when (symbolp name)
@@ -746,6 +765,7 @@
            (describe-block (stream "~A names a ~@[primitive~* ~]type-specifier:"
                                    name (eq kind :primitive))
              (describe-deprecation 'type name stream)
+             (describe-home-section name 'type stream)
              (describe-documentation name 'type stream (eq t fun))
              (when (functionp fun)
                (describe-lambda-list (%fun-lambda-list fun) stream)
@@ -757,6 +777,7 @@
           ((info :type :deprecated name)
            (describe-block (stream "~A names a deprecated type" name)
              (describe-deprecation 'type name stream)
+             (describe-home-section name 'type stream)
              (describe-documentation name 'type stream (eq t fun)))))))
 
 (defun describe-alien-type (name stream)
@@ -789,9 +810,19 @@
                     ((info :declaration :known name)
                      "a user-defined"))))))
     (when kind
-      (describe-block (stream "~A names ~A declaration." name kind)))))
+      (describe-block (stream "~A names ~A declaration." name kind)
+        (describe-home-section name 'declaration stream)
+        (describe-documentation name 'declaration stream)))))
 
 (defun sb-package-p (package)
   (let ((name (package-name package)))
     (and (<= 3 (length name))
          (string= "SB-" name :end2 3))))
+
+(defun describe-home-section (name locative stream)
+  (let ((package (find-package '#:sb-manual)))
+    (when package
+      (when (eq locative :macro)
+        (setq locative (find-symbol "MACRO" package)))
+      (funcall (find-symbol "DESCRIBE-HOME-SECTION" package)
+               name locative stream))))
