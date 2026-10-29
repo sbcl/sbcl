@@ -3258,14 +3258,14 @@
 
 (with-test (:name :member-dump-constants)
   (assert (not (ctu:file-compile
-                `((defconstant +f+ (lambda ()))
+                `((defconstant +f+ #'list)
                   (defun f (y)
                     (when (member y (list nil 10 +f+))
                       t)))))))
 
 (with-test (:name :make-array-dump-constants)
   (assert (not (ctu:file-compile
-                `((defconstant +f+ (lambda ()))
+                `((defconstant +f+ #'list)
                   (defun f ()
                     (make-array 10 :initial-element +f+)))))))
 
