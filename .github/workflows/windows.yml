@@ -40,15 +40,15 @@ jobs:
         PATH=$PATH:"/c/Program Files/Steel Bank Common Lisp/1.4.14"
         export PATH
         ./make.sh --arch=${{matrix.arch}} --with-sb-core-compression --xc-host='sbcl --lose-on-corruption --disable-ldb --disable-debugger'
-    - name: make installer
-      run: |
-        ./make-windows-installer.sh
-        mkdir sbcl-windows-installer; mv output/*msi sbcl-windows-installer
-    - name: save installer
-      uses: actions/upload-artifact@v4
-      with:
-        name: sbcl-windows-installer-${{ matrix.sys }}
-        path: sbcl-windows-installer
+    # - name: make installer
+    #   run: |
+    #     ./make-windows-installer.sh
+    #     mkdir sbcl-windows-installer; mv output/*msi sbcl-windows-installer
+    # - name: save installer
+    #   uses: actions/upload-artifact@v4
+    #   with:
+    #     name: sbcl-windows-installer-${{ matrix.sys }}
+    #     path: sbcl-windows-installer
     - name: build documentation
       run: cd ./doc/manual && sh generate-texinfo.sh
     - name: tests

@@ -41,23 +41,23 @@ jobs:
         PATH=$PATH:"/c/Program Files/Steel Bank Common Lisp/"
         export PATH
         ./make.sh --arch=${{matrix.arch}} --with-sb-core-compression --xc-host='sbcl --lose-on-corruption --disable-ldb --disable-debugger'
-    - name: install WiX Toolset
-      shell: pwsh
-      run: |
-        choco install wixtoolset
-        $wixPath = (Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" | Select-Object -First 1).FullName
-        echo "WIX=$wixPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-    - name: make installer
-      env:
-        WIX: ${{ env.WIX }}
-      run: |
-        ./make-windows-installer.sh
-        mkdir sbcl-windows-installer; mv output/*msi sbcl-windows-installer
-    - name: save installer
-      uses: actions/upload-artifact@v4
-      with:
-        name: sbcl-windows-installer-${{ matrix.sys }}
-        path: sbcl-windows-installer
+    # - name: install WiX Toolset
+    #   shell: pwsh
+    #   run: |
+    #     choco install wixtoolset
+    #     $wixPath = (Get-ChildItem "C:\Program Files (x86)\WiX Toolset*" | Select-Object -First 1).FullName
+    #     echo "WIX=$wixPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+    # - name: make installer
+    #   env:
+    #     WIX: ${{ env.WIX }}
+    #   run: |
+    #     ./make-windows-installer.sh
+    #     mkdir sbcl-windows-installer; mv output/*msi sbcl-windows-installer
+    # - name: save installer
+    #   uses: actions/upload-artifact@v4
+    #   with:
+    #     name: sbcl-windows-installer-${{ matrix.sys }}
+    #     path: sbcl-windows-installer
     - name: build documentation
       run: cd ./doc/manual && sh generate-texinfo.sh
     - name: tests
