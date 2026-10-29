@@ -53,7 +53,10 @@
          (cerror "Proceed anyway"
                  "make-host-1 stopped due to unexpected ~A." (or warnp style-warnp))))
 
-    #-(or clisp sbcl) `(with-compilation-unit () ,@forms)))
+    #-(or clisp sbcl)
+    `(handler-bind (#+cmucl
+                    (warning #'muffle-warning))
+       (with-compilation-unit () ,@forms))))
 
 ;;; Return T if we can skip rebuild of unicode data when re-running make-host-1.
 (defun outputs-up-to-date (inputs outputs)
