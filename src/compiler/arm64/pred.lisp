@@ -81,9 +81,42 @@
                 (:results (res :scs ,reg))
                 (:result-types ,type))))
   (def-move-if move-if/descriptor * (descriptor-reg any-reg zero))
-  (def-move-if move-if/word (:or unsigned-num signed-num) (unsigned-reg signed-reg zero))
   (def-move-if move-if/char character (character-reg zero))
   (def-move-if move-if/sap system-area-pointer (sap-reg zero)))
+
+(define-vop (move-if/word)
+  (:args (then :scs (unsigned-reg signed-reg zero (immediate (eql (tn-value tn) 1))))
+         (else :scs (unsigned-reg signed-reg zero (immediate (eql (tn-value tn) 1)))))
+  (:arg-types (:or unsigned-num signed-num) (:or unsigned-num signed-num))
+  (:results (res :scs (unsigned-reg signed-reg)))
+  (:result-types (:or unsigned-num signed-num))
+  (:info flags)
+  (:generator 0
+    (let* ((flags (conditional-flags-flags flags))
+           (not-p (eq (first flags) 'not)))
+      (when not-p (pop flags))
+      (aver (not (rest flags)))
+      (setf flags (if not-p
+                      (negate-condition (car flags))
+                      (car flags)))
+      (cond ((and (sc-is then immediate)
+                  (cond ((location= else zr-tn)
+                         (inst cset res flags)
+                         t)
+                        (t
+                         (inst mov tmp-tn (tn-value then))
+                         (setf then tmp-tn)
+                         nil))))
+            ((and (sc-is else immediate)
+                  (cond ((location= then zr-tn)
+                         (inst cset res (negate-condition flags))
+                         t)
+                        (t
+                         (inst mov tmp-tn (tn-value else))
+                         (setf else tmp-tn)
+                         nil))))
+            (t
+             (inst csel res then else flags))))))
 
 (define-vop (move-if/double move-if)
   (:args (then :scs (double-reg)) (else :scs (double-reg)))
