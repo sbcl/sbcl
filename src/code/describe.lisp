@@ -777,23 +777,21 @@
               (describe-function-source fun stream))))))))
 
 (defun describe-declaration (name stream)
-  (let ((kind (cond
-                ((member name '(ignore ignorable
-                                dynamic-extent
-                                special
-                                type ftype
-                                optimize
-                                inline notineline
-                                declaration))
-                 "a standard")
-                ((member name '(global always-bound
-                                freeze-type
-                                muffle-conditions unmuffle-conditions
-                                disable-package-locks enable-package-locks
-                                maybe-inline
-                                deprecated))
-                 "an SBCL-specific")
-                ((info :declaration :known name)
-                 "a user-defined"))))
+  (let ((kind
+          (when (info :declaration :known name)
+            (let ((package (symbol-package name)))
+              (cond ((and
+                      (or (eq name 'values)
+                          (sb-package-p package)))
+                     "an SBCL-specific")
+                    ((eq package (find-package :cl))
+                     "a standard")
+                    ((info :declaration :known name)
+                     "a user-defined"))))))
     (when kind
       (describe-block (stream "~A names ~A declaration." name kind)))))
+
+(defun sb-package-p (package)
+  (let ((name (package-name package)))
+    (and (<= 3 (length name))
+         (string= "SB-" name :end2 3))))

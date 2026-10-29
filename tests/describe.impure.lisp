@@ -143,6 +143,7 @@
                            (with-output-to-string (stream)
                              (describe name stream))))))
     (test 'inline "INLINE names a standard declaration.")
+    (test 'values "VALUES names an SBCL-specific declaration.")
     (test 'sb-ext:deprecated "DEPRECATED names an SBCL-specific declaration.")
     (test 'my-declaration "MY-DECLARATION names a user-defined declaration.")))
 
