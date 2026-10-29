@@ -81,7 +81,7 @@
         (move y x))))
 
 (define-move-vop move :move
-  (any-reg descriptor-reg immediate)
+  (any-reg descriptor-reg)
   (any-reg descriptor-reg))
 
 (defun move-immediate (target val &optional tmp-tn zeroed)

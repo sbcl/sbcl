@@ -73,7 +73,7 @@
       (move y x))))
 
 (define-move-vop move :move
-  (any-reg descriptor-reg immediate)
+  (any-reg descriptor-reg)
   (any-reg descriptor-reg))
 
 ;;; The MOVE-ARG VOP is used for moving descriptor values into
