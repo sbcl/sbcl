@@ -1304,21 +1304,38 @@
 (define-vop (single-float-bits)
   (:args (float :scs (single-reg descriptor-reg)
                 :load-if (not (sc-is float single-stack))))
-  (:results (bits :scs (signed-reg)))
+  (:results (bits :scs (signed-reg any-reg)
+                  :sc-costs (any-reg 1)))
   (:arg-types single-float)
   (:result-types signed-num)
   (:translate single-float-bits)
+  (:tag (:untagged) (nil))
   (:generator 4
-     (sc-case float
-       (single-reg
-        (inst movd bits float)
-        (inst movsx '(:dword :qword) bits bits))
-       (single-stack ; c.f. ea-for-sf-stack
-        (inst movsx '(:dword :qword)
-              bits (ea (frame-byte-offset (tn-offset float)) rbp-tn)))
-       (descriptor-reg
-        (move bits float)
-        (inst sar bits 32)))))
+    (sc-case bits
+      (signed-reg
+       (sc-case float
+         (single-reg
+          (inst movd bits float)
+          (inst movsx '(:dword :qword) bits bits))
+         (single-stack ; c.f. ea-for-sf-stack
+          (inst movsx '(:dword :qword)
+                bits (ea (frame-byte-offset (tn-offset float)) rbp-tn)))
+         (descriptor-reg
+          (move bits float)
+          (inst sar bits 32))))
+      (t
+       (sc-case float
+         (single-reg
+          (inst movd bits float)
+          (inst movsx '(:dword :qword) bits bits)
+          (inst shl bits n-fixnum-tag-bits))
+         (single-stack
+          (inst movsx '(:dword :qword)
+                bits (ea (frame-byte-offset (tn-offset float)) rbp-tn))
+          (inst shl bits n-fixnum-tag-bits))
+         (descriptor-reg
+          (move bits float)
+          (inst sar bits (- 32 n-fixnum-tag-bits))))))))
 
 (define-vop (single-float-sign)
   (:translate single-float-sign)

@@ -777,13 +777,15 @@
 (define-vop (single-float-bits)
   (:args (float :scs (single-reg descriptor-reg)
                 :load-if (not (sc-is float single-stack))))
-  (:results (bits :scs (signed-reg)
+  (:results (bits :scs (signed-reg any-reg)
+                  :sc-costs (any-reg 1)
                   :load-if (or (sc-is float descriptor-reg single-stack)
                                (not (sc-is bits signed-stack)))))
   (:arg-types single-float)
   (:result-types signed-num)
   (:translate single-float-bits)
   (:vop-var vop)
+  (:tag (:untagged) (nil))
   (:generator 4
     (sc-case bits
       (signed-reg
@@ -796,6 +798,18 @@
                    (load-store-offset (ash (tn-offset float) 3)))))
          (descriptor-reg
           (inst asr bits float 32))))
+      (any-reg
+       (sc-case float
+         (single-reg
+          (inst smov tmp-tn float 0 :s)
+          (inst lsl bits tmp-tn n-fixnum-tag-bits))
+         (single-stack
+          (inst ldrsw tmp-tn
+                (@ (current-nfp-tn vop)
+                   (load-store-offset (ash (tn-offset float) 3))))
+          (inst lsl bits tmp-tn n-fixnum-tag-bits))
+         (descriptor-reg
+          (inst asr bits float (- 32 n-fixnum-tag-bits)))))
       (signed-stack
        (sc-case float
          (single-reg
