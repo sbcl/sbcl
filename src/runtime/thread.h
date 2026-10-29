@@ -390,13 +390,13 @@ extern int thread_mv_cell_count(struct thread*);
 #define CONTROL_STACK_HARD_GUARD_PAGE(th) \
     ((os_vm_address_t)(th->control_stack_start))
 #define CONTROL_STACK_GUARD_PAGE(th) \
-    (CONTROL_STACK_HARD_GUARD_PAGE(th) + STACK_GUARD_SIZE)
+    (CONTROL_STACK_HARD_GUARD_PAGE(th) + os_reported_page_size)
 #define CONTROL_STACK_RETURN_GUARD_PAGE(th) \
     (CONTROL_STACK_GUARD_PAGE(th) + STACK_GUARD_SIZE)
 #else
 
 #define CONTROL_STACK_HARD_GUARD_PAGE(th) \
-    (((os_vm_address_t)(th->control_stack_end)) - STACK_GUARD_SIZE)
+    (((os_vm_address_t)(th->control_stack_end)) - os_reported_page_size)
 #define CONTROL_STACK_GUARD_PAGE(th) \
     (CONTROL_STACK_HARD_GUARD_PAGE(th) - STACK_GUARD_SIZE)
 #define CONTROL_STACK_RETURN_GUARD_PAGE(th) \

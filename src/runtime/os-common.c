@@ -530,9 +530,6 @@ protect_guard_page(void *page, int protect_p, os_vm_prot_t flags, size_t size) {
                            os_vm_page_size); }
 
 #if !(defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-DEF_PROTECT_PAGE(control_stack_hard_guard_page,
-                 CONTROL_STACK_HARD_GUARD_PAGE,
-                 OS_VM_PROT_NONE)
 DEF_PROTECT_PAGE(control_stack_guard_page,
                  CONTROL_STACK_GUARD_PAGE, OS_VM_PROT_NONE)
 DEF_PROTECT_PAGE(control_stack_return_guard_page,
@@ -543,10 +540,11 @@ void protect_control_stack_return_guard_page (__attribute__((unused)) int protec
 }
 #endif
 
-/* Unlike for the control stack, the binding and alien stack guards can reasonably
- * utilize the OS-reported granularity. The binding stack pointer is bumped by a couple
- * words at a time; there is no chance that special var binding would overstep and miss
- * the guard. As for alien stacks, I think people are not in the habit of blowing that.
+/* Unlike for the control stack soft guard, the control stack hard guard and the
+ * binding and alien stack guards can reasonably utilize the OS-reported granularity.
+ * The binding stack pointer is bumped by a couple words at a time; there is no chance
+ * that special var binding would overstep and miss the guard. As for alien stacks,
+ * I think people are not in the habit of blowing that.
  * If this reduction does cause problems, either a #define or C global var could let
  * users specify the guard range, depending on whether we think that such needs are
  * esoteric (i.e. for those willing to rebuild the runtime), or widespread */
@@ -555,6 +553,12 @@ void protect_control_stack_return_guard_page (__attribute__((unused)) int protec
     void protect_##name(int protect_p, struct thread *thread) {  \
         protect_guard_page(page_name(thread), protect_p, flags, \
                            os_reported_page_size); }
+
+#if !(defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
+DEF_PROTECT_PAGE(control_stack_hard_guard_page,
+                 CONTROL_STACK_HARD_GUARD_PAGE,
+                 OS_VM_PROT_NONE)
+#endif
 
 DEF_PROTECT_PAGE(binding_stack_hard_guard_page,
                  BINDING_STACK_HARD_GUARD_PAGE,

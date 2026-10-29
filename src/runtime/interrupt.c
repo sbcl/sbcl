@@ -1628,7 +1628,7 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
 
 #if !(defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
     if(addr >= CONTROL_STACK_HARD_GUARD_PAGE(th) &&
-       addr < CONTROL_STACK_HARD_GUARD_PAGE(th) + cstk_guard_size) {
+       addr < CONTROL_STACK_HARD_GUARD_PAGE(th) + os_reported_page_size) {
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         /* fake_foreign_function_call wants to write to the stack. */
         protect_control_stack_hard_guard_page(0, th);

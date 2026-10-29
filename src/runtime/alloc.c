@@ -768,8 +768,8 @@ alloc_thread_struct(void* spaces, unsigned int control_stack_size) {
      * and checks if the next is nonzero, looping again if it isn't.
      * There's no reason not to be exactly right here instead of probably right */
         memset((char*)th->control_stack_start, 0,
-               // take off 2 pages because of the soft and hard guard pages
-               THREAD_CONTROL_STACK_SIZE(th) - 2*os_vm_page_size);
+               // take off the soft and hard guard pages
+               THREAD_CONTROL_STACK_SIZE(th) - os_vm_page_size - os_reported_page_size);
 #else
     /* This is a little wasteful of cycles to pre-zero the pthread overhead (which in glibc
      * resides at the highest stack addresses) comprising about 5kb, below which is the lisp
