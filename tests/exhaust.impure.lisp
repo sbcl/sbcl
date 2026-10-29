@@ -102,7 +102,8 @@
 ;;; memory protection set up by win32_reset_stack_overflow_guard_page(). This is
 ;;; certainly not fool proof, though.
 (with-test (:name (:exhaust :write-to-stack-on-unwind)
-            :skipped-on (not (and :win32 :c-stack-is-control-stack)))
+            :skipped-on (not (and :win32 :c-stack-is-control-stack))
+            :fails-on (and :win32 :c-stack-is-control-stack))
   (let ((count 0))
     (labels ((recurse-and-write-to-stack-on-unwind ()
                (let ((x (random 1.0)))

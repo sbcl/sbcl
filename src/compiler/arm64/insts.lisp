@@ -1241,6 +1241,18 @@
   `(let ((rd ,rd)
          (rn ,rn))
      (inst csinc rd rn rn (negate-condition ,cond))))
+
+(define-instruction-macro cneg (rd rn cond)
+  `(let ((rd ,rd)
+         (rn ,rn))
+     (inst csneg rd rn rn (negate-condition ,cond))))
+
+(define-instruction-macro cinv (rd rn cond)
+  `(let ((rd ,rd)
+         (rn ,rn))
+     (inst csinv rd rn rn (negate-condition ,cond))))
+
+
 ;;;
 
 (def-emitter cond-compare
