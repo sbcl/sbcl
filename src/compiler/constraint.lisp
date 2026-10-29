@@ -1753,9 +1753,10 @@
                  (when (block-type-check (lambda-block fun))
                    ;; This is optimistic, make sure it's going to be
                    ;; processed.
-                   (setf (lambda-var-unused-initial-value var) t)
-                   (loop for set in (lambda-var-sets var)
-                         do (setf (set-reached set) nil)))))))
+                   (unless (policy fun (= debug 3))
+                     (setf (lambda-var-unused-initial-value var) t)
+                     (loop for set in (lambda-var-sets var)
+                           do (setf (set-reached set) nil))))))))
       (frob fun)
       (dolist (let (lambda-lets fun))
         (frob let)))))
@@ -2055,8 +2056,7 @@
                (when (lambda-var-constraints var)
                  (dolist (set (lambda-var-sets var))
                    (unless (or (set-reached set)
-                               (member set *sets-to-delete*)
-                               (policy set (= debug 3)))
+                               (member set *sets-to-delete*))
                      (delete-set set)))))))
       (dolist (fun (component-lambdas component))
         (find-dead-sets fun)
