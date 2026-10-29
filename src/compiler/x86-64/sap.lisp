@@ -123,11 +123,6 @@
 
 ;;;; mumble-SYSTEM-REF and mumble-SYSTEM-SET
 
-;; from 'llvm/projects/compiler-rt/lib/msan/msan.h':
-;;  "#define MEM_TO_SHADOW(mem) (((uptr)(mem)) ^ 0x500000000000ULL)"
-#+linux ; shadow space differs by OS
-(defconstant msan-mem-to-shadow-xor-const #x500000000000)
-
 #|
 https://llvm.org/doxygen/MemorySanitizer_8cpp.html
 /// "We load the shadow _after_ the application load,

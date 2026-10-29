@@ -523,7 +523,7 @@ during backtrace.
   (mixed-tlab :c-type "struct alloc_region" :length 3)
   ;; END of slots to keep near the beginning.
 
-  #+x86-64 (msan-param-tls) ; = &__msan_param_tls, unconditional wrt #+-msan
+  #+(or arm64 x86-64) (msan-param-tls) ; = &__msan_param_tls, unconditional wrt #+-msan
 
   ;; This is the original address at which the memory was allocated,
   ;; which may have different alignment then what we prefer to use.

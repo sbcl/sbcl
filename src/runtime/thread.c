@@ -298,6 +298,10 @@ static lispobj cons_lisp_thread(struct thread* thread)
 static int os_thread_init(struct thread *thread)
 {
     if (!arch_os_thread_init(thread)) return 0;
+#ifdef MEMORY_SANITIZER
+    extern __thread unsigned long __msan_param_tls[];
+    thread->msan_param_tls = (uword_t)&__msan_param_tls[0];
+#endif
     /* Signal handlers are run on the control stack, so if it is exhausted
      * we had better use an alternate stack for whatever signal tells us
      * we've exhausted it */

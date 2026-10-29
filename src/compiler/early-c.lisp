@@ -298,10 +298,15 @@ possible.")
 (sb-impl:define-thread-local *compilation*)
 (declaim (type compilation *compilation*))
 
-;; from 'llvm/projects/compiler-rt/lib/msan/msan.h':
-;;  "#define MEM_TO_SHADOW(mem) (((uptr)(mem)) ^ 0x500000000000ULL)"
+;; https://github.com/llvm/llvm-project/blob/b0553658eefdd307ac222bd4929fc312a662fa16/compiler-rt/lib/msan/msan.h#L96
+;;  "#define MEM_TO_SHADOW(mem) ((uptr)mem ^ 0xB00000000000ULL)"     (arm64)
+;; https://github.com/llvm/llvm-project/blob/b0553658eefdd307ac222bd4929fc312a662fa16/compiler-rt/lib/msan/msan.h#L247
+;;  "#define MEM_TO_SHADOW(mem) (((uptr)(mem)) ^ 0x500000000000ULL)" (x86-64)
 #+linux ; shadow space differs by OS
-(defconstant sb-vm::msan-mem-to-shadow-xor-const #x500000000000)
+(defconstant sb-vm::msan-mem-to-shadow-xor-const
+  #+arm64  #xB00000000000
+  #+x86-64 #x500000000000
+  #-(or arm64 x86-64) 0)
 
 (defstruct (compilation-unit (:conc-name cu-) (:predicate nil) (:copier nil)
                              (:constructor make-compilation-unit ()))
