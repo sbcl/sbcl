@@ -1912,8 +1912,7 @@
                                      ((n 3) (x 99))))
                    '((99))))))
 
-(with-test (:name (:debugger :variables :setq :unused-value)
-            :fails-on :sbcl)
+(with-test (:name (:debugger :variables :setq :unused-value))
   ;; The value X is set to last is never used.
   (with-variables-test (:strict (3) :lax (1 2))
       (sb-int:named-lambda variables-test (n)
@@ -2103,8 +2102,7 @@
     (assert (equal (run-stops '(1) '(((x 1)) ((x 1)))) '(1)))
     (assert (equal (run-stops '(0) '(((x 1)) ((x 2)))) '(2)))))
 
-(with-test (:name (:debugger :variables :setq :unwind-protect)
-            :fails-on :sbcl)
+(with-test (:name (:debugger :variables :setq :unwind-protect))
   ;; X is 1 only until it is set again.
   (with-variables-test (:strict (3) :lax (1 2))
       (sb-int:named-lambda variables-test ()
