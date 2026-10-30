@@ -15,8 +15,8 @@ jobs:
         include:
           - { arch: x86-64, subfeatures: sse4, options: --with-sb-thread --with-nonstop-foreign-call --with-tls-based-mv-return }
           - { arch: x86-64, subfeatures: fasteval, options: --with-sb-fasteval --without-sb-eval --with-nonstop-foreign-call }
-          - { arch: x86-64, options: --with-mark-region-gc --with-nonstop-foreign-call }
-          - { arch: x86-64, options: --without-sb-unicode --with-nonstop-foreign-call }
+          - { arch: x86-64, options: --with-mark-region-gc --with-nonstop-foreign-call --without-sb-doc }
+          - { arch: x86-64, options: --without-sb-unicode --with-nonstop-foreign-call}
 
       fail-fast: false
 

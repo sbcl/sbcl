@@ -47,7 +47,7 @@
 
 (defun emit-plain-for-docstring (docstring &optional (indent 0))
   (write-string (prefix-lines (make-string indent :initial-element #\Space)
-                              (sb-pcl::markdown-to-plain-text
+                              (markdown-to-plain-text
                                (reindent-docstring docstring)))))
 
 ;;; Per CLHS 11.1.2.1.2 #19, users are not allowed to define methods

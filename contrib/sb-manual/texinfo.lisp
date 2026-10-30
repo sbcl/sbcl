@@ -141,7 +141,7 @@
 
 ;;; A partial reimplemtation of DREF:DOCSTRING
 (defun %docstring (xref)
-  (let ((sb-pcl::*normalize-sbcl-docstrings* nil))
+  (let ((*normalize-sbcl-docstrings* nil))
     (values (let ((name (xref-name xref))
                   (locative-type (xref-locative-type xref)))
               (case locative-type

@@ -28,7 +28,7 @@ else
     SBCLRUNTIME="$1"
 fi
 
-${SBCLRUNTIME}                                                            \
-    --noinform --no-sysinit --no-userinit --noprint --disable-debugger    \
+${SBCLRUNTIME}                                                           \
+    --noinform --no-sysinit --no-userinit --noprint --disable-debugger   \
     --eval '(require :sb-manual)' --eval '(sb-manual::generate-texinfo)' \
     --quit
