@@ -3369,8 +3369,12 @@ not inlined.")
           (setf type (type-union type (lvar-type step)))))))
 
 ;;; Note that anything affected by the optimistic type of the value of
-;;; NODE is pending for reanalysis.
-(defun note-optimistic-change (node)
+;;; NODE is pending for reanalysis. A variable without an optimistic
+;;; type (such as one of a function with &OPTIONAL parameters) won't
+;;; note changes itself, but its copies look through it to the value of
+;;; NODE, so note its references too. SEEN is the list of such variables
+;;; being looked through.
+(defun note-optimistic-change (node &optional seen)
   (let* ((lvar (node-lvar node))
          (dest (and lvar (lvar-dest lvar))))
     (cond ((and (combination-p dest)
@@ -3378,7 +3382,16 @@ not inlined.")
                 (neq lvar (basic-combination-fun dest)))
            (let ((callee (combination-lambda dest)))
              (when callee
-               (setf (lambda-optimistic-pending callee) t)))
+               (setf (lambda-optimistic-pending callee) t)
+               (loop for arg in (basic-combination-args dest)
+                     for var in (lambda-vars callee)
+                     when (and (eq arg lvar)
+                               (not (lambda-var-optimistic-type var))
+                               (not (memq var seen))
+                               (lambda-var-values-known-p var))
+                       do (let ((seen (cons var seen)))
+                            (dolist (ref (leaf-refs var))
+                              (note-optimistic-change ref seen))))))
            (reoptimize-lvar lvar))
           ((set-p dest)
            (let ((var (set-var dest)))

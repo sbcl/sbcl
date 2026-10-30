@@ -726,6 +726,38 @@
   (def :logior 0 (logior x d) (unsigned-byte 8))
   (def :ash 1 (ash x d) (integer 1)))
 
+(with-test (:name (:optimistic-type :copy-of-recursive-result-through-optional))
+  (flet ((check (form)
+           (checked-compile-and-assert () form ((t) :ok))))
+    (check '(lambda (x)
+             (multiple-value-bind (a b)
+                 (and x (labels ((f (n)
+                                   (if (< n 0)
+                                       3
+                                       (f (- n 1)))))
+                          (f 1)))
+               (declare (ignore b))
+               (let ((c a))
+                 (if (eql c 3) :ok :bad)))))
+    (check '(lambda (x)
+             (multiple-value-bind (a b)
+                 (and x (labels ((f (n)
+                                   (if (< n 0)
+                                       3
+                                       (f (- n 1)))))
+                          (f 1)))
+               (declare (ignore b))
+               (let* ((c a) (d c) (e d))
+                 (if (eql e 3) :ok :bad)))))
+    (check '(lambda (x)
+             (funcall (lambda (&optional (a (and x (labels ((f (n)
+                                                              (if (< n 0)
+                                                                  3
+                                                                  (f (- n 1)))))
+                                                     (f 1)))))
+                        (let ((c a))
+                          (if (eql c 3) :ok :bad))))))))
+
 (with-test (:name (:optimistic-type :copies-between-local-functions))
   (assert-type
    (lambda (l)
