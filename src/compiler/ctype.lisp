@@ -1070,10 +1070,9 @@ and no value was provided for it." name)))))))))))
     (if trusted
         (derive-node-type call returns)
         (let ((lvar (node-lvar call)))
-          ;; If the value is used in a non-tail position, and the lvar
-          ;; is a single-use, assert the type. Multiple use sites need
-          ;; to be elided because the assertion has to apply to all
-          ;; uses. Tail positions are elided because the assertion
+          ;; If the value is used in a non-tail position,
+          ;; assert the type.
+          ;; Tail positions are elided because the assertion
           ;; would cause us not the be in a tail-position anymore. MV
           ;; calls are elided because not only are the assertions of
           ;; less use there, but they can cause the MV call conversion
@@ -1081,8 +1080,7 @@ and no value was provided for it." name)))))))))))
           (when (and lvar
                      (or (eq where-from :declared-verify)
                          (and (not (return-p (lvar-dest lvar)))
-                              (not (mv-combination-p (lvar-dest lvar)))
-                              (lvar-has-single-use-p lvar))))
+                              (not (mv-combination-p (lvar-dest lvar))))))
             (when (assert-node-type call returns policy 'ftype-context)
               (reoptimize-lvar lvar)))))
     (let* ((fun (combination-fun call))

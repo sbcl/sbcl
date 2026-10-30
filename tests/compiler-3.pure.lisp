@@ -1270,3 +1270,12 @@
                               (f)))))
     ((100) t)
     ((101) nil)))
+
+(with-test (:name :local-ftype-multiple-uses)
+  (assert-type
+   (lambda (f x)
+     (declare (type (or null (function (t) (mod 8))) f))
+     (1+
+      (if f
+          (funcall f x))))
+   (integer 1 8)))
