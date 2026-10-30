@@ -167,7 +167,10 @@
           (cond ((and then-value else-value
                       (let ((min (min else-value then-value))
                             (max (max else-value then-value)))
-                        (cond ((and (= min 0)
+                        (cond ((= then-value else-value)
+                               (load-immediate-word res then-value)
+                               t)
+                              ((and (= min 0)
                                     (= max 1))
                                (inst cset res (if (= max then-value)
                                                   flags
