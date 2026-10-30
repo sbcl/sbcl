@@ -2,6 +2,9 @@ name: CL-host
 
 on: [push]
 
+permissions:
+  contents: read
+
 jobs:
 
   ecl:
