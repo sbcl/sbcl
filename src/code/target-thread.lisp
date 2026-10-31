@@ -1934,6 +1934,8 @@ session."
            ;; use the "funny fixnum" representation
            (c-thread (%make-lisp-obj (thread-primitive-thread thread)))
            (sem (thread-semaphore thread)))
+      #+system-tlabs
+      (when (%instancep (sb-vm:thread-current-arena)) (sb-vm::switch-to-arena 0))
       ;; This AVER failed when I messed up deletion from *STARTING-THREADS*.
       ;; That in turn caused a failure in GC because a fixnum is not a legal value
       ;; for the startup info when observed by GC.
@@ -1990,8 +1992,7 @@ session."
          (let ((old (sb-ext:cas (thread-%visible thread) 1 -1)))
            ;; now (LIST-ALL-THREADS) won't see it
            (aver (eql old 1)))
-         (locally (declare (sb-c::tlab :system))
-           (sb-ext:atomic-push thread *joinable-threads*)))
+         (sb-ext:atomic-push thread *joinable-threads*))
         (t ; otherwise, physically remove from *ALL-THREADS*
          ;; The memory allocation/deallocation is handled in C.
          ;; I would like to combine the recycle bin for foreign and lisp threads though.

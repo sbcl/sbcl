@@ -75,3 +75,48 @@
           ;; surely more samples is better, right?
           sb-sprof-test::*sprof-loop-test-max-samples* 100)
     (sb-sprof-test:run-tests)))
+
+;;; This test _nearly_ always failed without the corresponding fix to target-thread.
+;;; It doesn't definitely fail, but it's better than the 1-in-100 failure rate that
+;;; arena.impure had. And amusingly it fails less often under parallel-exec
+;; new-arena doesn't exist maybe
+#+(and sb-thread arena-allocator (not (or interpreter gc-stress)))
+(test-util:with-test (:name :sprof-thread-exit-in-arena)
+  (setf (extern-alien "pre_verify_gen_0" int) 1) ; stays until EOF and I intend that
+  (let ((arena (sb-vm:new-arena 65536)))
+    (unwind-protect
+         (progn
+           (sb-sprof:reset)
+           (sb-sprof:start-profiling :sample-interval 0.001)
+           ;; Close the main thread's TLAB and promote *SAMPLES* so the child
+           ;; THREAD lands on a fresh nursery page with no caller stack roots.
+           (sb-ext:gc)
+           (flet ((run-kid ()
+                    (let ((th (sb-vm:with-arena (arena)
+                                (sb-thread:make-thread
+                                 (lambda ()
+                                   ;; If we don't get a SIGPROF in 10 million iterations,
+                                   ;; just give up trying.
+                                   (loop repeat 10000000
+                                         while (zerop
+                                                (sb-sys:sap-int
+                                                 (sb-vm::current-thread-offset-sap
+                                                  sb-vm:thread-sprof-data-slot)))))))))
+                      (sb-thread:join-thread th)
+                      nil)))
+             (declare (notinline run-kid))
+             (run-kid))
+           (sb-sprof:stop-profiling)
+           ;; Try to limit ambiguous stack refs that pin things under test
+           (sb-sys:scrub-control-stack)
+           ;; Rewinding resets freeptr -> allocator_base so GC won't scavenge
+           ;; ARENA, while keeping the memory mapped.
+           (sb-vm:rewind-arena arena)
+           (sb-ext:gc)
+           ;; Change (make-broadcast-stream) to *standard-output* if you also
+           ;; want to see #<SB-KERNEL:INSTANCE {120...}> or other garbage printed
+           ;; from sb-sprof's "Sampled threads:"
+           (sb-sprof:report :type :flat :stream (make-broadcast-stream))
+           (sb-ext:gc :full t)
+           (sb-sprof:reset))
+      (sb-vm:destroy-arena arena))))
