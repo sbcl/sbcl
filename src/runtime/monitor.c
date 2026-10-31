@@ -202,7 +202,8 @@ void save_gc_crashdump(char *pathname,
     int usage = (uword_t)fixedobj_free_pointer - FIXEDOBJ_SPACE_START;
     checked_write("fixedobj", &writer, (char*)FIXEDOBJ_SPACE_START, usage);
     int total_npages = FIXEDOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
-    checked_write("fixedobj_PTE", &writer, fixedobj_pages, total_npages * sizeof sizeof(struct fixedobj_page));
+    checked_write("fixedobj_PTE", &writer, fixedobj_pages,
+                  total_npages * sizeof sizeof(struct fixedobj_page));
     usage = (uword_t)text_space_highwatermark - TEXT_SPACE_START;
     // write the block_header_t that is just beyond the high water mark
     checked_write("text", &writer, (char*)TEXT_SPACE_START, usage+3*N_WORD_BYTES);
@@ -1347,7 +1348,7 @@ extern void print_generation_stats();
 int load_gc_crashdump(char* pathname)
 {
     int fd;
-    os_context_t *contexts[10], *context;
+    os_context_t /* *contexts[10],*/ *context;
     struct thread* threads = 0;
     fd = open(pathname, O_RDONLY);
     if (fd < 0) {
@@ -1471,7 +1472,7 @@ int load_gc_crashdump(char* pathname)
     checked_read("fixedobj", fd, (char*)FIXEDOBJ_SPACE_START, usage);
     // Always read the whole page table regardless of the current space usage
     int total_npages = FIXEDOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
-    checked_read("fixedobj_PTE", fd, fixedobj_pages, total_npages * sizeof sizeof(struct fixedobj_page));
+    checked_read("fixedobj_PTE", fd, fixedobj_pages, total_npages * sizeof(struct fixedobj_page));
     // Read text space
     usage = (uword_t)text_space_highwatermark - TEXT_SPACE_START;
     char *tlsf_memory_end = (char*)TEXT_SPACE_START + text_space_size;
@@ -1484,12 +1485,17 @@ int load_gc_crashdump(char* pathname)
     int n_bitmap_elts = ALIGN_UP(total_npages, 32) / 32;
     checked_read("text_gen", fd, text_page_genmask, total_npages); // 1 byte per page
     checked_read("text_WP", fd, text_page_touched_bits, n_bitmap_elts * sizeof (int));
-    tlsf_control = preamble.tlsf_control_address; // already mapped at a fixed address
     // TLSF control was mapped in gc_init_immobile()
+    fprintf(stderr, "TLSF control was @ %p, currently @ %p\n",
+            preamble.tlsf_control_address, tlsf_control);
     checked_read("TLSF_control", fd, tlsf_control, preamble.tlsf_control_size);
     int n_tlsf_pages = tlsf_memory_size / IMMOBILE_CARD_BYTES;
     fprintf(stderr, "%d TLSF pages\n", n_tlsf_pages);
-    tlsf_page_sso = malloc(n_tlsf_pages * sizeof (short));
+    // FIXME: rev 6aa247c9d broke this, and parts of that change need to be reverted.
+    // TLFS pages -must-not- be 64k, nor cards.  That's completely not how cards works.
+    // Cards are, by definition, supposed to be small.
+    // tlsf_page_sso = malloc(n_tlsf_pages * sizeof (short));
+    tlsf_page_sso = malloc(n_tlsf_pages * sizeof *tlsf_page_sso);
     checked_read("TLSF_sso", fd, tlsf_page_sso, n_tlsf_pages * sizeof (short));
     write_protect_immobile_space();
 #endif
@@ -1510,7 +1516,7 @@ int load_gc_crashdump(char* pathname)
         threads = th;
         checked_read("thread", fd, &thread_preamble, sizeof thread_preamble);
         uword_t* stackptr = (uword_t*)((char*)th->control_stack_end - thread_preamble.control_stack_nbytes);
-        context = contexts[i] = malloc(preamble.sizeof_context);
+        context = /*contexts[i] =*/ malloc(preamble.sizeof_context);
         nth_interrupt_context(0, th) = context;
         if (thread_preamble.has_context) {
             checked_read(" ctxt", fd, context, preamble.sizeof_context);
@@ -1611,11 +1617,16 @@ int main(int argc, char *argv[], char **envp)
     }
     extern void sb_query_os_page_size();
     sb_query_os_page_size();
-    bool have_hardwired_spaces = os_preinit(argv, envp);
-    // Unlike in ordinary startup where we might try to call personality()
-    // to disable ASLR, this can't proceed if the preinit fails.
-    if (!have_hardwired_spaces) lose("failed to preinit");
-    load_gc_crashdump(argv[1]);
+    if (setjmp(ldb_toplevel) == 0) {
+        bool have_hardwired_spaces = os_preinit(argv, envp);
+        // Unlike in ordinary startup where we might try to call personality()
+        // to disable ASLR, this can't proceed if the preinit fails.
+        if (!have_hardwired_spaces) lose("failed to preinit");
+        load_gc_crashdump(argv[1]);
+    } else {
+        fprintf(stderr, "lose() was called while loading the crashdump. Exiting\n");
+        exit(1);
+    }
     calc_asm_routine_bounds();
     gencgc_verbose = 1;
     if (setjmp(ldb_toplevel) != 0)

@@ -4812,8 +4812,6 @@ static uword_t verify_range(lispobj* start, lispobj* end, void* arg)
     return 0;
 }
 
-extern void save_gc_crashdump(char *, lispobj*);
-
 static int count_immobile_objects(__attribute__((unused)) int gen, int res[3])
 {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
