@@ -4308,9 +4308,7 @@ is :ANY, the function name is not checked."
                       (setf (combination-info node) :important-result-discarded)))
                   (set-value set)
                   :sets t)
-    (when (and (node-lvar set)
-               (not (type-single-value-p (lvar-derived-type (set-value set)))))
-      (filter-lvar (set-value set) (lambda (x) `(let ((v ,x)) v))))
+    (filter-lvar (set-value set) (lambda (x) `(let ((v ,x)) v)))
     (delete-filter set (node-lvar set) (set-value set))))
 
 (defun transform-to-identity (nth-arg node n-args)
