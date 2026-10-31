@@ -129,31 +129,6 @@
 ;; actually 88 (for now), but leave some wiggle room
 (defconstant longest-unicode-char-name 96)
 
-(defmacro with-name->char-buffer ((varname) form)
-  ;; After git rev 8b606d636cc1 we have no feature indicating
-  ;; support for DX strings but this is close enough.
-  #+c-stack-is-control-stack
-  `(dx-let ((,varname (make-array longest-unicode-char-name :element-type 'base-char)))
-     ,form)
-
-  #-c-stack-is-control-stack
-  (sb-c::if-vop-existsp (:named sb-vm::allocate-vector-on-number-stack)
-     (let ((nsp (gensym "NSP")))
-       `(let ((,nsp (sb-sys:%primitive sb-c:current-nsp)))
-          (sb-c::restoring-nsp ,nsp
-                               (let ((,varname (sb-ext:truly-the
-                                                (simple-base-string ,longest-unicode-char-name)
-                                                (sb-sys:%primitive sb-vm::allocate-vector-on-number-stack
-                                                                   sb-vm:simple-base-string-widetag
-                                                                   longest-unicode-char-name
-                                                                   (1+ (/ longest-unicode-char-name
-                                                                          (/ sb-vm:n-word-bits sb-vm:n-byte-bits)))))))
-                                 ,form))))
-     `(let ((,varname (or (sb-ext:atomic-pop *name->char-buffers*)
-                          (make-array longest-unicode-char-name :element-type 'base-char))))
-        (prog1 ,form
-          (sb-ext:atomic-push ,varname *name->char-buffers*)))))
-
 (defun huffman-decode (bits start nbits tree output)
   (declare (type (or (simple-base-string #.longest-unicode-char-name) null) output)
            (simple-bit-vector bits)
@@ -162,7 +137,7 @@
   (let ((bufpos longest-unicode-char-name)
         (pointer (+ start nbits)))
     (declare (index pointer))
-    (with-name->char-buffer (buffer)
+    (sb-impl::with-string-buffer (longest-unicode-char-name buffer)
       (labels ((choose (branch)
                  (destructuring-bind (left right) (cdr branch)
                    (if (= (sbit bits (decf pointer)) 1) right left)))

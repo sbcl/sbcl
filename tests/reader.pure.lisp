@@ -405,17 +405,8 @@
 (with-test (:name :read-symbol-does-not-cons-per-se
             :fails-on (or :mips :arm :ppc :sparc)) ; no idea why. does it vary by #+/-sb-thread?
   (test-reader-consing "COMMON-LISP-USER::A-SYMBOL"))
-(when (let ((s (find-symbol "ALLOCATE-VECTOR-ON-NUMBER-STACK" "SB-VM")))
-        (and s (gethash s sb-c::*backend-parsed-vops*)))
-  (push :simulated-dx-strings *features*))
-;;; For NAME-CHAR not to cons, the platform must either support DX allocation
-;;; of strings on the control stack, or simulate it via number stack strings.
-;;; Lacking either, we acquire a string buffer from a global buffer pool.
-;;; Pushing a buffer back onto the global pool creates one cons cell,
-;;; in which case this test makes 1 cons per iteration.
 (defglobal *callcount* 0)
-(with-test (:name :name-char-does-not-cons
-            :skipped-on (not (or :c-stack-is-control-stack :simulated-dx-strings)))
+(with-test (:name :name-char-does-not-cons :fails-on (or :mips :sparc))
   (sb-int:encapsulate 'sb-impl::name-char 'callcount
     (compile nil '(lambda (f name) (incf *callcount*) (funcall f name))))
   (unwind-protect

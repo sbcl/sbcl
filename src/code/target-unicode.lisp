@@ -493,7 +493,7 @@ name is that string, if one exists. Otherwise, NIL is returned."
       (or (let ((name-hash (ldb (byte 32 0) psxhash)))
             (try-base-char))
           (let ((name-hash (psxhash-to-name-hash psxhash string)))
-            (with-name->char-buffer (name-buffer)
+            (sb-impl::with-string-buffer (longest-unicode-char-name name-buffer)
               ;; Look in ucd-names first, since there are overlaps with ucd1-names,
               ;; and we always want to return the new codepoint that a name finds,
               ;; not the old, in the case of a conflict.
