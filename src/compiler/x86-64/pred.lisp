@@ -150,60 +150,86 @@
                      (not (sc-is else immediate))))
         (rotatef then else)
         (setf not-p (not not-p)))
-      (flet ((load-immediate (dst constant-tn
-                              &optional (sc-reg dst))
-               (let ((bits (immediate-tn-repr constant-tn
-                                              (sc-is sc-reg any-reg descriptor-reg))))
-                 (if (typep bits '(unsigned-byte 31))
-                     (unless size
-                       (setf size :dword))
-                     (setf size :qword))
-                 (if (nil-relative-p bits)
-                     (move-immediate dst bits)
-                     ;; Can't use ZEROIZE, since XOR will affect the flags.
-                     (inst mov dst bits)))))
-        (cond ((null (rest flags))
-               (cond ((sc-is else immediate)
-                      (load-immediate res else))
-                     (t
-                      (setf size :qword)
-                      (move res else)))
-               (cond ((sc-is then immediate)
-                      (load-immediate temp then res)
-                      (setf then temp))
-                     (t
-                      (setf size :qword)))
-               (inst cmov size (if not-p
-                                   (negate-condition (first flags))
-                                   (first flags))
-                     res
-                     then))
-              (not-p
-               (cond ((sc-is then immediate)
-                      (when (location= else res)
-                        (inst mov temp else)
+      (cond ((when (and (sc-is then immediate)
+                        (sc-is else immediate)
+                        (sc-is res signed-reg unsigned-reg)
+                        (not (rest flags)))
+               (let ((then (tn-value then))
+                     (else (tn-value else)))
+                 (cond ((eql then
+                             (case else
+                               (0 1)
+                               (1 0)))
+                        (inst set (if (= else 0)
+                                      (first flags)
+                                      (negate-condition (first flags))) res)
+                        (inst movzx '(:byte :dword) res res)
+                        t)
+                       ((eql then
+                             (case else
+                               (0 -1)
+                               (-1 0)))
+                        (inst mov res 0)
+                        (inst set (if (= else 0)
+                                      (first flags)
+                                      (negate-condition (first flags))) res)
+                        (inst neg res)
+                        t)))))
+            (t
+             (flet ((load-immediate (dst constant-tn
+                                     &optional (sc-reg dst))
+                      (let ((bits (immediate-tn-repr constant-tn
+                                                     (sc-is sc-reg any-reg descriptor-reg))))
+                        (if (typep bits '(unsigned-byte 31))
+                            (unless size
+                              (setf size :dword))
+                            (setf size :qword))
+                        (if (nil-relative-p bits)
+                            (move-immediate dst bits)
+                            ;; Can't use ZEROIZE, since XOR will affect the flags.
+                              (inst mov dst bits)))))
+               (cond ((null (rest flags))
+                      (cond ((sc-is else immediate)
+                             (load-immediate res else))
+                            (t
+                             (setf size :qword)
+                             (move res else)))
+                      (cond ((sc-is then immediate)
+                             (load-immediate temp then res)
+                             (setf then temp))
+                            (t
+                             (setf size :qword)))
+                      (inst cmov size (if not-p
+                                          (negate-condition (first flags))
+                                          (first flags))
+                            res
+                            then))
+                     (not-p
+                      (cond ((sc-is then immediate)
+                             (when (location= else res)
+                               (inst mov temp else)
+                               (setf else temp))
+                             (load-immediate res then))
+                            ((location= else res)
+                             (move temp else)
+                             (move res then)
+                             (setf else temp))
+                            (t
+                             (move res then)))
+                      (when (sc-is else immediate)
+                        (load-immediate temp else res)
                         (setf else temp))
-                      (load-immediate res then))
-                     ((location= else res)
-                      (move temp else)
-                      (move res then)
-                      (setf else temp))
+                      (dolist (flag flags)
+                        (inst cmov flag res else)))
                      (t
-                      (move res then)))
-               (when (sc-is else immediate)
-                 (load-immediate temp else res)
-                 (setf else temp))
-               (dolist (flag flags)
-                 (inst cmov flag res else)))
-              (t
-               (if (sc-is else immediate)
-                   (load-immediate res else)
-                   (move res else))
-               (when (sc-is then immediate)
-                 (load-immediate temp then res)
-                 (setf then temp))
-               (dolist (flag flags)
-                 (inst cmov flag res then))))))))
+                      (if (sc-is else immediate)
+                          (load-immediate res else)
+                          (move res else))
+                      (when (sc-is then immediate)
+                        (load-immediate temp then res)
+                        (setf then temp))
+                      (dolist (flag flags)
+                        (inst cmov flag res then))))))))))
 
 (macrolet ((def-move-if (name type reg stack)
              `(define-vop (,name move-if)
