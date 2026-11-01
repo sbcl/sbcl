@@ -4308,6 +4308,7 @@ is :ANY, the function name is not checked."
                       (setf (combination-info node) :important-result-discarded)))
                   (set-value set)
                   :sets t)
+    (remove-lvar-dx (set-value set))
     (filter-lvar (set-value set) (lambda (x) `(let ((v ,x)) v)))
     (delete-filter set (node-lvar set) (set-value set))))
 
