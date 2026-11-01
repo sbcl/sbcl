@@ -2191,7 +2191,7 @@
                    '(7)))))
 
 (with-test (:name (:debugger :variables :setq :before-dead))
-  (with-variables-test (:strict (3) :lax (1 2))
+  (with-variables-test (:strict (1 2 3) :lax ())
       (sb-int:named-lambda variables-test (x y)
         (declare (optimize (debug :debug)))
         (signal 'variables-stop)
@@ -2265,6 +2265,18 @@
           (opaque-identity l)))
     (assert (equal (run-stops '(5) '(((x 1)) ((x 2)) ((x 3))))
                    '(5)))))
+
+(with-test (:name (:debugger :variables :setq :until-overwritten))
+  (with-variables-test (:strict (1 2 3) :lax ())
+      (sb-int:named-lambda variables-test (x c)
+        (declare (optimize (debug :debug)))
+        (if c
+            (signal 'variables-stop)
+            (setq x (+ x x)))
+        (setq x 5)
+        nil)
+    (assert (equal (run-stops '(7 t) '(((x 7))))
+                   '(nil)))))
 
 (with-test (:name (:debugger :variables :setq :parameter))
   (with-variables-test ()
