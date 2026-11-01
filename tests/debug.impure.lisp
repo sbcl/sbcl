@@ -1135,8 +1135,7 @@
 (defun return-65535 ()
   65535)
 
-(with-test (:name :indirect-closure-values
-            :fails-on :arm)
+(with-test (:name :indirect-closure-values)
   (let ((count 0))
     (block nil
       (handler-bind ((error (lambda (c)
@@ -1164,10 +1163,39 @@
                             (f2 ()
                               (f1)))
                          (f2))))))))
-    (assert (= count 3))))
+    (assert (= count 3)))
+  (let ((count 0))
+    (block nil
+      (handler-bind ((error (lambda (c)
+                              (declare (ignore c))
+                              (sb-debug:map-backtrace
+                               (lambda (frame)
+                                 (let ((sb-debug::*current-frame* frame)
+                                       (name (sb-debug::frame-call frame)))
+                                   (print name)
 
-(with-test (:name :indirect-closure-values.2
-            :fails-on :arm)
+                                   (when (or (eq name 'test)
+                                             (and (consp name)
+                                                  (eql (search '(labels f1) name) 0)))
+                                     (incf count)
+                                     (assert (eql (var 'a) 2))))))
+                              (return))))
+        (funcall
+         (compile nil
+                  `(sb-int:named-lambda test ()
+                     (declare (optimize (debug 2)))
+                     (let ((a 1))
+                       (labels
+                           ((f1 ()
+                              (incf a)
+                              (signal 'error)
+                              2)
+                            (f2 ()
+                              (f1)))
+                         (f2))))))))
+    (assert (= count 1))))
+
+(with-test (:name :indirect-closure-values.2)
   (let ((count 0))
     (block nil
       (handler-bind ((error (lambda (c)

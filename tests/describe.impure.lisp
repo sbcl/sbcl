@@ -165,6 +165,7 @@
 
 #+sb-doc
 (progn
+  (setq run-tests::*allowed-inputs* :any)
   (require 'sb-manual)
 
   (with-test (:name (describe sb-manual variable))
