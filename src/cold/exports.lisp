@@ -299,8 +299,6 @@
    "WEAK-POINTER"
    "WEAK-POINTER-P"
    "WEAK-POINTER-VALUE"
-   "MAKE-WEAK-VECTOR"
-   "WEAK-VECTOR-P"
    ;; todo: add WEAK-VECTOR-REF here once it's actually not the same as SVREF
    ;; (currently WEAK-VECTOR-REF is in SB-INT:)
 
@@ -905,6 +903,8 @@ possibly temporarily, because it might be used internally.")
    "WEAK-VECTOR"
    "WEAK-VECTOR-LEN"
    "WEAK-VECTOR-REF"
+   "MAKE-WEAK-VECTOR"
+   "WEAK-VECTOR-P"
 
    ;; These could be moved back into SB-EXT if someone has
    ;; compelling reasons, but hopefully we can get by

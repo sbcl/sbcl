@@ -45,7 +45,7 @@
 #-weak-vector-readbarrier
 ;; legacy implementation of weak vector is basically SIMPLE-VECTOR
 (defun weak-vector-p (object)
-  "See if OBJECT is a weak vector. This implies SIMPLE-VECTOR-P."
+  "See if OBJECT is a weak vector."
   (and (simple-vector-p object)
        (test-header-data-bit object (ash sb-vm:vector-weak-flag sb-vm:array-flags-data-position))))
 
@@ -66,7 +66,10 @@ Hence, there is no need for MAKE-WEAK-POINTER and WEAK-POINTER-VALUE
 when writing or reading its elements.
 
 If an element is garbage collected, it is replaced by NIL in the
-vector."
+vector.
+
+> __Warning__: Do not rely on weak vector being SIMPLE-VECTORs. Access
+> to elements must be through SB-C::WEAK-VECTOR-REF."
   (declare (index length))
   (when (and element-p contents-p)
     (error "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS"))
@@ -79,12 +82,12 @@ vector."
         (error "~S has ~D elements, vector length is ~D."
                :initial-contents contents-length length))))
   (let ((v (sb-c::allocate-weak-vector length)))
-    (cond (initial-contents
-           (unless (= length (length initial-contents))
-             (initial-contents-error length (length initial-contents)))
-           (replace v initial-contents))
-          (t
-           (fill v initial-element)))
+    (if initial-contents
+        (dotimes (i length)
+          (setf (weak-vector-ref v i) (elt initial-contents i)))
+          ;; 0 is the usual default initial element for arrays, but all weak objects use NIL
+        (dotimes (i length)
+          (setf (weak-vector-ref v i) initial-element)))
     v))
 
 (defun make-weak-pointer (object)

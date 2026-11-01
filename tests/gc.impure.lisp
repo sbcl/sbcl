@@ -13,7 +13,7 @@
 
 (in-package :cl-user)
 
-(defvar *weak-vect* (make-weak-vector 8))
+(defvar *weak-vect* (sb-int:make-weak-vector 8))
 (defmacro wvref (v i) `(sb-int:weak-vector-ref ,v ,i))
 (with-test (:name :weak-vector
             :fails-on (and :c-stack-is-control-stack :win32))
@@ -29,7 +29,7 @@
                    (wvref a 6) (make-hash-table))))
       (declare (notinline x)) ;; Leave all the values below the stack pointer for
       (x))                    ;; scrub-control-stack to work
-    (assert (weak-vector-p a))
+    (assert (sb-int:weak-vector-p a))
     (sb-sys:scrub-control-stack)
     (gc)
     (assert (eq (wvref a 2) 'interned-symbol))
