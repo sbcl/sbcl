@@ -5,6 +5,7 @@
   :components ((:file "package")
                (:file "pax")
                (:file "docstring")
+               (:file "integration" :if-feature :sb-doc)
                (:file "markdown" :if-feature :sb-doc)
                (:file "texinfo" :if-feature :sb-doc)
                (:file "plain-text" :if-feature :sb-doc)

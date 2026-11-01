@@ -341,6 +341,25 @@
                   (prin1-to-line key :columns 2 :reserve 5)
                   (prin1-to-line value :columns 2 :reserve 5)))))))
 
+#-sb-doc
+(declaim (inline describe-home-section))
+(defun describe-home-section (name locative stream)
+  #-sb-doc
+  (declare (ignore name locative stream))
+  #+sb-doc
+  (let ((section-name (manual-home-section-name-and-title name locative)))
+    (when section-name
+      (format stream "~@:_User manual section: ~S" section-name))))
+
+#+sb-doc
+(defun manual-home-section-name-and-title (name locative)
+  (let ((package (find-package "SB-MANUAL")))
+    (when package
+      (when (eq locative :macro)
+        (setq locative (find-symbol "MACRO" package)))
+      (funcall (find-symbol "HOME-SECTION-NAME-AND-TITLE" package)
+               name locative))))
+
 (defmethod describe-object ((object package) stream)
   (print-standard-describe-header object stream)
   (describe-block (stream)
@@ -818,11 +837,3 @@
   (let ((name (package-name package)))
     (and (<= 3 (length name))
          (string= "SB-" name :end2 3))))
-
-(defun describe-home-section (name locative stream)
-  (let ((package (find-package '#:sb-manual)))
-    (when package
-      (when (eq locative :macro)
-        (setq locative (find-symbol "MACRO" package)))
-      (funcall (find-symbol "DESCRIBE-HOME-SECTION" package)
-               name locative stream))))

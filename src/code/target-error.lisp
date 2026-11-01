@@ -1120,55 +1120,31 @@ with that condition (or with no condition) will be returned."
 ;;; support the extension.)
 (define-condition unsupported-operator (simple-error) ())
 
-;;; (:ansi-cl :function remove)
-;;; (:ansi-cl :section (a b c))
-;;; (:ansi-cl :glossary "similar")
-;;;
-;;; (:sbcl :node "...")
-;;; (:sbcl :variable *ed-functions*)
 
-;;;
-;;; FIXME: this is not the right place for this.
-(defun print-reference (reference stream)
-  (ecase (car reference)
-    (:amop
-     (format stream "AMOP")
-     (format stream ", ")
-     (destructuring-bind (type data) (cdr reference)
-       (ecase type
-         (:readers "Readers for ~:(~A~) Metaobjects"
-                   (substitute #\  #\- (symbol-name data)))
-         (:initialization
-          (format stream "Initialization of ~:(~A~) Metaobjects"
-                  (substitute #\  #\- (symbol-name data))))
-         (:generic-function (format stream "Generic Function ~S" data))
-         (:function (format stream "Function ~S" data))
-         (:section (format stream "Section ~{~D~^.~}" data)))))
-    (:ansi-cl
-     (format stream "The ANSI Standard")
-     (format stream ", ")
-     (destructuring-bind (type data) (cdr reference)
-       (ecase type
-         (:function (format stream "Function ~S" data))
-         (:special-operator (format stream "Special Operator ~S" data))
-         (:macro (format stream "Macro ~S" data))
-         (:section (format stream "Section ~{~D~^.~}" data))
-         (:glossary (format stream "Glossary entry for ~S" data))
-         (:type (format stream "Type ~S" data))
-         (:system-class (format stream "System Class ~S" data))
-         (:issue (format stream "writeup for Issue ~A" data)))))
-    (:sbcl
-     (format stream "The SBCL Manual")
-     (format stream ", ")
-     (destructuring-bind (type data) (cdr reference)
-       (ecase type
-         (:node (format stream "Node ~S" data))
-         (:variable (format stream "Variable ~S" data))
-         (:function (format stream "Function ~S" data)))))
-    ;; FIXME: other documents (e.g. CLIM, Franz documentation :-)
-    ))
 (define-condition reference-condition ()
-  ((references :initarg :references :reader reference-condition-references)))
+  ;; REFERENCES is a list of elements like
+  ;;
+  ;;   (:ansi-cl :function remove)
+  ;;   (:ansi-cl :section (a b c))
+  ;;   (:ansi-cl :glossary "similar")
+  ;;
+  ;;   (:sbcl :node "...")
+  ;;   (:sbcl :variable *ed-functions*)
+  ;;   (:sbcl :section-name sb-manual:@customization-hooks-for-users)
+  ;;
+  ;; FIXME: other documents (e.g. CLIM, Franz documentation :-)
+  ((references :initarg :references :reader %reference-condition-references)))
+
+(defun reference-condition-references (c)
+  #+sb-doc
+  (let ((package (find-package "SB-MANUAL")))
+    (if package
+        (funcall (find-symbol "ADD-SB-MANUAL-SECTION-TO-REFERENCES" package)
+                 (%reference-condition-references c))
+        (%reference-condition-references c)))
+  #-sb-doc
+  (%reference-condition-references c))
+
 (defvar *print-condition-references* t)
 
 (define-condition simple-reference-error (reference-condition simple-error)
