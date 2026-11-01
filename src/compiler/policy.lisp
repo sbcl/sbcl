@@ -439,6 +439,20 @@ dynamic scoping on restrictions."
                             ,policy-sym)
            ,policy-sym))))
 
+(defmacro augment-lexenv-policy (lexenv-place quality value)
+  (let ((value-sym (gensym "VALUE"))
+        (lexenv-sym (gensym "LEXENV"))
+        (policy-sym (gensym "POLICY")))
+    `(let* ((,lexenv-sym ,lexenv-place)
+           (,value-sym ,value)
+           (,policy-sym (lexenv-policy ,lexenv-sym)))
+       (when (policy ,policy-sym (> ,quality ,value-sym))
+         (setf ,lexenv-place
+               (make-lexenv :default ,lexenv-sym
+                            :policy (%augment-policy ,(policy-quality-name-p quality)
+                                                     ,value-sym
+                                                     ,policy-sym)))))))
+
 (defvar *macro-policy* nil)
 ;; Set an alternate policy that is used to compile all code within DEFMACRO,
 ;; MACROLET, DEFINE-COMPILER-MARO - whether they occur at toplevel or not -

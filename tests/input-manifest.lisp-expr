@@ -166,4 +166,6 @@
  ("utf-8.impure.lisp" "contrib/sb-posix.fasl")
  ("x86-64-codegen.impure.lisp"
   "tests/typep-golden-data.txt")
+ ("describe.impure.lisp"
+  "contrib/sb-manual.fasl")
   )

@@ -1195,6 +1195,7 @@
     (when *show-transforms-p*
       (show-transform 'filter-lvar (generate-combination-tree lvar) form))
     (with-ir1-environment-from-node dest
+      (augment-lexenv-policy *lexenv* preserve-single-use-debug-variables 0)
       (ensure-block-start ctran)
       (let* ((old-block (ctran-block ctran))
              (new-start (make-ctran))
