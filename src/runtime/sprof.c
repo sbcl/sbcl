@@ -205,8 +205,7 @@ static int unstable_program_counter_p(uword_t addr)
 #else
     /* I think that it's a reasonable assumption that code in immobile
      * space will not be garbage-collected during the profiling run.
-     * Similar issue for fdefns which contain an executable instruction
-     * as well as closure-calling trampolines and builtin-trampoline GFs.
+     * Similar issue for closure-calling trampolines and executable funinstances.
      * It might be neat to mark some objects with a bit saying
      * never to move them if they appeared in a trace.
      * When would the bit get cleared though? I don't know */
