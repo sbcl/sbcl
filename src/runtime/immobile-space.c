@@ -127,7 +127,7 @@ unsigned char* text_page_genmask;
 // one per page *excluding* all pseudostatic pages.
 // Unlike with dynamic-space, the scan start for a text page
 // is an address not lower than the base page.
-unsigned int* tlsf_page_sso;
+unsigned short int* tlsf_page_sso;
 // Array of inverted write-protect flags, 1 bit per page.
 unsigned int* text_page_touched_bits;
 static int n_bitmap_elts; // length of array measured in 'int's
@@ -497,7 +497,7 @@ lispobj* text_page_scan_start(low_page_index_t page) {
     }
     if (pagebase > (char*)text_space_highwatermark) return 0;
     int tlsf_page = (pagebase - (char*)tlsf_mem_start) / IMMOBILE_CARD_BYTES;
-    unsigned int sso = tlsf_page_sso[tlsf_page];
+    unsigned short sso = tlsf_page_sso[tlsf_page];
     return (sso < IMMOBILE_CARD_BYTES) ? (lispobj*)(pagebase + sso) : 0;
 }
 

@@ -1491,10 +1491,6 @@ int load_gc_crashdump(char* pathname)
     checked_read("TLSF_control", fd, tlsf_control, preamble.tlsf_control_size);
     int n_tlsf_pages = tlsf_memory_size / IMMOBILE_CARD_BYTES;
     fprintf(stderr, "%d TLSF pages\n", n_tlsf_pages);
-    // FIXME: rev 6aa247c9d broke this, and parts of that change need to be reverted.
-    // TLFS pages -must-not- be 64k, nor cards.  That's completely not how cards works.
-    // Cards are, by definition, supposed to be small.
-    // tlsf_page_sso = malloc(n_tlsf_pages * sizeof (short));
     tlsf_page_sso = malloc(n_tlsf_pages * sizeof *tlsf_page_sso);
     checked_read("TLSF_sso", fd, tlsf_page_sso, n_tlsf_pages * sizeof (short));
     write_protect_immobile_space();

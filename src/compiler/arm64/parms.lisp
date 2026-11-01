@@ -35,9 +35,8 @@
 ;;; the alloc granularity, it will, once we are smarter about finding
 ;;; the start of objects.
 (defconstant gencgc-alloc-granularity 0)
-;;; The card size for immobile/low space.
-;;; This must be a multiple of the OS page size.
-(defconstant immobile-card-bytes +backend-page-bytes+)
+;;; The card size for immobile space.
+(defconstant immobile-card-bytes 2048)
 
 ;;; number of bits per word where a word holds one lisp descriptor
 (defconstant n-word-bits 64)
