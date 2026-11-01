@@ -2598,10 +2598,18 @@
    (eql 2)))
 
 (with-test (:name :set-elimination)
+  ;; The debugger wants frame variables to exist so incorrect values
+  ;; do not get shown.
   (assert (not (ctu:ir1-named-calls
                 `(lambda (x)
+                   (declare (optimize (debug 0)))
                    (setf x (truncate x 3))
-                   2)))))
+                   2))))
+  (assert (not (ctu:ir1-named-calls
+                `(lambda (x)
+                   (let ((y x))
+                     (setf y (truncate y 3))
+                     2))))))
 
 (with-test (:name :not-type-unions)
   (assert-type

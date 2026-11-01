@@ -34,6 +34,16 @@
 
   (values))
 
+;;; True if this variable should be live over its whole environment
+;;; for the debugger.
+(defun debug-environment-var-p (var)
+  (declare (type lambda-var var))
+  (let* ((home (lambda-var-home var))
+         (node (lambda-bind home)))
+    (not (or (and (neq home (lambda-home home)) (policy node (< debug 3)))
+             (policy node (zerop debug))
+             (policy node (= speed 3))))))
+
 ;;; We have to allocate the home TNs for variables before we can call
 ;;; ASSIGN-IR2-ENVIRONMENT so that we can close over TNs that haven't
 ;;; had their home environment assigned yet. Here we evaluate the
@@ -45,10 +55,7 @@
   (declare (type clambda fun))
   (dolist (var (lambda-vars fun))
     (when (leaf-refs var)
-      (let* ((node (lambda-bind fun))
-             (debug-variable-p (not (or (and let-p (policy node (< debug 3)))
-                                        (policy node (zerop debug))
-                                        (policy node (= speed 3))))))
+      (let ((debug-variable-p (debug-environment-var-p var)))
         (if (and let-p
                  (not debug-variable-p)
                  (not (lambda-var-indirect var))

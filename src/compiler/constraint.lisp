@@ -2053,7 +2053,8 @@
 
     (flet ((find-dead-sets (x)
              (dolist (var (lambda-vars x))
-               (when (lambda-var-constraints var)
+               (when (and (lambda-var-constraints var)
+                          (not (debug-environment-var-p var)))
                  (dolist (set (lambda-var-sets var))
                    (unless (or (set-reached set)
                                (member set *sets-to-delete*))
