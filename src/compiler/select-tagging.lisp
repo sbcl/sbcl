@@ -128,19 +128,29 @@
         100000)))
 
 (defun select-tagging (component)
-  (let ((net (make-net)))
+  (let ((net (make-net))
+        (seen (make-hash-table :test 'eq))
+        (walked (make-hash-table :test 'eq)))
     (do-blocks (block component)
       (do-nodes (node nil block)
         (when (and (combination-p node)
                    (consp (combination-info node)))
-          (let (seen-vars
-                seen-lvars
+          (let (any-lvars
                 (result (node-lvar node))
                 (tagged-template (car (combination-info node)))
                 (tagged 0)
                 (untagged 0))
             (declare (fixnum tagged untagged))
-            (labels ((add-lvar (lvar &optional (both t))
+            (labels ((seen-p (x)
+                       (eq (gethash x seen) node))
+                     (see (x)
+                       (or (seen-p x)
+                           (progn (setf (gethash x seen) node)
+                                  nil)))
+                     (visit-var (var)
+                       (unless (eq (gethash var walked) node)
+                         (setf (gethash var walked) node)))
+                     (add-lvar (lvar &optional (both t))
                        (add-edge net lvar node 10)
                        (when both
                          (add-edge net node lvar 10)))
@@ -175,8 +185,7 @@
                      (handle-var (var)
                        (if (global-var-p var)
                            (incf tagged)
-                           (unless (memq var seen-vars)
-                             (push var seen-vars)
+                           (unless (see var)
                              (when (functional-kind-eq (lambda-var-home var) external) ;; what about specialized-xep?
                                (incf tagged))
                              (loop for ref in (leaf-refs var)
@@ -187,16 +196,17 @@
                                          (lambda (dest lvar nth-value)
                                            (declare (ignorable nth-value))
                                            (unless (or (constant-lvar-p lvar)
-                                                       (memq lvar seen-lvars))
-                                             (push lvar seen-lvars)
+                                                       (see lvar))
+                                             (setq any-lvars t)
                                              (multiple-value-bind (tag untag) (read-costs lvar dest)
                                                (incf tagged tag)
                                                (incf untagged untag))
                                              nil))
-                                         ref))))))
+                                         ref
+                                         :visit-var #'visit-var))))))
                      (handle-lvar (lvar)
-                       (unless (memq lvar seen-lvars)
-                         (push lvar seen-lvars)
+                       (unless (see lvar)
+                         (setq any-lvars t)
                          (map-all-uses (lambda (use)
                                          (cond ((combination-p use)
                                                 (let ((template (combination-info use)))
@@ -207,7 +217,7 @@
                                                 (handle-var (set-var use)))
                                                ((and (ref-p use)
                                                      (and (lambda-var-p (ref-leaf use))
-                                                          (memq (ref-leaf use) seen-vars))))
+                                                          (seen-p (ref-leaf use)))))
                                                (t
                                                 (incf tagged))))
                                        lvar
@@ -234,7 +244,8 @@
                     (add-edge net result :untag 10)
                     (progn
                       (add-lvar result)
-                      (push result seen-lvars)
+                      (see result)
+                      (setq any-lvars t)
                       (map-all-dests
                        (lambda (dest lvar nth-value)
                          (declare (ignorable nth-value))
@@ -253,7 +264,7 @@
                       (when (> untagged 0)
                         (add-edge net result :untag (* untagged 10)))))))
             ;; Somehow all lvars are constant
-            (unless seen-lvars
+            (unless any-lvars
               (setf (combination-info node)
                     (car (combination-info node))))))))
     (when (> (length (net-to net)) 0)

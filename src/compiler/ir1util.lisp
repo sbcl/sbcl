@@ -200,8 +200,8 @@
                       (funcall function use)))))
       (recurse-lvar lvar))))
 
-(defun map-all-dests (function node &key (nth-value 0) cast)
-  (declare (dynamic-extent function))
+(defun map-all-dests (function node &key (nth-value 0) cast visit-var)
+  (declare (dynamic-extent function visit-var))
   (let (seen)
     (labels ((call (node lvar nth-value)
                (let ((continue (funcall function node lvar nth-value)))
@@ -230,9 +230,10 @@
                       (push node seen)
                       (let ((fun (combination-lambda node)))
                         (flet ((map-var (var)
-                                 (loop for ref in (leaf-refs var)
-                                       do
-                                       (recurse ref 0))))
+                                 (when (or (not visit-var) (funcall visit-var var))
+                                   (loop for ref in (leaf-refs var)
+                                         do
+                                         (recurse ref 0)))))
                           (if (functional-kind-eq fun mv-let)
                               (if nth-value
                                   (map-var (or (nth nth-value (lambda-vars fun))
