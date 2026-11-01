@@ -780,6 +780,16 @@ of specialized arrays is supported."
   (let ((data (allocate-vector-with-widetag #+ubsan (not initialize) widetag total-size n-bits)))
     (ecase initialize
      (:initial-element
+      ;; The spec says about MAKE-ARRAY that "if INITIAL-ELEMENT is
+      ;; supplied, it must be of the type given by ELEMENT-TYPE",
+      ;; where "must" indicates undefined behavior (CLHS 1.4.2). The
+      ;; FILL below checks INITIAL-ELEMENT against
+      ;; UPGRADED-ELEMENT-TYPE, but here and also in the non-complex
+      ;; case, we choose to expediently follow other implementations
+      ;; in not signalling an error for e.g.
+      ;;
+      ;;   (make-array '(1 1) :element-type 'string
+      ;;                      :initial-element nil)
       (fill (the vector data) initial-data))
      (:initial-contents
       ;; DIMENSIONS can be supplied as a list or integer now
