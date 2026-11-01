@@ -14,10 +14,9 @@
 ;;;; structure frobbing primitives
 
 (export '(%layout-slot-set %layout-slot-cas))
+#+(and immobile-space x86-64)
+(progn
 (defun %layout-slot-set (layout index value)
-  #+permgen (%primitive sb-vm::gc-remember-layout layout)
-  #-immobile-space (%instance-set layout index value)
-  #+immobile-space
   (with-pinned-objects (layout value)
    (sb-vm::with-pseudo-atomic-foreign-calls
     ;; This is pseudo-atomic because if you mark first and then GC occurs before storing,
@@ -32,8 +31,6 @@
                    (truly-the (mod 32) index)))
   value))
 (defun %layout-slot-cas (layout index oldval newval)
-  #-immobile-space (%instance-cas layout index oldval newval)
-  #+immobile-space
   (with-pinned-objects (layout oldval newval)
    (sb-vm::with-pseudo-atomic-foreign-calls
     ;; This code is barely correct. We need the entire call including coercion
@@ -43,7 +40,15 @@
      (alien-funcall (extern-alien "layout_slot_cas"
                                   (function unsigned unsigned unsigned unsigned int))
                     (get-lisp-obj-address layout) (get-lisp-obj-address oldval)
-                    (get-lisp-obj-address newval) (truly-the (mod 32) index))))))
+                    (get-lisp-obj-address newval) (truly-the (mod 32) index)))))))
+#-(and immobile-space x86-64)
+(progn
+(defun %layout-slot-set (layout index value)
+  #+permgen (%primitive sb-vm::gc-remember-layout layout)
+  (%instance-set layout index value))
+(defun %layout-slot-cas (layout index oldval newval)
+  #+permgen (%primitive sb-vm::gc-remember-layout layout)
+  (%instance-cas layout index oldval newval)))
 
 ;;; For lack of any better to place to write up some detail surrounding
 ;;; layout creation for structure types, I'm putting here.
