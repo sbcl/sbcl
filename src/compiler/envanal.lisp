@@ -662,7 +662,10 @@
              (let ((fun (ref-leaf (lvar-uses (second args)))))
                 (when (functional-p fun)
                   (reanalyze-funs fun)
-                  (code `(%funcall ,fun)))))
+                  (code `(%with-lexenv
+                          ,(make-lexenv :default (node-lexenv node)
+                                        :cleanup (block-end-cleanup (car pred-blocks)))
+                          (%funcall ,fun))))))
             ((:block :tagbody)
              (dolist (nlx (cleanup-nlx-info cleanup))
                (code `(%lexical-exit-breakup ',nlx))))

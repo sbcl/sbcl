@@ -1529,6 +1529,10 @@ to TAG."
     (setf (functional-kind fun) (functional-kind-attributes cleanup))
     (reference-leaf start next result fun)))
 
+(def-ir1-translator %with-lexenv ((lexenv form) start next result)
+  (let ((*lexenv* lexenv))
+    (ir1-convert start next result form)))
+
 (def-ir1-translator catch ((tag &body body) start next result)
   "CATCH tag form*
 
