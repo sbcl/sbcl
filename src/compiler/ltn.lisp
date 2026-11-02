@@ -93,7 +93,10 @@
     (aver (eq (ir2-lvar-kind info) :fixed))
     (cond
      ((lvar-delayed-leaf lvar)
-      (setf (ir2-lvar-kind info) :delayed))
+      (setf (ir2-lvar-kind info) :delayed)
+      ;; The TN of the leaf is where the debugger finds what it was bound to.
+      (when (lvar-substituted-var lvar)
+        (note-var-copy (lvar-substituted-var lvar) (lvar-delayed-leaf lvar))))
      (t (let ((tn (make-normal-tn (ir2-lvar-primitive-type info))))
           (setf (tn-type tn) (lvar-type lvar))
           (setf (tn-leaf tn) (lvar-substituted-var lvar))

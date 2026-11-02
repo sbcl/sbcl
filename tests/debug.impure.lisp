@@ -1758,6 +1758,15 @@
     (assert (equal (run-stops '(5) '(((x 6) (y 5))))
                    '((6 5 5))))))
 
+(with-test (:name (:debugger :variables :copy :delayed))
+  (with-variables-test (:strict (1 2 3) :lax ())
+    (sb-int:named-lambda variables-test (&key (b 5))
+      (declare (optimize (debug :debug)) (fixnum b))
+      (signal 'variables-stop)
+      (funcall (opaque-identity 'identity) b))
+    (assert (equal (run-stops '() '(((b 5))))
+                   '(5)))))
+
 (with-test (:name (:debugger :variables :cleanup :out-of-scope))
   (with-variables-test (:strict (1 2 3) :lax ())
       (sb-int:named-lambda variables-test (a)
