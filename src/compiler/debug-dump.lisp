@@ -162,7 +162,8 @@
                            ;; away is computed before its binding.
                            (or (not (or (member (tn-kind tn)
                                                 '(:environment :debug-environment))
-                                        (null (leaf-refs leaf))))
+                                        (null (leaf-refs leaf))
+                                        (lambda-var-copies leaf)))
                                (leaf-visible-to-debugger-p leaf node)))))
             (when live
               (funcall function leaf tn))
