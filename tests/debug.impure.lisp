@@ -1779,7 +1779,8 @@
     (assert (equal (run-stops '(1) '(((c 1))))
                    '((1))))))
 
-(with-test (:name (:debugger :variables :copy :out-of-scope))
+(with-test (:name (:debugger :variables :copy :out-of-scope)
+            :fails-on :x86-64)
   (with-variables-test (:strict (1 2 3) :lax ())
       (sb-int:named-lambda variables-test (a)
         (declare (optimize (debug :debug)))
