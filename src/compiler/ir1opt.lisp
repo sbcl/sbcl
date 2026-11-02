@@ -2863,6 +2863,8 @@ not inlined.")
   (declare (type basic-combination call) (type clambda fun))
   (map-combination-arg-var
    (lambda (arg var type)
+     (when (and arg (lvar-substituted-var arg) (null (lambda-var-sets var)))
+       (note-var-copy (lvar-substituted-var arg) var))
      (cond
        ((lambda-var-deleted var))
        ((lambda-var-sets var)
