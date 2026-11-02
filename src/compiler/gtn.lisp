@@ -108,7 +108,10 @@
                  ;; Yet it might get saved on the stack, but since it's
                  ;; never read no stack space is allocated for it in the
                  ;; callee frame.
-                 (unless (type-singleton-p (leaf-type var))
+                 (unless (and (type-singleton-p (leaf-type var))
+                              (notany (lambda (ref)
+                                        (combination-is (node-dest ref) '(%keep-live)))
+                                      (leaf-refs var)))
                    (environment-debug-live-tn res (lambda-environment fun)))))
 
               (setf (tn-leaf res) var)
