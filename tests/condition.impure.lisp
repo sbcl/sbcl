@@ -14,7 +14,9 @@
 ;;;; REFERENCE-CONDITIONs
 
 (defvar *reference-and-expected-list*
-  '(((:ansi-cl :function remove)
+  '(((:amop :readers generic-function)
+     ("AMOP, Readers for Generic Function Metaobjects"))
+    ((:ansi-cl :function remove)
      ("The ANSI Standard, Function REMOVE"))
     ((:ansi-cl :section (1 2 3))
      ("The ANSI Standard, Section 1.2.3"))

@@ -184,8 +184,9 @@ sb-kernel::(progn
      (format stream ", ")
      (destructuring-bind (type data) (cdr reference)
        (ecase type
-         (:readers "Readers for ~:(~A~) Metaobjects"
-          (substitute #\  #\- (symbol-name data)))
+         (:readers
+          (format stream "Readers for ~:(~A~) Metaobjects"
+                  (substitute #\  #\- (symbol-name data))))
          (:initialization
           (format stream "Initialization of ~:(~A~) Metaobjects"
                   (substitute #\  #\- (symbol-name data))))
