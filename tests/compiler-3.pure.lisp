@@ -758,6 +758,17 @@
                         (let ((c a))
                           (if (eql c 3) :ok :bad))))))))
 
+(with-test (:name (:optimistic-type :copy-through-variable-of-unchanged-type))
+  (checked-compile-and-assert ()
+      '(lambda (a b)
+        (let ((m (or (if a
+                         (funcall ((lambda () (lambda (n) (max 6 n)))) b))
+                     (error "")))
+              (n (if 0 0)))
+          (setq m m)
+          (- m n)))
+    ((5 5) 6)))
+
 (with-test (:name (:optimistic-type :copies-between-local-functions))
   (assert-type
    (lambda (l)
