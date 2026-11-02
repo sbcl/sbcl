@@ -90,6 +90,8 @@
   :derive-type #'symbol-value-derive-type)
 (defknown about-to-modify-symbol-value (symbol t &optional t t) null
   ())
+(defknown sb-impl::assert-dynbindable-safe (symbol t) null
+    (no-verify-arg-count))
 ;;; From CLHS, "If the symbol is globally defined as a macro or a
 ;;; special operator, an object of implementation-dependent nature and
 ;;; identity is returned. If the symbol is not globally defined as

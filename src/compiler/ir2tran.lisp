@@ -2151,50 +2151,51 @@
     ((vars vals &body body) start next result)
   ;; If we trust and do not verify type assertions, then we only need to check
   ;; that each symbols is bindable, and not whether the value is OK.
-  (let ((type-check (policy (lexenv-policy *lexenv*) (> type-check 1))))
+  (let ((type-check (policy (lexenv-policy *lexenv*) (> type-check 1)))
+        (*transforming* (1+ *transforming*)))
     (ir1-convert
      start next result
      (with-unique-names (bind unbind)
        (once-only ((n-save-bs '(%primitive current-binding-pointer)))
-        `(unwind-protect
-             (labels ((,unbind (vars)
-                        (declare (optimize (speed 2) (debug 0)))
-                        (let ((unbound-marker (%primitive make-unbound-marker)))
-                          (dolist (var vars)
-                            ;; CLHS says "bound and then made to have no value" -- user
-                            ;; should not be able to tell the difference between that and this.
-                            ;; MAKUNBOUND makes no use of the memoized fast-bindable bit.
-                            (about-to-modify-symbol-value var 'makunbound)
-                            (%primitive dynbind unbound-marker var))))
-                      (,bind (vars vals)
-                        (declare (optimize (speed 2) (debug 0)
-                                           (insert-debug-catch 0))
-                                 (list vars vals))
-                        (cond ((null vars))
-                              ((null vals) (,unbind vars))
-                              (t
-                               (let ((val (car vals))
-                                     (var (car vars)))
-                                 ,(if type-check
-                                      `(sb-impl::assert-dynbindable-safe var val)
-                                      `(unless (test-header-data-bit
-                                                var sb-vm::+symbol-fast-bindable+)
-                                         (sb-impl::assert-dynbindable-unsafe var)))
-                                 (%primitive dynbind val var))
-                               (,bind (cdr vars) (cdr vals))))))
-               (,bind ,vars ,vals)
-               nil
-               ,@body)
-          ;; Technically ANSI CL doesn't allow declarations at the
-          ;; start of the cleanup form. SBCL happens to allow for
-          ;; them, due to the way the UNWIND-PROTECT ir1 translation
-          ;; is implemented; the cleanup forms are directly spliced
-          ;; into an FLET definition body. And a declaration here
-          ;; actually has exactly the right scope for what we need
-          ;; (ensure that debug instrumentation is not emitted for the
-          ;; cleanup function). -- JES, 2007-06-16
-          (declare (optimize (insert-debug-catch 0)))
-          (%primitive unbind-to-here ,n-save-bs)))))))
+         `(unwind-protect
+               (labels ((,unbind (vars)
+                          (declare (optimize (speed 2) (debug 0)))
+                          (let ((unbound-marker (%primitive make-unbound-marker)))
+                            (dolist (var vars)
+                              ;; CLHS says "bound and then made to have no value" -- user
+                              ;; should not be able to tell the difference between that and this.
+                              ;; MAKUNBOUND makes no use of the memoized fast-bindable bit.
+                              (about-to-modify-symbol-value var 'makunbound)
+                              (%primitive dynbind unbound-marker var))))
+                        (,bind (vars vals)
+                          (declare (optimize (speed 2) (debug 0)
+                                             (insert-debug-catch 0))
+                                   (list vars vals))
+                          (cond ((null vars))
+                                ((null vals) (,unbind vars))
+                                (t
+                                 (let ((val (car vals))
+                                       (var (car vars)))
+                                   ,(if type-check
+                                        `(sb-impl::assert-dynbindable-safe var val)
+                                        `(unless (test-header-data-bit
+                                                  (the symbol var) sb-vm::+symbol-fast-bindable+)
+                                           (sb-impl::assert-dynbindable-unsafe var)))
+                                   (%primitive dynbind val var))
+                                 (,bind (cdr vars) (cdr vals))))))
+                 (,bind ,vars ,vals)
+                 nil
+                 ,@body)
+            ;; Technically ANSI CL doesn't allow declarations at the
+            ;; start of the cleanup form. SBCL happens to allow for
+            ;; them, due to the way the UNWIND-PROTECT ir1 translation
+            ;; is implemented; the cleanup forms are directly spliced
+            ;; into an FLET definition body. And a declaration here
+            ;; actually has exactly the right scope for what we need
+            ;; (ensure that debug instrumentation is not emitted for the
+            ;; cleanup function). -- JES, 2007-06-16
+            (declare (optimize (insert-debug-catch 0)))
+            (%primitive unbind-to-here ,n-save-bs)))))))
 
 ;;;; non-local exit
 

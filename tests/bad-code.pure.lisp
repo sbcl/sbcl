@@ -1278,3 +1278,16 @@
                            (arithmetic-error (c)
                              (1+ c))))
                       :allow-warnings t))))
+
+(with-test (:name :progv-symbol-check)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (v)
+                         (progv '(2) v))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (v)
+                         (declare (optimize (safety 0)))
+                         (progv '(2) v))
+                      :allow-warnings t))))
