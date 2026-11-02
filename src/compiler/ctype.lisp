@@ -1079,8 +1079,15 @@ and no value was provided for it." name)))))))))))
           ;; to cause astray.
           (when (and lvar
                      (or (eq where-from :declared-verify)
-                         (and (not (return-p (lvar-dest lvar)))
-                              (not (mv-combination-p (lvar-dest lvar))))))
+                         (and (not (mv-combination-p (lvar-dest lvar)))
+                              ;; Check unless every destination is a return
+                              (block nil
+                                (map-all-dests (lambda (node lvar nth-value)
+                                                 (declare (ignore lvar nth-value))
+                                                 (if (return-p node)
+                                                     t
+                                                     (return t)))
+                                               call)))))
             (when (assert-node-type call returns policy 'ftype-context)
               (reoptimize-lvar lvar)))))
     (let* ((fun (combination-fun call))

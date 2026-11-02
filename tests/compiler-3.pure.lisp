@@ -1321,4 +1321,10 @@
      (1+
       (if f
           (funcall f x))))
-   (integer 1 8)))
+   (integer 1 8))
+  (assert-type
+   (lambda (f x)
+     (declare (type (function (t) (values (mod 5) &optional)) f))
+     (flet ((n () (funcall f x)))
+       (+ (n) (n))))
+   (mod 9)))

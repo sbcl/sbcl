@@ -206,10 +206,19 @@
     (labels ((call (node lvar nth-value)
                (let ((continue (funcall function node lvar nth-value)))
                  (when continue
-                   (when (valued-node-p node)
-                     (recurse node (if (eq continue t)
-                                       0
-                                       continue))))))
+                   (cond ((valued-node-p node)
+                          (recurse node (if (eq continue t)
+                                            0
+                                            continue)))
+                         ((return-p node)
+                          (let ((lambda (return-lambda node)))
+                            (when (and (functional-kind-eq lambda nil)
+                                       (not (member lambda seen)))
+                              (push lambda seen)
+                              (loop for ref in (leaf-refs lambda)
+                                    for dest = (node-dest ref)
+                                    when (combination-p dest)
+                                    do (recurse dest nil)))))))))
              (recurse-node (node lvar nth-value)
                (cond ((and (combination-p node)
                            ;; Only the first value is used
