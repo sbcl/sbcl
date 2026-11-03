@@ -216,8 +216,10 @@
                                                ((set-p use)
                                                 (handle-var (set-var use)))
                                                ((and (ref-p use)
-                                                     (and (lambda-var-p (ref-leaf use))
-                                                          (seen-p (ref-leaf use)))))
+                                                     (let ((leaf (ref-leaf use)))
+                                                       (if (lambda-var-p leaf)
+                                                           (seen-p (ref-leaf use))
+                                                           (constant-p leaf)))))
                                                (t
                                                 (incf tagged))))
                                        lvar
