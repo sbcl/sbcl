@@ -307,6 +307,14 @@
              ((and gpr-r-p
                    (eql y (logandc2 (1- (expt 2 8)) fixnum-tag-mask)))
               (inst movzx '(:byte :dword) r x))
+             ((and gpr-r-p
+                   (= y (lognot #xFF)))
+              (move r x)
+              (inst xor :byte r r))
+             ((and gpr-r-p
+                   (= y (lognot #xFFFF)))
+              (move r x)
+              (inst xor :word r r))
              ((and (gpr-tn-p x) (typep y '(unsigned-byte 32)))
               ;; A 32-bit mov suffices unless to memory.
               (unless (location= x r)
@@ -315,11 +323,6 @@
              ((imm32-p y)
               (move r x)
               (inst and r y))
-             ((and (minusp y) (= (logcount (ash y -1)) 1)) ; lone 0 bit and elsewhere 1s
-              (move r x)
-              ;; 1- integer-length would be the bit index as an untagged num,
-              ;; but 1+ makes it the index to a fixnum. They cancel out.
-              (inst btr r (integer-length (lognot (ash y -1)))))
              ((let ((extend (sign-extend-log-mask y x-ref t)))
                 (when extend
                   (move r x)
@@ -331,7 +334,8 @@
              ((let* ((int (sb-c::type-approximate-interval (tn-ref-type x-ref)))
                      (mask (logandc1 (logior y fixnum-tag-mask)
                                      (ldb (byte (+ (integer-length (sb-c::interval-high int)) n-fixnum-tag-bits) 0) -1))))
-                (when (and (>= (sb-c::interval-low int) 0)
+                (when (and (or (>= (sb-c::interval-low int) 0)
+                               (minusp y))
                            (= (logcount mask) 1))
                   (move r x)
                   (inst btr r (1- (integer-length mask)))
@@ -354,6 +358,19 @@
              ((and gpr-r-p
                    (eql y (1- (expt 2 8))))
               (inst movzx '(:byte :dword) r x))
+             ((and gpr-r-p
+                   (= y (ldb (byte 64 0) (lognot #xFF))))
+              (move r x)
+              (inst xor :byte r r))
+             ((and gpr-r-p
+                   (= y (ldb (byte 64 0) (lognot #xFFFF))))
+              (move r x)
+              (inst xor :word r r))
+             ((and (gpr-tn-p x) (typep y '(unsigned-byte 32)))
+              ;; A 32-bit mov suffices unless to memory.
+              (unless (location= x r)
+                (inst mov (if gpr-r-p :dword :qword) r x))
+              (inst and :dword r y))
              ((imm32-p y)
               (move r x)
               (inst and r y))
@@ -381,6 +398,19 @@
              ((and gpr-r-p
                    (eql y (1- (expt 2 8))))
               (inst movzx '(:byte :dword) r x))
+             ((and gpr-r-p
+                   (= y (lognot #xFF)))
+              (move r x)
+              (inst xor :byte r r))
+             ((and gpr-r-p
+                   (= y (lognot #xFFFF)))
+              (move r x)
+              (inst xor :word r r))
+             ((and (gpr-tn-p x) (typep y '(unsigned-byte 32)))
+              ;; A 32-bit mov suffices unless to memory.
+              (unless (location= x r)
+                (inst mov (if gpr-r-p :dword :qword) r x))
+              (inst and :dword r y))
              ((imm32-p y)
               (move r x)
               (inst and r y))
@@ -400,26 +430,52 @@
 
   (define-binop logior 2 or
     :c/fixnum=>fixnum
-    ((let ((y (fixnumize y)))
+    ((let* ((y (fixnumize y))
+            (mask (ldb (byte n-word-bits 0) y)))
        (cond ((imm32-p y)
+              (cond ((and (gpr-tn-p r)
+                          (gpr-tn-p x)
+                          (not (location= x r))
+                          ;; Use addition if the bits are clear
+                          (let ((width (sb-c::unsigned-type-width (tn-ref-type x-ref))))
+                            (when (and width
+                                       (zerop (ldb (byte (+ width n-fixnum-tag-bits) 0) y)))
+                              (inst lea (if (plusp y)
+                                            :dword
+                                            :qword)
+                                    r (ea y x))
+                              t))))
+                    (t
+                     (move r x)
+                     (inst or r y))))
+             ((= (logcount mask) 1)
               (move r x)
-              (inst or r y))
-             ((and (not (imm32-p y))
-                   (= (logcount y) 1))
-              (move r x)
-              (inst bts r (1- (integer-length y))))
+              (inst bts r (1- (integer-length mask))))
              ((location= x r)
               (inst or r (constantize y)))
              (t
               (inst mov r y)
               (inst or r x)))))
+
     :c/unsigned=>unsigned
-    ((cond ((and (gpr-tn-p r) (eql y -1)) ; special-case "OR reg, all-ones"
+    ((cond ((and (gpr-tn-p r) (or (eql y most-positive-word) (eql y -1))) ; special-case "OR reg, all-ones"
             ;; I have yet to elicit this case. Can it happen?
             (inst mov r -1))
            ((imm32-p y)
-            (move r x)
-            (inst or r y))
+            (cond ((and (gpr-tn-p r)
+                        (gpr-tn-p x)
+                        (not (location= x r))
+                        (let ((width (sb-c::unsigned-type-width (tn-ref-type x-ref))))
+                          (when (and width
+                                     (zerop (ldb (byte width 0) y)))
+                            (inst lea (if (plusp y)
+                                          :dword
+                                          :qword)
+                                  r (ea y x))
+                            t))))
+                  (t
+                   (move r x)
+                   (inst or r y))))
            ((= (logcount y) 1)
             (move r x)
             (inst bts r (1- (integer-length y))))
@@ -428,32 +484,77 @@
            (t
             (inst mov r y)
             (inst or r x))))
+
     :c/signed=>signed
-    ((cond ((imm32-p y)
-            (move r x)
-            (inst or r y))
-           ((and (not (imm32-p y))
-                 (= (logcount (ldb (byte n-word-bits 0) y)) 1))
-            (move r x)
-            (inst bts r (1- (integer-length (ldb (byte n-word-bits 0) y)))))
-           ((location= x r)
-            (inst or r (constantize y)))
-           (t
-            (inst mov r y)
-            (inst or r x)))))
+    ((let ((mask (ldb (byte n-word-bits 0) y)))
+       (cond ((imm32-p y)
+              (cond ((and (gpr-tn-p r)
+                          (gpr-tn-p x)
+                          (not (location= x r))
+                          (let ((width (sb-c::unsigned-type-width (tn-ref-type x-ref))))
+                            (when (and width
+                                       (zerop (ldb (byte width 0) y)))
+                              (inst lea (if (plusp y)
+                                            :dword
+                                            :qword)
+                                    r (ea y x))
+                              t))))
+                    (t
+                     (move r x)
+                     (inst or r y))))
+             ((= (logcount mask) 1)
+              (move r x)
+              (inst bts r (1- (integer-length mask))))
+             ((location= x r)
+              (inst or r (constantize y)))
+             (t
+              (inst mov r y)
+              (inst or r x))))))
 
   (define-binop logxor 2 xor
+    :c/fixnum=>fixnum
+    ((let* ((y (fixnumize y))
+            (mask (ldb (byte n-word-bits 0) y)))
+       (cond ((imm32-p y)
+              (move r x)
+              (inst xor r y))
+             ((= (logcount mask) 1)
+              (move r x)
+              (inst btc r (1- (integer-length mask))))
+             ((location= x r)
+              (inst xor r (constantize y)))
+             (t
+              (inst mov r y)
+              (inst xor r x)))))
     :c/unsigned=>unsigned
     ((cond ((imm32-p y)
             (move r x)
             (if (eql y most-positive-word) ; special-case "XOR reg, [all-ones]"
                 (inst not r)
                 (inst xor r y)))
+           ((= (logcount y) 1)
+            (move r x)
+            (inst btc r (1- (integer-length y))))
            ((location= x r)
             (inst xor r (constantize y)))
            (t
             (inst mov r y)
-            (inst xor r x))))))
+            (inst xor r x))))
+    :c/signed=>signed
+    ((let ((mask (ldb (byte n-word-bits 0) y)))
+       (cond ((imm32-p y)
+              (move r x)
+              (if (eql y -1)
+                  (inst not r)
+                  (inst xor r y)))
+             ((= (logcount mask) 1)
+              (move r x)
+              (inst btc r (1- (integer-length mask))))
+             ((location= x r)
+              (inst xor r (constantize y)))
+             (t
+              (inst mov r y)
+              (inst xor r x)))))))
 
 (define-vop (logior-unsigned-signed=>signed)
   (:args (x :scs (unsigned-reg) :to (:result 1))
