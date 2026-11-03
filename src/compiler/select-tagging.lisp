@@ -96,8 +96,8 @@
             (values 0 1))
            (t
             (values 0 0))))
-        ;; ((listp vop-info)
-        ;;  (values 0 0))
+        ((listp vop-info)
+         (values 0 0))
         (t
          (values 1 0))))
 
@@ -246,6 +246,7 @@
                       (add-lvar result)
                       (see result)
                       (setq any-lvars t)
+                      (setf tagged 0 untagged 0)
                       (map-all-dests
                        (lambda (dest lvar nth-value)
                          (declare (ignorable nth-value))

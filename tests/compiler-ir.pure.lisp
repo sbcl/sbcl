@@ -998,9 +998,20 @@
                                 (loop repeat n
                                       do (print 1)))
                              nil))
-         (sub (find '- vops :key (lambda (vop)
+         (vop (find '- vops :key (lambda (vop)
                                    (car (sb-c::vop-info-translate (sb-c::vop-info vop)))))))
-    (assert (eq (sb-c::vop-info-tag (sb-c::vop-info sub)) :tagged))))
+    (assert (eq (sb-c::vop-info-tag (sb-c::vop-info vop)) :tagged)))
+  (let* ((vops (ctu:ir2-vops `(lambda (a b)
+                                (declare (fixnum a)
+                                         ((simple-array (unsigned-byte 32) (20)) b)
+                                         (optimize speed (safety 0)))
+                                (setf (aref b 0)
+                                      (logxor (aref b 0) a))
+                                a)
+                             nil))
+         (vop (find 'logxor vops :key (lambda (vop)
+                                        (car (sb-c::vop-info-translate (sb-c::vop-info vop)))))))
+    (assert (eq (sb-c::vop-info-tag (sb-c::vop-info vop)) :untagged))))
 
 #+sb-devel
 (with-test (:name (:assignment-lambda :substitute-and-delete))
