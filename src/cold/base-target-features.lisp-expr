@@ -39,10 +39,13 @@
 ;;;;     (lambda (list)
 ;;;;       (flet ((enable (x) (pushnew x list))
 ;;;;              (disable (x) (setf list (remove x list))))
-;;;;         #+nil (enable :sb-show)
-;;;;         (enable :sb-after-xc-core)
-;;;;         #+nil (disable :sb-doc)
+;;;;         #+nil (enable (feature :sb-show))
+;;;;         (enable (feature :sb-after-xc-core))
+;;;;         #+nil (disable (feature :sb-doc))
 ;;;;         list))
+;;;;
+;;;;   The FEATURE function returns its argument after checking that
+;;;;   it's one of the build features listed below.
 ;;;;
 ;;;;   With a customizer file, developers can avoid accidentally
 ;;;;   committing configuration changes and users can avoid the
@@ -349,7 +352,11 @@
    this makes the system as a whole slower, but allows coverage of
    tests to be measured.")
 
- (:bitmapped-conset t))
+ (:bitmapped-conset t)
+ (:nonstop-foreign-call nil)
+ (:tls-based-mv-return nil)
+ (:mark-region-gc nil)
+ (:android nil))
 
 
 ;;;; Local features

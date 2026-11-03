@@ -276,6 +276,29 @@
                    collect feature-name)
            *static-features*)))
 
+(defvar *known-features*
+  (let ((feature-defs (read-from-file "^base-target-features.lisp-expr")))
+    (loop for feature-def in feature-defs
+          for feature-name = (first feature-def)
+          collect feature-name)))
+
+(defun feature (object)
+  (unless (member object *known-features*)
+    (let ((format-control
+            "~@<~S is not a known feature. ~
+            If this is not a typo, use e.g. make.sh ~
+            with --with%-<feature> or --without%-<feature> ~
+            instead of --with-<feature> and --without-<feature>.~:@>"))
+      #+(or sbcl clisp)
+      (progn
+        (format *error-output* "~%ERROR: ")
+        (format *error-output* format-control object)
+        (terpri *error-output*)
+        (exit-process 1))
+      #-(or sbcl clisp)
+      (error format-control object)))
+  object)
+
 ;;; When cross-compiling, the *FEATURES* set for the target Lisp is
 ;;; not in general the same as the *FEATURES* set for the host Lisp.
 ;;; In order to refer to target features specifically, we refer to

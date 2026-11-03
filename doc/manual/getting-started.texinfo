@@ -212,10 +212,16 @@ The preferred way to do this is using command-line arguments to
 @code{make.sh}:
 
 @example
---fancy                    Enables a curated set of features.
---with-<feature>           Enables a specific feature.
---without-<feature>        Disables a specific feature.
+--fancy                 Enables a curated set of features.
+--with-<feature>        Enables a known feature.
+--without-<feature>     Disables a known feature.
+--with%-<feature>       Enables a known or unknown feature.
+--without%-<feature>    Disables a known or unknown feature.
 @end example
+
+It is an error if the feature in the @code{--with-<feature>} and
+@code{--without-<feature>} options is not one of @ref{build options}. Use the
+@code{%} variants to disable this check.
 
 When tracking the @ref{sbcl repository}, it may be annoying having to
 supply the same arguments to @code{make.sh} over and over again. You can
@@ -227,14 +233,16 @@ expression like this in it:
 (lambda (list)
   (flet ((enable (x) (pushnew x list))
          (disable (x) (setf list (remove x list))))
-    #+nil (enable :sb-show)
-    (enable :sb-after-xc-core)
-    #+nil (disable :sb-doc)
+    #+nil (enable (feature :sb-show))
+    (enable (feature :sb-after-xc-core))
+    #+nil (disable (feature :sb-doc))
     list))
 @end example
 
 This function gets a list of features from @code{make.sh} and returns the
-transformed list to be used for the build.
+transformed list to be used for the build. The @code{feature} function
+returns its argument after performing the same check that
+@code{--with-<feature>} does.
 
 @quotation
 @emph{Note}: There is no direct correspondance between @ref{build options}

@@ -192,9 +192,15 @@
   The preferred way to do this is using command-line arguments to
   `make.sh`:
 
-      --fancy                    Enables a curated set of features.
-      --with-<feature>           Enables a specific feature.
-      --without-<feature>        Disables a specific feature.
+      --fancy                 Enables a curated set of features.
+      --with-<feature>        Enables a known feature.
+      --without-<feature>     Disables a known feature.
+      --with%-<feature>       Enables a known or unknown feature.
+      --without%-<feature>    Disables a known or unknown feature.
+
+  It is an error if the feature in the `--with-<feature>` and
+  `--without-<feature>` options is not one of @BUILD-OPTIONS. Use the
+  `%` variants to disable this check.
 
   When tracking the @SBCL-REPOSITORY, it may be annoying having to
   supply the same arguments to `make.sh` over and over again. You can
@@ -205,13 +211,15 @@
       (lambda (list)
         (flet ((enable (x) (pushnew x list))
                (disable (x) (setf list (remove x list))))
-          #+nil (enable :sb-show)
-          (enable :sb-after-xc-core)
-          #+nil (disable :sb-doc)
+          #+nil (enable (feature :sb-show))
+          (enable (feature :sb-after-xc-core))
+          #+nil (disable (feature :sb-doc))
           list))
 
   This function gets a list of features from `make.sh` and returns the
-  transformed list to be used for the build.
+  transformed list to be used for the build. The `FEATURE` function
+  returns its argument after performing the same check that
+  `--with-<feature>` does.
 
   > _Note_: There is no direct correspondance between @BUILD-OPTIONS
   > and *FEATURES* in the compiled SBCL. Some build options do make it

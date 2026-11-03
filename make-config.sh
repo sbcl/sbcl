@@ -94,15 +94,22 @@ do
       --dynamic-space-size=)
         $optarg_ok && SBCL_DYNAMIC_SPACE_SIZE=$optarg
 	;;
-      --with)
-        WITH_FEATURES="$WITH_FEATURES :$optarg"
-        if [ "$optarg" = "android" ]
-        then
+      --with | --with%)
+        if [ "$option" = "--with" ]; then
+            WITH_FEATURES="$WITH_FEATURES (feature :$optarg)"
+        else
+            WITH_FEATURES="$WITH_FEATURES :$optarg"
+        fi
+        if [ "$optarg" = "android" ]; then
             android=true
         fi
         ;;
-      --without)
-        WITHOUT_FEATURES="$WITHOUT_FEATURES :$optarg"
+      --without | --without%)
+        if [ "$option" = "--without" ]; then
+            WITHOUT_FEATURES="$WITHOUT_FEATURES (feature :$optarg)"
+        else
+            WITHOUT_FEATURES="$WITHOUT_FEATURES :$optarg"
+        fi
         case $CONTRIBS
         in *"$optarg"*)
                SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST $optarg"
@@ -141,8 +148,8 @@ if (test -f customize-target-features.lisp && \
     (test -n "$WITH_FEATURES" || test -n "$WITHOUT_FEATURES"))
 then
     # Actually there's no reason why it would not work, but it would
-    # be confusing to say --with-thread only to have it turned off by
-    # customize-target-features.lisp...
+    # be confusing to say --with-sb-thread only to have it turned off
+    # by customize-target-features.lisp...
     echo "ERROR: Both customize-target-features.lisp, and feature-options"
     echo "to make.sh present -- cannot use both at the same time."
     exit 1
@@ -185,7 +192,18 @@ Options:
       order to specify the size in gigabytes.
 
   --with-<feature>     Build with specified feature.
-  --without-<feature>  Build wihout the specfied feature.
+  --without-<feature>  Build without the specified feature.
+
+      In the above two options, <feature> must be a known feature. See
+      the "Build Options" section of the manual. Alternatively, see
+      SB-MANUAL:@BUILD-OPTIONS or
+      src/cold/base-target-features.lisp-expr.
+
+  --with%-<feature>
+  --without%-<feature>
+
+     Same as --with-<feature> and --without-<feature>, but <feature>
+     can be anything.
 
   --fancy              Build with several optional features:
 
