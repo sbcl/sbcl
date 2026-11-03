@@ -315,10 +315,9 @@
                    (= y (lognot #xFFFF)))
               (move r x)
               (inst xor :word r r))
-             ((and (gpr-tn-p x) (typep y '(unsigned-byte 32)))
-              ;; A 32-bit mov suffices unless to memory.
-              (unless (location= x r)
-                (inst mov (if gpr-r-p :dword :qword) r x))
+             ((and gpr-r-p
+                   (typep y '(unsigned-byte 32)))
+              (move r x :dword)
               (inst and :dword r y))
              ((imm32-p y)
               (move r x)
@@ -367,10 +366,9 @@
                    (= y (ldb (byte 64 0) (lognot #xFFFF))))
               (move r x)
               (inst xor :word r r))
-             ((and (gpr-tn-p x) (typep y '(unsigned-byte 32)))
-              ;; A 32-bit mov suffices unless to memory.
-              (unless (location= x r)
-                (inst mov (if gpr-r-p :dword :qword) r x))
+             ((and gpr-r-p
+                   (typep y '(unsigned-byte 32)))
+              (move r x :dword)
               (inst and :dword r y))
              ((imm32-p y)
               (move r x)
@@ -407,10 +405,9 @@
                    (= y (lognot #xFFFF)))
               (move r x)
               (inst xor :word r r))
-             ((and (gpr-tn-p x) (typep y '(unsigned-byte 32)))
-              ;; A 32-bit mov suffices unless to memory.
-              (unless (location= x r)
-                (inst mov (if gpr-r-p :dword :qword) r x))
+             ((and gpr-r-p
+                   (typep y '(unsigned-byte 32)))
+              (move r x :dword)
               (inst and :dword r y))
              ((imm32-p y)
               (move r x)
