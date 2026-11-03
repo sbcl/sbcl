@@ -1841,34 +1841,47 @@
                               (type-specifier type1)
                               (type-specifier type2))))))))
 
-(defoptimizer (%make-array ir2-hook) ((dimensions widetag n-bits &key initial-contents &allow-other-keys) node)
+(defoptimizer (%make-array ir2-hook) ((dimensions widetag n-bits &key initial-contents displaced-to &allow-other-keys) node)
   (when (and (constant-lvar-p widetag)
-             initial-contents)
+             (or initial-contents
+                 displaced-to))
     (let* ((saetp (find (lvar-value widetag) sb-vm:*specialized-array-element-type-properties*
                         :key #'sb-vm:saetp-typecode))
-           (element-type (sb-vm:saetp-ctype saetp))
-           (initial-contents-type (lvar-type initial-contents))
-           (initial-contents-element-type (type-array-element-type initial-contents-type)))
-      (cond ((not (or (eq initial-contents-element-type *wild-type*)
-                      (types-equal-or-intersect element-type initial-contents-element-type)))
-             (let ((*compiler-error-context* node))
-               (compiler-warn "Incompatible :initial-contents ~s for :element-type ~a."
-                              (type-specifier initial-contents-type)
-                              (sb-vm:saetp-specifier saetp))))
-            ((constant-lvar-p initial-contents)
-             (let ((initial-contents (lvar-value initial-contents)))
-               (when (sequencep initial-contents)
-                 (map nil (lambda (x)
-                            (unless (or (ctypep x element-type)
-                                        (and (not (csubtypep (lvar-type dimensions) (specifier-type 'sequence)))
-                                             (sequencep x)))
-                              (let ((*compiler-error-context* node))
-                                (compiler-warn ":initial-contents has an element ~s incompatible with :element-type ~a."
-                                               x
-                                               (type-specifier element-type)))
-                              (return-from %make-array-ir2-hook-optimizer))
-                            x)
-                      initial-contents))))))))
+           (element-type (sb-vm:saetp-ctype saetp)))
+      (cond ((when displaced-to
+               (let* ((displaced-type (lvar-type displaced-to))
+                      (types (ctype-array-specialized-element-types displaced-type)))
+                 (unless (or (eq types *wild-type*)
+                             (or (not types)
+                                 (find element-type types)))
+                   (let ((*compiler-error-context* node))
+                     (compiler-warn "Incompatible :displaced-to ~s for :element-type ~a."
+                                    (type-specifier displaced-type)
+                                    (sb-vm:saetp-specifier saetp))
+                     t)))))
+            (initial-contents
+             (let* ((initial-contents-type (lvar-type initial-contents))
+                    (initial-contents-element-type (type-array-element-type initial-contents-type)))
+               (cond ((not (or (eq initial-contents-element-type *wild-type*)
+                               (types-equal-or-intersect element-type initial-contents-element-type)))
+                      (let ((*compiler-error-context* node))
+                        (compiler-warn "Incompatible :initial-contents ~s for :element-type ~a."
+                                       (type-specifier initial-contents-type)
+                                       (sb-vm:saetp-specifier saetp))))
+                     ((constant-lvar-p initial-contents)
+                      (let ((initial-contents (lvar-value initial-contents)))
+                        (when (sequencep initial-contents)
+                          (map nil (lambda (x)
+                                     (unless (or (ctypep x element-type)
+                                                 (and (not (csubtypep (lvar-type dimensions) (specifier-type 'sequence)))
+                                                      (sequencep x)))
+                                       (let ((*compiler-error-context* node))
+                                         (compiler-warn ":initial-contents has an element ~s incompatible with :element-type ~a."
+                                                        x
+                                                        (type-specifier element-type)))
+                                       (return-from %make-array-ir2-hook-optimizer))
+                                     x)
+                               initial-contents)))))))))))
 
 (defun check-sequence-item (item seq node format-string)
   (let ((seq-type (lvar-type seq))

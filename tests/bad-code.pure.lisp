@@ -1291,3 +1291,10 @@
                          (declare (optimize (safety 0)))
                          (progv '(2) v))
                       :allow-warnings t))))
+
+(with-test (:name :make-array-displaced-to)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda ()
+                         (make-array 1 :displaced-to "a"))
+                      :allow-warnings t))))

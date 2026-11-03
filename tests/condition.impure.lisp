@@ -48,7 +48,9 @@
 (with-test (:name :reference-condition)
   (check-reference-condition))
 
-(require 'sb-manual)
+(let (#+parallel-test-runner
+      (run-tests::*allowed-inputs* :any))
+  (require 'sb-manual))
 
 (with-test (:name :reference-condition-with-sb-manual)
   (check-reference-condition))

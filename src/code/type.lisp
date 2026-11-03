@@ -4635,7 +4635,7 @@ expansion happened."
                                 (negation-type-p type))
                      do (determine type)))
              (determine (type)
-               (etypecase type
+               (typecase type
                  (array-type
                   (when (eq (array-type-specialized-element-type type) *wild-type*)
                     (return-from ctype-array-specialized-element-types
@@ -4647,8 +4647,12 @@ expansion happened."
                  (intersection-type
                   (process-compound-type (intersection-type-types type)))
                  (member-type
-                  (process-compound-type
-                   (mapcar #'ctype-of (member-type-members type)))))))
+                  (unless (eq type (specifier-type 'null))
+                    (process-compound-type
+                     (mapcar #'ctype-of (member-type-members type)))))
+                 (t
+                  (when (contains-unknown-type-p type)
+                    (return-from ctype-array-specialized-element-types *wild-type*))))))
       (determine type))
     types))
 
