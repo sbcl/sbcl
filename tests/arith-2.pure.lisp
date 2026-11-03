@@ -2749,7 +2749,14 @@
     ((-9223372036854775808) 0)
     ((4611686018427387905) 4611686018427387905)
     ((2) 0)
-    ((1) 1)))
+    ((1) 1))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (declare ((integer -700000000 -600000000) x))
+      (logand x -1610612737))
+   ((-600000000) -1673741824)
+   ((-700000000) -1773741824)))
 
 (with-test (:name :no-modarith-ratios)
   (checked-compile-and-assert
