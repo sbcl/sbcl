@@ -432,23 +432,24 @@
   (define-binop logior 2 or
     :c/fixnum=>fixnum
     ((let* ((y (fixnumize y))
-            (mask (ldb (byte n-word-bits 0) y)))
-       (cond ((imm32-p y)
+            (mask (ldb (byte n-word-bits 0) y))
+            (imm32 (imm32-p y)))
+       (cond (imm32
               (cond ((and (gpr-tn-p r)
                           (gpr-tn-p x)
                           (not (location= x r))
                           ;; Use addition if the bits are clear
                           (let ((width (sb-c::unsigned-type-width (tn-ref-type x-ref))))
                             (when (and width
-                                       (zerop (ldb (byte (+ width n-fixnum-tag-bits) 0) y)))
-                              (inst lea (if (plusp y)
+                                       (zerop (ldb (byte (+ width n-fixnum-tag-bits) 0) imm32)))
+                              (inst lea (if (plusp imm32)
                                             :dword
                                             :qword)
-                                    r (ea y x))
+                                    r (ea imm32 x))
                               t))))
                     (t
                      (move r x)
-                     (inst or r y))))
+                     (inst or r imm32))))
              ((= (logcount mask) 1)
               (move r x)
               (inst bts r (1- (integer-length mask))))
@@ -462,21 +463,23 @@
     ((cond ((and (gpr-tn-p r) (or (eql y most-positive-word) (eql y -1))) ; special-case "OR reg, all-ones"
             ;; I have yet to elicit this case. Can it happen?
             (inst mov r -1))
-           ((imm32-p y)
-            (cond ((and (gpr-tn-p r)
-                        (gpr-tn-p x)
-                        (not (location= x r))
-                        (let ((width (sb-c::unsigned-type-width (tn-ref-type x-ref))))
-                          (when (and width
-                                     (zerop (ldb (byte width 0) y)))
-                            (inst lea (if (plusp y)
-                                          :dword
-                                          :qword)
-                                  r (ea y x))
-                            t))))
-                  (t
-                   (move r x)
-                   (inst or r y))))
+           ((let ((imm32 (imm32-p y)))
+              (when imm32
+                (cond ((and (gpr-tn-p r)
+                            (gpr-tn-p x)
+                            (not (location= x r))
+                            (let ((width (sb-c::unsigned-type-width (tn-ref-type x-ref))))
+                              (when (and width
+                                         (zerop (ldb (byte width 0) imm32)))
+                                (inst lea (if (plusp imm32)
+                                              :dword
+                                              :qword)
+                                      r (ea imm32 x))
+                                t))))
+                      (t
+                       (move r x)
+                       (inst or r imm32)))
+                t)))
            ((= (logcount y) 1)
             (move r x)
             (inst bts r (1- (integer-length y))))
@@ -487,22 +490,23 @@
             (inst or r x))))
 
     :c/signed=>signed
-    ((let ((mask (ldb (byte n-word-bits 0) y)))
-       (cond ((imm32-p y)
+    ((let ((mask (ldb (byte n-word-bits 0) y))
+           (imm32 (imm32-p y)))
+       (cond (imm32
               (cond ((and (gpr-tn-p r)
                           (gpr-tn-p x)
                           (not (location= x r))
                           (let ((width (sb-c::unsigned-type-width (tn-ref-type x-ref))))
                             (when (and width
-                                       (zerop (ldb (byte width 0) y)))
-                              (inst lea (if (plusp y)
+                                       (zerop (ldb (byte width 0) imm32)))
+                              (inst lea (if (plusp imm32)
                                             :dword
                                             :qword)
-                                    r (ea y x))
+                                    r (ea imm32 x))
                               t))))
                     (t
                      (move r x)
-                     (inst or r y))))
+                     (inst or r imm32))))
              ((= (logcount mask) 1)
               (move r x)
               (inst bts r (1- (integer-length mask))))
