@@ -1593,9 +1593,9 @@
   absolutely no overhead for calling a non-entry point function that
   is defined purely for modularity (i.e. called only in one place).
 
-  Block compilation also allows for more unboxed and non-descriptor
-  arguments and @RETURN-VALUES in non-trivial programs."
-  ;; FIXME: Link to @INTERACTIONS-WITH-LOCAL-CALL.
+  Block compilation also allows for more unboxed and @NON-DESCRIPTOR
+  arguments and @RETURN-VALUES in non-trivial programs (see
+  @NUMBERS-IN-LOCAL-CALL)."
   (@block-compilation-semantics section)
   (@block-compilation-declarations section)
   (@block-compilation-difficulties section))
@@ -2107,14 +2107,14 @@
 (defsection @numbers (:title "Numbers"
                       :concepts (("numeric" "types")
                                  ("types," "numeric")))
-  "Numbers are interesting because numbers are one of the few Common
+  "Numbers are interesting because they are one of the few Common
   Lisp data types that have direct support in conventional hardware.
   If a number can be represented in the way that the hardware expects
   it, then there is a big efficiency advantage.
 
   Using hardware representations is problematical in Lisp due to
   dynamic typing (where the type of a value may be unknown at compile
-  time.) It is possible to compile code for statically typed portions
+  time). It is possible to compile code for statically typed portions
   of a Lisp program with efficiency comparable to that obtained in
   statically typed languages such as C, but not all Lisp
   implementations succeed. There are two main barriers to efficient
@@ -2142,7 +2142,7 @@
   (@floating-point-efficiency section)
   (@specialized-arrays section)
   (@specialized-structure-slots section)
-  (@interactions-with-local-call section)
+  (@numbers-in-local-call section)
   (@representation-of-characters section))
 
 (defsection @descriptor (:title "Descriptor"
@@ -2152,15 +2152,14 @@
 
   "Lisp's dynamic typing requires that it be possible to represent any
   value with a fixed length object, known as a _descriptor_. This
-
-  fixed-length requirement is implicit in features such as:
+  fixed-length requirement is implicit in features such as
 
   - Data types (like SIMPLE-VECTOR) that can contain any type of
     object, and that can be destructively modified to contain
-    different objects (of possibly different types.)
+    different objects (of possibly different types)
 
   - Functions that can be called with any type of argument, and that
-    can be redefined at run time.
+    can be redefined at run time
 
   In order to save space, a descriptor is invariably represented as a
   single word. Objects that can be directly represented in the
@@ -2194,7 +2193,7 @@
 (defsection @non-descriptor (:title "Non-descriptor"
                              :concepts (("non-descriptor representation")
                                         ("stack numbers")))
-  "From the discussion above, we can see that the standard descriptor
+  "From the discussion above, we can see that the standard @DESCRIPTOR
   representation has many problems, the worst being number consing.
   Lisp compilers try to avoid these descriptor efficiency problems by
   using _non-descriptor_ representations. A compiler that uses
@@ -2220,13 +2219,13 @@
 
   Many Lisp compilers support non-descriptor representations for float
   types such as SINGLE-FLOAT and DOUBLE-FLOAT
-  (see @FLOATING-POINT-EFFICIENCY.) SBCL adds support for full
+  (see @FLOATING-POINT-EFFICIENCY). SBCL adds support for full
   @WORD-INTEGERS, characters (see @REPRESENTATION-OF-CHARACTERS) and
-  system area pointers (unconstrained pointers, see @UNTYPED-MEMORY.)
+  system area pointers (unconstrained pointers, see @UNTYPED-MEMORY).
   Many Lisp compilers support @NON-DESCRIPTOR-VARIABLES and array
-  elements (section @SPECIALIZED-ARRAYS.) SBCL adds support for
+  elements (section @SPECIALIZED-ARRAYS). SBCL adds support for
   non-descriptor arguments and return values in @LOCAL-CALL
-  (see @INTERACTIONS-WITH-LOCAL-CALL) and @SPECIALIZED-STUCTURE-SLOTS.")
+  (see @NUMBERS-IN-LOCAL-CALL) and @SPECIALIZED-STUCTURE-SLOTS.")
 
 (defsection @non-descriptor-variables
     (:title "Non-descriptor Variables"
@@ -2243,12 +2242,12 @@
         (declare (single-float x))
         ...)
 
-  Use of THE, or of variable declarations not at the binding form is
+  Use of THE or of variable declarations not at the binding form is
   insufficient to allow non-descriptor representation of the variable
   -- with these declarations it is not certain that all values of the
   variable are of the right type. It is sometimes useful to introduce
   a gratuitous binding that allows the compiler to change to a
-  non-descriptor representation, like:
+  non-descriptor representation, like
 
       (etypecase x
         ((signed-byte 32)
@@ -2270,7 +2269,7 @@
   global assignments at the end.
 
   Efficiency notes signal use of inefficient representations, so
-  programmer's needn't continuously worry about the details of
+  programmers needn't continuously worry about the details of
   representation selection (see @REPRESENTATION-EFF-NOTE.)")
 
 (defsection @generic-arithmetic (:title "Generic Arithmetic"
@@ -2310,11 +2309,17 @@
     type. Don't try to mix integers and floats or different float
     formats.
 
-  The \"good types\" are `(SIGNED-BYTE 32)`, `(UNSIGNED-BYTE 32)`,
-  SINGLE-FLOAT, DOUBLE-FLOAT, `(COMPLEX SINGLE-FLOAT)`, and `(COMPLEX
-  DOUBLE-FLOAT)`. See @FIXNUMS, @WORD-INTEGERS and
-  @FLOATING-POINT-EFFICIENCY for more discussion of good numeric
-  types.
+  The \"good types\" on 64-bit platforms are
+
+      (unsigned-byte 64)
+      (signed-byte 64)
+      single-float
+      double-float
+      (complex single-float)
+      (complex double-float)
+
+  See @FIXNUMS, @WORD-INTEGERS and @FLOATING-POINT-EFFICIENCY for more
+  discussion of good numeric types.
 
   FLOAT is not a good type, since it might mean either SINGLE-FLOAT or
   DOUBLE-FLOAT. INTEGER is not a good type, since it might mean
@@ -2332,18 +2337,14 @@
   ;; the general generic arithmetic
   "As noted above, SBCL has support for `(COMPLEX SINGLE-FLOAT)`
   and `(COMPLEX DOUBLE-FLOAT)`. These can be unboxed and, thus, are
-  quite efficient. However, arithmetic with complex types such as:
+  quite efficient. However, arithmetic with complex types such
+  as `(COMPLEX FLOAT)` and `(COMPLEX FIXNUM)` will be significantly
+  slower than the good complex types but is still faster than BIGNUM
+  or RATIO arithmetic, since the implementation is much simpler.
 
-      (complex float)
-      (complex fixnum)
-
-  will be significantly slower than the good complex types but is
-  still faster than BIGNUM or RATIO arithmetic, since the
-  implementation is much simpler.
-
-  > _Note_: don't use `/` to divide integers unless you want the
-  > overhead of rational arithmetic. Use TRUNCATE even when you know
-  > that the arguments divide evenly.
+  > _Note_: don't use the `/` function to divide integers unless you
+  > want the overhead of rational arithmetic. Use TRUNCATE even when
+  > you know that the arguments divide evenly.
 
   You don't need to remember all the rules for how to get open-coded
   arithmetic, since @EFFICIENCY-NOTES will tell you when and where
@@ -2351,7 +2352,7 @@
 
 (defsection @fixnums (:title "Fixnums" :concepts (("fixnums")
                                                   ("bignums")))
-  "A fixnum is a \"FIXed precision NUMber\". In modern Lisp
+  "A fixnum is a _FIXed-precision NUMber_. In modern Lisp
   implementations, fixnums can be represented with an immediate
   descriptor, so operating on fixnums requires no consing or memory
   references. Clever choice of representations also allows some
@@ -2360,12 +2361,13 @@
   using an unnatural integer representation.
 
   It is useful to distinguish the FIXNUM type from the fixnum
-  representation of integers. In SBCL there is absolutely nothing
+  representation of integers. In SBCL, there is absolutely nothing
   magical about the FIXNUM type in comparison to other finite integer
-  types. FIXNUM is equivalent to (is defined with DEFTYPE to
-  be) `(SIGNED-BYTE 30)`. FIXNUM is simply the largest subset of
-  integers that _can be represented_ using an immediate fixnum
-  descriptor.
+  types. FIXNUM is equivalent to `(SIGNED-BYTE 63)` on all 64-bit
+  platforms but ppc64, where it is `(SIGNED-BYTE 61)`. On 32-bit
+  platforms, a FIXNUM is `(SIGNED-BYTE 29)`. FIXNUM is simply the
+  largest subset of integers that _can be represented_ using an
+  immediate fixnum descriptor.
 
   Unlike in other Common Lisp compilers, it is in no way desirable to
   use the FIXNUM type in declarations in preference to more
@@ -2388,13 +2390,14 @@
   it can't prove that all the arguments, intermediate values, and
   results are fixnums. With bounded integer types such as FIXNUM, the
   result type proves to be especially problematical, since these types
-  are not closed under common arithmetic operations such as `+`, `-`,
-  `*` and `/`. For example, `(1+ (THE FIXNUM X))` does not necessarily
-  evaluate to a FIXNUM. Bignums were added to Lisp to get around this
-  problem, but they really just transform the correctness problem \"if
-  this add overflows, you will get the wrong answer\" to the
-  efficiency problem \"if this add _might_ overflow then your program
-  will run slowly (because of generic arithmetic.)\"
+  are not closed under common arithmetic operations such as
+  [`+`][function], [`-`][function], [`*`][function] and
+  [`/`][function]. For example, `(1+ (THE FIXNUM X))` does not
+  necessarily evaluate to a FIXNUM. Bignums were added to Lisp to get
+  around this problem, but they really just transform the correctness
+  problem _if this add overflows, you will get the wrong answer_ to
+  the efficiency problem _if this add overflows, then your program
+  will run slowly_ (because of generic arithmetic).
 
   There is just no getting around the fact that the hardware only
   directly supports short integers. To get the most efficient open
@@ -2403,21 +2406,23 @@
   integer types: `(1+ (THE FIXNUM X))` may not always be a FIXNUM,
   but `(1+ (THE (UNSIGNED-BYTE 8) X))` always is. Of course, you can
   also assert the result type by putting in lots of THE declarations
-  and then compiling with @SAFETY `0`.")
+  and then compiling with @SAFETY `0` (see
+  @TYPE-DECLARATION-CHECKING).")
 
 (defsection @word-integers (:title "Word Integers"
                             :concepts (("word integers")))
   "SBCL is unique in its efficient implementation of arithmetic
-  on full-word integers through non-descriptor representations and
-  open coding. Arithmetic on any subtype of these types:
+  on full-word integers through @NON-DESCRIPTOR representations and
+  open coding. Arithmetic on any subtype of
 
-      (signed-byte 32)
-      (unsigned-byte 32)
+      (signed-byte 64)
+      (unsigned-byte 64)
 
-  is reasonably efficient, although subtypes of FIXNUM remain somewhat
+  on 64-bit platforms and 32-bit equivalents on 32-bit platforms is
+  reasonably efficient, although subtypes of FIXNUM remain somewhat
   more efficient.
 
-  If a word integer must be represented as a descriptor, then the
+  If a word integer must be represented as a @DESCRIPTOR, then the
   BIGNUM representation is used, with its associated consing overhead.
   The support for word integers in no way changes the language
   semantics, it just makes arithmetic on small bignums vastly more
@@ -2443,12 +2448,13 @@
   FIXNUMs to word integers. Note that mixing `(UNSIGNED-BYTE 32)`
   arguments with arguments of any signed type (such as FIXNUM) is a
   no-no, since the result might not be unsigned.")
+;;; FIXME: ^^^ move modular arithmetic here
 
 (defsection @floating-point-efficiency
     (:title "Floating Point Efficiency"
      :concepts (("floating point efficiency")))
   "Arithmetic on objects of type SINGLE-FLOAT and DOUBLE-FLOAT is
-  efficiently implemented using non-descriptor representations and
+  efficiently implemented using @NON-DESCRIPTOR representations and
   open coding. As for integer arithmetic, the arguments must be known
   to be of the same float type. Unlike for integer arithmetic, the
   results and intermediate values usually take care of themselves due
@@ -2459,10 +2465,9 @@
   LONG-FLOAT are also acceptable in declarations, since they are
   synonyms for the SINGLE-FLOAT and DOUBLE-FLOAT types, respectively.
 
-  In SBCL, list-style float type specifiers such as
-  `(SINGLE-FLOAT 0.0 1.0)` will be used to good effect.
-
-  For example, in this function
+  In SBCL, compound float type specifiers such as
+  `(SINGLE-FLOAT 0.0 1.0)` will be used to good effect. For example,
+  in this function
 
       (defun square (x)
         (declare (type (single-float 0f0 10f0)))
@@ -2476,10 +2481,14 @@
       (+ (the (or (integer 1 1) (integer 5 5)) x)
          (the (or (integer 10 10) (integer 20 20)) y))
 
-  has the inferred type `(OR (INTEGER 11 11) (INTEGER 15 15)
-  (INTEGER 21 21) (INTEGER 25 25))`. This also works for
-  floating-point numbers. @MEMBER-TYPES are also supported.
-    
+  has the inferred type
+
+      (or (integer 11 11) (integer 15 15)
+          (integer 21 21) (integer 25 25))
+
+  This also works for floating-point numbers. @MEMBER-TYPES are also
+  supported.
+
   SBCL can also infer types for many mathematical functions including
   square root, exponential and logarithmic functions, trignometric
   functions and their inverses, and hyperbolic functions and their
@@ -2521,11 +2530,10 @@
   representation is used, creating consing overhead. For this reason,
   you should try to avoid situations (such as full call and
   non-specialized data structures) that force a descriptor
-  representation. See @SPECIALIZED-ARRAYS, @RAW-SLOTS and
-  @INTERACTIONS-WITH-LOCAL-CALL.
-
-  See @IEEE-FLOAT for information on the extensions to support IEEE
-  floating point."
+  representation. See @SPECIALIZED-ARRAYS, @SPECIALIZED-STUCTURE-SLOTS
+  and @NUMBERS-IN-LOCAL-CALL."
+  ;; FIXME: See @IEEE-FLOAT for information on the extensions to
+  ;; support IEEE floating point.
   (@signed-zeroes-and-special-functions section))
 
 (defsection @signed-zeroes-and-special-functions
@@ -2570,9 +2578,9 @@
   advantages:
 
   - A specialized array can save space by packing multiple elements
-    into a single word. For example, a BASE-CHAR array can have 4
-    elements per word, and a BIT array can have 32. This
-    space-efficient representation is possible because it is not
+    into a single word. For example, on 64-bit platforms, a BASE-CHAR
+    array can have 8 elements per word, and a BIT array can have 64.
+    This space-efficient representation is possible because it is not
     necessary to separately indicate the type of each element.
 
   - The elements in a specialized array can be given the same
@@ -2584,25 +2592,32 @@
     necessary to allocate a new object every time an array element is
     modified.
 
-  These are the specialized element types currently supported:
+  These are the specialized element types currently supported on
+  64-bit platforms:
 
+      nil
       bit
       (unsigned-byte 2)
       (unsigned-byte 4)
+      (unsigned-byte 7)
       (unsigned-byte 8)
+      (unsigned-byte 15)
       (unsigned-byte 16)
+      (unsigned-byte 31)
       (unsigned-byte 32)
+      (unsigned-byte 63)
+      (unsigned-byte 64)
       (signed-byte 8)
       (signed-byte 16)
       (signed-byte 30)
       (signed-byte 32)
-      base-character
+      (signed-byte 64)
       single-float
       double-float
-      ext:double-double-float
       (complex single-float)
       (complex double-float)
-      (complex ext:double-double-float)
+      base-char
+      character
 
   Although a SIMPLE-VECTOR can hold any type of object, T should still
   be considered a specialized array type, since arrays with element
@@ -2619,12 +2634,13 @@
     (:title "Specialized Structure Slots"
      :concepts (("structure types" "numeric slots")
                 ("specialized structure slots")))
-  "Structure slots declared by the :TYPE DEFSTRUCT slot option
-  to have certain known numeric types are also given non-descriptor
-  representations. These types (and subtypes of these types) are
-  supported:
+  "Structure slots declared by the :TYPE DEFSTRUCT slot option to have
+  certain known numeric types are also given @NON-DESCRIPTOR
+  representations. On 64-bit platforms, these types (and subtypes of
+  these types) are supported:
 
-      (unsigned-byte 32)
+      (unsigned-byte 64)
+      (signed-byte 64)
       single-float
       double-float
       (complex single-float)
@@ -2634,12 +2650,11 @@
   reduction spurious memory allocation and access overhead of programs
   that intensively use these types.")
 
-(defsection @interactions-with-local-call
-    (:title "Interactions With Local Call"
-     :concepts (("local call" "numeric operands")
-                ("numbers in local call")))
-  "@LOCAL-CALL has many advantages; one relevant toour discussion here
-  is that local call extends the usefulness of non-descriptor
+(defsection @numbers-in-local-call (:title "Numbers in Local Call"
+                                    :concepts (("local call" "numeric operands")
+                                               ("numbers in local call")))
+  "@LOCAL-CALL has many advantages; one relevant to our discussion here
+  is that local call extends the usefulness of @NON-DESCRIPTOR
   representations. If the compiler knows from the argument type that
   an argument has a non-descriptor representation, then the argument
   will be passed in that representation. The easiest way to ensure
@@ -2658,7 +2673,7 @@
   compilation can be used to reduce number consing to a minimum.
 
   Note that non-descriptor return values can only be used with the
-  known return convention (see @LOCAL-CALL-RETURN-VALUES.) If the
+  known return convention (see @LOCAL-CALL-RETURN-VALUES). If the
   compiler can't prove that a function always returns the same number
   of values, then it must use the unknown values return convention,
   which requires a descriptor representation. Pay attention to the
@@ -2674,7 +2689,7 @@
   descriptor representation, so there is not a great penalty for
   converting a character to a descriptor. Nonetheless, it may
   sometimes be helpful to declare character-valued variables as
-  BASE-CHARACTER.")
+  BASE-CHAR.")
 
 (defsection @modular-arithmetic (:title "Modular Arithmetic"
                                  :concepts ("modular arithmetic"
