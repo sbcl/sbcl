@@ -1563,3 +1563,12 @@
                                  (inst lea res (rip-relative-ea
                                                 (make-fixup nil :code-object))))))))))
      (assert (eq (sb-kernel:fun-code-header f) (funcall f)))))
+
+(with-test (:name :logandc2-constant-bit)
+  (let ((lines
+         (disassembly-lines
+          (compile
+           nil '(lambda (x) (logandc2 (the fixnum x) (ash 1 30)))))))
+    ;; When this LOGAND was emitted using an AND instruction, it needed a RIP-relative
+    ;; unboxed constant of #xFFFFFFFF7FFFFFFE. The BTR instruction avoids that.
+    (assert (loop for L in lines thereis (and (search "BTR" L) (search ", 31" L))))))

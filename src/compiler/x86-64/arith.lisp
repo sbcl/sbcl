@@ -315,6 +315,11 @@
              ((imm32-p y)
               (move r x)
               (inst and r y))
+             ((and (minusp y) (= (logcount (ash y -1)) 1)) ; lone 0 bit and elsewhere 1s
+              (move r x)
+              ;; 1- integer-length would be the bit index as an untagged num,
+              ;; but 1+ makes it the index to a fixnum. They cancel out.
+              (inst btr r (integer-length (lognot (ash y -1)))))
              ((let ((extend (sign-extend-log-mask y x-ref t)))
                 (when extend
                   (move r x)
@@ -322,8 +327,7 @@
                   t)))
              ((= y (fixnumize most-positive-fixnum))
               (move r x)
-              (inst btr r 63)
-              t)
+              (inst btr r 63))
              ((let* ((int (sb-c::type-approximate-interval (tn-ref-type x-ref)))
                      (mask (logandc1 (logior y fixnum-tag-mask)
                                      (ldb (byte (+ (integer-length (sb-c::interval-high int)) n-fixnum-tag-bits) 0) -1))))
