@@ -71,7 +71,10 @@ void visit_context_registers(void (*p)(os_context_register_t,void*),
     p(m->gregs[REG_R14], arg); p(m->gregs[REG_R15], arg);
     p(m->gregs[REG_RDI], arg); p(m->gregs[REG_RSI], arg); p(m->gregs[REG_RBX], arg);
     p(m->gregs[REG_RDX], arg); p(m->gregs[REG_RAX], arg); p(m->gregs[REG_RCX], arg);
-    // We could implicitly pin objects pointed to by parts of an XMM or YMM register here
+    // We should implicitly pin objects pointed to by parts of an XMM or YMM register here
+    // Foreign code is allowed to "spill" the general-purpose registers into floating-point
+    // registers. gcc already does that as far I understand, and LLVM was considering it.
+    // See https://lists.llvm.org/pipermail/llvm-dev/2022-January/154782.html
 }
 
 // This array is indexed by the encoding of the register in an instruction.

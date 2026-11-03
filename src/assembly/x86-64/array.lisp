@@ -58,10 +58,18 @@
     (inst lea card-index (ea disp vector start scale))
     (inst shr card-index gencgc-card-shift)
     (inst and :dword card-index card-index-mask)
+    ;; Consider: (DEFUN F () (MAKE-ARRAY 10 :INITIAL-ELEMENT (CONS x x)))
+    ;; which makes a new cons. For the tiny window of execution between the LEA of
+    ;; END-CARD-INDEX up until (INST MOVQ ITEM WORDPAIR) there is (probably) no GPR
+    ;; that holds the cons. A stop-for-GC in this thread in that critical window
+    ;; could orphan the cons. It's almost impossible to observe such a failure.
+    ;; I could only do it by hijacking this routine and redirecting to a mock
+    ;; routine which waits for another thread to initiate GC.
+    (inst push item)
     ;; Compute the modularly post-incremented end-card-mask so that our backward branch
     ;; in the loop can use a not-equal test. (We can't use any branch on inequality
     ;; because modular math screws it up)
-    (inst lea end-card-index (ea (- disp n-word-bytes) vector end scale))
+    (inst lea end-card-index (ea (- disp n-word-bytes) vector end scale)) ; clobbers RAX
     (inst shr end-card-index gencgc-card-shift)
     (inst inc :dword end-card-index)
     (inst and :dword end-card-index card-index-mask)
@@ -75,7 +83,8 @@
     (inst inc :dword card-index)
     (inst and :dword card-index card-index-mask)
     (inst cmp :dword card-index end-card-index)
-    (inst jmp :ne LOOP))
+    (inst jmp :ne LOOP)
+    (inst pop item))
 
   DONE-CARD-MARKING
   ;; restore ITEM from its saved location. Needed for the STOS instruction
