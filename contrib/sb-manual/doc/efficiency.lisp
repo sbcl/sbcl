@@ -569,7 +569,7 @@
   - In addition to declaring the array element type and simpleness,
     also declare the dimensions if they are fixed. For example,
 
-        (simple-array single-float (1024 1024))
+          (simple-array single-float (1024 1024))
 
     The bounds information allows array indexing for multi-dimensional
     arrays to be compiled much more efficiently and may also allow

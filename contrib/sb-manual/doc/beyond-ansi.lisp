@@ -745,7 +745,7 @@
   (sb-ext:exit function)
   (@running-external-programs section))
 
-(defsection @running-external-programs (:title "Running external programs")
+(defsection @running-external-programs (:title "Running External Programs")
   "External programs can be run with SB-EXT:RUN-PROGRAM.
 
   > _Note_: In SBCL versions prior to 1.0.13, SB-EXT:RUN-PROGRAM
