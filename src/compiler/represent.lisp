@@ -438,6 +438,24 @@
                     :t-ok nil))
           (return info))))))
 
+;;; If we have already coerced TN to SC by TEMPLATE before BEFORE in
+;;; its block and the coercion has not been overwritten since, return
+;;; the coercion TN. Otherwise, return NIL.
+(defun find-earlier-coercion (tn template sc before)
+  (declare (type tn tn) (type vop before))
+  (do ((vop (vop-prev before) (vop-prev vop)))
+      ((null vop) nil)
+    (when (eq (vop-info vop) template)
+      (let ((coerced (tn-ref-tn (vop-results vop))))
+        (when (and (eq (tn-ref-tn (vop-args vop)) tn)
+                   (eq (tn-sc coerced) sc)
+                   (not (tn-ref-next (tn-writes coerced))))
+          (return coerced))))
+    (do ((ref (vop-results vop) (tn-ref-across ref)))
+        ((null ref))
+      (when (eq (tn-ref-tn ref) tn)
+        (return-from find-earlier-coercion nil)))))
+
 ;;; Emit a coercion VOP for OP BEFORE the specified VOP or die trying.
 ;;; SCS is the operand's LOAD-SCS vector, which we use to determine
 ;;; what SCs the VOP will accept. We pick any acceptable coerce VOP,
@@ -489,6 +507,13 @@
                                                           (reference-tn-refs (vop-results vop) t)
                                                           vop)
                                      (delete-vop vop)
+                                     t))))
+                           ((and (not write-p)
+                                 before
+                                 (>= (vop-info-cost res) *efficiency-note-cost-threshold*)
+                                 (let ((coerced (find-earlier-coercion op-tn res sc before)))
+                                   (when coerced
+                                     (change-tn-ref-tn op coerced)
                                      t))))
                            (t
                             (let ((temp (make-representation-tn ptype scn)))
@@ -891,15 +916,25 @@
                  (res
                   (or
                    (jump-over-move-coercion vop x y block)
-                   (let ((res (or (maybe-move-from-fixnum+-1 x y x-ref)
-                                  res)))
-                     (unless (reuse-move-coercion vop res x-ref y-ref block)
-                       (when (>= (vop-info-cost res)
-                                 *efficiency-note-cost-threshold*)
-                         (maybe-emit-coerce-efficiency-note res x-ref y))
-
-                       (emit-move-template node (vop-block vop) res x y vop)
-                       (delete-vop vop)))))
+                   (let* ((res (or (maybe-move-from-fixnum+-1 x y x-ref)
+                                   res))
+                          (costly (>= (vop-info-cost res)
+                                      *efficiency-note-cost-threshold*))
+                          (coerced (and costly
+                                        (find-earlier-coercion x res (tn-sc y) vop))))
+                     (cond (coerced
+                            (emit-move-template node (vop-block vop)
+                                                (find-move-vop coerced nil (tn-sc y)
+                                                               (tn-primitive-type y)
+                                                               #'sc-move-vops)
+                                                coerced y vop)
+                            (delete-vop vop))
+                           ((reuse-move-coercion vop res x-ref y-ref block))
+                           (t
+                            (when costly
+                              (maybe-emit-coerce-efficiency-note res x-ref y))
+                            (emit-move-template node (vop-block vop) res x y vop)
+                            (delete-vop vop))))))
                  (t
                   (coerce-vop-operands vop)))))
         ((vop-info-move-args info)

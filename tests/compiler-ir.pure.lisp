@@ -133,6 +133,18 @@
                                   (lambda (&optional z)
                                     z))))))))
 
+;;; Y is stored twice, and boxed once for both.
+(with-test (:name (:representation :coercion :reused))
+  (assert (= (count-if (lambda (name)
+                         (search "MOVE-FROM-UNSIGNED" (symbol-name name)))
+                       (ir2-vops '(lambda (x v)
+                                   (declare (type sb-ext:word x) (simple-vector v))
+                                   (let ((y (logand (* x 3) sb-ext:most-positive-word)))
+                                     (setf (svref v 0) y
+                                           (svref v 1) y)
+                                     nil))))
+             1)))
+
 #+sb-devel
 (with-test (:name (:assignment-convert :iterative-tail))
   (let ((converted nil))
