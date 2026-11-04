@@ -352,7 +352,9 @@
    this makes the system as a whole slower, but allows coverage of
    tests to be measured.")
 
+ ;; TODO: Which ones should be documented and made public?
  (:bitmapped-conset t)
+ (:sb-devel nil)
  (:nonstop-foreign-call nil)
  (:tls-based-mv-return nil)
  (:mark-region-gc nil)
