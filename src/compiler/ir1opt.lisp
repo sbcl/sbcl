@@ -3951,7 +3951,7 @@ not inlined.")
   #+sb-xc-host context
   #-sb-xc-host
   (source-to-string
-   ;; #'(NAMED-LAMBDA FOO ...) = > FOO. This loses a bit of context
+   ;; #'(NAMED-LAMBDA FOO ...) => FOO. This loses a bit of context
    ;; if FOO was redefined but the error is much easier to
    ;; comprehend. We should do something similar for local functions
    ;; once their source form is something more informative than (NAME

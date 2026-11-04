@@ -149,6 +149,7 @@
   (@slot-access section)
   (@stack-allocation section)
   (@representation-of-objects section)
+  (@efficiency-notes section)
   (@recognized-idioms section)
   (@global-and-always-bound-variables section)
   (@miscellaneous-efficiency-issues section))
@@ -569,8 +570,8 @@
   - Avoid use of the THE declaration within expressions. Not only does
     it clutter the code, but it is often unnecesary under [safe
     policies][ @type-declaration-checking]. If the need for a return
-    type assertion is revealed by efficiency notes during tuning, then
-    you can consider THE, but it is preferable to constrain the
+    type assertion is revealed by @EFFICIENCY-NOTES during tuning,
+    then you can consider THE, but it is preferable to constrain the
     argument types more, allowing the compiler to prove the desired
     result type.
 
@@ -586,7 +587,7 @@
   - Declarations are sometimes necessary for integer loop variables,
     since the compiler can't always prove that the value is of a good
     integer type. These declarations are best added during tuning,
-    when an efficiency note indicates the need.")
+    when an @EFFICIENCY-NOTE indicates the need.")
 
 (defsection @type-inference (:title "Type Inference"
                              :concepts (("type inference")
@@ -2234,7 +2235,7 @@
   variables at the beginning of the function, and doing any global
   assignments at the end.
 
-  Efficiency notes signal use of inefficient representations, so
+  @EFFICIENCY-NOTES signal use of inefficient representations, so
   programmers needn't continuously worry about the details of
   representation selection (see @REPRESENTATION-EFF-NOTE.)")
 
@@ -2266,7 +2267,7 @@
   compiler can't prove that a function always returns the same number
   of values, then it must use the unknown values return convention,
   which requires a descriptor representation. Pay attention to the
-  known return efficiency notes to avoid number consing.")
+  known return @EFFICIENCY-NOTES to avoid number consing.")
 
 (defsection @specialized-arrays (:title "Specialized Arrays"
                                  :concepts (("specialized array types")
@@ -2700,6 +2701,109 @@
   Sign Bit_ in Iserles and Powell (eds.) _The State of the Art in
   Numerical Analysis_, pp. 165-211, Clarendon Press, 1987).")
 
+(defsection @efficiency-notes (:title "Efficiency Notes"
+                               :concepts (("efficiency notes")
+                                          ("notes," "efficiency")
+                                          ("tuning")))
+  "Efficiency notes are messages that alert the user that the compiler
+  has chosen a relatively inefficient implementation for some
+  operation. Usually an efficiency note reflects the compiler's desire
+  for more type information. If the type of the values concerned is
+  known to the programmer, then additional declarations can be used to
+  get a more efficient implementation.
+
+  The main cause of inefficiency is the compiler's lack of adequate
+  information about the types of function argument and result values.
+
+  Efficiency notes are enabled whenever @SPEED is greater than its
+  default of `1`. See the deprecated SB-EXT:INHIBIT-WARNINGS
+  optimization quality in @COMPILER-POLICY for the full picture. See
+  also @CONTROLLING-VERBOSITY for some related knobs."
+  (@operation-efficiency-notes section)
+  (@representation-efficiency-notes section))
+
+(defsection @operation-efficiency-notes (:title "Operation Efficiency Notes")
+  "Many important operations have an inefficient general case (see
+  e.g. @GENERIC-ARITHMETIC) but have efficient implementations that
+  can usually be used if there is sufficient argument type
+  information.
+
+  Compiling this function with an obscure missing declaration:
+
+      (defun eff-note (x y z)
+        (declare (fixnum x y z)
+                 (optimize speed))
+        (zerop (mod (+ x y z) 3)))
+
+      ; in: DEFUN EFF-NOTE
+      ;     (+ X Y Z)
+      ;
+      ; note: forced to do +/SIGNED=>S128 (cost 8)
+      ;       unable to do inline fixnum arithmetic (cost 2) because:
+      ;       The first argument is a (INTEGER -9223372036854775808 9223372036854775806), not a FIXNUM.
+      ;       The result is a (VALUES
+      ;                        (INTEGER -13835058055282163712 13835058055282163709)
+      ;                        &OPTIONAL), not a (VALUES FIXNUM &OPTIONAL).
+
+  This rather cryptic efficiency note is trying to tell us that the
+  result of the intermediate computation `(+ X Y)`, which adds two
+  fixnums, can overflow the fixnum range, so the addition of the
+  intermediate sum to `Z` must be done less efficiently. This might be
+  fixed by providing more type information about the result of `(+ X
+  Y)`:
+
+      (defun eff-note (x y z)
+        (declare (fixnum x y z)
+                 (optimize speed))
+        (zerop (mod (+ (the fixnum (+ x y)) z) 3)))")
+
+(defsection @representation-efficiency-notes
+    (:title "Representation Efficiency Notes"
+     :concepts (("representation efficiency notes")
+                ("efficiency notes," "representation")))
+  "When operating on values that have @NON-DESCRIPTOR representations,
+  there can be a substantial time and @CONSING penalty for converting
+  to and from @DESCRIPTOR representations. For this reason, the
+  compiler gives an efficiency note whenever it is forced to do a
+  representation coercion more expensive than
+  SB-EXT:*EFFICIENCY-NOTE-COST-THRESHOLD*.
+
+  Inefficient representation coercions may be due to type uncertainty,
+  as in this example on a 64-bit platform:
+
+      (defun cf+ (x y)
+        (declare (double-float x y)
+                 (optimize speed))
+        (cons (+ x y) t))
+
+      ; in: DEFUN CF+
+      ;     (CONS (+ X Y) T)
+      ;
+      ; note: doing float to pointer coercion (cost 13), for:
+      ;       the first argument of CONS
+
+  The issue here is that a CONS can only hold @DESCRIPTORs. Thus, the
+  64-bit float result of `(+ X Y)` needs to be boxed (see
+  @FLOATING-POINT).
+
+  Inefficient representation conversions are often not due to type
+  uncertainty -- instead, they result from evaluating a non-descriptor
+  expression in a context that requires a descriptor result:
+
+  - assignment to or initialization of any data structure other than
+    @SPECIALIZED-ARRAYS, or
+
+  - assignment to a SPECIAL variable, or
+
+  - passing as an argument or returning as a value in any function
+    call that is not a local call (see
+    @NON-DESCRIPTORS-IN-LOCAL-CALL).
+
+  If such inefficient coercions appear in a hot spot in the program,
+  data structure redesign or program reorganization may be necessary
+  to improve efficiency. See e.g. @BLOCK-COMPILATION,
+  @REPRESENTATION-OF-OBJECTS and @PROFILING.")
+
 (defsection @recognized-idioms (:title "Recognized Idioms"
                                 :concepts ("modular arithmetic"
                                            ("arithmetic," "modular")
@@ -2751,7 +2855,6 @@
 
   - Advanced Compiler Use and Efficiency Hints
       - General Efficiency Hints
-      - Efficiency Notes
 
   Besides this information from the CMUCL manual, there are a few other
   points to keep in mind.
