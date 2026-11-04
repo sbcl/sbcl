@@ -2811,3 +2811,27 @@
              (trap '(print)))
          count)))
    ((t '(:boom :boom)) 2 :allow-conditions 'warning)))
+
+(with-test (:name (:delete-set :dynamic-extent :bug-2172663))
+  (checked-compile
+   '(lambda ()
+     (declare (optimize compilation-speed))
+     (let ((v5 1))
+       (min -12014818848224
+            (max -529565849163824
+                 (let* ((v1 2))
+                   (declare (dynamic-extent v1))
+                   (decf v5 (multiple-value-setq (v1) (decf v1))))))))
+   :allow-warnings t :allow-style-warnings t))
+
+(with-test (:name (:delete-set :dynamic-extent :bug-2172699))
+  (checked-compile
+   '(lambda (c d)
+     (identity
+      (let* ((v1 (1+ d)))
+        (declare (dynamic-extent v1))
+        (incf v1)
+        (restart-case (if c
+                          (identity (decf v1))
+                          (incf v1))))))
+   :allow-warnings t :allow-style-warnings t))
