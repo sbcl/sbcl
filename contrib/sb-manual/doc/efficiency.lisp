@@ -2150,55 +2150,48 @@
                                     ("representation" "of objects")
                                     ("consing," "overhead of")))
 
-  "Lisp's dynamic typing requires that it be possible to represent any
-  value with a fixed length object, known as a _descriptor_. This
-  fixed-length requirement is implicit in features such as
+  "To support dynamic typing and garbage collection, all Lisp objects
+  can be represented with a one-word object, known as a _descriptor_,
+  in which a few _tag_ bits carry information about the object's type and
+  allocation.
 
-  - Data types (like SIMPLE-VECTOR) that can contain any type of
-    object, and that can be destructively modified to contain
-    different objects (of possibly different types)
+  There are two kinds of descriptors:
 
-  - Functions that can be called with any type of argument, and that
-    can be redefined at run time
+  - _Immediate descriptor_ (or _tagged value_)
 
-  In order to save space, a descriptor is invariably represented as a
-  single word. Objects that can be directly represented in the
-  descriptor itself are said to be _immediate_. Descriptors for
-  objects larger than one word are in reality pointers to the memory
-  actually containing the object.
+      For example, @FIXNUMS and CHARACTERs fit into a machine word
+      along with the tag bits. Immediate descriptors are unboxed. The
+      presence of the tag bits has a very slight performance impact on
+      operations.
 
-  Representing objects using pointers has two major disadvantages:
+  - _Pointer descriptor_ (or _tagged pointer_)
 
-  - The memory pointed to must be allocated on the heap, so it must
-    eventually be freed by the garbage collector. Excessive heap
-    allocation of objects (see @CONSING) is inefficient in several
-    ways.
+      Objects larger than one word (such as CONSes) or objects that do
+      not fit into one word due to the tag bits (such as
+      @WORD-INTEGERS and SINGLE-FLOATs) are represented as aligned
+      pointers to a separately allocated memory area, where the
+      alignment allows some low bits to be used as the tag. Pointer
+      descriptors are boxed.
 
-  - Representing an object in memory requires the compiler to emit
-    additional instructions to read the actual value in from memory,
-    and then to write the value back after operating on it.
+      Boxing objects using pointers has two major disadvantages:
 
-  The introduction of garbage collection makes things even worse,
-  since the garbage collector must be able to determine whether a
-  descriptor is an immediate object or a pointer. This requires that a
-  few bits in each descriptor be dedicated to the garbage collector.
-  The loss of a few bits doesn't seem like much, but it has a major
-  efficiency implication -- objects whose natural machine
-  representation is a full word (@WORD-INTEGERS and SINGLE-FLOATs)
-  cannot have an immediate representation. So the compiler is forced
-  to use an unnatural immediate representation (such as FIXNUM) or a
-  natural pointer representation (with the attendant consing
-  overhead.)")
+      - The memory pointed to must be allocated on the heap, so it
+        must eventually be freed by the garbage collector. Excessive
+        @CONSING is inefficient in several ways.
+
+      - Representing an object in memory requires the compiler to emit
+        additional instructions to read the actual value in from
+        memory, and then to write the value back after operating on
+        it.")
 
 (defsection @non-descriptor (:title "Non-descriptor"
                              :concepts (("non-descriptor representation")
                                         ("stack numbers")))
-  "From the discussion above, we can see that the standard @DESCRIPTOR
-  representation has many problems, the worst being number consing.
-  Lisp compilers try to avoid these descriptor efficiency problems by
-  using _non-descriptor_ representations. A compiler that uses
-  non-descriptor representations can compile this function so that it
-  does no number consing:
+  "We saw that the standard @DESCRIPTOR representation has efficiency
+  problems, the worst being the @CONSING caused by boxing. SBCL tries
+  to avoid these by using _non-descriptor_ representations, which are
+  basically untagged immediates. For example, this function does not
+  cons numbers:
 
       (defun multby (vec n)
         (declare (type (simple-array single-float (*)) vec)
@@ -2217,21 +2210,22 @@
   contexts in which the compiler is forced to use a descriptor
   representation.
 
-  Many Lisp compilers support non-descriptor representations for float
-  types such as SINGLE-FLOAT and DOUBLE-FLOAT
-  (see @FLOATING-POINT-EFFICIENCY). SBCL adds support for full
-  @WORD-INTEGERS, characters (see @REPRESENTATION-OF-CHARACTERS) and
-  system area pointers (unconstrained pointers, see @UNTYPED-MEMORY).
-  Many Lisp compilers support @NON-DESCRIPTOR-VARIABLES and array
-  elements (section @SPECIALIZED-ARRAYS). SBCL adds support for
-  non-descriptor arguments and return values in @LOCAL-CALL
-  (see @NUMBERS-IN-LOCAL-CALL) and @SPECIALIZED-STUCTURE-SLOTS.")
+  SBCL supports non-descriptor representations for
+
+  - float types (see @FLOATING-POINT-EFFICIENCY),
+  - @WORD-INTEGERS,
+  - characters (see @REPRESENTATION-OF-CHARACTERS),
+  - system area pointers (unconstrained pointers, see @UNTYPED-MEMORY),
+  - local variables (see @NON-DESCRIPTOR-VARIABLES),
+  - array elements (section @SPECIALIZED-ARRAYS),
+  - arguments and return values in @LOCAL-CALL (see @NUMBERS-IN-LOCAL-CALL), and
+  - @SPECIALIZED-STUCTURE-SLOTS.")
 
 (defsection @non-descriptor-variables
     (:title "Non-descriptor Variables"
      :concepts (("variables," "non-descriptor")
                 ("type declarations," "variable")))
-  "In order to use a non-descriptor representation for a variable or
+  "In order to use a @NON-DESCRIPTOR representation for a variable or
   expression intermediate value, the compiler must be able to prove
   that the value is always of a particular type having a
   non-descriptor representation. @TYPE-INFERENCE often needs some help
@@ -2260,13 +2254,13 @@
   ordering problem. Although the compiler will eventually prove that
   the outer `X` is a `(SIGNED-BYTE 32)` within that ETYPECASE branch,
   the inner `X` would have been optimized away by that time. Declaring
-  the type makes let optimization more cautious.
-
-  Note that storing a value into a global (or SPECIAL) variable always
-  forces a descriptor representation. Wherever possible, you should
-  operate only on local variables, binding any referenced globals to
-  local variables at the beginning of the function, and doing any
-  global assignments at the end.
+  the type makes let optimization more cautious."
+  ;; FIXME: ^^^ check the above example
+  "Note that storing a value into a global variable always forces a
+  descriptor representation. Wherever possible, you should operate
+  only on local variables, binding any referenced globals to local
+  variables at the beginning of the function, and doing any global
+  assignments at the end.
 
   Efficiency notes signal use of inefficient representations, so
   programmers needn't continuously worry about the details of
@@ -2350,7 +2344,7 @@
   arithmetic, since @EFFICIENCY-NOTES will tell you when and where
   there is a problem.")
 
-(defsection @fixnums (:title "Fixnums" :concepts (("fixnums")
+(defsection @fixnums (:title "FIXNUMs" :concepts (("fixnums")
                                                   ("bignums")))
   "A fixnum is a _FIXed-precision NUMber_. In modern Lisp
   implementations, fixnums can be represented with an immediate
@@ -2659,7 +2653,7 @@
   an argument has a non-descriptor representation, then the argument
   will be passed in that representation. The easiest way to ensure
   that the argument type is known at compile time is to always declare
-  the argument type in the called function, like:
+  the argument type in the called function, like
 
       (defun 2+f (x)
         (declare (single-float x))
@@ -2683,8 +2677,8 @@
     (:title "Representation of Characters"
      :concepts (("characters")
                 ("strings")))
-  "SBCL also uses a non-descriptor representation for characters when
-  convenient. This improves the efficiency of string manipulation, but
+  "SBCL also uses a @NON-DESCRIPTOR representation for characters when
+  convenient. This improves the efficiency of string manipulation but
   is otherwise pretty invisible; characters have an immediate
   descriptor representation, so there is not a great penalty for
   converting a character to a descriptor. Nonetheless, it may
