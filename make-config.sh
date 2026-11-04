@@ -94,8 +94,12 @@ do
       --dynamic-space-size=)
         $optarg_ok && SBCL_DYNAMIC_SPACE_SIZE=$optarg
 	;;
+      # Undocumented developer option
+      --allow-unknown-features)
+        ALLOW_UNKNOWN_FEATURES=yes
+        ;;
       --with | --with%)
-        if [ "$option" = "--with" ]; then
+        if [ "$option" = "--with" -a -z "$ALLOW_UNKNOWN_FEATURES" ]; then
             WITH_FEATURES="$WITH_FEATURES (feature :$optarg)"
         else
             WITH_FEATURES="$WITH_FEATURES :$optarg"
@@ -105,7 +109,7 @@ do
         fi
         ;;
       --without | --without%)
-        if [ "$option" = "--without" ]; then
+        if [ "$option" = "--without" -a -z "$ALLOW_UNKNOWN_FEATURES" ]; then
             WITHOUT_FEATURES="$WITHOUT_FEATURES (feature :$optarg)"
         else
             WITHOUT_FEATURES="$WITHOUT_FEATURES :$optarg"
