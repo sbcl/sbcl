@@ -115,17 +115,8 @@
 (define-vop (check-bound)
   (:translate %check-bound)
   (:args (array :scs (descriptor-reg constant))
-         (bound :scs (any-reg descriptor-reg)
-                :load-if (not (and (sc-is bound immediate)
-                                   (not (sc-is index immediate))
-                                   (typep (tn-value bound)
-                                          '(and sc-offset
-                                            (satisfies fixnum-add-sub-immediate-p))))))
-         (index :scs (any-reg descriptor-reg)
-                :load-if (not (and (sc-is index immediate)
-                                   (typep (tn-value index)
-                                          '(and sc-offset
-                                            (satisfies fixnum-add-sub-immediate-p)))))))
+         (bound :scs (any-reg descriptor-reg (immediate (typep (tn-value tn) 'sc-offset))))
+         (index :scs (any-reg descriptor-reg (immediate (typep (tn-value tn) 'sc-offset)))))
   (:variant-vars %test-fixnum)
   (:variant t)
   (:vop-var vop)
@@ -136,47 +127,52 @@
                      (generate-error-code vop 'sb-kernel::invalid-vector-index-error
                                           array index)
                      (generate-error-code vop 'invalid-array-index-error
-                                          array bound index)))
-          (bound (if (sc-is bound immediate)
-                     (let ((value (tn-value bound)))
-                       (cond ((and %test-fixnum
-                                   (power-of-two-limit-p (1- value)))
-                              (lognot (fixnumize (1- value))))
-                             ((sc-is index any-reg descriptor-reg)
-                              (fixnumize value))
-                             (t
-                              value)))
-                     bound))
-          (index (if (sc-is index immediate)
-                     (let ((value (tn-value index)))
-                       (if (sc-is bound any-reg descriptor-reg)
-                           (fixnumize value)
-                           value))
-                     index)))
-      (cond ((eql bound -1)
-             (inst cbnz index error))
-            ((typep bound '(integer * -1))
-             ;; Power of two bound, can be checked for fixnumness at
-             ;; the same time as it always occupies a consecutive bit
-             ;; range, everything else, including the tag, has to be
-             ;; zero.
-             (inst tst index bound)
-             (inst b :ne error))
-            (t
-             (when (and %test-fixnum (not (integerp index)))
-               (%test-fixnum index nil error t))
-             (cond ((integerp bound)
-                    (inst cmp index bound)
-                    (inst b :hs error))
-                   ((eql index 0)
-                    (inst cbz bound error))
-                   ((and (tn-p index)
-                         (sc-is index unsigned-reg signed-reg))
-                    (inst cmp index (lsr bound 1))
-                    (inst b :hs error))
-                   (t
-                    (inst cmp bound index)
-                    (inst b :ls error))))))))
+                                          array bound index))))
+      (if (and (sc-is bound immediate)
+               (sc-is index immediate))
+          (when (>= (tn-value index)
+                    (tn-value bound))
+            (inst b error))
+          (let ((bound (if (sc-is bound immediate)
+                           (let ((value (tn-value bound)))
+                             (cond ((and %test-fixnum
+                                         (power-of-two-limit-p (1- value)))
+                                    (lognot (fixnumize (1- value))))
+                                   ((sc-is index any-reg descriptor-reg)
+                                    (fixnumize value))
+                                   (t
+                                    value)))
+                           bound))
+                (index (if (sc-is index immediate)
+                           (let ((value (tn-value index)))
+                             (if (sc-is bound any-reg descriptor-reg)
+                                 (fixnumize value)
+                                 value))
+                           index)))
+            (cond ((eql bound -1)
+                   (inst cbnz index error))
+                  ((typep bound '(integer * -1))
+                   ;; Power of two bound, can be checked for fixnumness at
+                   ;; the same time as it always occupies a consecutive bit
+                   ;; range, everything else, including the tag, has to be
+                   ;; zero.
+                   (inst tst index bound)
+                   (inst b :ne error))
+                  (t
+                   (when (and %test-fixnum (not (integerp index)))
+                     (%test-fixnum index nil error t))
+                   (cond ((integerp bound)
+                          (inst cmp index (add-sub-immediate bound))
+                          (inst b :hs error))
+                         ((eql index 0)
+                          (inst cbz bound error))
+                         ((and (tn-p index)
+                               (sc-is index unsigned-reg signed-reg))
+                          (inst cmp index (lsr bound 1))
+                          (inst b :hs error))
+                         (t
+                          (inst cmp bound (add-sub-immediate index))
+                          (inst b :ls error))))))))))
 
 (define-vop (check-bound/fast check-bound)
   (:policy :fast)
@@ -186,18 +182,20 @@
 (define-vop (check-bound/fixnum check-bound)
   (:args (array)
          (bound)
-         (index :scs (any-reg)))
+         (index :scs (any-reg (immediate (typep (tn-value tn) 'sc-offset)))))
   (:arg-types * * tagged-num)
   (:variant nil)
+  (:related-args index)
   (:variant-cost 4))
 
 (define-vop (check-bound/untagged check-bound)
   (:args (array)
          (bound)
-         (index :scs (unsigned-reg signed-reg)))
+         (index :scs (unsigned-reg signed-reg (immediate (typep (tn-value tn) 'sc-offset)))))
   (:arg-types * *
               (:or unsigned-num signed-num))
   (:variant nil)
+  (:related-args index)
   (:variant-cost 5))
 ;;;; Accessors/Setters
 

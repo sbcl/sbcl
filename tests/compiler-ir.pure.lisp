@@ -1016,14 +1016,14 @@
               (let (y)
                 (setf y (aref a 0))
                 (aref a (logand y #xF))))
-           'logand :untagged)
+           'logand #+arm64 nil #-arm64 :untagged)
     (check `(lambda (n a)
               (declare ((simple-array (unsigned-byte 32) (100)) a))
               (let ((y 0))
                 (when n
                   (setf y (aref a 0)))
                 (aref a (logand y #xF))))
-           'logand :untagged)))
+           'logand #+arm64 nil #-arm64 :untagged)))
 
 #+sb-devel
 (with-test (:name (:assignment-lambda :substitute-and-delete))
