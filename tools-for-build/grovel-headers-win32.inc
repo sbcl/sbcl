@@ -214,8 +214,6 @@
     DEFTYPE("wst-dev-t", wst_dev_t);
     DEFTYPE("wst-ino-t", wst_ino_t);
     DEFTYPE("wst-off-t", wst_off_t);
-    DEFTYPE("wst-blksize-t", wst_blksize_t);
-    DEFTYPE("wst-blkcnt-t", wst_blkcnt_t);
     DEFTYPE("wst-nlink-t", wst_nlink_t);
     DEFTYPE("wst-uid-t", wst_uid_t);
     DEFTYPE("wst-gid-t", wst_gid_t);

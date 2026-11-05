@@ -41,8 +41,6 @@ featurep os-provides-dlopen
 
 featurep os-provides-dladdr
 
-featurep os-provides-blksize-t
-
 featurep os-provides-getprotoby-r
 
 featurep os-provides-poll

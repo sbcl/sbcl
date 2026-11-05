@@ -33,6 +33,7 @@
  * employed. */
 
 #include "genesis/sbcl.h"
+#include "lispobj.h" // for uword_t
 
 /* We use an extra layer of aliasing because Linux/MIPS struct stat
    doesn't use dev_t. This type is not defined on the Lisp side. */
@@ -50,17 +51,6 @@ typedef unsigned long long wst_dev_t;
 typedef ino_t wst_ino_t;
 typedef aliased_dev_t wst_dev_t;
 typedef off_t wst_off_t;
-#endif
-
-#ifdef LISP_FEATURE_OS_PROVIDES_BLKSIZE_T
-typedef blksize_t wst_blksize_t;
-typedef blkcnt_t wst_blkcnt_t;
-#elif defined(LISP_FEATURE_ANDROID)
-typedef unsigned long wst_blksize_t;
-typedef unsigned long long wst_blkcnt_t;
-#else
-typedef unsigned long wst_blksize_t;
-typedef unsigned long wst_blkcnt_t;
 #endif
 
 #ifdef LISP_FEATURE_WIN32 /* Win32 lacks nlink_t, st_uid, st_gid.*/
@@ -93,8 +83,10 @@ struct stat_wrapper {
     wst_gid_t     wrapped_st_gid;         /* group ID of owner */
     wst_dev_t     wrapped_st_rdev;        /* device type (if inode device) */
     wst_off_t     wrapped_st_size;        /* total size, in bytes */
-    wst_blksize_t wrapped_st_blksize;     /* blocksize for filesystem I/O */
-    wst_blkcnt_t  wrapped_st_blocks;      /* number of blocks allocated */
+    /* The OS's blksize_t and blkcnt_t, if it even has them, are irrelevant.
+     * These two slots are what we say they are. */
+    uword_t       wrapped_st_blksize;     /* blocksize for filesystem I/O */
+    uword_t       wrapped_st_blocks;      /* number of blocks allocated */
     time_t        wrapped_st_atime;       /* time_t of last access */
     time_t        wrapped_st_mtime;       /* time_t of last modification */
     time_t        wrapped_st_ctime;       /* time_t of last change */

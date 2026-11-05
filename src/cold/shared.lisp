@@ -585,8 +585,8 @@
   ;; Tell FIND-BOOTSTRAP-FILE that the stem is BUILD-DEPENDENT for generated files,
   ;; because "output/stuff-groveled-from-headers" can be sensitive to the
   ;; architecture even for a single OS - e.g.
-  ;;  (define-alien-type wst-blksize-t (signed 32)) ; arm64 Linux
-  ;;  (define-alien-type wst-blksize-t (signed 64)) ; x86-64 Linux
+  ;;  (define-alien-type wst-nlink-t (unsigned 32)) ; arm64 Linux
+  ;;  (define-alien-type wst-nlink-t (unsigned 64)) ; x86-64 Linux
   ;; If running multiarchitecture builds at the same time out of one tree,
   ;; it is essential that we look in *BUILD-DEPENDENT-GENERATED-SOURCES-ROOT*.
   (concatenate 'string (find-bootstrap-file (stem-remap-target stem) t) ".lisp"))

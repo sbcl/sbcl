@@ -62,8 +62,6 @@
           :GCC-TLS :USE-SYS-MMAP
           ;;; Enforce using of posix semaphores on Darwin instead of dispatch.
           :USE-DARWIN-POSIX-SEMAPHORES
-          ;; only for 'src/runtime/wrap.h'
-          :OS-PROVIDES-BLKSIZE-T
           ;; only for src/runtime/run-program.c
           :OS-PROVIDES-CLOSE-RANGE-WRAPPER)"))
        (public-features

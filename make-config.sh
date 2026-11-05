@@ -821,7 +821,7 @@ if [ "$sbcl_os" = darwin -a  "$sbcl_arch" = arm64 ]
 then
     # Launching new executables is pretty slow on macOS, but this configuration is pretty uniform
     echo ' :little-endian :os-provides-dlopen :os-provides-dladdr' >> $ltf
-    echo ' :os-provides-blksize-t :os-provides-posix-spawn' >> $ltf
+    echo ' :os-provides-posix-spawn' >> $ltf
 else
     # Use a little C program to try to guess the endianness.  Ware
     # cross-compilers!
