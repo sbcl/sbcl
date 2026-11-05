@@ -99,7 +99,7 @@
     (let ((nfp-tn (current-nfp-tn vop)))
       (when nfp-tn
         (let ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
-          (inst sub nfp-tn nsp-tn nbytes)
+          (inst sub nfp-tn nsp-tn (add-sub-immediate nbytes))
           (inst mov-sp nsp-tn nfp-tn))))))
 
 (define-vop (allocate-frame)

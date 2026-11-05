@@ -5398,3 +5398,23 @@
                (setq x (+ l x))))
        x))
    unsigned-byte))
+
+;;; A number stack frame too big for an immediate operand, set up by
+;;; the XEP and by a local call.
+(with-test (:name :large-number-stack-frame)
+  (let* ((n 600)
+         (xs (loop repeat n collect (gensym)))
+         (fun (checked-compile
+               `(lambda (v f)
+                  (declare (type (simple-array sb-ext:word (*)) v) (function f))
+                  (flet ((bump ()
+                           (let ,(loop for x in xs for i from 0 collect `(,x (aref v ,i)))
+                             (funcall f)
+                             ,@(loop for x in xs for i from 0
+                                     collect `(setf (aref v ,i)
+                                                    (logand (1+ ,x) sb-ext:most-positive-word))))))
+                    (bump)
+                    (bump)))))
+         (v (make-array n :element-type 'sb-ext:word :initial-element 0)))
+    (loop repeat 1000 do (funcall fun v (lambda () (fill v 7))))
+    (assert (every (lambda (x) (= x 2000)) v))))
