@@ -23,3 +23,14 @@
     (try 16 1)
     (try 32 2)
     (try 64 3)))
+
+(with-test (:name (:ldp-stp :aligned))
+  (dolist (line (ctu:disassembly-lines
+                 '(lambda (a b c f)
+                    (declare (function f))
+                    (funcall f)
+                    (list a b c))))
+    (let ((p (search "[CFP, #" line)))
+      (when (and p (or (search "LDP" line) (search "STP" line)))
+        (assert (zerop (mod (parse-integer line :start (+ p 7) :junk-allowed t)
+                            16)))))))

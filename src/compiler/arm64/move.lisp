@@ -345,6 +345,7 @@
                (and (= (abs (- (tn-offset tn1)
                                (tn-offset tn2)))
                        1)
+                    (evenp (min (tn-offset tn1) (tn-offset tn2)))
                     (ldp-stp-offset-p (* (min (tn-offset tn1)
                                               (tn-offset tn2))
                                          n-word-bytes)
