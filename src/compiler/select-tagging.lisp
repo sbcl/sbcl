@@ -52,7 +52,7 @@
 (defun min-cut (net)
   (declare (optimize speed))
   (macrolet ((data-vector (x)
-               #+sb-devel x
+               #+sb-xc-host x
                #-sb-xc-host
                `(truly-the (simple-array * (*)) (%array-data ,x))))
     (let* ((to (data-vector (net-to net)))
