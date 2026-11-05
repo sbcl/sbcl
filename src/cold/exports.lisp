@@ -2628,7 +2628,6 @@ be submitted as a \\CDR")
 
            #+x86 "SET-FPU-WORD-FOR-C"
            #+x86 "SET-FPU-WORD-FOR-LISP"
-           "ALIGN-STACK-POINTER"
            "ALIEN-FUNCALL-SAVES-FP-AND-PC"
            "ALLOC-ALIEN-STACK-SPACE" "ALLOC-NUMBER-STACK-SPACE"
            "ALLOCATE-CODE-OBJECT" "ALLOCATE-FRAME"
