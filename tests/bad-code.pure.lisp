@@ -1341,3 +1341,13 @@
                          (declare ((integer 5 9) n))
                          (make-array d :initial-contents #(1 2)))
                       :allow-warnings t))))
+
+(with-test (:name :unused-set-variable)
+  (assert (nth-value 3
+                     (checked-compile
+                      `(lambda ()
+                         (declare (optimize debug))
+                         (let (x)
+                           (setf x #())
+                           1))
+                      :allow-style-warnings t))))

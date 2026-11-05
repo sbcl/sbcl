@@ -1328,3 +1328,13 @@
      (flet ((n () (funcall f x)))
        (+ (n) (n))))
    (mod 9)))
+
+(with-test (:name :locally-no-references)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (let (x)
+           (locally (declare (float x))
+             (setf x 1.0)
+             x)))
+    (() 1.0)))
