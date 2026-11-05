@@ -33,7 +33,7 @@
             sb-vm::add-sub-immediate
             sb-vm::32-bit-reg sb-vm::single-reg sb-vm::double-reg
             sb-vm::complex-single-reg sb-vm::complex-double-reg
-            sb-vm::tmp-tn sb-vm::wzr-tn sb-vm::zr-tn sb-vm::nsp-offset)))
+            sb-vm::tmp-tn sb-vm::wzr-tn sb-vm::zr-tn sb-vm::nsp-tn sb-vm::nsp-offset)))
 
 
 
@@ -526,7 +526,11 @@
      ,@printers
      (:emitter
       (let ((size (reg-size rn)))
-       (cond ((or (register-p rm)
+       (cond ((and (register-p rm) (or (eq rd nsp-tn) (eq rn nsp-tn)))
+              ;; Only the extended register form reads register 31 as SP.
+              (emit-add-sub-ext-reg segment size ,op (gpr-offset rm)
+                                    #b011 0 (gpr-offset rn) (gpr-offset rd)))
+             ((or (register-p rm)
                   (shifter-operand-p rm))
               (multiple-value-bind (shift amount rm) (encode-shifted-register rm)
                 (emit-add-sub-shift-reg segment size ,op shift (gpr-offset rm)
@@ -576,7 +580,10 @@
                                   (fpr-offset rn)
                                   (fpr-offset rd)))
           (let ((size (reg-size rn)))
-            (cond ((or (register-p rm)
+            (cond ((and (register-p rm) (or (eq rd nsp-tn) (eq rn nsp-tn)))
+                   (emit-add-sub-ext-reg segment size ,op (gpr-offset rm)
+                                         #b011 0 (gpr-offset rn) (gpr-offset rd)))
+                  ((or (register-p rm)
                        (shifter-operand-p rm))
                    (multiple-value-bind (shift amount rm) (encode-shifted-register rm)
                      (emit-add-sub-shift-reg segment size ,op shift (gpr-offset rm)

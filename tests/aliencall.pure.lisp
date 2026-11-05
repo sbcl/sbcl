@@ -66,3 +66,19 @@
            (concatenation2 (alien-funcall strcat sap sap)))
       (assert (eq concatenation1 concatenation2))
       (free-alien str))))
+
+;;; SP has to move below a buffer too big for an immediate operand.
+(with-test (:name (with-alien :large-buffer))
+  (let ((clobber (checked-compile
+                  '(lambda ()
+                     (with-alien ((buf (array (unsigned 8) 5000)))
+                       (dotimes (i 5000) (setf (deref buf i) 255))))))
+        (keep (checked-compile
+               '(lambda (v f)
+                  (declare (type (simple-array sb-ext:word (*)) v) (function f))
+                  (let ((x (aref v 0)))
+                    (funcall f)
+                    x)))))
+    (assert (= (funcall keep (make-array 1 :element-type 'sb-ext:word :initial-element 42)
+                        clobber)
+               42))))
