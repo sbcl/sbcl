@@ -1602,16 +1602,11 @@
       (abort-ir1-transform "Can't specify :DISPLACED-INDEX-OFFSET without :DISPLACED-TO"))
     (when (and displaced-to
                (or initial-element initial-contents))
-      (if (types-equal-or-intersect (lvar-type displaced-to)
-                                    (specifier-type 'null))
-          (give-up-ir1-transform ":DISPLACED-TO potentially used with ~S"
-                                 (if initial-element
-                                     :initial-element
-                                     :initial-contents))
-          (abort-ir1-transform "Can't specify :DISPLACED-TO and ~S"
-                               (if initial-element
-                                   :initial-element
-                                   :initial-contents))))
+      (unless (lvar-intersectp displaced-to null)
+        (abort-ir1-transform "Can't specify :DISPLACED-TO and ~S"
+                             (if initial-element
+                                 :initial-element
+                                 :initial-contents))))
     (let ((fp-type (and fill-pointer
                         (lvar-type fill-pointer))))
       (when (and fp-type
@@ -1681,12 +1676,16 @@
                                      (sb-vm:saetp-typecode saetp)
                                      (give-up-ir1-transform))
                                 ,(sb-vm:saetp-n-bits-shift saetp)
+                                ,@(when displaced-to
+                                    (maybe-arg initial-element))
                                 ,@(maybe-arg initial-contents)
                                 ,@(maybe-arg adjustable)
                                 ,@(maybe-arg fill-pointer)
                                 ,@(maybe-arg displaced-to)
                                 ,@(maybe-arg displaced-index-offset))))
-          (cond ((not initial-element) creation-form)
+          (cond ((or (not initial-element)
+                     displaced-to)
+                 creation-form)
                 ;; with ubsan the call to %MAKE-ARRAY needs to see the :INITIAL-ELEMENT
                 ;; even if it looks like the default, otherwise %MAKE-ARRAY reserves the right
                 ;; to scribble on the array. Same for allocators that don't prezero

@@ -1841,47 +1841,90 @@
                               (type-specifier type1)
                               (type-specifier type2))))))))
 
-(defoptimizer (%make-array ir2-hook) ((dimensions widetag n-bits &key initial-contents displaced-to &allow-other-keys) node)
+(defun make-array-vector-dimensions-interval (dims)
+  (cond ((lvar-subtypep dims integer)
+         (type-approximate-interval (lvar-type dims) t))
+        ((constant-lvar-p dims)
+         (let ((val (lvar-value dims)))
+           (when (typep val '(cons unsigned-byte null))
+             (let ((n (car val)))
+               (make-interval :low n :high n)))))
+        ((cmatch (dims :transform nil)
+           ((:or (list (:type unsigned-byte n))
+                 (list* (:type unsigned-byte n) (:type null)))
+            (type-approximate-interval (lvar-type n) t))))))
+
+(defun check-initial-contents-dimensions (dimensions initial-contents node)
+  (flet ((w (format &rest args)
+           (let ((*compiler-error-context* node))
+             (apply #'compiler-warn format args))))
+    (let ((int (make-array-vector-dimensions-interval dimensions)))
+      (when int
+        (let ((c-int (if (lvar-subtypep initial-contents integer)
+                         (type-approximate-interval (lvar-type initial-contents) t)
+                         (multiple-value-bind (max min) (sequence-lvar-dimensions initial-contents)
+                           (when (and max min)
+                             (make-interval :low min :high max))))))
+          (when (and c-int
+                     (not (interval-intersect-p int c-int)))
+            (w "Bad :initial-contents of length (integer ~a ~a) for a vector of length (integer ~a ~a)"
+               (interval-low c-int) (interval-high c-int) (interval-low int) (interval-high int))))))))
+
+(defoptimizer (%make-array ir2-hook) ((dimensions widetag n-bits &key initial-element initial-contents displaced-to &allow-other-keys) node)
   (when (and (constant-lvar-p widetag)
              (or initial-contents
                  displaced-to))
     (let* ((saetp (find (lvar-value widetag) sb-vm:*specialized-array-element-type-properties*
                         :key #'sb-vm:saetp-typecode))
            (element-type (sb-vm:saetp-ctype saetp)))
-      (cond ((when displaced-to
-               (let* ((displaced-type (lvar-type displaced-to))
-                      (types (ctype-array-specialized-element-types displaced-type)))
-                 (unless (or (eq types *wild-type*)
-                             (or (not types)
-                                 (find element-type types)))
-                   (let ((*compiler-error-context* node))
-                     (compiler-warn "Incompatible :displaced-to ~s for :element-type ~a."
-                                    (type-specifier displaced-type)
-                                    (sb-vm:saetp-specifier saetp))
-                     t)))))
-            (initial-contents
-             (let* ((initial-contents-type (lvar-type initial-contents))
-                    (initial-contents-element-type (type-array-element-type initial-contents-type)))
-               (cond ((not (or (eq initial-contents-element-type *wild-type*)
-                               (types-equal-or-intersect element-type initial-contents-element-type)))
-                      (let ((*compiler-error-context* node))
-                        (compiler-warn "Incompatible :initial-contents ~s for :element-type ~a."
-                                       (type-specifier initial-contents-type)
-                                       (sb-vm:saetp-specifier saetp))))
-                     ((constant-lvar-p initial-contents)
-                      (let ((initial-contents (lvar-value initial-contents)))
-                        (when (sequencep initial-contents)
-                          (map nil (lambda (x)
-                                     (unless (or (ctypep x element-type)
-                                                 (and (not (csubtypep (lvar-type dimensions) (specifier-type 'sequence)))
-                                                      (sequencep x)))
-                                       (let ((*compiler-error-context* node))
-                                         (compiler-warn ":initial-contents has an element ~s incompatible with :element-type ~a."
-                                                        x
-                                                        (type-specifier element-type)))
-                                       (return-from %make-array-ir2-hook-optimizer))
-                                     x)
-                               initial-contents)))))))))))
+      (flet ((w (format &rest args)
+               (let ((*compiler-error-context* node))
+                 (apply #'compiler-warn format args)
+                 (return-from %make-array-ir2-hook-optimizer))))
+        (when displaced-to
+          (let* ((displaced-type (lvar-type displaced-to))
+                 (types (ctype-array-specialized-element-types displaced-type)))
+            (unless (or (eq types *wild-type*)
+                        (or (not types)
+                            (find element-type types)))
+              (w "Incompatible :displaced-to ~s for :element-type ~a."
+                 (type-specifier displaced-type)
+                 (sb-vm:saetp-specifier saetp)))))
+        (when initial-contents
+          (let* ((initial-contents-type (lvar-type initial-contents))
+                 (initial-contents-element-type (type-array-element-type initial-contents-type)))
+            (cond ((not (or (eq initial-contents-element-type *wild-type*)
+                            (types-equal-or-intersect element-type initial-contents-element-type)))
+                   (w "Incompatible :initial-contents ~s for :element-type ~a."
+                      (type-specifier initial-contents-type)
+                      (sb-vm:saetp-specifier saetp)))
+                  ((constant-lvar-p initial-contents)
+                   (let ((initial-contents (lvar-value initial-contents)))
+                     (when (sequencep initial-contents)
+                       (map nil (lambda (x)
+                                  (unless (or (ctypep x element-type)
+                                              (and (not (csubtypep (lvar-type dimensions) (specifier-type 'sequence)))
+                                                   (sequencep x)))
+                                    (w ":initial-contents has an element ~s incompatible with :element-type ~a."
+                                       x
+                                       (type-specifier element-type)))
+                                  x)
+                            initial-contents))))))
+          (when (and (not (node-intersectp node (array * ())))
+                     (not (lvar-intersectp initial-contents sequence)))
+            (w ":initial-contents ~a is not a sequence"
+               (type-specifier (lvar-type initial-contents))))
+          (check-initial-contents-dimensions dimensions initial-contents node))
+        (when (and initial-element
+                   (not (types-equal-or-intersect element-type (lvar-type initial-element))))
+          (w "Incompatible :initial-element ~a for upgraded-element-type ~a"
+             (type-specifier (lvar-type initial-element))
+             (type-specifier element-type)))))))
+
+(defoptimizers ir2-hook (sb-vm::initial-contents-list-error
+                         sb-vm::initial-contents-error)
+    ((initial-contents dimensions) node)
+  (check-initial-contents-dimensions dimensions initial-contents node))
 
 (defun check-sequence-item (item seq node format-string)
   (let ((seq-type (lvar-type seq))

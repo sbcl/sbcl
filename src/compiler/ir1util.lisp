@@ -365,7 +365,7 @@
 (defmacro lvar-intersection  (lvar type)
   `(type-intersection (lvar-type ,lvar) (specifier-type ',type)))
 
-(defmacro node-subtypep  (node type &key asserted nth-value)
+(defmacro node-subtypep (node type &key asserted nth-value)
   (let ((single-value (and (not nth-value)
                            (not (typep type '(cons (eql values)))))))
     `(let ((node ,node))
@@ -380,6 +380,24 @@
                (aver asserted)
                `(csubtypep (mv-asserted-type node ,nth-value)
                            (specifier-type ',type)))
+              (t
+               (bug "Implement"))))))
+
+(defmacro node-intersectp (node type &key asserted nth-value)
+  (let ((single-value (and (not nth-value)
+                           (not (typep type '(cons (eql values)))))))
+    `(let ((node ,node))
+       ,(cond (single-value
+               `(types-equal-or-intersect (single-value-type
+                                           ,(if asserted
+                                                `(or (node-checked-type node)
+                                                     (node-derived-type node))
+                                                `(node-derived-type node)))
+                                          (specifier-type ',type)))
+              (nth-value
+               (aver asserted)
+               `(types-equal-or-intersect (mv-asserted-type node ,nth-value)
+                                          (specifier-type ',type)))
               (t
                (bug "Implement"))))))
 

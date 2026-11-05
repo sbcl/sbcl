@@ -1292,9 +1292,40 @@
                          (progv '(2) v))
                       :allow-warnings t))))
 
-(with-test (:name :make-array-displaced-to)
+(with-test (:name :make-array-bad-arguments)
   (assert (nth-value 2
                      (checked-compile
                       `(lambda ()
                          (make-array 1 :displaced-to "a"))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (d)
+                         (make-array 1 :displaced-to d
+                                       :initial-contents 10))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (d)
+                         (make-array 5 :displaced-to d
+                                       :initial-contents '(10)))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (d)
+                         (make-array 5 :displaced-to d
+                                       :element-type 'character
+                                       :initial-element 2))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (d)
+                         (declare ((integer 5 9) n))
+                         (make-array d :initial-contents '(1)))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (d)
+                         (declare ((integer 5 9) n))
+                         (make-array d :initial-contents #(1 2)))
                       :allow-warnings t))))

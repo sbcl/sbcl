@@ -49,11 +49,6 @@
   (and (simple-vector-p object)
        (test-header-data-bit object (ash sb-vm:vector-weak-flag sb-vm:array-flags-data-position))))
 
-(defun initial-contents-error (content-length length)
-  (error "There are ~W elements in the :INITIAL-CONTENTS, but ~
-         the vector length is ~W."
-         content-length length))
-
 (defun make-weak-vector (length &key (initial-contents nil contents-p)
                                      (initial-element nil element-p))
   "Allocate a weak vector of LENGTH elements. See MAKE-ARRAY for a

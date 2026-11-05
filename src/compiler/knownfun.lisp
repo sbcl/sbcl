@@ -491,11 +491,13 @@
 
 ;;; Return MAX MIN
 (defun sequence-lvar-dimensions (lvar)
-  (cond ((constant-lvar-p lvar)
-         (let ((value (lvar-value lvar)))
-           (and (proper-sequence-p value)
-                (let ((length (length value)))
-                  (values length length)))))
+  (cond ((not lvar)
+         (values nil nil))
+        ((constant-lvar-p lvar)
+            (let ((value (lvar-value lvar)))
+              (and (proper-sequence-p value)
+                   (let ((length (length value)))
+                     (values length length)))))
         ((csubtypep (lvar-type lvar) (specifier-type 'cons))
          (values nil 1))
         (t

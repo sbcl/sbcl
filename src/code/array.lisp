@@ -538,6 +538,11 @@
              (length list) length)
       (error ":INITIAL-CONTENTS is not a proper list.")))
 
+(defun initial-contents-error (content-length length)
+  (error "There are ~W elements in the :INITIAL-CONTENTS, but ~
+         the vector length is ~W."
+         content-length length))
+
 (declaim (inline fill-vector-initial-contents))
 (defun fill-vector-initial-contents (length vector initial-contents)
   (declare (index length)
