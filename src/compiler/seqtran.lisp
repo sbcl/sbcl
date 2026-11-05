@@ -1751,6 +1751,8 @@
 (deftransform replace ((seq1 seq2 &key (start1 0) end1)
                        ((or null (simple-array * (*))) list &key (:start1 t) (:end1 t)) *
                        :node node)
+  (delay-ir1-optimizer node :constraint)
+  (check-replace-element-types node seq1 seq2 :abort t)
   (upgraded-element-type-specifier-or-give-up seq1)
   `(let* ((len1 (length seq1))
           (start1 ,(if start1
@@ -1801,14 +1803,24 @@
                        :node node)
   (transform-replace nil node)))
 
-(defoptimizer (replace ir2-hook) ((seq1 seq2 &key start1 end1 start2 end2) node)
+(defun check-replace-element-types (node seq1 seq2 &key start2 end2 abort)
   (flet ((element-type (lvar)
-           (type-array-element-type (lvar-type lvar))))
+           (type-array-element-type (lvar-type lvar)))
+         (w (format &rest args)
+           (cond (abort
+                  (let ((*compiler-error-context* node))
+                    (apply #'compiler-warn format args)
+                    t)
+                  (setf (combination-kind node) :error)
+                  (abort-ir1-transform node))
+                 (t
+                  (let ((*compiler-error-context* node))
+                    (apply #'compiler-warn format args)
+                    t)))))
     (let ((type1 (element-type seq1))
           (type2 (element-type seq2)))
-      (check-sequence-ranges seq1 start1 end1 node :suffix 1 :name 'target-sequence1)
-      (check-sequence-ranges seq2 start2 end2 node :suffix 2 :name 'source-sequence2)
-      (cond ((eq type1 *wild-type*))
+      (cond ((eq type1 *wild-type*)
+             nil)
             ((block nil
                (when (constant-lvar-p seq2)
                  (let ((sequence (lvar-value seq2))
@@ -1825,21 +1837,28 @@
                    (when (and (<= start (length sequence))
                               (or (not end)
                                   (<= end (length sequence))))
-                       (map nil (lambda (x)
-                                  (unless (ctypep x type1)
-                                    (let ((*compiler-error-context* node))
-                                      (compiler-warn "The source sequence has an element ~s incompatible with the target array element type ~a."
-                                                     x
-                                                     (type-specifier type1)))
-                                    (return-from replace-ir2-hook-optimizer))
-                                  x)
-                            (subseq sequence start end)))))))
-            ((eq type2 *wild-type*))
+                     (map nil (lambda (x)
+                                (unless (ctypep x type1)
+                                  (let ((*compiler-error-context* node))
+                                    (compiler-warn "The source sequence has an element ~s incompatible with the target array element type ~a."
+                                                   x
+                                                   (type-specifier type1)))
+                                  (return-from check-replace-element-types t))
+                                x)
+                          (subseq sequence start end)))))))
+            ((eq type2 *wild-type*)
+             nil)
             ((not (types-equal-or-intersect type1 type2))
              (let ((*compiler-error-context* node))
                (compiler-warn "Incompatible array element types: ~a and ~a"
                               (type-specifier type1)
-                              (type-specifier type2))))))))
+                              (type-specifier type2))
+               t))))))
+
+(defoptimizer (replace ir2-hook) ((seq1 seq2 &key start1 end1 start2 end2) node)
+  (check-sequence-ranges seq1 start1 end1 node :suffix 1 :name 'target-sequence1)
+  (check-sequence-ranges seq2 start2 end2 node :suffix 2 :name 'source-sequence2)
+  (check-replace-element-types node seq1 seq2 :start2 start2 :end2 end2))
 
 (defun make-array-vector-dimensions-interval (dims)
   (cond ((lvar-subtypep dims integer)

@@ -758,6 +758,18 @@
                          (declare (string x))
                          (replace x #(1 2 3)))
                       :allow-warnings 'warning)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x)
+                         (declare (simple-base-string x))
+                         (replace x '(#\a 1)))
+                      :allow-warnings 'warning)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x)
+                         (declare (simple-base-string x))
+                         (replace x #(#\b 2)))
+                      :allow-warnings 'warning)))
   (checked-compile
    `(lambda (n)
       (replace (the (simple-array single-float) n) '(1 1.0) :start2 1)))
