@@ -31,7 +31,6 @@
 ;; Types in src/runtime/wrap.h. See that file for explantion.
 ;; Don't use these types for anything other than the stat wrapper.
 (define-alien-type wst-ino-t (unsigned 64))
-(define-alien-type wst-dev-t (signed 32))
 (define-alien-type wst-off-t (signed 64))
 (define-alien-type wst-nlink-t (unsigned 16))
 (define-alien-type wst-uid-t (unsigned 32))

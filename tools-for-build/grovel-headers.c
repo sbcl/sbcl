@@ -174,7 +174,6 @@ main(int argc, char __attribute__((unused)) *argv[])
     printf(";; Types in src/runtime/wrap.h. See that file for explantion.\n");
     printf(";; Don't use these types for anything other than the stat wrapper.\n");
     DEFTYPE("wst-ino-t", wst_ino_t);
-    DEFTYPE("wst-dev-t", wst_dev_t);
     DEFTYPE("wst-off-t", wst_off_t);
     DEFTYPE("wst-nlink-t", wst_nlink_t);
     DEFTYPE("wst-uid-t", wst_uid_t);

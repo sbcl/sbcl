@@ -35,21 +35,11 @@
 #include "genesis/sbcl.h"
 #include "lispobj.h" // for uword_t
 
-/* We use an extra layer of aliasing because Linux/MIPS struct stat
-   doesn't use dev_t. This type is not defined on the Lisp side. */
-#ifdef LISP_FEATURE_MIPS
-typedef unsigned long aliased_dev_t;
-#else
-typedef dev_t aliased_dev_t;
-#endif
-
 #ifdef LISP_FEATURE_ANDROID
 typedef unsigned long long wst_ino_t;
 typedef long long wst_off_t;
-typedef unsigned long long wst_dev_t;
 #else
 typedef ino_t wst_ino_t;
-typedef aliased_dev_t wst_dev_t;
 typedef off_t wst_off_t;
 #endif
 
@@ -75,13 +65,13 @@ struct stat_wrapper {
      * happen, and I nodded sagely. But now I know better.:-| This is
      * another entry for Dan Barlow's ongoing episodic rant about C
      * header files, I guess.. -- WHN 2001-05-10 */
-    wst_dev_t     wrapped_st_dev;         /* device */
+    uword_t       wrapped_st_dev;         /* device */
     wst_ino_t     wrapped_st_ino;         /* inode */
     mode_t        wrapped_st_mode;        /* protection */
     wst_nlink_t   wrapped_st_nlink;       /* number of hard links */
     wst_uid_t     wrapped_st_uid;         /* user ID of owner */
     wst_gid_t     wrapped_st_gid;         /* group ID of owner */
-    wst_dev_t     wrapped_st_rdev;        /* device type (if inode device) */
+    uword_t       wrapped_st_rdev;        /* device type (if inode device) */
     wst_off_t     wrapped_st_size;        /* total size, in bytes */
     /* The OS's blksize_t and blkcnt_t, if it even has them, are irrelevant.
      * These two slots are what we say they are. */

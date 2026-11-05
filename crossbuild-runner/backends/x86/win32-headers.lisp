@@ -178,7 +178,6 @@
 (define-alien-type size-t (unsigned 32))
 (define-alien-type ssize-t (unsigned 32))
 (define-alien-type mode-t (unsigned 16))
-(define-alien-type wst-dev-t (unsigned 32))
 (define-alien-type wst-ino-t (unsigned 16))
 (define-alien-type wst-off-t (unsigned 32))
 (define-alien-type wst-nlink-t (signed 16))

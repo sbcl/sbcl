@@ -780,13 +780,13 @@ avoiding `atexit(3)` hooks, etc. Otherwise `exit(2)` is called."
 ;;; not clear whether either comment is correct.  -- RMK 2007-11-14.
 (define-alien-type nil
   (struct wrapped_stat
-    (st-dev wst-dev-t)
+    (st-dev word)
     (st-ino wst-ino-t)
     (st-mode mode-t)
     (st-nlink wst-nlink-t)
     (st-uid wst-uid-t)
     (st-gid wst-gid-t)
-    (st-rdev wst-dev-t)
+    (st-rdev word)
     (st-size wst-off-t)
     (st-blksize word)
     (st-blocks word)

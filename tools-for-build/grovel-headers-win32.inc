@@ -211,7 +211,6 @@
     DEFTYPE("ssize-t", ssize_t);
     DEFTYPE("mode-t", mode_t);
 
-    DEFTYPE("wst-dev-t", wst_dev_t);
     DEFTYPE("wst-ino-t", wst_ino_t);
     DEFTYPE("wst-off-t", wst_off_t);
     DEFTYPE("wst-nlink-t", wst_nlink_t);
