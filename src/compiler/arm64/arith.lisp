@@ -4895,15 +4895,15 @@
   (:generator 1
     (inst rbit res arg)))
 
-(deftransform abs ((x) (signed-word) signed-word :vop t)
+(deftransform abs ((x) ((signed-byte 128)) (signed-byte 128) :vop t)
   t)
 
 (define-vop (abs)
   (:translate abs)
   (:args (x :scs (signed-reg)))
   (:arg-types signed-num)
-  (:results (res :scs (signed-reg)))
-  (:result-types signed-num)
+  (:results (res :scs (signed-reg unsigned-reg)))
+  (:result-types (:or signed-num unsigned-num))
   (:generator 2
     (inst cmp x 0)
     (inst csneg res x x :pl)))
@@ -4914,6 +4914,19 @@
   (:results (res :scs (any-reg)))
   (:result-types tagged-num)
   (:variant-cost 1))
+
+(define-vop (abs/s128)
+  (:translate abs)
+  (:args ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128)
+  (:results ((lo-res hi-res) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 5
+    (inst asr tmp-tn hi-x 63)
+    (inst eor lo-res lo-x tmp-tn)
+    (inst eor hi-res hi-x tmp-tn)
+    (inst subs lo-res lo-res tmp-tn)
+    (inst sbc hi-res hi-res tmp-tn)))
 
 ;;; Doesn't work well with comparisons, require-gengc-barrier-p
 #+nil
