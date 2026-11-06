@@ -1923,8 +1923,8 @@
 ;;; eliminated. This improves the performance on some CL-BENCH tests
 ;;; by up to 50%, which is probably signigicant enough to justify the
 ;;; reduction in readability that was introduced. --JES, 2004-08-07
-(declaim (inline %bignum-divide))
-(defun %bignum-divide (x y compute-q compute-rem)
+(declaim (inline %bignum-truncate))
+(defun %bignum-truncate (x y compute-q compute-rem)
   (declare (type bignum x y))
   (let (truncate-x truncate-y)
     (labels
@@ -2120,8 +2120,7 @@
            (declare (type bignum-length len-x len-y)
                     (type (integer 0 (#.digit-size)) shift))
            (cond ((zerop shift)
-                  (bignum-replace truncate-x x :end1 len-x)
-                  (bignum-replace truncate-y y :end1 len-y))
+                  (bignum-replace truncate-x x :end1 len-x))
                  (t
                   (bignum-ashift-left-unaligned x 0 shift (1+ len-x)
                                                 truncate-x)
@@ -2134,51 +2133,46 @@
       ;; to shift it to account for the initial Y shift. After we
       ;; multiple bind q and r, we first fix up the signs and then
       ;; return the normalized results.
-      (let* ((x-plusp (bignum-plus-p x))
+      (let* ((orig-x x)
+             (x-plusp (bignum-plus-p x))
              (y-plusp (bignum-plus-p y))
              (x (if x-plusp x (negate-bignum-not-fully-normalized x)))
              (y (if y-plusp y (negate-bignum-not-fully-normalized y)))
              (len-x (%bignum-length x))
              (len-y (%bignum-length y)))
+        (when (plusp (bignum-compare y x))
+          (return-from %bignum-truncate
+            (cond (compute-q (values 0 (and compute-rem orig-x)))
+                  (compute-rem orig-x)
+                  (t nil))))
         (multiple-value-bind (q r)
-            (cond ((plusp (bignum-compare y x))
-                   (if compute-rem
-                       (let ((res (%allocate-bignum len-x)))
-                         (dotimes (i len-x)
-                           (setf (%bignum-ref res i) (%bignum-ref x i)))
-                         (values 0 res))
-                       (values 0 nil)))
-                  (t
-                   (let ((len-x+1 (1+ len-x)))
-                     ;; TODO: someone who understands this algorithm could probably figure out
-                     ;; whether these allocations can prezero fewer words.
-                     (setf truncate-x (alloc-zeroing len-x+1))
-                     (setf truncate-y (alloc-zeroing (1+ len-y)))
-                     (let ((y-shift (shift-y-for-truncate y)))
-                       (shift-and-store-truncate-buffers x len-x y
-                                                         len-y y-shift)
-                       (values (return-quotient-leaving-remainder len-x+1 len-y)
-                               (if compute-rem
-                                   ;; Now that RETURN-QUOTIENT-LEAVING-REMAINDER
-                                   ;; has executed, we just tidy up the remainder
-                                   ;; (in TRUNCATE-X) and return it.
-                                   (cond
-                                     ((zerop y-shift)
-                                      (let ((res (%allocate-bignum len-y)))
-                                        (declare (type bignum res))
-                                        (bignum-replace res truncate-x :end2 len-y)
-                                        (%normalize-bignum res len-y)))
-                                     (t
-                                      (shift-right-unaligned
-                                       truncate-x 0 y-shift len-y
-                                       ((= j res-len-1)
-                                        (setf (%bignum-ref res j)
-                                              (%ashr (%bignum-ref truncate-x i)
-                                                     y-shift))
-                                        (%normalize-bignum res res-len))
-                                       res)))
-                                   (loop for j of-type bignum-index from 0 below len-y
-                                         always (zerop (%bignum-ref truncate-x j)))))))))
+            (let ((len-x+1 (1+ len-x))
+                  (y-shift (shift-y-for-truncate y)))
+              ;; TODO: someone who understands this algorithm could probably figure out
+              ;; whether these allocations can prezero fewer words.
+              (setf truncate-x (alloc-zeroing len-x+1))
+              (setf truncate-y (if (zerop y-shift)
+                                   y
+                                   (alloc-zeroing (1+ len-y))))
+              (shift-and-store-truncate-buffers x len-x y len-y y-shift)
+              (values (return-quotient-leaving-remainder len-x+1 len-y)
+                      (if compute-rem
+                          ;; Now that RETURN-QUOTIENT-LEAVING-REMAINDER
+                          ;; has executed, we just tidy up the remainder
+                          ;; (in TRUNCATE-X) and return it.
+                          (cond
+                            ((zerop y-shift)
+                             (%normalize-bignum truncate-x len-y))
+                            (t
+                             (shift-right-unaligned
+                              truncate-x 0 y-shift len-y
+                              ((= j res-len-1)
+                               (setf (%bignum-ref truncate-x j)
+                                     (%ashr (%bignum-ref truncate-x i)
+                                            y-shift))
+                               (%normalize-bignum truncate-x res-len)))))
+                          (loop for j of-type bignum-index from 0 below len-y
+                                always (zerop (%bignum-ref truncate-x j))))))
           (let ((rem (if compute-rem
                          (let ((rem (cond (x-plusp r)
                                           ((typep r 'fixnum) (the fixnum (- r)))
@@ -2189,18 +2183,15 @@
                          r)))
             (if compute-q
                 (let ((quotient (cond ((eq x-plusp y-plusp) q)
-                                      ((typep q 'fixnum) (the fixnum (- q)))
                                       (t (negate-bignum-in-place q)))))
-                  (values (if (typep quotient 'fixnum)
-                              quotient
-                              (%normalize-bignum quotient (%bignum-length quotient)))
+                  (values (%normalize-bignum quotient (%bignum-length quotient))
                           rem))
                 rem)))))))
 
 (defun bignum-truncate (x y)
   (declare (type bignum x y)
            (optimize speed (safety 0)))
-  (%bignum-divide x y t t))
+  (%bignum-truncate x y t t))
 
 ;;; Divide X by Y when Y fits in a word.
 (declaim (inline %bignum-truncate-single-digit))
@@ -2322,13 +2313,15 @@
       ((fixnum fixnum)
        (zerop (rem number divisor)))
       ((fixnum bignum)
-       (zerop number))
+       (or (zerop number)
+           (and (= number most-negative-fixnum)
+                (= divisor (- most-negative-fixnum)))))
       ((bignum fixnum)
        (%bignum-truncate-single-digit number divisor nil nil))
       ((bignum bignum)
        (if (single-digit-bignum-p divisor)
            (%bignum-truncate-single-digit number divisor nil nil)
-           (%bignum-divide number divisor nil nil))))))
+           (%bignum-truncate number divisor nil nil))))))
 
 (defun integer-truncate-divisible-p (number divisor)
   (declare (optimize speed (safety 0)))
@@ -2348,13 +2341,19 @@
        (multiple-value-bind (q r) (truncate number divisor)
          (values q (zerop r))))
       ((fixnum bignum)
-       (values 0 (zerop number)))
+       (cond ((zerop number)
+              (values 0 t))
+             ((and (= number most-negative-fixnum)
+                   (= divisor (- most-negative-fixnum)))
+              (values -1 t))
+             (t
+              (values 0 nil))))
       ((bignum fixnum)
        (%bignum-truncate-single-digit number divisor t nil))
       ((bignum bignum)
        (if (single-digit-bignum-p divisor)
            (%bignum-truncate-single-digit number divisor t nil)
-           (%bignum-divide number divisor t nil))))))
+           (%bignum-truncate number divisor t nil))))))
 
 ;;; This is used by %output-integer-in-base for repeatedly dividing a
 ;;; bignum by a base into a preallocated quotient bignum.
@@ -2559,7 +2558,7 @@
 ;;; which had been deliberately excluded from the target due to a surrounding
 ;;; (EVAL-WHEN (:COMPILE-TOPLEVEL :EXECUTE) ...) form.
 #-sb-devel
-(dolist (s '(negate-bignum-buffer-in-place %bignum-divide %bignum-truncate-single-digit))
+(dolist (s '(negate-bignum-buffer-in-place %bignum-truncate %bignum-truncate-single-digit))
   (clear-info :function :inlining-data s)
   (clear-info :function :inlinep s)
   (clear-info :source-location :declaration s))

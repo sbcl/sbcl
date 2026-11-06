@@ -2966,3 +2966,22 @@
     (((+ (ash 1 75) 42) -64) (ash 1 11))
     (((- (+ (ash 1 75) 42)) -64) -2049)
     (((+ (ash 1 75) 42) -100) 0)))
+
+(with-test (:name :integer-divisible-p)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (n d)
+         (declare (integer n d))
+         (zerop (rem n d)))
+    ((most-negative-fixnum (- most-negative-fixnum)) t)
+    ((0 (expt 2 64)) t)
+    ((-1 (expt 2 64)) nil))
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (n d)
+         (declare (integer n d))
+         (multiple-value-bind (q r) (truncate n d)
+           (values q (zerop r))))
+    ((most-negative-fixnum (- most-negative-fixnum)) (values -1 t))
+    ((0 (expt 2 64)) (values 0 t))
+    ((-1 (expt 2 64)) (values 0 nil))))
