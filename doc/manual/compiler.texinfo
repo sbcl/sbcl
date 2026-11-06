@@ -77,7 +77,11 @@ printed to @code{*standard-output*}.
 The external format to use when opening the source file. The
 default is @code{:default} which uses the
 @code{sb-ext:*default-source-external-format*}.
+@end itemize
 
+The rest of the arguments are extensions to the standard:
+
+@itemize
 @item @code{:block-compile} @{@code{nil} | @code{:specified} | @code{t}@}
 
 Determines whether multiple functions are compiled together as a
@@ -89,7 +93,7 @@ combine top-level @code{defun}s. With @code{:specified}, an explicit @code{start
 declaration will enable block compilation. A value of @code{t} indicates
 that all forms in the file(s) should be compiled as a unit. The
 default is the value of @code{sb-ext:*block-compile-default*}, which is
-initially @code{nil}.
+initially @code{nil}. See @ref{block compilation}.
 
 @item @code{:entry-points}
 
@@ -98,13 +102,13 @@ file(s) that must be given global definitions. This only applies
 to block compilation and is useful mainly when @code{:block-compile} @code{t} is
 specified on a file that lacks @code{start-block} declarations. If the
 value is @code{nil} (the default), then all functions will be globally
-defined.
+defined. See @ref{block compilation}.
 
 @item @code{:trace-file}
 
 If given, internal data structures are dumped to the specified
 file, or if a value of @code{t} is given, to a file of @code{.trace} type
-derived from the input file name. (non-standard)
+derived from the input file name. See @ref{trace files}.
 
 @item @code{:emit-cfasl}
 
@@ -687,7 +691,7 @@ types involving the @code{satisfies} type specifier.
 @node type declaration checking
 @subsection Type Declaration Checking
 
-The SBCL compiler treats type declarations differently from most other
+The compiler treats type declarations differently from most other
 Lisp compilers. Under the default @ref{compiler policy}, the compiler
 doesn't blindly believe type declarations but considers them
 assertions about the program that should be checked: all type
@@ -730,19 +734,29 @@ checking. Any type errors in code where type checks are not
 performed are liable to corrupt the heap.
 @end itemize
 
-There is a third option of mostly historical interest called Weak
-Type Checking, where declared types may be simplified into faster to
-check supertypes: for example, @code{(or (integer -17 -7) (integer 7
-17))} is simplified into @code{(integer -17 17)}. This option is also
-unsafe and is no longer available by any combination of the standard
-optimization qualities.
+@quotation
+@emph{Note}: There is a third option of mostly historical interest
+called Weak Type Checking, where declared types may be simplified
+into faster to check supertypes: for example, @code{(or (integer -17
+-7) (integer 7 17))} is simplified into @code{(integer -17 17)}. This
+option is also unsafe and is no longer available by any
+combination of the standard optimization qualities.
+@end quotation
 
-Note that CLOS slots with types declared using the @code{:type} slot option
+@quotation
+@emph{Note}: CLOS slots with types declared using the @code{:type} slot option
 in @code{defclass} are asserted if and only if the class was defined in
-@emph{safe code} and the slot access location is in @emph{safe code} as well.
-This laxness does not pose any safety issues, as the CLOS slot types
-are not available for @ref{type inference}, nor do CLOS slot types
-provide any efficiency benefits.
+@emph{safe code} and the slot access location is in @emph{safe code} as
+well. This laxness does not pose any safety issues, as the CLOS
+slot types are not available for @ref{type inference}, nor do CLOS slot
+types provide any efficiency benefits.
+@end quotation
+
+@quotation
+@emph{Note}: The @code{sb-ext:truly-the} special form declares the type of the
+result of the operations, producing its argument; the declaration
+is not checked. In short: don't use it.
+@end quotation
 
 @node precise type checking
 @cindex precise type checking
@@ -903,7 +917,7 @@ numeric argument. Another possible fix would be to say:
 
 This would be preferable in some circumstances since it would allow
 a non-standard representation to be used for the local @code{pos}
-variable in the loop body.
+variable in the loop body. See also @ref{non descriptor}.
 
 @node compiler policy
 @section Compiler Policy

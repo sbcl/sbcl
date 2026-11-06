@@ -14,13 +14,14 @@
 * Inline Expansion: inline expansion.
 * Slot Access: slot access.
 * Stack Allocation: stack allocation.
-* Modular Arithmetic: modular arithmetic.
+* Representation of Objects: representation of objects.
+* Efficiency Notes: efficiency notes.
 * Recognized Idioms: recognized idioms.
 * Global and Always-bound Variables: global and always bound variables.
-* Miscellaneous Efficiency Issues: miscellaneous efficiency issues.
+* Efficiency Miscellanea: efficiency miscellanea.
 @end menu
 
-In SBCL as with any language on any computer, the path to efficient
+In SBCL, as with any language on any computer, the path to efficient
 code starts with good algorithms and sensible programming
 techniques, but to avoid inefficiency pitfalls, you need to know
 some of this implementation's quirks and features. This chapter is
@@ -106,6 +107,11 @@ convention. These features allow a more natural programming style:
 @item A @code{funcall} that is as efficient as normal named call
 @end itemize
 
+We also discuss how the compiler handles the tension between
+efficient, natural @ref{representation of objects} and the dynamic nature
+of Common Lisp. @ref{efficiency notes} open a window into the compiler's
+view.
+
 Finally, we can only touch upon some of the most important concepts
 discussed later before this introduction gets too long, so let's
 focus on the big picture. Writing efficient code that works is a
@@ -139,9 +145,7 @@ separate coding from tuning. During coding, you should:
   and object representations. Try to make interfaces abstract enough
   so that you can change to a different representation if @ref{profiling}
   reveals a need.
-@end itemize
 
-@itemize
 @item Whenever you make an assumption about a function argument or
   global data structure, add consistency assertions, either with
   type declarations or explicit uses of @code{assert}, @code{ecase}, etc.
@@ -150,14 +154,16 @@ separate coding from tuning. During coding, you should:
 During tuning, you should:
 
 @itemize
+@item Follow the recommendations in @ref{efficiency miscellanea}.
+
+@item Declare @@@code{speed}-critical code and pay attention to
+  @ref{efficiency notes}.
+
 @item Identify the hot spots in the program through @ref{profiling}.
 
 @item Identify inefficient constructs in the hot spot with efficiency
   notes, more profiling, or manual inspection of the source and with
   judicious use of @code{disassemble}.
-
-@item Add declarations and consider the application of discussed in the
-  section.
 
 @item If all else fails, consider algorithm or data structure changes.
   If you did a good job coding, changes will be easy to introduce.
@@ -239,6 +245,8 @@ number type specifiers. Understanding means that:
   @ref{type check optimization}).
 @end itemize
 
+For related information, see @ref{representation of objects}.
+
 @node type canonicalization
 @cindex types, equivalence
 @cindex canonicalization of types
@@ -318,7 +326,7 @@ example:
 
 The type assertion on the @code{top} slot ensures that an error will be
 signaled when there is an attempt to store an illegal value (such as
-@code{:rmvd}.) Although somewhat weak, these union type assertions
+@code{:rmvd}). Although somewhat weak, these union type assertions
 provide a useful input into type inference, allowing the cost of
 type checking to be reduced. For example, this loop is safely
 compiled with no type checks:
@@ -621,8 +629,8 @@ are some general guidelines for maximum robustness and efficiency:
   these declarations in during initial coding so that type
   assertions can find bugs for you during debugging.
 
-@item Durining development, prefer declaring function argument types
-  with with @code{declare} within the function to avoid having to redefine
+@item During development, prefer declaring function argument types
+  with @code{declare} within the function to avoid having to redefine
   @code{ftype}s, which can lead to safety problems (see
   @ref{type declaration checking}).
 
@@ -647,7 +655,9 @@ are some general guidelines for maximum robustness and efficiency:
 @item In addition to declaring the array element type and simpleness,
   also declare the dimensions if they are fixed. For example,
 
-  (simple-array single-float (1024 1024))
+@example
+(simple-array single-float (1024 1024))
+@end example
 
   The bounds information allows array indexing for multi-dimensional
   arrays to be compiled much more efficiently and may also allow
@@ -656,8 +666,8 @@ are some general guidelines for maximum robustness and efficiency:
 @item Avoid use of the @code{the} declaration within expressions. Not only does
   it clutter the code, but it is often unnecesary under safe
   policies. If the need for a return
-  type assertion is revealed by efficiency notes during tuning, then
-  you can consider @code{the}, but it is preferable to constrain the
+  type assertion is revealed by @ref{efficiency notes} during tuning,
+  then you can consider @code{the}, but it is preferable to constrain the
   argument types more, allowing the compiler to prove the desired
   result type.
 
@@ -673,7 +683,7 @@ are some general guidelines for maximum robustness and efficiency:
 @item Declarations are sometimes necessary for integer loop variables,
   since the compiler can't always prove that the value is of a good
   integer type. These declarations are best added during tuning,
-  when an efficiency note indicates the need.
+  when @ref{efficiency notes} indicate the need.
 @end itemize
 
 @node type inference
@@ -1171,7 +1181,7 @@ becoming
 
 A constant variable is a lexical variable that is never assigned to,
 always keeping its initial value. Whenever possible, avoid setting
-lexical variables -- instead bind a new variable to the new value.
+lexical variables; instead, bind a new variable to the new value.
 Except for loop variables, it is almost always possible to avoid
 setting lexical variables. This form:
 
@@ -1378,7 +1388,7 @@ never be executed. Code becomes unreachable when
 
 When code that appeared in the original source is deleted, the
 compiler prints a note to indicate a possible problem (or at least
-unnecessary code.) For example:
+unnecessary code). For example:
 
 @example
 (defun foo ()
@@ -1525,10 +1535,10 @@ programming style:
   inline function, write it as a function and declare it @code{inline}.
   It's clearer, less error-prone, and works just as well.
 
-@item Don't write macros that try to "optimize" their expansion in
-  trivial ways such as avoiding binding variables for simple
-  expressions. The compiler does these optimizations too and is less
-  likely to make a mistake.
+@item Don't write macros that try to optimize their expansion in trivial
+  ways such as avoiding binding variables for simple expressions.
+  The compiler does these optimizations too and is less likely to
+  make a mistake.
 
 @item Make use of local functions (i.e. @code{labels} and @code{flet}) and @ref{tail call}s
   in places where it is clearer. @ref{local call} is faster than full
@@ -1815,9 +1825,9 @@ stored in memory at all. In this example, there is no penalty for
 @end example
 
 In local call, the compiler effectively passes closed-over values as
-extra arguments, so there is no need for you to "optimize"
-@code{localfun} by explicitly passing in lexically visible values.
-Closures may also be subject to @ref{let optimization}.
+extra arguments, so there is no need for you to optimize @code{localfun}
+by explicitly passing in lexically visible values. Closures may also
+be subject to @ref{let optimization}.
 
 @quotation
 @emph{Note}: indirect value cells are currently always allocated on the
@@ -1912,8 +1922,9 @@ absolutely no overhead for calling a non-entry point function that
 is defined purely for modularity (i.e. called only in one place).
 
 @cindex return values
-Block compilation also allows for more unboxed and non-descriptor
-arguments and return values in non-trivial programs.
+Block compilation also allows for more unboxed and @ref{non descriptor}
+arguments and return values in non-trivial programs (see
+@ref{non descriptors in local call}).
 
 @node block compilation semantics
 @subsection Block Compilation Semantics
@@ -2045,7 +2056,7 @@ SBCL can expand almost any function inline, including functions
 with keyword arguments. The only restrictions are that keyword
 argument keywords in the call must be constant, and that global
 function definitions (@code{defun}) must be done in a null lexical
-environment (not nested in a @code{let} or other binding form.) Local
+environment (not nested in a @code{let} or other binding form). Local
 functions (e.g. @code{flet}) can be inline expanded in any environment.
 Combined with source-level optimization, inline expansion can be
 used for things that would otherwise require macros for efficient
@@ -2501,11 +2512,11 @@ suprising ways with the otherwise inaccessible parts criterion:
 SBCL also performs sophisticated escape analysis to enable automatic
 stack allocation of local functions without any bound dynamic extent
 declarations in many situations where the compiler can prove that no
-uses escape (traditional Lisp terminology names this situation "all
-uses are downward funargs"). For example, in the following
-function, the local function @code{#'predicatep} is stack allocated,
-because the compiler understands that the built-in function
-@code{position-if} only uses its first argument as a downward funarg:
+uses escape (traditional Lisp terminology names this situation @emph{all
+uses are downward funargs}). For example, in the following function,
+the local function @code{#'predicatep} is stack allocated, because the
+compiler understands that the built-in function @code{position-if} only
+uses its first argument as a downward funarg:
 
 @example
 (let ((acc 0))
@@ -2542,11 +2553,505 @@ detect incorrect usage of dynamic extent declarations.
   (trivial-hof (lambda (a b) (+ a b x)) 92))
 @end example
 
+@node representation of objects
+@cindex representation of objects
+@cindex object representation
+@section Representation of Objects
+
+@menu
+* Descriptor: descriptor.
+* Non-descriptor: non descriptor.
+* Non-descriptor Variables: non descriptor variables.
+* Non-descriptors in Local Call: non descriptors in local call.
+* Specialized Arrays: specialized arrays.
+* Specialized Structure Slots: specialized structure slots.
+* Characters: characters.
+* Generic Arithmetic: generic arithmetic.
+* Fixnums: fixnums.
+* Word Integers: word integers.
+* Modular Arithmetic: modular arithmetic.
+* Floating Point: floating point.
+@end menu
+
+@node descriptor
+@cindex descriptor representation
+@cindex representation, descriptor
+@subsection Descriptor
+
+To support dynamic typing and garbage collection, all Lisp objects
+can be represented with a one-word object, known as a @emph{descriptor},
+in which a few @emph{tag} bits carry information about the object's type and
+allocation.
+
+There are two kinds of descriptors:
+
+@itemize
+@item @emph{Immediate descriptor} (or @emph{tagged value})
+
+For example, @ref{fixnums} and @ref{characters} fit into a machine word
+along with the tag bits. Immediate descriptors are unboxed. The
+presence of the tag bits has a very slight performance impact on
+operations.
+
+@item @emph{Pointer descriptor} (or @emph{tagged pointer})
+
+Objects larger than one word (such as @code{cons}es) or objects that do
+not fit into one word due to the tag bits (such as
+@ref{word integers} and @code{single-float}s) are represented as aligned
+pointers to a separately allocated memory area, where the
+alignment allows some low bits to be used as the tag. Pointer
+descriptors are boxed.
+
+This boxing has two major disadvantages:
+
+@itemize
+@item The memory pointed to must be allocated on the heap, so it
+      must eventually be freed by the garbage collector. Excessive
+      @ref{consing} is inefficient in several ways.
+
+@item Representing an object in memory requires the compiler to emit
+      additional instructions to read the actual value in from
+      memory, and then to write the value back after operating on
+      it.
+@end itemize
+@end itemize
+
+@node non descriptor
+@cindex non-descriptor representation
+@cindex representation, non-descriptor
+@subsection Non-descriptor
+
+We saw that the standard @ref{descriptor} representation has efficiency
+problems, the worst being the @ref{consing} caused by boxing. SBCL tries
+to avoid these by using @emph{non-descriptor} representations, which are
+basically untagged immediates. For example, this function does not
+cons numbers:
+
+@example
+(defun multby (vec n)
+  (declare (type (simple-array single-float (*)) vec)
+           (single-float n))
+  (dotimes (i (length vec))
+    (setf (aref vec i)
+          (* n (aref vec i)))))
+@end example
+
+If a descriptor representation were used, each iteration of the loop
+might cons two floats and do three times as many memory references.
+
+As its negative definition suggests, the range of possible
+non-descriptor representations is large. The performance improvement
+from non-descriptor representation depends upon both the number of
+types that have non-descriptor representations and the number of
+contexts in which the compiler is forced to use a descriptor
+representation.
+
+SBCL supports non-descriptor representations for
+
+@itemize
+@item float types (see @ref{floating point}),
+
+@item @ref{word integers},
+
+@item @ref{characters},
+
+@item system area pointers (unconstrained pointers, see @ref{untyped memory}),
+
+@item local variables (see @ref{non descriptor variables}),
+
+@item array elements (section @ref{specialized arrays}),
+
+@item arguments and return values in @ref{local call} (see
+  @ref{non descriptors in local call}), and
+
+@item @ref{specialized structure slots}.
+@end itemize
+
+@node non descriptor variables
+@cindex variables, non-descriptor
+@cindex type declarations, variable
+@subsection Non-descriptor Variables
+
+In order to use a @ref{non descriptor} representation for a variable or
+expression intermediate value, the compiler must be able to prove
+that the value is always of a particular type having a
+non-descriptor representation. @ref{type inference} often needs some help
+from user-supplied declarations. The best kind of type declaration
+is a variable type declaration placed at the binding point:
+
+@example
+(let ((x (car l)))
+  (declare (single-float x))
+  ...)
+@end example
+
+Use of @code{the} or of variable declarations not at the binding form is
+insufficient to allow non-descriptor representation of the variable:
+with these declarations, it is not certain that all values of the
+variable are of the right type. It is sometimes useful to introduce
+a gratuitous binding that allows the compiler to change to a
+non-descriptor representation, like
+
+@example
+(etypecase x
+  ((signed-byte 32)
+   (let ((x x))
+     (declare (type (signed-byte 32) x))
+     ...))
+  ...)
+@end example
+
+The declaration on the inner @code{x} is necessary here due to a phase
+ordering problem. Although the compiler will eventually prove that
+the outer @code{x} is a @code{(signed-byte 32)} within that @code{etypecase} branch,
+the inner @code{x} would have been optimized away by that time. Declaring
+the type makes let optimization more cautious.
+
+Note that storing a value into a global variable always forces a
+descriptor representation. Wherever possible, you should operate
+only on local variables, binding any referenced globals to local
+variables at the beginning of the function, and doing any global
+assignments at the end.
+
+@ref{efficiency notes} signal use of inefficient representations, so
+programmers needn't continuously worry about the details of
+representation selection (see @ref{representation efficiency notes}).
+
+@node non descriptors in local call
+@cindex local call, non-descriptors
+@cindex non-descriptor, in local call
+@subsection Non-descriptors in Local Call
+
+@ref{local call} has many advantages; one relevant to our discussion here
+is that local call extends the usefulness of @ref{non descriptor}
+representations. If the compiler knows from the argument type that
+an argument has a non-descriptor representation, then the argument
+will be passed in that representation. The easiest way to ensure
+that the argument type is known at compile time is to always declare
+the argument type in the called function, like
+
+@example
+(defun 2+f (x)
+  (declare (single-float x))
+  (+ x 2.0))
+@end example
+
+The advantages of passing arguments and return values in a
+@ref{non descriptor} representation are the same as for non-descriptor
+representations in general: reduced consing and memory access. This
+extends the applicative programming styles (see @ref{local call}) to
+numeric code. Also, if source files are kept reasonably small, block
+compilation can be used to reduce number consing to a minimum.
+
+Note that non-descriptor return values can only be used with the
+known return convention (see @ref{local call return values}). If the
+compiler can't prove that a function always returns the same number
+of values, then it must use the unknown values return convention,
+which requires a descriptor representation. Pay attention to the
+known return @ref{efficiency notes} to avoid number consing.
+
+@node specialized arrays
+@cindex specialized array types
+@cindex array types, specialized
+@cindex types, specialized array
+@subsection Specialized Arrays
+
+Common Lisp supports specialized array element types through the
+@code{:element-type} argument to @code{make-array}. When an array has a
+specialized element type, only elements of that type can be stored
+in the array. From this restriction comes two major efficiency
+advantages:
+
+@itemize
+@item A specialized array can save space by packing multiple elements
+  into a single word. For example, on 64-bit platforms, a @code{base-char}
+  array can have 8 elements per word, and a @code{bit} array can have 64.
+  This space-efficient representation is possible because it is not
+  necessary to separately indicate the type of each element.
+
+@item The elements in a specialized array can be given the same
+  non-descriptor representation as the one used in registers and on
+  the stack, eliminating the need for representation conversions
+  when reading and writing array elements. For objects with pointer
+  descriptor representations (such as floats and word integers)
+  there is also a substantial consing reduction because it is not
+  necessary to allocate a new object every time an array element is
+  modified.
+@end itemize
+
+These are the specialized element types currently supported on
+64-bit platforms:
+
+@example
+nil
+bit
+(unsigned-byte 2)
+(unsigned-byte 4)
+(unsigned-byte 7)
+(unsigned-byte 8)
+(unsigned-byte 15)
+(unsigned-byte 16)
+(unsigned-byte 31)
+(unsigned-byte 32)
+(unsigned-byte 63)
+(unsigned-byte 64)
+(signed-byte 8)
+(signed-byte 16)
+(signed-byte 30)
+(signed-byte 32)
+(signed-byte 64)
+single-float
+double-float
+(complex single-float)
+(complex double-float)
+base-char
+character
+@end example
+
+Although a @code{simple-vector} can hold any type of object, @code{t} should still
+be considered a specialized array type, since arrays with element
+type @code{t} are specialized to hold descriptors.
+
+When using non-descriptor representations, it is particularly
+important to make sure that array accesses are open-coded, since in
+addition to the generic operation overhead, efficiency is lost when
+the array element is converted to a descriptor so that it can be
+passed to (or from) the generic access routine. You can detect
+inefficient array accesses by enabling @ref{efficiency notes}.
+
+@node specialized structure slots
+@cindex structure types numeric slots
+@cindex specialized structure slots
+@subsection Specialized Structure Slots
+
+Structure slots declared by the @code{:type} @code{defstruct} slot option to have
+certain known numeric types are also given @ref{non descriptor}
+representations. On 64-bit platforms, these types (and subtypes of
+these types) are supported:
+
+@example
+(unsigned-byte 64)
+(signed-byte 64)
+single-float
+double-float
+(complex single-float)
+(complex double-float)
+@end example
+
+The primary advantage of specialized slot representations is a large
+reduction in spurious memory allocation and access overhead of
+programs that intensively use these types.
+
+@node characters
+@cindex characters
+@subsection Characters
+
+SBCL also uses a @ref{non descriptor} representation for characters when
+convenient. This improves the efficiency of string manipulation but
+is otherwise pretty invisible; characters have an immediate
+@ref{descriptor} representation, so there is not a great penalty for
+converting a character to a descriptor. Nonetheless, it may
+sometimes be helpful to declare character-valued variables as
+@code{base-char}.
+
+@node generic arithmetic
+@cindex generic arithmetic
+@cindex arithmetic, generic
+@subsection Generic Arithmetic
+
+In Common Lisp, arithmetic operations are @emph{generic}. For example, the
+@code{+} function can be passed @code{fixnum}s, @code{bignum}s, @code{ratio}s, and various
+kinds of @code{float}s and @code{complex}es, in any combination.
+
+@quotation
+@emph{Note}: As Steele notes in CLTL II, this generic conception of
+@emph{generic} is not to be confused with the CLOS concept of a generic
+function.
+@end quotation
+
+In addition to the inherent complexity of @code{bignum} and @code{ratio}
+operations, there is also a lot of overhead in just figuring out
+which operation to do and what contagion and canonicalization rules
+apply. The complexity of generic arithmetic is so great that it is
+inconceivable to open code it. Instead, the compiler does a function
+call to a generic arithmetic routine, consuming many instructions
+before the actual computation even starts.
+
+This is ridiculous, since even Lisp programs do a lot of arithmetic,
+and the hardware is capable of doing operations on small integers
+and floats with a single instruction. To get acceptable efficiency,
+the compiler special-cases uses of generic arithmetic that are
+directly implemented in the hardware. In order to open code
+arithmetic, several constraints must be met:
+
+@itemize
+@item All the arguments must be known to be a @emph{good type} of number.
+
+@item The result must be known to be a good type of number.
+
+@item Any intermediate values such as the result of @code{(+ a b)} in the
+  call @code{(+ a b c)} must be known to be a good type of number.
+
+@item All the above numbers with good types must be of the @emph{same} good
+  type. Don't try to mix integers and floats or different float
+  formats.
+@end itemize
+
+The good types on 64-bit platforms are
+
+@example
+(unsigned-byte 64)
+(signed-byte 64)
+single-float
+double-float
+(complex single-float)
+(complex double-float)
+@end example
+
+See @ref{fixnums}, @ref{word integers} and @ref{floating point} for more discussion
+of good numeric types.
+
+@code{float} is not a good type, since it might mean either @code{single-float} or
+@code{double-float}. @code{integer} is not a good type, since it might mean
+@code{bignum}. @code{rational} is not a good type, since it might mean @code{ratio}. Note
+however that these types are still useful in declarations, since
+@ref{type inference} may be able to strengthen a weak declaration into a
+good one, when it would be at a loss if there was no declaration at
+all. The @code{integer} and @code{unsigned-byte} (or non-negative integer) types
+are especially useful in this regard, since they can often be
+strengthened to a good integer type.
+
+As noted above, SBCL has support for @code{(complex single-float)}
+and @code{(complex double-float)}. These can be unboxed and, thus, are
+quite efficient. However, arithmetic with complex types such
+as @code{(complex float)} and @code{(complex fixnum)} will be significantly
+slower than the good complex types but is still faster than @code{bignum}
+or @code{ratio} arithmetic, since the implementation is much simpler.
+
+@quotation
+@emph{Note}: don't use the @code{/} function to divide integers unless you
+want the overhead of rational arithmetic. Use @code{truncate} even when
+you know that the arguments divide evenly.
+@end quotation
+
+You don't need to remember all the rules for how to get open-coded
+arithmetic, since @ref{efficiency notes} will tell you when and where
+there is a problem.
+
+@node fixnums
+@cindex fixnums
+@cindex bignums
+@subsection Fixnums
+
+A fixnum is a @emph{FIXed-precision NUMber}. In modern Lisp
+implementations, fixnums can be represented with an immediate
+@ref{descriptor}, so operating on fixnums requires no consing or memory
+references. Clever choice of representations also allows some
+arithmetic operations to be done on fixnums using hardware supported
+word-integer instructions, somewhat reducing the speed penalty for
+using an unnatural integer representation.
+
+It is useful to distinguish the @code{fixnum} type from the fixnum
+representation of integers. In SBCL, there is absolutely nothing
+magical about the @code{fixnum} type in comparison to other finite integer
+types. @code{fixnum} is equivalent to @code{(signed-byte 63)} on all 64-bit
+platforms but ppc64, where it is @code{(signed-byte 61)}. On 32-bit
+platforms, a @code{fixnum} is @code{(signed-byte 29)}. @code{fixnum} is simply the
+largest subset of integers that @emph{can be represented} using an
+immediate fixnum descriptor.
+
+Unlike in other Common Lisp compilers, it is in no way desirable to
+use the @code{fixnum} type in declarations in preference to more
+restrictive integer types such as @code{bit}, @code{(integer -43 7)}
+and @code{(unsigned-byte 8)}. Since SBCL does understand these integer
+types, it is preferable to use the more restrictive type, as it
+allows better @ref{type inference} (see @ref{more types meaningful}).
+
+The small, efficient fixnum is contrasted with bignum, or @emph{BIG
+NUMber}. This is another descriptor representation for integers, but
+this time a pointer representation that allows for arbitrarily large
+integers. Bignum operations are less efficient than fixnum
+operations, both because of the consing and memory reference
+overheads of a pointer descriptor, and also because of the inherent
+complexity of extended precision arithmetic. While fixnum operations
+can often be done with a single instruction, bignum operations are
+so complex that they are always done using generic arithmetic.
+
+A crucial point is that the compiler will use generic arithmetic if
+it can't prove that all the arguments, intermediate values, and
+results are fixnums. With bounded integer types such as @code{fixnum}, the
+result type proves to be especially problematical, since these types
+are not closed under common arithmetic operations such as
+@code{+}, @code{-}, @code{*} and
+@code{/}. For example, @code{(1+ (the fixnum x))} does not
+necessarily evaluate to a @code{fixnum}. Bignums were added to Lisp to get
+around this problem, but they really just transform the correctness
+problem @emph{if this add overflows, you will get the wrong answer} to
+the efficiency problem @emph{if this add overflows, then your program
+will run slowly} (because of generic arithmetic).
+
+@cindex safety, optimization quality
+@cindex optimization quality safety
+There is just no getting around the fact that the hardware only
+directly supports short integers. To get the most efficient open
+coding, the compiler must be able to prove that the result is a good
+integer type. This is an argument in favor of using more restrictive
+integer types: @code{(1+ (the fixnum x))} may not always be a @code{fixnum},
+but @code{(1+ (the (unsigned-byte 8) x))} always is. Of course, you can
+also assert the result type by putting in lots of @code{the} declarations
+and then compiling with @code{safety} @code{0} (see
+@ref{type declaration checking}).
+
+@node word integers
+@cindex word integers
+@subsection Word Integers
+
+SBCL provides an efficient implementation of arithmetic
+on full-word integers through @ref{non descriptor} representations and
+open coding. Arithmetic on any subtype of
+
+@example
+(signed-byte 64)
+(unsigned-byte 64)
+@end example
+
+on 64-bit platforms or the 32-bit equivalents on 32-bit platforms is
+reasonably efficient, although subtypes of @code{fixnum} remain somewhat
+more efficient.
+
+If a word integer must be represented as a @ref{descriptor}, then the
+@code{bignum} representation is used, with its associated consing overhead.
+The support for word integers in no way changes the language
+semantics, it just makes arithmetic on small bignums vastly more
+efficient. It is fine to do arithmetic operations with mixed @code{fixnum}
+and word integer operands; just declare the most specific integer
+type you can, and let the compiler decide what representation to
+use.
+
+In fact, to most users, the greatest advantage of word integer
+arithmetic is that it effectively provides a few guard bits on the
+fixnum representation. If there are missing assertions on
+intermediate values in a fixnum expression, the intermediate results
+can usually be proved to fit in a word. After the whole expression
+is evaluated, there will often be a fixnum assertion on the final
+result, allowing creation of a fixnum result without even checking
+for overflow.
+
+The remarks in @ref{fixnums} about fixnum result type also apply to word
+integers; you must be careful to give the compiler enough
+information to prove that the result is still a word integer. This
+time, though, when we blow out of word integers we land in into
+generic bignum arithmetic, which is much worse than sleazing from
+@code{fixnum}s to word integers. Note that mixing unsigned word
+integers (e.g. @code{(unsigned-byte 64)}) arguments with arguments of any
+signed type (such as @code{fixnum}) is a no-no, since the result might not
+be unsigned.
+
 @node modular arithmetic
 @cindex modular arithmetic
 @cindex arithmetic, modular
 @cindex arithmetic, hardware
-@section Modular Arithmetic
+@subsection Modular Arithmetic
 
 @menu
 * Signed Modular Arithmetic: signed modular arithmetic.
@@ -2557,8 +3062,8 @@ result depend only on n lower bits of (all or some) arguments. If
 the compiler sees an expression of form @code{(logand <expr> <mask>)},
 where @code{<expr>} is a tree of such @emph{good} functions and @code{<mask>} is
 known to be of type @code{(unsigned-byte <w>)}, where @code{<w>} is a @emph{good}
-width, all intermediate results will be cut to @code{<w>} bits (but it is
-not done for variables and constants!). This often results in an
+width, all intermediate results will be cut to @code{<w>} bits (but this
+is @emph{not} done for variables and constants). This often results in an
 ability to use simple machine instructions for the functions.
 
 Consider this example:
@@ -2578,14 +3083,18 @@ cutting results to 32 bits, and because terminals (here, expressions
 @code{x} and @code{y}) are also of type @code{(unsigned-byte 32)}, 32-bit machine
 arithmetic can be used.
 
-As of SBCL 0.8.5 good functions are @code{+}, @code{-}, @code{logand}, @code{logior},
-@code{logxor}, @code{lognot} and their combinations; and @code{ash} with the positive
-second argument. Good widths are 32 on 32-bit CPUs and 64 on 64-bit
-CPUs. While it is possible to support smaller widths as well,
-currently this is not implemented.
+@itemize
+@item Good functions are @code{+}, @code{-}, @code{logand},
+  @code{logior}, @code{logxor}, @code{lognot}, @code{ash} with a positive second
+  argument, and their combinations.
+
+@item Good widths are 64 on 64-bit CPUs and 32 on 32-bit CPUs. While it
+  is possible to support smaller widths as well, currently this is
+  not implemented.
+@end itemize
 
 @node signed modular arithmetic
-@subsection Signed Modular Arithmetic
+@subsubsection Signed Modular Arithmetic
 
 Sign-extending the result in the following way will be
 translated into signed modular arithmetic:
@@ -2596,6 +3105,259 @@ translated into signed modular arithmetic:
   (let ((u (ldb (byte 64 0) (+ a b))))
     (logior u (- (mask-field (byte 1 63) u)))))
 @end example
+
+@node floating point
+@cindex floating point efficiency
+@subsection Floating Point
+
+@menu
+* Signed Zeroes and Special Functions: signed zeroes and special functions.
+@end menu
+
+Arithmetic on objects of type @code{single-float} and @code{double-float} is
+efficiently implemented using @ref{non descriptor} representations and
+open coding. As for integer arithmetic, the arguments must be known
+to be of the same float type. Unlike for integer arithmetic, the
+results and intermediate values usually take care of themselves due
+to the rules of float contagion, i.e. @code{(1+ (the single-float x))} is
+always a @code{single-float}.
+
+Although they are not specially implemented, @code{short-float} and
+@code{long-float} are also acceptable in declarations, since they are
+synonyms for the @code{single-float} and @code{double-float} types, respectively.
+
+In SBCL, compound float type specifiers such as
+@code{(single-float 0.0 1.0)} will be used to good effect. For example,
+in this function
+
+@example
+(defun square (x)
+  (declare (type (single-float 0f0 10f0)))
+  (* x x))
+@end example
+
+SBCL can deduce that the return type of the function @code{square}
+is @code{(single-float 0f0 100f0)}.
+
+Many union types are also supported so that
+
+@example
+(+ (the (or (integer 1 1) (integer 5 5)) x)
+   (the (or (integer 10 10) (integer 20 20)) y))
+@end example
+
+has the inferred type
+
+@example
+(or (integer 11 11) (integer 15 15)
+    (integer 21 21) (integer 25 25))
+@end example
+
+This also works for floating-point numbers. @ref{member types} are also
+supported.
+
+SBCL can also infer types for many mathematical functions including
+square root, exponential and logarithmic functions, trigonometric
+functions and their inverses, and hyperbolic functions and their
+inverses. For numeric code, this can greatly enhance efficiency by
+allowing the compiler to use specialized versions of the functions
+instead of the generic versions. The greatest benefit of this type
+inference is determining that the result of the function is a
+real-valued number instead of possibly being a complex-valued
+number.
+
+For example, consider the function
+
+@example
+(defun fun (x)
+  (declare (type (single-float (0f0) 100f0) x))
+  (values (sqrt x) (log x)))
+@end example
+
+With this declaration, the compiler can determine that the argument
+to @code{sqrt} and @code{log} are always non-negative so that the result is always
+a @code{single-float}. In fact, the return type for this function is
+derived to be @code{(values (single-float 0f0 10f0) (single-float *
+2f0))}.
+
+If the declaration were reduced to just @code{(declare (single-float
+x))}, the argument to @code{sqrt} and @code{log} could be negative. This forces
+the use of the generic versions of these functions because the
+result could be a complex number.
+
+We note, however, that proper interval arithmetic is not fully
+implemented in the compiler so the inferred types may be slightly in
+error due to round-off errors. This round-off error could accumulate
+to cause the compiler to erroneously deduce the result type and
+cause code to be removed as being unreachable. Thus, the
+declarations should only be precise enough for the compiler to
+deduce that a real-valued argument to a function would produce a
+real-valued result. The @ref{efficiency notes} from the compiler will
+guide you on what declarations might be useful.
+
+When a float must be represented as a @ref{descriptor}, a pointer
+representation is used, creating @ref{consing} overhead. For this reason,
+you should try to avoid situations (such as full call and
+non-specialized data structures) that force a descriptor
+representation. See @ref{specialized arrays},
+@ref{specialized structure slots} and @ref{non descriptors in local call}.
+
+@node signed zeroes and special functions
+@subsubsection Signed Zeroes and Special Functions
+
+SBCL supports IEEE signed zeroes. In typical usage, the signed
+zeroes are not a problem and can be treated as an unsigned zero.
+However, some of the special functions have branch points at zero, so
+care must be taken.
+
+For example, suppose we have the function
+
+@example
+(defun fun (x)
+  (declare (type (single-float 0f0) x))
+  (log x))
+@end example
+
+The derived result of the function is @code{(or single-float
+(complex single-float))} because the declared values for @code{x}
+includes both @code{-0.0} and @code{0.0} and @code{(log -0.0)} is actually a
+complex number. Because of this, the generic complex log routine is
+used.
+
+If the declaration for @code{x} were @code{(single-float (0f0))} so @code{+0.0} is
+not included or @code{(or (single-float (0f0)) (member 0f0))} so @code{+0.0}
+is included but not @code{-0.0}, the derived type would be @code{single-float}
+for both cases. By declaring @code{x} this way, the log can be
+implemented using a fast real-valued log routine instead of the
+generic log routine.
+
+SBCL implements the branch cuts and values given by Kahan (@emph{Branch
+Cuts for Complex Elementary Functions, or Much Ado About Nothing's
+Sign Bit} in Iserles and Powell (eds.) @emph{The State of the Art in
+Numerical Analysis}, pp. 165-211, Clarendon Press, 1987).
+
+@node efficiency notes
+@cindex efficiency note,
+@cindex note, efficiency
+@cindex tuning
+@section Efficiency Notes
+
+@menu
+* Operation Efficiency Notes: operation efficiency notes.
+* Representation Efficiency Notes: representation efficiency notes.
+@end menu
+
+Efficiency notes are messages that alert the user that the compiler
+has chosen a relatively inefficient implementation for some
+operation. Usually an efficiency note reflects the compiler's desire
+for more type information. If the type of the values concerned is
+known to the programmer, then additional declarations can be used to
+get a more efficient implementation.
+
+The main cause of inefficiency is the compiler's lack of adequate
+information about the types of function argument and result values.
+
+@cindex speed, optimization quality
+@cindex optimization quality speed
+Efficiency notes are enabled whenever @code{speed} is greater than its
+default of @code{1}. See the deprecated @code{sb-ext:inhibit-warnings}
+optimization quality in @ref{compiler policy} for the full picture. See
+also @ref{controlling verbosity} for some related knobs.
+
+@node operation efficiency notes
+@cindex operation efficiency note
+@cindex efficiency note, operation
+@subsection Operation Efficiency Notes
+
+Many important operations have an inefficient general case (see
+e.g. @ref{generic arithmetic}) but have efficient implementations that
+can usually be used if there is sufficient argument type
+information.
+
+Compiling this function with an obscure missing declaration:
+
+@example
+(defun eff-note (x y z)
+  (declare (fixnum x y z)
+           (optimize speed))
+  (zerop (mod (+ x y z) 3)))
+
+; in: DEFUN EFF-NOTE
+;     (+ X Y Z)
+;
+; note: forced to do +/SIGNED=>S128 (cost 8)
+;       unable to do inline fixnum arithmetic (cost 2) because:
+;       The first argument is a (INTEGER -9223372036854775808 9223372036854775806), not a FIXNUM.
+;       The result is a (VALUES
+;                        (INTEGER -13835058055282163712 13835058055282163709)
+;                        &OPTIONAL), not a (VALUES FIXNUM &OPTIONAL).
+@end example
+
+This rather cryptic efficiency note is trying to tell us that the
+result of the intermediate computation @code{(+ x y)}, which adds two
+fixnums, can overflow the fixnum range, so the addition of the
+intermediate sum to @code{z} must be done less efficiently. This might be
+fixed by providing more type information about the result of @code{(+ x
+y)}:
+
+@example
+(defun eff-note (x y z)
+  (declare (fixnum x y z)
+           (optimize speed))
+  (zerop (mod (+ (the fixnum (+ x y)) z) 3)))
+@end example
+
+@node representation efficiency notes
+@cindex representation efficiency note
+@cindex efficiency note, representation
+@subsection Representation Efficiency Notes
+
+When operating on values that have @ref{non descriptor} representations,
+there can be a substantial time and @ref{consing} penalty for converting
+to and from @ref{descriptor} representations. For this reason, the
+compiler gives an efficiency note whenever it is forced to do a
+representation coercion more expensive than
+@code{sb-ext:*efficiency-note-cost-threshold*}.
+
+Inefficient representation coercions may be due to type uncertainty,
+as in this example on a 64-bit platform:
+
+@example
+(defun cf+ (x y)
+  (declare (double-float x y)
+           (optimize speed))
+  (cons (+ x y) t))
+
+; in: DEFUN CF+
+;     (CONS (+ X Y) T)
+;
+; note: doing float to pointer coercion (cost 13), for:
+;       the first argument of CONS
+@end example
+
+The issue here is that a @code{cons} can only hold @ref{descriptor}s. Thus, the
+64-bit float result of @code{(+ x y)} needs to be boxed (see
+@ref{floating point}).
+
+Inefficient representation conversions are often not due to type
+uncertainty. Instead, they result from evaluating a non-descriptor
+expression in a context that requires a descriptor result:
+
+@itemize
+@item assignment to or initialization of any data structure other than
+  @ref{specialized arrays}, or
+
+@item assignment to a @code{special} variable, or
+
+@item passing as an argument or returning as a value in any function
+  call that is not a local call (see
+  @ref{non descriptors in local call}).
+@end itemize
+
+If such inefficient coercions appear in a hot spot in the program,
+data structure redesign or program reorganization may be necessary
+to improve efficiency. See e.g. @ref{block compilation},
+@ref{representation of objects} and @ref{profiling}.
 
 @node recognized idioms
 @cindex modular arithmetic
@@ -2665,8 +3427,54 @@ of the named symbols. Proclaiming an unbound symbol as
 @code{sb-ext:always-bound} signals an error. Allows the compiler to elide
 boundness checks from value lookups.
 @end deffn
-@node miscellaneous efficiency issues
-@section Miscellaneous Efficiency Issues
+@node efficiency miscellanea
+@cindex efficiency, miscellanea
+@section Efficiency Miscellanea
+
+@menu
+* Compile Your Code: compile your code.
+* Consing: consing.
+* Complex Argument Syntax: complex argument syntax.
+* Mapping and Iteration: mapping and iteration.
+* Trace Files: trace files.
+* Assignments: assignments.
+* Optimization Opportunities: optimization opportunities.
+@end menu
+
+This section is a summary of various implementation costs and ways to
+get around them. In each section, there are references to related
+in-depth discussion.
+
+@node compile your code
+@subsection Compile Your Code
+
+At this point, the advantages of compiling code relative to running it
+interpreted probably need not be emphasized too much, but remember
+that in SBCL, running compiled code is typically runs hundreds of
+times faster than using the @ref{interpreter} (when
+@code{sb-ext:*evaluator-mode*} is not @code{:compile}). Also, compiled (fasl)
+files load significantly faster than source files, so it is
+worthwhile compiling files that are loaded many times, even if the
+speed of the functions in the file is unimportant.
+
+Even disregarding the efficiency advantages, compiled code is as
+good or better than interpreted code. Compiled code can be debugged
+at the source level (see @ref{debugger}), and compiled code does more
+error checking. For these reasons, the interpreter should be
+regarded mainly as an interactive command interpreter, rather than
+as a programming language implementation.
+
+@node consing
+@cindex consing
+@cindex memory allocation
+@cindex efficiency, memory use
+@subsection Consing
+
+Consing is another name for allocation of memory, as done by the
+@code{cons} function (hence its name). @code{cons} is by no means the only
+function which conses: so do @code{make-array} and many other functions.
+Arithmetic and function calls can also have hidden consing
+overheads. Consing hurts performance in the following ways:
 
 @cindex garbage collector, conservative
 @cindex conservative garbage collector
@@ -2674,93 +3482,230 @@ boundness checks from value lookups.
 @cindex garbage collector, generational
 @cindex generational garbage collector
 @cindex GENCGC
-The @code{sb-ext:purify} function (available with conservative GC) causes
-SBCL first to collect all garbage, then to mark all uncollected
-objects as permanent, never again attempting to collect them as
-garbage. This can cause a large increase in efficiency when using a
-primitive garbage collector, or a more moderate increase in
-efficiency when using a more sophisticated garbage collector which
-is well suited to the program's memory usage pattern. It also allows
-permanent code to be frozen at fixed addresses, a precondition for
-using copy-on-write to share code between multiple Lisp processes.
-This is less important with modern generational GC, but not all
-SBCL platforms use such a garbage collector.
-
-The @code{sb-ext:truly-the} special form declares the type of the result of
-the operations, producing its argument; the declaration is not
-checked. In short: don't use it.
-
-FIXME: The remaining material in the CMUCL manual about getting good
-performance from the compiler should be reviewed, and added to this
-section. In the meantime, the original CMUCL manual is still 95+%
-correct for the SBCL's compiler. See the sections
-
 @itemize
-@item Advanced Compiler Use and Efficiency Hints
-@itemize
-@item Object Representation
-@item Numbers
-@item General Efficiency Hints
-@item Efficiency Notes
-@end itemize
+@item Consing reduces memory access locality, increasing paging
+  activity.
+
+@item Consing takes time just like anything else.
+
+@item Any space allocated eventually needs to be reclaimed, either by
+  @ref{garbage collection} or by starting a new Lisp process. Note that
+  CheneyGC is less efficient than GENCGC.
 @end itemize
 
-Besides this information from the CMUCL manual, there are a few other
-points to keep in mind.
+Consing is not undiluted evil, since programs do things other than
+consing, and appropriate consing can speed up the real work. It
+would certainly save time to allocate a vector of intermediate
+results that are reused hundreds of times. Also, if it is necessary
+to copy a large data structure many times, it may be more efficient
+to update the data structure non-destructively; this somewhat
+increases update overhead but makes copying trivial.
+
+Note that the remarks in the introduction of section @ref{efficiency}
+about the importance of separating tuning from coding also apply to
+consing overhead. The majority of consing will be done by a small
+portion of the program. The consing hot spots are even less
+predictable than the CPU hot spots, so don't waste time and create
+bugs by doing unnecessary consing optimization. During initial
+coding, avoid unnecessary side-effects and cons where it is
+convenient. If profiling reveals a consing problem, @emph{then} go back
+and fix the hot spots.
+
+See @ref{non descriptor} for a discussion of how one might avoid consing.
+
+@node complex argument syntax
+@cindex argument syntax efficiency
+@cindex keyword argument efficiency
+@cindex rest argument efficiency
+@cindex efficiency, argument syntax
+@subsection Complex Argument Syntax
+
+Lisp has very powerful argument passing mechanisms. Unfortunately, two
+of the most powerful mechanisms, @code{&rest} and @code{&key} arguments, have a
+significant performance penalty:
 
 @itemize
-@item The CMUCL manual doesn't seem to state it explicitly, but
-  Python (the CMUCL compiler, not the language) has a mental block
-  about type inference when assignment is involved. Python is very
-  aggressive and clever about inferring the types of values bound
-  with @code{let}, @code{let*}, inline function call, and so forth. However, it's
-  much more passive and dumb about inferring the types of values
-  assigned with @code{setq}, @code{setf}, and friends. It would be nice to fix
-  this, but in the meantime don't expect that just because it's very
-  smart about types in most respects it will be smart about types
-  involved in assignments. (This doesn't affect its ability to
-  benefit from explicit type declarations involving the assigned
-  variables, only its ability to get by without explicit type
-  declarations.)
+@item With keyword arguments, the called function has to parse the
+  supplied keywords by iterating over them and checking them against
+  the desired keywords.
+
+@item With rest arguments, the function must cons a list to hold the
+  arguments. If a function is called many times or with many
+  arguments, large amounts of memory will be allocated.
 @end itemize
 
-@cindex garbage collector, generational
-@cindex generational garbage collector
-@cindex GENCGC
+Although rest argument consing is worse than keyword parsing,
+neither problem is serious unless a great many of calls are made to
+such a function. The use of keyword arguments is strongly encouraged
+in functions with many arguments or with interfaces that are likely
+to be extended, and rest arguments are often natural in user
+interface functions.
+
+@code{&optional} arguments have some efficiency advantage over keyword
+arguments, but their syntactic clumsiness and lack of extensibility
+has caused many Lisp programmers to abandon their use except in
+functions that have obviously simple and immutable interfaces (such
+as @code{subseq}), or in functions that are only called in a few places.
+When defining an interface function to be used by other programmers
+or users, use of only required and keyword arguments is recommended.
+
+Parsing of @code{defmacro} keyword and @code{rest} arguments is done at compile
+time, so a macro can be used to provide a convenient syntax with an
+efficient implementation. If the macro-expanded form contains no
+keyword or rest arguments, then it is perfectly acceptable in inner
+loops.
+
+Keyword argument parsing overhead can also be avoided by use of
+@ref{inline expansion} and @ref{block compilation}.
+
+@quotation
+@emph{Note}: the compiler open-codes most heavily used system functions
+which have keyword or rest arguments, so that no run-time overhead
+is involved.
+@end quotation
+
+@node mapping and iteration
+@cindex mapping, efficiency of
+@subsection Mapping and Iteration
+
+One of the traditional Lisp programming styles is a highly
+applicative one, involving the use of mapping functions and many
+lists to store intermediate results. To compute the sum of the
+square-roots of a list of numbers, one might say
+
+@example
+(reduce #'+ (mapcar #'sqrt list-of-numbers))
+@end example
+
+This programming style is clear and elegant, but unfortunately results
+in slow code. There are two reasons why:
+
 @itemize
-@item Since the time the CMUCL manual was written, CMUCL (and thus SBCL)
-  has gotten a generational GC. This means that there are some
-  efficiency implications of various patterns of memory usage which
-  aren't discussed in the CMUCL manual. (Some new material should be
-  written about this.)
+@item The creation of lists of intermediate results causes much
+  @ref{consing}.
 
-@item SBCL has some important known efficiency problems. Perhaps the
-  most important are
+@item Each level of application requires another scan down the list.
+  Thus, disregarding other effects, the above code would probably
+  take twice as long as a straightforward iterative version.
+@end itemize
+
+An example of an iterative version of the same code:
+
+@example
+(loop for x in list-of-numbers
+      sum (sqrt x))
+@end example
+
+or
+
+@example
+(do ((num list-of-numbers (cdr num))
+     (sum 0 (+ (sqrt (car num)) sum)))
+    ((null num) sum))
+@end example
+
+See sections @ref{variable type inference} and @ref{let optimization} for a
+discussion of the interactions of iteration constructs with
+@ref{type inference} and variable optimization. Also, @ref{local tail call}
+discusses an applicative style of iteration.
+
+@node trace files
+@cindex trace file
+@cindex implicit continuation representation
+@cindex IR1 representation
+@cindex virtual machine representation
+@cindex IR2 representation
+@subsection Trace Files
+
+In order to write efficient code, you need to know the relative costs
+of different operations. The main reason why writing efficient Lisp
+code is difficult is that there are so many operations, and the
+costs of these operations vary in obscure context-dependent ways.
+Although @ref{efficiency notes} point out some problem areas, the only
+way to ensure generation of the best code is to look at the assembly
+code output.
+
+The @code{disassemble} function is a convenient way to get the assembly
+code for a function, but it can be very difficult to interpret since
+the correspondence with the original source code is weak. A
+better (but more awkward) option is to use the @code{:trace-file} argument
+to @code{compile-file} to generate a trace file.
+
+A trace file is a dump of the compiler's internal representations,
+through four stages of processing, including annotated assembly
+code. Each component in the program gets four pages in the trace
+file (separated by @code{^l}'):
 
 @itemize
-@item The garbage collector is not particularly efficient, at least
-      on platforms without the generational collector (as of SBCL
-      0.8.9, all except x86).
+@item The implicit continuation representation (IR1) of the optimized
+  source. This is a dump of the flow graph representation used for
+  @@SOURCE-OPTIMIZATIONS. As you will quickly notice, it is not
+  really very close to the source. This representation is not very
+  useful to even sophisticated users.
 
-@item Various aspects of the PCL implementation of CLOS are more
-      inefficient than necessary.
-@end itemize
+@item The Virtual Machine representation (VM or IR2) of the program.
+  This dump represents the generated code as sequences of @emph{Virtual
+  OPerations} (VOPs). This representation is intermediate between
+  the source and the assembly code; each VOP corresponds fairly
+  directly to some primitive function or construct, but a given VOP
+  also has a fairly predictable instruction sequence. An operation
+  (such as @code{+}) may have multiple implementations with
+  different cost and applicability. The choice of a particular VOP
+  such as @code{+/fixnum} or @code{+/single-float} represents this choice of
+  implementation. Once you are familiar with it, the VM
+  representation is probably the most useful for determining what
+  implementation has been used.
+
+@item An assembly listing, annotated with the VOP responsible for
+  generating the instructions. This listing is useful for figuring
+  out what a VOP does and how it is implemented in a particular
+  context, but its large size makes it more difficult to read.
+
+@item A disassembly of the generated code, which has all
+  pseudo-operations expanded out but is not annotated with VOPs.
 @end itemize
 
-Finally, note that Common Lisp defines many constructs which, in the
-infamous phrase, "could be compiled efficiently by a sufficiently
-smart compiler". The phrase is infamous because making a compiler
-which actually is sufficiently smart to find all these optimizations
-systematically is well beyond the state of the art of current
-compiler technology. Instead, they're optimized on a case-by-case
-basis by hand-written code, or not optimized at all if the
-appropriate case hasn't been hand-coded. Some cases where no such
-hand-coding has been done as of SBCL version 0.6.3 include
+Note that trace file generation takes much space and time, since the
+trace file is tens of times larger than the source file. To avoid
+huge confusing trace files and much wasted time, it is best to
+separate the critical program portion into its own file and then
+generate the trace file from this small file.
+
+@node assignments
+@cindex efficiency, assignments
+@cindex assignments, efficiency of
+@subsection Assignments
+
+The compiler has a mental block about type inference when assignment
+is involved. It does very aggressive and clever @ref{type inference} on
+the types of values bound with @code{let}, @code{let*}, @ref{inline expansion}, and so
+forth. However, it's much more passive and dumb about inferring the
+types of values assigned with @code{setq}, @code{setf}, and friends in the context
+of loop induction, closed over variables and aliases. It would be
+nice to fix this, but in the meantime don't expect that just because
+it's very smart about types in most respects it will be smart about
+types involved in assignments.
+
+@quotation
+@emph{Note}: This doesn't affect its ability to benefit from explicit
+type declarations involving the assigned variables, only its
+ability to get by without explicit type declarations.
+@end quotation
+
+@node optimization opportunities
+@subsection Optimization Opportunities
+
+Common Lisp defines many constructs that @emph{could be compiled
+efficiently by a sufficiently smart compiler}. This phrase is
+infamous because making a compiler that actually is sufficiently
+smart to find all these optimizations systematically is well beyond
+the state of the art of current compiler technology. Instead,
+they're optimized on a case-by-case basis by hand-written code, or
+not optimized at all if the appropriate case hasn't been hand-coded.
+Some cases where no such hand-coding has been done include
 
 @itemize
 @item @code{(reduce #'f x)} where the type of @code{x} is known at compile time,
-
-@item various bit vector operations, e.g. @code{(position 0 some-bit-vector)},
 
 @item specialized sequence idioms, e.g. @code{(remove item list :count 1)},
 
@@ -2769,7 +3714,7 @@ hand-coding has been done as of SBCL version 0.6.3 include
   (which currently performs safe @code{endp} checking internal to @code{assoc}).
 @end itemize
 
-If your system's performance is suffering due to some construct that
+If you find that performance is suffering due to some construct that
 SBCL fails to compile efficiently, even though it could be in
 principle, consider writing a patch to the compiler and submitting
 it for inclusion in the main sources. Such code is often reasonably

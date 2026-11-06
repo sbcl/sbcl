@@ -16,7 +16,7 @@
 * Commercial Support: commercial support.
 * Reporting Bugs: reporting bugs.
 * Editor Integration: editor integration.
-* Internals Documentation: internals documentation.
+* Contributing: contributing.
 * History and Implementation of SBCL: history and implementation of sbcl.
 @end menu
 
@@ -169,13 +169,19 @@ together with Emacs is recommended for use with SBCL, though other
 options exist as well. SLIME can be downloaded from
 @url{https://slime.common-lisp.dev/}.
 
-@node internals documentation
-@subsection Internals Documentation
+@node contributing
+@subsection Contributing
 
 If you're interested in the development of the SBCL system itself,
-then subscribing to
-@uref{mailto:sbcl-devel@@lists.sourceforge.net, sbcl-devel@@lists.sourceforge.net}
-is a good idea.
+then
+
+@itemize
+@item subscribe to the
+  @uref{mailto:sbcl-devel@@lists.sourceforge.net, @code{sbcl-devel@@lists.sourceforge.net}}
+  mailing list, and
+
+@item join the @code{#sbcl} IRC channel (see @ref{internet community}).
+@end itemize
 
 The Texinfo sources for the SBCL Internals Manual are available in
 @code{doc/internals/}.

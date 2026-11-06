@@ -643,6 +643,22 @@ assigned to using @code{setf}. Available on GENCGC platforms only.
 
 Experimental: interface subject to change.
 @end deffn
+@anchor{Function sb-ext purify}
+@ffindex @sortas{purify sb-ext} purify [sb-ext]
+@deffn{Function} sb-ext:purify &key root-structures environment-name
+This function optimizes garbage collection by moving all currently live
+objects into non-collected storage. @code{root-structures} is an optional list of
+objects which should be copied first to maximize locality.
+
+@code{defstruct} structures defined with the (@code{:pure} @code{t}) option are moved into
+read-only storage, further reducing @code{gc} cost. List and vector slots of pure
+structures are also moved into read-only storage.
+
+@code{environment-name} is unused.
+
+This function is a no-op on platforms using the generational garbage
+collector (x86, x86-64, ppc, arm, arm64).
+@end deffn
 @node tracing live objects back to roots
 @subsection Tracing Live Objects Back to Roots
 
@@ -1517,7 +1533,7 @@ functions described in @ref{exseq simple iterator protocol}.
 @section Unix Support
 
 @menu
-* Running external programs: running external programs.
+* Running External Programs: running external programs.
 @end menu
 
 @anchor{Variable sb-ext *posix-argv*}
@@ -1581,7 +1597,7 @@ execution of the hook that signaled, but otherwise allow the exit
 process to continue normally.
 @end deffn
 @node running external programs
-@subsection Running external programs
+@subsection Running External Programs
 
 External programs can be run with @code{sb-ext:run-program}.
 
