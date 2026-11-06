@@ -338,7 +338,7 @@
                                  (unless (memq ref seen)
                                    (push ref seen)
                                    (rec (node-lvar ref))))))))
-                       dest)))))
+                       (values dest lvar))))))
       (rec lvar))))
 
 (defun lvar-dest-var (lvar)

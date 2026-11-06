@@ -5588,6 +5588,36 @@
                 `(values ,#1# 0))
            (truly-the sb-vm:signed-word ($fun x y))))))
 
+(deftransform truncate ((x y) (integer integer) * :node node :important nil)
+  (when (and (double-word-sized-lvar-p x)
+             (double-word-sized-lvar-p y))
+    (give-up-ir1-transform))
+  (delay-ir1-transform node :ir1-phases)
+  (block nil
+    (cmatch (node)
+      (((:or eq = eql) (nth-value 1 (:this x y)) 0)
+       `(sb-bignum::integer-divisible-p x y))
+      ((> (nth-value 1 (:this x y)) 0)
+       (when (node-subtypep node unsigned-byte :nth-value 1 :asserted t)
+         `(not (sb-bignum::integer-divisible-p x y))))
+      (t
+       (or (multiple-value-bind (dest lvar) (mv-bind-dest (node-lvar node) 1 :single-use t)
+             (when dest
+               (cmatch (dest :transform nil)
+                 (((:or eq = eql) x 0)
+                  (when (eq lvar x)
+                    (erase-node-type node t 1)
+                    (transform-call dest `(lambda (x z) (declare (ignore z)) x)
+                                    'truncate)
+                    `(sb-bignum::integer-truncate-divisible-p x y)))
+                 ((> (:type unsigned-byte x) 0)
+                  (when (eq lvar x)
+                    (erase-node-type node t 1)
+                    (transform-call dest `(lambda (x z) (declare (ignore z)) (not x))
+                                    'truncate)
+                    `(sb-bignum::integer-truncate-divisible-p x y))))))
+           (give-up-ir1-transform))))))
+
 
 ;;;; arithmetic and logical identity operation elimination
 

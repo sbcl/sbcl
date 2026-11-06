@@ -1923,7 +1923,8 @@
 ;;; eliminated. This improves the performance on some CL-BENCH tests
 ;;; by up to 50%, which is probably signigicant enough to justify the
 ;;; reduction in readability that was introduced. --JES, 2004-08-07
-(defun bignum-truncate (x y)
+(declaim (inline %bignum-divide))
+(defun %bignum-divide (x y compute-q compute-rem)
   (declare (type bignum x y))
   (let (truncate-x truncate-y)
     (labels
@@ -1992,7 +1993,8 @@
            (declare (type bignum-length len-x len-y))
            (let* ((len-q (- len-x len-y))
                   ;; Add one for extra sign digit in case high bit is on.
-                  (q (%allocate-bignum (1+ len-q)))
+                  (q (when compute-q
+                       (%allocate-bignum (1+ len-q))))
                   (k (1- len-q))
                   (y1 (%bignum-ref truncate-y (1- len-y)))
                   (y2 (%bignum-ref truncate-y (- len-y 2)))
@@ -2004,17 +2006,19 @@
                       (type bignum-index k i i-1 i-2 low-x-digit)
                       (type bignum-element-type y1 y2))
              ;; DO NOT ASSUME THAT %ALLOCATE-BIGNUM PREZEROS
-             (setf (%bignum-ref q len-q) 0)
+             (when compute-q
+               (setf (%bignum-ref q len-q) 0))
              (loop
-              (setf (%bignum-ref q k)
-                    (try-bignum-truncate-guess
-                     ;; This modifies TRUNCATE-X. Must access
-                     ;; elements each pass.
-                     (bignum-truncate-guess y1 y2
-                                            (%bignum-ref truncate-x i)
-                                            (%bignum-ref truncate-x i-1)
-                                            (%bignum-ref truncate-x i-2))
-                     len-y low-x-digit))
+              (let ((digit (try-bignum-truncate-guess
+                            ;; This modifies TRUNCATE-X. Must access
+                            ;; elements each pass.
+                            (bignum-truncate-guess y1 y2
+                                                   (%bignum-ref truncate-x i)
+                                                   (%bignum-ref truncate-x i-1)
+                                                   (%bignum-ref truncate-x i-2))
+                            len-y low-x-digit)))
+                (when compute-q
+                  (setf (%bignum-ref q k) digit)))
               (cond ((zerop k) (return))
                     (t (decf k)
                        (decf low-x-digit)
@@ -2138,10 +2142,12 @@
              (len-y (%bignum-length y)))
         (multiple-value-bind (q r)
             (cond ((plusp (bignum-compare y x))
-                   (let ((res (%allocate-bignum len-x)))
-                     (dotimes (i len-x)
-                       (setf (%bignum-ref res i) (%bignum-ref x i)))
-                     (values 0 res)))
+                   (if compute-rem
+                       (let ((res (%allocate-bignum len-x)))
+                         (dotimes (i len-x)
+                           (setf (%bignum-ref res i) (%bignum-ref x i)))
+                         (values 0 res))
+                       (values 0 nil)))
                   (t
                    (let ((len-x+1 (1+ len-x)))
                      ;; TODO: someone who understands this algorithm could probably figure out
@@ -2151,42 +2157,56 @@
                      (let ((y-shift (shift-y-for-truncate y)))
                        (shift-and-store-truncate-buffers x len-x y
                                                          len-y y-shift)
-                       (values (return-quotient-leaving-remainder len-x+1
-                                                                  len-y)
-                               ;; Now that RETURN-QUOTIENT-LEAVING-REMAINDER
-                               ;; has executed, we just tidy up the remainder
-                               ;; (in TRUNCATE-X) and return it.
-                               (cond
-                                 ((zerop y-shift)
-                                  (let ((res (%allocate-bignum len-y)))
-                                    (declare (type bignum res))
-                                    (bignum-replace res truncate-x :end2 len-y)
-                                    (%normalize-bignum res len-y)))
-                                 (t
-                                  (shift-right-unaligned
-                                   truncate-x 0 y-shift len-y
-                                   ((= j res-len-1)
-                                    (setf (%bignum-ref res j)
-                                          (%ashr (%bignum-ref truncate-x i)
-                                                 y-shift))
-                                    (%normalize-bignum res res-len))
-                                   res))))))))
-          (let ((quotient (cond ((eq x-plusp y-plusp) q)
-                                ((typep q 'fixnum) (the fixnum (- q)))
-                                (t (negate-bignum-in-place q))))
-                (rem (cond (x-plusp r)
-                           ((typep r 'fixnum) (the fixnum (- r)))
-                           (t (negate-bignum-in-place r)))))
-            (values (if (typep quotient 'fixnum)
-                        quotient
-                        (%normalize-bignum quotient (%bignum-length quotient)))
-                    (if (typep rem 'fixnum)
-                        rem
-                        (%normalize-bignum rem (%bignum-length rem))))))))))
+                       (values (return-quotient-leaving-remainder len-x+1 len-y)
+                               (if compute-rem
+                                   ;; Now that RETURN-QUOTIENT-LEAVING-REMAINDER
+                                   ;; has executed, we just tidy up the remainder
+                                   ;; (in TRUNCATE-X) and return it.
+                                   (cond
+                                     ((zerop y-shift)
+                                      (let ((res (%allocate-bignum len-y)))
+                                        (declare (type bignum res))
+                                        (bignum-replace res truncate-x :end2 len-y)
+                                        (%normalize-bignum res len-y)))
+                                     (t
+                                      (shift-right-unaligned
+                                       truncate-x 0 y-shift len-y
+                                       ((= j res-len-1)
+                                        (setf (%bignum-ref res j)
+                                              (%ashr (%bignum-ref truncate-x i)
+                                                     y-shift))
+                                        (%normalize-bignum res res-len))
+                                       res)))
+                                   (loop for j of-type bignum-index from 0 below len-y
+                                         always (zerop (%bignum-ref truncate-x j)))))))))
+          (let ((rem (if compute-rem
+                         (let ((rem (cond (x-plusp r)
+                                          ((typep r 'fixnum) (the fixnum (- r)))
+                                          (t (negate-bignum-in-place r)))))
+                           (if (typep rem 'fixnum)
+                               rem
+                               (%normalize-bignum rem (%bignum-length rem))))
+                         r)))
+            (if compute-q
+                (let ((quotient (cond ((eq x-plusp y-plusp) q)
+                                      ((typep q 'fixnum) (the fixnum (- q)))
+                                      (t (negate-bignum-in-place q)))))
+                  (values (if (typep quotient 'fixnum)
+                              quotient
+                              (%normalize-bignum quotient (%bignum-length quotient)))
+                          rem))
+                rem)))))))
+
+(defun bignum-truncate (x y)
+  (declare (type bignum x y)
+           (optimize speed (safety 0)))
+  (%bignum-divide x y t t))
 
 ;;; Divide X by Y when Y fits in a word.
-(defun bignum-truncate-single-digit (x y)
+(declaim (inline %bignum-truncate-single-digit))
+(defun %bignum-truncate-single-digit (x y compute-q compute-rem)
   (declare (type bignum x)
+           (type boolean compute-q compute-rem)
            (optimize (safety 0)))
   (labels
       ((bignum-truncate-single-digit (x len-x y)
@@ -2205,39 +2225,48 @@
                     ;; normalization logic further down would avoid
                     ;; mutilating X.  Just go ahead and cons, consing's
                     ;; cheap.
-                    (values (copy-bignum x len-x) 0))
+                    (values (if compute-q (copy-bignum x len-x) nil)
+                            (if compute-rem 0 t)))
                    (t
                     (let ((n-bits (1- (integer-length y))))
                       (values
-                       (shift-right-unaligned x 0 n-bits len-x
-                                              ((= j res-len-1)
-                                               (setf (%bignum-ref res j)
-                                                     (%ashr (%bignum-ref x i) n-bits))
-                                               res)
-                                              res)
-                       (logand (%bignum-ref x 0) (1- y))))))
+                       (when compute-q
+                         (shift-right-unaligned x 0 n-bits len-x
+                                                ((= j res-len-1)
+                                                 (setf (%bignum-ref res j)
+                                                       (%ashr (%bignum-ref x i) n-bits))
+                                                 res)
+                                                res))
+                       (let ((rem-bits (logand (%bignum-ref x 0) (1- y))))
+                         (if compute-rem
+                             rem-bits
+                             (zerop rem-bits)))))))
              (cond ((sb-c::when-vop-existsp (:translate %half-bigfloor)
                       (typep y 'half-bignum-element-type))
                     (do ((i (1- (* len-x 2)) (1- i))
-                         (q (%allocate-bignum len-x))
+                         (q (when compute-q (%allocate-bignum len-x)))
                          (r 0))
                         ((minusp i)
-                         (values q r))
+                         (values q (if compute-rem r (zerop r))))
                       (declare (type half-bignum-element-type r))
                       (multiple-value-bind (q-digit r-digit)
                           (%half-bigfloor r (%half-bignum-ref x i) y)
                         (declare (type half-bignum-element-type q-digit r-digit))
-                        (setf (%half-bignum-ref q i) q-digit)
+                        (when compute-q
+                          (setf (%half-bignum-ref q i) q-digit))
                         (setf r r-digit))))
                    (t
                     (do ((i (1- len-x) (1- i))
-                         (q (%allocate-bignum len-x))
+                         (q (when compute-q (%allocate-bignum len-x)))
                          (r 0))
                         ((minusp i)
-                         (values q r))
-                      (setf (values (%bignum-ref q i)
-                                    r)
-                            (%bigfloor r (%bignum-ref x i) y))))))))
+                         (values q (if compute-rem r (zerop r))))
+                      (if compute-q
+                          (setf (values (%bignum-ref q i)
+                                        r)
+                                (%bigfloor r (%bignum-ref x i) y))
+                          (setf r
+                                (nth-value 1 (%bigfloor r (%bignum-ref x i) y))))))))))
     (let* ((x-plusp (bignum-plus-p x))
            (y-plusp t)
            (x (if x-plusp x (negate-bignum-not-fully-normalized x)))
@@ -2260,13 +2289,72 @@
       (declare (word y))
       (multiple-value-bind (q r)
           (bignum-truncate-single-digit x len-x y)
-        (let ((quotient (cond ((eq x-plusp y-plusp) q)
-                              (t (negate-bignum-in-place q))))
-              (rem (cond (x-plusp r)
-                         ((typep r 'fixnum) (the fixnum (- r)))
-                         (t (- r)))))
-          (values (%normalize-bignum quotient (%bignum-length quotient))
-                  rem))))))
+        (let ((rem (if compute-rem
+                       (cond (x-plusp r)
+                             ((typep r 'fixnum) (the fixnum (- r)))
+                             (t (- r)))
+                       r)))
+          (if compute-q
+              (let ((quotient (let ((q1 (cond ((eq x-plusp y-plusp) q)
+                                              (t (negate-bignum-in-place q)))))
+                                (%normalize-bignum q1 (%bignum-length q1)))))
+                (values quotient rem))
+              rem))))))
+
+(defun bignum-truncate-single-digit (x y)
+  (declare (optimize speed (safety 0)))
+  (%bignum-truncate-single-digit x y t t))
+
+(defun integer-divisible-p (number divisor)
+  (declare (optimize speed (safety 0)))
+  (macrolet ((single-digit-bignum-p (x)
+               #+(or x86-64 x86 ppc64 arm64)
+               `(or (typep ,x 'word)
+                    (typep ,x 'sb-vm:signed-word))
+               ;; Other backends don't have native double-word/word division,
+               ;; and their bigfloor implementation doesn't handle
+               ;; full-width divisors.
+               #-(or x86-64 x86 ppc64 arm64)
+               `(or (typep ,x '(unsigned-byte ,(1- sb-vm:n-word-bits)))
+                    (typep ,x '(integer ,(- 1 (expt 2 (- sb-vm:n-word-bits 1)))
+                                ,(1- (expt 2 (- sb-vm:n-word-bits 1))))))))
+    (sb-kernel::number-dispatch ((number integer) (divisor integer))
+      ((fixnum fixnum)
+       (zerop (rem number divisor)))
+      ((fixnum bignum)
+       (zerop number))
+      ((bignum fixnum)
+       (%bignum-truncate-single-digit number divisor nil nil))
+      ((bignum bignum)
+       (if (single-digit-bignum-p divisor)
+           (%bignum-truncate-single-digit number divisor nil nil)
+           (%bignum-divide number divisor nil nil))))))
+
+(defun integer-truncate-divisible-p (number divisor)
+  (declare (optimize speed (safety 0)))
+  (macrolet ((single-digit-bignum-p (x)
+               #+(or x86-64 x86 ppc64 arm64)
+               `(or (typep ,x 'word)
+                    (typep ,x 'sb-vm:signed-word))
+               ;; Other backends don't have native double-word/word division,
+               ;; and their bigfloor implementation doesn't handle
+               ;; full-width divisors.
+               #-(or x86-64 x86 ppc64 arm64)
+               `(or (typep ,x '(unsigned-byte ,(1- sb-vm:n-word-bits)))
+                    (typep ,x '(integer ,(- 1 (expt 2 (- sb-vm:n-word-bits 1)))
+                                ,(1- (expt 2 (- sb-vm:n-word-bits 1))))))))
+    (sb-kernel::number-dispatch ((number integer) (divisor integer))
+      ((fixnum fixnum)
+       (multiple-value-bind (q r) (truncate number divisor)
+         (values q (zerop r))))
+      ((fixnum bignum)
+       (values 0 (zerop number)))
+      ((bignum fixnum)
+       (%bignum-truncate-single-digit number divisor t nil))
+      ((bignum bignum)
+       (if (single-digit-bignum-p divisor)
+           (%bignum-truncate-single-digit number divisor t nil)
+           (%bignum-divide number divisor t nil))))))
 
 ;;; This is used by %output-integer-in-base for repeatedly dividing a
 ;;; bignum by a base into a preallocated quotient bignum.
