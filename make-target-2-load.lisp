@@ -24,86 +24,27 @@
 ;;; to know if NEW-ARENA returns an arena, so give them a sensible feature name.
 #+system-tlabs (push :arena-allocator *features*)
 
-;;; Remove symbols from CL:*FEATURES* that should not be exposed to users.
-(let* (#-sb-devel
-       (non-target-features
-        ;;
-        ;; FIXME: I suspect that this list should be changed to its inverse-
-        ;; features that _SHOULD_ go into SB-IMPL:+INTERNAL-FEATURES+ and
-        ;; comments about the reasoning behind each, rather than features to
-        ;; discard and reasons they're not needed. The default assumption should be
-        ;; to drop any build-time feature that lacks a rationale to preserve it.
-        ;;
-        ;; READ-FROM-STRING prevents making references to
-        ;; all these keywords from the source form itself.
-        (read-from-string "
-         (;; :SB-AFTER-XC-CORE is essentially an option flag to make-host-2
-          :SB-AFTER-XC-CORE
-          ;; CONS-PROFILING sets the initial compiler policy which persists
-          ;; into the default baseline policy. It has no relevance post-build
-          ;; in as much as policy can be changed later arbitrarily.
-          :CONS-PROFILING
-          ;; Used by nothing after compiling 'target-thread.lisp' or 'thread.c'
-          :SB-FUTEX :OS-THREAD-STACK
-          ;; These affect the BREAK instruction emitter, but the C code is able
-          ;; to handle anything, and post-build we don't care which it is.
-          :UD2-BREAKPOINTS :INT4-BREAKPOINTS
-          ;; Uses of OS-PROVIDES-DLOPEN and -DLADDR are confined to src/code/foreign.lisp
-          :OS-PROVIDES-DLOPEN :OS-PROVIDES-DLADDR
-          ;; more-or-less confined to serve-event, except for a test which now
-          ;; detects whether COMPUTE-POLLFDS is defined and therefore testable.
-          :OS-PROVIDES-POLL
-          ;; Silly feature we add in because additive features are more sensible
-          ;; than subtractive ones. So you opt out, not in, to having *LOAD-TRUENAME*
-          ;; eagerly bound.
-          :ANSI-COMPLIANT-LOAD-TRUENAME
-          ;; The final batch of symbols is strictly for C. The LISP_FEATURE_
-          ;; prefix on the corresponding #define is unfortunate.
-          :GCC-TLS :USE-SYS-MMAP
-          ;;; Enforce using of posix semaphores on Darwin instead of dispatch.
-          :USE-DARWIN-POSIX-SEMAPHORES
-          ;; only for src/runtime/run-program.c
-          :OS-PROVIDES-CLOSE-RANGE-WRAPPER)"))
-       (public-features
-        (cons
-         sb-impl::!sbcl-architecture
-         (read-from-string "
-          (:COMMON-LISP :SBCL :ANSI-CL :IEEE-FLOATING-POINT
-           :64-BIT ; choice of word size. 32-bit if absent
-           :BIG-ENDIAN :LITTLE-ENDIAN ; endianness: pick one and only one
-           :BSD :UNIX :LINUX :WIN32 :DARWIN :SUNOS :ANDROID ; OS: pick one or more
-           :FREEBSD :GNU-KFREEBSD :OPENBSD :NETBSD :DRAGONFLY :HAIKU
-           :MACH-O :ELF ; obj file format: pick zero or one
-           ;; I would argue that this should not be exposed,
-           ;; but I would also anticipate blowback from removing it.
-           :GENCGC :MARK-REGION-GC ; GC: pick one and only one
-           :ARENA-ALLOCATOR :ALLOCATION-SIZE-HISTOGRAM
-           ;; Can't use s-l-a-d :compression safely without it
-           :SB-CORE-COMPRESSION
-           ;; Features that are also in *FEATURES-POTENTIALLY-AFFECTING-FASL-FORMAT*
-           ;; and would probably mess up something if made non-public,
-           ;; though I don't think they should all be public.
-           :MSAN :UBSAN
-           :SB-SAFEPOINT
-           :SB-THREAD :SB-UNICODE
-           ;; Things which (I think) at least one person has requested be kept around
-           :SB-LDB
-           ;; We keep the :SB-PACKAGE-LOCKS feature despite it no longer
-           ;; affecting the build. (It's not a choice any more)
-           :SB-PACKAGE-LOCKS
-           ;; unsure, I think this is for end-user consumption,
-           ;; though every release of SBCL since eons ago has had local nicknames.
-           :PACKAGE-LOCAL-NICKNAMES
-           ;; Developer mode features. A release build will never have them,
-           ;; hence it makes no difference whether they're public or not.
-           :SB-DEVEL :SB-DEVEL-LOCK-PACKAGES)")))
-       #-sb-devel
-       (non-internal-features (append non-target-features public-features)))
+(defun retained-features (value)
+  (let ((feature-defs
+          (with-open-file (s "src/cold/base-target-features.lisp-expr")
+            (read s))))
+    (loop for feature-def in feature-defs
+          for feature-name = (first feature-def)
+          for options = (cddr feature-def)
+          when (eq (getf options :retain :internal) value)
+            collect feature-name)))
+
+;;; Remove symbols from CL:*FEATURES* that should not be exposed to
+;;; users and move others into SB-IMPL:+INTERNAL-FEATURES+ unless
+;;; :RETAIN NIL.
+(let ((cl-features (retained-features t)))
   (setq sb-impl:+internal-features+
-        (set-difference *features* #+sb-devel public-features
-                                   #-sb-devel non-internal-features))
+        (set-difference *features*
+                        #+sb-devel cl-features
+                        #-sb-devel (append cl-features
+                                           (retained-features nil))))
   (setf (sb-int:info :variable :kind 'sb-impl:+internal-features+) :constant)
-  (setq *features* (remove-if-not (lambda (x) (member x public-features))
+  (setq *features* (remove-if-not (lambda (x) (member x cl-features))
                                   *features*)))
 
 ;;; There's a fair amount of machinery which is needed only at cold

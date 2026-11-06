@@ -51,9 +51,36 @@
 ;;;;   committing configuration changes and users can avoid the
 ;;;;   version control conflicts they would risk by editing this file.
 
-;;; user-configurable features and their base values
+;;; List of build features of the format
 ;;;
-;;; Those that are :PUBLIC T go into the user manual.
+;;;     (name default &key (retain :internal) public documentation)
+;;;
+;;; - NAME is the build feature (a keyword).
+;;;
+;;; - DEFAULT is whether it's on by default (NIL, T or :AUTO, where
+;;;   :AUTO means that `make-config.sh` determines a dynamic default).
+;;;
+;;; - RETAIN is T, :INTERNAL, or NIL.
+;;;
+;;;     - T: NAME will be in CL:*FEATURES* in the built SBCL. In this
+;;;       case, NAME had better have the :SB- prefix or have a meaning
+;;;       that's not SBCL-specific (e.g. :X86).
+;;;
+;;;     - :INTERNAL: NAME will be in SB-IMPL:+INTERNAL-FEATURES+. This
+;;;       is the default. NAME can be anything.
+;;;
+;;;         FIXME: I suspect that the default should be changed to NIL
+;;;         and we should explicitly mark features as :RETAIN
+;;;         :INTERNAL that go into SB-IMPL:+INTERNAL-FEATURES+ along
+;;;         with the reasoning behind each, rather than features to
+;;;         discard and reasons they're not needed. The default
+;;;         assumption should be to drop any build-time feature that
+;;;         lacks a rationale to preserve it. -- DK
+;;;
+;;;     - NIL: NAME is dropped after the build. NAME can be anything.
+;;;
+;;; - If PUBLIC, then it must have DOCUMENTATION, which will be
+;;;   included in the user manual.
 (
  ;; I (WHN) made this an optional feature because I came to Common
  ;; Lisp from C++ through Scheme, so I'm accustomed to asking Emacs
@@ -99,6 +126,7 @@
  readtable configured so that the system sources can be read.")
 
  (:sb-ldb t
+  :retain t
   :public t
   :documentation
   "Enable the @LDB, the low-level debugger. In the ideal world you
@@ -109,6 +137,8 @@
   at least provide an informative backtrace.")
 
  (:sb-after-xc-core nil
+  ;; Essentially an option flag to make-host-2
+  :retain nil
   :public t
   :documentation
   "This isn't really a target Lisp feature at all but controls
@@ -117,7 +147,7 @@
   modify SBCL's own source code, as in `slam.sh`. Otherwise you don't
   need it.")
 
- ;; (This feature was called :DEBUG in the original CMUCL code.)
+ ;; This feature was called :DEBUG in the original CMUCL code.
  (:sb-show-assem nil
   :public t
   :documentation
@@ -143,10 +173,7 @@
   "Enabled automatically by `make-config.sh` for platforms which
   implement short vector SIMD intrinsics.")
 
- ;; FIXME: Should this be :SB-CYCLE-COUNTER instead? If so, then the
- ;; same goes for :COMPARE-AND-SWAP-VOPS as well, and a bunch of
- ;; others. Perhaps build-time convenience features like this should
- ;; all live in e.g. SB-INT instead?
+ ;; This is not :RETAIN T, so it doesn't need the :SB- prefix.
  (:cycle-counter nil
   :public t
   :documentation
@@ -204,7 +231,9 @@
  (:high-security nil)
  (:high-security-support nil)
 
- (:sb-thread nil
+ (:sb-thread :auto
+  ;; In *FEATURES-POTENTIALLY-AFFECTING-FASL-FORMAT*
+  :retain t
   :public t
   :documentation
   "Enable low-level thread primitives support. See SB-MANUAL:@THREADING.
@@ -214,11 +243,13 @@
   Windows. Other platforms that support them include FreeBSD, Solaris.")
 
  (:sb-futex nil
+  :retain nil
   :public t
   :documentation
   "Use `futex`es as our locking primitive. Only available on Linux.")
 
  (:sb-package-locks t
+  :retain t
   :public t
   :documentation
   "Enable detection of unportable code (when applied to the
@@ -228,6 +259,8 @@
   SB-MANUAL:@PACKAGE-LOCKS.")
 
  (:sb-unicode t
+  ;; In *FEATURES-POTENTIALLY-AFFECTING-FASL-FORMAT*
+  :retain t
   :public t
   :documentation
   "Support for the entirety of the 21-bit character space defined by
@@ -263,13 +296,20 @@
   `\\\\M-?` (`slime-edit-uses`) work which lists call/expansion/etc.
   sites. It will increase the core size by major 5-6MB, though.")
 
- ;; We support package local nicknames. No :sb-prefix here, as we
+ ;; We support package local nicknames. No :SB- prefix here, as we
  ;; vainly believe our API is worth copying to other implementations
  ;; as well. This doesn't affect the build at all, merely declares how
  ;; things are.
- (:package-local-nicknames t)
+ (:package-local-nicknames t
+  ;; Unsure if this is for end-user consumption, though every release
+  ;; of SBCL since eons ago has had local nicknames. -- DK
+  :retain t)
 
  (:ansi-compliant-load-truename t
+  ;; Silly feature we add in because additive features are more
+  ;; sensible than subtractive ones. So you opt out, not in, to having
+  ;; *LOAD-TRUENAME* eagerly bound.
+  :retain nil
   :public t
   :documentation
   "CLHS says that *LOAD-TRUENAME* has to be bound whenever
@@ -286,7 +326,8 @@
  ;; 19990702) haven't tried to verify that it does conform, but it
  ;; should at least mostly conform (because the underlying x86
  ;; hardware tries).
- (:ieee-floating-point t)
+ (:ieee-floating-point t
+  :retain t)
 
  ;; CMUCL had, and we inherited, code to support 80-bit LONG-FLOAT on
  ;; the x86 architecture. Nothing has been done to actively destroy
@@ -330,19 +371,23 @@
   Requires all spaces to be relocatable on start-up.")
 
  (:sb-core-compression nil
+  ;; Can't use SB-EXT:SAVE-LISP-AND-DIE :COMPRESSION safely without it
+  :retain t
   :public t
   :documentation
   "Support zstd-based compressed core files. Enable this feature to
   compile it in. Obviously, doing so adds a dependency on zstd.")
 
- (:sb-safepoint nil
+ (:sb-safepoint :auto
+  ;; In *FEATURES-POTENTIALLY-AFFECTING-FASL-FORMAT*
+  :retain t
   :public t
   :documentation
   "On certain thread-enabled platforms, synchronization between
   threads for the purpose of stopping and starting the world around GC
   can be performed using safepoints instead of signals. Enable this
   feature to compile with safepoints and to use them for GC. This is
-  always enabled on :WIN32.")
+  always enabled on :WIN32. Not enabled elsewhere by default.")
 
  (:sb-cover-for-internals nil
   :public t
@@ -354,94 +399,117 @@
 
  ;; TODO: Which ones should be documented and made public?
  (:bitmapped-conset t)
- (:sb-devel nil)
  (:nonstop-foreign-call nil)
  (:tls-based-mv-return nil)
- (:mark-region-gc nil)
- (:android nil))
-
 
-;;;; Local features
-;;;; --------------
-;;;;
-;;;; Local features are set automatically by make-config.sh and should
-;;;; not be configured unless you really, really know what you're
-;;;; doing. Local features are
-;;;;
-;;;; machine architecture features:
-;;;;   :x86
-;;;;      any Intel 386 or better, or compatibles like the AMD K6 or K7
-;;;;   :x86-64
-;;;;      any x86-64 CPU running in 64-bit mode
-;;;;   :sparc
-;;;;      any Sun UltraSPARC (possibly also non-Ultras -- currently untested)
-;;;;   :ppc
-;;;;      any PowerPC CPU
-;;;;   :ppc64
-;;;;      64-bit PowerPC CPU, ISA 2.06 (POWER7) or later
-;;;;   :mips
-;;;;      any MIPS CPU (in little-endian mode with :little-endian)
-;;;;   :arm
-;;;;      an ARM CPU (details yet to be determined)
-;;;;   :arm64
-;;;;     an ARMv8 AArch64 CPU
-;;;;   :riscv
-;;;;      A RISC-V CPU.
-;;;;   :loongarch64
-;;;;      64-bit LoongArch CPU
-;;;; (CMUCL also had a :pentium feature, which affected the definition
-;;;; of some floating point vops. It was present but not enabled or
-;;;; documented in the CMUCL code that SBCL is derived from, and has
-;;;; now been moved to the *BACKEND-SUBFEATURES* mechanism.)
-;;;;
-;;;; properties derived from the machine architecture
-;;;;
-;;;;   :64-bit
-;;;;     means (= sb-vm:n-word-bits 64), currently true for x86-64,
-;;;;     arm64, riscv64, ppc64
-;;;;
-;;;;   :64-bit-registers
-;;;;     means (= sb-vm:n-machine-word-bits 64), yet (=
-;;;;     sb-vm:n-word-bits 32) currently true for alpha
-;;;;
-;;;;   :control-stack-grows-downward-not-upward
-;;;;     On X86, the Lisp control stack grows downward. On the other
-;;;;     supported CPU architectures as of sbcl-0.7.1.40, the system
-;;;;     stack grows upward.
-;;;;
-;;;;   Note that there are other stack-related differences between the
-;;;;   X86 port and the other ports. E.g. on X86, the Lisp control
-;;;;   stack coincides with the C stack, meaning that on the X86
-;;;;   there's stuff on the control stack that the Lisp-level debugger
-;;;;   doesn't understand very well. As of sbcl-0.7.1.40 things like
-;;;;   that are just parameterized by #+X86, but it'd probably be
-;;;;   better to use new flags like :CONTROL-STACK-CONTAINS-C-STACK.
-;;;;
-;;;;   :alien-callbacks
-;;;;     Alien callbacks have been implemented for this platform.
-;;;;
-;;;;   :compare-and-swap-vops
-;;;;     The backend implements compare-and-swap VOPs.
-;;;;
-;;;; operating system features:
-;;;;   :unix       = We're intended to run under some Unix-like OS. (This is not
-;;;;                 exclusive with the features which indicate which particular
-;;;;                 Unix-like OS we're intended to run under.)
-;;;;   :linux      = We're intended to run under some version of Linux.
-;;;;   :bsd        = We're intended to run under some version of BSD Unix. (This
-;;;;                 is not exclusive with the features which indicate which
-;;;;                 particular version of BSD we're intended to run under.)
-;;;;   :freebsd    = We're intended to run under FreeBSD.
-;;;;   :openbsd    = We're intended to run under OpenBSD.
-;;;;   :netbsd     = We're intended to run under NetBSD.
-;;;;   :dragonfly  = We're intended to run under DragonFly BSD.
-;;;;   :darwin     = We're intended to run under Darwin (including MacOS X).
-;;;;   :sunos      = We're intended to run under Solaris user environment
-;;;;                 with the SunOS kernel.
-;;;;   :win32      = We're intended to run under some version of Windows.
-;;;;
-;;;; The above is not an exhaustive list, see make-config.sh for the
-;;;; full picture.
+ ;; ------------------------------------------
+ ;; Undocumented stuff to retain in *FEATURES*
+ ;; ------------------------------------------
+
+ ;; Standard features (don't disable these)
+ (:ansi-cl t :retain t)
+ (:common-lisp t :retain t)
+ ;; Should we add :X3J13 too?
+ ;;
+ ;; No. CLHS says ":x3j13 [...] A conforming implementation might or
+ ;; might not contain such a feature." -- CSR, 2002-02-21
+ ;;
+ ;; Our dialect
+ (:sbcl t :retain t)
+
+ ;; 32-bit if absent
+ (:64-bit :auto :retain t)
+
+ ;; Endianness (mutually exclusive)
+ (:big-endian nil :retain t)
+ (:little-endian nil :retain t)
+
+ ;; Machine architecture (mutually exclusive)
+ (:arm :auto :retain t)
+ (:arm64 :auto :retain t)
+ (:loongarch64 :auto :retain t)
+ (:mips :auto :retain t)
+ (:ppc :auto :retain t)
+ (:ppc64 :auto :retain t)
+ (:riscv :auto :retain t)
+ (:sparc :auto :retain t)
+ (:x86 :auto :retain t)
+ (:x86-64 :auto :retain t)
+
+ ;; Operating system (mutually exclusive)
+ (:android :auto :retain t)
+ (:darwin :auto :retain t)
+ (:dragonfly :auto :retain t)
+ (:freebsd :auto :retain t)
+ (:gnu-kfreebsd :auto :retain t)
+ (:haiku :auto :retain t)
+ (:linux :auto :retain t)
+ (:netbsd :auto :retain t)
+ (:openbsd :auto :retain t)
+ (:sunos :auto :retain t)
+ (:win32 :auto :retain t)
+
+ ;; Operating system families (not mutually exclusive)
+ (:bsd :auto :retain t)
+ (:unix :auto :retain t)
+
+ ;; Object file format (mutually exclusive)
+ (:elf :auto :retain t)
+ (:mach-o :auto :retain t)
+
+ ;; Memory management
+ ;;
+ ;; I would argue that these should not be exposed, but I would also
+ ;; anticipate blowback from removing it. -- DK
+ (:allocation-size-histogram nil :retain t)
+ (:arena-allocator nil :retain t)
+ ;; :CHENEYGC is curiously missing.
+ (:gencgc :auto :retain t)
+ (:mark-region-gc nil :retain t)
+
+ ;; Features that are also in
+ ;; *FEATURES-POTENTIALLY-AFFECTING-FASL-FORMAT* and would probably
+ ;; mess up something if made non-public, though I don't think they
+ ;; should all be public. -- DK
+ (:msan nil :retain t)
+ (:ubsan nil :retain t)
+
+ ;; Developer mode features. A normal build will never have them,
+ ;; hence it makes no difference whether they're retained or not.
+ (:sb-devel nil :retain t)
+ (:sb-devel-lock-packages nil :retain t)
+
+ ;; ----------------------------
+ ;; Non-public, drop after build
+ ;; ----------------------------
+
+ ;; CONS-PROFILING sets the initial compiler policy which persists
+ ;; into the default baseline policy. It has no relevance post-build
+ ;; in as much as policy can be changed later arbitrarily.
+ (:cons-profiling nil :retain nil)
+ ;; Used by nothing after compiling target-thread.lisp or thread.c
+ (:os-thread-stack nil :retain nil)
+ ;; These affect the BREAK instruction emitter, but the C code is able
+ ;; to handle anything, and post-build we don't care which it is.
+ (:ud2-breakpoints nil :retain nil)
+ (:int4-breakpoints nil :retain nil)
+ ;; Uses of OS-PROVIDES-DLOPEN and -DLADDR are confined to
+ ;; src/code/foreign.lisp
+ (:os-provides-dlopen nil :retain nil)
+ (:os-provides-dladdr nil :retain nil)
+ ;; More or less confined to serve-event, except for a test which now
+ ;; detects whether COMPUTE-POLLFDS is defined and therefore
+ ;; testable.
+ (:os-provides-poll nil :retain nil)
+ ;; The final batch of symbols is strictly for C. The LISP_FEATURE_
+ ;; prefix on the corresponding #define is unfortunate.
+ (:gcc-tls nil :retain nil)
+ (:use-sys-mmap nil :retain nil)
+ ;; Enforce using of posix semaphores on Darwin instead of dispatch.
+ (:use-darwin-posix-semaphores nil :retain nil)
+ ;; Only for src/runtime/run-program.c
+ (:os-provides-close-range-wrapper nil :retain nil))
+
 
 ;;;; Internals
 ;;;; ---------

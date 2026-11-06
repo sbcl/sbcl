@@ -254,33 +254,19 @@
     (when (probe-file customizer-file-name)
       (copy-list (funcall (compile nil (read-from-file customizer-file-name)) nil)))))
 
-;;; features present in all builds
-(defvar *static-features*
-  '(;; our standard
-    :ansi-cl :common-lisp
-
-    ;; Should we add :X3J13 too?
-    ;;
-    ;; No. CLHS says ":x3j13 [...] A conforming implementation might
-    ;; or might not contain such a feature." -- CSR, 2002-02-21
-
-    ;; our dialect
-    :sbcl))
-
 (defun base-features ()
-  (let ((feature-defs (read-from-file "^base-target-features.lisp-expr")))
-    (union (loop for feature-def in feature-defs
-                 for feature-name = (first feature-def)
-                 for enabledp = (second feature-def)
-                 when enabledp
-                   collect feature-name)
-           *static-features*)))
-
-(defvar *known-features*
   (let ((feature-defs (read-from-file "^base-target-features.lisp-expr")))
     (loop for feature-def in feature-defs
           for feature-name = (first feature-def)
-          collect feature-name)))
+          ;; We don't collect features with default :AUTO. It's up to
+          ;; make-config.sh to add them or not.
+          for enabledp = (eq (second feature-def) t)
+          when enabledp
+            collect feature-name)))
+
+(defvar *known-features*
+  (let ((feature-defs (read-from-file "^base-target-features.lisp-expr")))
+    (mapcar #'first feature-defs)))
 
 (defun feature (object)
   (unless (member object *known-features*)

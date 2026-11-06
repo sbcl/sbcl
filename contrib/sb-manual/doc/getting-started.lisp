@@ -320,9 +320,9 @@
 (defun feature-docstring ()
   (with-output-to-string (out)
     (dolist (feature-def (base-target-features))
-      (destructuring-bind (feature enabledp &key public documentation)
+      (destructuring-bind (feature default &key retain public documentation)
           feature-def
-        (declare (ignore enabledp))
+        (declare (ignore default retain))
         (when public
           (assert documentation ()
                   "No documentation for public build feature ~S."
