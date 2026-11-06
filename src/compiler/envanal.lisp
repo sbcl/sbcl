@@ -619,9 +619,17 @@
                  (setf (dynamic-extent-info dynamic-extent) (make-lvar))))
               (derived-dynamic-extents
                (aver (null (enclose-dynamic-extent enclose)))
-               (let ((lvar (make-lvar)))
+               (let ((lvar (or (some #'dynamic-extent-info derived-dynamic-extents)
+                               (make-lvar))))
                  (dolist (dynamic-extent derived-dynamic-extents)
-                   (setf (dynamic-extent-info dynamic-extent) lvar))))))))
+                   (let ((old (dynamic-extent-info dynamic-extent)))
+                     (unless (eq old lvar)
+                       (when old
+                         (dolist (lambda (component-lambdas component))
+                           (dolist (other (lambda-dynamic-extents lambda))
+                             (when (eq (dynamic-extent-info other) old)
+                               (setf (dynamic-extent-info other) lvar)))))
+                       (setf (dynamic-extent-info dynamic-extent) lvar))))))))))
   (values))
 
 ;;;; cleanup emission

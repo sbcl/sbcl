@@ -2505,7 +2505,9 @@
 
 (with-test (:name :auto-dx-monster)
   (assert (equal (auto-dx-monster 3 #(1 2 3)) 3))
-  (assert-no-consing (auto-dx-monster 3 #(1 2 3))))
+  (assert-no-consing (auto-dx-monster 3 #(1 2 3)))
+  (assert (equal (auto-dx-monster nil #(1 2 3)) 3))
+  (assert-no-consing (auto-dx-monster nil #(1 2 3))))
 
 (defun auto-dx-recursive-ref (seq)
   (labels ((f (x)
