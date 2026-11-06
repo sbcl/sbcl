@@ -81,6 +81,10 @@
 ;;;
 ;;; - If PUBLIC, then it must have DOCUMENTATION, which will be
 ;;;   included in the user manual.
+;;;
+;;;     FIXME: We should document all :RETAIN T features (like :X86
+;;;     and :LINUX). For that, we may need something like :PUBLIC
+;;;     :READ-ONLY. -- MG
 (
  ;; I (WHN) made this an optional feature because I came to Common
  ;; Lisp from C++ through Scheme, so I'm accustomed to asking Emacs

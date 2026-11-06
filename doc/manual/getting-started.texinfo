@@ -254,16 +254,20 @@ such as @code{:ansi-cl} and @code{:sbcl} with no corresponding build option.
 @node build options
 @subsection Build Options
 
+The following is a list is build option with the default value and
+whether they are retained in @code{cl:*features*} in the built SBCL in
+parentheses.
+
 @cindex debug, optimization quality
 @cindex optimization quality debug
 @itemize
-@item @code{:sb-doc}
+@item @code{:sb-doc} (on)
 
 Retain documentation strings found in the system sources in the
 target SBCL executable. Traditional Common Lisp folk will want this
 option set.
 
-@item @code{:sb-show}
+@item @code{:sb-show} (off)
 
 Make more debugging information available (for debugging SBCL
  itself). If you aren't hacking or troubleshooting SBCL itself, you
@@ -298,7 +302,7 @@ If you want to be able to use the extra debugging information,
 therefore, be sure to keep the sources around, and run with the
 readtable configured so that the system sources can be read.
 
-@item @code{:sb-ldb}
+@item @code{:sb-ldb} (on, in @code{*features*})
 
 Enable the @ref{ldb}, the low-level debugger. In the ideal world you
 would not need this unless you are messing with SBCL at a very low
@@ -307,7 +311,7 @@ assembly code for a port to a new CPU). However, experience shows
 that sooner or later everyone @code{lose()}s, in which case @code{sb-ldb} can
 at least provide an informative backtrace.
 
-@item @code{:sb-after-xc-core}
+@item @code{:sb-after-xc-core} (off)
 
 This isn't really a target Lisp feature at all but controls
 whether the build process produces an @code{after-xc.core} file. This can
@@ -315,12 +319,12 @@ be useful for shortening the edit/compile/debug cycle when you
 modify SBCL's own source code, as in @code{slam.sh}. Otherwise you don't
 need it.
 
-@item @code{:sb-show-assem}
+@item @code{:sb-show-assem} (off)
 
 Enable extra debugging output in the @code{assem.lisp} assembler /
 scheduler code.
 
-@item @code{:sb-dyncount}
+@item @code{:sb-dyncount} (off)
 
 Enable code for collecting statistics on usage of various
 operations, useful for performance tuning of the SBCL system itself.
@@ -328,18 +332,18 @@ This code is probably pretty stale (having not been tested since the
 fork from base CMUCL) but might nonetheless be a useful starting
 point for anyone who wants to collect such statistics in the future.
 
-@item @code{:sb-simd-pack}
+@item @code{:sb-simd-pack} (off)
 
 Enabled automatically by @code{make-config.sh} for platforms which
 implement short vector SIMD intrinsics.
 
-@item @code{:cycle-counter}
+@item @code{:cycle-counter} (off)
 
 Enabled automatically by @code{make-config.sh} for platforms which
 implement the @code{%read-cycle-counter} VOP. Can be disabled manually:
 affects @code{time}.
 
-@item @code{:immobile-space}
+@item @code{:immobile-space} (off)
 
 Build with support for an additional dynamic heap differing from
 the main dynamic heap in two ways:
@@ -360,7 +364,7 @@ allocation of those objects is relatively unimportant. If unexpected
 performance regressions are observed, consider disabling this
 feature and reporting a bug.
 
-@item @code{:immobile-code}
+@item @code{:immobile-code} (off)
 
 Allocate most functions in the immobile space.
 Enabled by default if supported. The down-side of this feature is
@@ -369,14 +373,14 @@ movable code. If a particular application is performance-constrained
 by speed of creation of compiled functions (not including closures),
 the feature can be disabled.
 
-@item @code{:compact-instance-header}
+@item @code{:compact-instance-header} (off)
 
 Combine the layout pointer, instance-length, and widetag of
 an @code{instance} into a single machine word. This represents a space
 savings of anywhere from 4% to 8% in typical applications. (Your
 mileage may vary.)
 
-@item @code{:sb-thread}
+@item @code{:sb-thread} (dynamic, in @code{*features*})
 
 Enable low-level thread primitives support. See @ref{threading}.
 
@@ -384,11 +388,11 @@ As of SBCL 2.6.9, threads are part of the default build on x86oid
 Linux, Darwin, and Windows. In fact, threads are mandatory on
 Windows. Other platforms that support them include FreeBSD, Solaris.
 
-@item @code{:sb-futex}
+@item @code{:sb-futex} (off)
 
 Use @code{futex}es as our locking primitive. Only available on Linux.
 
-@item @code{:sb-package-locks}
+@item @code{:sb-package-locks} (on, in @code{*features*})
 
 Enable detection of unportable code (when applied to the
 @code{common-lisp} package or SBCL-internal packages) or bad-neighbourly
@@ -396,38 +400,38 @@ code (when applied to user-level packages), relating to material
 alteration to packages or to bindings in symbols in packages. See
 @ref{package locks}.
 
-@item @code{:sb-unicode}
+@item @code{:sb-unicode} (on, in @code{*features*})
 
 Support for the entirety of the 21-bit character space defined by
 the Unicode consortium, rather than the classical 8-bit ISO-8859-1
 character set. See @ref{unicode support}.
 
-@item @code{:sb-eval}
+@item @code{:sb-eval} (on)
 
 Support for a full evaluator that can execute all the CL special
 forms, as opposed to the traditional SBCL evaluator, which called
 @code{compile} for everything complicated. See @ref{interpreter}.
 
-@item @code{:sb-fasteval}
+@item @code{:sb-fasteval} (off)
 
 Support for a different evaluator (interpreter) with improved
 performance. You can have only one of @code{:sb-eval} @code{and} @code{:sb-fasteval}. See
 @ref{interpreter}.
 
-@item @code{:sb-source-locations}
+@item @code{:sb-source-locations} (on)
 
 Record source location information for variables, classes,
 conditions, packages, etc. Gives much better information on
 @code{M-.} in Slime but increases core size by about 100kB.
 
-@item @code{:sb-xref-for-internals}
+@item @code{:sb-xref-for-internals} (off)
 
 Record xref data for SBCL internals. This can be rather useful for
 people who want to develop on SBCL itself because it will make
 @code{M-?} (@code{slime-edit-uses}) work which lists call/expansion/etc.
 sites. It will increase the core size by major 5-6MB, though.
 
-@item @code{:ansi-compliant-load-truename}
+@item @code{:ansi-compliant-load-truename} (on)
 
 @code{clhs} says that @code{*load-truename*} has to be bound whenever
 @code{*load-pathname*} is because obviously the spec wanted to mandate that
@@ -436,7 +440,7 @@ sites. It will increase the core size by major 5-6MB, though.
  Remove this feature if you want to ignore the technical requirement
  that @code{*load-truename*} be a variable (as opposed to a symbol-macro).
 
-@item @code{:largefile}
+@item @code{:largefile} (off)
 
 Some platforms don't use a 32-bit @code{off_t} by default, and thus can't
 handle files larger than 2GB. This feature will control whether
@@ -447,22 +451,22 @@ to work, you shouldn't be enabling it manually. You might however
 want to disable it, if you need to pass file descriptors to foreign
 code that uses a 32-bit @code{off_t}.
 
-@item @code{:relocatable-static-space}
+@item @code{:relocatable-static-space} (off)
 
 Allow static space to be relocatable on start-up.
 
-@item @code{:aslr}
+@item @code{:aslr} (off)
 
 Allow Lisp spaces to be randomly allocated anywhere in virtual address
 space, i.e. the behavior of passing @code{mmap} an address of zero.
 Requires all spaces to be relocatable on start-up.
 
-@item @code{:sb-core-compression}
+@item @code{:sb-core-compression} (off, in @code{*features*})
 
 Support zstd-based compressed core files. Enable this feature to
 compile it in. Obviously, doing so adds a dependency on zstd.
 
-@item @code{:sb-safepoint}
+@item @code{:sb-safepoint} (dynamic, in @code{*features*})
 
 On certain thread-enabled platforms, synchronization between
 threads for the purpose of stopping and starting the world around GC
@@ -470,7 +474,7 @@ can be performed using safepoints instead of signals. Enable this
 feature to compile with safepoints and to use them for GC. This is
 always enabled on @code{:win32}. Not enabled elsewhere by default.
 
-@item @code{:sb-cover-for-internals}
+@item @code{:sb-cover-for-internals} (off)
 
 Build the SBCL system itself with code coverage data marks (and
 sequences in the compiled code to set those marks). Inevitably,
