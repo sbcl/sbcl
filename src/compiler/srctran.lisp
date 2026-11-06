@@ -2457,10 +2457,14 @@
                :any-branch t)
   (remove-abs x node))
 
+(deftransform abs ((x) (:or ((word) *)
+                            ((signed-word) *)))
+  '(if (< x 0) (- x) x))
+
 (defoptimizer (cos optimizer) ((x) node)
   (when (or ;; can't negate an integer 0 in a complex
-         (not (lvar-intersectp x (complex rational)))
-         (minus-zero-ignored-p node))
+            (not (lvar-intersectp x (complex rational)))
+            (minus-zero-ignored-p node))
     (negate-lvar x node :test '%negate :minus-zero-ignored t
                         :any-branch t))
   (remove-abs x node nil))
