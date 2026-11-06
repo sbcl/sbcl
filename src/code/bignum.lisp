@@ -2558,7 +2558,8 @@
 ;;; to be used post-build. It references the BIGNUM-NEGATE-LOOP macro,
 ;;; which had been deliberately excluded from the target due to a surrounding
 ;;; (EVAL-WHEN (:COMPILE-TOPLEVEL :EXECUTE) ...) form.
-(let ((s 'negate-bignum-buffer-in-place))
+#-sb-devel
+(dolist (s '(negate-bignum-buffer-in-place %bignum-divide %bignum-truncate-single-digit))
   (clear-info :function :inlining-data s)
   (clear-info :function :inlinep s)
   (clear-info :source-location :declaration s))
