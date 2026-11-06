@@ -605,13 +605,13 @@
   convention. This macro is handy for passing callbacks which close over
   Lisp values into C."
   (with-alien-callable macro)
-  "Note that the garbage collector moves objects, and won't be able to fix
+  "Note that the garbage collector moves objects and won't be able to fix
   up any references in C variables. There are three mechanisms for
   coping with this:
 
-  - SB-EXT:PURIFY moves all live Lisp data into static or read-only
-    areas such that it will never be moved (or freed) again in the
-    life of the Lisp session
+  - On CheneyGC platforms, SB-EXT:PURIFY moves all live Lisp data into
+    static or read-only areas such that it will never be moved (or
+    freed) again in the life of the Lisp session.
 
   - SB-SYS:WITH-PINNED-OBJECTS is a macro which arranges for some set
     of objects to be pinned in memory for the dynamic extent of its

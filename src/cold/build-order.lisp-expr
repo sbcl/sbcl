@@ -737,6 +737,6 @@
   "src/code/query"
   "src/code/timer"
   "src/code/repack-xref"
-  #+cheneygc "src/code/purify"
+  "src/code/purify"
   "src/code/module"
   "src/code/save"))

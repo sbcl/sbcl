@@ -9,6 +9,7 @@
 
 (in-package "SB-KERNEL")
 
+#+cheneygc
 (define-alien-routine ("purify" %purify) void
   (static-roots unsigned-long)
   (read-only-roots unsigned-long))
@@ -26,6 +27,8 @@
 
    This function is a no-op on platforms using the generational garbage
    collector (x86, x86-64, ppc, arm, arm64)."
-  (declare (ignore environment-name))
+  (declare (ignore #-cheneygc root-structures
+                   environment-name))
+  #+cheneygc
   (%purify (get-lisp-obj-address root-structures)
            (get-lisp-obj-address nil)))
