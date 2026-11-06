@@ -142,10 +142,6 @@
                                      ("format," "external"))))
 
 
-(define-concept @garbage-collection
-    (:title "garbage collection"
-     :keys (("garbage collection"))))
-
 (define-concept @generational-gc
     (:title "generational GC"
      :keys (("garbage collector," "generational")

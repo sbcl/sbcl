@@ -298,7 +298,8 @@
   (sb-ext:generation-bytes-consed-between-gcs function)
   (sb-ext:generation-minimum-age-before-gc function)
   (sb-ext:generation-number-of-gcs function)
-  (sb-ext:generation-number-of-gcs-before-promotion function))
+  (sb-ext:generation-number-of-gcs-before-promotion function)
+  (sb-ext:purify function))
 
 (defsection @tracing-live-objects-back-to-roots
     (:title "Tracing Live Objects Back to Roots")

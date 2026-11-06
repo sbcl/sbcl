@@ -2,7 +2,7 @@
 
 (defsection @efficiency (:title "Efficiency"
                          :concepts ("efficicency"))
-  "In SBCL as with any language on any computer, the path to efficient
+  "In SBCL, as with any language on any computer, the path to efficient
   code starts with good algorithms and sensible programming
   techniques, but to avoid inefficiency pitfalls, you need to know
   some of this implementation's quirks and features. This chapter is
@@ -123,7 +123,7 @@
 
   During tuning, you should:
 
-  - Follow the @GENERAL-EFFICIENCY-HINTS.
+  - Follow the recommendations in @EFFICIENCY-MISCELLANEA.
 
   - Declare @SPEED-critical code and pay attention to
     @EFFICIENCY-NOTES.
@@ -133,9 +133,6 @@
   - Identify inefficient constructs in the hot spot with efficiency
     notes, more profiling, or manual inspection of the source and with
     judicious use of DISASSEMBLE.
-
-  - Add declarations and consider the application of discussed in the
-    section.
 
   - If all else fails, consider algorithm or data structure changes.
     If you did a good job coding, changes will be easy to introduce."
@@ -152,8 +149,7 @@
   (@efficiency-notes section)
   (@recognized-idioms section)
   (@global-and-always-bound-variables section)
-  (@general-efficiency-hints section)
-  (@miscellaneous-efficiency-issues section))
+  (@efficiency-miscellanea section))
 
 (defsection @more-about-types (:title "More About Types"
                                :concepts (("types")))
@@ -218,10 +214,9 @@
     declarations to make interesting assertions about functions and
     data structures. More specific declarations also aid type
     inference and reduce the cost for type checking (see
-    @TYPE-CHECK-OPTIMIZATION)."
-  ;; FIXME: once we have these sections: "For related information, see
-  ;; @NUMERIC-TYPES and @ARRAY-TYPES."
-  )
+    @TYPE-CHECK-OPTIMIZATION).
+
+  For related information, see @REPRESENTATION-OF-OBJECTS.")
 
 (defsection @type-canonicalization (:title "Type Canonicalization"
                                     :concepts (("types," "equivalence")
@@ -536,8 +531,8 @@
     these declarations in during initial coding so that type
     assertions can find bugs for you during debugging.
 
-  - Durining development, prefer declaring function argument types
-    with with DECLARE within the function to avoid having to redefine
+  - During development, prefer declaring function argument types
+    with DECLARE within the function to avoid having to redefine
     FTYPEs, which can lead to safety problems (see
     @TYPE-DECLARATION-CHECKING).
 
@@ -992,7 +987,7 @@
 
   A constant variable is a lexical variable that is never assigned to,
   always keeping its initial value. Whenever possible, avoid setting
-  lexical variables -- instead bind a new variable to the new value.
+  lexical variables; instead, bind a new variable to the new value.
   Except for loop variables, it is almost always possible to avoid
   setting lexical variables. This form:
 
@@ -2211,8 +2206,8 @@
         ...)
 
   Use of THE or of variable declarations not at the binding form is
-  insufficient to allow non-descriptor representation of the variable
-  -- with these declarations it is not certain that all values of the
+  insufficient to allow non-descriptor representation of the variable:
+  with these declarations, it is not certain that all values of the
   variable are of the right type. It is sometimes useful to introduce
   a gratuitous binding that allows the compiler to change to a
   non-descriptor representation, like
@@ -2703,8 +2698,8 @@
   Numerical Analysis_, pp. 165-211, Clarendon Press, 1987).")
 
 (defsection @efficiency-notes (:title "Efficiency Notes"
-                               :concepts (("efficiency notes")
-                                          ("notes," "efficiency")
+                               :concepts (("efficiency note,")
+                                          ("note," "efficiency")
                                           ("tuning")))
   "Efficiency notes are messages that alert the user that the compiler
   has chosen a relatively inefficient implementation for some
@@ -2723,7 +2718,10 @@
   (@operation-efficiency-notes section)
   (@representation-efficiency-notes section))
 
-(defsection @operation-efficiency-notes (:title "Operation Efficiency Notes")
+(defsection @operation-efficiency-notes
+    (:title "Operation Efficiency Notes"
+     :concepts (("operation efficiency note")
+                ("efficiency note," "operation")))
   "Many important operations have an inefficient general case (see
   e.g. @GENERIC-ARITHMETIC) but have efficient implementations that
   can usually be used if there is sufficient argument type
@@ -2760,8 +2758,8 @@
 
 (defsection @representation-efficiency-notes
     (:title "Representation Efficiency Notes"
-     :concepts (("representation efficiency notes")
-                ("efficiency notes," "representation")))
+     :concepts (("representation efficiency note")
+                ("efficiency note," "representation")))
   "When operating on values that have @NON-DESCRIPTOR representations,
   there can be a substantial time and @CONSING penalty for converting
   to and from @DESCRIPTOR representations. For this reason, the
@@ -2788,7 +2786,7 @@
   @FLOATING-POINT).
 
   Inefficient representation conversions are often not due to type
-  uncertainty -- instead, they result from evaluating a non-descriptor
+  uncertainty. Instead, they result from evaluating a non-descriptor
   expression in a context that requires a descriptor result:
 
   - assignment to or initialization of any data structure other than
@@ -2829,18 +2827,19 @@
   (sb-ext:global declaration)
   (sb-ext:always-bound declaration))
 
-(defsection @general-efficiency-hints
-    (:title "General Efficiency Hints"
-     :concepts ("efficiency," "general hints"))
-  "This section is a summary of various implementation costs and ways to get
-  around them. These hints are relatively unrelated to the use of the
-  compiler. In each section, there are references to related in-depth
-  discussion."
+(defsection @efficiency-miscellanea
+    (:title "Efficiency Miscellanea"
+     :concepts (("efficiency," "miscellanea")))
+  "This section is a summary of various implementation costs and ways to
+  get around them. In each section, there are references to related
+  in-depth discussion."
   (@compile-your-code section)
   (@consing section)
   (@complex-argument-syntax section)
   (@mapping-and-iteration section)
-  (@trace-files section))
+  (@trace-files section)
+  (@assignments section)
+  (@optimization-opportunities section))
 
 (defsection @compile-your-code (:title "Compile Your Code")
   "At this point, the advantages of compiling code relative to running it
@@ -2862,18 +2861,18 @@
 (defsection @consing (:title "Consing"
                       :concepts (("consing")
                                  ("memory allocation")
-                                 ("efficiency" "of memory use")))
+                                 ("efficiency," "memory use")))
   "Consing is another name for allocation of memory, as done by the
   CONS function (hence its name). CONS is by no means the only
-  function which conses -- so does MAKE-ARRAY and many other
-  functions. Arithmetic and function calls can also have hidden
-  consing overheads. Consing hurts performance in the following ways:
-    
+  function which conses: so do MAKE-ARRAY and many other functions.
+  Arithmetic and function calls can also have hidden consing
+  overheads. Consing hurts performance in the following ways:
+
   - Consing reduces memory access locality, increasing paging
     activity.
-    
+
   - Consing takes time just like anything else.
-    
+
   - Any space allocated eventually needs to be reclaimed, either by
     @GARBAGE-COLLECTION or by starting a new Lisp process. Note that
     @CHENEYGC is less efficient than @GENCGC.
@@ -2903,9 +2902,9 @@
      :concepts (("argument syntax" "efficiency")
                 ("keyword argument" "efficiency")
                 ("rest argument" "efficiency")
-                ("efficiency of" "argument syntax")))
+                ("efficiency," "argument syntax")))
   "Lisp has very powerful argument passing mechanisms. Unfortunately, two
-  of the most powerful mechanisms, &REST and keyword arguments, have a
+  of the most powerful mechanisms, &REST and &KEY arguments, have a
   significant performance penalty:
 
   - With keyword arguments, the called function has to parse the
@@ -2946,7 +2945,7 @@
 
 (defsection @mapping-and-iteration (:title "Mapping and Iteration"
                                     :concepts (("mapping," "efficiency of")))
-  "One of the traditional Lispqqqq programming styles is a highly
+  "One of the traditional Lisp programming styles is a highly
   applicative one, involving the use of mapping functions and many
   lists to store intermediate results. To compute the sum of the
   square-roots of a list of numbers, one might say
@@ -2958,7 +2957,7 @@
 
   - The creation of lists of intermediate results causes much
     @CONSING.
-    
+
   - Each level of application requires another scan down the list.
     Thus, disregarding other effects, the above code would probably
     take twice as long as a straightforward iterative version.
@@ -3003,17 +3002,17 @@
   through four stages of processing, including annotated assembly
   code. Each component in the program gets four pages in the trace
   file (separated by `^L`'):
-    
+
   - The implicit continuation representation (IR1) of the optimized
     source. This is a dump of the flow graph representation used for
     @SOURCE-OPTIMIZATIONS. As you will quickly notice, it is not
     really very close to the source. This representation is not very
     useful to even sophisticated users.
-    
+
   - The Virtual Machine representation (VM or IR2) of the program.
     This dump represents the generated code as sequences of _Virtual
     OPerations_ (VOPs). This representation is intermediate between
-    the source and the assembly code -- each VOP corresponds fairly
+    the source and the assembly code; each VOP corresponds fairly
     directly to some primitive function or construct, but a given VOP
     also has a fairly predictable instruction sequence. An operation
     (such as [`+`][function]) may have multiple implementations with
@@ -3022,12 +3021,12 @@
     implementation. Once you are familiar with it, the VM
     representation is probably the most useful for determining what
     implementation has been used.
-    
+
   - An assembly listing, annotated with the VOP responsible for
     generating the instructions. This listing is useful for figuring
     out what a VOP does and how it is implemented in a particular
     context, but its large size makes it more difficult to read.
-    
+
   - A disassembly of the generated code, which has all
     pseudo-operations expanded out but is not annotated with VOPs.
 
@@ -3037,51 +3036,32 @@
   separate the critical program portion into its own file and then
   generate the trace file from this small file.")
 
-(defsection @miscellaneous-efficiency-issues
-    (:title "Miscellaneous Efficiency Issues")
-  "The SB-EXT:PURIFY function (available with @CONSERVATIVE-GC) causes
-  SBCL first to collect all garbage, then to mark all uncollected
-  objects as permanent, never again attempting to collect them as
-  garbage. This can cause a large increase in efficiency when using a
-  primitive garbage collector, or a more moderate increase in
-  efficiency when using a more sophisticated garbage collector which
-  is well suited to the program's memory usage pattern. It also allows
-  permanent code to be frozen at fixed addresses, a precondition for
-  using copy-on-write to share code between multiple Lisp processes.
-  This is less important with modern @GENERATIONAL-GC, but not all
-  SBCL platforms use such a garbage collector.
+(defsection @assignments (:title "Assignments"
+                          :concepts (("efficiency," "assignments")
+                                     ("assignments," "efficiency of")))
+  "The compiler has a mental block about type inference when assignment
+  is involved. It does very aggressive and clever @TYPE-INFERENCE on
+  the types of values bound with LET, LET*, @INLINE-EXPANSION, and so
+  forth. However, it's much more passive and dumb about inferring the
+  types of values assigned with SETQ, SETF, and friends in the context
+  of loop induction, closed over variables and aliases. It would be
+  nice to fix this, but in the meantime don't expect that just because
+  it's very smart about types in most respects it will be smart about
+  types involved in assignments.
 
-  The SB-EXT:TRULY-THE special form declares the type of the result of
-  the operations, producing its argument; the declaration is not
-  checked. In short: don't use it."
-  ;; FIXME: It's not a macro.
-  #+nil
-  (sb-ext:truly-the macro)
-  "- The CMUCL manual doesn't seem to state it explicitly, but
-    Python (the CMUCL compiler, not the language) has a mental block
-    about type inference when assignment is involved. Python is very
-    aggressive and clever about inferring the types of values bound
-    with LET, LET*, inline function call, and so forth. However, it's
-    much more passive and dumb about inferring the types of values
-    assigned with SETQ, SETF, and friends. It would be nice to fix
-    this, but in the meantime don't expect that just because it's very
-    smart about types in most respects it will be smart about types
-    involved in assignments. (This doesn't affect its ability to
-    benefit from explicit type declarations involving the assigned
-    variables, only its ability to get by without explicit type
-    declarations.)"
-  ;; FIXME: Python dislikes assignments but not in type inference. The
-  ;; real problems are loop induction, closed over variables and
-  ;; aliases.
-  "Finally, note that Common Lisp defines many constructs which, in the
-  infamous phrase, _could be compiled efficiently by a sufficiently
-  smart compiler_. The phrase is infamous because making a compiler
-  which actually is sufficiently smart to find all these optimizations
-  systematically is well beyond the state of the art of current
-  compiler technology. Instead, they're optimized on a case-by-case
-  basis by hand-written code, or not optimized at all if the
-  appropriate case hasn't been hand-coded. Some cases where no such
-  hand-coding has been done as of SBCL version 0.6.3 include
+  > _Note_: This doesn't affect its ability to benefit from explicit
+  > type declarations involving the assigned variables, only its
+  > ability to get by without explicit type declarations.")
+
+(defsection @optimization-opportunities (:title "Optimization Opportunities")
+  "Common Lisp defines many constructs that _could be compiled
+  efficiently by a sufficiently smart compiler_. This phrase is
+  infamous because making a compiler that actually is sufficiently
+  smart to find all these optimizations systematically is well beyond
+  the state of the art of current compiler technology. Instead,
+  they're optimized on a case-by-case basis by hand-written code, or
+  not optimized at all if the appropriate case hasn't been hand-coded.
+  Some cases where no such hand-coding has been done include
 
   - `(REDUCE #'F X)` where the type of `X` is known at compile time,
 
@@ -3091,10 +3071,10 @@
     type checking, e.g. `(LOCALLY (DECLARE (SAFETY 1)) (ASSOC ITEM LIST))`
     (which currently performs safe ENDP checking internal to ASSOC).
 
-  If your system's performance is suffering due to some construct that
+  If you find that performance is suffering due to some construct that
   SBCL fails to compile efficiently, even though it could be in
   principle, consider writing a patch to the compiler and submitting
   it for inclusion in the main sources. Such code is often reasonably
   straightforward to write; search the sources for the string
-  `deftransform` to find many examples (some straightforward, some
+  `DEFTRANSFORM` to find many examples (some straightforward, some
   less so).")

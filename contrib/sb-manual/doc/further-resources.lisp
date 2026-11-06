@@ -216,7 +216,7 @@
   - If available, include information on outcome of the same test with
     other versions of SBCL, OS, etc.")
 
-  (defsection @editor-integration (:title "Editor Integration")
+(defsection @editor-integration (:title "Editor Integration")
   "Though SBCL can be used running \"bare\", the recommended mode of
   development is with an editor connected to SBCL, supporting not only
   basic Lisp editing (paren-matching, etc) but providing among other

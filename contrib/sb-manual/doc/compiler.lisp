@@ -353,7 +353,7 @@
   (@getting-existing-programs-to-run section))
 
 (defsection @type-declaration-checking (:title "Type Declaration Checking")
-  "The SBCL compiler treats type declarations differently from most other
+  "The compiler treats type declarations differently from most other
   Lisp compilers. Under the default @COMPILER-POLICY, the compiler
   doesn't blindly believe type declarations but considers them
   assertions about the program that should be checked: all type
@@ -391,19 +391,23 @@
       checking. Any type errors in code where type checks are not
       performed are liable to corrupt the heap.
 
-  There is a third option of mostly historical interest called Weak
-  Type Checking, where declared types may be simplified into faster to
-  check supertypes: for example, `(OR (INTEGER -17 -7) (INTEGER 7
-  17))` is simplified into `(INTEGER -17 17)`. This option is also
-  unsafe and is no longer available by any combination of the standard
-  optimization qualities.
+  > _Note_: There is a third option of mostly historical interest
+  > called Weak Type Checking, where declared types may be simplified
+  > into faster to check supertypes: for example, `(OR (INTEGER -17
+  > -7) (INTEGER 7 17))` is simplified into `(INTEGER -17 17)`. This
+  > option is also unsafe and is no longer available by any
+  > combination of the standard optimization qualities.
 
-  Note that CLOS slots with types declared using the :TYPE slot option
-  in DEFCLASS are asserted if and only if the class was defined in
-  _safe code_ and the slot access location is in _safe code_ as well.
-  This laxness does not pose any safety issues, as the CLOS slot types
-  are not available for @TYPE-INFERENCE, nor do CLOS slot types
-  provide any efficiency benefits.")
+  > _Note_: CLOS slots with types declared using the :TYPE slot option
+  > in DEFCLASS are asserted if and only if the class was defined in
+  > _safe code_ and the slot access location is in _safe code_ as
+  > well. This laxness does not pose any safety issues, as the CLOS
+  > slot types are not available for @TYPE-INFERENCE, nor do CLOS slot
+  > types provide any efficiency benefits.
+
+  > _Note_: The SB-EXT:TRULY-THE special form declares the type of the
+  > result of the operations, producing its argument; the declaration
+  > is not checked. In short: don't use it.")
 
 (defsection @precise-type-checking (:title "Precise Type Checking"
                                     :concepts (("precise" "type checking")
@@ -543,10 +547,7 @@
 
   This would be preferable in some circumstances since it would allow
   a non-standard representation to be used for the local `POS`
-  variable in the loop body."
-  ;; FIXME: <xref>ND-variables (non-descriptor, i.e. unboxed), once we
-  ;; crib the text from the CMUCL manual.
-  )
+  variable in the loop body. See also @NON-DESCRIPTOR.")
 
 ;;; FIXME: Mention non-ANSI quantities.
 (defsection @compiler-policy (:title "Compiler Policy")
