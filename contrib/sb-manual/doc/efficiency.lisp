@@ -123,7 +123,7 @@
 
   During tuning, you should:
 
-  - Follow the @GENERAL-EFFICIENCY-HINTs.
+  - Follow the @GENERAL-EFFICIENCY-HINTS.
 
   - Declare @SPEED-critical code and pay attention to
     @EFFICIENCY-NOTES.
@@ -152,6 +152,7 @@
   (@efficiency-notes section)
   (@recognized-idioms section)
   (@global-and-always-bound-variables section)
+  (@general-efficiency-hints section)
   (@miscellaneous-efficiency-issues section))
 
 (defsection @more-about-types (:title "More About Types"
@@ -283,7 +284,7 @@
 
   The type assertion on the `TOP` slot ensures that an error will be
   signaled when there is an attempt to store an illegal value (such as
-  `:RMVD`.) Although somewhat weak, these union type assertions
+  `:RMVD`). Although somewhat weak, these union type assertions
   provide a useful input into type inference, allowing the cost of
   type checking to be reduced. For example, this loop is safely
   compiled with no type checks:
@@ -587,7 +588,7 @@
   - Declarations are sometimes necessary for integer loop variables,
     since the compiler can't always prove that the value is of a good
     integer type. These declarations are best added during tuning,
-    when an @EFFICIENCY-NOTE indicates the need.")
+    when @EFFICIENCY-NOTES indicate the need.")
 
 (defsection @type-inference (:title "Type Inference"
                              :concepts (("type inference")
@@ -1162,7 +1163,7 @@
 
   When code that appeared in the original source is deleted, the
   compiler prints a note to indicate a possible problem (or at least
-  unnecessary code.) For example:
+  unnecessary code). For example:
 
       (defun foo ()
         (if t
@@ -1682,7 +1683,7 @@
   with keyword arguments. The only restrictions are that keyword
   argument keywords in the call must be constant, and that global
   function definitions (DEFUN) must be done in a null lexical
-  environment (not nested in a LET or other binding form.) Local
+  environment (not nested in a LET or other binding form). Local
   functions (e.g. FLET) can be inline expanded in any environment.
   Combined with source-level optimization, inline expansion can be
   used for things that would otherwise require macros for efficient
@@ -2181,7 +2182,7 @@
 
   - @WORD-INTEGERS,
 
-  - characters (see @REPRESENTATION-OF-CHARACTERS),
+  - @CHARACTERS,
 
   - system area pointers (unconstrained pointers, see @UNTYPED-MEMORY),
 
@@ -2192,7 +2193,7 @@
   - arguments and return values in @LOCAL-CALL (see
     @NON-DESCRIPTORS-IN-LOCAL-CALL), and
 
-  - @SPECIALIZED-STUCTURE-SLOTS.")
+  - @SPECIALIZED-STRUCTURE-SLOTS.")
 
 (defsection @non-descriptor-variables
     (:title "Non-descriptor Variables"
@@ -2237,7 +2238,7 @@
 
   @EFFICIENCY-NOTES signal use of inefficient representations, so
   programmers needn't continuously worry about the details of
-  representation selection (see @REPRESENTATION-EFF-NOTE.)")
+  representation selection (see @REPRESENTATION-EFFICIENCY-NOTES).")
 
 (defsection @non-descriptors-in-local-call
     (:title "Non-descriptors in Local Call"
@@ -2664,8 +2665,8 @@
   representation is used, creating @CONSING overhead. For this reason,
   you should try to avoid situations (such as full call and
   non-specialized data structures) that force a descriptor
-  representation. See @SPECIALIZED-ARRAYS, @SPECIALIZED-STUCTURE-SLOTS
-  and @NON-DESCRIPTORS-IN-LOCAL-CALL."
+  representation. See @SPECIALIZED-ARRAYS,
+  @SPECIALIZED-STRUCTURE-SLOTS and @NON-DESCRIPTORS-IN-LOCAL-CALL."
   ;; FIXME: See @IEEE-FLOAT for information on the extensions to
   ;; support IEEE floating point.
   (@signed-zeroes-and-special-functions section))
@@ -2828,6 +2829,214 @@
   (sb-ext:global declaration)
   (sb-ext:always-bound declaration))
 
+(defsection @general-efficiency-hints
+    (:title "General Efficiency Hints"
+     :concepts ("efficiency," "general hints"))
+  "This section is a summary of various implementation costs and ways to get
+  around them. These hints are relatively unrelated to the use of the
+  compiler. In each section, there are references to related in-depth
+  discussion."
+  (@compile-your-code section)
+  (@consing section)
+  (@complex-argument-syntax section)
+  (@mapping-and-iteration section)
+  (@trace-files section))
+
+(defsection @compile-your-code (:title "Compile Your Code")
+  "At this point, the advantages of compiling code relative to running it
+  interpreted probably need not be emphasized too much, but remember
+  that in SBCL, running compiled code is typically runs hundreds of
+  times faster than using the @INTERPRETER (when
+  SB-EXT:*EVALUATOR-MODE* is not :COMPILE). Also, compiled (fasl)
+  files load significantly faster than source files, so it is
+  worthwhile compiling files that are loaded many times, even if the
+  speed of the functions in the file is unimportant.
+
+  Even disregarding the efficiency advantages, compiled code is as
+  good or better than interpreted code. Compiled code can be debugged
+  at the source level (see @DEBUGGER), and compiled code does more
+  error checking. For these reasons, the interpreter should be
+  regarded mainly as an interactive command interpreter, rather than
+  as a programming language implementation.")
+
+(defsection @consing (:title "Consing"
+                      :concepts (("consing")
+                                 ("memory allocation")
+                                 ("efficiency" "of memory use")))
+  "Consing is another name for allocation of memory, as done by the
+  CONS function (hence its name). CONS is by no means the only
+  function which conses -- so does MAKE-ARRAY and many other
+  functions. Arithmetic and function calls can also have hidden
+  consing overheads. Consing hurts performance in the following ways:
+    
+  - Consing reduces memory access locality, increasing paging
+    activity.
+    
+  - Consing takes time just like anything else.
+    
+  - Any space allocated eventually needs to be reclaimed, either by
+    @GARBAGE-COLLECTION or by starting a new Lisp process. Note that
+    @CHENEYGC is less efficient than @GENCGC.
+
+  Consing is not undiluted evil, since programs do things other than
+  consing, and appropriate consing can speed up the real work. It
+  would certainly save time to allocate a vector of intermediate
+  results that are reused hundreds of times. Also, if it is necessary
+  to copy a large data structure many times, it may be more efficient
+  to update the data structure non-destructively; this somewhat
+  increases update overhead but makes copying trivial.
+
+  Note that the remarks in the introduction of section @EFFICIENCY
+  about the importance of separating tuning from coding also apply to
+  consing overhead. The majority of consing will be done by a small
+  portion of the program. The consing hot spots are even less
+  predictable than the CPU hot spots, so don't waste time and create
+  bugs by doing unnecessary consing optimization. During initial
+  coding, avoid unnecessary side-effects and cons where it is
+  convenient. If profiling reveals a consing problem, _then_ go back
+  and fix the hot spots.
+
+  See @NON-DESCRIPTOR for a discussion of how one might avoid consing.")
+
+(defsection @complex-argument-syntax
+    (:title "Complex Argument Syntax"
+     :concepts (("argument syntax" "efficiency")
+                ("keyword argument" "efficiency")
+                ("rest argument" "efficiency")
+                ("efficiency of" "argument syntax")))
+  "Lisp has very powerful argument passing mechanisms. Unfortunately, two
+  of the most powerful mechanisms, &REST and keyword arguments, have a
+  significant performance penalty:
+
+  - With keyword arguments, the called function has to parse the
+    supplied keywords by iterating over them and checking them against
+    the desired keywords.
+
+  - With rest arguments, the function must cons a list to hold the
+    arguments. If a function is called many times or with many
+    arguments, large amounts of memory will be allocated.
+
+  Although rest argument consing is worse than keyword parsing,
+  neither problem is serious unless a great many of calls are made to
+  such a function. The use of keyword arguments is strongly encouraged
+  in functions with many arguments or with interfaces that are likely
+  to be extended, and rest arguments are often natural in user
+  interface functions.
+
+  &OPTIONAL arguments have some efficiency advantage over keyword
+  arguments, but their syntactic clumsiness and lack of extensibility
+  has caused many Lisp programmers to abandon their use except in
+  functions that have obviously simple and immutable interfaces (such
+  as SUBSEQ), or in functions that are only called in a few places.
+  When defining an interface function to be used by other programmers
+  or users, use of only required and keyword arguments is recommended.
+
+  Parsing of DEFMACRO keyword and REST arguments is done at compile
+  time, so a macro can be used to provide a convenient syntax with an
+  efficient implementation. If the macro-expanded form contains no
+  keyword or rest arguments, then it is perfectly acceptable in inner
+  loops.
+
+  Keyword argument parsing overhead can also be avoided by use of
+  @INLINE-EXPANSION and @BLOCK-COMPILATION.
+
+  > _Note_: the compiler open-codes most heavily used system functions
+  > which have keyword or rest arguments, so that no run-time overhead
+  > is involved.")
+
+(defsection @mapping-and-iteration (:title "Mapping and Iteration"
+                                    :concepts (("mapping," "efficiency of")))
+  "One of the traditional Lispqqqq programming styles is a highly
+  applicative one, involving the use of mapping functions and many
+  lists to store intermediate results. To compute the sum of the
+  square-roots of a list of numbers, one might say
+
+      (reduce #'+ (mapcar #'sqrt list-of-numbers))
+
+  This programming style is clear and elegant, but unfortunately results
+  in slow code. There are two reasons why:
+
+  - The creation of lists of intermediate results causes much
+    @CONSING.
+    
+  - Each level of application requires another scan down the list.
+    Thus, disregarding other effects, the above code would probably
+    take twice as long as a straightforward iterative version.
+
+  An example of an iterative version of the same code:
+
+      (loop for x in list-of-numbers
+            sum (sqrt x))
+
+  or
+
+      (do ((num list-of-numbers (cdr num))
+           (sum 0 (+ (sqrt (car num)) sum)))
+          ((null num) sum))
+
+  See sections @VARIABLE-TYPE-INFERENCE and @LET-OPTIMIZATION for a
+  discussion of the interactions of iteration constructs with
+  @TYPE-INFERENCE and variable optimization. Also, @LOCAL-TAIL-CALL
+  discusses an applicative style of iteration.")
+
+(defsection @trace-files (:title "Trace Files"
+                          :concepts (("trace file")
+                                     ("implicit continuation representation")
+                                     ("IR1 representation")
+                                     ("virtual machine representation")
+                                     ("IR2 representation")))
+  "In order to write efficient code, you need to know the relative costs
+  of different operations. The main reason why writing efficient Lisp
+  code is difficult is that there are so many operations, and the
+  costs of these operations vary in obscure context-dependent ways.
+  Although @EFFICIENCY-NOTES point out some problem areas, the only
+  way to ensure generation of the best code is to look at the assembly
+  code output.
+
+  The DISASSEMBLE function is a convenient way to get the assembly
+  code for a function, but it can be very difficult to interpret since
+  the correspondence with the original source code is weak. A
+  better (but more awkward) option is to use the :TRACE-FILE argument
+  to COMPILE-FILE to generate a trace file.
+
+  A trace file is a dump of the compiler's internal representations,
+  through four stages of processing, including annotated assembly
+  code. Each component in the program gets four pages in the trace
+  file (separated by `^L`'):
+    
+  - The implicit continuation representation (IR1) of the optimized
+    source. This is a dump of the flow graph representation used for
+    @SOURCE-OPTIMIZATIONS. As you will quickly notice, it is not
+    really very close to the source. This representation is not very
+    useful to even sophisticated users.
+    
+  - The Virtual Machine representation (VM or IR2) of the program.
+    This dump represents the generated code as sequences of _Virtual
+    OPerations_ (VOPs). This representation is intermediate between
+    the source and the assembly code -- each VOP corresponds fairly
+    directly to some primitive function or construct, but a given VOP
+    also has a fairly predictable instruction sequence. An operation
+    (such as [`+`][function]) may have multiple implementations with
+    different cost and applicability. The choice of a particular VOP
+    such as `+/FIXNUM` or `+/SINGLE-FLOAT` represents this choice of
+    implementation. Once you are familiar with it, the VM
+    representation is probably the most useful for determining what
+    implementation has been used.
+    
+  - An assembly listing, annotated with the VOP responsible for
+    generating the instructions. This listing is useful for figuring
+    out what a VOP does and how it is implemented in a particular
+    context, but its large size makes it more difficult to read.
+    
+  - A disassembly of the generated code, which has all
+    pseudo-operations expanded out but is not annotated with VOPs.
+
+  Note that trace file generation takes much space and time, since the
+  trace file is tens of times larger than the source file. To avoid
+  huge confusing trace files and much wasted time, it is best to
+  separate the critical program portion into its own file and then
+  generate the trace file from this small file.")
+
 (defsection @miscellaneous-efficiency-issues
     (:title "Miscellaneous Efficiency Issues")
   "The SB-EXT:PURIFY function (available with @CONSERVATIVE-GC) causes
@@ -2848,18 +3057,7 @@
   ;; FIXME: It's not a macro.
   #+nil
   (sb-ext:truly-the macro)
-  "FIXME: The remaining material in the CMUCL manual about getting good
-  performance from the compiler should be reviewed, and added to this
-  section. In the meantime, the original CMUCL manual is still 95+%
-  correct for the SBCL's compiler. See the sections
-
-  - Advanced Compiler Use and Efficiency Hints
-      - General Efficiency Hints
-
-  Besides this information from the CMUCL manual, there are a few other
-  points to keep in mind.
-
-  - The CMUCL manual doesn't seem to state it explicitly, but
+  "- The CMUCL manual doesn't seem to state it explicitly, but
     Python (the CMUCL compiler, not the language) has a mental block
     about type inference when assignment is involved. Python is very
     aggressive and clever about inferring the types of values bound
@@ -2875,23 +3073,7 @@
   ;; FIXME: Python dislikes assignments but not in type inference. The
   ;; real problems are loop induction, closed over variables and
   ;; aliases.
-  "- Since the time the CMUCL manual was written, CMUCL (and thus SBCL)
-    has gotten a @GENERATIONAL-GC. This means that there are some
-    efficiency implications of various patterns of memory usage which
-    aren't discussed in the CMUCL manual. (Some new material should be
-    written about this.)
-
-  - SBCL has some important known efficiency problems. Perhaps the
-    most important are
-
-      - The garbage collector is not particularly efficient, at least
-        on platforms without the generational collector (as of SBCL
-        0.8.9, all except x86).
-
-      - Various aspects of the PCL implementation of CLOS are more
-        inefficient than necessary.
-
-  Finally, note that Common Lisp defines many constructs which, in the
+  "Finally, note that Common Lisp defines many constructs which, in the
   infamous phrase, _could be compiled efficiently by a sufficiently
   smart compiler_. The phrase is infamous because making a compiler
   which actually is sufficiently smart to find all these optimizations
@@ -2902,8 +3084,6 @@
   hand-coding has been done as of SBCL version 0.6.3 include
 
   - `(REDUCE #'F X)` where the type of `X` is known at compile time,
-
-  - various bit vector operations, e.g. `(POSITION 0 SOME-BIT-VECTOR)`,
 
   - specialized sequence idioms, e.g. `(REMOVE ITEM LIST :COUNT 1)`,
 

@@ -1947,6 +1947,8 @@ returning its filename.
     default is :DEFAULT which uses the
     SB-EXT:*DEFAULT-SOURCE-EXTERNAL-FORMAT*.
 
+The rest of the arguments are extensions to the standard:
+
 - :BLOCK-COMPILE {NIL | :SPECIFIED | T}
 
     Determines whether multiple functions are compiled together as a
@@ -1958,7 +1960,7 @@ returning its filename.
     declaration will enable block compilation. A value of T indicates
     that all forms in the file(s) should be compiled as a unit. The
     default is the value of SB-EXT:*BLOCK-COMPILE-DEFAULT*, which is
-    initially NIL.
+    initially NIL. See SB-MANUAL:@BLOCK-COMPILATION.
 
 - :ENTRY-POINTS
 
@@ -1967,13 +1969,13 @@ returning its filename.
     to block compilation and is useful mainly when :BLOCK-COMPILE T is
     specified on a file that lacks START-BLOCK declarations. If the
     value is NIL (the default), then all functions will be globally
-    defined.
+    defined. See SB-MANUAL:@BLOCK-COMPILATION.
 
 - :TRACE-FILE
 
     If given, internal data structures are dumped to the specified
     file, or if a value of T is given, to a file of `.trace` type
-    derived from the input file name. (non-standard)
+    derived from the input file name. See SB-MANUAL:@TRACE-FILES.
 
 - :EMIT-CFASL
 
