@@ -97,7 +97,7 @@
   (@commercial-support section)
   (@reporting-bugs section)
   (@editor-integration section)
-  (@internals-documentation section)
+  (@contributing section)
   (@history-and-implementation-of-sbcl section))
 
 (defsection @volunteer-support (:title "Volunteer Support")
@@ -228,12 +228,15 @@
   options exist as well. SLIME can be downloaded from
   <https://slime.common-lisp.dev/>.")
 
-;;; FIXME
-(defsection @internals-documentation (:title "Internals Documentation")
+(defsection @contributing (:title "Contributing")
   "If you're interested in the development of the SBCL system itself,
-  then subscribing to
-  [sbcl-devel@lists.sourceforge.net](mailto:sbcl-devel@lists.sourceforge.net)
-  is a good idea.
+  then
+
+  - subscribe to the
+    [`sbcl-devel@lists.sourceforge.net`](mailto:sbcl-devel@lists.sourceforge.net)
+    mailing list, and
+
+  - join the `#sbcl` IRC channel (see @INTERNET-COMMUNITY).
 
   The Texinfo sources for the SBCL Internals Manual are available in
   `doc/internals/`.
