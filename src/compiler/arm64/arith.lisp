@@ -287,6 +287,20 @@
          (:generator ,(1+ untagged-penalty)
            (inst ,op r x y))))))
 
+(define-vop (logxor/not unsigned-binop-c)
+  (:translate logxor)
+  (:args (x :scs (any-reg signed-reg unsigned-reg)
+            :sc-costs (any-reg 1)))
+  (:arg-types (:or unsigned-num signed-num) (:constant (eql #.most-positive-word)))
+  (:results (r :scs (unsigned-reg signed-reg)))
+  (:result-types (:or unsigned-num signed-num))
+  (:info y)
+  (:ignore y)
+  (:generator 2
+    (inst mvn r (if (sc-is x any-reg)
+                    (asr x n-fixnum-tag-bits)
+                    x))))
+
 (define-binop + 4 add :constant-test abs-add-sub-immediate-p :constant-fixnum-test fixnum-abs-add-sub-immediate-p
   :negative-op sub)
 (define-binop - 4 sub :constant-test abs-add-sub-immediate-p :constant-fixnum-test fixnum-abs-add-sub-immediate-p
