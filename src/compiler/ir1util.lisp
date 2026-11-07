@@ -2330,7 +2330,8 @@
           (lambda-var (reoptimize-lambda-var leaf)))
         (typecase leaf
           (lambda-var
-           (delete-lambda-var leaf))
+           (unless (preserve-set-only-debug-var-p leaf)
+             (delete-lambda-var leaf)))
           (clambda
            (functional-kind-ecase leaf
              ((nil let mv-let assignment escape cleanup)
@@ -2487,6 +2488,11 @@
        (let ((var (set-var node)))
          (when (and (not (setf (basic-var-sets var)
                                (delq1 node (basic-var-sets var))))
+                    (lambda-var-p var)
+                    (null (leaf-refs var))
+                    (not (lambda-var-deleted var)))
+           (delete-lambda-var var))
+         (when (and (null (basic-var-sets var))
                     (lambda-var-p var)
                     ;; Constraints won't compute it for vars without sets
                     (lambda-var-compute-same-refs var))
@@ -3600,6 +3606,15 @@ is :ANY, the function name is not checked."
        (not (and (combination-p node)
                  (typep (leaf-debug-name (combination-lambda node))
                         '(cons (member hairy-function-entry) t))))))
+
+;;; Don't delete set but unreferenced variables on high-debug to
+;;; improve the debugging experience.
+(defun preserve-set-only-debug-var-p (var)
+  (and (lambda-var-p var)
+       (not (lambda-var-deleted var))
+       (lambda-var-sets var)
+       (let ((bind (lambda-bind (lambda-var-home var))))
+         (and bind (policy bind (= preserve-set-only-debug-variables 3))))))
 
 ;;; Call (lambda (arg lambda-var type)), for a mv-combination ARG can
 ;;; be NIL when it produces multiple values.

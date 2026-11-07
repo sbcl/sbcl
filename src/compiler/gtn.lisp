@@ -54,8 +54,9 @@
 (defun assign-lambda-var-tns (fun let-p)
   (declare (type clambda fun))
   (dolist (var (lambda-vars fun))
-    (when (leaf-refs var)
-      (let ((debug-variable-p (debug-environment-var-p var)))
+    (when (or (leaf-refs var) (preserve-set-only-debug-var-p var))
+      (let ((debug-variable-p (or (debug-environment-var-p var)
+                                  (preserve-set-only-debug-var-p var))))
         (if (and let-p
                  (not debug-variable-p)
                  (not (lambda-var-indirect var))
@@ -109,9 +110,7 @@
                  ;; never read no stack space is allocated for it in the
                  ;; callee frame.
                  (unless (and (type-singleton-p (leaf-type var))
-                              (notany (lambda (ref)
-                                        (combination-is (node-dest ref) '(%keep-live)))
-                                      (leaf-refs var)))
+                              (leaf-refs var))
                    (environment-debug-live-tn res (lambda-environment fun)))))
 
               (setf (tn-leaf res) var)

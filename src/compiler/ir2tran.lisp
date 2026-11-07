@@ -342,7 +342,7 @@
                    nil)))
     (etypecase leaf
       (lambda-var
-       (when (leaf-refs leaf)
+       (when (or (leaf-refs leaf) (preserve-set-only-debug-var-p leaf))
          (let ((tn (find-in-environment leaf (node-environment node)))
                (indirect (lambda-var-indirect leaf))
                (explicit (lambda-var-explicit-value-cell leaf)))
@@ -1661,11 +1661,11 @@
                                    (fun-type-required (specifier-type `(function ,@(cddr name)))))))
                (fixed-arg-state (and arg-types
                                      (sb-vm::make-fixed-call-args-state))))
-          (when (leaf-refs (first vars))
+          (when (leaf-info (first vars))
             (emit-move node block arg-count-tn (leaf-info (first vars))))
           (dolist (arg (rest vars))
             (let ((arg-type (pop arg-types)))
-              (if (leaf-refs arg)
+              (if (leaf-info arg)
                   (let ((pass (if fixed-arg-state
                                   (sb-vm::fixed-call-arg-location arg-type fixed-arg-state)
                                   (standard-arg-location n)))
@@ -1875,7 +1875,7 @@
          (vars (lambda-vars fun)))
     (aver (functional-kind-eq fun mv-let))
     (mapc (lambda (src var)
-            (when (leaf-refs var)
+            (when (leaf-info var)
               (let ((dest (leaf-info var)))
                 (if (and (lambda-var-indirect var)
                          (lambda-var-explicit-value-cell var))

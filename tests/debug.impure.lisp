@@ -2426,8 +2426,7 @@
     (assert (equal (run-stops '(5 9) '(((x 5) (y 27 10))))
                    '(27)))))
 
-(with-test (:name (:debugger :variables :setq :only-set)
-            :fails-on :sbcl)
+(with-test (:name (:debugger :variables :setq :only-set))
   (with-variables-test (:strict (3) :lax (1 2))
       (sb-int:named-lambda variables-test ()
         (declare (optimize (debug :debug)))
@@ -2438,8 +2437,7 @@
     (assert (equal (run-stops '() '(((x 46))))
                    '(nil)))))
 
-(with-test (:name (:debugger :variables :setq :only-set :parameter)
-            :fails-on :sbcl)
+(with-test (:name (:debugger :variables :setq :only-set :parameter))
   (with-variables-test (:strict (3) :lax (1 2))
       (sb-int:named-lambda variables-test (x)
         (declare (optimize (debug :debug)))
@@ -2447,6 +2445,18 @@
         (signal 'variables-stop)
         nil)
     (assert (equal (run-stops '(5) '(((x 46))))
+                   '(nil)))))
+
+(with-test (:name (:debugger :variables :setq :only-set :policy))
+  (with-variables-test (:strict (1 2 3) :lax ())
+      (sb-int:named-lambda variables-test (a)
+        (declare (optimize (debug :debug)
+                           (sb-c::preserve-set-only-debug-variables 3)))
+        (let ((x 23))
+          (setq x a)
+          (signal 'variables-stop)
+          nil))
+    (assert (equal (run-stops '(46) '(((a 46) (x 46))))
                    '(nil)))))
 
 (with-test (:name (:debugger :variables :setq :copy-of-split :unused-fun))
@@ -2499,8 +2509,7 @@
     (assert (equal (run-stops '(5) '(((x 5))))
                    '(5)))))
 
-(with-test (:name (:debugger :variables :setq :copy-set :speed)
-            :fails-on :sbcl)
+(with-test (:name (:debugger :variables :setq :copy-set :speed))
   (with-variables-test (:strict (1 2 3) :lax ())
       (sb-int:named-lambda variables-test (a b)
         (declare (optimize (debug :debug) (speed 3)))
@@ -2700,8 +2709,7 @@
     (assert (equal (run-stops '(1) '(((a 1) (d 1))))
                    '(nil)))))
 
-(with-test (:name (:debugger :variables :setq :late-noreturn)
-            :fails-on :sbcl)
+(with-test (:name (:debugger :variables :setq :late-noreturn))
   (with-variables-test (:strict (3) :lax (1 2))
       (sb-int:named-lambda variables-test (a b c)
         (declare (optimize (debug :debug)))

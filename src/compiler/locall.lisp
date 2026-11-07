@@ -68,7 +68,7 @@
                           (if (functional-kind-eq fun optional)
                               (make-local-call-context fun name)
                               name)))
-      (unless (leaf-refs var)
+      (unless (or (leaf-refs var) (preserve-set-only-debug-var-p var))
         (flush-dest (car args))
         (setf (car args) nil))))
 

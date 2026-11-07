@@ -115,6 +115,13 @@ optimizations.
 When enabled, the variable is preserved and can be seen in the
 debugger.")
 
+(define-optimization-quality preserve-set-only-debug-variables
+    (if (= debug 3) 3 0)
+  ("no" "no" "no" "yes")
+  "When enabled, a variable which is set but never read is preserved along
+with its assignments, and can be seen in the debugger. When disabled, it
+is eliminated.")
+
 (define-optimization-quality preserve-constants
   0
   ("no" "no" "no" "yes"))
