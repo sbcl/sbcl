@@ -922,6 +922,43 @@
                                         (change-block-successor (node-block use) block (if-consequent if))
                                         (delete-lvar-use use))))))))))))))
 
+;;; (if boolean t nil)
+(defun unwrap-boolean-if (test con alt)
+  ;; This is similar to UNWRAP-PREDICATES
+  (when (and (eq (lvar-type test) (specifier-type 'boolean))
+             (equal (block-succ alt) (block-succ con))
+             (let ((uses (lvar-uses test)))
+               (and (atom uses) ;; leave  (if (if x t nil) t nil) for duplicate-if-if-1
+                    (not (and (combination-p uses)
+                              (let ((info (combination-fun-info uses)))
+                                (and info
+                                     (ir1-attributep (fun-info-attributes info) predicate))))))))
+    (let ((ref-con (next-node con :type :ref :single-predecessor t))
+          ref-alt
+          tail-merge
+          new-lvar)
+      (when (and
+             ref-con
+             (setf ref-alt (next-node alt :type :ref :single-predecessor t))
+             (setf new-lvar (node-lvar ref-con))
+             (eq new-lvar (node-lvar ref-alt))
+             (and (constant-p (ref-leaf ref-con))
+                  (eq (constant-value (ref-leaf ref-con)) t))
+             (and (constant-p (ref-leaf ref-alt))
+                  (eq (constant-value (ref-leaf ref-alt)) nil))
+             (lvar-almost-immediately-used-p test :flushable t))
+        (when (return-p (lvar-dest new-lvar))
+          (do-uses (use test)
+            (when (and (basic-combination-p use)
+                       (not (node-to-be-deleted-p use))
+                       (eq (basic-combination-kind use) :local))
+              (push use tail-merge))))
+        (substitute-lvar-uses new-lvar test nil)
+        (delete-lvar-use ref-con)
+        (delete-lvar-use ref-alt)
+        (dolist (use tail-merge)
+          (merge-tail-sets use))))))
+
 ;;; Check whether the predicate is known to be true or false,
 ;;; deleting the IF node in favor of the appropriate branch when this
 ;;; is the case.
@@ -945,6 +982,9 @@
                   consequent)
                  ((eq consequent alternative)
                   alternative)
+                 ((unless fast
+                    (unwrap-boolean-if test consequent alternative))
+                  (return-from ir1-optimize-if))
                  ((and (not fast)
                        (or
                         (blocks-equivalent-p alternative consequent)

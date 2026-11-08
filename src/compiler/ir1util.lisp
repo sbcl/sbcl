@@ -1969,19 +1969,19 @@
 
 ;;; (if x x nil)
 (defun if-test-redundant-p (test con alt)
-  (let ((ref-alt (single-ref-block-p alt))
-        (ref-con (single-ref-block-p con))
-        (ref-test (lvar-uses test)))
-    (and (ref-p ref-test)
-         ref-con
-         ref-alt
-         (equal (block-succ alt) (block-succ con))
-         (eq (ref-lvar ref-alt) (ref-lvar ref-con))
-         (same-ref-p ref-test ref-con)
-         (and (constant-p (ref-leaf ref-alt))
-              (null (constant-value (ref-leaf ref-alt))))
-         (eq (node-enclosing-cleanup ref-alt)
-             (node-enclosing-cleanup ref-con)))))
+  (let ((ref-test (lvar-uses test)))
+    (when (and (ref-p ref-test)
+               (equal (block-succ alt) (block-succ con)))
+      (let ((ref-con (single-ref-block-p con))
+            ref-alt)
+        (and ref-con
+             (setf ref-alt (single-ref-block-p alt))
+             (eq (node-lvar ref-alt) (node-lvar ref-con))
+             (and (constant-p (ref-leaf ref-alt))
+                  (null (constant-value (ref-leaf ref-alt))))
+             (eq (node-enclosing-cleanup ref-alt)
+                 (node-enclosing-cleanup ref-con))
+             (same-ref-p ref-test ref-con))))))
 
 ;;; If a block consisting of a single ref is equivalent to another
 ;;; block with the same ref and the have the same successor it can be
