@@ -2565,25 +2565,24 @@
   (sys-reg :field (byte 16 5) :type 'sys-reg)
   (rt :field (byte 5 0) :type 'x-reg))
 
+(defconstant-eqx +system-registers+
+    '((#b1101101000010000 . :nzcv)
+      (#b1101101000100000 . :fpcr)
+      (#b1101101000100001 . :fpsr)
+      (#b1101110011101000 . :ccnt)
+      (#b1101111100000010 . :cntvct_el0)
+      (#b1101111010000010 . :tpidr_el0)
+      (#b1101111010000011 . :tpidrro_el0)
+      (#b1101100000000111 . :dczid_el0))
+  #'equal)
+
 (defun decode-sys-reg (reg)
-  (ecase reg
-    (#b1101101000010000 :nzcv)
-    (#b1101101000100000 :fpcr)
-    (#b1101101000100001 :fpsr)
-    (#b1101110011101000 :ccnt)
-    (#b1101111010000010 :tpidr_el0)
-    (#b1101111010000011 :tpidrro_el0)
-    (#b1101100000000111 :dczid_el0)))
+  (or (cdr (assoc (the fixnum reg) +system-registers+))
+      (format nil "<systemreg:#b~b>" reg)))
 
 (defun encode-sys-reg (reg)
-  (ecase reg
-    (:nzcv #b1101101000010000)
-    (:fpcr #b1101101000100000)
-    (:fpsr #b1101101000100001)
-    (:ccnt #b1101110011101000)
-    (:tpidr_el0 #b1101111010000010)
-    (:tpidrro_el0 #b1101111010000011)
-    (:dczid_el0 #b1101100000000111)))
+  (or (car (rassoc (the keyword reg) +system-registers+))
+      (error "Unknown system reg ~S" reg)))
 
 (define-instruction msr (segment sys-reg rt)
   (:printer sys-reg ((l 0)) '(:name :tab sys-reg ", " rt))

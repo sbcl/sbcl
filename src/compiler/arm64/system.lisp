@@ -257,6 +257,13 @@
     (:generator 2
       (inst ldr sap (@ thread-tn (extend n :lsl word-shift))))))
 
+(defknown %read-cycle-counter () word ())
+(define-vop (%read-cycle-counter)
+  (:translate %read-cycle-counter)
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1 (inst mrs r :cntvct_el0)))
+
 ;;; Barriers
 (define-vop (%compiler-barrier)
   (:translate %compiler-barrier)

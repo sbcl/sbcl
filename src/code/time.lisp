@@ -320,6 +320,11 @@ normally during operations like SLEEP."
   (multiple-value-bind (user sys faults) (get-system-info)
     (values user sys faults (get-bytes-consed))))
 
+;;; On both modern x86-64 (with invariant TSC) and arm64 (CNTVCT_EL0, 1 GHz on Armv8.6+),
+;;; the hardware counter does not actually report "processor cycles" - it ticks at a fixed
+;;; rate rather than a variable frequency depending on the particular core. This is what you
+;;; usually want for profiling.
+;;; And on Linux, reading the physical cycle counter on arm64 may raise SIGILL.
 (defun elapsed-cycles (h0 l0 h1 l1)
   (declare (ignorable h0 l0 h1 l1))
   #+cycle-counter
@@ -329,8 +334,12 @@ normally during operations like SLEEP."
   nil)
 (declaim (inline read-cycle-counter))
 (defun read-cycle-counter ()
-  #+cycle-counter
-  (sb-vm::%read-cycle-counter)
+  ;; AArch64 has a 64-bit register which we're not splitting into two pieces
+  ;; to match the old API. Using the bits as LO works fine.
+  ;; Really though READ-CYCLE-COUNTER for #+64-bit should produce one word
+  ;; rather than being driven by the 32-bit x86 legacy code.
+  #+(and cycle-counter arm64) (values 0 (sb-vm::%read-cycle-counter))
+  #+(and cycle-counter (not arm64)) (sb-vm::%read-cycle-counter)
   #-cycle-counter
   (values 0 0))
 
