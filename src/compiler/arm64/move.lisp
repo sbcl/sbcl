@@ -730,6 +730,16 @@
 (define-move-vop s128-move-unsigned :move
   (unsigned-reg) (signed-128-reg))
 
+(define-vop (move-from-128-to-word)
+  (:args (x :scs (signed-128-reg)))
+  (:results (y :scs (signed-reg unsigned-reg)))
+  (:note "128 integer to word move")
+  (:generator 1
+    (move y (128-reg-parts x))))
+
+(define-move-vop move-from-128-to-word :move
+  (signed-128-reg) (signed-reg unsigned-reg))
+
 (define-vop (move-to-128)
   (:args (x :scs (descriptor-reg any-reg immediate constant) :to :save))
   (:arg-refs x-ref)

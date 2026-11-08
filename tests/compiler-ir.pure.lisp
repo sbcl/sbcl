@@ -133,6 +133,17 @@
                                   (lambda (&optional z)
                                     z))))))))
 
+;;; A signed 128-bit integer whose type fits in a word is moved to one as
+;;; its low word, not boxed as an integer and then untagged.
+(with-test (:name (:representation :signed-128 :to-word)
+            :skipped-on (not (or :arm64 :x86-64)))
+  (let ((vops (ir2-vops '(lambda (bits i n)
+                          (declare (simple-bit-vector bits) (sb-int:index i n))
+                          (loop for j from (* i i) to n by i
+                                do (setf (sbit bits j) 0))))))
+    (assert (find 'sb-vm::move-from-128-to-word vops))
+    (assert (not (find 'sb-vm::move-from-128 vops)))))
+
 ;;; Y is stored twice, and boxed once for both.
 (with-test (:name (:representation :coercion :reused))
   (assert (= (count-if (lambda (name)
