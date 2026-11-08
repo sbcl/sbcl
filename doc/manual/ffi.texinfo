@@ -340,7 +340,7 @@ and how to dynamically allocate and free foreign variables.
 @subsection Accessing Foreign Values
 
 @menu
-* Untyped memory: untyped memory.
+* System Area Pointer: system area pointer.
 @end menu
 
 @anchor{Function sb-alien deref}
@@ -362,39 +362,130 @@ is automatically dereferenced. @code{setf}able.
 Note that @code{slot} is evaluated, and need not be a compile-time
 constant (but only constant slot accesses are efficiently compiled).
 @end deffn
-@node untyped memory
-@subsubsection Untyped memory
+@node system area pointer
+@subsubsection System Area Pointer
 
-As noted at the beginning of the chapter, the System Area Pointer
-facilities allow untyped access to foreign memory. SAPs can be
-converted to and from the usual typed foreign values using @code{sap-alien}
-and @code{alien-sap}, and also to and from integers (raw machine
+System area pointers allow untyped access to foreign memory. SAPs can
+be converted to and from the usual typed foreign values using
+@code{sap-alien} and @code{alien-sap}, and also to and from integers (raw machine
 addresses). They should thus be used with caution; corrupting the
 Lisp heap or other memory with SAPs is trivial.
 
+@anchor{Class sb-sys system-area-pointer}
+@ttindex @sortas{system-area-pointer sb-sys} system-area-pointer [sb-sys]
+@deffn{Class} sb-sys:system-area-pointer
+@end deffn
+@anchor{Function sb-sys sap-int}
+@ffindex @sortas{sap-int sb-sys} sap-int [sb-sys]
+@deffn{Function} sb-sys:sap-int sap
+Return the address corresponding to @code{sap}. Note that this conses if the
+address does not fit into @code{fixnum} range.
+@end deffn
 @anchor{Function sb-sys int-sap}
 @ffindex @sortas{int-sap sb-sys} int-sap [sb-sys]
 @deffn{Function} sb-sys:int-sap x
-Creates a @code{sap} pointing at the virtual address @code{x}.
+Create a @code{system-area-pointer} for the virtual address @code{x}, an unsigned
+machine word integer.
+@end deffn
+@anchor{Function sb-sys sap+}
+@ffindex @sortas{sap+ sb-sys} sap+ [sb-sys]
+@deffn{Function} sb-sys:sap+ sap offset
+Create a new @code{system-area-pointer} @code{offset} bytes (a signed machine word)
+from @code{sap}.
+@end deffn
+@anchor{Function sb-sys sap-}
+@ffindex @sortas{sap- sb-sys} sap- [sb-sys]
+@deffn{Function} sb-sys:sap- sap-1 sap-2
+Return the difference of @code{sap-1} and @code{sap-2} as a signed machine word.
+It holds that @code{(sap- (sap+ sap offset) sap)} is @code{offset}.
+@end deffn
+The following functions compare the @code{sb-sys:int-sap} values without
+consing:
+
+@anchor{Function sb-sys sap=}
+@ffindex @sortas{sap= sb-sys} sap= [sb-sys]
+@deffn{Function} sb-sys:sap= sap-1 sap-2
+@end deffn
+@anchor{Function sb-sys sap<=}
+@ffindex @sortas{sap<= sb-sys} sap<= [sb-sys]
+@deffn{Function} sb-sys:sap<= sap-1 sap-2
+@end deffn
+@anchor{Function sb-sys sap>=}
+@ffindex @sortas{sap>= sb-sys} sap>= [sb-sys]
+@deffn{Function} sb-sys:sap>= sap-1 sap-2
+@end deffn
+@anchor{Function sb-sys sap>}
+@ffindex @sortas{sap> sb-sys} sap> [sb-sys]
+@deffn{Function} sb-sys:sap> sap-1 sap-2
+@end deffn
+The rest are @code{setf}able accessors.
+
+The first group of accessors is for @code{unsigned-byte}s of varying widths:
+
+@anchor{Function sb-sys sap-ref-8}
+@ffindex @sortas{sap-ref-8 sb-sys} sap-ref-8 [sb-sys]
+@deffn{Function} sb-sys:sap-ref-8 sap offset
+Access the (@code{unsigned-byte} 8) value at the memory location @code{offset} bytes
+from @code{sap}. @code{setf}able.
+@end deffn
+@anchor{Function sb-sys sap-ref-16}
+@ffindex @sortas{sap-ref-16 sb-sys} sap-ref-16 [sb-sys]
+@deffn{Function} sb-sys:sap-ref-16 sap offset
+Access the (@code{unsigned-byte} 16) value at the memory location @code{offset} bytes
+from @code{sap}. @code{setf}able.
 @end deffn
 @anchor{Function sb-sys sap-ref-32}
 @ffindex @sortas{sap-ref-32 sb-sys} sap-ref-32 [sb-sys]
 @deffn{Function} sb-sys:sap-ref-32 sap offset
-Access the value of the memory location at @code{offset} bytes from @code{sap}. @code{setf}able.
+Access the (@code{unsigned-byte} 32) value at the memory location @code{offset} bytes
+from @code{sap}. @code{setf}able.
 @end deffn
-@anchor{Function sb-sys sap=}
-@ffindex @sortas{sap= sb-sys} sap= [sb-sys]
-@deffn{Function} sb-sys:sap= x y
-Compare the @code{sap}s @code{x} and @code{y} for equality.
+@anchor{Function sb-sys sap-ref-64}
+@ffindex @sortas{sap-ref-64 sb-sys} sap-ref-64 [sb-sys]
+@deffn{Function} sb-sys:sap-ref-64 sap offset
+Access the (@code{unsigned-byte} 64) value at the memory location @code{offset} bytes
+from @code{sap}. @code{setf}able.
 @end deffn
-Similarly named functions exist for accessing other sizes of word,
-other comparisons, and other conversions. The reader is invited to
-use @code{apropos} and @code{describe} for more details:
+Then, we have their @code{signed-byte} equivalents:
 
-@example
-(apropos "sap" :sb-sys)
-@end example
+@anchor{Function sb-sys signed-sap-ref-8}
+@ffindex @sortas{signed-sap-ref-8 sb-sys} signed-sap-ref-8 [sb-sys]
+@deffn{Function} sb-sys:signed-sap-ref-8 sap offset
+@end deffn
+@anchor{Function sb-sys signed-sap-ref-16}
+@ffindex @sortas{signed-sap-ref-16 sb-sys} signed-sap-ref-16 [sb-sys]
+@deffn{Function} sb-sys:signed-sap-ref-16 sap offset
+@end deffn
+@anchor{Function sb-sys signed-sap-ref-32}
+@ffindex @sortas{signed-sap-ref-32 sb-sys} signed-sap-ref-32 [sb-sys]
+@deffn{Function} sb-sys:signed-sap-ref-32 sap offset
+@end deffn
+@anchor{Function sb-sys signed-sap-ref-64}
+@ffindex @sortas{signed-sap-ref-64 sb-sys} signed-sap-ref-64 [sb-sys]
+@deffn{Function} sb-sys:signed-sap-ref-64 sap offset
+@end deffn
+Finally, accessors for various types:
 
+@anchor{Function sb-sys sap-ref-sap}
+@ffindex @sortas{sap-ref-sap sb-sys} sap-ref-sap [sb-sys]
+@deffn{Function} sb-sys:sap-ref-sap sap offset
+Like @code{sap-ref-word}, but convert the word to a @code{system-area-pointer}.
+@end deffn
+@anchor{Function sb-sys sap-ref-lispobj}
+@ffindex @sortas{sap-ref-lispobj sb-sys} sap-ref-lispobj [sb-sys]
+@deffn{Function} sb-sys:sap-ref-lispobj sap offset
+Like @code{sap-ref-word}, but interpret the word as a Lisp object descriptor.
+@end deffn
+@anchor{Function sb-sys sap-ref-single}
+@ffindex @sortas{sap-ref-single sb-sys} sap-ref-single [sb-sys]
+@deffn{Function} sb-sys:sap-ref-single sap offset
+Access the 32-bit value pointed at as a @code{single-float}.
+@end deffn
+@anchor{Function sb-sys sap-ref-double}
+@ffindex @sortas{sap-ref-double sb-sys} sap-ref-double [sb-sys]
+@deffn{Function} sb-sys:sap-ref-double sap offset
+Access the 64-bit value pointed at as a @code{double-float}.
+@end deffn
 @node coercing foreign values
 @subsection Coercing Foreign Values
 

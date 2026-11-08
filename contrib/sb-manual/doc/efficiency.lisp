@@ -2179,7 +2179,7 @@
 
   - @CHARACTERS,
 
-  - system area pointers (unconstrained pointers, see @UNTYPED-MEMORY),
+  - @SYSTEM-AREA-POINTERs,
 
   - local variables (see @NON-DESCRIPTOR-VARIABLES),
 

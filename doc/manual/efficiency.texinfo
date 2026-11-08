@@ -2655,7 +2655,7 @@ SBCL supports non-descriptor representations for
 
 @item @ref{characters},
 
-@item system area pointers (unconstrained pointers, see @ref{untyped memory}),
+@item @ref{system area pointer}s,
 
 @item local variables (see @ref{non descriptor variables}),
 

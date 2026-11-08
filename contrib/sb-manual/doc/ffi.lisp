@@ -294,23 +294,42 @@
 (defsection @accessing-foreign-values (:title "Accessing Foreign Values")
   (sb-alien:deref function)
   (sb-alien:slot function)
-  (@untyped-memory section))
+  (@system-area-pointer section))
 
-(defsection @untyped-memory (:title "Untyped memory")
-  "As noted at the beginning of the chapter, the System Area Pointer
-  facilities allow untyped access to foreign memory. SAPs can be
-  converted to and from the usual typed foreign values using SAP-ALIEN
-  and ALIEN-SAP, and also to and from integers (raw machine
+(defsection @system-area-pointer (:title "System Area Pointer")
+  "System area pointers allow untyped access to foreign memory. SAPs can
+  be converted to and from the usual typed foreign values using
+  SAP-ALIEN and ALIEN-SAP, and also to and from integers (raw machine
   addresses). They should thus be used with caution; corrupting the
   Lisp heap or other memory with SAPs is trivial."
+  (sb-sys:system-area-pointer class)
+  (sb-sys:sap-int function)
   (sb-sys:int-sap function)
-  (sb-sys:sap-ref-32 function)
+  (sb-sys:sap+ function)
+  (sb-sys:sap- function)
+  "The following functions compare the SB-SYS:INT-SAP values without
+  consing:"
   (sb-sys:sap= function)
-  "Similarly named functions exist for accessing other sizes of word,
-  other comparisons, and other conversions. The reader is invited to
-  use APROPOS and DESCRIBE for more details:
+  (sb-sys:sap<= function)
+  (sb-sys:sap>= function)
+  (sb-sys:sap> function)
+  "The rest are SETFable accessors.
 
-      (apropos \"sap\" :sb-sys)")
+  The first group of accessors is for UNSIGNED-BYTEs of varying widths:"
+  (sb-sys:sap-ref-8 function)
+  (sb-sys:sap-ref-16 function)
+  (sb-sys:sap-ref-32 function)
+  (sb-sys:sap-ref-64 function)
+  "Then, we have their SIGNED-BYTE equivalents:"
+  (sb-sys:signed-sap-ref-8 function)
+  (sb-sys:signed-sap-ref-16 function)
+  (sb-sys:signed-sap-ref-32 function)
+  (sb-sys:signed-sap-ref-64 function)
+  "Finally, accessors for various types:"
+  (sb-sys:sap-ref-sap function)
+  (sb-sys:sap-ref-lispobj function)
+  (sb-sys:sap-ref-single function)
+  (sb-sys:sap-ref-double function))
 
 (defsection @coercing-foreign-values (:title "Coercing Foreign Values")
   (addr macro)

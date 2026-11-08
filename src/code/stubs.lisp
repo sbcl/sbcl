@@ -44,39 +44,65 @@
   (def word-logical-orc1 x y)
   (def word-logical-orc2 x y))
 
-(macrolet ((def (name &optional (args '(x)))
+(macrolet ((def (name &optional (args '(x)) docstring)
              `(defun ,name ,args
+                ,@(when docstring
+                    `(,docstring))
                 (,@(if (listp name) `(funcall #',name) `(,name)) ,@args)))
            (def* (&rest defs)
              `(progn ,@(mapcar (lambda (x) `(def ,@x)) defs))))
   ;; SAP arithmetic and accessors
-  (def sap< (x y))
-  (def sap<= (x y))
-  (def sap= (x y))
-  (def sap>= (x y))
-  (def sap> (x y))
-  (def sap+ (sap offset))
-  (def sap- (x y))
-  (def sap-int)
-  (def int-sap)
-  (macrolet ((def-accessor (name)
+  (def sap< (sap-1 sap-2))
+  (def sap<= (sap-1 sap-2))
+  (def sap= (sap-1 sap-2))
+  (def sap>= (sap-1 sap-2))
+  (def sap> (sap-1 sap-2))
+  (def sap+ (sap offset)
+    "Create a new SYSTEM-AREA-POINTER OFFSET bytes (a signed machine word)
+     from SAP.")
+  (def sap- (sap-1 sap-2)
+    "Return the difference of SAP-1 and SAP-2 as a signed machine word.
+    It holds that `(SAP- (SAP+ SAP OFFSET) SAP)` is `OFFSET`.")
+  (def sap-int (sap)
+    "Return the address corresponding to SAP. Note that this conses if the
+    address does not fit into FIXNUM range.")
+  (def int-sap (x)
+    "Create a SYSTEM-AREA-POINTER for the virtual address X, an unsigned
+    machine word integer.")
+  (macrolet ((def-accessor (name &optional docstring)
                ;; the low-level %SET functions should not need stubs
                `(progn (def (setf ,name) (value sap offset))
-                       (def ,name (sap offset)))))
-    (def-accessor sap-ref-8)
-    (def-accessor sap-ref-16)
-    (def-accessor sap-ref-32)
-    (def-accessor sap-ref-64)
-    (def-accessor sap-ref-word)
+                       (def ,name (sap offset)
+                         ,docstring))))
+    (def-accessor sap-ref-8
+      "Access the (UNSIGNED-BYTE 8) value at the memory location OFFSET bytes
+      from SAP. SETFable.")
+    (def-accessor sap-ref-16
+      "Access the (UNSIGNED-BYTE 16) value at the memory location OFFSET bytes
+      from SAP. SETFable.")
+    (def-accessor sap-ref-32
+      "Access the (UNSIGNED-BYTE 32) value at the memory location OFFSET bytes
+      from SAP. SETFable.")
+    (def-accessor sap-ref-64
+      "Access the (UNSIGNED-BYTE 64) value at the memory location OFFSET bytes
+      from SAP. SETFable.")
+    (def-accessor sap-ref-word
+      "Access the (UNSIGNED-BYTE 64) or (UNSIGNED-BYTE 32) value on 64-bit
+       and 32-bit platforms respectively at the memory location OFFSET
+       bytes from SAP. SETFable.")
     (def-accessor signed-sap-ref-8)
     (def-accessor signed-sap-ref-16)
     (def-accessor signed-sap-ref-32)
     (def-accessor signed-sap-ref-64)
     (def-accessor signed-sap-ref-word)
-    (def-accessor sap-ref-sap)
-    (def-accessor sap-ref-lispobj)
-    (def-accessor sap-ref-single)
-    (def-accessor sap-ref-double))
+    (def-accessor sap-ref-sap
+      "Like SAP-REF-WORD, but convert the word to a SYSTEM-AREA-POINTER.")
+    (def-accessor sap-ref-lispobj
+      "Like SAP-REF-WORD, but interpret the word as a Lisp object descriptor.")
+    (def-accessor sap-ref-single
+      "Access the 32-bit value pointed at as a SINGLE-FLOAT.")
+    (def-accessor sap-ref-double
+      "Access the 64-bit value pointed at as a DOUBLE-FLOAT."))
   (def %byte-blt (src src-start dst dst-start count))
   (def get-header-data)
   (def set-header-data (x val))
@@ -214,15 +240,6 @@
                   sb-vm:lowtag-mask))
        (* sb-vm::simd-pack-512-mask-value-slot
           sb-vm:n-word-bytes)))))
-
-;;; Document only those that SB-MANUAL:@UNTYPED-MEMORY singles out as
-;;; examples.
-(setf (documentation 'int-sap 'function)
-      "Creates a SAP pointing at the virtual address `X`.")
-(setf
- (documentation 'sap-ref-32 'function)
- "Access the value of the memory location at OFFSET bytes from SAP. SETFable.")
-(setf (documentation 'sap= 'function) "Compare the SAPs X and Y for equality.")
 
 #+sb-simd-pack
 (macrolet ((def (name)
