@@ -1757,7 +1757,11 @@
        (intersection-type
         (source-transform-intersection-typep object ctype))
        (member-type
-        `(if (member ,object ',(member-type-members ctype)) t))
+        (let ((members (member-type-members ctype)))
+          (if (<= (length members) 3) ;; Transform a test for BOOLEAN quicker
+              `(boolean-or ,@(loop for m in members
+                                   collect `(eql ,object ',m)))
+              `(if (member ,object ',members) t))))
        (args-type
         (compiler-warn "illegal type specifier for TYPEP: ~S" type)
         (return-from transform-typep (values nil t)))
