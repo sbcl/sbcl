@@ -5142,6 +5142,40 @@
     (inst dec :dword length)
     (inst jmp :nz LOOP)))
 
+(define-vop (bignum-neg-equal-loop)
+  (:args (p* :scs (descriptor-reg))
+         (n* :scs (descriptor-reg))
+         (len :scs (unsigned-reg)))
+  (:arg-types bignum bignum unsigned-num)
+  (:results (res :scs (descriptor-reg) :from :load))
+  (:temporary (:sc unsigned-reg) p n length digit)
+  (:generator 8
+    (inst lea p (ea (- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) p*))
+    (inst lea n (ea (- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) n*))
+    (inst mov :dword length len)
+
+    (inst clc)
+    (inst mov res null-tn)
+
+    LOOP
+    (inst mov digit (ea p))
+    (inst adc digit (ea n))
+
+    (inst jmp :nz DONE)
+
+    (inst lea p (ea 8 p))
+    (inst lea n (ea 8 n))
+
+    (inst dec :dword length)
+
+    (inst jmp :nz LOOP)
+
+    (inst jmp :nc DONE)
+
+    (inst add res (static-symbol-offset t))
+
+    DONE))
+
 (define-vop (bignum-mulx-and-add-word-loop)
   (:args (a :scs (descriptor-reg))
          (b :scs (unsigned-reg) :target rdx)

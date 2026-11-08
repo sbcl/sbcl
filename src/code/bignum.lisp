@@ -1140,6 +1140,128 @@
 (defun bignum-abs-buffer (bignum len)
   (unless (%bignum-0-or-plusp bignum len)
     (negate-bignum-buffer-in-place bignum len)))
+
+(defun bignum-abs= (a b)
+  (declare (type bignum a b)
+           (optimize speed (safety 0)))
+  (let* ((len-a (%bignum-length a))
+         (len-b (%bignum-length b))
+         (a-top (%bignum-ref a (1- len-a)))
+         (b-top (%bignum-ref b (1- len-b))))
+    (cond
+      ;; Same sign needs simple comparisons
+      ((not (logbitp (1- digit-size) (logxor a-top b-top)))
+       (and (= len-a len-b)
+            (= a-top b-top)
+            (do ((i (- len-a 2) (1- i)))
+                ((minusp i) t)
+              (unless (= (%bignum-ref a i) (%bignum-ref b i))
+                (return nil)))))
+      (t
+       (multiple-value-bind (p len-p n len-n)
+           (if (minusp (sb-c::mask-signed-field digit-size a-top))
+               (values b len-b a len-a)
+               (values a len-a b len-b))
+         ;; Lengths must either be equal or the positive number must
+         ;; be sign-extended with a zero digit.
+         (let ((len-p-1 (1- len-p)))
+           (cond ((= len-p-1 len-n)
+                  (unless (zerop (%bignum-ref p len-p-1))
+                    (return-from bignum-abs= nil))
+                  (decf len-p-1))
+                 ((/= len-p len-n)
+                  (return-from bignum-abs= nil)))
+           ;; Negation is the same as (+ (lognot x) 1),
+           ;; adding 1 will carry on until it finds the first 0 bit.
+           ;; Going from top to bottom, find the first digit that is
+           ;; not a complement, the remaning digits have to be zero.
+           (sb-c::if-vop-existsp (:named sb-vm::bignum-neg-equal-loop)
+             (sb-sys:%primitive sb-vm::bignum-neg-equal-loop p n len-n)
+             (do ((i len-p-1))
+                 ((minusp i) nil)
+               (let ((p-digit (%bignum-ref p i))
+                     (n-digit (%bignum-ref n i)))
+                 (decf i)
+                 (unless (= (logxor n-digit all-ones-digit) p-digit)
+                   (return
+                     (and (not (zerop p-digit))
+                          (zerop (logand (+ p-digit n-digit) all-ones-digit))
+                          (loop for j from i downto 0
+                                always (zerop (logior (%bignum-ref p j)
+                                                      (%bignum-ref n j))))))))))))))))
+
+(defun bignum-abs< (a b)
+  (declare (type bignum a b)
+           (optimize speed (safety 0)))
+  (let* ((len-a (%bignum-length a))
+         (len-b (%bignum-length b))
+         (a-top (%bignum-ref a (1- len-a)))
+         (b-top (%bignum-ref b (1- len-b))))
+    (cond
+      ;; Same sign is easy
+      ((not (logbitp (1- digit-size) (logxor a-top b-top)))
+       (cond ((< len-a len-b) t)
+             ((> len-a len-b) nil)
+             (t
+              (when (minusp (sb-c::mask-signed-field digit-size a-top))
+                (rotatef a b)
+                (rotatef a-top b-top))
+              (cond ((< a-top b-top) t)
+                    ((> a-top b-top) nil)
+                    (t
+                     (do ((i (- len-a 2) (1- i)))
+                         ((minusp i) nil)
+                       (let ((a-digit (%bignum-ref a i))
+                             (b-digit (%bignum-ref b i)))
+                         (unless (= a-digit b-digit)
+                           (return (< a-digit b-digit))))))))))
+      (t
+       (if (minusp (sb-c::mask-signed-field digit-size a-top))
+           ;; (< -a b) => (> b -a) => (> b (1+ (lognot a)))
+           ;; => (and (> b (lognot a)) (/= b (1+ (lognot a))))
+           (let ((len-b-1 (1- len-b)))
+             (cond ((= len-b-1 len-a)
+                    (unless (zerop (%bignum-ref b len-b-1))
+                      (return-from bignum-abs< t))
+                    (decf len-b-1))
+                   ((> len-a len-b)
+                    (return-from bignum-abs< nil))
+                   ((/= len-b len-a)
+                    (return-from bignum-abs< t)))
+             (do ((i len-b-1))
+                 ((minusp i) nil)
+               (let* ((p-digit (%bignum-ref b i))
+                      (n-digit (%bignum-ref a i))
+                      (m-digit (logxor n-digit all-ones-digit)))
+                 (decf i)
+                 ;; Similar to bignum-abs=, find the first unequal
+                 ;; complement and see which way it goes.
+                 ;; The negative A case also needs to check for equality.
+                 (unless (= m-digit p-digit)
+                   (return
+                     (and (> p-digit m-digit)
+                          (not (and (zerop (logand (+ p-digit n-digit) all-ones-digit))
+                                    (loop for j from i downto 0
+                                          always (zerop (logior (%bignum-ref b j)
+                                                                (%bignum-ref a j))))))))))))
+
+           ;; (< a -b) => (< a (1+ (lognot b))) => (<= a (lognot b))
+           (let ((len-a-1 (1- len-a)))
+             (cond ((= len-a-1 len-b)
+                    (unless (zerop (%bignum-ref a len-a-1))
+                      (return-from bignum-abs< nil))
+                    (decf len-a-1))
+                   ((> len-b len-a)
+                    (return-from bignum-abs< t))
+                   ((/= len-a len-b)
+                    (return-from bignum-abs< nil)))
+             (do ((i len-a-1))
+                 ((minusp i) t)
+               (let ((p-digit (%bignum-ref a i))
+                     (m-digit (logxor (%bignum-ref b i) all-ones-digit)))
+                 (decf i)
+                 (unless (= m-digit p-digit)
+                   (return (< p-digit m-digit)))))))))))
 
 ;;;; shifting
 

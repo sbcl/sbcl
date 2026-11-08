@@ -141,8 +141,8 @@
                           (declare (simple-bit-vector bits) (sb-int:index i n))
                           (loop for j from (* i i) to n by i
                                 do (setf (sbit bits j) 0))))))
-    (assert (find 'sb-vm::move-from-128-to-word vops))
-    (assert (not (find 'sb-vm::move-from-128 vops)))))
+    (assert (find "MOVE-FROM-128-TO-WORD" vops :test #'string=))
+    (assert (not (find "MOVE-FROM-128" vops :test #'string=)))))
 
 ;;; Y is stored twice, and boxed once for both.
 (with-test (:name (:representation :coercion :reused))

@@ -332,6 +332,9 @@
 (defknown abs (number) (and (real 0) (not (member -0f0 -0d0)))
   (movable foldable flushable))
 
+(defknown (sb-kernel::abs= sb-kernel::abs-eql sb-kernel::abs<) (number number) boolean
+  (movable foldable flushable no-verify-arg-count))
+
 (defknown (phase signum) (number) number
   (movable foldable flushable))
 (defknown cis (real) (complex float)

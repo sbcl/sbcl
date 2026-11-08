@@ -2683,6 +2683,36 @@
     (inst sub length length 1)
     (inst cbnz length LOOP)))
 
+(define-vop (bignum-neg-equal-loop)
+  (:args (p* :scs (descriptor-reg))
+         (n* :scs (descriptor-reg))
+         (len :scs (unsigned-reg)))
+  (:arg-types bignum bignum unsigned-num)
+  (:results (res :scs (descriptor-reg) :from :load))
+  (:temporary (:sc unsigned-reg) p n index length digit-p digit-n)
+  (:generator 8
+    (inst add-sub p p* (- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag))
+    (inst add-sub n n* (- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag))
+    (move length len)
+    (inst adds index zr-tn zr-tn) ;; clear carry
+    (move res null-tn)
+
+    LOOP
+    (inst ldr digit-p (@ p index))
+    (inst ldr digit-n (@ n index))
+    (inst sub length length 1)
+    (inst add index index 8)
+    (inst adcs zr-tn digit-p digit-n)
+
+    (inst b :ne DONE)
+
+    (inst cbnz length LOOP)
+
+    (inst b :cc DONE)
+
+    (load-symbol res t)
+    DONE))
+
 (define-vop (bignum-mult-and-add-word-loop)
   (:args (a* :scs (descriptor-reg))
          (b :scs (unsigned-reg))
