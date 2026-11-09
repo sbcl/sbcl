@@ -752,7 +752,8 @@
   (sb-ext:posix-getenv function)
   (sb-ext:posix-environ function)
   (sb-ext:exit function)
-  (@running-external-programs section))
+  (@running-external-programs section)
+  (@signal-handling section))
 
 (defsection @running-external-programs (:title "Running External Programs")
   "External programs can be run with SB-EXT:RUN-PROGRAM.
@@ -783,6 +784,54 @@
   (sb-ext:process-core-dumped function)
   (sb-ext:process-close function)
   (sb-ext:process-kill function))
+
+(defsection @signal-handling (:title "Signal Handling"
+                              :concepts (("signal handling")))
+  (sb-sys:without-interrupts macro)
+  (sb-sys:with-interrupts macro)
+  #-win32
+  (sb-sys:enable-interrupt function)
+  (@default-signal-handlers section))
+
+(defsection @default-signal-handlers (:title "Default Signal Handlers")
+  "SBCL establishes the following signal handlers:
+
+  - `\\\\SIGINT`: SIGNALs an SB-SYS:INTERACTIVE-INTERRUPT (in
+    SB-THREAD::FOREGROUND-THREAD with @THREADING). If that condition
+    is not handled, it enters the @DEBUGGER respecting
+    *DEBUGGER-HOOK*.
+
+  - `\\\\SIGPIPE`: Ignored.
+
+  - `\\\\SIGTERM`: Calls `(SB-EXT:EXIT)`.
+
+  - `\\\\SIGFPE`: Signals the standard FLOATING-POINT-OVERFLOW,
+    FLOATING-POINT-UNDERFLOW, FLOATING-POINT-INEXACT, DIVISION-BY-ZERO
+    conditions based on the execution context, or
+    SB-KERNEL:FLOATING-POINT-EXCEPTION if the appropriate condition
+    could not be determined.
+
+  - `\\\\SIGALRM`: Checks for expired @TIMERS.
+
+  - `\\\\SIGURG`: Handles interruptions by SB-THREAD:INTERRUPT-THREAD
+    unless :SB-SAFEPOINT is enabled (see @BUILD-OPTIONS).
+
+  - `\\\\SIGCHLD`: Handles child status changes for SB-EXT:RUN-PROGRAM.
+
+  - `\\\\SIGUSR2`: Used by @GARBAGE-COLLECTION with @THREADING.
+
+  - `\\\\SIGABRT`: Drops into @LDB. Always handled by the runtime.
+    Establishing a Lisp handler has no effect.
+
+  - `\\\\SIGSEGV`, `\\\\SIGILL`, `\\\\SIGEMT`, `\\\\SIGBUS`,
+    `\\\\SIGTRAP`, `\\\\SIGSYS`: Some of these synchronous interrupts
+    are used by the runtime. Else, they may be subject to
+    `--lose-on-corruption` (see @RUNTIME-OPTIONS). If neither, then
+    they signal a SIMPLE-ERROR.
+
+      It is still safe to use SB-SYS:ENABLE-INTERRUPT, as that only
+      affects the signals that are handled in Lisp."
+  (sb-sys:interactive-interrupt condition))
 
 (defsection @unicode-support (:title "Unicode Support"
                               :concepts (@unicode))

@@ -1099,8 +1099,8 @@ current process which should land in a thread that does not block
 it, that is, a Lisp thread.
 
 The resignalling trick cannot work for synchronously triggered signals
-(@code{sigsegv} and co), take care not to trigger any. Resignalling for
-synchronously triggered signals in foreign threads is subject to
+(@code{SIGSEGV} and co), take care not to trigger any. Resignalling
+for synchronously triggered signals in foreign threads is subject to
 @code{--lose-on-corruption}, see @ref{runtime options}.
 
 @node implementation on linux x86oids

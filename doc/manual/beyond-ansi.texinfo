@@ -1543,6 +1543,7 @@ functions described in @ref{exseq simple iterator protocol}.
 
 @menu
 * Running External Programs: running external programs.
+* Signal Handling: signal handling.
 @end menu
 
 @anchor{Variable sb-ext *posix-argv*}
@@ -1864,6 +1865,225 @@ Hand @code{signal} to @code{process}. If @code{whom} is @code{:pid}, use the kil
 Returns @code{t} if successful, otherwise returns @code{nil} and error
 number (two values).
 @end deffn
+@node signal handling
+@cindex signal handling
+@subsection Signal Handling
+
+@menu
+* Default Signal Handlers: default signal handlers.
+@end menu
+
+@anchor{Macro sb-sys without-interrupts}
+@ffindex @sortas{without-interrupts sb-sys} without-interrupts [sb-sys]
+@deffn{Macro} sb-sys:without-interrupts &body body
+Execute @code{body} with all deferrable interrupts disabled. Deferrable
+interrupts arriving during execution of the @code{body} take effect after
+@code{body} has been executed. Deferrable interrupts include most blockable
+POSIX signals, and @code{sb-thread:interrupt-thread}.
+
+This macro does not interfere with garbage collection, and unlike in
+many traditional Lisps using userspace threads, in SBCL
+@code{without-interrupts} does not inhibit scheduling of other threads.
+
+The local macros @code{allow-with-interrupts} and @code{with-local-interrupts} are
+available in @code{body}.
+
+@itemize
+@item @code{allow-with-interrupts} allows @code{with-interrupts} to take effect during
+  the dynamic scope of its body, unless there is an outer
+  @code{without-interrupts} without a corresponding @code{allow-with-interrupts}.
+
+@item @code{with-local-interrupts} executes its body with interrupts enabled
+  provided that there is an @code{allow-with-interrupts} for every
+  @code{without-interrupts} surrounding the current one.
+  @code{with-local-interrupts} is equivalent to:
+
+@example
+(allow-with-interrupts (with-interrupts ...))
+@end example
+@end itemize
+
+Care must be taken not to let either @code{allow-with-interrupts} or
+@code{with-local-interrupts} appear in a function that escapes from inside
+the @code{without-interrupts} in:
+
+@example
+(without-interrupts
+  ;; The body of the lambda would be executed with WITH-INTERRUPTS allowed
+  ;; regardless of the interrupt policy in effect when it is called.
+  (lambda () (allow-with-interrupts ...)))
+
+(without-interrupts
+  ;; The body of the lambda would be executed with interrupts enabled
+  ;; regardless of the interrupt policy in effect when it is called.
+  (lambda () (with-local-interrupts ...)))
+@end example
+@end deffn
+@anchor{Macro sb-sys with-interrupts}
+@ffindex @sortas{with-interrupts sb-sys} with-interrupts [sb-sys]
+@deffn{Macro} sb-sys:with-interrupts &body body
+Execute @code{body} with deferrable interrupts conditionally enabled. If there
+are pending interrupts they take effect prior to executing @code{body}.
+
+As interrupts are normally allowed @code{with-interrupts} only makes sense if there
+is an outer @code{without-interrupts} with a corresponding @code{allow-with-interrupts}:
+interrupts are not enabled if any outer @code{without-interrupts} is not accompanied
+by @code{allow-with-interrupts}.
+@end deffn
+@anchor{Function sb-sys enable-interrupt}
+@ffindex @sortas{enable-interrupt sb-sys} enable-interrupt [sb-sys]
+@deffn{Function} sb-sys:enable-interrupt signum handler
+Set the Unix signal @code{handler} for @code{signum}. This applies to all threads in
+the SBCL process.
+
+@itemize
+@item @code{signum} is a signal number. Use the constants @code{sb-posix:sigint},
+  @code{sb-posix:sighup} and others.
+
+@item @code{handler} is a function, @code{:default} or @code{:ignore}.
+
+@itemize
+@item When @code{handler} is a function, it takes three arguments,
+        paralleling those of @code{sigaction.sa_sigaction} (see
+        @code{sigaction(2)}).
+
+@example
+(sb-sys:enable-interrupt
+  :sighup (lambda (signal siginfo-sap context-sap)
+            (declare (ignore signal siginfo-sap context-sap))
+            (setq *sighup-received* t)))
+@end example
+
+@item To reset the handler of @code{sighup}:
+
+@example
+(sb-sys:enable-interrupt :sighup :default)
+@end example
+
+@item To ignore @code{sigint}:
+
+@example
+(sb-sys:enable-interrupt :sigint :ignore)
+@end example
+@end itemize
+@end itemize
+
+@quotation
+@emph{Warning}: See @code{signal-safety(7)} for restrictions on what signal
+handlers are allowed to do, which is not a whole lot in practice.
+A simple and safe way is to set a flag, as in the above example,
+and check periodically in some application loop.
+@end quotation
+@end deffn
+@node default signal handlers
+@subsubsection Default Signal Handlers
+
+SBCL establishes the following signal handlers:
+
+@itemize
+@item @code{SIGINT}: @code{signal}s an @code{sb-sys:interactive-interrupt} (in
+  @code{sb-thread::foreground-thread} with @ref{threading}). If that condition
+  is not handled, it enters the @ref{debugger} respecting
+  @code{*debugger-hook*}.
+
+@item @code{SIGPIPE}: Ignored.
+
+@item @code{SIGTERM}: Calls @code{(sb-ext:exit)}.
+
+@item @code{SIGFPE}: Signals the standard @code{floating-point-overflow},
+  @code{floating-point-underflow}, @code{floating-point-inexact}, @code{division-by-zero}
+  conditions based on the execution context, or
+  @code{sb-kernel:floating-point-exception} if the appropriate condition
+  could not be determined.
+
+@item @code{SIGALRM}: Checks for expired @ref{timers}.
+
+@item @code{SIGURG}: Handles interruptions by @code{sb-thread:interrupt-thread}
+  unless @code{:sb-safepoint} is enabled (see @ref{build options}).
+
+@item @code{SIGCHLD}: Handles child status changes for @code{sb-ext:run-program}.
+
+@item @code{SIGUSR2}: Used by @ref{garbage collection} with @ref{threading}.
+
+@item @code{SIGABRT}: Drops into @ref{ldb}. Always handled by the runtime.
+  Establishing a Lisp handler has no effect.
+
+@item @code{SIGSEGV}, @code{SIGILL}, @code{SIGEMT}, @code{SIGBUS},
+  @code{SIGTRAP}, @code{SIGSYS}: Some of these synchronous interrupts
+  are used by the runtime. Else, they may be subject to
+  @code{--lose-on-corruption} (see @ref{runtime options}). If neither, then
+  they signal a @code{simple-error}.
+
+It is still safe to use @code{sb-sys:enable-interrupt}, as that only
+affects the signals that are handled in Lisp.
+@end itemize
+
+@anchor{Condition sb-sys interactive-interrupt}
+@ttindex @sortas{interactive-interrupt sb-sys} interactive-interrupt [sb-sys]
+@deffn{Condition} sb-sys:interactive-interrupt
+@end deffn
+@node fd streams
+@cindex file descriptor stream
+@subsection File Descriptor Streams
+
+Many of the UNIX system calls return file descriptors. Instead of
+using other UNIX system calls to perform I/O on them, you can create
+a @code{sb-sys:fd-stream} around them. For example,
+@code{sb-bsd-sockets:socket-make-stream} and @code{sb-simple-streams:open} are
+built using fd streams.
+
+@anchor{Structure sb-sys fd-stream}
+@ttindex @sortas{fd-stream sb-sys} fd-stream [sb-sys]
+@deffn{Structure} sb-sys:fd-stream
+@end deffn
+@anchor{Function sb-sys fd-stream-p}
+@ffindex @sortas{fd-stream-p sb-sys} fd-stream-p [sb-sys]
+@deffn{Function} sb-sys:fd-stream-p object
+@end deffn
+@anchor{Function sb-sys make-fd-stream}
+@ffindex @sortas{make-fd-stream sb-sys} make-fd-stream [sb-sys]
+@deffn{Function} sb-sys:make-fd-stream fd &key (class 'sb-sys:fd-stream) input output (element-type 'base-char) (buffering :full) (external-format :default) serve-events timeout file original delete-original pathname input-buffer-p dual-channel-p (name (if sb-impl::file
+    (format nil "file ~A" sb-impl::file)
+    (format nil "descriptor ~W" sb-impl::fd))) auto-close
+Create an @code{fd-stream} for the given Unix file descriptor @code{fd}.
+
+@itemize
+@item If @code{input} is non-@code{nil}, allow input operations. If @code{output} is non-nil,
+  allow output operations. If neither @code{input} nor @code{output} is specified,
+  default to allowing input.
+
+@item @code{element-type} indicates the element type to use (as for @code{open}).
+
+@item @code{buffering} indicates the kind of buffering to use. Acceptable
+  values for @code{buffering} are @code{:full}, @code{:line} and @code{:none}, default is @code{:full},
+  i.e. output is buffered till it is explicitly flushed using @code{close}
+  or @code{finish-output}. (@code{force-output} forces some output to be flushed:
+  to ensure all buffered output is flushed use @code{finish-output}.)
+
+@item @code{timeout} (if non-@code{nil}) is the number of seconds to wait for input.
+  If @code{nil} (the default), then wait forever. When we time out, we
+  signal @code{io-timeout}.
+
+@item @code{file} is the name of the file (will be returned by @code{pathname} on the
+  returned @code{fd-stream}).
+
+@item @code{name} is used to identify the stream when printed.
+
+@item If @code{serve-events} is true, @code{serve-event} machinery is used to handle
+  blocking IO on the stream.
+
+@item If @code{auto-close} is true, the underlying OS socket is automatically
+  closed after the stream and the socket have been garbage
+  collected. Default is @code{nil}.
+@end itemize
+@end deffn
+@anchor{Function sb-sys fd-stream-fd}
+@ffindex @sortas{fd-stream-fd sb-sys} fd-stream-fd [sb-sys]
+@deffn{Function} sb-sys:fd-stream-fd instance
+Return the Unix file descriptor associated with @code{fd-stream}.
+See the @code{fd} argument of @code{make-fd-stream}.
+@end deffn
+
 @node unicode support
 @cindex Unicode
 @section Unicode Support

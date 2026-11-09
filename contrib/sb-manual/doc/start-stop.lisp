@@ -275,7 +275,9 @@
       to continue and handle the error in Lisp. However, this will not
       always work, and SBCL may subsequently malfunction or even hang.
       With this option, upon encountering such an error, SBCL will
-      exit instead of signalling a Lisp error.
+      instead attempt to enter @LDB (and exit if \\LDB is not
+      available). See also @DEFAULT-SIGNAL-HANDLERS and
+      @FOREIGN-THREADS.
 
   - `--script <filename>`
 

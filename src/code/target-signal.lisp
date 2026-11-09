@@ -64,9 +64,38 @@
 
 ;;;; interface to installing signal handlers
 
-(defun enable-interrupt (signal handler)
+(defun enable-interrupt (signum handler)
+  "Set the Unix signal HANDLER for SIGNUM. This applies to all threads in
+  the SBCL process.
+
+  - SIGNUM is a signal number. Use the constants SB-POSIX:SIGINT,
+    SB-POSIX:SIGHUP and others.
+
+  - HANDLER is a function, :DEFAULT or :IGNORE.
+
+        - When HANDLER is a function, it takes three arguments,
+          paralleling those of `sigaction.sa_sigaction` (see
+          `sigaction(2)`).
+
+                (sb-sys:enable-interrupt
+                  :sighup (lambda (signal siginfo-sap context-sap)
+                            (declare (ignore signal siginfo-sap context-sap))
+                            (setq *sighup-received* t)))
+
+        - To reset the handler of `SIGHUP`:
+
+                (sb-sys:enable-interrupt :sighup :default)
+
+        - To ignore `SIGINT`:
+
+                (sb-sys:enable-interrupt :sigint :ignore)
+
+  > _Warning_: See `signal-safety(7)` for restrictions on what signal
+  > handlers are allowed to do, which is not a whole lot in practice.
+  > A simple and safe way is to set a flag, as in the above example,
+  > and check periodically in some application loop."
   (declare (type (or function (member :default :ignore)) handler))
-  (%install-handler signal handler)
+  (%install-handler signum handler)
   ;; This used to return the previously installed handler, if any.
   ;; It no longer does, but the old handler can be obtained via SAP-REF-LISPOBJ
   ;; on 'lisp_sig_handlers'. The reason for not returning it is that the value was
@@ -105,10 +134,6 @@
 ;;;;
 ;;;; Most of these just call ERROR to report the presence of the signal.
 
-;;; SIGINT is handled like BREAK, except that ANSI BREAK ignores
-;;; *DEBUGGER-HOOK*, but we want SIGINT's BREAK to respect it, so that
-;;; SIGINT in --disable-debugger mode will cleanly terminate the system
-;;; (by respecting the *DEBUGGER-HOOK* established in that mode).
 (macrolet
   ((define-signal-handler (name what &optional (function 'error))
     `(defun ,name (signal info context)
@@ -129,6 +154,10 @@
 (define-signal-handler sigsys-handler "bad argument to a system call")
 ) ; end MACROLET
 
+;;; SIGINT is handled like BREAK, except that ANSI BREAK ignores
+;;; *DEBUGGER-HOOK*, but we want SIGINT's BREAK to respect it, so that
+;;; SIGINT in --disable-debugger mode will cleanly terminate the system
+;;; (by respecting the *DEBUGGER-HOOK* established in that mode).
 (defun sigint-handler (signal info
                        sb-kernel:*current-internal-error-context*)
   (declare (ignore signal info))

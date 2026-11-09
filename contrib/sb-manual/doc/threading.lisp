@@ -285,8 +285,8 @@
   it, that is, a Lisp thread.
 
   The resignalling trick cannot work for synchronously triggered signals
-  (`SIGSEGV` and co), take care not to trigger any. Resignalling for
-  synchronously triggered signals in foreign threads is subject to
+  (`\\\\SIGSEGV` and co), take care not to trigger any. Resignalling
+  for synchronously triggered signals in foreign threads is subject to
   `--lose-on-corruption`, see @RUNTIME-OPTIONS.")
 
 (defsection @implementation-on-linux-x86oids

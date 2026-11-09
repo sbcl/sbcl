@@ -337,7 +337,9 @@ corrupt the image. By default, SBCL prints a warning, then tries
 to continue and handle the error in Lisp. However, this will not
 always work, and SBCL may subsequently malfunction or even hang.
 With this option, upon encountering such an error, SBCL will
-exit instead of signalling a Lisp error.
+instead attempt to enter @ref{ldb} (and exit if LDB is not
+available). See also @ref{default signal handlers} and
+@ref{foreign threads}.
 
 @item @code{--script <filename>}
 
