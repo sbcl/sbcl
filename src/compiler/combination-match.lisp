@@ -37,12 +37,13 @@
   (commutative nil :type boolean))
 
 (defstruct cm-operand
-  (kind :var :type (member :wildcard :var :type :constant :plus :literal :combination))
+  (kind :var :type (member :wildcard :var :type :constant :plus :literal :combination :or))
   (name nil :type symbol)
   (type nil :type t)
   (value nil :type t)
   (lvar-var nil)
-  (sub-combinations nil :type list))
+  (sub-combinations nil :type list)
+  (sub-operands nil :type list))
 
 (defstruct cm-combination
   (operator nil :type (or null cm-operator))
@@ -52,7 +53,15 @@
   (plus nil :type (or null fixnum))
   (rest-var nil :type symbol)
   (casts nil :type t)
-  (nth-value nil :type (or null index)))
+  (nth-value nil :type (or null index))
+  (inverted nil :type boolean))
+
+(defun cm-invert-relation (op)
+  (case op
+    (< '>)
+    (> '<)
+    (<= '>=)
+    (>= '<=)))
 
 (defun parse-cm-spec (spec unravel-casts)
   (let ((this-level nil))
@@ -65,12 +74,6 @@
              (extract-name-var (op)
                (and (consp op)
                     (second (member :name op))))
-             (invert-relation (op)
-               (case op
-                 (< '>)
-                 (> '<)
-                 (<= '>=)
-                 (>= '<=)))
              (equal-spec (a b)
                (cond ((eq a b))
                      ((symbolp a)
@@ -81,24 +84,42 @@
                       (and (equal (car a) (car b))
                            (= (length a) (length b))
                            (every #'equal-spec a b)))))
+             (invert-name-spec (name-spec)
+               (cond ((symbolp name-spec)
+                      (cm-invert-relation name-spec))
+                     ((consp name-spec)
+                      (let* ((name-var (extract-name-var name-spec))
+                             (names (clean-name-spec (if (eq (car name-spec) :or)
+                                                         (cdr name-spec)
+                                                         name-spec))))
+                        (when (some #'cm-invert-relation names)
+                          (let ((inverted-names
+                                  (loop for n in names
+                                        for inv = (cm-invert-relation n)
+                                        when inv
+                                        collect inv)))
+                            (if (or name-var (cdr inverted-names))
+                                `(:or ,@inverted-names ,@(when name-var `(:name ,name-var)))
+                                (car inverted-names))))))))
+             (commutative-name-p (n)
+               (and (symbolp n)
+                    (not (keywordp n))
+                    (let ((info (info :function :info n)))
+                      (and info
+                           (ir1-attributep (fun-info-attributes info) commutative)))))
              (invertible-p (s)
                (and (consp s)
-                    (symbolp (car s))
-                    (invert-relation (car s))
+                    (invert-name-spec (car s))
                     (= (length (cdr s)) 2)
                     (not (equal-spec (first (cdr s)) (second (cdr s))))))
              (invert-spec (s)
-               (list (invert-relation (car s))
+               (list (invert-name-spec (car s))
                      (second (cdr s))
                      (first (cdr s))))
              (ensure-or (x)
-               (let ((specs (if (typep x '(cons (eql :or)))
-                                (clean-name-spec (cdr x))
-                                (list x))))
-                 (loop for s in specs
-                       collect s
-                       when (invertible-p s)
-                       collect (invert-spec s))))
+               (if (typep x '(cons (eql :or)))
+                   (clean-name-spec (cdr x))
+                   (list x)))
              (expand-aliases (specs &optional exclude)
                (loop for spec in specs
                      when (when (listp spec)
@@ -129,7 +150,11 @@
                      append it
                      else collect spec))
              (parse-operand (s expected-type level)
-               (cond ((typep s '(cons (eql :type)))
+               (cond ((typep s '(cons (eql :or)))
+                      (make-cm-operand :kind :or
+                                       :sub-operands (loop for sub in (clean-name-spec (cdr s))
+                                                           collect (parse-operand sub expected-type level))))
+                     ((typep s '(cons (eql :type)))
                       (make-cm-operand :kind :type
                                        :type (second s)
                                        :name (third s)))
@@ -156,7 +181,7 @@
                      ((consp s)
                       (make-cm-operand :kind :combination
                                        :sub-combinations (recurse s level)))))
-             (parse-combination (raw level)
+             (parse-combination (raw level &optional inverted)
                (destructuring-bind (name-spec . args) raw
                  (when (eq name-spec :this)
                    (aver (or (not this-level)
@@ -183,8 +208,7 @@
                                    (or (find :commutative names)
                                        (loop for name in names
                                              always (unless (memq name '(:* :this))
-                                                      (ir1-attributep (fun-info-attributes (fun-info-or-lose name))
-                                                                      commutative))))
+                                                      (commutative-name-p name))))
                                    (not (or (integerp (car (last args)))
                                             (typep (car (last args)) '(cons (eql :constant)))
                                             (equal-spec (first args) (second args))))))
@@ -216,10 +240,21 @@
                                             :variable variable
                                             :plus plus
                                             :rest-var rest-var
-                                            :casts casts)))))
+                                            :casts casts
+                                            :inverted inverted)))))
              (recurse (spec level)
-               (loop for spec in (expand-aliases (ensure-or spec))
-                     collect (parse-combination spec (1+ level)))))
+               (let ((specs (if (typep spec '(cons (eql :or)))
+                                (clean-name-spec (cdr spec))
+                                (list spec))))
+                 (loop for s in specs
+                       append (expand-aliases (list s)) into normal-specs
+                       when (invertible-p s)
+                       append (expand-aliases (list (invert-spec s))) into inverted-specs
+                       finally
+                       (return (nconc (loop for s in normal-specs
+                                            collect (parse-combination s (1+ level) nil))
+                                      (loop for s in inverted-specs
+                                            collect (parse-combination s (1+ level) t))))))))
       (values (recurse spec -1) this-level))))
 
 (defun ordered-set-difference (set1 set2)
@@ -255,7 +290,9 @@
                                (push :plus vars)
                                (add (cm-operand-name op)))
                               (:combination
-                               (mapc #'walk-combination (cm-operand-sub-combinations op)))))
+                               (mapc #'walk-combination (cm-operand-sub-combinations op)))
+                              (:or
+                               (mapc #'walk-operand (cm-operand-sub-operands op)))))
                           (walk-combination (comb)
                             (let ((op (cm-combination-operator comb)))
                               (excluded (cm-operator-name-var op)))
@@ -274,6 +311,7 @@
                                    (op-names (cm-operator-names op))
                                    (name-var (cm-operator-name-var op))
                                    (commutative (cm-operator-commutative op))
+                                   (inverted (cm-combination-inverted comb))
                                    (arg-operands (cm-combination-operands comb))
                                    (arg-count (cm-combination-arg-count comb))
                                    (variable (cm-combination-variable comb))
@@ -305,7 +343,14 @@
                                        (expand-operands lvars operands
                                                         (if name-var
                                                             (lambda ()
-                                                              `(let ((,name-var .name.))
+                                                              `(let ((,name-var ,(if inverted
+                                                                                     `(case .name.
+                                                                                        ,@(loop for n in op-names
+                                                                                                for inv = (cm-invert-relation n)
+                                                                                                when inv
+                                                                                                collect `((,n) ',inv))
+                                                                                        (t .name.))
+                                                                                     '.name.)))
                                                                  ,(funcall inner-body)))
                                                             inner-body)))
                                      (branch-form
@@ -399,7 +444,17 @@
                                  ,@(cases-to-cond
                                     (expand-combinations (cdr lvars) (cdr operands)
                                                          (cm-operand-sub-combinations op)
-                                                         body)))))))))
+                                                         body))))))
+                         (:or
+                          (if (some (lambda (o) (not (eq (cm-operand-kind o) :or))) (cdr operands))
+                              (expand-operands (append (cdr lvars) (list lvar))
+                                               (append (cdr operands) (list op))
+                                               body)
+                              (let ((old-bound-vars bound-vars))
+                                `(or ,@(loop for sub-op in (cm-operand-sub-operands op)
+                                             collect (progn
+                                                       (setf bound-vars old-bound-vars)
+                                                       (expand-operands lvars (cons sub-op (cdr operands)) body))))))))))
                    (funcall body)))
 
              (gen-1 (clauses node)
@@ -474,15 +529,18 @@
                                  (cond
                                    ,@(cases-to-cond branches)))))))))
       (let ((dest (member :dest clauses)))
-        `(progn
-           (block .combination-match.
-             ,(gen-1 (ldiff clauses dest) node)
-             ,@(when dest
-                 `(,(gen-1 (cdr dest) `(node-dest ,node)))))
-           ,@(or otherwise
-                 (and transform
-                      `((delay-ir1-transform ,node :ir1-phases)
-                        (give-up-ir1-transform)))))))))
+        (let ((before (ldiff clauses dest))
+              (after (and dest (cdr dest))))
+          `(progn
+             (block .combination-match.
+               ,@(when before
+                   `(,(gen-1 before node)))
+               ,@(when after
+                   `(,(gen-1 after `(node-dest ,node)))))
+             ,@(or otherwise
+                   (and transform
+                        `((delay-ir1-transform ,node :ir1-phases)
+                          (give-up-ir1-transform))))))))))
 
 (defun combination/cast-name (node &optional cast-type)
   (typecase node
