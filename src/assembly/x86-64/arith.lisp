@@ -278,18 +278,18 @@
          (:results (result :scs (unsigned-reg)))
          (:result-types positive-fixnum)
          ;; input/output of assembly routine
-         (:temporary (:sc unsigned-reg :offset rdx-offset
-                          :from (:argument 0) :to (:result 0)) rdx)
+         (:temporary (:sc unsigned-reg :offset #.(car sb-vm::*register-arg-offsets*)
+                          :from (:argument 0) :to (:result 0)) routine-result)
          (:vop-var vop)
          (:generator ,cost
            ,@(when signed
-               `((move rdx arg)
-                 (setf arg rdx)
+               `((move routine-result arg)
+                 (setf arg routine-result)
                  ,(if (eq arg-type 'fixnum)
-                      `(inst sar rdx n-fixnum-tag-bits)
-                      `(inst test rdx rdx))
+                      `(inst sar routine-result n-fixnum-tag-bits)
+                      `(inst test routine-result routine-result))
                  (inst jmp :ge POSITIVE)
-                 (inst not rdx)
+                 (inst not routine-result)
                  POSITIVE))
            (when (memq :popcnt *backend-subfeatures*) ; always use POPCNT
            ;; Intel's implementation of POPCNT on some models treats it as
@@ -312,9 +312,9 @@
            (inst popcnt result arg)
            (inst jmp done)
          slow
-           (move rdx arg)
+           (move routine-result arg)
            (invoke-asm-routine 'call 'logcount vop)
-           (move result rdx)
+           (move result routine-result)
          done))))
   (def-it unsigned-byte-64-count 14 unsigned-reg unsigned-num)
   (def-it signed-byte-64-count 15 signed-reg signed-num :signed t)
