@@ -1316,11 +1316,12 @@
       ;; Verify all 7 interconnected functions were processed
       (assert (= h-checked 7)))))
 
-(with-test (:name (:select-tagging :through-variables))
+(with-test (:name (:select-tagging :through-variables)
+            :skipped-on (not (and :sb-unicode (or :x86-64 :arm64))))
   (assert (zerop (count-if (lambda (name)
                              (search "WORD/FIXNUM" (symbol-name name)))
                            (ir2-vops '(lambda (s)
-                                       (declare (simple-string s))
+                                       (declare ((simple-array character (*))  s))
                                        (labels ((outer (i sum)
                                                   (if (< i (length s))
                                                       (inner i sum 0)
