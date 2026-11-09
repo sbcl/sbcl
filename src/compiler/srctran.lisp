@@ -1829,7 +1829,10 @@
                 (mapcan #'split (union-type-types arg)))
                (intersection-type
                 (if (find-if #'hairy-type-p (intersection-type-types arg))
-                    (split (find-if-not #'hairy-type-p (intersection-type-types arg)))
+                    (let ((non-hairy (find-if-not #'hairy-type-p (intersection-type-types arg))))
+                      (if non-hairy
+                          (split non-hairy)
+                          (list arg)))
                     (list arg)))
                (list
                 (loop for a in arg

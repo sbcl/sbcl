@@ -243,3 +243,15 @@
   (assert-error (coerce (opaque-identity 1)
                         (opaque-identity 'list))
                 type-error))
+
+(with-test (:name :one-arg-derive-type-unknown-intersections)
+  (assert-type
+   (lambda (x)
+     (coerce (the (or null (and (satisfies eval) unknown)) x) 'integer))
+   (and integer (satisfies eval) unknown)
+   :allow-style-warnings t)
+  (assert-type
+   (lambda (x)
+     (coerce (the (or null (and unknown1 unknown2)) x) 'integer))
+   (and integer unknown1 unknown2)
+   :allow-style-warnings t))
