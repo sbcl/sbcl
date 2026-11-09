@@ -849,7 +849,8 @@
                        (unless no-effect
                          (let (fun)
                            (when (and (eq (combination-kind node) :local)
-                                      (functional-kind-eq (setf fun (combination-lambda node)) let))
+                                      (functional-kind-eq (setf fun (combination-lambda node))
+                                                          let assignment))
                              (setf node (lambda-bind fun))
                              (go :next)))))
                       (entry
