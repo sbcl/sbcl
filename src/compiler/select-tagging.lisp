@@ -142,6 +142,7 @@
         (when (and (combination-p node)
                    (consp (combination-info node)))
           (let (any-lvars
+                current
                 (result (node-lvar node))
                 (tagged-template (car (combination-info node)))
                 (tagged 0)
@@ -153,7 +154,12 @@
                        (or (seen-p x)
                            (progn (setf (gethash x seen) node)
                                   nil)))
+                     (link (var)
+                       (when (and current (lambda-var-p var))
+                         (add-edge net current var 8)
+                         (add-edge net var current 8)))
                      (visit-var (var)
+                       (link var)
                        (unless (eq (gethash var walked) node)
                          (setf (gethash var walked) node)))
                      (add-lvar (lvar &optional (both t))
@@ -189,6 +195,7 @@
                              (t
                               (values 1 0))))
                      (handle-var (var)
+                       (link var)
                        (if (global-var-p var)
                            (incf tagged)
                            (unless (see var)
@@ -241,6 +248,7 @@
                                 (not (logbitp 0 related)))
                       (add-arg-lvar i arg (not (eq (vop-info-tag tagged-template) :commutative)))
                       (setf tagged 0 untagged 0)
+                      (setq current arg)
                       (handle-lvar arg)
                       (when (> tagged 0)
                         (add-edge net :tag arg (* tagged 8)))
@@ -253,6 +261,7 @@
                     (progn
                       (add-lvar result)
                       (see result)
+                      (setq current result)
                       (setq any-lvars t)
                       (setf tagged 0 untagged 0)
                       (map-all-dests

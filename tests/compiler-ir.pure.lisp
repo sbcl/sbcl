@@ -1315,3 +1315,20 @@
       (assert (equal (funcall fun 1 42) '(42 42 42 42)))
       ;; Verify all 7 interconnected functions were processed
       (assert (= h-checked 7)))))
+
+(with-test (:name (:select-tagging :through-variables))
+  (assert (zerop (count-if (lambda (name)
+                             (search "WORD/FIXNUM" (symbol-name name)))
+                           (ir2-vops '(lambda (s)
+                                       (declare (simple-string s))
+                                       (labels ((outer (i sum)
+                                                  (if (< i (length s))
+                                                      (inner i sum 0)
+                                                      sum))
+                                                (inner (j sum n)
+                                                  (let ((d (and (< j (length s))
+                                                                (digit-char-p (schar s j)))))
+                                                    (if d
+                                                        (inner (1+ j) sum (+ (* n 10) d))
+                                                        (outer (1+ j) (+ sum n))))))
+                                         (outer 0 0))))))))
