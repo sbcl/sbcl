@@ -321,14 +321,18 @@
 ;;; instruction returns the low cycle count in EAX and high cycle
 ;;; count in EDX.
 ;;;
-;;; In order to obtain more significant results on out-of-order
-;;; processors (such as the Pentium II and later), we issue a
-;;; serializing CPUID instruction before and after reading the cycle
-;;; counter. This instruction is used for its side effect of emptying
-;;; the processor pipeline, to ensure that the RDTSC instruction is
-;;; executed once all pending instructions have been completed and
-;;; before any others. CPUID writes to EBX and ECX in addition to EAX
-;;; and EDX, so they need to be added as temporaries.
+;;; Originally from rev f866d5d986 this vop inserted the CPUID instruction
+;;; before and after RDTSC.  Rev 9b1fade83d removed one of the CPUIDs.
+;;; However, no sources recommend it now for high performance profiling.
+;;; * https://github.com/abseil/abseil-cpp/blob/master/absl/base/internal/unscaledcycleclock.h
+;;;   uses only the RDTSC
+;;; * Intel SDM Vol. 3C sec 25.1.2 -
+;;;   CPUID is architecturally required to trap to the VMM on every execution
+;;; * Intel SDM Vol. 2B
+;;;   If software requires RDTSC to be executed only after all previous instructions have
+;;;   executed and all previous loads are globally visible, it can execute LFENCE
+;;;   immediately before RDTSC
+;;; (And per the last remark above, LFENCE is only if you "need" serialization)
 ;;;
 ;;; Note that cache effects mean that the cycle count can vary for
 ;;; different executions of the same code (it counts cycles, not
@@ -350,17 +354,10 @@
   (:translate %read-cycle-counter)
   (:temporary (:sc unsigned-reg :offset rax-offset :target lo) eax)
   (:temporary (:sc unsigned-reg :offset rdx-offset :target hi) edx)
-  (:temporary (:sc unsigned-reg :offset rbx-offset) ebx)
-  (:temporary (:sc unsigned-reg :offset rcx-offset) ecx)
-  (:ignore ebx ecx)
   (:results (hi :scs (unsigned-reg))
             (lo :scs (unsigned-reg)))
   (:result-types unsigned-num unsigned-num)
   (:generator 5
-     (zeroize eax)
-     ;; Intel docs seem quite consistent on only using CPUID before RDTSC,
-     ;; not both before and after. Go figure.
-     (inst cpuid)
      (inst rdtsc)
      (move lo eax)
      (move hi edx)))
