@@ -1544,6 +1544,7 @@ functions described in @ref{exseq simple iterator protocol}.
 @menu
 * Running External Programs: running external programs.
 * Signal Handling: signal handling.
+* File Descriptor Streams: fd streams.
 @end menu
 
 @anchor{Variable sb-ext *posix-argv*}
@@ -2083,7 +2084,6 @@ Create an @code{fd-stream} for the given Unix file descriptor @code{fd}.
 Return the Unix file descriptor associated with @code{fd-stream}.
 See the @code{fd} argument of @code{make-fd-stream}.
 @end deffn
-
 @node unicode support
 @cindex Unicode
 @section Unicode Support

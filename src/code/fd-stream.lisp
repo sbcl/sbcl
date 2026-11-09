@@ -177,6 +177,10 @@
                               ;; -3: can't be determined
                               (member -1 -2 -3))))
 
+(setf (documentation 'fd-stream-fd 'function)
+      "Return the Unix file descriptor associated with FD-STREAM.
+See the `FD` argument of MAKE-FD-STREAM.")
+
 (defun fd-stream-bivalent-p (stream)
   (eq (fd-stream-element-mode stream) :bivalent))
 
@@ -2544,26 +2548,6 @@
 
 ;;;; creation routines (MAKE-FD-STREAM and OPEN)
 
-;;; Create a stream for the given Unix file descriptor.
-;;;
-;;; If INPUT is non-NIL, allow input operations. If OUTPUT is non-nil,
-;;; allow output operations. If neither INPUT nor OUTPUT is specified,
-;;; default to allowing input.
-;;;
-;;; ELEMENT-TYPE indicates the element type to use (as for OPEN).
-;;;
-;;; BUFFERING indicates the kind of buffering to use.
-;;;
-;;; TIMEOUT (if true) is the number of seconds to wait for input. If
-;;; NIL (the default), then wait forever. When we time out, we signal
-;;; IO-TIMEOUT.
-;;;
-;;; FILE is the name of the file (will be returned by PATHNAME).
-;;;
-;;; NAME is used to identify the stream when printed.
-;;;
-;;; If SERVE-EVENTS is true, SERVE-EVENT machinery is used to
-;;; handle blocking IO on the stream.
 (defun make-fd-stream (fd
                        &key
                        (class 'fd-stream)
@@ -2584,6 +2568,35 @@
                                  (format nil "file ~A" file)
                                  (format nil "descriptor ~W" fd)))
                        auto-close)
+  "Create an FD-STREAM for the given Unix file descriptor FD.
+
+  - If INPUT is non-NIL, allow input operations. If OUTPUT is non-nil,
+    allow output operations. If neither INPUT nor OUTPUT is specified,
+    default to allowing input.
+
+  - ELEMENT-TYPE indicates the element type to use (as for OPEN).
+
+  - BUFFERING indicates the kind of buffering to use. Acceptable
+    values for BUFFERING are :FULL, :LINE and :NONE, default is :FULL,
+    i.e. output is buffered till it is explicitly flushed using CLOSE
+    or FINISH-OUTPUT. (FORCE-OUTPUT forces some output to be flushed:
+    to ensure all buffered output is flushed use FINISH-OUTPUT.)
+
+  - TIMEOUT (if non-NIL) is the number of seconds to wait for input.
+    If NIL (the default), then wait forever. When we time out, we
+    signal IO-TIMEOUT.
+
+  - FILE is the name of the file (will be returned by PATHNAME on the
+    returned FD-STREAM).
+
+  - NAME is used to identify the stream when printed.
+
+  - If SERVE-EVENTS is true, SERVE-EVENT machinery is used to handle
+    blocking IO on the stream.
+
+  - If AUTO-CLOSE is true, the underlying OS socket is automatically
+    closed after the stream and the socket have been garbage
+    collected. Default is NIL."
   (declare (type index fd) (type (or real null) timeout)
            (type (member :none :line :full) buffering))
   ;; OPEN ensures that the external-format argument is OK before

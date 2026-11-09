@@ -8,13 +8,8 @@
   not allow Lisp control of the scheduler. This is found in the
   `SB-THREAD` package.
 
-  Threads are part of the default build on x86[-64]/ARM64 Linux and
-  Windows.
-
-  They are also supported on: x86[-64] Darwin (Mac OS X), x86[-64]
-  FreeBSD, x86 SunOS (Solaris), PPC Linux, ARM64 Linux, RISC-V Linux.
-  On these platforms threads must be explicitly enabled at build-time,
-  see `INSTALL` for directions."
+  Threads are one of the default @BUILD-OPTIONS on most major
+  architectures and supported on many others."
   (@threading-basics section)
   (@special-variables-in-threads section)
   (@atomic-operations section)

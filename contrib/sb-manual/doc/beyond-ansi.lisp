@@ -753,7 +753,8 @@
   (sb-ext:posix-environ function)
   (sb-ext:exit function)
   (@running-external-programs section)
-  (@signal-handling section))
+  (@signal-handling section)
+  (@fd-streams section))
 
 (defsection @running-external-programs (:title "Running External Programs")
   "External programs can be run with SB-EXT:RUN-PROGRAM.
@@ -832,6 +833,18 @@
       It is still safe to use SB-SYS:ENABLE-INTERRUPT, as that only
       affects the signals that are handled in Lisp."
   (sb-sys:interactive-interrupt condition))
+
+(defsection @fd-streams (:title "File Descriptor Streams"
+                         :concepts (("file descriptor stream")))
+  "Many of the UNIX system calls return file descriptors. Instead of
+  using other UNIX system calls to perform I/O on them, you can create
+  a SB-SYS:FD-STREAM around them. For example,
+  SB-BSD-SOCKETS:SOCKET-MAKE-STREAM and SB-SIMPLE-STREAMS:OPEN are
+  built using fd streams."
+  (sb-sys:fd-stream structure)
+  (sb-sys:fd-stream-p function)
+  (sb-sys:make-fd-stream function)
+  (sb-sys:fd-stream-fd function))
 
 (defsection @unicode-support (:title "Unicode Support"
                               :concepts (@unicode))

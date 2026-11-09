@@ -242,15 +242,24 @@
   :documentation
   "Enable low-level thread primitives support. See SB-MANUAL:@THREADING.
 
-  As of SBCL 2.6.9, threads are part of the default build on x86oid
-  Linux, Darwin, and Windows. In fact, threads are mandatory on
-  Windows. Other platforms that support them include FreeBSD, Solaris.")
+  Threads are on by default on
+
+  - x86 / x86-64 Linux, Darwin, and Windows,
+
+  - ARM64, RISC-V, and LoongArch64.
+
+  In fact, threads are mandatory on Windows.
+
+  Threading is generally supported on architectures with POSIX threads
+  except on ARM, SPARC, MIPS, ppc64 and on the DragonFly BSD operating
+  system.")
 
  (:sb-futex nil
   :retain nil
   :public t
   :documentation
-  "Use `futex`es as our locking primitive. Only available on Linux.")
+  "Use `futex`es as our locking primitive for lower-overhead
+  synchronization. Only available on Linux.")
 
  (:sb-package-locks t
   :retain t

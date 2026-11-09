@@ -277,10 +277,10 @@ the socket stream when trying to read from it.
 
 If AUTO-CLOSE is true, the underlying OS socket is automatically
 closed after the stream and the socket have been garbage collected.
-Default is false.
+Default is NIL.
 
 If SERVE-EVENTS is true, blocking IO on the socket will dispatch to
-the recursive event loop. Default is false.
+the recursive event loop. Default is NIL.
 
 The stream for SOCKET will be cached, and a second invocation of this
 method will return the same stream. This may lead to oddities if this
