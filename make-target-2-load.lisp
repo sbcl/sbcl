@@ -26,7 +26,8 @@
 
 (defun retained-features (value)
   (let ((feature-defs
-          (with-open-file (s "src/cold/base-target-features.lisp-expr")
+          (with-open-file (s (merge-pathnames "src/cold/base-target-features.lisp-expr"
+                                              *load-pathname*))
             (read s))))
     (loop for feature-def in feature-defs
           for feature-name = (first feature-def)
