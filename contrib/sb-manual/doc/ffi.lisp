@@ -624,22 +624,9 @@
   convention. This macro is handy for passing callbacks which close over
   Lisp values into C."
   (with-alien-callable macro)
-  "Note that the garbage collector moves objects and won't be able to fix
-  up any references in C variables. There are three mechanisms for
-  coping with this:
-
-  - On CheneyGC platforms, SB-EXT:PURIFY moves all live Lisp data into
-    static or read-only areas such that it will never be moved (or
-    freed) again in the life of the Lisp session.
-
-  - SB-SYS:WITH-PINNED-OBJECTS is a macro which arranges for some set
-    of objects to be pinned in memory for the dynamic extent of its
-    body forms. On ports which use the @GENERATIONAL-GC
-    (most, as of this writing) this affects exactly the specified
-    objects. On other ports it is implemented by turning off GC for
-    the duration (so could be said to have a whole-world granularity).
-
-  - Disable GC, using the SB-EXT:WITHOUT-GCING macro."
+  "Note that the garbage collector moves objects and won't be able to
+  fix up any references in C variables. See @CONTROLLING-GC for how to
+  cope with this."
   (@lisp-as-a-shared-library section))
 
 (defsection @lisp-as-a-shared-library (:title "Lisp as a Shared Library")

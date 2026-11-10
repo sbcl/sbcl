@@ -1051,9 +1051,16 @@ Lisp extension proposal by David N. Gray")
            "NOTE-LOCAL-ALIEN-TYPE"
            "PARSE-ALIEN-TYPE" "UNPARSE-ALIEN-TYPE"))
 
+;;; DON'T ADD MORE PRIVATE STUFF TO THIS MESS. This package is
+;;; effectively public, as too many publicly documented things live in
+;;; it. Unfortunately, it also has many private things. We can't move
+;;; the public things without breaking compatibility, but maybe we
+;;; should remove private stuff. -- MG, 2026-10-10
 (defpackage "SB-SYS"
   (:documentation
-   "private: In theory, this \"contains functions and information
+   "private except for things documented in the user manual
+
+In theory, this \"contains functions and information
 necessary for system interfacing\" (said cmu-user.tex at the time of
 the SBCL code fork). That probably was and is a good idea, but in
 practice, the distinctions between this package and `SB-KERNEL` and even
@@ -2413,8 +2420,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "LONG-FLOAT-MID-BITS"))
 
 (defpackage "SB-SEQUENCE"
-  (:documentation "semi-public: implements something which might eventually
-be submitted as a \\CDR")
+  (:documentation "public: this might eventually be submitted as a \\CDR")
   (:use)
   (:export "PROTOCOL-UNIMPLEMENTED"
            "PROTOCOL-UNIMPLEMENTED-OPERATION"
@@ -2488,7 +2494,7 @@ be submitted as a \\CDR")
 
 #+sb-eval
 (defpackage "SB-EVAL"
-  (:documentation "internal: the evaluator implementation used to execute code without compiling it.")
+  (:documentation "private: the evaluator implementation used to execute code without compiling it.")
   (:use "CL" "SB-KERNEL" "SB-EXT" "SB-INT")
   (:export "INTERPRETED-FUNCTION-NAME"
            "INTERPRETED-FUNCTION-DEBUG-NAME"
@@ -2913,7 +2919,7 @@ be submitted as a \\CDR")
 
 (defpackage "SB-VM"
   (:documentation
-   "internal: the default place to hide information about the hardware and data
+   "private: the default place to hide information about the hardware and data
 structure representations")
   (:use "CL" "SB-ALIEN" "SB-ALIEN-INTERNALS" "SB-ASSEM" "SB-C"
         "SB-EXT" "SB-INT" "SB-KERNEL" "SB-SYS" "SB-UNIX")
@@ -3499,7 +3505,7 @@ stuff like SB-DEBUG::*TRACED-FUNS*.")
            "SEMAPHORE-NOTIFICATION-STATUS"))
 
 (defpackage "SB-WALKER"
-  (:documentation "internal: a code walker used by PCL")
+  (:documentation "private: a code walker used by PCL")
   (:use "CL" "SB-INT" "SB-EXT")
   (:shadow "RECONS")
   (:export "DEFINE-WALKER-TEMPLATE"
@@ -3675,12 +3681,12 @@ package is deprecated in favor of SB-MOP.")
 
 (defpackage "SB-BROTHERTREE"
   (:use "CL" "SB-EXT" "SB-INT")
-  (:documentation "internal: 1-2-Brother tree")
+  (:documentation "private: 1-2-Brother tree")
   (:shadow "DELETE")
   (:export "INSERT" "DELETE" "FIND<=" "FIND>=" "FIND="))
 
 (defpackage "SB-LOCKLESS"
-  (:documentation "internal: lockfree lists")
+  (:documentation "private: lockfree lists")
   (:use "CL" "SB-INT" "SB-EXT" "SB-SYS" "SB-KERNEL")
   (:export "+TAIL+" "%NODE-NEXT" "GET-NEXT"
            "MAKE-SO-SET/STRING" "MAKE-SO-SET/FIXNUM" "MAKE-SO-SET/ADDR"
@@ -3694,7 +3700,7 @@ package is deprecated in favor of SB-MOP.")
 
 #+sb-fasteval
 (defpackage "SB-INTERPRETER"
-  (:documentation "internal: a new EVAL implementation with semantic preprocessing.")
+  (:documentation "private: a new EVAL implementation with semantic preprocessing.")
   (:use "CL" "SB-KERNEL" "SB-EXT" "SB-INT")
   (:import-from "SB-C"
                 "PARSE-EVAL-WHEN-SITUATIONS"

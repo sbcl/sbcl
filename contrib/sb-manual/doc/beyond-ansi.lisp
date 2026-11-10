@@ -271,6 +271,7 @@
   (@finalization section)
   (@weak-pointers section)
   (@gc-introspection-and-tuning section)
+  (@controlling-gc section)
   (@tracing-live-objects-back-to-roots section))
 
 (defsection @finalization (:title "Finalization"
@@ -306,8 +307,12 @@
   (sb-ext:generation-bytes-consed-between-gcs function)
   (sb-ext:generation-minimum-age-before-gc function)
   (sb-ext:generation-number-of-gcs function)
-  (sb-ext:generation-number-of-gcs-before-promotion function)
-  (sb-ext:purify function))
+  (sb-ext:generation-number-of-gcs-before-promotion function))
+
+(defsection @controlling-gc (:title "Controlling GC")
+  (sb-ext:purify function)
+  (sb-sys:with-pinned-objects macro)
+  (sb-sys:without-gcing macro))
 
 (defsection @tracing-live-objects-back-to-roots
     (:title "Tracing Live Objects Back to Roots")
