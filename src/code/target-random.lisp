@@ -132,8 +132,8 @@ See SB-EXT:SEED-RANDOM-STATE for a SBCL extension to this functionality."
       (fallback-random-seed)))
 
 (defun seed-random-state (&optional state)
-  "Make a random state object. The optional STATE argument specifies a seed
-for deterministic pseudo-random number generation.
+  "Make a RANDOM-STATE object. The optional STATE argument specifies a
+seed for deterministic pseudo-random number generation.
 
 As per the Common Lisp standard for MAKE-RANDOM-STATE,
 

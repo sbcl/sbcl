@@ -93,7 +93,7 @@ will be signalled when the core is saved -- this is orthogonal from DONT-SAVE."
     pathname))
 
 (defun unload-shared-object (pathname)
-  "Unloads the shared object loaded earlier using the designated PATHNAME with
+  "Unload the shared object loaded earlier using the designated PATHNAME with
 LOAD-SHARED-OBJECT, to the degree supported on the platform.
 
 Experimental."

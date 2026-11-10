@@ -339,7 +339,7 @@
 
 
 (defun emptyp (sequence)
-  "Returns T if SEQUENCE is an empty sequence and NIL
+  "Return T if SEQUENCE is an empty sequence and NIL
    otherwise. Signals an error if SEQUENCE is not a sequence."
   (declare (explicit-check sequence))
   (seq-dispatch-checking sequence
@@ -1199,7 +1199,7 @@ many elements are copied."
 
 
 (defmacro sb-sequence:dosequence ((element sequence &optional return) &body body)
-  "Executes BODY with ELEMENT subsequently bound to each element of
+  "Execute BODY with ELEMENT subsequently bound to each element of
   SEQUENCE, then returns RETURN."
   (multiple-value-bind (forms decls) (parse-body body nil)
     (once-only ((sequence sequence))
@@ -1241,7 +1241,7 @@ many elements are copied."
                (tagbody ,@forms))))))))
 
 (defmacro do-subsequence ((element sequence start end) &body body)
-  "Executes BODY with ELEMENT subsequently bound to each element of
+  "Execute BODY with ELEMENT subsequently bound to each element of
   SEQUENCE, then returns RETURN."
   (multiple-value-bind (forms decls) (parse-body body nil)
     (once-only ((sequence sequence)

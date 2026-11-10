@@ -1000,7 +1000,7 @@ core and return a descriptor to it."
         (setq val (logior (ash bits (* i sb-vm:n-word-bits)) val))))))
 
 (defun number-pair-to-core (first second type)
-  "Makes a number pair of TYPE (ratio or complex) and fills it in."
+  "Make a number pair of TYPE (ratio or complex) and fill it in."
   (let ((des (allocate-otherptr *dynamic* 3 type)))
     (write-wordindexed des 1 first)
     (write-wordindexed des 2 second)

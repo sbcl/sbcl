@@ -120,7 +120,7 @@
     (process-mandatory argtypes '())))
 
 (defun argtypes-variants (argtypes)
-  "Returns a list of lists of type specifiers such that each list of type
+  "Return a list of lists of type specifiers such that each list of type
 specifiers satisfies the argument type specification given by ARGTYPES."
   (multiple-value-bind (mandatory optional rest)
       (parse-argtypes argtypes)

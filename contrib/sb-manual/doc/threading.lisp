@@ -311,7 +311,7 @@
   However, when a region fills, a lock must be obtained while another
   is allocated, and when a collection is required, all processes are
   stopped. This is achieved by sending them signals, which may make
-  for interesting behaviour if they are interrupted in system calls.
+  for interesting behavior if they are interrupted in system calls.
   The streams interface is believed to handle the required system call
   restarting correctly, but this may be a consideration when making
   other blocking calls e.g. from foreign library code.

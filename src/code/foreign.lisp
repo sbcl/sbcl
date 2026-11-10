@@ -105,7 +105,7 @@
 )
 
 (defun find-foreign-symbol-address (name)
-  "Returns the address of the foreign symbol NAME, or NIL. Does not enter the
+  "Return the address of the foreign symbol NAME, or NIL. Does not enter the
 symbol in the linkage table, and never returns an address in the linkage-table."
   (find-dynamic-foreign-symbol-address name))
 
@@ -124,7 +124,7 @@ symbol in the linkage table, and never returns an address in the linkage-table."
 ;;; because the use is from a function named %FOREIGN-SYMBOL-POINTER which is
 ;;; documented to return "a pointer to a foreign symbol NAME." which this isn't.
 (defun foreign-symbol-address (name &optional datap)
-  "Returns the address of the foreign symbol NAME. DATAP must be true if the
+  "Return the address of the foreign symbol NAME. DATAP must be true if the
 symbol designates a variable.
 Returns a secondary value T for historical reasons.
 
@@ -134,7 +134,7 @@ Symbols are entered into the linkage-table if they aren't there already."
     (values (sb-vm::alien-linkage-index-to-addr index datap) t)))
 
 (defun foreign-symbol-sap (symbol &optional datap)
-  "Returns a SAP corresponding to the foreign symbol. DATAP must be true if the
+  "Return a SAP corresponding to the foreign symbol. DATAP must be true if the
 symbol designates a variable. May enter the symbol into the linkage-table."
   (let ((addr (foreign-symbol-address symbol datap)))
     (if datap ; return the real answer, not an address in the linkage table

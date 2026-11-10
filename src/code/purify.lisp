@@ -15,8 +15,8 @@
   (read-only-roots unsigned-long))
 
 (defun purify (&key root-structures environment-name)
-  "This function optimizes garbage collection by moving all currently live
-   objects into non-collected storage. ROOT-STRUCTURES is an optional list of
+  "Optimize garbage collection by moving all currently live objects into
+   non-collected storage. ROOT-STRUCTURES is an optional list of
    objects which should be copied first to maximize locality.
 
    DEFSTRUCT structures defined with the (:PURE T) option are moved into

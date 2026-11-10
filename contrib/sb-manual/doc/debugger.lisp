@@ -112,7 +112,7 @@
   following the normal rules (see @DEBUGGER-INVOCATION). In such
   nested debugger sessions, the prompt is `<frame>[<nesting-level>]`.
 
-  It is possible to override the normal printing behaviour in the
+  It is possible to override the normal printing behavior in the
   debugger by using the SB-EXT:*DEBUG-PRINT-VARIABLE-ALIST*."
   (sb-ext:*debug-print-variable-alist* variable))
 

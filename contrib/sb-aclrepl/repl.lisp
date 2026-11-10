@@ -89,7 +89,7 @@
         cmd)))
 
 (defun dispatch-command-line (input-stream)
-  "Processes an input line that starts with *command-char*"
+  "Process an input line that starts with *command-char*"
   (let* ((line (string-trim-whitespace (read-line input-stream)))
          (first-space-pos (position #\space line))
          (cmd-string (subseq line 1 first-space-pos))
@@ -226,7 +226,7 @@
   (gethash (string-downcase cmdstr) *cmd-table-hash*))
 
 (defun user-cmd= (c1 c2)
-  "Returns T if two user commands are equal"
+  "Return T if two user commands are equal."
   (and (eq (user-cmd-func c1) (user-cmd-func c2))
        (equal (user-cmd-args c1) (user-cmd-args c2))
        (equal (user-cmd-input c1) (user-cmd-input c2))))
@@ -307,7 +307,7 @@
 
 #+sb-thread
 (defun other-threads ()
-  "Returns a list of all threads except the current one"
+  "Return a list of all threads except the current one."
   (delete sb-thread:*current-thread* (all-threads)))
 
 (defun exit-cmd (&optional (status 0))
@@ -378,12 +378,12 @@
   (and (numberp x) (numberp y) (> x y)))
 
 (defun newer-file-p (file1 file2)
-  "Is file1 newer (written later than) file2?"
+  "Is FILE1 newer (written later than) FILE2?"
   (>-num (if (probe-file file1) (file-write-date file1))
          (if (probe-file file2) (file-write-date file2))))
 
 (defun compile-file-as-needed (src-path)
-  "Compiles a file if needed, returns path."
+  "Compile a file if needed. Returns SRC-PATH."
   (let ((dest-path (compile-file-pathname src-path)))
     (when (or (not (probe-file dest-path))
               (newer-file-p src-path dest-path))

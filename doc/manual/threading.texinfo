@@ -88,7 +88,7 @@ True if @code{thread}, defaulting to current thread, is the main thread of the p
 @anchor{Function sb-thread main-thread}
 @ffindex @sortas{main-thread sb-thread} main-thread [sb-thread]
 @deffn{Function} sb-thread:main-thread
-Returns the main thread of the process.
+Return the main thread of the process.
 @end deffn
 @node running threads
 @subsection Running Threads
@@ -107,7 +107,7 @@ terminates the thread.
 @anchor{Macro sb-thread return-from-thread}
 @ffindex @sortas{return-from-thread sb-thread} return-from-thread [sb-thread]
 @deffn{Macro} sb-thread:return-from-thread values-form &key allow-exit
-Unwinds from and terminates the current thread, with values from
+Unwind from and terminate the current thread, with values from
 @code{values-form} as the results visible to @code{join-thread}.
 
 If current thread is the main thread of the process (see
@@ -119,7 +119,7 @@ calling @code{sb-ext:exit} with @code{:code} 0 and @code{:abort} @code{nil}.
 @anchor{Function sb-thread abort-thread}
 @ffindex @sortas{abort-thread sb-thread} abort-thread [sb-thread]
 @deffn{Function} sb-thread:abort-thread &key allow-exit
-Unwinds from and terminates the current thread abnormally, causing
+Unwind from and terminate the current thread abnormally, causing
 @code{join-thread} on current thread to signal an error unless a
 default-value is provided.
 
@@ -310,7 +310,7 @@ mechanism for inter-thread communication.
 @anchor{Condition sb-thread thread-error}
 @ttindex @sortas{thread-error sb-thread} thread-error [sb-thread]
 @deffn{Condition} sb-thread:thread-error
-Conditions of type @code{thread-error} are signalled when thread operations fail.
+Signalled when thread operations fail.
 The offending thread is initialized by the @code{:thread} initialization argument and
 read by the function @code{thread-error-thread}.
 @end deffn
@@ -471,7 +471,7 @@ Works on all @code{cas}able places.
 @anchor{Macro sb-ext atomic-update}
 @ffindex @sortas{atomic-update sb-ext} atomic-update [sb-ext]
 @deffn{Macro} sb-ext:atomic-update place update-fn &rest arguments
-Updates @code{place} atomically to the value returned by calling function
+Update @code{place} atomically to the value returned by calling function
 designated by @code{update-fn} with @code{arguments} and the previous value of @code{place}.
 
 @code{place} may be read and @code{update-fn} evaluated and called multiple times before the
@@ -773,7 +773,7 @@ Create a semaphore with the supplied @code{count} and @code{name}.
 @ffindex @sortas{signal-semaphore sb-thread} signal-semaphore [sb-thread]
 @deffn{Function} sb-thread:signal-semaphore semaphore &optional (n 1)
 Increment the count of @code{semaphore} by @code{n}. If there are threads waiting
-on this semaphore, then @code{n} of them is woken up.
+on this semaphore, then wake up @code{n} of them.
 @end deffn
 @anchor{Function sb-thread wait-on-semaphore}
 @ffindex @sortas{wait-on-semaphore sb-thread} wait-on-semaphore [sb-thread]
@@ -805,7 +805,7 @@ the status is set to @code{t}.
 @anchor{Function sb-thread semaphore-count}
 @ffindex @sortas{semaphore-count sb-thread} semaphore-count [sb-thread]
 @deffn{Function} sb-thread:semaphore-count semaphore
-Returns the current count of @code{semaphore}.
+Return the current count of @code{semaphore}.
 @end deffn
 @anchor{Function sb-thread semaphore-name}
 @ffindex @sortas{semaphore-name sb-thread} semaphore-name [sb-thread]
@@ -828,14 +828,14 @@ is initially @code{nil}.
 @anchor{Function sb-thread semaphore-notification-status}
 @ffindex @sortas{semaphore-notification-status sb-thread} semaphore-notification-status [sb-thread]
 @deffn{Function} sb-thread:semaphore-notification-status semaphore-notification
-Returns @code{t} if a @code{wait-on-semaphore} or @code{try-semaphore} using
+Return @code{t} if a @code{wait-on-semaphore} or @code{try-semaphore} using
 @code{semaphore-notification} has succeeded since the notification object was created
 or cleared.
 @end deffn
 @anchor{Function sb-thread clear-semaphore-notification}
 @ffindex @sortas{clear-semaphore-notification sb-thread} clear-semaphore-notification [sb-thread]
 @deffn{Function} sb-thread:clear-semaphore-notification semaphore-notification
-Resets the @code{semaphore-notification} object for use with another call to
+Reset the @code{semaphore-notification} object for use with another call to
 @code{wait-on-semaphore} or @code{try-semaphore}.
 @end deffn
 @node waitqueues and condition variables
@@ -1126,7 +1126,7 @@ each thread has its own region so this involves no stopping.
 However, when a region fills, a lock must be obtained while another
 is allocated, and when a collection is required, all processes are
 stopped. This is achieved by sending them signals, which may make
-for interesting behaviour if they are interrupted in system calls.
+for interesting behavior if they are interrupted in system calls.
 The streams interface is believed to handle the required system call
 restarting correctly, but this may be a consideration when making
 other blocking calls e.g. from foreign library code.

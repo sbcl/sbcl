@@ -44,16 +44,16 @@ Use ENQUEUE to add objects to the queue, and DEQUEUE to remove them."
 (declaim (sb-ext:freeze-type queue))
 
 (setf (documentation 'queuep 'function)
-      "Returns true if argument is a QUEUE, NIL otherwise."
+      "Return true if argument is a QUEUE, NIL otherwise."
       (documentation 'queue-name 'function)
-      "Name of a QUEUE. Can be assigned to using SETF. Queue names
-can be arbitrary printable objects, and need not be unique.")
+      "Name of a QUEUE. SETFable. Queue names can be arbitrary printable
+objects, and need not be unique.")
 
 (declaim (ftype (sfunction (&key (:name t)
                                  (:initial-contents sequence)) queue)
                 make-queue))
 (defun make-queue (&key name initial-contents)
-  "Returns a new QUEUE with NAME and contents of the INITIAL-CONTENTS
+  "Return a new QUEUE with NAME and contents of the INITIAL-CONTENTS
 sequence enqueued."
   (let* ((dummy (cons +dummy+ nil))
          (queue (%make-queue dummy dummy name)))
@@ -66,7 +66,7 @@ sequence enqueued."
 
 (declaim (ftype (sfunction (t queue) t) enqueue))
 (defun enqueue (value queue)
-  "Adds VALUE to the end of QUEUE. Returns VALUE."
+  "Add VALUE to the end of QUEUE. Returns VALUE."
   ;; Attempt CAS, repeat upon failure. Upon success update QUEUE-TAIL.
   (declare (optimize speed))
   (let ((new (cons value nil)))
@@ -77,7 +77,7 @@ sequence enqueued."
 
 (declaim (ftype (sfunction (queue) (values t boolean)) dequeue))
 (defun dequeue (queue)
-  "Retrieves the oldest value in QUEUE and returns it as the primary value,
+  "Retrieve the oldest value in QUEUE and returns it as the primary value,
 and T as secondary value. If the queue is empty, returns NIL as both primary
 and secondary value."
   ;; Attempt to CAS QUEUE-HEAD with the next node, repeat upon
@@ -114,7 +114,7 @@ and secondary value."
 
 (declaim (ftype (sfunction (queue) list) list-queue-contents))
 (defun list-queue-contents (queue)
-  "Returns the contents of QUEUE as a list without removing them from the
+  "Return the contents of QUEUE as a list without removing them from the
 QUEUE. Mainly useful for manual examination of queue state, as the list may be
 out of date by the time it is returned, and concurrent dequeue operations may
 in the worse case force the queue-traversal to be restarted several times."
@@ -127,7 +127,7 @@ in the worse case force the queue-traversal to be restarted several times."
 
 (declaim (ftype (sfunction (queue) unsigned-byte) queue-count))
 (defun queue-count (queue)
-  "Returns the number of objects in QUEUE. Mainly useful for manual
+  "Return the number of objects in QUEUE. Mainly useful for manual
 examination of queue state, and in PRINT-OBJECT methods: inefficient as it
 must walk the entire queue."
   (tagbody
@@ -142,7 +142,7 @@ must walk the entire queue."
 
 (declaim (ftype (sfunction (queue) boolean) queue-empty-p))
 (defun queue-empty-p (queue)
-  "Returns T if QUEUE is empty, NIL otherwise."
+  "Return T if QUEUE is empty, NIL otherwise."
   (null (cdr (queue-head queue))))
 
 ;;; Experimental support for compiling in the background.

@@ -27,7 +27,7 @@ Unixlike platform". This is section 2 of the Unix manual, plus
 section 3 calls that are (a) typically found in libc, but (b) not
 part of the C standard. For example, we intend to provide support
 for @code{opendir(3)} and @code{readdir(3)} but not for @code{printf(3)}. That
-said, if your favourite system call is not included yet, you are
+said, if your favorite system call is not included yet, you are
 encouraged to submit a patch to the SBCL mailing list.
 
 Some facilities are omitted where they offer absolutely no
@@ -264,12 +264,12 @@ counterparts.
 @anchor{Function sb-posix getcwd}
 @ffindex @sortas{getcwd sb-posix} getcwd [sb-posix]
 @deffn{Function} sb-posix:getcwd
-Returns the process's current working directory as a string.
+Return the OS process's current working directory as a string.
 @end deffn
 @anchor{Function sb-posix readlink}
 @ffindex @sortas{readlink sb-posix} readlink [sb-posix]
 @deffn{Function} sb-posix:readlink pathspec
-Returns the resolved target of a symbolic link as a string.
+Return the resolved target of a symbolic link as a string.
 @end deffn
 @anchor{Function sb-posix syslog}
 @ffindex @sortas{syslog sb-posix} syslog [sb-posix]

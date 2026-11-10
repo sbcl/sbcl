@@ -25,7 +25,7 @@ If ENVIRONMENT is provided, the FORM is first macroexpanded in it."
 
 (declaim (inline constant-form-value))
 (defun constant-form-value (form &optional (environment nil envp))
-  "Returns the value of the constant FORM in ENVIRONMENT. Behaviour
+  "Return the value of the constant FORM in ENVIRONMENT. Behaviour
 is undefined unless CONSTANTP has been first used to determine the
 constantness of the FORM in ENVIRONMENT."
   (%constant-form-value form environment envp))

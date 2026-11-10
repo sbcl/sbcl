@@ -1765,7 +1765,7 @@ of specialized arrays is supported."
 ;;; User visible extension
 (declaim (ftype (sfunction (array) (simple-array * (*))) array-storage-vector))
 (defun array-storage-vector (array)
-  "Returns the underlying storage vector of ARRAY, which must be a non-displaced array.
+  "Return the underlying storage vector of ARRAY, which must be a non-displaced array.
 
 In SBCL, if ARRAY is a of type \(SIMPLE-ARRAY * \(*)), it is its own storage
 vector. Multidimensional arrays, arrays with fill pointers, and adjustable
@@ -1989,7 +1989,7 @@ ARRAY, which this function returns.
 ) ; end MACROLET
 
 (defun bit-not (bit-array &optional result-bit-array)
-  "Performs a bit-wise logical NOT on the elements of BIT-ARRAY,
+  "Perform a bit-wise logical NOT on the elements of BIT-ARRAY,
   putting the results in RESULT-BIT-ARRAY. If RESULT-BIT-ARRAY is T,
   BIT-ARRAY is used. If RESULT-BIT-ARRAY is NIL or omitted, a new array is
   created. Both arrays must have the same rank and dimensions."

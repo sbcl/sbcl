@@ -114,7 +114,7 @@
                                          form &body body)
   "Resolves potential name conflict condition arising from FORM.
 
-The conflict is resolved in favour of SYMBOL, a form which must
+The conflict is resolved in favor of SYMBOL, a form which must
 evaluate to a symbol.
 
 If RESTARTED is a symbol, it is bound for the BODY forms and set to T

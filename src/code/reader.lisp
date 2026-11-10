@@ -249,12 +249,16 @@
 
 (declaim (inline readtable-normalization))
 (defun readtable-normalization (readtable)
-  "Returns T if READTABLE normalizes symbols to SB-MANUAL::@NFKC, and NIL
-otherwise. The READTABLE-NORMALIZATION of the standard readtable is T."
+  "Return T if READTABLE normalizes symbols to NFKC, and NIL otherwise.
+This is true by default in Unicode builds. SETFable.
+
+Symbols created by INTERN and similar functions are not affected by
+this setting. If SB-EXT:READTABLE-NORMALIZATION is T, symbols that are
+not normalized are escaped during printing."
   (%readtable-normalization readtable))
 
 (defun (setf readtable-normalization) (new-value readtable)
-  "Sets the READTABLE-NORMALIZATION of the given READTABLE to NEW-VALUE.
+  "Set the READTABLE-NORMALIZATION of the given READTABLE to NEW-VALUE.
 Pass T to make READTABLE normalize symbols to NFKC (the default behavior),
 and NIL to suppress normalization."
   ;; This function does not accept a readtable designator, only a readtable.
@@ -262,7 +266,7 @@ and NIL to suppress normalization."
   (setf (%readtable-normalization readtable) new-value))
 
 (defun readtable-base-char-preference (readtable)
-  "Returns :SYMBOLS, :STRINGS, :BOTH, or NIL, depending on whether the
+  "Return :SYMBOLS, :STRINGS, :BOTH, or NIL, depending on whether the
 reader should try to intern a base-string when reading a symbol name,
 respectively produce a base-string when reading a quoted string, or in both
 cases, or neither. The preference applies when a symbol-name or string
@@ -277,7 +281,7 @@ be interned (returned, respectively) as required. The default is :SYMBOLS."
 
 (defun (setf readtable-base-char-preference) (new-value readtable)
   (declare (type (member :symbols :strings :both nil) new-value))
-  "Sets the READTABLE-BASE-CHAR-PREFERENCE of the given READTABLE."
+  "Set the READTABLE-BASE-CHAR-PREFERENCE of the given READTABLE."
   (assert-not-standard-readtable readtable '(setf readtable-base-char-preference))
   (setf (%readtable-symbol-preference readtable)
         (if (member new-value '(:symbols :both)) 'base-char 'character)
@@ -314,10 +318,10 @@ be interned (returned, respectively) as required. The default is :SYMBOLS."
         entry)))
 
 (defun copy-readtable (&optional (from-readtable *readtable*) to-readtable)
-  "Copies FROM-READTABLE and returns the result. Uses TO-READTABLE as a target
-for the copy when provided, otherwise a new readtable is created. The
-FROM-READTABLE defaults to the standard readtable when NIL and to the current
-readtable when not provided."
+  "Copy FROM-READTABLE and return the result. Uses TO-READTABLE as a
+target for the copy when provided, otherwise a new readtable is
+created. The FROM-READTABLE defaults to the standard readtable when
+NIL and to the current readtable when not provided."
   (assert-not-standard-readtable to-readtable 'copy-readtable)
   (let ((really-from-readtable (or from-readtable *standard-readtable*))
         (really-to-readtable (or to-readtable (make-readtable))))
@@ -351,7 +355,7 @@ readtable when not provided."
 
 (defun set-syntax-from-char (to-char from-char &optional
                              (to-readtable *readtable*) (from-readtable nil))
-  "Causes the syntax of TO-CHAR in TO-READTABLE to be the same as
+  "Set the syntax of TO-CHAR in TO-READTABLE to be the same as
 FROM-CHAR in FROM-READTABLE. TO-READTABLE defaults to *READTABLE*, and
 FROM-READTABLE defaults to the standard Lisp readtable when NIL."
   ;; TO-READTABLE is a readtable, not a readtable-designator
@@ -366,9 +370,9 @@ FROM-READTABLE defaults to the standard Lisp readtable when NIL."
 (defun set-macro-character (char function &optional
                                  (non-terminatingp nil)
                                  (rt-designator *readtable*))
-  "Causes CHAR to be a macro character which invokes FUNCTION when seen
-   by the reader. The NON-TERMINATINGP flag can be used to make the macro
-   character non-terminating, i.e. embeddable in a symbol name."
+  "Set CHAR to be a macro character that invokes FUNCTION when seen
+  by the reader. The NON-TERMINATINGP flag can be used to make the
+  macro character non-terminating, i.e. embeddable in a symbol name."
   (let ((designated-readtable (or rt-designator *standard-readtable*)))
     (assert-not-standard-readtable designated-readtable 'set-macro-character)
     (assign-char-syntax
@@ -412,9 +416,9 @@ FROM-READTABLE defaults to the standard Lisp readtable when NIL."
                                       (non-terminating-p nil)
                                       (rt *readtable*)
                                       &aux (function (get-cmt-entry char rt)))
-  "Cause CHAR to become a dispatching macro character in readtable (which
-   defaults to the current readtable). If NON-TERMINATING-P, the char will
-   be non-terminating."
+  "Make CHAR a dispatching macro character in readtable (which
+  defaults to the current readtable). If NON-TERMINATING-P, the char
+  will be non-terminating."
   ;; Punting to SET-MACRO-CHARACTER is the best way to set the syntax whether changed or not
   (set-macro-character
      char
@@ -429,7 +433,7 @@ FROM-READTABLE defaults to the standard Lisp readtable when NIL."
 (defun set-dispatch-macro-character (disp-char sub-char function
                                      &optional (rt-designator *readtable*))
   "Cause FUNCTION to be called whenever the reader reads DISP-CHAR
-   followed by SUB-CHAR."
+  followed by SUB-CHAR."
   (when (digit-char-p sub-char)
     (error "SUB-CHAR must not be a decimal digit: ~S" sub-char))
   (let* ((sub-char (char-upcase sub-char))

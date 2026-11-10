@@ -3,7 +3,7 @@
 (in-package "SB-VM")
 
 (defun machine-type ()
-  "Returns a string describing the type of the local machine."
+  "Return a string describing the type of the local machine."
   #-64-bit "PowerPC"
   #+64-bit "PowerPC64")
 

@@ -151,7 +151,8 @@
     (inst* op src temp 0)))
 
 (defmacro load-type (target source &optional (offset 0))
-;  "Loads the type bits of a pointer into target independent of byte-ordering issues."
+  ;; Load the type bits of a pointer into target independent of
+  ;; byte-ordering issues.
   `(inst ld.bu ,target ,source ,offset))
 
 (defun three-way-comparison (x y condition flavor not-p target)

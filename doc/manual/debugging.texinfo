@@ -151,7 +151,7 @@ The debugger can be invoked again within a debugger session
 following the normal rules (see @ref{debugger invocation}). In such
 nested debugger sessions, the prompt is @code{<frame>[<nesting-level>]}.
 
-It is possible to override the normal printing behaviour in the
+It is possible to override the normal printing behavior in the
 debugger by using the @code{sb-ext:*debug-print-variable-alist*}.
 
 @anchor{Variable sb-ext *debug-print-variable-alist*}
@@ -1158,11 +1158,11 @@ re-enable them).
 @anchor{Function sb-ext disable-debugger}
 @ffindex @sortas{disable-debugger sb-ext} disable-debugger [sb-ext]
 @deffn{Function} sb-ext:disable-debugger
-When invoked, this function will turn off both the @ref{debugger}
-and @ref{ldb} (the low-level debugger), similar to specifying
-@code{--disable-debugger} (see @ref{toplevel options}) and
-@code{--disable-ldb} (see @ref{runtime options}) on the command line.
-See also @code{enable-debugger}.
+Turn off both the @ref{debugger} and @ref{ldb} (the
+low-level debugger), similar to specifying @code{--disable-debugger} (see
+@ref{toplevel options}) and @code{--disable-ldb} (see
+@ref{runtime options}) on the command line. See also
+@code{enable-debugger}.
 @end deffn
 @anchor{Function sb-ext enable-debugger}
 @ffindex @sortas{enable-debugger sb-ext} enable-debugger [sb-ext]

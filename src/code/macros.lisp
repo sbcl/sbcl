@@ -405,9 +405,9 @@ tree structure resulting from the evaluation of EXPRESSION."
 ;;;; DEFGLOBAL and DEFINE-LOAD-TIME-GLOBAL
 
 (sb-xc:defmacro defglobal (name value &optional (doc nil docp))
-  "Defines NAME as a global variable that is always bound. VALUE is evaluated
-and assigned to NAME both at compile- and load-time but only if NAME
-is not already bound.
+  "Define NAME as a global variable that is always bound. VALUE is
+evaluated and assigned to NAME both at compile- and load-time but only
+if NAME is not already bound.
 
 Global variables share their values between all threads. They cannot
 be locally bound, declared special, defined as constants, or defined
@@ -427,8 +427,9 @@ See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
                    ,@(and docp `(',doc))))))
 
 (sb-xc:defmacro define-load-time-global (name value &optional (doc nil docp))
-  "Defines NAME as a global variable that is always bound. VALUE is evaluated
-and assigned to NAME at load-time, but only if NAME is not already bound.
+  "Define NAME as a global variable that is always bound. VALUE is
+evaluated and assigned to NAME at load-time, but only if NAME is not
+already bound.
 
 Attempts to read NAME at compile-time will signal an UNBOUND-VARIABLE error
 unless it has otherwise been assigned a value.
@@ -650,7 +651,8 @@ evaluated as a PROGN."
 ;;; needed.
 (sb-xc:defmacro assert (test-form &optional places datum &rest arguments
                             &environment env)
-  "Signals an error if the value of TEST-FORM is NIL. Returns NIL.
+  "Signal an error if the value of TEST-FORM is NIL. If the condition is
+   not handled, return NIL.
 
    Optional DATUM and ARGUMENTS can be used to change the signaled
    error condition and are interpreted as in (APPLY #'ERROR DATUM
@@ -2113,7 +2115,7 @@ EXPERIMENTAL: Interface subject to change."
   (expand-atomic-frob 'atomic-decf place diff env))
 
 (sb-xc:defmacro atomic-update (place update-fn &rest arguments &environment env)
-  "Updates PLACE atomically to the value returned by calling function
+  "Update PLACE atomically to the value returned by calling function
 designated by UPDATE-FN with ARGUMENTS and the previous value of PLACE.
 
 PLACE may be read and UPDATE-FN evaluated and called multiple times before the

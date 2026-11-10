@@ -28,7 +28,7 @@
                        ~S.~@:>"
                operation datum 'sequence (class-of datum)))))
   (:documentation
-   "This error is signaled if a sequence operation is applied to an
+   "Signaled if a sequence operation is applied to an
    instance of a sequence class that does not support the
    operation."))
 
@@ -43,7 +43,7 @@
   (:method ((s vector)) (zerop (length s)))
   (:method ((s sequence)) (zerop (length s)))
   (:documentation
-   "Returns T if SEQUENCE is an empty sequence and NIL
+   "Return T if SEQUENCE is an empty sequence and NIL
    otherwise. Signals an error if SEQUENCE is not a sequence."))
 
 (defgeneric sequence:length (sequence)
@@ -52,7 +52,7 @@
   (:method ((s sequence))
     (sequence:protocol-unimplemented 'sequence:length s))
   (:documentation
-   "Returns the length of SEQUENCE or signals a
+   "Return the length of SEQUENCE or signals a
    SEQUENCE:PROTOCOL-UNIMPLEMENTED error if the sequence protocol is
    not implemented for the class of SEQUENCE."))
 
@@ -62,7 +62,7 @@
   (:method ((s sequence) index)
     (sequence:protocol-unimplemented 'sequence:elt s))
   (:documentation
-   "Returns the element at position INDEX of SEQUENCE or signals a
+   "Return the element at position INDEX of SEQUENCE or signals a
    SEQUENCE:PROTOCOL-UNIMPLEMENTED error if the sequence protocol is
    not implemented for the class of SEQUENCE."))
 
@@ -73,8 +73,8 @@
   (:method (new-value (s sequence) index)
     (sequence:protocol-unimplemented '(setf sequence:elt) s))
   (:documentation
-   "Replaces the element at position INDEX of SEQUENCE with NEW-VALUE
-   and returns NEW-VALUE or signals a SEQUENCE:PROTOCOL-UNIMPLEMENTED
+   "Replace the element at position INDEX of SEQUENCE with NEW-VALUE
+   and return NEW-VALUE or signal a SEQUENCE:PROTOCOL-UNIMPLEMENTED
    error if the sequence protocol is not implemented for the class of
    SEQUENCE."))
 
@@ -104,7 +104,7 @@
     (declare (ignore initial-element initial-contents))
     (sequence:protocol-unimplemented 'sequence:make-sequence-like s))
   (:documentation
-   "Returns a freshly allocated sequence of length LENGTH and of the
+   "Return a freshly allocated sequence of length LENGTH and of the
    same class as SEQUENCE. Elements of the new sequence are
    initialized to INITIAL-ELEMENT, if supplied, initialized to
    INITIAL-CONTENTS if supplied, or undefined if neither is supplied.
@@ -143,7 +143,7 @@
     (declare (ignore args))
     (sequence:protocol-unimplemented 'sequence:adjust-sequence s))
   (:documentation
-   "Returns destructively modified SEQUENCE or a freshly allocated
+   "Return destructively modified SEQUENCE or a freshly allocated
    sequence of the same class as SEQUENCE of length LENGTH. Elements
    of the returned sequence are initialized to INITIAL-ELEMENT, if
    supplied, initialized to INITIAL-CONTENTS if supplied, or identical
@@ -175,7 +175,7 @@
            :datum s
            :expected-type 'sequence))
   (:documentation
-   "Returns a sequence iterator for SEQUENCE or, if START and/or END
+   "Return a sequence iterator for SEQUENCE or, if START and/or END
    are supplied, the subsequence bounded by START and END as nine
    values:
 
@@ -301,7 +301,7 @@
           (values (1- end) (1- start) from-end)
           (values start end nil))))
   (:documentation
-   "Returns a sequence iterator for SEQUENCE, START, END and FROM-END
+   "Return a sequence iterator for SEQUENCE, START, END and FROM-END
    as three values:
 
    1. iterator state
@@ -328,7 +328,7 @@
         (1- iterator)
         (1+ iterator)))
   (:documentation
-   "Moves ITERATOR one position forward or backward in SEQUENCE
+   "Move ITERATOR one position forward or backward in SEQUENCE
    depending on the iteration direction encoded in FROM-END."))
 
 (defgeneric sequence:iterator-endp (sequence iterator limit from-end)
@@ -339,7 +339,7 @@
   (:method ((s sequence) iterator limit from-end)
     (= iterator limit))
   (:documentation
-   "Returns non-NIL when ITERATOR has reached LIMIT (which may
+   "Return non-NIL when ITERATOR has reached LIMIT (which may
    correspond to the end of SEQUENCE) with respect to the iteration
    direction encoded in FROM-END."))
 
@@ -351,7 +351,7 @@
   (:method ((s sequence) iterator)
     (sequence:elt s iterator))
   (:documentation
-   "Returns the element of SEQUENCE associated to the position of
+   "Return the element of SEQUENCE associated to the position of
    ITERATOR."))
 
 (defgeneric (setf sequence:iterator-element) (new-value sequence iterator)
@@ -373,14 +373,14 @@
   (:method ((s vector) iterator) iterator)
   (:method ((s sequence) iterator) iterator)
   (:documentation
-   "Returns the position of ITERATOR in SEQUENCE."))
+   "Return the position of ITERATOR in SEQUENCE."))
 
 (defgeneric sequence:iterator-copy (sequence iterator)
   (:method ((s list) iterator) iterator)
   (:method ((s vector) iterator) iterator)
   (:method ((s sequence) iterator) iterator)
   (:documentation
-   "Returns a copy of ITERATOR which also traverses SEQUENCE but can
+   "Return a copy of ITERATOR which also traverses SEQUENCE but can
    be mutated independently of ITERATOR."))
 
 (defun %make-sequence-iterator (sequence from-end start end)
@@ -398,7 +398,7 @@
       &optional iterator limit from-end-p
                 step endp element set-element index copy)
      (sequence &key from-end (start 0) end) &body body)
-  "Executes BODY with the elements of VARS bound to the iteration
+  "Execute BODY with the elements of VARS bound to the iteration
   state returned by SEQUENCE:MAKE-SEQUENCE-ITERATOR for SEQUENCE and
   ARGS. Elements of VARS may be NIL in which case the corresponding
   value returned by SEQUENCE:MAKE-SEQUENCE-ITERATOR is ignored."
@@ -420,7 +420,7 @@
     ((&optional step endp elt setf index copy)
      (sequence &rest args &key from-end start end)
      &body body)
-  "Executes BODY with the names STEP, ENDP, ELT, SETF, INDEX and COPY
+  "Execute BODY with the names STEP, ENDP, ELT, SETF, INDEX and COPY
 bound to local functions which execute the iteration state query and
 mutation functions returned by SEQUENCE:MAKE-SEQUENCE-ITERATOR for
 SEQUENCE and ARGS. When some names are not supplied or NIL is supplied

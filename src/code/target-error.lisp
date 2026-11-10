@@ -155,7 +155,7 @@ with that condition (or with no condition) will be returned."
              :format-arguments (list identifier condition))))
 
 (defun invoke-restart (restart &rest values)
-  "Calls the function associated with the given restart, passing any given
+  "Call the function associated with the given restart, passing any given
    arguments. If the argument restart is not a restart or a currently active
    non-nil restart name, then a CONTROL-ERROR is signalled."
   (/show "entering INVOKE-RESTART" restart)
@@ -193,7 +193,7 @@ with that condition (or with no condition) will be returned."
         '())))
 
 (defun invoke-restart-interactively (restart)
-  "Calls the function associated with the given restart, prompting for any
+  "Call the function associated with RESTART, prompting for any
    necessary arguments. If the argument restart is not a restart or a
    currently active non-NIL restart name, then a CONTROL-ERROR is signalled."
   ;; For an explanation of the call to FIND-RESTART-OR-CONTROL-ERROR,
@@ -2159,16 +2159,16 @@ return NIL if none exists."))
                  ,doc
                  (invoke-restart (find-restart-or-control-error ',name condition)))))
   (def step-continue
-      "Transfers control to the STEP-CONTINUE restart associated with
+      "Transfer control to the STEP-CONTINUE restart associated with
 the condition, continuing execution without stepping. Signals a
 CONTROL-ERROR if the restart does not exist.")
   (def step-next
-      "Transfers control to the STEP-NEXT restart associated with the
+      "Transfer control to the STEP-NEXT restart associated with the
 condition, executing the current form without stepping and continuing
 stepping with the next form. Signals CONTROL-ERROR if the restart does
 not exist.")
   (def step-into
-      "Transfers control to the STEP-INTO restart associated with the
+      "Transfer control to the STEP-INTO restart associated with the
 condition, stepping into the current form. Signals a CONTROL-ERROR if
 the restart does not exist."))
 

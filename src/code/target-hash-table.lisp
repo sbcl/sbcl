@@ -716,8 +716,8 @@
   name)
 
 (defmacro define-hash-table-test (name hash-function)
-  "Defines NAME as a new kind of hash table test for use with the :TEST
-argument to MAKE-HASH-TABLE, and associates a default HASH-FUNCTION with it.
+  "Define NAME as a new kind of hash table test for use with the :TEST
+argument to MAKE-HASH-TABLE, and associate a default HASH-FUNCTION with it.
 
 NAME must be a symbol naming a global two argument equivalence predicate.
 Afterwards both 'NAME and #'NAME can be used with :TEST argument. In both
@@ -1164,7 +1164,7 @@ Examples:
       "Return the rehash-threshold HASH-TABLE was created with.")
 
 (setf (documentation 'hash-table-synchronized-p 'function)
-      "Returns T if HASH-TABLE is synchronized.")
+      "Return T if HASH-TABLE is synchronized.")
 
 (declaim (inline hash-table-pairs-capacity))
 (defun hash-table-pairs-capacity (pairs)
@@ -2048,9 +2048,8 @@ multiple threads accessing the same hash-table without locking."
             (values next-free hash)))))))
 
 (defun gethash (key hash-table &optional default)
-  "Finds the entry in HASH-TABLE whose key is KEY and returns the
-associated value and T as multiple values, or returns DEFAULT and NIL
-if there is no such entry. Entries can be added using SETF."
+  "Return the value associated with KEY in HASH-TABLE and T as the second
+value, or return DEFAULT and NIL if there is no such value. SETFable."
   (declare (type hash-table hash-table)
            (values t (member t nil)))
   (gethash3 key hash-table default))
@@ -3117,7 +3116,7 @@ there was such an entry, or NIL if not."
   (funcall (hash-table-remhash-impl hash-table) key hash-table))
 
 (defun clrhash (hash-table)
-  "This removes all the entries from HASH-TABLE and returns the hash
+  "Remove all the entries from HASH-TABLE and return the hash
 table itself."
   ;; This used to do nothing at all for tables that has a COUNT of 0,
   ;; but that wasn't quite right, because some steps below pertain to

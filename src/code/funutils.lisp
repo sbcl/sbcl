@@ -13,7 +13,7 @@
 (in-package "SB-IMPL")
 
 (defun identity (thing)
-  "This function simply returns what was passed to it."
+  "Return THING."
   thing)
 
 (defun complement (function)

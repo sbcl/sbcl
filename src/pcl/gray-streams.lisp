@@ -281,7 +281,7 @@
 
 (defgeneric stream-terpri (stream)
   (:documentation
-   "Writes an end of line, as for TERPRI. Returns NIL. The default
+   "Write an end of line, like TERPRI, and return NIL. The default
   method does (STREAM-WRITE-CHAR stream `#\\Newline`)."))
 
 (defmethod stream-terpri ((stream fundamental-character-output-stream))
@@ -289,7 +289,7 @@
 
 (defgeneric stream-fresh-line (stream)
   (:documentation
-   "Outputs a new line to the Stream if it is not positioned at the
+   "Output a new line to STREAM if it is not positioned at the
   beginning of a line. Returns T if it output a new line, nil
   otherwise. Used by FRESH-LINE. The default method uses
   STREAM-START-LINE-P and STREAM-TERPRI."))
@@ -301,7 +301,7 @@
 
 (defgeneric stream-finish-output (stream)
   (:documentation
-   "Attempts to ensure that all output sent to the Stream has reached
+   "Attempt to ensure that all output sent to STREAM has reached
   its destination, and only then returns false. Implements
   FINISH-OUTPUT. The default method does nothing."))
 
@@ -310,7 +310,7 @@
 
 (defgeneric stream-force-output (stream)
   (:documentation
-   "Attempts to force any buffered output to be sent. Implements
+   "Attempt to force any buffered output to be sent. Implements
   FORCE-OUTPUT. The default method does nothing."))
 
 (defmethod stream-force-output ((stream fundamental-output-stream))

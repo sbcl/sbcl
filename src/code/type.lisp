@@ -1877,7 +1877,7 @@
     (xform type-spec env #'values-specifier-type)))
 
 (defun typexpand-1 (type-specifier &optional env)
-  "Takes and expands a type specifier once like MACROEXPAND-1.
+  "Expand TYPE-SPECIFIER once like MACROEXPAND-1.
 Returns two values: the expansion, and a boolean that is true when
 expansion happened."
   (declare (type type-specifier type-specifier))
@@ -1897,7 +1897,7 @@ expansion happened."
         (values type-specifier nil))))
 
 (defun typexpand (type-specifier &optional env)
-  "Takes and expands a type specifier repeatedly like MACROEXPAND.
+  "Expand TYPE-SPECIFIER repeatedly like MACROEXPAND.
 Returns two values: the expansion, and a boolean that is true when
 expansion happened."
   ;; TYPE-SPECIFIER is of type TYPE-SPECIFIER, but it is preferable to

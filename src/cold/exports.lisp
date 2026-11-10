@@ -3641,7 +3641,7 @@ ISBN 0-262-61074-4, with exceptions as noted in the User Manual.")
 extensions, but even they are not guaranteed to be present in later
 versions of SBCL, and the other stuff in here is definitely not
 guaranteed to be present in later versions of SBCL.  Use of this
-package is deprecated in favour of SB-MOP.")
+package is deprecated in favor of SB-MOP.")
   (:use "CL" "SB-MOP" "SB-INT" "SB-EXT" "SB-WALKER" "SB-KERNEL")
   ;; experimental SBCL-only (for now) symbols
   (:export "SYSTEM-CLASS"

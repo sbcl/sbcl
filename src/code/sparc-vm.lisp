@@ -12,7 +12,7 @@
 
 ;;; See x86-vm.lisp for a description of this.
 (defun machine-type ()
-  "Returns a string describing the type of the local machine."
+  "Return a string describing the type of the local machine."
   "SPARC")
 
 (defun return-machine-address (scp)

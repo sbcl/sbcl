@@ -484,7 +484,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
         (__gmpz_add (addr result) (addr result) (addr gb))))))
 
 (defgmpfun mpz-divisible-p (n d)
-  "Returns T if (ZEROP (MOD N D))."
+  "Return T if (ZEROP (MOD N D))."
   (with-mpz-vars ((n gn) (d gd))
     (not
       (zerop

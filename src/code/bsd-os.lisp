@@ -29,7 +29,7 @@
   (newlen sb-unix:size-t))
 
 (defun sysctl (type &rest name)
-  "Retrieves an integer or string value with the given name."
+  "Retrieve an integer or string value with the given NAME."
   (let ((name-len (length name)))
     (when (> name-len ctl-maxname)
       (error "sysctl name ~S is too long" name))
@@ -55,7 +55,7 @@
 
 #+darwin
 (defun sysctlbyname (type name)
-  "Retrieves an integer or string value with the given name."
+  "Retrieve an integer or string value with the given NAME."
   (with-alien ((result-len sb-unix:size-t))
     (ecase type
       (:int

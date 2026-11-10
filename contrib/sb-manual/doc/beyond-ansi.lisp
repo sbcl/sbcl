@@ -514,7 +514,7 @@
 
       This is consistent with the description SB-MOP:ENSURE-CLASS in
       AMOP as the functional version of DEFCLASS, which has this
-      behaviour; however, it is not consistent with the weaker
+      behavior; however, it is not consistent with the weaker
       requirement in AMOP, which states that any class found by
       FIND-CLASS, no matter what its [CLASS-NAME][function], is
       redefined.
@@ -898,7 +898,7 @@
   that reads user input may be replaced completely. See the :TOPLEVEL
   argument of SB-EXT:SAVE-LISP-AND-DIE.
 
-  The behaviour of REQUIRE when called with only one argument is
+  The behavior of REQUIRE when called with only one argument is
   implementation-defined. In SBCL, REQUIRE behaves in the following
   way:"
   (require function)

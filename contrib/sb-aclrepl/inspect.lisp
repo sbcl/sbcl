@@ -502,13 +502,13 @@ POSITION is NIL if the id is invalid or not found."
          position)))))
 
 (defun inspected-elements (object &optional length (skip 0))
-  "Returns elements of an object that have been trimmed and labeled based on
-length and skip. Returns (VALUES ELEMENTS LABELS ELEMENT-COUNT)
-where ELEMENTS and LABELS are vectors containing ELEMENT-COUNT items.
-LABELS elements may be a string, number, cons pair, :tail, or :ellipses.
-This function may return an ELEMENT-COUNT of up to (+ 3 length) which would
-include an :ellipses at the beginning, :ellipses at the end,
-and the last element."
+  "Return elements of an object that have been trimmed and labeled based
+on length and skip as (VALUES ELEMENTS LABELS ELEMENT-COUNT) where
+ELEMENTS and LABELS are vectors containing ELEMENT-COUNT items. LABELS
+elements may be a STRING, NUMBER, CONS, :TAIL, or :ELLIPSES. This
+function may return an ELEMENT-COUNT of up to (+ 3 LENGTH), which
+would include an :ELLIPSES at the beginning, :ELLIPSES at the end, and
+the last element."
   (let* ((parts (inspected-parts object))
          (print-length (if length length (parts-count parts)))
          (last-part (last-part parts))
@@ -581,7 +581,7 @@ position with the label if the label is a string."
         id))))
 
 (defun array-index-string (index parts)
-  "Formats an array index in row major format."
+  "Format an array index in row major format."
   (let ((rev-dimensions (parts-seq-hint parts)))
     (if (null rev-dimensions)
         "[]"
@@ -646,8 +646,8 @@ position with the label if the label is a string."
       (inspected-description-of-nontrivial-list object)))
 
 (defun cons-safe-length (object)
-  "Returns (VALUES LENGTH LIST-TYPE) where length is the number of
-cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
+  "Return (VALUES LENGTH LIST-TYPE) where length is the number of
+cons cells and LIST-TYPE is :NORMAL, :DOTTED, or :CYCLIC."
     (do ((length 1 (1+ length))
          (lst (cdr object) (cdr lst)))
         ((or (not (consp lst))

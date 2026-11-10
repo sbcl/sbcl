@@ -16,7 +16,7 @@ framework is there, but many classes are just stubs at the moment.
 See @code{SYS:CONTRIB;SB-SIMPLE-STREAMS;SIMPLE-STREAM-TEST.LISP} for
 things that should work.
 
-Known differences to the ACL behaviour:
+Known differences to the ACL behavior:
 
 @itemize
 @item @code{sb-simple-streams:open} does not return a @code{simple-stream} by

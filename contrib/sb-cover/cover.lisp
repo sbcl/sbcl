@@ -738,8 +738,8 @@ The source locations are stored in (CAR SOURCE-MAP+IDGEN)"
         (setf *current-package* package)))))
 
 (defun look-for-in-package-form-in-stream (stream start-position end-position)
-  "Scans the stream between start-position up to end-position for
-   something that looks like an in-package form. If it does find
+  "Scan the stream between START-POSITION up to END-POSITION for
+   something that looks like an IN-PACKAGE form. If it does find
    something, the function updates *current-package*. In all cases,
    the stream is reset to end-position on exit."
   (assert (file-position stream start-position))  ; rewind the stream

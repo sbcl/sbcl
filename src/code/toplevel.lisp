@@ -248,8 +248,8 @@ means to wait indefinitely.")
   (sb-win32:millisleep (truncate (* seconds 1000))))
 
 (defun sleep (seconds)
-  "This function causes execution to be suspended for SECONDS. SECONDS may be
-any non-negative real number."
+  "Suspend execution of the current thread for SECONDS.
+SECONDS may be any non-negative real number."
   (declare (explicit-check))
   (when (or (not (realp seconds))
             (minusp seconds))

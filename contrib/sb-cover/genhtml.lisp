@@ -12,7 +12,7 @@ image."
   (setf (cdr *code-coverage-info*) nil))
 
 (defun save-coverage ()
-  "Returns an opaque representation of the current code coverage state.
+  "Return an opaque representation of the current code coverage state.
 The only operation that may be done on the state is passing it to
 RESTORE-COVERAGE. The representation is guaranteed to be readably printable.
 A representation that has been printed and read back will work identically

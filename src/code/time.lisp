@@ -102,7 +102,7 @@ format."
 (defconstant +mar-1-1903+ #.(encode-universal-time 0 0 0 1 3 1903 0))
 
 (defun years-since-mar-2000 (utime)
-  "Returns number of complete years since March 1st 2000, and remainder in seconds"
+  "Return number of complete years since March 1st 2000, and remainder in seconds"
   (let* ((days-in-year (* 86400 365))
          (days-in-4year (+ (* 4 days-in-year) 86400))
          (days-in-100year (- (* 25 days-in-4year) 86400))
@@ -134,7 +134,7 @@ format."
       (t unix-time))))
 
 (defun decode-universal-time (universal-time &optional time-zone)
-  "Converts a universal-time to decoded time format returning the following
+  "Convert a universal-time to decoded time format returning the following
    nine values: second, minute, hour, date, month, year, day of week (0 =
    Monday), T (daylight savings time) or NIL (standard time), and timezone.
    Completely ignores daylight-savings-time when time-zone is supplied."
@@ -397,10 +397,10 @@ normally during operations like SLEEP."
 ;;; The guts of the TIME macro. Compute overheads, run the (compiled)
 ;;; function, report the times.
 (defun call-with-timing (timer function &rest arguments)
-  "Calls FUNCTION with ARGUMENTS, and gathers timing information about it.
-Then calls TIMER with keyword arguments describing the information collected.
-Calls TIMER even if FUNCTION performs a non-local transfer of control. Finally
-returns values returned by FUNCTION.
+  "Call FUNCTION with ARGUMENTS, and gather timing information about it.
+Then call TIMER with keyword arguments describing the information collected.
+Call TIMER even if FUNCTION performs a non-local transfer of control. Finally
+return values returned by FUNCTION.
 
   :USER-RUN-TIME-US
       User run time in microseconds.

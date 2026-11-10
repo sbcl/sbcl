@@ -169,9 +169,9 @@
          (tree-equal-test x y (%coerce-callable-to-fun test)))))
 
 (defun endp (object)
-  "This is the recommended way to test for the end of a proper list. It
-   returns true if OBJECT is NIL, false if OBJECT is a CONS, and an error
-   for any other type of OBJECT."
+  "Return true if OBJECT is NIL, false if OBJECT is a CONS, and signal an
+  error for any other type of OBJECT. This is the recommended way to
+  test for the end of a proper list."
   (endp object))
 
 (defun list-length (list)
@@ -237,11 +237,12 @@
   "Return the 10th object in a list or NIL if there is no 10th object."
   (cadr (cddddr (cddddr list))))
 (defun rest (list)
-  "Means the same as the cdr of a list."
+  "Same as the CDR of a list."
   (cdr list))
 
 (defun nthcdr (n list)
-  "Performs the cdr function n times on a list."
+  "Returns the tail of LIST that would be obtained by calling CDR N times
+  in succession."
   (declare (explicit-check n)
            (optimize speed))
   (flet ((fast-nthcdr (n list)
@@ -542,7 +543,7 @@
 ;;; and it avoids running down the last argument to NCONC which allows
 ;;; the last argument to be circular.
 (defun nconc (&rest lists)
-   "Concatenates the lists given as arguments (by changing them)"
+   "Destructively concatenate LISTS."
    (declare (optimize speed))
    (flet ((fail (object)
             (error 'type-error
@@ -693,7 +694,7 @@
 ;;;; substitution of expressions
 
 (defun subst (new old tree &key key (test #'eql testp) (test-not #'eql notp))
-  "Substitutes new for subtrees matching old."
+  "Substitute NEW for subtrees of TREE matching OLD."
   (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
@@ -713,7 +714,7 @@
       (s tree))))
 
 (defun subst-if (new test tree &key key)
-  "Substitutes new for subtrees for which test is true."
+  "Substitute NEW for subtrees of TREE for which TEST is true."
   (declare (dynamic-extent test key))
   (let ((test (%coerce-callable-to-fun test))
         (key (and key (%coerce-callable-to-fun key))))
@@ -729,7 +730,7 @@
       (s tree))))
 
 (defun subst-if-not (new test tree &key key)
-  "Substitutes new for subtrees for which test is false."
+  "Substitute NEW for subtrees of TREE for which TEST is false."
   (declare (dynamic-extent test key))
   (let ((test (%coerce-callable-to-fun test))
         (key (and key (%coerce-callable-to-fun key))))
@@ -745,7 +746,7 @@
       (s tree))))
 
 (defun nsubst (new old tree &key key (test #'eql testp) (test-not #'eql notp))
-  "Substitute NEW for subtrees matching OLD."
+  "Substitute NEW for subtrees of TREE matching OLD."
   (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))

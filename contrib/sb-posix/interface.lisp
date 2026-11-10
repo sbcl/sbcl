@@ -408,9 +408,9 @@
   ;; error handling here yet!
   (define-call-internally posix-fork "fork" pid-t minusp)
   (defun fork ()
-    "Forks the current process, returning 0 in the new process and the PID of
-the child process in the parent. Forking while multiple threads are running is
-not supported."
+    "Fork the current OS process, returning 0 in the new process and the
+PID of the child process in the parent. Forking while multiple threads
+are running is not supported."
     ;; Supporting fork in multithreaded code is not worth the hassle, as users would
     ;; be prone to violating the constraints of the various operating systems:
     ;; Linux:
@@ -480,7 +480,7 @@ not supported."
 (progn
   (export 'readlink :sb-posix)
   (defun readlink (pathspec)
-    "Returns the resolved target of a symbolic link as a string."
+    "Return the resolved target of a symbolic link as a string."
     (flet ((%readlink (path buf length)
              (alien-funcall
               (extern-alien "readlink" (function int (c-string :not-null t) (* t) int))
@@ -495,7 +495,7 @@ not supported."
 (progn
   (export 'getcwd :sb-posix)
   (defun getcwd ()
-    "Returns the process's current working directory as a string."
+    "Return the OS process's current working directory as a string."
     #+(or android linux openbsd freebsd netbsd sunos darwin dragonfly haiku)
     (sb-unix:posix-getcwd)
     #-(or android linux openbsd freebsd netbsd sunos darwin dragonfly haiku)

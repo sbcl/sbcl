@@ -13,7 +13,7 @@
   section 3 calls that are (a) typically found in libc, but (b) not
   part of the C standard. For example, we intend to provide support
   for `opendir(3)` and `readdir(3)` but not for `printf(3)`. That
-  said, if your favourite system call is not included yet, you are
+  said, if your favorite system call is not included yet, you are
   encouraged to submit a patch to the SBCL mailing list.
 
   Some facilities are omitted where they offer absolutely no

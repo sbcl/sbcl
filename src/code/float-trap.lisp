@@ -63,9 +63,9 @@
                                  (accrued-exceptions nil accrued-x-p)
                                  (fast-mode nil fast-mode-p)
                                  #+x86 (precision nil precisionp))
-  "This function sets options controlling the floating-point
-hardware. If a keyword is not supplied, then the current value is
-preserved. Possible keywords:
+  "Set options controlling the floating-point hardware.
+If a keyword is not supplied, then the current value is preserved.
+Possible keywords:
 
  :TRAPS
    A list of the exception conditions that should cause traps.
@@ -123,11 +123,11 @@ in effect."
   (values))
 
 (defun get-floating-point-modes ()
-  "This function returns a list representing the state of the floating
-point modes. The list is in the same format as the &KEY arguments to
+  "Return a list representing the state of the floating point modes.
+The list is in the same format as the &KEY arguments to
 SET-FLOATING-POINT-MODES, i.e.
 
-  (apply #'set-floating-point-modes (get-floating-point-modes))
+    (apply #'set-floating-point-modes (get-floating-point-modes))
 
 sets the floating point modes to their current values (and thus is a no-op)."
   (flet ((exc-keys (bits)

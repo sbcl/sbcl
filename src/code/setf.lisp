@@ -406,7 +406,7 @@
 ;;;; DEFINE-MODIFY-MACRO stuff
 
 (sb-xc:defmacro define-modify-macro (name lambda-list function &optional doc-string)
-  "Creates a new read-modify-write macro like PUSH or INCF."
+  "Define a new read-modify-write macro like PUSH or INCF."
   (check-designator name 'define-modify-macro)
   (binding* (((nil required optional rest)
               (parse-lambda-list
@@ -466,8 +466,8 @@
 ;;; but the bug seems to be due to irreconcilable problems in the spec.
 ;;; Everybody seems to interpret the spec the way we do though.
 (sb-xc:defmacro defsetf (access-fn &rest rest)
-  "Associates a SETF update function or macro with the specified access
-  function or macro. The format is complex. See the manual for details."
+  "Associate a SETF update function or macro with the specified access
+  function or macro. The format is complex."
   (check-designator access-fn 'defsetf
       #'symbolp "symbol" "access-function")
   (typecase rest

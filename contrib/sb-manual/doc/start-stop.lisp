@@ -314,7 +314,7 @@
       End processing of runtime options and pass the rest of the
       command-line arguments to the toplevel function.
 
-  In the future, runtime options may be added to control behaviour
+  In the future, runtime options may be added to control behavior
   such as lazy allocation of memory.")
 
 (defsection @toplevel-options (:title "Toplevel Options")

@@ -69,7 +69,7 @@
 (defvar *unblock-deferrables-on-enabling-interrupts-p*)
 
 (defmacro without-interrupts (&body body)
-  "Executes BODY with all deferrable interrupts disabled. Deferrable
+  "Execute BODY with all deferrable interrupts disabled. Deferrable
 interrupts arriving during execution of the BODY take effect after BODY has
 been executed.
 
@@ -148,7 +148,7 @@ WITHOUT-INTERRUPTS in:
            (,without-interrupts-body)))))
 
 (defmacro with-interrupts (&body body)
-  "Executes BODY with deferrable interrupts conditionally enabled. If there
+  "Execute BODY with deferrable interrupts conditionally enabled. If there
 are pending interrupts they take effect prior to executing BODY.
 
 As interrupts are normally allowed WITH-INTERRUPTS only makes sense if there

@@ -108,7 +108,7 @@
   SB-EXT:NATIVE-NAMESTRING converts a non-wild pathname designator to
   the equivalent native namestring, if possible. Some Lisp pathname
   concepts (such as the :BACK directory component) have no direct
-  equivalents in most Operating Systems; the behaviour of
+  equivalents in most Operating Systems; the behavior of
   SB-EXT:NATIVE-NAMESTRING is unspecified if an inappropriate pathname
   designator is passed to it. Additionally, note that conversion from
   pathname to native filename and back to pathname should not be

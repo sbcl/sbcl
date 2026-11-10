@@ -108,7 +108,7 @@ implementation it is ~S." *!default-package-use-list*)
 ;;; different package, it is merely the same error as if any already-existing name
 ;;; was given. I see no reason to be more strict than the spec would have it be.
 (defun rename-package (package-designator name &optional (nicknames ()))
-  "Changes the name and nicknames for a package."
+  "Change the name and nicknames of a package."
   ;; CLHS says:
   ;; "The consequences are undefined if new-name or any new-nickname
   ;; conflicts with any existing package names."
@@ -216,7 +216,7 @@ implementation it is ~S." *!default-package-use-list*)
 
 (defmacro defpackage (package &rest options)
   #.(format nil
-     "Defines a new package called PACKAGE. Each of OPTIONS should be one of the
+     "Define a new package called PACKAGE. Each of OPTIONS should be one of the
 following:~% ~{~%~4T(~S ~A)~}~%
 All options except ~{~S, ~}and :DOCUMENTATION can be used multiple
 times.

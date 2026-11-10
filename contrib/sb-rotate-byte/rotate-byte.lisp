@@ -1,7 +1,7 @@
 (in-package "SB-ROTATE-BYTE")
 
 (defun rotate-byte (count bytespec integer)
-  "Rotates a field of bits within INTEGER; specifically, returns an
+  "Rotate a field of bits within INTEGER; specifically, return an
 integer that contains the bits of INTEGER rotated COUNT times
 leftwards within the byte specified by BYTESPEC, and elsewhere
 contains the bits of INTEGER."

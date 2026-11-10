@@ -1224,7 +1224,7 @@ call themselves or each other."
 ;;; Assert that FORM evaluates to the specified type (which may be a
 ;;; VALUES type). TYPE may be a type specifier or (as a hack) a CTYPE.
 (def-ir1-translator the ((value-type form) start next result)
-  "Specifies that the values returned by FORM conform to the VALUE-TYPE.
+  "Assert that the values returned by FORM conform to the VALUE-TYPE.
 
 CLHS specifies that the consequences are undefined if any result is
 not of the declared type, but SBCL treats declarations as assertions
@@ -1247,13 +1247,11 @@ is unable to derive from other declared types."
 ;;; never uses the macro -- but manually calling its MACRO-FUNCTION or
 ;;; MACROEXPANDing TRULY-THE forms does.
 (def-ir1-translator truly-the ((value-type form) start next result)
-  "Specifies that the values returned by FORM conform to the
-VALUE-TYPE, and causes the compiler to trust this information
-unconditionally.
+  "Assert that the values returned by FORM conform to the
+VALUE-TYPE. The compiler trusts this information unconditionally.
 
 Consequences are undefined if any result is not of the declared type
--- typical symptoms including memory corruptions. Use with great
-care."
+-- typical symptoms include memory corruption. Use with great care."
   (the-in-policy value-type form **zero-typecheck-policy** start next result))
 
 ;;; THE with some options for the CAST

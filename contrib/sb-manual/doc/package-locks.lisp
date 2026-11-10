@@ -95,7 +95,7 @@
   code into an image without the said symbols will not cause a package
   lock violation, even if the packages in question are locked.
 
-  With the exception of interned symbols, behaviour is unspecified if
+  With the exception of interned symbols, behavior is unspecified if
   package locks affecting compiled code are not the same during
   loading of the code or execution.
 

@@ -1027,7 +1027,7 @@ avoiding `atexit(3)` hooks, etc. Otherwise `exit(2)` is called."
   (declaim (inline get-time-of-day))
   (defun get-time-of-day ()
     "Return the number of seconds and microseconds since the beginning of
-the UNIX epoch (January 1st 1970.)"
+the UNIX epoch (January 1st 1970)."
     (with-alien ((tv (struct timeval)))
       (syscall* ("sb_gettimeofday" (* (struct timeval)) system-area-pointer)
                 (values (slot tv 'tv-sec)

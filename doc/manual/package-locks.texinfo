@@ -118,7 +118,7 @@ If file-compiled code contains interned symbols, then loading that
 code into an image without the said symbols will not cause a package
 lock violation, even if the packages in question are locked.
 
-With the exception of interned symbols, behaviour is unspecified if
+With the exception of interned symbols, behavior is unspecified if
 package locks affecting compiled code are not the same during
 loading of the code or execution.
 
@@ -312,57 +312,57 @@ condition.
 @anchor{Function sb-ext package-locked-p}
 @ffindex @sortas{package-locked-p sb-ext} package-locked-p [sb-ext]
 @deffn{Function} sb-ext:package-locked-p package
-Returns @code{t} when @code{package} is locked, @code{nil} otherwise. Signals an error
+Return @code{t} when @code{package} is locked, @code{nil} otherwise. Signals an error
 if @code{package} doesn't designate a valid package.
 @end deffn
 @anchor{Function sb-ext lock-package}
 @ffindex @sortas{lock-package sb-ext} lock-package [sb-ext]
 @deffn{Function} sb-ext:lock-package package
-Locks @code{package} and returns @code{t}. Has no effect if @code{package} was already
+Lock @code{package} and return @code{t}. Has no effect if @code{package} was already
 locked. Signals an error if @code{package} is not a valid package designator.
 @end deffn
 @anchor{Function sb-ext unlock-package}
 @ffindex @sortas{unlock-package sb-ext} unlock-package [sb-ext]
 @deffn{Function} sb-ext:unlock-package package
-Unlocks @code{package} and returns @code{t}. Has no effect if @code{package} was already
+Unlock @code{package} and return @code{t}. Has no effect if @code{package} was already
 unlocked. Signals an error if @code{package} is not a valid package designator.
 @end deffn
 @anchor{Function sb-ext package-implemented-by-list}
 @ffindex @sortas{package-implemented-by-list sb-ext} package-implemented-by-list [sb-ext]
 @deffn{Function} sb-ext:package-implemented-by-list package
-Returns a list containing the implementation packages of
+Return a list containing the implementation packages of
 @code{package}. Signals an error if @code{package} is not a valid package designator.
 @end deffn
 @anchor{Function sb-ext package-implements-list}
 @ffindex @sortas{package-implements-list sb-ext} package-implements-list [sb-ext]
 @deffn{Function} sb-ext:package-implements-list package
-Returns the packages that @code{package} is an implementation package
+Return the packages that @code{package} is an implementation package
 of. Signals an error if @code{package} is not a valid package designator.
 @end deffn
 @anchor{Function sb-ext add-implementation-package}
 @ffindex @sortas{add-implementation-package sb-ext} add-implementation-package [sb-ext]
 @deffn{Function} sb-ext:add-implementation-package packages-to-add &optional (package *package*)
-Adds @code{packages-to-add} as implementation packages of @code{package}. Signals
+Add @code{packages-to-add} as implementation packages of @code{package}. Signals
 an error if @code{package} or any of the @code{packages-to-add} is not a valid
 package designator.
 @end deffn
 @anchor{Function sb-ext remove-implementation-package}
 @ffindex @sortas{remove-implementation-package sb-ext} remove-implementation-package [sb-ext]
 @deffn{Function} sb-ext:remove-implementation-package packages-to-remove &optional (package *package*)
-Removes @code{packages-to-remove} from the implementation packages of
+Remove @code{packages-to-remove} from the implementation packages of
 @code{package}. Signals an error if @code{package} or any of the @code{packages-to-remove}
 is not a valid package designator.
 @end deffn
 @anchor{Macro sb-ext without-package-locks}
 @ffindex @sortas{without-package-locks sb-ext} without-package-locks [sb-ext]
 @deffn{Macro} sb-ext:without-package-locks &body body
-Ignores all runtime package lock violations during the execution of
-body. Body can begin with declarations.
+Ignore all runtime package lock violations during the execution of
+@code{body}. @code{body} can begin with declarations.
 @end deffn
 @anchor{Macro sb-ext with-unlocked-packages}
 @ffindex @sortas{with-unlocked-packages sb-ext} with-unlocked-packages [sb-ext]
 @deffn{Macro} sb-ext:with-unlocked-packages (&rest packages) &body forms
-Unlocks @code{packages} for the dynamic scope of the body. Signals an
+Unlock @code{packages} for the dynamic scope of the body. Signals an
 error if any of @code{packages} is not a valid package designator.
 @end deffn
 The @code{defpackage} options are extended to include the following:

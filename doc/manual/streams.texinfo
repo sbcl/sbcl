@@ -261,14 +261,14 @@ output @code{stream}. The default method does nothing.
 @anchor{Generic function sb-gray stream-finish-output}
 @ffindex @sortas{stream-finish-output sb-gray} stream-finish-output [sb-gray]
 @deffn{Generic function} sb-gray:stream-finish-output stream
-Attempts to ensure that all output sent to the Stream has reached
+Attempt to ensure that all output sent to @code{stream} has reached
 its destination, and only then returns false. Implements
 @code{finish-output}. The default method does nothing.
 @end deffn
 @anchor{Generic function sb-gray stream-force-output}
 @ffindex @sortas{stream-force-output sb-gray} stream-force-output [sb-gray]
 @deffn{Generic function} sb-gray:stream-force-output stream
-Attempts to force any buffered output to be sent. Implements
+Attempt to force any buffered output to be sent. Implements
 @code{force-output}. The default method does nothing.
 @end deffn
 @anchor{Generic function sb-gray stream-write-sequence}
@@ -296,7 +296,7 @@ returns @code{nil}.
 @anchor{Generic function sb-gray stream-fresh-line}
 @ffindex @sortas{stream-fresh-line sb-gray} stream-fresh-line [sb-gray]
 @deffn{Generic function} sb-gray:stream-fresh-line stream
-Outputs a new line to the Stream if it is not positioned at the
+Output a new line to @code{stream} if it is not positioned at the
 beginning of a line. Returns @code{t} if it output a new line, nil
 otherwise. Used by @code{fresh-line}. The default method uses
 @code{stream-start-line-p} and @code{stream-terpri}.
@@ -336,7 +336,7 @@ either @code{stream-start-line-p} or @code{stream-fresh-line}.
 @anchor{Generic function sb-gray stream-terpri}
 @ffindex @sortas{stream-terpri sb-gray} stream-terpri [sb-gray]
 @deffn{Generic function} sb-gray:stream-terpri stream
-Writes an end of line, as for @code{terpri}. Returns @code{nil}. The default
+Write an end of line, like @code{terpri}, and return @code{nil}. The default
 method does (@code{stream-write-char} stream @code{#\Newline}).
 @end deffn
 @anchor{Generic function sb-gray stream-write-char}

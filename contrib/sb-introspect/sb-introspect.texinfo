@@ -96,7 +96,7 @@ For definitions that do not define an object (e.g. @code{defvar}), use
 @anchor{Function sb-introspect find-definition-sources-by-name}
 @ffindex @sortas{find-definition-sources-by-name sb-introspect} find-definition-sources-by-name [sb-introspect]
 @deffn{Function} sb-introspect:find-definition-sources-by-name name type
-Returns a list of @code{definition-source}s for definitions of @code{name} with
+Return a list of @code{definition-source}s for definitions of @code{name} with
 the given definition @code{type}. A @code{definition-source} object is always
 returned for definitions that exist, but the source location (e.g.
 @code{definition-source-pathname}) may be missing. @code{type} can currently be one
@@ -194,7 +194,7 @@ determined (e.g. because the function was compiled with @code{debug} 0).
 @anchor{Function sb-introspect function-type}
 @ffindex @sortas{function-type sb-introspect} function-type [sb-introspect]
 @deffn{Function} sb-introspect:function-type function-designator
-Returns the ftype of @code{function-designator} or @code{nil}.
+Return the ftype of @code{function-designator} or @code{nil}.
 @end deffn
 @anchor{Function sb-introspect method-combination-lambda-list}
 @ffindex @sortas{method-combination-lambda-list sb-introspect} method-combination-lambda-list [sb-introspect]
@@ -246,7 +246,7 @@ pairs.
 @anchor{Function sb-introspect deftype-lambda-list}
 @ffindex @sortas{deftype-lambda-list sb-introspect} deftype-lambda-list [sb-introspect]
 @deffn{Function} sb-introspect:deftype-lambda-list type-specifier-name
-Returns the lambda list of @code{type-specifier-name} as the first return
+Return the lambda list of @code{type-specifier-name} as the first return
 value, and a flag whether the arglist could be found as the second
 value.
 
@@ -290,7 +290,7 @@ Experimental.
 @anchor{Function sb-introspect allocation-information}
 @ffindex @sortas{allocation-information sb-introspect} allocation-information [sb-introspect]
 @deffn{Function} sb-introspect:allocation-information object
-Returns information about the allocation of @code{object}. The primary return
+Return information about the allocation of @code{object}. The primary return
 value indicates the general type of allocation: @code{:immediate}, @code{:heap},
 @code{:stack}, or @code{:foreign}.
 
@@ -334,7 +334,7 @@ For @code{:stack} objects, the secondary value is the thread on whose stack
 the object is allocated.
 
 Expected use-cases include introspection to gain insight into allocation and
-GC behaviour and restricting memoization to heap-allocated arguments.
+GC behavior and restricting memoization to heap-allocated arguments.
 
 Experimental: interface subject to change.
 @end deffn

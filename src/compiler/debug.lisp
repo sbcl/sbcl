@@ -1466,9 +1466,9 @@
 
 ;;;; producing a graphviz file
 
+;;; Return a new string in which all the occurrences of PART are
+;;; replaced with REPLACEMENT.
 (defun replace-all (string part replacement &key (test #'char=))
-  "Returns a new string in which all the occurences of the part
-is replaced with replacement."
   (with-output-to-string (out)
     (loop with part-length = (length part)
           for old-pos = 0 then (+ pos part-length)

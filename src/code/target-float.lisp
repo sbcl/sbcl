@@ -78,9 +78,11 @@
 ;;;   <http://modular.fas.harvard.edu/edu/Fall2001/124/lectures/lecture17/lecture18/>
 
 (defun rationalize (x)
-  "Converts any REAL to a RATIONAL.  Floats are converted to a simple rational
-  representation exploiting the assumption that floats are only accurate to
-  their precision.  RATIONALIZE (and also RATIONAL) preserve the invariant:
+  "Convert X (a REAL) to a RATIONAL. Floats are converted to a simple
+  rational representation exploiting the assumption that floats are
+  only accurate to their precision. RATIONALIZE (and also RATIONAL)
+  preserves the invariant:
+
       (= x (float (rationalize x) x))"
   (declare (explicit-check))
   (number-dispatch ((x real))

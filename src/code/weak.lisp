@@ -92,8 +92,8 @@ vector.
 (declaim (inline weak-pointer-value))
 (defun weak-pointer-value (weak-pointer)
   "If WEAK-POINTER is valid, return the value of WEAK-POINTER and T.
-If the referent of WEAK-POINTER has been garbage collected,
-returns the values NIL and NIL."
+If the referent of WEAK-POINTER has been garbage collected, return the
+values NIL and NIL."
   (declare (type weak-pointer weak-pointer))
   (let ((value (sb-vm::%weak-pointer-value weak-pointer)))
     (if (sb-vm::unbound-marker-p value)

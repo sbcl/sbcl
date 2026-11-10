@@ -568,7 +568,7 @@
   all qualities is `1`. Whenever qualities are equal, ties are broken
   according to a broad idea of what a good default environment is
   supposed to be. Generally this downplays @SPEED, @COMPILATION-SPEED
-  and @SPACE in favour of @SAFETY and @DEBUG. Novice and casual users
+  and @SPACE in favor of @SAFETY and @DEBUG. Novice and casual users
   should stick to the default policy. Advanced users often want to
   improve speed and memory usage at the cost of safety and
   debuggability.

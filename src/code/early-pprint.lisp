@@ -79,10 +79,10 @@
                                      ,@(if object (list object)))))))
 
 (defmacro pprint-exit-if-list-exhausted ()
-  "Cause the closest enclosing use of PPRINT-LOGICAL-BLOCK to return
-   if its list argument is exhausted. Can only be used inside
-   PPRINT-LOGICAL-BLOCK, and only when the LIST argument to
-   PPRINT-LOGICAL-BLOCK is supplied."
+  "Make the closest enclosing use of PPRINT-LOGICAL-BLOCK return
+  if its list argument is exhausted. Can only be used inside
+  PPRINT-LOGICAL-BLOCK, and only when the LIST argument to
+  PPRINT-LOGICAL-BLOCK is supplied."
   (error "PPRINT-EXIT-IF-LIST-EXHAUSTED must be lexically inside ~
           PPRINT-LOGICAL-BLOCK."))
 

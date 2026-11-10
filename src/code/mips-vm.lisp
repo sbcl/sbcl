@@ -3,7 +3,7 @@
 (in-package "SB-VM")
 
 (defun machine-type ()
-  "Returns a string describing the type of the local machine."
+  "Return a string describing the type of the local machine."
   "MIPS")
 
 (defun return-machine-address (scp)

@@ -16,7 +16,7 @@
 ;;; type TYPE. This behavior is needed e.g. to test for the validity
 ;;; of numeric subtype bounds read when cross-compiling.)
 (defun typep (object type &optional environment)
-  "Is OBJECT of type TYPE?"
+  "See if OBJECT is of TYPE."
   (declare (type lexenv-designator environment) (ignore environment))
   (declare (explicit-check))
   ;; Actually interpreting types at runtime is done by %TYPEP. The
@@ -345,8 +345,7 @@
 ;;;; which are not needed during self-build.
 
 (defun typexpand-all (type-specifier &optional env)
-  "Takes and expands a type specifier recursively like
-`SB-CLTL2:MACROEXPAND-ALL`."
+  "Expand TYPE-SPECIFIER recursively like `SB-CLTL2:MACROEXPAND-ALL`."
   ;; TYPE-SPECIFIER is of type TYPE-SPECIFIER, but it is preferable to
   ;; defer to VALUES-SPECIFIER-TYPE for the check.
   (declare (type lexenv-designator env) (ignore env))
@@ -363,13 +362,13 @@
   (type-specifier (values-specifier-type type-specifier)))
 
 (defun defined-type-name-p (name &optional env)
-  "Returns T if NAME is known to name a type specifier, otherwise NIL."
+  "Return T if NAME is known to name a type specifier, otherwise NIL."
   (declare (symbol name))
   (declare (ignore env))
   (and (info :type :kind name) t))
 
 (defun valid-type-specifier-p (type-specifier &optional env)
-  "Returns T if TYPE-SPECIFIER is a valid type specifier, otherwise NIL.
+  "Return T if TYPE-SPECIFIER is a valid type specifier, otherwise NIL.
 
 There may be different metrics on what constitutes a \"valid type
 specifier\" depending on context. If this function does not suit your

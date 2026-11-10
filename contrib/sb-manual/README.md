@@ -222,7 +222,9 @@ without the context of their parents. So, their names should be
 globally meaningful. Thus, it is better to name the section describing
 `SB-ACLREPL`'s usage `@SB-ACLREPL-USAGE` than `@USAGE`.
 
-## Docstring Formatting
+## Docstring Style
+
+### Docstring Indentation
 
 The Emacs style:
 
@@ -232,8 +234,32 @@ The Emacs style:
       x)
 
 You may also indent all but the first line as long as you do it
-consistently within the docstring. Maybe one day we could even agree
-upon a universally accepted style ... just joking.
+consistently within the docstring, as `DOCUMENTATION` normalizes to
+the above.
+
+Maybe one day we could even agree upon a universally accepted style
+... just joking.
+
+### Docstring Wording
+
+From Elisp Documentation Tips
+(https://www.gnu.org/software/emacs/manual/html_node/elisp/Documentation-Tips.html):
+
+> - For consistency, phrase the verb in the first sentence of a
+>   function’s documentation string as an imperative. For instance,
+>   use `Return the cons of A and B.` in preference to `Returns the
+>   cons of A and B.` Usually it looks good to do likewise for the
+>   rest of the first paragraph. Subsequent paragraphs usually look
+>   better if each sentence is indicative and has a proper subject.
+>
+> - Write docstrings in the active voice, not the passive, and in the
+>   present tense, not the future. For instance, use `Return a list
+>   containing A and B.` instead of `A list containing A and B will be
+>   returned.`
+>
+> - Avoid using the word "cause" (or its equivalents) unnecessarily.
+>   Instead of, `Cause Emacs to display text in boldface`, write just
+>   `Display text in boldface`.
 
 ## Typographic Miscellanea
 

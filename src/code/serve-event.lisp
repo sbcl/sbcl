@@ -124,7 +124,7 @@
 
 ;;; Remove an old handler from *descriptor-handlers*.
 (defun remove-fd-handler (handler)
-  "Removes HANDLER from the list of active handlers."
+  "Remove HANDLER from the list of active handlers."
   (filter-handlers (delete handler handlers)))
 
 ;;; Search *descriptor-handlers* for any reference to fd, and nuke 'em.

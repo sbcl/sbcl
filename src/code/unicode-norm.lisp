@@ -15,7 +15,7 @@
 
 (declaim (inline combining-class))
 (defun combining-class (character)
-  "Returns the canonical combining class (CCC) of CHARACTER"
+  "Return the canonical combining class (CCC) of CHARACTER."
   (aref +character-misc-database+ (+ 2 (misc-index character))))
 
 ;;; Implements UAX#15: Normalization Forms
@@ -196,7 +196,7 @@ only characters for which it returns T are collected."
       'string))))
 
 (defun normalized-p (string &optional (form :nfd))
-  "Tests if STRING is normalized to FORM"
+  "Test if STRING is normalized to FORM."
   (declare (string string))
   (etypecase string
     (base-string t)

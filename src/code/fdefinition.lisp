@@ -290,7 +290,7 @@
             (fset name closure))))))
 
 (defun unencapsulate (name type)
-  "Removes NAME's encapsulation of the specified TYPE if such exists."
+  "Remove NAME's encapsulation of the specified TYPE if such exists."
   (let ((fun (name->fun name)))
     (if (typep fun 'generic-function)
         (unencapsulate-generic-function fun type)

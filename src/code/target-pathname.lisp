@@ -884,8 +884,8 @@ the operating system native pathname conventions."
                            (version nil versionp)
                            defaults
                            (case :local))
-  "Makes a new pathname from the component arguments. Note that host is
-a host-structure or string."
+  "Make a new pathname from the component arguments. Note that HOST is
+a HOST structure or string."
   (let* ((defaults (when defaults
                      (with-pathname (defaults defaults) defaults)))
          (default-host (if defaults
@@ -1804,7 +1804,7 @@ unspecified elements into a completed to-pathname based on the to-wildname."
   `(satisfies logical-namestring-p))
 
 (defun logical-pathname (pathspec)
-  "Converts the pathspec argument to a logical-pathname and returns it."
+  "Convert the pathspec argument to a logical-pathname and return it."
   (declare (type (or logical-pathname string stream) pathspec)
            (values logical-pathname))
   (if (typep pathspec 'logical-pathname)
@@ -1996,8 +1996,8 @@ unspecified elements into a completed to-pathname based on the to-wildname."
       possibly-logical-pathname))
 
 (defun load-logical-pathname-translations (host)
-  "Reads logical pathname translations from SYS:SITE;HOST.TRANSLATIONS.NEWEST,
-with HOST replaced by the supplied parameter. Returns T on success.
+  "Read logical pathname translations from SYS:SITE;HOST.TRANSLATIONS.NEWEST,
+with HOST replaced by the supplied parameter. Return T on success.
 
 If HOST is already defined as logical pathname host, no file is loaded and NIL
 is returned.

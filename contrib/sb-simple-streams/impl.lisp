@@ -688,9 +688,9 @@
              (the character char))))
 
 (defun listen (&optional (stream *standard-input*) (width 1))
-  "Returns T if WIDTH octets are available on STREAM.  If WIDTH is
-given as 'CHARACTER, check for a character.  Note: the WIDTH argument
-is supported only on simple-streams."
+  "Return T if WIDTH octets are available on STREAM. If WIDTH is
+given as 'CHARACTER, check for a character. Note: the WIDTH argument
+is supported only on SIMPLE-STREAMS."
   (declare (sb-int:explicit-check))
   ;; WIDTH is number of octets which must be available; any value
   ;; other than 1 is treated as 'character.
@@ -752,8 +752,8 @@ is supported only on simple-streams."
          (sm charpos stream)))
 
 (defun wait-for-input-available (stream &optional timeout)
-  "Waits for input to become available on the Stream and returns T.  If
-  Timeout expires, Nil is returned."
+  "Wait for input to become available on the STREAM and return T. If
+  TIMEOUT expires, NIL is returned."
   (let ((stream (in-stream-from-designator stream)))
     (etypecase stream
       (fixnum

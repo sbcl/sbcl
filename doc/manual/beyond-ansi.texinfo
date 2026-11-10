@@ -226,10 +226,12 @@ canonical format.
 @anchor{Function sb-ext readtable-normalization}
 @ffindex @sortas{readtable-normalization sb-ext} readtable-normalization [sb-ext]
 @deffn{Function} sb-ext:readtable-normalization readtable
-@cindex NFKC
-@cindex normalization form compatibility composition
-Returns @code{t} if @code{readtable} normalizes symbols to NFKC, and @code{nil}
-otherwise. The @code{readtable-normalization} of the standard readtable is @code{t}.
+Return @code{t} if @code{readtable} normalizes symbols to NFKC, and @code{nil} otherwise.
+This is true by default in Unicode builds. @code{setf}able.
+
+Symbols created by @code{intern} and similar functions are not affected by
+this setting. If @code{sb-ext:readtable-normalization} is @code{t}, symbols that are
+not normalized are escaped during printing.
 @end deffn
 @node decimal syntax for rationals
 @cindex decimal syntax for rationals
@@ -299,7 +301,7 @@ able to refer to the thus hidden @code{"BAR"} package:
 @anchor{Function sb-ext package-local-nicknames}
 @ffindex @sortas{package-local-nicknames sb-ext} package-local-nicknames [sb-ext]
 @deffn{Function} sb-ext:package-local-nicknames package-designator
-Returns an alist of @code{(local-nickname . actual-package)} describing the
+Return an alist of @code{(local-nickname . actual-package)} describing the
 nicknames local to the designated package.
 
 When in the designated package, calls to @code{find-package} with any of the
@@ -316,7 +318,7 @@ Experimental: interface subject to change.
 @anchor{Function sb-ext package-locally-nicknamed-by-list}
 @ffindex @sortas{package-locally-nicknamed-by-list sb-ext} package-locally-nicknamed-by-list [sb-ext]
 @deffn{Function} sb-ext:package-locally-nicknamed-by-list package-designator
-Returns a list of packages which have a local nickname for the designated
+Return a list of packages which have a local nickname for the designated
 package.
 
 Experimental: interface subject to change.
@@ -324,7 +326,7 @@ Experimental: interface subject to change.
 @anchor{Function sb-ext add-package-local-nickname}
 @ffindex @sortas{add-package-local-nickname sb-ext} add-package-local-nickname [sb-ext]
 @deffn{Function} sb-ext:add-package-local-nickname local-nickname actual-package &optional (package-designator (sb-int:sane-package))
-Adds @code{local-nickname} for @code{actual-package} in the designated package, defaulting
+Add @code{local-nickname} for @code{actual-package} in the designated package, defaulting
 to current package. @code{local-nickname} must be a string designator, and
 @code{actual-package} must be a package designator.
 
@@ -351,7 +353,7 @@ Experimental: interface subject to change.
 @ffindex @sortas{remove-package-local-nickname sb-ext} remove-package-local-nickname [sb-ext]
 @deffn{Function} sb-ext:remove-package-local-nickname old-nickname &optional (package-designator (sb-int:sane-package))
 If the designated package had @code{old-nickname} as a local nickname for
-another package, it is removed. Returns true if the nickname existed and was
+another package, remove it. Returns true if the nickname existed and was
 removed, and @code{nil} otherwise.
 
 Experimental: interface subject to change.
@@ -541,8 +543,8 @@ Allocate and return a @code{weak-pointer} that points to @code{object}.
 @ffindex @sortas{weak-pointer-value sb-ext} weak-pointer-value [sb-ext]
 @deffn{Function} sb-ext:weak-pointer-value weak-pointer
 If @code{weak-pointer} is valid, return the value of @code{weak-pointer} and @code{t}.
-If the referent of @code{weak-pointer} has been garbage collected,
-returns the values @code{nil} and @code{nil}.
+If the referent of @code{weak-pointer} has been garbage collected, return the
+values @code{nil} and @code{nil}.
 @end deffn
 @node gc introspection and tuning
 @subsection GC Introspection and Tuning
@@ -565,7 +567,7 @@ Total real time spent doing garbage collection (as reported by
 @ffindex @sortas{bytes-consed-between-gcs sb-ext} bytes-consed-between-gcs [sb-ext]
 @deffn{Function} sb-ext:bytes-consed-between-gcs
 The amount of memory that will be allocated before the next garbage
-collection is initiated. This can be set with @code{setf}.
+collection is initiated. @code{setf}able.
 
 On GENCGC platforms this is the nursery size, and defaults to 5% of dynamic
 space size.
@@ -590,7 +592,7 @@ more microefficient interface and submit it as a patch.
 @anchor{Function sb-ext gc-logfile}
 @ffindex @sortas{gc-logfile sb-ext} gc-logfile [sb-ext]
 @deffn{Function} sb-ext:gc-logfile
-Return the pathname used to log garbage collections. Can be @code{setf}.
+Return the pathname used to log garbage collections. @code{setf}able.
 Default is @code{nil}, meaning collections are not logged. If non-null, the
 designated file is opened before and after each collection, and generation
 statistics are appended to it.
@@ -653,8 +655,8 @@ Experimental: interface subject to change.
 @anchor{Function sb-ext purify}
 @ffindex @sortas{purify sb-ext} purify [sb-ext]
 @deffn{Function} sb-ext:purify &key root-structures environment-name
-This function optimizes garbage collection by moving all currently live
-objects into non-collected storage. @code{root-structures} is an optional list of
+Optimize garbage collection by moving all currently live objects into
+non-collected storage. @code{root-structures} is an optional list of
 objects which should be copied first to maximize locality.
 
 @code{defstruct} structures defined with the (@code{:pure} @code{t}) option are moved into
@@ -984,7 +986,7 @@ argument of slot accessors.
 
 This is consistent with the description @code{sb-mop:ensure-class} in
 AMOP as the functional version of @code{defclass}, which has this
-behaviour; however, it is not consistent with the weaker
+behavior; however, it is not consistent with the weaker
 requirement in AMOP, which states that any class found by
 @code{find-class}, no matter what its @code{class-name}, is
 redefined.
@@ -1114,28 +1116,28 @@ functions:
 @anchor{Generic function sb-sequence length}
 @ffindex @sortas{length sb-sequence} length [sb-sequence]
 @deffn{Generic function} sb-sequence:length sequence
-Returns the length of @code{sequence} or signals a
+Return the length of @code{sequence} or signals a
 @code{sequence:protocol-unimplemented} error if the sequence protocol is
 not implemented for the class of @code{sequence}.
 @end deffn
 @anchor{Generic function sb-sequence elt}
 @ffindex @sortas{elt sb-sequence} elt [sb-sequence]
 @deffn{Generic function} sb-sequence:elt sequence index
-Returns the element at position @code{index} of @code{sequence} or signals a
+Return the element at position @code{index} of @code{sequence} or signals a
 @code{sequence:protocol-unimplemented} error if the sequence protocol is
 not implemented for the class of @code{sequence}.
 @end deffn
 @anchor{Setf generic function sb-sequence elt}
 @ffindex @sortas{elt sb-sequence} elt [sb-sequence]
 @deffn{Setf generic function} sb-sequence:elt sequence index
-Returns the element at position @code{index} of @code{sequence} or signals a
+Return the element at position @code{index} of @code{sequence} or signals a
 @code{sequence:protocol-unimplemented} error if the sequence protocol is
 not implemented for the class of @code{sequence}.
 @end deffn
 @anchor{Generic function sb-sequence adjust-sequence}
 @ffindex @sortas{adjust-sequence sb-sequence} adjust-sequence [sb-sequence]
 @deffn{Generic function} sb-sequence:adjust-sequence sequence length &key initial-element initial-contents
-Returns destructively modified @code{sequence} or a freshly allocated
+Return destructively modified @code{sequence} or a freshly allocated
 sequence of the same class as @code{sequence} of length @code{length}. Elements
 of the returned sequence are initialized to @code{initial-element}, if
 supplied, initialized to @code{initial-contents} if supplied, or identical
@@ -1146,7 +1148,7 @@ not implemented for the class of @code{sequence}.
 @anchor{Generic function sb-sequence make-sequence-like}
 @ffindex @sortas{make-sequence-like sb-sequence} make-sequence-like [sb-sequence]
 @deffn{Generic function} sb-sequence:make-sequence-like sequence length &key initial-element initial-contents
-Returns a freshly allocated sequence of length @code{length} and of the
+Return a freshly allocated sequence of length @code{length} and of the
 same class as @code{sequence}. Elements of the new sequence are
 initialized to @code{initial-element}, if supplied, initialized to
 @code{initial-contents} if supplied, or undefined if neither is supplied.
@@ -1169,7 +1171,7 @@ to instances of that class signals the following condition:
 @anchor{Condition sb-sequence protocol-unimplemented}
 @ttindex @sortas{protocol-unimplemented sb-sequence} protocol-unimplemented [sb-sequence]
 @deffn{Condition} sb-sequence:protocol-unimplemented
-This error is signaled if a sequence operation is applied to an
+Signaled if a sequence operation is applied to an
 instance of a sequence class that does not support the
 operation.
 @end deffn
@@ -1201,13 +1203,13 @@ There are some noteworthy irregularities:
 @anchor{Generic function sb-sequence emptyp}
 @ffindex @sortas{emptyp sb-sequence} emptyp [sb-sequence]
 @deffn{Generic function} sb-sequence:emptyp sequence
-Returns @code{t} if @code{sequence} is an empty sequence and @code{nil}
+Return @code{t} if @code{sequence} is an empty sequence and @code{nil}
 otherwise. Signals an error if @code{sequence} is not a sequence.
 @end deffn
 @anchor{Macro sb-sequence dosequence}
 @ffindex @sortas{dosequence sb-sequence} dosequence [sb-sequence]
 @deffn{Macro} sb-sequence:dosequence (element sequence &optional return) &body body
-Executes @code{body} with @code{element} subsequently bound to each element of
+Execute @code{body} with @code{element} subsequently bound to each element of
 @code{sequence}, then returns @code{return}.
 @end deffn
 The remaining list parallels the @emph{Sequence Dictionary}, see
@@ -1428,7 +1430,7 @@ An iterator is created by calling:
 @anchor{Function sb-sequence make-sequence-iterator}
 @ffindex @sortas{make-sequence-iterator sb-sequence} make-sequence-iterator [sb-sequence]
 @deffn{Function} sb-sequence:make-sequence-iterator sequence &key from-end start end
-Returns a sequence iterator for @code{sequence} or, if @code{start} and/or @code{end}
+Return a sequence iterator for @code{sequence} or, if @code{start} and/or @code{end}
 are supplied, the subsequence bounded by @code{start} and @code{end} as nine
 values:
 
@@ -1460,7 +1462,7 @@ iterators:
 @anchor{Macro sb-sequence with-sequence-iterator}
 @ffindex @sortas{with-sequence-iterator sb-sequence} with-sequence-iterator [sb-sequence]
 @deffn{Macro} sb-sequence:with-sequence-iterator (&optional iterator limit from-end-p step endp element set-element index copy) (sequence &key from-end (start 0) end) &body body
-Executes @code{body} with the elements of @code{vars} bound to the iteration
+Execute @code{body} with the elements of @code{vars} bound to the iteration
 state returned by @code{sequence:make-sequence-iterator} for @code{sequence} and
 @code{args}. Elements of @code{vars} may be @code{nil} in which case the corresponding
 value returned by @code{sequence:make-sequence-iterator} is ignored.
@@ -1468,7 +1470,7 @@ value returned by @code{sequence:make-sequence-iterator} is ignored.
 @anchor{Macro sb-sequence with-sequence-iterator-functions}
 @ffindex @sortas{with-sequence-iterator-functions sb-sequence} with-sequence-iterator-functions [sb-sequence]
 @deffn{Macro} sb-sequence:with-sequence-iterator-functions (&optional step endp elt setf index copy) (sequence &rest args &key from-end start end) &body body
-Executes @code{body} with the names @code{step}, @code{endp}, @code{elt}, @code{setf}, @code{index} and @code{copy}
+Execute @code{body} with the names @code{step}, @code{endp}, @code{elt}, @code{setf}, @code{index} and @code{copy}
 bound to local functions which execute the iteration state query and
 mutation functions returned by @code{sequence:make-sequence-iterator} for
 @code{sequence} and @code{args}. When some names are not supplied or @code{nil} is supplied
@@ -1487,37 +1489,37 @@ can be specialized for iterator classes:
 @anchor{Generic function sb-sequence iterator-step}
 @ffindex @sortas{iterator-step sb-sequence} iterator-step [sb-sequence]
 @deffn{Generic function} sb-sequence:iterator-step sequence iterator from-end
-Moves @code{iterator} one position forward or backward in @code{sequence}
+Move @code{iterator} one position forward or backward in @code{sequence}
 depending on the iteration direction encoded in @code{from-end}.
 @end deffn
 @anchor{Generic function sb-sequence iterator-endp}
 @ffindex @sortas{iterator-endp sb-sequence} iterator-endp [sb-sequence]
 @deffn{Generic function} sb-sequence:iterator-endp sequence iterator limit from-end
-Returns non-@code{nil} when @code{iterator} has reached @code{limit} (which may
+Return non-@code{nil} when @code{iterator} has reached @code{limit} (which may
 correspond to the end of @code{sequence}) with respect to the iteration
 direction encoded in @code{from-end}.
 @end deffn
 @anchor{Generic function sb-sequence iterator-element}
 @ffindex @sortas{iterator-element sb-sequence} iterator-element [sb-sequence]
 @deffn{Generic function} sb-sequence:iterator-element sequence iterator
-Returns the element of @code{sequence} associated to the position of
+Return the element of @code{sequence} associated to the position of
 @code{iterator}.
 @end deffn
 @anchor{Setf generic function sb-sequence iterator-element}
 @ffindex @sortas{iterator-element sb-sequence} iterator-element [sb-sequence]
 @deffn{Setf generic function} sb-sequence:iterator-element sequence iterator
-Returns the element of @code{sequence} associated to the position of
+Return the element of @code{sequence} associated to the position of
 @code{iterator}.
 @end deffn
 @anchor{Generic function sb-sequence iterator-index}
 @ffindex @sortas{iterator-index sb-sequence} iterator-index [sb-sequence]
 @deffn{Generic function} sb-sequence:iterator-index sequence iterator
-Returns the position of @code{iterator} in @code{sequence}.
+Return the position of @code{iterator} in @code{sequence}.
 @end deffn
 @anchor{Generic function sb-sequence iterator-copy}
 @ffindex @sortas{iterator-copy sb-sequence} iterator-copy [sb-sequence]
 @deffn{Generic function} sb-sequence:iterator-copy sequence iterator
-Returns a copy of @code{iterator} which also traverses @code{sequence} but can
+Return a copy of @code{iterator} which also traverses @code{sequence} but can
 be mutated independently of @code{iterator}.
 @end deffn
 Iterator objects implementing the above simple iteration protocol are
@@ -1526,7 +1528,7 @@ created by calling the following generic function:
 @anchor{Generic function sb-sequence make-simple-sequence-iterator}
 @ffindex @sortas{make-simple-sequence-iterator sb-sequence} make-simple-sequence-iterator [sb-sequence]
 @deffn{Generic function} sb-sequence:make-simple-sequence-iterator sequence &key from-end start end
-Returns a sequence iterator for @code{sequence}, @code{start}, @code{end} and @code{from-end}
+Return a sequence iterator for @code{sequence}, @code{start}, @code{end} and @code{from-end}
 as three values:
 
 1. iterator state
@@ -1561,12 +1563,12 @@ corresponds to @code{name}, or @code{nil} if there is none. See @code{getenv(3)}
 @anchor{Function sb-ext posix-environ}
 @ffindex @sortas{posix-environ sb-ext} posix-environ [sb-ext]
 @deffn{Function} sb-ext:posix-environ
-Return the Unix environment as a list of @code{simple-string}s. See @code{man environ}.
+Return the Unix environment as a list of @code{simple-string}s. See @code{environ(7)}.
 @end deffn
 @anchor{Function sb-ext exit}
 @ffindex @sortas{exit sb-ext} exit [sb-ext]
 @deffn{Function} sb-ext:exit &key code abort (timeout sb-ext:*exit-timeout*)
-Terminates the process, causing SBCL to exit with @code{code}. @code{code}
+Terminate the OS process, causing SBCL to exit with @code{code}. @code{code}
 defaults to 0 when @code{abort} is false, and 1 when it is true.
 
 When @code{abort} is false (the default), current thread is first unwound,
@@ -1625,7 +1627,7 @@ executables that system library routines do not.
 @anchor{Function sb-ext run-program}
 @ffindex @sortas{run-program sb-ext} run-program [sb-ext]
 @deffn{Function} sb-ext:run-program program args &key env environment (wait t) search pty input if-input-does-not-exist output (if-output-exists :error) (error :output) (if-error-exists :error) status-hook (external-format :default) directory preserve-fds use-posix-spawn
-@code{run-program} creates a new process specified by @code{program}.
+Create a new OS process specified by @code{program}.
 @code{args} is a list of strings to be passed literally to the new program.
 In POSIX environments, this list becomes the array supplied as the second
 parameter to the execv() or execvp() system call, each list element becoming
@@ -1661,7 +1663,7 @@ The @code{&key} arguments have the following meanings:
 @item @code{:environment}
 
 A list of @code{string}s describing the new Unix environment
-(as in "man environ"). The default is to copy the environment of
+(see @code{environ(7)}). The default is to copy the environment of
 the current process.
 
 @item @code{:env}
@@ -1916,22 +1918,23 @@ Unicode codepoint.
 @anchor{Function sb-unicode general-category}
 @ffindex @sortas{general-category sb-unicode} general-category [sb-unicode]
 @deffn{Function} sb-unicode:general-category character
-Returns the general category of @code{character} as it appears in UnicodeData.txt
+Return the general category of @code{character} as it appears in
+UnicodeData.txt.
 @end deffn
 @anchor{Function sb-unicode bidi-class}
 @ffindex @sortas{bidi-class sb-unicode} bidi-class [sb-unicode]
 @deffn{Function} sb-unicode:bidi-class character
-Returns the bidirectional class of @code{character}
+Return the bidirectional class of @code{character}.
 @end deffn
 @anchor{Function sb-unicode combining-class}
 @ffindex @sortas{combining-class sb-unicode} combining-class [sb-unicode]
 @deffn{Function} sb-unicode:combining-class character
-Returns the canonical combining class (CCC) of @code{character}
+Return the canonical combining class (CCC) of @code{character}.
 @end deffn
 @anchor{Function sb-unicode decimal-value}
 @ffindex @sortas{decimal-value sb-unicode} decimal-value [sb-unicode]
 @deffn{Function} sb-unicode:decimal-value character
-Returns the decimal digit value associated with @code{character} or @code{nil} if
+Return the decimal digit value associated with @code{character} or @code{nil} if
 there is no such value.
 
 The only characters in Unicode with a decimal digit value are those
@@ -1942,7 +1945,7 @@ Because of this, @code{(decimal-digit c) <=> (digit-char-p c 10)} in
 @anchor{Function sb-unicode digit-value}
 @ffindex @sortas{digit-value sb-unicode} digit-value [sb-unicode]
 @deffn{Function} sb-unicode:digit-value character
-Returns the Unicode digit value of @code{character} or @code{nil} if it doesn't exist.
+Return the Unicode digit value of @code{character} or @code{nil} if it doesn't exist.
 
 Digit values are guaranteed to be integers between 0 and 9 inclusive.
 All characters with decimal digit values have the same digit value,
@@ -1952,59 +1955,59 @@ that have a digit value but no decimal digit value
 @anchor{Function sb-unicode numeric-value}
 @ffindex @sortas{numeric-value sb-unicode} numeric-value [sb-unicode]
 @deffn{Function} sb-unicode:numeric-value character
-Returns the numeric value of @code{character} or @code{nil} if there is no such value.
+Return the numeric value of @code{character} or @code{nil} if there is no such value.
 Numeric value is the most general of the Unicode numeric properties.
 The only constraint on the numeric value is that it be a rational number.
 @end deffn
 @anchor{Function sb-unicode mirrored-p}
 @ffindex @sortas{mirrored-p sb-unicode} mirrored-p [sb-unicode]
 @deffn{Function} sb-unicode:mirrored-p character
-Returns @code{t} if @code{character} needs to be mirrored in bidirectional text.
+Return @code{t} if @code{character} needs to be mirrored in bidirectional text.
 Otherwise, returns @code{nil}.
 @end deffn
 @anchor{Function sb-unicode bidi-mirroring-glyph}
 @ffindex @sortas{bidi-mirroring-glyph sb-unicode} bidi-mirroring-glyph [sb-unicode]
 @deffn{Function} sb-unicode:bidi-mirroring-glyph character
-Returns the mirror image of @code{character} if it exists.
-Otherwise, returns @code{nil}.
+Return the mirror image of @code{character} if it exists.
+Otherwise, return @code{nil}.
 @end deffn
 @anchor{Function sb-unicode age}
 @ffindex @sortas{age sb-unicode} age [sb-unicode]
 @deffn{Function} sb-unicode:age character
-Returns the version of Unicode in which @code{character} was assigned as a pair
+Return the version of Unicode in which @code{character} was assigned as a pair
 of values, both integers, representing the major and minor version respectively.
 If @code{character} is not assigned in Unicode, returns @code{nil} for both values.
 @end deffn
 @anchor{Function sb-unicode hangul-syllable-type}
 @ffindex @sortas{hangul-syllable-type sb-unicode} hangul-syllable-type [sb-unicode]
 @deffn{Function} sb-unicode:hangul-syllable-type character
-Returns the Hangul syllable type of @code{character}.
+Return the Hangul syllable type of @code{character}.
 The syllable type can be one of @code{:l}, @code{:v}, @code{:t}, @code{:lv}, or @code{:lvt}.
-If the character is not a Hangul syllable or Jamo, returns @code{nil}
+If the character is not a Hangul syllable or Jamo, returns @code{nil}.
 @end deffn
 @anchor{Function sb-unicode east-asian-width}
 @ffindex @sortas{east-asian-width sb-unicode} east-asian-width [sb-unicode]
 @deffn{Function} sb-unicode:east-asian-width character
-Returns the East Asian Width property of @code{character} as
+Return the East Asian Width property of @code{character} as
 one of the keywords @code{:n} (Narrow), @code{:a} (Ambiguous), @code{:h} (Halfwidth),
-@code{:w} (Wide), @code{:f} (Fullwidth), or @code{:na} (Not applicable)
+@code{:w} (Wide), @code{:f} (Fullwidth), or @code{:na} (Not applicable).
 @end deffn
 @anchor{Function sb-unicode script}
 @ffindex @sortas{script sb-unicode} script [sb-unicode]
 @deffn{Function} sb-unicode:script character
-Returns the Script property of @code{character} as a keyword.
-If @code{character} does not have a known script, returns @code{:unknown}
+Return the Script property of @code{character} as a keyword.
+If @code{character} does not have a known script, returns @code{:unknown}.
 @end deffn
 @anchor{Function sb-unicode char-block}
 @ffindex @sortas{char-block sb-unicode} char-block [sb-unicode]
 @deffn{Function} sb-unicode:char-block character
-Returns the Unicode block in which @code{character} resides as a keyword.
-If @code{character} does not have a known block, returns @code{:no-block}
+Return the Unicode block in which @code{character} resides as a keyword.
+If @code{character} does not have a known block, returns @code{:no-block}.
 @end deffn
 @anchor{Function sb-unicode unicode-1-name}
 @ffindex @sortas{unicode-1-name sb-unicode} unicode-1-name [sb-unicode]
 @deffn{Function} sb-unicode:unicode-1-name character
-Returns the name assigned to @code{character} in Unicode 1.0 if it is distinct
+Return the name assigned to @code{character} in Unicode 1.0 if it is distinct
 from the name currently assigned to @code{character}. Otherwise, returns @code{nil}.
 This property has been officially obsoleted by the Unicode standard, and
 is only included for backwards compatibility.
@@ -2012,92 +2015,92 @@ is only included for backwards compatibility.
 @anchor{Function sb-unicode proplist-p}
 @ffindex @sortas{proplist-p sb-unicode} proplist-p [sb-unicode]
 @deffn{Function} sb-unicode:proplist-p character property
-Returns @code{t} if @code{character} has the specified @code{property}.
+Return @code{t} if @code{character} has the specified @code{property}.
 @code{property} is a keyword representing one of the properties from PropList.txt,
 with underscores replaced by dashes.
 @end deffn
 @anchor{Function sb-unicode uppercase-p}
 @ffindex @sortas{uppercase-p sb-unicode} uppercase-p [sb-unicode]
 @deffn{Function} sb-unicode:uppercase-p character
-Returns @code{t} if @code{character} has the Unicode property Uppercase and @code{nil} otherwise
+Return @code{t} if @code{character} has the Unicode property Uppercase and @code{nil} otherwise.
 @end deffn
 @anchor{Function sb-unicode lowercase-p}
 @ffindex @sortas{lowercase-p sb-unicode} lowercase-p [sb-unicode]
 @deffn{Function} sb-unicode:lowercase-p character
-Returns @code{t} if @code{character} has the Unicode property Lowercase and @code{nil} otherwise
+Return @code{t} if @code{character} has the Unicode property Lowercase and @code{nil} otherwise.
 @end deffn
 @anchor{Function sb-unicode cased-p}
 @ffindex @sortas{cased-p sb-unicode} cased-p [sb-unicode]
 @deffn{Function} sb-unicode:cased-p character
-Returns @code{t} if @code{character} has a (Unicode) case, and @code{nil} otherwise
+Return @code{t} if @code{character} has a (Unicode) case, and @code{nil} otherwise.
 @end deffn
 @anchor{Function sb-unicode case-ignorable-p}
 @ffindex @sortas{case-ignorable-p sb-unicode} case-ignorable-p [sb-unicode]
 @deffn{Function} sb-unicode:case-ignorable-p character
-Returns @code{t} if @code{character} is Case Ignorable as defined in Unicode 6.3, Chapter
-3
+Return @code{t} if @code{character} is Case Ignorable as defined in Unicode 6.3, Chapter
+3.
 @end deffn
 @anchor{Function sb-unicode alphabetic-p}
 @ffindex @sortas{alphabetic-p sb-unicode} alphabetic-p [sb-unicode]
 @deffn{Function} sb-unicode:alphabetic-p character
-Returns @code{t} if @code{character} is Alphabetic according to the Unicode standard
-and @code{nil} otherwise
+Return @code{t} if @code{character} is Alphabetic according to the Unicode standard
+and @code{nil} otherwise.
 @end deffn
 @anchor{Function sb-unicode ideographic-p}
 @ffindex @sortas{ideographic-p sb-unicode} ideographic-p [sb-unicode]
 @deffn{Function} sb-unicode:ideographic-p character
-Returns @code{t} if @code{character} has the Unicode property Ideographic,
-which loosely corresponds to the set of "Chinese characters"
+Return @code{t} if @code{character} has the Unicode property Ideographic,
+which loosely corresponds to the set of "Chinese characters".
 @end deffn
 @anchor{Function sb-unicode math-p}
 @ffindex @sortas{math-p sb-unicode} math-p [sb-unicode]
 @deffn{Function} sb-unicode:math-p character
-Returns @code{t} if @code{character} is a mathematical symbol according to Unicode and
-@code{nil} otherwise
+Return @code{t} if @code{character} is a mathematical symbol according to Unicode and
+@code{nil} otherwise.
 @end deffn
 @anchor{Function sb-unicode whitespace-p}
 @ffindex @sortas{whitespace-p sb-unicode} whitespace-p [sb-unicode]
 @deffn{Function} sb-unicode:whitespace-p character
-Returns @code{t} if @code{character} is whitespace according to Unicode
-and @code{nil} otherwise
+Return @code{t} if @code{character} is whitespace according to Unicode
+and @code{nil} otherwise.
 @end deffn
 @anchor{Function sb-unicode soft-dotted-p}
 @ffindex @sortas{soft-dotted-p sb-unicode} soft-dotted-p [sb-unicode]
 @deffn{Function} sb-unicode:soft-dotted-p character
-Returns @code{t} if @code{character} has a soft dot (such as the dots on i and j) which
-disappears when accents are placed on top of it. and @code{nil} otherwise
+Return @code{t} if @code{character} has a soft dot (such as the dots on i and j) that
+disappears when accents are placed on top of it, and @code{nil} otherwise.
 @end deffn
 @anchor{Function sb-unicode hex-digit-p}
 @ffindex @sortas{hex-digit-p sb-unicode} hex-digit-p [sb-unicode]
 @deffn{Function} sb-unicode:hex-digit-p character &key ascii
-Returns @code{t} if @code{character} is a hexadecimal digit and @code{nil} otherwise.
+Return @code{t} if @code{character} is a hexadecimal digit and @code{nil} otherwise.
 If @code{:ascii} is non-@code{nil}, fullwidth equivalents of the Latin letters A through F
 are excluded.
 @end deffn
 @anchor{Function sb-unicode default-ignorable-p}
 @ffindex @sortas{default-ignorable-p sb-unicode} default-ignorable-p [sb-unicode]
 @deffn{Function} sb-unicode:default-ignorable-p character
-Returns @code{t} if @code{character} is a Default@emph{Ignorable}Code_Point
+Return @code{t} if @code{character} is a Default@emph{Ignorable}Code_Point.
 @end deffn
 @anchor{Function sb-unicode grapheme-break-class}
 @ffindex @sortas{grapheme-break-class sb-unicode} grapheme-break-class [sb-unicode]
 @deffn{Function} sb-unicode:grapheme-break-class character
-Returns the grapheme breaking class of @code{character}, as specified in UAX #29.
+Return the grapheme breaking class of @code{character}, as specified in UAX #29.
 @end deffn
 @anchor{Function sb-unicode word-break-class}
 @ffindex @sortas{word-break-class sb-unicode} word-break-class [sb-unicode]
 @deffn{Function} sb-unicode:word-break-class character
-Returns the word breaking class of @code{character}, as specified in UAX #29.
+Return the word breaking class of @code{character}, as specified in UAX #29.
 @end deffn
 @anchor{Function sb-unicode sentence-break-class}
 @ffindex @sortas{sentence-break-class sb-unicode} sentence-break-class [sb-unicode]
 @deffn{Function} sb-unicode:sentence-break-class character
-Returns the sentence breaking class of @code{character}, as specified in UAX #29.
+Return the sentence breaking class of @code{character}, as specified in UAX #29.
 @end deffn
 @anchor{Function sb-unicode line-break-class}
 @ffindex @sortas{line-break-class sb-unicode} line-break-class [sb-unicode]
 @deffn{Function} sb-unicode:line-break-class character
-Returns the line breaking class of @code{character}, as specified in the
+Return the line breaking class of @code{character}, as specified in the
 Unicode character database.
 @end deffn
 @node unicode string operations
@@ -2117,7 +2120,7 @@ only characters for which it returns @code{t} are collected.
 @anchor{Function sb-unicode normalized-p}
 @ffindex @sortas{normalized-p sb-unicode} normalized-p [sb-unicode]
 @deffn{Function} sb-unicode:normalized-p string &optional (form :nfd)
-Tests if @code{string} is normalized to @code{form}
+Test if @code{string} is normalized to @code{form}.
 @end deffn
 SBCL implements the full range of Unicode case operations with the
 functions
@@ -2125,7 +2128,7 @@ functions
 @anchor{Function sb-unicode uppercase}
 @ffindex @sortas{uppercase sb-unicode} uppercase [sb-unicode]
 @deffn{Function} sb-unicode:uppercase string &key locale
-Returns the full uppercase of @code{string} according to the Unicode standard.
+Return the full uppercase of @code{string} according to the Unicode standard.
 The result is not guaranteed to have the same length as the input. If @code{:locale}
 is @code{nil}, no language-specific case transformations are applied. If @code{:locale} is a
 keyword representing a two-letter ISO country code, the case transforms of that
@@ -2135,21 +2138,21 @@ Win32 only).
 @anchor{Function sb-unicode lowercase}
 @ffindex @sortas{lowercase sb-unicode} lowercase [sb-unicode]
 @deffn{Function} sb-unicode:lowercase string &key locale
-Returns the full lowercase of @code{string} according to the Unicode standard.
+Return the full lowercase of @code{string} according to the Unicode standard.
 The result is not guaranteed to have the same length as the input.
 @code{:locale} has the same semantics as the @code{:locale} argument to @code{uppercase}.
 @end deffn
 @anchor{Function sb-unicode titlecase}
 @ffindex @sortas{titlecase sb-unicode} titlecase [sb-unicode]
 @deffn{Function} sb-unicode:titlecase string &key locale
-Returns the titlecase of @code{string}. The resulting string can
+Return the titlecase of @code{string}. The resulting string can
 be longer than the input.
 @code{:locale} has the same semantics as the @code{:locale} argument to @code{uppercase}.
 @end deffn
 @anchor{Function sb-unicode casefold}
 @ffindex @sortas{casefold sb-unicode} casefold [sb-unicode]
 @deffn{Function} sb-unicode:casefold string
-Returns the full casefolding of @code{string} according to the Unicode standard.
+Return the full casefolding of @code{string} according to the Unicode standard.
 Casefolding removes case information in a way that allows the results to be used
 for case-insensitive comparisons.
 The result is not guaranteed to have the same length as the input.
@@ -2166,40 +2169,43 @@ Algorithm.
 @anchor{Function sb-unicode unicode<}
 @ffindex @sortas{unicode< sb-unicode} unicode< [sb-unicode]
 @deffn{Function} sb-unicode:unicode< string1 string2 &key (start1 0) end1 (start2 0) end2
-Determines whether @code{string1} sorts before @code{string2} using the Unicode Collation
-Algorithm. The function uses an untailored Default Unicode Collation Element Table
-to produce the sort keys. The function uses the Shifted method for dealing
-with variable-weight characters, as described in UTS #10
+Determine whether @code{string1} sorts before @code{string2} using the Unicode
+Collation Algorithm. The function uses an untailored Default Unicode
+Collation Element Table to produce the sort keys. The function uses
+the Shifted method for dealing with variable-weight characters, as
+described in UTS #10.
 @end deffn
 @anchor{Function sb-unicode unicode=}
 @ffindex @sortas{unicode= sb-unicode} unicode= [sb-unicode]
 @deffn{Function} sb-unicode:unicode= string1 string2 &key (start1 0) end1 (start2 0) end2 (strict t)
-Determines whether @code{string1} and @code{string2} are canonically equivalent according
-to Unicode. The @code{start} and @code{end} arguments behave like the arguments to @code{string=}.
-If @code{:strict} is @code{nil}, @code{unicode=} tests compatibility equivalence instead.
+Determine whether @code{string1} and @code{string2} are canonically equivalent
+according to Unicode. The @code{start} and @code{end} arguments behave like the
+arguments to @code{string=}. If @code{:strict} is @code{nil}, @code{unicode=} tests compatibility
+equivalence instead.
 @end deffn
 @anchor{Function sb-unicode unicode-equal}
 @ffindex @sortas{unicode-equal sb-unicode} unicode-equal [sb-unicode]
 @deffn{Function} sb-unicode:unicode-equal string1 string2 &key (start1 0) end1 (start2 0) end2 (strict t)
-Determines whether @code{string1} and @code{string2} are canonically equivalent after
-casefolding (that is, ignoring case differences) according to Unicode. The
-@code{start} and @code{end} arguments behave like the arguments to @code{string=}. If @code{:strict} is
-@code{nil}, @code{unicode=} tests compatibility equivalence instead.
+Determine whether @code{string1} and @code{string2} are canonically equivalent
+after casefolding (that is, ignoring case differences) according to
+Unicode. The @code{start} and @code{end} arguments behave like the arguments to
+@code{string=}. If @code{:strict} is @code{nil}, @code{unicode=} tests compatibility equivalence
+instead.
 @end deffn
 @anchor{Function sb-unicode unicode<=}
 @ffindex @sortas{unicode<= sb-unicode} unicode<= [sb-unicode]
 @deffn{Function} sb-unicode:unicode<= string1 string2 &key (start1 0) end1 (start2 0) end2
-Tests if @code{string1} and @code{string2} are either @code{unicode<} or @code{unicode=}
+See if @code{string1} and @code{string2} are either @code{unicode<} or @code{unicode=}.
 @end deffn
 @anchor{Function sb-unicode unicode>}
 @ffindex @sortas{unicode> sb-unicode} unicode> [sb-unicode]
 @deffn{Function} sb-unicode:unicode> string1 string2 &key (start1 0) end1 (start2 0) end2
-Tests if @code{string2} is @code{unicode<} @code{string1}.
+See if @code{string2} is @code{unicode<} @code{string1}.
 @end deffn
 @anchor{Function sb-unicode unicode>=}
 @ffindex @sortas{unicode>= sb-unicode} unicode>= [sb-unicode]
 @deffn{Function} sb-unicode:unicode>= string1 string2 &key (start1 0) end1 (start2 0) end2
-Tests if @code{string1} and @code{string2} are either @code{unicode=} or @code{unicode>}
+See if @code{string1} and @code{string2} are either @code{unicode=} or @code{unicode>}.
 @end deffn
 The following functions are provided for detecting visually
 confusable strings:
@@ -2207,8 +2213,8 @@ confusable strings:
 @anchor{Function sb-unicode confusable-p}
 @ffindex @sortas{confusable-p sb-unicode} confusable-p [sb-unicode]
 @deffn{Function} sb-unicode:confusable-p string1 string2 &key (start1 0) end1 (start2 0) end2
-Determines whether @code{string1} and @code{string2} could be visually confusable
-according to the IDNA confusableSummary.txt table
+Determine whether @code{string1} and @code{string2} could be visually confusable
+according to the IDNA confusableSummary.txt table.
 @end deffn
 @node breaking unicode strings
 @subsection Breaking Unicode Strings
@@ -2219,29 +2225,29 @@ Unicode string into useful parts.
 @anchor{Function sb-unicode graphemes}
 @ffindex @sortas{graphemes sb-unicode} graphemes [sb-unicode]
 @deffn{Function} sb-unicode:graphemes string
-Breaks @code{string} into graphemes according to the default
+Break @code{string} into graphemes according to the default
 grapheme breaking rules specified in UAX #29, returning a list of strings.
 @end deffn
 @anchor{Function sb-unicode words}
 @ffindex @sortas{words sb-unicode} words [sb-unicode]
 @deffn{Function} sb-unicode:words string
-Breaks @code{string} into words according to the default
-word breaking rules specified in UAX #29. Returns a list of strings
+Break @code{string} into words according to the default word breaking rules
+specified in UAX #29. Returns a list of strings.
 @end deffn
 @anchor{Function sb-unicode sentences}
 @ffindex @sortas{sentences sb-unicode} sentences [sb-unicode]
 @deffn{Function} sb-unicode:sentences string
-Breaks @code{string} into sentences according to the default
-sentence breaking rules specified in UAX #29
+Break @code{string} into sentences according to the default
+sentence breaking rules specified in UAX #29.
 @end deffn
 @anchor{Function sb-unicode lines}
 @ffindex @sortas{lines sb-unicode} lines [sb-unicode]
 @deffn{Function} sb-unicode:lines string &key (margin *print-right-margin*)
-Breaks @code{string} into lines that are no wider than @code{:margin} according to the
+Break @code{string} into lines that are no wider than @code{:margin} according to the
 line breaking rules outlined in UAX #14. Combining marks will always be kept
 together with their base characters, and spaces (but not other types of
 whitespace) will be removed from the end of lines. If @code{:margin} is unspecified,
-it defaults to 80 characters
+it defaults to 80 characters.
 @end deffn
 @node customization hooks for users
 @section Customization Hooks for Users
@@ -2250,20 +2256,20 @@ The toplevel repl prompt may be customized, and the function
 that reads user input may be replaced completely. See the @code{:toplevel}
 argument of @code{sb-ext:save-lisp-and-die}.
 
-The behaviour of @code{require} when called with only one argument is
+The behavior of @code{require} when called with only one argument is
 implementation-defined. In SBCL, @code{require} behaves in the following
 way:
 
 @anchor{Function common-lisp require}
 @ffindex @sortas{require common-lisp} require [common-lisp]
 @deffn{Function} require module-name &optional pathnames
-Loads a module, unless it already has been loaded. @code{pathnames}, if supplied,
-is a designator for a list of pathnames to be loaded if the module
-needs to be. If @code{pathnames} is not supplied, functions from the list
-@code{*module-provider-functions*} are called in order with @code{module-name}
-as an argument, until one of them returns non-@code{nil}.  User code is
-responsible for calling @code{provide} to indicate a successful load of the
-module.
+Load @code{module-name}, unless it already has been loaded. @code{pathnames}, if
+supplied, is a designator for a list of pathnames to be loaded if
+the module needs to be. If @code{pathnames} is not supplied, functions from
+the list @code{*module-provider-functions*} are called in order with
+@code{module-name} as an argument, until one of them returns non-@code{nil}. User
+code is responsible for calling @code{provide} to indicate a successful
+load of the module.
 @end deffn
 @anchor{Variable sb-ext *module-provider-functions*}
 @vvindex @sortas{module-provider-functions* sb-ext} *module-provider-functions* [sb-ext]
@@ -2277,7 +2283,7 @@ mechanisms as follows:
 @anchor{Function common-lisp ed}
 @ffindex @sortas{ed common-lisp} ed [common-lisp]
 @deffn{Function} ed &optional x
-Starts the editor (on a file or a function if named).  Functions
+Start the editor (on a file or a function if named). Functions
 from the list @code{*ed-functions*} are called in order with @code{x} as an argument
 until one of them returns non-@code{nil}; these functions are responsible for
 signalling a @code{file-error} to indicate failure to perform an operation on
@@ -2401,8 +2407,8 @@ also: @code{sb-ext:with-locked-hash-table}.
 @anchor{Macro sb-ext define-hash-table-test}
 @ffindex @sortas{define-hash-table-test sb-ext} define-hash-table-test [sb-ext]
 @deffn{Macro} sb-ext:define-hash-table-test name hash-function
-Defines @code{name} as a new kind of hash table test for use with the @code{:test}
-argument to @code{make-hash-table}, and associates a default @code{hash-function} with it.
+Define @code{name} as a new kind of hash table test for use with the @code{:test}
+argument to @code{make-hash-table}, and associate a default @code{hash-function} with it.
 
 @code{name} must be a symbol naming a global two argument equivalence predicate.
 Afterwards both '@code{name} and #'@code{name} can be used with @code{:test} argument. In both
@@ -2460,7 +2466,7 @@ Examples:
 @anchor{Macro sb-ext with-locked-hash-table}
 @ffindex @sortas{with-locked-hash-table sb-ext} with-locked-hash-table [sb-ext]
 @deffn{Macro} sb-ext:with-locked-hash-table (hash-table) &body body
-Limits concurrent accesses to @code{hash-table} for the duration of @code{body}.
+Limit concurrent accesses to @code{hash-table} for the duration of @code{body}.
 If @code{hash-table} is synchronized, @code{body} will execute with exclusive
 ownership of the table. If @code{hash-table} is not synchronized, @code{body} will
 execute with other @code{with-locked-hash-table} bodies excluded -- exclusion
@@ -2470,7 +2476,7 @@ unspecified.
 @anchor{Function sb-ext hash-table-synchronized-p}
 @ffindex @sortas{hash-table-synchronized-p sb-ext} hash-table-synchronized-p [sb-ext]
 @deffn{Function} sb-ext:hash-table-synchronized-p ht
-Returns @code{t} if @code{hash-table} is synchronized.
+Return @code{t} if @code{hash-table} is synchronized.
 @end deffn
 @anchor{Function sb-ext hash-table-weakness}
 @ffindex @sortas{hash-table-weakness sb-ext} hash-table-weakness [sb-ext]
@@ -2506,8 +2512,8 @@ word size.
 @anchor{Function sb-ext seed-random-state}
 @ffindex @sortas{seed-random-state sb-ext} seed-random-state [sb-ext]
 @deffn{Function} sb-ext:seed-random-state &optional state
-Make a random state object. The optional @code{state} argument specifies a seed
-for deterministic pseudo-random number generation.
+Make a @code{random-state} object. The optional @code{state} argument specifies a
+seed for deterministic pseudo-random number generation.
 
 As per the Common Lisp standard for @code{make-random-state},
 
@@ -2681,7 +2687,7 @@ explicitly overrides outer deadlines.
 @anchor{Macro sb-sys with-deadline}
 @ffindex @sortas{with-deadline sb-sys} with-deadline [sb-sys]
 @deffn{Macro} sb-sys:with-deadline (&key seconds override) &body body
-Arranges for a @code{timeout} condition to be signalled if an operation
+Arrange for a @code{timeout} condition to be signalled if an operation
 respecting deadlines occurs either after the deadline has passed, or
 would take longer than the time left to complete.
 
@@ -2819,7 +2825,7 @@ Signaled when an operation does not complete within an allotted time budget.
 @anchor{Function sb-ext array-storage-vector}
 @ffindex @sortas{array-storage-vector sb-ext} array-storage-vector [sb-ext]
 @deffn{Function} sb-ext:array-storage-vector array
-Returns the underlying storage vector of @code{array}, which must be a non-displaced array.
+Return the underlying storage vector of @code{array}, which must be a non-displaced array.
 
 In SBCL, if @code{array} is a of type (@code{simple-array} * (*)), it is its own storage
 vector. Multidimensional arrays, arrays with fill pointers, and adjustable
@@ -2835,7 +2841,7 @@ cause this function to be removed without further warning.
 @anchor{Function sb-ext delete-directory}
 @ffindex @sortas{delete-directory sb-ext} delete-directory [sb-ext]
 @deffn{Function} sb-ext:delete-directory pathspec &key recursive
-Deletes the directory designated by @code{pathspec} (a pathname designator).
+Delete the directory designated by @code{pathspec} (a pathname designator).
 Returns the truename of the directory deleted.
 
 If @code{recursive} is false (the default), signals an error unless the directory is
@@ -2860,12 +2866,12 @@ it does not exist or if it is a file or a symbolic link.
 @ffindex @sortas{get-time-of-day sb-ext} get-time-of-day [sb-ext]
 @deffn{Function} sb-ext:get-time-of-day
 Return the number of seconds and microseconds since the beginning of
-the UNIX epoch (January 1st 1970.)
+the UNIX epoch (January 1st 1970).
 @end deffn
 @anchor{Function sb-ext assert-version->=}
 @ffindex @sortas{assert-version->= sb-ext} assert-version->= [sb-ext]
 @deffn{Function} sb-ext:assert-version->= &rest subversions
-Asserts that the current SBCL is of version equal to or greater than
+Assert that the current SBCL is of version equal to or greater than
 the version specified in the arguments.  A continuable error is signaled
 otherwise.
 

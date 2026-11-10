@@ -605,7 +605,7 @@ per standard Unix unlink() behaviour."
      pathname)))
 
 (defun delete-directory (pathspec &key recursive)
-  "Deletes the directory designated by PATHSPEC (a pathname designator).
+  "Delete the directory designated by PATHSPEC (a pathname designator).
 Returns the truename of the directory deleted.
 
 If RECURSIVE is false \(the default), signals an error unless the directory is

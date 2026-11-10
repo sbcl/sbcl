@@ -32,9 +32,9 @@
 ;;; builds.
 
 (defmacro with-cas-lock ((place) &body body)
-  "Runs BODY with interrupts disabled and *CURRENT-THREAD* compare-and-swapped
-into PLACE instead of NIL. PLACE must be a place acceptable to
-COMPARE-AND-SWAP, and must initially hold NIL.
+  "Run BODY with interrupts disabled and *CURRENT-THREAD*
+compare-and-swapped into PLACE instead of NIL. PLACE must be a place
+acceptable to SB-EXT:COMPARE-AND-SWAP, and must initially hold NIL.
 
 WITH-CAS-LOCK is suitable mostly when the critical section needing protection
 is very small, and cost of allocating a separate lock object would be
@@ -114,7 +114,7 @@ WITH-CAS-LOCK can be entered recursively."
 (define-condition thread-error (error)
   ((thread :reader thread-error-thread :initarg :thread))
   (:documentation
-   "Conditions of type THREAD-ERROR are signalled when thread operations fail.
+   "Signalled when thread operations fail.
 The offending thread is initialized by the :THREAD initialization argument and
 read by the function THREAD-ERROR-THREAD."))
 
@@ -421,7 +421,7 @@ created and old ones may exit at any time."
                       thread))))
 
 (defun main-thread ()
-  "Returns the main thread of the process."
+  "Return the main thread of the process."
   *initial-thread*)
 
 (declaim (inline main-thread-p))
@@ -441,7 +441,7 @@ created and old ones may exit at any time."
 (locally (declare (sb-c::tlab :system)) (defun sys-tlab-list (&rest args) args))
 
 (defmacro return-from-thread (values-form &key allow-exit)
-  "Unwinds from and terminates the current thread, with values from
+  "Unwind from and terminate the current thread, with values from
 VALUES-FORM as the results visible to JOIN-THREAD.
 
 If current thread is the main thread of the process (see
@@ -465,7 +465,7 @@ calling SB-EXT:EXIT with :CODE 0 and :ABORT NIL."
            (throw '%return-from-thread (values-list values))))))
 
 (defun abort-thread (&key allow-exit)
-  "Unwinds from and terminates the current thread abnormally, causing
+  "Unwind from and terminate the current thread abnormally, causing
 JOIN-THREAD on current thread to signal an error unless a
 default-value is provided.
 
@@ -722,7 +722,7 @@ Experimental: subject to change without prior notice."
 
 (defmacro with-progressive-timeout ((name &key seconds)
                                     &body body)
-  "Binds NAME as a local function for BODY. Each time #'NAME is called, it
+  "Bind NAME as a local function for BODY. Each time #'NAME is called, it
 returns SECONDS minus the time that has elapsed since BODY was entered, or
 zero if more time than SECONDS has elapsed. If SECONDS is NIL, #'NAME
 returns NIL each time."
@@ -1391,7 +1391,7 @@ is initially NIL.")
 
 (declaim (inline semaphore-notification-status))
 (defun semaphore-notification-status (semaphore-notification)
-  "Returns T if a WAIT-ON-SEMAPHORE or TRY-SEMAPHORE using
+  "Return T if a WAIT-ON-SEMAPHORE or TRY-SEMAPHORE using
 SEMAPHORE-NOTIFICATION has succeeded since the notification object was created
 or cleared."
   (barrier (:read))
@@ -1399,14 +1399,14 @@ or cleared."
 
 (declaim (inline clear-semaphore-notification))
 (defun clear-semaphore-notification (semaphore-notification)
-  "Resets the SEMAPHORE-NOTIFICATION object for use with another call to
+  "Reset the SEMAPHORE-NOTIFICATION object for use with another call to
 WAIT-ON-SEMAPHORE or TRY-SEMAPHORE."
   (barrier (:write)
     (setf (semaphore-notification-%status semaphore-notification) nil)))
 
 (declaim (inline semaphore-count))
 (defun semaphore-count (semaphore)
-  "Returns the current count of SEMAPHORE."
+  "Return the current count of SEMAPHORE."
   (barrier (:read))
   (semaphore-%count semaphore))
 
@@ -1518,7 +1518,7 @@ the status is set to T."
 (declaim (ftype (sfunction (semaphore &optional (integer 1)) null) signal-semaphore))
 (defun signal-semaphore (semaphore &optional (n 1))
   "Increment the count of SEMAPHORE by N. If there are threads waiting
-on this semaphore, then N of them is woken up."
+on this semaphore, then wake up N of them."
   (declare (type (integer 1) n))
   ;; Need to disable interrupts so that we don't lose a wakeup after
   ;; we have incremented the count.
@@ -1694,7 +1694,7 @@ thread is not the foreground thread."
 
 ;;; called from top of invoke-debugger
 (defun debugger-wait-until-foreground-thread (stream)
-  "Returns T if thread had been running in background, NIL if it was
+  "Return T if thread had been running in background, NIL if it was
 interactive."
   (declare (ignore stream))
   #-sb-thread nil

@@ -120,7 +120,7 @@
            return))
 
 (defun alien-callback-p (alien)
-  "Returns true if the alien is associated with a Lisp-side callback."
+  "Return true if the alien is associated with a Lisp-side callback."
   (alien-callback-index alien))
 
 ;;; Invalidate the alien function ALIEN allocated by Lisp and allow

@@ -149,13 +149,13 @@ Example:
 
 (declaim (inline make-frlock))
 (defun make-frlock (&key name)
-  "Returns a new FRLOCK with NAME."
+  "Return a new FRLOCK with NAME."
   (%make-frlock name))
 
 #+new-frlock
 (progn
 (defmacro frlock-write ((frlock) &body body)
-  "Executes BODY while holding FRLOCK for writing."
+  "Execute BODY while holding FRLOCK for writing."
   (let ((the-frlock (make-symbol "FRLOCK")))
     `(let ((,the-frlock (the frlock ,frlock)))
        (with-system-mutex ((frlock-mutex ,the-frlock))
@@ -166,7 +166,7 @@ Example:
          (atomic-incf (frlock-counter ,the-frlock)))
        (values))))
 (defmacro frlock-read ((frlock) &body value-forms)
-  "Evaluates VALUE-FORMS under FRLOCK until a consistent state
+  "Evaluate VALUE-FORMS under FRLOCK until a consistent state
 is observed, and return the results as multiple values."
   (let ((syms (make-gensym-list (length value-forms)))
         (the-frlock (make-symbol "FRLOCK"))
@@ -202,10 +202,11 @@ Using FRLOCK-READ instead is recommended."
 
 (declaim (inline frlock-read-end))
 (defun frlock-read-end (frlock)
-  "Ends a read sequence on FRLOCK. Returns a token and an epoch. If the token
-and epoch are EQL to the read-token and epoch returned by FRLOCK-READ-BEGIN,
-the values read under the FRLOCK are consistent and can be used: if the values
-differ, the values are inconsistent and the read must be restated.
+  "End a read sequence on FRLOCK. Return a token and an epoch. If the
+token and epoch are EQL to the read-token and epoch returned by
+FRLOCK-READ-BEGIN, the values read under the FRLOCK are consistent and
+can be used: if the values differ, the values are inconsistent and the
+read must be restated.
 
 Using FRLOCK-READ instead is recommended.
 
@@ -223,7 +224,7 @@ Example:
           (frlock-epoch frlock)))
 
 (defmacro frlock-read ((frlock) &body value-forms)
-  "Evaluates VALUE-FORMS under FRLOCK till it obtains a consistent
+  "Evaluate VALUE-FORMS under FRLOCK till it obtains a consistent
 set, and returns that as multiple values."
   (once-only ((frlock frlock))
     (with-unique-names (t0 t1 e0 e1)
@@ -264,7 +265,7 @@ set, and returns that as multiple values."
 ;;; Normal entry-point.
 (declaim (inline grab-frlock-write-lock))
 (defun grab-frlock-write-lock (frlock &key (wait-p t) timeout)
-  "Acquires FRLOCK for writing, invalidating existing and future read-tokens
+  "Acquire FRLOCK for writing, invalidating existing and future read-tokens
 for the duration. Returns T on success, and NIL if the lock wasn't acquired
 due to e.g. a timeout. Using FRLOCK-WRITE instead is recommended."
   (without-interrupts
@@ -272,16 +273,16 @@ due to e.g. a timeout. Using FRLOCK-WRITE instead is recommended."
 
 (declaim (inline release-frlock-write-lock))
 (defun release-frlock-write-lock (frlock)
-  "Releases FRLOCK after writing, allowing valid read-tokens to be acquired again.
-Signals an error if the current thread doesn't hold FRLOCK for writing. Using FRLOCK-WRITE
-instead is recommended."
+  "Release FRLOCK after writing, allowing valid read-tokens to be
+acquired again. Signals an error if the current thread doesn't hold
+FRLOCK for writing. Using FRLOCK-WRITE instead is recommended."
   (barrier (:write)) ; ensure all user state is published
   (setf (frlock-post-counter frlock)
         (logand most-positive-fixnum (1+ (frlock-post-counter frlock))))
   (release-mutex (frlock-mutex frlock) :if-not-owner :error))
 
 (defmacro frlock-write ((frlock &key (wait-p t) timeout) &body body)
-  "Executes BODY while holding FRLOCK for writing."
+  "Execute BODY while holding FRLOCK for writing."
   (once-only ((frlock frlock))
     (with-unique-names (got-it)
       `(without-interrupts

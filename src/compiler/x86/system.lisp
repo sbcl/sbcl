@@ -320,7 +320,7 @@
      (move hi edx)))
 
 (defmacro with-cycle-counter (&body body)
-  "Returns the primary value of BODY as the primary value, and the
+  "Return the primary value of BODY as the primary value, and the
 number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
   (with-unique-names (hi0 hi1 lo0 lo1)
     `(multiple-value-bind (,hi0 ,lo0) (%read-cycle-counter)

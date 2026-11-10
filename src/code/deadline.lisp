@@ -68,7 +68,7 @@
 
 (defmacro with-deadline ((&key seconds override)
                          &body body)
-  "Arranges for a TIMEOUT condition to be signalled if an operation
+  "Arrange for a TIMEOUT condition to be signalled if an operation
 respecting deadlines occurs either after the deadline has passed, or
 would take longer than the time left to complete.
 
@@ -110,14 +110,14 @@ Experimental."
 
 (declaim (inline decode-internal-time))
 (defun decode-internal-time (time)
-  "Returns internal time value TIME decoded into seconds and microseconds."
+  "Return internal time value TIME decoded into seconds and microseconds."
   (declare (type internal-time time))
   (multiple-value-bind (sec frac)
       (truncate time internal-time-units-per-second)
     (values sec (* frac sb-unix::microseconds-per-internal-time-unit))))
 
 (defun signal-timeout (datum &rest arguments)
-  "Signals a timeout condition while inhibiting further timeouts due to
+  "Signal a timeout condition while inhibiting further timeouts due to
 deadlines while the condition is being handled."
   ;; FIXME: Maybe we should make ERROR do WITH-INTERRUPTS instead of
   ;; putting it all over the place (now that we have ALLOW-WITH-INTERRUPTS.)
@@ -170,7 +170,7 @@ CONDITION, or return NIL if the restart is not found."
 
 (declaim (inline relative-decoded-times))
 (defun relative-decoded-times (abs-sec abs-usec)
-  "Returns relative decoded time as two values: difference between
+  "Return relative decoded time as two values: difference between
 ABS-SEC and ABS-USEC and current real time.
 
 If ABS-SEC and ABS-USEC are in the past, 0 0 is returned."
@@ -204,7 +204,7 @@ If ABS-SEC and ABS-USEC are in the past, 0 0 is returned."
                                    boolean))
                 decode-timeout))
 (defun decode-timeout (seconds)
-  "Decodes a relative timeout in SECONDS into five values, taking any
+  "Decode a relative timeout in SECONDS into five values, taking any
 global deadlines into account: `TO-SEC`, `TO-USEC`, `STOP-SEC`,
 `STOP-USEC`, `DEADLINEP`.
 

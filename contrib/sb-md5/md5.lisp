@@ -592,7 +592,7 @@ and appended bit-length, as specified by the MD5 standard.
 
 The resulting MD5 message-digest is returned as an array of sixteen
 (unsigned-byte 8) values.  Calling UPDATE-MD5-STATE after a call to
-FINALIZE-MD5-STATE results in unspecified behaviour."
+FINALIZE-MD5-STATE results in unspecified behavior."
   (declare (type md5-state state)
            (optimize (speed 3) (safety 1) (space 0) (debug 1) #+lw-int32 (float 0)))
   (locally

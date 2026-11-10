@@ -72,10 +72,9 @@
         (setf *break-on-signals* new-value)))))
 
 (defun signal (datum &rest arguments)
-  "Invokes the signal facility on a condition formed from DATUM and
-   ARGUMENTS. If the condition is not handled, NIL is returned. If
-   (TYPEP condition *BREAK-ON-SIGNALS*) is true, the debugger is invoked
-   before any signalling is done."
+  "Signal the condition denoted by DATUM and ARGUMENTS. If the condition
+  is not handled, return NIL. If (TYPEP condition *BREAK-ON-SIGNALS*)
+  is true, the debugger is invoked before any signalling is done."
   (declare (explicit-check))
   (%signal (apply #'coerce-to-condition datum 'simple-condition 'signal arguments)))
 (defun %signal (condition)

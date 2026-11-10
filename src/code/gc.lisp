@@ -326,7 +326,7 @@ used to specify the oldest generation guaranteed to be collected."
 
 (defun bytes-consed-between-gcs ()
   "The amount of memory that will be allocated before the next garbage
-collection is initiated. This can be set with SETF.
+collection is initiated. SETFable.
 
 On GENCGC platforms this is the nursery size, and defaults to 5% of dynamic
 space size.
@@ -357,7 +357,7 @@ Note that currently, changes to this value are lost when saving core."
       (free-alien old))
     pathname))
 (defun gc-logfile ()
-    "Return the pathname used to log garbage collections. Can be SETF.
+    "Return the pathname used to log garbage collections. SETFable.
 Default is NIL, meaning collections are not logged. If non-null, the
 designated file is opened before and after each collection, and generation
 statistics are appended to it."

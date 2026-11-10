@@ -563,12 +563,12 @@ distinct from the global value. Can also be SETF."
   "counter for generating unique GENSYM symbols")
 
 (defun gensym (&optional (thing "G"))
-  "Creates a new uninterned symbol whose name is a prefix string (defaults
-   to \"G\"), followed by a decimal number. Thing, when supplied, will
-   alter the prefix if it is a string, or be used for the decimal number
-   if it is a number, of this symbol. The default value of the number is
-   the current value of *gensym-counter* which is incremented each time
-   it is used."
+  "Create a new uninterned symbol whose name is a prefix string (defaults
+  to \"G\"), followed by a decimal number. THING, when supplied, will
+  alter the prefix if it is a string, or be used for the decimal
+  number if it is a number, of this symbol. The default value of the
+  number is the current value of *GENSYM-COUNTER*, which is
+  incremented each time it is used."
   (multiple-value-bind (prefix int)
       (if (integerp thing)
           (values "G" thing)
@@ -578,7 +578,7 @@ distinct from the global value. Can also be SETF."
     (make-symbol (%symbol-nameify prefix int))))
 
 (defun gentemp (&optional (prefix "T") (package (sane-package)))
-  "Creates a new symbol interned in package PACKAGE with the given PREFIX."
+  "Create a new symbol interned in package PACKAGE with the given PREFIX."
   (loop (multiple-value-bind (sym accessibility)
             (intern (%symbol-nameify prefix (incf *gentemp-counter*)) package)
           (unless accessibility (return sym))))))

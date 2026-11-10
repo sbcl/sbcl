@@ -30,7 +30,7 @@ the state of a gate without blocking."
 (declaim (sb-ext:freeze-type gate))
 
 (setf (documentation 'gatep 'function)
-      "Returns true if the argument is a GATE."
+      "Return true if the argument is a GATE."
       (documentation 'gate-name 'function)
       "Name of a GATE. SETFable.")
 
@@ -41,7 +41,7 @@ the state of a gate without blocking."
             (gate-state gate))))
 
 (defun make-gate (&key name open)
-  "Makes a new gate. Gate will be initially open if OPEN is true, and closed if OPEN
+  "Make a new gate. Gate will be initially open if OPEN is true, and closed if OPEN
 is NIL (the default.) NAME, if provided, is the name of the gate, used when printing
 the gate."
   (flet ((generate-name (thing)
@@ -54,7 +54,7 @@ the gate."
      :state (if open :open :closed))))
 
 (defun open-gate (gate)
-  "Opens GATE. Returns T if the gate was previously closed, and NIL
+  "Open GATE. Return T if the gate was previously closed, and NIL
 if the gate was already open."
   (declare (gate gate))
   (let (closed)
@@ -66,7 +66,7 @@ if the gate was already open."
     closed))
 
 (defun close-gate (gate)
-  "Closes GATE. Returns T if the gate was previously open, and NIL
+  "Close GATE. Return T if the gate was previously open, and NIL
 if the gate was already closed."
   (declare (gate gate))
   (let (open)
@@ -76,7 +76,7 @@ if the gate was already closed."
     open))
 
 (defun wait-on-gate (gate &key timeout)
-  "Waits for GATE to open, or TIMEOUT seconds to pass. Returns T
+  "Wait for GATE to open or TIMEOUT seconds to pass. Return T
 if the gate was opened in time, and NIL otherwise."
   (declare (gate gate))
   (with-mutex ((gate-mutex gate))
@@ -87,6 +87,6 @@ if the gate was opened in time, and NIL otherwise."
   t)
 
 (defun gate-open-p (gate)
-  "Returns true if GATE is open."
+  "Return true if GATE is open."
   (declare (gate gate))
   (eq :open (gate-state gate)))

@@ -98,7 +98,7 @@ Examples:
   sockint::size-of-sockaddr-in)
 
 (defmethod bits-of-sockaddr ((socket inet-socket) sockaddr &optional size)
-  "Returns address and port of SOCKADDR as multiple values"
+  "Return address and port of SOCKADDR as multiple values"
   (declare (type (sb-alien:alien
                   (* (sb-alien:struct sb-bsd-sockets-internal::sockaddr-in)))
                  sockaddr)

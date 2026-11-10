@@ -672,9 +672,9 @@
 ;;;; converting to/from floats
 
 (defun float (number &optional (other () otherp))
-  "Converts any REAL to a float. If OTHER is not provided, it returns a
-  SINGLE-FLOAT if NUMBER is not already a FLOAT. If OTHER is provided, the
-  result is the same float format as OTHER."
+  "Convert NUMBER (a REAL) to a FLOAT. If OTHER is not provided, it
+  returns a SINGLE-FLOAT if NUMBER is not already a FLOAT. If OTHER is
+  provided, the result is the same float format as OTHER."
   (declare (explicit-check))
   (if otherp
       (number-dispatch ((number real) (other float))

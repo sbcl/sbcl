@@ -953,7 +953,7 @@ All qualities take values of type @code{(integer 0 3)}. The default for
 all qualities is @code{1}. Whenever qualities are equal, ties are broken
 according to a broad idea of what a good default environment is
 supposed to be. Generally this downplays @code{speed}, @code{compilation-speed}
-and @code{space} in favour of @code{safety} and @code{debug}. Novice and casual users
+and @code{space} in favor of @code{safety} and @code{debug}. Novice and casual users
 should stick to the default policy. Advanced users often want to
 improve speed and memory usage at the cost of safety and
 debuggability.

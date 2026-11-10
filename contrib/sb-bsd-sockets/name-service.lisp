@@ -65,14 +65,14 @@
       (sb-thread:make-mutex :name "gethostby lock"))
 
   (defun get-host-by-name (host-name)
-    "Returns a HOST-ENT instance for HOST-NAME or signals a NAME-SERVICE-ERROR.
+    "Return a HOST-ENT instance for HOST-NAME or signals a NAME-SERVICE-ERROR.
 HOST-NAME may also be an IP address in dotted quad notation or some other
 weird stuff -- see `gethostbyname(3)` for the details."
     (sb-int:with-system-mutex (**gethostby-lock** :allow-with-interrupts t)
       (make-host-ent (sockint::gethostbyname host-name))))
 
   (defun get-host-by-address (address)
-    "Returns a HOST-ENT instance for ADDRESS, which should be a vector of
+    "Return a HOST-ENT instance for ADDRESS, which should be a vector of
  `(INTEGER 0 255)`, or signals a NAME-SERVICE-ERROR. See
  `gethostbyaddr(3)` for details."
     (sb-int:with-system-mutex (**gethostby-lock** :allow-with-interrupts t)
@@ -91,7 +91,7 @@ weird stuff -- see `gethostbyname(3)` for the details."
 #+sb-bsd-sockets-addrinfo
 (progn
   (defun get-host-by-name (host-name)
-    "Returns a HOST-ENT instance for HOST-NAME or signals a NAME-SERVICE-ERROR.
+    "Return a HOST-ENT instance for HOST-NAME or signals a NAME-SERVICE-ERROR.
 
 Another HOST-ENT instance containing zero, one or more IPv6 addresses
 may be returned as a second return value.
@@ -144,7 +144,7 @@ weird stuff - see getaddrinfo(3) for the details."
             (values host-ent4 #-win32 host-ent6)))))
 
   (defun get-host-by-address (address)
-    "Returns a HOST-ENT instance for ADDRESS, which should be a vector of
+    "Return a HOST-ENT instance for ADDRESS, which should be a vector of
 \(integer 0 255) with 4 elements in case of an IPv4 address and 16
 elements in case of an IPv6 address, or signals a NAME-SERVICE-ERROR.
 See `gethostbyaddr(3)` for details."

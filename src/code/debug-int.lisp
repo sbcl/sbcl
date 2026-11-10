@@ -276,7 +276,7 @@
     (prin1 (debug-block-fun-name obj) str)))
 
 (setf (documentation 'debug-block-successors 'function)
-  "Returns the list of possible code-locations where execution may continue
+  "Return the list of possible code-locations where execution may continue
    when the basic-block represented by debug-block completes its execution.")
 
 (setf (documentation 'debug-block-elsewhere-p 'function)

@@ -71,7 +71,7 @@
      (inst stdx ,reg thread-base-tn ,temp)))
 
 (defmacro load-type (target source &optional (offset 0))
-  "Loads the type bits of a pointer into target independent of
+  "Load the type bits of a pointer into target independent of
   byte-ordering issues."
   (once-only ((n-target target)
               (n-source source)

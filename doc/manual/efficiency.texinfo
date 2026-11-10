@@ -3398,9 +3398,9 @@ is turned into hardware instructions on arm64 and x86-64. It returns
 @anchor{Macro sb-ext defglobal}
 @ffindex @sortas{defglobal sb-ext} defglobal [sb-ext]
 @deffn{Macro} sb-ext:defglobal name value &optional doc
-Defines @code{name} as a global variable that is always bound. @code{value} is evaluated
-and assigned to @code{name} both at compile- and load-time but only if @code{name}
-is not already bound.
+Define @code{name} as a global variable that is always bound. @code{value} is
+evaluated and assigned to @code{name} both at compile- and load-time but only
+if @code{name} is not already bound.
 
 Global variables share their values between all threads. They cannot
 be locally bound, declared special, defined as constants, or defined

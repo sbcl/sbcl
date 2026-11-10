@@ -322,7 +322,7 @@
   (char->name "ucd-names" *base-char-name-alist* #xA0)))
 
 (defun unicode-1-name (character)
-  "Returns the name assigned to CHARACTER in Unicode 1.0 if it is distinct
+  "Return the name assigned to CHARACTER in Unicode 1.0 if it is distinct
 from the name currently assigned to CHARACTER. Otherwise, returns NIL.
 This property has been officially obsoleted by the Unicode standard, and
 is only included for backwards compatibility."
@@ -586,7 +586,7 @@ name is that string, if one exists. Otherwise, NIL is returned."
     (recurse 0 (truncate (length vector) 2))))
 
 (defun proplist-p (character property)
-  "Returns T if CHARACTER has the specified PROPERTY.
+  "Return T if CHARACTER has the specified PROPERTY.
 PROPERTY is a keyword representing one of the properties from PropList.txt,
 with underscores replaced by dashes."
   (macrolet ((get-ub32-vector ()
@@ -618,12 +618,13 @@ with underscores replaced by dashes."
        (svref vector index)))
 
 (defun general-category (character)
-  "Returns the general category of CHARACTER as it appears in UnicodeData.txt"
+  "Return the general category of CHARACTER as it appears in
+UnicodeData.txt."
   (svref-or-null #.(read-ucd-constant '*general-categories*)
                  (sb-impl::ucd-general-category character)))
 
 (defun bidi-class (character)
-  "Returns the bidirectional class of CHARACTER"
+  "Return the bidirectional class of CHARACTER."
   (if (and (eql (general-category character) :Cn)
            (default-ignorable-p character))
       :Bn
@@ -632,7 +633,7 @@ with underscores replaced by dashes."
        (aref +character-misc-database+ (1+ (misc-index character))))))
 
 (defun decimal-value (character)
-  "Returns the decimal digit value associated with CHARACTER or NIL if
+  "Return the decimal digit value associated with CHARACTER or NIL if
 there is no such value.
 
 The only characters in Unicode with a decimal digit value are those
@@ -642,7 +643,7 @@ Because of this, `(decimal-digit c) <=> (digit-char-p c 10)` in
   (sb-impl::ucd-decimal-digit character))
 
 (defun digit-value (character)
-  "Returns the Unicode digit value of CHARACTER or NIL if it doesn't exist.
+  "Return the Unicode digit value of CHARACTER or NIL if it doesn't exist.
 
 Digit values are guaranteed to be integers between 0 and 9 inclusive.
 All characters with decimal digit values have the same digit value,
@@ -654,29 +655,29 @@ that have a digit value but no decimal digit value"
     (if (< %digit 10) %digit nil)))
 
 (defun mirrored-p (character)
-  "Returns T if CHARACTER needs to be mirrored in bidirectional text.
+  "Return T if CHARACTER needs to be mirrored in bidirectional text.
 Otherwise, returns NIL."
   (logbitp 5 (aref +character-misc-database+
                     (+ 5 (misc-index character)))))
 
 (defun east-asian-width (character)
-  "Returns the East Asian Width property of CHARACTER as
+  "Return the East Asian Width property of CHARACTER as
 one of the keywords :N (Narrow), :A (Ambiguous), :H (Halfwidth),
-:W (Wide), :F (Fullwidth), or :NA (Not applicable)"
+:W (Wide), :F (Fullwidth), or :NA (Not applicable)."
   (svref-or-null #.(read-ucd-constant '*east-asian-widths*)
                  (ldb (byte 3 0)
                       (aref +character-misc-database+
                             (+ 5 (misc-index character))))))
 
 (defun script (character)
-  "Returns the Script property of CHARACTER as a keyword.
-If CHARACTER does not have a known script, returns :UNKNOWN"
+  "Return the Script property of CHARACTER as a keyword.
+If CHARACTER does not have a known script, returns :UNKNOWN."
   (svref-or-null #.(read-ucd-constant '*scripts*)
                  (aref +character-misc-database+ (+ 6 (misc-index character)))))
 
 (defun char-block (character)
-  "Returns the Unicode block in which CHARACTER resides as a keyword.
-If CHARACTER does not have a known block, returns :NO-BLOCK"
+  "Return the Unicode block in which CHARACTER resides as a keyword.
+If CHARACTER does not have a known block, returns :NO-BLOCK."
   (let* ((code (char-code character))
          (block-index (ordered-ranges-position
                        code
@@ -687,7 +688,7 @@ If CHARACTER does not have a known block, returns :NO-BLOCK"
         :no-block)))
 
 (defun age (character)
-  "Returns the version of Unicode in which CHARACTER was assigned as a pair
+  "Return the version of Unicode in which CHARACTER was assigned as a pair
 of values, both integers, representing the major and minor version respectively.
 If CHARACTER is not assigned in Unicode, returns NIL for both values."
   (let* ((value (aref +character-misc-database+ (+ 8 (misc-index character))))
@@ -696,9 +697,9 @@ If CHARACTER is not assigned in Unicode, returns NIL for both values."
     (if (zerop value) (values nil nil) (values major minor))))
 
 (defun hangul-syllable-type (character)
-  "Returns the Hangul syllable type of CHARACTER.
+  "Return the Hangul syllable type of CHARACTER.
 The syllable type can be one of :L, :V, :T, :LV, or :LVT.
-If the character is not a Hangul syllable or Jamo, returns NIL"
+If the character is not a Hangul syllable or Jamo, returns NIL."
   (let ((cp (char-code character)))
     (cond
       ((or
@@ -714,7 +715,7 @@ If the character is not a Hangul syllable or Jamo, returns NIL"
        (if (= 0 (rem (- cp #xac00) 28)) :LV :LVT)))))
 
 (defun line-break-class (character)
-  "Returns the line breaking class of CHARACTER, as specified in the
+  "Return the line breaking class of CHARACTER, as specified in the
 Unicode character database."
   (let ((syllable-type (hangul-syllable-type character)))
     (if syllable-type
@@ -724,56 +725,56 @@ Unicode character database."
                        (aref +character-misc-database+ (+ 7 (misc-index character)))))))
 
 (defun uppercase-p (character)
-  "Returns T if CHARACTER has the Unicode property Uppercase and NIL otherwise"
+  "Return T if CHARACTER has the Unicode property Uppercase and NIL otherwise."
   (or (eql (general-category character) :Lu) (proplist-p character :other-uppercase)))
 
 (defun lowercase-p (character)
-  "Returns T if CHARACTER has the Unicode property Lowercase and NIL otherwise"
+  "Return T if CHARACTER has the Unicode property Lowercase and NIL otherwise."
   (or (eql (general-category character) :Ll) (proplist-p character :other-lowercase)))
 
 (defun cased-p (character)
-  "Returns T if CHARACTER has a (Unicode) case, and NIL otherwise"
+  "Return T if CHARACTER has a (Unicode) case, and NIL otherwise."
   (or (uppercase-p character) (lowercase-p character)
       (eql (general-category character) :Lt)))
 
 (defun case-ignorable-p (character)
-  "Returns T if CHARACTER is Case Ignorable as defined in Unicode 6.3, Chapter
-3"
+  "Return T if CHARACTER is Case Ignorable as defined in Unicode 6.3, Chapter
+3."
   (or (member (general-category character)
               '(:Mn :Me :Cf :Lm :Sk))
       (member (word-break-class character)
               '(:midletter :midnumlet :single-quote))))
 
 (defun alphabetic-p (character)
-  "Returns T if CHARACTER is Alphabetic according to the Unicode standard
-and NIL otherwise"
+  "Return T if CHARACTER is Alphabetic according to the Unicode standard
+and NIL otherwise."
   (or (member (general-category character) '(:Lu :Ll :Lt :Lm :Lo :Nl))
       (proplist-p character :other-alphabetic)))
 
 (defun ideographic-p (character)
-  "Returns T if CHARACTER has the Unicode property Ideographic,
-which loosely corresponds to the set of \"Chinese characters\""
+  "Return T if CHARACTER has the Unicode property Ideographic,
+which loosely corresponds to the set of \"Chinese characters\"."
   (proplist-p character :ideographic))
 
 (defun math-p (character)
-  "Returns T if CHARACTER is a mathematical symbol according to Unicode and
-NIL otherwise"
+  "Return T if CHARACTER is a mathematical symbol according to Unicode and
+NIL otherwise."
   (or (eql (general-category character) :sm) (proplist-p character :other-math)))
 
 (defun whitespace-p (character)
-  "Returns T if CHARACTER is whitespace according to Unicode
-and NIL otherwise"
+  "Return T if CHARACTER is whitespace according to Unicode
+and NIL otherwise."
   (proplist-p character :white-space))
 
 (defun hex-digit-p (character &key ascii)
-  "Returns T if CHARACTER is a hexadecimal digit and NIL otherwise.
+  "Return T if CHARACTER is a hexadecimal digit and NIL otherwise.
 If :ASCII is non-NIL, fullwidth equivalents of the Latin letters A through F
 are excluded."
   (proplist-p character (if ascii :ascii-hex-digit :hex-digit)))
 
 (defun soft-dotted-p (character)
-  "Returns T if CHARACTER has a soft dot (such as the dots on i and j) which
-disappears when accents are placed on top of it. and NIL otherwise"
+  "Return T if CHARACTER has a soft dot (such as the dots on i and j) that
+disappears when accents are placed on top of it, and NIL otherwise."
   (proplist-p character :soft-dotted))
 
 (eval-when (:compile-toplevel)
@@ -781,7 +782,7 @@ disappears when accents are placed on top of it. and NIL otherwise"
     (coerce array '(vector (unsigned-byte 32)))))
 
 (defun default-ignorable-p (character)
-  "Returns T if CHARACTER is a Default_Ignorable_Code_Point"
+  "Return T if CHARACTER is a Default_Ignorable_Code_Point."
   (and
    (or (proplist-p character :other-default-ignorable-code-point)
        (eql (general-category character) :cf)
@@ -878,7 +879,7 @@ disappears when accents are placed on top of it. and NIL otherwise"
 
 
 (defun uppercase (string &key locale)
-  "Returns the full uppercase of STRING according to the Unicode standard.
+  "Return the full uppercase of STRING according to the Unicode standard.
 The result is not guaranteed to have the same length as the input. If :LOCALE
 is NIL, no language-specific case transformations are applied. If :LOCALE is a
 keyword representing a two-letter ISO country code, the case transforms of that
@@ -907,7 +908,7 @@ Win32 only)."
          (t nil)))))
 
 (defun lowercase (string &key locale)
-  "Returns the full lowercase of STRING according to the Unicode standard.
+  "Return the full lowercase of STRING according to the Unicode standard.
 The result is not guaranteed to have the same length as the input.
 :LOCALE has the same semantics as the :LOCALE argument to UPPERCASE."
   (when (eq locale t) (setf locale (get-user-locale)))
@@ -975,7 +976,7 @@ The result is not guaranteed to have the same length as the input.
        (t nil)))))
 
 (defun titlecase (string &key locale)
-  "Returns the titlecase of STRING. The resulting string can
+  "Return the titlecase of STRING. The resulting string can
 be longer than the input.
 :LOCALE has the same semantics as the :LOCALE argument to UPPERCASE."
   (when (eq locale t) (setf locale (get-user-locale)))
@@ -1005,7 +1006,7 @@ be longer than the input.
    (apply #'concatenate 'string (nreverse cased))))
 
 (defun casefold (string)
-  "Returns the full casefolding of STRING according to the Unicode standard.
+  "Return the full casefolding of STRING according to the Unicode standard.
 Casefolding removes case information in a way that allows the results to be used
 for case-insensitive comparisons.
 The result is not guaranteed to have the same length as the input."
@@ -1019,7 +1020,7 @@ The result is not guaranteed to have the same length as the input."
 ;;; Setting flag=T/state=:nobrk-next prevents a break between `second` and `third`
 
 (defun grapheme-break-class (character)
-  "Returns the grapheme breaking class of CHARACTER, as specified in UAX #29."
+  "Return the grapheme breaking class of CHARACTER, as specified in UAX #29."
   (let ((cp (when character (char-code character)))
         (gc (when character (general-category character)))
         (not-spacing-mark
@@ -1133,14 +1134,14 @@ The result is not guaranteed to have the same length as the input."
   (def map-graphemes map-grapheme-boundaries))
 
 (defun graphemes (string)
-  "Breaks STRING into graphemes according to the default
+  "Break STRING into graphemes according to the default
 grapheme breaking rules specified in UAX #29, returning a list of strings."
   (let (result)
     (map-graphemes (lambda (a) (push (subseq a 0) result)) string)
     (nreverse result)))
 
 (defun word-break-class (character)
-  "Returns the word breaking class of CHARACTER, as specified in UAX #29."
+  "Return the word breaking class of CHARACTER, as specified in UAX #29."
   ;; Words use graphemes as characters to deal with the ignore rule
   (when (listp character)
     (setf character (car character)))
@@ -1212,8 +1213,8 @@ grapheme breaking rules specified in UAX #29, returning a list of strings."
            (push ,%thing ,list)))))
 
 (defun words (string)
-  "Breaks STRING into words according to the default
-word breaking rules specified in UAX #29. Returns a list of strings"
+  "Break STRING into words according to the default word breaking rules
+specified in UAX #29. Returns a list of strings."
   (let ((chars (coerce string 'list))
         words word flag)
     (flatpush (car chars) word)
@@ -1290,7 +1291,7 @@ word breaking rules specified in UAX #29. Returns a list of strings"
                (t (brk))))))))))
 
 (defun sentence-break-class (character)
-  "Returns the sentence breaking class of CHARACTER, as specified in UAX #29."
+  "Return the sentence breaking class of CHARACTER, as specified in UAX #29."
   (when (listp character)
     (setf character (car character)))
   (let ((cp (when character (char-code character)))
@@ -1369,8 +1370,8 @@ Specifically,
     (flush) (nreverse clusters))))
 
 (defun sentences (string)
-  "Breaks STRING into sentences according to the default
-sentence breaking rules specified in UAX #29"
+  "Break STRING into sentences according to the default
+sentence breaking rules specified in UAX #29."
   (let ((special-handling '(:close :sp :sep :cr :lf :scontinue :sterm :aterm))
         (chars (sentence-prebreak string))
         sentence sentences state)
@@ -1688,11 +1689,11 @@ appear in an SBCL string. The line-breaking behavior of surrogates is undefined.
     (values list tail)))
 
 (defun lines (string &key (margin *print-right-margin*))
-  "Breaks STRING into lines that are no wider than :MARGIN according to the
+  "Break STRING into lines that are no wider than :MARGIN according to the
 line breaking rules outlined in UAX #14. Combining marks will always be kept
 together with their base characters, and spaces (but not other types of
 whitespace) will be removed from the end of lines. If :MARGIN is unspecified,
-it defaults to 80 characters"
+it defaults to 80 characters."
   (when (string= string "") (return-from lines (list "")))
   (unless margin (setf margin 80))
   (do* ((chars (line-break-annotate string))
@@ -1942,18 +1943,20 @@ it defaults to 80 characters"
     (< (length string1) (length string2))))
 
 (defun unicode= (string1 string2 &key (start1 0) end1 (start2 0) end2 (strict t))
-  "Determines whether STRING1 and STRING2 are canonically equivalent according
-to Unicode. The START and END arguments behave like the arguments to STRING=.
-If :STRICT is NIL, UNICODE= tests compatibility equivalence instead."
+  "Determine whether STRING1 and STRING2 are canonically equivalent
+according to Unicode. The START and END arguments behave like the
+arguments to STRING=. If :STRICT is NIL, UNICODE= tests compatibility
+equivalence instead."
   (let ((str1 (normalize-string (subseq string1 start1 end1) (if strict :nfd :nfkd)))
         (str2 (normalize-string (subseq string2 start2 end2) (if strict :nfd :nfkd))))
     (string= str1 str2)))
 
 (defun unicode-equal (string1 string2 &key (start1 0) end1 (start2 0) end2 (strict t))
-  "Determines whether STRING1 and STRING2 are canonically equivalent after
-casefolding (that is, ignoring case differences) according to Unicode. The
-START and END arguments behave like the arguments to STRING=. If :STRICT is
-NIL, UNICODE= tests compatibility equivalence instead."
+  "Determine whether STRING1 and STRING2 are canonically equivalent
+after casefolding (that is, ignoring case differences) according to
+Unicode. The START and END arguments behave like the arguments to
+STRING=. If :STRICT is NIL, UNICODE= tests compatibility equivalence
+instead."
   (let ((str1 (normalize-string (subseq string1 start1 end1) (if strict :nfd :nfkd)))
         (str2 (normalize-string (subseq string2 start2 end2) (if strict :nfd :nfkd))))
     (string=
@@ -1961,10 +1964,11 @@ NIL, UNICODE= tests compatibility equivalence instead."
      (normalize-string (casefold str2) (if strict :nfd :nfkd)))))
 
 (defun unicode< (string1 string2 &key (start1 0) end1 (start2 0) end2)
-  "Determines whether STRING1 sorts before STRING2 using the Unicode Collation
-Algorithm. The function uses an untailored Default Unicode Collation Element Table
-to produce the sort keys. The function uses the Shifted method for dealing
-with variable-weight characters, as described in UTS #10"
+  "Determine whether STRING1 sorts before STRING2 using the Unicode
+Collation Algorithm. The function uses an untailored Default Unicode
+Collation Element Table to produce the sort keys. The function uses
+the Shifted method for dealing with variable-weight characters, as
+described in UTS #10."
   (let* ((s1 (subseq string1 start1 end1))
          (s2 (subseq string2 start2 end2))
          (k1 (sort-key s1)) (k2 (sort-key s2)))
@@ -1973,7 +1977,7 @@ with variable-weight characters, as described in UTS #10"
         (vector< k1 k2))))
 
 (defun unicode<= (string1 string2 &key (start1 0) end1 (start2 0) end2)
-  "Tests if STRING1 and STRING2 are either UNICODE< or UNICODE="
+  "See if STRING1 and STRING2 are either UNICODE< or UNICODE=."
   (or
    (unicode= string1 string2 :start1 start1 :end1 end1
              :start2 start2 :end2 end2)
@@ -1981,12 +1985,12 @@ with variable-weight characters, as described in UTS #10"
              :start2 start2 :end2 end2)))
 
 (defun unicode> (string1 string2 &key (start1 0) end1 (start2 0) end2)
-  "Tests if STRING2 is UNICODE< STRING1."
+  "See if STRING2 is UNICODE< STRING1."
    (unicode< string2 string1 :start1 start2 :end1 end2
              :start2 start1 :end2 end1))
 
 (defun unicode>= (string1 string2 &key (start1 0) end1 (start2 0) end2)
-  "Tests if STRING1 and STRING2 are either UNICODE= or UNICODE>"
+  "See if STRING1 and STRING2 are either UNICODE= or UNICODE>."
   (or
    (unicode= string1 string2 :start1 start1 :end1 end1
              :start2 start2 :end2 end2)
@@ -2027,7 +2031,7 @@ with variable-weight characters, as described in UTS #10"
 ;;;    100.00% CPU
 
 (defun numeric-value (character)
-  "Returns the numeric value of CHARACTER or NIL if there is no such value.
+  "Return the numeric value of CHARACTER or NIL if there is no such value.
 Numeric value is the most general of the Unicode numeric properties.
 The only constraint on the numeric value is that it be a rational number."
   (or (find-in-perfect-hashmap character "numerics" t cdr)
@@ -2036,8 +2040,8 @@ The only constraint on the numeric value is that it be a rational number."
 ;;; FIXME: why does #-sb-unicode want or need this?
 ;;; (Indeed the regression test for it is *disabled* so I reiterate - WHY?)
 (defun bidi-mirroring-glyph (character)
-  "Returns the mirror image of CHARACTER if it exists.
-Otherwise, returns NIL."
+  "Return the mirror image of CHARACTER if it exists.
+Otherwise, return NIL."
   ;; This used to call MIRRORED-P before table lookup, but it's not faster to do so
   #+sb-unicode
   (find-in-perfect-hashmap character "bidi-mirrors"
@@ -2107,8 +2111,8 @@ Otherwise, returns NIL."
 ;;; even if it contains no confusable characters at all.
 ;;; e.g. (lookup-confusable #\W) => NIL but (confusable-p "W" "W") => T
 (defun confusable-p (string1 string2 &key (start1 0) end1 (start2 0) end2)
-  "Determines whether STRING1 and STRING2 could be visually confusable
-according to the IDNA confusableSummary.txt table"
+  "Determine whether STRING1 and STRING2 could be visually confusable
+according to the IDNA confusableSummary.txt table."
     (let* ((form #+sb-unicode :nfd #-sb-unicode :nfc)
            (str1 (normalize-string (subseq string1 start1 end1) form))
            (str2 (normalize-string (subseq string2 start2 end2) form))

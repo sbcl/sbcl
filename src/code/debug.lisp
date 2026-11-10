@@ -508,8 +508,8 @@ Other commands:
 
 (declaim (type (member :minimal :normal :full) *method-frame-style*))
 (defvar *method-frame-style* :normal
-  "Determines how frames corresponding to method functions are represented in
-backtraces. Possible values are :MINIMAL, :NORMAL, and :FULL.
+  "Determine how frames corresponding to method functions are represented
+in backtraces. Possible values are :MINIMAL, :NORMAL, and :FULL.
 
   :MINIMAL represents them as
 
@@ -571,7 +571,7 @@ backtraces. Possible values are :MINIMAL, :NORMAL, and :FULL.
                       (start 0)
                       (from :debugger-frame)
                       (count *backtrace-frame-count*))
-  "Calls the designated FUNCTION with each frame on the call stack.
+  "Call the designated FUNCTION with each frame on the call stack.
 Returns the last value returned by FUNCTION.
 
 COUNT is the number of frames to backtrace, defaulting to
@@ -714,7 +714,7 @@ possible while navigating and ignoring possible errors."
                        (start 0)
                        (from :debugger-frame)
                        (method-frame-style *method-frame-style*))
-    "Returns a list describing the call stack. Each frame is represented
+    "Return a list describing the call stack. Each frame is represented
 by a sublist:
 
   \(<name> ...args...)
@@ -1011,7 +1011,7 @@ information."
 (defun frame-call (frame &key (method-frame-style *method-frame-style*)
                               (argument-limit call-arguments-limit)
                               replace-dynamic-extent-objects)
-  "Returns as multiple values a descriptive name for the function responsible
+  "Return as multiple values a descriptive name for the function responsible
 for FRAME, arguments that that function, and a list providing additional
 information about the frame.
 
@@ -1480,11 +1480,11 @@ the current thread are replaced with dummy objects which can safely escape."
 ;;; halt-on-failures and prompt-on-failures modes, suitable for
 ;;; noninteractive and interactive use respectively
 (defun disable-debugger ()
-  "When invoked, this function will turn off both the SB-MANUAL:@DEBUGGER
-and SB-MANUAL:@LDB (the low-level debugger), similar to specifying
-`--disable-debugger` (see SB-MANUAL:@TOPLEVEL-OPTIONS) and
-`--disable-ldb` (see SB-MANUAL:@RUNTIME-OPTIONS) on the command line.
-See also ENABLE-DEBUGGER."
+  "Turn off both the SB-MANUAL:@DEBUGGER and SB-MANUAL:@LDB (the
+low-level debugger), similar to specifying `--disable-debugger` (see
+SB-MANUAL:@TOPLEVEL-OPTIONS) and `--disable-ldb` (see
+SB-MANUAL:@RUNTIME-OPTIONS) on the command line. See also
+ENABLE-DEBUGGER."
   ;; *DEBUG-IO* used to be set here to *ERROR-OUTPUT* which is sort
   ;; of unexpected but mostly harmless, but then ENABLE-DEBUGGER had
   ;; to set it to a suitable value again and be very careful,

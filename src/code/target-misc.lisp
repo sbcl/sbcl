@@ -61,7 +61,7 @@ are running on, or NIL if we can't find any useful information."
   "See ED.")
 
 (defun ed (&optional x)
-  "Starts the editor (on a file or a function if named).  Functions
+  "Start the editor (on a file or a function if named). Functions
 from the list *ED-FUNCTIONS* are called in order with X as an argument
 until one of them returns non-NIL; these functions are responsible for
 signalling a FILE-ERROR to indicate failure to perform an operation on
@@ -242,7 +242,7 @@ the file system."
              (version>= (rest x) (rest y))))))
 
 (defun assert-version->= (&rest subversions)
-  "Asserts that the current SBCL is of version equal to or greater than
+  "Assert that the current SBCL is of version equal to or greater than
 the version specified in the arguments.  A continuable error is signaled
 otherwise.
 

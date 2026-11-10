@@ -829,7 +829,7 @@ will be signalled when the core is saved -- this is orthogonal from @code{dont-s
 @anchor{Function sb-alien unload-shared-object}
 @ffindex @sortas{unload-shared-object sb-alien} unload-shared-object [sb-alien]
 @deffn{Function} sb-alien:unload-shared-object pathname
-Unloads the shared object loaded earlier using the designated @code{pathname} with
+Unload the shared object loaded earlier using the designated @code{pathname} with
 @code{load-shared-object}, to the degree supported on the platform.
 
 Experimental.

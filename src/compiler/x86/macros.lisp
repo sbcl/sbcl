@@ -151,7 +151,7 @@
   `(store-symbol-value ,reg *binding-stack-pointer*))
 
 (defmacro load-type (target source &optional (offset 0))
-  "Loads the type bits of a pointer into target independent of
+  "Load the type bits of a pointer into target independent of
    byte-ordering issues."
   `(inst mov ,target (make-ea :byte :base ,source :disp ,offset)))
 

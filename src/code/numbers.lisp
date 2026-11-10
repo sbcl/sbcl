@@ -690,8 +690,8 @@ The second returned value is the remainder."
   (mod number divisor))
 
 (defun round (number &optional (divisor 1))
-  "Rounds number (or number/divisor) to nearest integer.
-  The second returned value is the remainder."
+  "Round NUMBER divided by DIVISOR to nearest integer.
+  The second return value is the remainder."
   (declare (explicit-check)
            (maybe-inline round))
   (macrolet ((round-float (rtype)
@@ -1521,7 +1521,8 @@ and the number of 0 bits if INTEGER is negative."
     ((bignum (foreach fixnum bignum)) (minusp integer))))
 
 (defun ash (integer count)
-  "Shifts integer left by count places preserving sign. - count shifts right."
+  "Shift INTEGER left by COUNT places preserving sign. Negative COUNT
+  shifts right."
   (declare (explicit-check))
   (etypecase integer
     (fixnum

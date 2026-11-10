@@ -15,7 +15,7 @@ on 32-bit rings.
 @anchor{Function sb-rotate-byte rotate-byte}
 @ffindex @sortas{rotate-byte sb-rotate-byte} rotate-byte [sb-rotate-byte]
 @deffn{Function} sb-rotate-byte:rotate-byte count bytespec integer
-Rotates a field of bits within @code{integer}; specifically, returns an
+Rotate a field of bits within @code{integer}; specifically, return an
 integer that contains the bits of @code{integer} rotated @code{count} times
 leftwards within the byte specified by @code{bytespec}, and elsewhere
 contains the bits of @code{integer}.

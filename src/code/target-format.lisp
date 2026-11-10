@@ -72,7 +72,7 @@
     (write-char #\" s)))
 
 (defun format (destination control-string &rest format-arguments)
-  "Provides various facilities for formatting output.
+  "Produce formatted output.
   CONTROL-STRING contains a string to be output, possibly with embedded
   directives, which are flagged with the escape character \"~\". Directives
   generally expand into additional text to be output, usually consuming one

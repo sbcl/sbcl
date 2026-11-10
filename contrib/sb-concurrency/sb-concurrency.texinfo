@@ -37,19 +37,19 @@ Use @code{enqueue} to add objects to the queue, and @code{dequeue} to remove the
 @anchor{Function sb-concurrency dequeue}
 @ffindex @sortas{dequeue sb-concurrency} dequeue [sb-concurrency]
 @deffn{Function} sb-concurrency:dequeue queue
-Retrieves the oldest value in @code{queue} and returns it as the primary value,
+Retrieve the oldest value in @code{queue} and returns it as the primary value,
 and @code{t} as secondary value. If the queue is empty, returns @code{nil} as both primary
 and secondary value.
 @end deffn
 @anchor{Function sb-concurrency enqueue}
 @ffindex @sortas{enqueue sb-concurrency} enqueue [sb-concurrency]
 @deffn{Function} sb-concurrency:enqueue value queue
-Adds @code{value} to the end of @code{queue}. Returns @code{value}.
+Add @code{value} to the end of @code{queue}. Returns @code{value}.
 @end deffn
 @anchor{Function sb-concurrency list-queue-contents}
 @ffindex @sortas{list-queue-contents sb-concurrency} list-queue-contents [sb-concurrency]
 @deffn{Function} sb-concurrency:list-queue-contents queue
-Returns the contents of @code{queue} as a list without removing them from the
+Return the contents of @code{queue} as a list without removing them from the
 @code{queue}. Mainly useful for manual examination of queue state, as the list may be
 out of date by the time it is returned, and concurrent dequeue operations may
 in the worse case force the queue-traversal to be restarted several times.
@@ -57,31 +57,31 @@ in the worse case force the queue-traversal to be restarted several times.
 @anchor{Function sb-concurrency make-queue}
 @ffindex @sortas{make-queue sb-concurrency} make-queue [sb-concurrency]
 @deffn{Function} sb-concurrency:make-queue &key name initial-contents
-Returns a new @code{queue} with @code{name} and contents of the @code{initial-contents}
+Return a new @code{queue} with @code{name} and contents of the @code{initial-contents}
 sequence enqueued.
 @end deffn
 @anchor{Function sb-concurrency queue-count}
 @ffindex @sortas{queue-count sb-concurrency} queue-count [sb-concurrency]
 @deffn{Function} sb-concurrency:queue-count queue
-Returns the number of objects in @code{queue}. Mainly useful for manual
+Return the number of objects in @code{queue}. Mainly useful for manual
 examination of queue state, and in @code{print-object} methods: inefficient as it
 must walk the entire queue.
 @end deffn
 @anchor{Function sb-concurrency queue-empty-p}
 @ffindex @sortas{queue-empty-p sb-concurrency} queue-empty-p [sb-concurrency]
 @deffn{Function} sb-concurrency:queue-empty-p queue
-Returns @code{t} if @code{queue} is empty, @code{nil} otherwise.
+Return @code{t} if @code{queue} is empty, @code{nil} otherwise.
 @end deffn
 @anchor{Function sb-concurrency queue-name}
 @ffindex @sortas{queue-name sb-concurrency} queue-name [sb-concurrency]
 @deffn{Function} sb-concurrency:queue-name instance
-Name of a @code{queue}. Can be assigned to using @code{setf}. Queue names
-can be arbitrary printable objects, and need not be unique.
+Name of a @code{queue}. @code{setf}able. Queue names can be arbitrary printable
+objects, and need not be unique.
 @end deffn
 @anchor{Function sb-concurrency queuep}
 @ffindex @sortas{queuep sb-concurrency} queuep [sb-concurrency]
 @deffn{Function} sb-concurrency:queuep object
-Returns true if argument is a @code{queue}, @code{nil} otherwise.
+Return true if argument is a @code{queue}, @code{nil} otherwise.
 @end deffn
 @node sb concurrency mailbox
 @subsection Mailbox
@@ -107,18 +107,18 @@ Messages can be arbitrary objects.
 @anchor{Function sb-concurrency list-mailbox-messages}
 @ffindex @sortas{list-mailbox-messages sb-concurrency} list-mailbox-messages [sb-concurrency]
 @deffn{Function} sb-concurrency:list-mailbox-messages mailbox
-Returns a fresh list containing all the messages in @code{mailbox}. Does not
+Return a fresh list containing all the messages in @code{mailbox}. Does not
 remove messages from the mailbox.
 @end deffn
 @anchor{Function sb-concurrency mailbox-count}
 @ffindex @sortas{mailbox-count sb-concurrency} mailbox-count [sb-concurrency]
 @deffn{Function} sb-concurrency:mailbox-count mailbox
-Returns the number of messages currently in @code{mailbox}.
+Return the number of messages currently in @code{mailbox}.
 @end deffn
 @anchor{Function sb-concurrency mailbox-empty-p}
 @ffindex @sortas{mailbox-empty-p sb-concurrency} mailbox-empty-p [sb-concurrency]
 @deffn{Function} sb-concurrency:mailbox-empty-p mailbox
-Returns true if @code{mailbox} is currently empty, @code{nil} otherwise.
+Return true if @code{mailbox} is currently empty, @code{nil} otherwise.
 @end deffn
 @anchor{Function sb-concurrency mailbox-name}
 @ffindex @sortas{mailbox-name sb-concurrency} mailbox-name [sb-concurrency]
@@ -128,17 +128,17 @@ Name of a @code{mailbox}. @code{setf}able.
 @anchor{Function sb-concurrency mailboxp}
 @ffindex @sortas{mailboxp sb-concurrency} mailboxp [sb-concurrency]
 @deffn{Function} sb-concurrency:mailboxp object
-Returns true if argument is a @code{mailbox}, @code{nil} otherwise.
+Return true if argument is a @code{mailbox}, @code{nil} otherwise.
 @end deffn
 @anchor{Function sb-concurrency make-mailbox}
 @ffindex @sortas{make-mailbox sb-concurrency} make-mailbox [sb-concurrency]
 @deffn{Function} sb-concurrency:make-mailbox &key name initial-contents
-Returns a new @code{mailbox} with messages in @code{initial-contents} enqueued.
+Return a new @code{mailbox} with messages in @code{initial-contents} enqueued.
 @end deffn
 @anchor{Function sb-concurrency receive-message}
 @ffindex @sortas{receive-message sb-concurrency} receive-message [sb-concurrency]
 @deffn{Function} sb-concurrency:receive-message mailbox &key timeout
-Removes the oldest message from @code{mailbox} and returns it as the primary
+Remove the oldest message from @code{mailbox} and returns it as the primary
 value, and a secondary value of @code{t}. If @code{mailbox} is empty waits until a message
 arrives.
 
@@ -155,8 +155,8 @@ message could be received.
 @anchor{Function sb-concurrency receive-pending-messages}
 @ffindex @sortas{receive-pending-messages sb-concurrency} receive-pending-messages [sb-concurrency]
 @deffn{Function} sb-concurrency:receive-pending-messages mailbox &optional n
-Removes and returns all (or at most @code{n}) currently pending messages
-from @code{mailbox}, or returns @code{nil} if no messages are pending.
+Remove and return all (or at most @code{n}) currently pending messages
+from @code{mailbox}, or return @code{nil} if no messages are pending.
 
 @quotation
 @emph{Note}: Concurrent threads may be snarfing messages during the run
@@ -168,7 +168,7 @@ message sent right after @code{x}.
 @anchor{Function sb-concurrency send-message}
 @ffindex @sortas{send-message sb-concurrency} send-message [sb-concurrency]
 @deffn{Function} sb-concurrency:send-message mailbox message
-Adds a @code{message} to @code{mailbox}. Message can be any object.
+Add a @code{message} to @code{mailbox}. Message can be any object.
 @end deffn
 @node sb concurrency gates
 @subsection Gates
@@ -189,7 +189,7 @@ the state of a gate without blocking.
 @anchor{Function sb-concurrency close-gate}
 @ffindex @sortas{close-gate sb-concurrency} close-gate [sb-concurrency]
 @deffn{Function} sb-concurrency:close-gate gate
-Closes @code{gate}. Returns @code{t} if the gate was previously open, and @code{nil}
+Close @code{gate}. Return @code{t} if the gate was previously open, and @code{nil}
 if the gate was already closed.
 @end deffn
 @anchor{Function sb-concurrency gate-name}
@@ -200,30 +200,30 @@ Name of a @code{gate}. @code{setf}able.
 @anchor{Function sb-concurrency gate-open-p}
 @ffindex @sortas{gate-open-p sb-concurrency} gate-open-p [sb-concurrency]
 @deffn{Function} sb-concurrency:gate-open-p gate
-Returns true if @code{gate} is open.
+Return true if @code{gate} is open.
 @end deffn
 @anchor{Function sb-concurrency gatep}
 @ffindex @sortas{gatep sb-concurrency} gatep [sb-concurrency]
 @deffn{Function} sb-concurrency:gatep object
-Returns true if the argument is a @code{gate}.
+Return true if the argument is a @code{gate}.
 @end deffn
 @anchor{Function sb-concurrency make-gate}
 @ffindex @sortas{make-gate sb-concurrency} make-gate [sb-concurrency]
 @deffn{Function} sb-concurrency:make-gate &key name open
-Makes a new gate. Gate will be initially open if @code{open} is true, and closed if @code{open}
+Make a new gate. Gate will be initially open if @code{open} is true, and closed if @code{open}
 is @code{nil} (the default.) @code{name}, if provided, is the name of the gate, used when printing
 the gate.
 @end deffn
 @anchor{Function sb-concurrency open-gate}
 @ffindex @sortas{open-gate sb-concurrency} open-gate [sb-concurrency]
 @deffn{Function} sb-concurrency:open-gate gate
-Opens @code{gate}. Returns @code{t} if the gate was previously closed, and @code{nil}
+Open @code{gate}. Return @code{t} if the gate was previously closed, and @code{nil}
 if the gate was already open.
 @end deffn
 @anchor{Function sb-concurrency wait-on-gate}
 @ffindex @sortas{wait-on-gate sb-concurrency} wait-on-gate [sb-concurrency]
 @deffn{Function} sb-concurrency:wait-on-gate gate &key timeout
-Waits for @code{gate} to open, or @code{timeout} seconds to pass. Returns @code{t}
+Wait for @code{gate} to open or @code{timeout} seconds to pass. Return @code{t}
 if the gate was opened in time, and @code{nil} otherwise.
 @end deffn
 @node sb concurrency frlocks
@@ -272,18 +272,18 @@ Example:
 @anchor{Macro sb-concurrency frlock-read}
 @ffindex @sortas{frlock-read sb-concurrency} frlock-read [sb-concurrency]
 @deffn{Macro} sb-concurrency:frlock-read (frlock) &body value-forms
-Evaluates @code{value-forms} under @code{frlock} till it obtains a consistent
+Evaluate @code{value-forms} under @code{frlock} till it obtains a consistent
 set, and returns that as multiple values.
 @end deffn
 @anchor{Macro sb-concurrency frlock-write}
 @ffindex @sortas{frlock-write sb-concurrency} frlock-write [sb-concurrency]
 @deffn{Macro} sb-concurrency:frlock-write (frlock &key (wait-p t) timeout) &body body
-Executes @code{body} while holding @code{frlock} for writing.
+Execute @code{body} while holding @code{frlock} for writing.
 @end deffn
 @anchor{Function sb-concurrency make-frlock}
 @ffindex @sortas{make-frlock sb-concurrency} make-frlock [sb-concurrency]
 @deffn{Function} sb-concurrency:make-frlock &key name
-Returns a new @code{frlock} with @code{name}.
+Return a new @code{frlock} with @code{name}.
 @end deffn
 @anchor{Function sb-concurrency frlock-name}
 @ffindex @sortas{frlock-name sb-concurrency} frlock-name [sb-concurrency]
@@ -301,10 +301,11 @@ Using @code{frlock-read} instead is recommended.
 @anchor{Function sb-concurrency frlock-read-end}
 @ffindex @sortas{frlock-read-end sb-concurrency} frlock-read-end [sb-concurrency]
 @deffn{Function} sb-concurrency:frlock-read-end frlock
-Ends a read sequence on @code{frlock}. Returns a token and an epoch. If the token
-and epoch are @code{eql} to the read-token and epoch returned by @code{frlock-read-begin},
-the values read under the @code{frlock} are consistent and can be used: if the values
-differ, the values are inconsistent and the read must be restated.
+End a read sequence on @code{frlock}. Return a token and an epoch. If the
+token and epoch are @code{eql} to the read-token and epoch returned by
+@code{frlock-read-begin}, the values read under the @code{frlock} are consistent and
+can be used: if the values differ, the values are inconsistent and the
+read must be restated.
 
 Using @code{frlock-read} instead is recommended.
 
@@ -323,14 +324,14 @@ Example:
 @anchor{Function sb-concurrency grab-frlock-write-lock}
 @ffindex @sortas{grab-frlock-write-lock sb-concurrency} grab-frlock-write-lock [sb-concurrency]
 @deffn{Function} sb-concurrency:grab-frlock-write-lock frlock &key (wait-p t) timeout
-Acquires @code{frlock} for writing, invalidating existing and future read-tokens
+Acquire @code{frlock} for writing, invalidating existing and future read-tokens
 for the duration. Returns @code{t} on success, and @code{nil} if the lock wasn't acquired
 due to e.g. a timeout. Using @code{frlock-write} instead is recommended.
 @end deffn
 @anchor{Function sb-concurrency release-frlock-write-lock}
 @ffindex @sortas{release-frlock-write-lock sb-concurrency} release-frlock-write-lock [sb-concurrency]
 @deffn{Function} sb-concurrency:release-frlock-write-lock frlock
-Releases @code{frlock} after writing, allowing valid read-tokens to be acquired again.
-Signals an error if the current thread doesn't hold @code{frlock} for writing. Using @code{frlock-write}
-instead is recommended.
+Release @code{frlock} after writing, allowing valid read-tokens to be
+acquired again. Signals an error if the current thread doesn't hold
+@code{frlock} for writing. Using @code{frlock-write} instead is recommended.
 @end deffn

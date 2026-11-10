@@ -14,7 +14,7 @@
   See `\\\\SYS:CONTRIB;SB-SIMPLE-STREAMS;SIMPLE-STREAM-TEST.LISP` for
   things that should work.
 
-  Known differences to the ACL behaviour:
+  Known differences to the ACL behavior:
 
   - `SB-SIMPLE-STREAMS:OPEN` does not return a `SIMPLE-STREAM` by
     default. See its :CLASS argument.

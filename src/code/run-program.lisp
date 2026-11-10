@@ -47,7 +47,7 @@
 
 #-win32
 (defun posix-environ ()
-  "Return the Unix environment as a list of SIMPLE-STRINGs. See `man environ`."
+  "Return the Unix environment as a list of SIMPLE-STRINGs. See `environ(7)`."
   (c-strings->string-list (extern-alien environ (* c-string))))
 
 #+win32
@@ -735,7 +735,7 @@ should not be used."
                       #+win32 (escape-arguments t)
                       #+win32 (window nil)
                       #+os-provides-posix-spawn use-posix-spawn) ;; experimental
-  "RUN-PROGRAM creates a new process specified by PROGRAM.
+  "Create a new OS process specified by PROGRAM.
 ARGS is a list of strings to be passed literally to the new program.
 In POSIX environments, this list becomes the array supplied as the second
 parameter to the execv() or execvp() system call, each list element becoming
@@ -768,7 +768,7 @@ The &KEY arguments have the following meanings:
 - :ENVIRONMENT
 
     A list of STRINGs describing the new Unix environment
-    (as in \"man environ\"). The default is to copy the environment of
+    (see `environ(7)`). The default is to copy the environment of
     the current process.
 
 - :ENV

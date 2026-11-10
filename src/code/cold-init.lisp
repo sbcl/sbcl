@@ -357,7 +357,7 @@
     (critically-unreachable "after TOPLEVEL-INIT")))
 
 (defun quit (&key recklessly-p (unix-status 0))
-  "Calls (SB-EXT:EXIT :CODE UNIX-STATUS :ABORT RECKLESSLY-P),
+  "Call (SB-EXT:EXIT :CODE UNIX-STATUS :ABORT RECKLESSLY-P),
 see documentation for SB-EXT:EXIT."
   (exit :code unix-status :abort recklessly-p))
 
@@ -393,7 +393,7 @@ see documentation for SB-EXT:EXIT."
                            nil)
                 exit))
 (defun exit (&key code abort (timeout *exit-timeout*))
-  "Terminates the process, causing SBCL to exit with CODE. CODE
+  "Terminate the OS process, causing SBCL to exit with CODE. CODE
 defaults to 0 when ABORT is false, and 1 when it is true.
 
 When ABORT is false (the default), current thread is first unwound,

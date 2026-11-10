@@ -612,12 +612,12 @@ of :INHERITED :EXTERNAL :INTERNAL."
 ;;;; package locking operations, built unconditionally now
 
 (defun package-locked-p (package)
-  "Returns T when PACKAGE is locked, NIL otherwise. Signals an error
+  "Return T when PACKAGE is locked, NIL otherwise. Signals an error
 if PACKAGE doesn't designate a valid package."
   (package-lock (find-undeleted-package-or-lose package)))
 
 (defun lock-package (package)
-  "Locks PACKAGE and returns T. Has no effect if PACKAGE was already
+  "Lock PACKAGE and return T. Has no effect if PACKAGE was already
 locked. Signals an error if PACKAGE is not a valid package designator."
   (flet ((unoptimize (table)
            (dovector (x (symtbl-cells table))
@@ -635,18 +635,18 @@ locked. Signals an error if PACKAGE is not a valid package designator."
   t)
 
 (defun unlock-package (package)
-  "Unlocks PACKAGE and returns T. Has no effect if PACKAGE was already
+  "Unlock PACKAGE and return T. Has no effect if PACKAGE was already
 unlocked. Signals an error if PACKAGE is not a valid package designator."
   (setf (package-lock (find-undeleted-package-or-lose package)) nil)
   t)
 
 (defun package-implemented-by-list (package)
-  "Returns a list containing the implementation packages of
+  "Return a list containing the implementation packages of
 PACKAGE. Signals an error if PACKAGE is not a valid package designator."
   (package-%implementation-packages (find-undeleted-package-or-lose package)))
 
 (defun package-implements-list (package)
-  "Returns the packages that PACKAGE is an implementation package
+  "Return the packages that PACKAGE is an implementation package
 of. Signals an error if PACKAGE is not a valid package designator."
   (let ((package (find-undeleted-package-or-lose package)))
     (loop for x in (list-all-packages)
@@ -655,7 +655,7 @@ of. Signals an error if PACKAGE is not a valid package designator."
 
 (defun add-implementation-package (packages-to-add
                                    &optional (package *package*))
-  "Adds PACKAGES-TO-ADD as implementation packages of PACKAGE. Signals
+  "Add PACKAGES-TO-ADD as implementation packages of PACKAGE. Signals
 an error if PACKAGE or any of the PACKAGES-TO-ADD is not a valid
 package designator."
   (let ((package (find-undeleted-package-or-lose package))
@@ -666,7 +666,7 @@ package designator."
 
 (defun remove-implementation-package (packages-to-remove
                                       &optional (package *package*))
-  "Removes PACKAGES-TO-REMOVE from the implementation packages of
+  "Remove PACKAGES-TO-REMOVE from the implementation packages of
 PACKAGE. Signals an error if PACKAGE or any of the PACKAGES-TO-REMOVE
 is not a valid package designator."
   (let ((package (find-undeleted-package-or-lose package))
@@ -677,7 +677,7 @@ is not a valid package designator."
            (mapcar #'find-undeleted-package-or-lose packages-to-remove)))))
 
 (defmacro with-unlocked-packages ((&rest packages) &body forms)
-  "Unlocks PACKAGES for the dynamic scope of the body. Signals an
+  "Unlock PACKAGES for the dynamic scope of the body. Signals an
 error if any of PACKAGES is not a valid package designator."
   (with-unique-names (unlocked-packages)
     `(let (,unlocked-packages)
@@ -919,7 +919,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
   (def package-shadowing-symbols package-%shadowing-symbols))
 
 (defun package-local-nicknames (package-designator)
-  "Returns an alist of `(LOCAL-NICKNAME . ACTUAL-PACKAGE)` describing the
+  "Return an alist of `(LOCAL-NICKNAME . ACTUAL-PACKAGE)` describing the
 nicknames local to the designated package.
 
 When in the designated package, calls to FIND-PACKAGE with any of the
@@ -951,7 +951,7 @@ Experimental: interface subject to change."
           :format-arguments format-args))
 
 (defun package-locally-nicknamed-by-list (package-designator)
-  "Returns a list of packages which have a local nickname for the designated
+  "Return a list of packages which have a local nickname for the designated
 package.
 
 Experimental: interface subject to change."
@@ -967,7 +967,7 @@ Experimental: interface subject to change."
 
 (defun add-package-local-nickname (local-nickname actual-package
                                    &optional (package-designator (sane-package)))
-  "Adds LOCAL-NICKNAME for ACTUAL-PACKAGE in the designated package, defaulting
+  "Add LOCAL-NICKNAME for ACTUAL-PACKAGE in the designated package, defaulting
 to current package. LOCAL-NICKNAME must be a string designator, and
 ACTUAL-PACKAGE must be a package designator.
 
@@ -1056,7 +1056,7 @@ Experimental: interface subject to change."
 (defun remove-package-local-nickname (old-nickname
                                       &optional (package-designator (sane-package)))
   "If the designated package had OLD-NICKNAME as a local nickname for
-another package, it is removed. Returns true if the nickname existed and was
+another package, remove it. Returns true if the nickname existed and was
 removed, and NIL otherwise.
 
 Experimental: interface subject to change."
@@ -1628,7 +1628,7 @@ Experimental: interface subject to change."
 ;;; If we are uninterning a shadowing symbol, then a name conflict can
 ;;; result, otherwise just nuke the symbol.
 (defun unintern (symbol &optional (package (sane-package)))
-  "Makes SYMBOL no longer present in PACKAGE. If SYMBOL was present then T is
+  "Make SYMBOL no longer present in PACKAGE. If SYMBOL was present then T is
 returned, otherwise NIL. If PACKAGE is SYMBOL's home package, then it is made
 uninterned."
   (with-package-graph ()
@@ -1686,7 +1686,7 @@ uninterned."
   (mapcar #'string (ensure-list thing)))
 
 (defun export (symbols &optional (package (sane-package)))
-  "Exports SYMBOLS from PACKAGE, checking that no name conflicts result."
+  "Export SYMBOLS from PACKAGE, checking that no name conflicts result."
   (with-package-graph ()
     (let ((package (find-undeleted-package-or-lose package))
           (symbols (symbol-listify symbols))
@@ -1746,7 +1746,7 @@ uninterned."
 
 ;;; Check that all symbols are accessible, then move from external to internal.
 (defun unexport (symbols &optional (package (sane-package)))
-  "Makes SYMBOLS no longer exported from PACKAGE."
+  "Make SYMBOLS no longer exported from PACKAGE."
   (with-package-graph ()
     (let ((package (find-undeleted-package-or-lose package))
           (symbols (symbol-listify symbols))

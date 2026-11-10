@@ -285,7 +285,7 @@ when the file was compiled.")
                     source))))
 
 (defun find-definition-sources-by-name (name type)
-  "Returns a list of DEFINITION-SOURCEs for definitions of NAME with
+  "Return a list of DEFINITION-SOURCEs for definitions of NAME with
 the given definition TYPE. A DEFINITION-SOURCE object is always
 returned for definitions that exist, but the source location (e.g.
 DEFINITION-SOURCE-PATHNAME) may be missing. TYPE can currently be one
@@ -653,7 +653,7 @@ determined (e.g. because the function was compiled with DEBUG 0)."
                (values raw-result nil))))))
 
 (defun deftype-lambda-list (type-specifier-name)
-  "Returns the lambda list of TYPE-SPECIFIER-NAME as the first return
+  "Return the lambda list of TYPE-SPECIFIER-NAME as the first return
 value, and a flag whether the arglist could be found as the second
 value.
 
@@ -686,7 +686,7 @@ or a method combination name."
     (sb-pcl::method-combination-info-lambda-list info)))
 
 (defun function-type (function-designator)
-  "Returns the ftype of FUNCTION-DESIGNATOR or NIL."
+  "Return the ftype of FUNCTION-DESIGNATOR or NIL."
   (etypecase function-designator
     ((or symbol cons)
      ;; XXX: why require FBOUNDP? Would it be wrong to always report the proclaimed type?
@@ -1058,7 +1058,7 @@ Experimental."
           1)))
 
 (defun allocation-information (object)
-  "Returns information about the allocation of OBJECT. The primary return
+  "Return information about the allocation of OBJECT. The primary return
 value indicates the general type of allocation: :IMMEDIATE, :HEAP,
 :STACK, or :FOREIGN.
 
@@ -1102,7 +1102,7 @@ For :STACK objects, the secondary value is the thread on whose stack
 the object is allocated.
 
 Expected use-cases include introspection to gain insight into allocation and
-GC behaviour and restricting memoization to heap-allocated arguments.
+GC behavior and restricting memoization to heap-allocated arguments.
 
 Experimental: interface subject to change."
   ;; FIXME: Would be nice to provide the size of the object as well, though

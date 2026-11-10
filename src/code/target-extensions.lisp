@@ -158,7 +158,7 @@ these hooks.")
          ,@body))))
 
 (defmacro with-locked-hash-table ((hash-table) &body body)
-  "Limits concurrent accesses to HASH-TABLE for the duration of BODY.
+  "Limit concurrent accesses to HASH-TABLE for the duration of BODY.
 If HASH-TABLE is synchronized, BODY will execute with exclusive
 ownership of the table. If HASH-TABLE is not synchronized, BODY will
 execute with other WITH-LOCKED-HASH-TABLE bodies excluded -- exclusion

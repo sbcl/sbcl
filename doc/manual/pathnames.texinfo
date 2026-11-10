@@ -75,7 +75,7 @@ return the closest equivalent Lisp pathname to a given string
 @code{sb-ext:native-namestring} converts a non-wild pathname designator to
 the equivalent native namestring, if possible. Some Lisp pathname
 concepts (such as the @code{:back} directory component) have no direct
-equivalents in most Operating Systems; the behaviour of
+equivalents in most Operating Systems; the behavior of
 @code{sb-ext:native-namestring} is unspecified if an inappropriate pathname
 designator is passed to it. Additionally, note that conversion from
 pathname to native filename and back to pathname should not be

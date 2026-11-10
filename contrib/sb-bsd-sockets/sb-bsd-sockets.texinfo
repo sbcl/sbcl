@@ -374,7 +374,7 @@ This class represents the results of an address lookup.
 @anchor{Function sb-bsd-sockets get-host-by-name}
 @ffindex @sortas{get-host-by-name sb-bsd-sockets} get-host-by-name [sb-bsd-sockets]
 @deffn{Function} sb-bsd-sockets:get-host-by-name host-name
-Returns a @code{host-ent} instance for @code{host-name} or signals a @code{name-service-error}.
+Return a @code{host-ent} instance for @code{host-name} or signals a @code{name-service-error}.
 
 Another @code{host-ent} instance containing zero, one or more IPv6 addresses
 may be returned as a second return value.
@@ -385,7 +385,7 @@ weird stuff - see getaddrinfo(3) for the details.
 @anchor{Function sb-bsd-sockets get-host-by-address}
 @ffindex @sortas{get-host-by-address sb-bsd-sockets} get-host-by-address [sb-bsd-sockets]
 @deffn{Function} sb-bsd-sockets:get-host-by-address address
-Returns a @code{host-ent} instance for @code{address}, which should be a vector of
+Return a @code{host-ent} instance for @code{address}, which should be a vector of
 (integer 0 255) with 4 elements in case of an IPv4 address and 16
 elements in case of an IPv6 address, or signals a @code{name-service-error}.
 See @code{gethostbyaddr(3)} for details.

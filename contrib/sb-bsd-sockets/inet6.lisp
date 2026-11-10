@@ -106,7 +106,7 @@ malformed."
   sockint::size-of-sockaddr-in6)
 
 (defmethod bits-of-sockaddr ((socket inet6-socket) sockaddr &optional size)
-  "Returns address and port of SOCKADDR as multiple values"
+  "Return address and port of SOCKADDR as multiple values"
   (declare (ignore size))
   (values
    (coerce (loop for i from 0 below 16
