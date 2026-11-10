@@ -6252,7 +6252,7 @@
   (def check-range<= nil nil t))
 
 (macrolet ((def (name)
-             `(deftransform ,name ((lo x hi) ((constant-arg fixnum) (signed-byte 128) (constant-arg fixnum)))
+             `(deftransform ,name ((lo x hi) ((constant-arg fixnum) (signed-byte 128) (constant-arg fixnum)) * :important nil)
                 (if (sb-c::word-sized-lvar-p x)
                     (sb-c::give-up-ir1-transform)
                     (if (>= (lvar-value lo) 0)
