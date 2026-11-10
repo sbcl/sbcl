@@ -8,8 +8,12 @@
   not allow Lisp control of the scheduler. This is found in the
   `SB-THREAD` package.
 
+  Threading is supported generally on architectures with POSIX threads
+  except on ARM, SPARC, MIPS, ppc64 and on the DragonFly BSD operating
+  system, as well as on Windows.
+
   Threads are one of the default @BUILD-OPTIONS on most major
-  architectures and supported on many others."
+  architectures."
   (@threading-basics section)
   (@special-variables-in-threads section)
   (@atomic-operations section)

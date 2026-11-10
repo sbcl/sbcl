@@ -319,7 +319,9 @@
 
 (defun feature-docstring ()
   (with-output-to-string (out)
-    (dolist (feature-def (base-target-features))
+    (dolist (feature-def (sort (base-target-features) #'string<
+                               :key (lambda (def)
+                                      (symbol-name (first def)))))
       (destructuring-bind (feature default &key retain public documentation)
           feature-def
         (when public

@@ -240,7 +240,8 @@
   :retain t
   :public t
   :documentation
-  "Enable low-level thread primitives support. See SB-MANUAL:@THREADING.
+  "Enable low-level thread primitives support. See SB-MANUAL:@THREADING
+  for the list of supported platforms.
 
   Threads are on by default on
 
@@ -248,11 +249,7 @@
 
   - ARM64, RISC-V, and LoongArch64.
 
-  In fact, threads are mandatory on Windows.
-
-  Threading is generally supported on architectures with POSIX threads
-  except on ARM, SPARC, MIPS, ppc64 and on the DragonFly BSD operating
-  system.")
+  In fact, threads are mandatory on Windows.")
 
  (:sb-futex nil
   :retain nil
@@ -306,7 +303,7 @@
   :documentation
   "Record xref data for SBCL internals. This can be rather useful for
   people who want to develop on SBCL itself because it will make
-  `\\\\M-?` (`slime-edit-uses`) work which lists call/expansion/etc.
+  `\\\\M-?` (`slime-edit-uses`) work, which lists call/expansion/etc.
   sites. It will increase the core size by major 5-6MB, though.")
 
  ;; We support package local nicknames. No :SB- prefix here, as we
