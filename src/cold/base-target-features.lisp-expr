@@ -58,7 +58,8 @@
 ;;; - NAME is the build feature (a keyword).
 ;;;
 ;;; - DEFAULT is whether it's on by default (NIL, T or :AUTO, where
-;;;   :AUTO means that `make-config.sh` determines a dynamic default).
+;;;   :AUTO means that `make-config.sh` or src/cold/shared.lisp
+;;;   determines a dynamic default).
 ;;;
 ;;; - RETAIN is T, :INTERNAL, or NIL.
 ;;;
@@ -85,6 +86,10 @@
 ;;;     FIXME: We should document all :RETAIN T features (like :X86
 ;;;     and :LINUX). For that, we may need something like :PUBLIC
 ;;;     :READ-ONLY. -- MG
+;;;
+;;; FIXME: Move FEATURE-COMPATIBILITY-TESTS in src/code/shared.lisp to
+;;; a declarative format here to centralize the logic and allow the
+;;; dependencies between build features to be documented.
 (
  ;; I (WHN) made this an optional feature because I came to Common
  ;; Lisp from C++ through Scheme, so I'm accustomed to asking Emacs
@@ -207,23 +212,27 @@
   performance regressions are observed, consider disabling this
   feature and reporting a bug.")
 
- (:immobile-code nil
+ (:immobile-code :auto
   :public t
   :documentation
   "Allocate most functions in the immobile space.
-  Enabled by default if supported. The down-side of this feature is
-  that the allocator is significantly slower than the allocator for
-  movable code. If a particular application is performance-constrained
-  by speed of creation of compiled functions (not including closures),
-  the feature can be disabled.")
+  Needs :IMMOBILE-SPACE. Enabled by default if :IMMOBILE-SPACE.
 
- (:compact-instance-header nil
+  The down-side of this feature is that the allocator is significantly
+  slower than the allocator for movable code. If a particular
+  application is performance-constrained by speed of creation of
+  compiled functions (not including closures), the feature can be
+  disabled.")
+
+ (:compact-instance-header :auto
   :public t
   :documentation
   "Combine the layout pointer, instance-length, and widetag of
   an `INSTANCE` into a single machine word. This represents a space
-  savings of anywhere from 4% to 8% in typical applications. (Your
-  mileage may vary.)")
+  saving of anywhere from 4% to 8% in typical applications. (Your
+  mileage may vary.)
+
+  Needs :IMMOBILE-SPACE. Enabled by default on x86-64 if :IMMOBILE-SPACE.")
 
  ;; Peter Van Eynde's increase-bulletproofness code for CMUCL
  ;;
@@ -251,12 +260,13 @@
 
   In fact, threads are mandatory on Windows.")
 
- (:sb-futex nil
+ (:sb-futex :auto
   :retain nil
   :public t
   :documentation
   "Use `futex`es as our locking primitive for lower-overhead
-  synchronization. Only available on Linux.")
+  synchronization. Available on Linux, FreeBSD, OpenBSD, Darwin ARM64,
+  and Windows under various names.")
 
  (:sb-package-locks t
   :retain t
@@ -486,7 +496,7 @@
 
  ;; Developer mode features. A normal build will never have them,
  ;; hence it makes no difference whether they're retained or not.
- (:sb-devel nil :retain t)
+ (:sb-devel :auto :retain t)
  (:sb-devel-lock-packages nil :retain t)
 
  ;; ----------------------------
@@ -498,27 +508,27 @@
  ;; in as much as policy can be changed later arbitrarily.
  (:cons-profiling nil :retain nil)
  ;; Used by nothing after compiling target-thread.lisp or thread.c
- (:os-thread-stack nil :retain nil)
+ (:os-thread-stack :auto :retain nil)
  ;; These affect the BREAK instruction emitter, but the C code is able
  ;; to handle anything, and post-build we don't care which it is.
  (:ud2-breakpoints nil :retain nil)
- (:int4-breakpoints nil :retain nil)
+ (:int4-breakpoints :auto :retain nil)
  ;; Uses of OS-PROVIDES-DLOPEN and -DLADDR are confined to
  ;; src/code/foreign.lisp
- (:os-provides-dlopen nil :retain nil)
- (:os-provides-dladdr nil :retain nil)
+ (:os-provides-dlopen :auto :retain nil)
+ (:os-provides-dladdr :auto :retain nil)
  ;; More or less confined to serve-event, except for a test which now
  ;; detects whether COMPUTE-POLLFDS is defined and therefore
  ;; testable.
- (:os-provides-poll nil :retain nil)
+ (:os-provides-poll :auto :retain nil)
  ;; The final batch of symbols is strictly for C. The LISP_FEATURE_
  ;; prefix on the corresponding #define is unfortunate.
- (:gcc-tls nil :retain nil)
- (:use-sys-mmap nil :retain nil)
+ (:gcc-tls :auto :retain nil)
+ (:use-sys-mmap :auto :retain nil)
  ;; Enforce using of posix semaphores on Darwin instead of dispatch.
- (:use-darwin-posix-semaphores nil :retain nil)
+ (:use-darwin-posix-semaphores :auto :retain nil)
  ;; Only for src/runtime/run-program.c
- (:os-provides-close-range-wrapper nil :retain nil))
+ (:os-provides-close-range-wrapper :auto :retain nil))
 
 
 ;;;; Internals

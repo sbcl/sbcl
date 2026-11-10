@@ -276,12 +276,14 @@ Allow Lisp spaces to be randomly allocated anywhere in virtual address
 space, i.e. the behavior of passing @code{mmap} an address of zero.
 Requires all spaces to be relocatable on start-up.
 
-@item @code{:compact-instance-header} (off)
+@item @code{:compact-instance-header} (dynamic)
 
 Combine the layout pointer, instance-length, and widetag of
 an @code{instance} into a single machine word. This represents a space
-savings of anywhere from 4% to 8% in typical applications. (Your
+saving of anywhere from 4% to 8% in typical applications. (Your
 mileage may vary.)
+
+Needs @code{:immobile-space}. Enabled by default on x86-64 if @code{:immobile-space}.
 
 @item @code{:cycle-counter} (off)
 
@@ -289,14 +291,16 @@ Enabled automatically by @code{make-config.sh} for platforms which
 implement the @code{%read-cycle-counter} VOP. Can be disabled manually:
 affects @code{time}.
 
-@item @code{:immobile-code} (off)
+@item @code{:immobile-code} (dynamic)
 
 Allocate most functions in the immobile space.
-Enabled by default if supported. The down-side of this feature is
-that the allocator is significantly slower than the allocator for
-movable code. If a particular application is performance-constrained
-by speed of creation of compiled functions (not including closures),
-the feature can be disabled.
+Needs @code{:immobile-space}. Enabled by default if @code{:immobile-space}.
+
+The down-side of this feature is that the allocator is significantly
+slower than the allocator for movable code. If a particular
+application is performance-constrained by speed of creation of
+compiled functions (not including closures), the feature can be
+disabled.
 
 @item @code{:immobile-space} (off)
 
@@ -380,10 +384,11 @@ Support for a different evaluator (interpreter) with improved
 performance. You can have only one of @code{:sb-eval} @code{and} @code{:sb-fasteval}. See
 @ref{interpreter}.
 
-@item @code{:sb-futex} (off)
+@item @code{:sb-futex} (dynamic)
 
 Use @code{futex}es as our locking primitive for lower-overhead
-synchronization. Only available on Linux.
+synchronization. Available on Linux, FreeBSD, OpenBSD, Darwin ARM64,
+and Windows under various names.
 
 @item @code{:sb-ldb} (on, in @code{*features*})
 
