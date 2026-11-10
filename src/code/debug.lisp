@@ -38,7 +38,7 @@
   "An association list describing new bindings for special variables
 to be used within the debugger. For example,
 
- ((*PRINT-LENGTH* . 10) (*PRINT-LEVEL* . 6) (*PRINT-PRETTY* . NIL))
+    ((*print-length* . 10) (*print-level* . 6) (*print-pretty* . nil))
 
 The variables in the CAR positions are bound to the values in the CDR
 during the execution of some debug commands. When the same variable
@@ -511,30 +511,31 @@ Other commands:
   "Determine how frames corresponding to method functions are represented
 in backtraces. Possible values are :MINIMAL, :NORMAL, and :FULL.
 
-  :MINIMAL represents them as
+- :MINIMAL represents them as
 
-    (<gf-name> ...args...)
+        (<gf-name> ...args...)
 
-    if all arguments are available, and only a single method is applicable to
-    the arguments -- otherwise behaves as :NORMAL.
+    if all arguments are available, and only a single method is
+    applicable to the arguments -- otherwise behaves as :NORMAL.
 
-  :NORMAL represents them as
+- :NORMAL represents them as
 
-    ((:method <gf-name> [<qualifier>*] (<specializer>*)) ...args...)
+        ((:method <gf-name> [<qualifier>*] (<specializer>*)) ...args...)
 
-    The frame is then followed by either [fast-method] or [slow-method],
-    designating the kind of method function. (See below.)
+    The frame is then followed by either `[fast-method]` or
+    `[slow-method]`, designating the kind of method function. (See
+    below.)
 
-  :FULL represents them using the actual funcallable method function name:
+- :FULL represents them using the actual funcallable method function name:
 
-    ((sb-pcl:fast-method <gf-name> [<qualifier>*] (<specializer>*)) ...args...)
+        ((sb-pcl:fast-method <gf-name> [<qualifier>*] (<specializer>*)) ...args...)
 
-   or
+    or
 
-    ((sb-pcl:slow-method <gf-name> [<qualifier>*] (<specializer>*)) ...args...)
+        ((sb-pcl:slow-method <gf-name> [<qualifier>*] (<specializer>*)) ...args...)
 
-   In the this case arguments may include values internal to SBCL's method
-   dispatch machinery.")
+    In this case, arguments may include values internal to SBCL's
+    method dispatch machinery.")
 
 (defun backtrace (&optional (count *backtrace-frame-count*) (stream *debug-io*))
   (print-backtrace :count count :stream stream))
@@ -574,28 +575,24 @@ in backtraces. Possible values are :MINIMAL, :NORMAL, and :FULL.
   "Call the designated FUNCTION with each frame on the call stack.
 Returns the last value returned by FUNCTION.
 
-COUNT is the number of frames to backtrace, defaulting to
-*BACKTRACE-FRAME-COUNT*.
+- START is the number of the frame the backtrace should start from.
 
-START is the number of the frame the backtrace should start from.
+- COUNT is the number of frames to backtrace from START.
 
-FROM specifies the frame relative to which the frames are numbered. Possible
-values are an explicit SB-DI:FRAME object, and the
-keywords :CURRENT-FRAME, :INTERRUPTED-FRAME, and :DEBUGGER-FRAME. Default
-is :DEBUGGER-FRAME.
+- FROM specifies the frame relative to which the frames are numbered.
+  Possible values are an explicit SB-DI:FRAME object, and the keywords
+  :CURRENT-FRAME, :INTERRUPTED-FRAME, and :DEBUGGER-FRAME.
 
-  :CURRENT-FRAME
-    specifies the caller of MAP-BACKTRACE.
+    - :CURRENT-FRAME specifies the caller of MAP-BACKTRACE.
 
-  :INTERRUPTED-FRAME
-    specifies the first interrupted frame on the stack \(typically the frame
-    where the error occurred, as opposed to error handling frames) if any,
-    otherwise behaving as :CURRENT-FRAME.
+    - :INTERRUPTED-FRAME specifies the first interrupted frame on the
+      stack (typically the frame where the error occurred, as opposed
+      to error handling frames) if any, otherwise behaving as
+      :CURRENT-FRAME.
 
-  :DEBUGGER-FRAME
-    specifies the currently debugged frame when inside the debugger, and
-    behaves as :INTERRUPTED-FRAME outside the debugger.
-"
+    - :DEBUGGER-FRAME specifies the currently debugged frame when
+      inside the debugger, and behaves as :INTERRUPTED-FRAME outside
+      the debugger."
   (declare (dynamic-extent function))
   (loop with result = nil
         for index upfrom 0
@@ -621,44 +618,31 @@ is :DEBUGGER-FRAME.
                         (emergency-best-effort (> *debug-command-level* 1)))
   "Print a listing of the call stack to STREAM, defaulting to *DEBUG-IO*.
 
-COUNT is the number of frames to backtrace, defaulting to
-*BACKTRACE-FRAME-COUNT*.
+START, FROM and COUNT behave as in MAP-BACKTRACE.
 
-START is the number of the frame the backtrace should start from.
+- If PRINT-THREAD is true (default), backtrace is preceded by printing
+  the thread object the backtrace is from.
 
-FROM specifies the frame relative to which the frames are numbered. Possible
-values are an explicit SB-DI:FRAME object, and the
-keywords :CURRENT-FRAME, :INTERRUPTED-FRAME, and :DEBUGGER-FRAME. Default
-is :DEBUGGER-FRAME.
+- If PRINT-PC is true (default is false), then the program counter is
+  printed for each frame where it's available.
 
-  :CURRENT-FRAME
-    specifies the caller of PRINT-BACKTRACE.
+- The argument list is truncated at ARGUMENT-LIMIT (default is no
+  truncation).
 
-  :INTERRUPTED-FRAME
-    specifies the first interrupted frame on the stack \(typically the frame
-    where the error occured, as opposed to error handling frames) if any,
-    otherwise behaving as :CURRENT-FRAME.
+- If PRINT-FRAME-SOURCE is true (default is false), each frame is
+  followed by printing the currently executing source form in the
+  function responsible for that frame, when available. Requires the
+  function to have been compiled at DEBUG 2 or higher. If
+  PRINT-FRAME-SOURCE is :ALWAYS, it also reports \"no source
+  available\" for frames that were compiled at lower debug settings.
 
-  :DEBUGGER-FRAME
-    specifies the currently debugged frame when inside the debugger, and
-    behaves as :INTERRUPTED-FRAME outside the debugger.
+- METHOD-FRAME-STYLE determines how frames corresponding to method
+  functions are printed. Possible values are :MINIMAL, :NORMAL, and
+  :FULL. See *METHOD-FRAME-STYLE* for more information.
 
-If PRINT-THREAD is true (default), backtrace is preceded by printing the
-thread object the backtrace is from.
-
-If PRINT-FRAME-SOURCE is true (default is false), each frame is followed by
-printing the currently executing source form in the function responsible for
-that frame, when available. Requires the function to have been compiled at
-DEBUG 2 or higher. If PRINT-FRAME-SOURCE is :ALWAYS, it also reports \"no
-source available\" for frames for which were compiled at lower debug settings.
-
-METHOD-FRAME-STYLE (defaulting to *METHOD-FRAME-STYLE*), determines how frames
-corresponding to method functions are printed. Possible values
-are :MINIMAL, :NORMAL, and :FULL. See *METHOD-FRAME-STYLE* for more
-information.
-
-If EMERGENCY-BEST-EFFORT is true then try to print as much information as
-possible while navigating and ignoring possible errors."
+- If EMERGENCY-BEST-EFFORT is true, then try to print as much
+  information as possible while navigating and ignoring possible
+  errors."
   (let ((start-frame (backtrace-start-frame from)))
     (with-debug-io-syntax ()
       (let ((*suppress-print-errors* (if (and emergency-best-effort
@@ -717,41 +701,16 @@ possible while navigating and ignoring possible errors."
     "Return a list describing the call stack. Each frame is represented
 by a sublist:
 
-  \(<name> ...args...)
+    (<name> ...args...)
 
-where the name describes the function responsible for the frame. The name
-might not be bound to the actual function object. Unavailable arguments are
-represented by dummy objects that print as #<unavailable argument>. Objects
-with dynamic-extent allocation by the current thread are represented by
-substitutes to avoid references to them from leaking outside their legal
-extent.
+where `<name>` describes the function responsible for the frame. The
+name might not be bound to the actual function object. Unavailable
+arguments are represented by dummy objects that print as
+`#<unavailable argument>`. Objects with dynamic-extent allocation by
+the current thread are represented by substitutes to avoid references
+to them from leaking outside their legal extent.
 
-COUNT is the number of frames to backtrace, defaulting to
-*BACKTRACE-FRAME-COUNT*.
-
-START is the number of the frame the backtrace should start from.
-
-FROM specifies the frame relative to which the frames are numbered. Possible
-values are an explicit SB-DI:FRAME object, and the
-keywords :CURRENT-FRAME, :INTERRUPTED-FRAME, and :DEBUGGER-FRAME. Default
-is :DEBUGGER-FRAME.
-
-  :CURRENT-FRAME
-    specifies the caller of LIST-BACKTRACE.
-
-  :INTERRUPTED-FRAME
-    specifies the first interrupted frame on the stack \(typically the frame
-    where the error occured, as opposed to error handling frames) if any,
-    otherwise behaving as :CURRENT-FRAME.
-
-  :DEBUGGER-FRAME
-    specifies the currently debugged frame when inside the debugger, and
-    behaves as :INTERRUPTED-FRAME outside the debugger.
-
-METHOD-FRAME-STYLE (defaulting to *METHOD-FRAME-STYLE*), determines how frames
-corresponding to method functions are printed. Possible values
-are :MINIMAL, :NORMAL, and :FULL. See *METHOD-FRAME-STYLE* for more
-information."
+See PRINT-BACKTRACE for a description of the arguments."
   (let (rbacktrace)
      (map-backtrace
       (lambda (frame)
@@ -1060,11 +1019,7 @@ the current thread are replaced with dummy objects which can safely escape."
     (sb-di:debug-var-value var frame)
     (make-unprintable-object "unavailable argument")))
 
-;;; Prints a representation of the function call causing FRAME to
-;;; exist. VERBOSITY indicates the level of information to output;
-;;; zero indicates just printing the DEBUG-FUN's name, and one
-;;; indicates displaying call-like, one-liner format with argument
-;;; values.
+;;; Prints a representation of the function call for FRAME.
 (defun print-frame-call (frame stream
                          &key print-frame-source
                               number

@@ -9,6 +9,7 @@
 * LDB: ldb.
 * Enabling and Disabling the Debugger: enabling and disabling the debugger.
 * Function Tracing: function tracing.
+* Backtraces: backtraces.
 @end menu
 
 This chapter documents the debugging facilities of SBCL, including
@@ -160,7 +161,9 @@ debugger by using the @code{sb-ext:*debug-print-variable-alist*}.
 An association list describing new bindings for special variables
 to be used within the debugger. For example,
 
- ((@code{*print-length*} . 10) (@code{*print-level*} . 6) (@code{*print-pretty*} . @code{nil}))
+@example
+((*print-length* . 10) (*print-level* . 6) (*print-pretty* . nil))
+@end example
 
 The variables in the @code{car} positions are bound to the values in the @code{cdr}
 during the execution of some debug commands. When the same variable
@@ -1342,4 +1345,135 @@ The default value for the @code{:encapsulate} option to @code{trace}.
 @vvindex @sortas{trace-report-default* sb-debug} *trace-report-default* [sb-debug]
 @deffn{Variable} sb-debug:*trace-report-default*
 The default value for the @code{:report} option to @code{trace}.
+@end deffn
+@node backtraces
+@section Backtraces
+
+@anchor{Function sb-debug map-backtrace}
+@ffindex @sortas{map-backtrace sb-debug} map-backtrace [sb-debug]
+@deffn{Function} sb-debug:map-backtrace function &key (start 0) (from :debugger-frame) (count sb-debug:*backtrace-frame-count*)
+Call the designated @code{function} with each frame on the call stack.
+Returns the last value returned by @code{function}.
+
+@itemize
+@item @code{start} is the number of the frame the backtrace should start from.
+
+@item @code{count} is the number of frames to backtrace from @code{start}.
+
+@item @code{from} specifies the frame relative to which the frames are numbered.
+  Possible values are an explicit @code{sb-di:frame} object, and the keywords
+  @code{:current-frame}, @code{:interrupted-frame}, and @code{:debugger-frame}.
+
+@itemize
+@item @code{:current-frame} specifies the caller of @code{map-backtrace}.
+
+@item @code{:interrupted-frame} specifies the first interrupted frame on the
+      stack (typically the frame where the error occurred, as opposed
+      to error handling frames) if any, otherwise behaving as
+      @code{:current-frame}.
+
+@item @code{:debugger-frame} specifies the currently debugged frame when
+      inside the debugger, and behaves as @code{:interrupted-frame} outside
+      the debugger.
+@end itemize
+@end itemize
+@end deffn
+@anchor{Function sb-debug print-backtrace}
+@ffindex @sortas{print-backtrace sb-debug} print-backtrace [sb-debug]
+@deffn{Function} sb-debug:print-backtrace &key (stream *debug-io*) (start 0) (from :debugger-frame) (count sb-debug:*backtrace-frame-count*) (print-thread t) (print-pc sb-debug::*backtrace-print-pc*) (argument-limit sb-debug::*default-argument-limit*) print-frame-source (method-frame-style sb-debug:*method-frame-style*) (emergency-best-effort (> sb-debug::*debug-command-level* 1))
+Print a listing of the call stack to @code{stream}, defaulting to @code{*debug-io*}.
+
+@code{start}, @code{from} and @code{count} behave as in @code{map-backtrace}.
+
+@itemize
+@item If @code{print-thread} is true (default), backtrace is preceded by printing
+  the thread object the backtrace is from.
+
+@item If @code{print-pc} is true (default is false), then the program counter is
+  printed for each frame where it's available.
+
+@item The argument list is truncated at @code{argument-limit} (default is no
+  truncation).
+
+@item If @code{print-frame-source} is true (default is false), each frame is
+  followed by printing the currently executing source form in the
+  function responsible for that frame, when available. Requires the
+  function to have been compiled at @code{debug} 2 or higher. If
+  @code{print-frame-source} is @code{:always}, it also reports "no source
+  available" for frames that were compiled at lower debug settings.
+
+@item @code{method-frame-style} determines how frames corresponding to method
+  functions are printed. Possible values are @code{:minimal}, @code{:normal}, and
+  @code{:full}. See @code{*method-frame-style*} for more information.
+
+@item If @code{emergency-best-effort} is true, then try to print as much
+  information as possible while navigating and ignoring possible
+  errors.
+@end itemize
+@end deffn
+@anchor{Function sb-debug list-backtrace}
+@ffindex @sortas{list-backtrace sb-debug} list-backtrace [sb-debug]
+@deffn{Function} sb-debug:list-backtrace &key (count sb-debug:*backtrace-frame-count*) (argument-limit sb-debug::*default-argument-limit*) (start 0) (from :debugger-frame) (method-frame-style sb-debug:*method-frame-style*)
+Return a list describing the call stack. Each frame is represented
+by a sublist:
+
+@example
+(<name> ...args...)
+@end example
+
+where @code{<name>} describes the function responsible for the frame. The
+name might not be bound to the actual function object. Unavailable
+arguments are represented by dummy objects that print as
+@code{#<unavailable argument>}. Objects with dynamic-extent allocation by
+the current thread are represented by substitutes to avoid references
+to them from leaking outside their legal extent.
+
+See @code{print-backtrace} for a description of the arguments.
+@end deffn
+@anchor{Variable sb-debug *backtrace-frame-count*}
+@vvindex @sortas{backtrace-frame-count* sb-debug} *backtrace-frame-count* [sb-debug]
+@deffn{Variable} sb-debug:*backtrace-frame-count*
+Default number of frames to backtrace. Defaults to 1000.
+@end deffn
+@anchor{Variable sb-debug *method-frame-style*}
+@vvindex @sortas{method-frame-style* sb-debug} *method-frame-style* [sb-debug]
+@deffn{Variable} sb-debug:*method-frame-style*
+Determine how frames corresponding to method functions are represented
+in backtraces. Possible values are @code{:minimal}, @code{:normal}, and @code{:full}.
+
+@itemize
+@item @code{:minimal} represents them as
+
+@example
+(<gf-name> ...args...)
+@end example
+
+if all arguments are available, and only a single method is
+applicable to the arguments -- otherwise behaves as @code{:normal}.
+
+@item @code{:normal} represents them as
+
+@example
+((:method <gf-name> [<qualifier>*] (<specializer>*)) ...args...)
+@end example
+
+The frame is then followed by either @code{[fast-method]} or
+@code{[slow-method]}, designating the kind of method function. (See
+below.)
+
+@item @code{:full} represents them using the actual funcallable method function name:
+
+@example
+((sb-pcl:fast-method <gf-name> [<qualifier>*] (<specializer>*)) ...args...)
+@end example
+
+or
+
+@example
+((sb-pcl:slow-method <gf-name> [<qualifier>*] (<specializer>*)) ...args...)
+@end example
+
+In this case, arguments may include values internal to SBCL's
+method dispatch machinery.
+@end itemize
 @end deffn

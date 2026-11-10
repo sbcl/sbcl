@@ -8,7 +8,8 @@
   (@debugger section)
   (@ldb section)
   (@enabling-and-disabling-the-debugger section)
-  (@function-tracing section))
+  (@function-tracing section)
+  (@backtraces section))
 
 (defsection @debugger (:title "Debugger"
                        :concepts (("debugger")))
@@ -914,3 +915,10 @@
   (sb-debug:*max-trace-indentation* variable)
   (sb-debug:*trace-encapsulate-default* variable)
   (sb-debug:*trace-report-default* variable))
+
+(defsection @backtraces (:title "Backtraces")
+  (sb-debug:map-backtrace function)
+  (sb-debug:print-backtrace function)
+  (sb-debug:list-backtrace function)
+  (sb-debug:*backtrace-frame-count* variable)
+  (sb-debug:*method-frame-style* variable))
