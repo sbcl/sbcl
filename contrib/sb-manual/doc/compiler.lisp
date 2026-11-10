@@ -12,8 +12,7 @@
   (@compiler-policy section)
   (@compiler-errors section)
   (@open-coding-and-inline-expansion section)
-  (@interpreter section)
-  (@advanced-compiler-use-and-efficiency-hints section))
+  (@interpreter section))
 
 (defsection @calling-the-compiler (:title "Calling the Compiler")
   (compile function)
@@ -715,7 +714,7 @@
   "Since Common Lisp forbids the redefinition of standard functions, the
   compiler can have special knowledge of these standard functions
   embedded in it. This special knowledge is used in various ways (open
-  coding, @INLINE-EXPANSION, source transformation), but the
+  coding, @INLINE-EXPANSION, @SOURCE-OPTIMIZATION), but the
   implications to the user are basically the same:
 
   - Attempts to redefine standard functions may be frustrated since
@@ -781,18 +780,3 @@
   Unlike in some other Lisp implementations, in SBCL, interpreted code
   is not safer or more debuggable than compiled code."
   (sb-ext:*evaluator-mode* variable))
-
-(defsection @advanced-compiler-use-and-efficiency-hints
-    (:title "Advanced Compiler Use and Efficiency Hints")
-  "For more advanced usages of the compiler, please see the chapter of the
-  same name in the CMUCL manual. Many aspects of the compiler have stayed
-  exactly the same, and there is a much more detailed explanation of the
-  compiler's behavior and how to maximally optimize code in their
-  manual. In particular, while SBCL no longer supports byte-code
-  compilation, it does support CMUCL's block compilation facility allowing
-  whole program optimization and increased use of the local call
-  convention.
-
-  Unlike CMUCL, SBCL is able to open-code forward-referenced type
-  tests while block compiling. This helps with mutually referential
-  DEFSTRUCTs in particular.")

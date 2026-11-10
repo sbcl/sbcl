@@ -5,21 +5,21 @@
   programming in SBCL. It provides one package per SIMD instruction
   set, plus functions and macros for querying whether an instruction
   set is available and what functions and data types it exports."
-  (@data-types section)
-  (@casts section)
-  (@constructors section)
-  (@unpackers section)
-  (@reinterpret-casts section)
-  (@associatives section)
-  (@reducers section)
-  (@rounding section)
-  (@comparisons section)
-  (@conditionals section)
-  (@loads-and-stores section)
-  (@specialized-scalar-operations section)
-  (@instruction-set-dispatch section))
+  (@sb-simd-data-types section)
+  (@sb-simd-casts section)
+  (@sb-simd-constructors section)
+  (@sb-simd-unpackers section)
+  (@sb-simd-reinterpret-casts section)
+  (@sb-simd-associatives section)
+  (@sb-simd-reducers section)
+  (@sb-simd-rounding section)
+  (@sb-simd-comparisons section)
+  (@sb-simd-conditionals section)
+  (@sb-simd-loads-and-stores section)
+  (@sb-simd-specialized-scalar-operations section)
+  (@sb-simd-instruction-set-dispatch section))
 
-(defsection @data-types (:title "Data Types")
+(defsection @sb-simd-data-types (:title "Data Types")
   "The central data type in sb-simd is the SIMD pack. A SIMD pack
   is very similar to a specialized vector, except that its length must
   be a particular power of two that depends on its element type and
@@ -49,7 +49,7 @@
   specialized arrays instead of passing them around as function
   arguments.")
 
-(defsection @casts (:title "Casts")
+(defsection @sb-simd-casts (:title "Casts")
   "For each scalar data type `X`, there is a function named `X`
   that is equivalent to `(LAMBDA (V) (COERCE V 'X))`. For each SIMD
   data type `X.Y`, there is a function named `X.Y` that ensures that
@@ -65,17 +65,17 @@
   the argument can actually be of any type that is a suitable argument
   of the cast function named `X.Y`.")
 
-(defsection @constructors (:title "Constructors")
+(defsection @sb-simd-constructors (:title "Constructors")
   "For each SIMD data type `X.Y`, there is a constructor named
   `MAKE-X.Y` that takes `Y` arguments of type `X` and returns a SIMD
   pack whose elements are the supplied values.")
 
-(defsection @unpackers (:title "Unpackers")
+(defsection @sb-simd-unpackers (:title "Unpackers")
   "For each SIMD data type `X.Y`, there is a function named
   `X.Y-VALUES` that returns, as `Y` multiple values, the elements of
   the supplied SIMD pack of type `X.Y`.")
 
-(defsection @reinterpret-casts (:title "Reinterpret Casts")
+(defsection @sb-simd-reinterpret-casts (:title "Reinterpret Casts")
   "For each SIMD data type `X.Y`, there is a function named
   `X.Y!` that takes any SIMD pack or scalar datum and interprets its
   bits as a SIMD pack of type `X.Y`. If the supplied datum has more
@@ -83,7 +83,7 @@
   supplied datum has less bits than the resulting value, the missing
   bits are assumed to be zero.")
 
-(defsection @associatives (:title "Associatives")
+(defsection @sb-simd-associatives (:title "Associatives")
   "For each associative binary function, e.g. `TWO-ARG-X.Y-OP`, there
   is a function `X.Y-OP` that takes any number of arguments and
   combines them with this binary function in a tree-like fashion. If
@@ -97,7 +97,7 @@
   `SB-SIMD-FMA:U8.32-MAX`, for computing the element-wise maximum of
   one or more 256 bit packs of 8 bit integers.")
 
-(defsection @reducers (:title "Reducers")
+(defsection @sb-simd-reducers (:title "Reducers")
   "For binary functions `TWO-ARG-X.Y-OP` that are not associative but
   have a neutral element, there are functions `X.Y-OP` that take any
   positive number of arguments and return the reduction of all
@@ -114,7 +114,7 @@
   argument, where `SB-SIMD-FMA:U32.8-` simply negates all values in
   the pack.")
 
-(defsection @rounding (:title "Rounding")
+(defsection @sb-simd-rounding (:title "Rounding")
   "For each floating-point SIMD data type `X.Y`, there are several
   functions that round the values of a supplied SIMD pack to nearby
   floating-point values whose fractional digits are all zero. Those
@@ -123,7 +123,7 @@
   versions of CL:ROUND, CL:FLOOR, CL:CEILING, and CL:TRUNCATE,
   respectively.")
 
-(defsection @comparisons (:title "Comparisons")
+(defsection @sb-simd-comparisons (:title "Comparisons")
   "For each SIMD data type `X.Y`, there exist conversion functions
   `X.Y<`, `X.Y<=`, `X.Y>`, `X.Y>=`, and `X.Y=` that check whether the
   supplied arguments are strictly monotonically increasing,
@@ -136,7 +136,7 @@
   of the arguments at that position satisfy the test, or all zero, if
   they don't. We call a SIMD packs of such unsigned integers a mask.")
 
-(defsection @conditionals (:title "Conditionals")
+(defsection @sb-simd-conditionals (:title "Conditionals")
   "The SIMD paradigm is inherently incompatible with fine-grained control
   flow. A piece of code containing an IF special form cannot be
   vectorized in a straightforward way, because doing so would require
@@ -159,7 +159,7 @@
   the second operand if the corresponding mask bits are set, and from
   the third operand if the corresponding mask bits are not set.")
 
-(defsection @loads-and-stores (:title "Loads and Stores")
+(defsection @sb-simd-loads-and-stores (:title "Loads and Stores")
   "In practice, a SIMD pack `X.Y` is usually not constructed by
   calling its constructor but by loading `Y` consecutive elements from
   a specialized array with element type `X`. The functions for doing
@@ -190,7 +190,7 @@
   on certain array indices that depend on the actual placement of that
   array in memory.")
 
-(defsection @specialized-scalar-operations
+(defsection @sb-simd-specialized-scalar-operations
     (:title "Specialized Scalar Operations")
   "Finally, for each SIMD function `X.Y-OP` that applies a certain
   operation `OP` element-wise to the `Y` elements of type `X`, there
@@ -210,7 +210,8 @@
   final reason is that these scalar functions can be used to simplify
   the life of tools for automatic vectorization.")
 
-(defsection @instruction-set-dispatch (:title "Instruction Set Dispatch")
+(defsection @sb-simd-instruction-set-dispatch
+    (:title "Instruction Set Dispatch")
   "One challenge that is unique to image-based programming systems such as
   Lisp is that a program can run on one machine, be dumped as an image,
   and then resumed on another machine.  While nobody expects this feature

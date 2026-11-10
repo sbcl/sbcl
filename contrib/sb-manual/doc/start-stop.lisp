@@ -249,8 +249,9 @@
 
   - `--tls-limit <positive integer>`
 
-      Maximum number of thread-local @SPECIAL-VARIABLES in threaded
-      builds. Default value is 4096.
+      Maximum number of thread-local special variables (see
+      @SPECIAL-VARIABLES-IN-THREADS) in threaded builds. Default value
+      is 4096.
 
   - `--noinform`
 

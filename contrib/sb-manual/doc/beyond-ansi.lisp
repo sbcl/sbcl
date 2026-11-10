@@ -28,6 +28,7 @@
   (@reader-extensions section)
   (@package-local-nicknames section)
   (@package-variance section)
+  (@resolution-of-name-conflicts section)
   (@garbage-collection section)
   (@generic-function-dispatch section)
   (@extended-slot-access section)
@@ -37,7 +38,6 @@
   (@unicode-support section)
   (@customization-hooks-for-users section)
   (@tools-to-help-developers section)
-  (@resolution-of-name-conflicts section)
   (@hash-table-extensions section)
   (@random-number-generation section)
   (@timeouts-and-deadlines section)
@@ -175,13 +175,11 @@
     (:title "Symbol Name Normalization"
      :concepts (("symbol name" "normalization")
                 ("normalization" "of symbol name")))
-  "SBCL also extends the reader to normalize all symbols to _Normalization
-  Form KC_ in builds with @UNICODE enabled. Whether symbols are
-  normalized is controlled by"
-  (sb-ext:readtable-normalization function)
-  "Symbols created by INTERN and similar functions are not affected by
-  this setting. If SB-EXT:READTABLE-NORMALIZATION is T, symbols that
-  are not normalized are escaped during printing.")
+  "In [Unicode builds][@build-options], SBCL can normalize all symbols
+  READ to :NFKC (see SB-UNICODE:NORMALIZE-STRING). This converts
+  visually different but semantically identical symbols into a
+  canonical format."
+  (sb-ext:readtable-normalization function))
 
 (defsection @decimal-syntax-for-rationals
     (:title "Decimal Syntax for Rationals"
@@ -254,6 +252,16 @@
   the following variable."
   (sb-ext:*on-package-variance* variable))
 
+(defsection @resolution-of-name-conflicts
+    (:title "Resolution of Name Conflicts")
+  "CLHS `11.1.1.2.5` requires that name conflicts in packages be
+  resolvable in favor of any of the conflicting symbols. In the
+  interactive debugger, this is achieved by prompting for the symbol
+  in whose favor the conflict should be resolved; for programmatic
+  use, the SB-EXT:RESOLVE-CONFLICT restart should be invoked with one
+  argument, which should be a member of the list returned by the
+  condition accessor SB-EXT:NAME-CONFLICT-SYMBOLS.")
+
 (defsection @garbage-collection (:title "Garbage Collection"
                                  :concepts ("garbage collection"))
   "SBCL provides additional garbage collection functionality not
@@ -262,7 +270,7 @@
   (sb-ext:*after-gc-hooks* variable)
   (@finalization section)
   (@weak-pointers section)
-  (@introspection-and-tuning section)
+  (@gc-introspection-and-tuning section)
   (@tracing-live-objects-back-to-roots section))
 
 (defsection @finalization (:title "Finalization"
@@ -286,7 +294,7 @@
   (sb-ext:make-weak-pointer function)
   (sb-ext:weak-pointer-value function))
 
-(defsection @introspection-and-tuning (:title "Introspection and Tuning")
+(defsection @gc-introspection-and-tuning (:title "GC Introspection and Tuning")
   (sb-ext:*gc-run-time* (variable 0))
   (sb-ext:*gc-real-time* (variable 0))
   (sb-ext:bytes-consed-between-gcs function)
@@ -809,8 +817,8 @@
   - `#\\UE1`
   - `#\\U+00E1`"
   (@unicode-property-access section)
-  (@string-operations section)
-  (@breaking-strings section))
+  (@unicode-string-operations section)
+  (@breaking-unicode-strings section))
 
 (defsection @unicode-property-access (:title "Unicode property access")
   "The following functions can be used to find information about a
@@ -846,8 +854,9 @@
   (sb-unicode:sentence-break-class function)
   (sb-unicode:line-break-class function))
 
-(defsection @string-operations (:title "String operations"
-                                :concepts (("normalization" "of strings")))
+(defsection @unicode-string-operations
+    (:title "Unicode String operations"
+     :concepts (("normalization" "of strings")))
   "SBCL can normalize strings using:"
   (sb-unicode:normalize-string function)
   (sb-unicode:normalized-p function)
@@ -875,7 +884,7 @@
   confusable strings:"
   (sb-unicode:confusable-p function))
 
-(defsection @breaking-strings (:title "Breaking strings")
+(defsection @breaking-unicode-strings (:title "Breaking Unicode Strings")
   "The `SB-UNICODE` package includes several functions for breaking a
   Unicode string into useful parts."
   (sb-unicode:graphemes function)
@@ -915,19 +924,9 @@
   Documentation for the command `\\inspect` is accessed by typing
   `\\help` at the `\\inspect` prompt.")
 
-(defsection @resolution-of-name-conflicts
-    (:title "Resolution of Name Conflicts")
-  "CLHS `11.1.1.2.5` requires that name conflicts in packages be
-  resolvable in favour of any of the conflicting symbols. In the
-  interactive debugger, this is achieved by prompting for the symbol
-  in whose favour the conflict should be resolved; for programmatic
-  use, the SB-EXT:RESOLVE-CONFLICT restart should be invoked
-  with one argument, which should be a member of the list returned by
-  the condition accessor SB-EXT:NAME-CONFLICT-SYMBOLS.")
-
 (defsection @hash-table-extensions (:title "Hash Table Extensions")
-  "@HASH-TABLE extensions supported by SBCL are all controlled by keyword
-  arguments to MAKE-HASH-TABLE."
+  "Extensions to @HASH-TABLEs supported by SBCL are all controlled by
+  keyword arguments to MAKE-HASH-TABLE."
   (make-hash-table function)
   (sb-ext:define-hash-table-test macro)
   (sb-ext:with-locked-hash-table macro)

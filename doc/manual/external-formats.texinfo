@@ -9,7 +9,7 @@
 * The Default External Format: default external format.
 * External Format Designators: external format designators.
 * Character Coding Conditions: character coding conditions.
-* Converting between Strings and Octet Vectors: converting between strings and octet vectors.
+* Converting Between Strings and Octet Vectors: converting between strings and octet vectors.
 * Supported External Formats: supported external formats.
 @end menu
 
@@ -142,7 +142,7 @@ currently exported or documented but will be in future SBCL
 versions.
 
 @node converting between strings and octet vectors
-@section Converting between Strings and Octet Vectors
+@section Converting Between Strings and Octet Vectors
 
 To encode Lisp strings as octet vectors and decode octet vectors as
 Lisp strings, the following SBCL-specific functions can be used:

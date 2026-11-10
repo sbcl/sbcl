@@ -111,7 +111,7 @@
   versions.")
 
 (defsection @converting-between-strings-and-octet-vectors
-    (:title "Converting between Strings and Octet Vectors")
+    (:title "Converting Between Strings and Octet Vectors")
   "To encode Lisp strings as octet vectors and decode octet vectors as
   Lisp strings, the following SBCL-specific functions can be used:"
   (sb-ext:string-to-octets function)

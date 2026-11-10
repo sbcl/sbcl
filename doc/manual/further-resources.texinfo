@@ -215,8 +215,15 @@ still reflected in the current implementation:
   supplying low-level services and loading a Lisp @code{.core} file.
 @end itemize
 
+The name @emph{Steel Bank Common Lisp} itself is a reference to @emph{Carnegie
+Mellon University Common Lisp} from which SBCL forked: Andrew
+Carnegie made his fortune in the steel industry and Andrew Mellon
+was a successful banker.
+
 @cindex garbage collector, generational
 @cindex generational garbage collector
+@cindex garbage collector, conservative
+@cindex conservative garbage collector
 @cindex GENCGC
 SBCL also inherited some newer architectural features from CMUCL.
 The most important is that on some architectures it has a
@@ -239,28 +246,32 @@ of forms, such as symbols which are @code{boundp}. More complicated forms
 are evaluated by calling @code{compile} and then calling @code{funcall} on the
 returned result.
 
-The direct ancestor of SBCL is the x86 port of CMUCL. This port was in
-some ways the most cobbled-together of all the CMUCL ports, since a
-number of strange changes had to be made to support the register-poor
-x86 architecture. Some things (like tracing and debugging) do not work
-particularly well there. SBCL should be able to improve in these areas
-(and has already improved in some other areas), but it takes a while.
+The direct ancestor of SBCL is the x86 port of CMUCL. This port was
+in some ways the most cobbled-together of all the CMUCL ports, since
+a number of strange changes had to be made to support the
+register-poor x86 architecture. Some things (like tracing and
+debugging) do not work particularly well there. SBCL should be able
+to improve in these areas (and has already improved in some other
+areas), but it takes a while.
 
+@cindex garbage collector, generational
+@cindex generational garbage collector
 @cindex garbage collector, conservative
 @cindex conservative garbage collector
-@cindex CheneyGC
-On the x86 SBCL -- like the x86 port of CMUCL -- uses a
+@cindex GENCGC
+On x86, SBCL -- like the x86 port of CMUCL -- uses a
 @emph{conservative GC}. This means that it doesn't maintain a strict
-separation between tagged and untagged data, instead treating some
-untagged data (e.g. raw floating point numbers) as possibly-tagged
-data and so not collecting any Lisp objects that they point to. This
-has some negative consequences for average time efficiency (though
-possibly no worse than the negative consequences of trying to
-implement an exact GC on a processor architecture as register-poor
-as the x86) and also has potentially unlimited consequences for
-worst-case memory efficiency. In practice, conservative GCs work
-reasonably well, not getting anywhere near the worst case. But they
-can occasionally cause odd patterns of memory usage.
+separation between @ref{descriptor} and @ref{non descriptor} data, instead
+treating some non-descriptor data (e.g. raw floating point numbers)
+as possibly-descriptor data and so not collecting any Lisp objects
+that they point to. This has some negative consequences for average
+time efficiency (though possibly no worse than the negative
+consequences of trying to implement an exact GC on a processor
+architecture as register-poor as the x86) and also has potentially
+unlimited consequences for worst-case memory efficiency. In
+practice, conservative GCs work reasonably well, not getting
+anywhere near the worst case. But they can occasionally cause odd
+patterns of memory usage.
 
 The fork from CMUCL was based on a major rewrite of the system
 bootstrap process. CMUCL has for many years tolerated a very unusual

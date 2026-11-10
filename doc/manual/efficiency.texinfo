@@ -1921,10 +1921,16 @@ convenience) they are broken up into many small functions. There is
 absolutely no overhead for calling a non-entry point function that
 is defined purely for modularity (i.e. called only in one place).
 
+Block compilation also allows
+
 @cindex return values
-Block compilation also allows for more unboxed and @ref{non descriptor}
-arguments and return values in non-trivial programs (see
-@ref{non descriptors in local call}).
+@itemize
+@item for more unboxed and @ref{non descriptor} arguments and return values
+  in non-trivial programs (see @ref{non descriptors in local call}), and
+
+@item open-coding forward-referenced type tests, which helps with
+  mutually referential @code{defstruct}s in particular.
+@end itemize
 
 @node block compilation semantics
 @subsection Block Compilation Semantics
@@ -2394,7 +2400,7 @@ of values when they are recognized as having dynamic extent:
 @cindex optimization quality safety
 @strong{Warning}: Stack space is limited, so allocation of a large
 vector may cause stack overflow. Stack overflow checks are
-done except in 0 @code{safety} policies.
+done except in @code{safety} @code{0} policies.
 @end quotation
 
 @item closures defined with @code{flet} or @code{labels} with a bound @code{dynamic-extent}
@@ -3476,11 +3482,13 @@ function which conses: so do @code{make-array} and many other functions.
 Arithmetic and function calls can also have hidden consing
 overheads. Consing hurts performance in the following ways:
 
-@cindex garbage collector, conservative
-@cindex conservative garbage collector
+@cindex garbage collector, precise
+@cindex precise garbage collector
 @cindex CheneyGC
 @cindex garbage collector, generational
 @cindex generational garbage collector
+@cindex garbage collector, conservative
+@cindex conservative garbage collector
 @cindex GENCGC
 @itemize
 @item Consing reduces memory access locality, increasing paging

@@ -1580,9 +1580,13 @@
   absolutely no overhead for calling a non-entry point function that
   is defined purely for modularity (i.e. called only in one place).
 
-  Block compilation also allows for more unboxed and @NON-DESCRIPTOR
-  arguments and @RETURN-VALUES in non-trivial programs (see
-  @NON-DESCRIPTORS-IN-LOCAL-CALL)."
+  Block compilation also allows
+
+  - for more unboxed and @NON-DESCRIPTOR arguments and @RETURN-VALUES
+    in non-trivial programs (see @NON-DESCRIPTORS-IN-LOCAL-CALL), and
+
+  - open-coding forward-referenced type tests, which helps with
+    mutually referential DEFSTRUCTs in particular."
   (@block-compilation-semantics section)
   (@block-compilation-declarations section)
   (@block-compilation-difficulties section))
@@ -1948,7 +1952,7 @@
 
       > __Warning__: Stack space is limited, so allocation of a large
       > vector may cause stack overflow. Stack overflow checks are
-      > done except in 0 @SAFETY policies.
+      > done except in @SAFETY `0` policies.
 
   - @CLOSUREs defined with FLET or LABELS with a bound DYNAMIC-EXTENT
     declaration;

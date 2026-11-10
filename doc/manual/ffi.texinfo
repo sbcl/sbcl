@@ -1070,6 +1070,8 @@ coping with this:
 
 @cindex garbage collector, generational
 @cindex generational garbage collector
+@cindex garbage collector, conservative
+@cindex conservative garbage collector
 @cindex GENCGC
 @itemize
 @item On CheneyGC platforms, @code{sb-ext:purify} moves all live Lisp data into

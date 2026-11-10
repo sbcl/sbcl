@@ -5,9 +5,9 @@
 
 @menu
 * Queue: sb concurrency queue.
-* Mailbox (lock-free): sb concurrency mailbox.
+* Mailbox: sb concurrency mailbox.
 * Gates: sb concurrency gates.
-* Frlocks, aka Fast Read Locks: sb concurrency frlocks.
+* Fast Read Locks: sb concurrency frlocks.
 @end menu
 
 Additional data structures, synchronization primitives and tools for
@@ -84,7 +84,7 @@ can be arbitrary printable objects, and need not be unique.
 Returns true if argument is a @code{queue}, @code{nil} otherwise.
 @end deffn
 @node sb concurrency mailbox
-@subsection Mailbox (lock-free)
+@subsection Mailbox
 
 @code{sb-concurrency:mailbox} is a lock-free message queue where one or
 multiple ends can send messages to one or multiple receivers. The
@@ -227,7 +227,7 @@ Waits for @code{gate} to open, or @code{timeout} seconds to pass. Returns @code{
 if the gate was opened in time, and @code{nil} otherwise.
 @end deffn
 @node sb concurrency frlocks
-@subsection Frlocks, aka Fast Read Locks
+@subsection Fast Read Locks
 
 @anchor{Structure sb-concurrency frlock}
 @ttindex @sortas{frlock sb-concurrency} frlock [sb-concurrency]

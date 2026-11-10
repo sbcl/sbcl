@@ -37,19 +37,19 @@ contributed modules.
 @section sb-simd
 
 @menu
-* Data Types: data types.
-* Casts: casts.
-* Constructors: constructors.
-* Unpackers: unpackers.
-* Reinterpret Casts: reinterpret casts.
-* Associatives: associatives.
-* Reducers: reducers.
-* Rounding: rounding.
-* Comparisons: comparisons.
-* Conditionals: conditionals.
-* Loads and Stores: loads and stores.
-* Specialized Scalar Operations: specialized scalar operations.
-* Instruction Set Dispatch: instruction set dispatch.
+* Data Types: sb simd data types.
+* Casts: sb simd casts.
+* Constructors: sb simd constructors.
+* Unpackers: sb simd unpackers.
+* Reinterpret Casts: sb simd reinterpret casts.
+* Associatives: sb simd associatives.
+* Reducers: sb simd reducers.
+* Rounding: sb simd rounding.
+* Comparisons: sb simd comparisons.
+* Conditionals: sb simd conditionals.
+* Loads and Stores: sb simd loads and stores.
+* Specialized Scalar Operations: sb simd specialized scalar operations.
+* Instruction Set Dispatch: sb simd instruction set dispatch.
 @end menu
 
 The @code{sb-simd} module provides a convenient interface for SIMD
@@ -57,7 +57,7 @@ programming in SBCL. It provides one package per SIMD instruction
 set, plus functions and macros for querying whether an instruction
 set is available and what functions and data types it exports.
 
-@node data types
+@node sb simd data types
 @subsection Data Types
 
 The central data type in sb-simd is the SIMD pack. A SIMD pack
@@ -89,7 +89,7 @@ usually be avoided via inlining, or by loading and storing them to
 specialized arrays instead of passing them around as function
 arguments.
 
-@node casts
+@node sb simd casts
 @subsection Casts
 
 For each scalar data type @code{x}, there is a function named @code{x}
@@ -107,21 +107,21 @@ function description states that an argument must be of type @code{x.y},
 the argument can actually be of any type that is a suitable argument
 of the cast function named @code{x.y}.
 
-@node constructors
+@node sb simd constructors
 @subsection Constructors
 
 For each SIMD data type @code{x.y}, there is a constructor named
 @code{make-x.y} that takes @code{y} arguments of type @code{x} and returns a SIMD
 pack whose elements are the supplied values.
 
-@node unpackers
+@node sb simd unpackers
 @subsection Unpackers
 
 For each SIMD data type @code{x.y}, there is a function named
 @code{x.y-values} that returns, as @code{y} multiple values, the elements of
 the supplied SIMD pack of type @code{x.y}.
 
-@node reinterpret casts
+@node sb simd reinterpret casts
 @subsection Reinterpret Casts
 
 For each SIMD data type @code{x.y}, there is a function named
@@ -131,7 +131,7 @@ bits than the resulting value, the excess bits are discarded. If the
 supplied datum has less bits than the resulting value, the missing
 bits are assumed to be zero.
 
-@node associatives
+@node sb simd associatives
 @subsection Associatives
 
 For each associative binary function, e.g. @code{two-arg-x.y-op}, there
@@ -147,7 +147,7 @@ summing any number of 256 bit packs of single floats, and
 @code{sb-simd-fma:u8.32-max}, for computing the element-wise maximum of
 one or more 256 bit packs of 8 bit integers.
 
-@node reducers
+@node sb simd reducers
 @subsection Reducers
 
 For binary functions @code{two-arg-x.y-op} that are not associative but
@@ -166,7 +166,7 @@ from the first supplied one, except in the case of a single
 argument, where @code{sb-simd-fma:u32.8-} simply negates all values in
 the pack.
 
-@node rounding
+@node sb simd rounding
 @subsection Rounding
 
 For each floating-point SIMD data type @code{x.y}, there are several
@@ -177,7 +177,7 @@ functions are @code{x.y-round}, @code{x.y-floor}, @code{x.y-ceiling}, and
 versions of @code{cl:round}, @code{cl:floor}, @code{cl:ceiling}, and @code{cl:truncate},
 respectively.
 
-@node comparisons
+@node sb simd comparisons
 @subsection Comparisons
 
 For each SIMD data type @code{x.y}, there exist conversion functions
@@ -192,7 +192,7 @@ The bits of each unsigned integer are either all one, if the values
 of the arguments at that position satisfy the test, or all zero, if
 they don't. We call a SIMD packs of such unsigned integers a mask.
 
-@node conditionals
+@node sb simd conditionals
 @subsection Conditionals
 
 The SIMD paradigm is inherently incompatible with fine-grained control
@@ -217,7 +217,7 @@ and that returns a value of type @code{x.y} where each element is from
 the second operand if the corresponding mask bits are set, and from
 the third operand if the corresponding mask bits are not set.
 
-@node loads and stores
+@node sb simd loads and stores
 @subsection Loads and Stores
 
 In practice, a SIMD pack @code{x.y} is usually not constructed by
@@ -250,7 +250,7 @@ handling by the user, non-temporal loads and stores will only work
 on certain array indices that depend on the actual placement of that
 array in memory.
 
-@node specialized scalar operations
+@node sb simd specialized scalar operations
 @subsection Specialized Scalar Operations
 
 Finally, for each SIMD function @code{x.y-op} that applies a certain
@@ -271,7 +271,7 @@ they can be used to write reference implementations for testing. A
 final reason is that these scalar functions can be used to simplify
 the life of tools for automatic vectorization.
 
-@node instruction set dispatch
+@node sb simd instruction set dispatch
 @subsection Instruction Set Dispatch
 
 One challenge that is unique to image-based programming systems such as

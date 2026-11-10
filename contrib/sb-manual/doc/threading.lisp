@@ -16,13 +16,13 @@
   On these platforms threads must be explicitly enabled at build-time,
   see `INSTALL` for directions."
   (@threading-basics section)
-  (@special-variables section)
+  (@special-variables-in-threads section)
   (@atomic-operations section)
   (@mutex-support section)
   (@semaphores section)
-  (@waitqueue/condition-variables section)
+  (@waitqueues-and-condition-variables section)
   (@barriers section)
-  (@sessions/debugging section)
+  (@debugging-sessions section)
   (@foreign-threads section)
   (@implementation-on-linux-x86oids section))
 
@@ -66,9 +66,10 @@
   (sb-thread:interrupt-thread-error condition)
   (sb-thread:join-thread-error condition))
 
-(defsection @special-variables (:title "Special Variables")
+(defsection @special-variables-in-threads
+    (:title "Special Variables in Threads")
   "The interaction of special variables with multiple threads is mostly
-  as one would expect, with behaviour very similar to other
+  as one would expect, with behavior very similar to other
   implementations.
 
   - Global special values are visible across all threads.
@@ -152,8 +153,8 @@
   (sb-thread:semaphore-notification-status function)
   (sb-thread:clear-semaphore-notification function))
 
-(defsection @waitqueue/condition-variables
-    (:title "Waitqueue/condition variables")
+(defsection @waitqueues-and-condition-variables
+    (:title "Waitqueues and Condition Variables")
   "These are based on the POSIX condition variable design, hence the
   annoyingly CL-conflicting name. For use when you want to check a
   condition and sleep until it's true. For example: you have a shared
@@ -244,12 +245,12 @@
     SB-THREAD:CONDITION-BROADCAST."
   (sb-thread:barrier macro))
 
-(defsection @sessions/debugging (:title "Sessions/Debugging")
+(defsection @debugging-sessions (:title "Debugging Sessions")
   "If the user has multiple views onto the same Lisp image (for example,
   using multiple terminals, or a windowing system, or network access)
   they are typically set up as multiple _sessions_ such that each view
   has its own collection of foreground, background, and stopped
-  threads. A thread which wishes to create a new session can use
+  threads. A thread that wishes to create a new session can use
   SB-THREAD:WITH-NEW-SESSION to remove itself from the current
   session (which it shares with its parent and siblings) and create a
   fresh one."
@@ -270,7 +271,7 @@
   (sb-thread:get-foreground function)
   (sb-thread:release-foreground function))
 
-(defsection @foreign-threads (:title "Foreign threads")
+(defsection @foreign-threads (:title "Foreign Threads")
   "Direct calls to `pthread_create(3)` (instead of SB-THREAD:MAKE-THREAD)
   create threads that SBCL is not aware of, these are called foreign
   threads. Currently, it is not possible to run Lisp code in such

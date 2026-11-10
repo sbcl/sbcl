@@ -8,6 +8,7 @@
 * Reader Extensions: reader extensions.
 * Package-local Nicknames: package local nicknames.
 * Package Variance: package variance.
+* Resolution of Name Conflicts: resolution of name conflicts.
 * Garbage Collection: garbage collection.
 * Generic Function Dispatch: generic function dispatch.
 * Extended Slot Access: extended slot access.
@@ -17,7 +18,6 @@
 * Unicode Support: unicode support.
 * Customization Hooks for Users: customization hooks for users.
 * Tools to Help Developers: tools to help developers.
-* Resolution of Name Conflicts: resolution of name conflicts.
 * Hash Table Extensions: hash table extensions.
 * Random Number Generation: random number generation.
 * Timeouts and Deadlines: timeouts and deadlines.
@@ -218,10 +218,10 @@ read-time package lock violation, so does @code{foo::(bar)}.
 @cindex normalization of symbol name
 @subsection Symbol Name Normalization
 
-@cindex Unicode
-SBCL also extends the reader to normalize all symbols to @emph{Normalization
-Form KC} in builds with Unicode enabled. Whether symbols are
-normalized is controlled by
+In Unicode builds, SBCL can normalize all symbols
+@code{read} to @code{:nfkc} (see @code{sb-unicode:normalize-string}). This converts
+visually different but semantically identical symbols into a
+canonical format.
 
 @anchor{Function sb-ext readtable-normalization}
 @ffindex @sortas{readtable-normalization sb-ext} readtable-normalization [sb-ext]
@@ -231,10 +231,6 @@ normalized is controlled by
 Returns @code{t} if @code{readtable} normalizes symbols to NFKC, and @code{nil}
 otherwise. The @code{readtable-normalization} of the standard readtable is @code{t}.
 @end deffn
-Symbols created by @code{intern} and similar functions are not affected by
-this setting. If @code{sb-ext:readtable-normalization} is @code{t}, symbols that
-are not normalized are escaped during printing.
-
 @node decimal syntax for rationals
 @cindex decimal syntax for rationals
 @cindex rational, decimal syntax
@@ -403,6 +399,17 @@ Example:
 specifies to signal a warning if SWANK package is in variance, and an
 error otherwise.
 @end deffn
+@node resolution of name conflicts
+@section Resolution of Name Conflicts
+
+@code{clhs} @code{11.1.1.2.5} requires that name conflicts in packages be
+resolvable in favor of any of the conflicting symbols. In the
+interactive debugger, this is achieved by prompting for the symbol
+in whose favor the conflict should be resolved; for programmatic
+use, the @code{sb-ext:resolve-conflict} restart should be invoked with one
+argument, which should be a member of the list returned by the
+condition accessor @code{sb-ext:name-conflict-symbols}.
+
 @node garbage collection
 @cindex garbage collection
 @section Garbage Collection
@@ -410,7 +417,7 @@ error otherwise.
 @menu
 * Finalization: finalization.
 * Weak Pointers: weak pointers.
-* Introspection and Tuning: introspection and tuning.
+* GC Introspection and Tuning: gc introspection and tuning.
 * Tracing Live Objects Back to Roots: tracing live objects back to roots.
 @end menu
 
@@ -537,8 +544,8 @@ If @code{weak-pointer} is valid, return the value of @code{weak-pointer} and @co
 If the referent of @code{weak-pointer} has been garbage collected,
 returns the values @code{nil} and @code{nil}.
 @end deffn
-@node introspection and tuning
-@subsection Introspection and Tuning
+@node gc introspection and tuning
+@subsection GC Introspection and Tuning
 
 @anchor{Variable sb-ext *gc-run-time*}
 @vvindex @sortas{gc-run-time* sb-ext} *gc-run-time* [sb-ext]
@@ -1861,8 +1868,8 @@ number (two values).
 
 @menu
 * Unicode property access: unicode property access.
-* String operations: string operations.
-* Breaking strings: breaking strings.
+* Unicode String operations: unicode string operations.
+* Breaking Unicode Strings: breaking unicode strings.
 @end menu
 
 SBCL provides support for working with Unicode text and querying the
@@ -2093,9 +2100,9 @@ Returns the sentence breaking class of @code{character}, as specified in UAX #29
 Returns the line breaking class of @code{character}, as specified in the
 Unicode character database.
 @end deffn
-@node string operations
+@node unicode string operations
 @cindex normalization of strings
-@subsection String operations
+@subsection Unicode String operations
 
 SBCL can normalize strings using:
 
@@ -2203,8 +2210,8 @@ confusable strings:
 Determines whether @code{string1} and @code{string2} could be visually confusable
 according to the IDNA confusableSummary.txt table
 @end deffn
-@node breaking strings
-@subsection Breaking strings
+@node breaking unicode strings
+@subsection Breaking Unicode Strings
 
 The @code{sb-unicode} package includes several functions for breaking a
 Unicode string into useful parts.
@@ -2305,23 +2312,12 @@ accessed by typing @code{help} at the debugger prompt. See @ref{debugger}.
 Documentation for the command @code{inspect} is accessed by typing
 @code{help} at the @code{inspect} prompt.
 
-@node resolution of name conflicts
-@section Resolution of Name Conflicts
-
-@code{clhs} @code{11.1.1.2.5} requires that name conflicts in packages be
-resolvable in favour of any of the conflicting symbols. In the
-interactive debugger, this is achieved by prompting for the symbol
-in whose favour the conflict should be resolved; for programmatic
-use, the @code{sb-ext:resolve-conflict} restart should be invoked
-with one argument, which should be a member of the list returned by
-the condition accessor @code{sb-ext:name-conflict-symbols}.
-
 @node hash table extensions
 @section Hash Table Extensions
 
 @cindex hash table
-hash table extensions supported by SBCL are all controlled by keyword
-arguments to @code{make-hash-table}.
+Extensions to hash tables supported by SBCL are all controlled by
+keyword arguments to @code{make-hash-table}.
 
 @anchor{Function common-lisp make-hash-table}
 @ffindex @sortas{make-hash-table common-lisp} make-hash-table [common-lisp]

@@ -138,9 +138,9 @@ Code for options that not every system has should be conditionalised:
 
 (defmacro define-socket-option-bool (name level c-name &optional features (info ""))
   `(define-socket-option ,name
-       ,(format nil "~@<Return the value of the ~A socket option for SOCKET. ~
+       ,(format nil "~@<Return the value of the `\\\\~A` socket option for SOCKET. ~
                  This can also be updated with SETF.~:@>"
-                (symbol-name c-name))
+                (substitute #\_ #\- (symbol-name c-name)))
     ,level ,c-name
     sb-alien:int bool-to-foreign-int foreign-int-to-bool sb-alien:addr
     ,features ,info))

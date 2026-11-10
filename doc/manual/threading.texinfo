@@ -5,14 +5,14 @@
 
 @menu
 * Threading Basics: threading basics.
-* Special Variables: special variables.
+* Special Variables in Threads: special variables in threads.
 * Atomic Operations: atomic operations.
 * Mutex Support: mutex support.
 * Semaphores: semaphores.
-* Waitqueue/condition variables: waitqueue/condition variables.
+* Waitqueues and Condition Variables: waitqueues and condition variables.
 * Barriers: barriers.
-* Sessions/Debugging: sessions/debugging.
-* Foreign threads: foreign threads.
+* Debugging Sessions: debugging sessions.
+* Foreign Threads: foreign threads.
 * Implementation on Linux x86oids: implementation on linux x86oids.
 @end menu
 
@@ -340,11 +340,11 @@ Signalled when joining a thread fails due to abnormal exit of the thread
 to be joined. The offending thread can be accessed using
 @code{thread-error-thread}.
 @end deffn
-@node special variables
-@section Special Variables
+@node special variables in threads
+@section Special Variables in Threads
 
 The interaction of special variables with multiple threads is mostly
-as one would expect, with behaviour very similar to other
+as one would expect, with behavior very similar to other
 implementations.
 
 @itemize
@@ -838,8 +838,8 @@ or cleared.
 Resets the @code{semaphore-notification} object for use with another call to
 @code{wait-on-semaphore} or @code{try-semaphore}.
 @end deffn
-@node waitqueue/condition variables
-@section Waitqueue/condition variables
+@node waitqueues and condition variables
+@section Waitqueues and Condition Variables
 
 These are based on the POSIX condition variable design, hence the
 annoyingly CL-conflicting name. For use when you want to check a
@@ -1041,14 +1041,14 @@ returns the values of the last form in @code{forms}.
 The file @code{memory-barriers.txt} in the Linux kernel documentation is
 highly recommended reading for anyone programming at this level.
 @end deffn
-@node sessions/debugging
-@section Sessions/Debugging
+@node debugging sessions
+@section Debugging Sessions
 
 If the user has multiple views onto the same Lisp image (for example,
 using multiple terminals, or a windowing system, or network access)
 they are typically set up as multiple @emph{sessions} such that each view
 has its own collection of foreground, background, and stopped
-threads. A thread which wishes to create a new session can use
+threads. A thread that wishes to create a new session can use
 @code{sb-thread:with-new-session} to remove itself from the current
 session (which it shares with its parent and siblings) and create a
 fresh one.
@@ -1084,7 +1084,7 @@ Background this thread.  If @code{next} is supplied, arrange for it to
 have the foreground next.
 @end deffn
 @node foreign threads
-@section Foreign threads
+@section Foreign Threads
 
 Direct calls to @code{pthread_create(3)} (instead of @code{sb-thread:make-thread})
 create threads that SBCL is not aware of, these are called foreign

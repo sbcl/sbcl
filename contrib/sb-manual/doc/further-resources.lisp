@@ -267,6 +267,11 @@
   - The system is implemented as a C program which is responsible for
     supplying low-level services and loading a Lisp `.core` file.
 
+  The name _Steel Bank Common Lisp_ itself is a reference to _Carnegie
+  Mellon University Common Lisp_ from which SBCL forked: Andrew
+  Carnegie made his fortune in the steel industry and Andrew Mellon
+  was a successful banker.
+
   SBCL also inherited some newer architectural features from CMUCL.
   The most important is that on some architectures it has a
   @GENERATIONAL-GC, which has various implications (mostly good) for
@@ -288,25 +293,27 @@
   are evaluated by calling COMPILE and then calling FUNCALL on the
   returned result.
 
-  The direct ancestor of SBCL is the x86 port of CMUCL. This port was in
-  some ways the most cobbled-together of all the CMUCL ports, since a
-  number of strange changes had to be made to support the register-poor
-  x86 architecture. Some things (like tracing and debugging) do not work
-  particularly well there. SBCL should be able to improve in these areas
-  (and has already improved in some other areas), but it takes a while.
+  The direct ancestor of SBCL is the x86 port of CMUCL. This port was
+  in some ways the most cobbled-together of all the CMUCL ports, since
+  a number of strange changes had to be made to support the
+  register-poor x86 architecture. Some things (like tracing and
+  debugging) do not work particularly well there. SBCL should be able
+  to improve in these areas (and has already improved in some other
+  areas), but it takes a while.
 
-  On the x86 SBCL -- like the x86 port of CMUCL -- uses a
+  On x86, SBCL -- like the x86 port of CMUCL -- uses a
   _@CONSERVATIVE-GC_. This means that it doesn't maintain a strict
-  separation between tagged and untagged data, instead treating some
-  untagged data (e.g. raw floating point numbers) as possibly-tagged
-  data and so not collecting any Lisp objects that they point to. This
-  has some negative consequences for average time efficiency (though
-  possibly no worse than the negative consequences of trying to
-  implement an exact GC on a processor architecture as register-poor
-  as the x86) and also has potentially unlimited consequences for
-  worst-case memory efficiency. In practice, @CONSERVATIVE-GCs work
-  reasonably well, not getting anywhere near the worst case. But they
-  can occasionally cause odd patterns of memory usage.
+  separation between @DESCRIPTOR and @NON-DESCRIPTOR data, instead
+  treating some non-descriptor data (e.g. raw floating point numbers)
+  as possibly-descriptor data and so not collecting any Lisp objects
+  that they point to. This has some negative consequences for average
+  time efficiency (though possibly no worse than the negative
+  consequences of trying to implement an exact GC on a processor
+  architecture as register-poor as the x86) and also has potentially
+  unlimited consequences for worst-case memory efficiency. In
+  practice, @CONSERVATIVE-GCs work reasonably well, not getting
+  anywhere near the worst case. But they can occasionally cause odd
+  patterns of memory usage.
 
   The fork from CMUCL was based on a major rewrite of the system
   bootstrap process. CMUCL has for many years tolerated a very unusual

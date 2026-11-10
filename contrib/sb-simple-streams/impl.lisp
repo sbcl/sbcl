@@ -619,21 +619,30 @@
              class mapped input-handle output-handle
              #+win32 (overlapped t)
              (auto-close t))
-  "Return a stream which reads from or writes to Filename.
+  "Return a stream which reads from or writes to FILENAME.
+
   Defined keywords:
-   :direction - one of :input, :output, :io, or :probe
-   :element-type - type of object to read or write, default BASE-CHAR
-   :if-exists - one of :error, :new-version, :rename, :rename-and-delete,
-                       :overwrite, :append, :supersede or NIL
-   :if-does-not-exist - one of :error, :create or NIL
-   :external-format - :default
-  See the manual for details.
+
+  - :DIRECTION - one of :INPUT, :OUTPUT, :IO, or :PROBE
+
+  - :ELEMENT-TYPE - type of object to read or write, default BASE-CHAR
+
+  - :IF-EXISTS - one of :ERROR, :NEW-VERSION, :RENAME, :RENAME-AND-DELETE,
+    :OVERWRITE, :APPEND, :SUPERSEDE or NIL
+
+  - :IF-DOES-NOT-EXIST - one of :ERROR, :CREATE or NIL
+
+  - :EXTERNAL-FORMAT - :DEFAULT
 
   The following are simple-streams-specific additions:
-   :class - class of stream object to be created
-   :mapped - T to open a memory-mapped file
-   :input-handle - a stream or Unix file descriptor to read from
-   :output-handle - a stream or Unix file descriptor to write to"
+
+  - :CLASS - class of stream object to be created
+
+  - :MAPPED - T to open a memory-mapped file
+
+  - :INPUT-HANDLE - a stream or Unix file descriptor to read from
+
+  - :OUTPUT-HANDLE - a stream or Unix file descriptor to write to"
   (declare (ignore element-type external-format input-handle output-handle
                    #+win32 overlapped auto-close
                    if-exists if-does-not-exist))
@@ -713,7 +722,7 @@ is supported only on simple-streams."
        (sb-gray:stream-read-sequence stream seq start end)))))
 
 (defun clear-input (&optional (stream *standard-input*) buffer-only)
-  "Clears any buffered input associated with the Stream."
+  "Clear any buffered input associated with the STREAM."
   (declare (sb-int:explicit-check))
   (let ((stream (in-stream-from-designator stream)))
     (etypecase stream

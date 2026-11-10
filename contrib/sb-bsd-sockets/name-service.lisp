@@ -147,7 +147,7 @@ weird stuff - see getaddrinfo(3) for the details."
     "Returns a HOST-ENT instance for ADDRESS, which should be a vector of
 \(integer 0 255) with 4 elements in case of an IPv4 address and 16
 elements in case of an IPv6 address, or signals a NAME-SERVICE-ERROR.
-See gethostbyaddr(3) for details."
+See `gethostbyaddr(3)` for details."
     (declare (optimize speed))
     (multiple-value-bind (sockaddr sockaddr-size address-family)
         (etypecase address

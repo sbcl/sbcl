@@ -311,8 +311,9 @@ default is 2MB.
 
 @item @code{--tls-limit <positive integer>}
 
-Maximum number of thread-local @ref{special variables} in threaded
-builds. Default value is 4096.
+Maximum number of thread-local special variables (see
+@ref{special variables in threads}) in threaded builds. Default value
+is 4096.
 
 @item @code{--noinform}
 

@@ -2728,13 +2728,17 @@
                (if-does-not-exist if-does-not-exist)
                (if-exists if-exists))
   "Return a stream which reads from or writes to FILENAME.
+
   Defined keywords:
-   :DIRECTION - one of :INPUT, :OUTPUT, :IO, or :PROBE
-   :ELEMENT-TYPE - the type of object to read or write, default CHARACTER
-   :IF-EXISTS - one of :ERROR, :NEW-VERSION, :RENAME, :RENAME-AND-DELETE,
-                       :OVERWRITE, :APPEND, :SUPERSEDE or NIL
-   :IF-DOES-NOT-EXIST - one of :ERROR, :CREATE or NIL
-  See the manual for details."
+
+  - :DIRECTION - one of :INPUT, :OUTPUT, :IO, or :PROBE
+
+  - :ELEMENT-TYPE - the type of object to read or write, default CHARACTER
+
+  - :IF-EXISTS - one of :ERROR, :NEW-VERSION, :RENAME,
+    :RENAME-AND-DELETE, :OVERWRITE, :APPEND, :SUPERSEDE or NIL
+
+  - :IF-DOES-NOT-EXIST - one of :ERROR, :CREATE or NIL"
   (multiple-value-bind (external-format-entry canonized-external-format)
       (parse-external-format external-format)
     (unless external-format-entry

@@ -126,6 +126,8 @@ sampling runs.
 
 @cindex garbage collector, generational
 @cindex generational garbage collector
+@cindex garbage collector, conservative
+@cindex conservative garbage collector
 @cindex GENCGC
 Allocation profiling is only supported on SBCL builds that use the
 generational GC. Tracking of call stacks at a depth of more than

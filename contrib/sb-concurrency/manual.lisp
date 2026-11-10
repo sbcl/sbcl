@@ -29,7 +29,7 @@
   (sb-concurrency:queue-name function)
   (sb-concurrency:queuep function))
 
-(defsection @sb-concurrency-mailbox (:title "Mailbox (lock-free)")
+(defsection @sb-concurrency-mailbox (:title "Mailbox")
   "SB-CONCURRENCY:MAILBOX is a lock-free message queue where one or
   multiple ends can send messages to one or multiple receivers. The
   difference to @SB-CONCURRENCY-QUEUE is that the receiving end may
@@ -60,7 +60,7 @@
   (sb-concurrency:open-gate function)
   (sb-concurrency:wait-on-gate function))
 
-(defsection @sb-concurrency-frlocks (:title "Frlocks, aka Fast Read Locks")
+(defsection @sb-concurrency-frlocks (:title "Fast Read Locks")
   (sb-concurrency:frlock structure)
   (sb-concurrency:frlock-read macro)
   (sb-concurrency:frlock-write macro)

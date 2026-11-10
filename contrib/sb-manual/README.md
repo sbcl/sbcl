@@ -296,6 +296,16 @@ in particular, the AMA style. It's `Compile-time Evaluation` not
 
 - Write `fasl` and not `FASL`
 
+### That vs Which
+
+Prefer `that` for restrictive (defining) clauses, and use `which`
+exclusively for non-restrictive (parenthetical) clauses preceded by a
+comma.
+
+This brings clarity to e.g. when we mean all stack frames, _which_
+correspond to function calls, and when we mean the frames _that_ match
+specific debug criteria.
+
 ## Paragraph Formatting
 
 Note that docstrings are also inconsistent about whether one or two
