@@ -863,8 +863,9 @@
                          when
                          (ecase (operand-parse-kind op)
                            ((:argument :result)
-                            `(,(operand-parse-name op)
-                              (tn-ref-tn ,(operand-parse-temp op))))
+                            (unless (listp (operand-parse-name op)) ;; Ignore 128-bit registers, for now
+                              `(,(operand-parse-name op)
+                                (tn-ref-tn ,(operand-parse-temp op)))))
                            (:temporary
                             (and (operand-parse-unused-if op)
                                  `(,(operand-parse-name op)

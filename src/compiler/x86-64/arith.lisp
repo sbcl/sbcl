@@ -6251,6 +6251,21 @@
 
   (def check-range<= nil nil t))
 
+(macrolet ((def (name)
+             `(deftransform ,name ((lo x hi) ((constant-arg fixnum) (signed-byte 128) (constant-arg fixnum)))
+                (if (sb-c::word-sized-lvar-p x)
+                    (sb-c::give-up-ir1-transform)
+                    (if (>= (lvar-value lo) 0)
+                        `(and (typep x 'sb-vm:word)
+                              (,',name lo (truly-the sb-vm:word x) hi))
+                        `(and (typep x 'sb-vm:signed-word)
+                              (,',name lo (truly-the sb-vm:signed-word x) hi)))))))
+  (def range<)
+  (def range<=)
+  (def range<<=)
+  (def range<=<)
+  (def check-range<=))
+
 (deftransform %dpb ((new size posn integer) (:or (((constant-arg integer)
                                                    (constant-arg (integer 1 1))
                                                    word
