@@ -2633,3 +2633,10 @@
      (cond ((eq a (expt 2 68)) 1)
            (t a)))
    integer))
+
+(with-test (:name :type-from-constraints-if-test)
+  (checked-compile
+   `(lambda (y)
+     (declare (list y))
+     (when y
+       (check-type y cons)))))

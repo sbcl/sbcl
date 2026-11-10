@@ -1152,6 +1152,7 @@
              (setf set t))))))
     (cond ((and ref
                 (and (if-p (node-dest ref))
+                     (not (lvar-annotations (node-lvar ref)))
                      (or (and not-xset
                               (xset-member-p nil not-xset))
                          (csubtypep (specifier-type 'null) not-type))))
