@@ -117,7 +117,7 @@
           (let ((symbol (sap-ref-lispobj symbolmap (ash i -1))))
             ;; If no symbol, the index is unused (or else there's an unavoidable race)
             (unless (= (get-lisp-obj-address symbol) sb-vm:no-tls-value-marker)
-              (setf (sap-ref-lispobj (sb-thread:current-thread-sap) i) symbol)))))))
+              (setf (sap-ref-lispobj (current-thread-sap) i) symbol)))))))
   thread)
 
 (eval-when (:compile-toplevel)

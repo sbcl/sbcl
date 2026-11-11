@@ -11,16 +11,6 @@
 
 (in-package "SB-THREAD")
 
-;;; symbols to protect from tree-shaker, for some tests
-(export '(%thread-local-references
-          %thread-from-tid
-          get-spinlock
-          release-spinlock
-          spinlock
-          with-tls-lock
-          with-session-lock
-          with-spinlock))
-
 #+(or linux win32 freebsd darwin openbsd)
 (defmacro my-kernel-thread-id () `(thread-os-tid *current-thread*))
 
@@ -519,7 +509,6 @@ SB-EXT:SAVE-LISP-AND-DIE.)"
         :slot token
         :byte-offset (+ #+(and 64-bit big-endian) 4)))
 
-    (export 'futex-wake) ; for naughty users only
     (declaim (inline futex-wait futex-wake))
 
     (define-alien-routine "futex_wake" int (word-addr unsigned) (n unsigned-long))
@@ -2772,7 +2761,6 @@ mechanism for inter-thread communication."
             (show sym val))
           (setq from (sap+ from (* sb-vm:binding-size sb-vm:n-word-bytes))))))))
 
-(export '(allocator-histogram print-allocator-histogram reset-allocator-histogram))
 (defun allocator-histogram (&optional (thread *current-thread*))
   (if (eq thread :all)
       (labels ((vector-sum (a b)

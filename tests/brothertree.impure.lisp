@@ -196,7 +196,7 @@
       (gc :full t)
       (time (setq tree (build-avltree-from-ints insertion-order)))
       (time (loop for i from 150 by 100 repeat n
-               do (let ((node (sb-thread:avl-find<= i tree)))
+               do (let ((node (sb-thread::avl-find<= i tree)))
                     (assert (and node (= (sb-thread::avlnode-key node)
                                          (- i 50))))))))
     (format t "~&Red/black:")

@@ -395,18 +395,42 @@ Please check that all strings which were not recognizable to the compiler
            (search "-TN" (string symbol))))
       (#.(mapcar 'find-package
                  '("SB-ALIEN" "SB-ASSEM" "SB-BROTHERTREE" "SB-C" "SB-DISASSEM" "SB-FORMAT"
-                   "SB-IMPL" "SB-KERNEL" "SB-LOCKLESS" "SB-LOOP" "SB-MOP" "SB-PCL"
+                   "SB-KERNEL" "SB-LOCKLESS" "SB-LOOP" "SB-MOP" "SB-PCL"
                    "SB-PRETTY" "SB-PROFILE"
                    "SB-REGALLOC" "SB-SYS" "SB-UNICODE" "SB-UNIX" "SB-WALKER"))
        ;; Assume all and only external symbols must be retained
          (eq accessibility :external))
+      (#.(find-package "SB-IMPL")
+       (or (eq accessibility :external)
+           (member symbol '(sb-impl::hash-table-hash-fun-state
+                            sb-impl::+sxstate-max-chain-length-bits+
+                            sb-impl::+sxstate-limit-bits+
+                            sb-impl::+highest-sxstate-limit+
+                            sb-impl::make-sxstate sxstate-limit
+                            sb-impl::sxstate-max-chain-length
+                            sb-impl::truncated-hash-p
+                            sb-impl::flat-hash-table-p))))
       (#.(find-package "SB-THREAD")
        (or (eq accessibility :external)
-           ;; for some reason a recent change caused the tree-shaker to drop MAKE-SPINLOCK
-           ;; which makes sense. I'm not sure what was rooting the symbol.
-           ;; However the :spinlock-api test in threads.impure asserts that spinlock symbols
-           ;; exist despite being internal symbols.
-           (sb-int:info :function :deprecated symbol)))
+           (member symbol '(sb-thread::avltree-list
+                            sb-thread::avl-find>=
+                            sb-thread::avl-find<=
+                            sb-thread::%thread-local-references
+                            sb-thread::%thread-from-tid
+                            sb-thread::get-spinlock
+                            sb-thread::release-spinlock
+                            sb-thread::spinlock
+                            sb-thread::make-spinlock
+                            sb-thread::with-tls-lock
+                            sb-thread::with-session-lock
+                            sb-thread::with-spinlock
+                            sb-thread::with-recursive-spinlock
+                            sb-thread::spinlock-name
+                            sb-thread::allocator-histogram
+                            sb-thread::reset-allocator-histogram
+                            sb-thread::print-allocator-histogram
+                            sb-thread::futex-wake
+                            sb-thread::current-thread-sap))))
       (#.(find-package "SB-FASL")
        ;; Retain +BACKEND-FASL-FILE-IMPLEMENTATION+ and +FASL-FILE-VERSION+
        ;; (and anything else otherwise reachable)

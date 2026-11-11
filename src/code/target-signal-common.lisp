@@ -55,7 +55,7 @@
         ,@body))
     (:asynchronous
      (flet ((mv-count-byte ()
-              `(sap-ref-8 (sb-thread:current-thread-sap)
+              `(sap-ref-8 (sb-thread::current-thread-sap)
                           ,(1+ (ash sb-vm:thread-state-word-slot
                                     sb-vm:word-shift))))
             (spill/restore (form)
@@ -64,7 +64,7 @@
                      for j below (length mv-spill)
                      do ,form))
             (mv-slot-at (n)
-              `(sap-ref-lispobj (sb-thread:current-thread-sap) ,n)))
+              `(sap-ref-lispobj (sb-thread::current-thread-sap) ,n)))
        `(let* ((raw-mv-count ,(mv-count-byte))
                (mv-count (ash raw-mv-count (- sb-vm:n-fixnum-tag-bits)))
                (mv-spill (make-array

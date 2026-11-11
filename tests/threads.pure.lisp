@@ -321,4 +321,4 @@
 (with-test (:name :thread-from-tid)
   (let ((tid (sb-thread:thread-os-tid *current-thread*)))
     (when (plusp tid) ; SunOS returns 0
-      (assert (eq (sb-thread:%thread-from-tid tid) *current-thread*)))))
+      (assert (eq (sb-thread::%thread-from-tid tid) *current-thread*)))))

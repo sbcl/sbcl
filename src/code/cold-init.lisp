@@ -384,7 +384,7 @@ see documentation for SB-EXT:EXIT."
       (alien-funcall asan-lisp-thread-cleanup)
       ;; - threads ready to be pthread_joined, so effectively dead to Lisp
       ;;   but whose pthread memory resources have not been released
-      (sb-thread:%dispose-thread-structs))
+      (sb-thread::%dispose-thread-structs))
     t))
 
 (declaim (ftype (sfunction (&key (:code (or null exit-code))

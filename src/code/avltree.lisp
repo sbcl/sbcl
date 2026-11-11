@@ -174,7 +174,6 @@
                 (t tree)))
         result)))
 
-(export '(avltree-list avl-find>= avl-find<=))
 (defun avltree-list (tree &optional (transducer #'avlnode-data))
   (let (result)
     (named-let recurse ((node tree))

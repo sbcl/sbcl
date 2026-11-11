@@ -224,7 +224,7 @@ The following keyword args are recognized:
                   (sleep sample-interval)
                   (map-threads
                    (lambda (thread)
-                     (sb-thread:with-tls-lock (thread c-thread)
+                     (sb-thread::with-tls-lock (thread c-thread)
                        (unless (= c-thread 0)
                          (sb-unix:pthread-kill (sb-thread::thread-os-thread thread)
                                                sb-unix:sigprof)))))))

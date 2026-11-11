@@ -103,8 +103,6 @@
 ;;;; Collisions" (https://zenodo.org/doi/10.5281/zenodo.10991321).
 
 (declaim (inline hash-table-hash-fun-state))
-;; For testing
-(export 'hash-table-hash-fun-state)
 (defun hash-table-hash-fun-state (table)
   (truly-the fixnum (hash-table-%hash-fun-state table)))
 
@@ -513,11 +511,6 @@
 ;;;; hash (SXSTATE-LIMIT) and what the likely maximum number of keys
 ;;;; is in any bucket (SXSTATE-MAX-CHAIN-LENGTH).
 
-;;; For testing
-(export '(+sxstate-max-chain-length-bits+ +sxstate-limit-bits+
-          +highest-sxstate-limit+ make-sxstate sxstate-limit
-          sxstate-max-chain-length))
-
 (defconstant +sxstate-max-chain-length-bits+ 4)
 (defconstant +sxstate-limit-bits+
   #-64-bit (- (1- sb-vm:n-fixnum-bits) +sxstate-max-chain-length-bits+)
@@ -613,8 +606,6 @@
                       (logbitp bit ,(ldb (byte 32 0) mask))
                       (logbitp (- bit 32) ,(ash mask -32)))))))
 
-;; For testing
-(export 'truncated-hash-p)
 ;;; ADAPTIVE-EQUAL-HASH indicates in the highest bit just above
 ;;; CLIPPED-HASH whether the hash was computed from a truncated
 ;;; version of the key.
@@ -1215,8 +1206,6 @@ multiple threads accessing the same hash-table without locking."
 ;;;; plain vector as far as the GC is concerned.
 
 (declaim (inline flat-hash-table-p))
-;; For testing
-(export 'flat-hash-table-p)
 (defun flat-hash-table-p (table)
   (eql (hash-table-%hash-fun-state table) +hft-flat+))
 

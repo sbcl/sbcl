@@ -3422,9 +3422,7 @@ stuff like SB-DEBUG::*TRACED-FUNS*.")
 (defpackage "SB-THREAD"
   (:documentation "public (but low-level): native thread support")
   (:use "CL" "SB-ALIEN" "SB-INT" "SB-SYS" "SB-KERNEL")
-  (:export "%DISPOSE-THREAD-STRUCTS"
-           "*CURRENT-THREAD*"
-           "CURRENT-THREAD-SAP"
+  (:export "*CURRENT-THREAD*"
            "DESTROY-THREAD"
            "INTERRUPT-THREAD"
            "INTERRUPT-THREAD-ERROR"

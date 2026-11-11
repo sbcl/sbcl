@@ -3,7 +3,7 @@
 
 (defvar *print-histogram* nil)
 (defun check-histogram (bin-index count kind)
-  (let* ((h (sb-thread:allocator-histogram))
+  (let* ((h (sb-thread::allocator-histogram))
          (bins (first h))
          (ok t))
     (dotimes (i (length bins))
@@ -12,7 +12,7 @@
                         (= (aref bins bin-index) count)
                         (zerop (aref bins i))))))
     (when (or (not ok) *print-histogram*)
-      (sb-thread:print-allocator-histogram h))
+      (sb-thread::print-allocator-histogram h))
     (unless ok
       (error "Unexpected histogram: expected bin ~D = ~D"
              bin-index count))
@@ -33,7 +33,7 @@
 (defvar *arena* (sb-vm:new-arena (* 512 1024 1024))) ; 512 MiB
 
 (defun %assert-histogram (lambda bin-index count kind)
-  (sb-thread:reset-allocator-histogram)
+  (sb-thread::reset-allocator-histogram)
   (sb-vm:with-arena (*arena*)
     (funcall lambda))
   (sb-vm:rewind-arena *arena*)
@@ -69,9 +69,9 @@
                         (* (+ array-len sb-vm:vector-data-offset)
                            sb-vm:n-word-bytes)))
              (let ((expected-histogram (%assert-histogram function bin-index 1 :boxed)))
-               (sb-thread:reset-allocator-histogram)
+               (sb-thread::reset-allocator-histogram)
                (opaque-identity (funcall 'instrumented-make-array-n array-len))
-               (let ((histogram (sb-thread:allocator-histogram)))
+               (let ((histogram (sb-thread::allocator-histogram)))
                  (assert (equalp histogram expected-histogram)))))))
 
 (test-util:with-test (:name :boxed-array-large-bins)
@@ -89,10 +89,10 @@
                    (* (+ array-len sb-vm:vector-data-offset)
                       sb-vm:n-word-bytes)))
         (let ((expected-histogram (%assert-histogram function bin-index 1 :boxed)))
-          (sb-thread:reset-allocator-histogram)
+          (sb-thread::reset-allocator-histogram)
           (opaque-identity (funcall 'instrumented-make-array-n array-len))
-          (let ((histogram (sb-thread:allocator-histogram)))
-            ;; (sb-thread:print-allocator-histogram histogram)
+          (let ((histogram (sb-thread::allocator-histogram)))
+            ;; (sb-thread::print-allocator-histogram histogram)
             (assert (equalp histogram expected-histogram)))))
       (incf array-len 2))))
 

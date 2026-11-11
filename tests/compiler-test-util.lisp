@@ -233,7 +233,7 @@
        (progn #+sb-thread
               (sb-int:with-system-mutex (sb-thread::*make-thread-lock*)
                 (sb-impl::finalizer-thread-stop)
-                (sb-thread:%dispose-thread-structs))
+                (sb-thread::%dispose-thread-structs))
               #+(and sb-thread gencgc) (sb-vm::close-thread-alloc-region)
               (setf sb-int:*n-bytes-freed-or-purified* 0)
 
