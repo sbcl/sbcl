@@ -679,28 +679,6 @@ Arrange with the garbage collector that OBJECTS will not be moved in memory
 for the duration of @code{body}.  Useful for e.g. foreign calls where another thread
 may trigger garbage collection.
 @end deffn
-@anchor{Macro sb-sys without-gcing}
-@ffindex @sortas{without-gcing sb-sys} without-gcing [sb-sys]
-@deffn{Macro} sb-sys:without-gcing &body body
-Execute the forms in @code{body} without doing a garbage collection. It
-inhibits both automatically and explicitly triggered collections.
-Finally, upon leaving the @code{body} if gc is not inhibited it runs the
-pending gc. Similarly, if gc is triggered in another thread then it
-waits until gc is enabled in this thread.
-
-Implies @code{sb-sys:without-interrupts} for @code{body}, and causes any nested
-@code{sb-sys:with-interrupts} to signal a warning during execution of the
-@code{body}.
-
-Should be used with great care, and not at all in multithreaded
-application code: Any locks that are ever acquired while @code{gc} is
-inhibited need to be always held with @code{gc} inhibited to prevent
-deadlocks: if @code{t}1 holds the lock and is stopped for @code{gc} while @code{t}2 is
-waiting for the lock inside @code{without-gcing} the system will be
-deadlocked. Since SBCL does not currently document its internal locks,
-application code can never be certain that this invariant is
-maintained.
-@end deffn
 @node tracing live objects back to roots
 @subsection Tracing Live Objects Back to Roots
 

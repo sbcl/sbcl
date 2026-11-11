@@ -311,8 +311,7 @@
 
 (defsection @controlling-gc (:title "Controlling GC")
   (sb-ext:purify function)
-  (sb-sys:with-pinned-objects macro)
-  (sb-sys:without-gcing macro))
+  (sb-sys:with-pinned-objects macro))
 
 (defsection @tracing-live-objects-back-to-roots
     (:title "Tracing Live Objects Back to Roots")
