@@ -1857,14 +1857,24 @@ session."
         (when (eq old (setq old (sb-ext:cas *all-threads* old new)))
           (return))))))
 
-;; We're going to join one finished thread if it exists, and reuse its memory,
+;; We're going to join one finished thread if it exists, and potentially reuse its memory,
 ;; if that memory is the size we want right now. The way to know if it's the right size
 ;; is that control_stack_size + OS-allocated address = binding stack address stored
 ;; in the thread. Refer to alloc_thread_struct() for a helpful picture.
-(defun primitive-join (thread dispose)
+;;
+;; The returned value depends on whether the caller wants to unconditionally dispose
+;; a struct, or try to reuse memory of a joined thread.
+;; * If DISPOSE is NIL, then the result is a SAP to memory that we can reuse
+;;   for a thread struct, or NIL if we can't reuse memory.
+;; * If DISPOSE is T, then the return value is T if we did join a thread,
+;;   or NIL if we did not. The purpose of DISPOSE=T is to free as many underlying
+;;   threads as possible. Caller will cease looping only when this returns NIL.
+;;
+(defun primitive-join (dispose)
   ;; It's safe to read from the other thread's memory, because the current thread
   ;; has ownership of that memory now. And we can't call this on a FOREIGN-THREAD.
-  (let ((c-thread (descriptor-sap (thread-startup-info thread))))
+  (binding* ((thread (sb-ext:atomic-pop *joinable-threads*) :exit-if-null)
+             (c-thread (descriptor-sap (thread-startup-info thread))))
     (setf (thread-startup-info thread) 0)
     ;; Clean up *ALL-THREADS*
     (delete-from-all-threads (sap-int c-thread))
@@ -1883,7 +1893,7 @@ session."
       (cond ((or dispose (/= (sap- (thread-ref c-thread :binding-stack-start) os-address)
                              (extern-alien "thread_control_stack_size" unsigned-int)))
              (free-thread-struct c-thread)
-             nil)
+             dispose)
             (t ; Return the originally mapped address
              os-address)))))
 
@@ -1892,10 +1902,12 @@ session."
 ;;; the *ALL-THREADS* tree as well. Must be called with the *MAKE-THREAD-LOCK* held
 ;;; or interrupts inhibited or both.
 ;;; We try to keep up to RETAIN blocks of memory for reuse by later calls to MAKE-THREAD.
+;;; Note that the NTHCDR is a heuristic pre-test of whether to try joining a thread.
+;;; Since *JOINABLE-THREADS* is only modified by ATOMIC-{PUSH,POP}, walking it without a
+;;; lock is safe. At worst, two callers may pop more than :RETAIN specified to do.
 (defun %dispose-thread-structs (&key (retain 0))
-  (loop (unless (nthcdr retain *joinable-threads*) (return))
-        (let ((item (sb-ext:atomic-pop *joinable-threads*)))
-          (if item (primitive-join item t) (return)))))
+  (loop (cond ((not (nthcdr retain *joinable-threads*)) (return))
+              ((not (primitive-join t)) (return)))))
 
 ;;; Allocate lisp thread memory, attempting first to join any exited
 ;;; threads, freeing their memory. Possibly reuse the memory from one of
@@ -1912,8 +1924,7 @@ session."
 ;;; Ours has the meaning of "get result if done, otherwise wait"
 ;;; which is not the same as deallocation of the thread's OS resources.
 (defun allocate-thread-memory ()
-  (let ((reuse (let ((corpse (sb-ext:atomic-pop *joinable-threads*)))
-                 (when corpse (primitive-join corpse nil)))))
+  (let ((reuse (primitive-join nil)))
     ;; If there is more than 1 more joinable, join all but 1.
     ;; Two threads could both find > 1 thread to join, and both do
     ;; a join, leaving 0 to join. That's ok.
