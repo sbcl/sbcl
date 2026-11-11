@@ -1338,3 +1338,15 @@
              (setf x 1.0)
              x)))
     (() 1.0)))
+
+(with-test (:name :local-call-bad-keywords)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (v)
+                         (declare (optimize (debug 2)))
+                         (labels ((f (&key k)
+                                    (f)
+                                    (values k v)))
+                           (declare (inline f))
+                           (f 1 2 :allow-other-keys t)))
+                      :allow-warnings t))))

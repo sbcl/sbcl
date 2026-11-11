@@ -865,10 +865,8 @@
           (let ((lvar (first key)))
             (unless (types-equal-or-intersect (lvar-type lvar)
                                               (specifier-type 'symbol))
-              (setf (combination-kind call) :error)
               (compiler-warn "Argument of type ~s cannot be used as a keyword."
-                             (type-specifier (lvar-type lvar)))
-              (return-from convert-more-call))
+                             (type-specifier (lvar-type lvar))))
             (unless (constant-lvar-p lvar)
               (when flame
                 (compiler-notify "non-constant keyword in keyword call"))
