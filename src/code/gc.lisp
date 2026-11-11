@@ -115,14 +115,6 @@ run in any thread.")
 
 ;;; For GENCGC all generations < GEN will be GC'ed.
 
-(defmacro try-acquire-gc-lock (&rest forms)
-  #-sb-thread `(progn ,@forms t)
-  #+sb-thread
-  `(when (eql (alien-funcall (extern-alien "try_acquire_gc_lock" (function int))) 1)
-     ,@forms
-     (alien-funcall (extern-alien "release_gc_lock" (function void)))
-     t))
-
 (defmacro get-gc-real-time ()
   ;; 64-bit is just a call to clock-gettime and some math that won't ever cons
   #+64-bit '(get-internal-real-time)

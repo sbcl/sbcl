@@ -1794,11 +1794,31 @@ session."
       (make-thread #'thread-repl))))
 
 
+(defmacro sb-kernel::try-acquire-gc-lock (&rest forms)
+  #-sb-thread `(progn ,@forms t)
+  #+sb-thread
+  `(when (eql (alien-funcall (extern-alien "try_acquire_gc_lock" (function int))) 1)
+     ,@forms
+     (alien-funcall (extern-alien "release_gc_lock" (function void)))
+     t))
+
 ;;;; The beef
 #+sb-thread
 (macrolet ((thread-ref (sap slot)
              `(sap-ref-sap ,sap (ash ,(package-symbolicate "SB-VM" "THREAD-" slot "-SLOT")
-                                     sb-vm:word-shift))))
+                                     sb-vm:word-shift)))
+           (pthread-creation-wrapper ((th) form)
+             `(with-pinned-objects (,th)
+                ;; No extra caution is needed if foreign calls can make progress.
+                #+(or sb-safepoint nonstop-foreign-call) ,form
+                ;; In glibc's NPTL implementation, pthread_create acquires a process-wide lock
+                ;; in allocate_stack. Deferring SIG_STOP_FOR_GC across that call ensures that
+                ;; Lisp threads won't stop while holding that lock, which would block non-Lisp
+                ;; threads from doing any pthread_{create,_join}.
+                #-(or sb-safepoint nonstop-foreign-call)
+                (progn
+                  #+(or x86 x86-64) (sb-vm:with-pseudo-atomic-foreign-calls ,form)
+                  #-(or x86 x86-64) (without-gcing ,form)))))
 ;;; Return T if the thread was created
 (defun os-thread-create (thread thread-sap)
   (aver (memq thread *starting-threads*))
@@ -1836,7 +1856,7 @@ session."
          (= 0 (with-alien ((setguard (function int system-area-pointer unsigned)
                                      :extern "pthread_attr_setguardsize"))
                 (alien-funcall setguard attr 0)))
-         (with-pinned-objects (thread)
+         (pthread-creation-wrapper (thread)
            (= 0 (alien-funcall
                  (extern-alien "create_lisp_thread" (function int unsigned system-area-pointer))
                  (get-lisp-obj-address thread) thread-sap))))))
@@ -1857,6 +1877,61 @@ session."
         (when (eq old (setq old (sb-ext:cas *all-threads* old new)))
           (return))))))
 
+;; Like pthread_create, glibc's pthread_join acquires the process-wide stack_cache_lock
+;; (via __deallocate_stack), so we prefer not to stop for GC while inside pthread_join.
+;; However, simply inhibiting GC around pthread_join is unsafe: an exiting thread pushes
+;; itself onto *JOINABLE-THREADS* in Lisp before our unregister_thread() acquires
+;; all_threads_lock. Suppose the current thread (call it "T_joiner") wants to join that
+;; exiting thread ("T_exiting") because it was popped from the list. If T_joiner says:
+;; I can't make progress until T_exiting exits, and meanwhile GC can't occur;
+;; and T_exiting says: I can't make progress until acquiring all_threads_lock in
+;; unregister_thread(), and a -third- thread (call it "T_gcing") has already begun the
+;; stop-the-world protocol before T_exiting acquires all_threads_lock, then T_gcing
+;; owns the all_threads_lock and _no_ thread can make progress because T_joiner
+;; won't allow the GC cycle to run.
+;; There is potential workaround involving pthread_tryjoin_np - if the pthread join
+;; can't complete immediately, we don't touch *JOINABLE-THREADS* (either put T_exiting
+;; back in the list, or otherwise enforce that at most one joiner attempts to join the
+;; same T_exiting while it remains in the list). Dependency on a specific libpthread
+;; from Lisp is really not great. Instead, by using TRY-ACQUIRE-GC-LOCK around the pop
+;; of *JOINABLE-THREADS*, we prevent any thread from starting GC.
+;;
+(defun %primitive-join-1 ()
+  ;; If either of these features is present, then native threads are not prevented
+  ;; from making progress, so the big comment above does not pertain.
+  #+(or sb-safepoint nonstop-foreign-call)
+  (binding* ((thread (sb-ext:atomic-pop *joinable-threads*) :exit-if-null))
+    #+win32
+    (with-alien ((wait (function unsigned unsigned unsigned) :extern "WaitForSingleObject")
+                 (close (function int unsigned) :extern "CloseHandle"))
+      ;; #+win32 does not keep the thread handle ("os-thread") in the Lisp instance.
+      ;; But HANDLE-THREAD-EXIT stashes the pointer to 'struct thread' in
+      ;; the STARTUP-INFO slot (and sets THREAD-PRIMITIVE-THREAD to 0)
+      (let* ((c-thread (descriptor-sap (thread-startup-info thread)))
+             (os-thread (sap-int (thread-ref c-thread :os-thread))))
+        (alien-funcall wait os-thread #xffffffff)
+        (alien-funcall close os-thread)))
+    #-win32
+    (with-alien ((join (function int unsigned unsigned) :extern "pthread_join"))
+      (alien-funcall join (thread-os-thread thread) 0) ; no result pointer
+      (setf (thread-os-thread thread) 0))
+    thread)
+
+  ;; Remove one thread from *JOINABLE-THREADS* and call the OS's thread join operation,
+  ;; atomically with respect to GC - but even more atomically than usual: do not even
+  ;; let GC think about trying to run; do not let it acquire all_threads_lock.
+  ;; If we can't do that, then do nothing, even if *JOINABLE-THREADS* is non-NIL.
+  ;; The next MAKE-THREAD should take care of it.
+  #-(or sb-safepoint nonstop-foreign-call)
+  (let (thread)
+    (without-interrupts
+     (sb-kernel::try-acquire-gc-lock
+      (when (setq thread (sb-ext:atomic-pop *joinable-threads*))
+        (with-alien ((join (function int unsigned unsigned) :extern "pthread_join"))
+          (alien-funcall join (thread-os-thread thread) 0) ; no result pointer
+          (setf (thread-os-thread thread) 0)))))
+    thread))
+
 ;; We're going to join one finished thread if it exists, and potentially reuse its memory,
 ;; if that memory is the size we want right now. The way to know if it's the right size
 ;; is that control_stack_size + OS-allocated address = binding stack address stored
@@ -1873,22 +1948,11 @@ session."
 (defun primitive-join (dispose)
   ;; It's safe to read from the other thread's memory, because the current thread
   ;; has ownership of that memory now. And we can't call this on a FOREIGN-THREAD.
-  (binding* ((thread (sb-ext:atomic-pop *joinable-threads*) :exit-if-null)
+  (binding* ((thread (%primitive-join-1) :exit-if-null)
              (c-thread (descriptor-sap (thread-startup-info thread))))
     (setf (thread-startup-info thread) 0)
     ;; Clean up *ALL-THREADS*
     (delete-from-all-threads (sap-int c-thread))
-    ;; Release the OS and/or pthread resources
-    #+win32
-    (with-alien ((wait (function unsigned unsigned unsigned) :extern "WaitForSingleObject")
-                 (close (function int unsigned) :extern "CloseHandle"))
-      (let ((os-thread (sap-int (thread-ref c-thread :os-thread))))
-        (alien-funcall wait os-thread #xffffffff)
-        (alien-funcall close os-thread)))
-    #-win32
-    (with-alien ((join (function int unsigned unsigned) :extern "pthread_join"))
-      (alien-funcall join (thread-os-thread thread) 0) ; no result pointer
-      (setf (thread-os-thread thread) 0))
     (let ((os-address (thread-ref c-thread :os-address)))
       (cond ((or dispose (/= (sap- (thread-ref c-thread :binding-stack-start) os-address)
                              (extern-alien "thread_control_stack_size" unsigned-int)))
