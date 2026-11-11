@@ -221,7 +221,7 @@ run in any thread.")
                   ;; Return a 0 for easy ternary logic in the C
                   ;; runtime.
                   (when (and (eql gen 0)
-                             (neq epoch *gc-pending*))
+                             (neq epoch *gc-epoch*))
                     (return 0)))))))))
 
 #+sb-thread
