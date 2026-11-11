@@ -145,16 +145,24 @@
   function and the values of its arguments in the style of a Lisp
   function call:
 
-  - `up`: Move up to the next higher frame. More recent function calls
-     are considered to be higher on the stack.
+  - `up`
 
-  - `down`: Move down to the next lower frame.
+      Move up to the next higher frame. More recent function calls are
+      considered to be higher on the stack.
 
-  - `bottom`: Move to the lowest frame.
+  - `down`
 
-  - `frame [<n>]`: Move to the frame with the specified number.
-    Prompts for the number if not supplied. The frame with number 0 is
-    the frame where the debugger was entered.")
+      Move down to the next lower frame.
+
+  - `bottom`
+
+       Move to the lowest frame.
+
+  - `frame [<n>]`
+
+      Move to the frame with the specified number. Prompts for the
+      number if not supplied. The frame with number 0 is the frame
+      where the debugger was entered.")
 
 (defsection @how-arguments-are-printed (:title "How Arguments are Printed")
   "A frame is printed to look like a function call but with the actual
@@ -332,13 +340,15 @@
       X  =  1
       X#1  =  2
 
-  - `list-locals [<prefix>]`: This command prints the name and value
-    of all variables in the current frame whose name has the specified
-    `<prefix>`, which may be a string or a symbol. If no `<prefix>` is
-    given, then all available variables are printed. If a variable has
-    a potentially ambiguous name, then the name is printed with a
-    `#<identifier>` suffix, where `<identifier>` is the small integer
-    used to make the name unique."
+  - `list-locals [<prefix>]`
+
+      This command prints the name and value of all variables in the
+      current frame whose name has the specified `<prefix>`, which may
+      be a string or a symbol. If no `<prefix>` is given, then all
+      available variables are printed. If a variable has a potentially
+      ambiguous name, then the name is printed with a `#<identifier>`
+      suffix, where `<identifier>` is the small integer used to make
+      the name unique."
   (sb-debug:var function)
   (@variable-value-availability section)
   (@note-on-lexical-variable-access section))
@@ -438,16 +448,17 @@
 (defsection @source-location-printing
     (:title "Source Location Printing"
      :concepts (("source location" "in debugger")))
-  "One of the debugger's capabilities is source level debugging of
-  compiled code.  These commands display the source location for the
-  current frame:
+  "One of the debugger's capabilities is source-level debugging of
+  compiled code.
 
-  - `source [<context>]`: This command displays the file that the
-    current frame's function was defined from (if it was defined from
-    a file), and then the source form responsible for generating the
-    code that the current frame was executing. If `<context>` is
-    specified, then it is an integer specifying the number of
-    enclosing levels of list structure to print.
+  - `source [<context>]`
+
+      This command displays the file that the current frame's function
+      was defined from (if it was defined from a file), and then the
+      source form responsible for generating the code that the current
+      frame was executing. If `<context>` is specified, then it is an
+      integer specifying the number of enclosing levels of list
+      structure to print.
 
   The source form for a location in the code is the innermost list
   present in the original source that encloses the form responsible
@@ -657,54 +668,75 @@
 (defsection @exiting-the-debugger (:title "Exiting the Debugger")
   "These commands get you out of the debugger.
 
-  - `toplevel`: Throw to top level.
+  - `toplevel`
 
-  - `restart [<n>]` or `<n>`: Invoke the `<n>`th restart case as
-    displayed by the `error` command. If `<n>` is not specified, the
-    available restart cases are reported. When using the short
-    form (`<n>`), an integer for which there is no corresponding
-    restart is evaluated following normal REPL semantics.
+      Throw to top level.
 
-  - `\\continue`: Call CONTINUE with the condition given that invoked
-    the debugger. If there is no restart case named CONTINUE, then an
-    error is signaled. This is not a debugger command but the name of
-    a commonly available restart.
+  - `restart [<n>]` or `<n>`
 
-  - `\\abort`: Call ABORT on the condition that invoked the debugger.
-    This is useful for popping debug command loop levels or aborting
-    to top level, as the case may be. This is not a debugger command
-    but the name of a commonly available restart.
+      Invoke the `<n>`th restart case as displayed by the `error`
+      command. If `<n>` is not specified, the available restart cases
+      are reported. When using the short form (`<n>`), an integer for
+      which there is no corresponding restart is evaluated following
+      normal REPL semantics.
 
-  - `return <value>`: Return `VALUE` from the current stack frame.
-    This command is available when the @DEBUG optimization quality is
-    greater than both @SPEED and @SPACE. Care must be taken that the
-    value is of the same type as SBCL expects the stack frame to
-    return.
+  - `\\continue`
 
-  - `restart-frame`: Restart execution of the current stack frame.
-    This command is available when the @DEBUG optimization quality is
-    greater than both @SPEED and @SPACE and when the frame is for a
-    global function. If the function is redefined in the debugger
-    before the frame is restarted, the new function will be used.")
+      Call CONTINUE with the condition given that invoked the
+      debugger. If there is no restart case named CONTINUE, then an
+      error is signaled. This is not a debugger command but the name
+      of a commonly available restart.
+
+  - `\\abort`
+
+      Call ABORT on the condition that invoked the debugger. This is
+      useful for popping debug command loop levels or aborting to top
+      level, as the case may be. This is not a debugger command but
+      the name of a commonly available restart.
+
+  - `return <value>`
+
+      Return `VALUE` from the current stack frame. This command is
+      available when the @DEBUG optimization quality is greater than
+      both @SPEED and @SPACE. Care must be taken that the value is of
+      the same type as SBCL expects the stack frame to return.
+
+  - `restart-frame`
+
+      Restart execution of the current stack frame. This command is
+      available when the @DEBUG optimization quality is greater than
+      both @SPEED and @SPACE and when the frame is for a global
+      function. If the function is redefined in the debugger before
+      the frame is restarted, the new function will be used.")
 
 (defsection @information-commands (:title "Information Commands")
   "Most of these commands print information about the current frame or
   function, but a few show general information.
 
-  - `help` or `?`: Display a synopsis of debugger commands.
+  - `help` or `?`
 
-  - `\\describe`: Call DESCRIBE on the current function and display
-    the number of local variables.
+      Display a synopsis of debugger commands.
 
-  - `\\print`: Display the current function call as it would be
-    displayed by moving to this frame.
+  - `\\describe`
 
-  - `\\error`: Print the condition given to INVOKE-DEBUGGER and the
-    active proceed cases.
+      Call DESCRIBE on the current function and display the number of
+      local variables.
 
-  - `backtrace [<n>]`: Display all the frames from the current to the
-    bottom. Only shows `<n>` frames if specified. The printing is
-    controlled by SB-DEBUG:*DEBUG-PRINT-VARIABLE-ALIST*.")
+  - `\\print`
+
+      Display the current function call as it would be displayed by
+      moving to this frame.
+
+  - `\\error`
+
+      Print the condition given to INVOKE-DEBUGGER and the active
+      proceed cases.
+
+  - `backtrace [<n>]`
+
+      Display all the frames from the current to the bottom. Only
+      shows `<n>` frames if specified. The printing is controlled by
+      SB-DEBUG:*DEBUG-PRINT-VARIABLE-ALIST*.")
 
 (defsection @breakpoint-commands (:title "Breakpoint Commands"
                                   :concepts ("breakpoint"))
@@ -714,18 +746,22 @@
   are largely useless unless the @DEBUG optimize quality is at least
   2 (see @DEBUG-INFORMATION). These commands manipulate breakpoints:
 
-  - `breakpoint <location> [<option> <value>]*`: Set a breakpoint in
-    some function. `<location>` may be an integer code location
-    number (as displayed by `list-locations`) or a keyword. The
-    keyword can be used to indicate setting a breakpoint at the
-    function start (:START, `:S`) or function end (:END, `:E`). The
-    `breakpoint` command has :CONDITION, :BREAK, :PRINT and :FUNCTION
-    options which work similarly to the TRACE options.
+  - `breakpoint <location> [<option> <value>]*`
 
-  - `list-locations [<function>]` or `ll [<function>]`: List all the
-    code locations in the current frame's function, or in `<function>`
-    if it is supplied. The display format is the code location number,
-    a colon and then the source form for that location:
+      Set a breakpoint in some function. `<location>` may be an
+      integer code location number (as displayed by `list-locations`)
+      or a keyword. The keyword can be used to indicate setting a
+      breakpoint at the function start (:START, `:S`) or function
+      end (:END, `:E`). The `breakpoint` command has :CONDITION,
+      :BREAK, :PRINT and :FUNCTION options which work similarly to the
+      TRACE options.
+
+  - `list-locations [<function>]` or `ll [<function>]`
+
+      List all the code locations in the current frame's function, or
+      in `<function>` if it is supplied. The display format is the
+      code location number, a colon and then the source form for that
+      location:
 
           3: (1- N)
 
@@ -736,16 +772,21 @@
       the same source. The listed function becomes the new default
       function for breakpoint setting (via the `breakpoint`) command.
 
-  - `list-breakpoints` or `lb`: List all currently active breakpoints
-    with their breakpoint number.
+  - `list-breakpoints` or `lb`
 
-  - `delete-breakpoint [<number>]` or `db [<number>]`: Delete a
-    breakpoint specified by its breakpoint number. If no number is
-    specified, delete all breakpoints.
+      List all currently active breakpoints with their breakpoint
+      number.
 
-  - `step*`: Step to the next possible breakpoint location in the
-    current function. This always steps over function calls, instead
-    of stepping into them."
+  - `delete-breakpoint [<number>]` or `db [<number>]`
+
+      Delete a breakpoint specified by its breakpoint number. If no
+      number is specified, delete all breakpoints.
+
+  - `step*`
+
+      Step to the next possible breakpoint location in the current
+      function. This always steps over function calls, instead of
+      stepping into them."
   (@breakpoint-example section))
 
 (defsection @breakpoint-example (:title "Breakpoint Example")
@@ -834,22 +875,32 @@
 
   The following debugger commands are used for controlling single stepping.
 
-  - `start`: Select the CONTINUE restart if one exists and starts
-    single stepping. None of the other single stepping commands can be
-    used before stepping has been started either by using `start` or
-    by using the standard STEP macro.
+  - `start`
 
-  - `step`: Step into the current form. Stepping will be resumed when
-    the next form that has been compiled with stepper instrumentation
-    is evaluated.
+      Select the CONTINUE restart if one exists and starts single
+      stepping. None of the other single stepping commands can be used
+      before stepping has been started either by using `start` or by
+      using the standard STEP macro.
 
-  - `next`: Step over the current form. Stepping will be disabled
-    until evaluation of the form is complete.
+  - `step`
 
-  - `out`: Step out of the current frame. Stepping will be disabled
-    until the topmost stack frame that had been stepped into returns.
+      Step into the current form. Stepping will be resumed when the
+      next form that has been compiled with stepper instrumentation is
+      evaluated.
 
-  - `stop`: Stop the single stepper and resumes normal execution."
+  - `next`
+
+      Step over the current form. Stepping will be disabled until
+      evaluation of the form is complete.
+
+  - `out`
+
+      Step out of the current frame. Stepping will be disabled until
+      the topmost stack frame that had been stepped into returns.
+
+  - `stop`
+
+      Stop the single stepper and resumes normal execution."
   (step macro))
 
 (defsection @ldb (:title "\\LDB")

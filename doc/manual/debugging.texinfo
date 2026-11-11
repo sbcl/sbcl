@@ -214,16 +214,24 @@ function and the values of its arguments in the style of a Lisp
 function call:
 
 @itemize
-@item @code{up}: Move up to the next higher frame. More recent function calls
-   are considered to be higher on the stack.
+@item @code{up}
 
-@item @code{down}: Move down to the next lower frame.
+Move up to the next higher frame. More recent function calls are
+considered to be higher on the stack.
 
-@item @code{bottom}: Move to the lowest frame.
+@item @code{down}
 
-@item @code{frame [<n>]}: Move to the frame with the specified number.
-  Prompts for the number if not supplied. The frame with number 0 is
-  the frame where the debugger was entered.
+Move down to the next lower frame.
+
+@item @code{bottom}
+
+ Move to the lowest frame.
+
+@item @code{frame [<n>]}
+
+Move to the frame with the specified number. Prompts for the
+number if not supplied. The frame with number 0 is the frame
+where the debugger was entered.
 @end itemize
 
 @node how arguments are printed
@@ -455,13 +463,15 @@ X#1  =  2
 @end example
 
 @itemize
-@item @code{list-locals [<prefix>]}: This command prints the name and value
-  of all variables in the current frame whose name has the specified
-  @code{<prefix>}, which may be a string or a symbol. If no @code{<prefix>} is
-  given, then all available variables are printed. If a variable has
-  a potentially ambiguous name, then the name is printed with a
-  @code{#<identifier>} suffix, where @code{<identifier>} is the small integer
-  used to make the name unique.
+@item @code{list-locals [<prefix>]}
+
+This command prints the name and value of all variables in the
+current frame whose name has the specified @code{<prefix>}, which may
+be a string or a symbol. If no @code{<prefix>} is given, then all
+available variables are printed. If a variable has a potentially
+ambiguous name, then the name is printed with a @code{#<identifier>}
+suffix, where @code{<identifier>} is the small integer used to make
+the name unique.
 @end itemize
 
 @anchor{Function sb-debug var}
@@ -606,17 +616,18 @@ things happening.
 * Source Location Availability: source location availability.
 @end menu
 
-One of the debugger's capabilities is source level debugging of
-compiled code.  These commands display the source location for the
-current frame:
+One of the debugger's capabilities is source-level debugging of
+compiled code.
 
 @itemize
-@item @code{source [<context>]}: This command displays the file that the
-  current frame's function was defined from (if it was defined from
-  a file), and then the source form responsible for generating the
-  code that the current frame was executing. If @code{<context>} is
-  specified, then it is an integer specifying the number of
-  enclosing levels of list structure to print.
+@item @code{source [<context>]}
+
+This command displays the file that the current frame's function
+was defined from (if it was defined from a file), and then the
+source form responsible for generating the code that the current
+frame was executing. If @code{<context>} is specified, then it is an
+integer specifying the number of enclosing levels of list
+structure to print.
 @end itemize
 
 The source form for a location in the code is the innermost list
@@ -889,35 +900,46 @@ These commands get you out of the debugger.
 @cindex space, optimization quality
 @cindex optimization quality space
 @itemize
-@item @code{toplevel}: Throw to top level.
+@item @code{toplevel}
 
-@item @code{restart [<n>]} or @code{<n>}: Invoke the @code{<n>}th restart case as
-  displayed by the @code{error} command. If @code{<n>} is not specified, the
-  available restart cases are reported. When using the short
-  form (@code{<n>}), an integer for which there is no corresponding
-  restart is evaluated following normal REPL semantics.
+Throw to top level.
 
-@item @code{continue}: Call @code{continue} with the condition given that invoked
-  the debugger. If there is no restart case named @code{continue}, then an
-  error is signaled. This is not a debugger command but the name of
-  a commonly available restart.
+@item @code{restart [<n>]} or @code{<n>}
 
-@item @code{abort}: Call @code{abort} on the condition that invoked the debugger.
-  This is useful for popping debug command loop levels or aborting
-  to top level, as the case may be. This is not a debugger command
-  but the name of a commonly available restart.
+Invoke the @code{<n>}th restart case as displayed by the @code{error}
+command. If @code{<n>} is not specified, the available restart cases
+are reported. When using the short form (@code{<n>}), an integer for
+which there is no corresponding restart is evaluated following
+normal REPL semantics.
 
-@item @code{return <value>}: Return @code{value} from the current stack frame.
-  This command is available when the @code{debug} optimization quality is
-  greater than both @code{speed} and @code{space}. Care must be taken that the
-  value is of the same type as SBCL expects the stack frame to
-  return.
+@item @code{continue}
 
-@item @code{restart-frame}: Restart execution of the current stack frame.
-  This command is available when the @code{debug} optimization quality is
-  greater than both @code{speed} and @code{space} and when the frame is for a
-  global function. If the function is redefined in the debugger
-  before the frame is restarted, the new function will be used.
+Call @code{continue} with the condition given that invoked the
+debugger. If there is no restart case named @code{continue}, then an
+error is signaled. This is not a debugger command but the name
+of a commonly available restart.
+
+@item @code{abort}
+
+Call @code{abort} on the condition that invoked the debugger. This is
+useful for popping debug command loop levels or aborting to top
+level, as the case may be. This is not a debugger command but
+the name of a commonly available restart.
+
+@item @code{return <value>}
+
+Return @code{value} from the current stack frame. This command is
+available when the @code{debug} optimization quality is greater than
+both @code{speed} and @code{space}. Care must be taken that the value is of
+the same type as SBCL expects the stack frame to return.
+
+@item @code{restart-frame}
+
+Restart execution of the current stack frame. This command is
+available when the @code{debug} optimization quality is greater than
+both @code{speed} and @code{space} and when the frame is for a global
+function. If the function is redefined in the debugger before
+the frame is restarted, the new function will be used.
 @end itemize
 
 @node information commands
@@ -927,20 +949,30 @@ Most of these commands print information about the current frame or
 function, but a few show general information.
 
 @itemize
-@item @code{help} or @code{?}: Display a synopsis of debugger commands.
+@item @code{help} or @code{?}
 
-@item @code{describe}: Call @code{describe} on the current function and display
-  the number of local variables.
+Display a synopsis of debugger commands.
 
-@item @code{print}: Display the current function call as it would be
-  displayed by moving to this frame.
+@item @code{describe}
 
-@item @code{error}: Print the condition given to @code{invoke-debugger} and the
-  active proceed cases.
+Call @code{describe} on the current function and display the number of
+local variables.
 
-@item @code{backtrace [<n>]}: Display all the frames from the current to the
-  bottom. Only shows @code{<n>} frames if specified. The printing is
-  controlled by @code{sb-debug:*debug-print-variable-alist*}.
+@item @code{print}
+
+Display the current function call as it would be displayed by
+moving to this frame.
+
+@item @code{error}
+
+Print the condition given to @code{invoke-debugger} and the active
+proceed cases.
+
+@item @code{backtrace [<n>]}
+
+Display all the frames from the current to the bottom. Only
+shows @code{<n>} frames if specified. The printing is controlled by
+@code{sb-debug:*debug-print-variable-alist*}.
 @end itemize
 
 @node breakpoint commands
@@ -960,18 +992,22 @@ are largely useless unless the @code{debug} optimize quality is at least
 2 (see @ref{debug information}). These commands manipulate breakpoints:
 
 @itemize
-@item @code{breakpoint <location> [<option> <value>]*}: Set a breakpoint in
-  some function. @code{<location>} may be an integer code location
-  number (as displayed by @code{list-locations}) or a keyword. The
-  keyword can be used to indicate setting a breakpoint at the
-  function start (@code{:start}, @code{:s}) or function end (@code{:end}, @code{:e}). The
-  @code{breakpoint} command has @code{:condition}, @code{:break}, @code{:print} and @code{:function}
-  options which work similarly to the @code{trace} options.
+@item @code{breakpoint <location> [<option> <value>]*}
 
-@item @code{list-locations [<function>]} or @code{ll [<function>]}: List all the
-  code locations in the current frame's function, or in @code{<function>}
-  if it is supplied. The display format is the code location number,
-  a colon and then the source form for that location:
+Set a breakpoint in some function. @code{<location>} may be an
+integer code location number (as displayed by @code{list-locations})
+or a keyword. The keyword can be used to indicate setting a
+breakpoint at the function start (@code{:start}, @code{:s}) or function
+end (@code{:end}, @code{:e}). The @code{breakpoint} command has @code{:condition},
+@code{:break}, @code{:print} and @code{:function} options which work similarly to the
+@code{trace} options.
+
+@item @code{list-locations [<function>]} or @code{ll [<function>]}
+
+List all the code locations in the current frame's function, or
+in @code{<function>} if it is supplied. The display format is the
+code location number, a colon and then the source form for that
+location:
 
 @example
 3: (1- N)
@@ -984,16 +1020,21 @@ after the call, which would result in two code locations with
 the same source. The listed function becomes the new default
 function for breakpoint setting (via the @code{breakpoint}) command.
 
-@item @code{list-breakpoints} or @code{lb}: List all currently active breakpoints
-  with their breakpoint number.
+@item @code{list-breakpoints} or @code{lb}
 
-@item @code{delete-breakpoint [<number>]} or @code{db [<number>]}: Delete a
-  breakpoint specified by its breakpoint number. If no number is
-  specified, delete all breakpoints.
+List all currently active breakpoints with their breakpoint
+number.
 
-@item @code{step*}: Step to the next possible breakpoint location in the
-  current function. This always steps over function calls, instead
-  of stepping into them.
+@item @code{delete-breakpoint [<number>]} or @code{db [<number>]}
+
+Delete a breakpoint specified by its breakpoint number. If no
+number is specified, delete all breakpoints.
+
+@item @code{step*}
+
+Step to the next possible breakpoint location in the current
+function. This always steps over function calls, instead of
+stepping into them.
 @end itemize
 
 @node breakpoint example
@@ -1093,22 +1134,32 @@ for compiled code.
 The following debugger commands are used for controlling single stepping.
 
 @itemize
-@item @code{start}: Select the @code{continue} restart if one exists and starts
-  single stepping. None of the other single stepping commands can be
-  used before stepping has been started either by using @code{start} or
-  by using the standard @code{step} macro.
+@item @code{start}
 
-@item @code{step}: Step into the current form. Stepping will be resumed when
-  the next form that has been compiled with stepper instrumentation
-  is evaluated.
+Select the @code{continue} restart if one exists and starts single
+stepping. None of the other single stepping commands can be used
+before stepping has been started either by using @code{start} or by
+using the standard @code{step} macro.
 
-@item @code{next}: Step over the current form. Stepping will be disabled
-  until evaluation of the form is complete.
+@item @code{step}
 
-@item @code{out}: Step out of the current frame. Stepping will be disabled
-  until the topmost stack frame that had been stepped into returns.
+Step into the current form. Stepping will be resumed when the
+next form that has been compiled with stepper instrumentation is
+evaluated.
 
-@item @code{stop}: Stop the single stepper and resumes normal execution.
+@item @code{next}
+
+Step over the current form. Stepping will be disabled until
+evaluation of the form is complete.
+
+@item @code{out}
+
+Step out of the current frame. Stepping will be disabled until
+the topmost stack frame that had been stepped into returns.
+
+@item @code{stop}
+
+Stop the single stepper and resumes normal execution.
 @end itemize
 
 @anchor{Macro common-lisp step}
