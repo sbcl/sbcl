@@ -457,7 +457,7 @@ scheduler code.
 
 @item @code{:sb-simd-pack} (off)
 
-Enabled automatically by @code{make-config.sh} for platforms which
+Enabled automatically by @code{make-config.sh} for platforms that
 implement short vector SIMD intrinsics.
 
 @item @code{:sb-source-locations} (on)

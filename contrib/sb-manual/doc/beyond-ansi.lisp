@@ -674,13 +674,13 @@
   (sb-sequence:copy-seq generic-function)
   (sb-sequence:fill generic-function)
   (sb-sequence:subseq generic-function)
-  (sb-sequence:map function)
+  (sb-sequence:map generic-function)
   (sb-sequence:reduce generic-function)
   (sb-sequence:search generic-function)
   (sb-sequence:mismatch generic-function)
   (sb-sequence:replace generic-function)
-  (sb-sequence:concatenate function)
-  (sb-sequence:merge function)
+  (sb-sequence:concatenate generic-function)
+  (sb-sequence:merge generic-function)
   "Counting:"
   (sb-sequence:count generic-function)
   (sb-sequence:count-if generic-function)
@@ -730,7 +730,7 @@
   query or mutate this state.
 
   An iterator is created by calling:"
-  (sb-sequence:make-sequence-iterator function)
+  (sb-sequence:make-sequence-iterator generic-function)
   "The following convenience macros simplify traversing sequences using
   iterators:"
   (sb-sequence:with-sequence-iterator macro)

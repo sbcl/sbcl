@@ -179,7 +179,7 @@
  (:sb-simd-pack nil
   :public t
   :documentation
-  "Enabled automatically by `make-config.sh` for platforms which
+  "Enabled automatically by `make-config.sh` for platforms that
   implement short vector SIMD intrinsics.")
 
  ;; This is not :RETAIN T, so it doesn't need the :SB- prefix.

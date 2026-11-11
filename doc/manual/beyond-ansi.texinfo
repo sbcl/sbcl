@@ -1238,9 +1238,9 @@ The remaining list parallels the @emph{Sequence Dictionary}, see
 @ffindex @sortas{subseq sb-sequence} subseq [sb-sequence]
 @deffn{Generic function} sb-sequence:subseq sequence start &optional end
 @end deffn
-@anchor{Function sb-sequence map}
+@anchor{Generic function sb-sequence map}
 @ffindex @sortas{map sb-sequence} map [sb-sequence]
-@deffn{Function} sb-sequence:map result-prototype function sequence &rest sequences
+@deffn{Generic function} sb-sequence:map result-prototype function sequence &rest sequences
 Implements @code{cl:map} for extended sequences.
 
 @code{result-prototype} corresponds to the @code{result-type} of @code{cl:map} but
@@ -1270,9 +1270,9 @@ function designator.
 @ffindex @sortas{replace sb-sequence} replace [sb-sequence]
 @deffn{Generic function} sb-sequence:replace sequence1 sequence2 &key start1 end1 start2 end2
 @end deffn
-@anchor{Function sb-sequence concatenate}
+@anchor{Generic function sb-sequence concatenate}
 @ffindex @sortas{concatenate sb-sequence} concatenate [sb-sequence]
-@deffn{Function} sb-sequence:concatenate result-prototype &rest sequences
+@deffn{Generic function} sb-sequence:concatenate result-prototype &rest sequences
 Implements @code{cl:concatenate} for extended sequences.
 
 @code{result-prototype} corresponds to the @code{result-type} of @code{cl:concatenate}
@@ -1284,9 +1284,9 @@ classes act when they are specified as the result type in a
 and thus should only be used for dispatch and to determine its
 class.
 @end deffn
-@anchor{Function sb-sequence merge}
+@anchor{Generic function sb-sequence merge}
 @ffindex @sortas{merge sb-sequence} merge [sb-sequence]
-@deffn{Function} sb-sequence:merge result-prototype sequence1 sequence2 predicate &key key
+@deffn{Generic function} sb-sequence:merge result-prototype sequence1 sequence2 predicate &key key
 Implements @code{cl:merge} for extended sequences.
 
 @code{result-prototype} corresponds to the @code{result-type} of @code{cl:merge} but
@@ -1438,9 +1438,9 @@ query or mutate this state.
 
 An iterator is created by calling:
 
-@anchor{Function sb-sequence make-sequence-iterator}
+@anchor{Generic function sb-sequence make-sequence-iterator}
 @ffindex @sortas{make-sequence-iterator sb-sequence} make-sequence-iterator [sb-sequence]
-@deffn{Function} sb-sequence:make-sequence-iterator sequence &key from-end start end
+@deffn{Generic function} sb-sequence:make-sequence-iterator sequence &key from-end start end
 Return a sequence iterator for @code{sequence} or, if @code{start} and/or @code{end}
 are supplied, the subsequence bounded by @code{start} and @code{end} as nine
 values:

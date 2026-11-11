@@ -32,6 +32,12 @@
 ;;;; This list of exceptional packages can be found in the
 ;;;; definition of the FINISH-SYMBOLS function.
 
+;;;; Packages are either "private" (whose exports are SBCL internal,
+;;;; not for users) or "public" (whose exports are for users). There
+;;;; are also semi-public abominations. Do not make the situation
+;;;; worse than it already is (SB-MANUAL's tests helps in this by
+;;;; catching new, undocumented exports in public packages).
+
 (in-package "SB-COLD")
 
 (defpackage "SB-EXT"
@@ -1058,7 +1064,7 @@ Lisp extension proposal by David N. Gray")
 ;;; should remove private stuff. -- MG, 2026-10-10
 (defpackage "SB-SYS"
   (:documentation
-   "private except for things documented in the user manual
+   "semi-public: private except for things documented in the user manual
 
 In theory, this \"contains functions and information
 necessary for system interfacing\" (said cmu-user.tex at the time of

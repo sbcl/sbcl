@@ -45,6 +45,9 @@
 (defparameter *extra-dummies*
   '((argument :pax)
     (macro :dref)
+    (constant :dref)
+    (structure-accessor :dref)
+    (symbol-macro :dref)
     (setf-function :dref)
     (setf-generic-function :dref)
     (section :pax)
@@ -243,14 +246,28 @@
 (defun-dummy (xref-locative-args :dref) (xref)
   (rest (sb-c::ensure-list (second xref))))
 
+(defun-dummy (xref= :dref) (xref-1 xref-2)
+  (equal xref-1 xref-2))
+
 (defun-dummy (home-section :pax) (xref)
-  (do-external-symbols (sym (find-package :sb-manual))
-    (when (lazy-doc-name-p sym :section)
-      (let ((section (symbol-value sym)))
-        (dolist (entry (section-entries section))
-          (when (and (listp entry)
-                     (equal entry xref))
-            (return-from home-section section)))))))
+  (flet ((normalize-xref-entry (entry)
+           ;; PAX:HOME-SECTION handles sub-locatives properly (e.g.
+           ;; when the section lists the reference as a TYPE when it's
+           ;; in fact a CLASS). The manual does not do that, so we can
+           ;; do dumb EQUAL comparison except for (VARIABLE
+           ;; <INITFORM>).
+           (let ((locative (second entry)))
+             (if (and (listp locative)
+                      (eq (first locative) 'variable))
+                 (list (first entry) 'variable)
+                 entry))))
+    (do-external-symbols (sym (find-package :sb-manual))
+      (when (lazy-doc-name-p sym :section)
+        (let ((section (symbol-value sym)))
+          (dolist (entry (section-entries section))
+            (when (and (listp entry)
+                       (equal (normalize-xref-entry entry) xref))
+              (return-from home-section section))))))))
 
 
 ;;; DEFINE-CONCEPT names a set of index keys. When MARKDOWN-TO-TEXINFO

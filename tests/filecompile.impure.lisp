@@ -99,7 +99,7 @@
           ;; This call exists solely to prove that the BACKTRACE-ALL-THREADS no longer
           ;; calls lose() if libunwind is absent. See the comment below for an example
           ;; of the expected output.
-          #+x86-64 (let ((bts (sb-debug:backtrace-all-threads)))
+          #+x86-64 (let ((bts (sb-debug::backtrace-all-threads)))
                      (declare (ignorable bts))
                      #+nil (print bts))
           (let ((string1 (sb-thread:join-thread thr1))

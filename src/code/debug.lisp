@@ -2631,7 +2631,6 @@ forms that explicitly control this kind of evaluation.")
              (push :end list))))
     (nreverse list)))
 
-(export 'backtrace-all-threads)
 (defun backtrace-all-threads (&aux (stream (make-string-output-stream))
                                    results)
   (let ((tls-size (sb-alien:extern-alien "dynamic_values_bytes" (sb-alien:unsigned 32)))
