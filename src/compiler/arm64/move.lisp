@@ -350,6 +350,29 @@
                                               (tn-offset tn2))
                                          n-word-bytes)
                                       n-word-bits)))
+             ;; Whether another VOP in the block reads the slot of TN1 or
+             ;; TN2 after the stores (STOREP), or writes it before the
+             ;; loads. Forwarding a store to a load of another size fails,
+             ;; and the load then waits for the store to complete: that is
+             ;; slower than two stores and two loads when, as with a value
+             ;; saved and restored around a short call, it comes soon.
+             (accessed-nearby-p (tn1 tn2 storep)
+               (flet ((slot-p (tn)
+                        (and (tn-sc tn)
+                             (or (location= tn tn1) (location= tn tn2)))))
+                 (if storep
+                     (do ((vop (vop-next vop2) (vop-next vop)))
+                         ((null vop) nil)
+                       (do ((ref (vop-args vop) (tn-ref-across ref)))
+                           ((null ref))
+                         (when (slot-p (tn-ref-tn ref))
+                           (return-from accessed-nearby-p t))))
+                     (do ((vop (sb-c::vop-prev vop1) (sb-c::vop-prev vop)))
+                         ((null vop) nil)
+                       (do ((ref (vop-results vop) (tn-ref-across ref)))
+                           ((null ref))
+                         (when (slot-p (tn-ref-tn ref))
+                           (return-from accessed-nearby-p t)))))))
              (load-arg (x load-tn)
                (sc-case x
                  ((constant immediate control-stack)
@@ -395,7 +418,9 @@
                            (or (not (eq fp cfp-tn))
                                (and (not (location= dest1 source2))
                                     (not (location= dest2 source1))))
-                           (suitable-offsets-p dest1 dest2))
+                           (suitable-offsets-p dest1 dest2)
+                           (or (not (eq fp cfp-tn))
+                               (not (accessed-nearby-p dest1 dest2 t))))
                       ;; Load the source registers
                       (let (new-source1 new-source2)
                         (if (and (stack-p source1)
@@ -442,7 +467,9 @@
                            (register-p dest1)
                            (register-p dest2)
                            (not (location= dest1 dest2))
-                           (suitable-offsets-p source1 source2))
+                           (suitable-offsets-p source1 source2)
+                           (or (not (eq fp cfp-tn))
+                               (not (accessed-nearby-p source1 source2 nil))))
                       (when (> (tn-offset source1)
                                (tn-offset source2))
                         (rotatef dest1 dest2)

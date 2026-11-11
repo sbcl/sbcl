@@ -34,3 +34,48 @@
       (when (and p (or (search "LDP" line) (search "STP" line)))
         (assert (zerop (mod (parse-integer line :start (+ p 7) :junk-allowed t)
                             16)))))))
+
+;;; Stack slots stored or loaded as a pair are not accessed the other way
+;;; nearby: a value saved before a short call and restored after it would
+;;; otherwise wait for the store, its forwarding failing.
+(with-test (:name (:ldp-stp :forwarding))
+  (flet ((mismatched (form)
+           (let ((stored (make-hash-table)) (bad '()))
+             (dolist (line (ctu:disassembly-lines form) bad)
+               ;; A label starts another straight-line run.
+               (when (search ": " line)
+                 (clrhash stored))
+               (let ((p (search "[CFP, #" line)))
+                 (when p
+                   (let ((offset (parse-integer line :start (+ p 7) :junk-allowed t)))
+                     (cond ((search "STP " line)
+                            (setf (gethash offset stored) :pair
+                                  (gethash (+ offset 8) stored) :pair))
+                           ((search "STR " line)
+                            (setf (gethash offset stored) :single))
+                           ((search "LDP " line)
+                            (when (or (eq (gethash offset stored) :single)
+                                      (eq (gethash (+ offset 8) stored) :single))
+                              (push line bad)))
+                           ((search "LDR " line)
+                            (when (eq (gethash offset stored) :pair)
+                              (push line bad)))))))))))
+    (assert (null (mismatched
+                   '(lambda (f n)
+                     (declare (function f) (fixnum n))
+                     (let ((a 0) (b 0) (c 0))
+                       (declare (fixnum a b c))
+                       (dotimes (i n)
+                         (funcall f)
+                         (incf a)
+                         (incf b 2)
+                         (incf c 3))
+                       (list a b c))))))
+    (assert (null (mismatched
+                   '(lambda (f v n)
+                     (declare (function f) (simple-vector v) (fixnum n))
+                     (let ((k 0))
+                       (declare (fixnum k))
+                       (dotimes (i n k)
+                         (when (funcall f (svref v i))
+                           (incf k))))))))))
