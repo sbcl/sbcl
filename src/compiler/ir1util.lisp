@@ -1039,7 +1039,8 @@
                (delq1 old-lvar (dynamic-extent-values dynamic-extent)))
          (dolist (ref (leaf-refs var))
            (let ((new (nth-value 1 (principal-lvar-end (node-lvar ref)))))
-             (unless (lvar-dynamic-extent new)
+             (when (and new
+                        (not (lvar-dynamic-extent new)))
                (setf (lvar-dynamic-extent new) dynamic-extent)
                (push new (dynamic-extent-values dynamic-extent)))))))
       t)))
