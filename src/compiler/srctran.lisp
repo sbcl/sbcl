@@ -4550,7 +4550,7 @@
   (macrolet ((def (name types word-var args vop)
                `(deftransform ,name ((x y) ,types
                                      * :node node :important nil)
-                  (when (word-sized-lvar-p ,word-var)
+                  (when (double-word-sized-lvar-p ,word-var)
                     (give-up-ir1-transform))
                   (delay-ir1-transform node :ir1-phases)
                   (let ((cast (cast-or-check-bound-type node (specifier-type 'fixnum))))
@@ -4638,10 +4638,10 @@
   (let ((type (single-value-type (node-derived-type node)))
         (x-type (lvar-type x))
         (y-type (lvar-type y)))
-    (when (or (word-sized-type-p type)
+    (when (or (double-word-sized-type-p type)
               (if swap
-                  (word-sized-type-p y-type)
-                  (word-sized-type-p x-type)))
+                  (double-word-sized-type-p y-type)
+                  (double-word-sized-type-p x-type)))
       (give-up-ir1-transform))
     (multiple-value-bind (cast result-type) (cast-or-check-bound-type node (specifier-type 'fixnum) t)
       (unless cast
@@ -4721,7 +4721,7 @@
 (when-vop-existsp (:named sb-vm::overflow-ash-t)
   (deftransform ash ((x y) (t word)
                      * :node node :important nil)
-    (or (unless (word-sized-lvar-p x)
+    (or (unless (double-word-sized-lvar-p x)
           (delay-ir1-transform node :ir1-phases)
           (let ((cast (cast-or-check-bound-type node (specifier-type 'fixnum))))
             (when cast
@@ -4758,7 +4758,7 @@
 ;; (the fixnum (ash x -1)) can be inlined
 (deftransform ash ((x shift) (t (constant-arg (integer #.(- 1 sb-vm:n-word-bits) -1)))
                    * :node node :important nil :priority :last)
-  (or (unless (word-sized-lvar-p x)
+  (or (unless (double-word-sized-lvar-p x)
         (multiple-value-bind (cast result-type) (cast-or-check-bound-type node (specifier-type 'fixnum))
           (when cast
             (delay-ir1-transform node :constraint)
@@ -4775,7 +4775,7 @@
 
 ;;; (the fixnum (* x fixnum))
 (defun unknown-*-transform (x y node)
-  (or (unless (or (word-sized-lvar-p x)
+  (or (unless (or (double-word-sized-lvar-p x)
                   (lvar-subtypep x (or complex float)))
         (block nil
           (multiple-value-bind (cast) (cast-or-check-bound-type node (specifier-type 'fixnum))
