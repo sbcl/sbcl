@@ -151,11 +151,16 @@
   (sb-sprof:reset function)
   (sb-sprof:start-profiling function)
   (sb-sprof:stop-profiling function)
+  (sb-sprof:start-sampling function)
+  (sb-sprof:stop-sampling function)
   (sb-sprof:profile-call-counts function)
   (sb-sprof:unprofile-call-counts function)
   "__Variables__"
   (sb-sprof:*max-samples* variable)
+  (sb-sprof:*report-sort-by* variable)
+  (sb-sprof:*report-sort-order* variable)
   (sb-sprof:*sample-interval* variable)
+  (sb-sprof:*sampling-mode* variable)
   "__Credits__
 
   `SB-SPROF` is an SBCL port, with enhancements, of Gerd Moellmann's

@@ -193,7 +193,7 @@ repeatedly evaluate @code{body}.
 @anchor{Macro sb-sprof with-sampling}
 @ffindex @sortas{with-sampling sb-sprof} with-sampling [sb-sprof]
 @deffn{Macro} sb-sprof:with-sampling (&optional (on t)) &body body
-Evaluate body with statistical sampling turned on or off in the current thread.
+Evaluate @code{body} with statistical sampling turned on or off in the current thread.
 @end deffn
 @strong{Functions}
 
@@ -321,6 +321,16 @@ may be falling afoul of this.
 @deffn{Function} sb-sprof:stop-profiling
 Stop profiling if profiling.
 @end deffn
+@anchor{Function sb-sprof start-sampling}
+@ffindex @sortas{start-sampling sb-sprof} start-sampling [sb-sprof]
+@deffn{Function} sb-sprof:start-sampling &optional (thread sb-thread:*current-thread*)
+Unblock @code{sigprof} in the specified thread.
+@end deffn
+@anchor{Function sb-sprof stop-sampling}
+@ffindex @sortas{stop-sampling sb-sprof} stop-sampling [sb-sprof]
+@deffn{Function} sb-sprof:stop-sampling &optional (thread sb-thread:*current-thread*)
+Block @code{sigprof} in the specified thread.
+@end deffn
 @anchor{Function sb-sprof profile-call-counts}
 @ffindex @sortas{profile-call-counts sb-sprof} profile-call-counts [sb-sprof]
 @deffn{Function} sb-sprof:profile-call-counts &rest names
@@ -343,10 +353,26 @@ functions during statistical profiling.
 @deffn{Variable} sb-sprof:*max-samples*
 Default maximum number of stack traces collected.
 @end deffn
+@anchor{Variable sb-sprof *report-sort-by*}
+@vvindex @sortas{report-sort-by* sb-sprof} *report-sort-by* [sb-sprof]
+@deffn{Variable} sb-sprof:*report-sort-by*
+Method for sorting the flat report: either by @code{:samples} or by @code{:cumulative-samples}.
+@end deffn
+@anchor{Variable sb-sprof *report-sort-order*}
+@vvindex @sortas{report-sort-order* sb-sprof} *report-sort-order* [sb-sprof]
+@deffn{Variable} sb-sprof:*report-sort-order*
+Order for sorting the flat report: either @code{:descending} or @code{:ascending}.
+@end deffn
 @anchor{Variable sb-sprof *sample-interval*}
 @vvindex @sortas{sample-interval* sb-sprof} *sample-interval* [sb-sprof]
 @deffn{Variable} sb-sprof:*sample-interval*
 Default number of seconds between samples.
+@end deffn
+@anchor{Variable sb-sprof *sampling-mode*}
+@vvindex @sortas{sampling-mode* sb-sprof} *sampling-mode* [sb-sprof]
+@deffn{Variable} sb-sprof:*sampling-mode*
+Default sampling mode. @code{:cpu} for cpu profiling, @code{:alloc} for allocation
+profiling, and @code{:time} for wallclock profiling.
 @end deffn
 @strong{Credits}
 

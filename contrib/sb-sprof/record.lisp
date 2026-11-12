@@ -135,7 +135,7 @@ EXPERIMENTAL: Interface subject to change."
              #+sb-thread '(sb-thread::%symbol-value-in-thread 'sb-thread::*sprof-enable* thread)
              #-sb-thread 'sb-thread::*sprof-enable*))
 (defun start-sampling (&optional (thread sb-thread:*current-thread*))
-  "Unblock SIGPROF in the specified thread"
+  "Unblock SIGPROF in the specified thread."
   (when (eql (enabled) 0)
     (cond ((neq thread sb-thread:*current-thread*)
            (sb-thread::%interrupt-thread thread #'start-sampling))
@@ -148,7 +148,7 @@ EXPERIMENTAL: Interface subject to change."
   nil)
 
 (defun stop-sampling (&optional (thread sb-thread:*current-thread*))
-  "Block SIGPROF in the specified thread"
+  "Block SIGPROF in the specified thread."
   (when (eql (enabled) 1)
     #+sb-thread (sb-thread::%set-symbol-value-in-thread 'sb-thread::*sprof-enable* thread 0)
     #-sb-thread (setq sb-thread::*sprof-enable* 0)
@@ -168,7 +168,7 @@ EXPERIMENTAL: Interface subject to change."
                (if enable (stop-sampling) (start-sampling))))))
 
 (defmacro with-sampling ((&optional (on t)) &body body)
-  "Evaluate body with statistical sampling turned on or off in the current thread."
+  "Evaluate BODY with statistical sampling turned on or off in the current thread."
   `(call-with-sampling (if ,on t nil) (lambda () ,@body)))
 
 ;;; Return something serving as debug info for address PC.

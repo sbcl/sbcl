@@ -266,13 +266,7 @@
        :missing
        ((sb-sequence:canonize-key function)
         (sb-sequence:canonize-test function)))
-      (sb-sprof
-       :missing
-       ((sb-sprof:*report-sort-by* variable)
-        (sb-sprof:*report-sort-order* variable)
-        (sb-sprof:*sampling-mode* variable)
-        (sb-sprof:start-sampling function)
-        (sb-sprof:stop-sampling function)))
+      (sb-sprof)
       (sb-profile)
       #+(and x86-64 sb-thread)
       (sb-aprof
