@@ -7,10 +7,10 @@
 @menu
 * Why Deprecate?: why deprecate?.
 * The Deprecation Pipeline: the deprecation pipeline.
-* Deprecation Conditions: deprecation conditions.
 * Introspecting Deprecation Information: introspecting deprecation information.
 * Deprecation Declaration: deprecation declaration.
 * Deprecation Examples: deprecation examples.
+* Deprecation Conditions: deprecation conditions.
 * Deprecated Interfaces in SBCL: deprecated interfaces in sbcl.
 @end menu
 
@@ -156,49 +156,6 @@ signaled at compile-time and an @code{error} is signaled at run-time.
 The interface is deleted entirely.
 @end itemize
 
-@node deprecation conditions
-@section Deprecation Conditions
-
-@code{sb-ext:deprecation-condition} is the superclass of all
-deprecation-related warning and error conditions. All common slots and
-readers are defined in this condition class.
-
-@anchor{Condition sb-ext deprecation-condition}
-@ttindex @sortas{deprecation-condition sb-ext} deprecation-condition [sb-ext]
-@deffn{Condition} sb-ext:deprecation-condition
-Superclass for deprecation-related error and warning
-conditions.
-@end deffn
-@anchor{Condition sb-ext early-deprecation-warning}
-@ttindex @sortas{early-deprecation-warning sb-ext} early-deprecation-warning [sb-ext]
-@deffn{Condition} sb-ext:early-deprecation-warning
-This warning is signaled when the use of a variable,
-function, type, etc. in @code{:early} deprecation is detected at
-compile-time. The use will work at run-time with no warning or
-error.
-@end deffn
-@anchor{Condition sb-ext late-deprecation-warning}
-@ttindex @sortas{late-deprecation-warning sb-ext} late-deprecation-warning [sb-ext]
-@deffn{Condition} sb-ext:late-deprecation-warning
-This warning is signaled when the use of a variable,
-function, type, etc. in @code{:late} deprecation is detected at
-compile-time. The use will work at run-time with no warning or
-error.
-@end deffn
-@anchor{Condition sb-ext final-deprecation-warning}
-@ttindex @sortas{final-deprecation-warning sb-ext} final-deprecation-warning [sb-ext]
-@deffn{Condition} sb-ext:final-deprecation-warning
-This warning is signaled when the use of a variable,
-function, type, etc. in @code{:final} deprecation is detected at
-compile-time. An error will be signaled at run-time.
-@end deffn
-@anchor{Condition sb-ext deprecation-error}
-@ttindex @sortas{deprecation-error sb-ext} deprecation-error [sb-ext]
-@deffn{Condition} sb-ext:deprecation-error
-This error is signaled at run-time when an attempt is made to use
-a thing that is in @code{:final} deprecation, i.e. call a function or access
-a variable.
-@end deffn
 @node introspecting deprecation information
 @section Introspecting Deprecation Information
 
@@ -296,6 +253,73 @@ Attempting to use the deprecated functions:
 |- ERROR: The function CL-USER::FEZ has been deprecated...
 @end example
 
+@node deprecation conditions
+@section Deprecation Conditions
+
+@code{sb-ext:deprecation-condition} is the superclass of all
+deprecation-related warning and error conditions. All common slots and
+readers are defined in this condition class.
+
+@anchor{Condition sb-ext deprecation-condition}
+@ttindex @sortas{deprecation-condition sb-ext} deprecation-condition [sb-ext]
+@deffn{Condition} sb-ext:deprecation-condition
+Superclass for deprecation-related error and warning
+conditions.
+@end deffn
+@anchor{Function sb-ext deprecation-condition-name}
+@ffindex @sortas{deprecation-condition-name sb-ext} deprecation-condition-name [sb-ext]
+@deffn{Function} sb-ext:deprecation-condition-name condition
+@end deffn
+@anchor{Function sb-ext deprecation-condition-namespace}
+@ffindex @sortas{deprecation-condition-namespace sb-ext} deprecation-condition-namespace [sb-ext]
+@deffn{Function} sb-ext:deprecation-condition-namespace condition
+@end deffn
+@anchor{Function sb-ext deprecation-condition-replacements}
+@ffindex @sortas{deprecation-condition-replacements sb-ext} deprecation-condition-replacements [sb-ext]
+@deffn{Function} sb-ext:deprecation-condition-replacements condition
+@end deffn
+@anchor{Function sb-ext deprecation-condition-runtime-error}
+@ffindex @sortas{deprecation-condition-runtime-error sb-ext} deprecation-condition-runtime-error [sb-ext]
+@deffn{Function} sb-ext:deprecation-condition-runtime-error condition
+@end deffn
+@anchor{Function sb-ext deprecation-condition-software}
+@ffindex @sortas{deprecation-condition-software sb-ext} deprecation-condition-software [sb-ext]
+@deffn{Function} sb-ext:deprecation-condition-software condition
+@end deffn
+@anchor{Function sb-ext deprecation-condition-version}
+@ffindex @sortas{deprecation-condition-version sb-ext} deprecation-condition-version [sb-ext]
+@deffn{Function} sb-ext:deprecation-condition-version condition
+@end deffn
+@anchor{Condition sb-ext early-deprecation-warning}
+@ttindex @sortas{early-deprecation-warning sb-ext} early-deprecation-warning [sb-ext]
+@deffn{Condition} sb-ext:early-deprecation-warning
+This warning is signaled when the use of a variable,
+function, type, etc. in @code{:early} deprecation is detected at
+compile-time. The use will work at run-time with no warning or
+error.
+@end deffn
+@anchor{Condition sb-ext late-deprecation-warning}
+@ttindex @sortas{late-deprecation-warning sb-ext} late-deprecation-warning [sb-ext]
+@deffn{Condition} sb-ext:late-deprecation-warning
+This warning is signaled when the use of a variable,
+function, type, etc. in @code{:late} deprecation is detected at
+compile-time. The use will work at run-time with no warning or
+error.
+@end deffn
+@anchor{Condition sb-ext final-deprecation-warning}
+@ttindex @sortas{final-deprecation-warning sb-ext} final-deprecation-warning [sb-ext]
+@deffn{Condition} sb-ext:final-deprecation-warning
+This warning is signaled when the use of a variable,
+function, type, etc. in @code{:final} deprecation is detected at
+compile-time. An error will be signaled at run-time.
+@end deffn
+@anchor{Condition sb-ext deprecation-error}
+@ttindex @sortas{deprecation-error sb-ext} deprecation-error [sb-ext]
+@deffn{Condition} sb-ext:deprecation-error
+This error is signaled at run-time when an attempt is made to use
+a thing that is in @code{:final} deprecation, i.e. call a function or access
+a variable.
+@end deffn
 @node deprecated interfaces in sbcl
 @section Deprecated Interfaces in SBCL
 

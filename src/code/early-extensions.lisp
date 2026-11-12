@@ -1222,8 +1222,8 @@ NOTE: This interface is experimental and subject to change."
 
 ;;; Without a proclaimed type, the call is "untrusted" and so the compiler
 ;;; would generate a post-call check that the function did not return.
-(declaim (ftype (function (t t t t t) nil) deprecation-error))
-(define-error-wrapper deprecation-error (software version namespace name replacements)
+(declaim (ftype (function (t t t t t) nil) %deprecation-error))
+(define-error-wrapper %deprecation-error (software version namespace name replacements)
   (error 'deprecation-error
          :namespace namespace
          :name name
@@ -1301,7 +1301,7 @@ NOTE: This interface is experimental and subject to change."
         (set-closure-name
          (lambda (&rest args)
            (declare (ignore args))
-           (deprecation-error software version 'function name replacement-spec))
+           (%deprecation-error software version 'function name replacement-spec))
          t
          name)))
 
@@ -1309,7 +1309,7 @@ NOTE: This interface is experimental and subject to change."
     (software version name replacement-spec)
   (sb-c::%define-symbol-macro
    name
-   `(deprecation-error
+   `(%deprecation-error
      ,software ,version 'variable ',name
      (list ,@(mapcar
               (lambda (replacement)

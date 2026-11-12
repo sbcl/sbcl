@@ -18,10 +18,10 @@
   interfaces are subject to censure."
   (@why-deprecate? section)
   (@the-deprecation-pipeline section)
-  (@deprecation-conditions section)
   (@introspecting-deprecation-information section)
   (@deprecation-declaration section)
   (@deprecation-examples section)
+  (@deprecation-conditions section)
   (@deprecated-interfaces-in-sbcl section))
 
 (defsection @why-deprecate? (:title "Why Deprecate?")
@@ -141,16 +141,6 @@
 
       The interface is deleted entirely.")
 
-(defsection @deprecation-conditions (:title "Deprecation Conditions")
-  "SB-EXT:DEPRECATION-CONDITION is the superclass of all
-  deprecation-related warning and error conditions. All common slots and
-  readers are defined in this condition class."
-  (sb-ext:deprecation-condition condition)
-  (sb-ext:early-deprecation-warning condition)
-  (sb-ext:late-deprecation-warning condition)
-  (sb-ext:final-deprecation-warning condition)
-  (sb-ext:deprecation-error condition))
-
 (defsection @introspecting-deprecation-information
     (:title "Introspecting Deprecation Information")
   "The deprecation status of functions and variables can be inspected
@@ -194,6 +184,22 @@
       => DANGER
       (danger)
       |- ERROR: The function CL-USER::FEZ has been deprecated...")
+
+(defsection @deprecation-conditions (:title "Deprecation Conditions")
+  "SB-EXT:DEPRECATION-CONDITION is the superclass of all
+  deprecation-related warning and error conditions. All common slots and
+  readers are defined in this condition class."
+  (sb-ext:deprecation-condition condition)
+  (sb-ext:deprecation-condition-name function)
+  (sb-ext:deprecation-condition-namespace function)
+  (sb-ext:deprecation-condition-replacements function)
+  (sb-ext:deprecation-condition-runtime-error function)
+  (sb-ext:deprecation-condition-software function)
+  (sb-ext:deprecation-condition-version function)
+  (sb-ext:early-deprecation-warning condition)
+  (sb-ext:late-deprecation-warning condition)
+  (sb-ext:final-deprecation-warning condition)
+  (sb-ext:deprecation-error condition))
 
 (defsection @deprecated-interfaces-in-sbcl
     (:title "Deprecated Interfaces in SBCL")
