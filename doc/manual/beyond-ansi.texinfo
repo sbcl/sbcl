@@ -3030,6 +3030,12 @@ and its context.
 @deffn{Condition} sb-ext:timeout
 Signaled when an operation does not complete within an allotted time budget.
 @end deffn
+@anchor{Condition sb-sys io-timeout}
+@ttindex @sortas{io-timeout sb-sys} io-timeout [sb-sys]
+@deffn{Condition} sb-sys:io-timeout
+Signaled when an IO operation does not complete within
+an allotted time budget.
+@end deffn
 @node operations supporting timeouts and deadlines
 @subsection Operations Supporting Timeouts and Deadlines
 
@@ -3050,6 +3056,38 @@ Signaled when an operation does not complete within an allotted time budget.
 | grab-frlock-write-lock | yes               | yes?                  |
 @end example
 
+To implement new operations that support timeouts and deadlines, the
+following tools are available:
+
+@anchor{Function sb-sys signal-deadline}
+@ffindex @sortas{signal-deadline sb-sys} signal-deadline [sb-sys]
+@deffn{Function} sb-sys:signal-deadline
+Signal a @code{deadline-timeout} condition, and associate a @code{defer-deadline}
+restart with it. Implementors of blocking functions are responsible
+for calling this when a deadline is reached.
+@end deffn
+@anchor{Function sb-sys decode-internal-time}
+@ffindex @sortas{decode-internal-time sb-sys} decode-internal-time [sb-sys]
+@deffn{Function} sb-sys:decode-internal-time time
+Return internal time value @code{time} decoded into seconds and microseconds.
+@end deffn
+@anchor{Function sb-sys decode-timeout}
+@ffindex @sortas{decode-timeout sb-sys} decode-timeout [sb-sys]
+@deffn{Function} sb-sys:decode-timeout seconds
+Decode a relative timeout in @code{seconds} into five values, taking any
+global deadlines into account: @code{to-sec}, @code{to-usec}, @code{stop-sec},
+@code{stop-usec}, @code{deadlinep}.
+
+@code{to-sec} and @code{to-usec} indicate the relative timeout in seconds and
+microseconds. @code{stop-sec} and @code{stop-usec} indicate the absolute timeout
+in seconds and microseconds. @code{deadlinep} is true if the returned
+values reflect a global deadline instead of the local timeout
+indicated by @code{seconds}.
+
+If @code{seconds} is @code{nil} and there is no global timeout all returned values
+will be @code{nil}. If a global deadline has already passed when
+@code{decode-timeout} is called, a @code{timeout} condition is signalled.
+@end deffn
 @node miscellaneous extensions
 @section Miscellaneous Extensions
 

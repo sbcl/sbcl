@@ -117,7 +117,7 @@ Experimental."
     (values sec (* frac sb-unix::microseconds-per-internal-time-unit))))
 
 (defun signal-timeout (datum &rest arguments)
-  "Signal a timeout condition while inhibiting further timeouts due to
+  "Signal a TIMEOUT condition while inhibiting further timeouts due to
 deadlines while the condition is being handled."
   ;; FIXME: Maybe we should make ERROR do WITH-INTERRUPTS instead of
   ;; putting it all over the place (now that we have ALLOW-WITH-INTERRUPTS.)
@@ -214,9 +214,9 @@ in seconds and microseconds. `DEADLINEP` is true if the returned
 values reflect a global deadline instead of the local timeout
 indicated by SECONDS.
 
-If SECONDS is null and there is no global timeout all returned values will be
-null. If a global deadline has already passed when DECODE-TIMEOUT is called,
-it will signal a timeout condition."
+If SECONDS is NIL and there is no global timeout all returned values
+will be NIL. If a global deadline has already passed when
+DECODE-TIMEOUT is called, a TIMEOUT condition is signalled."
   (declare (optimize speed)
            (explicit-check))
   (flet ((return-timeout (timeout deadline signalp)

@@ -1614,7 +1614,9 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
      (format stream
              "I/O timeout while doing ~(~A~) on ~S."
              (io-timeout-direction condition)
-             (stream-error-stream condition)))))
+             (stream-error-stream condition))))
+  (:documentation "Signaled when an IO operation does not complete within
+an allotted time budget."))
 
 (define-condition deadline-timeout (timeout)
   ()

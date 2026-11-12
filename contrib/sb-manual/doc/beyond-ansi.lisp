@@ -1182,7 +1182,8 @@
   that moment to be interrupted by an asynchronously signaled
   SB-EXT:TIMEOUT condition, (almost) irregardless of the operation
   and its context."
-  (sb-ext:timeout condition))
+  (sb-ext:timeout condition)
+  (sb-sys:io-timeout condition))
 
 (defsection @operations-supporting-timeouts-and-deadlines
     (:title "Operations Supporting Timeouts and Deadlines")
@@ -1218,7 +1219,13 @@
   | wait-on-gate           | yes               | yes?                  |
   | frlock-write           | yes               | yes?                  |
   | grab-frlock-write-lock | yes               | yes?                  |
-  ```")
+  ```
+
+  To implement new operations that support timeouts and deadlines, the
+  following tools are available:"
+  (sb-sys:signal-deadline function)
+  (sb-sys:decode-internal-time function)
+  (sb-sys:decode-timeout function))
 
 (defsection @miscellaneous-extensions (:title "Miscellaneous Extensions")
   (sb-ext:array-storage-vector function)
