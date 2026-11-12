@@ -1167,8 +1167,7 @@ of `SB-KERNEL`) have been undone, but probably more remain.")
    "WITH-FD-HANDLER"
    "WITH-INTERRUPTS" "WITH-LOCAL-INTERRUPTS"
    "WITH-PINNED-OBJECTS" "WITHOUT-GCING"
-   "WITHOUT-INTERRUPTS"
-   "WITH-INTERRUPT-BINDINGS"))
+   "WITHOUT-INTERRUPTS"))
 
 (defpackage "SB-ASSEM"
   (:documentation "private: the assembler, used by the compiler")

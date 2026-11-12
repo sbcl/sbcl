@@ -375,6 +375,10 @@ Lisp heap or other memory with SAPs is trivial.
 @ttindex @sortas{system-area-pointer sb-sys} system-area-pointer [sb-sys]
 @deffn{Class} sb-sys:system-area-pointer
 @end deffn
+@anchor{Function sb-sys system-area-pointer-p}
+@ffindex @sortas{system-area-pointer-p sb-sys} system-area-pointer-p [sb-sys]
+@deffn{Function} sb-sys:system-area-pointer-p object
+@end deffn
 @anchor{Function sb-sys sap-int}
 @ffindex @sortas{sap-int sb-sys} sap-int [sb-sys]
 @deffn{Function} sb-sys:sap-int sap
@@ -418,9 +422,20 @@ consing:
 @ffindex @sortas{sap> sb-sys} sap> [sb-sys]
 @deffn{Function} sb-sys:sap> sap-1 sap-2
 @end deffn
-The rest are @code{setf}able accessors.
+@anchor{Function sb-sys sap<}
+@ffindex @sortas{sap< sb-sys} sap< [sb-sys]
+@deffn{Function} sb-sys:sap< sap-1 sap-2
+@end deffn
+A utility for @ref{specialized arrays}:
 
-The first group of accessors is for @code{unsigned-byte}s of varying widths:
+@anchor{Function sb-sys vector-sap}
+@ffindex @sortas{vector-sap sb-sys} vector-sap [sb-sys]
+@deffn{Function} sb-sys:vector-sap vector
+Return a @code{system-area-pointer} pointing to the first element in @code{vector}.
+@code{vector} must be specialized.
+@end deffn
+The rest are @code{setf}able accessors. The first group of accessors is for
+@code{unsigned-byte}s of varying widths:
 
 @anchor{Function sb-sys sap-ref-8}
 @ffindex @sortas{sap-ref-8 sb-sys} sap-ref-8 [sb-sys]
@@ -446,6 +461,13 @@ from @code{sap}. @code{setf}able.
 Access the (@code{unsigned-byte} 64) value at the memory location @code{offset} bytes
 from @code{sap}. @code{setf}able.
 @end deffn
+@anchor{Function sb-sys sap-ref-word}
+@ffindex @sortas{sap-ref-word sb-sys} sap-ref-word [sb-sys]
+@deffn{Function} sb-sys:sap-ref-word sap offset
+Access the (@code{unsigned-byte} 64) or (@code{unsigned-byte} 32) value on 64-bit
+and 32-bit platforms respectively at the memory location @code{offset}
+bytes from @code{sap}. @code{setf}able.
+@end deffn
 Then, we have their @code{signed-byte} equivalents:
 
 @anchor{Function sb-sys signed-sap-ref-8}
@@ -463,6 +485,10 @@ Then, we have their @code{signed-byte} equivalents:
 @anchor{Function sb-sys signed-sap-ref-64}
 @ffindex @sortas{signed-sap-ref-64 sb-sys} signed-sap-ref-64 [sb-sys]
 @deffn{Function} sb-sys:signed-sap-ref-64 sap offset
+@end deffn
+@anchor{Function sb-sys signed-sap-ref-word}
+@ffindex @sortas{signed-sap-ref-word sb-sys} signed-sap-ref-word [sb-sys]
+@deffn{Function} sb-sys:signed-sap-ref-word sap offset
 @end deffn
 Finally, accessors for various types:
 

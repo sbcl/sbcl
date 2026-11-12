@@ -108,7 +108,9 @@
   (def set-header-data (x val))
   (def widetag-of)
   (def %other-pointer-widetag)
-  (def vector-sap)
+  (def vector-sap (vector)
+    "Return a SYSTEM-AREA-POINTER pointing to the first element in VECTOR.
+VECTOR must be specialized.")
   (def binding-stack-pointer-sap  ())
   #+cheneygc (def dynamic-space-free-pointer ())
   (def control-stack-pointer-sap ())

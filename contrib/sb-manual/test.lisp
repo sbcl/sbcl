@@ -60,7 +60,7 @@
     (cond (home-section
            (values nil (format nil "in ~S" (section-name home-section))))
           ((case (xref-locative-type dref)
-             ((function generic-function)
+             ((function generic-function macro)
               (sb-int:info :function :deprecated name))
              ((constant variable)
               (sb-int:info :variable :deprecated name))
@@ -447,6 +447,23 @@
       ;; This is currently too messy a mix of public and private to
       ;; comprehend.
       (sb-sys
+       :not-needed
+       (;; Dummy global definitions for local macros in
+        ;; SB-SYS:WITH-INTERRUPTS
+        (sb-sys:with-local-interrupts macro)
+        (sb-sys:allow-with-interrupts macro)
+        ;; We should deprecate this, but it's used internally.
+        (sb-sys:without-gcing macro)
+        ;; We should get rid of SERVE-EVENT.
+        (sb-sys:*periodic-polling-function* variable)
+        (sb-sys:*periodic-polling-period* variable)
+        (sb-sys:add-fd-handler function)
+        (sb-sys:invalidate-descriptor function)
+        (sb-sys:remove-fd-handler function)
+        (sb-sys:serve-all-events function)
+        (sb-sys:serve-event function)
+        (sb-sys:wait-until-fd-usable function)
+        (sb-sys:with-fd-handler macro))
        :missing
        ((sb-sys:%standard-char-p function)
         (sb-sys:*allow-with-interrupts* variable)
@@ -457,8 +474,6 @@
         (sb-sys:*linkage-info* variable)
         (sb-sys:*long-site-name* variable)
         (sb-sys:*machine-version* variable)
-        (sb-sys:*periodic-polling-function* variable)
-        (sb-sys:*periodic-polling-period* variable)
         (sb-sys:*runtime-dlhandle* variable)
         (sb-sys:*shared-objects* variable)
         (sb-sys:*short-site-name* variable)
@@ -468,9 +483,7 @@
         #+sb-safepoint
         (sb-sys:*thruption-pending* variable)
         (sb-sys:*tty* variable)
-        (sb-sys:add-fd-handler function)
         (sb-sys:allocate-system-memory function)
-        (sb-sys:allow-with-interrupts macro)
         (sb-sys:beep function)
         (sb-sys:breakpoint-error condition)
         (sb-sys:close-shared-objects function)
@@ -490,7 +503,6 @@
         (sb-sys:get-machine-version function)
         (sb-sys:get-system-info function)
         (sb-sys:in-interruption macro)
-        (sb-sys:invalidate-descriptor function)
         (sb-sys:invoke-interruption function)
         (sb-sys:io-timeout condition)
         (sb-sys:memmove function)
@@ -504,29 +516,16 @@
         (sb-sys:read-n-bytes function)
         #+win32
         (sb-sys:reinit-internal-real-time function)
-        (sb-sys:remove-fd-handler function)
         (sb-sys:reopen-shared-objects function)
         (sb-sys:sap-foreign-symbol function)
-        (sb-sys:sap-ref-word function)
-        (sb-sys:sap< function)
         (sb-sys:scrub-control-stack function)
-        (sb-sys:serve-all-events function)
-        (sb-sys:serve-event function)
         (sb-sys:signal-deadline function)
-        (sb-sys:signed-sap-ref-word function)
-        (sb-sys:system-area-pointer-p function)
         (sb-sys:system-condition condition)
         (sb-sys:system-condition-address function)
         (sb-sys:system-condition-context function)
         (sb-sys:system-internal-run-time function)
         (sb-sys:update-alien-linkage-table function)
-        (sb-sys:vector-sap function)
-        (sb-sys:wait-until-fd-usable function)
-        (sb-sys:with-code-pages-pinned macro)
-        (sb-sys:with-fd-handler macro)
-        (sb-sys:with-interrupt-bindings macro)
-        (sb-sys:with-local-interrupts macro)
-        (sb-sys:without-gcing macro))))))
+        (sb-sys:with-code-pages-pinned macro))))))
 
 (defun ->xrefs (refs)
   (let ((xrefs ()))

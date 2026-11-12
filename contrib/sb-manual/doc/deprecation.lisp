@@ -195,7 +195,6 @@
       (danger)
       |- ERROR: The function CL-USER::FEZ has been deprecated...")
 
-
 (defsection @deprecated-interfaces-in-sbcl
     (:title "Deprecated Interfaces in SBCL")
   "This sections lists legacy interfaces in various stages of deprecation."

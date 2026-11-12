@@ -18,8 +18,6 @@
 (sb-impl:define-thread-local sb-pcl::*cache-miss-values-stack* nil)
 (sb-impl:define-thread-local sb-pcl::*dfun-miss-gfs-on-stack* nil)
 
-;;; TODO: this macro should probably disappear from the pristine image, right?
-;;; (well it doesn't)
 (defmacro with-interrupt-bindings ((style) &body body)
   (declare (type (member :synchronous :asynchronous) style)
            (ignorable style))

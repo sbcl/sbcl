@@ -303,6 +303,7 @@
   addresses). They should thus be used with caution; corrupting the
   Lisp heap or other memory with SAPs is trivial."
   (sb-sys:system-area-pointer class)
+  (sb-sys:system-area-pointer-p function)
   (sb-sys:sap-int function)
   (sb-sys:int-sap function)
   (sb-sys:sap+ function)
@@ -313,18 +314,22 @@
   (sb-sys:sap<= function)
   (sb-sys:sap>= function)
   (sb-sys:sap> function)
-  "The rest are SETFable accessors.
-
-  The first group of accessors is for UNSIGNED-BYTEs of varying widths:"
+  (sb-sys:sap< function)
+  "A utility for @SPECIALIZED-ARRAYS:"
+  (sb-sys:vector-sap function)
+  "The rest are SETFable accessors. The first group of accessors is for
+  UNSIGNED-BYTEs of varying widths:"
   (sb-sys:sap-ref-8 function)
   (sb-sys:sap-ref-16 function)
   (sb-sys:sap-ref-32 function)
   (sb-sys:sap-ref-64 function)
+  (sb-sys:sap-ref-word function)
   "Then, we have their SIGNED-BYTE equivalents:"
   (sb-sys:signed-sap-ref-8 function)
   (sb-sys:signed-sap-ref-16 function)
   (sb-sys:signed-sap-ref-32 function)
   (sb-sys:signed-sap-ref-64 function)
+  (sb-sys:signed-sap-ref-word function)
   "Finally, accessors for various types:"
   (sb-sys:sap-ref-sap function)
   (sb-sys:sap-ref-lispobj function)
