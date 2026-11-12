@@ -780,7 +780,7 @@
                               (word-sized-type-p integer-type))
                          ',name)
                         #+(or arm64 x86-64)
-                        ((not (word-sized-type-p integer-type))
+                        ((not (double-word-sized-type-p integer-type))
                          (cond ((csubtypep count-type (make-numeric-type 'integer (- result-width width) most-positive-fixnum))
                                 ;; Uses the bits from the first word when shifting right
                                 ,(when signedp
