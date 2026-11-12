@@ -140,58 +140,63 @@
 
 ;;;; bounds checking routine
 (defun emit-bounds-check (vop %test-fixnum array index limit)
-  (let*  ((use-length-p (null limit))
-          (error
-            (if use-length-p
-                (generate-error-code vop 'sb-kernel::invalid-vector-index-error
-                                     array index)
-                (generate-error-code vop 'invalid-array-index-error array limit
-                                     index)))
-          (bound (if (and (tn-p limit) (sc-is limit immediate))
-                     (let ((value (tn-value limit)))
-                       (cond ((and %test-fixnum
-                                   (power-of-two-limit-p (1- value)))
-                              (lognot (fixnumize (1- value))))
-                             ((sc-is index any-reg descriptor-reg)
-                              (fixnumize value))
-                             (t
-                              value)))
-                     limit))
-          (index (if (sc-is index immediate)
-                     (let ((value (tn-value index)))
-                       (if (or (null bound) ; from array header
-                               (sc-is bound any-reg descriptor-reg))
-                           (fixnumize value)
-                           value))
-                     index)))
-    (cond ((typep bound '(integer * -1))
-           ;; Power of two bound, can be checked for fixnumness at
-           ;; the same time as it always occupies a consecutive bit
-           ;; range, everything else, including the tag, has to be
-           ;; zero.
-           (inst test index (if (eql bound -1)
-                                index ;; zero?
-                                bound))
-           (inst jmp :ne error))
-          (t
-           (when (and %test-fixnum (not (integerp index)))
-             (%test-fixnum index nil error t))
-           (cond (use-length-p
-                  (let ((len (vector-len-ea array)))
-                    (cond ((integerp index)
-                           (inst cmp vector-len-op-size len index)
-                           (inst jmp :be error))
-                          (t
-                           (inst cmp vector-len-op-size index len)
-                           (inst jmp :nb error)))))
-                 ((integerp bound)
-                  (inst cmp index bound)
-                  (inst jmp :nb error))
-                 (t
-                  (if (eql index 0)
-                      (inst test bound bound)
-                      (inst cmp bound index))
-                  (inst jmp :be error)))))))
+  (let* ((use-length-p (null limit))
+         (error
+           (if use-length-p
+               (generate-error-code vop 'sb-kernel::invalid-vector-index-error
+                                    array index)
+               (generate-error-code vop 'invalid-array-index-error array limit
+                                    index))))
+    (when (sc-is index signed-128-reg)
+      (with-128-parts (lo hi index)
+        (inst test hi hi)
+        (inst jmp :nz error)
+        (setf index lo)))
+    (let* ((bound (if (and (tn-p limit) (sc-is limit immediate))
+                      (let ((value (tn-value limit)))
+                        (cond ((and %test-fixnum
+                                    (power-of-two-limit-p (1- value)))
+                               (lognot (fixnumize (1- value))))
+                              ((sc-is index any-reg descriptor-reg)
+                               (fixnumize value))
+                              (t
+                               value)))
+                      limit))
+           (index (if (sc-is index immediate)
+                      (let ((value (tn-value index)))
+                        (if (or (null bound) ; from array header
+                                (sc-is bound any-reg descriptor-reg))
+                            (fixnumize value)
+                            value))
+                      index)))
+      (cond ((typep bound '(integer * -1))
+             ;; Power of two bound, can be checked for fixnumness at
+             ;; the same time as it always occupies a consecutive bit
+             ;; range, everything else, including the tag, has to be
+             ;; zero.
+             (inst test index (if (eql bound -1)
+                                  index ;; zero?
+                                  bound))
+             (inst jmp :ne error))
+            (t
+             (when (and %test-fixnum (not (integerp index)))
+               (%test-fixnum index nil error t))
+             (cond (use-length-p
+                    (let ((len (vector-len-ea array)))
+                      (cond ((integerp index)
+                             (inst cmp vector-len-op-size len index)
+                             (inst jmp :be error))
+                            (t
+                             (inst cmp vector-len-op-size index len)
+                             (inst jmp :nb error)))))
+                   ((integerp bound)
+                    (inst cmp index bound)
+                    (inst jmp :nb error))
+                   (t
+                    (if (eql index 0)
+                        (inst test bound bound)
+                        (inst cmp bound index))
+                    (inst jmp :be error))))))))
 
 (define-vop (check-bound)
   (:translate %check-bound)
@@ -227,9 +232,9 @@
 (define-vop (check-bound/untagged check-bound)
   (:args (array)
          (bound :scs (unsigned-reg signed-reg))
-         (index :scs (unsigned-reg signed-reg)))
+         (index :scs (unsigned-reg signed-reg signed-128-reg)))
   (:arg-types * (:or unsigned-num signed-num)
-                (:or unsigned-num signed-num))
+                (:or unsigned-num signed-num signed-byte-128))
   (:variant nil)
   (:variant-cost 5))
 

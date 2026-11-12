@@ -731,11 +731,11 @@
   (unsigned-reg) (signed-128-reg))
 
 (define-vop (move-from-128-to-word)
-  (:args (x :scs (signed-128-reg)))
+  (:args ((lo) :scs (signed-128-reg)))
   (:results (y :scs (signed-reg unsigned-reg)))
   (:note "128 integer to word move")
   (:generator 1
-    (move y (128-reg-parts x))))
+    (move y lo)))
 
 (define-move-vop move-from-128-to-word :move
   (signed-128-reg) (signed-reg unsigned-reg))

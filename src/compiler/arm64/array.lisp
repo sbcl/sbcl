@@ -128,6 +128,10 @@
                                           array index)
                      (generate-error-code vop 'invalid-array-index-error
                                           array bound index))))
+      (when (sc-is index signed-128-reg)
+        (with-128-parts (lo hi index)
+          (inst cbnz hi error)
+          (setf index lo)))
       (if (and (sc-is bound immediate)
                (sc-is index immediate))
           (when (>= (tn-value index)
@@ -191,9 +195,9 @@
 (define-vop (check-bound/untagged check-bound)
   (:args (array)
          (bound)
-         (index :scs (unsigned-reg signed-reg (immediate (typep (tn-value tn) 'sc-offset)))))
+         (index :scs (unsigned-reg signed-reg signed-128-reg (immediate (typep (tn-value tn) 'sc-offset)))))
   (:arg-types * *
-              (:or unsigned-num signed-num))
+              (:or unsigned-num signed-num signed-byte-128))
   (:variant nil)
   (:related-args index)
   (:variant-cost 5))
@@ -531,4 +535,3 @@
                                other-pointer-lowtag))
     (inst add lip object offset)
     (inst ldaddal diff result lip)))
-
