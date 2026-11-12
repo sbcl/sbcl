@@ -645,6 +645,7 @@
   SEQUENCE subclass, an attempt to apply one of the missing operations
   to instances of that class signals the following condition:"
   (sb-sequence:protocol-unimplemented condition)
+  (sb-sequence:protocol-unimplemented-operation generic-function)
   "In addition to the mandatory functions above, methods on the sequence
   functions listed below can be defined.
 

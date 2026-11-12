@@ -32,9 +32,15 @@
    instance of a sequence class that does not support the
    operation."))
 
-(defun sequence:protocol-unimplemented (operation sequence)
+(setf (documentation 'sequence:protocol-unimplemented-operation 'function)
+      "Return the name of operation (a SYMBOL) that caused the
+SB-SEQUENCE:PROTOCOL-UNIMPLEMENTED error.")
+
+(defun %protocol-unimplemented (operation sequence)
   (error 'sequence:protocol-unimplemented
          :datum sequence
+         ;; These are the type supported out of the box, but this can
+         ;; be incorrect in the presence of extensions.
          :expected-type '(or list vector)
          :operation operation))
 
@@ -50,7 +56,7 @@
   (:method ((s list)) (length s))
   (:method ((s vector)) (length s))
   (:method ((s sequence))
-    (sequence:protocol-unimplemented 'sequence:length s))
+    (%protocol-unimplemented 'sequence:length s))
   (:documentation
    "Return the length of SEQUENCE or signals a
    SEQUENCE:PROTOCOL-UNIMPLEMENTED error if the sequence protocol is
@@ -60,7 +66,7 @@
   (:method ((s list) index) (elt s index))
   (:method ((s vector) index) (elt s index))
   (:method ((s sequence) index)
-    (sequence:protocol-unimplemented 'sequence:elt s))
+    (%protocol-unimplemented 'sequence:elt s))
   (:documentation
    "Return the element at position INDEX of SEQUENCE or signals a
    SEQUENCE:PROTOCOL-UNIMPLEMENTED error if the sequence protocol is
@@ -71,7 +77,7 @@
   (:method (new-value (s list) index) (setf (elt s index) new-value))
   (:method (new-value (s vector) index) (setf (elt s index) new-value))
   (:method (new-value (s sequence) index)
-    (sequence:protocol-unimplemented '(setf sequence:elt) s))
+    (%protocol-unimplemented '(setf sequence:elt) s))
   (:documentation
    "Replace the element at position INDEX of SEQUENCE with NEW-VALUE
    and return NEW-VALUE or signal a SEQUENCE:PROTOCOL-UNIMPLEMENTED
@@ -102,7 +108,7 @@
       (t (make-array length :element-type (array-element-type s)))))
   (:method ((s sequence) length &key initial-element initial-contents)
     (declare (ignore initial-element initial-contents))
-    (sequence:protocol-unimplemented 'sequence:make-sequence-like s))
+    (%protocol-unimplemented 'sequence:make-sequence-like s))
   (:documentation
    "Return a freshly allocated sequence of length LENGTH and of the
    same class as SEQUENCE. Elements of the new sequence are
@@ -141,7 +147,7 @@
       (t (apply #'adjust-array s length args))))
   (:method ((s sequence) length &rest args)
     (declare (ignore args))
-    (sequence:protocol-unimplemented 'sequence:adjust-sequence s))
+    (%protocol-unimplemented 'sequence:adjust-sequence s))
   (:documentation
    "Return destructively modified SEQUENCE or a freshly allocated
    sequence of the same class as SEQUENCE of length LENGTH. Elements

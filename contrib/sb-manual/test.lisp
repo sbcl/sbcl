@@ -265,9 +265,7 @@
       (sb-sequence
        :missing
        ((sb-sequence:canonize-key function)
-        (sb-sequence:canonize-test function)
-        (sb-sequence:protocol-unimplemented function)
-        (sb-sequence:protocol-unimplemented-operation generic-function)))
+        (sb-sequence:canonize-test function)))
       (sb-sprof
        :missing
        ((sb-sprof:*report-sort-by* variable)

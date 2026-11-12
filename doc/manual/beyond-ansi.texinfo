@@ -1186,6 +1186,12 @@ Signaled if a sequence operation is applied to an
 instance of a sequence class that does not support the
 operation.
 @end deffn
+@anchor{Generic function sb-sequence protocol-unimplemented-operation}
+@ffindex @sortas{protocol-unimplemented-operation sb-sequence} protocol-unimplemented-operation [sb-sequence]
+@deffn{Generic function} sb-sequence:protocol-unimplemented-operation condition
+Return the name of operation (a @code{symbol}) that caused the
+@code{sb-sequence:protocol-unimplemented} error.
+@end deffn
 In addition to the mandatory functions above, methods on the sequence
 functions listed below can be defined.
 
