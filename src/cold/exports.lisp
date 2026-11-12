@@ -72,6 +72,7 @@
    "ATOMIC-PUSH"
    "ATOMIC-POP"
    "WORD"
+   "SIGNED-WORD"
    "MOST-POSITIVE-WORD"
 
    ;; Not an atomic operation, but should be used with them

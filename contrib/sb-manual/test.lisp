@@ -231,10 +231,14 @@
         (sb-ext:unknown-keyword-argument-name function)
         (sb-ext:valid-type-specifier-p function)
         (sb-ext:with-current-source-form macro)
-        (sb-ext:word type)))
+        (sb-ext:word type)
+        (sb-ext:signed-word type)))
       (sb-alien
        :not-needed
-       ((* function)
+       (;; These are symbols in the CL package that we use as e.g.
+        ;; foreign type specifiers. Obviously, we don't want to
+        ;; document their normal meaning.
+        (* function)
         (* variable)
         (array class)
         (boolean type)
@@ -244,23 +248,22 @@
         (float function)
         (integer class)
         (long-float type)
-        (sb-ext:word type)
         (single-float class)
         (union function)
         (values function)
-        (function class))
-       :missing
-       ((sb-alien:alien-size macro)
+        (function class)
+        ;; Similar to above
+        (sb-ext:word type)
+        (sb-ext:signed-word type)
+        ;; Exposed because of (SB-ALIEN:CAST MACRO). Should be
+        ;; renamed.
         (sb-alien:cast structure)
-        (sb-alien:define-alien-type macro)
-        (sb-alien:load-1-foreign function)
-        (sb-alien:load-foreign function)
-        (sb-alien:null-alien function)
-        (sb-alien:set-errno function)
-        (sb-alien:signed-word type)
+        ;; Exposed because of SB-ALIEN:SLOT function). Should be
+        ;; renamed.
         (sb-alien:slot class)
-        (sb-alien:struct class)
-        (sb-alien:undefined-alien-error condition)))
+        ;; Exposed due to the foreign type specifier SB-ALIEN:STRUCT.
+        ;; Should be renamed.
+        (sb-alien:struct class)))
       (sb-sequence
        :missing
        ((sb-sequence:canonize-key function)

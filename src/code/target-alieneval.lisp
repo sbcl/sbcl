@@ -73,6 +73,9 @@
   SBCL 0.7.5, they are still implemented using an older more-or-less
   parallel mechanism inherited from CMUCL.
 
+  When the value is accessed, UNDEFINED-ALIEN-ERROR is signaled if the
+  external variable does not exists.
+
   For example, to access a C-level counter `foo`, one could write
 
       (define-alien-variable \"foo\" int)
@@ -113,9 +116,10 @@ variable is undefined."
                    (error 'unbound-variable :name symbol))))
 
 (defmacro extern-alien (name type &environment env)
-  "Return an alien of TYPE which points to an externally defined value of NAME.
-  NAME is not evaluated and may be either a string or a symbol. TYPE
-  is an unevaluated alien type specifier. SETFable."
+  "Return the value of the external alien variable NAME of TYPE
+  without having to define it with DEFINE-ALIEN-VARIABLE. Signals
+  UNDEFINED-ALIEN-ERROR if the external variable does not exists.
+  SETFable."
   (let* ((name (if (and env (constantp name env)) (constant-form-value name env) name))
          (alien-name (possibly-base-stringize
                       (etypecase name
@@ -300,9 +304,9 @@ variable is undefined."
             :type (unparse-alien-type (alien-value-type value)))))
 
 (declaim (inline null-alien))
-(defun null-alien (x)
-  "Return true if X (which must be an ALIEN pointer) is null, false otherwise."
-  (zerop (sap-int (alien-sap x))))
+(defun null-alien (alien)
+  "See if ALIEN (which must be an alien pointer) is `\\\\NULL`."
+  (zerop (sap-int (alien-sap alien))))
 
 (defmacro sap-alien (sap type &environment env)
   "Convert the SYSTEM-AREA-POINTER SAP to an ALIEN of the specified
@@ -928,6 +932,10 @@ the result to a stack-allocated buffer:
   "Define a foreign interface function for the routine with the specified NAME.
 Also automatically DECLAIM the FTYPE of the defined function. The
 semantics of the actual call are the same as for ALIEN-FUNCALL.
+
+As is the case with DEFINE-ALIEN-VARIABLE, no UNDEFINED-ALIEN-ERROR
+may be signaled at time of definition, but when the function is
+called.
 
 This macro is a convenience for automatically generating Lisp
 interfaces to simple foreign functions. The primary feature is the

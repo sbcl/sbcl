@@ -83,6 +83,7 @@
       (struct foo
         (a int)
         (b (array (* (struct foo)) 100)))"
+  (alien-size macro)
   (@defining-foreign-types section)
   (@foreign-types-and-lisp-types section)
   (@foreign-type-specifiers section))
@@ -97,7 +98,8 @@
   An anonymous structure or union type is specified by using the name
   NIL. The WITH-ALIEN macro defines a local scope which _captures_ any
   named type definitions. Other types are not inherently named, but
-  can be given named abbreviations using the DEFINE-ALIEN-TYPE macro.")
+  can be given named abbreviations using the DEFINE-ALIEN-TYPE macro."
+  (define-alien-type macro))
 
 (defsection @foreign-types-and-lisp-types
     (:title "Foreign Types and Lisp Types")
@@ -130,34 +132,38 @@
 
   These are the basic foreign type specifiers:
 
-  - The foreign type specifier `(* <FOO>)` describes a pointer to an
-    object of type `<FOO>`. A pointed-to type `<FOO>` of T indicates a
-    pointer to anything, similar to `void *` in ANSI C. A null alien
-    pointer can be detected with the NULL-ALIEN function.
+  - `(* <FOO>)`
 
-  - The foreign type specifier `(ARRAY <FOO> &REST <DIMENSIONS>)`
-    describes array of the specified `<DIMENSIONS>`, holding elements
-    of type `<FOO>`. Note that (unlike in C) `(* <FOO>)` and
-    `(ARRAY <FOO>)` are considered to be different types when
-    type checking is done. If equivalence of pointer and array types
-    is desired, it may be explicitly coerced using CAST.
+      A pointer to an object of type `<FOO>`. A pointed-to type
+      `<FOO>` of T indicates a pointer to anything, similar to `void
+      *` in ANSI C. A null alien pointer can be detected with the
+      NULL-ALIEN function.
 
-  Arrays are accessed using DEREF, passing the indices
-  as additional arguments.  Elements are stored in row-major order
-  (as in C), so the first dimension determines only the size of the
-  memory block, and not the layout of the higher dimensions. An array
-  whose first dimension is variable may be specified by using NIL as
-  the first dimension. Fixed-size arrays can be allocated as array
-  elements, structure slots or WITH-ALIEN variables. Dynamic arrays
-  can only be allocated using MAKE-ALIEN.
+  - `(ARRAY <FOO> &REST <DIMENSIONS>)`
 
-  - The foreign type specifier `(STRUCT <NAME> &REST <FIELDS>)`
-    describes a structure type with the specified `<NAME>` and
-    `<FIELDS>`. Fields are allocated at the same offsets used by the
-    implementation's C compiler, as guessed by the SBCL internals.
-    An optional :ALIGNMENT keyword argument can be specified for each
-    field to explicitly control the alignment of a field. If `<NAME>`
-    is NIL then the structure is anonymous.
+      An array of the specified `<DIMENSIONS>`, holding elements of
+      type `<FOO>`. Note that (unlike in C) `(* <FOO>)` and `(ARRAY
+      <FOO>)` are considered to be different types when type checking
+      is done. If equivalence of pointer and array types is desired,
+      it may be explicitly coerced using CAST.
+
+      Arrays are accessed using DEREF, passing the indices as
+      additional arguments. Elements are stored in row-major order
+      (as in C), so the first dimension determines only the size of the
+      memory block, and not the layout of the higher dimensions. An array
+      whose first dimension is variable may be specified by using NIL as
+      the first dimension. Fixed-size arrays can be allocated as array
+      elements, structure slots or WITH-ALIEN variables. Dynamic arrays
+      can only be allocated using MAKE-ALIEN.
+
+  - `(STRUCT <NAME> &REST <FIELDS>)`
+
+      A structure type with the specified `<NAME>` and `<FIELDS>`.
+      Fields are allocated at the same offsets used by the
+      implementation's C compiler, as guessed by the SBCL internals.
+      An optional :ALIGNMENT keyword argument can be specified for
+      each field to explicitly control the alignment of a field. If
+      `<NAME>` is NIL then the structure is anonymous.
 
       If a named foreign STRUCT specifier is passed to
       DEFINE-ALIEN-TYPE or WITH-ALIEN, then this defines,
@@ -166,71 +172,89 @@
       current (local or global) alien structure type definition of
       `<NAME>`.
 
-  - The foreign type specifier `(UNION <NAME> &REST <FIELDS>)` is
-    similar to STRUCT but describes a union type. All fields are
-    allocated at the same offset, and the size of the union is the
-    size of the largest field. The programmer must determine which
-    field is active from context.
+  - `(UNION <NAME> &REST <FIELDS>)`
 
-  - The foreign type specifier `(ENUM <NAME> &REST <SPECS>)` describes
-    an enumeration type that maps between integer values and symbols.
-    If `<NAME>` is NIL, then the type is anonymous. Each element of
-    the `<SPECS>` list is either a Lisp symbol, or a list
-    `(<symbol> <value>)`. `<value>` is an integer. If `<value>` is not
-    supplied, then it defaults to one greater than the value for the
-    preceding spec (or to zero if it is the first spec).
+      Similar to STRUCT but describes a union type. All fields are
+      allocated at the same offset, and the size of the union is the
+      size of the largest field. The programmer must determine which
+      field is active from context.
 
-  - The foreign type specifier `(SIGNED &OPTIONAL <BITS>)` specifies a
-    signed integer with the specified number of `<BITS>` precision.
-    The upper limit on integer precision is determined by the
-    machine's word size. If `<BITS>` is not specified, the maximum
-    size will be used.
+  - `(ENUM <NAME> &REST <SPECS>)`
 
-  - The foreign type specifier `(INTEGER &OPTIONAL <BITS>)` is
-    equivalent to the corresponding type specifier using SIGNED
-    instead of INTEGER.
+      An enumeration type that maps between integer values and
+      symbols. If `<NAME>` is NIL, then the type is anonymous. Each
+      element of the `<SPECS>` list is either a Lisp symbol, or a list
+      `(<symbol> <value>)`. `<value>` is an integer. If `<value>` is
+      not supplied, then it defaults to one greater than the value for
+      the preceding spec (or to zero if it is the first spec).
 
-  - The foreign type specifier `(UNSIGNED &OPTIONAL <BITS>)` is like
-    corresponding type specifier using SIGNED except that the variable
-    is treated as an unsigned integer.
+  - `(SIGNED &OPTIONAL <BITS>)`
 
-  - The foreign type specifier `(BOOLEAN &OPTIONAL <BITS>)` is similar
-    to an enumeration type but maps from Lisp NIL and T to C 0 and 1
-    respectively. `<BITS>` determines the amount of storage allocated
-    to hold the truth value.
+      A signed integer with the specified number of `<BITS>`
+      precision. The upper limit on integer precision is determined by
+      the machine's word size. If `<BITS>` is not specified, the
+      maximum size will be used.
 
-  - The foreign type specifier `\\SINGLE-FLOAT` describes a
-    floating-point number in IEEE single-precision format.
+  - `(INTEGER &OPTIONAL <BITS>)`
 
-  - The foreign type specifier `\\DOUBLE-FLOAT` describes a
-    floating-point number in IEEE double-precision format.
+      Equivalent to the corresponding type specifier using SIGNED
+      instead of INTEGER.
 
-  - The foreign type specifier `(FUNCTION <RESULT-TYPE> &REST
-    <ARG-TYPES>)` describes a foreign function that takes arguments of
-    the specified `<ARG-TYPES>` and returns a result of type
-    `<RESULT-TYPE>`. Note that the only context where a foreign
-    `\\FUNCTION` type is directly specified is in the argument to
-    ALIEN-FUNCALL. In all other contexts, foreign functions are
-    represented by foreign function pointer types: `(* (FUNCTION
-    ...))`.
+  - `(UNSIGNED &OPTIONAL <BITS>)`
 
-  - The foreign type specifier `\\SYSTEM-AREA-POINTER` describes a
-    pointer which is represented in Lisp as a SYSTEM-AREA-POINTER
-    object. SBCL exports this type from `SB-ALIEN` because CMUCL did,
-    but tentatively (as of the first draft of this section of the
-    manual, SBCL 0.7.6) it is deprecated, since it doesn't seem to be
-    required by user code.
+      Like SIGNED, but unsigned.
 
-  - The foreign type specifier VOID is used in function types to
-    declare that no useful value is returned. Using ALIEN-FUNCALL to
-    call a VOID foreign function will return zero values.
+  - `(BOOLEAN &OPTIONAL <BITS>)`
 
-  - The foreign type specifier `(C-STRING &KEY <EXTERNAL-FORMAT>
-    <ELEMENT-TYPE> <NOT-NULL>)` is similar to `(* CHAR)` but is
-    interpreted as a null-terminated string, and is automatically
-    converted into a Lisp string when accessed; or if the pointer is C
-    `\\NULL` or 0, then accessing it gives Lisp NIL unless
-    `<NOT-NULL>` is true, in which case a TYPE-ERROR is signalled.
+      Similar to an enumeration type but maps from Lisp NIL and T to C
+      0 and 1 respectively. `<BITS>` determines the amount of storage
+      allocated to hold the truth value.
+
+  - `WORD`
+
+      Equivalent to `(UNSIGNED 64)` and `(UNSIGNED 32)` on 64-bit and
+      32-bit CPUs, respectively.
+
+  - `SIGNED-WORD`
+
+      Equivalent to `(SIGNED 64)` and `(SIGNED 32)` on 64-bit and
+      32-bit CPUs, respectively.
+
+  - `\\SINGLE-FLOAT`
+
+      A floating-point number in IEEE single-precision format.
+
+  - `\\DOUBLE-FLOAT`
+
+      A floating-point number in IEEE double-precision format.
+
+  - `(FUNCTION <RESULT-TYPE> &REST <ARG-TYPES>)`
+
+      A foreign function that takes arguments of the specified
+      `<ARG-TYPES>` and returns a result of type `<RESULT-TYPE>`. Note
+      that the only context where a foreign `\\FUNCTION` type is
+      directly specified is in the argument to ALIEN-FUNCALL. In all
+      other contexts, foreign functions are represented by foreign
+      function pointer types: `(* (FUNCTION ...))`.
+
+  - `\\SYSTEM-AREA-POINTER`
+
+      A pointer that is represented in Lisp as a SYSTEM-AREA-POINTER
+      object.
+
+  - VOID
+
+      This is used in function types to declare that no useful value
+      is returned. Using ALIEN-FUNCALL to call a VOID foreign function
+      will return zero values.
+
+  - `(C-STRING &KEY <EXTERNAL-FORMAT> <ELEMENT-TYPE> <NOT-NULL>)`
+
+      Similar to `(* CHAR)` but is interpreted as a null-terminated
+      string, and is automatically converted into a Lisp string when
+      accessed; or if the pointer is C `\\NULL` or 0, then accessing
+      it gives Lisp NIL unless `<NOT-NULL>` is true, in which case a
+      TYPE-ERROR is signalled.
 
       @EXTERNAL-FORMAT conversion is automatically done when Lisp
       strings are passed to foreign code, or when foreign strings are
@@ -276,8 +300,9 @@
 
       Storing Lisp NIL in a C-STRING writes C `\\\\NULL` to the
       variable."
-  "- `SB-ALIEN` also exports translations of these C type
-    specifiers as foreign type specifiers:
+  "
+  - `SB-ALIEN` also exports translations of these C type specifiers as
+    foreign type specifiers:
 
       CHAR, SHORT, INT, LONG, UNSIGNED-CHAR, UNSIGNED-SHORT,
       UNSIGNED-INT, UNSIGNED-LONG, FLOAT, DOUBLE, SIZE-T, OFF-T")
@@ -292,8 +317,9 @@
   (@foreign-dynamic-allocation section))
 
 (defsection @accessing-foreign-values (:title "Accessing Foreign Values")
-  (sb-alien:deref function)
-  (sb-alien:slot function)
+  (deref function)
+  (slot function)
+  (null-alien function)
   (@system-area-pointer section))
 
 (defsection @system-area-pointer (:title "System Area Pointer")
@@ -381,7 +407,9 @@
           (<alien-string> <lisp-symbol>)"
   (define-alien-variable macro)
   (get-errno function)
-  (extern-alien macro))
+  (set-errno function)
+  (extern-alien macro)
+  (undefined-alien-error condition))
 
 (defsection @foreign-data-structure-examples
     (:title "Foreign Data Structure Examples")

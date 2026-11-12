@@ -11,6 +11,11 @@
 
 (in-package "SB-ALIEN")
 
+(declaim (sb-ext:deprecated
+          :early ("SBCL" "0.8.13")
+          (function load-foreign :replacement load-shared-object)
+          (function load-1-foreign :replacement load-shared-object)))
+
 ;;; Used to serialize modifications to *shared-objects*.
 (define-load-time-global *shared-objects-lock*
   (sb-thread:make-mutex :name "shared object list lock"))

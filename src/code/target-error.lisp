@@ -1318,7 +1318,9 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
    (lambda (condition stream)
      (if (slot-boundp condition 'name)
          (format stream "Undefined alien: ~S" (cell-error-name condition))
-         (format stream "Undefined alien symbol.")))))
+         (format stream "Undefined alien symbol."))))
+  (:documentation "Signaled when an undefined alien variable or function
+is accessed."))
 
 (define-condition undefined-alien-variable-error (undefined-alien-error) ()
   (:report
