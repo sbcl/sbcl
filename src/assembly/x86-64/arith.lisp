@@ -210,7 +210,7 @@
 
 #+sb-assembling
 (define-assembly-routine (logcount)
-                         ((:arg arg (descriptor-reg any-reg) (:lisp-reg 0))
+                         ((:arg arg (descriptor-reg any-reg) rdx-offset)
                           (:temp mask unsigned-reg rcx-offset)
                           (:temp temp unsigned-reg rax-offset))
   (inst push temp)
@@ -278,18 +278,18 @@
          (:results (result :scs (unsigned-reg)))
          (:result-types positive-fixnum)
          ;; input/output of assembly routine
-         (:temporary (:sc unsigned-reg :offset #.(car sb-vm::*register-arg-offsets*)
-                          :from (:argument 0) :to (:result 0)) routine-result)
+         (:temporary (:sc unsigned-reg :offset rdx-offset
+                          :from (:argument 0) :to (:result 0)) rdx)
          (:vop-var vop)
          (:generator ,cost
            ,@(when signed
-               `((move routine-result arg)
-                 (setf arg routine-result)
+               `((move rdx arg)
+                 (setf arg rdx)
                  ,(if (eq arg-type 'fixnum)
-                      `(inst sar routine-result n-fixnum-tag-bits)
-                      `(inst test routine-result routine-result))
+                      `(inst sar rdx n-fixnum-tag-bits)
+                      `(inst test rdx rdx))
                  (inst jmp :ge POSITIVE)
-                 (inst not routine-result)
+                 (inst not rdx)
                  POSITIVE))
            (when (memq :popcnt *backend-subfeatures*) ; always use POPCNT
            ;; Intel's implementation of POPCNT on some models treats it as
@@ -312,19 +312,69 @@
            (inst popcnt result arg)
            (inst jmp done)
          slow
-           (move routine-result arg)
+           (move rdx arg)
            (invoke-asm-routine 'call 'logcount vop)
-           (move result routine-result)
+           (move result rdx)
          done))))
   (def-it unsigned-byte-64-count 14 unsigned-reg unsigned-num)
   (def-it signed-byte-64-count 15 signed-reg signed-num :signed t)
   (def-it positive-fixnum-count 12 any-reg positive-fixnum)
   (def-it signed-fixnum-count 13 any-reg fixnum :signed t))
 
+#-sb-assembling
+(define-vop (logcount/s128)
+  (:translate logcount)
+  (:args ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-refs x-ref)
+  (:arg-types signed-byte-128)
+  (:results (result :scs (unsigned-reg) :from :load))
+  (:result-types positive-fixnum)
+  (:temporary (:sc unsigned-reg) tmp1)
+  (:temporary (:sc unsigned-reg :offset rdx-offset
+               :unused-if (memq :popcnt *backend-subfeatures*))
+              rdx)
+  (:vop-var vop)
+  (:generator 18
+    (let* ((unsignedp (csubtypep (tn-ref-type x-ref)
+                                 (specifier-type 'unsigned-byte)))
+           (lo (if unsignedp lo-x result))
+           (hi (if unsignedp hi-x tmp1)))
+      (unless unsignedp
+        (move tmp1 hi-x)
+        (inst sar tmp1 63)
+        (move result lo-x)
+        (inst xor result tmp1)
+        (inst xor tmp1 hi-x))
+      (flet ((popcnt ()
+               (cond (unsignedp
+                      (zeroize tmp1)
+                      (inst popcnt tmp1 hi)
+                      (zeroize result)
+                      (inst popcnt result lo))
+                     (t
+                      (inst popcnt tmp1 tmp1)
+                      (inst popcnt result result)))
+               (inst add :dword result tmp1)))
+        (if (memq :popcnt *backend-subfeatures*)
+            (popcnt)
+            (assemble ()
+              (test-cpu-feature cpu-has-popcnt)
+              (inst jmp :z slow)
+              (popcnt)
+              (inst jmp done)
+              slow
+              (move rdx hi)
+              (invoke-asm-routine 'call 'logcount vop)
+              (move tmp1 rdx :dword)
+              (move rdx lo)
+              (invoke-asm-routine 'call 'logcount vop)
+              (inst lea :dword result (ea rdx tmp1))
+              done))))))
+
 ;;; General case of EQL
 
 (defconstant cplx-dfloat-real-offs (+ (ash complex-double-float-real-slot word-shift)
-                                   (- other-pointer-lowtag)))
+                                      (- other-pointer-lowtag)))
 (defconstant cplx-dfloat-imag-offs (+ (ash complex-double-float-imag-slot word-shift)
                                    (- other-pointer-lowtag)))
 

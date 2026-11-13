@@ -1548,6 +1548,28 @@
     (:arg-types (:or signed-num fixnum))
     (:variant t)
     (:variant-cost 30))
+
+(define-vop (logcount/s128)
+  (:translate logcount)
+  (:args ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-refs x-ref)
+  (:arg-types signed-byte-128)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:temporary (:sc complex-double-reg) v)
+  (:policy :fast-safe)
+  (:generator 8
+    (cond ((csubtypep (tn-ref-type x-ref) (specifier-type 'unsigned-byte))
+           (inst fmov v lo-x)
+           (inst ins v 1 hi-x nil :d))
+          (t
+           (inst eor tmp-tn lo-x (asr hi-x 63))
+           (inst fmov v tmp-tn)
+           (inst eor tmp-tn hi-x (asr hi-x 63))
+           (inst ins v 1 tmp-tn nil :d)))
+    (inst cnt v v :16b)
+    (inst uaddlv v :h v :16b)
+    (inst fmov res v)))
 
 
 (deftransform %ldb ((size posn integer) (:or (((constant-arg (integer 1 #.(1- n-word-bits)))
