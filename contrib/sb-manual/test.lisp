@@ -170,7 +170,6 @@
         (sb-ext:primitive-object-size function)
         (sb-ext:print-symbol-with-prefix function)
         (sb-ext:print-unreadably function)
-        (sb-ext:reader-package-does-not-exist condition)
         (sb-ext:readtable-base-char-preference function)
         (sb-ext:set-macro-policy function)
         (sb-ext:short-float-negative-infinity constant)
