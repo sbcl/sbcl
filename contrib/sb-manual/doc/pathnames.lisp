@@ -1,11 +1,12 @@
 (in-package :sb-manual)
 
-(defsection @pathnames (:title "Pathnames"
-                        :concepts ("pathname"))
+(defsection @filenames (:title "Filenames")
   (@lisp-pathnames section)
-  (@native-filenames section))
+  (@native-filenames section)
+  (@file-errors section))
 
-(defsection @lisp-pathnames (:title "Lisp Pathnames")
+(defsection @lisp-pathnames (:title "Lisp Pathnames"
+                             :concepts (("pathname")))
   "There are many aspects of ANSI Common Lisp's pathname support
   which are implementation-defined and so need documentation."
   (@home-directory-specifiers section)
@@ -151,3 +152,8 @@
       ; parsed from the first string to unparse as the second string.
       (setf *p* (parse-native-namestring \"/tmp/\")) => #P\"/tmp/\"
       (native-namestring *p* :as-file t) => \"/tmp\"")
+
+(defsection @file-errors (:title "File Errors")
+  (sb-ext:delete-file-error condition)
+  (sb-ext:file-does-not-exist condition)
+  (sb-ext:file-exists condition))

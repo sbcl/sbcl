@@ -41,7 +41,7 @@
   (@beyond-the-ansi-standard section)
   (@external-formats section)
   (@foreign-function-interface section)
-  (@pathnames section)
+  (@filenames section)
   (@streams section)
   (@package-locks section)
   (@threading section)

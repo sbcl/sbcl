@@ -342,7 +342,7 @@
     (@beyond-the-ansi-standard "beyond-ansi.texinfo")
     (@external-formats "external-formats.texinfo")
     (@foreign-function-interface "ffi.texinfo")
-    (@pathnames "pathnames.texinfo")
+    (@filenames "pathnames.texinfo")
     (@streams "streams.texinfo")
     (@package-locks "package-locks.texinfo")
     (@threading "threading.texinfo")

@@ -21,7 +21,7 @@
     be used as Lisp streams (e.g. passed as the first argument to
     FORMAT).
 
-  - _Simple Streams_: The bundled contrib module `SB-SIMPLE-STREAMS`
+  - _Simple Streams_: The bundled contrib module @SB-SIMPLE-STREAMS
     implements a subset of the Franz Allegro simple-streams proposal."
   (@stream-external-formats section)
   (@bivalent-streams section)
