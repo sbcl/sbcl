@@ -260,7 +260,10 @@
   in whose favor the conflict should be resolved; for programmatic
   use, the SB-EXT:RESOLVE-CONFLICT restart should be invoked with one
   argument, which should be a member of the list returned by the
-  condition accessor SB-EXT:NAME-CONFLICT-SYMBOLS.")
+  condition accessor SB-EXT:NAME-CONFLICT-SYMBOLS."
+  (sb-ext:name-conflict condition)
+  (sb-ext:name-conflict-datum function)
+  (sb-ext:name-conflict-symbols function))
 
 (defsection @garbage-collection (:title "Garbage Collection"
                                  :concepts ("garbage collection"))

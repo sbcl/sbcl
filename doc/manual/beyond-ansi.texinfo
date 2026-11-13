@@ -412,6 +412,25 @@ use, the @code{sb-ext:resolve-conflict} restart should be invoked with one
 argument, which should be a member of the list returned by the
 condition accessor @code{sb-ext:name-conflict-symbols}.
 
+@anchor{Condition sb-ext name-conflict}
+@ttindex @sortas{name-conflict sb-ext} name-conflict [sb-ext]
+@deffn{Condition} sb-ext:name-conflict
+Signaled when @code{use-package}, @code{import}, or @code{export} is about
+to make a symbol accessible in a package where another symbol is
+already accessible under the same name. The package is available via
+@code{package-error-package}.
+@end deffn
+@anchor{Function sb-ext name-conflict-datum}
+@ffindex @sortas{name-conflict-datum sb-ext} name-conflict-datum [sb-ext]
+@deffn{Function} sb-ext:name-conflict-datum condition
+Return the symbol that caused the @code{name-conflict}.
+@end deffn
+@anchor{Function sb-ext name-conflict-symbols}
+@ffindex @sortas{name-conflict-symbols sb-ext} name-conflict-symbols [sb-ext]
+@deffn{Function} sb-ext:name-conflict-symbols condition
+Return the list of symbols in @code{name-conflict}, including
+@code{name-conflict-datum}.
+@end deffn
 @node garbage collection
 @cindex garbage collection
 @section Garbage Collection

@@ -1497,7 +1497,17 @@ Experimental: interface subject to change."
              (name-conflict-function c)
              (name-conflict-datum c)
              (package-error-package c)
-             (name-conflict-symbols c)))))
+             (name-conflict-symbols c))))
+  (:documentation "Signaled when USE-PACKAGE, IMPORT, or EXPORT is about
+to make a symbol accessible in a package where another symbol is
+already accessible under the same name. The package is available via
+PACKAGE-ERROR-PACKAGE."))
+
+(setf (documentation 'name-conflict-datum 'function)
+      "Return the symbol that caused the NAME-CONFLICT."
+      (documentation 'name-conflict-symbols 'function)
+      "Return the list of symbols in NAME-CONFLICT, including
+NAME-CONFLICT-DATUM.")
 
 (defun %name-conflict (package function datum &rest symbols)
   (flet ((import1p (c)
@@ -1650,7 +1660,7 @@ uninterned."
               (let ((s (find-external-symbol name (symtbl-package tbl))))
                 (unless (eql s 0) (pushnew s cset :test #'eq))))
             (when (cdr cset)
-              (apply #'name-conflict package 'unintern symbol cset)
+              (apply #'%name-conflict package 'unintern symbol cset)
               (return-from unintern t)))
           (setf (package-%shadowing-symbols package)
                 (remove symbol shadowing-symbols))) ; would not DELETE be ok?
@@ -1802,12 +1812,12 @@ the importation, then a correctable error is signalled."
           (multiple-value-bind (s w) (find-symbol n package)
             (cond ((not w)
                    (if (not (null (cdr ss)))
-                       (apply #'name-conflict package 'import ss ss)
+                       (apply #'%name-conflict package 'import ss ss)
                        (push (car ss) syms)))
                   ((and (eql (car ss) s) (null (cdr ss)))
                    (if (eq w :inherited) (push s syms)))
                   (t
-                   (apply #'name-conflict package 'import ss (adjoin s ss))))))
+                   (apply #'%name-conflict package 'import ss (adjoin s ss))))))
         (when (or homeless syms)
           (let ((union (delete-duplicates (append homeless syms))))
             (assert-package-unlocked package "importing symbol~P ~{~A~^, ~}"
@@ -1917,10 +1927,10 @@ PACKAGE."
             (cond
               ((not w)
                (when (not (null (cdr ss)))
-                 (apply #'name-conflict package 'use-package ss ss)))
+                 (apply #'%name-conflict package 'use-package ss ss)))
               ((and (eql s (car ss)) (null (cdr ss))))
               ((member s shadowing-symbols))
-              (t (apply #'name-conflict package 'use-package ss (adjoin s ss)))))))
+              (t (apply #'%name-conflict package 'use-package ss (adjoin s ss)))))))
 
       (let ((tbls (package-tables package))
             (added-tbls (mapcar #'package-external-symbols packages)))
