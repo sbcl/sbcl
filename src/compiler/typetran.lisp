@@ -1205,7 +1205,7 @@
       `(simd-pack-p ,object)
       `(and (simd-pack-p ,object)
             ,(if (= (logcount mask) 1)
-                 `(eql (%simd-pack-tag ,object) ,(sb-vm::simd-pack-mask->tag mask))
+                 `(eql (%simd-pack-tag ,object) ,(sb-kernel::simd-pack-mask->tag mask))
                  `(logbitp (%simd-pack-tag ,object) ,mask))))))
 
 #+sb-simd-pack-256
@@ -1215,7 +1215,7 @@
         `(simd-pack-256-p ,object)
         `(and (simd-pack-256-p ,object)
               ,(if (= (logcount mask) 1)
-                   `(eql (%simd-pack-256-tag ,object) ,(sb-vm::simd-pack-mask->tag mask))
+                   `(eql (%simd-pack-256-tag ,object) ,(sb-kernel::simd-pack-mask->tag mask))
                    `(logbitp (%simd-pack-256-tag ,object) ,mask))))))
 
 #+sb-simd-pack-512
@@ -1225,7 +1225,7 @@
         `(simd-pack-512-p ,object)
         `(and (simd-pack-512-p ,object)
               ,(if (= (logcount mask) 1)
-                   `(eql (%simd-pack-512-tag ,object) ,(sb-vm::simd-pack-mask->tag mask))
+                   `(eql (%simd-pack-512-tag ,object) ,(sb-kernel::simd-pack-mask->tag mask))
                    `(logbitp (%simd-pack-512-tag ,object) ,mask))))))
 
 ;;; Return the predicate and type from the most specific entry in

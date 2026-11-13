@@ -5431,31 +5431,39 @@ expansion happened."
 
 #+sb-simd-pack
 (progn
+  (declaim (inline simd-pack-mask->tag))
+  (defun simd-pack-mask->tag (mask)
+    (declare (type (and (integer 1)
+                        (unsigned-byte #.(length +simd-pack-element-types+))) mask))
+    (1- (integer-length mask)))
+
 ;;; FIXME: the pretty-print of this error message is just ghastly. How about:
 ;;;  "must be a subtype of ({SIGNED-BYTE|UNSIGNED-BYTE} {8|16|32|64}) or {SINGLE|DOUBLE}-FLOAT"
 ;;; Users sophisticated enough to code with simd-packs will understand what it means.
-(defun simd-type-parser-helper (element-type-spec type-name ctor)
-  (when (eq element-type-spec '*)
-    (return-from simd-type-parser-helper (funcall ctor +simd-pack-wild+)))
-  (let ((element-type (single-value-specifier-type element-type-spec)))
-    (when (eq element-type *empty-type*)
-      (return-from simd-type-parser-helper *empty-type*))
-    (dotimes (i (length +simd-pack-element-types+)
-                (error "~S element type must be a subtype of ~
+  (defun simd-type-parser-helper (element-type-spec type-name ctor)
+    (declare (function ctor))
+    (when (eq element-type-spec '*)
+      (return-from simd-type-parser-helper (funcall ctor +simd-pack-wild+)))
+    (let ((element-type (single-value-specifier-type element-type-spec)))
+      (when (eq element-type *empty-type*)
+        (return-from simd-type-parser-helper *empty-type*))
+      (dotimes (i (length +simd-pack-element-types+)
+                  (error "~S element type must be a subtype of ~
                         ~{~/sb-impl:print-type-specifier/~#[~;, or ~
                         ~:;, ~]~}."
-                     type-name (coerce +simd-pack-element-types+ 'list)))
-      (when (csubtypep element-type (parsed-simd-pack-element-type i))
-        (return (funcall ctor (ash 1 i)))))))
+                         type-name (coerce +simd-pack-element-types+ 'list)))
+        (when (csubtypep element-type (parsed-simd-pack-element-type i))
+          (return (funcall ctor (ash 1 i)))))))
 
-(defun simd-type-unparser-helper (base-type mask)
-  (cond ((= mask +simd-pack-wild+) base-type)
-        ((= (logcount mask) 1)
-         `(,base-type ,(elt +simd-pack-element-types+ (sb-vm::simd-pack-mask->tag mask))))
-        (t
-         `(or ,@(loop for et across +simd-pack-element-types+ for i from 0
-                      when (logbitp i mask)
-                      collect `(,base-type ,et)))))))
+  (defun simd-type-unparser-helper (base-type mask)
+    (declare (type (unsigned-byte #.(length +simd-pack-element-types+)) mask))
+    (cond ((= mask +simd-pack-wild+) base-type)
+          ((= (logcount mask) 1)
+           `(,base-type ,(elt +simd-pack-element-types+ (simd-pack-mask->tag mask))))
+          (t
+           `(or ,@(loop for i below (length +simd-pack-element-types+)
+                        when (logbitp i mask)
+                        collect `(,base-type ,(aref +simd-pack-element-types+ i))))))))
 
 #+sb-simd-pack
 (progn

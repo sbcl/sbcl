@@ -269,12 +269,6 @@
             *backend-t-primitive-type*
             (primitive-type type)))))
 
-#+sb-simd-pack
-(defun simd-pack-mask->tag (mask)
-  (aver (= (logcount mask) 1))
-  (the (integer 0 (#.(length +simd-pack-element-types+)))
-       (1- (integer-length mask))))
-
 ;;; Return the primitive type corresponding to a type descriptor
 ;;; structure. The second value is true when the primitive type is
 ;;; exactly equivalent to the argument Lisp type.
@@ -473,7 +467,7 @@
        (let ((mask (simd-pack-type-tag-mask type)))
          (if (= (logcount mask) 1)
              (values (primitive-type-or-lose
-                      (svref +simd-pack-128-primtypes+ (simd-pack-mask->tag mask)))
+                      (svref +simd-pack-128-primtypes+ (sb-kernel::simd-pack-mask->tag mask)))
                      t)
              (any))))
       #+sb-simd-pack-256
@@ -481,7 +475,7 @@
        (let ((mask (simd-pack-256-type-tag-mask type)))
          (if (= (logcount mask) 1)
              (values (primitive-type-or-lose
-                      (svref +simd-pack-256-primtypes+ (simd-pack-mask->tag mask)))
+                      (svref +simd-pack-256-primtypes+ (sb-kernel::simd-pack-mask->tag mask)))
                      t)
              (any))))
       #+sb-simd-pack-512
@@ -489,7 +483,7 @@
        (let ((mask (simd-pack-512-type-tag-mask type)))
          (if (= (logcount mask) 1)
              (values (primitive-type-or-lose
-                      (svref +simd-pack-512-primtypes+ (simd-pack-mask->tag mask)))
+                      (svref +simd-pack-512-primtypes+ (sb-kernel::simd-pack-mask->tag mask)))
                      t)
              (any))))
       (cons-type
