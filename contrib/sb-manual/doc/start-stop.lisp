@@ -177,10 +177,10 @@
   (@exit-on-errors section))
 
 (defsection @exit (:title "Exit")
-  "SBCL can be stopped at any time by calling SB-EXT:EXIT,
-  optionally returning a specified numeric value to the calling
-  process. See @THREADING for information about terminating individual
-  threads.")
+  "SBCL can be stopped at any time by calling SB-EXT:EXIT or
+  SB-EXT:QUIT, optionally returning a specified numeric value to the
+  calling process. See @THREADING for information about terminating
+  individual threads.")
 
 (defsection @end-of-file (:title "End of File")
   "By default, SBCL also exits upon reaching the end of input. This can

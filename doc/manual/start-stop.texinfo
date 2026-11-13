@@ -223,10 +223,10 @@ signalled immediately, but loading modules will fail.
 @node exit
 @subsection Exit
 
-SBCL can be stopped at any time by calling @code{sb-ext:exit},
-optionally returning a specified numeric value to the calling
-process. See @ref{threading} for information about terminating individual
-threads.
+SBCL can be stopped at any time by calling @code{sb-ext:exit} or
+@code{sb-ext:quit}, optionally returning a specified numeric value to the
+calling process. See @ref{threading} for information about terminating
+individual threads.
 
 @node end of file
 @subsection End of File

@@ -1624,6 +1624,12 @@ excepting errors from @code{*exit-hooks*}, which cause warnings and stop
 execution of the hook that signaled, but otherwise allow the exit
 process to continue normally.
 @end deffn
+@anchor{Function sb-ext quit}
+@ffindex @sortas{quit sb-ext} quit [sb-ext]
+@deffn{Function} sb-ext:quit &key recklessly-p (unix-status 0)
+Call (@code{sb-ext:exit} @code{:code} @code{unix-status} @code{:abort} @code{recklessly-p}),
+see documentation for @code{sb-ext:exit}.
+@end deffn
 @node running external programs
 @subsection Running External Programs
 

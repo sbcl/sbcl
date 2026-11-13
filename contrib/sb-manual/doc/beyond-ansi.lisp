@@ -757,6 +757,7 @@
   (sb-ext:posix-getenv function)
   (sb-ext:posix-environ function)
   (sb-ext:exit function)
+  (sb-ext:quit function)
   (@running-external-programs section)
   (@signal-handling section)
   (@fd-streams section))
