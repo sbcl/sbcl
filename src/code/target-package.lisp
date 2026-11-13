@@ -692,7 +692,7 @@ error if any of PACKAGES is not a valid package designator."
           (when (find-package p)
             (lock-package p)))))))
 
-(defun package-lock-violation (package &key (symbol nil symbol-p)
+(defun %package-lock-violation (package &key (symbol nil symbol-p)
                                format-control format-arguments)
   (let* ((restart :continue)
          (cl-violation-p (eq package *cl-package*))
@@ -761,9 +761,9 @@ error if any of PACKAGES is not a valid package designator."
 (defun assert-package-unlocked (package &optional format-control
                                 &rest format-arguments)
   (when (package-lock-violation-p package)
-    (package-lock-violation package
-                            :format-control format-control
-                            :format-arguments format-arguments))
+    (%package-lock-violation package
+                             :format-control format-control
+                             :format-arguments format-arguments))
   package)
 
 ;;; Must be used inside the dynamic contour established by
@@ -792,10 +792,10 @@ error if any of PACKAGES is not a valid package designator."
                         name))))
            (package (sb-xc:symbol-package symbol)))
       (when (package-lock-violation-p package symbol)
-        (package-lock-violation package
-                                :symbol symbol
-                                :format-control format-control
-                                :format-arguments (cons name format-arguments)))))
+        (%package-lock-violation package
+                                 :symbol symbol
+                                 :format-control format-control
+                                 :format-arguments (cons name format-arguments)))))
   name)
 
 
@@ -1499,7 +1499,7 @@ Experimental: interface subject to change."
              (package-error-package c)
              (name-conflict-symbols c)))))
 
-(defun name-conflict (package function datum &rest symbols)
+(defun %name-conflict (package function datum &rest symbols)
   (flet ((import1p (c)
            (declare (ignore c))
            (and (eq 'import function)
@@ -1711,7 +1711,7 @@ uninterned."
                              (not (member s (package-%shadowing-symbols p))))
                     ;; Beware: the name conflict is in package P, not in
                     ;; PACKAGE.
-                    (name-conflict p 'export sym sym s)))))))
+                    (%name-conflict p 'export sym sym s)))))))
         ;; Check that all symbols are accessible. If not, ask to import them.
         (let ((missing ())
               (imports ()))
