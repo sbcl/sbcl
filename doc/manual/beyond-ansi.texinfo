@@ -99,6 +99,10 @@ user or system initialization file (see @ref{initialization files}).
          (call-next-method))))
 @end example
 
+@anchor{Condition sb-ext invalid-fasl}
+@ttindex @sortas{invalid-fasl sb-ext} invalid-fasl [sb-ext]
+@deffn{Condition} sb-ext:invalid-fasl
+@end deffn
 @node compiler only implementation
 @subsection Compiler-only Implementation
 
@@ -153,6 +157,22 @@ where this is not appropriate, the programmer can handle the
 condition type @code{sb-ext:defconstant-uneql} and choose either the
 @code{continue} restart or @code{abort} restart as appropriate.
 
+@anchor{Condition sb-ext defconstant-uneql}
+@ttindex @sortas{defconstant-uneql sb-ext} defconstant-uneql [sb-ext]
+@deffn{Condition} sb-ext:defconstant-uneql
+@end deffn
+@anchor{Function sb-ext defconstant-uneql-name}
+@ffindex @sortas{defconstant-uneql-name sb-ext} defconstant-uneql-name [sb-ext]
+@deffn{Function} sb-ext:defconstant-uneql-name condition
+@end deffn
+@anchor{Function sb-ext defconstant-uneql-new-value}
+@ffindex @sortas{defconstant-uneql-new-value sb-ext} defconstant-uneql-new-value [sb-ext]
+@deffn{Function} sb-ext:defconstant-uneql-new-value condition
+@end deffn
+@anchor{Function sb-ext defconstant-uneql-old-value}
+@ffindex @sortas{defconstant-uneql-old-value sb-ext} defconstant-uneql-old-value [sb-ext]
+@deffn{Function} sb-ext:defconstant-uneql-old-value condition
+@end deffn
 @node style warnings
 @subsection Style Warnings
 
@@ -3287,6 +3307,30 @@ sets the documentation string stored in the function object.
 
 returns the documentation stored under the function name if any, and
 falls back on the documentation in the function object if necessary.
+@end deffn
+@strong{Conditions}:
+
+@anchor{Condition sb-ext implicit-generic-function-warning}
+@ttindex @sortas{implicit-generic-function-warning sb-ext} implicit-generic-function-warning [sb-ext]
+@deffn{Condition} sb-ext:implicit-generic-function-warning
+@end deffn
+@anchor{Function sb-ext implicit-generic-function-name}
+@ffindex @sortas{implicit-generic-function-name sb-ext} implicit-generic-function-name [sb-ext]
+@deffn{Function} sb-ext:implicit-generic-function-name condition
+@end deffn
+@anchor{Condition sb-ext unknown-keyword-argument}
+@ttindex @sortas{unknown-keyword-argument sb-ext} unknown-keyword-argument [sb-ext]
+@deffn{Condition} sb-ext:unknown-keyword-argument
+@end deffn
+@anchor{Function sb-ext unknown-keyword-argument-name}
+@ffindex @sortas{unknown-keyword-argument-name sb-ext} unknown-keyword-argument-name [sb-ext]
+@deffn{Function} sb-ext:unknown-keyword-argument-name condition
+@end deffn
+@anchor{Condition sb-ext package-does-not-exist}
+@ttindex @sortas{package-does-not-exist sb-ext} package-does-not-exist [sb-ext]
+@deffn{Condition} sb-ext:package-does-not-exist
+Signaled when a designated package does not
+exists (including the case where it's been deleted with @code{delete-package}).
 @end deffn
 @node stale extensions
 @section Stale Extensions

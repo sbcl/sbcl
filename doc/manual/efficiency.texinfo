@@ -3118,6 +3118,7 @@ translated into signed modular arithmetic:
 
 @menu
 * Signed Zeroes and Special Functions: signed zeroes and special functions.
+* IEEE Floating Point: ieee floating point.
 @end menu
 
 Arithmetic on objects of type @code{single-float} and @code{double-float} is
@@ -3242,6 +3243,63 @@ Cuts for Complex Elementary Functions, or Much Ado About Nothing's
 Sign Bit} in Iserles and Powell (eds.) @emph{The State of the Art in
 Numerical Analysis}, pp. 165-211, Clarendon Press, 1987).
 
+@node ieee floating point
+@cindex nan
+@cindex infinity
+@subsubsection IEEE Floating Point
+
+@anchor{Function sb-ext float-denormalized-p}
+@ffindex @sortas{float-denormalized-p sb-ext} float-denormalized-p [sb-ext]
+@deffn{Function} sb-ext:float-denormalized-p x
+Return true if the float X is denormalized.
+@end deffn
+@anchor{Function sb-ext float-nan-p}
+@ffindex @sortas{float-nan-p sb-ext} float-nan-p [sb-ext]
+@deffn{Function} sb-ext:float-nan-p x
+Return true if the float X is a NaN (Not a Number).
+@end deffn
+@anchor{Function sb-ext float-trapping-nan-p}
+@ffindex @sortas{float-trapping-nan-p sb-ext} float-trapping-nan-p [sb-ext]
+@deffn{Function} sb-ext:float-trapping-nan-p x
+Return true if the float X is a trapping NaN (Not a Number).
+@end deffn
+@anchor{Function sb-ext float-infinity-p}
+@ffindex @sortas{float-infinity-p sb-ext} float-infinity-p [sb-ext]
+@deffn{Function} sb-ext:float-infinity-p x
+Return true if the float X is an infinity (+ or -).
+@end deffn
+@anchor{Variable sb-ext short-float-negative-infinity}
+@vvindex @sortas{short-float-negative-infinity sb-ext} short-float-negative-infinity [sb-ext]
+@deffn{Variable} sb-ext:short-float-negative-infinity
+@end deffn
+@anchor{Variable sb-ext short-float-positive-infinity}
+@vvindex @sortas{short-float-positive-infinity sb-ext} short-float-positive-infinity [sb-ext]
+@deffn{Variable} sb-ext:short-float-positive-infinity
+@end deffn
+@anchor{Variable sb-ext single-float-negative-infinity}
+@vvindex @sortas{single-float-negative-infinity sb-ext} single-float-negative-infinity [sb-ext]
+@deffn{Variable} sb-ext:single-float-negative-infinity
+@end deffn
+@anchor{Variable sb-ext single-float-positive-infinity}
+@vvindex @sortas{single-float-positive-infinity sb-ext} single-float-positive-infinity [sb-ext]
+@deffn{Variable} sb-ext:single-float-positive-infinity
+@end deffn
+@anchor{Variable sb-ext double-float-negative-infinity}
+@vvindex @sortas{double-float-negative-infinity sb-ext} double-float-negative-infinity [sb-ext]
+@deffn{Variable} sb-ext:double-float-negative-infinity
+@end deffn
+@anchor{Variable sb-ext double-float-positive-infinity}
+@vvindex @sortas{double-float-positive-infinity sb-ext} double-float-positive-infinity [sb-ext]
+@deffn{Variable} sb-ext:double-float-positive-infinity
+@end deffn
+@anchor{Variable sb-ext long-float-negative-infinity}
+@vvindex @sortas{long-float-negative-infinity sb-ext} long-float-negative-infinity [sb-ext]
+@deffn{Variable} sb-ext:long-float-negative-infinity
+@end deffn
+@anchor{Variable sb-ext long-float-positive-infinity}
+@vvindex @sortas{long-float-positive-infinity sb-ext} long-float-positive-infinity [sb-ext]
+@deffn{Variable} sb-ext:long-float-positive-infinity
+@end deffn
 @node efficiency notes
 @cindex efficiency note,
 @cindex note, efficiency

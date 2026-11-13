@@ -2668,7 +2668,8 @@
   @SPECIALIZED-STRUCTURE-SLOTS and @NON-DESCRIPTORS-IN-LOCAL-CALL."
   ;; FIXME: See @IEEE-FLOAT for information on the extensions to
   ;; support IEEE floating point.
-  (@signed-zeroes-and-special-functions section))
+  (@signed-zeroes-and-special-functions section)
+  (@ieee-floating-point section))
 
 (defsection @signed-zeroes-and-special-functions
     (:title "Signed Zeroes and Special Functions")
@@ -2700,6 +2701,22 @@
   Cuts for Complex Elementary Functions, or Much Ado About Nothing's
   Sign Bit_ in Iserles and Powell (eds.) _The State of the Art in
   Numerical Analysis_, pp. 165-211, Clarendon Press, 1987).")
+
+(defsection @ieee-floating-point (:title "IEEE Floating Point"
+                                  :concepts (("nan")
+                                             ("infinity")))
+  (sb-ext:float-denormalized-p function)
+  (sb-ext:float-nan-p function)
+  (sb-ext:float-trapping-nan-p function)
+  (sb-ext:float-infinity-p function)
+  (sb-ext:short-float-negative-infinity constant)
+  (sb-ext:short-float-positive-infinity constant)
+  (sb-ext:single-float-negative-infinity constant)
+  (sb-ext:single-float-positive-infinity constant)
+  (sb-ext:double-float-negative-infinity constant)
+  (sb-ext:double-float-positive-infinity constant)
+  (sb-ext:long-float-negative-infinity constant)
+  (sb-ext:long-float-positive-infinity constant))
 
 (defsection @efficiency-notes (:title "Efficiency Notes"
                                :concepts (("efficiency note,")

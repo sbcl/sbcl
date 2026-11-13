@@ -19,6 +19,9 @@
       ((variable)
        (member (sb-int:info :variable :kind name)
                '(:global :special :constant)))
+      ((constant)
+       (member (sb-int:info :variable :kind name)
+               '(:constant)))
       ((declaration)
        (find name (sb-cltl2:declaration-information 'declaration)))
       ((class structure condition)
@@ -154,7 +157,9 @@
                 ((type class structure condition)
                  (documentation name 'type))
                 (t
-                 (cond ((eq locative-type (dummy 'macro))
+                 (cond ((eq locative-type (dummy 'constant))
+                        (documentation name 'variable))
+                       ((eq locative-type (dummy 'macro))
                         (documentation (macro-function name) t))
                        ((eq locative-type (dummy 'setf-function))
                         (documentation (fdefinition name) t))
@@ -190,6 +195,8 @@
      (values "Declaration" "ddindex"))
     (t
      (cond
+       ((eq locative-type (dummy 'constant))
+        (values "Variable" "vvindex"))
        ((eq locative-type (dummy 'macro))
         (values "Macro" "ffindex"))
        ((eq locative-type (dummy 'setf-function))
