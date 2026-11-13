@@ -1731,7 +1731,8 @@ forms that explicitly control this kind of evaluation.")
    displaying the distinguishing id values.
 
    The result of this function is limited to the availability of
-   variable information. This is SETFable."
+   variable information. This is SETFable and can be used in TRACE,
+   too."
   (define-var-operation :ref))
 (defun (setf var) (value name &optional (id 0 id-supplied))
   (define-var-operation :set value))
@@ -1774,9 +1775,10 @@ forms that explicitly control this kind of evaluation.")
       (decf n))))
 
 (defun arg (n)
-  "Return the N'th argument's value if possible. Argument zero is the first
-   argument in a frame's default printed representation. Count keyword/value
-   pairs as separate arguments."
+  "Return the value of the argument's value at index N in the current
+  frame's default printed representation. Keyword / value pairs are
+  counted as separate arguments. Can be used in TRACE. If N is out of
+  range or the value cannot be determined, then signal an error."
   (when (sb-di::all-args-available-p *current-frame*)
     (return-from arg
       (early-frame-nth-arg n *current-frame*)))

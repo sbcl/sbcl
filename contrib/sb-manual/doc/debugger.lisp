@@ -317,10 +317,10 @@
 (defsection @variable-access (:title "Variable Access"
                               :concepts (("debug" "variables")
                                          ("variable," "debugger access")))
-  "There are two ways to access the current frame's local variables in
-  the debugger: `list-locals` and SB-DEBUG:VAR.
-
-  The debugger doesn't really understand lexical scoping; it has just
+  "There are three ways to access the current frame's local variables in
+  the debugger: SB-DEBUG:ARG, `list-locals`, and SB-DEBUG:VAR."
+  (sb-debug:arg function)
+  "The debugger doesn't really understand lexical scoping; it has just
   one namespace for all the variables in the current stack frame. If a
   symbol is the name of multiple variables in the same function, then
   the reference appears ambiguous, even though lexical scoping
@@ -953,7 +953,41 @@
   FUNCALL, that function object identity is preserved, and that
   anonymous and local functions can also be traced."
   (trace macro)
-  "In the case of functions where the known return convention is used
+  "Here is an example of tracing with some of the possible options.
+  For simplicity, this is the function:
+
+      (defun fact (n)
+        (if (zerop n)
+            1
+            (* n (fact (1- n)))))
+
+  This example shows how to use the :CONDITION option:
+
+      (trace fact :condition (= 4 (sb-debug:arg 0)))
+      (fact 10)
+        0: (FACT 4)
+        0: FACT returned 24
+      3628800
+
+  As we can see, we produced output when the condition was satisfied.
+
+  Here's another example:
+
+      (untrace)
+      (trace fact :break (= 4 (sb-debug:arg 0)))
+      (fact 10)
+        0: (FACT 5)
+          1: (FACT 4)
+
+      Breaking before traced call to FACT:
+         [Condition of type SIMPLE-CONDITION]
+
+      ...
+
+  In this example, we see that normal tracing occurs until we the
+  argument reaches 4, at which point, we break into the debugger.
+
+  In the case of functions where the known return convention is used
   to optimize, encapsulation may be necessary in order to make tracing
   work at all. The symptom of this occurring is an error stating
 

@@ -99,7 +99,6 @@
         (sb-debug:*flush-debug-errors* variable)
         (sb-debug:*in-the-debugger* variable)
         (sb-debug:*stack-top-hint* variable)
-        (sb-debug:arg function)
         (sb-debug:backtrace function)
         (sb-debug:backtrace-as-list function)
         (sb-debug:frame-has-debug-tag-p function)

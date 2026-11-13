@@ -437,9 +437,17 @@ again.
 * Note On Lexical Variable Access: note on lexical variable access.
 @end menu
 
-There are two ways to access the current frame's local variables in
-the debugger: @code{list-locals} and @code{sb-debug:var}.
+There are three ways to access the current frame's local variables in
+the debugger: @code{sb-debug:arg}, @code{list-locals}, and @code{sb-debug:var}.
 
+@anchor{Function sb-debug arg}
+@ffindex @sortas{arg sb-debug} arg [sb-debug]
+@deffn{Function} sb-debug:arg n
+Return the value of the argument's value at index @code{n} in the current
+frame's default printed representation. Keyword / value pairs are
+counted as separate arguments. Can be used in @code{trace}. If @code{n} is out of
+range or the value cannot be determined, then signal an error.
+@end deffn
 The debugger doesn't really understand lexical scoping; it has just
 one namespace for all the variables in the current stack frame. If a
 symbol is the name of multiple variables in the same function, then
@@ -492,7 +500,8 @@ you left @code{id} unspecified, then this returns no values after
 displaying the distinguishing id values.
 
 The result of this function is limited to the availability of
-variable information. This is @code{setf}able.
+variable information. This is @code{setf}able and can be used in @code{trace},
+too.
 @end deffn
 @node variable value availability
 @cindex variable, value availabilty in debugger
@@ -1359,6 +1368,46 @@ The @code{*-after} and @code{*-all} forms can use also use @code{sb-debug:arg}. 
 which are evaluated after the function call, @code{(sb-debug:arg n)} returns
 the @code{n}th value returned by the function.
 @end deffn
+Here is an example of tracing with some of the possible options.
+For simplicity, this is the function:
+
+@example
+(defun fact (n)
+  (if (zerop n)
+      1
+      (* n (fact (1- n)))))
+@end example
+
+This example shows how to use the @code{:condition} option:
+
+@example
+(trace fact :condition (= 4 (sb-debug:arg 0)))
+(fact 10)
+  0: (FACT 4)
+  0: FACT returned 24
+3628800
+@end example
+
+As we can see, we produced output when the condition was satisfied.
+
+Here's another example:
+
+@example
+(untrace)
+(trace fact :break (= 4 (sb-debug:arg 0)))
+(fact 10)
+  0: (FACT 5)
+    1: (FACT 4)
+
+Breaking before traced call to FACT:
+   [Condition of type SIMPLE-CONDITION]
+
+...
+@end example
+
+In this example, we see that normal tracing occurs until we the
+argument reaches 4, at which point, we break into the debugger.
+
 In the case of functions where the known return convention is used
 to optimize, encapsulation may be necessary in order to make tracing
 work at all. The symptom of this occurring is an error stating
