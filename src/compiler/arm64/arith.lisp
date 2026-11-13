@@ -1430,8 +1430,14 @@
     (integer 0 #.sb-vm:n-word-bits)
     (movable foldable flushable))
 
+(defknown (cls-128 clz-127) (integer)
+    (integer 0 128)
+    (movable foldable flushable))
+
 (defun clz (integer) (- 64 (integer-length integer)))
 (defun cls (integer) (- 63 (integer-length integer)))
+(defun cls-128 (integer) (- 127 (integer-length integer)))
+(defun clz-127 (integer) (- 128 (integer-length integer)))
 
 ;;; Implement via transforms and cls/clz, so that the addition has a
 ;;; chance to get associated with some surrounding arithmetic.
@@ -1441,10 +1447,18 @@
 (deftransform integer-length ((integer) (word) fixnum :node node :priority :last)
   (sb-c::delay-ir1-transform node :ir1-phases)
   `(- 64 (clz integer)))
+(deftransform integer-length ((integer) ((unsigned-byte 127)) * :node node :priority :last)
+  (sb-c::delay-ir1-transform node :ir1-phases)
+  `(- 128 (clz-127 integer)))
+(deftransform integer-length ((integer) ((signed-byte 128)) * :node node :priority :last)
+  (sb-c::delay-ir1-transform node :ir1-phases)
+  `(- 127 (cls-128 integer)))
 
 (sb-c::def-combination-match-alias integer-length (x)
   `((- 64 (clz ,x))
-    (- 63 (cls ,x))))
+    (- 63 (cls ,x))
+    (- 127 (cls-128 ,x))
+    (- 128 (clz-127 ,x))))
 
 (define-vop ()
   (:translate cls)
@@ -1463,6 +1477,33 @@
   (:result-types positive-fixnum)
   (:generator 1
     (inst clz res arg)))
+
+(define-vop ()
+  (:translate clz-127)
+  (:args ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:generator 5
+    (inst clz tmp-tn lo-x)
+    (inst add tmp-tn tmp-tn 64)
+    (inst cmp hi-x 0)
+    (inst clz res hi-x)
+    (inst csel res tmp-tn res :eq)))
+
+(define-vop ()
+  (:translate cls-128)
+  (:args ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-types signed-byte-128)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:generator 6
+    (inst eor tmp-tn lo-x hi-x)
+    (inst clz tmp-tn tmp-tn)
+    (inst cls res hi-x)
+    (inst cmp res 63)
+    (inst csel tmp-tn tmp-tn zr-tn :eq)
+    (inst add res res tmp-tn)))
 
 (define-vop ()
   (:translate count-trailing-zeros)

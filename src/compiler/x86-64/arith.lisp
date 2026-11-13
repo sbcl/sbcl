@@ -3811,6 +3811,41 @@
     (inst xor res arg) ;; invert if negative
     (inst bsr res res)))
 
+(define-vop (integer-length/s128)
+  (:translate integer-length)
+  (:args ((lo-x hi-x) :scs (signed-128-reg)))
+  (:arg-refs x-ref)
+  (:arg-types signed-byte-128)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:temporary (:sc unsigned-reg) tmp1 tmp2)
+  (:policy :fast-safe)
+  (:generator 10
+    (cond ((csubtypep (tn-ref-type x-ref) (specifier-type 'unsigned-byte))
+           (zeroize tmp2)
+           (inst bsr tmp1 lo-x)
+           (inst lea :dword tmp1 (ea 1 tmp1))
+           (inst cmov :dword :nz tmp2 tmp1)
+
+           (inst bsr res hi-x)
+           (inst lea :dword res (ea 65 res))
+           (inst cmov :dword :z res tmp2))
+          (t
+           (move tmp2 hi-x)
+           (inst sar tmp2 63) ;; invert if negative
+           (move tmp1 lo-x)
+           (inst xor tmp1 tmp2)
+           (inst xor tmp2 hi-x)
+
+           (zeroize res)
+           (inst bsr tmp1 tmp1)
+           (inst lea :dword tmp1 (ea 1 tmp1))
+           (inst cmov :dword :nz res tmp1)
+
+           (inst bsr tmp2 tmp2)
+           (inst lea :dword tmp2 (ea 65 tmp2))
+           (inst cmov :dword :nz res tmp2)))))
+
 (define-vop ()
   (:translate count-trailing-zeros)
   (:args (arg :scs (signed-reg unsigned-reg) :to :save))
