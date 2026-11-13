@@ -2561,6 +2561,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
   (:use "CL" "SB-ALIEN-INTERNALS" "SB-ALIEN" "SB-ASSEM" "SB-BIGNUM"
         #+sb-dyncount "SB-DYNCOUNT" "SB-EXT" "SB-FASL" "SB-INT"
         "SB-KERNEL" "SB-SYS")
+  (:shadow "EXIT")
   (:import-from "SB-FASL" "+FIXUP-KINDS+")
   (:import-from "SB-ASSEM" "BRANCH" "FLUSHABLE")
   ;; These are for SB-DEBUG.

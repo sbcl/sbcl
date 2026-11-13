@@ -153,7 +153,6 @@
         (sb-ext:double-float-negative-infinity constant)
         (sb-ext:double-float-positive-infinity constant)
         (sb-ext:eval-tlf function)
-        (sb-ext:exit structure)
         (sb-ext:file-does-not-exist condition)
         (sb-ext:file-exists condition)
         (sb-ext:float-denormalized-p function)
