@@ -1285,6 +1285,19 @@
     (inst sub lo y)
     (inst sbb hi tmp)))
 
+(define-vop (-/unsigned=>s128)
+  (:translate -)
+  (:boxing-variant -/unsigned=>integer)
+  (:args (x :scs (unsigned-reg) :target lo)
+         (y :scs (unsigned-reg) :to :save))
+  (:arg-types unsigned-num unsigned-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 8
+    (move lo x)
+    (inst sub lo y)
+    (inst sbb hi hi)))
+
 (define-vop (-/signed-unsigned=>s128)
   (:translate -)
   (:args (x :scs (signed-reg) :target lo)
@@ -6001,6 +6014,24 @@
   (:args (y :scs (unsigned-reg) :to :save)
          ((lo-x hi-x) :scs (signed-128-reg)))
   (:arg-types unsigned-num signed-byte-128))
+
+(define-vop (logxor/unsigned-signed=>s128)
+  (:translate logxor)
+  (:args (x :scs (unsigned-reg) :target lo)
+         (y :scs (signed-reg) :to :save))
+  (:arg-types unsigned-num signed-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (move lo x)
+    (inst xor lo y)
+    (move hi y)
+    (inst sar hi 63)))
+
+(define-vop (logxor/signed-unsigned=>s128 logxor/unsigned-signed=>s128)
+  (:args (y :scs (signed-reg) :to :save)
+         (x :scs (unsigned-reg) :target lo))
+  (:arg-types signed-num unsigned-num))
 
 (in-package "SB-C")
 

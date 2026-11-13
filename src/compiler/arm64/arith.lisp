@@ -2457,6 +2457,22 @@
          ((lo-x hi-x) :scs (signed-128-reg)))
   (:arg-types unsigned-num signed-byte-128))
 
+(define-vop (logxor/unsigned-signed=>s128)
+  (:translate logxor)
+  (:args (x :scs (unsigned-reg) :target lo)
+         (y :scs (signed-reg) :to :save))
+  (:arg-types unsigned-num signed-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (inst eor lo x y)
+    (inst asr hi y 63)))
+
+(define-vop (logxor/signed-unsigned=>s128 logxor/unsigned-signed=>s128)
+  (:args (y :scs (signed-reg) :to :save)
+         (x :scs (unsigned-reg) :target lo))
+  (:arg-types signed-num unsigned-num))
+
 ;;;; Bignum stuff.
 
 (define-vop (bignum-length get-header-data)
@@ -3522,6 +3538,18 @@
   (:generator 11
     (inst subs lo y lo-x)
     (inst sbc  hi zr-tn hi-x)))
+
+(define-vop (-/unsigned=>s128)
+  (:translate -)
+  (:boxing-variant -/unsigned=>integer)
+  (:args (x :scs (unsigned-reg))
+         (y :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num)
+  (:results ((lo hi) :scs (signed-128-reg)))
+  (:result-types signed-byte-128)
+  (:generator 10
+    (inst subs lo x y)
+    (inst csetm hi :cc)))
 
 (define-vop (%negate/unsigned=>integer)
   (:translate %negate)
