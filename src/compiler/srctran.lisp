@@ -3547,7 +3547,15 @@
     ((eq (logcount x) 0)
      '(eq x 0))))
 
-(deftransform logcount ((x) (signed-word) * :node node :important nil)
+(sb-xc:deftype double-word ()
+  #-(or x86-64 arm64) 'word
+  #+(or x86-64 arm64) '(unsigned-byte 127))
+
+(sb-xc:deftype signed-double-word ()
+  #-(or x86-64 arm64) 'signed-word
+  #+(or x86-64 arm64) '(signed-byte 128))
+
+(deftransform logcount ((x) (signed-double-word) * :node node :important nil)
   (delay-ir1-transform node :ir1-phases) ;; unsigned transforms are better
   (cmatch (node)
     :dest
@@ -3570,7 +3578,7 @@
      `(let ((x (logxor x (ash x ,(- 1 sb-vm:n-word-bits)))))
         (logtest x (- x 1))))))
 
-(deftransform logcount ((x) (word) * :node node :important nil)
+(deftransform logcount ((x) (double-word) * :node node :important nil)
   (cmatch (node)
     :dest
     (((:or eq eql =) (logcount x) (integer-length x))
