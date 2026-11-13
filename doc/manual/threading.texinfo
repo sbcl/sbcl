@@ -37,8 +37,8 @@ architectures.
 * Thread Objects: thread objects.
 * Running Threads: running threads.
 * Asynchronous Operations: asynchronous operations.
-* Miscellaneous Operations: miscellaneous operations.
-* Error Conditions: error conditions.
+* Miscellaneous Operations: threading/miscellaneous operations.
+* Threading Error Conditions: threading/error conditions.
 @end menu
 
 @example
@@ -88,6 +88,25 @@ True if @code{thread}, defaulting to current thread, is the main thread of the p
 @ffindex @sortas{main-thread sb-thread} main-thread [sb-thread]
 @deffn{Function} sb-thread:main-thread
 Return the main thread of the process.
+@end deffn
+@anchor{Function sb-thread thread-ephemeral-p}
+@ffindex @sortas{thread-ephemeral-p sb-thread} thread-ephemeral-p [sb-thread]
+@deffn{Function} sb-thread:thread-ephemeral-p instance
+Return @code{t} if @code{thread} is ephemeral, which indicates that this thread
+is used by SBCL for internal purposes. Specifically, this means that
+our runtime knows how to terminate this thread cleanly prior to core
+file saving without signalling an error in that case.
+@end deffn
+@anchor{Function sb-thread thread-os-tid}
+@ffindex @sortas{thread-os-tid sb-thread} thread-os-tid [sb-thread]
+@deffn{Function} sb-thread:thread-os-tid instance
+Return the ID of the OS thread that @code{thread} maps or mapped onto.
+For example, the OS thread ID is @code{gettid(2)} on Linux and
+@code{GetCurrentThreadId} on Windows.
+
+Note that this function is racy on two fronts: first, the return value
+may be 0 if @code{thread} has not completed its initialization; second, the
+OS thread with the returned ID may have already exited.
 @end deffn
 @node running threads
 @subsection Running Threads
@@ -181,13 +200,14 @@ Yield the processor to other threads.
 @deffn{Function} sb-thread:interrupt-thread thread function
 Interrupt @code{thread} and make it run @code{function}.
 
-The interrupt is asynchronous, and can occur anywhere with the exception of
-sections protected using @code{sb-sys:without-interrupts}.
+The interrupt is asynchronous and can occur anywhere with the
+exception of sections protected using @code{sb-sys:without-interrupts}.
 
-@code{function} is called with interrupts disabled, under
-@code{sb-sys:allow-with-interrupts}. Since functions such as @code{grab-mutex} may try to
-enable interrupts internally, in most cases @code{function} should either enter
-@code{sb-sys:with-interrupts} to allow nested interrupts, or
+When @code{thread} executes @code{function}, it is @code{funcall}ed (subject to
+@code{*interrupt-handler*}) with no arguments with interrupts disabled, under
+@code{sb-sys:allow-with-interrupts}. Since functions such as @code{grab-mutex} may
+try to enable interrupts internally, in most cases @code{function} should
+either enter @code{sb-sys:with-interrupts} to allow nested interrupts, or
 @code{sb-sys:without-interrupts} to prevent them completely.
 
 When a thread receives multiple interrupts, they are executed in the order
@@ -284,7 +304,14 @@ to use @code{without-interrupts}:
 Since most libraries using @code{unwind-protect} do not do this, you should never
 assume that unknown code can safely be terminated using @code{terminate-thread}.
 @end deffn
-@node miscellaneous operations
+@anchor{Variable sb-thread *interrupt-handler*}
+@vvindex @sortas{interrupt-handler* sb-thread} *interrupt-handler* [sb-thread]
+@deffn{Variable} sb-thread:*interrupt-handler*
+A function which is called with the function argument to @code{sb-thread:interrupt-thread}
+when the interrupt is ready to run.
+The default behavior is to use @code{funcall}.
+@end deffn
+@node threading/miscellaneous operations
 @subsection Miscellaneous Operations
 
 @anchor{Function sb-thread symbol-value-in-thread}
@@ -303,8 +330,8 @@ Can also be used with @code{setf} to change the thread-local value of @code{symb
 @code{symbol-value-in-thread} is primarily intended as a debugging tool, and not as a
 mechanism for inter-thread communication.
 @end deffn
-@node error conditions
-@subsection Error Conditions
+@node threading/error conditions
+@subsection Threading Error Conditions
 
 @anchor{Condition sb-thread thread-error}
 @ttindex @sortas{thread-error sb-thread} thread-error [sb-thread]
@@ -338,6 +365,12 @@ exited. The offending thread can be accessed using @code{thread-error-thread}.
 Signalled when joining a thread fails due to abnormal exit of the thread
 to be joined. The offending thread can be accessed using
 @code{thread-error-thread}.
+@end deffn
+@anchor{Function sb-thread join-thread-problem}
+@ffindex @sortas{join-thread-problem sb-thread} join-thread-problem [sb-thread]
+@deffn{Function} sb-thread:join-thread-problem condition
+Return the reason that a @code{join-thread-error} was signaled.
+Possible values are @code{:timeout}, @code{:abort}, @code{:foreign}, and @code{:self-join}.
 @end deffn
 @node special variables in threads
 @section Special Variables in Threads
@@ -696,6 +729,11 @@ testing whether the current thread is holding a mutex see
 Current owner of @code{mutex}, @code{nil} if the mutex is free. May return a
 stale value, use @code{mutex-owner} instead.
 @end deffn
+@anchor{Function sb-thread holding-mutex-p}
+@ffindex @sortas{holding-mutex-p sb-thread} holding-mutex-p [sb-thread]
+@deffn{Function} sb-thread:holding-mutex-p mutex
+Test whether the current thread is holding @code{mutex}.
+@end deffn
 @anchor{Function sb-thread grab-mutex}
 @ffindex @sortas{grab-mutex sb-thread} grab-mutex [sb-thread]
 @deffn{Function} sb-thread:grab-mutex mutex &key (waitp t) timeout
@@ -748,6 +786,21 @@ around calls to it.
 The @code{if-not-owner} keyword dictates behavior when the current thread does not own the
 mutex. Do nothing and silently return if @code{:punt}, signal a @code{warning} or @code{error} if @code{:warn}
 or @code{:error} respectively, or release the mutex anyway if @code{:force}.
+@end deffn
+@anchor{Condition sb-thread thread-deadlock}
+@ttindex @sortas{thread-deadlock sb-thread} thread-deadlock [sb-thread]
+@deffn{Condition} sb-thread:thread-deadlock
+When @code{grab-mutex} finds that the mutex is owned by
+another thread, it performs heuristic deadlock detection and may
+signal this condition. The detection is conservative: the deadlocks it
+detects are real deadlocks, but not all deadlocks are detected. In
+particular, non-mutex sources of blocking are not considered.
+@end deffn
+@anchor{Function sb-thread thread-deadlock-cycle}
+@ffindex @sortas{thread-deadlock-cycle sb-thread} thread-deadlock-cycle [sb-thread]
+@deffn{Function} sb-thread:thread-deadlock-cycle condition
+Return the deadlocking cycle detected as a list of @code{thread}, @code{mutex}
+conses.
 @end deffn
 @node semaphores
 @section Semaphores
@@ -862,7 +915,7 @@ Important stuff to be aware of:
 
 @itemize
 @item when calling condition-wait, you must hold the mutex.
-  condition-wait will drop the mutex while it waits, and obtain it
+  condition-wait will drop the mutex while it waits and obtain it
   again before returning for whatever reason;
 
 @item likewise, you must be holding the mutex around calls to
@@ -1102,6 +1155,12 @@ The resignalling trick cannot work for synchronously triggered signals
 for synchronously triggered signals in foreign threads is subject to
 @code{--lose-on-corruption}, see @ref{runtime options}.
 
+@anchor{Structure sb-thread foreign-thread}
+@ttindex @sortas{foreign-thread sb-thread} foreign-thread [sb-thread]
+@deffn{Structure} sb-thread:foreign-thread
+Type of native threads which are attached to the runtime as Lisp threads
+temporarily.
+@end deffn
 @node implementation on linux x86oids
 @section Implementation on Linux x86oids
 

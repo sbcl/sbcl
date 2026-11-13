@@ -32,8 +32,8 @@
   (@thread-objects section)
   (@running-threads section)
   (@asynchronous-operations section)
-  (@miscellaneous-operations section)
-  (@error-conditions section))
+  (@threading/miscellaneous-operations section)
+  (@threading/error-conditions section))
 
 (defsection @thread-objects (:title "Thread Objects")
   (sb-thread:thread structure)
@@ -42,7 +42,9 @@
   (sb-thread:thread-alive-p function)
   (sb-thread:thread-name function)
   (sb-thread:main-thread-p function)
-  (sb-thread:main-thread function))
+  (sb-thread:main-thread function)
+  (sb-thread:thread-ephemeral-p function)
+  (sb-thread:thread-os-tid function))
 
 (defsection @running-threads (:title "Running Threads")
   (sb-thread:make-thread function)
@@ -53,17 +55,20 @@
 
 (defsection @asynchronous-operations (:title "Asynchronous Operations")
   (sb-thread:interrupt-thread function)
-  (sb-thread:terminate-thread function))
+  (sb-thread:terminate-thread function)
+  (sb-thread:*interrupt-handler* variable))
 
-(defsection @miscellaneous-operations (:title "Miscellaneous Operations")
+(defsection @threading/miscellaneous-operations
+    (:title "Miscellaneous Operations")
   (sb-thread:symbol-value-in-thread function))
 
-(defsection @error-conditions (:title "Error Conditions")
+(defsection @threading/error-conditions (:title "Threading Error Conditions")
   (sb-thread:thread-error condition)
   (sb-thread:thread-error-thread function)
   (sb-thread:symbol-value-in-thread-error condition)
   (sb-thread:interrupt-thread-error condition)
-  (sb-thread:join-thread-error condition))
+  (sb-thread:join-thread-error condition)
+  (sb-thread:join-thread-problem function))
 
 (defsection @special-variables-in-threads
     (:title "Special Variables in Threads")
@@ -133,8 +138,11 @@
   (sb-thread:mutex-name function)
   (sb-thread:mutex-owner function)
   (sb-thread:mutex-value function)
+  (sb-thread:holding-mutex-p function)
   (sb-thread:grab-mutex function)
-  (sb-thread:release-mutex function))
+  (sb-thread:release-mutex function)
+  (sb-thread:thread-deadlock condition)
+  (sb-thread:thread-deadlock-cycle function))
 
 (defsection @semaphores (:title "Semaphores")
   "Semaphores are among other things useful for keeping track of a
@@ -173,7 +181,7 @@
   Important stuff to be aware of:
 
   - when calling condition-wait, you must hold the mutex.
-    condition-wait will drop the mutex while it waits, and obtain it
+    condition-wait will drop the mutex while it waits and obtain it
     again before returning for whatever reason;
 
   - likewise, you must be holding the mutex around calls to
@@ -286,7 +294,8 @@
   The resignalling trick cannot work for synchronously triggered signals
   (`\\\\SIGSEGV` and co), take care not to trigger any. Resignalling
   for synchronously triggered signals in foreign threads is subject to
-  `--lose-on-corruption`, see @RUNTIME-OPTIONS.")
+  `--lose-on-corruption`, see @RUNTIME-OPTIONS."
+  (sb-thread:foreign-thread structure))
 
 (defsection @implementation-on-linux-x86oids
     (:title "Implementation on Linux x86oids")

@@ -630,7 +630,7 @@
 (("src/code/room" ; for MAP-ALLOCATED-OBJECTS
   #+x86-64 "src/code/text-space" ; needs src/code/room
   "src/code/warm-error"
- #+(and sb-futex (or arm64 x86-64)) "src/code/rwlock"
+ #+(and rwlock sb-futex (or arm64 x86-64)) "src/code/rwlock"
   "src/code/icf"
   "src/code/defpackage")
 

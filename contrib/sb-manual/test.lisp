@@ -237,25 +237,7 @@
         (sb-aprof:aprof-start function)
         (sb-aprof:aprof-stop function)
         (sb-aprof:patch-all-code function)))
-      (sb-thread
-       :missing
-       ((sb-thread:*interrupt-handler* variable)
-        (sb-thread:foreign-thread structure)
-        (sb-thread:holding-mutex-p function)
-        (sb-thread:join-thread-problem function)
-        ("sb-thread:make-rw-spinlock" function)
-        ("sb-thread:make-rwlock" function)
-        ("sb-thread:rwlock-rdlock" function)
-        ("sb-thread:rwlock-unlock" function)
-        ("sb-thread:rwlock-wrlock" function)
-        ("sb-thread:rwspinlock-rdlock" function)
-        ("sb-thread:rwspinlock-rdunlock" function)
-        ("sb-thread:rwspinlock-wrlock" function)
-        ("sb-thread:rwspinlock-wrunlock" function)
-        (sb-thread:thread-deadlock condition)
-        (sb-thread:thread-deadlock-cycle function)
-        (sb-thread:thread-ephemeral-p function)
-        (sb-thread:thread-os-tid function)))
+      (sb-thread)
       (sb-unicode
        :missing
        ((sb-unicode:scalar-p function)

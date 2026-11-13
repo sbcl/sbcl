@@ -124,10 +124,19 @@ read by the function THREAD-ERROR-THREAD."))
              do (format stream "    ~S~%  waited for:~%    ~S~%  owned by:~%"
                         (car part)
                         (cdr part)))
-       (format stream "    ~S~%" start)))))
+       (format stream "    ~S~%" start))))
+  (:documentation "When GRAB-MUTEX finds that the mutex is owned by
+another thread, it performs heuristic deadlock detection and may
+signal this condition. The detection is conservative: the deadlocks it
+detects are real deadlocks, but not all deadlocks are detected. In
+particular, non-mutex sources of blocking are not considered."))
+
+(setf (documentation 'thread-deadlock-cycle 'function)
+      "Return the deadlocking cycle detected as a list of THREAD, MUTEX
+conses.")
 
 (setf (documentation 'thread-error-thread 'function)
- "Return the offending thread that the THREAD-ERROR pertains to.")
+      "Return the offending thread that the THREAD-ERROR pertains to.")
 
 (define-condition symbol-value-in-thread-error (cell-error thread-error)
   ((info :reader symbol-value-in-thread-error-info :initarg :info))
@@ -176,8 +185,8 @@ to be joined. The offending thread can be accessed using
 THREAD-ERROR-THREAD."))
 
 (setf (documentation 'join-thread-problem 'function)
-  "Return the reason that a JOIN-THREAD-ERROR was signaled. Possible values are
-:TIMEOUT, :ABORT, :FOREIGN, and :SELF-JOIN.")
+      "Return the reason that a JOIN-THREAD-ERROR was signaled.
+Possible values are :TIMEOUT, :ABORT, :FOREIGN, and :SELF-JOIN.")
 
 (define-deprecated-function :late "1.0.29.17" join-thread-error-thread thread-error-thread
     (condition)
@@ -266,11 +275,19 @@ a simple-string (not necessarily unique) or NIL."
             (format stream "~@[~S ~](free)" name))))))
 
 (setf (documentation 'thread-ephemeral-p 'function)
-  "Return T if THREAD is `ephemeral', which indicates that this thread is
-used by SBCL for internal purposes, and specifically that our runtime knows how
-to terminate this thread cleanly prior to core file saving without signalling
-an error in that case."
-)
+      "Return T if THREAD is ephemeral, which indicates that this thread
+is used by SBCL for internal purposes. Specifically, this means that
+our runtime knows how to terminate this thread cleanly prior to core
+file saving without signalling an error in that case.")
+
+(setf (documentation 'thread-os-tid 'function)
+      "Return the ID of the OS thread that THREAD maps or mapped onto.
+For example, the OS thread ID is `gettid(2)` on Linux and
+`GetCurrentThreadId` on Windows.
+
+Note that this function is racy on two fronts: first, the return value
+may be 0 if THREAD has not completed its initialization; second, the
+OS thread with the returned ID may have already exited.")
 
 ;;; Ensure that THREAD is in *ALL-THREADS*.
 (defmacro update-all-threads (key thread)
@@ -2449,13 +2466,14 @@ The default behavior is to use FUNCALL.")
 (defun interrupt-thread (thread function)
   "Interrupt THREAD and make it run FUNCTION.
 
-The interrupt is asynchronous, and can occur anywhere with the exception of
-sections protected using SB-SYS:WITHOUT-INTERRUPTS.
+The interrupt is asynchronous and can occur anywhere with the
+exception of sections protected using SB-SYS:WITHOUT-INTERRUPTS.
 
-FUNCTION is called with interrupts disabled, under
-SB-SYS:ALLOW-WITH-INTERRUPTS. Since functions such as GRAB-MUTEX may try to
-enable interrupts internally, in most cases FUNCTION should either enter
-SB-SYS:WITH-INTERRUPTS to allow nested interrupts, or
+When THREAD executes FUNCTION, it is FUNCALLed (subject to
+*INTERRUPT-HANDLER*) with no arguments with interrupts disabled, under
+SB-SYS:ALLOW-WITH-INTERRUPTS. Since functions such as GRAB-MUTEX may
+try to enable interrupts internally, in most cases FUNCTION should
+either enter SB-SYS:WITH-INTERRUPTS to allow nested interrupts, or
 SB-SYS:WITHOUT-INTERRUPTS to prevent them completely.
 
 When a thread receives multiple interrupts, they are executed in the order
