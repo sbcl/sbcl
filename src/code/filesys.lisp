@@ -930,27 +930,31 @@ filenames."
   "Map over entries in DIRECTORY. Keyword arguments specify which entries to
 map over, and how:
 
- :FILES
-    If true, call FUNCTION with the pathname of each file in DIRECTORY.
-    Defaults to T.
+ - :FILES
 
- :DIRECTORIES
-   If true, call FUNCTION with a pathname for each subdirectory of DIRECTORY.
-   If :AS-FILES, the pathname used is a pathname designating the subdirectory
-   as a file in DIRECTORY. Otherwise the pathname used is a directory
-   pathname. Defaults to T.
+     If true, call FUNCTION with the pathname of each file in DIRECTORY.
 
- :CLASSIFY-SYMLINKS
-   If true, the decision to call FUNCTION with the pathname of a symbolic link
-   depends on the resolution of the link: if it points to a directory, it is
-   considered a directory entry, otherwise a file entry. If false, all
-   symbolic links are considered file entries. In both cases the pathname used
-   for the symbolic link is not fully resolved, but names it as an immediate
-   child of DIRECTORY. Defaults to T.
+ - :DIRECTORIES
 
- :ERRORP
-   If true, signal an error if DIRECTORY does not exist, cannot be read, etc.
-   Defaults to T.
+     If true, call FUNCTION with a pathname for each subdirectory of
+     DIRECTORY. If :AS-FILES, the pathname used is a pathname
+     designating the subdirectory as a file in DIRECTORY. Otherwise
+     the pathname used is a directory pathname.
+
+ - :CLASSIFY-SYMLINKS
+
+     If true, the decision to call FUNCTION with the pathname of a
+     symbolic link depends on the resolution of the link: if it points
+     to a directory, it is considered a directory entry, otherwise a
+     file entry. If false, all symbolic links are considered file
+     entries. In both cases the pathname used for the symbolic link is
+     not fully resolved, but names it as an immediate child of
+     DIRECTORY. Defaults to T.
+
+ - :ERRORP
+
+     If true, signal an error if DIRECTORY does not exist, cannot be
+     read, etc.
 
 Experimental: interface subject to change."
   (declare (pathname-designator directory))

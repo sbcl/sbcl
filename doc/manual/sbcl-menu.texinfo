@@ -9,7 +9,7 @@
 * Beyond the ANSI Standard: beyond the ansi standard.
 * External Formats: external formats.
 * Foreign Function Interface: foreign function interface.
-* Pathnames: pathnames.
+* Filenames: filenames.
 * Streams: streams.
 * Package Locks: package locks.
 * Threading: threading.

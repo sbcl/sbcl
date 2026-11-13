@@ -79,7 +79,8 @@
             ;; If a fasl was stale, try to recompile and load (once).
             (sb-ext:invalid-fasl ()
                (asdf:perform (make-instance 'asdf:compile-op) c)
-               (call-next-method))))")
+               (call-next-method))))"
+  (sb-ext:invalid-fasl condition))
 
 (defsection @compiler-only-implementation
     (:title "Compiler-only Implementation")
@@ -126,7 +127,11 @@
   internally in the implementation of SBCL itself. In circumstances
   where this is not appropriate, the programmer can handle the
   condition type SB-EXT:DEFCONSTANT-UNEQL and choose either the
-  CONTINUE restart or ABORT restart as appropriate.")
+  CONTINUE restart or ABORT restart as appropriate."
+  (sb-ext:defconstant-uneql condition)
+  (sb-ext:defconstant-uneql-name function)
+  (sb-ext:defconstant-uneql-new-value function)
+  (sb-ext:defconstant-uneql-old-value function))
 
 (defsection @style-warnings (:title "Style Warnings")
   "SBCL gives style warnings about various kinds of perfectly legal code,
@@ -1249,7 +1254,13 @@
   (sb-ext:unencapsulated-function function)
   (sb-ext:compile-file-position macro)
   (sb-ext:compile-file-line macro)
-  (documentation generic-function))
+  (documentation generic-function)
+  "__Conditions__:"
+  (sb-ext:implicit-generic-function-warning condition)
+  (sb-ext:implicit-generic-function-name function)
+  (sb-ext:unknown-keyword-argument condition)
+  (sb-ext:unknown-keyword-argument-name function)
+  (sb-ext:package-does-not-exist condition))
 
 (defsection @stale-extensions (:title "Stale Extensions")
   "SBCL has inherited from CMUCL various hooks to allow the user to

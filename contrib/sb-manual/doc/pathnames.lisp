@@ -3,7 +3,7 @@
 (defsection @filenames (:title "Filenames")
   (@lisp-pathnames section)
   (@native-filenames section)
-  (@file-errors section))
+  (@files-dictionary section))
 
 (defsection @lisp-pathnames (:title "Lisp Pathnames"
                              :concepts (("pathname")))
@@ -153,7 +153,8 @@
       (setf *p* (parse-native-namestring \"/tmp/\")) => #P\"/tmp/\"
       (native-namestring *p* :as-file t) => \"/tmp\"")
 
-(defsection @file-errors (:title "File Errors")
+(defsection @files-dictionary (:title "Files Dictionary")
+  (sb-ext:map-directory function)
   (sb-ext:delete-file-error condition)
   (sb-ext:file-does-not-exist condition)
   (sb-ext:file-exists condition))

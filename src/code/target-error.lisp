@@ -1555,7 +1555,9 @@ is accessed."))
 
 (define-condition simple-package-error (simple-condition package-error) ())
 
-(define-condition package-does-not-exist (simple-package-error) ())
+(define-condition package-does-not-exist (simple-package-error) ()
+  (:documentation "Signaled when a designated package does not
+exists (including the case where it's been deleted with DELETE-PACKAGE)."))
 
 (define-condition simple-reader-package-error (simple-reader-error package-error) ())
 
