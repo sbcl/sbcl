@@ -87,21 +87,21 @@
   (sb-gray:fundamental-character-output-stream class))
 
 (defsection @methods-common-to-all-streams
-    (:title "Methods common to all streams")
+    (:title "Methods Common to All Streams")
   "These generic functions can be specialized on any generalized instance
   of fundamental-stream."
   (stream-element-type generic-function)
   (close generic-function)
   (sb-gray:stream-file-position generic-function))
 
-(defsection @input-stream-methods (:title "Input stream methods")
+(defsection @input-stream-methods (:title "Input Stream Methods")
   "These generic functions may be specialized on any generalized instance
   of fundamental-input-stream."
   (sb-gray:stream-clear-input generic-function)
   (sb-gray:stream-read-sequence generic-function))
 
 (defsection @character-input-stream-methods
-    (:title "Character input stream methods")
+    (:title "Character Input Stream Methods")
   "These generic functions are used to implement subclasses of
   SB-GRAY:FUNDAMENTAL-INPUT-STREAM:"
   (sb-gray:stream-peek-char generic-function)
@@ -111,7 +111,7 @@
   (sb-gray:stream-listen generic-function)
   (sb-gray:stream-unread-char generic-function))
 
-(defsection @output-stream-methods (:title "Output stream methods")
+(defsection @output-stream-methods (:title "Output Stream Methods")
   "These generic functions are used to implement subclasses of
   SB-GRAY:FUNDAMENTAL-OUTPUT-STREAM:"
   (sb-gray:stream-clear-output generic-function)
@@ -120,7 +120,7 @@
   (sb-gray:stream-write-sequence generic-function))
 
 (defsection @character-output-stream-methods
-    (:title "Character output stream methods")
+    (:title "Character Output Stream Methods")
   "These generic functions are used to implement subclasses of
   SB-GRAY:FUNDAMENTAL-CHARACTER-OUTPUT-STREAM:"
   (sb-gray:stream-advance-to-column generic-function)
@@ -132,7 +132,7 @@
   (sb-gray:stream-write-char generic-function)
   (sb-gray:stream-write-string generic-function))
 
-(defsection @binary-stream-methods (:title "Binary stream methods")
+(defsection @binary-stream-methods (:title "Binary Stream Methods")
   "The following generic functions are available for subclasses of
   SB-GRAY:FUNDAMENTAL-BINARY-STREAM:"
   (sb-gray:stream-read-byte generic-function)

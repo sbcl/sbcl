@@ -753,7 +753,7 @@ SBCL 0.7.5, they are still implemented using an older more-or-less
 parallel mechanism inherited from CMUCL.
 
 When the value is accessed, @code{undefined-alien-error} is signaled if the
-external variable does not exists.
+external variable does not exist.
 
 For example, to access a C-level counter @code{foo}, one could write
 
@@ -787,7 +787,7 @@ Set the C library pseudo-variable named @code{errno} for obscure syscalls.
 @deffn{Macro} sb-alien:extern-alien name type
 Return the value of the external alien variable @code{name} of @code{type}
 without having to define it with @code{define-alien-variable}. Signals
-@code{undefined-alien-error} if the external variable does not exists.
+@code{undefined-alien-error} if the external variable does not exist.
 @code{setf}able.
 @end deffn
 @anchor{Condition sb-alien undefined-alien-error}

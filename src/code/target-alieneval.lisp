@@ -74,7 +74,7 @@
   parallel mechanism inherited from CMUCL.
 
   When the value is accessed, UNDEFINED-ALIEN-ERROR is signaled if the
-  external variable does not exists.
+  external variable does not exist.
 
   For example, to access a C-level counter `foo`, one could write
 
@@ -118,7 +118,7 @@ variable is undefined."
 (defmacro extern-alien (name type &environment env)
   "Return the value of the external alien variable NAME of TYPE
   without having to define it with DEFINE-ALIEN-VARIABLE. Signals
-  UNDEFINED-ALIEN-ERROR if the external variable does not exists.
+  UNDEFINED-ALIEN-ERROR if the external variable does not exist.
   SETFable."
   (let* ((name (if (and env (constantp name env)) (constant-form-value name env) name))
          (alien-name (possibly-base-stringize

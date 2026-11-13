@@ -31,7 +31,7 @@ streams:
   be used as Lisp streams (e.g. passed as the first argument to
   @code{format}).
 
-@item @emph{Simple Streams}: The bundled contrib module @code{sb-simple-streams}
+@item @emph{Simple Streams}: The bundled contrib module @ref{sb simple streams}
   implements a subset of the Franz Allegro simple-streams proposal.
 @end itemize
 
@@ -68,12 +68,12 @@ octets to characters and implements a fast path through @code{read-char}.
 
 @menu
 * Gray Streams classes: gray streams classes.
-* Methods common to all streams: methods common to all streams.
-* Input stream methods: input stream methods.
-* Character input stream methods: character input stream methods.
-* Output stream methods: output stream methods.
-* Character output stream methods: character output stream methods.
-* Binary stream methods: binary stream methods.
+* Methods Common to All Streams: methods common to all streams.
+* Input Stream Methods: input stream methods.
+* Character Input Stream Methods: character input stream methods.
+* Output Stream Methods: output stream methods.
+* Character Output Stream Methods: character output stream methods.
+* Binary Stream Methods: binary stream methods.
 * Gray Streams Examples: gray streams examples.
 @end menu
 
@@ -151,7 +151,7 @@ Superclass of all Gray output streams whose element-type
 is a subtype of character.
 @end deffn
 @node methods common to all streams
-@subsection Methods common to all streams
+@subsection Methods Common to All Streams
 
 These generic functions can be specialized on any generalized instance
 of fundamental-stream.
@@ -176,7 +176,7 @@ to clean up the side effects of having created the stream.
 Used by @code{file-position}. Returns or changes the current position within @code{stream}.
 @end deffn
 @node input stream methods
-@subsection Input stream methods
+@subsection Input Stream Methods
 
 These generic functions may be specialized on any generalized instance
 of fundamental-input-stream.
@@ -193,7 +193,7 @@ The default method does nothing.
 This is like @code{cl:read-sequence}, but for Gray streams.
 @end deffn
 @node character input stream methods
-@subsection Character input stream methods
+@subsection Character Input Stream Methods
 
 These generic functions are used to implement subclasses of
 @code{sb-gray:fundamental-input-stream}:
@@ -247,7 +247,7 @@ Return @code{nil}. Every subclass of @code{fundamental-character-input-stream}
 must define a method for this function.
 @end deffn
 @node output stream methods
-@subsection Output stream methods
+@subsection Output Stream Methods
 
 These generic functions are used to implement subclasses of
 @code{sb-gray:fundamental-output-stream}:
@@ -277,7 +277,7 @@ Attempt to force any buffered output to be sent. Implements
 This is like @code{cl:write-sequence}, but for Gray streams.
 @end deffn
 @node character output stream methods
-@subsection Character output stream methods
+@subsection Character Output Stream Methods
 
 These generic functions are used to implement subclasses of
 @code{sb-gray:fundamental-character-output-stream}:
@@ -356,7 +356,7 @@ The string argument is returned. The default method provided by
 @code{stream-write-char}.
 @end deffn
 @node binary stream methods
-@subsection Binary stream methods
+@subsection Binary Stream Methods
 
 The following generic functions are available for subclasses of
 @code{sb-gray:fundamental-binary-stream}:
