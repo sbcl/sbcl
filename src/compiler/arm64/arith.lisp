@@ -2208,6 +2208,18 @@
       (inst lsl r tmp-tn (- n-word-bits n-fixnum-bits)))
     DONE))
 
+(define-vop (mask-signed-field/s128)
+  (:translate sb-c::mask-signed-field)
+  (:args ((lo-x) :scs (signed-128-reg)))
+  (:arg-types (:constant (integer 1 64)) signed-byte-128)
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:info width)
+  (:generator 10
+    (if (= width 64)
+        (move r lo-x)
+        (inst sbfm r lo-x 0 (1- width)))))
+
 (define-vop (mask-signed-field-integer)
   (:translate sb-c::mask-signed-field)
   (:args (x :scs (descriptor-reg)))

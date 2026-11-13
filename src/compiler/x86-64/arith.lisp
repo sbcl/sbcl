@@ -5799,6 +5799,24 @@
                              :qword)
                      r mask)))))))
 
+(define-vop (mask-signed-field/s128)
+  (:translate sb-c::mask-signed-field)
+  (:args ((lo-x) :scs (signed-128-reg)))
+  (:arg-types (:constant (integer 1 64)) signed-byte-128)
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:info width)
+  (:generator 10
+    (case width
+      (64 (move r lo-x))
+      (32 (inst movsx r (reg-in-size lo-x :dword)))
+      (16 (inst movsx r (reg-in-size lo-x :word)))
+      (8  (inst movsx r (reg-in-size lo-x :byte)))
+      (t
+       (move r lo-x)
+       (inst shl r (- 64 width))
+       (inst sar r (- 64 width))))))
+
 (defun imm32-or-32-mask-p (n)
   (or (eql n (1- (expt 2 32)))
       (imm32-p n)))
