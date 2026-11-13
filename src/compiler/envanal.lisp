@@ -763,7 +763,8 @@
                            ;; want tail calls inside XEPs to the
                            ;; functions they are the entry point for.
                            (eq (basic-combination-kind use) :local)))
-              (setf (node-tail-p use) t)))))))
+              (setf (ctran-source-path (node-prev ret)) nil ;; prevent code-deletion-note
+                    (node-tail-p use) t)))))))
   ;; Tail call non-returning functions if no debugging is wanted.
   (dolist (block (block-pred (component-tail component)))
     (let ((last (block-last block)))

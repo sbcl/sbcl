@@ -1350,3 +1350,8 @@
                            (declare (inline f))
                            (f 1 2 :allow-other-keys t)))
                       :allow-warnings t))))
+
+(with-test (:name :tail-call-deletion-notes)
+ (checked-compile
+  `(lambda (f) (set-difference (union f '(1)) nil))
+  :allow-notes nil))
