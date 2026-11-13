@@ -706,8 +706,7 @@
 
 (deftransform logbitp ((index integer) * * :node node)
   (let ((integer-type (lvar-type integer)))
-    (cond ((or (csubtypep integer-type (specifier-type 'word))
-               (csubtypep integer-type (specifier-type 'sb-vm:signed-word)))
+    (cond ((double-word-sized-type-p integer-type)
            (delay-ir1-transform node :ir1-phases)
            `(logtest 1 (ash integer (- index))))
           ((csubtypep integer-type (specifier-type 'bignum))
