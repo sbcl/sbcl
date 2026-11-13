@@ -776,20 +776,29 @@
   > However, we caution such users that this search routine finds
   > executables that system library routines do not."
   (sb-ext:run-program function)
-  "When SB-EXT:RUN-PROGRAM is called with :WAIT NIL, an process object
+  "When SB-EXT:RUN-PROGRAM is called with :WAIT NIL, a PROCESS object
   is returned. The following functions are available for use with
   processes:"
+  (sb-ext:process structure)
   (sb-ext:process-p function)
+  (sb-ext:process-pid function)
+  (sb-ext:process-plist function)
+  "__Streams__:"
   (sb-ext:process-input function)
   (sb-ext:process-output function)
   (sb-ext:process-error function)
+  #-win32
+  (sb-ext:process-pty function)
+  "__Lifetime management__:"
   (sb-ext:process-alive-p function)
   (sb-ext:process-status function)
+  (sb-ext:process-status-hook function)
   (sb-ext:process-wait function)
-  (sb-ext:process-exit-code function)
-  (sb-ext:process-core-dumped function)
   (sb-ext:process-close function)
-  (sb-ext:process-kill function))
+  (sb-ext:process-kill function)
+  "__For exited processes__:"
+  (sb-ext:process-core-dumped function)
+  (sb-ext:process-exit-code function))
 
 (defsection @signal-handling (:title "Signal Handling"
                               :concepts (("signal handling")))

@@ -166,12 +166,12 @@
   `(with-system-mutex (*active-processes-lock*)
      ,@body))
 
-(deftype process-status ()
+(deftype %process-status ()
   '(member :running :stopped :exited :signaled))
 
 (defstruct (process (:copier nil))
   (pid     nil :type word :read-only t) ; PID of child process
-  (%status nil :type process-status)
+  (%status nil :type %process-status)
   %exit-code                            ; either exit code or signal
   core-dumped                           ; T if a core image was dumped
   #-win32 pty                           ; stream to child's pty, or NIL
@@ -209,7 +209,8 @@
 
 (defun process-status (process)
   "Return the current status of PROCESS.  The result is one of :RUNNING,
-   :STOPPED, :EXITED, :SIGNALED."
+   :STOPPED (e.g. suspended by a `\\\\SIGSTOP` signal), :EXITED,
+   :SIGNALED (exited due to a fatal signal)."
   (get-processes-status-changes)
   (process-%status process))
 
@@ -266,8 +267,8 @@ The function is called with PROCESS as its only argument."
 
 (defun process-wait (process &optional check-for-stopped)
   "Wait for PROCESS to quit running for some reason. When
-CHECK-FOR-STOPPED is T, also returns when PROCESS is stopped. Returns
-PROCESS."
+CHECK-FOR-STOPPED is T, also returns when PROCESS-STATUS is :STOPPED.
+Returns PROCESS."
   (declare (ignorable check-for-stopped))
   #+win32
   (sb-win32::win32-process-wait process)

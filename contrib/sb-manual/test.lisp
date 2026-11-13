@@ -180,12 +180,6 @@
         (sb-ext:primitive-object-size function)
         (sb-ext:print-symbol-with-prefix function)
         (sb-ext:print-unreadably function)
-        (sb-ext:process-pid function)
-        (sb-ext:process-plist function)
-        #-win32
-        (sb-ext:process-pty function)
-        (sb-ext:process-status type)
-        (sb-ext:process-status-hook function)
         (sb-ext:quit function)
         (sb-ext:reader-package-does-not-exist condition)
         (sb-ext:readtable-base-char-preference function)

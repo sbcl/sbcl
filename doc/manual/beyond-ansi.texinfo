@@ -1814,15 +1814,31 @@ consistently display a console window or use the @code{:window}
 @end quotation
 @end itemize
 @end deffn
-When @code{sb-ext:run-program} is called with @code{:wait} @code{nil}, an process object
+When @code{sb-ext:run-program} is called with @code{:wait} @code{nil}, a PROCESS object
 is returned. The following functions are available for use with
 processes:
 
+@anchor{Structure sb-ext process}
+@ttindex @sortas{process sb-ext} process [sb-ext]
+@deffn{Structure} sb-ext:process
+@end deffn
 @anchor{Function sb-ext process-p}
 @ffindex @sortas{process-p sb-ext} process-p [sb-ext]
 @deffn{Function} sb-ext:process-p object
 @code{t} if @code{object} is a @code{process}, @code{nil} otherwise.
 @end deffn
+@anchor{Function sb-ext process-pid}
+@ffindex @sortas{process-pid sb-ext} process-pid [sb-ext]
+@deffn{Function} sb-ext:process-pid instance
+The pid of the child process.
+@end deffn
+@anchor{Function sb-ext process-plist}
+@ffindex @sortas{process-plist sb-ext} process-plist [sb-ext]
+@deffn{Function} sb-ext:process-plist instance
+A place for clients to stash things.
+@end deffn
+@strong{Streams}:
+
 @anchor{Function sb-ext process-input}
 @ffindex @sortas{process-input sb-ext} process-input [sb-ext]
 @deffn{Function} sb-ext:process-input instance
@@ -1838,6 +1854,13 @@ The output stream of the process or @code{nil}.
 @deffn{Function} sb-ext:process-error instance
 The error stream of the process or @code{nil}.
 @end deffn
+@anchor{Function sb-ext process-pty}
+@ffindex @sortas{process-pty sb-ext} process-pty [sb-ext]
+@deffn{Function} sb-ext:process-pty instance
+The pty stream of the process or @code{nil}.
+@end deffn
+@strong{Lifetime management}:
+
 @anchor{Function sb-ext process-alive-p}
 @ffindex @sortas{process-alive-p sb-ext} process-alive-p [sb-ext]
 @deffn{Function} sb-ext:process-alive-p process
@@ -1848,24 +1871,21 @@ positive on a closed process.
 @ffindex @sortas{process-status sb-ext} process-status [sb-ext]
 @deffn{Function} sb-ext:process-status process
 Return the current status of @code{process}.  The result is one of @code{:running},
-@code{:stopped}, @code{:exited}, @code{:signaled}.
+@code{:stopped} (e.g. suspended by a @code{SIGSTOP} signal), @code{:exited},
+@code{:signaled} (exited due to a fatal signal).
+@end deffn
+@anchor{Function sb-ext process-status-hook}
+@ffindex @sortas{process-status-hook sb-ext} process-status-hook [sb-ext]
+@deffn{Function} sb-ext:process-status-hook instance
+A function that is called when @code{process} changes its status.
+The function is called with @code{process} as its only argument.
 @end deffn
 @anchor{Function sb-ext process-wait}
 @ffindex @sortas{process-wait sb-ext} process-wait [sb-ext]
 @deffn{Function} sb-ext:process-wait process &optional check-for-stopped
 Wait for @code{process} to quit running for some reason. When
-@code{check-for-stopped} is @code{t}, also returns when @code{process} is stopped. Returns
-@code{process}.
-@end deffn
-@anchor{Function sb-ext process-exit-code}
-@ffindex @sortas{process-exit-code sb-ext} process-exit-code [sb-ext]
-@deffn{Function} sb-ext:process-exit-code process
-The exit code or the signal of a stopped process.
-@end deffn
-@anchor{Function sb-ext process-core-dumped}
-@ffindex @sortas{process-core-dumped sb-ext} process-core-dumped [sb-ext]
-@deffn{Function} sb-ext:process-core-dumped instance
-@code{t} if a core image was dumped by the process.
+@code{check-for-stopped} is @code{t}, also returns when @code{process-status} is @code{:stopped}.
+Returns @code{process}.
 @end deffn
 @anchor{Function sb-ext process-close}
 @ffindex @sortas{process-close sb-ext} process-close [sb-ext]
@@ -1882,6 +1902,18 @@ Hand @code{signal} to @code{process}. If @code{whom} is @code{:pid}, use the kil
 @code{whom} is @code{:process-group}, use the @code{killpg(1)} Unix system call.
 Returns @code{t} if successful, otherwise returns @code{nil} and error
 number (two values).
+@end deffn
+@strong{For exited processes}:
+
+@anchor{Function sb-ext process-core-dumped}
+@ffindex @sortas{process-core-dumped sb-ext} process-core-dumped [sb-ext]
+@deffn{Function} sb-ext:process-core-dumped instance
+@code{t} if a core image was dumped by the process.
+@end deffn
+@anchor{Function sb-ext process-exit-code}
+@ffindex @sortas{process-exit-code sb-ext} process-exit-code [sb-ext]
+@deffn{Function} sb-ext:process-exit-code process
+The exit code or the signal of a stopped process.
 @end deffn
 @node signal handling
 @cindex signal handling
