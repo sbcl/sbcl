@@ -402,11 +402,8 @@
   > _safe code_ and the slot access location is in _safe code_ as
   > well. This laxness does not pose any safety issues, as the CLOS
   > slot types are not available for @TYPE-INFERENCE, nor do CLOS slot
-  > types provide any efficiency benefits.
-
-  > _Note_: The SB-EXT:TRULY-THE special form declares the type of the
-  > result of the operations, producing its argument; the declaration
-  > is not checked. In short: don't use it.")
+  > types provide any efficiency benefits."
+  (sb-ext:truly-the macro))
 
 (defsection @precise-type-checking (:title "Precise Type Checking"
                                     :concepts (("precise" "type checking")

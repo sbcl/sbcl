@@ -49,6 +49,7 @@
   '(((compile function) "SB-C")
     ((compile-file function) "SB-C")
     ((with-compilation-unit macro) "SB-C")
+    ((sb-ext:truly-the macro) "SB-C")
     ((sb-ext:restrict-compiler-policy function) "SB-C")
     ((sb-ext:generation-average-age function) "SB-KERNEL")
     ((sb-ext:generation-bytes-allocated function) "SB-KERNEL")

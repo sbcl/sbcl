@@ -184,7 +184,6 @@
         (sb-ext:step-next function)
         (sb-ext:step-values-condition condition)
         (sb-ext:symbol-global-value function)
-        (sb-ext:truly-the macro)
         (sb-ext:typexpand function)
         (sb-ext:typexpand-1 function)
         (sb-ext:typexpand-all function)

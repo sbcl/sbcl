@@ -751,12 +751,10 @@ slot types are not available for @ref{type inference}, nor do CLOS slot
 types provide any efficiency benefits.
 @end quotation
 
-@quotation
-@emph{Note}: The @code{sb-ext:truly-the} special form declares the type of the
-result of the operations, producing its argument; the declaration
-is not checked. In short: don't use it.
-@end quotation
-
+@anchor{Macro sb-ext truly-the}
+@ffindex @sortas{truly-the sb-ext} truly-the [sb-ext]
+@deffn{Macro} sb-ext:truly-the value-type form
+@end deffn
 @node precise type checking
 @cindex precise type checking
 @cindex type checking, precise

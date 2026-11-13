@@ -1224,13 +1224,13 @@ call themselves or each other."
 ;;; Assert that FORM evaluates to the specified type (which may be a
 ;;; VALUES type). TYPE may be a type specifier or (as a hack) a CTYPE.
 (def-ir1-translator the ((value-type form) start next result)
-  "Assert that the values returned by FORM conform to the VALUE-TYPE.
+  "Assert that the values returned by FORM conform to VALUE-TYPE.
 
 CLHS specifies that the consequences are undefined if any result is
 not of the declared type, but SBCL treats declarations as assertions
-as long as SAFETY is at least 2, in which case incorrect type
+as long as SAFETY is at least 1, in which case incorrect type
 information will result in a runtime type-error instead of leading to
-eg. heap corruption. This is however expressly non-portable: use
+e.g. heap corruption. This is however expressly non-portable: use
 CHECK-TYPE instead of THE to catch type-errors at runtime. THE is best
 considered an optimization tool to inform the compiler about types it
 is unable to derive from other declared types."
@@ -1247,8 +1247,8 @@ is unable to derive from other declared types."
 ;;; never uses the macro -- but manually calling its MACRO-FUNCTION or
 ;;; MACROEXPANDing TRULY-THE forms does.
 (def-ir1-translator truly-the ((value-type form) start next result)
-  "Assert that the values returned by FORM conform to the
-VALUE-TYPE. The compiler trusts this information unconditionally.
+  "Assert that the values returned by FORM conform to VALUE-TYPE.
+The compiler trusts this information unconditionally.
 
 Consequences are undefined if any result is not of the declared type
 -- typical symptoms include memory corruption. Use with great care."
@@ -1339,7 +1339,8 @@ Consequences are undefined if any result is not of the declared type
 #-sb-xc-host
 (setf (info :function :macro-function 'truly-the)
       (lambda (whole env)
-        (declare (ignore env))
+        (declare (ignore env)
+                 (lambda-list (value-type form)))
         `(the ,@(cdr whole)))
       (info :function :macro-function 'the*)
       (lambda (whole env)
