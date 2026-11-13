@@ -1169,7 +1169,7 @@
                              fun-info
                              (ir1-attributep (fun-info-attributes fun-info) no-verify-arg-count))
                         (and (typep name
-                                    '(cons (eql sb-impl::specialized-xep)))
+                                    '(cons (eql specialized-xep)))
                              (setf name (second name))))
                     (let ((type (info :function :type name)))
                       (and (not (fun-type-keyp type))
@@ -1224,7 +1224,7 @@
                 (ir1-attributep (fun-info-attributes info) fixed-args))
            (values (sb-vm::make-fixed-call-args-state)
                    (fun-type-required (info :function :type name))))
-          ((typep name '(cons (eql sb-impl::specialized-xep)))
+          ((typep name '(cons (eql specialized-xep)))
            (values (sb-vm::make-fixed-call-args-state)
                    (fun-type-required (info :function :type (second name))))))))
 
@@ -1588,7 +1588,7 @@
                   (or
                    (and fun-info
                         (ir1-attributep (fun-info-attributes fun-info) no-verify-arg-count))
-                   (typep name '(cons (eql sb-impl::specialized-xep)))))
+                   (typep name '(cons (eql specialized-xep)))))
         (vop verify-arg-count node block
              arg-count-location
              min
@@ -1657,7 +1657,7 @@
                (arg-types (or (and fixed-args
                                    (fun-type-required (info :function :type name)))
                               (and (typep name
-                                          '(cons (eql sb-impl::specialized-xep)))
+                                          '(cons (eql specialized-xep)))
                                    (fun-type-required (specifier-type `(function ,@(cddr name)))))))
                (fixed-arg-state (and arg-types
                                      (sb-vm::make-fixed-call-args-state))))

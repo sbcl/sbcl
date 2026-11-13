@@ -42,6 +42,8 @@
   ;; Technically the ALLOW-ATOM argument of NIL isn't needed, but
   ;; the compiler isn't figuring out not to test SYMBOLP twice in a row.
   (with-globaldb-name (key1 key2 nil) name
+      :specialized
+      (return-from find-fdefn (values (get-info-value name +fdefn-info-num+)))
       :hairy
       (awhen (get-fancily-named-fdefn name nil)
         (return-from find-fdefn it))
@@ -117,6 +119,9 @@
           (let ((fdefn (with-globaldb-name (key1 key2) name
                         :simple (get-info-value-initializing
                                  :function :definition name (new name))
+                        ;; (too bad this can't be merged with the preceding)
+                        :specialized (get-info-value-initializing
+                                      :function :definition name (new name))
                         :hairy (get-fancily-named-fdefn name #'new))))
             ;; Slot accessors spring into existence as soon as a reference
             ;; is made to the respective fdefn, but we can't do this in
@@ -124,6 +129,8 @@
             ;; which would recurse, as the fdefn would not have been
             ;; installed yet.
             (when (and made-new
+                       ;; I hope that (and think) this is idempotent. A racing thread
+                       ;; could install the fdefn even if MADE-NEW is true, right?
                        (typep name '(cons (eql sb-pcl::slot-accessor))))
               (sb-pcl::ensure-accessor name))
             fdefn))))))
@@ -272,7 +279,7 @@
                               (declare (ignore args))
                               (error "~S is undefined" name))))
                        (copy-structure existing)))
-             (specialized-xep (info :function :specialized-xep name))
+             (specialized-xep (fname-has-specialized-xep-p name))
              (closure (named-lambda encapsulation (&rest args)
                         (apply function (encapsulation-info-definition info)
                                args))))
@@ -357,7 +364,8 @@
            :format-arguments (list object setter))))
 
 (defun remove-specialized-xep (name &optional (clear-info t))
-  (let ((xep (info :function :specialized-xep name)))
+  (binding* ((holder (info :function :specialized-xep name) :exit-if-null)
+             (xep (specxep-info-specialization holder)))
     (when xep
       (let* ((xep-name
                `(specialized-xep ,name ,@xep))
@@ -366,7 +374,7 @@
           (fset fdefn
                 (compile nil (make-specialized-xep-stub name xep xep-name))))
         (when clear-info
-          (clear-info :function :specialized-xep name)
+          (setf (specxep-info-specialization holder) nil)
           (undefine-fun-name xep-name))))))
 
 (defun setf-fdefinition (new-value name clear-specialized-xep)

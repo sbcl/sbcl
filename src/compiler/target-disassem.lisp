@@ -1828,7 +1828,7 @@
                           (return)))
                        ((eq kind nil)
                         (let ((name (sb-c::compiled-debug-fun-name fmap-entry)))
-                          (cond ((and (typep name '(cons (eql sb-impl::specialized-xep)))
+                          (cond ((and (typep name '(cons (eql specialized-xep)))
                                       (eq (%fun-name function)
                                           (second name)))
                                  (setf first-block-seen-p t))

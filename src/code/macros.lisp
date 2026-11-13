@@ -194,15 +194,15 @@ tree structure resulting from the evaluation of EXPRESSION."
       (when (and extra-info (not (keywordp extra-info)))
         (setq extra-info (list 'quote extra-info)))
       `(progn
-         ,@(let ((existing-specialized-xep (info :function :specialized-xep name)))
+         ,@(let ((existing-specialized-xep (fname-has-specialized-xep-p name)))
              (if (and existing-specialized-xep
                       (not (equal existing-specialized-xep specialized-xep)))
                  (multiple-value-bind (xep xep-name)
                      (make-specialized-xep-stub name existing-specialized-xep)
                    `((progn
                        (eval-when (:compile-toplevel)
-                         (clear-info :function :specialized-xep ',name))
-                       (when (fdefinition ',xep-name)
+                         (set-fname-specialized-xep-name ',name nil)) ; clear it
+                       (when (fboundp ',xep-name)
                          (setf (fdefinition ',xep-name) ,xep)))))))
          ,@(if specialized-xep
                (let ((xep-name `(specialized-xep ,name ,@specialized-xep)))

@@ -867,6 +867,8 @@ possibly temporarily, because it might be used internally.")
    "ADDRESS-BASED-COUNTER-VAL"
    "DEFINE-FUNCTION-NAME-SYNTAX" "VALID-FUNCTION-NAME-P" ; should be SB-EXT?
    "PERMANENT-FNAME-P" "FSET"
+   "SPECIALIZED-XEP" ; a particular subspecies of extended function name
+   "FNAME-HAS-SPECIALIZED-XEP-P" "SET-FNAME-SPECIALIZED-XEP-NAME"
 
    "LEGAL-VARIABLE-NAME-P"
    "LEGAL-FUN-NAME-P" "LEGAL-FUN-NAME-OR-TYPE-ERROR"

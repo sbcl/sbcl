@@ -225,7 +225,7 @@
                              (system-package-p (symbol-package name)))))))
           (setf where :declared-verify))
         (when (typep name
-                     '(cons (eql sb-impl::specialized-xep)))
+                     '(cons (eql specialized-xep)))
           (setf ftype (specifier-type `(function ,@(cddr name)))
                 where :declared))
         (make-global-var

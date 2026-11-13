@@ -905,8 +905,8 @@
   (let ((fun-info (info :function :info fun)))
     (when (or (and fun-info
                    (ir1-attributep (fun-info-attributes fun-info) fixed-args))
-              (typep fun '(cons (eql sb-impl::specialized-xep))))
-      (loop for type in (fun-type-required (if (typep fun '(cons (eql sb-impl::specialized-xep)))
+              (typep fun '(cons (eql specialized-xep))))
+      (loop for type in (fun-type-required (if (typep fun '(cons (eql specialized-xep)))
                                                (specifier-type `(function ,@(cddr fun)))
                                                (info :function :type fun)))
             for var in vars
@@ -991,7 +991,7 @@
              (res (progn
                     (when (fun-type-p ftype)
                       (add-ftype vars ftype explicit-check))
-                    (when (typep source-name '(cons (eql sb-impl::specialized-xep)))
+                    (when (typep source-name '(cons (eql specialized-xep)))
                       (push source-name
                             (lexenv-user-data *lexenv*)))
                     (if (or (find-if #'lambda-var-arg-info vars) keyp)
@@ -1477,7 +1477,7 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
 ;;; * a possibly empty list of dynamic extent arguments.
 ;;; The inline lambda will be NIL for a structure accessor, predicate, or copier
 ;;; since those can always be reconstructed from a defstruct description.
-(defun %compiler-defun (name compile-toplevel inline-lambda extra-info &optional specialized-xep)
+(defun %compiler-defun (name compile-toplevel inline-lambda extra-info &optional specialization)
   (cond (compile-toplevel
          (let ((defined-fun nil))
            (with-single-package-locked-error
@@ -1499,10 +1499,10 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
                (hashset-insert names name)))))
 
   (become-defined-fun-name name)
-  (when specialized-xep
-    (setf (info :function :specialized-xep name) specialized-xep)
-    (let ((xep-name (list* 'sb-impl::specialized-xep name specialized-xep)))
-      (setf (info :function :type xep-name) (specifier-type `(function ,@specialized-xep))
+  (when specialization
+    (let ((xep-name `(specialized-xep ,name ,@specialization)))
+      (set-fname-specialized-xep-name name xep-name)
+      (setf (info :function :type xep-name) (specifier-type `(function ,@specialization))
             (info :function :where-from xep-name) :declared)))
 
   (values))

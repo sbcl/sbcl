@@ -646,10 +646,16 @@ This is interpreted as
 ;; in which case its second component is +NO-AUXILIARY-KEY+.
 ;;
 (defmacro with-globaldb-name ((key1 key2 &optional (allow-atom t))
-                              name &key simple hairy)
+                              name &key specialized simple hairy)
   (with-unique-names (rest)
+    ;; When a :SPECIALIZED stanza exists, the invoker is usually going to perform
+    ;; a recursive lookup on the second element of NAME - but this macro doesn't know
+    ;; whether it is a "FIND" versus "ENSURE-FOUND" operation. The result of that
+    ;; initial lookup is used as a dictionary for a secondary lookup.
     `(let ((,key1 ,name) (,key2 +NO-AUXILIARY-KEY+))
-       (if (or ,@(if allow-atom `((symbolp ,key1)))
+       (cond ,@(when specialized
+                 `(((typep ,key1 '(cons (eql specialized-xep))) ,specialized)))
+             ((or ,@(if allow-atom `((symbolp ,key1)))
                (if (listp ,key1)
                    (let ((,rest (cdr ,key1)))
                      (when (listp ,rest)
@@ -659,9 +665,10 @@ This is interpreted as
                              ((eq (car ,key1) 'sb-pcl::slot-accessor)
                               (multiple-value-setq (,key2 ,key1)
                                 (pcl-global-accessor-name-p ,key1))))))))
-           ,simple
-           ;; The KEYs remain bound, but they should not be used for anything.
-           ,hairy))))
+              ,simple)
+             (t
+              ;; The KEYs remain bound, but they should not be used for anything.
+              ,hairy)))))
 
 ;;; Some of this stuff might belong in 'symbol.lisp', but can't be,
 ;;; because 'symbol.lisp' is :NOT-HOST in build-order.
@@ -694,7 +701,7 @@ This is interpreted as
 ;;; Return the new value so that this can be conveniently used in a
 ;;; SETF function.
 (defun set-info-value (name info-number new-value)
-  (when (typep name 'fixnum)
+  (when (typep name 'fixnum) ; this is weird! who was passing in fixnums?
     (error "~D is not a legal INFO name." name))
 
   ;; Storage of FAST-METHOD and SLOW-METHOD compiler info is largely pointless.
@@ -739,6 +746,14 @@ This is interpreted as
         ;; UPDATE-SYMBOL-INFO never supplies OLD-INFO as NIL.
         (update-symbol-info key1 (lambda (old-info)
                                    (augment old-info key2)))
+        :specialized
+        #+sb-xc-host (error "Can't set-info-value for ~S" name)
+        #-sb-xc-host
+        (let* ((cell (ensure-specxep-info-cell name))
+               (old (car cell)))
+          (loop (let* ((new (augment old +no-auxiliary-key+))
+                       (actual (cas (car cell) old new)))
+                  (if (eq actual old) (return) (setq old actual)))))
         :hairy
         ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
         (info-puthash *info-environment* name
@@ -780,6 +795,7 @@ This is interpreted as
         ;; UPDATE-SYMBOL-INFO never supplies OLD-INFO as NIL.
         (update-symbol-info key1 (lambda (old-info)
                                    (augment old-info key2)))
+        :specialized (bug "Unhandled")
         :hairy
         ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
         (info-puthash *info-environment* name
@@ -822,6 +838,15 @@ This is interpreted as
         ;; UPDATE-SYMBOL-INFO never supplies OLD-INFO as NIL.
         (update-symbol-info key1 (lambda (old-info)
                                    (get-or-set old-info key2)))
+        :specialized
+        #+sb-xc-host (error "Can't %get-info-value-initializing ~S" name)
+        #-sb-xc-host
+        (let ((cell (ensure-specxep-info-cell name)))
+          (loop (let* ((old (car cell))
+                       (new (get-or-set old +no-auxiliary-key+)))
+                  (when (eq new nil) (return))
+                  (let ((actual (cas (car cell) old new)))
+                    (if (eq actual old) (return) (setq old actual))))))
         :hairy
         ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
         (info-puthash *info-environment* name

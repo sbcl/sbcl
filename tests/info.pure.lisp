@@ -600,4 +600,24 @@
 (setf (sb-impl::info-env-storage sb-int:*info-environment*) (sb-impl::make-info-storage 30)
       (sb-impl::info-env-count sb-int:*info-environment*) 0)
 
+(proclaim '(ftype (function (double-float t fixnum fixnum) double-float) (setf foo)))
+(defun (setf foo) (newval x i j) (format t "hi ~S ~S ~S~%" x i j) newval)
+(handler-bind ((warning #'muffle-warning))
+  (proclaim '(ftype (function (double-float t fixnum fixnum) (values double-float &optional))
+                    (setf foo))))
+(defun (setf foo) (newval x i j) (format t "hi ~S ~S ~S~%" x i j) newval)
+(with-test (:name :specialized-xep-names
+                  :skipped-on (or :interpreter (not (or :arm64 :x86-64))))
+  (let ((output (with-output-to-string (*standard-output*) (sb-int:show-info 'foo))))
+    (assert (= (loop for line in (split-string output #\newline)
+                     count (search "signature" line))
+               2)))
+  (let ((xep-name '(sb-int:specialized-xep (setf foo) (double-float t fixnum fixnum)
+                                           (values double-float &optional))))
+    (assert (nth-value 1 (info :function :type xep-name)))
+    (fmakunbound '(setf foo))
+    (assert (not (nth-value 1 (info :function :type xep-name))))
+    (assert (not (clear-info :function :type xep-name)))
+    (assert (find-fdefn xep-name))))
+
 ;;; success

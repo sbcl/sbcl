@@ -149,6 +149,30 @@
 (push '("SB-INT" define-info-type) *!removable-symbols*)
 
 
+;;; The SPECXEP-INFO struct is a mini globaldb-within-globaldb.
+;;; There can be more than one stem associated with a given root:
+;;; "root" FUN begets 2 stems:
+;;;   1. FUN (which is also the root)
+;;;   2. (SETF FUN)
+;;; A complete specialized XEP name is a stem plus a specialization.
+;;; There can be more than one specialized XEP name associated with a stem:
+;;;     (SPECIALIZED-XEP (SETF FUN) (DOUBLE-FLOAT NUMBER) FIXNUM) ; specname 1
+;;; and after you make an edit to the FTYPE proclamation perhaps:
+;;;     (SPECIALIZED-XEP (SETF FUN) (DOUBLE-FLOAT FIXNUM) FIXNUM) ; specname 2
+;;; Only one specname is the current (or "active") name for the stem, but we need to
+;;; persist data for all the names. Notably an FDEFN is associated with each name.
+;;; Callers of an obsolete FDEFN get redirected through a stub to the global name,
+;;; which may redirect to a revised specialized definition.
+(defstruct (specxep-info (:constructor make-specxep-info)
+                         (:predicate nil) (:copier nil))
+  ;; Lisp functions name aren't overloadable, so there can be at most 1 active specialized XEP
+  ;; name, but the alist can store info for N names as per the example above.
+  ;;  ((#<packed-info>  . specialization1) (#<packed-info> . specialization2) ...)
+  alist
+  ;; the specialization that function FOO should use if we compile a call.
+  specialization)
+(declaim (freeze-type specxep-info))
+
 ;;; INFO is the standard way to access the database. It's settable.
 ;;;
 ;;; Return the information of the specified CATEGORY and KIND for NAME.
@@ -191,6 +215,18 @@
       (dx-flet ((clear-simple (old)
                   (setq new (packed-info-remove old key2 info-numbers))))
         (update-symbol-info key1 #'clear-simple))
+      :specialized
+      (binding* ((stem (second name))
+                 (holder (info :function :specialized-xep stem) :exit-if-null)
+                 (cell (rassoc (cddr name) (specxep-info-alist holder) :test 'equal)
+                       :exit-if-null)
+                 (old (car cell)))
+        #+sb-xc-host (error "Can't clear-info-values for specialized-xep: old=~S" old)
+        #-sb-xc-host
+        (loop (setq new (packed-info-remove old +no-auxiliary-key+ info-numbers))
+              (unless new (return)) ; nothing changed
+              (let ((actual-old (cas (car cell) old new)))
+                (if (eq old actual-old) (return) (setq old actual-old)))))
       :hairy
       ;; The global hashtable is not imbued with knowledge of the convention
       ;; for PACKED-INFO-REMOVE because that would render it less useful
@@ -241,6 +277,11 @@
            ;; In the :simple branch, KEY1 is no doubt a symbol,
            ;; but constraint propagation isn't informing the compiler here.
            :simple (values (symbol-dbinfo (truly-the symbol key1)) key2)
+           :specialized
+           (binding* ((stem (second name))
+                      (holder (info :function :specialized-xep stem) :exit-if-null))
+             (values (car (rassoc (cddr name) (specxep-info-alist holder) :test 'equal))
+                     +no-auxiliary-key+))
            :hairy (values (info-gethash name *info-environment*)
                           +no-auxiliary-key+)))
       (when packed-info
@@ -396,7 +437,7 @@
 ;;; is *empty-type*, which in turn avoids type cache pollution.
 (define-info-type (:function :predicate-truth-constraint) :type-spec t)
 
-(define-info-type (:function :specialized-xep) :type-spec t)
+(define-info-type (:function :specialized-xep) :type-spec (or null specxep-info))
 
 ;;;; ":VARIABLE" subsection - Data pertaining to globally known variables.
 
@@ -615,6 +656,46 @@
 ;;; correct for what INFO can return, not what it may store.
 (define-info-type (:symbol :package) :type-spec (or package null))
 
+(defun fname-has-specialized-xep-p (fun-name)
+  (aver (not (typep fun-name '(cons (eql specialized-xep)))))
+  (awhen (info :function :specialized-xep fun-name)
+    (specxep-info-specialization it)))
+
+(defun set-fname-specialized-xep-name (fun-name specialized-name)
+  (aver (not (typep fun-name '(cons (eql specialized-xep)))))
+  (cond (specialized-name
+         (aver (eql (car specialized-name) 'specialized-xep))
+         (aver (equal (cadr specialized-name) fun-name))
+         (let ((holder (ensure-specxep-info-holder specialized-name)))
+           (setf (specxep-info-specialization holder) (cddr specialized-name))))
+        (t
+         ;; erase the specialization for FUN-NAME
+         (awhen (info :function :specialized-xep fun-name)
+           (setf (specxep-info-specialization it) nil)))))
+
+(defun ensure-specxep-info-holder (specialized-name)
+  ;; Expect (SPECIALIZED-XEP some-function-name . specialization)
+  (aver (eq (car specialized-name) 'specialized-xep))
+  #+sb-xc-host (error "Not implemented for host yet")
+  #-sb-xc-host
+  (let ((stem (second specialized-name)))
+    (get-info-value-initializing :function :specialized-xep stem (make-specxep-info))))
+
+(defun ensure-specxep-info-cell (specialized-name)
+  #+sb-xc-host ; probably can just use symbol-plist
+  (error "Not implemented for host yet: ensure-specxep-info-cell ~S" specialized-name)
+  #-sb-xc-host
+  (let* ((holder (ensure-specxep-info-holder specialized-name))
+         (specialization (cddr specialized-name))
+         (alist (specxep-info-alist holder)))
+    (loop (let ((found (rassoc specialization alist :test 'equal)))
+            (if found (return found)))
+          (let* ((cell (cons +nil-packed-infos+ specialization))
+                 (new (cons cell alist))
+                 ;; this would be a weak CAS if we had that
+                 (old (cas (specxep-info-alist holder) alist new)))
+            (if (eq old alist) (return cell) (setq alist old))))))
+
 (!defun-from-collected-cold-init-forms !info-type-cold-init)
 
 #-sb-xc-host
@@ -638,12 +719,28 @@
      (lambda (name type-num val)
        (unless (eq name prev)
          (format t "~&~S" (setq prev name)))
-       (let ((type (svref *info-types* type-num)))
+       (let* ((type (svref *info-types* type-num))
+              (kind (and type (meta-info-kind type))))
          (format t "~&  ~@[type ~D~]~@[~{~S ~S~}~] = "
                  (if (not type) type-num)
                  (if type
-                     (list (meta-info-category type) (meta-info-kind type))))
-         (write val :level 2)))
+                     (list (meta-info-category type) kind)))
+         (cond
+           ((eq kind :specialized-xep) ; decode it
+            (let ((*print-pretty* nil))
+              (format t "~&    current XEP = ~S~%"
+                      (specxep-info-specialization val))
+              (dolist (pair (specxep-info-alist val))
+                (format t "    signature ~S~%" (cdr pair))
+                (%call-with-each-info
+                 (lambda (name type-num val)
+                   (declare (ignore name))
+                   (let ((type (svref *info-types* type-num)))
+                     (format t "      ~S ~S = ~S~%"
+                             (meta-info-category type) (meta-info-kind type) val)))
+                 (car pair) :error))))
+           (t
+            (write val :level 2)))))
      sym)))
 
 #-sb-xc-host

@@ -152,7 +152,7 @@
            (ltn-default-call node)))))
 
 (defun unboxed-specialized-return-p (name)
-  (and (typep name '(cons (eql sb-impl::specialized-xep)))
+  (and (typep name '(cons (eql specialized-xep)))
        (let* ((specifier (cadddr name))
               (type (and (neq specifier '*)
                          (values-specifier-type (cadddr name)))))

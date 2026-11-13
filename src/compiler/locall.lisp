@@ -192,9 +192,9 @@
             (types (or (and (or
                              (and info
                                   (ir1-attributep (fun-info-attributes info) fixed-args))
-                             (typep name '(cons (eql sb-impl::specialized-xep))))
+                             (typep name '(cons (eql specialized-xep))))
                             (loop for var in (lambda-vars fun)
-                                  for type in (fun-type-required (if (typep name '(cons (eql sb-impl::specialized-xep)))
+                                  for type in (fun-type-required (if (typep name '(cons (eql specialized-xep)))
                                                                      (specifier-type `(function ,@(cddr name)))
                                                                      (info :function :type name)))
                                   for temp in temps

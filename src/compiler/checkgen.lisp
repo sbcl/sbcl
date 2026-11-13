@@ -304,7 +304,7 @@
               (cast-context cast)))
            (checkable
              (cond ((and (basic-combination-p dest)
-                         (not (info :function :specialized-xep
+                         (not (fname-has-specialized-xep-p
                                     (lvar-fun-name (basic-combination-fun dest))))
                          (or (not (basic-combination-fun-info dest))
                              ;; fixed-args functions do not check their arguments.
