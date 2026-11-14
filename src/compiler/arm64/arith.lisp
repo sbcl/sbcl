@@ -2924,12 +2924,12 @@
 
 (define-vop (bignum-mult-and-add-4-arg)
   (:translate sb-bignum:%multiply-and-add)
-  (:args (x :scs (unsigned-reg) :to :result)
+  (:args (x :scs (unsigned-reg) :to :save)
          (y :scs (unsigned-reg) :target lo)
-         (prev :scs (unsigned-reg) :to :result)
-         (carry-in :scs (unsigned-reg) :to :result))
+         (prev :scs (unsigned-reg) :to :save)
+         (carry-in :scs (unsigned-reg) :to :save))
   (:arg-types unsigned-num unsigned-num unsigned-num unsigned-num)
-  (:results (hi :scs (unsigned-reg) :from :eval)
+  (:results (hi :scs (unsigned-reg) :from :load)
             (lo :scs (unsigned-reg)))
   (:result-types unsigned-num unsigned-num)
   (:generator 9

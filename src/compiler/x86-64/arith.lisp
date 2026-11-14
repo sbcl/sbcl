@@ -4972,7 +4972,7 @@
          (la :scs (unsigned-reg) :target remaining-length)
          (lb :scs (unsigned-reg) :target length)
          (r :scs (descriptor-reg)))
-  (:arg-types bignum bignum unsigned-num bignum unsigned-num)
+  (:arg-types bignum bignum unsigned-num unsigned-num bignum)
   (:temporary (:sc unsigned-reg :from (:argument 2)) length)
   (:temporary (:sc unsigned-reg :from (:argument 3)) remaining-length)
   (:temporary (:sc unsigned-reg) n index sign-digit-a sign-digit-b)
@@ -5139,9 +5139,9 @@
             (last2 :scs (unsigned-reg)))
   (:result-types unsigned-num unsigned-num)
   (:generator 10
+    (move length l :dword)
     (zeroize last2)
     (zeroize index)
-    (move length l :dword)
     LOOP
     (move last1 last2)
     (inst mov last2 0)
@@ -5178,9 +5178,9 @@
             (last2 :scs (unsigned-reg)))
   (:result-types unsigned-num unsigned-num)
   (:generator 10
+    (move length l :dword)
     (zeroize last2)
     (zeroize index)
-    (move length l :dword)
     LOOP
     (move last1 last2)
     (inst mov last2 0)

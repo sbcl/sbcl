@@ -803,7 +803,7 @@
     (inst b :vc done)
     (inst mov header (bignum-header-for-length 1))
     #+bignum-assertions
-    (inst mov hi 0)
+    (error "Solve ~a" '(inst mov hi 0)) ;; can't write into an input register
     allocate
     (with-fixed-allocation
         (y lr nil (+ 2 bignum-digits-offset))
