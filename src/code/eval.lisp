@@ -308,3 +308,8 @@
   #+(or arm64 x86-64)
   (declare (explicit-check))
   (values-list list))
+
+#+arm64
+(defun sb-c::reverse-values-list (list length)
+  (declare (explicit-check))
+  (sb-c::reverse-values-list list length))
