@@ -3425,19 +3425,26 @@
             (multi-instruction-emitter (segment position)
               (let* ((delta (compute-delta position))
                      (negative (minusp delta))
-                     (low (ldb (byte 19 0) delta))
-                     (high (ldb (byte 16 19) delta)))
-               ;; ADR
-               (emit-pc-relative segment 0
-                                 (ldb (byte 2 0) low)
-                                 (ldb (byte 19 2) low)
-                                 (gpr-offset lip))
-               (assemble (segment vop)
-                 (inst movz dest high 16)
-                 (inst ldr dest (@ lip (extend dest (if negative
-                                                        :sxtw
-                                                        :lsl)
-                                               3))))))
+                     (shift12 (min 4095 (ash (abs delta) -12)))
+                     (high (ash shift12 12))
+                     (low (the (signed-byte 21)
+                               (if negative
+                                   (+ delta high)
+                                   (- delta high))))
+                     (addr-reg (or lip
+                                   (if (sc-is dest 32-bit-reg)
+                                       (make-random-tn (sc-or-lose 'unsigned-reg) (tn-offset dest))
+                                       dest))))
+                ;; ADR
+                (emit-pc-relative segment 0
+                                  (ldb (byte 2 0) low)
+                                  (ldb (byte 19 2) low)
+                                  (gpr-offset addr-reg))
+                (assemble (segment vop)
+                  (if negative
+                      (inst sub addr-reg addr-reg high)
+                      (inst add addr-reg addr-reg high))
+                  (inst ldr dest (@ addr-reg)))))
             (one-instruction-emitter (segment position)
               (emit-ldr-literal segment
                                 (sc-case dest
@@ -3453,8 +3460,8 @@
                                     1
                                     0)
                                 (ldb (byte 19 0)
-                                ;; The cast asserts that the signed displacement
-                                ;; doesn't overflow the field.
+                                     ;; The cast asserts that the signed displacement
+                                     ;; doesn't overflow the field.
                                      (the (signed-byte 19)
                                           (ash (compute-delta position) -2)))
                                 (reg-offset dest)))
@@ -3465,14 +3472,14 @@
                   (emit-back-patch segment 4
                                    #'one-instruction-emitter)
                   t))))
-     (if lip
+     (if (or lip (not (fp-register-p dest)))
          (emit-chooser
           segment 12 2
           #'multi-instruction-maybe-shrink
           #'multi-instruction-emitter)
          (emit-back-patch segment 4 #'one-instruction-emitter)))))
 
-(define-instruction load-constant (segment dest index &optional lip)
+(define-instruction load-constant (segment dest index)
   (:vop-var vop)
   (:emitter
    (labels ((compute-delta (position &optional magic-value)
@@ -3485,19 +3492,22 @@
             (multi-instruction-emitter (segment position)
               (let* ((delta (compute-delta position))
                      (negative (minusp delta))
-                     (low (ldb (byte 19 0) delta))
-                     (high (ldb (byte 16 19) delta)))
+                     (shift12 (min 4095 (ash (abs delta) -12)))
+                     (high (ash shift12 12))
+                     (low (the (signed-byte 21)
+                               (if negative
+                                   (+ delta high)
+                                   (- delta high)))))
                 ;; ADR
                 (emit-pc-relative segment 0
                                   (ldb (byte 2 0) low)
                                   (ldb (byte 19 2) low)
-                                  (gpr-offset lip))
+                                  (gpr-offset dest))
                 (assemble (segment vop)
-                  (inst movz dest high 16)
-                  (inst ldr dest (@ lip (extend dest (if negative
-                                                         :sxtw
-                                                         :lsl)
-                                                3))))))
+                  (if negative
+                      (inst sub dest dest high)
+                      (inst add dest dest high))
+                  (inst ldr dest (@ dest)))))
             (one-instruction-emitter (segment position)
               (emit-ldr-literal segment
                                 #b01
@@ -3513,12 +3523,10 @@
                   (emit-back-patch segment 4
                                    #'one-instruction-emitter)
                   t))))
-     (if lip
-         (emit-chooser
-          segment 12 2
-          #'multi-instruction-maybe-shrink
-          #'multi-instruction-emitter)
-         (emit-back-patch segment 4 #'one-instruction-emitter)))))
+     (emit-chooser
+      segment 12 2
+      #'multi-instruction-maybe-shrink
+      #'multi-instruction-emitter))))
 
 ;;; SIMD
 (def-emitter simd-three-diff
