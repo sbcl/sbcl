@@ -147,6 +147,11 @@
   function)
 ) ; end MACROLET
 
+;;; Retun either s SYMBOL or FDEFN from the address-to-name linkage table map.
+;;; Perhaps somewhat confusingly, the "name" of an entry holding an FDEFN is the FDEFN
+;;; itself, not FDEFN-NAME. This is generally the right thing: it's quick to deref the
+;;; name, and the debugger wants the FDEFN for single-step. The reverse operation -
+;;; name to FDEFN - is more involved.
 (defun linkage-addr->name (value mode)
   (declare (type (member :index :abs :rel) mode))
   (flet ((in-range-p (low count &aux (high (sap+ low (ash count word-shift))))

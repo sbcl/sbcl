@@ -196,8 +196,9 @@
     #+linkage-space
     (loop for index in (sb-c:unpack-code-fixup-locs (sb-vm::%code-fixups code))
           for this = (sb-vm::linkage-addr->name index :index)
-          when (or (not namep) (equal this name))
-          collect this)
+          for fdefn-name = (if (sb-kernel:fdefn-p this) (sb-kernel:fdefn-name this) this)
+          when (or (not namep) (equal name fdefn-name))
+          collect fdefn-name)
     #-linkage-space
     (sb-int:binding* (((start count) (code-header-fdefn-range code)))
       (loop for i from start repeat count
