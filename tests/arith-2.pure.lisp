@@ -1326,7 +1326,21 @@
   (assert-type
    (lambda (a)
      (reduce 'logior (the (simple-array (unsigned-byte 8)) a) :initial-value -7))
-   (integer -7 -1)))
+   (integer -7 -1))
+  (assert-type
+   (lambda (s)
+     (reduce 'logior s :key (lambda (x)
+                              (declare (ignore x))
+                              5)))
+   (or (eql 0) (eql 5)))
+  (assert-type
+   (lambda (s)
+     (reduce #'logior s
+             :initial-value 5
+             :key (lambda (x)
+                    (declare (ignore x))
+                    -2)))
+   (or (integer -2 -1) (eql 5))))
 
 (with-test (:name :atanh-type)
   (assert-type

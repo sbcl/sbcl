@@ -4543,10 +4543,18 @@
                   (some #'try '(double-float single-float float unsigned-byte integer rational real))))
                (logior
                 (when (csubtypep element-type (specifier-type 'integer))
-                  (if initial-value
-                      (when (csubtypep initial-value-type (specifier-type 'integer))
-                        (%two-arg-derive-type element-type initial-value-type #'logior-derive-type-aux))
-                      element-type))))))
+                  (let ((type
+                          (if initial-value
+                              (when (csubtypep initial-value-type (specifier-type 'integer))
+                                (%two-arg-derive-type element-type initial-value-type #'logior-derive-type-aux))
+                              element-type)))
+                    (cond (identity-p
+                           (type-union type (specifier-type '(eql 0))))
+                          ((and initial-value
+                                (not non-empty))
+                           (type-union type initial-value-type))
+                          (t
+                           type))))))))
          (let ((fun-result (single-value-type (fun-type-returns fun-type))))
            (cond (initial-value-type
                   (type-union initial-value-type fun-result))
