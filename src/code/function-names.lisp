@@ -55,7 +55,7 @@ use as a BLOCK name in the function in question."
                   (valid-function-name-p fun))))))))
 
 (define-function-name-syntax specialized-xep (name)
-  name)
+  (and (consp (cdr name)) (valid-function-name-p (cadr name))))
 
 ;;; FBOUNDP wants to know what names are valid early on in COLD-INIT.
 (defun !function-names-init ()

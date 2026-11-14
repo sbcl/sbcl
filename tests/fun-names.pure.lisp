@@ -70,3 +70,8 @@
                        :allow-warnings t)
     (assert (and warnp errorp))
     (assert-error (funcall fun nil 1) type-error)))
+
+(with-test (:name :specxep-block-name)
+  (assert (equal (multiple-value-list
+                  (sb-int:valid-function-name-p '(sb-int:specialized-xep (setf h) x)))
+                 '(t h))))
