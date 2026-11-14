@@ -528,7 +528,7 @@
               single-float single-float single-float single-float
               single-float single-float single-float single-float)
   (:result-types simd-pack-512-single)
-  (:results (dst :scs (single-avx512-reg) :from (:argument 4)))
+  (:results (dst :scs (single-avx512-reg) :from (:argument 3)))
   (:result-types simd-pack-512-single)
   (:temporary (:sc single-avx512-reg) t0 t1 t2 t3)
   (:generator 5

@@ -273,7 +273,7 @@
          (z :scs (single-reg))
          (w :scs (single-reg)))
   (:arg-types single-float single-float single-float single-float)
-  (:temporary (:sc single-neon-reg :from (:argument 2)) tmp)
+  (:temporary (:sc single-neon-reg :from (:argument 1)) tmp)
   (:results (dst :scs (single-neon-reg)))
   (:result-types simd-pack-single)
   (:generator 3
