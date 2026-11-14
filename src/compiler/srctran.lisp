@@ -8390,51 +8390,52 @@
          (give-up-ir1-transform))))
 
 (defun derive-gcd (args)
-  (let ((min)
-        (max)
-        (includes-zero t)
-        unbounded
-        primes)
-    (loop for arg in args
-          for type = (lvar-type arg)
-          do (multiple-value-bind (low high) (integer-type-numeric-bounds type)
-               (let ((zero (types-equal-or-intersect type (specifier-type '(eql 0)))))
-                 (unless zero
-                   (setf includes-zero nil))
-                 (cond ((not (and low high))
-                        (setf unbounded t))
-                       ((and (= (abs low) 1)
-                             (= (abs high) 1)
-                             (not zero))
-                        (return-from derive-gcd (specifier-type '(eql 1))))
-                       #-sb-xc-host
-                       ((and (= low high)
-                             (typep (abs low)
-                                    `(integer 0
-                                              ,(min (expt 2 32)
-                                                    most-positive-fixnum)))
-                             ;; Get some extra points
-                             (positive-primep (abs low)))
-                        (pushnew (abs low) primes))))
-               (cond (unbounded)
-                     (min
-                      (setf min (min min low)
-                            max (max max high)))
-                     (t
-                      (setf min low
-                            max high)))))
-    (cond ((not primes)
-           (make-numeric-type 'integer (if includes-zero
-                                           0
-                                           1)
-                              (unless unbounded
-                                (max (abs min)
-                                     (abs max)))))
-          ((cdr primes)
-           (specifier-type '(eql 1)))
-          (t
-           (type-union (specifier-type '(eql 1))
-                       (make-numeric-type 'eql (car primes)))))))
+  (when args
+    (let ((min)
+          (max)
+          (includes-zero t)
+          unbounded
+          primes)
+      (loop for arg in args
+            for type = (lvar-type arg)
+            do (multiple-value-bind (low high) (integer-type-numeric-bounds type)
+                 (let ((zero (types-equal-or-intersect type (specifier-type '(eql 0)))))
+                   (unless zero
+                     (setf includes-zero nil))
+                   (cond ((not (and low high))
+                          (setf unbounded t))
+                         ((and (= (abs low) 1)
+                               (= (abs high) 1)
+                               (not zero))
+                          (return-from derive-gcd (specifier-type '(eql 1))))
+                         #-sb-xc-host
+                         ((and (= low high)
+                               (typep (abs low)
+                                      `(integer 0
+                                                ,(min (expt 2 32)
+                                                      most-positive-fixnum)))
+                               ;; Get some extra points
+                               (positive-primep (abs low)))
+                          (pushnew (abs low) primes))))
+                 (cond (unbounded)
+                       (min
+                        (setf min (min min low)
+                              max (max max high)))
+                       (t
+                        (setf min low
+                              max high)))))
+      (cond ((not primes)
+             (make-numeric-type 'integer (if includes-zero
+                                             0
+                                             1)
+                                (unless unbounded
+                                  (max (abs min)
+                                       (abs max)))))
+            ((cdr primes)
+             (specifier-type '(eql 1)))
+            (t
+             (type-union (specifier-type '(eql 1))
+                         (make-numeric-type 'eql (car primes))))))))
 
 (defoptimizer (gcd derive-type) ((&rest args))
   (derive-gcd args))
