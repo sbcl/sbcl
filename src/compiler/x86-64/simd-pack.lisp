@@ -366,7 +366,7 @@
   (:results (y :scs (double-sse-reg)))
   (:result-types simd-pack-double)
   (:generator 2
-    (move x y)))
+    (move y x)))
 
 (define-vop ()
   (:translate %simd-pack-int-to-single)
@@ -375,4 +375,4 @@
   (:results (y :scs (single-sse-reg)))
   (:result-types simd-pack-single)
   (:generator 2
-    (move x y)))
+    (move y x)))

@@ -338,7 +338,7 @@
   (:results (y :scs (double-neon-reg)))
   (:result-types simd-pack-double)
   (:generator 2
-    (move x y :16b)))
+    (move y x :16b)))
 
 (define-vop ()
   (:translate %simd-pack-int-to-single)
@@ -347,4 +347,4 @@
   (:results (y :scs (single-neon-reg)))
   (:result-types simd-pack-single)
   (:generator 2
-    (move x y :16b)))
+    (move y x :16b)))

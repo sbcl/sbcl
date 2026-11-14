@@ -635,7 +635,7 @@
   (:results (y :scs (double-avx512-reg)))
   (:result-types simd-pack-512-double)
   (:generator 2
-    (move x y)))
+    (move y x)))
 
 (define-vop ()
   (:translate %simd-pack-512-int-to-single)
@@ -644,4 +644,4 @@
   (:results (y :scs (single-avx512-reg)))
   (:result-types simd-pack-512-single)
   (:generator 2
-    (move x y)))
+    (move y x)))
