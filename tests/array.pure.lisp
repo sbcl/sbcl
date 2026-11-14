@@ -1236,3 +1236,12 @@
      (eq (sb-kernel:array-underlying-widetag a)
          (sb-kernel:array-underlying-widetag b)))
    (eql t)))
+
+(with-test (:name :with-array-data-offset)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (declare ((simple-array t (2 2)) a))
+         (sb-kernel:with-array-data ((data a) (start 1) (end 4))
+           (list (aref data start) start end)))
+    ((#2A((10 20) (30 40))) '(20 1 4) :test #'equal)))

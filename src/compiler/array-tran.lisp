@@ -2462,10 +2462,10 @@
                     (real-end (or end len)))
                (unless (<= 0 start real-end len)
                  (array-bounding-indices-bad-error array start end))
-               (values data 0 real-end 0))
+               (values data start real-end 0))
             `(let ((data (truly-the (simple-array ,element-type (*))
                                     (%array-data array))))
-               (values data 0 (or end (length data)) 0)))
+               (values data start (or end (length data)) 0)))
         `(%with-array-data-macro array start end
                                  :check-fill-pointer ,check-fill-pointer
                                  :check-bounds ,check-bounds
