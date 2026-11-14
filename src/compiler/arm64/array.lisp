@@ -233,22 +233,22 @@
   (full simple-array-fixnum tagged-num any-reg)
   (full simple-array-signed-byte-64 signed-num signed-reg)
 
-  (partial simple-base-string character :byte nil character-reg)
+  (partial simple-base-string character 8 nil character-reg)
   #+sb-unicode
-  (partial simple-character-string character :word nil character-reg)
+  (partial simple-character-string character 32 nil character-reg)
 
-  (partial simple-array-unsigned-byte-7 positive-fixnum :byte nil unsigned-reg signed-reg)
-  (partial simple-array-unsigned-byte-8 positive-fixnum :byte nil unsigned-reg signed-reg)
+  (partial simple-array-unsigned-byte-7 positive-fixnum 8 nil unsigned-reg signed-reg)
+  (partial simple-array-unsigned-byte-8 positive-fixnum 8 nil unsigned-reg signed-reg)
 
-  (partial simple-array-unsigned-byte-15 positive-fixnum :short nil unsigned-reg signed-reg)
-  (partial simple-array-unsigned-byte-16 positive-fixnum :short nil unsigned-reg signed-reg)
+  (partial simple-array-unsigned-byte-15 positive-fixnum 16 nil unsigned-reg signed-reg)
+  (partial simple-array-unsigned-byte-16 positive-fixnum 16 nil unsigned-reg signed-reg)
 
-  (partial simple-array-unsigned-byte-31 positive-fixnum :word nil unsigned-reg signed-reg)
-  (partial simple-array-unsigned-byte-32 positive-fixnum :word nil unsigned-reg signed-reg)
+  (partial simple-array-unsigned-byte-31 positive-fixnum 32 nil unsigned-reg signed-reg)
+  (partial simple-array-unsigned-byte-32 positive-fixnum 32 nil unsigned-reg signed-reg)
 
-  (partial simple-array-signed-byte-8 tagged-num :byte t signed-reg)
-  (partial simple-array-signed-byte-16 tagged-num :short t signed-reg)
-  (partial simple-array-signed-byte-32 tagged-num :word t signed-reg)
+  (partial simple-array-signed-byte-8 tagged-num 8 t signed-reg)
+  (partial simple-array-signed-byte-16 tagged-num 16 t signed-reg)
+  (partial simple-array-signed-byte-32 tagged-num 32 t signed-reg)
 
   (partial simple-array-single-float single-float :single-float nil single-reg)
   (full simple-array-double-float double-float double-reg)

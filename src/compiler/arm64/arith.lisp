@@ -2503,12 +2503,12 @@
   (unsigned-reg) unsigned-num sb-bignum:%bignum-set)
 
 (define-partial-reffer sb-c::%half-bignum-ref bignum
-  :word nil bignum-digits-offset other-pointer-lowtag (unsigned-reg signed-reg)
+  32 nil bignum-digits-offset other-pointer-lowtag (unsigned-reg signed-reg)
   positive-fixnum
   sb-bignum:%half-bignum-ref)
 
 (define-partial-setter sb-c::%half-bignum-set bignum
-  :word bignum-digits-offset other-pointer-lowtag (unsigned-reg signed-reg)
+  32 bignum-digits-offset other-pointer-lowtag (unsigned-reg signed-reg)
   positive-fixnum
   (setf sb-bignum:%half-bignum-ref))
 

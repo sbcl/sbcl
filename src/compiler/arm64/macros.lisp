@@ -491,15 +491,15 @@
      (:generator 5
        ,@(multiple-value-bind (op shift)
              (ecase size
-               (:byte
+               (8
                 (values (if signed 'ldrsb 'ldrb) 0))
-               (:short
+               (16
                 (values (if signed 'ldrsh 'ldrh) 1))
-               (:word
+               (32
                 (values (if signed 'ldrsw 'ldr) 2))
                (:single-float
                 (values 'ldr 2)))
-           (let ((value (if (and (eq size :word)
+           (let ((value (if (and (eq size 32)
                                  (not signed))
                             '(32-bit-reg value)
                             'value)))
@@ -508,7 +508,11 @@
                   (inst ,op ,value (@ object (load-store-offset
                                               (+
                                                (ash (tn-value index) ,shift)
-                                               (- (* ,offset n-word-bytes) ,lowtag))))))
+                                               (- (* ,offset n-word-bytes) ,lowtag))
+                                              tmp-tn
+                                              ,(if (eq size :single-float)
+                                                   32
+                                                   size)))))
                  (t
                   (let ((shift ,shift))
                     (when (sc-is index any-reg)
@@ -548,13 +552,13 @@
              (setf value wzr-tn))
            ,@(multiple-value-bind (op shift)
                  (ecase size
-                   (:byte
+                   (8
                     (values 'strb 0))
-                   (:short
+                   (16
                     (values 'strh 1))
-                   ((:word :single-float)
+                   ((32 :single-float)
                     (values 'str 2)))
-               (let ((value (if (eq size :word)
+               (let ((value (if (eq size 32)
                                 '(32-bit-reg value)
                                 'value)))
                  `((sc-case index
@@ -562,7 +566,11 @@
                       (inst ,op ,value (@ object (load-store-offset
                                                   (+
                                                    (ash (tn-value index) ,shift)
-                                                   (- (* ,offset n-word-bytes) ,lowtag))))))
+                                                   (- (* ,offset n-word-bytes) ,lowtag))
+                                                  tmp-tn
+                                                  ,(if (eq size :single-float)
+                                                       32
+                                                       size)))))
                      (t
                       (let ((shift ,shift))
                         (when (sc-is index any-reg)
