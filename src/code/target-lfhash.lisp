@@ -272,7 +272,7 @@
 ;;  1. Making a "no value" marker that is distinct from NIL.
 ;;  2. Placing keys/value pairs in adjacent cells and using double-wide CAS.
 ;; The reason we don't care about this anomaly is that we have to
-;; look in an Info-Vector [q.v.] anyway to get the whole picture.
+;; look in a packed-info anyway to get the whole picture.
 ;;
 (defun info-puthash (env key update-proc)
   (declare (dynamic-extent update-proc))

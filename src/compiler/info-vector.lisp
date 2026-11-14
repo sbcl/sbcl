@@ -12,14 +12,14 @@
 ;;;; This file implements abstract types which map globaldb Info-Number/Name
 ;;;; pairs to data values. The database itself is defined in 'globaldb'.
 
-;;;; Info-Vectors
-;;;; ============
+;;;; Packed-Info
+;;;; ===========
 
-;;; Info for a Name (an arbitrary object) is stored in an Info-Vector,
-;;; which is like is a 2-level association list. Info-Vectors are stored in
+;;; Info for a Name (an arbitrary object) is stored in a PACKED-INFO
+;;; which is like is a 2-level association list. The PACKED-INFOs are attached to
 ;;; symbols for most names, or in the global hashtable for "complicated" names.
 
-;;; Such vectors exists in two variations: packed and unpacked.
+;;; There are two representations: unpacked and packed.
 ;;; The representations are nearly equivalent for lookup, but the packed format
 ;;; is more space-efficient, though difficult to manipulate except by unpacking.
 
@@ -28,19 +28,19 @@
 ;;;  2. (SETF SB-MOP:STANDARD-INSTANCE-ACCESS)
 ;;;  3. (CAS SB-MOP:STANDARD-INSTANCE-ACCESS)
 ;;;
-;;; Those three names share one Info-Vector. Conceptually the outer alist key
+;;; Those three names share one PACKED-INFO. Conceptually the outer alist key
 ;;; is NIL for the first of those names, and SETF/CAS for the latter two.
 ;;; The inner alist key is a number identifying a type of info.
 ;;; If it were actually an alist, it would look like this:
 ;;;
-;;;  ((nil  (63 . #<fdefn SB-MOP:STANDARD-INSTANCE-ACCESS>) (1 . :FUNCTION) ...)
+;;;  ((nil  (63 . #<fdefn SB-MOP:STANDARD-INSTANCE-ACCESS>) (5 . :FUNCTION) ...)
 ;;;   (SETF (63 . #<fdefn (SETF SB-MOP:STANDARD-INSTANCE-ACCESS)>) ...)
 ;;;   (CAS  (63 . #<fdefn (CAS SB-MOP:STANDARD-INSTANCE-ACCESS)>) ...)
 ;;;   ...)
 ;;;
 ;;; Note:
 ;;; * The root name is exogenous to the vector - it is not stored.
-;;; * The info-number for (:FUNCTION :DEFINITION) is 63, :KIND is 1, etc.
+;;; * The info-number for (:FUNCTION :DEFINITION) is 63, :KIND is 5, etc.
 ;;; * Names which are lists of length other than 2, or improper lists,
 ;;;   or whose elements are not both symbols, are disqualified.
 
@@ -114,7 +114,7 @@
 ;; Descriptors are target fixnums
 (deftype info-descriptor () `(signed-byte ,sb-vm:n-fixnum-bits))
 
-;; An empty info-vector. Its 0th field describes that there are no more fields.
+;; An empty PACKED-INFO. Its 0th field describes that there are no more fields.
 (defglobal +nil-packed-infos+
     (let ((v (make-packed-info 1)))
       (setf (%info-ref v 0) 0)
@@ -122,8 +122,8 @@
 
 #+sb-xc-host ; In the target, UPDATE-SYMBOL-INFO is defined in 'symbol.lisp'.
 (defun update-symbol-info (symbol update-fn)
-  ;; Never pass NIL to an update-fn. Pass the minimal info-vector instead,
-  ;; a vector describing 0 infos and 0 auxiliary keys.
+  ;; Never pass NIL to an update-fn. Pass the minimal PACKED-INFO instead,
+  ;; describing 0 infos and 0 auxiliary keys.
   (let ((newval (funcall update-fn (or (symbol-%info symbol) +nil-packed-infos+))))
     (when newval
       (setf (get symbol :sb-xc-globaldb-info) newval))
@@ -374,7 +374,7 @@
               descriptor-idx field-idx)))) ; can be ignored if 1st val is nil
 
 ;; Take a packed-info INPUT and insert (AUX-KEY,INFO-NUMBER,VALUE).
-;; Packed info-vectors are immutable. Any alteration must create a copy.
+;; PACKED-INFO instances are immutable. Any alteration must create a copy.
 ;; This is done by unpacking/repacking - it's easy enough and fairly
 ;; efficient since the temporary vector is stack-allocated.
 ;;
@@ -513,7 +513,7 @@
                (return)))))
     (let ((delta (- (length new) end)))
       (cond ((zerop delta) nil)
-            ;; All empty info-vectors are equivalent, so if
+            ;; All empty PACKED-INFO instances are equivalent, so if the
             ;; unpacked vector has no data, return a constant.
             ((eql end 1) +nil-packed-infos+)
             (t (packify-infos new end)))))) ; otherwise repack

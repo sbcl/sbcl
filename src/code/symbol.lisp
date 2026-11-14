@@ -163,8 +163,8 @@ distinct from the global value. Can also be SETF."
 
 ;; A symbol's INFO slot is always in one of three states:
 ;;   1. NIL                                    ; the initial state
-;;   2. #(data ....)                           ; globaldb used the slot
-;;   3. (PLIST . NIL) or (PLIST . #(data ...)) ; plist was touched,
+;;   2. #<data ....>                           ; globaldb used the slot
+;;   3. (PLIST . NIL) or (PLIST . #<data ...>) ; plist was touched,
 ;;      and also possibly globaldb used the slot
 ;;
 ;; State 1 transitions to state 2 by assigning globaldb data,
@@ -173,8 +173,8 @@ distinct from the global value. Can also be SETF."
 ;; State 2 transitions to state 3 via ({SETF|CAS} SYMBOL-PLIST).
 ;; There are *no* other permissible state transitions.
 
-;; Atomically update SYMBOL's info/plist slot to contain a new info vector.
-;; The vector is computed by calling UPDATE-FN on the old vector,
+;; Atomically update SYMBOL's info/plist slot to contain a new PACKED-INFO.
+;; The new packed-info is computed by calling UPDATE-FN on the old instance,
 ;; repeatedly as necessary, until no conflict happens with other updaters.
 ;; The function may choose to abort the update by returning NIL.
 (defun update-symbol-info (symbol update-fn)

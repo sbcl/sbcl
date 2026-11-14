@@ -184,13 +184,13 @@
         (values (sb-kernel:%info-ref vector index) t)
         (values nil nil))))
 
-;; Info vectors may be concurrently updated. If more than one thread writes
+;; PACKED-INFOs may be concurrently updated. If more than one thread writes
 ;; the same name/info-number, it's random which thread prevails, but for
 ;; non-colliding updates, none should be lost.
-;; This is not a "reasonable" use of packed info vectors.
+;; This is not a "reasonable" use of PACKED-INFO.
 ;; It's just a check of the response of the algorithm to heavy pounding.
 #+sb-thread
-(test-util:with-test (:name :info-vector-concurrency)
+(test-util:with-test (:name :packed-info-concurrency)
   (let ((s (gensym))
         (a (make-array 1 :element-type 'sb-ext:word :initial-element 0)))
     (let* ((aux-keys '(0 a b c d e f g h nil i j k l m n o p setf q r s))
@@ -406,7 +406,7 @@
                  (return))))))
 
 #+sb-thread
-(test-util:with-test (:name :info-vector-classoid-cell)
+(test-util:with-test (:name :packed-info-classoid-cell)
   (let (readers writers more-threads results)
     (dotimes (i 5)
       (push (sb-thread:make-thread #'be-a-classoid-cell-writer) writers))
@@ -549,7 +549,7 @@
 ;; a piece of info for a name, as it is quite brutal and consy,
 ;; but for this test, that's precisely the goal.
 ;; This test conses ~5 Megabytes on 64-bit almost entirely due
-;; to allocation of each immutable info storage vector.
+;; to allocation of each immutable packed-info.
 (test-util:with-test (:name :get-info-value-updating
                       :skipped-on (not :sb-thread))
   (flet ((run (names)
