@@ -172,9 +172,21 @@
   (unless from-amount
     (setf from-amount 0))
   (case new
-    ((char= char-equal . #.+eq-ops+)
+    (eq
      (unless not-p
        (values from from-amount)))
+    ((char= eql)
+     (unless not-p
+       (values (if (eq from 'eq) new from) from-amount)))
+    (char-equal
+     (unless not-p
+       (case from
+         ((char-equal char= eq eql) (values 'char-equal from-amount)))))
+    (=
+     (unless not-p
+       (case from
+         ((= eq eql) (values '= from-amount))
+         ((< <= > >=) (values from from-amount)))))
     (<
      (if not-p
          (case from

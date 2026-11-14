@@ -2649,3 +2649,13 @@
            nil
            (and (< 4 (char-code c)) (< (char-code c) 9)))))
    boolean))
+
+(with-test (:name :inherit-equality-p-char-equal)
+  (assert-type
+   (lambda (x y z)
+     (if (eq y z)
+         (if (char-equal x y)
+             (eq x z)
+             t)
+         t))
+   boolean))
