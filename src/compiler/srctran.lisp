@@ -4280,7 +4280,8 @@
                               collect
                               (gen type))))
                ((cons (eql :not))
-                `(not ,(gen (cadr type))))
+                `(not (types-equal-or-intersect (lvar-type arg)
+                                                (specifier-type ',(cadr type)))))
                (t
                 `(csubtypep (lvar-type arg) (specifier-type ',type))))))
     `(and (combination-p ,node)
@@ -4332,14 +4333,13 @@
                (setf truly-type t))
               (t
                (give-up-ir1-transform))))
-      (cond ((combination-typed-p use %negate (:and (:not (integer * 0))
-                                                    (:or word
-                                                         sb-vm:signed-word)))
+      (cond ((combination-typed-p use %negate (:or word
+                                                   sb-vm:signed-word))
              (splice-fun-args amount '%negate 1)
              (wrap-if truly-type
                       `(truly-the word)
                       `(ash-inverted integer amount)))
-            ((combination-typed-p use %negate (:not (integer * 0)))
+            ((combination-typed-p use %negate (:not (integer * -1)))
              (splice-fun-args amount '%negate 1)
              (wrap-if truly-type
                       `(truly-the word)
@@ -4351,7 +4351,8 @@
 
   (deftransform ash ((integer amount) (sb-vm:signed-word t) *
                      :important nil :node node)
-    (when (constant-lvar-p amount)
+    (when (or (constant-lvar-p amount)
+              (lvar-subtypep integer unsigned-byte)) ;; go to the word transform above
       (give-up-ir1-transform))
     (delay-ir1-transform node :ir1-phases)
     (let ((use (lvar-uses amount))
@@ -4359,19 +4360,19 @@
           (dest (node-dest node))
           truly-type)
       (unless (csubtypep result-type (specifier-type 'sb-vm:signed-word))
-        (cond ((or (combination-typed-p dest mask-signed-field (eql #.(1- sb-vm:n-word-bits)))
-                   (combination-typed-p dest logand t word))
-               (setf truly-type t))
+        (cond ((combination-typed-p dest mask-signed-field (eql #.(1- sb-vm:n-word-bits)))
+               (setf truly-type `(truly-the sb-vm:signed-word)))
+              ((combination-typed-p dest logand t word)
+               (setf truly-type `(truly-the sb-vm:signed-word)))
               (t
                (give-up-ir1-transform))))
-      (cond ((combination-typed-p use %negate (:and (:not (integer * 0))
-                                                    (:or word
-                                                         sb-vm:signed-word)))
+      (cond ((combination-typed-p use %negate (:or word
+                                                   sb-vm:signed-word))
              (splice-fun-args amount '%negate 1)
              (wrap-if truly-type
                       `(truly-the sb-vm:signed-word)
                       `(ash-inverted integer amount)))
-            ((combination-typed-p use %negate (:not (integer * 0)))
+            ((combination-typed-p use %negate (:not (integer * -1)))
              (splice-fun-args amount '%negate 1)
              (wrap-if truly-type
                       `(truly-the sb-vm:signed-word)

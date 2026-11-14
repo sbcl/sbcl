@@ -1197,7 +1197,6 @@
   (:args (number)
          (amount))
   (:results (result))
-  (:temporary (:sc non-descriptor-reg) temp)
   (:arg-refs nil amount-ref)
   (:variant-vars variant)
   (:related-args number)
@@ -1212,32 +1211,33 @@
            (:unsigned (inst lsr result number amount)))
          (unless positive
            (inst tbz amount 63 done)
-           (inst neg temp amount)
-           (inst lsl result number temp)))
+           (inst neg tmp-tn amount)
+           (inst lsl result number tmp-tn)))
         (positive
          (inst cmp amount n-word-bits)
          (ecase variant
            (:signed
-            (inst csinv temp amount zr-tn :lo)
-            (inst asr result number temp))
+            (inst csinv tmp-tn amount zr-tn :lo)
+            (inst asr result number tmp-tn))
            (:unsigned
-            (inst csel result number zr-tn :lo)
-            (inst lsr result result amount))))
+            (inst csel tmp-tn number zr-tn :lo)
+            (inst lsr result tmp-tn amount))))
         (t
          (inst cmp amount 0)
-         (inst csneg temp amount amount :ge)
-         (inst cmp temp n-word-bits)
+         (inst csneg tmp-tn amount amount :ge)
+         (inst cmp tmp-tn n-word-bits)
          ;; Only the first 6 bits count for shifts.
          ;; This sets all bits to 1 if AMOUNT is larger than 63,
          ;; cutting the amount to 63.
-         (inst csinv temp temp zr-tn :lo)
+         (inst csinv tmp-tn tmp-tn zr-tn :lo)
          (ecase variant
-           (:signed (inst asr result number temp))
+           (:signed (inst asr result number tmp-tn))
            (:unsigned
             (inst csel result number zr-tn :lo)
-            (inst lsr result result temp)))
+            (inst lsr result result tmp-tn)))
          (inst tbz amount 63 done)
-         (inst lsl result number temp))))
+         (inst lsl result number tmp-tn)
+         (inst csel result result zr-tn :lo))))
     done))
 
 (define-vop (ash/signed=>signed ash/signed/unsigned)

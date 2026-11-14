@@ -2609,7 +2609,20 @@
       (declare ((integer -5 5) y)
                ((signed-byte 16) x))
       (ash x (- y)))
-   ((1 -5) 32)))
+   ((1 -5) 32))
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (x)
+         (logand #xffffffffffffffff (ash 1 (- (the integer x)))))
+    ((-1) 2))
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (x)
+         (declare (signed-word x))
+         (logand #xffffffffffffffff (ash 1 (- x))))
+    ((-1) 2)
+    ((-64) 0)
+    ((-63) 9223372036854775808)))
 
 (with-test (:name :+/-rationals
             :skipped-on (not :arm64)) ;; FIXME: others translate to generic-+
