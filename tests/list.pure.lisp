@@ -482,3 +482,9 @@
             set-difference nset-difference
             set-exclusive-or nset-exclusive-or
             subsetp))))
+
+(with-test (:name :set-exclusive-or-same-arg)
+  (assert-type
+   (lambda (x)
+     (set-exclusive-or x x))
+   null))

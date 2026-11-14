@@ -4433,7 +4433,7 @@
                 (not key)
                 (or (not test)
                     (lvar-fun-is test '(eq eql equal equalp))))
-           'list1)
+           nil)
           (t
            (give-up-ir1-transform)))))
 
