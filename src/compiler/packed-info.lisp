@@ -747,13 +747,7 @@ This is interpreted as
         (update-symbol-info key1 (lambda (old-info)
                                    (augment old-info key2)))
         :specialized
-        #+sb-xc-host (error "Can't set-info-value for ~S" name)
-        #-sb-xc-host
-        (let* ((cell (ensure-specxep-info-cell name))
-               (old (car cell)))
-          (loop (let* ((new (augment old +no-auxiliary-key+))
-                       (actual (cas (car cell) old new)))
-                  (if (eq actual old) (return) (setq old actual)))))
+        (error "Can't SET-INFO-VALUE on ~S" name)
         :hairy
         ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
         (info-puthash *info-environment* name
@@ -838,15 +832,7 @@ This is interpreted as
         ;; UPDATE-SYMBOL-INFO never supplies OLD-INFO as NIL.
         (update-symbol-info key1 (lambda (old-info)
                                    (get-or-set old-info key2)))
-        :specialized
-        #+sb-xc-host (error "Can't %get-info-value-initializing ~S" name)
-        #-sb-xc-host
-        (let ((cell (ensure-specxep-info-cell name)))
-          (loop (let* ((old (car cell))
-                       (new (get-or-set old +no-auxiliary-key+)))
-                  (when (eq new nil) (return))
-                  (let ((actual (cas (car cell) old new)))
-                    (if (eq actual old) (return) (setq old actual))))))
+        :specialized (bug "Unhandled")
         :hairy
         ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
         (info-puthash *info-environment* name

@@ -43,7 +43,9 @@
   ;; the compiler isn't figuring out not to test SYMBOLP twice in a row.
   (with-globaldb-name (key1 key2 nil) name
       :specialized
-      (return-from find-fdefn (values (get-info-value name +fdefn-info-num+)))
+      (return-from find-fdefn
+        (awhen (info :function :specialized-xep (second name))
+          (find name (specxep-info-fdefns it) :key #'fdefn-name :test #'equal)))
       :hairy
       (awhen (get-fancily-named-fdefn name nil)
         (return-from find-fdefn it))
@@ -119,9 +121,15 @@
           (let ((fdefn (with-globaldb-name (key1 key2) name
                         :simple (get-info-value-initializing
                                  :function :definition name (new name))
-                        ;; (too bad this can't be merged with the preceding)
-                        :specialized (get-info-value-initializing
-                                      :function :definition name (new name))
+                        :specialized
+                        (let* ((holder (ensure-specxep-info-holder name))
+                               (list (specxep-info-fdefns holder))
+                               new)
+                          (loop (let ((found (find name list :key #'fdefn-name :test #'equal)))
+                                  (if found (return found)))
+                                (unless new (setq new (new name)))
+                                (let ((old (cas (specxep-info-fdefns holder) list (cons new list))))
+                                  (if (eq old list) (return new) (setq list old)))))
                         :hairy (get-fancily-named-fdefn name #'new))))
             ;; Slot accessors spring into existence as soon as a reference
             ;; is made to the respective fdefn, but we can't do this in
@@ -371,8 +379,7 @@
         (when fdefn
           (fset fdefn (compile nil (stub-lexpr-for-specialized-name specialized-name))))
         (when clear-info
-          (setf (specxep-info-specialization holder) nil)
-          (undefine-fun-name specialized-name))))))
+          (setf (specxep-info-specialization holder) nil))))))
 
 (defun setf-fdefinition (new-value name clear-specialized-xep)
   (declare (type function new-value) (optimize (safety 1)))

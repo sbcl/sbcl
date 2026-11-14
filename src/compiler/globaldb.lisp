@@ -165,10 +165,7 @@
 ;;; which may redirect to a revised specialized definition.
 (defstruct (specxep-info (:constructor make-specxep-info)
                          (:predicate nil) (:copier nil))
-  ;; Lisp functions name aren't overloadable, so there can be at most 1 active specialized XEP
-  ;; name, but the alist can store info for N names as per the example above.
-  ;;  ((#<packed-info>  . specialization1) (#<packed-info> . specialization2) ...)
-  alist
+  (fdefns nil :type list) ; one per specialization we've ever seen
   ;; the specialization that function FOO should use if we compile a call.
   specialization)
 (declaim (freeze-type specxep-info))
@@ -215,18 +212,7 @@
       (dx-flet ((clear-simple (old)
                   (setq new (packed-info-remove old key2 info-numbers))))
         (update-symbol-info key1 #'clear-simple))
-      :specialized
-      (binding* ((stem (second name))
-                 (holder (info :function :specialized-xep stem) :exit-if-null)
-                 (cell (rassoc (cddr name) (specxep-info-alist holder) :test 'equal)
-                       :exit-if-null)
-                 (old (car cell)))
-        #+sb-xc-host (error "Can't clear-info-values for specialized-xep: old=~S" old)
-        #-sb-xc-host
-        (loop (setq new (packed-info-remove old +no-auxiliary-key+ info-numbers))
-              (unless new (return)) ; nothing changed
-              (let ((actual-old (cas (car cell) old new)))
-                (if (eq old actual-old) (return) (setq old actual-old)))))
+      :specialized (bug "Don't do this")
       :hairy
       ;; The global hashtable is not imbued with knowledge of the convention
       ;; for PACKED-INFO-REMOVE because that would render it less useful
@@ -277,11 +263,7 @@
            ;; In the :simple branch, KEY1 is no doubt a symbol,
            ;; but constraint propagation isn't informing the compiler here.
            :simple (values (symbol-dbinfo (truly-the symbol key1)) key2)
-           :specialized
-           (binding* ((stem (second name))
-                      (holder (info :function :specialized-xep stem) :exit-if-null))
-             (values (car (rassoc (cddr name) (specxep-info-alist holder) :test 'equal))
-                     +no-auxiliary-key+))
+           :specialized (values nil +no-auxiliary-key+)
            :hairy (values (info-gethash name *info-environment*)
                           +no-auxiliary-key+)))
       (when packed-info
@@ -691,21 +673,6 @@
   (let ((stem (second specialized-name)))
     (get-info-value-initializing :function :specialized-xep stem (make-specxep-info))))
 
-(defun ensure-specxep-info-cell (specialized-name)
-  #+sb-xc-host ; probably can just use symbol-plist
-  (error "Not implemented for host yet: ensure-specxep-info-cell ~S" specialized-name)
-  #-sb-xc-host
-  (let* ((holder (ensure-specxep-info-holder specialized-name))
-         (specialization (cddr specialized-name))
-         (alist (specxep-info-alist holder)))
-    (loop (let ((found (rassoc specialization alist :test 'equal)))
-            (if found (return found)))
-          (let* ((cell (cons +nil-packed-infos+ specialization))
-                 (new (cons cell alist))
-                 ;; this would be a weak CAS if we had that
-                 (old (cas (specxep-info-alist holder) alist new)))
-            (if (eq old alist) (return cell) (setq alist old))))))
-
 (!defun-from-collected-cold-init-forms !info-type-cold-init)
 
 #-sb-xc-host
@@ -740,15 +707,8 @@
             (let ((*print-pretty* nil))
               (format t "~&    current XEP = ~S~%"
                       (specxep-info-specialization val))
-              (dolist (pair (specxep-info-alist val))
-                (format t "    signature ~S~%" (cdr pair))
-                (%call-with-each-info
-                 (lambda (name type-num val)
-                   (declare (ignore name))
-                   (let ((type (svref *info-types* type-num)))
-                     (format t "      ~S ~S = ~S~%"
-                             (meta-info-category type) (meta-info-kind type) val)))
-                 (car pair) :error))))
+              (dolist (fdefn (specxep-info-fdefns val))
+                (format t "    ~S~%" fdefn))))
            (t
             (write val :level 2)))))
      sym)))
