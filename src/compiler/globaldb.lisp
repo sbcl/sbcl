@@ -657,8 +657,8 @@
 (define-info-type (:symbol :package) :type-spec (or package null))
 
 (defun fname-has-specialized-xep-p (fun-name)
-  (aver (not (typep fun-name '(cons (eql specialized-xep)))))
-  (awhen (info :function :specialized-xep fun-name)
+  (awhen (and (not (typep fun-name '(cons (eql specialized-xep))))
+              (info :function :specialized-xep fun-name))
     (specxep-info-specialization it)))
 
 (defun set-fname-specialized-xep-name (fun-name specialized-name)
