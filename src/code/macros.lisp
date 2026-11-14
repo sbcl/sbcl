@@ -141,19 +141,20 @@ tree structure resulting from the evaluation of EXPRESSION."
                           thereis (csubtypep value (specifier-type 'double-float))))))
          (cdr (type-specifier type)))))
 
-(defun make-specialized-xep-stub (name specialized
-                                  &optional (xep-name
-                                             `(specialized-xep ,name ,@specialized)))
-  (let ((vars (loop for arg in (car specialized)
-                    for i from 0
-                    collect (make-symbol (format nil "A~a" i)))))
-    (values
-     `(named-lambda ,xep-name ,vars
+;;; Return a lambda expression which will be fbound to SPECIALIZED-NAME and which
+;;; trampolines to the global -unspecialized- function. Caller will compile it either
+;;; as part of the DEFUN expansion (when signatures don't match), or via COMPILE
+;;; upon installing an encapsulation so that we can intercept specialized call sites.
+(defun stub-lexpr-for-specialized-name (specialized-name)
+  (destructuring-bind (name . specialization) (cdr specialized-name)
+    (let ((vars (loop for arg in (car specialization)
+                      for i from 0
+                      collect (make-symbol (format nil "A~a" i)))))
+     `(named-lambda ,specialized-name ,vars
         (declare (notinline ,name)
                  (muffle-conditions warning)
                  (optimize inhibit-warnings))
-        (funcall ',name ,@vars))
-     xep-name)))
+        (funcall ',name ,@vars)))))
 
 (flet ((defun-expander (env name lambda-list body snippet &optional source-form always-store-source-form)
   (multiple-value-bind (forms decls doc) (parse-body body t)
@@ -181,10 +182,10 @@ tree structure resulting from the evaluation of EXPRESSION."
                            "lexical environment too hairy, can't inline DEFUN ~S"
                            name)
                           nil)))))
-           (specialized-xep (and (not (or inline-thing
-                                          (info :function :info name)
-                                          (eq (info :function :inlinep name) 'notinline)))
-                                 (specialized-xep-for-type-p lambda-list name))))
+           (specialization (and (not (or inline-thing
+                                         (info :function :info name)
+                                         (eq (info :function :inlinep name) 'notinline)))
+                                (specialized-xep-for-type-p lambda-list name))))
       (when (and (eq snippet :constructor)
                  (not (typep inline-thing '(cons (eql sb-c:lambda-with-lexenv)))))
         ;; constructor in null lexenv need not save the expansion
@@ -194,21 +195,22 @@ tree structure resulting from the evaluation of EXPRESSION."
       (when (and extra-info (not (keywordp extra-info)))
         (setq extra-info (list 'quote extra-info)))
       `(progn
-         ,@(let ((existing-specialized-xep (fname-has-specialized-xep-p name)))
-             (if (and existing-specialized-xep
-                      (not (equal existing-specialized-xep specialized-xep)))
-                 (multiple-value-bind (xep xep-name)
-                     (make-specialized-xep-stub name existing-specialized-xep)
+         ,@(let ((existing-specialization (fname-has-specialized-xep-p name)))
+             (when (and existing-specialization
+                        (not (equal existing-specialization specialization)))
+               (let* ((existing-specialized-name
+                       `(specialized-xep ,name ,@existing-specialization))
+                      (stub (stub-lexpr-for-specialized-name existing-specialized-name)))
                    `((progn
                        (eval-when (:compile-toplevel)
                          (set-fname-specialized-xep-name ',name nil)) ; clear it
-                       (when (fboundp ',xep-name)
-                         (setf (fdefinition ',xep-name) ,xep)))))))
-         ,@(if specialized-xep
-               (let ((xep-name `(specialized-xep ,name ,@specialized-xep)))
+                       (when (fboundp ',existing-specialized-name)
+                         (setf (fdefinition ',existing-specialized-name) ,stub)))))))
+         ,@(if specialization
+               (let ((specialized-name `(specialized-xep ,name ,@specialization)))
                  `((eval-when (:compile-toplevel)
-                     (sb-c:%compiler-defun ',name t nil nil ',specialized-xep))
-                    (let ((xep (named-lambda ,xep-name ,(third named-lambda)
+                     (sb-c:%compiler-defun ',name t nil nil ',specialization))
+                    (let ((xep (named-lambda ,specialized-name ,(third named-lambda)
                                  (declare (sb-c::source-form ,source-form))
                                  ,@(cdddr named-lambda))))
                       (sb-impl::%defun-specialized-xep
@@ -222,7 +224,7 @@ tree structure resulting from the evaluation of EXPRESSION."
                            ;; Avoid tail calls for unboxed returns.
                            (values)))
                        xep
-                       ',specialized-xep))))
+                       ',specialization))))
                (let ((definition
                        (if (block-compilation-non-entry-point name)
                            `(progn

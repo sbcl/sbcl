@@ -358,16 +358,18 @@
              (change-full-call combination new))))))
     (:full
      (let* ((combination-name (lvar-fun-name (combination-fun combination) t))
-            (specialized (or (fname-has-specialized-xep-p combination-name)
-                             (let ((specialized (assoc 'specialized-xep
-                                                       (lexenv-user-data (node-lexenv combination)))))
-                               (when (eq (cadr specialized) combination-name)
-                                 (cddr specialized))))))
-       (when (and specialized
+            (specialization
+             (or (fname-has-specialized-xep-p combination-name)
+                 (let ((specialized-name (assoc 'specialized-xep
+                                                (lexenv-user-data (node-lexenv combination)))))
+                   (when (eq (cadr specialized-name) combination-name)
+                     (cddr specialized-name))))))
+       (when (and specialization
                   (= (length (combination-args combination))
-                     (length (first specialized)))
+                     (length (first specialization)))
                   (not (fun-lexically-notinline-p combination-name (node-lexenv combination))))
-         (change-full-call combination `(specialized-xep ,combination-name ,@specialized)))))))
+         (change-full-call combination
+                           `(specialized-xep ,combination-name ,@specialization)))))))
 
 ;;; The %other-pointer-subtype-p optimizer in ir2opt combines multiple
 ;;; checks for other-pointer into a single widetag load.

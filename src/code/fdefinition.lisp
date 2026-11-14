@@ -279,14 +279,13 @@
                               (declare (ignore args))
                               (error "~S is undefined" name))))
                        (copy-structure existing)))
-             (specialized-xep (fname-has-specialized-xep-p name))
+             (specialization (fname-has-specialized-xep-p name))
              (closure (named-lambda encapsulation (&rest args)
                         (apply function (encapsulation-info-definition info)
                                args))))
-        (when specialized-xep
-          (let* ((xep-name
-                   `(specialized-xep ,name ,@specialized-xep))
-                 (xep-fun (name->fun xep-name)))
+        (when specialization
+          (let* ((specialized-name `(specialized-xep ,name ,@specialization))
+                 (xep-fun (name->fun specialized-name)))
             (when xep-fun
               (setf (encapsulation-info-specialized-xep info) xep-fun)
               (remove-specialized-xep name nil))))
@@ -365,17 +364,15 @@
 
 (defun remove-specialized-xep (name &optional (clear-info t))
   (binding* ((holder (info :function :specialized-xep name) :exit-if-null)
-             (xep (specxep-info-specialization holder)))
-    (when xep
-      (let* ((xep-name
-               `(specialized-xep ,name ,@xep))
-             (fdefn (find-fdefn xep-name)))
+             (specialization (specxep-info-specialization holder)))
+    (when specialization
+      (let* ((specialized-name `(specialized-xep ,name ,@specialization))
+             (fdefn (find-fdefn specialized-name)))
         (when fdefn
-          (fset fdefn
-                (compile nil (make-specialized-xep-stub name xep xep-name))))
+          (fset fdefn (compile nil (stub-lexpr-for-specialized-name specialized-name))))
         (when clear-info
           (setf (specxep-info-specialization holder) nil)
-          (undefine-fun-name xep-name))))))
+          (undefine-fun-name specialized-name))))))
 
 (defun setf-fdefinition (new-value name clear-specialized-xep)
   (declare (type function new-value) (optimize (safety 1)))
