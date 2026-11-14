@@ -439,9 +439,15 @@ is either numeric or alphabetic."
            nil)
           #+sb-unicode
           (t
-           (with-case-info (c1 index cases)
-             (or (= (aref cases index) (char-code c2)) ;; lower case
-                 (= (aref cases (1+ index)) (char-code c2))))))))
+           (with-case-info (c1 index1 cases1)
+             (let ((lower1 (aref cases1 index1)))
+               (or (= lower1 (char-code c2))
+                   (= (aref cases1 (1+ index1)) (char-code c2))
+                   ;; For something like #\LATIN_CAPITAL_LETTER_D_WITH_SMALL_LETTER_Z
+                   ;; uppercase and lowercase do not match the character itslef.
+                   (and (plusp lower1)
+                        (with-case-info (c2 index2 cases2)
+                          (= lower1 (aref cases2 index2)))))))))))
 
 ;;; There are transforms on two-arg-char-equal, don't make it inlinable itself.
 (defun two-arg-char-equal (c1 c2)
