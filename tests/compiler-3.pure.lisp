@@ -1355,3 +1355,13 @@
  (checked-compile
   `(lambda (f) (set-difference (union f '(1)) nil))
   :allow-notes nil))
+
+(with-test (:name :accumulate-optimistic-arg-types-deleted-calls)
+  (checked-compile
+   `(lambda ()
+      (labels ((g (a b)
+                 (f a)
+                 (g a b))
+               (f (a)
+                 (f a)))
+        (g 2 (error "x"))))))

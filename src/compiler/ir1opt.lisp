@@ -3470,13 +3470,14 @@ not inlined.")
                         (lambda (value) (push value (aref arg-values i)))
                         arg var (or (aref seen i) (list var))))))
           (dolist (ref (leaf-refs fun))
-            (let ((dest (node-dest ref)))
-              (when dest
-                (loop for var in vars
-                      for arg in (basic-combination-args dest)
-                      for i from 0
-                      when (lambda-var-optimistic-type var)
-                        do (accumulate arg var i)))))
+            (unless (node-to-be-deleted-p ref)
+              (let ((dest (node-dest ref)))
+                (when dest
+                  (loop for var in vars
+                        for arg in (basic-combination-args dest)
+                        for i from 0
+                        when (lambda-var-optimistic-type var)
+                        do (accumulate arg var i))))))
           (loop for var in vars
                 for i from 0
                 when (lambda-var-optimistic-type var)
