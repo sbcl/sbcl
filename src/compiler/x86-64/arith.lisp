@@ -5809,9 +5809,8 @@
   (:generator 10
     (case width
       (64 (move r lo-x))
-      (32 (inst movsx r (reg-in-size lo-x :dword)))
-      (16 (inst movsx r (reg-in-size lo-x :word)))
-      (8  (inst movsx r (reg-in-size lo-x :byte)))
+      ((8 16 32)
+       (inst movsx `(,(bits->size width) :qword) r lo-x))
       (t
        (move r lo-x)
        (inst shl r (- 64 width))
