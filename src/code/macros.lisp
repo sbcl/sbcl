@@ -209,7 +209,7 @@ tree structure resulting from the evaluation of EXPRESSION."
          ,@(if specialization
                (let ((specialized-name `(specialized-xep ,name ,@specialization)))
                  `((eval-when (:compile-toplevel)
-                     (sb-c:%compiler-defun ',name t nil nil ',specialization))
+                     (sb-c:%compiler-defun ',name t nil ,extra-info ',specialization))
                     (let ((xep (named-lambda ,specialized-name ,(third named-lambda)
                                  (declare (sb-c::source-form ,source-form))
                                  ,@(cdddr named-lambda))))
@@ -224,7 +224,8 @@ tree structure resulting from the evaluation of EXPRESSION."
                            ;; Avoid tail calls for unboxed returns.
                            (values)))
                        xep
-                       ',specialization))))
+                       ',specialization
+                       ,@(when extra-info `(,extra-info))))))
                (let ((definition
                        (if (block-compilation-non-entry-point name)
                            `(progn

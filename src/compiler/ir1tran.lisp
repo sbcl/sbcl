@@ -218,16 +218,13 @@
                                          (= debug 3)))
                    (not (or
                          (info :function :info name)
+                         (typep name '(cons (eql specialized-xep)))
                          (let ((name (if (consp name)
                                          (second name)
                                          name)))
                            (when (symbolp name)
                              (system-package-p (symbol-package name)))))))
           (setf where :declared-verify))
-        (when (typep name
-                     '(cons (eql specialized-xep)))
-          (setf ftype (specifier-type `(function ,@(cddr name)))
-                where :declared))
         (make-global-var
          :global-function name
          (if notinline

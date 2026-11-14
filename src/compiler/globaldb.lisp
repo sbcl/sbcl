@@ -321,7 +321,9 @@
   :default
   #+sb-xc-host nil
   #-sb-xc-host (lambda (name)
-                 (if (or (fboundp name) (pcl-methodfn-name-p name))
+                 (if (or (fboundp name)
+                         (pcl-methodfn-name-p name)
+                         (typep name '(cons (eql specialized-xep))))
                      :function
                      nil)))
 
@@ -344,7 +346,7 @@
   :default (lambda (name)
              (declare (ignorable name))
              #+sb-xc-host (specifier-type 'function)
-             #-sb-xc-host (sb-c::ftype-from-definition name)))
+             #-sb-xc-host (ftype-from-definition name)))
 
 ;;; the ASSUMED-TYPE for this function, if we have to infer the type
 ;;; due to not having a declaration or definition
@@ -372,7 +374,10 @@
   ;; not clear how to generalize the FBOUNDP expression to the
   ;; cross-compiler. -- WHN 19990606
   #+sb-xc-host :assumed
-  #-sb-xc-host (lambda (name) (if (fboundp name) :defined :assumed)))
+  #-sb-xc-host (lambda (name)
+                 (cond ((typep name '(cons (eql specialized-xep))) :declared)
+                       ((fboundp name) :defined)
+                       (t :assumed))))
 
 ;;; Two kinds of hints for compiling calls as efficiently as possible:
 ;;; (A) Inline expansion: To inline a function, we want a lambda
@@ -384,6 +389,11 @@
 ;;; If only (B) is stored, then this is a DXABLE-ARGS.
 ;;; If both, this is an INLINING-DATA.
 (define-info-type (:function :inlining-data)
+  :default (lambda (name)
+             (when (typep name '(cons (eql specialized-xep)))
+               (let ((data (info :function :inlining-data (second name))))
+                 (when (typep data 'sb-c::dxable-args)
+                   (sb-c::make-dxable-args (sb-c::dxable-args-list data))))))
   :type-spec (or list sb-c::dxable-args sb-c::inlining-data))
 
 ;;; This specifies whether this function may be expanded inline. If

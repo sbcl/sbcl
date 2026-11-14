@@ -1417,9 +1417,22 @@
               t))
   (assert (and (= i 1) (= j 1))))
 
+(declaim (ftype (function (double-float function) fixnum) unboxed-hof))
+(defun unboxed-hof (x fun)
+  (declare (dynamic-extent fun))
+  (if (> x 0d0) (funcall fun 1) 0))
+(defun autodxclosure3 (x &aux (y 2))
+  (declare (double-float x) (fixnum y) (optimize speed (safety 0) (debug 0)))
+  (unboxed-hof x (lambda (a) (+ a y))))
+
 (with-test (:name (:no-consing :auto-dx-closures))
   (assert-no-consing (autodxclosure1 42))
-  (assert-no-consing (autodxclosure2)))
+  (assert-no-consing (autodxclosure2))
+  #+(or arm64 x86-64)
+  (assert (equal (ctu:find-named-callees #'autodxclosure3)
+                 '((sb-int:specialized-xep unboxed-hof (double-float function)
+                                           (values fixnum &rest t)))))
+  (assert-no-consing (autodxclosure3 3d0)))
 
 (with-test (:name (:no-consing :more-auto-dx-closures))
   (assert-no-consing

@@ -1500,10 +1500,6 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
 
   (become-defined-fun-name name)
   (when specialization
-    (let ((specialized-name `(specialized-xep ,name ,@specialization)))
-      (set-fname-specialized-xep-name name specialized-name)
-      (setf (info :function :type specialized-name)
-            (specifier-type `(function ,@specialization))
-            (info :function :where-from specialized-name) :declared)))
+    (set-fname-specialized-xep-name name `(specialized-xep ,name ,@specialization)))
 
   (values))

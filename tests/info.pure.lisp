@@ -614,7 +614,7 @@
                2)))
   (let ((xep-name '(sb-int:specialized-xep (setf foo) (double-float t fixnum fixnum)
                                            (values double-float &optional))))
-    (assert (nth-value 1 (info :function :type xep-name)))
+    (assert (sb-kernel:fun-type-p (info :function :type xep-name)))
     (fmakunbound '(setf foo))
     (assert (not (nth-value 1 (info :function :type xep-name))))
     (assert (not (clear-info :function :type xep-name)))

@@ -295,7 +295,9 @@
     (interpreted-function (sb-interpreter:%fun-ftype function))
     (t (%simple-fun-type (%fun-fun function)))))
 
-(defun sb-c::ftype-from-definition (name)
+(defun ftype-from-definition (name)
+  (when (typep name '(cons (eql specialized-xep)))
+    (return-from ftype-from-definition (specifier-type `(function ,@(cddr name)))))
   (let ((function (fboundp name)))
     (cond
       ((not function)
