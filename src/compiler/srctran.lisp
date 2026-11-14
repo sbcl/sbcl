@@ -2294,7 +2294,7 @@
             (combination-info node) (list #'compiler-warn "division by zero")))
     type))
 
-(defconstant +left-shift-derive-type-cutoff+ 256)
+(defconstant +left-shift-derive-type-cutoff+ 4096)
 
 (defun ash-derive-type-aux (n-type shift same-arg)
   (declare (ignore same-arg))
@@ -4005,8 +4005,10 @@
                     size-interval)
            (type-intersection (make-numeric-type 'integer
                                                  0
-                                                 (max (interval-high int-interval)
-                                                      (1- (ash 1 (interval-high posn-minuend-interval)))))
+                                                 (let ((min-high (interval-high posn-minuend-interval)))
+                                                   (when (<= min-high +left-shift-derive-type-cutoff+)
+                                                     (max (interval-high int-interval)
+                                                          (1- (ash 1 min-high))))))
                               (or computed *universal-type*)))))
      computed)))
 
@@ -8116,7 +8118,7 @@
            (setf mc1 (lvar-value (second args))))
           (ash (* constant)
            (let ((c (lvar-value (second args))))
-             (when (plusp c)
+             (when (typep c `(integer 0 ,+left-shift-derive-type-cutoff+))
                (setf mc1 (ash 1 c))))))
         (or (cond (c1
                    (let* (arg2
