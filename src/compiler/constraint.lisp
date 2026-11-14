@@ -425,10 +425,23 @@
           (register-constraint y new x))
         new)))
 
-(declaim (inline type-for-constraints-p))
 (defun type-for-constraints-p (type)
-  (not (or (eq type *universal-type*)
-           (opaque-type-p type))))
+  (cond ((eq type *universal-type*)
+         (values nil nil))
+        ((opaque-type-p type)
+         (when (and (intersection-type-p type)
+                    (find-if-not #'opaque-type-p (intersection-type-types type)))
+           (let* ((pruned-p)
+                  (pruned (remove-if (lambda (x)
+                                       (and (opaque-type-p x)
+                                            (not (eq x (specifier-type '(satisfies keywordp))))
+                                            (setf pruned-p t)))
+                                     (intersection-type-types type))))
+             (if pruned-p
+                 (values (sb-kernel::%type-intersection pruned) nil)
+                 (values type t)))))
+        (t
+         (values type t))))
 
 ;;; Actual conset interface
 ;;;
@@ -822,10 +835,11 @@
                  (when lvar
                    (constraint-propagate-back lvar fun y constraints consequent-constraints alternative-constraints)))
                (add-no-complement (fun x y not-p &optional lvar)
-                 (add-test-constraint quick-p
-                                      fun x y not-p
-                                      constraints
-                                      consequent-constraints)
+                 (when x
+                   (add-test-constraint quick-p
+                                        fun x y not-p
+                                        constraints
+                                        consequent-constraints))
                  (when lvar
                    (constraint-propagate-back lvar fun y constraints consequent-constraints nil)))
                (process-node (node)
@@ -863,13 +877,13 @@
                                                    (handler-bind ((parse-unknown-type
                                                                     (lambda (c) c (return))))
                                                      (careful-specifier-type val))))))
-                                 (when (and ctype
-                                            (type-for-constraints-p ctype))
-                                   (add 'typep
-                                        (ok-lvar-lambda-var (first args) constraints)
-                                        ctype
-                                        nil
-                                        (first args)))))))
+                                 (when ctype
+                                   (multiple-value-bind (ctype complement) (type-for-constraints-p ctype)
+                                     (when ctype
+                                       (let ((var (ok-lvar-lambda-var (first args) constraints)))
+                                         (if complement
+                                             (add 'typep var ctype nil (first args))
+                                             (add-no-complement 'typep var ctype nil (first args)))))))))))
                           ((eq eql)
                            (let* ((arg1 (first args))
                                   (var1 (ok-lvar-lambda-var arg1 constraints))
@@ -1121,8 +1135,8 @@
                    (t
                     (setq not-type (type-union not-type other)))))
             (eql
-             (let ((other-type (leaf-type other)))
-               (cond ((not (type-for-constraints-p other-type)))
+             (let ((other-type (type-for-constraints-p (leaf-type other))))
+               (cond ((not other-type))
                      ((not not-p)
                       (when (and ref
                                  (constant-p other))
@@ -1519,13 +1533,14 @@
                  (conset-union target new))
 
                (let* ((arg-var (ok-lvar-lambda-var val constraints))
-                      (type (if arg-var
-                                ;; Not strictly necessary to grab the
-                                ;; type from constraints here straight
-                                ;; away, but speeds up convergence.
-                                (type-from-constraints arg-var constraints (lvar-type val))
-                                (lvar-type val))))
-                 (when (type-for-constraints-p type)
+                      (type (type-for-constraints-p
+                             (if arg-var
+                                 ;; Not strictly necessary to grab the
+                                 ;; type from constraints here straight
+                                 ;; away, but speeds up convergence.
+                                 (type-from-constraints arg-var constraints (lvar-type val))
+                                 (lvar-type val)))))
+                 (when type
                    (conset-add-constraint target 'typep var type nil))
                  (when arg-var
                    ;; Don't inherit constraints that have one of the
@@ -1562,11 +1577,11 @@
              (clear-var-sets var gen nil)))
          (when (functional-kind-eq fun nil optional)
            (dolist (var (lambda-vars fun))
-             (let ((type (leaf-defined-type var)))
-               (when (and (lambda-var-constraints var)
-                          (type-for-constraints-p type)
-                          (not (lambda-var-arg-info var)))
-                 (conset-add-constraint gen 'typep var type nil)))))))
+             (when (and (lambda-var-constraints var)
+                        (not (lambda-var-arg-info var)))
+               (let ((type (type-for-constraints-p (leaf-defined-type var))))
+                 (when type
+                   (conset-add-constraint gen 'typep var type nil))))))))
       (ref
        (when (ok-ref-lambda-var node)
          (maybe-add-eql-var-lvar-constraint node gen)
@@ -1576,11 +1591,11 @@
       (cast
        (let* ((lvar (cast-value node))
               (var (ok-lvar-lambda-var lvar gen))
-              (atype (single-value-type (cast-derived-type node))))
-         (when (and var
-                    (type-for-constraints-p atype))
-           (conset-add-constraint-to-eql gen 'typep var atype nil))
-         (constraint-propagate-back lvar 'typep atype gen gen nil)))
+              (atype (type-for-constraints-p (single-value-type (cast-derived-type node)))))
+         (when atype
+           (when var
+             (conset-add-constraint-to-eql gen 'typep var atype nil))
+           (constraint-propagate-back lvar 'typep atype gen gen nil))))
       (cset
        (unless (and preprocess-refs-p
                     (delete-redundant-set node gen))
@@ -1589,8 +1604,8 @@
                     (nil (lambda-var-constraints var) :exit-if-null))
            (when (policy node (or (and (= speed 3) (> speed compilation-speed))
                                   (> debug 1)))
-             (let ((type (lambda-var-type var)))
-               (when (type-for-constraints-p type)
+             (let ((type (type-for-constraints-p (lambda-var-type var))))
+               (when type
                  (do-eql-vars (other (var gen))
                    (unless (eql other var)
                      (conset-add-constraint gen 'typep other type nil))))))
@@ -1600,8 +1615,8 @@
              (when new
                (conset-union gen new)))
 
-           (let ((type (lvar-type (set-value node))))
-             (when (type-for-constraints-p type)
+           (let ((type (type-for-constraints-p (lvar-type (set-value node)))))
+             (when type
                (conset-add-constraint gen 'typep var type nil)))
            (unless (policy node (> compilation-speed speed))
              (maybe-add-eql-var-var-constraint var (set-value node) gen))
@@ -1642,8 +1657,8 @@
                (loop for var in vars
                      for val in args
                      when (and val (lambda-var-constraints var))
-                       do (let ((type (lvar-type val)))
-                            (when (type-for-constraints-p type)
+                       do (let ((type (type-for-constraints-p (lvar-type val))))
+                            (when type
                               (conset-add-constraint gen 'typep var type nil)))
                           (maybe-add-eql-var-var-constraint var val gen)
                           (add-var-result-constraints var val gen)))
@@ -1814,13 +1829,13 @@
                     *universal-type*))
           (when (eq in-var-type *universal-type*)
             (return)))
-
-        (when (type-for-constraints-p in-var-type)
-          (conset-adjoin (find-or-create-constraint 'typep
-                                                    var
-                                                    in-var-type
-                                                    nil)
-                         in))))
+        (let ((in-var-type (type-for-constraints-p in-var-type)))
+          (when in-var-type
+            (conset-adjoin (find-or-create-constraint 'typep
+                                                      var
+                                                      in-var-type
+                                                      nil)
+                           in)))))
     (dolist (var equality-vars)
       (join-equality-constraints var block in predecessor-outs all-previous-outs-computed))))
 

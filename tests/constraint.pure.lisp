@@ -2659,3 +2659,11 @@
              t)
          t))
    boolean))
+
+(with-test (:name :opaque-type-intersections)
+ (assert-type
+  (lambda ()
+    (let ((v 9))
+      (setq v (the (satisfies eval) 1d0))
+      (max 6 v)))
+  (eql 6)))
