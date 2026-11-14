@@ -2640,3 +2640,12 @@
      (declare (list y))
      (when y
        (check-type y cons)))))
+
+(with-test (:name :char-code-back)
+  (assert-type
+   (lambda (c y)
+     (let ((y (the (integer 4 9) y)))
+       (if (eql (char-code c) y)
+           nil
+           (and (< 4 (char-code c)) (< (char-code c) 9)))))
+   boolean))
