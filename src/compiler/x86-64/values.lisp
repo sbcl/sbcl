@@ -171,21 +171,27 @@
             (count :scs (any-reg) :from :eval))
   (:generator 20
     (move loop-index num)
-    (unless (eq (tn-kind count) :unused)
-      (zeroize count))
-    (sc-case skip
-      (immediate
-       (inst lea src (ea (- (* (tn-value skip) n-word-bytes)) context))
-       (inst sub loop-index (fixnumize (tn-value skip))))
-      (any-reg
-       (inst neg skip)
-       (inst lea src (ea context skip (ash 1 (- word-shift n-fixnum-tag-bits))))
-       (inst neg skip)
-       (inst sub loop-index skip)))
-    (unless (eq (tn-kind start) :unused)
-      (inst mov start rsp-tn))
-    (unless (eq (tn-kind count) :unused)
-      (inst cmov :g count loop-index))
+    (let (zero-count)
+      (unless (eq (tn-kind count) :unused)
+        (if (or (location= count skip)
+                (location= count context))
+            (setf zero-count t)
+            (zeroize count))) ;; XOR affects flags
+      (sc-case skip
+        (immediate
+         (inst lea src (ea (- (* (tn-value skip) n-word-bytes)) context))
+         (inst sub loop-index (fixnumize (tn-value skip))))
+        (any-reg
+         (inst neg skip)
+         (inst lea src (ea context skip (ash 1 (- word-shift n-fixnum-tag-bits))))
+         (inst neg skip)
+         (inst sub loop-index skip)))
+      (unless (eq (tn-kind start) :unused)
+        (inst mov start rsp-tn))
+      (unless (eq (tn-kind count) :unused)
+        (when zero-count
+          (inst mov count 0))
+        (inst cmov :g count loop-index)))
     (inst jmp :le DONE)
     (inst shl loop-index (- word-shift n-fixnum-tag-bits))
 
