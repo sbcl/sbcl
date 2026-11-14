@@ -160,7 +160,7 @@
                  (cond ((eq locative-type (dummy 'constant))
                         (documentation name 'variable))
                        ((eq locative-type (dummy 'macro))
-                        (documentation (macro-function name) t))
+                        (documentation name 'function))
                        ((eq locative-type (dummy 'setf-function))
                         (documentation (fdefinition name) t))
                        ((eq locative-type (dummy 'setf-generic-function))

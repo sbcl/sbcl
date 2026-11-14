@@ -754,6 +754,11 @@ types provide any efficiency benefits.
 @anchor{Macro sb-ext truly-the}
 @ffindex @sortas{truly-the sb-ext} truly-the [sb-ext]
 @deffn{Macro} sb-ext:truly-the value-type form
+Assert that the values returned by @code{form} conform to @code{value-type}.
+The compiler trusts this information unconditionally.
+
+Consequences are undefined if any result is not of the declared type
+-- typical symptoms include memory corruption. Use with great care.
 @end deffn
 @node precise type checking
 @cindex precise type checking
