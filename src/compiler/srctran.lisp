@@ -6860,16 +6860,21 @@
 (defun transform-constant-char-equal (a b &optional (op 'char=))
   (let ((char (lvar-value b)))
     (if (both-case-p char)
-        (let ((reverse (if (upper-case-p char)
-                           (char-downcase char)
-                           (char-upcase char))))
+        (let ((reverse (cond ((upper-case-p char)
+                              (char-downcase char))
+                             ((lower-case-p char)
+                              (char-upcase char))
+                             (t
+                              ;; Something like #\LATIN_CAPITAL_LETTER_D_WITH_SMALL_LETTER_Z
+                              (return-from transform-constant-char-equal)))))
           `(or (,op ,a ,char)
                (,op ,a ,reverse)))
         `(,op ,a ,char))))
 
 (deftransform char-equal ((a b) (t (constant-arg character)) *
                           :node node)
-  (transform-constant-char-equal 'a b))
+  (or (transform-constant-char-equal 'a b)
+      (give-up-ir1-transform)))
 
 (defun no-case-character-type-p (type)
   (and (typep type 'character-set-type)
