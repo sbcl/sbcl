@@ -119,7 +119,7 @@
 
 (defconstant +info-metainfo-type-num+ 0)
 
-;; Refer to info-vector.lisp for the meaning of this constant.
+;; Refer to packed-info.lisp for the meaning of this constant.
 (defconstant +no-auxiliary-key+ 0)
 
 ;;; Return the globaldb info for SYMBOL. With respect to the state diagram

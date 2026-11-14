@@ -367,7 +367,7 @@ during backtrace.
                            :cas-trans cas-symbol-fdefn)
   ;; The private accessor for INFO reads the slot verbatim.
   ;; In contrast, the SYMBOL-INFO function always returns a PACKED-INFO
-  ;; instance (see info-vector.lisp) or NIL. The slot itself may hold a cons
+  ;; instance (see packed-info.lisp) or NIL. The slot itself may hold a cons
   ;; of the user's PLIST and a PACKED-INFO or just a PACKED-INFO.
   ;; It can't hold a PLIST alone without wrapping in an extra cons cell.
     (info :ref-trans symbol-%info :ref-known (flushable)

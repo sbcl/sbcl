@@ -189,7 +189,7 @@
  ("src/compiler/policies")
 
  ("src/code/target-lfhash" :not-host)
- ("src/compiler/info-vector" :c-headers)
+ ("src/compiler/packed-info" :c-headers)
  ("src/compiler/globaldb" :c-headers)
  ("src/compiler/generic/objdef" :c-headers)
  ("src/code/lockfree-list" :c-headers)

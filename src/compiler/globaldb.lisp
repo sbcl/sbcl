@@ -17,7 +17,7 @@
 ;;;; (And sometimes the Kind is literally :KIND, as a consequence of
 ;;;; how users of the database desire to name their keys.)
 
-;;;; The relation between this file and 'info-vectors' is that the
+;;;; The relation between this file and 'packed-infos' is that the
 ;;;; latter provides a fundamental mechanism to create property-list-like
 ;;;; things whose "indicators" are restricted to small integers.
 ;;;; The globaldb abstraction is layered on top of that and is responsible

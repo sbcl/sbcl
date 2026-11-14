@@ -544,7 +544,7 @@
                                (aref output name-index))
                              random-results)))))))))
 
-;; As explained in the comments at the top of 'info-vector.lisp',
+;; As explained in the comments at the top of 'packed-info.lisp',
 ;; it is a bad idea to use globaldb to store an atomic counter as
 ;; a piece of info for a name, as it is quite brutal and consy,
 ;; but for this test, that's precisely the goal.
