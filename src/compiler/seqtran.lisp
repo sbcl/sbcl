@@ -4548,7 +4548,9 @@
                               (when (csubtypep initial-value-type (specifier-type 'integer))
                                 (%two-arg-derive-type element-type initial-value-type #'logior-derive-type-aux))
                               element-type)))
-                    (cond (identity-p
+                    (cond ((not type)
+                           nil)
+                          (identity-p
                            (type-union type (specifier-type '(eql 0))))
                           ((and initial-value
                                 (not non-empty))
