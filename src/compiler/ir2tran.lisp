@@ -310,22 +310,24 @@
                      (entry-info-offset entry-info) (length closure)
                      stack-allocate-p tn)
                 (loop for what in closure and n from 0 do
-                  (if (lambda-p what)
-                      (unless (functional-kind-eq what deleted)
-                        (delayed (list tn (find-in-environment what env) n
-                                       stack-allocate-p)))
-                      (unless (and (lambda-var-p what)
-                                   (null (leaf-refs what)))
-                        (let ((initial-value (closure-initial-value what env nil)))
-                          (if initial-value
-                              (vop closure-init node ir2-block tn initial-value n
-                                   stack-allocate-p)
-                              ;; An initial-value of NIL means to
-                              ;; stash the frame pointer... which
-                              ;; requires a different VOP.
+                      (if (lambda-p what)
+                          (unless (functional-kind-eq what deleted)
+                            (delayed (list tn (find-in-environment what env) n
+                                           stack-allocate-p)))
+                          (unless (and (lambda-var-p what)
+                                       (null (leaf-refs what)))
+                            (let ((initial-value (closure-initial-value what env nil)))
+                              (if initial-value
+                                  (vop closure-init node ir2-block tn initial-value n
+                                       stack-allocate-p #+(or arm64 x86-64) nil)
+                                  ;; An initial-value of NIL means to
+                                  ;; stash the frame pointer... which
+                                  ;; requires a different VOP.
                               (vop closure-init-from-fp node ir2-block tn n))))))))))))
     (loop for (tn what n stack-allocate-p) in (delayed)
-          do (vop closure-init node ir2-block tn what n stack-allocate-p)))
+          do (vop closure-init node ir2-block tn what n stack-allocate-p
+                  ;; emit a barrier, which might be a result of another make-closure, issued after this one
+                  #+(or arm64 x86-64) t)))
   (values))
 
 ;;; Convert a SET node. If the NODE's LVAR is annotated, then we also

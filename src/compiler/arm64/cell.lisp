@@ -581,9 +581,12 @@
 (define-vop (closure-init)
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
-  (:info offset dx)
+  (:arg-refs nil value-ref)
+  (:info offset dx barrier)
   (:ignore dx)
   (:generator 4
+    (when barrier
+      (emit-gengc-barrier object nil tmp-tn value-ref))
     (storew value object (+ closure-info-offset offset) fun-pointer-lowtag)))
 
 (define-vop (closure-init-from-fp)
