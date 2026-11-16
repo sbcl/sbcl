@@ -1541,8 +1541,10 @@ and the number of 0 bits if INTEGER is negative."
                                     (ash (truly-the fixnum integer) count)))))))
            ((minusp (the integer count))
             (if (minusp integer) -1 0))
+           ((eql integer 0)
+            0)
            (t
-            (bignum-ashift-left (make-small-bignum integer) count))))
+            (error "can't represent result of left shift"))))
     (bignum
      (if (plusp (the integer count))
          (bignum-ashift-left integer count)

@@ -3021,3 +3021,8 @@
          (<= l x h))
     ((16777216 16777217.0d0 16777217) t)
     ((16777216 16777218.0d0 16777217) nil)))
+
+(with-test (:name :ash-left-0-bignum)
+  (assert (zerop
+           (opaque-identity (ash (opaque-identity 0)
+                                 (opaque-identity (expt 2 100)))))))
