@@ -1316,6 +1316,16 @@
       ;; Verify all 7 interconnected functions were processed
       (assert (= h-checked 7)))))
 
+(with-test (:name (:select-tagging :commutative :untagged-arguments)
+            :skipped-on (not :arm64))
+  (assert (member 'sb-vm::logior/unsigned=>unsigned
+                  (ctu:ir2-vops '(lambda (v i)
+                                  (declare ((simple-array (unsigned-byte 8) (*)) v)
+                                           (fixnum i)
+                                           (optimize speed (safety 0)))
+                                  (logior (ash (logand (aref v i) 31) 6)
+                                          (logand (aref v (1+ i)) 63)))))))
+
 (with-test (:name (:select-tagging :through-variables)
             :skipped-on (not (and :sb-unicode (or :x86-64 :arm64))))
   (assert (zerop (count-if (lambda (name)
