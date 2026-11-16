@@ -5744,16 +5744,15 @@
     (union-type
      (every #'numeric-type-without-bounds-p (union-type-types type)))))
 
-
 (defun rational-type-without-bounds-p (type)
   (typecase type
-    (numeric-type type
+    (numeric-type
      (and (not (eq (numeric-type-class type) 'integer))
           (not (eq type (specifier-type 'ratio)))
           (not (numeric-type-low type))
           (not (numeric-type-high type))))
     (union-type
-     (every #'numeric-type-without-bounds-p (union-type-types type)))))
+     (every #'rational-type-without-bounds-p (union-type-types type)))))
 
 ;;; Pick off easy association opportunities for constant folding.
 ;;; More complicated stuff that also depends on commutativity
