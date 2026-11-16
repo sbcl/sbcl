@@ -769,6 +769,22 @@
           (- m n)))
     ((5 5) 6)))
 
+(with-test (:name (:optimistic-type :copy-through-set-variable))
+  ;; lp#2174525
+  (checked-compile-and-assert ()
+      '(lambda (c d)
+        (multiple-value-bind (v10 v9) (values 1 0)
+          (declare (ignore v9))
+          (multiple-value-bind (v10 v7 v9)
+              (if (not (minusp (min 4323771237324570
+                                    (max -667621502401930
+                                         (shiftf v10 (ignore-errors (truncate c)))))))
+                  (values (min 12 (max 0 v10)) 0 0)
+                  (values 0 0 0))
+            (declare (ignore v10 v7 v9))
+            (handler-case d))))
+    ((-204896145371609360573994998991770753794889708248227 7) 7)))
+
 (with-test (:name (:optimistic-type :copies-between-local-functions))
   (assert-type
    (lambda (l)
