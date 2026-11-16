@@ -4093,7 +4093,7 @@
     (cond ((<= mask most-positive-word)
            (cmatch (node)
              :dest
-             (((:or eq > :name name) (%ldb posn integer) 0)
+             (((:or eq > :name name) (%ldb size posn integer) 0)
               `(,name (logand integer ,mask) 0))))
           (t
            (give-up-ir1-transform)))))
