@@ -1221,7 +1221,7 @@ the first."
                    :infinite-y-finite-x
                    (,op (coerce 0 '(dispatch-type y)) y))
                   (((foreach fixnum bignum) ratio)
-                   (dispatch-ratio (y numerator denominator (dispatch-type x))
+                   (dispatch-ratio (y numerator denominator (dispatch-type y))
                        (,(case op
                            (<= '<)
                            (>= '>)
