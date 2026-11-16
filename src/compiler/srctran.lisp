@@ -7048,6 +7048,15 @@
       ((transform-eq-on-words 'eq x y))
       (t (give-up-ir1-transform)))))
 
+(deftransform eq ((x y) (t (constant-arg t)) * :node node :important nil)
+  (cmatch (node)
+    ;; (eq (aref #(:a :b :c) n) :a) => (eq n 0)
+    ((eq (aref (:constant a simple-array) i) (:constant c))
+     (let ((p (position c a :test #'eq)))
+       (when (and p
+                  (not (position c a :start (1+ p) :test #'eq)))
+         `(eq i ,p))))))
+
 ;;; This is similar to SIMPLE-EQUALITY-TRANSFORM, except that we also
 ;;; try to convert to a type-specific predicate or EQ:
 ;;; -- If both args are characters, convert to CHAR=. This is better than

@@ -31,6 +31,15 @@
    `((%negate ,a))
    t)) ;; don't include (- x)
 
+(def-combination-match-alias aref (a i)
+  (values `((data-vector-ref ,a ,i))
+          t))
+
+#+x86-64
+(def-combination-match-alias data-vector-ref (a i)
+  (values `((data-vector-ref-with-offset ,a ,i 0))
+          t))
+
 (defstruct cm-operator
   (names nil :type list)
   (name-var nil :type symbol)
