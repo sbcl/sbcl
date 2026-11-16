@@ -3026,3 +3026,36 @@
   (assert (zerop
            (opaque-identity (ash (opaque-identity 0)
                                  (opaque-identity (expt 2 100)))))))
+
+(with-test (:name :range<-to-null)
+  (when (vop-existsp 'sb-kernel:check-range<=)
+    (assert-type
+     (lambda (x)
+       (declare ((integer 0) x))
+       (sb-kernel:check-range<= -5 x -1))
+     null)
+    (assert-type
+     (lambda (x)
+       (declare ((integer * 0) x))
+       (sb-kernel:check-range<= 1 x 5))
+     null)
+    (assert-type
+     (lambda (x)
+       (declare ((integer 1 5) x))
+       (sb-kernel:check-range<= 1 x 5))
+     (eql t)))
+  (assert-type
+   (lambda (x)
+     (declare ((integer 0) x))
+     (sb-kernel:range<= -5 x -1))
+   null)
+  (assert-type
+   (lambda (x)
+     (declare ((integer * 0) x))
+     (sb-kernel:range<= 1 x 5))
+   null)
+  (assert-type
+   (lambda (x)
+     (declare ((integer 1 5) x))
+     (sb-kernel:range<= 1 x 5))
+   (eql t)))
