@@ -5,6 +5,9 @@
 
 (in-package "SB-VM")
 
+(define-assembly-routine (memory-fault-trap (:return-style :none)) ()
+  (inst break memory-fault-emulation-trap))
+
 (define-assembly-routine
     (undefined-tramp (:return-style :none))
     ()

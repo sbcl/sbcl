@@ -87,6 +87,8 @@ unsigned int aggressive_scrub_control_stack = 0;
 // Using fixed offsets and bytes is no worse than what we do elsewhere.
 void tune_asm_routines_for_microarch(void)
 {
+    memory_fault_emulation_trap = get_asm_routine_by_name("MEMORY-FAULT-TRAP", 0);
+
     // Assign the static lisp symbol's value the address of the C function
     // that assists calling C from Lisp.
 #ifdef LISP_FEATURE_SB_THREAD

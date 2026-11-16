@@ -19,6 +19,9 @@
   (inst jmp (register-inline-constant :qword -1))
   (register-inline-constant :oword -1)) ; for effect
 
+(define-assembly-routine (memory-fault-trap (:return-style :none)) ()
+  (inst break memory-fault-emulation-trap))
+
 ;;; The SYNCHRONOUS-TRAP routine has nearly the same effect as executing INT3
 ;;; but is more friendly to gdb. There may be some subtle bugs with regard to
 ;;; blocking/unblocking of async signals which arrive nearly around the same

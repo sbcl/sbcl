@@ -1278,7 +1278,7 @@ void gc_load_corefile_ptes(core_entry_elt_t n_ptes,
                              spaces[IMMOBILE_TEXT_CORE_SPACE_ID].len);
     calc_immobile_space_bounds();
 #endif
-#ifdef LISP_FEATURE_X86_64
+#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
     tune_asm_routines_for_microarch();
 #endif
 #ifdef LISP_FEATURE_DARWIN_JIT

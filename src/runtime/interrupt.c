@@ -1775,7 +1775,6 @@ static bool ll_signal_is_for_lisp(int signal, os_context_t *context)
     uword_t pc = os_context_pc(context);
     if (signal == SIGTRAP) --pc; // INT3 points _after_ the trapping instruction
     if (gc_managed_heap_space_p(pc)
-        || pc == (uword_t)memory_fault_emulation_trap
         || pc == (uword_t)do_pending_interrupt) return 1;
     return 0;
 }
@@ -2034,6 +2033,7 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
 #  if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 #    error memory fault emulation needs validating for this architecture
 #  endif
+    if (!memory_fault_emulation_trap) lose("memory fault in cold-load");
     /* We're on the altstack, and don't want to run Lisp code here, so
      * we need to return from this signal handler.  But when we get to
      * Lisp we'd like to have a signal context (with correct values in
@@ -2057,7 +2057,7 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
 #  endif
     set_os_context_pc(context, (os_context_register_t)memory_fault_emulation_trap);
     /* We exit here, letting the signal handler return, picking up at
-     * memory_fault_emulation_trap (in target-assem.S), which will
+     * the MEMORY-FAULT-EMULATION-TRAP Lisp assembly routine, which will
      * trap, and the handler calls the function below, where we
      * restore our state to parallel what a non-x86oid would have, and
      * then run the common code for handling the error in Lisp. */

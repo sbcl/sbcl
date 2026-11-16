@@ -25,6 +25,7 @@
 #include "gc.h"
 #include "var-io.h"
 #include "code.h"
+#include "core.h"
 #include "align.h"
 
 #include "genesis/static-symbols.h"
@@ -368,4 +369,8 @@ arch_write_linkage_table_entry(int index, void *target_addr, int datap)
     *reloc_addr = 0x90;
 }
 
+void tune_asm_routines_for_microarch(void)
+{
+    memory_fault_emulation_trap = get_asm_routine_by_name("MEMORY-FAULT-TRAP", 0);
+}
 #include "x86-arch-shared.inc"

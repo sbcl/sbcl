@@ -568,14 +568,6 @@ GNAME(handle_csp_safepoint_violation):
 	SIZE(GNAME(handle_csp_safepoint_violation))
 #endif /* SB-SAFEPOINT */
 
-	.globl 	GNAME(memory_fault_emulation_trap)
-	TYPE(GNAME(memory_fault_emulation_trap))
-	.align	align_16byte,0x90
-GNAME(memory_fault_emulation_trap):
-	TRAP
-	.byte 	trap_MemoryFaultEmulation
-	SIZE(GNAME(memory_fault_emulation_trap))
-
 #ifdef LISP_FEATURE_WIN32
 	/* The guts of the exception-handling system doesn't use
 	 * frame pointers, which manages to throw off backtraces
