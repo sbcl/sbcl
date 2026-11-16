@@ -3012,3 +3012,12 @@
     ((most-negative-fixnum (- most-negative-fixnum)) (values -1 t))
     ((0 (expt 2 64)) (values 0 t))
     ((-1 (expt 2 64)) (values 0 nil))))
+
+(with-test (:name :range<-float-coercion)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (l x h)
+         (declare (fixnum l h))
+         (<= l x h))
+    ((16777216 16777217.0d0 16777217) t)
+    ((16777216 16777218.0d0 16777217) nil)))
