@@ -38,7 +38,9 @@
     (nid n :untag)
     n))
 
-(defun add-edge (net u v c)
+;;; Add an edge from U to V with capacity C, and one back with capacity
+;;; BACK.
+(defun add-edge (net u v c &optional (back 0))
   (let ((u (nid net u))
         (v (nid net v)))
     (flet ((add (from to cap)
@@ -47,7 +49,7 @@
              (vector-push-extend (aref (net-head net) from) (net-next net))
              (setf (aref (net-head net) from) (1- (length (net-to net))))))
       (add u v c)
-      (add v u 0))))
+      (add v u back))))
 
 (defun min-cut (net)
   (declare (optimize speed))
@@ -156,21 +158,19 @@
                                   nil)))
                      (link (var)
                        (when (and current (lambda-var-p var))
-                         (add-edge net current var 8)
-                         (add-edge net var current 8)))
+                         (add-edge net current var 8 8)))
                      (visit-var (var)
                        (link var)
                        (unless (eq (gethash var walked) node)
                          (setf (gethash var walked) node)))
                      (add-lvar (lvar &optional (both t))
-                       (add-edge net lvar node 8)
-                       (when both
-                         (add-edge net node lvar 8)))
+                       (add-edge net lvar node 8 (if both 8 0)))
                      (add-arg-lvar (i lvar &optional (both t))
-                       (add-edge net lvar node 8)
-                       (when (and both
-                                  (> (tagged-template-arg-p lvar i tagged-template) 0))
-                         (add-edge net node lvar (* 8 (boxing-cost lvar)))))
+                       (add-edge net lvar node 8
+                                 (if (and both
+                                          (> (tagged-template-arg-p lvar i tagged-template) 0))
+                                     (* 8 (boxing-cost lvar))
+                                     0)))
                      (read-costs (lvar node)
                        (cond ((combination-p node)
                               (let ((template (combination-info node)))
