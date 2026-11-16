@@ -80,7 +80,7 @@ do
         $optarg_ok && SBCL_PREFIX=$optarg
         ;;
       --arch=)
-        $oparg_ok && SBCL_ARCH=$optarg
+        $optarg_ok && SBCL_ARCH=$optarg
         ;;
       --xc-host=)
         $optarg_ok && SBCL_XC_HOST=$optarg
