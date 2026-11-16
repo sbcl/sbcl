@@ -112,58 +112,33 @@
                       (accessor (symbolicate prefix '- name)))
 
                  (if (eq kind :boolean)
-                     `((declaim (inline ,accessor (setf ,accessor))
-                                (ftype (function (,type) boolean) ,accessor)
-                                (ftype (function (t ,type) t) (setf ,accessor)))
-
+                     `((declaim (inline ,accessor (setf ,accessor)))
                        (defun ,accessor (instance)
                          (logbitp ,offset (,flags-accessor instance)))
 
                        (defun (setf ,accessor) (value instance)
                          (setf (ldb (byte 1 ,offset) (,flags-accessor instance))
                                (if value 1 0))
-                         value)
+                         value))
 
-                       (define-compiler-macro (setf ,accessor) (&whole whole value instance)
-                         (if (constantp value)
-                             (let* ((value (eval value))
-                                    (bit (if value 1 0)))
-                               `(progn
-                                  (setf (ldb (byte 1 ,',offset) (,',flags-accessor ,instance))
-                                        ,bit)
-                                  ',value))
-                             whole)))
                      (let ((val-vec (coerce values 'vector))
                            (member-type `(member ,@values)))
-                       `((declaim (inline ,accessor (setf ,accessor))
-                                  (ftype (function (,type) ,member-type) ,accessor)
-                                  (ftype (function (,member-type ,type) ,member-type) (setf ,accessor)))
-
+                       `((declaim (inline ,accessor (setf ,accessor)))
                          (defun ,accessor (instance)
                            (svref ,val-vec
-                                  (ldb (byte ,size ,offset) (,flags-accessor instance))))
+                                  (truly-the (mod ,(length values))
+                                             (ldb (byte ,size ,offset) (,flags-accessor instance)))))
 
                          (defun (setf ,accessor) (value instance)
-                           (let ((i (position value ',values :test #'eql)))
+                           (let ((i (position (the* (,member-type :use-annotations t) value) ',values :test #'eql)))
                              (unless i
-                               (error "~s is not of type (MEMBER ~s)" value ',values))
+                               #+sb-xc-host
+                               (error "~s is not of type (MEMBER ~s)" value ',values)
+                               #-sb-xc-host
+                               (%type-check-error value ',member-type nil))
                              (setf (ldb (byte ,size ,offset) (,flags-accessor instance))
                                    i)
-                             value))
-
-                         (define-compiler-macro (setf ,accessor) (&whole whole value instance)
-                           (if (constantp value)
-                               (let* ((value (eval value))
-                                      (i (position value ',values :test #'eql)))
-                                 (if i
-                                     `(progn (setf (ldb (byte ,',size ,',offset) (,',flags-accessor ,instance))
-                                                   ,i)
-                                             ',value)
-                                     (progn
-                                       (warn "Invalid constant value ~S for ~S. Expected one of ~S."
-                                             value ',accessor ',values)
-                                       whole)))
-                               whole))))))))))
+                             value))))))))))
 
 (defmacro construct-flags (type-spec &rest args)
   (let* ((type (if (consp type-spec) (first type-spec) type-spec))
