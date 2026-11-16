@@ -3175,7 +3175,7 @@
         (map-lambda-var-values
          (lambda (lvar)
            (setf seen (map-lambda-var-values* (lambda (lvar) (push lvar lvars))
-                                              lvar var seen)))
+                                              lvar seen)))
          var)
         (dolist (lvar lvars)
           (let ((constant (and lvar (lvar-constant lvar))))

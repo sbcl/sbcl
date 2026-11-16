@@ -3178,14 +3178,6 @@ not inlined.")
                  (block-type-check (node-block dest)))
         (reoptimize-node dest)))))
 
-;;; The LAMBDA-VAR ARG references, looking through a cast.
-(defun combination-arg-lambda-var (arg)
-  (and arg
-       (or (lvar-lambda-var arg)
-           (let ((use (lvar-uses arg)))
-             (and (cast-p use)
-                  (lvar-lambda-var (cast-value use)))))))
-
 ;;; Return the lambda variable referenced by USE if it is eligible for
 ;;; optimistic type inference.
 (defun optimistic-var (use)
@@ -3350,21 +3342,23 @@ not inlined.")
   (declare (function fun)
            (dynamic-extent fun)
            (type lambda-var var))
-  (let ((home (lambda-var-home var)))
-    (if (functional-kind-eq home let)
-        (funcall fun (let-var-initial-value var))
-        (let ((n (position var (lambda-vars home))))
-          (dolist (ref (leaf-refs home))
-            (funcall fun (nth n (combination-args (node-dest ref)))))))
+  (let* ((home (lambda-var-home var))
+         (n (position var (lambda-vars home))))
+    (dolist (ref (leaf-refs home))
+      (unless (node-to-be-deleted-p ref)
+        (let ((dest (node-dest ref)))
+          (when dest
+            (funcall fun (nth n (combination-args dest)))))))
     (dolist (set (lambda-var-sets var))
       (funcall fun (set-value set)))))
 
-;;; Like MAP-LAMBDA-VAR-VALUES, but recursive on the lambda vars.
-(defun map-lambda-var-values* (fun value var seen)
+;;; Like MAP-LAMBDA-VAR-VALUES, but recursive on the lambda vars. If
+;;; DEPENDENT, a function, is analyzed from the values of the variables
+;;; looked through, it is noted as depending on them.
+(defun map-lambda-var-values* (fun value seen &optional dependent)
   (declare (function fun)
            (dynamic-extent fun)
-           (type (or null lvar) value)
-           (type lambda-var var))
+           (type (or null lvar) value))
   (let* ((use (and value (lvar-uses value)))
          (other (and (ref-p use) (ref-leaf use))))
     (cond ((memq other seen))
@@ -3373,7 +3367,9 @@ not inlined.")
            (push other seen)
            (map-lambda-var-values
             (lambda (value)
-              (setf seen (map-lambda-var-values* fun value var seen)))
+              (when (and dependent value)
+                (pushnew dependent (lvar-dependent-nodes value) :test #'eq))
+              (setf seen (map-lambda-var-values* fun value seen dependent)))
             other))
           (t
            (funcall fun value))))
@@ -3390,7 +3386,6 @@ not inlined.")
                 *universal-type*)))
     (declare (dynamic-extent #'assumed-type))
     (and arg
-         (not (eq (lvar-lambda-var arg) var))
          (lvar-optimistic-type arg *optimistic-solve-depth* #'assumed-type)
          t)))
 
@@ -3409,34 +3404,22 @@ not inlined.")
 
 ;;; Note that anything affected by the optimistic type of the value of
 ;;; NODE is pending for reanalysis.
-(defun note-optimistic-change (node &optional seen)
+(defun note-optimistic-change (node)
   (let* ((lvar (node-lvar node))
          (dest (and lvar (lvar-dest lvar))))
-    (flet ((pass-on (var)
-             (when (and (not (memq var seen))
-                        (lambda-var-values-known-p var))
-               (let ((seen (cons var seen)))
-                 (dolist (ref (leaf-refs var))
-                   (note-optimistic-change ref seen))))))
-      (cond ((and (combination-p dest)
-                  (eq (combination-kind dest) :local)
-                  (neq lvar (basic-combination-fun dest)))
-             (let ((callee (combination-lambda dest)))
-               (when callee
-                 (setf (lambda-optimistic-pending callee) t)
-                 (loop for arg in (basic-combination-args dest)
-                       for var in (lambda-vars callee)
-                       when (eq arg lvar)
-                         do (pass-on var))))
-             (reoptimize-lvar lvar))
-            ((set-p dest)
-             (let ((var (set-var dest)))
-               (when (lambda-var-p var)
-                 (when (lambda-var-optimistic-type var)
-                   (setf (lambda-optimistic-pending (lambda-var-home var)) t))
-                 ;; Copies look through VAR to its set values too.
-                 (pass-on var)))
-             (reoptimize-lvar lvar))))))
+    (cond ((and (combination-p dest)
+                (eq (combination-kind dest) :local)
+                (neq lvar (basic-combination-fun dest)))
+           (let ((callee (combination-lambda dest)))
+             (when callee
+               (setf (lambda-optimistic-pending callee) t)))
+           (reoptimize-lvar lvar))
+          ((set-p dest)
+           (let ((var (set-var dest)))
+             (when (and (lambda-var-p var)
+                        (lambda-var-optimistic-type var))
+               (setf (lambda-optimistic-pending (lambda-var-home var)) t)))
+           (reoptimize-lvar lvar)))))
 
 ;;; Compute the union of the optimistic types of every variable of FUN
 ;;; across all calls and update those types whenever there is a reason
@@ -3456,57 +3439,31 @@ not inlined.")
                (optimistic-type-propagatable-fun-p fun))
       (dolist (var vars)
         (init-variable-optimistic-type var))
-      (let ((accum-types (make-array (length vars) :initial-element *empty-type*))
-            (steps (make-array (length vars) :initial-element nil))
-            (leaves (make-array (length vars) :initial-element nil))
-            (arg-values (make-array (length vars) :initial-element nil))
-            (seen (make-array (length vars) :initial-element nil)))
-        (declare (dynamic-extent accum-types steps leaves arg-values seen))
-
-        (flet ((accumulate (arg var i)
-                 (setf (aref leaves i)
-                       (join-optimistic-leaves (aref leaves i)
-                                               (lvar-optimistic-leaf arg var)))
-                 ;; Look through copies of other variables to their
-                 ;; values.
-                 (setf (aref seen i)
-                       (map-lambda-var-values*
-                        (lambda (value) (push value (aref arg-values i)))
-                        arg var (or (aref seen i) (list var))))))
-          (dolist (ref (leaf-refs fun))
-            (unless (node-to-be-deleted-p ref)
-              (let ((dest (node-dest ref)))
-                (when dest
-                  (loop for var in vars
-                        for arg in (basic-combination-args dest)
-                        for i from 0
-                        when (lambda-var-optimistic-type var)
-                        do (accumulate arg var i))))))
-          (loop for var in vars
-                for i from 0
-                when (lambda-var-optimistic-type var)
-                  do (dolist (set (lambda-var-sets var))
-                       (accumulate (set-value set) var i))))
-
-        (loop for var in vars
-              for i from 0
-              when (lambda-var-optimistic-type var)
-                do (dolist (value (aref arg-values i))
-                     (if (optimistic-step-p value var (aref seen i))
-                         (push value (aref steps i))
-                         (setf (aref accum-types i)
-                               (type-union (aref accum-types i)
-                                           (cond ((null value) *universal-type*)
-                                                 ((lvar-optimistic-type value))
-                                                 (t (lvar-type value))))))))
-
-        (loop for var in vars
-              for i from 0
-              when (lambda-var-optimistic-type var)
-                do (let ((new (optimistic-assumed-type var (aref accum-types i)
-                                                       (aref steps i)
-                                                       (aref seen i)))
-                         (leaf (aref leaves i)))
+      (loop for var in vars
+            when (lambda-var-optimistic-type var)
+              do (let ((values '())
+                       (same (list var))
+                       (base *empty-type*)
+                       (steps '())
+                       (leaf nil))
+                   (map-lambda-var-values
+                    (lambda (arg)
+                      (setf leaf (join-optimistic-leaves
+                                  leaf (lvar-optimistic-leaf arg var)))
+                      ;; Look through copies of other variables to
+                      ;; their values.
+                      (setf same (map-lambda-var-values*
+                                  (lambda (value) (push value values))
+                                  arg same fun)))
+                    var)
+                   (dolist (value values)
+                     (if (optimistic-step-p value var same)
+                         (push value steps)
+                         (setf base (type-union base
+                                                (cond ((null value) *universal-type*)
+                                                      ((lvar-optimistic-type value))
+                                                      (t (lvar-type value)))))))
+                   (let ((new (optimistic-assumed-type var base steps same)))
                      (unless (and (type= new (lambda-var-optimistic-type var))
                                   (eq leaf (lambda-var-optimistic-leaf var)))
                        (setf (lambda-var-optimistic-type var) new
