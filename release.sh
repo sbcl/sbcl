@@ -24,6 +24,7 @@ usage: $0 [-s] VERSION-NUMBER [REV]
   - Builds source tarball
   - Builds a SBCL for self-build
   - Builds x86-64 binaries
+  - Cross-builds x86 binaries
   - Uploads binaries
   - Pushes the repository
   - Builds and uploads the documentation
@@ -207,18 +208,16 @@ fi
 
 ## Build x86 release binary.
 
-#if [ ! -d $SBCL_RELEASE_DIR/sbcl-$VERSION-x86-linux ]; then
-#  cd $SBCL_DIR
-#  sh clean.sh
-#  export SBCL_ARCH=x86
-#  export PATH=/scratch/src/release/x86-gcc-wrapper:$PATH
-#  nice -20 ./make.sh "$SBCL_RELEASE_DIR/bin/sbcl --core $SBCL_RELEASE_DIR/bin/s#bcl.core --no-userinit" >> $LOGFILE 2>&1
-#  cd tests
-#  nice -20 sh ./run-tests.sh >>$LOGFILE 2>&
+if [ ! -d $SBCL_RELEASE_DIR/sbcl-$VERSION-x86-linux ]; then
+  cd $SBCL_DIR
+  sh clean.sh
+  SBCL_ARCH=x86 nice -20 ./make.sh "$SBCL_RELEASE_DIR/bin/sbcl --core $SBCL_RELEASE_DIR/bin/s#bcl.core --no-userinit" >> $LOGFILE 2>&1
+  cd tests
+  nice -20 sh ./run-tests.sh >>$LOGFILE 2>&
 
-#  cd $SBCL_RELEASE_DIR
-#  ln -s $SBCL_DIR $SBCL_RELEASE_DIR/sbcl-$VERSION-x86-linux
-#  sh $SBCL_DIR/binary-distribution.sh sbcl-$VERSION-x86-linux
+  cd $SBCL_RELEASE_DIR
+  ln -s $SBCL_DIR $SBCL_RELEASE_DIR/sbcl-$VERSION-x86-linux
+  sh $SBCL_DIR/binary-distribution.sh sbcl-$VERSION-x86-linux
 #fi
 
 ## Checksum
@@ -266,6 +265,7 @@ chmod 775 $VERSION
 cd $VERSION
 put sbcl-$VERSION-$SFUSER.asc
 put sbcl-$VERSION-x86-64-linux-binary.tar.bz2
+put sbcl-$VERSION-x86-linux-binary.tar.bz2
 put sbcl-$VERSION-source.tar.bz2
 put sbcl-$VERSION-documentation-html.tar.bz2
 put sbcl-$VERSION-release-notes.txt
@@ -302,7 +302,7 @@ if [ ! -f $SBCL_RELEASE_DIR/sbcl-page-uploaded ]; then
   git pull
   git submodule update
   cp $SBCL_DIR/NEWS .
-  perl -i -pe "s/(:x86-64 :linux :available) \".*\"/\$1 \"$VERSION\"/" \
+  perl -i -pe "s/(:x86(?:-64)? :linux :available) \".*\"/\$1 \"$VERSION\"/" \
     platform-support-platforms.lisp
 
   export LC_CTYPE=en_GB.utf8
