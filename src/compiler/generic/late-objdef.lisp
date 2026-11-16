@@ -256,8 +256,8 @@
              (format stream "~%};~%")))
       (write-table "sword_t (*const scavtab[256])(lispobj *where, lispobj object)"
                    "scav_" scavtab)
-      (format stream "static void (*scav_ptr[~d])(lispobj *where, lispobj object)~
- = {~{~%  (void(*)(lispobj*,lispobj))~A~^,~}~%};~%" (length ptrtab) ptrtab)
+      (format stream "static sword_t (*scav_ptr[~d])(lispobj *where, lispobj object)~
+ = {~{~%  ~A~^,~}~%};~%" (length ptrtab) ptrtab)
       (write-table "static lispobj (*transother[64])(lispobj object)"
                    "trans_" transtab)
       (format stream "#define size_pointer (sizerfn)0~%")
