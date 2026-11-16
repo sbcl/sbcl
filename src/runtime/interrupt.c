@@ -1754,6 +1754,35 @@ extern void restore_sbcl_signals () {
     }
 }
 
+/* Handling of SIGILL and SIGTRAP in a Lisp thread in foreign code should delegate
+ * to whatever handler was installed before SBCL took over the signal. There's no
+ * way we could know what the foreign code was trying to do with these signals.
+ * clang can insert instructions that generate SIGILL for code that should never
+ * be reached, and other things - the reasons seem to be ever more increasing as new
+ * varieties of code hardening are implemented.
+ * If Lisp were to treat the bytes after the trapping instruction as error break data,
+ * it will surely report some completely fictitious error (or for UD2, silently step
+ * over the trap and keep executing).
+ * In the absence of a chained handler, fail cleanly via lose().
+ * I have not ascertained correctness of this predicate below for architectures
+ * other than x86-64, but the reasoning seems universally correct - don't handle
+ * synchronous signals that we don't understand */
+
+#ifdef LISP_FEATURE_X86_64
+static bool ll_signal_is_for_lisp(int signal, os_context_t *context)
+{
+    if (signal != SIGILL && signal != SIGTRAP) return 1; // sure, just do it
+    uword_t pc = os_context_pc(context);
+    if (signal == SIGTRAP) --pc; // INT3 points _after_ the trapping instruction
+    if (gc_managed_heap_space_p(pc)
+        || pc == (uword_t)memory_fault_emulation_trap
+        || pc == (uword_t)do_pending_interrupt) return 1;
+    return 0;
+}
+#else
+#define ll_signal_is_for_lisp(dummy1,dummy2) 1
+#endif
+
 static void
 low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 {
@@ -1767,7 +1796,9 @@ low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
     RECORD_SIGNAL(signal,void_context);
     UNBLOCK_SIGSEGV();
     RESTORE_FP_CONTROL_WORD(context,void_context);
-    if (lisp_thread_p(void_context)) {
+    struct sigaction *old = &old_ll_sigactions[signal];
+    int in_lisp_thread = lisp_thread_p(context);
+    if (in_lisp_thread && ll_signal_is_for_lisp(signal, context)) {
         interrupt_low_level_handlers[signal](signal, info, context);
     }
 #if defined LISP_FEATURE_DARWIN && defined LISP_FEATURE_SB_THREAD
@@ -1776,10 +1807,16 @@ low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
          * be delivered and then ignored in code. */
     }
 #endif
-    else if (old_ll_sigactions[signal].sa_handler == SIG_IGN) {
+    else if (old->sa_handler == SIG_IGN) {
         // drop it
-    } else if (old_ll_sigactions[signal].sa_handler != SIG_DFL) {
-        (old_ll_sigactions[signal].sa_sigaction)(signal, info, context);
+    } else if (old->sa_handler != SIG_DFL) {
+        if (old->sa_flags & SA_SIGINFO)
+            (old->sa_sigaction)(signal, info, context);
+        else
+            (old->sa_handler)(signal);
+    } else if (in_lisp_thread) {
+        lose("Unhandled sig%d in foreign code @ %p",
+             signal, (void*)os_context_pc(context));
     } else {
 #ifdef LISP_FEATURE_SB_THREAD
         lose("Can't handle sig%d in non-lisp thread %p @ %p",
@@ -2009,7 +2046,6 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
      * it up in the trap handler.  And the stack pointer manipulation
      * works as long as the on-stack side only pops items in its trap
      * handler. */
-    extern void memory_fault_emulation_trap(void);
     void **sp = (void **)*os_context_sp_addr(context);
     *--sp = (void *)os_context_pc(context);
     *--sp = addr;

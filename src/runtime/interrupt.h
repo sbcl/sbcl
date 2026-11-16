@@ -120,6 +120,7 @@ extern bool handle_guard_page_triggered(os_context_t *,os_vm_address_t);
 /* assembly language stub that executes trap_PendingInterrupt */
 extern void do_pending_interrupt(void);
 #endif
+extern void memory_fault_emulation_trap(void);
 
 #ifdef LISP_FEATURE_SB_THREAD
 extern void sig_stop_for_gc_handler(int, siginfo_t*, os_context_t*);
