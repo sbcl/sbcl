@@ -2463,7 +2463,7 @@
                 `((unless (<= start1 end1 len1)
                     (oops pattern start1 end1))
                   (unless (<= start2 end2 len2)
-                    (oops pattern start2 end2))))
+                    (oops text start2 end2))))
             (when (= end1 start1)
               (return-from search (if from-end
                                       end2
