@@ -303,9 +303,15 @@ uword_t sxhash_simple_string(struct vector* string)
     return result;
 }
 
-// This works on vector-like objects, which includes most numerics.
-static uword_t vector_sxhash(lispobj* object)
+static uint32_t sxhash_simple_string_key(uword_t key)
 {
+    return (uint32_t)sxhash_simple_string((struct vector*)key);
+}
+
+// This works on vector-like objects, which includes most numerics.
+static uint32_t vector_sxhash(uword_t arg)
+{
+    lispobj* object = (lispobj*)arg;
     lispobj header = *object;
     int widetag = header_widetag(header);
     sword_t nwords = sizetab[widetag](object);
@@ -373,11 +379,11 @@ void hopscotch_create(tableptr ht, int hashfun,
       ht->compare = 0; ht->hash = hopscotch_hmix; break;
     case HOPSCOTCH_STRING_HASH:
       ht->compare = vector_eql;
-      ht->hash = (uint32_t(*)(uword_t))sxhash_simple_string;
+      ht->hash = sxhash_simple_string_key;
       break;
     case HOPSCOTCH_VECTOR_HASH:
       ht->compare = vector_eql;
-      ht->hash = (uint32_t(*)(uword_t))vector_sxhash;
+      ht->hash = vector_sxhash;
       break;
 
     default: lose("Bad hash function");

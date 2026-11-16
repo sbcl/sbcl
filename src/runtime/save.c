@@ -329,7 +329,7 @@ void save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 #ifdef LISP_FEATURE_LINKAGE_SPACE
     // Lisp linkage space precedes the general space directory
     int i;
-    extern void illegal_linkage_space_call();
+    extern void illegal_linkage_space_call(void);
     /* The C runtime is theoretically position-independent so don't write out the address
      * of the unused entry sentinel. The affected elements needn't be restored on restart.
      * (Maybe add a renumbering pass in Lisp to ensure the table is 100% dense) */

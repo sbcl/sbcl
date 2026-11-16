@@ -3262,7 +3262,7 @@ void remember_all_permgen()
     permgen_remset_count = 0;
 }
 
-void illegal_linkage_space_call() {
+void illegal_linkage_space_call(void) {
     lose("jumped via obsolete linkage entry");
 }
 

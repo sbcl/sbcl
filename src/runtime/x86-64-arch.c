@@ -90,7 +90,7 @@ void tune_asm_routines_for_microarch(void)
     // Assign the static lisp symbol's value the address of the C function
     // that assists calling C from Lisp.
 #ifdef LISP_FEATURE_SB_THREAD
-    extern void callback_wrapper_trampoline();
+    extern void callback_wrapper_trampoline(lispobj, lispobj, lispobj);
     SYMBOL(CALLBACK_WRAPPER_TRAMPOLINE)->value = (lispobj)callback_wrapper_trampoline;
 #else
     extern void funcall_alien_callback();
