@@ -161,7 +161,7 @@
          (when testp
            (error ":TEST and :TEST-NOT were both supplied."))
          (tree-equal-test-not x y (%coerce-callable-to-fun test-not)))
-        ((or (not test)
+        ((or (not testp)
              (eql test #'eql)
              (eql test 'eql))
          (tree-equal-eql x y))
