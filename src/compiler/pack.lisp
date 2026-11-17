@@ -1465,9 +1465,15 @@
              (declare (type index count))
              (loop
               (let ((refs (funcall slot-function current)))
-                (unless (and (plusp count)
-                             refs
-                             (not (tn-ref-next refs)))
+                (unless (and (plusp count) refs)
+                  (return nil))
+                (when (tn-ref-next refs)
+                  (when (and (eq current tn) (eq slot-function #'tn-writes))
+                    (do ((ref refs (tn-ref-next ref)))
+                        ((null ref))
+                      (let ((target (tn-ref-target ref)))
+                        (when target
+                          (funcall callee (tn-ref-tn target))))))
                   (return nil))
                 (let ((target (tn-ref-target refs)))
                   (unless target (return nil))
@@ -1497,6 +1503,76 @@
                 (check-ok-target target tn sc))
       (return-from find-ok-target-offset it))))
 
+;;; Return the cost of a move weighted by loop depth.
+(defun move-loop-weight (vop)
+  (let ((loop (block-loop (ir2-block-block (vop-block vop)))))
+    (if loop
+        (1+ (* (1+ (max 1 *tn-write-cost* *backend-register-save-penalty*))
+               (loop-depth loop)))
+        1)))
+
+;;; Call FUN with each TN which a move aliases against its loop weight.
+(defun map-move-partners (fun tn)
+  (declare (function fun) (dynamic-extent fun))
+  (do ((ref (tn-reads tn) (tn-ref-next ref)))
+      ((null ref))
+    (let ((vop (tn-ref-vop ref)))
+      (when (eq (sb-c::vop-info-move-vop-p (vop-info vop)) :move)
+        (funcall fun (tn-ref-tn (vop-results vop)) (move-loop-weight vop)))))
+  (do ((ref (tn-writes tn) (tn-ref-next ref)))
+      ((null ref))
+    (let ((vop (tn-ref-vop ref)))
+      (when (eq (sb-c::vop-info-move-vop-p (vop-info vop)) :move)
+        (funcall fun (tn-ref-tn (vop-args vop)) (move-loop-weight vop))))))
+
+;;; Return the location in SC for TN which minimizes the cost of
+;;; loop-weighted moves. We score each location based on whether the
+;;; TN's move partners are already allocated there, or if an
+;;; unallocated partner could be legally allocated there in the
+;;; future. We also prioritize unwired locations over wired locations
+;;; in bounded storage bases.
+(defun find-ok-moved-offset (tn sc)
+  (declare (type tn tn) (type storage-class sc))
+  (let* ((sb (sc-sb sc))
+         (unbounded (eq (sb-kind sb) :unbounded))
+         (best nil)
+         (best-score 0))
+    (declare (type fixnum best-score))
+    (flet ((score (loc)
+             (unless (conflicts-in-sc tn sc loc)
+               (let ((score 0))
+                 (declare (type fixnum score))
+                 (map-move-partners
+                  (lambda (other weight)
+                    (let ((other-sc (tn-sc other)))
+                      (cond ((tn-offset other)
+                             (when (and (eq (sc-sb other-sc) sb)
+                                        (= (tn-offset other) loc))
+                               (incf score (* 2 weight))))
+                            ((not (member (tn-kind other) '(:normal :debug-environment))))
+                            (unbounded
+                             (when (and (memq sc (sc-alternate-scs other-sc))
+                                        (not (conflicts-in-sc other sc loc)))
+                               (incf score weight)))
+                            ((and (eq (sc-sb other-sc) sb)
+                                  (sc-locations-member loc (sc-locations other-sc))
+                                  (not (conflicts-in-sc other other-sc loc)))
+                             (incf score weight)))))
+                  tn)
+                 (when (> score best-score)
+                   (setq best loc best-score score))))))
+      (when (= (sc-element-size sc) 1)
+        (if unbounded
+            (dotimes (loc (finite-sb-current-size sb))
+              (score loc))
+            (let* ((locations (logandc2 (sc-locations sc) (sc-reserve-locations sc)))
+                   (wired (finite-sb-wired-map sb)))
+              (do-sc-locations (loc (logandc2 locations wired) nil 1)
+                (score loc))
+              (do-sc-locations (loc (logand locations wired) nil 1)
+                (score loc))))))
+    best))
+
 ;;;; location selection
 
 ;;; Select some location for TN in SC, returning the offset if we
@@ -1597,6 +1673,7 @@
       (when (or restricted
                 (not (and (minusp (tn-cost tn)) (sc-save-p sc))))
         (let ((loc (or (find-ok-target-offset original sc)
+                       (and (eq tn original) (find-ok-moved-offset original sc))
                        (select-location original sc :use-reserved-locs restricted)
                        (when (unbounded-sc-p sc)
                          (grow-sc sc)
