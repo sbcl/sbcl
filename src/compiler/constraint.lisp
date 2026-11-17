@@ -1801,13 +1801,8 @@
     (flet ((find-vars (out)
              (do-conset-elements (con out)
                (let ((kind  (constraint-kind con))
-                     (y     (constraint-y con))
-                     (not-p (constraint-not-p con)))
-                 (when (and (or (member kind '(typep < >))
-                                (and (eq kind 'eql) (or (not not-p)
-                                                        (constant-p y)))
-                                (and (eq kind '=) (and (numeric-type-p y)
-                                                       (not not-p))))
+                     (y     (constraint-y con)))
+                 (when (and (member kind '(typep < > = >= <= eql))
                             (not (conset-member con in)))
                    (pushnew (constraint-x con) vars))
                  (when (and (equality-constraint-p con)
@@ -1821,16 +1816,18 @@
       (let ((in-var-type *empty-type*))
         (dolist (out predecessor-outs)
           (setq in-var-type
-                (if (do-propagatable-constraints (con (out var))
-                      (unless (conset-member con in)
-                        (return t)))
-                    (type-union in-var-type
-                                (type-from-constraints var out *universal-type*))
-                    *universal-type*))
+                (type-union in-var-type
+                            (type-from-constraints var out *universal-type*)))
           (when (eq in-var-type *universal-type*)
             (return)))
         (let ((in-var-type (type-for-constraints-p in-var-type)))
           (when in-var-type
+            ;; Remove existing typep constraints so that overlapping
+            ;; TYPEPs do not cause any loops
+            (do-propagatable-constraints (con (in var))
+              (when (and (eq (constraint-kind con) 'typep)
+                         (not (constraint-not-p con)))
+                (conset-delete con in)))
             (conset-adjoin (find-or-create-constraint 'typep
                                                       var
                                                       in-var-type

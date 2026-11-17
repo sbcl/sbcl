@@ -2667,3 +2667,23 @@
       (setq v (the (satisfies eval) 1d0))
       (max 6 v)))
   (eql 6)))
+
+(with-test (:name :loop-number-five-thousand)
+  (checked-compile
+   `(lambda (w)
+      (declare (optimize (debug 2)))
+      (let ((v 4))
+        (loop (if (> v 5)
+                  (return))
+              (loop
+               (if *
+                   (return))
+               (tagbody
+                  (flet ((g ()
+                           (go l)))
+                    (when w
+                      (g))
+                    (setq w v))
+                l)
+               (print 1))
+              (incf v))))))
