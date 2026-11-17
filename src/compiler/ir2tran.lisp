@@ -292,10 +292,11 @@
   (declare (type enclose node)
            (type ir2-block ir2-block))
   (collect ((delayed))
-    (dolist (fun (enclose-funs node))
-      (let ((xep (functional-entry-fun fun)))
-        ;; If there is no XEP then no closure needs to be created.
-        (when (and xep (not (functional-kind-eq xep deleted)))
+    (loop for (fun . remaining-funs) on (enclose-funs node)
+          for xep = (functional-entry-fun fun)
+          when (and xep (not (functional-kind-eq xep deleted)))
+          do
+          ;; If there is no XEP then no closure needs to be created.
           (aver (xep-p xep))
           (let ((closure (environment-closure (get-lambda-environment xep))))
             (when closure
@@ -309,25 +310,33 @@
                 (vop make-closure node ir2-block #-(or x86-64 arm64) entry
                      (entry-info-offset entry-info) (length closure)
                      stack-allocate-p tn)
-                (loop for what in closure and n from 0 do
-                      (if (lambda-p what)
-                          (unless (functional-kind-eq what deleted)
-                            (delayed (list tn (find-in-environment what env) n
-                                           stack-allocate-p)))
-                          (unless (and (lambda-var-p what)
-                                       (null (leaf-refs what)))
-                            (let ((initial-value (closure-initial-value what env nil)))
-                              (if initial-value
-                                  (vop closure-init node ir2-block tn initial-value n
-                                       stack-allocate-p #+(or arm64 x86-64) nil)
-                                  ;; An initial-value of NIL means to
-                                  ;; stash the frame pointer... which
-                                  ;; requires a different VOP.
-                              (vop closure-init-from-fp node ir2-block tn n))))))))))))
+                (loop for what in closure
+                      for n from 0
+                      do
+                      (cond ((lambda-p what)
+                             (unless (functional-kind-eq what deleted)
+                               ;; Delay if it hasn't been allocated yet
+                               ;; TODO: sort the functions to reduce delays?
+                               (if (find what remaining-funs :key #'functional-entry-fun)
+                                   (delayed (list tn (find-in-environment what env) n
+                                                  stack-allocate-p))
+                                   (vop closure-init node ir2-block tn
+                                        (find-in-environment what env) n stack-allocate-p
+                                        #+(or arm64 x86-64) nil))))
+                            ((not (and (lambda-var-p what)
+                                       (null (leaf-refs what))))
+                             (let ((initial-value (closure-initial-value what env nil)))
+                               (if initial-value
+                                   (vop closure-init node ir2-block tn initial-value n
+                                        stack-allocate-p #+(or arm64 x86-64) nil)
+                                   ;; An initial-value of NIL means to
+                                   ;; stash the frame pointer... which
+                                   ;; requires a different VOP.
+                                   (vop closure-init-from-fp node ir2-block tn n))))))))))
     (loop for (tn what n stack-allocate-p) in (delayed)
           do (vop closure-init node ir2-block tn what n stack-allocate-p
                   ;; emit a barrier, which might be a result of another make-closure, issued after this one
-                  #+(or arm64 x86-64) t)))
+                  #+(or arm64 x86-64) (not stack-allocate-p))))
   (values))
 
 ;;; Convert a SET node. If the NODE's LVAR is annotated, then we also
