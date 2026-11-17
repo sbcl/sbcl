@@ -116,9 +116,10 @@
 
 #-sb-xc-host
 (defun alien-linkage-index-from-addr (addr)
-  (ecase alien-linkage-table-growth-direction
-    (:up   (floor (- addr alien-linkage-space-start) alien-linkage-table-entry-size))
-    (:down (1- (floor (- space-end addr) space-end))))))
+  (values ; primary value only
+   (ecase alien-linkage-table-growth-direction
+     (:up   (floor (- addr alien-linkage-space-start) alien-linkage-table-entry-size))
+     (:down (1- (floor (- space-end addr) space-end)))))))
 
 
 ;;;; interfaces to IR2 conversion

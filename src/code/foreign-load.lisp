@@ -111,7 +111,7 @@ Experimental."
           (dlclose-or-lose old)
           (setf *shared-objects* (remove old *shared-objects*))
           (update-alien-linkage-table t)
-          ;; Return T for unloaded, vs whatever update-linkage-info returns
+          ;; Return T for unloaded, vs whatever UPDATE-ALIEN-LINKAGE-TABLE returns
           t)))))
 
 (defun try-reopen-shared-object (obj)

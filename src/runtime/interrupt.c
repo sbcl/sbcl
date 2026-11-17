@@ -2057,7 +2057,7 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
 #  endif
     set_os_context_pc(context, (os_context_register_t)memory_fault_emulation_trap);
     /* We exit here, letting the signal handler return, picking up at
-     * the MEMORY-FAULT-EMULATION-TRAP Lisp assembly routine, which will
+     * the MEMORY-FAULT-TRAP Lisp assembly routine, which will
      * trap, and the handler calls the function below, where we
      * restore our state to parallel what a non-x86oid would have, and
      * then run the common code for handling the error in Lisp. */
