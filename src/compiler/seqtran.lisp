@@ -1143,37 +1143,42 @@
                 ((eq fun-name 'quickfill)
                  ;; array is simple, and out-of-bounds can't happen
                  `(,basher ,bash-value seq 0 (vector-length seq)))
-                ;; FIXME: isn't this (NOT (CONSERVATIVE-ARRAY-TYPE-COMPLEXP (lvar-type seq))) ?
-                ((csubtypep (lvar-type seq) (specifier-type '(simple-array * (*))))
-                  `(block nil
-                     (tagbody
-                        (let* ((len (vector-length seq))
-                               (end (cond (end
-                                           (when (> end len)
-                                             (go bad-index))
-                                           end)
-                                          (len))))
-                          (return (,basher ,bash-value seq
-                                           ,(if (or (not start)
-                                                    (and (constant-lvar-p start)
-                                                         (eql (lvar-value start) 0)))
-                                                0
-                                                `(if (> start end)
-                                                     (go bad-index)
-                                                     start))
-                                           (- end start))))
-                      bad-index
-                        (sequence-bounding-indices-bad-error seq start end))))
+                ;; isn't this (NOT (CONSERVATIVE-ARRAY-TYPE-COMPLEXP (lvar-type seq))) ?
+                ((lvar-subtypep seq (simple-array * (*)))
+                 (let ((check-bounds-p (policy node (plusp insert-array-bounds-checks))))
+                   `(block nil
+                      (tagbody
+                         (let* ((len (vector-length seq))
+                                (end (cond (end
+                                            ,@(when check-bounds-p
+                                                `((when (> end len)
+                                                    (go bad-index))))
+                                            end)
+                                           (len))))
+                           (return (,basher ,bash-value seq
+                                            ,(if (or (not start)
+                                                     (and (constant-lvar-p start)
+                                                          (eql (lvar-value start) 0)))
+                                                 0
+                                                 (if check-bounds-p
+                                                     `(if (> start end)
+                                                          (go bad-index)
+                                                          start)
+                                                     'start))
+                                            (- end start))))
+                       bad-index
+                         ,@(when check-bounds-p
+                             `((sequence-bounding-indices-bad-error seq start end)))))))
                 (t
-                  `(with-array-data ((data seq)
-                                     (start start)
-                                     (end end)
-                                     :check-fill-pointer t)
-                     (declare (type (simple-array ,element-type 1) data))
-                     (declare (type index start end))
-                     (declare (optimize (safety 0) (speed 3)))
-                     (,basher ,bash-value data start (- end start))
-                     seq)))
+                 `(with-array-data ((data seq)
+                                    (start start)
+                                    (end end)
+                                    :check-fill-pointer t)
+                    (declare (type (simple-array ,element-type 1) data))
+                    (declare (type index start end))
+                    (declare (optimize (safety 0) (speed 3)))
+                    (,basher ,bash-value data start (- end start))
+                    seq)))
               `((declare (type ,element-type item))))))
           ;; OK, it's not a "bashable" array type.
           ((and (policy node (> speed space))
