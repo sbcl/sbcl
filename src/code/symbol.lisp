@@ -495,16 +495,17 @@ distinct from the global value. Can also be SETF."
            (setf (cadr plist) new-value)
            (return place)))))
 
-(defun get-properties (place indicator-list)
+(defun get-properties (plist indicator-list)
   "Like GETF, except that INDICATOR-LIST is a list of indicators which will
-  be looked for in the property list stored in PLACE. Three values are
+  be looked for in the property list stored in PLIST. Three values are
   returned, see manual for details."
-  (do ((plist place (cddr plist)))
+  (do ((original plist)
+       (plist plist (cddr plist)))
       ((null plist) (values nil nil nil))
     (cond ((atom (cdr plist))
            (error 'simple-type-error
                   :format-control "malformed property list: ~S."
-                  :format-arguments (list place)
+                  :format-arguments (list original)
                   :datum (cdr plist)
                   :expected-type 'cons))
           ((memq (car plist) indicator-list)
