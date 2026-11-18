@@ -1015,11 +1015,13 @@
 
 #+sb-devel
 (with-test (:name :select-tagging)
-  (flet ((check (code vop kind)
+  (flet ((check (code vop kind &optional not)
            (let* ((vops (ctu:ir2-vops code nil))
                   (vop (find vop vops :key (lambda (vop)
                                              (car (sb-c::vop-info-translate (sb-c::vop-info vop)))))))
-             (assert (eq (sb-c::vop-info-tag (sb-c::vop-info vop)) kind)))))
+             (assert (eq (sb-c::vop-info-tag (sb-c::vop-info vop)) kind))
+             (when not
+               (assert (not (find not vops :key #'sb-c:vop-name :test #'string=)))))))
     (check `(lambda (n)
               (declare (fixnum n)
                        (optimize speed (safety 0)))
@@ -1046,7 +1048,17 @@
                 (when n
                   (setf y (aref a 0)))
                 (aref a (logand y #xF))))
-           'logand #+arm64 nil #-arm64 :untagged)))
+           'logand #+arm64 nil #-arm64 :untagged)
+    (check `(lambda (v x)
+              (declare ((integer 10 20)  x)
+                       ((simple-array (unsigned-byte 8) 1) v)
+                       (optimize speed (safety 0)))
+              (let ((n (aref v 0)))
+                (values (* n x)
+                        (* n x)
+                        (* n x))))
+           '* #+arm64 :commutative #-arm64 :tagged
+              #+arm64 "MOVE-FROM-WORD/FIXNUM")))
 
 #+sb-devel
 (with-test (:name (:assignment-lambda :substitute-and-delete))
@@ -1318,13 +1330,22 @@
 
 (with-test (:name (:select-tagging :commutative :untagged-arguments)
             :skipped-on (not :arm64))
-  (assert (member 'sb-vm::logior/unsigned=>unsigned
-                  (ctu:ir2-vops '(lambda (v i)
+  (assert (not (find "MOVE-FROM-WORD/FIXNUM"
+                     (ir2-vops `(lambda (v i)
                                   (declare ((simple-array (unsigned-byte 8) (*)) v)
                                            (fixnum i)
                                            (optimize speed (safety 0)))
                                   (logior (ash (logand (aref v i) 31) 6)
-                                          (logand (aref v (1+ i)) 63)))))))
+                                          (logand (aref v (1+ i)) 63))))
+                     :test #'equal)))
+  (assert (not (find "MOVE-FROM-WORD/FIXNUM"
+                     (ir2-vops `(lambda (v i)
+                                  (declare ((simple-array (unsigned-byte 8) (*)) v)
+                                           (fixnum i)
+                                           (optimize speed (safety 0)))
+                                  (logior (logand (aref v (1+ i)) 63)
+                                          (ash (logand (aref v i) 31) 6))))
+                     :test #'equal))))
 
 (with-test (:name (:select-tagging :through-variables)
             :skipped-on (not (and :sb-unicode (or :x86-64 :arm64))))

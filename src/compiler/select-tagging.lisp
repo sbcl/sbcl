@@ -291,9 +291,12 @@
                          (setq any t)
                          (reach arg)
                          (add-edge net arg node 8
-                                   (if (> (tagged-template-arg-p arg i tagged-template) 0)
-                                       (* 8 (boxing-cost arg))
-                                       0))))
+                                   (cond ((eq (vop-info-tag tagged-template) :commutative)
+                                          1)
+                                         ((> (tagged-template-arg-p arg i tagged-template) 0)
+                                          (* 8 (boxing-cost arg)))
+                                         (t
+                                          0)))))
               (unless (template-conditional-p tagged-template)
                 (cond ((zerop (tagged-template-results-p tagged-template))
                        ;; The result is untagged for both vops, e.g. (ash fixnum positive-constant)
