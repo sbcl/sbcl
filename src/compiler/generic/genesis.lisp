@@ -2421,8 +2421,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
          (ensure-gethash (if datap (list symbol-name) symbol-name)
                          *cold-foreign-symbol-table*
                          (hash-table-count *cold-foreign-symbol-table*))))
-    #+x86-64 index
-    #-x86-64 (sb-vm::alien-linkage-index-to-addr index)))
+    #+(or arm64 x86-64) index
+    #-(or arm64 x86-64) (sb-vm::alien-linkage-index-to-addr index)))
 
 (defun foreign-symbols-to-core ()
   (flet ((to-core (list transducer target-symbol)

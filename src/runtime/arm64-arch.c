@@ -374,36 +374,30 @@ void arch_install_interrupt_handlers()
 void arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 {
   THREAD_JIT_WP(0);
-  char *reloc_addr = (char*)ALIEN_LINKAGE_SPACE_START + index * ALIEN_LINKAGE_TABLE_ENTRY_SIZE;
-
-  if (datap) {
-    *(uword_t *)reloc_addr = (uword_t)target_addr;
-    goto DONE;
-  }
   /*
+    address
     ldr reg,=address
     br  reg
-    address
   */
-  int* inst_ptr;
-  unsigned inst;
 
-  inst_ptr = (int*) reloc_addr;
-
-  // ldr reg, =address
-  inst = 0x58000000 | 2 << 5 | LINKAGE_TEMP_REG;
-  *inst_ptr++ = inst;
-
-  // br reg
-  inst = 0xD61F0000 | LINKAGE_TEMP_REG << 5;
-  *inst_ptr++ = inst;
-
-  // address
-  *(uword_t *)inst_ptr++ = (uword_t)target_addr;
-
-  os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
-
- DONE:
+  const unsigned int entries_per_group = 16;
+  unsigned int major_index = (unsigned int)index / entries_per_group;
+  unsigned int minor_index = (unsigned int)index % entries_per_group;
+  char* group_base = (major_index * entries_per_group * ALIEN_LINKAGE_TABLE_ENTRY_SIZE)
+                     + (char*)ALIEN_LINKAGE_SPACE_START;
+  char* data = group_base + minor_index * N_WORD_BYTES;
+  *(uword_t*)data = (uword_t)target_addr;
+  uint32_t* inst_ptr = (void*)(group_base + entries_per_group * N_WORD_BYTES
+                               + minor_index * 8);
+  if (datap) {
+      inst_ptr[0] = inst_ptr[1] = 0xD503201F; // NOP
+  } else {
+      int disp = (int)(data - (char*)inst_ptr) / 4; // -32 words (-128 bytes)
+      inst_ptr[0] = 0x58000000u | ((uint32_t)(disp & 0x7ffff) << 5)
+                    | LINKAGE_TEMP_REG;                    // ldr reg, [pc, -128]
+      inst_ptr[1] = 0xD61F0000u | (LINKAGE_TEMP_REG << 5); // br reg
+      os_flush_icache((os_vm_address_t)inst_ptr, 8);
+  }
   THREAD_JIT_WP(1);
 }
 

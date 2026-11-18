@@ -5007,9 +5007,13 @@
                                            (setf val (ash val -8))))))))))
 
 (defun sb-vm:fixup-code-object (code offset value kind flavor)
-  (declare (type index offset) (ignore flavor))
+  (declare (type index offset))
   (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
     (error "Unaligned instruction?  offset=#x~X." offset))
+  (case flavor
+    ((:foreign :foreign-dataref)
+     (setq value
+           (sb-vm::alien-linkage-index-to-addr value (eq flavor :foreign-dataref)))))
   (let ((sap (code-instructions code)))
     (ecase kind
       (:absolute

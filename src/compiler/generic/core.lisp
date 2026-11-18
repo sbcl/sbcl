@@ -83,8 +83,8 @@
                    ((:foreign :foreign-dataref)
                     (let* ((datap (eq flavor-id #.(encoded-fixup-flavor :foreign-dataref)))
                            (index (sb-impl::ensure-alien-linkage-index name datap)))
-                      #-x86-64 (sb-vm::alien-linkage-index-to-addr index datap)
-                      #+x86-64 index))
+                      #-(or arm64 x86-64) (sb-vm::alien-linkage-index-to-addr index datap)
+                      #+(or arm64 x86-64) index))
                    #+linkage-space
                    (:linkage-cell
                     (let* ((warn #+x86-64 (= (sap-ref-32 (code-instructions code-obj) offset) 1))

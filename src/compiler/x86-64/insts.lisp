@@ -3537,9 +3537,9 @@
   (case flavor
     (:linkage-cell (setf addend 0))
     ((:foreign :foreign-dataref)
-     ;; VALUE is an _index_ into the linkage table (unlike for other achitectures where it
-     ;; is an address) and ADDEND is a boolean flag. This unique convention in contrast
-     ;; to the other architectures supports relocatable alien linkage space.
+     ;; VALUE is an _index_ into the linkage table (as on arm64, unlike other architectures
+     ;; where it is an address) and ADDEND is a boolean flag. Passing the index rather than
+     ;; an address supports relocatable alien linkage space.
      (setf value
            (let ((datap (eq flavor :foreign-dataref)))
              (ecase kind

@@ -68,7 +68,7 @@
       (not (static-symbol-p symbol))
       (not (null (info :variable :wired-tls symbol)))))
 
-#+x86-64
+#+(or arm64 x86-64)
 ;;; Alien linkage entries are bundled into groups of 16. Within a group, all pointer words
 ;;; are adjacent, followed by the jump instructions corresponding to them (if relevant).
 ;;; To see why this is more favorable to the CPU, consider trying to bring 8 consecutive
@@ -78,7 +78,7 @@
 ;;; Therefore 8 entries consume 4 lines.  However the same 8 entries using separated I & D
 ;;; consume only 1 icache line and 1 dcache line, so 8 entries consume 2 lines.
 ;;; Conclusion: non-interleaving improves theoretical density in L1 cache.
-;;; Though this is conditioned for x86-64, any of the architectures could (and probably
+;;; Though conditioned for arm64 and x86-64, any of the architectures could (and probably
 ;;; should) use a piecewise linear map from alien linkage index to table element, because
 ;;; spacing data away from instructions by >1 cache line is generally the right thing.
 (symbol-macrolet ((entries-per-group 16))
@@ -88,9 +88,9 @@
        (if datap
            ;; return the address of the indirection word
            (* index-in-group sb-vm:n-word-bytes)
-           ;; return the address of the JMP instruction
+           ;; return the address of the jump instruction(s)
            (+ (* entries-per-group sb-vm:n-word-bytes) ; skip over N indirection words
-              (* index-in-group 8)))))) ; coincidentally it's 8 bytes for the JMP+padding
+              (* index-in-group 8)))))) ; 8 bytes for JMP+NOP (x86-64) or LDR+BR (arm64)
 
 (defun alien-linkage-index-from-addr (addr)
   (let* ((offset (- addr alien-linkage-space-start))
@@ -105,7 +105,7 @@
 (defun alien-linkage-index-to-addr (i &optional datap)
   (+ (alien-linkage-element-offset i datap) alien-linkage-space-start)))
 
-#-x86-64 ; alien linkage index -> address mapping is strictly linear
+#-(or arm64 x86-64) ; alien linkage index -> address mapping is strictly linear
 (symbol-macrolet ((space-end (+ alien-linkage-space-start alien-linkage-space-size)))
 ;;; the address of the linkage table entry for table index I.
 (defun alien-linkage-index-to-addr (i &optional datap)

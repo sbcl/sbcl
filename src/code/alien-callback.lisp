@@ -371,8 +371,6 @@ function value."
             (symbol (alien-sap (gethash new-value sb-alien::*alien-callables*)))
             (integer (int-sap new-value))))
          (address-of-jump-address
-          #+arm64 (sap+ (int-sap (sb-vm::alien-linkage-index-to-addr linkage-index nil)) 8)
-          #+x86-64
           ;; Access the linkage index as if data, even though it's a function- this computes
           ;; the address of the word in the linkage space which needs to get overwritten.
           ;; Computing as a function would get the immutable address within the space.
