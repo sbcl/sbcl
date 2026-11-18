@@ -1229,11 +1229,10 @@
   (declare (type (or rational complex) z))
   (let ((sqrt-1+z (complex-sqrt (+ 1 z)))
         (sqrt-1-z (complex-sqrt (- 1 z))))
-    (with-float-traps-masked (:divide-by-zero)
-      (complex (* 2 (atan (/ (realpart sqrt-1-z)
-                             (realpart sqrt-1+z))))
-               (asinh (imagpart (* (conjugate sqrt-1+z)
-                                   sqrt-1-z)))))))
+    (complex (* 2 (atan (realpart sqrt-1-z)
+                        (realpart sqrt-1+z)))
+             (asinh (imagpart (* (conjugate sqrt-1+z)
+                                 sqrt-1-z))))))
 
 ;;; Compute acosh z = 2 * log(sqrt((z+1)/2) + sqrt((z-1)/2))
 ;;;
@@ -1242,11 +1241,10 @@
   (declare (type (or rational complex) z))
   (let ((sqrt-z-1 (complex-sqrt (- z 1)))
         (sqrt-z+1 (complex-sqrt (+ z 1))))
-    (with-float-traps-masked (:divide-by-zero)
-      (complex (asinh (realpart (* (conjugate sqrt-z-1)
-                                   sqrt-z+1)))
-               (* 2 (atan (/ (imagpart sqrt-z-1)
-                             (realpart sqrt-z+1))))))))
+    (complex (asinh (realpart (* (conjugate sqrt-z-1)
+                                 sqrt-z+1)))
+             (* 2 (atan (imagpart sqrt-z-1)
+                        (realpart sqrt-z+1))))))
 
 ;;; Compute asin z = asinh(i*z)/i.
 ;;;
@@ -1255,11 +1253,10 @@
   (declare (type (or rational complex) z))
   (let ((sqrt-1-z (complex-sqrt (- 1 z)))
         (sqrt-1+z (complex-sqrt (+ 1 z))))
-    (with-float-traps-masked (:divide-by-zero)
-      (complex (atan (/ (realpart z)
-                        (realpart (* sqrt-1-z sqrt-1+z))))
-               (asinh (imagpart (* (conjugate sqrt-1-z)
-                                   sqrt-1+z)))))))
+    (complex (atan (realpart z)
+                   (realpart (* sqrt-1-z sqrt-1+z)))
+             (asinh (imagpart (* (conjugate sqrt-1-z)
+                                 sqrt-1+z))))))
 
 ;;; Compute asinh z = log(z + sqrt(1 + z*z)).
 ;;;
