@@ -1916,7 +1916,7 @@ extended <package-name>::<form-in-package> syntax."
                                     (if junk-allowed
                                         (return-from ,(symbolicate 'parse-integer
                                                                    (if radix (princ-to-string radix) ""))
-                                          (values nil end))
+                                          (values nil (- end offset)))
                                         (parse-error "no non-whitespace characters in string ~S.")))
                                  (declare (fixnum i))
                                  (unless (whitespace[1]p (char string i)) (return i))))

@@ -738,3 +738,11 @@
   (let ((nines (make-string 500 :initial-element #\9)))
     (assert (eql (read-from-string (concatenate 'string nines "r5"))
                  (* (1- (expt 10 500)) (expt 10 5))))))
+
+(with-test (:name :parse-integer-displaced-offset)
+  (assert (= (nth-value 1 (parse-integer (make-array 1
+                                                     :element-type 'character
+                                                     :displaced-to "1 "
+                                                     :displaced-index-offset 1)
+                                         :junk-allowed t))
+             1)))
