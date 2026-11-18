@@ -1052,10 +1052,7 @@
          (element-type (type-specifier element-ctype))
          (saetp (unless (eq *wild-type* element-ctype)
                   (find-saetp-by-ctype element-ctype))))
-    (cond ((eq *wild-type* element-ctype)
-           (delay-ir1-transform node :constraint)
-           `(vector-fill seq item start end))
-          ((and (csubtypep type (specifier-type 'simple-base-string))
+    (cond ((and (csubtypep type (specifier-type 'simple-base-string))
                 (not start)
                 (not end)
                 (policy node (>= speed space)))
@@ -1179,7 +1176,8 @@
                      seq)))
               `((declare (type ,element-type item))))))
           ;; OK, it's not a "bashable" array type.
-          ((policy node (> speed space))
+          ((and (policy node (> speed space))
+                (not (eq element-ctype *wild-type*)))
            (values
             `(with-array-data ((data seq)
                                (start start)
@@ -1207,6 +1205,7 @@
           ((csubtypep type (specifier-type 'string))
            '(string-fill seq item start end))
           (t
+           (delay-ir1-transform node :constraint)
            '(vector-fill seq item start end)))))
 
 (deftransform fill ((seq item &key (start 0) (end nil))
@@ -1542,6 +1541,9 @@
   (check-sequence-ranges sequence start end node))
 
 (defoptimizer (fill ir2-hook) ((sequence item &key start end) node)
+  (check-sequence-ranges sequence start end node))
+
+(defoptimizer (string-fill ir2-hook) ((sequence item start end) node)
   (check-sequence-ranges sequence start end node))
 
 (defoptimizer (search ir2-hook) ((sub-sequence1 main-sequence2 &key start1 end1 start2 end2 &allow-other-keys) node)
@@ -1971,7 +1973,7 @@
   (check-sequence-ranges seq start end node)
   (check-sequence-item new seq node "Can't substitute ~a into ~a"))
 
-(defoptimizer (vector-fill ir2-hook) ((seq item start end) node)
+(defoptimizers ir2-hook (vector-fill string-fill vector-fill/t) ((seq item start end) node)
   (check-sequence-ranges seq start end node)
   (check-sequence-item item seq node "Can't fill ~a into ~a"))
 

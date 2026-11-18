@@ -141,6 +141,10 @@
   (no-verify-arg-count)
   :result-arg 0)
 
+(defknown (string-fill) (string character t t) vector
+  (no-verify-arg-count)
+  :result-arg 0)
+
 ;;; Return the length of VECTOR.
 ;;; Ordinary code should prefer to use (LENGTH (THE VECTOR FOO)) instead.
 (defknown vector-length ((read-only vector)) index (flushable dx-safe))

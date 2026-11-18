@@ -794,24 +794,24 @@
   vector)
 
 (defun string-fill (sequence item start end)
-  (declare (string sequence))
+  (declare (explicit-check))
   (with-array-data ((data sequence)
                     (start start)
                     (end end)
                     :force-inline t
-                    :check-fill-pointer t)
+                    :check-fill-pointer t
+                    :vector-type string)
     ;; DEFTRANSFORM for FILL will turn these into
     ;; calls to UB*-BASH-FILL.
     (etypecase data
       #+sb-unicode
       ((simple-array character (*))
-       (let ((item (locally (declare (optimize (safety 3)))
-                     (the character item))))
+       (locally (declare (optimize (sb-c:insert-array-bounds-checks 0)))
          (fill data item :start start :end end)))
       ((simple-array base-char (*))
-       (let ((item (locally (declare (optimize (safety 3)))
-                     (the base-char item))))
-         (fill data item :start start :end end))))))
+       (locally (declare (optimize (sb-c:insert-array-bounds-checks 0)))
+         (fill data item :start start :end end)))))
+  sequence)
 
 (defun fill (sequence item &key (start 0) end)
   "Replace the specified elements of SEQUENCE with ITEM."

@@ -2358,7 +2358,8 @@
                                   (start-var &optional (svalue 0))
                                   (end-var &optional (evalue nil))
                                   &key force-inline check-fill-pointer
-                                       array-header-p)
+                                       array-header-p
+                                       (vector-type 'vector))
                                  &body forms
                                  &environment env)
   (once-only ((n-array array)
@@ -2373,7 +2374,7 @@
              (cond ,@(and (not array-header-p)
                           `(((not (array-header-p ,n-array))
                              (let ((,n-array ,n-array))
-                               (declare (type vector ,n-array))
+                               (declare (type ,vector-type ,n-array))
                                ,(once-only ((n-len `(length ,n-array))
                                             (n-end `(or ,n-evalue ,n-len)))
                                   (if check-bounds
@@ -2390,7 +2391,8 @@
                             `(%with-array-data-macro ,n-array ,n-svalue ,n-evalue
                                                      :check-bounds ,check-bounds
                                                      :check-fill-pointer ,check-fill-pointer
-                                                     :array-header-p t))
+                                                     :array-header-p t
+                                                     :vector-type ,vector-type))
                            (check-fill-pointer
                             `(%with-array-data/fp ,n-array ,n-svalue ,n-evalue))
                            (t
@@ -2410,10 +2412,11 @@
 ;;; DEFTRANSFORMs and DEFUNs.
 (sb-xc:defmacro %with-array-data-macro
     (array start end &key (element-type '*) check-bounds check-fill-pointer
-                          array-header-p)
+                          array-header-p
+                          (vector-type 'vector))
   (with-unique-names (size defaulted-end data cumulative-offset)
     `(let* ((,size ,(cond (check-fill-pointer
-                           `(length (the vector ,array)))
+                           `(length (the ,vector-type ,array)))
                           (array-header-p
                            `(%array-available-elements ,array))
                           (t
