@@ -1000,15 +1000,7 @@ Examples:
              ;; generalized table methods.
              (setq hash-fun (%coerce-callable-to-fun hash-function)
                    hash-fun-state +hft-user-defined+
-                   kind -1))
-            ;; There is no flat implementation for weak hash tables,
-            ;; and only EQ and EQL are reliably fast enough for it to
-            ;; work well.
-            ((and (null weakness)
-                  (or (and (eql kind 0) (<= size +flat-limit/eq+))
-                      (and (eql kind 1) (<= size +flat-limit/eql+))))
-             (setq hash-fun #'hash/flat
-                   hash-fun-state +hft-flat+)))
+                   kind -1)))
       (%make-hash-table
        ;; compute flags. The stored KIND bits don't matter for a user-supplied hash
        ;; and/or test fun, however we don't want to imply that it is an EQ table
@@ -1043,85 +1035,94 @@ Examples:
                          size rehash-size rehash-threshold)
   (declare (type single-float rehash-threshold))
   (binding* (
-           ;; KLUDGE: The most natural way of expressing the below is
-           ;; (round (/ (float size) rehash-threshold)), and indeed
-           ;; it was expressed like that until 0.7.0. However,
-           ;; MAKE-HASH-TABLE is called very early in cold-init, and
-           ;; the SPARC has no primitive instructions for rounding,
-           ;; but only for truncating; therefore, we fudge this issue
-           ;; a little. The other uses of truncate, below, similarly
-           ;; used to be round. -- CSR, 2002-10-01
-           ;;
-           ;; Note that this has not yet been audited for
-           ;; correctness. It just seems to work. -- CSR, 2002-11-02
-           (scaled-size (truncate (/ (float size 1.0) rehash-threshold)))
-           (bucket-count (power-of-two-ceiling
-                          (max scaled-size +min-hash-table-size+)))
-           (weakp (logtest flags hash-table-weak-flag))
-           ;; Non-weak tables created with no options other than :TEST
-           ;; are allocated at 0 size. Weak tables are complicated enough,
-           ;; so just do their usual thing.
-           (defaultp (and (not weakp) (= size +min-hash-table-size+)))
-           (index-vector
-            (if defaultp
-                #.(sb-xc:make-array 2 :element-type '(unsigned-byte 32)
-                                    :initial-element 0)
-                (make-index-vector bucket-count)))
-           (kv-vector (if defaultp #(0 0 nil) (%alloc-kv-pairs size)))
-           ;; Needs to be the half the length of the KV vector to link
-           ;; KV entries - mapped to indices at 2i and 2i+1 -
-           ;; together.
-           ;; We don't need this to be initially 0-filled, so don't specify
-           ;; an initial element (in case we ever meaningfully distinguish
-           ;; between don't-care and 0-fill)
-           (next-vector (if defaultp
-                            #.(sb-xc:make-array 0 :element-type '(unsigned-byte 32))
-                            (make-array (1+ size) :element-type 'hash-table-index
-                                        ;; For testing, preload huge values for all 'next' elements
-                                        ;; so that we generate an error if any is inadvertently read
-                                        ;; above the high-water-mark for the k/v vector.
-                                        #+sb-devel :initial-element #+sb-devel bad-next-value)))
-           (table-kind (ht-flags-kind flags))
-           (userfunp (logtest flags hash-table-userfun-flag))
-           ;; same here - don't care about initial contents
-           (hash-vector (when (or userfunp (>= table-kind 2))
-                          (if defaultp
-                              #.(sb-xc:make-array 1 :element-type '(unsigned-byte 32))
-                              (make-array (1+ size) :element-type 'hash-table-index))))
-           ((getter setter remover)
-            (if weakp
-                (values #'gethash/weak #'puthash/weak #'remhash/weak)
-                (pick-table-methods (logtest flags hash-table-synchronized-flag)
-                                    (if userfunp nil test) hash-fun-state)))
-           (table
-            (if (or (/= rehash-threshold 1) (/= rehash-size default-rehash-size) userfunp weakp)
-                (%alloc-general-hash-table flags getter setter remover hash-fun-state
-                                           test test-fun hash-fun
-                                           rehash-size rehash-threshold
-                                           kv-vector index-vector next-vector hash-vector)
-                (%alloc-hash-table flags getter setter remover hash-fun-state test-fun hash-fun
-                                   kv-vector index-vector next-vector hash-vector))))
-      (declare (type index scaled-size))
-      ;; The trailing metadata element is either the table itself or the hash-vector
-      ;; depending on weakness. Non-weak hashing vectors can be GCed without looking
-      ;; at the table. Weak hashing vectors need the table.
-      ;; As a special-case, non-weak tables with EQL hashing put T in this slot.
-      ;; GC can't get the table kind since it doesn't have access to the table.
-      (cond (defaultp
-             ;; Stash the desired size for the first time the vectors are grown.
+             ;; KLUDGE: The most natural way of expressing the below is
+             ;; (round (/ (float size) rehash-threshold)), and indeed
+             ;; it was expressed like that until 0.7.0. However,
+             ;; MAKE-HASH-TABLE is called very early in cold-init, and
+             ;; the SPARC has no primitive instructions for rounding,
+             ;; but only for truncating; therefore, we fudge this issue
+             ;; a little. The other uses of truncate, below, similarly
+             ;; used to be round. -- CSR, 2002-10-01
+             ;;
+             ;; Note that this has not yet been audited for
+             ;; correctness. It just seems to work. -- CSR, 2002-11-02
+             (scaled-size (truncate (/ (float size 1.0) rehash-threshold)))
+             (bucket-count (power-of-two-ceiling
+                            (max scaled-size +min-hash-table-size+)))
+             (weakp (logtest flags hash-table-weak-flag))
+             ;; Non-weak tables created with no options other than :TEST
+             ;; are allocated at 0 size. Weak tables are complicated enough,
+             ;; so just do their usual thing.
+             (defaultp (and (not weakp) (= size +min-hash-table-size+)))
+             (index-vector
+              (if defaultp
+                  #.(sb-xc:make-array 2 :element-type '(unsigned-byte 32)
+                                        :initial-element 0)
+                  (make-index-vector bucket-count)))
+             (kv-vector (if defaultp #(0 0 nil) (%alloc-kv-pairs size)))
+             ;; Needs to be the half the length of the KV vector to link
+             ;; KV entries - mapped to indices at 2i and 2i+1 -
+             ;; together.
+             ;; We don't need this to be initially 0-filled, so don't specify
+             ;; an initial element (in case we ever meaningfully distinguish
+             ;; between don't-care and 0-fill)
+             (next-vector (if defaultp
+                              #.(sb-xc:make-array 0 :element-type '(unsigned-byte 32))
+                              (make-array (1+ size) :element-type 'hash-table-index
+                                          ;; For testing, preload huge values for all 'next' elements
+                                          ;; so that we generate an error if any is inadvertently read
+                                          ;; above the high-water-mark for the k/v vector.
+                                                    #+sb-devel :initial-element #+sb-devel bad-next-value)))
+             (table-kind (ht-flags-kind flags))
+             (userfunp (logtest flags hash-table-userfun-flag))
+             ((hash-fun hash-fun-state)
+              (if (and (not weakp)
+                       (not userfunp)
+                       (or (and (eql table-kind hash-table-kind-eq)
+                                (<= bucket-count +flat-limit/eq+))
+                           (and (eql table-kind hash-table-kind-eql)
+                                (<= bucket-count +flat-limit/eql+))))
+                  (values #'hash/flat +hft-flat+)
+                  (values hash-fun hash-fun-state)))
+             ;; same here - don't care about initial contents
+             (hash-vector (when (or userfunp (>= table-kind 2))
+                            (if defaultp
+                                #.(sb-xc:make-array 1 :element-type '(unsigned-byte 32))
+                                (make-array (1+ size) :element-type 'hash-table-index))))
+             ((getter setter remover)
+              (if weakp
+                  (values #'gethash/weak #'puthash/weak #'remhash/weak)
+                  (pick-table-methods (logtest flags hash-table-synchronized-flag)
+                                      (if userfunp nil test) hash-fun-state)))
+             (table
+              (if (or (/= rehash-threshold 1) (/= rehash-size default-rehash-size) userfunp weakp)
+                  (%alloc-general-hash-table flags getter setter remover hash-fun-state
+                                             test test-fun hash-fun
+                                             rehash-size rehash-threshold
+                                             kv-vector index-vector next-vector hash-vector)
+                  (%alloc-hash-table flags getter setter remover hash-fun-state test-fun hash-fun
+                                     kv-vector index-vector next-vector hash-vector))))
+    (declare (type index scaled-size))
+    ;; The trailing metadata element is either the table itself or the hash-vector
+    ;; depending on weakness. Non-weak hashing vectors can be GCed without looking
+    ;; at the table. Weak hashing vectors need the table.
+    ;; As a special-case, non-weak tables with EQL hashing put T in this slot.
+    ;; GC can't get the table kind since it doesn't have access to the table.
+    (cond (defaultp
+           ;; Stash the desired size for the first time the vectors are grown.
              (setf (hash-table-cache table) (- size)
                    ;; Cause the overflow logic to be invoked on the first insert.
                    (hash-table-next-free-kv table) 0))
-            (t
-             (setf (kv-vector-supplement kv-vector)
-                   (if weakp
-                       table
-                       (or hash-vector (= table-kind hash-table-kind-eql))))
-             (when weakp
-               (logior-array-flags kv-vector (logior sb-vm:vector-hashing-flag
-                                                  sb-vm:vector-weak-flag)))))
-      (when (logtest flags hash-table-synchronized-flag)
-        (install-hash-table-lock table))
+          (t
+           (setf (kv-vector-supplement kv-vector)
+                 (if weakp
+                     table
+                     (or hash-vector (= table-kind hash-table-kind-eql))))
+           (when weakp
+             (logior-array-flags kv-vector (logior sb-vm:vector-hashing-flag
+                                                   sb-vm:vector-weak-flag)))))
+    (when (logtest flags hash-table-synchronized-flag)
+      (install-hash-table-lock table))
     table))
 
 ;;; a "plain" hash-table has nothing fancy: default size, default growth rate,
