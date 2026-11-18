@@ -2686,4 +2686,27 @@
                     (setq w v))
                 l)
                (print 1))
-              (incf v))))))
+              (incf v)))))
+  (checked-compile
+   `(lambda ()
+      (declare (optimize (debug 2)))
+      (labels ((f0 ())
+               (f1 (a36)
+                 (let ((acc41 (logand a36 1023)))
+                   (loop for e39 in *
+                         for i40 below 8
+                         do (setq acc41
+                                  (let (v43)
+                                    (tagbody
+                                       (flet ((g44 ()
+                                                (go l45)))
+                                         (when acc41 (g44))
+                                         (setq v43 a36))
+                                     l45)
+                                    v43))))))
+        (values (+
+                 (f1
+                  (let ((acc56 (rem * 4)))
+                    acc56)))
+                #'f0)))
+   :allow-warnings t))

@@ -1566,12 +1566,14 @@
          (format t " EMPTY"))))
 
 (defun print-conset-difference (set1 set2)
-  (let ((diff1 (conset-difference (copy-conset set1) set2))
-        (diff2 (conset-difference (copy-conset set2) set1)))
-    (format t "Not in set1~%")
-    (print-conset diff1)
-    (format t "Not in set2~%")
-    (print-conset diff2)))
+  (when (and (conset-p set1)
+             (conset-p set2))
+    (let ((diff1 (conset-difference (copy-conset set1) set2))
+          (diff2 (conset-difference (copy-conset set2) set1)))
+      (format t "Not in set1~%")
+      (print-conset diff1)
+      (format t "Not in set2~%")
+      (print-conset diff2))))
 
 (defun print-constraints (block &optional kind)
   (handler-case (progn
