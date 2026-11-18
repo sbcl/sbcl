@@ -1620,7 +1620,27 @@ void reset_thread_binding_stack_guard_page(struct thread *th)
 #if defined LISP_FEATURE_ARM64 && defined LISP_FEATURE_SB_THREAD && \
     defined MEMORY_FAULTS_ON_ALTSTACK && !defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK
 #define HANDLE_FOREIGN_ALIEN_STACK_EXHAUSTION 1
+#ifdef LISP_FEATURE_DARWIN
+#define ARM64_MEMORY_FAULT_EMULATION 1
+#endif
+#include <pthread.h>
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
+
+/* Bounds of the native (C) stack this thread is running on. */
+static void
+native_stack_bounds(struct thread *th, uword_t *lo, uword_t *hi)
+{
+    if (pthread_main_np()) {
+        /* create_main_lisp_thread moved alien_stack_start (and hence the
+         * guard pages) to the bottom of the OS stack. */
+        pthread_t self = pthread_self();
+        *hi = (uword_t)pthread_get_stackaddr_np(self);
+        *lo = *hi - pthread_get_stacksize_np(self);
+    } else {
+        *lo = (uword_t)th->alien_stack_start;
+        *hi = *lo + ALIEN_STACK_SIZE;
+    }
+}
 
 /* Return address for the redirected call below.  ALIEN-STACK-EXHAUSTED-ERROR
  * signals an error and should only ever exit non-locally. */
@@ -1642,14 +1662,15 @@ alien_stack_exhausted_error_returned(void)
  * calling Lisp from the handler) also lets the kernel clear its
  * "on the alternate signal stack" state.
  *
+ * [LO, HI) are the bounds of the native stack in use: the alien stack for
+ * threads made by SBCL, the OS stack for the initial thread.
+ *
  * Returns false, changing nothing, if the frame-record chain can't be
  * trusted. */
 static bool
-arrange_foreign_alien_stack_exhausted_error(struct thread *th,
-                                            os_context_t *context)
+arrange_foreign_stack_exhausted_error(struct thread *th, os_context_t *context,
+                                      uword_t lo, uword_t hi)
 {
-    uword_t lo = (uword_t)th->alien_stack_start;
-    uword_t hi = lo + ALIEN_STACK_SIZE;
     lispobj *lisp_frame = (lispobj*)th->control_frame_pointer;
     /* At the call-out, emit-c-call stored the then-current CFP (x29) at
      * lisp_frame[0], so that is the saved fp in the outermost foreign
@@ -1805,16 +1826,20 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
         if (foreign_function_call_active_p(th)) {
 #ifdef HANDLE_FOREIGN_ALIEN_STACK_EXHAUSTION
             /* Never unwind out of the runtime's own C code (e.g. the GC). */
+            uword_t lo, hi;
+            native_stack_bounds(th, &lo, &hi);
             if (!gc_active_p && !lose_on_corruption_p &&
-                arrange_foreign_alien_stack_exhausted_error(th, context))
+                arrange_foreign_stack_exhausted_error(th, context, lo, hi))
                 return 1;
-#endif
-            lose("Native (alien) stack exhausted in foreign code in thread %p.\n"
-                 "  Non-initial threads have a %ld KiB native stack (ALIEN_STACK_SIZE);\n"
-                 "  the initial thread runs on the larger OS stack.\n"
-                 "  fault: %p, PC: %p",
-                 th, (long)(ALIEN_STACK_SIZE / 1024),
+            lose("Native (alien) stack exhausted in foreign code in thread %p\n"
+                 "  (native stack size %ld KiB).  fault: %p, PC: %p",
+                 th, (long)((hi - lo) / 1024),
                  addr, (void*)os_context_pc(context));
+#else
+            lose("Native (alien) stack exhausted in foreign code in thread %p.\n"
+                 "  fault: %p, PC: %p",
+                 th, addr, (void*)os_context_pc(context));
+#endif
         }
 #endif
         lower_thread_alien_stack_guard_page(th);
@@ -2125,9 +2150,50 @@ siginfo_code(siginfo_t *info)
 void
 lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
 {
+#ifdef HANDLE_FOREIGN_ALIEN_STACK_EXHAUSTION
+    struct thread *th = get_sb_vm_thread();
+    uword_t stack_lo, stack_hi;
+    native_stack_bounds(th, &stack_lo, &stack_hi);
+#endif
+
     lisp_memory_fault_warning(context, addr);
 
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+#ifdef ARM64_MEMORY_FAULT_EMULATION
+    /* We're on the altstack, where Lisp must not run (it is small and
+     * unguarded, and leaving it non-locally would leave the kernel
+     * believing we are still on it).  Save the fault address, PC and SP
+     * below the faulting SP -- clear of Darwin's 128-byte red zone -- and
+     * return to arm64_memory_fault_trap, whose SIGILL is taken on the
+     * normal stack; handle_memory_fault_emulation_trap() then restores the
+     * state and signals the error as before. */
+    {
+        extern void arm64_memory_fault_trap(void);
+        uword_t osp = *os_context_register_addr(context, reg_NSP);
+        uword_t *sp = (uword_t*)((osp - 128) & ~(uword_t)15) - 4;
+        /* Refuse only when SP is on a stack we know and too close to its
+         * end; a foreign thread's stack is unknown, so just try. */
+        if (osp + 16*os_vm_page_size > stack_lo && osp <= stack_hi &&
+            (uword_t)sp < stack_lo + 3*os_vm_page_size)
+            lose("Memory fault at %p (pc=%p) with no usable native stack (sp=%p)",
+                 addr, (void*)os_context_pc(context), (void*)osp);
+        sp[0] = (uword_t)addr;
+        sp[1] = os_context_pc(context);
+        sp[2] = osp;
+        sp[3] = 0;
+        *os_context_register_addr(context, reg_NSP) = (os_context_register_t)sp;
+        set_os_context_pc(context, (os_context_register_t)arm64_memory_fault_trap);
+    }
+}
+
+void
+handle_memory_fault_emulation_trap(os_context_t *context)
+{
+    uword_t *sp = (uword_t*)*os_context_register_addr(context, reg_NSP);
+    void *addr = (void*)sp[0];
+    set_os_context_pc(context, (os_context_register_t)sp[1]);
+    *os_context_register_addr(context, reg_NSP) = (os_context_register_t)sp[2];
+
+#elif defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK
 #  if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 #    error memory fault emulation needs validating for this architecture
 #  endif
@@ -2174,7 +2240,7 @@ handle_memory_fault_emulation_trap(os_context_t *context)
     *os_context_sp_addr(context) = (os_context_register_t)sp;
 #  endif
 
-#endif /* C_STACK_IS_CONTROL_STACK */
+#endif /* ARM64_MEMORY_FAULT_EMULATION / C_STACK_IS_CONTROL_STACK */
     int in_lisp = !foreign_function_call_active_p(get_sb_vm_thread());
 
     if (in_lisp)

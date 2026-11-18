@@ -396,6 +396,28 @@ void create_main_lisp_thread(lispobj function) {
     unblock_gc_stop_signal();
 #endif
     link_thread(th);
+#if defined LISP_FEATURE_ARM64 && defined LISP_FEATURE_DARWIN && \
+    !defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    {
+        /* The initial thread's foreign code and native-stack Lisp data
+         * (with-alien, number stack frames) live on the OS stack, not on the
+         * alien stack allocated in the thread struct, so that stack had no
+         * soft guard page and its exhaustion was an ordinary (often fatal)
+         * memory fault.  Point the alien stack guard pages at the bottom of
+         * the OS stack instead, so that exhaustion is handled exactly as in
+         * other threads.  The struct's own alien stack is unused here. */
+        pthread_t self = pthread_self();
+        char *os_stack_lo = (char*)pthread_get_stackaddr_np(self)
+                            - pthread_get_stacksize_np(self);
+        if (IS_ALIGNED((uword_t)os_stack_lo, os_reported_page_size)) {
+            protect_alien_stack_hard_guard_page(0, th);
+            protect_alien_stack_guard_page(0, th);
+            th->alien_stack_start = (lispobj*)os_stack_lo;
+            protect_alien_stack_hard_guard_page(1, th);
+            protect_alien_stack_guard_page(1, th);
+        }
+    }
+#endif
 #ifdef RUN_MAIN_THREAD_ON_OS_STACK
     // cons_lisp_thread copies the stack range to the SB-THREAD:THREAD so we need
     // the values to be valid now.
