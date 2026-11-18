@@ -160,3 +160,16 @@ void prepare_exit_test(int seconds)
     setitimer(ITIMER_REAL, &it, 0);
 }
 #endif
+
+#if defined __linux__ && (defined __x86_64__ || defined __aarch64__)
+/* Simulate a KCFI-instrumented C function with a known 32-bit type ID
+ * at -4 bytes from the entry point. */
+__asm__(".pushsection .text\n"
+        ".balign 8\n"
+        ".long 0, 0x12345678\n"
+        ".globl kcfi_dummy\n"
+        ".type kcfi_dummy, %function\n"
+        "kcfi_dummy:\n"
+        "ret\n"
+        ".popsection\n");
+#endif

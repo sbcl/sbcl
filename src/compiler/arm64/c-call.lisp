@@ -714,6 +714,9 @@
       ;; Return value allocation size - must be 16-byte aligned for stack alignment
       (let ((return-bytes (logandc2 (+ (* n-word-bytes return-slot-count) 15) 15)))
       (assemble (segment 'nil)
+        ;; Reserve 8 bytes before the entrypoint for a KCFI type ID,
+        ;; optionally filled in before passing to foreign code.
+        (inst nop) (inst nop)
         (inst mov-sp nsp-save-tn nsp-tn)
         (inst str lr-tn (@ nsp-tn -16 :pre-index))
         ;; Save x8 (hidden struct return pointer) to stack if returning large struct

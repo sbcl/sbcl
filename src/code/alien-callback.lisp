@@ -87,11 +87,13 @@
                              (mapcar 'alien-type-word-aligned-bits
                                      argument-types))
                       8)
-                     0))))
+                     0)))
+              ;; Assembler-wrapper is static, so sap-taking is safe.
+              ;; Skip 8 bytes for KCFI type ID on 2 supported architectures.
+              (sap (sap+ (vector-sap assembler-wrapper)
+                         (or #+(or arm64 x86-64) 8 0))))
          (vector-push-extend function *alien-callback-functions*)
-         ;; Assembler-wrapper is static, so sap-taking is safe.
-         (let ((alien (%sap-alien (adjustable-sap (vector-sap assembler-wrapper))
-                                  alien-fun-type)))
+         (let ((alien (%sap-alien (adjustable-sap sap) alien-fun-type)))
            (vector-push-extend alien *alien-callbacks*)
            alien))))))
 
@@ -353,6 +355,59 @@ function value."
                         0
                         (make-alien-pointer-type))
           (cast (alien-callable-function lisp-name) (* t)))))
+
+#+(or arm64 x86-64)
+(progn
+;;; Support for a cutting-edge design for lisp callbacks that can be invoked from
+;;; KCFI-hardened (kernel control-flow-integrity) foreign code. Since calculation of
+;;; a type ID is known only to the C compiler, the best we can do is to copy
+;;; the ID of a compatible C function. (An ID is a 32-bit int produced by taking the
+;;; lower half of xxHash64 from a C++ mangled typename.)
+
+;;; This variable holds an alist of (CALLABLE-NAME . ALIEN-INDEX) where the car is the symbol
+;;; naming the alien-callable object to modify, and the cdr is the alien linkage index
+;;; of the alien function whose ID to take.
+(defglobal *kcfi-type-ids-to-copy* nil)
+
+;;; Return the actual address of alien function at INDEX, unless it is UNDEFINED-ALIEN-TRAMP
+;;; in which case return NIL.
+(defun alien-function-definedp (index)
+  ;; Passing T for DATAP - despite being a function, not data - gets the address of the
+  ;; word holding the jump target. Passing NIL would get the address that Lisp should jump
+  ;; to into the table itself, which we don't want.
+  (let* ((linkage-addr (sb-vm::alien-linkage-index-to-addr index t))
+         (jump-target (sap-ref-word (int-sap linkage-addr) 0)))
+    (unless (= (sb-fasl:get-asm-routine 'sb-vm::undefined-alien-tramp) jump-target)
+      jump-target)))
+
+;;; Copy a KCFI type ID from a compatible C function into an alien-callable. In foreign code
+;;; compiled with -fsanitize=kcfi it is otherwise illegal to call through a function pointer
+;;; into Lisp. Mismatch of the type ID raises SIGILL.
+(defun copy-kcfi-type-id (callable-name alien-index)
+  (binding* ((my-sap (alien-sap (alien-callable-function callable-name)))
+             (definedp (alien-function-definedp alien-index) :exit-if-null))
+    ;; both #+arm64 and #+x86-64 place the ID at -4 from the entry address
+    (setf (sap-ref-32 my-sap -4) (sap-ref-32 (int-sap definedp) -4))))
+
+;;; The way you use this is:
+;;;   (ENSURE-KCFI-CALLABLE 'my-alien-callable "my_c_dummy")
+;;; and in C++:
+;;;   extern "C" { return_type my_c_dummy(arg_type) {return something;} }
+(export 'ensure-kcfi-callable)
+(defun ensure-kcfi-callable (callable-name copy-id-from)
+  (let ((alien-index (sb-impl::ensure-alien-linkage-index copy-id-from nil)))
+    (copy-kcfi-type-id callable-name alien-index)
+    ;; if the CALLABLE-NAME was valid, then preserve the association
+    (with-system-mutex ((hash-table-lock (car sb-sys:*linkage-info*)))
+      (acond ((assoc callable-name *kcfi-type-ids-to-copy*)
+              (rplacd it alien-index))
+             (t
+              (push (cons callable-name alien-index) *kcfi-type-ids-to-copy*))))))
+
+(fmakunbound 'reinstall-kcfi-type-ids)
+(defun reinstall-kcfi-type-ids ()
+  (dolist (pair *kcfi-type-ids-to-copy*)
+    (copy-kcfi-type-id (car pair) (cdr pair)))))
 
 ;;; Changing the entry point of an alien linkage table entry allows testing without
 ;;; the foreign library, or mocking of foreign routines. This is more powerful than

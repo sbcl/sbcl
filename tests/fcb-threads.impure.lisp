@@ -20,10 +20,27 @@
 (setf (generation-number-of-gcs-before-promotion 0) 5)
 (setf (generation-number-of-gcs-before-promotion 1) 3)
 
+#+(and linux (or arm64 x86-64))
+(progn
+  (define-alien-callable kcfi-early-cb int () 1)
+  (sb-alien:ensure-kcfi-callable 'kcfi-early-cb "kcfi_dummy")
+  (assert (/= (sb-sys:sap-ref-32 (alien-sap (alien-callable-function 'kcfi-early-cb)) -4)
+              #x12345678)))
+
 (compile-so "fcb-threads.c" "fcb-threads.so")
 
 ;;;; Just exercise a ton of calls from 1 thread
 (define-alien-callable perftestcb int () 0)
+
+#+(and linux (or arm64 x86-64))
+(with-test (:name :ensure-kcfi-callable)
+  ;; Registered before LOAD-SHARED-OBJECT: patched by REINSTALL-KCFI-TYPE-IDS
+  (assert (= (sb-sys:sap-ref-32 (alien-sap (alien-callable-function 'kcfi-early-cb)) -4)
+             #x12345678))
+  ;; Registered after LOAD-SHARED-OBJECT: patched immediately
+  (sb-alien:ensure-kcfi-callable 'perftestcb "kcfi_dummy")
+  (assert (= (sb-sys:sap-ref-32 (alien-sap (alien-callable-function 'perftestcb)) -4)
+             #x12345678)))
 (defun trivial-call-test (n)
   (with-alien ((testfun (function int system-area-pointer int) :extern "minimal_perftest"))
     (alien-funcall testfun (alien-sap (alien-callable-function 'perftestcb)) n)))

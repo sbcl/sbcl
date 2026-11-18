@@ -101,8 +101,11 @@
           ;; Look up only the currently undefined foreign symbols
           (dolist (key (cdr info))
             (recheck key (the (not null) (gethash key ht)))))
-      (setf (cdr info) notdef)))))
-)
+      (setf (cdr info) notdef))))
+  (sb-alien::reinstall-kcfi-type-ids)))
+
+;;; Dummy function, will get replaced when alien-callback is compiled and loaded.
+(defun sb-alien::reinstall-kcfi-type-ids ())
 
 (defun find-foreign-symbol-address (name)
   "Return the address of the foreign symbol NAME, or NIL. Does not enter the

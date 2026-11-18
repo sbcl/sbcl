@@ -972,6 +972,9 @@ Floats are passed in integer registers."
                                                  (if large-struct-return-p 1 0))
                                               n-word-bytes)))
         (assemble (segment 'nil)
+          ;; Reserve 8 bytes before the entrypoint for a KCFI type ID,
+          ;; optionally filled in before passing to foreign code.
+          (emit-long-nop segment 8)
           ;; For large struct returns, save the hidden pointer before using it
           ;; Windows: RCX (first arg register), SysV: RDI (first arg register)
           (when large-struct-return-p
