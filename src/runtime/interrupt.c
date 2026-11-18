@@ -1694,22 +1694,23 @@ arrange_foreign_stack_exhausted_error(struct thread *th, os_context_t *context,
         ++nframes;
     }
 
-    fprintf(stderr, "INFO: Native stack exhausted in foreign code; "
-            "abandoning %ld foreign frames", nframes + 1);
-    print_pthread_self_name();
-    fprintf(stderr, "\n");
-
     unblock_signals_in_context_and_maybe_warn(context);
     /* Everything at or above the outermost frame record (that frame's
-     * saved registers, and the Lisp caller's native-stack data) is kept. */
-    *os_context_register_addr(context, reg_NSP) = fp & ~(uword_t)15;
+     * saved registers, and the Lisp caller's native-stack data) is kept.
+     * The one-element argument vector -- the number of abandoned frames,
+     * which tells ALIEN-STACK-EXHAUSTED-ERROR that this was foreign code
+     * and the guard page is still in place -- goes just below that, in
+     * the discarded region; call_into_lisp builds its frame below it. */
+    uword_t new_sp = (fp - 16) & ~(uword_t)15;
+    ((lispobj*)new_sp)[0] = make_fixnum(nframes + 1);
+    *os_context_register_addr(context, reg_NSP) = new_sp;
     *os_context_register_addr(context, reg_CFP) = fp;
     *os_context_register_addr(context, reg_LR) =
         (os_context_register_t)alien_stack_exhausted_error_returned;
     *os_context_register_addr(context, 0) =
         (os_context_register_t)StaticSymbolFunction(ALIEN_STACK_EXHAUSTED_ERROR);
-    *os_context_register_addr(context, 1) = 0; /* args */
-    *os_context_register_addr(context, 2) = 0; /* nargs */
+    *os_context_register_addr(context, 1) = new_sp; /* args */
+    *os_context_register_addr(context, 2) = 1;      /* nargs */
     set_os_context_pc(context, (os_context_register_t)call_into_lisp);
     return 1;
 }
