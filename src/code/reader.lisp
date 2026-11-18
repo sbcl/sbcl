@@ -122,7 +122,7 @@
   #+sb-unicode
   (acond ((base-char-p char) ; alphabetic char is stored under both char cases
           (svref (charmacro-dtable-base-chars (truly-the cons dtable)) (char-code char)))
-         ((charmacro-dtable-extended-chars dtable) (gethash (char-upcase char) it 0))
+         ((charmacro-dtable-extended-chars dtable) (values (gethash (char-upcase char) it 0)))
          (t 0)))
 
 (eval-when (:compile-toplevel) ; wire in the fallbacks via :KNOWN-FUN constants
@@ -379,7 +379,7 @@ FROM-READTABLE defaults to the standard Lisp readtable when NIL."
      designated-readtable
      char
      (if non-terminatingp +char-attr-constituent+ +char-attr-terminating-macro+)
-     function)))
+     (or function 0))))
 
 (defun get-macro-character (char &optional (rt-designator *readtable*))
   "Return the function associated with the specified CHAR which is a macro
@@ -445,6 +445,8 @@ FROM-READTABLE defaults to the standard Lisp readtable when NIL."
       ;; the dispatch table. Perhaps it should be copy-on-write?
       (if (typep sub-char 'base-char)
           (let ((array (charmacro-dtable-base-chars dtable)))
+            (unless function
+              (setf function 0))
             #+sb-unicode (setf (svref array (char-code (char-downcase sub-char))) function)
             (setf (svref array (char-code sub-char)) function))
           (let ((hashtable (charmacro-dtable-extended-chars dtable)))
