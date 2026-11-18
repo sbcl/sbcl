@@ -1237,3 +1237,8 @@
                         (subseq v n))
                       s))
     (('(a b c) 2) '(3 4 a b c) :test #'equal)))
+
+(with-test (:name :vector-fill-float-check)
+  (assert-error (fill (opaque-identity (make-array 3 :element-type '(complex double-float)))
+                      (opaque-identity 1d0))
+      type-error))
