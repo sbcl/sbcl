@@ -1849,7 +1849,11 @@ multiple threads accessing the same hash-table without locking."
                                 (not (logtest 3 initial-stamp)))
                            old-index-vector
                            (make-index-vector n-buckets))))))))
-    (binding* ((new-table-p (= (hash-table-%count table) 0))
+    (binding* ((old-kv-vector (hash-table-pairs table))
+               (hwm (kv-vector-high-water-mark old-kv-vector))
+               ;; Check hash-table-pairs-capacity instead of
+               ;; hash-table-%count, because of weak hash-tables
+               (new-table-p (= (hash-table-pairs-capacity old-kv-vector) 0))
                ((new-size new-n-buckets)
                 (if new-table-p
                     ;; For new tables, CACHE holds the desired initial
@@ -1864,9 +1868,7 @@ multiple threads accessing the same hash-table without locking."
                (new-flat-p (and old-flat-p (<= new-n-buckets
                                                (if is-eql
                                                    +flat-limit/eql+
-                                                   +flat-limit/eq+))))
-               (old-kv-vector (hash-table-pairs table))
-               (hwm (kv-vector-high-water-mark old-kv-vector)))
+                                                   +flat-limit/eq+)))))
       ;; Rehash + resize only occurs when:
       ;;  (1) every usable pair was at some point filled (so HWM = SIZE)
       ;;  (2) no cells below HWM are available (so COUNT = SIZE)

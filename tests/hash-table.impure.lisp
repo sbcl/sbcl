@@ -301,3 +301,30 @@
               (keys (loop for i below 50 collect (cons i i))))
           (loop for k in keys for i from 0 do (setf (gethash k ht) i))
           (loop for k in keys for i from 0 do (assert (eql (gethash k ht) i))))))
+(defvar *gc* nil)
+
+(defun gc-eql (a b)
+  (when *gc*
+    (setf *gc* nil)
+    (sb-ext:gc :full t))
+  (eql a b))
+
+(defun zero-hash (x)
+  (declare (ignore x))
+  0)
+
+(defun fill-ht (ht n)
+  (dotimes (i n)
+    (setf (gethash i ht) (list i)))
+  ht)
+
+(with-test (:name :grow-hash-table-emptied-weak)
+  (let ((ht (make-hash-table :test 'gc-eql
+                             :hash-function 'zero-hash
+                             :weakness :value
+                             :size 7)))
+    (fill-ht ht 7)
+    (sb-sys:scrub-control-stack)
+    (let ((*gc* t))
+      (setf (gethash 99 ht) :ok))
+    (assert (eq (gethash 99 ht) :ok))))
