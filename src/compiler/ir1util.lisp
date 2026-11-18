@@ -919,6 +919,7 @@
 (defun node-to-be-deleted-p (node)
   (block-to-be-deleted-p (node-block node)))
 
+(declaim (inline lambda-block))
 (defun lambda-block (lambda)
   (declare (type clambda lambda))
   (node-block (lambda-bind lambda)))
@@ -1432,9 +1433,9 @@
             nil))))
 
 ;;; Return the non-LET LAMBDA that holds BLOCK's code.
+(declaim (ftype (sfunction (cblock) (or clambda null)) block-home-lambda))
 (defun block-home-lambda (block)
-  (declare (type cblock block)
-           #-sb-xc-host (inline node-home-lambda))
+  (declare #-sb-xc-host (inline node-home-lambda))
   (node-home-lambda (block-last block)))
 
 ;;; Return the IR1 environment for BLOCK.

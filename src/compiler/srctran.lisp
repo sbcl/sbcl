@@ -9941,6 +9941,12 @@
 
 (deftransform %coerce-to-policy ((thing) (policy))
   'thing)
+(deftransform %coerce-to-policy ((thing) (lexenv))
+  `(lexenv-policy thing))
+(deftransform %coerce-to-policy ((thing) (node))
+  `(lexenv-policy (node-lexenv thing)))
+(deftransform %coerce-to-policy ((thing) (functional))
+  `(lexenv-policy (functional-lexenv thing)))
 
 
 (defun prev-node (node &key type (cast t))
