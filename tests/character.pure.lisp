@@ -259,3 +259,10 @@
    (((make-array 2 :element-type 'character :fill-pointer 0 :initial-element #\x) 'character) (condition 'type-error))
    (((make-array 2 :element-type 'character :fill-pointer 1 :initial-element #\x) 'character) #\x)
    (((make-array 2 :element-type 'character :fill-pointer 2 :initial-element #\x) 'character) (condition 'type-error))))
+
+(with-test (:name :digit-char-p-fast-path)
+  (loop for i below char-code-limit
+        for c = (code-char i)
+        for d = (digit-char-p c)
+        do (unless (eql (sb-impl::ucd-decimal-digit c) d)
+             (error "Bad (digit-char-p ~s) => ~d" c d))))

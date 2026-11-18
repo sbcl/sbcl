@@ -534,7 +534,7 @@ Case is ignored." t))
   "If char is a digit in the specified radix, returns the fixnum for which
 that digit stands, else returns NIL."
   (let ((code (char-code char)))
-    (if (<= code 1632) ;; (loop for code from 127 when (digit-char-p (code-char code)) return code)
+    (if (< code 1632) ;; (loop for code from 127 when (digit-char-p (code-char code)) return code)
         (let ((weight (- code 48)))
           (cond ((minusp weight) nil)
                 ((<= radix 10.)
