@@ -758,3 +758,6 @@
     (assert (equal (read-from-string "[1)") '(1)))
     (set-macro-character #\[ nil)
     (assert (equal (read-from-string "[") '[))))
+
+(with-test (:name :sign-dot-colon)
+  (assert-error (read-from-string "-.:a") package-error))

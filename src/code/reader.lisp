@@ -1394,6 +1394,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
         (#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
         (#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+        (#.+char-attr-package-delimiter+ (go COLON))
         (t (go SYMBOL)))
      FRONTDOT ; saw "dot"
       (ouch-read-buffer char buf)
