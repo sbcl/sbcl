@@ -1617,6 +1617,83 @@ void reset_thread_binding_stack_guard_page(struct thread *th)
     fprintf(stderr, "\n");
 }
 
+#if defined LISP_FEATURE_ARM64 && defined LISP_FEATURE_SB_THREAD && \
+    defined MEMORY_FAULTS_ON_ALTSTACK && !defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+#define HANDLE_FOREIGN_ALIEN_STACK_EXHAUSTION 1
+extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
+
+/* Return address for the redirected call below.  ALIEN-STACK-EXHAUSTED-ERROR
+ * signals an error and should only ever exit non-locally. */
+static void __attribute__((noreturn))
+alien_stack_exhausted_error_returned(void)
+{
+    lose("ALIEN-STACK-EXHAUSTED-ERROR returned into abandoned foreign frames");
+}
+
+/* The native ("alien") stack overflowed while foreign code was running, so
+ * the Lisp registers in CONTEXT are meaningless (x27/x29 belong to C).
+ * Arrange for the return from this signal handler to enter Lisp exactly as
+ * an alien callback would -- through call_into_lisp, which rebuilds the Lisp
+ * register state from thread->control_{frame,stack}_pointer as saved by the
+ * call-out -- calling ALIEN-STACK-EXHAUSTED-ERROR.  The native stack pointer
+ * is first rewound past every foreign frame back to the outermost one, so
+ * the error handler gets nearly the whole stack.  The abandoned foreign
+ * frames are never resumed.  Returning through sigreturn (rather than
+ * calling Lisp from the handler) also lets the kernel clear its
+ * "on the alternate signal stack" state.
+ *
+ * Returns false, changing nothing, if the frame-record chain can't be
+ * trusted. */
+static bool
+arrange_foreign_alien_stack_exhausted_error(struct thread *th,
+                                            os_context_t *context)
+{
+    uword_t lo = (uword_t)th->alien_stack_start;
+    uword_t hi = lo + ALIEN_STACK_SIZE;
+    lispobj *lisp_frame = (lispobj*)th->control_frame_pointer;
+    /* At the call-out, emit-c-call stored the then-current CFP (x29) at
+     * lisp_frame[0], so that is the saved fp in the outermost foreign
+     * frame record. */
+    uword_t lisp_cfp;
+    uword_t fp = *os_context_register_addr(context, reg_CFP); /* C frame pointer */
+    long nframes = 0;
+
+    if (!lisp_frame) return 0;
+    lisp_cfp = lisp_frame[0];
+    /* AAPCS64 frame records: [fp] = caller's fp, [fp+8] = return address.
+     * Darwin requires x29 to always address a valid frame record. */
+    for (;;) {
+        uword_t next;
+        if (fp < lo || fp + 2*N_WORD_BYTES > hi || (fp & (N_WORD_BYTES-1)))
+            return 0;
+        next = *(uword_t*)fp;
+        if (next == lisp_cfp) break;            /* outermost foreign frame */
+        if (next <= fp) return 0;               /* must head toward stack base */
+        fp = next;
+        ++nframes;
+    }
+
+    fprintf(stderr, "INFO: Native stack exhausted in foreign code; "
+            "abandoning %ld foreign frames", nframes + 1);
+    print_pthread_self_name();
+    fprintf(stderr, "\n");
+
+    unblock_signals_in_context_and_maybe_warn(context);
+    /* Everything at or above the outermost frame record (that frame's
+     * saved registers, and the Lisp caller's native-stack data) is kept. */
+    *os_context_register_addr(context, reg_NSP) = fp & ~(uword_t)15;
+    *os_context_register_addr(context, reg_CFP) = fp;
+    *os_context_register_addr(context, reg_LR) =
+        (os_context_register_t)alien_stack_exhausted_error_returned;
+    *os_context_register_addr(context, 0) =
+        (os_context_register_t)StaticSymbolFunction(ALIEN_STACK_EXHAUSTED_ERROR);
+    *os_context_register_addr(context, 1) = 0; /* args */
+    *os_context_register_addr(context, 2) = 0; /* nargs */
+    set_os_context_pc(context, (os_context_register_t)call_into_lisp);
+    return 1;
+}
+#endif
+
 bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
 {
     struct thread *th = get_sb_vm_thread();
@@ -1721,10 +1798,17 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
             addr < ALIEN_STACK_GUARD_PAGE(th) + astk_guard_size) {
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         /* The Lisp register state in CONTEXT is meaningless while foreign
-         * code is running (x27/x29 belong to C on arm64), so we can't
-         * safely arrange a return into Lisp from here yet.  At least say
-         * clearly what happened instead of dying with an obscure signal. */
+         * code is running (x27/x29 belong to C on arm64), so the generic
+         * path below can't be used.  Redirect into Lisp the way a callback
+         * would if we can; otherwise at least say clearly what happened
+         * instead of dying with an obscure signal. */
         if (foreign_function_call_active_p(th)) {
+#ifdef HANDLE_FOREIGN_ALIEN_STACK_EXHAUSTION
+            /* Never unwind out of the runtime's own C code (e.g. the GC). */
+            if (!gc_active_p && !lose_on_corruption_p &&
+                arrange_foreign_alien_stack_exhausted_error(th, context))
+                return 1;
+#endif
             lose("Native (alien) stack exhausted in foreign code in thread %p.\n"
                  "  Non-initial threads have a %ld KiB native stack (ALIEN_STACK_SIZE);\n"
                  "  the initial thread runs on the larger OS stack.\n"
