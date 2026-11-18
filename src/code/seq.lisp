@@ -441,7 +441,7 @@
                 (if iep
                     (make-array length :element-type 'character :initial-element initial-element)
                     (make-array length :element-type 'character))))
-             ((and (consp result-type)
+             ((and (consp type)
                    (let ((element-type
                            (case (car type)
                              (vector
@@ -449,9 +449,12 @@
                                 (when (consp et-cdr)
                                   (let ((et-car (car et-cdr))
                                         (d-cdr (cdr et-cdr)))
-                                    (when (and (consp d-cdr)
-                                               (or (cdr d-cdr)
-                                                   (not (eql (car d-cdr) length))))
+                                    (when (cond ((null d-cdr)
+                                                 nil)
+                                                ((listp d-cdr)
+                                                 (or (cdr d-cdr)
+                                                     (not (eql (car d-cdr) length))))
+                                                (t))
                                       (return-from try))
                                     (case et-car
                                       (* t)
