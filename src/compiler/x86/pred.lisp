@@ -71,86 +71,7 @@
                                     :index index :scale (if fixnump 1 4))))))))
 
 (defun convert-conditional-move-p (dst-tn)
-  (when (memq :cmov *backend-subfeatures*)
-    (sc-case dst-tn
-      ((descriptor-reg any-reg)
-       'move-if/t)
-      ((unsigned-reg signed-reg)
-       'move-if/word)
-      ;; FIXME: Can't use CMOV with byte registers, and characters live
-      ;; in such outside of unicode builds. A better solution then just
-      ;; disabling MOVE-IF/CHAR should be possible, though.
-      #+sb-unicode
-      (character-reg
-       'move-if/char)
-      (sap-reg
-       'move-if/sap)
-      (t))))
-
-(define-vop (move-if)
-  (:args (then) (else))
-  (:results (res))
-  (:info flags)
-  (:temporary (:sc unsigned-reg) temp)
-  (:generator 0
-    (let* ((flags (conditional-flags-flags flags))
-           (not-p (eq (first flags) 'not)))
-      (when not-p (pop flags))
-      (when (location= res then)
-        (rotatef then else)
-        (setf not-p (not not-p)))
-      (flet ((load-immediate (dst constant-tn &optional (sc-reg dst))
-               (let ((val (tn-value constant-tn)))
-                 ;; Shouldn't this just be ENCODE-VALUE-IF-IMMEDIATE ?
-                 ;; (at least for a boxed SC ?)
-                 (etypecase val
-                   (integer
-                    (if (sc-is sc-reg any-reg descriptor-reg)
-                        (inst mov dst (fixnumize val))
-                        (inst mov dst val)))
-                   (symbol
-                    (load-symbol dst val))
-                   (character
-                    (sc-case sc-reg
-                      ((any-reg descriptor-reg)
-                       (inst mov dst
-                             (logior (ash (char-code val) n-widetag-bits)
-                                     character-widetag)))
-                      (character-reg
-                       (inst mov sc-reg (char-code val)))))
-                   (structure-object
-                    (aver (eq val sb-lockless:+tail+))
-                    (+ nil-value lflist-tail-value-nil-offset))))))
-        (aver (null (rest flags)))
-        (if (sc-is else immediate)
-            (load-immediate res else)
-            (move res else))
-        (when (sc-is then immediate)
-          (load-immediate temp then res)
-          (setf then temp))
-        (inst cmov (if not-p
-                       (negate-condition (first flags))
-                       (first flags))
-              res
-              then)))))
-
-(macrolet ((def-move-if (name type reg stack)
-             `(define-vop (,name move-if)
-                (:args (then :scs (immediate ,@(ensure-list reg) ,@stack) :to :eval
-                             :load-if (not (or (sc-is then immediate)
-                                               (and (sc-is then ,@stack)
-                                                    (not (location= else res))))))
-                       (else :scs (immediate ,@(ensure-list reg) ,@stack) :target res
-                             :load-if (not (sc-is else immediate ,@stack))))
-                (:arg-types ,type ,type)
-                (:results (res :scs ,(ensure-list reg)))
-                (:result-types ,type))))
-  (def-move-if move-if/t t (descriptor-reg any-reg) (control-stack))
-  (def-move-if move-if/word (:or unsigned-num signed-num) (unsigned-reg signed-reg) (unsigned-stack signed-stack))
-  ;; FIXME: See convert-conditional-move-p above.
-  #+sb-unicode
-  (def-move-if move-if/char character character-reg (character-stack))
-  (def-move-if move-if/sap system-area-pointer sap-reg (sap-stack)))
+  (declare (ignore dst-tn)))
 
 
 ;;;; conditional VOPs
