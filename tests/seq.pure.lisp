@@ -1242,3 +1242,7 @@
   (assert-error (fill (opaque-identity (make-array 3 :element-type '(complex double-float)))
                       (opaque-identity 1d0))
       type-error))
+
+(with-test (:name :reduce-bound-check)
+  (assert-error (reduce #'+ (opaque-identity '(1 2)) :start 2 :end 3)
+      type-error))

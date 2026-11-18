@@ -1915,7 +1915,7 @@ many elements are copied."
            (type (or null index) end))
   (let ((key (and key (%coerce-callable-to-fun key))))
    (seq-dispatch-checking sequence
-       (let ((sequence (nthcdr-check-bounds start sequence
+       (let ((list (nthcdr-check-bounds start sequence
                                             start end sequence)))
          (if end
              (cond ((> start end)
@@ -1925,7 +1925,7 @@ many elements are copied."
                         initial-value))
                    (t
                     (let ((count (the index (- end start))))
-                      (let* ((l sequence)
+                      (let* ((l list)
                              (head (list nil))
                              (tail head))
                         (declare (dynamic-extent head))
@@ -1947,10 +1947,10 @@ many elements are copied."
                                 (setq tail (copy-list-to e tail)))
                               (decf i))
                         (cdr head)))))
-             (if (endp sequence)
+             (if (endp list)
                  (if ivp
                      initial-value)
-                 (let* ((l sequence)
+                 (let* ((l list)
                         (head (list nil))
                         (tail head))
                    (declare (dynamic-extent head))
@@ -1994,7 +1994,7 @@ many elements are copied."
                                     (return-from reduce-append (append initial-value (cdr head)))))
                              (return))
                            (setq tail (copy-list-to e tail))))))
-               (truly-the list (cdr head)))))
+               (cdr head))))
        (apply #'sb-sequence:reduce function sequence args))))
 
 (defun reduce (function sequence &rest args
@@ -2009,14 +2009,13 @@ many elements are copied."
              (type index start)
              (type (or null index) end))
     (seq-dispatch-checking sequence
-        (let ((sequence (nthcdr-check-bounds start sequence
-                                             start end sequence)))
+        (let ((list (nthcdr-check-bounds start sequence
+                                         start end sequence)))
           (declare (optimize (sb-c:insert-array-bounds-checks 0)))
           (if end
               (cond ((> start end)
                      (sequence-bounding-indices-bad-error sequence start end))
                     ((= end start)
-
                      (if ivp
                          initial-value
                          (funcall function)))
@@ -2025,7 +2024,7 @@ many elements are copied."
                        (let ((count (the index (- end start))))
                          (if from-end
                              (let ((vector (reverse-into-vector-to-nthcdr-check-bounds
-                                            count sequence start end sequence))
+                                            count list start end sequence))
                                    (end count)
                                    (start 0))
                                (when (not ivp)
@@ -2039,24 +2038,26 @@ many elements are copied."
                                              count
                                              (1- count))
                                          (1- count))
-                                  (sequence (if ivp
-                                                sequence
-                                                (cdr sequence))
-                                            (cdr sequence))
+                                  (list (if ivp
+                                            list
+                                            (if (endp list)
+                                                (sequence-bounding-indices-bad-error sequence start end)
+                                                (cdr list)))
+                                        (cdr list))
                                   (value (if ivp
                                              initial-value
-                                             (apply-key key (car sequence)))
-                                         (funcall function value (apply-key key (car sequence)))))
+                                             (apply-key key (car list)))
+                                         (funcall function value (apply-key key (car list)))))
                                  ((<= count 0) value)
-                               (when (endp sequence)
+                               (when (endp list)
                                  (sequence-bounding-indices-bad-error sequence start end))))))))
-              (if (endp sequence)
+              (if (endp list)
                   (if ivp
                       initial-value
                       (funcall function))
                   (cond-dispatch key
                     (if from-end
-                        (let* ((vector (list-reverse-into-vector sequence))
+                        (let* ((vector (list-reverse-into-vector list))
                                (end (length vector))
                                (start 0))
                           (when (not ivp)
@@ -2066,15 +2067,15 @@ many elements are copied."
                                (value initial-value))
                               ((>= index end) value)
                             (setq value (funcall function (apply-key key (aref vector index)) value))))
-                        (do ((sequence (if ivp
-                                           sequence
-                                           (cdr sequence))
-                                       (cdr sequence))
+                        (do ((list (if ivp
+                                       list
+                                       (cdr list))
+                                   (cdr list))
                              (value (if ivp
                                         initial-value
-                                        (apply-key key (car sequence)))
-                                    (funcall function value (apply-key key (car sequence)))))
-                            ((endp sequence) value)))))))
+                                        (apply-key key (car list)))
+                                    (funcall function value (apply-key key (car list)))))
+                            ((endp list) value)))))))
         (with-array-data ((vector sequence) (start start) (end end) :check-fill-pointer t
                           :force-inline t)
           (declare (optimize (sb-c:insert-array-bounds-checks 0)))
