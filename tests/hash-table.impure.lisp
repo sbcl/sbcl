@@ -328,3 +328,25 @@
     (let ((*gc* t))
       (setf (gethash 99 ht) :ok))
     (assert (eq (gethash 99 ht) :ok))))
+
+(defun install-ephemeral-value (ht k)
+  (setf (gethash k ht) (list :ephemeral))
+  ht)
+
+(with-test (:name :weak-gc-race)
+  (let ((ht (make-hash-table :test 'gc-eql
+                             :hash-function 'zero-hash
+                             :weakness :value)))
+    (fill-ht ht 1)
+    (sb-sys:scrub-control-stack)
+    (let ((*gc* t))
+      (setf (gethash 0 ht) :v))
+    (assert (eq (gethash 0 ht) :v)))
+  (let ((ht (make-hash-table :test 'gc-eql
+                             :hash-function 'zero-hash
+                             :weakness :value)))
+    (fill-ht ht 1)
+    (sb-sys:scrub-control-stack)
+    (let ((*gc* t))
+      (remhash 0 ht))
+    (assert (null (nth-value 1 (gethash 0 ht))))))

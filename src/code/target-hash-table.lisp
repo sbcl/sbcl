@@ -2937,7 +2937,8 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
     (declare (type hash-table hash-table) (optimize speed))
     (with-weak-hash-table-entry
       (declare (ignore predecessor))
-      (cond ((= physical-index 0)
+      (cond ((or (= physical-index 0)
+                 (empty-ht-slot-p probed-value))
              (insert-at (hash-table-next-free-kv hash-table)
                         hash-table key hash address-sensitive-p value))
             ((or (empty-ht-slot-p (cas (weak-kvv-ref kv-vector (1+ physical-index))
@@ -3012,7 +3013,8 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
 (defun remhash/weak (key hash-table)
   (declare (type hash-table hash-table) (optimize speed))
   (with-weak-hash-table-entry
-        (unless (eql physical-index 0)
+        (unless (or (eql physical-index 0)
+                    (empty-ht-slot-p probed-value)) ;; removed by the GC
           ;; Mark slot as empty.
           (if (or (empty-ht-slot-p (cas (weak-kvv-ref kv-vector (1+ physical-index))
                                         probed-value +empty-ht-slot+))

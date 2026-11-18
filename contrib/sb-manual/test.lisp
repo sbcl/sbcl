@@ -221,7 +221,9 @@
         (sb-alien:slot class)
         ;; Exposed due to the foreign type specifier SB-ALIEN:STRUCT.
         ;; Should be renamed.
-        (sb-alien:struct class)))
+        (sb-alien:struct class)
+        #+(or arm64 x86-64)
+        (sb-alien:ensure-kcfi-callable function)))
       (sb-sequence
        :missing
        ((sb-sequence:canonize-key function)
