@@ -591,6 +591,7 @@
                 #+sb-unicode ,sb-vm:complex-character-string-widetag
                 ,sb-vm:bignum-widetag
                 ,sb-vm:ratio-widetag
+                #-64-bit ,sb-vm:single-float-widetag
                 ,sb-vm:double-float-widetag
                 ,sb-vm:complex-rational-widetag
                 ,sb-vm:complex-single-float-widetag
