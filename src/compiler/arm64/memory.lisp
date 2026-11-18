@@ -58,11 +58,12 @@
 
 (define-vop (cell-set)
   (:args (object :scs (descriptor-reg))
-         (value :scs (descriptor-reg any-reg)))
+         (value :scs (descriptor-reg any-reg zero)))
+  (:arg-refs nil value-ref)
   (:variant-vars offset lowtag)
   (:vop-var vop)
   (:generator 4
-    (emit-gengc-barrier object nil tmp-tn (vop-nth-arg 1 vop))
+    (emit-gengc-barrier object nil tmp-tn value-ref)
     (storew value object offset lowtag)))
 
 ;;;
