@@ -288,3 +288,16 @@
                   (opaque-identity (make-hash-table))))
   (equalp (opaque-identity (make-hash-table :weakness :key))
           (opaque-identity (make-hash-table))))
+
+(with-test (:name :guess-eq-hash-fun-out-of-bounds)
+  ;; Failed only with #+sb-hash-table-debug
+  (let ((ht (make-hash-table :test 'eq :rehash-threshold 0.1 :rehash-size 50))
+        (keys (loop for i below 60 collect (cons i i))))
+    (loop for k in keys for i from 0 do (setf (gethash k ht) i))
+    (loop for k in keys for i from 0 do (assert (eql (gethash k ht) i))))
+  (loop for (size rehash-size) in '((8 25) (10 30) (15 2.5))
+        do
+        (let ((ht (make-hash-table :test 'eq :size size :rehash-size rehash-size))
+              (keys (loop for i below 50 collect (cons i i))))
+          (loop for k in keys for i from 0 do (setf (gethash k ht) i))
+          (loop for k in keys for i from 0 do (assert (eql (gethash k ht) i))))))

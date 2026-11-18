@@ -350,8 +350,9 @@
            `(let ((address (get-lisp-obj-address (aref kv-vector ,key-index))))
               (setq changed-bits (logior changed-bits
                                          (logxor a-key-address address))))))
-      (loop for key-index upfrom 4 upto 32 by 2 do
-        (note-changed-bits key-index)))
+      (loop for key-index from 4 to (min 32 (* 2 (kv-vector-high-water-mark kv-vector)))
+            by 2
+            do (note-changed-bits key-index)))
     (let ((unchanged-bits (ldb (byte #.sb-vm:n-word-bits 0)
                                (lognot changed-bits))))
       (set-hash-fun
