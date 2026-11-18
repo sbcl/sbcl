@@ -352,7 +352,7 @@
       (log number)))
 
 (defun log-single-float (number)
-  (if (< number 0)
+  (if (quiet< number 0)
       (complex (log (- number)) (coerce pi 'single-float))
       (log number)))
 
