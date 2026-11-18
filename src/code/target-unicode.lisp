@@ -413,7 +413,7 @@ is only included for backwards compatibility."
                 (push (cons codepoint name) (gethash name-hash ht))))))))
     (when any-collisions
       (format *error-output* "~&Hash collisions:~%")
-      (maphash (lambda (k v) (when (cdr v) (format t "~X = ~S~%" k v))) ht)
+      (maphash (lambda (k v) (when (cdr v) (format *error-output* "~X = ~S~%" k v))) ht)
       (error "Can't proceed. Please find a better string hashing algorithm"))
     (let* ((hashes (make-array (hash-table-count ht)
                                :initial-contents
@@ -484,7 +484,7 @@ name is that string, if one exists. Otherwise, NIL is returned."
               (parse-integer string :start start :radix 16 :junk-allowed t)
             ;; It's not ok if PARSE-INTEGER did not consume all input.
             ;; If a character were officially named UFAAAAA don't fail on it.
-            (when (and val (< val char-code-limit) (= (length name) end))
+            (when (and val (< val char-code-limit) (= len end))
               (return-from name-char (code-char val)))))))
     (let ((psxhash (psxhash string)))
       ;; The base char name alist is short enough that PSXHASH's result
