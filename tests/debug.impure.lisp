@@ -2447,18 +2447,6 @@
     (assert (equal (run-stops '(5) '(((x 46))))
                    '(nil)))))
 
-(with-test (:name (:debugger :variables :setq :only-set :policy))
-  (with-variables-test (:strict (1 2 3) :lax ())
-      (sb-int:named-lambda variables-test (a)
-        (declare (optimize (debug :debug)
-                           (sb-c::preserve-set-only-debug-variables 3)))
-        (let ((x 23))
-          (setq x a)
-          (signal 'variables-stop)
-          nil))
-    (assert (equal (run-stops '(46) '(((a 46) (x 46))))
-                   '(nil)))))
-
 (with-test (:name (:debugger :variables :setq :copy-of-split :unused-fun))
   (with-variables-test (:strict (1 2 3) :lax ())
       (sb-int:named-lambda variables-test (a b)

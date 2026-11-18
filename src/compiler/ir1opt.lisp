@@ -686,8 +686,7 @@
           (cset
            (let ((var (set-var node)))
              (when (and (lambda-var-p var)
-                        (null (leaf-refs var))
-                        (not (preserve-set-only-debug-var-p var)))
+                        (null (leaf-refs var)))
                (flush-dest (set-value node))
                (setf (basic-var-sets var)
                      (delq1 node (basic-var-sets var)))

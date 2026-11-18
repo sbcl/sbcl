@@ -1381,3 +1381,14 @@
                (f (a)
                  (f a)))
         (g 2 (error "x"))))))
+
+(with-test (:name :closures-for-unread-set-vars)
+  (checked-compile-and-assert
+      ()
+      `(lambda (i f)
+         (multiple-value-call
+             (lambda ()
+               (setf i 0))
+           (funcall f))
+         1)
+    ((1 (lambda () (values))) 1)))

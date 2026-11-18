@@ -40,9 +40,10 @@
   (declare (type lambda-var var))
   (let* ((home (lambda-var-home var))
          (node (lambda-bind home)))
-    (not (or (and (neq home (lambda-home home)) (policy node (< debug 3)))
-             (policy node (zerop debug))
-             (policy node (= speed 3))))))
+    (not (policy node (or
+                       (and (neq home (lambda-home home)) (< debug 3))
+                       (or (zerop debug)
+                           (= speed 3)))))))
 
 ;;; We have to allocate the home TNs for variables before we can call
 ;;; ASSIGN-IR2-ENVIRONMENT so that we can close over TNs that haven't
@@ -54,9 +55,8 @@
 (defun assign-lambda-var-tns (fun let-p)
   (declare (type clambda fun))
   (dolist (var (lambda-vars fun))
-    (when (or (leaf-refs var) (preserve-set-only-debug-var-p var))
-      (let ((debug-variable-p (or (debug-environment-var-p var)
-                                  (preserve-set-only-debug-var-p var))))
+    (when (leaf-refs var)
+      (let ((debug-variable-p (debug-environment-var-p var)))
         (if (and let-p
                  (not debug-variable-p)
                  (not (lambda-var-indirect var))
@@ -110,7 +110,9 @@
                  ;; never read no stack space is allocated for it in the
                  ;; callee frame.
                  (unless (and (type-singleton-p (leaf-type var))
-                              (leaf-refs var))
+                              (notany (lambda (ref)
+                                        (combination-is (node-dest ref) '(%keep-live)))
+                                      (leaf-refs var)))
                    (environment-debug-live-tn res (lambda-environment fun)))))
 
               (setf (tn-leaf res) var)

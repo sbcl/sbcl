@@ -108,11 +108,7 @@
         ;; the problem this way instead of somehow solving it
         ;; somewhere upstream and just doing (AVER (LEAF-REFS VAR))
         ;; here.)
-        ;;
-        ;; If we preserve such variables for the debugger though, we
-        ;; do need to close them over.
-        (unless (and (null (leaf-refs var))
-                     (not (preserve-set-only-debug-var-p var)))
+        (unless (null (leaf-refs var))
 
           (let ((set-env (get-node-environment set)))
             (unless (eq set-env env)

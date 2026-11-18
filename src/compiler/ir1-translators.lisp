@@ -1453,6 +1453,16 @@ Consequences are undefined if any result is not of the declared type
     (ir1-convert start dest-ctran dest-lvar (wrap-if (neq type *universal-type*)
                                                      `(the ,(type-specifier type))
                                                      value))
+    (when (and (lambda-var-p var)
+               (policy *lexenv* (= debug 3)))
+      (let ((ctran (make-ctran))
+            (*lexenv* (make-lexenv :type-restrictions (list (cons var nil))))
+            (ever-used (leaf-ever-used var)))
+        (ir1-convert dest-ctran ctran nil
+                     `(%keep-live ,(leaf-source-name var)))
+        (unless ever-used
+          (setf (leaf-ever-used var) nil))
+        (setq dest-ctran ctran)))
     (let ((res (make-set var dest-lvar)))
       (setf (lvar-dest dest-lvar) res)
       (cond (result ; SETQ with a result counts as a REF also

@@ -34,8 +34,10 @@
 
 ;;; Read X so that its value stays live for the debugger.
 (define-vop (keep-live)
+  (:translate %keep-live)
   (:args (x))
   (:ignore x)
+  (:arg-types *)
   (:generator 0))
 
 ;;; Emit a label for sub-block (or sub-node) reference.

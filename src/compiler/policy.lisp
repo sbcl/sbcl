@@ -79,7 +79,7 @@
 (defvar *policy-max* nil)
 
 (declaim (type policy *policy*)
-         (always-bound *policy*)
+         (always-bound *policy* *policy-min* *policy-max*)
          (type (or policy null) *policy-min* *policy-max*))
 
 (defun restrict-compiler-policy (&optional quality (min 0) (max 3))
