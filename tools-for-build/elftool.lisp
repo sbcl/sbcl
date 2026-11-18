@@ -480,7 +480,7 @@
 
 (defconstant core-align #+x86-64 4096 #+arm64 65536)
 
-(defun write-preamble (output linkage-bss-size)
+(defun write-preamble (output &optional linkage-bss-size)
   (declare (ignorable linkage-bss-size))
   #+linkage-space (format output
                           " .globl lisp_fun_linkage_space
@@ -740,13 +740,7 @@ lisp_fun_linkage_space: .zero ~:*~D
           (floor (- aligned-end end-loc) n-word-bytes)
         (aver (>= nwords 2))
         (aver (zerop remainder))
-        (decf nwords 2)
-        (format output " .quad 0x~x, ~d # (simple-array fixnum (~d))~%"
-                simple-array-fixnum-widetag
-                (ash nwords n-fixnum-tag-bits)
-                nwords)
-        (when (plusp nwords)
-          (format output " .fill ~d~%" (* nwords n-word-bytes))))))
+        (format output " .fill ~d~%" (* nwords n-word-bytes)))))
   ;; Extend with 1 MB of filler
   (format output " .fill ~D~%~alisp_code_end:
  .size lisp_jit_code, .-lisp_jit_code~%"

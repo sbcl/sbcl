@@ -768,6 +768,16 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
         // unprotect the pages
         os_protect((void*)TEXT_SPACE_START, text_space_size, OS_VM_PROT_ALL);
+#if defined LISP_FEATURE_ARM64 && defined LISP_FEATURE_IMMOBILE_SPACE
+        // IMMOBILE_TEXT_CORE_SPACE_ID has 0 pages in a split core directory,
+        // so coreparse_alloc_space will not allocate alien linkage space.
+        ALIEN_LINKAGE_SPACE_START =
+            (uword_t)os_alloc_gc_space(ALIEN_LINKAGE_TABLE_CORE_SPACE_ID, MOVABLE,
+                                       (char*)&lisp_code_start - ALIEN_LINKAGE_SPACE_SIZE,
+                                       ALIEN_LINKAGE_SPACE_SIZE);
+        if (!ALIEN_LINKAGE_SPACE_START)
+            lose("Can't allocate alien linkage space");
+#endif
     }
 #endif
 

@@ -1757,6 +1757,9 @@
 (defun was-visitedp (hashset obj) (gethash (descriptor-bits obj) hashset))
 
 (defun trace-t/nil-symbols (static-constants visitor)
+  (declare (ignorable static-constants visitor))
+  #+arm64 (error "Not implemented")
+  #+x86-64
   (with-pinned-objects (static-constants)
     (let* ((sap (sap+ (vector-sap static-constants) (ash 2 word-shift)))
            ;; TODO: this is correct only because T is known to directly follow the
