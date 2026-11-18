@@ -279,3 +279,13 @@
                  (sb-kernel::%closure-fun
                   (symbol-function 'eval-top-level-test))))))
   (assert (= (funcall 'eval-top-level-test 4) 4)))
+
+(declaim (ftype (function (t) (values double-float &optional)) specialized-tail-call))
+(defun specialized-tail-call (v)
+  (declare (optimize (safety 0)))
+  (flet ((v () v))
+    (declare (notinline v))
+    (v)))
+
+(with-test (:name :specialized-tail-call)
+  (assert (= (opaque-identity (specialized-tail-call 1d0)) 1d0)))

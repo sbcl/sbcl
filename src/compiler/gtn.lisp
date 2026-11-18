@@ -229,15 +229,16 @@
     (let ((ptypes (mapcar #'primitive-type types)))
       (multiple-value-bind (use-standard specialized-xep-type) (use-standard-returns tails)
         (cond ((eq use-standard :unboxed)
-               (make-return-info :unboxed
-                                 count
-                                 ptypes
-                                 types
-                                 (let ((state (sb-vm::make-fixed-call-args-state)))
-                                   (loop for type in (if specialized-xep-type
-                                                         (mapcar #'primitive-type (values-type-required specialized-xep-type))
-                                                         ptypes)
-                                         collect (sb-vm::fixed-call-arg-location type state)))))
+               (let ((ptypes (if specialized-xep-type
+                                 (mapcar #'primitive-type (values-type-required specialized-xep-type))
+                                 ptypes)))
+                 (make-return-info :unboxed
+                                   count
+                                   ptypes
+                                   types
+                                   (let ((state (sb-vm::make-fixed-call-args-state)))
+                                     (loop for type in ptypes
+                                           collect (sb-vm::fixed-call-arg-location type state))))))
               ((or (eq count :unknown) use-standard)
                (make-return-info :unknown count ptypes types))
               (t
