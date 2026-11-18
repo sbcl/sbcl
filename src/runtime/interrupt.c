@@ -1719,6 +1719,20 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
     }
     else if(addr >= ALIEN_STACK_GUARD_PAGE(th) &&
             addr < ALIEN_STACK_GUARD_PAGE(th) + astk_guard_size) {
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+        /* The Lisp register state in CONTEXT is meaningless while foreign
+         * code is running (x27/x29 belong to C on arm64), so we can't
+         * safely arrange a return into Lisp from here yet.  At least say
+         * clearly what happened instead of dying with an obscure signal. */
+        if (foreign_function_call_active_p(th)) {
+            lose("Native (alien) stack exhausted in foreign code in thread %p.\n"
+                 "  Non-initial threads have a %ld KiB native stack (ALIEN_STACK_SIZE);\n"
+                 "  the initial thread runs on the larger OS stack.\n"
+                 "  fault: %p, PC: %p",
+                 th, (long)(ALIEN_STACK_SIZE / 1024),
+                 addr, (void*)os_context_pc(context));
+        }
+#endif
         lower_thread_alien_stack_guard_page(th);
 
         /* For the unfortunate case, when the alien stack is
@@ -1862,7 +1876,7 @@ ll_install_handler (int signal, interrupt_handler_t handler)
         sa.sa_sigaction = low_level_handle_now_handler;
     sa.sa_mask = blockable_sigset;
     sa.sa_flags = SA_SIGINFO | SA_RESTART | OS_SA_NODEFER;
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+#ifdef MEMORY_FAULTS_ON_ALTSTACK
     /* darwin-os.h defines SIG_MEMORY_FAULT as SIGBUS, which is delivered for
      * most protection faults, whereas SIGSEGV is delivered for some faults
      * inside the initial process stack range. Without SA_ONSTACK, SIGSEGV is fatal

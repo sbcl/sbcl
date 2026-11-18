@@ -333,7 +333,7 @@ static int os_thread_init(struct thread *thread)
      * and then due to another bug I caused (in trying to use FORMAT after streams were closed)
      * I got a stack overflow, and the sanitizer didn't help.*/
 #if !defined LISP_FEATURE_WIN32 && \
-     defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK && !defined ADDRESS_SANITIZER
+     defined MEMORY_FAULTS_ON_ALTSTACK && !defined ADDRESS_SANITIZER
     stack_t sigstack;
     sigstack.ss_sp    = calc_altstack_base(thread);
     sigstack.ss_flags = 0;
