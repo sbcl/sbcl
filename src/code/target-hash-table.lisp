@@ -1952,7 +1952,11 @@ multiple threads accessing the same hash-table without locking."
           (when (and old-addr-hashing-p (not new-flat-p))
             (logior-array-flags new-kv-vector sb-vm:vector-addr-hashing-flag))
 
+          (reset-array-flags old-kv-vector sb-vm:vector-weak-flag)
           ;; Copy the k/v pairs excluding leading and trailing metadata.
+          ;; vector-weak-flag needs to be cleared beforehand, or a GC
+          ;; can collect an entry between copying key and value, making
+          ;; the copy inconsistent.
           (replace new-kv-vector old-kv-vector
                    :start1 2 :start2 2 :end2 (* 2 (1+ hwm)))
 
