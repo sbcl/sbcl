@@ -450,6 +450,21 @@ GNAME(do_pending_interrupt):
         brk trap_PendingInterrupt
 	ret
 
+#ifdef LISP_FEATURE_DARWIN
+        /* The SIGSEGV/SIGBUS handler runs on the altstack, where Lisp must
+         * not run.  For an ordinary memory fault it saves the faulting
+         * state on the native stack and "returns" here; the resulting
+         * SIGILL is taken on the normal stack with a proper context, and
+         * sigill_handler recognises this PC and calls
+         * handle_memory_fault_emulation_trap().  See lisp_memory_fault_error. */
+        .align 2
+	.global	GNAME(arm64_memory_fault_trap)
+	TYPE(arm64_memory_fault_trap)
+GNAME(arm64_memory_fault_trap):
+        udf #0x5bc1
+	SIZE(arm64_memory_fault_trap)
+#endif
+
 #ifdef __ELF__
 // Mark the object as not requiring an executable stack.
 .section .note.GNU-stack,"",%progbits

@@ -192,6 +192,17 @@ extern pthread_key_t current_thread;
 # define THREAD_CSP_PAGE_SIZE 0
 #endif
 
+/* Platforms on which memory-fault signals (SIGSEGV / SIG_MEMORY_FAULT) are
+ * delivered on the per-thread alternate signal stack.  This is needed
+ * wherever the native C stack can be exhausted: if the handler runs on the
+ * exhausted stack, the kernel cannot push the signal frame and kills the
+ * process (Darwin reports that as SIGILL).  On arm64 the Lisp control stack
+ * is separate, but foreign code runs on the native ("alien") stack. */
+#if defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK || \
+    (defined LISP_FEATURE_ARM64 && defined LISP_FEATURE_DARWIN)
+#define MEMORY_FAULTS_ON_ALTSTACK 1
+#endif
+
 /* sigaltstack() - "Signal stacks are automatically adjusted
  * for the direction of stack growth and alignment requirements." */
 static inline void* calc_altstack_base(struct thread* thread) {

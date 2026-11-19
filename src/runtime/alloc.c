@@ -930,8 +930,6 @@ void free_thread_struct(struct thread *th)
 int
 on_altstack_p(struct thread *th, void *esp)
 {
-    void *start = (char *)th+dynamic_values_bytes;
-    void *end = (char *)start + 32*SIGSTKSZ;
-    return start <= esp && esp < end;
+    return calc_altstack_base(th) <= esp && esp < calc_altstack_end(th);
 }
 #endif
