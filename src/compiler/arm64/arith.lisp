@@ -3211,6 +3211,7 @@
          ((lo-x hi-x) :scs (signed-128-reg)))
   (:arg-types unsigned-num signed-byte-128))
 
+;;; This is not left to the s128 VOPs because the result is u128
 (define-vop (*/unsigned=>integer)
   (:translate *)
   (:args (x :scs (unsigned-reg))
@@ -3223,19 +3224,21 @@
   (:vop-var vop)
   (:generator 20
     (let ((value (and (sc-is y immediate)
-                        (tn-value y))))
-        (cond ((and value
-                    (plusp value)
-                    (= (logcount value) 1))
-               (let ((shift (1- (integer-length value))))
-                 (inst lsl low x shift)
-                 (inst lsr high x (- n-word-bits shift))))
-              (t
-               (when (sc-is y immediate)
-                 (load-immediate-word low value)
-                 (setf y low))
-               (inst umulh high x y)
-               (inst mul low x y))))
+                      (tn-value y))))
+      (cond ((eql value 1)
+             (move low x)
+             (setf high zr-tn))
+            ((and value
+                  (plusp value)
+                  (= (logcount value) 1))
+             (let ((shift (1- (integer-length value))))
+               (inst lsl low x shift)
+               (inst lsr high x (- n-word-bits shift))))
+            (t
+             (when value
+               (setf y (load-immediate-word low value)))
+             (inst umulh high x y)
+             (inst mul low x y))))
     (inst mov header (bignum-header-for-length 3))
     (inst tbnz high 63 allocate)
     (inst mov header (bignum-header-for-length 2))
