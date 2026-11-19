@@ -3059,3 +3059,19 @@
      (declare ((integer 1 5) x))
      (sb-kernel:range<= 1 x 5))
    (eql t)))
+
+(with-test (:name :float-integer-/-minus-zero)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (a b)
+         (declare ((signed-byte 8) a b))
+         (float (/ a b)))
+    ((0 -10) 0.0)
+    ((5 2) 2.5))
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (a b)
+         (declare ((signed-byte 32) a b))
+         (float (/ a b) 1d0))
+    ((0 -10) 0d0)
+    ((10 2) 5d0)))

@@ -56,8 +56,15 @@
                                  ($value most-positive-exactly-$type-integer))
                      n)
               (:type #1# d)))
-       `(/ (%$type n)
-           (%$type d))))))
+       (if (or (minus-zero-ignored-p node)
+               (or (lvar-subtypep d unsigned-byte)
+                   (not (lvar-intersectp n (eql 0)))))
+           `(/ (%$type n)
+               (%$type d))
+           `(if (eq n 0)
+                ($if (eq '$type 'double-float) 0d0 0f0)
+                (/ (%$type n)
+                   (%$type d))))))))
 
 ;;; (%double-float (%single-float x)) => (%double-float x) if it doesn't lose precision
 (deftransform %double-float ((n) (single-float) * :node node :important nil)
