@@ -3,6 +3,13 @@
 ;;; ref in SB-ALIEN::*STRUCT-TYPE-CACHE which will get GCed.
 (define-alien-type nil (struct myalien))
 
+(with-test (:name :alien-linkage-index-from-addr)
+  (dotimes (i 50)
+    (dolist (datap '(nil t))
+      (let ((addr (sb-vm::alien-linkage-index-to-addr i datap)))
+        (dotimes (b (min 8 sb-vm:alien-linkage-table-entry-size))
+          (assert (= (sb-vm::alien-linkage-index-from-addr (+ addr b)) i)))))))
+
 (with-test (:name :no-alien-sap-call
                   :skipped-on (and (not :sb-thread) :x86-64))
   (let ((lines

@@ -92,15 +92,19 @@
            (+ (* entries-per-group sb-vm:n-word-bytes) ; skip over N indirection words
               (* index-in-group 8)))))) ; 8 bytes for JMP+NOP (x86-64) or LDR+BR (arm64)
 
+
 (defun alien-linkage-index-from-addr (addr)
-  (let* ((offset (- addr alien-linkage-space-start))
-         (group-number (floor offset (* entries-per-group alien-linkage-table-entry-size)))
-         (index (* group-number entries-per-group)))
-    (dotimes (i entries-per-group) ; This is a very silly but simple technique
-      (when (or (= offset (alien-linkage-element-offset index nil))
-                (= offset (alien-linkage-element-offset index t)))
-        (return index))
-      (incf index))))
+  ;; A shorter implementation (thanks to AI) is a little too clever for me:
+  ;; (let ((offset (- addr alien-linkage-space-start)))
+  ;;   (logior (ash (logand offset -256) -4)
+  ;;           (ldb (byte 4 3) offset)))
+  (binding* ((bytes-per-group (* entries-per-group alien-linkage-table-entry-size))
+             ((group byte-offset) (floor (- addr alien-linkage-space-start) bytes-per-group)))
+    (+ (* group entries-per-group)
+       ;; Both the data half [0, 128) and stub half [128, 256) use 8-byte slots,
+       ;; so dividing by 8 and taking MOD entries-per-group maps any byte in either
+       ;; half (including the 2nd stub instruction at +4 on arm64) to 0..15.
+       (rem (ash byte-offset -3) entries-per-group))))
 
 (defun alien-linkage-index-to-addr (i &optional datap)
   (+ (alien-linkage-element-offset i datap) alien-linkage-space-start)))
@@ -119,7 +123,7 @@
   (values ; primary value only
    (ecase alien-linkage-table-growth-direction
      (:up   (floor (- addr alien-linkage-space-start) alien-linkage-table-entry-size))
-     (:down (1- (floor (- space-end addr) space-end)))))))
+     (:down (floor (- space-end addr 1) alien-linkage-table-entry-size))))))
 
 
 ;;;; interfaces to IR2 conversion
