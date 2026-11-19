@@ -566,7 +566,11 @@ void* new_thread_trampoline(void* arg)
 #endif
 {
     struct thread* th = arg;
+
+    // done in create_lisp_thread, ASSOCIATE_OS_THREAD does DuplicateHandle, leaking the original
+#ifndef LISP_FEATURE_WIN32
     ASSOCIATE_OS_THREAD(th);
+#endif
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     init_thread_data scribble;
