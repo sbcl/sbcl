@@ -1558,7 +1558,7 @@ NAME-CONFLICT-DATUM.")
             (multiple-value-bind (accessible-symbol status)
                 (find-symbol (symbol-name s) package)
               (cond ((and (eq accessible-symbol s)
-                          (member status '(:internal :exported)))
+                          (member status '(:internal :external)))
                      ;; The symbol S is present in PACKAGE.  Unintern
                      ;; to resolve the conflict.
                      (unintern s package))
