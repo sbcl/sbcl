@@ -3136,8 +3136,10 @@ table itself."
     (dx-flet ((clear ()
                 (let* ((kv-vector (hash-table-pairs hash-table))
                        (high-water-mark (kv-vector-high-water-mark kv-vector))
-                       (flatp (flat-hash-table-p hash-table)))
+                       (flatp (flat-hash-table-p hash-table))
+                       weak)
                   (when (hash-table-weak-p hash-table)
+                    (setf weak t)
                     (aver (eq (kv-vector-supplement kv-vector) hash-table)))
                   ;; Remove address-sensitivity.
                   (reset-array-flags kv-vector sb-vm:vector-addr-hashing-flag)
@@ -3153,8 +3155,13 @@ table itself."
                                  (hash-table-smashed-cells hash-table))
                             (plusp (hash-table-%count hash-table)))
                     (when (plusp (hash-table-%count hash-table))
+                      ;; don't let cull_weak_hash_table_bucket see
+                      ;; key/value not written atomically
+                      (reset-array-flags kv-vector sb-vm:vector-weak-flag)
                       ;; Fill all slots with the empty marker.
                       (fill kv-vector +empty-ht-slot+ :start 2 :end (* (1+ high-water-mark) 2))
+                      (when weak
+                        (logior-array-flags kv-vector sb-vm:vector-weak-flag))
                       ;; Set to 0 only after kv-vector is cleared,
                       ;; or cull_weak_hash_table_bucket will find new dead entries.
                       (setf (hash-table-%count hash-table) 0))
