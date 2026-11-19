@@ -10,6 +10,16 @@
 
 (declaim (muffle-conditions (and compiler-note (not sb-c::unknown-typep-note))))
 
+;; See the comment in sb-grovel/def-to-lisp.lisp: under qemu-user the
+;; target lisp cannot execve the target groveler directly, so when
+;; SBCL_RUNNER is set the a.out runs through it.
+(defun split-runner (string)
+  (loop for start = 0 then (1+ end)
+        for end = (position #\Space string :start start)
+        unless (= start (or end (length string)))
+          collect (subseq string start end)
+        while end))
+
 (defun run-defs-to-lisp (inputs output)
   (flet ((invoke (string &rest args)
            #+android
@@ -39,10 +49,18 @@
       (let* ((c-compiler-output (merge-pathnames #+unix "a.out" #+win32 "a.exe" output))
              (result (invoke "RUN-C-COMPILER" c-file c-compiler-output)))
         (unless (= result 0) (error "C compilation failed"))
-        (let ((result
-               (process-exit-code
-                (run-program (namestring c-compiler-output) (list (namestring output))
-                             :search nil :input nil :output *trace-output*))))
+        (let* ((runner #+win32 nil
+                       #-win32 (split-runner
+                                (or (sb-ext:posix-getenv "SBCL_RUNNER") "")))
+               (result
+                (process-exit-code
+                 (run-program (or (first runner) (namestring c-compiler-output))
+                              (append (rest runner)
+                                      (when runner
+                                        (list (namestring c-compiler-output)))
+                                      (list (namestring output)))
+                              :search (if runner t nil)
+                              :input nil :output *trace-output*))))
           (unless (= result 0) (error "C execution failed")))))))
 
 (defparameter +genfile+ "generated-constants")
