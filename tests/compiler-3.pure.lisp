@@ -1392,3 +1392,29 @@
            (funcall f))
          1)
     ((1 (lambda () (values))) 1)))
+
+;;; When PROPAGATE-FUN-CHANGE expanded a local INLINE function via
+;;; CONVERT-CALL-IF-POSSIBLE -> MAYBE-EXPAND-LOCAL-INLINE, any global
+;;; inline expansion inside it (with IR1-CONVERTING-NOT-OPTIMIZING-P = T)
+;;; queued an OPTIONAL-DISPATCH and its &MORE-PROCESSOR on
+;;; COMPONENT-NEW-FUNCTIONALS without running LOCALL-ANALYZE-COMPONENT.
+;;; IR1-OPTIMIZE could then walk into the unanalyzed &MORE-PROCESSOR and
+;;; transform (%NEGATE (- #:N-COUNT 1)): NEGATE-LVAR called TRANSFORM-CALL
+;;; on (-) -> LOCALL-ANALYZE-COMPONENT, deleting the unused
+;;; &MORE-PROCESSOR while IR1-TRANSFORM for %NEGATE in that same block
+;;; was still on the stack, tripping (AVER (NOT (BLOCK-DELETE-P BLOCK))).
+(declaim (inline local-inline-locall-callee local-inline-locall-caller))
+(defun local-inline-locall-callee (&key k) k)
+(defun local-inline-locall-caller (fn p)
+  (declare (function fn))
+  (if p (funcall fn) (funcall fn)))
+
+(with-test (:name :local-inline-locall-analyze)
+  (checked-compile-and-assert
+      ()
+      `(lambda (p)
+         (flet ((body () (local-inline-locall-callee)))
+           (declare (inline body))
+           (local-inline-locall-caller #'body p)))
+    ((t) nil)
+    ((nil) nil)))
