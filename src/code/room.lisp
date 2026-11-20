@@ -125,14 +125,6 @@
        (bounds dynamic-space-start
                (sap-int (dynamic-space-free-pointer)))))))
 
-;;; Return the total number of bytes used in SPACE.
-(defun space-bytes (space)
-  (if (eq space :immobile)
-      (+ (space-bytes :immobile-fixed)
-         (space-bytes :immobile-variable))
-      (multiple-value-bind (start end) (%space-bounds space)
-        (ash (- end start) n-fixnum-tag-bits))))
-
 ;;; Iterate over all the objects in the contiguous block of memory
 ;;; with the low address at START and the high address just before
 ;;; END, calling FUN with the object, the object's type code, and the
@@ -1490,7 +1482,7 @@ We could try a few things to mitigate this:
            (lambda (obj widetag size)
              (declare (ignore widetag size))
              (setf (aref result index) obj)
-             (incf count))
+             (incf index))
            (%make-lisp-obj base)
            (%make-lisp-obj limit))))
       result))))

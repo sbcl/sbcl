@@ -153,8 +153,7 @@
             :serial t
             :skipped-on :interpreter)
   ;; Asking for the size of a heap space should not cost anything!
-  (ctu:assert-no-consing (sb-vm:%space-bounds :static))
-  (ctu:assert-no-consing (sb-vm:space-bytes :static)))
+  (ctu:assert-no-consing (sb-vm:%space-bounds :static)))
 
 (with-test (:name (sb-vm:map-allocated-objects :no-consing)
             :serial t

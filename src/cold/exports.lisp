@@ -3171,7 +3171,7 @@ structure representations")
            "SLOT-NAME" "SLOT-OFFSET"
            "SLOT-SPECIAL"
            "+STATIC-FDEFNS+" "STATIC-FUN-OFFSET"
-           "%SPACE-BOUNDS" "SPACE-BYTES"
+           "%SPACE-BOUNDS"
            "STABLE-HASH-REQUIRED-FLAG"
            "HASH-SLOT-PRESENT-FLAG"
            "STATIC-SYMBOL-OFFSET" "STATIC-SYMBOL-P"
