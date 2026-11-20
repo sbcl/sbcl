@@ -423,7 +423,8 @@
        (declare (type system-area-pointer sap)
                 (type unsigned-byte offset)
                 (ignore ignore))
-       ,(if (eq (alien-type-class type) 'integer)
+       ;; If it's just sap-ref then it's already sign-extended
+       ,(if (eq (alien-type-class-name (alien-type-class type)) 'integer)
             extract
             `(naturalize ,extract ',type)))))
 
