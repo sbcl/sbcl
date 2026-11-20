@@ -1052,8 +1052,8 @@
                               x-bound))
                        (numeric-type-format x))))
       (if greater
-          (modified-numeric-type x :low new-bound)
-          (modified-numeric-type x :high new-bound)))))
+          (modified-numeric-type x :low new-bound :normalize-zeros nil)
+          (modified-numeric-type x :high new-bound :normalize-zeros nil)))))
 
 (defun constrain-real-to-integer (y greater or-equal)
   (declare (type numeric-type y))

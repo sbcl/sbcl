@@ -2710,3 +2710,18 @@
                     acc56)))
                 #'f0)))
    :allow-warnings t))
+
+(with-test (:name :constrain-float-type-normalize-zero)
+  (assert-type
+   (lambda (x y z)
+     (declare ((double-float -1.0d0 5.0d0) x)
+              ((double-float -1.0d0 1.0d0) y)
+              ((double-float -1.0d0 2.0d0) z))
+     (if (and (typep x '(or (eql 0.0d0) (double-float 4.0d0 5.0d0)))
+              (< x y)
+              (< x z))
+         (if (eql x -0.0d0)
+             0
+             1)
+         1))
+   (eql 1)))
