@@ -2194,9 +2194,20 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   (let ((target (case-frob-stream-target stream))
         (c (char-upcase char)))
     (if (ansi-stream-p target)
-        ;; ansi stream method for character out has to return the original char
-        (progn (funcall (ansi-stream-cout target) target c) char)
-        (stream-write-char target c))))
+        (funcall (ansi-stream-cout target) target c)
+        (stream-write-char target c))
+    ;; return the original char
+    char))
+
+(defun case-frob-downcase-out (stream char)
+  (declare (type case-frob-stream stream)
+           (type character char))
+  (let ((target (case-frob-stream-target stream))
+        (c (char-downcase char)))
+    (if (ansi-stream-p target)
+        (funcall (ansi-stream-cout target) target c)
+        (stream-write-char target c))
+    char))
 
 (defun case-frob-upcase-sout (stream str start end)
   (declare (type case-frob-stream stream)
@@ -2213,15 +2224,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (if (ansi-stream-p target)
         (funcall (ansi-stream-sout target) target string 0 string-len)
         (stream-write-string target string 0 string-len))))
-
-(defun case-frob-downcase-out (stream char)
-  (declare (type case-frob-stream stream)
-           (type character char))
-  (let ((target (case-frob-stream-target stream))
-        (c (char-downcase char)))
-    (if (ansi-stream-p target)
-        (progn (funcall (ansi-stream-cout target) target c) char)
-        (stream-write-char target c))))
 
 (defun case-frob-downcase-sout (stream str start end)
   (declare (type case-frob-stream stream)
