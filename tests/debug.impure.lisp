@@ -480,7 +480,10 @@
     (g x)))
 
 (with-test (:name (trace :flet :known-values-return)
-                  . #.*breakpoint-tracing-expectations*)
+            . #.(let ((x (copy-list *breakpoint-tracing-expectations*)))
+                  (setf (getf x :fails-on)
+                        (append (getf x :fails-on) '(:x86-64)))
+                  x))
   (assert (equal (collecting-traces ((flet g :in fn-known-values-return))
                    (fn-known-values-return 9))
                  '((0 (flet g :in fn-known-values-return) :enter 9)

@@ -146,7 +146,7 @@
                        (:skipped-broken " Skipped (broken):")
                        (:skipped-disabled " Skipped (irrelevant):")
                        (:skipped-unimplemented " Skipped (unimplemented):")))
-                    (format t " ~a / ~a~%"
+                    (format t " ~a / ~s~%"
                             (enough-namestring (second fail))
                             (third fail)))))
            (when (> skipcount 0)
