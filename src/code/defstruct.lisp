@@ -852,25 +852,24 @@ unless :NAMED is also specified.")))
   (declare (type defstruct-description dd))
   (let* ((option-bits (parse-defstruct-options options dd))
          (inherits
-          (if (dd-class-p dd)
-              #+sb-xc-host (!inherits-for-structure dd)
-              #-sb-xc-host
-              (let ((super (compiler-layout-or-lose (or (first (dd-include dd))
-                                                        'structure-object))))
-                (concatenate 'simple-vector
-                             (layout-inherits super) (vector super)))))
+           (when (dd-class-p dd)
+             #+sb-xc-host (!inherits-for-structure dd)
+             #-sb-xc-host
+             (let ((super (compiler-layout-or-lose (or (first (dd-include dd))
+                                                       'structure-object))))
+               (concatenate 'vector (layout-inherits super) (vector super)))))
          (proto-classoid
-          (if (dd-class-p dd)
-              ;; The classoid needs a layout whereby to convey inheritance.
-              ;; Classoids only store a *direct* superclass list.
-              ;; Both the layout and classoid are throwaway objects.
-              ;; It's probably too dangerous to stack-allocate, because references
-              ;; could leak from the type cache machinery.
-              (let* ((classoid (make-structure-classoid :name (dd-name dd)))
-                     (layout (make-temporary-layout (hash-layout-name (dd-name dd))
-                                                    classoid inherits)))
-                (setf (classoid-layout classoid) layout)
-                classoid)))
+           (when (dd-class-p dd)
+             ;; The classoid needs a layout whereby to convey inheritance.
+             ;; Classoids only store a *direct* superclass list.
+             ;; Both the layout and classoid are throwaway objects.
+             ;; It's probably too dangerous to stack-allocate, because references
+             ;; could leak from the type cache machinery.
+             (let* ((classoid (make-structure-classoid :name (dd-name dd)))
+                    (layout (make-temporary-layout (hash-layout-name (dd-name dd))
+                                                   classoid inherits)))
+               (setf (classoid-layout classoid) layout)
+               classoid)))
          (ancestor-slot-comparator-list))
     #+sb-xc-host
     (when (member (dd-name dd) '(pathname logical-pathname))
@@ -960,7 +959,10 @@ unless :NAMED is also specified.")))
 
     (when (find name (dd-slots defstruct) :test #'string= :key #'dsd-name)
       (let* ((parent-name (first (dd-include defstruct)))
-             (parent (and parent-name (find-defstruct-description parent-name)))
+             (parent (and parent-name
+                          (if (dd-class-p defstruct)
+                              (find-defstruct-description parent-name)
+                              (info :typed-structure :info parent-name))))
              (included? (and parent (find name
                                           (dd-slots parent)
                                           :key #'dsd-name
