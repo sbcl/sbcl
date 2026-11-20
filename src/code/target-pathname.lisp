@@ -1097,11 +1097,11 @@ a HOST structure or string."
       (declare (type pathname defaults))
       (etypecase thing
         (string
-         (with-array-data ((thing thing) (start start) (end end)
+         (with-array-data ((thing thing :offset-var offset) (start start) (end end)
                            :check-fill-pointer t)
            (multiple-value-bind (pathname position)
                (%parse-namestring thing found-host defaults start end junk-allowed)
-             (values pathname (- position start)))))
+             (values pathname (- position offset)))))
         (pathname
          (let ((defaulted-host (or found-host (%pathname-host defaults))))
            (declare (type host defaulted-host))
@@ -1189,13 +1189,13 @@ directory."
       (declare (type pathname defaults))
       (etypecase thing
         (string
-         (with-array-data ((thing thing) (start start) (end end)
+         (with-array-data ((thing thing :offset-var offset) (start start) (end end)
                            :check-fill-pointer t)
            (multiple-value-bind (pathname position)
                (%parse-native-namestring thing
                                          found-host defaults start end junk-allowed
                                          as-directory)
-             (values pathname (- position start)))))
+             (values pathname (- position offset)))))
         (pathname
          (let ((defaulted-host (or found-host (%pathname-host defaults))))
            (declare (type host defaulted-host))

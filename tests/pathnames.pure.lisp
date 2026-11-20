@@ -1055,3 +1055,13 @@
     (assert (not (pathname-type (pathname "^^^.abc")))))
   (let ((p #-win32 #p"a*\\.c" #+win32 #p"a*^.c"))
     (assert (equal (pathname (namestring p)) p))))
+
+(with-test (:name :parse-namestring-start)
+  (multiple-value-bind (path pos)
+      (parse-namestring "abc/def" nil #p"" :start 3)
+    (assert (equal path #p"/def"))
+    (assert (eql pos 7)))
+  (multiple-value-bind (path pos)
+      (sb-ext:parse-native-namestring "abc/def" nil #p"" :start 3)
+    (assert (equal path #p"/def"))
+    (assert (eql pos 7))))
