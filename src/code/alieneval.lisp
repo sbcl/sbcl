@@ -1130,7 +1130,9 @@
                      (old (and name (auxiliary-alien-type kind name env)))
                      (old-fields (and old (alien-record-type-fields old)))
                      (redefined (and old (not old-fields))))
-            (when (and old-fields (notevery #'record-fields-match-p old-fields new-fields))
+            (when (and old-fields
+                       (or (/= (length old-fields) (length new-fields))
+                           (notevery #'record-fields-match-p old-fields new-fields)))
               (cerror "Continue, clobbering the old definition."
                       "Incompatible alien record type definition~%Old: ~S~%New: ~S"
                       (unparse-alien-type old)
@@ -1227,9 +1229,10 @@
             (alien-type-alignment type2))
        (flet ((match-fields (&optional old)
                 (setf (gethash type1 *alien-type-matches*) (cons type2 old))
-                (every #'record-fields-match-p
-                       (alien-record-type-fields type1)
-                       (alien-record-type-fields type2))))
+                (let ((f1 (alien-record-type-fields type1))
+                      (f2 (alien-record-type-fields type2)))
+                  (and (= (length f1) (length f2))
+                       (every #'record-fields-match-p f1 f2)))))
          (if *alien-type-matches*
              (let ((types (gethash type1 *alien-type-matches*)))
                (or (memq type2 types) (match-fields types)))
