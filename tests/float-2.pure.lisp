@@ -1068,3 +1068,7 @@ fractional bits."
 (with-test (:name :tan-complex-to-rational-tanh)
   (assert (= (opaque-identity (tan (opaque-identity (complex 0 1/2))))
              (complex 0 (tanh (opaque-identity 1/2))))))
+
+(with-test (:name :bignum-to-double-sticky-bits)
+  (assert (= (float (opaque-identity (+ (expt 2 118) (expt 2 65) (expt 2 32))) 1d0)
+             (opaque-identity 3.3230699894622904d35))))

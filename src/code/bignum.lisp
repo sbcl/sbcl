@@ -1558,27 +1558,6 @@
               (return)))
       (values last1 last2))))
 
-;;; Make a single or double float with the specified significand,
-;;; exponent and sign.
-;;; FIXME: how are these not the same as {SINGLE,DOUBLE}-FROM-BITS ???
-#-64-bit
-(declaim (inline double-float-from-bits))
-#-64-bit
-(defun double-float-from-bits (bits exp plusp)
-  (declare (fixnum exp))
-  ;; "float to pointer coercion -> return value"
-  (let ((hi (dpb exp
-                 sb-vm:double-float-hi-exponent-byte
-                 (logandc2 (ecase sb-vm:n-word-bits
-                             (32 (%bignum-ref bits 2))
-                             (64 (ash (%bignum-ref bits 1) -32)))
-                           (ash sb-vm:double-float-hidden-bit -32))))
-        (lo (logand #xffffffff (%bignum-ref bits 1))))
-    (sb-kernel:make-double-float (if plusp
-                           hi
-                           (logior hi (ash -1 sb-vm:float-sign-shift)))
-                       lo)))
-
 ;;; Convert Bignum to a float in the specified Format, rounding to the best
 ;;; approximation.
 #-64-bit
@@ -1588,32 +1567,32 @@
            (if plusp
                bignum
                (negate-bignum-not-fully-normalized bignum)))
-         (len (bignum-integer-length x))
+         (int-len (bignum-buffer-integer-length x (%bignum-length x)))
          (digits sb-vm:double-float-digits)
          (keep (+ digits digit-size))
-         (shift (- keep len))
+         (shift (- keep int-len))
          (shifted
            (if (minusp shift)
                (bignum-ashift-right x (- shift))
                (bignum-ashift-left x shift)))
          (low (%bignum-ref shifted 0))
          (round-bit (ash 1 (1- digit-size))))
-    (declare (type bignum-length len digits keep)
+    (declare (type bignum-length int-len digits keep)
              (fixnum shift))
     (labels ((round-up ()
                (let ((rounded (add-bignums shifted round-bit)))
                  (if (> (integer-length rounded) keep)
-                     (float-from-bits (bignum-ashift-right rounded 1) (1+ len))
-                     (float-from-bits rounded len))))
+                     (float-from-bits (bignum-ashift-right rounded 1) (1+ int-len))
+                     (float-from-bits rounded int-len))))
              (float-from-bits (bits len)
-               (declare (type bignum-length len))
-               (double-float-from-bits bits
-                                       (check-exponent len
-                                                       sb-vm:double-float-bias
-                                                       sb-vm:double-float-normal-exponent-max)
-                                       plusp))
+               (sb-kernel::double-from-bits
+                (if plusp 0 1)
+                (check-exponent len
+                                sb-vm:double-float-bias
+                                sb-vm:double-float-normal-exponent-max)
+                (bignum-ashift-right bits digit-size)))
              (check-exponent (exp bias max)
-               (declare (type bignum-length len))
+               (declare (type bignum-length int-len))
                (let ((exp (+ exp bias)))
                  (when (> exp max)
                    (return-from bignum-to-double-float
@@ -1621,15 +1600,14 @@
                                   1d300
                                   -1d300))))
                  exp)))
-      (cond ((not (logtest round-bit low)) (float-from-bits shifted len))
+      (cond ((not (logtest round-bit low)) (float-from-bits shifted int-len))
             ((and (= low round-bit)
-                  (dotimes
-                      (i (- (%bignum-length x) (ceiling keep digit-size)) t)
-                    (unless (zerop (%bignum-ref x i)) (return nil))))
+                  (or (not (minusp shift))
+                      (bignum-lower-bits-zero-p x (- shift) (%bignum-length x))))
              (let ((next (%bignum-ref shifted 1)))
                (if (oddp next)
                    (round-up)
-                   (float-from-bits shifted len))))
+                   (float-from-bits shifted int-len))))
             (t (round-up))))))
 
 (macrolet
