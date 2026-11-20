@@ -1544,19 +1544,16 @@ of specialized arrays is supported."
                         :displaced-to displaced-to
                         :displaced-index-offset displaced-index-offset)))
       (contents-p ; array former contents replaced by INITIAL-CONTENTS
-       (let ((array-data (data-vector-from-inits dimensions new-total-size widetag n-bits-shift
-                                                 initialize initial-data)))
-         (cond ((adjustable-array-p array)
-                (set-array-header array array-data new-total-size new-fill-pointer
-                                  0 dimensions nil nil))
-               ((array-header-p array)
-                ;; simple multidimensional array.
-                ;; fill-pointer vectors satisfy ADJUSTABLE-ARRAY-P (in SBCL, that is)
-                ;; and therefore are handled by the first stanza of the cond.
-                (%make-array dimensions widetag n-bits-shift
-                             :initial-contents initial-contents))
-               (t
-                array-data))))
+       (if (typep array '(and simple-array (not vector)))
+           (%make-array dimensions widetag n-bits-shift
+                        :initial-contents initial-contents)
+           (let ((array-data (data-vector-from-inits dimensions new-total-size widetag n-bits-shift
+                                                     initialize initial-data)))
+             (cond ((adjustable-array-p array)
+                    (set-array-header array array-data new-total-size new-fill-pointer
+                                      0 dimensions nil nil))
+                   (t
+                    array-data)))))
       ((= rank 1)
        (let ((old-length (array-total-size array)))
          ;; Because ADJUST-ARRAY has to ignore any fill-pointer when
