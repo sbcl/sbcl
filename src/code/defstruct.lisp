@@ -2090,7 +2090,8 @@ or they must be declared locally notinline at each call site.~@:>"
                    (source-form (and (boundp '*dsd-source-form*)
                                      (cdr (assq dsd *dsd-source-form*)))))
                (cond ((and default
-                           (not pretty))
+                           (not pretty)
+                           (neq type t))
                       `(the* (,type :source-form ,source-form
                                     :context ,dsd
                                     :use-annotations t)
