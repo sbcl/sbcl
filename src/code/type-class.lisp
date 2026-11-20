@@ -530,7 +530,7 @@
                                    :environment nil))
          (ll-decl (third lexpr))
          (defun-name (symbolicate "PARSE-<" name ">")))
-    (aver (and (eq (car ll-decl) 'declare) (caadr ll-decl) 'sb-c::lambda-list))
+    (aver (and (eq (car ll-decl) 'declare) (eq (caadr ll-decl) 'sb-c::lambda-list)))
     `(progn
        (defun ,defun-name (,context spec)
          ,ll-decl
@@ -1096,7 +1096,15 @@
                 (loop for e across vector
                       do
                       (setf h (mix h (numbound-hash e))))
-                h)))
+                h))
+           (ranges-equal (a b)
+             ;; POSOPT: avoid checking for lists for integer ranges
+             `(let* ((a ,a)
+                     (b ,b))
+                (let ((length (length a)))
+                  (and (= (length b) length)
+                       (loop for i below length
+                             always (numbound-eql (aref a i) (aref b i))))))))
 
   (def-type-model (numeric-union-type
                    (:extra-mix-step)
@@ -1107,7 +1115,7 @@
     ;; #(run low high ...) where run is one of range-integer-run,
     ;; range-ratio-run, range-rational-run.
     ;; Floats are just #(low high ...)
-    (ranges #() :type simple-vector :hasher hash-ranges :test equalp)))
+    (ranges #() :type simple-vector :hasher hash-ranges :test ranges-equal)))
 
 (declaim (inline numeric-type-aspects))
 (defun numeric-type-aspects (x)
@@ -1404,7 +1412,6 @@
                         ((values-type constant-type)
                          (bug "Unexpected type ~S in CTYPEP-MACRO" name))
                         (classoid 'classoid)
-                        (numeric-type 'number)
                         (fun-type 'function)
                         (alien-type-type 'alien)
                         ;; remove "-TYPE" suffix from name of type's type to get
@@ -1478,46 +1485,6 @@
                    (when absent
                      (error "Unhandled type-classes: ~S" absent)))
                  clauses)))))))
-
-;;; Common logic for %%TYPEP and CROSS-TYPEP to test numeric types
-(defmacro number-typep (object type)
-  `(let ((object ,object) (type ,type))
-     (and (numberp object)
-          (let ((num (if (complexp object) (realpart object) object)))
-            (ecase (numeric-type-class type)
-              (integer (and (integerp num)
-                            ;; If the type is (COMPLEX INTEGER), it can
-                            ;; only match the object if both real and imag
-                            ;; parts are integers.
-                            (or (not (complexp object))
-                                (integerp (imagpart object)))))
-              (rational (rationalp num))
-              (float
-               (ecase (numeric-type-format type)
-                 ;; (short-float (typep num 'short-float))
-                 (single-float (typep num 'single-float))
-                 (double-float (typep num 'double-float))
-                 ;; (long-float (typep num 'long-float))
-                 ((nil) (floatp num))))
-              ((nil) t)))
-          (flet ((bound-test (val)
-                   (and (let ((low (numeric-type-low type)))
-                          (cond ((null low) t)
-                                ((listp low) (sb-xc:> val (car low)))
-                                (t (sb-xc:>= val low))))
-                        (let ((high (numeric-type-high type)))
-                          (cond ((null high) t)
-                                ((listp high) (sb-xc:< val (car high)))
-                                (t (sb-xc:<= val high)))))))
-            (ecase (numeric-type-complexp type)
-              ((nil) t)
-              (:complex
-               (and (complexp object)
-                    (bound-test (realpart object))
-                    (bound-test (imagpart object))))
-              (:real
-               (and (not (complexp object))
-                    (bound-test object))))))))
 
 ;;; Drop NILs, possibly reducing the storage vector length
 (defun rebuild-ctype-hashsets ()
