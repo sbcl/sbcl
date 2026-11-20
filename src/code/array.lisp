@@ -314,11 +314,10 @@
                    (t
                     (result simple-vector-widetag)))))
           (intersection-type
-           (let ((types (intersection-type-types ctype)))
-             (loop for type in types
-                   unless (hairy-type-p type)
-                   return (%vector-widetag-and-n-bits-shift (type-specifier type)))
-             (result simple-vector-widetag)))
+           ;; Something upgradable can only come from
+           ;; (and numeric-type (satisfies x)), and that is
+           ;; removed by replace-hairy-type above.
+           (result simple-vector-widetag))
           (character-set-type
            #-sb-unicode (result simple-base-string-widetag)
            #+sb-unicode
