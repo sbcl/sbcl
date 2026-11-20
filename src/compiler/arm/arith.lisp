@@ -740,9 +740,10 @@
            (inst mov r 0))
           (t
            (loadw r x bignum-digits-offset other-pointer-lowtag)
-           (let ((delta (- n-word-bits width)))
-             (inst mov r (lsl r delta))
-             (inst mov r (asr r delta)))))))
+           (unless (= width n-word-bits)
+             (let ((delta (- n-word-bits width)))
+               (inst mov r (lsl r delta))
+               (inst mov r (asr r delta))))))))
 ;;;; Bignum stuff.
 
 (define-vop (bignum-length get-header-data)

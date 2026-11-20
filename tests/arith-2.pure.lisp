@@ -3075,3 +3075,11 @@
          (float (/ a b) 1d0))
     ((0 -10) 0d0)
     ((10 2) 5d0)))
+
+(with-test (:name :mask-signed-field-bignum)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (x)
+         (declare (bignum x))
+         (sb-c::mask-signed-field sb-vm:n-word-bits x))
+    (((ldb (byte 300 0) -1)) -1)))
