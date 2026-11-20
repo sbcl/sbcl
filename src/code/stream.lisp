@@ -2397,13 +2397,12 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                 stream sequence-element-type))))))
 
 (defun compatible-vector-and-stream-element-types-p (vector stream)
-  (declare (type vector vector)
-           (type ansi-stream stream))
-  (or (and (typep vector '(simple-array (unsigned-byte 8) (*)))
-           (memq (stream-element-mode stream) '(unsigned-byte :bivalent))
-           t)
-      (and (typep vector '(simple-array (signed-byte 8) (*)))
-           (eq (stream-element-mode stream) 'signed-byte))))
+  (declare (type fd-stream stream))
+  (cond ((typep vector '(simple-array (unsigned-byte 8) (*)))
+         (or (equal (fd-stream-element-type stream) '(unsigned-byte 8))
+             (eq (fd-stream-element-mode stream) :bivalent)))
+        ((typep vector '(simple-array (signed-byte 8) (*)))
+         (equal (fd-stream-element-type stream) '(signed-byte 8)))))
 
 ;;;; READ-SEQUENCE
 
@@ -2556,7 +2555,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                            (offset-start start)
                            (offset-end end)
                            :check-fill-pointer t)
-           (if (and (ansi-stream-p stream)
+           (if (and (fd-stream-p stream)
                     (compatible-vector-and-stream-element-types-p data stream))
                (read-vector/fast data offset-start offset-end offset)
                (read-vector (compute-read-function (array-element-type data))
