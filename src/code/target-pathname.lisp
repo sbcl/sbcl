@@ -1591,9 +1591,7 @@ unspecified elements into a completed to-pathname based on the to-wildname."
            :args (list word)
            :namestring word :offset 0))
   (dotimes (i (length word) (string-upcase word))
-    ;; um, how do we know it's SIMPLE-STRING when the decl at the top
-    ;; only says STRING?
-    (let ((ch (schar word i)))
+    (let ((ch (char word i)))
       (unless (lpn-word-char-p ch)
           (error 'namestring-parse-error
                  :complaint "logical namestring character which ~
