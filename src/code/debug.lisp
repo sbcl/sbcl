@@ -400,13 +400,13 @@ Other commands:
         (setf condition (funcall (breakpoint-info-condition bp-hit-info)
                                  current-frame)))
       (cond ((and bp-hit-info step-hit-info (= 1 *number-of-steps*))
-             (build-string (format nil "~&*Step (to a breakpoint)*"))
+             (build-string "*Step (to a breakpoint)*")
              (print-common-info)
-             (break string))
+             (break "~a" string))
             ((and bp-hit-info step-hit-info break)
-             (build-string (format nil "~&*Step (to a breakpoint)*"))
+             (build-string "*Step (to a breakpoint)*")
              (print-common-info)
-             (break string))
+             (break "~a" string))
             ((and bp-hit-info step-hit-info)
              (print-common-info)
              (format *debug-io* "~A" string)
@@ -421,10 +421,10 @@ Other commands:
              (set-step-breakpoint current-frame))
             (bp-hit-info
              (when break
-               (build-string (format nil "~&*Breakpoint hit*")))
+               (build-string "*Breakpoint hit*"))
              (print-common-info)
              (if break
-                 (break string)
+                 (break "~a" string)
                  (format *debug-io* "~A" string)))
             (t
              (break "unknown breakpoint"))))))
