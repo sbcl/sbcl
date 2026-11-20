@@ -757,8 +757,8 @@ We could try a few things to mitigate this:
            (let ((addr (get-lisp-obj-address obj)))
              (when (>= addr start)
                (when (if count
-                         (> count-so-far count)
-                         (> pages-so-far pages))
+                         (>= count-so-far count)
+                         (>= pages-so-far pages))
                  (return-from print-allocated-objects (values)))
 
                (unless count
@@ -780,7 +780,7 @@ We could try a few things to mitigate this:
                           (or (not smaller) (<= size smaller))
                           (or (not larger) (>= size larger)))
                  (incf count-so-far)
-                 (case type
+                 (case obj-type
                    (#.code-header-widetag
                     (let ((dinfo (%code-debug-info obj)))
                       (format stream "~&Code object: ~S~%"

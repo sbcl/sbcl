@@ -757,7 +757,7 @@ line break."
 
 (defmethod print-object ((entry pprint-dispatch-entry) stream)
   (print-unreadable-object (entry stream :type t)
-    (format stream "type=~S, priority=~S]"
+    (format stream "type=~S, priority=~S"
             (pprint-dispatch-entry-type entry)
             (pprint-dispatch-entry-priority entry))))
 
