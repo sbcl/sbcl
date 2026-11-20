@@ -384,7 +384,7 @@ Other commands:
                (setf string (concatenate 'string string str)))
              (print-common-info ()
                (build-string
-                (with-output-to-string (*standard-output*)
+                (with-output-to-string (*standard-output*) ;; FIXME: nothing is actually printed to *standard-output*?
                   (when fun-end-cookie
                     (format *debug-io* "~%Return values: ~S" return-vals))
                   (when condition
@@ -453,7 +453,7 @@ Other commands:
             (push (create-breakpoint-info code-location bp 0)
                   *step-breakpoints*))))
        (t
-        (let* ((debug-fun (sb-di:frame-debug-fun *current-frame*))
+        (let* ((debug-fun (sb-di:frame-debug-fun frame))
                (bp (sb-di:make-breakpoint #'main-hook-fun debug-fun
                                           :kind :fun-end)))
           (sb-di:activate-breakpoint bp)
