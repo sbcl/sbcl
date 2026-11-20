@@ -335,9 +335,9 @@
           ((block nil
              (inst movsx r
                    (case width
-                     (16 (make-random-tn (load-time-value (sc-or-lose 'word-reg)) (tn-offset r)))
-                     (8 (if (member (tn-offset r) *byte-regs*)
-                            (make-random-tn (load-time-value (sc-or-lose 'byte-reg)) (tn-offset r))
+                     (16 (make-random-tn (load-time-value (sc-or-lose 'word-reg)) (tn-offset x)))
+                     (8 (if (member (tn-offset x) *byte-regs*)
+                            (make-random-tn (load-time-value (sc-or-lose 'byte-reg)) (tn-offset x))
                             (return)))
                      (t (return))))
              t))
