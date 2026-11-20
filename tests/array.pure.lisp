@@ -1245,3 +1245,11 @@
          (sb-kernel:with-array-data ((data a) (start 1) (end 4))
            (list (aref data start) start end)))
     ((#2A((10 20) (30 40))) '(20 1 4) :test #'equal)))
+
+(with-test (:name :adjust-array-fill-missing)
+  (let ((a (opaque-identity (make-array '(2 2)
+                                        :element-type 'single-float
+                                        :initial-contents '((1.0 2.0) (3.0 4.0))
+                                        :adjustable t))))
+    (assert (equalp (adjust-array a '(1 4))
+                    (opaque-identity #2A((1.0 2.0 0.0 0.0)))))))

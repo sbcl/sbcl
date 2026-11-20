@@ -1596,8 +1596,7 @@ of specialized arrays is supported."
                      (zap-array-data old-data (array-dimensions array)
                                      old-start
                                      new-data dimensions new-total-size
-                                     element-type initial-element
-                                     element-p))
+                                     initial-element element-p))
                  (if (adjustable-array-p array)
                      (set-array-header array new-data new-total-size
                                        nil 0 dimensions nil nil)
@@ -1789,8 +1788,7 @@ ARRAY, which this function returns.
 ;;; from the OLD-DATA in an arrangement specified by the OLD-DIMS to
 ;;; the NEW-DATA in an arrangement specified by the NEW-DIMS. OFFSET
 ;;; is a displaced offset to be added to computed indices of OLD-DATA.
-(defun zap-array-data (old-data old-dims offset new-data new-dims new-length
-                       element-type initial-element initial-element-p)
+(defun zap-array-data (old-data old-dims offset new-data new-dims new-length initial-element initial-element-p)
   (declare (list old-dims new-dims)
            (fixnum new-length))
   ;; OLD-DIMS comes from array-dimensions, which returns a fresh list
@@ -1799,26 +1797,15 @@ ARRAY, which this function returns.
   (setf old-dims (nreverse old-dims)
         new-dims (reverse new-dims))
   (cond ((eq old-data new-data)
-         ;; NEW-LENGTH, ELEMENT-TYPE, INITIAL-ELEMENT, and
-         ;; INITIAL-ELEMENT-P are used when OLD-DATA and NEW-DATA are
-         ;; EQ; in this case, a temporary must be used and filled
-         ;; appropriately. specified initial-element.
-         ;; FIXME: transforming this TYPEP to someting a bit faster
-         ;; would be a win...
-         (unless (or (not initial-element-p)
-                     (typep initial-element element-type))
-           (error "~S can't be used to initialize an array of type ~
-                    ~/sb-impl:print-type-specifier/."
-                  initial-element element-type))
-         (let ((temp (if initial-element-p
-                         (make-array new-length :initial-element initial-element)
-                         (make-array new-length))))
-           (declare (simple-vector temp))
-           (zap-array-data-aux old-data old-dims offset temp new-dims)
-           (dotimes (i new-length)
-             (setf (aref new-data i) (aref temp i)))
-           ;; Kill the temporary vector to prevent garbage retention.
-           (%shrink-vector temp 0)))
+         (multiple-value-bind (widetag shift) (array-underlying-widetag-and-shift (truly-the simple-array old-data))
+           (let ((temp (%make-array new-length widetag shift)))
+             (when initial-element-p
+               (fill temp initial-element))
+             ;; TODO: zap-array-data-aux boxes floats when copying
+             (zap-array-data-aux old-data old-dims offset temp new-dims)
+             (replace new-data temp)
+             ;; Kill the temporary vector to prevent garbage retention.
+             (%shrink-vector temp 0))))
         (t
          ;; When OLD-DATA and NEW-DATA are not EQ, NEW-DATA has
          ;; already been filled with any
