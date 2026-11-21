@@ -31,3 +31,20 @@
                          (read-from-string string)))
            finally (return t)))
   t)
+
+(defvar *displaced-base-string*
+  (make-array 3 :element-type 'base-char
+                :displaced-to (make-array 10 :element-type 'base-char
+                                             :initial-contents "0123456789")
+                                             ;; will be set to #\null ^
+                :displaced-index-offset 2))
+;; Our strtod() wrapper looked for a null 1 char past where it would be required to treat
+;; a non-simple base string as a C string. Consequently the answer was often bogus
+;; except when string had an additional null in the right place.
+(setf (char (sb-kernel:%array-data *displaced-base-string*) 6) #\null)
+
+(deftest sb-libc.strtod.2
+    (or (not *decimal-point-character*)
+        (progn (assert (= (sb-posix:strtod *displaced-base-string*) 234.0d0))
+               t))
+  t)
