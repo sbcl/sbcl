@@ -1488,6 +1488,9 @@
                                         1 (walk-directive-list s args)))))
                    (cond
                      ((directive-atsignp conditional)
+                      ;; This warns for (format t "~@[~]~A" x), which
+                      ;; is not an error if X is true, but no real code
+                      ;; should look like that.
                       (values 1 (max 1 sub-max) remaining))
                      ((loop for p in (directive-params conditional)
                             thereis (or (integerp (cdr p))
