@@ -440,7 +440,7 @@
           (cerror "Define it anyway"
                   "fop ~S with opcode ~D conflicts with fop ~S."
                  name opcode oname))))
-    (let ((existing-opcode (get name 'opcode)))
+    (let ((existing-opcode (gethash name *fop-name-to-opcode*)))
       (when (and existing-opcode (/= existing-opcode opcode))
         (error "multiple codes for fop name ~S: ~D and ~D"
                name opcode existing-opcode)))
