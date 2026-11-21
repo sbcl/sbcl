@@ -679,10 +679,10 @@ it does not exist or if it is a file or a symbolic link."
                                       :as-directory directory))
            (dir-existsp (dir)
              ;; X_OK implies a searchable directory. Not defined on #+win32
-             #+unix (sb-unix:unix-access (namestring dir) (logior sb-unix:r_ok sb-unix:x_ok))
+             #+unix (sb-unix:unix-access (native-namestring dir) (logior sb-unix:r_ok sb-unix:x_ok))
              #-unix (probe-file dir))
            (file-existsp (file)
-             #+unix (sb-unix:unix-access (namestring file) sb-unix:r_ok)
+             #+unix (sb-unix:unix-access (native-namestring file) sb-unix:r_ok)
              #-unix (probe-file file))
            (probe (path)
              (when (dir-existsp (merge-pathnames "contrib/" path))
@@ -740,6 +740,7 @@ it does not exist or if it is a file or a symbolic link."
                   (path (not-empty (posix-getenv "HOMEPATH"))))
               (and drive path
                    (concatenate 'string drive path)))
+            (not-empty (sb-win32::get-folder-namestring sb-win32::csidl_profile))
             (lose)))))
 
 ;;; (This is an ANSI Common Lisp function.)
@@ -751,9 +752,7 @@ system. HOST argument is ignored by SBCL."
   (declare (ignore host))
   (values
    (parse-native-namestring
-    (or (user-homedir-namestring)
-        #+win32
-        (sb-win32::get-folder-namestring sb-win32::csidl_profile))
+    (user-homedir-namestring)
     *physical-host*
     *default-pathname-defaults*
     :as-directory t)))
