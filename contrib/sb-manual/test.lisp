@@ -392,7 +392,11 @@
         (sb-sys:serve-all-events function)
         (sb-sys:serve-event function)
         (sb-sys:wait-until-fd-usable function)
-        (sb-sys:with-fd-handler macro))
+        (sb-sys:with-fd-handler macro)
+        (sb-sys:make-fd-stream function)
+        (sb-sys:fd-stream structure)
+        (sb-sys:fd-stream-fd function)
+        (sb-sys:fd-stream-p function))
        :missing
        ((sb-sys:%standard-char-p function)
         (sb-sys:*allow-with-interrupts* variable)
