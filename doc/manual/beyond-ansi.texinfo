@@ -2028,11 +2028,16 @@ by @code{allow-with-interrupts}.
 @ffindex @sortas{enable-interrupt sb-sys} enable-interrupt [sb-sys]
 @deffn{Function} sb-sys:enable-interrupt signum handler
 Set the Unix signal @code{handler} for @code{signum}. This applies to all threads in
-the SBCL process.
+the SBCL process. (This interface is experimental, and subject to change or removal.)
 
+@c TODO: figure out exactly which signals users are allowed to handle,
+@c document them here, and maybe have ENABLE-INTERRUPT reject signal
+@c numbers users aren't allowed to use.
 @itemize
 @item @code{signum} is a signal number. Use the constants @code{sb-posix:sigint},
-  @code{sb-posix:sighup} and others.
+  @code{sb-posix:sighup} and others. At present, users may install signal handlers
+  only for certain asynchronous signals, such as @code{sighup}, @code{sigint},
+  @code{sigquit}, @code{sigterm}.
 
 @item @code{handler} is a function, @code{:default} or @code{:ignore}.
 
@@ -2043,21 +2048,21 @@ the SBCL process.
 
 @example
 (sb-sys:enable-interrupt
-  :sighup (lambda (signal siginfo-sap context-sap)
-            (declare (ignore signal siginfo-sap context-sap))
-            (setq *sighup-received* t)))
+  sb-posix:sighup (lambda (signal siginfo-sap context-sap)
+                    (declare (ignore signal siginfo-sap context-sap))
+                    (setq *sighup-received* t)))
 @end example
 
 @item To reset the handler of @code{sighup}:
 
 @example
-(sb-sys:enable-interrupt :sighup :default)
+(sb-sys:enable-interrupt sb-posix:sighup :default)
 @end example
 
 @item To ignore @code{sigint}:
 
 @example
-(sb-sys:enable-interrupt :sigint :ignore)
+(sb-sys:enable-interrupt sb-posix:sigint :ignore)
 @end example
 @end itemize
 @end itemize
@@ -2067,18 +2072,25 @@ the SBCL process.
 handlers are allowed to do, which is not a whole lot in practice.
 A simple and safe way is to set a flag, as in the above example,
 and check periodically in some application loop.
+
+@emph{Warning}: Signal handler functions to be used in ``production''
+should never perform any non-local transfer of control (e.g.,
+@code{throw} or @code{invoke-restart}, but should only ever return
+normally or terminate the process.
+
 @end quotation
 @end deffn
 @node default signal handlers
 @subsubsection Default Signal Handlers
 
+(These details are subject to change.)
 SBCL establishes the following signal handlers:
 
 @itemize
 @item @code{SIGINT}: @code{signal}s an @code{sb-sys:interactive-interrupt} (in
-  @code{sb-thread::foreground-thread} with @ref{threading}). If that condition
-  is not handled, it enters the @ref{debugger} respecting
-  @code{*debugger-hook*}.
+  @code{sb-thread::foreground-thread} with @ref{threading}). Ordinarily
+  this will invoke a @ref{debugger}, respecting
+  @code{*invoke-debugger-hook*} and @code{*debugger-hook*}.
 
 @item @code{SIGPIPE}: Ignored.
 
@@ -2104,12 +2116,17 @@ SBCL establishes the following signal handlers:
 
 @item @code{SIGSEGV}, @code{SIGILL}, @code{SIGEMT}, @code{SIGBUS},
   @code{SIGTRAP}, @code{SIGSYS}: Some of these synchronous interrupts
-  are used by the runtime. Else, they may be subject to
+  are used by the runtime. When one is not, it may be subject to
   @code{--lose-on-corruption} (see @ref{runtime options}). If neither, then
   they signal a @code{simple-error}.
 
-It is still safe to use @code{sb-sys:enable-interrupt}, as that only
-affects the signals that are handled in Lisp.
+@c FIXME: I (RMK) don't know what this is trying to communicate,
+@c   It is still safe to use @code{sb-sys:enable-interrupt}, as that only
+@c   affects the signals that are handled in Lisp.
+@c For most of the signals mentioned above, messing with the default
+@c handlers will screw up something or other or leave SBCL prone to
+@c immediate termination. Doesn't seem too safe to me.
+
 @end itemize
 
 @anchor{Condition sb-sys interactive-interrupt}

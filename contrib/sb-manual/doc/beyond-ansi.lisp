@@ -817,12 +817,13 @@
   (@default-signal-handlers section))
 
 (defsection @default-signal-handlers (:title "Default Signal Handlers")
-  "SBCL establishes the following signal handlers:
+  "(These details are subject to change.)
+  SBCL establishes the following signal handlers:
 
   - `\\\\SIGINT`: SIGNALs an SB-SYS:INTERACTIVE-INTERRUPT (in
-    SB-THREAD::FOREGROUND-THREAD with @THREADING). If that condition
-    is not handled, it enters the @DEBUGGER respecting
-    *DEBUGGER-HOOK*.
+    SB-THREAD::FOREGROUND-THREAD with @THREADING). Ordinarily,
+    this will invoke a @DEBUGGER, respecting
+    *INVOKE-DEBUGGER-HOOK* and *DEBUGGER-HOOK*.
 
   - `\\\\SIGPIPE`: Ignored.
 
@@ -848,12 +849,13 @@
 
   - `\\\\SIGSEGV`, `\\\\SIGILL`, `\\\\SIGEMT`, `\\\\SIGBUS`,
     `\\\\SIGTRAP`, `\\\\SIGSYS`: Some of these synchronous interrupts
-    are used by the runtime. Else, they may be subject to
+    are used by the runtime. When one is not, it may be subject to
     `--lose-on-corruption` (see @RUNTIME-OPTIONS). If neither, then
-    they signal a SIMPLE-ERROR.
+    they signal a SIMPLE-ERROR."
+  ;; FIXME: I don't know what this is trying to say. (see the texinfo)
+  ;;    It is still safe to use SB-SYS:ENABLE-INTERRUPT, as that only
+  ;;    affects the signals that are handled not handled within the runtime.
 
-      It is still safe to use SB-SYS:ENABLE-INTERRUPT, as that only
-      affects the signals that are handled in Lisp."
   (sb-sys:interactive-interrupt condition))
 
 (defsection @unicode-support (:title "Unicode Support"

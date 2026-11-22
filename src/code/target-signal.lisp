@@ -66,10 +66,14 @@
 
 (defun enable-interrupt (signum handler)
   "Set the Unix signal HANDLER for SIGNUM. This applies to all threads in
-  the SBCL process.
+  the SBCL process. (This interface is experimental, and subject to
+  change or removal.)
 
   - SIGNUM is a signal number. Use the constants SB-POSIX:SIGINT,
-    SB-POSIX:SIGHUP and others.
+    SB-POSIX:SIGHUP and others. At present, users may install signal
+    handlers for certain asynchronous signals, such as @code{sighup},
+    @code{sigint}, @code{sigquit}, @code{sigterm}.
+
 
   - HANDLER is a function, :DEFAULT or :IGNORE.
 
@@ -78,22 +82,27 @@
           `sigaction(2)`).
 
                 (sb-sys:enable-interrupt
-                  :sighup (lambda (signal siginfo-sap context-sap)
-                            (declare (ignore signal siginfo-sap context-sap))
-                            (setq *sighup-received* t)))
+                  sb-posix:sighup (lambda (signal siginfo-sap context-sap)
+                                    (declare (ignore signal siginfo-sap context-sap))
+                                    (setq *sighup-received* t)))
 
         - To reset the handler of `SIGHUP`:
 
-                (sb-sys:enable-interrupt :sighup :default)
+                (sb-sys:enable-interrupt sb-posix:sighup :default)
 
         - To ignore `SIGINT`:
 
-                (sb-sys:enable-interrupt :sigint :ignore)
+                (sb-sys:enable-interrupt sb-posix:sigint :ignore)
 
   > _Warning_: See `signal-safety(7)` for restrictions on what signal
   > handlers are allowed to do, which is not a whole lot in practice.
   > A simple and safe way is to set a flag, as in the above example,
-  > and check periodically in some application loop."
+  > and check periodically in some application loop.
+
+  > Signal handler functions to be used in ``production''
+  > should never perform any non-local transfer of control (e.g.,
+  > THROW or INVOKE-RESTART, but should only ever return
+  > normally or terminate the process."
   (declare (type (or function (member :default :ignore)) handler))
   (%install-handler signum handler)
   ;; This used to return the previously installed handler, if any.
