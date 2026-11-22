@@ -1418,3 +1418,16 @@
            (local-inline-locall-caller #'body p)))
     ((t) nil)
     ((nil) nil)))
+
+(with-test (:name :substitute-single-use-lvar-cast-exit)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (flet ((f (b)
+               (block nil
+                 (tagbody
+                    (return (funcall (opaque-identity (lambda () (go l)))))
+                  l
+                    (return (the integer b))))))
+        (- (f (* (the integer a) 3)))))
+   ((1) -3)))

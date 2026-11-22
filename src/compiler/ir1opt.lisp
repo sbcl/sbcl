@@ -2793,14 +2793,15 @@ not inlined.")
                         (principal-lvar-end lvar)
                       (declare (ignore pdest))
                       (lvar-single-value-p pprev)))
-                   ;; CASTs can disappear, don't substitute if
+                   ;; CASTs and EXITs can disappear, don't substitute if
                    ;; DEST-LVAR has other uses
                    (block nil
-                     (map-lvar-dest-casts
-                      (lambda (cast)
-                        (when (and (node-lvar cast)
-                                   (consp (lvar-uses (node-lvar cast))))
-                          (return)))
+                     (map-lvar-dest-casts-or-exits
+                      (lambda (node)
+                        (let ((lvar (node-lvar node)))
+                          (when (and lvar
+                                     (consp (lvar-uses lvar)))
+                            (return))))
                       lvar)
                      t)))
              (mv-combination

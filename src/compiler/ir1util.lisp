@@ -300,14 +300,16 @@
                   use)))))
     (recurse lvar)))
 
-(defun map-lvar-dest-casts (fun lvar)
+(defun map-lvar-dest-casts-or-exits (fun lvar)
   (declare (dynamic-extent fun))
   (labels ((pld (lvar)
              (and lvar
                   (let ((dest (lvar-dest lvar)))
-                    (when (cast-p dest)
-                      (funcall fun dest)
-                      (pld (cast-lvar dest)))))))
+                    (cond ((cast-p dest)
+                           (funcall fun dest)
+                           (pld (cast-lvar dest)))
+                          ((exit-p dest)
+                           (funcall fun dest)))))))
     (pld lvar)))
 
 (defun let-lvar-dest (lvar &key single-use (closure t))
