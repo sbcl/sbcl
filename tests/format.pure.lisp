@@ -176,3 +176,14 @@
     (let ((s " how are you?
 "))
       (assert (or (string= (car c) s) (string= (cadr c) s))))))
+
+(with-test (:name :^)
+  (flet ((test (expected fc &rest args)
+           (assert (equal (apply #'format nil (opaque-identity fc) args)
+                          expected))
+           (assert (equal (apply #'format nil
+                                 (funcall (checked-compile `(lambda () (formatter ,fc))))
+                                 args)
+                          expected))))
+    (test "(2)" "~:@{~0:^~A~}~A" '(1) '(2))
+    (test "1 (2)" "~:@{~A~0:^,~} ~A" '(1) '(2))))

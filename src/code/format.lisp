@@ -207,7 +207,7 @@
 ;;; that will invoke PPRINT-POP in the right lexical environemnt.
 (defvar *logical-block-popper* nil)
 (declaim (type (or null function) *logical-block-popper*)
-         (always-bound *logical-block-popper*))
+         (always-bound *up-up-and-out-allowed* *logical-block-popper*))
 
 ;;; Used by the expander stuff. This is bindable so that ~<...~:>
 ;;; can change it.
@@ -223,6 +223,7 @@
 ;;; again with it bound to T. If this is T, we don't try to do anything
 ;;; fancy with args.
 (defvar *orig-args-available* nil)
+(declaim (always-bound *expander-next-arg-macro* *orig-args-available*))
 
 ;;; Used by the expander stuff. List of (symbol . offset) for simple args.
 (defvar *simple-args*)

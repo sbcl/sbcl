@@ -1055,8 +1055,9 @@
                 (t (if colonp
                        (null *outside-args*)
                        (null args)))))
-    (throw (if colonp 'up-up-and-out 'up-and-out)
-           args)))
+    (if colonp
+        (throw 'up-up-and-out *outside-args*)
+        (throw 'up-and-out args))))
 
 ;;;; format interpreters for iteration
 
