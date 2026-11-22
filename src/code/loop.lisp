@@ -961,7 +961,13 @@ code to be loaded.
             ;; longer be empty and the compiler won't produce
             ;; warnings.
             type)
+           #+sb-xc-host
            ((sb-xc:typep init type)
+            type)
+           #-sb-xc-host
+           ((let ((ctype (specifier-type type)))
+              (and (not (contains-unknown-type-p ctype))
+                   (%%typep init ctype)))
             type)
            ((sb-xc:typep init '(simple-array * (*)))
             ;; The cross-compiler must not inquire of the host
