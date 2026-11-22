@@ -659,9 +659,9 @@
           (when (and
                  (not (member (sb-name (sc-sb (tn-sc x)))
                               #+(or x86 x86-64)
-                              '(sb-vm::stack)
+                              '(sb-vm::stack constant)
                               #-(or x86 x86-64)
-                              '(sb-vm::control-stack sb-vm::non-descriptor-stack)))
+                              '(sb-vm::control-stack sb-vm::non-descriptor-stack constant)))
                  (constant-p y))
             (let ((move (branch-destination branch-if)))
               (when (and move
