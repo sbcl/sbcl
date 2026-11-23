@@ -161,36 +161,38 @@
           (simple-reader-error stream "improper list for #S: ~S." body))
         (let ((constructor-args
                (loop for tail on (rest body) by #'cddr
-                     with slot-name = (and (consp tail) (car tail))
-                     do (progn
-                          (when (null (cdr tail))
-                            (simple-reader-error
-                             stream
-                             "the arglist for the ~S constructor in #S ~
-                              has an odd length: ~S."
-                             (car body) (rest body)))
-                          (when (or (atom (cdr tail))
-                                    (and (atom (cddr tail))
-                                         (not (null (cddr tail)))))
-                            (simple-reader-error
-                             stream
-                             "the arglist for the ~S constructor in #S ~
-                              is improper: ~S."
-                             (car body) (rest body)))
-                          (when (not (typep (car tail) 'string-designator))
-                            (simple-reader-error
-                             stream
-                             "a slot name in #S is not a string ~
-                              designator: ~S."
-                             slot-name))
-                          (when (not (keywordp slot-name))
-                            (warn 'structure-initarg-not-keyword
-                                  :format-control
-                                  "in #S ~S, the use of non-keywords ~
-                                   as slot specifiers is deprecated: ~S."
-                                  :format-arguments
-                                  (list (car body) slot-name))))
-                     collect (intern (string (car tail)) *keyword-package*)
+                     for slot-name = (car tail)
+                     do
+                     (when (null (cdr tail))
+                       (simple-reader-error
+                        stream
+                        "the arglist for the ~S constructor in #S ~
+                         has an odd length: ~S."
+                        (car body) (rest body)))
+                     (when (or (atom (cdr tail))
+                               (and (atom (cddr tail))
+                                    (not (null (cddr tail)))))
+                       (simple-reader-error
+                        stream
+                        "the arglist for the ~S constructor in #S ~
+                         is improper: ~S."
+                        (car body) (rest body)))
+                     collect (cond ((keywordp slot-name)
+                                    slot-name)
+                                   ((not (typep slot-name 'string-designator))
+                                    (simple-reader-error
+                                     stream
+                                     "a slot name in #S is not a string ~
+                                      designator: ~S."
+                                     slot-name))
+                                   (t
+                                    (warn 'structure-initarg-not-keyword
+                                          :format-control
+                                          "in #S ~S, the use of non-keywords ~
+                                           as slot specifiers is deprecated: ~S."
+                                          :format-arguments
+                                          (list (car body) slot-name))
+                                    (intern (string slot-name) *keyword-package*)))
                      collect (cadr tail))))
           (handler-bind ((type-error
                           (lambda (c)
