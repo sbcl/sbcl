@@ -51,7 +51,7 @@
 ;;;; compiler.
 
 (defun not (object)
-  "Return T if X is NIL, otherwise return NIL."
+  "Return T if OBJECT is NIL, otherwise return NIL."
   (not object))
 
 ;;; All the primitive type predicate wrappers share a parallel form.
@@ -305,8 +305,7 @@
                   (declare (ignore end-y))
                   (loop for x-i fixnum from start-x below end-x
                         for y-i fixnum from start-y
-                        always (or (= (sbit x x-i)
-                                      (sbit y y-i))))))))))
+                        always (= (sbit x x-i) (sbit y y-i)))))))))
 
 (defun equal (x y)
   "Return T if X and Y are EQL or if they are structured components whose
