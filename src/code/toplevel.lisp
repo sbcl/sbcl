@@ -53,7 +53,7 @@ function of zero arguments.
 
 - If a function, it is called by the default toplevel to obtain a
   pathname designator for the default userinit file or NIL. If the
-  function returns NIL, no sysinit file is used unless one has been
+  function returns NIL, no userinit file is used unless one has been
   specified on the command line.")
 
 
