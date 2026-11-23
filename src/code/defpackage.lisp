@@ -346,7 +346,8 @@ SB-MANUAL:@PACKAGE-LOCAL-NICKNAMES."
     (loop
       with x = (car list)
       for y in (rest list)
-      for z = (remove-duplicates (intersection (cdr x)(cdr y) :test #'string=))
+      for z = (remove-duplicates (intersection (cdr x) (cdr y) :test #'string=)
+                                 :test #'string=)
       when z do (%program-error "Parameters ~S and ~S must be disjoint ~
                                  but have common elements ~%   ~S"
                                 (car x) (car y) z))))
