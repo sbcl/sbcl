@@ -558,7 +558,7 @@ error otherwise.")
           (dolist (p old-implements)
             (remove-implementation-package package p)))
         (keep-them ()
-          :report "Keep exporting them."))))
+          :report "Keep being an implementation package for them."))))
   (update-package package nicknames source-location
                   shadows shadowing-imports
                   use imports interns exports
