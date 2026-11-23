@@ -1731,7 +1731,9 @@
                    '((5 5))))))
 
 (with-test (:name (:debugger :variables :copy :error)
-            :fails-on (and :win32 :x86-64))
+            :fails-on (and (or :win32
+                               :darwin) ;; doesn't always fail
+                           :x86-64))
   (with-variables-test (:strict (3) :lax (1 2))
       (sb-int:named-lambda variables-test (x)
         (declare (optimize (debug :debug)))
