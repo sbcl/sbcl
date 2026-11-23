@@ -756,7 +756,7 @@
         (describe-function-source it stream)))
     ;; It seems entirely bogus to claim that, for example (SETF CAR)
     ;; has a setf expander when what we mean is that CAR has.
-    (when (and (consp name) (eq 'setf (car name)) (not (cddr name)))
+    (when (typep name '(cons (eql setf) (cons symbol null)))
       (let* ((name2 (second name))
              (expander (info :setf :expander name2)))
         (cond ((typep expander '(cons symbol))
