@@ -162,7 +162,7 @@
   ;; we'll conservatively say that no two blobs of code are equivalent
   ;; if there is no signature function.
   #+x86-64
-  (with-pinned-objects (obj1 obj2)
+  (with-pinned-objects (code1 code2)
     (and (= (code-header-words code1) (code-header-words code2))
          (= (code-n-entries code1) (code-n-entries code2))
          (= (%code-code-size code1) (%code-code-size code2))
