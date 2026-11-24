@@ -247,7 +247,7 @@
       (inst add s-i s-i 16)
 
       WORD
-      (inst cmp s-i 7)
+      (inst cmp s-i 8)
       (inst b :lt BYTE)
       (inst sub s-i s-i 8)
       (inst ldr g (@ source s-i))
