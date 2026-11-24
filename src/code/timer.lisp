@@ -121,7 +121,7 @@
   (zerop (length (%pqueue-contents priority-queue))))
 
 (defun priority-queue-remove (priority-queue item &key (test #'eq))
-  "Remove and return ITEM from PRIORITY-QUEUE."
+  "Remove ITEM from PRIORITY-QUEUE and return its index."
   (symbol-macrolet ((contents (%pqueue-contents priority-queue))
                     (keyfun (%pqueue-keyfun priority-queue)))
     (let ((i (position item contents :test test)))
