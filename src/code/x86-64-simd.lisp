@@ -2271,6 +2271,7 @@
       (inst jmp DONE)
 
       FOUND
+      (inst vzeroupper)
       (inst bsf :dword left left)
       (inst shl left 2)
       (inst add 32-bit-array left)
