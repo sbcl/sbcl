@@ -442,7 +442,7 @@
 (defun make-sc+offset (sc-number offset)
   ;; Both any-reg and descriptor-reg are tagged and are accessed in
   ;; the same way, combine them to reduce debug info size.
-  (when (eq sc-number sb-vm:any-reg-sc-number)
+  (when (eql sc-number sb-vm:any-reg-sc-number)
     (setf sc-number sb-vm:descriptor-reg-sc-number))
   (dpb (ash sc-number (- (byte-size (car +sc+offset-scn-bytes+))))
        (cadr +sc+offset-scn-bytes+)
