@@ -15,8 +15,20 @@ set -e
 
 this="$0"
 
+# On Windows, the runtime is sbcl.exe; on Unix, it's sbcl.  A tree
+# reused for different cross-build targets may carry both; prefer
+# the newer one.
+find_sbcl_runtime(){
+    SBCL_RUNTIME="$1"/src/runtime/sbcl
+    if [ -f "$SBCL_RUNTIME".exe ] && \
+       { [ ! -f "$SBCL_RUNTIME" ] || [ "$SBCL_RUNTIME".exe -nt "$SBCL_RUNTIME" ]; }; then
+        SBCL_RUNTIME="$SBCL_RUNTIME".exe
+    fi
+}
+
 build_directory_p(){
-    [ -x "$1"/src/runtime/sbcl -a -f "$1"/output/sbcl.core ];
+    find_sbcl_runtime "$1"
+    [ -x "$SBCL_RUNTIME" -a -f "$1"/output/sbcl.core ];
 }
 
 # OSX 10.8 readlink doesn't have -f
@@ -76,9 +88,9 @@ fi
 if build_directory_p "$BASE"; then
     export SBCL_HOME
     if [ "$CORE_DEFINED" = "no" ]; then
-	SBCL_HOME="$BASE"/obj/sbcl-home exec "$BASE"/src/runtime/sbcl --core "$CORE" "$@"
+	SBCL_HOME="$BASE"/obj/sbcl-home exec $SBCL_RUNNER "$SBCL_RUNTIME" --core "$CORE" "$@"
     else
-	SBCL_HOME="$BASE"/obj/sbcl-home exec "$BASE"/src/runtime/sbcl "$@"
+	SBCL_HOME="$BASE"/obj/sbcl-home exec $SBCL_RUNNER "$SBCL_RUNTIME" "$@"
     fi
 else
     echo "No built SBCL here ($BASE): run 'sh make.sh' first!"
