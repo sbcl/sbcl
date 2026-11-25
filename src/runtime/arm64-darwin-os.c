@@ -80,9 +80,16 @@ os_flush_icache(os_vm_address_t address, os_vm_size_t length)
     __clear_cache(address, end_address);
 }
 
+extern void arm64_memory_fault_trap(void);
+extern void handle_memory_fault_emulation_trap(os_context_t *context);
+
 void
 sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
     int esr;
+    if ((void*)OS_CONTEXT_PC(context) == (void*)arm64_memory_fault_trap) {
+        handle_memory_fault_emulation_trap(context);
+        return;
+    }
     if (siginfo->si_code == ILL_ILLTRP &&
         ((esr = context->uc_mcontext->__es.__esr)>>26 & 0x3f) == 0x2C) {
         int code = 0;

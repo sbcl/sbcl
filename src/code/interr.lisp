@@ -753,11 +753,22 @@
                  *error-output*)
      (error 'binding-stack-exhausted))))
 
-(defun alien-stack-exhausted-error ()
+;;; ABANDONED-FOREIGN-FRAMES is supplied by the runtime when the native
+;;; stack overflowed in foreign code: the foreign frames were discarded
+;;; (and will never be resumed) to make room, and the guard page is still
+;;; protected.  Otherwise the overflow was in Lisp and the guard page has
+;;; been lowered to give the handler headroom.
+(defun alien-stack-exhausted-error (&optional abandoned-foreign-frames)
   (let ((sb-debug:*stack-top-hint* nil))
     (infinite-error-protect
-     (write-line "Alien stack guard page temporarily disabled: proceed with caution"
-                 *error-output*)
+     (let ((stream *error-output*))
+       (cond (abandoned-foreign-frames
+              (write-string "Native stack exhausted in foreign code; abandoned " stream)
+              (write abandoned-foreign-frames :stream stream :base 10 :radix nil)
+              (write-line " foreign frames: proceed with caution" stream))
+             (t
+              (write-line "Alien stack guard page temporarily disabled: proceed with caution"
+                          stream))))
      (error 'alien-stack-exhausted))))
 
 ;;; KLUDGE: we keep a single HEAP-EXHAUSTED-ERROR object around, so

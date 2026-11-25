@@ -153,7 +153,7 @@
       (assert ok))))
 
 (with-test (:name (:exhaust :alien-stack)
-                  :skipped-on (not :c-stack-is-control-stack))
+                  :skipped-on (not (or :c-stack-is-control-stack (and :arm64 :darwin))))
   (let ((ok nil))
     (labels ((exhaust-alien-stack (i)
                (with-alien ((integer-array (array int 500)))
