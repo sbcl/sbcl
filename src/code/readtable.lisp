@@ -92,7 +92,7 @@ types for the Common Lisp expression reader."
                :initial-element +char-attr-constituent+)
    :type attribute-table
    :read-only t)
-  ;; The BASE-CHAR-MACRO-TABLE is a vector of BASE-CHAR-CODE-LIMIT
+  ;; The BASE-CHAR-MACRO-ARRAY is a vector of BASE-CHAR-CODE-LIMIT
   ;; functions. One of these functions called with appropriate
   ;; arguments whenever any non-WHITESPACE character is encountered
   ;; inside READ-PRESERVING-WHITESPACE. These functions are used to
@@ -159,7 +159,7 @@ types for the Common Lisp expression reader."
 ;;; (And by the way, the glossary is the easiest way to discover Figure 2-8)
 ;;;
 ;;; So which are the constituents that are invalid and _not_ shadowed by having syntactic
-;;; type of "whitespace"? Just char-codes 7 and 127 for #\Backspace and #\Rubout.
+;;; type of "whitespace"? Just char-codes 8 and 127 for #\Backspace and #\Rubout.
 ;;; And the bug: we consider multi-escape and single-escape equivalent because either one
 ;;; will allow invalid constituent characters into a token; only single-escape should.
 
