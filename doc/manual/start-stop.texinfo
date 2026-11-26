@@ -539,7 +539,7 @@ function of zero arguments.
 
 @item If a function, it is called by the default toplevel to obtain a
   pathname designator for the default userinit file or @code{nil}. If the
-  function returns @code{nil}, no sysinit file is used unless one has been
+  function returns @code{nil}, no userinit file is used unless one has been
   specified on the command line.
 @end itemize
 @end deffn

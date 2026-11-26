@@ -66,13 +66,15 @@
 
 (defun enable-interrupt (signum handler)
   "Set the Unix signal HANDLER for SIGNUM. This applies to all threads in
-  the SBCL process. (This interface is experimental, and subject to
-  change or removal.)
+  the SBCL process.
+
+  > __Warning__: This interface is experimental and subject to change
+  > or removal.
 
   - SIGNUM is a signal number. Use the constants SB-POSIX:SIGINT,
     SB-POSIX:SIGHUP and others. At present, users may install signal
-    handlers for certain asynchronous signals, such as @code{sighup},
-    @code{sigint}, @code{sigquit}, @code{sigterm}.
+    handlers for certain asynchronous signals, such as `\\\\SIGHUP`,
+    `\\\\SIGINT`, `\\\\SIGQUIT`, `\\\\SIGTERM`.
 
 
   - HANDLER is a function, :DEFAULT or :IGNORE.
@@ -99,10 +101,10 @@
   > A simple and safe way is to set a flag, as in the above example,
   > and check periodically in some application loop.
 
-  > Signal handler functions to be used in ``production''
-  > should never perform any non-local transfer of control (e.g.,
-  > THROW or INVOKE-RESTART, but should only ever return
-  > normally or terminate the process."
+  > Signal handler functions to be used in \"production\" should never
+  > perform any non-local transfer of control (e.g. THROW or
+  > INVOKE-RESTART) but should only ever return normally or terminate
+  > the process."
   (declare (type (or function (member :default :ignore)) handler))
   (%install-handler signum handler)
   ;; This used to return the previously installed handler, if any.

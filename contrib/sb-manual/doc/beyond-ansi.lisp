@@ -817,13 +817,14 @@
   (@default-signal-handlers section))
 
 (defsection @default-signal-handlers (:title "Default Signal Handlers")
-  "(These details are subject to change.)
-  SBCL establishes the following signal handlers:
+  "SBCL establishes the following signal handlers.
+
+  > __Warning__: These details are subject to change.
 
   - `\\\\SIGINT`: SIGNALs an SB-SYS:INTERACTIVE-INTERRUPT (in
-    SB-THREAD::FOREGROUND-THREAD with @THREADING). Ordinarily,
-    this will invoke a @DEBUGGER, respecting
-    *INVOKE-DEBUGGER-HOOK* and *DEBUGGER-HOOK*.
+    SB-THREAD::FOREGROUND-THREAD with @THREADING). Ordinarily, this
+    will invoke the @DEBUGGER, respecting
+    SB-EXT:*INVOKE-DEBUGGER-HOOK* and *DEBUGGER-HOOK*.
 
   - `\\\\SIGPIPE`: Ignored.
 
@@ -852,10 +853,15 @@
     are used by the runtime. When one is not, it may be subject to
     `--lose-on-corruption` (see @RUNTIME-OPTIONS). If neither, then
     they signal a SIMPLE-ERROR."
-  ;; FIXME: I don't know what this is trying to say. (see the texinfo)
+  ;; FIXME: I don't know what this is trying to say:
+  ;;
   ;;    It is still safe to use SB-SYS:ENABLE-INTERRUPT, as that only
-  ;;    affects the signals that are handled not handled within the runtime.
-
+  ;;    affects the signals that are handled not handled within the
+  ;;    runtime.
+  ;;
+  ;; For most of the signals mentioned above, messing with the default
+  ;; handlers will screw up something or other or leave SBCL prone to
+  ;; immediate termination. Doesn't seem too safe to me. -- RMK
   (sb-sys:interactive-interrupt condition))
 
 (defsection @unicode-support (:title "Unicode Support"
