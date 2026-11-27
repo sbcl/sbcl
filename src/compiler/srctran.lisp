@@ -9388,7 +9388,7 @@
                       ((consp element-type)
                        (specifier-type (consify element-type)))
                       (t
-                       (error "can't understand type ~S~%" element-type))))))
+                       (error "can't understand type ~S" element-type))))))
       (labels ((recurse (type)
                   (cond ((array-type-p type)
                          (get-element-type type))

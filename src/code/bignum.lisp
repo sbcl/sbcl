@@ -145,7 +145,7 @@
     bignum))
 
 (defun index-out-of-bounds (bignum i)
-  (error "out-of-bounds bignum set @ ~x[~d], len=~d~%"
+  (error "out-of-bounds bignum set @ ~x[~d], len=~d"
          (sb-kernel:get-lisp-obj-address bignum) i (%bignum-length bignum)))
 
 (declaim (inline %bignum-set))

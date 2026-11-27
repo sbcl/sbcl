@@ -581,7 +581,7 @@ of :INHERITED :EXTERNAL :INTERNAL."
                               (stored (aref psp-vector index)))
                      (setq max (max stored max))
                      (unless (= stored actual-psp)
-                       (error "Messup @ ~A: ~D ~D~%" symbol actual-psp stored)))))))
+                       (error "Messup @ ~A: ~D ~D" symbol actual-psp stored)))))))
       (let ((old (symtbl-cells table)))
         (dovector (sym old)
           (when (pkg-symbol-valid-p sym)

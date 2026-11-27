@@ -1246,7 +1246,7 @@ We could try a few things to mitigate this:
                             (and (eq (car obj) 0) (eq (cdr obj) 0)))
                         (/= type #b101))))
            (unless ok
-             (error "Object @ ~x (gen~D) is on page-type ~b~%"
+             (error "Object @ ~x (gen~D) is on page-type ~b"
                     obj-addr (generation-of obj) type)))
          ;; This is not the most efficient way to update the bit arrays,
          ;; but the simplest and clearest for sure. (The loop could avoided

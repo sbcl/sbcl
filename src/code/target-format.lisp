@@ -42,7 +42,7 @@
         (print-symbol-with-prefix stream fun)
         (write-char #\/ stream)))))
 
-(defun dummy (&rest args) (error "Should not be called: ~S~%" args))
+(defun dummy (&rest args) (error "Should not be called: ~S" args))
 
 (defun make-fmt-control (string symbols)
   (let ((f (%make-fmt-control string symbols nil)))

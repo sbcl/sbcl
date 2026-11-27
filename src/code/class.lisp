@@ -501,7 +501,7 @@ between the ~A definition and the ~A definition"
           (unless (eql depth -1)
             (let ((old-layout (svref inherits depth)))
               (unless (or (eql old-layout 0) (eq old-layout layout))
-                (error "layout depth conflict: ~S~%" layouts)))
+                (error "layout depth conflict: ~S" layouts)))
             (setf (svref inherits depth) layout))))
       (do ((i 0 (1+ i))
            (j 0))

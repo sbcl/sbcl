@@ -1064,11 +1064,11 @@
                        ;; FIXME: FORMAT T for stale
                        ;; diagnostic output (several of
                        ;; them around here), ick
-                       (error "** tail-call old-fp not S0~%")
+                       (error "** tail-call old-fp not S0")
                        (move old-fp-tmp old-fp)
                        (storew old-fp-tmp rbp-tn (frame-word-offset ocfp-save-offset))))
                     ((any-reg descriptor-reg)
-                     (error "** tail-call old-fp in reg not S0~%")
+                     (error "** tail-call old-fp in reg not S0")
                      (storew old-fp rbp-tn (frame-word-offset ocfp-save-offset))))
 
                   ;; For tail call, we have to push the

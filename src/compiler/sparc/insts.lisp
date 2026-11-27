@@ -269,12 +269,12 @@ Otherwise, use the Sparc register names")
 (defun integer-condition (condition-reg)
   (declare (type (member :icc :xcc) condition-reg))
   (or (position condition-reg integer-condition-registers)
-      (error "Unknown integer condition register:  ~S~%"
+      (error "Unknown integer condition register:  ~S"
              condition-reg)))
 
 (defun branch-prediction (pred)
   (or (position pred branch-predictions)
-      (error "Unknown branch prediction:  ~S~%Must be one of: ~S~%"
+      (error "Unknown branch prediction:  ~S~%Must be one of: ~S"
              pred branch-predictions)))
 
 (defconstant-eqx branch-pred-printer
@@ -329,7 +329,7 @@ Otherwise, use the Sparc register names")
 
 (defun fp-condition (condition-reg)
   (or (position condition-reg fp-condition-registers)
-      (error "Unknown integer condition register:  ~S~%"
+      (error "Unknown integer condition register:  ~S"
              condition-reg)))
 
 (defconstant-eqx fp-branch-pred-printer
@@ -505,12 +505,12 @@ Otherwise, use the Sparc register names")
   (let ((posn (position condition-reg cond-move-condition-registers)))
     (if posn
         (truncate posn 4)
-        (error "Unknown conditional move condition register:  ~S~%"
+        (error "Unknown conditional move condition register:  ~S"
                condition-reg))))
 
 (defun cond-move-condition (condition-reg)
   (or (position condition-reg cond-move-condition-registers)
-      (error "Unknown conditional move condition register:  ~S~%"
+      (error "Unknown conditional move condition register:  ~S"
              condition-reg)))
 
 (defconstant-eqx cond-move-printer
@@ -576,7 +576,7 @@ Otherwise, use the Sparc register names")
 
 (defun register-condition (rcond)
   (or (position rcond cond-move-integer-conditions)
-      (error "Unknown register condition:  ~S~%" rcond)))
+      (error "Unknown register condition:  ~S" rcond)))
 
 (define-instruction-format
     (format-4-cond-move-integer 32 :default-printer cond-move-integer-printer)

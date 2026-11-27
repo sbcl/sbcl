@@ -61,7 +61,7 @@
           (emergency-fallback
            (apply emergency-fallback specialized-arg rest))
           (t
-           (error "No applicable method for ~S on ~S~%" gf-name
+           (error "No applicable method for ~S on ~S" gf-name
                   (type-of specialized-arg))))))
 
 (defun make-load-form (object &optional environment)
