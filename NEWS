@@ -5,6 +5,10 @@ changes relative to sbcl-2.6.10:
     --without-<feature> is not known. Use the unchecked --with%-<feature>
     and --without%-<feature> options if this is undesirable.
   * enhancement: compile-time type errors about FTYPEs are now more readable.
+  * enhancement: the debugger is better able to show frame-local variables, to
+    different degrees depending on the compiler DEBUG optimization policy.
+  * enhancement: support for reading the CPU's cycle counter is now
+    implemented for ARM64.
   * minor incompatible change: SB-EXT:READER-PACKAGE-DOES-NOT-EXIST has been
     removed.
   * minor incompatible change: SB-EXT:NAME-CONFLICT-FUNCTION has been
@@ -46,6 +50,13 @@ changes relative to sbcl-2.6.10:
     (reported by Jesse Bouwman)
   * bug fix: address a possible window for heap corruption between allocations
     of mutually-referential closures.  (reported by J. Gareth Williams)
+  * bug fix: a garbage collection crash due to an arena in use at the point of
+    thread exit.
+  * bug fix: a very hard-to-trigger heap corruption bug in initializing simple
+    vectors.
+  * bug fix: the system delegates handling of SIGILL or SIGTRAP triggered by
+    non-SBCL code to whatever native handler is available rather than its own.
+  * bug fix: SB-POSIX:STRTOD works on displaced BASE-STRINGs.
   * bug fixes: address a number of issues identified by ember arlynx from an
     LLM-assisted ACL2 consistency audit;
     ** potential miscompilation involving (VALUES-LIST (REST ...));
@@ -72,6 +83,8 @@ changes relative to sbcl-2.6.10:
   * optimization: (zerop (rem integer integer)) allocates fewer intermediate
     bignums.
   * optimization: equalp hashing of ratios doesn't cons.
+  * optimization: reading the cycle counter on x86-64 no longer uses CPUID as
+    well as RDTSC, making it significantly faster under hypervisors.
   * documentation
     ** all material from the "Advanced Compiler Use and Efficiency Hints"
        section of the CMUCL manual has been ported to SB-MANUAL:@EFFICIENCY.
