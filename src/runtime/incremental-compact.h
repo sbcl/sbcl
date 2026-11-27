@@ -30,7 +30,7 @@ static inline void log_slot(lispobj target, lispobj *where,
   if (p != -1 && target_pages[p])
     log_relevant_slot(where, source_object, source_type);
 }
-extern void commit_thread_local_remset();
+extern void commit_thread_local_remset(void);
 
 #endif
 #endif

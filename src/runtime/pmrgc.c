@@ -1689,7 +1689,7 @@ static uword_t fill_table(lispobj *start, lispobj *end, __attribute__((unused)) 
     return 0;
 }
 
-static void parallel_walk_worker() {
+static void parallel_walk_worker(void) {
     /* Copy the verifier state. */
     struct verify_state *original = parallel_walk_extra, copy = *original;
     uword_t index;

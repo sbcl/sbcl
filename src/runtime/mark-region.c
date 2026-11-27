@@ -565,7 +565,7 @@ static bool work_to_do(struct Qblock **where) {
 
 static _Atomic(uword_t) traced;          /* Number of objects traced. */
 static bool threads_did_any_work;
-static void trace_step() {
+static void trace_step(void) {
   uword_t local_traced = 0, start_time = get_time(), running_time = 0;
   bool did_anything = 0;
   uword_t backoff = 1;
@@ -840,7 +840,7 @@ static _Atomic(page_index_t) last_page_processed;
   while ((claim = atomic_fetch_add(&last_page_processed, PAGES_CLAIMED_PER_THREAD)) < page_table_pages && \
          (limit = claim + PAGES_CLAIMED_PER_THREAD, limit = (limit >= page_table_pages) ? page_table_pages - 1 : limit, 1))
 
-static void sweep_lines() {
+static void sweep_lines(void) {
   /* Free this gen, and work out how much space is used on each small
    * page. */
   os_vm_size_t total_decrement = 0;
@@ -1193,10 +1193,16 @@ static void CPU_SPLIT scavenge_root_gens_worker(void) {
   atomic_fetch_add(&dirty_root_objects, local_dirty_root_objects);
 }
 
+/* Indirect calls to a target_clones IFUNC go through an .iplt stub that lacks
+ * a KCFI type-hash preamble; dispatch through a plain thunk instead. */
+static void scavenge_root_gens_worker_thunk(void) {
+  scavenge_root_gens_worker();
+}
+
 static void __attribute__((noinline)) mr_scavenge_root_gens() {
   root_objects_checked = 0; dirty_root_objects = 0;
   last_page_processed = 0;
-  run_on_thread_pool(scavenge_root_gens_worker);
+  run_on_thread_pool(scavenge_root_gens_worker_thunk);
 }
 
 static void CPU_SPLIT raise_survivors(void) {

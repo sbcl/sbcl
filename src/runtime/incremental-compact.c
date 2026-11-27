@@ -120,7 +120,7 @@ static inline lispobj *slot_from_tagged(lispobj t) { return (lispobj*)(t &~ 7); 
  * do with grey objects. */
 static _Thread_local struct Qblock *output_block = NULL;
 
-void commit_thread_local_remset() {
+void commit_thread_local_remset(void) {
   if (output_block && output_block->count) {
     acquire_lock(&remset_lock);
     output_block->next = remset;
