@@ -67,6 +67,11 @@ changes relative to sbcl-2.6.10:
        (REVERSE (VALUES-LIST ...));
     ** latent miscompilation for codepaths accessing the data vector of simple
        multidimensional arrays.
+  * optimization: (< (abs x) (abs y)) doesn't cons bignums when negating (or
+    floats when the types are not known).
+  * optimization: (zerop (rem integer integer)) allocates fewer intermediate
+    bignums.
+  * optimization: equalp hashing of ratios doesn't cons.
   * documentation
     ** all material from the "Advanced Compiler Use and Efficiency Hints"
        section of the CMUCL manual has been ported to SB-MANUAL:@EFFICIENCY.
