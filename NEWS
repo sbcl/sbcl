@@ -1,5 +1,59 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.6.10:
+  * bug fix: failure to encode sufficiently large offsets on ARM64 leading to
+    fatal errors from miscompilation.  (lp#1980437, reported by Stephen
+    Westfold)
+  * bug fix: DIGIT-CHAR-P is consistent with ALPHANUMERICP.  (lp#1177986,
+    reported by Ken Harris)
+  * bug fix: heap corruption from miscompilation involving automatic
+    stack-allocation of closures.  (lp#2167248)
+  * bug fix: more complete reasoning about ARRAY types and subtype
+    relationships.  (lp#2172126)
+  * bug fix: internal compiler error while transforming AREF.  (lp#2172382,
+    reported by Andrew Kravchuk)
+  * bug fix: propagate type assertions to multiple uses through conditionals.
+    (lp#2172569, reported by Vasily Postnicov)
+  * bug fix: miscompilation of LOGCOUNT on AMD64 without the POPCOUNT
+    instruction.  (lp#2173766, reported by Chemal Pemial)
+  * bug fix: spurious warning from CHECK-TYPE under a NULL guard on values
+    whose type otherwise includes NULL.  (lp#2173875, reported by Vilem
+    Vychodil)
+  * bug fix: on Windows each thread leaked a handle, even after being joined.
+    (lp#2175070, reported by Jan Jouleodov)
+  * bug fix: several internal compiler errors found by random testing.
+    (lp#2172773, lp#2173748, lp#2173829, lp#2173993, lp#2174477,
+    lp#2174491, lp#2175803)
+  * bug fix: internal compiler error on type test of LOAD-TIME-VALUE.
+    (reported by Robert Smith)
+  * bug fix: macroexpansion failure on LOOP with type specifiers involving
+    unknown types.  (reported by Sahil Kang)
+  * bug fix: internal compiler error on type-asserted local tail calls.
+    (reported by Jesse Bouwman)
+  * bug fix: address a possible window for heap corruption between allocations
+    of mutually-referential closures.  (reported by J. Gareth Williams)
+  * bug fixes: address a number of issues identified by ember arlynx from an
+    LLM-assisted ACL2 consistency audit;
+    ** potential miscompilation involving (VALUES-LIST (REST ...));
+    ** potential miscompilation in creating certain SIMD-PACK objects;
+    ** potential miscompilation in bignum multiplication;
+    ** miscompilations in SIMD int-to-float operations;
+    ** erroneous compiler optimization of SET-EXCLUSIVE-OR when both arguments
+       are the same;
+    ** erroneous compiler optimizations for ASH with known-negative shifts;
+    ** unsound constraint propagation after a CHAR-CODE test;
+    ** unsound compiler optimization of CHAR-EQUAL given a constant titlecase
+       character;
+    ** for titlecase characters, define a more consistent CHAR-EQUAL, and less
+       unsound compiler optimizations;
+    ** wrong type derivation for (REDUCE 'LOGIOR ...);
+    ** miscompilation of sub-word array references on ARM64;
+    ** internal compiler error when optimizing GCD on no arguments;
+    ** missing runtime definition for a transformed function for
+       (REVERSE (VALUES-LIST ...));
+    ** latent miscompilation for codepaths accessing the data vector of simple
+       multidimensional arrays.
+  
 changes in sbcl-2.6.10 relative to sbcl-2.6.9:
   * minor incompatible change: testing for float equality using `=` is now a
     quiet operation, not signalling when given NaNs as input.
