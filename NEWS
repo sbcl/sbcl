@@ -1,6 +1,20 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.6.10:
+  * enhancement: make.sh fails early if <feature> in --with-<feature> and
+    --without-<feature> is not known. Use the unchecked --with%-<feature>
+    and --without%-<feature> options if this is undesirable.
+  * enhancement: compile-time type errors about FTYPEs are now more readable.
+  * minor incompatible change: SB-EXT:READER-PACKAGE-DOES-NOT-EXIST has been
+    removed.
+  * minor incompatible change: SB-EXT:NAME-CONFLICT-FUNCTION has been
+    unexported.
+  * minor incompatible change: SB-EXT:MAKE-WEAK-VECTOR and WEAK-VECTOR-P have
+    been unexported.
+  * minor incompatible change: SB-SYS:WITH-INTERRUPT-BINDINGS has been
+    unexported.
+  * minor incompatible change: Look for core and contribs in the current
+    directory last to reduce the chance of surprises.
   * bug fix: failure to encode sufficiently large offsets on ARM64 leading to
     fatal errors from miscompilation.  (lp#1980437, reported by Stephen
     Westfold)
@@ -53,6 +67,18 @@ changes relative to sbcl-2.6.10:
        (REVERSE (VALUES-LIST ...));
     ** latent miscompilation for codepaths accessing the data vector of simple
        multidimensional arrays.
+  * documentation
+    ** all material from the "Advanced Compiler Use and Efficiency Hints"
+       section of the CMUCL manual has been ported to SB-MANUAL:@EFFICIENCY.
+    ** new section: @SIGNAL-HANDLING
+    ** DOCUMENTATION supports SB-MANUAL sections (use e.g. (DOCUMENTATION
+       SB-MANUAL:@LDB T)).
+    ** DESCRIBE and some errors refer to SB-MANUAL sections (if loaded).
+    ** fleshed out sections @THREADING, @RESOLUTION-OF-NAME-CONFLICTS,
+       @RUNNING-EXTERNAL-PROGRAMS, @FOREIGN-FUNCTION-INTERFACE,
+       @FUNCTION-TRACING, @STATISTICAL-PROFILER, @EXTENSIBLE-SEQUENCES,
+       @DEPRECATION-CONDITIONS, @TIMEOUTS-AND-DEADLINES,
+       @SYSTEM-AREA-POINTERS.
   
 changes in sbcl-2.6.10 relative to sbcl-2.6.9:
   * minor incompatible change: testing for float equality using `=` is now a
