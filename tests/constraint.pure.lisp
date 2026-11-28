@@ -2724,4 +2724,14 @@
              0
              1)
          1))
-   (eql 1)))
+   (eql 1))
+  (assert-type
+   (lambda (x)
+     (declare (double-float x))
+     (min x -0d0))
+   (double-float * 0d0))
+  (assert-type
+   (lambda (x)
+     (declare (single-float x))
+     (min -0f0 x))
+   (or (member -0.0) (single-float * (0.0)))))

@@ -1022,11 +1022,14 @@
   (aver (eql (numeric-type-class y) 'float))
   (labels ((exclude (x)
              (cond ((not x) nil)
+                   ((sb-xc:= (type-bound-number x) 0)
+                    (if (or (not or-equal) (consp x))
+                        (list (float (if greater 0.0 -0.0)
+                                     (type-bound-number x)))
+                        (float (if greater -0.0 0.0) x)))
                    (or-equal x)
-                   (t
-                    (if (consp x)
-                        x
-                        (list x)))))
+                   ((consp x) x)
+                   (t (list x))))
            (bound (x)
              (if greater (numeric-type-low x) (numeric-type-high x)))
            (tighter-p (x ref)
